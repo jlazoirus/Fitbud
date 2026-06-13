@@ -6,6 +6,7 @@
 -- ============================================================
 
 -- Limpieza idempotente (puedes re-ejecutar este archivo sin error)
+drop table if exists weight_log cascade;
 drop table if exists day_log cascade;
 drop table if exists diet_dishes cascade;
 drop table if exists diet_days cascade;
@@ -69,6 +70,13 @@ create table day_log (
   updated_at  timestamptz not null default now()
 );
 
+-- ---------- REGISTRO DE PESO SEMANAL ----------
+create table weight_log (
+  week        int primary key,
+  kg          numeric not null,
+  updated_at  timestamptz not null default now()
+);
+
 create index on dish_ingredients (dish_id);
 create index on dish_ingredients (ingredient_id);
 create index on diet_dishes (diet_id);
@@ -108,6 +116,7 @@ alter table dish_ingredients enable row level security;
 alter table diets            enable row level security;
 alter table diet_dishes      enable row level security;
 alter table day_log          enable row level security;
+alter table weight_log       enable row level security;
 
 create policy "anon all ingredients"      on ingredients      for all using (true) with check (true);
 create policy "anon all dishes"           on dishes           for all using (true) with check (true);
@@ -115,3 +124,4 @@ create policy "anon all dish_ingredients" on dish_ingredients for all using (tru
 create policy "anon all diets"            on diets            for all using (true) with check (true);
 create policy "anon all diet_dishes"      on diet_dishes      for all using (true) with check (true);
 create policy "anon all day_log"          on day_log          for all using (true) with check (true);
+create policy "anon all weight_log"       on weight_log       for all using (true) with check (true);

@@ -51,6 +51,8 @@ git push origin main
 
 ## Contexto actual al escribir este backlog
 
+Lee el contexto del app en el archivo con el nombre CONTEXT.md que se encuentra en la carpeta del proyecto
+
 El commit actual leido para preparar esta lista fue:
 
 `11c32ac Migrar a Vercel: proxy serverless para mantener las keys solo en el servidor`

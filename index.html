@@ -448,7 +448,7 @@ function renderTabs(){
   const tabs=[["day","Hoy","🏠"],["week","Semana","📅"],["foods","Alimentos","🥗"],["weight","Peso","⚖️"],["settings","Ajustes","⚙️"]];
   $("#tabs").innerHTML=tabs.map(([v,l,i])=>`<button class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${i}</span>${l}</button>`).join("");
 }
-function setView(v){view=v;if(v==="day")current=clampDate(current);if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}render();window.scrollTo(0,0);if(v==="day")syncDay(current);}
+function setView(v){view=v;if(v==="day")current=clampDate(current);if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}render();window.scrollTo(0,0);if(v==="day")syncDay(current);if(v==="weight")syncWeights();}
 
 /* ---------- Fase 2 + 5: VISTA HOY ---------- */
 function renderDay(){
@@ -786,7 +786,7 @@ function renderWeight(){
     ${weightChart()}
     <table class="wt"><thead><tr><th>Sem</th><th>Rango esperado</th><th>Tu promedio</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
-function setWeight(n,v){if(v==="")delete S.weights[n];else S.weights[n]=+v;save();renderWeight();}
+function setWeight(n,v){if(v===""){delete S.weights[n];pushWeight(n,null);}else{S.weights[n]=+v;pushWeight(n,+v);}save();renderWeight();}
 function weightChart(){
   const pts=Object.keys(WEIGHT_RANGES).map(n=>({x:+n,y:S.weights[n]})).filter(p=>p.y!=null);
   if(pts.length<1)return `<div class="chart muted small center">Ingresa tu peso semanal para ver el gráfico de evolución.</div>`;
@@ -863,7 +863,7 @@ function saveSupabase(){
   if(!supa){toast("Faltan datos o la librería no cargó");renderSettings();return;}
   toast("Conectando…");
   dbLoad().then(()=>{renderSettings();toast(DB.error?"Error al conectar":"Conectado ✓");});
-  syncDay(current);
+  syncDay(current);syncWeights();
 }
 function clearSupabase(){delete S.settings.supaKey;delete S.settings.supaUrl;save();supa=null;DB.loaded=false;DB.error=null;supaInit();toast(supa?"Override borrado; usando config.js":"Desconectado");renderSettings();}
 function clearKey(){delete S.settings.apiKey;save();toast(CONFIG.anthropic.apiKey?"Override borrado; usando config.js":"API key borrada");renderSettings();}
@@ -935,6 +935,24 @@ async function pullDay(ds){
 function commitDay(ds){save();pushDay(ds);}
 // Trae el día desde la DB y re-renderiza si seguimos viéndolo.
 function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&view==="day"&&current===ds)renderDay();});}
+
+/* ---- Registro de peso en la DB (tabla weight_log) ---- */
+async function pushWeight(week,kg){
+  if(!supa)return;
+  try{
+    if(kg==null) await supa.from("weight_log").delete().eq("week",week);
+    else await supa.from("weight_log").upsert({week:week,kg:kg,updated_at:new Date().toISOString()},{onConflict:"week"});
+  }catch(e){}
+}
+async function pullWeights(){
+  if(!supa)return false;
+  try{
+    const r=await supa.from("weight_log").select("week,kg");
+    if(!r.error&&Array.isArray(r.data)){const w={};r.data.forEach(x=>{w[x.week]=Number(x.kg);});S.weights=w;save();return true;}
+  }catch(e){}
+  return false;
+}
+function syncWeights(){if(supa)pullWeights().then(ok=>{if(ok&&view==="weight")renderWeight();});}
 
 function ingById(id){return DB.ingredients.find(x=>x.id===id);}
 function macrosFromLines(lines){let t={kcal:0,p:0,c:0,f:0};lines.forEach(l=>{const i=ingById(+l.ingredient_id);if(!i||l.grams==null)return;const g=(+l.grams)/100;t.kcal+=i.kcal*g;t.p+=i.protein_g*g;t.c+=i.carbs_g*g;t.f+=i.fat_g*g;});return{kcal:Math.round(t.kcal),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f)};}
@@ -1095,8 +1113,9 @@ registerServiceWorker();
 render();
 ensureDB();
 syncDay(current);
+syncWeights();
 // Carga las credenciales servidas por Vercel y re-renderiza con la conexión lista.
-loadRemoteConfig().then(()=>{supaInit();render();ensureDB();syncDay(current);});
+loadRemoteConfig().then(()=>{supaInit();render();ensureDB();syncDay(current);syncWeights();});
 </script>
 </body>
 </html>
