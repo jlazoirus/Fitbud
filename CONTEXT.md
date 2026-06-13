@@ -11,8 +11,8 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 
 ## 2. Stack y arquitectura
 - **Frontend:** un único `index.html` (HTML+CSS+JS inline). Mobile-first. Sin dependencias salvo `supabase-js` por CDN (jsDelivr).
-- **Persistencia local:** `localStorage` (clave `fitbud_v1`) para el progreso diario (comidas marcadas, extras, peso, overrides locales de credenciales).
-- **Base de datos:** Supabase (PostgreSQL) para el catálogo de alimentos (ingredientes/platos/dietas).
+- **Persistencia:** la **fuente de verdad es Supabase**; `localStorage` (clave `fitbud_v1`) es solo **caché offline** que la espeja. Ningún dato del usuario vive solo en el navegador (el progreso diario va a `day_log` y el peso a `weight_log`). Lo único local-de-dispositivo son los overrides de credenciales en Ajustes (en producción vienen de Vercel).
+- **Base de datos:** Supabase (PostgreSQL) — catálogo de alimentos (ingredientes/platos/dietas), consumo diario (`day_log`) y peso (`weight_log`).
 - **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador.
 - **Hosting:** Vercel (estático + funciones en `api/`). No hay build.
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
@@ -22,35 +22,40 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 ## 3. Mapa de archivos
 | Archivo | Qué es |
 |---|---|
-| `index.html` | **Toda la app** (~1012 líneas): datos, estado, render, vistas, IA, voz, DB. |
+| `index.html` | **Toda la app** (~1160 líneas): datos, estado, render, vistas, IA, voz, DB, sync. |
 | `config.js` | Fallback de config en runtime (`window.FITBUD_CONFIG`). **Vacío en el repo**; producción usa Vercel. |
 | `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. |
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
 | `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v2`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. |
-| `supabase/schema.sql` | Esquema de la DB (tablas, vista `dish_macros`, RLS). Correr primero. |
-| `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después. |
+| `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
+| `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
+| `supabase/day_log.sql` | Migración incremental: tabla `day_log` (consumo diario). |
+| `supabase/weight_log.sql` | Migración incremental: tabla `weight_log` (peso). |
 | `plan-10-semanas-recomposicion.md` | Plan original (fuente de verdad de menús, días, entrenos, metas). |
 | `BUILD_PLAN.md`, `PROGRESS.md`, `REQUIREMENTS.md`, `README.md` | Docs del proyecto. |
 
 ## 4. Estructura interna de index.html (con líneas aprox.)
 - **Config runtime** (~151): `CONFIG` (de `config.js`), `REMOTE` (de `/api/config`), `effectiveSettings()` (prioridad: override local en Ajustes → REMOTE/Vercel → config.js), `aiAvailable()`, `settingSource()`.
 - **Capa de datos** (~198): `START`/`END`, `WEEKS` (11 semanas incl. "Arranque"), `REFEED_DATES`, `BREAKFASTS`/`DINNERS`/`MENUS` (A/B/C/D por día de semana), `WORKOUTS`, `DAY_TARGET` (metas por tipo de día), `SLOTS` (kcal+macros por slot y tipo de día).
-- **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno) generándolo desde las reglas.
-- **Estado/persistencia** (~335): `S` (objeto raíz en localStorage), `dayState(ds)`, `mealState`, `mealValue` (aplica overrides `ovr`), `dayTotals(ds)` (suma solo comidas marcadas `done`).
+- **Entrenamiento:** `WORKOUT_OPTIONS` (con `id` y `kind` Pesas/Correr/Descanso), `WEEKDAY_WORKOUT_ID` (plan por día), `effectiveWorkout(ds)` (resuelve override del día sobre el plan). UI: `openWorkoutPicker(ds)` + `setWorkout(ds,id)`.
+- **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
+- **Estado/persistencia** (~335): `S` (objeto raíz, cacheado en localStorage), `dayState(ds)` (campos: `meals{id:{done,ovr}}`, `extras[]`, `workoutDone`, `workoutOverride`), `mealState`, `mealValue` (resuelve macros: override manual → DB por `dishName` → fallback plan), `dayTotals(ds)` (suma solo comidas marcadas `done`).
+- **Sincronización con la DB:** `commitDay(ds)`=`save()`+`pushDay(ds)` (upsert a `day_log`); `pullDay(ds)`/`syncDay(ds)` bajan el día; `pushWeight`/`pullWeights`/`syncWeights` para `weight_log`. Se llama `commitDay` en cada mutación del día (toggles, reemplazo, editor, sugerencia IA, cambio de entreno) y `syncDay`/`syncWeights` al arrancar, navegar y conectar.
 - **Navegación:** `current` (fecha YYYY-MM-DD), `view` (`day|week|foods|weight|settings`), `render()` (dispatcher), `renderTabs()`, `setView()`.
 - **Vistas:** `renderDay()` (HOY: dashboard kcal/macros + comidas + extras + entreno + resumen), `renderWeek()`, `renderFoods()` (sub-tabs `platos|ingredientes|dietas`), `renderWeight()` (tabla + gráfico SVG), `renderSettings()`.
 - **Comidas:** `mealCard`, `extraCard`, `toggleMeal/Extra/Workout`, `openReplace`/`applyReplace`, `openEditor`/`editorSheet`/`saveEditor` (comidas personalizadas / editar valores).
 - **IA (Claude)** (~619): `callClaude(userText,maxTokens)` → si hay key local llama directo a Anthropic; si no, usa `/api/claude`. `parseJSON()` (limpia ```json). `aiEstimate()` (IA1 estimar comida), `aiSuggest()` (IA2 sugerir), `aiReview()` (IA3 revisar macros). System prompt vegetariano sin huevo.
 - **Voz** (~695): `toggleMic()`/`stopMic()` con Web Speech API (`es-PE`, fallback `es-ES`), alimenta el campo del editor.
 - **Supabase / Alimentos** (~808): `supa` (cliente), `DB` (cache: ingredients/dishes/dishIng/diets/dietDishes), `supaUrlFrom()` (acepta ID, URL o link dashboard), `supaInit()`, `dbLoad()`, `macrosFromLines()`/`dishMacros()` (cálculo de macros), `foodsDishes/foodsIngredients/foodsDiets`, editores CRUD `editIngredient/saveIngredient/deleteIngredient`, `editDish/dishModal/dishLineSet/saveDish/deleteDish`.
-- **Init** (final): `supaInit(); registerServiceWorker(); render();` y luego `loadRemoteConfig().then(()=>{supaInit();render();})`.
+- **Init** (final): `supaInit(); registerServiceWorker(); render(); ensureDB(); syncDay(current); syncWeights();` y de nuevo tras `loadRemoteConfig().then(...)` (por si las credenciales llegan de Vercel).
 
 ## 5. Modelo de datos del plan (reglas)
 - **Tipos de día:** PESAS (Lun/Mar/Jue/Vie), BAJO (Mié/Sáb/Dom), REFEED (sáb 27 jun, 11 jul, 8 ago, 22 ago), DIETBREAK (toda la semana 6, 20–26 jul).
 - **Metas (`DAY_TARGET`):** PESAS 2000/180P/195C/55G · BAJO 1800/180/150/50 · REFEED 2700/160/350/55 · DIETBREAK 2750/170/300/70.
-- **Menús (`MENUS`):** A Criollo, B Mediterráneo, C Asiático, D Mexicano — asignados por semana en `WEEKS`. Desayunos/cenas rotan; almuerzo según menú+día.
+- **Menús (`MENUS`):** A Criollo, B Mediterráneo, C Asiático, D Mexicano — asignados por semana en `WEEKS`. Desayunos/cenas rotan; almuerzo según menú+día (autoritativo desde `diet_dishes` en la DB).
+- **Entrenamiento:** plan fijo por día de semana (`WEEKDAY_WORKOUT_ID`), pero **intercambiable por día** (pesas/correr/descanso) vía `workoutOverride` en el estado del día.
 
 ## 6. Base de datos Supabase
 Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
@@ -59,6 +64,8 @@ Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
 - `dish_ingredients(id, dish_id, ingredient_id, grams)` — receta (líneas).
 - `diets(id, code, name, description)` — A/B/C/D.
 - `diet_dishes(id, diet_id, dish_id, weekday, slot)` — qué plato cada día.
+- `day_log(log_date pk, state jsonb, updated_at)` — consumo del día (comidas/extras/entreno/override) como documento JSON.
+- `weight_log(week pk, kg, updated_at)` — peso semanal.
 - Vista `dish_macros` — macros calculados por plato (suma de ingredientes), `security_invoker`.
 - **RLS:** políticas permiten todo al rol anónimo (publishable key). Para blindar escritura: Supabase Auth + cambiar a `to authenticated`.
 - **Cálculo de macros:** `macros = Σ ingrediente(por_100g) × gramos/100`. En la app se hace en cliente (`macrosFromLines`).
@@ -87,16 +94,22 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Verificación rápida:** `curl https://fitbud-green.vercel.app/api/config` (debe dar JSON con proxy:true y supabase lleno). Conteo de datos vía Supabase REST con la publishable key (`/rest/v1/dishes?select=id` + header `apikey`).
 - **Syntax check del JS embebido:** extraer el último `<script>` de index.html y `node --check`.
 
-## 10. Buenos puntos de extensión (ideas para nuevas funcionalidades)
-1. ~~Conectar HOY con Supabase~~ ✅ **Hecho** — macros del día desde la DB vía `dishName` + `mealValue()`; el **almuerzo** se lee de `diet_dishes` (`dietLunchDish()`), así reasignar/renombrar el plato en Supabase se refleja. Fallback al plan en código. Pendiente menor: porciones especiales de REFEED/DIETBREAK (el almuerzo refeed usa el plato estándar sin la doble porción).
-2b. ~~Historial de consumo en Supabase~~ ✅ **Hecho** — tabla `day_log(log_date pk, state jsonb)`. `commitDay(ds)` sube el estado del día (comidas/extras/entreno) en cada cambio; `syncDay(ds)`/`pullDay(ds)` lo baja al abrir/navegar un día. localStorage queda como caché offline. Migración: `supabase/day_log.sql`.
-3b. ~~Peso en la nube~~ ✅ **Hecho** — tabla `weight_log(week pk, kg)`. `setWeight` sube (`pushWeight`), `pullWeights`/`syncWeights` baja al arrancar y al abrir Peso. Migración: `supabase/weight_log.sql`. Ahora **ningún dato del usuario vive solo en el navegador** (días + peso en la DB); `localStorage` es solo caché offline. Las credenciales en Ajustes son override de dev (en Vercel vienen de `/api/config`). Conflictos: last-write-wins, sin cola offline.
-2. **Historial de consumo en Supabase:** hoy el progreso diario vive solo en localStorage. Tabla `log(date, dish_id/custom, grams, done...)` para sync entre dispositivos.
-3. **Auth de Supabase** para proteger escritura (multiusuario o solo dueño).
-4. **Editor de dietas** (hoy `foodsDiets` es solo lectura): asignar/editar `diet_dishes`.
-5. **Buscar/filtrar** ingredientes y platos; búsqueda por macros restantes.
-6. **Registro de peso en Supabase** + objetivos; hoy `S.weights` es local.
-7. **Mejorar la IA:** que sugiera usando platos reales de la DB; cachear respuestas.
+## 10. Extensiones
+
+### Ya hecho ✅
+- **Macros del día desde la DB** — vía `dishName` + `mealValue()`; el almuerzo se lee de `diet_dishes` (`dietLunchDish()`), así reasignar/renombrar el plato en Supabase se refleja. Fallback al plan.
+- **Consumo diario en la DB** — `day_log` + `commitDay`/`pullDay`/`syncDay`. Sincroniza entre dispositivos; localStorage es caché.
+- **Peso en la DB** — `weight_log` + `pushWeight`/`pullWeights`/`syncWeights`. Nada del usuario vive solo en el navegador.
+- **Cambiar el entrenamiento del día** (pesas/correr/descanso) — `WORKOUT_OPTIONS` + `effectiveWorkout` + `workoutOverride` (sincroniza vía `day_log`).
+
+### Pendiente / ideas
+- **Porciones especiales de REFEED/DIETBREAK:** el almuerzo refeed usa el plato estándar de la DB, sin la doble porción de carbo que indica el plan.
+- **¿El cambio de entreno ajusta el tipo de día/metas?** Hoy cambiar pesas↔correr no cambia `DAY_TARGET` (sigue por el día de semana). Decidir si debería.
+- **Auth de Supabase** para proteger escritura (hoy RLS abierto al rol anónimo).
+- **Editor de dietas** (hoy `foodsDiets` es solo lectura): asignar/editar `diet_dishes` desde la app.
+- **Buscar/filtrar** ingredientes y platos; sugerencias por macros restantes.
+- **Conflictos de sync:** hoy last-write-wins, sin cola offline (cambios hechos sin red se pueden perder si otro dispositivo escribe).
+- **Mejorar la IA:** que sugiera usando platos reales de la DB; cachear respuestas.
 
 ## 11. Convenciones / gotchas
 - **Sin build, sin frameworks.** Todo en `index.html`; las funciones se llaman vía `onclick` inline. Mantener ese estilo (vanilla, español en UI/labels).
