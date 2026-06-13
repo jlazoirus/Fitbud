@@ -694,9 +694,9 @@ function renderSettings(){
 
     <div class="dash">
       <div class="row between"><b>🗄️ Base de datos (Supabase)</b><span class="badge ${supa?'b-BAJO':'b-Libre'}">${supa?'Conectada':'Sin conectar'}</span></div>
-      <div class="muted small" style="margin:6px 0 10px">Guarda ingredientes, platos y dietas, y calcula sus macros. Crea un proyecto gratis en supabase.com, corre el SQL de la carpeta <code>supabase/</code> y pega aquí la URL y la <b>Publishable key</b> (Settings → API Keys).</div>
-      <div class="field"><label>Project URL</label>
-        <input id="set_supaurl" type="text" placeholder="https://xxxxx.supabase.co" value="${esc(S.settings.supaUrl||'')}">
+      <div class="muted small" style="margin:6px 0 10px">Guarda ingredientes, platos y dietas, y calcula sus macros. Crea un proyecto gratis en supabase.com, corre el SQL de la carpeta <code>supabase/</code> y pega aquí el Project ID (o la URL) y la <b>Publishable key</b> (Settings → API Keys).</div>
+      <div class="field"><label>Project URL o ID</label>
+        <input id="set_supaurl" type="text" placeholder="tu-project-id  ó  https://xxxxx.supabase.co" value="${esc(S.settings.supaUrl||'')}">
       </div>
       <div class="field"><label>Publishable key (sb_publishable_…)</label>
         <input id="set_supakey" type="password" placeholder="${S.settings.supaKey?'•••• guardada':'sb_publishable_...'}" value="">
@@ -714,7 +714,7 @@ function renderSettings(){
 }
 function saveSettings(){const v=$("#set_key").value.trim();if(v)S.settings.apiKey=v;S.settings.model=$("#set_model").value;save();toast("Ajustes guardados");renderSettings();}
 function saveSupabase(){
-  const url=$("#set_supaurl").value.trim();const key=$("#set_supakey").value.trim();
+  const url=supaUrlFrom($("#set_supaurl").value);const key=$("#set_supakey").value.trim();
   S.settings.supaUrl=url; if(key)S.settings.supaKey=key; save();
   supaInit(); DB.loaded=false; DB.error=null;
   if(!supa){toast("Faltan datos o la librería no cargó");renderSettings();return;}
@@ -734,10 +734,20 @@ let supa=null;
 let DB={ingredients:[],dishes:[],dishIng:[],diets:[],dietDishes:[],loaded:false,error:null};
 let foodTab="platos";
 
+// Acepta URL completa, link del dashboard, "xxx.supabase.co" o solo el Project ID
+function supaUrlFrom(v){
+  v=(v||"").trim().replace(/\/+$/,"");
+  if(!v)return"";
+  const dash=v.match(/dashboard\/project\/([a-z0-9]+)/i);
+  if(dash)return"https://"+dash[1]+".supabase.co";
+  if(/^https?:\/\//i.test(v))return v;
+  return"https://"+v.replace(/\.supabase\.co$/i,"")+".supabase.co";
+}
 function supaInit(){
   supa=null;
-  if(S.settings.supaUrl&&S.settings.supaKey&&window.supabase&&window.supabase.createClient){
-    try{supa=window.supabase.createClient(S.settings.supaUrl,S.settings.supaKey);}catch(e){supa=null;}
+  const url=supaUrlFrom(S.settings.supaUrl);
+  if(url&&S.settings.supaKey&&window.supabase&&window.supabase.createClient){
+    try{supa=window.supabase.createClient(url,S.settings.supaKey);}catch(e){supa=null;}
   }
   return supa;
 }
