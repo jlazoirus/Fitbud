@@ -2,6 +2,8 @@
 
 Tracker web de mi plan nutricional y de entrenamiento de **10 semanas** (sáb 13 jun → dom 23 ago 2026). Un solo archivo `index.html`, sin frameworks ni dependencias.
 
+**🔗 En vivo:** https://jlazoirus.github.io/Fitbud/
+
 ## Qué hace
 
 - **Vista HOY** según la fecha real: comidas del plan, entrenamiento y metas del día.
