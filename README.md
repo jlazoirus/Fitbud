@@ -2,7 +2,7 @@
 
 Tracker web/PWA de mi plan nutricional y de entrenamiento de **10 semanas** (sáb 13 jun → dom 23 ago 2026). App estática, sin frameworks ni build step.
 
-**🔗 En vivo:** desplegado en Vercel (las credenciales viven como variables de entorno en Vercel, no en este repo).
+**🔗 En vivo:** https://fitbud-green.vercel.app/ (desplegado en Vercel; las credenciales viven como variables de entorno en Vercel, no en este repo).
 
 ## Qué hace
 
