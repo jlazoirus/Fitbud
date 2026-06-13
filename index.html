@@ -694,12 +694,12 @@ function renderSettings(){
 
     <div class="dash">
       <div class="row between"><b>🗄️ Base de datos (Supabase)</b><span class="badge ${supa?'b-BAJO':'b-Libre'}">${supa?'Conectada':'Sin conectar'}</span></div>
-      <div class="muted small" style="margin:6px 0 10px">Guarda ingredientes, platos y dietas, y calcula sus macros. Crea un proyecto gratis en supabase.com, corre el SQL de la carpeta <code>supabase/</code> y pega aquí la URL y la <b>anon key</b> (Settings → API).</div>
+      <div class="muted small" style="margin:6px 0 10px">Guarda ingredientes, platos y dietas, y calcula sus macros. Crea un proyecto gratis en supabase.com, corre el SQL de la carpeta <code>supabase/</code> y pega aquí la URL y la <b>Publishable key</b> (Settings → API Keys).</div>
       <div class="field"><label>Project URL</label>
         <input id="set_supaurl" type="text" placeholder="https://xxxxx.supabase.co" value="${esc(S.settings.supaUrl||'')}">
       </div>
-      <div class="field"><label>Anon public key</label>
-        <input id="set_supakey" type="password" placeholder="${S.settings.supaKey?'•••• guardada':'eyJ...'}" value="">
+      <div class="field"><label>Publishable key (sb_publishable_…)</label>
+        <input id="set_supakey" type="password" placeholder="${S.settings.supaKey?'•••• guardada':'sb_publishable_...'}" value="">
       </div>
       <button class="btn btn-accent" style="width:100%" onclick="saveSupabase()">Guardar y conectar</button>
       ${S.settings.supaKey?`<button class="btn" style="width:100%;margin-top:8px" onclick="clearSupabase()">Desconectar</button>`:""}

@@ -88,10 +88,11 @@ group by d.id, d.name, d.slot, d.menu;
 -- ============================================================
 -- RLS (Row Level Security)
 -- App personal: se permite acceso completo al rol anónimo para
--- que la app (con anon key) pueda leer y editar.
--- ⚠️ Cualquiera con tu URL+anon key podría escribir. Si quieres
---    proteger la escritura, activa Supabase Auth y reemplaza las
---    políticas de abajo por "to authenticated".
+-- que la app (con la Publishable key, que entra como rol anon)
+-- pueda leer y editar.
+-- ⚠️ Cualquiera con tu URL + publishable key podría escribir. Si
+--    quieres proteger la escritura, activa Supabase Auth y reemplaza
+--    las políticas de abajo por "to authenticated".
 -- ============================================================
 alter table ingredients      enable row level security;
 alter table dishes           enable row level security;

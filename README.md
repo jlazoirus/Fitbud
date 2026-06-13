@@ -41,10 +41,10 @@ Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
 2. En el **SQL Editor**, ejecuta primero [`supabase/schema.sql`](supabase/schema.sql) y luego [`supabase/seed.sql`](supabase/seed.sql) (datos precargados: 55 ingredientes, 43 platos, 4 dietas).
-3. En **Project Settings → API**, copia la **Project URL** y la **anon public key**.
+3. En **Project Settings → API Keys**, copia la **Project URL** y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
 4. En la app → **Ajustes → Base de datos**, pégalas y pulsa *Guardar y conectar*.
 
-> ⚠️ Las políticas RLS del `schema.sql` permiten lectura y escritura al rol anónimo (cómodo para uso personal). Como la URL+anon key viven en tu navegador, cualquiera que las obtenga podría editar. Para proteger la escritura, activa Supabase Auth y cambia las políticas a `to authenticated`.
+> ⚠️ Las políticas RLS del `schema.sql` permiten lectura y escritura al rol anónimo (cómodo para uso personal). Como la URL + publishable key viven en tu navegador, cualquiera que las obtenga podría editar. Para proteger la escritura, activa Supabase Auth y cambia las políticas a `to authenticated`.
 
 ## Uso local
 
