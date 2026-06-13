@@ -17,7 +17,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Hosting:** Vercel (estático + funciones en `api/`). No hay build.
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
 
-> ⚠️ **Dato clave:** el tracker diario (vista HOY) usa macros **hardcodeados por slot** (`SLOTS`/`DAY_TARGET` en index.html) y es **independiente** de la base de datos de Supabase. La DB de alimentos hoy alimenta **solo** la pestaña "Alimentos". Conectar el tracker diario con los platos/macros reales de Supabase es una extensión natural pendiente (ver §10).
+> **Macros del día (resuelto):** la vista HOY ya toma los macros de cada comida desde la **base de datos** (calculados por ingredientes), no de valores fijos. `buildDay` asigna a cada comida un `dishName` (nombre canónico del plato en la DB; ver `BREAKFAST_DISHES`, `DINNER_DISHES`, `LUNCH_DISHES`, `DISH_NAMES`), y `mealValue()` resuelve con esta prioridad: **1)** override manual (editar/personalizar) → **2)** macros de la DB por `dishName` → **3)** fallback a `SLOTS` (valores del plan) si la DB no está conectada. `DAY_TARGET` (metas diarias) sí sigue siendo constante del plan, a propósito. La DB se carga al arrancar (`ensureDB()`), no solo en la pestaña Alimentos.
 
 ## 3. Mapa de archivos
 | Archivo | Qué es |
@@ -88,7 +88,7 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Syntax check del JS embebido:** extraer el último `<script>` de index.html y `node --check`.
 
 ## 10. Buenos puntos de extensión (ideas para nuevas funcionalidades)
-1. **Conectar HOY con Supabase:** que las comidas del día se elijan de los `dishes` reales y los macros salgan de la DB (hoy están hardcodeados en `SLOTS`). Mapear `MENUS`/slots a `dishes`/`diet_dishes`.
+1. ~~Conectar HOY con Supabase~~ ✅ **Hecho** — los macros del día salen de la DB vía `dishName` + `mealValue()` (fallback a `SLOTS`). Posible mejora: elegir las comidas del día directamente desde `diet_dishes` en vez de los arrays en código, y modelar las porciones especiales de REFEED/DIETBREAK (hoy el almuerzo refeed usa el plato estándar, sin la doble porción).
 2. **Historial de consumo en Supabase:** hoy el progreso diario vive solo en localStorage. Tabla `log(date, dish_id/custom, grams, done...)` para sync entre dispositivos.
 3. **Auth de Supabase** para proteger escritura (multiusuario o solo dueño).
 4. **Editor de dietas** (hoy `foodsDiets` es solo lectura): asignar/editar `diet_dishes`.

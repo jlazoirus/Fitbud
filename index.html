@@ -235,8 +235,28 @@ const MENUS = {
   C:{1:"Tofu teriyaki 250g + arroz 150g + brócoli al vapor",2:"Curry de garbanzos (leche de coco light) + arroz 120g",3:"Salteado de tempeh 200g con sésamo, pak choi y pimientos",4:"Pad thai de tofu 250g (fideos de arroz 80g, sin huevo)",5:"Bowl de edamame 200g + tofu 150g + arroz 120g + palta ¼",6:"Ramen miso: tofu 250g + fideos 60g + verduras + nori",0:"Chaufa de quinua con tofu 200g y verduras (sin huevo)"},
   D:{1:"Burrito bowl: frijol negro + arroz 100g + cottage 100g + guacamole",2:"Chili vegetariano (soya + frijoles) + arroz 80g",3:"Tacos de frijol negro y queso fresco (3 tortillas) + repollo",4:"Fajitas de tofu 250g con pimientos + 3 tortillas integrales",5:"Quesadillas integrales (2) con frijol, queso 80g y champiñones",6:"Enchiladas de frijol (3 tortillas, salsa roja) + cottage 100g",0:"Sopa azteca ligera + tofu 200g + tortilla en tiras + palta ¼"},
 };
-const ALL_LUNCHES = []; // para reemplazo de almuerzo
-["A","B","C","D"].forEach(L=>{const d=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];for(let wd=0;wd<7;wd++){ALL_LUNCHES.push({menu:L,wd,name:MENUS[L][wd]});}});
+// Nombres canónicos de los platos en la base de datos (Supabase). Sirven para
+// resolver los macros de cada comida desde la DB (ingredientes) en vez de los
+// valores hardcodeados de SLOTS. Deben coincidir EXACTO con supabase/seed.sql.
+const BREAKFAST_DISHES = ["Avena proteica","Bowl griego","Panqueques sin huevo","Smoothie bowl"];
+const DINNER_DISHES = ["Cena: yogur griego + cottage + fruta","Cena: queso fresco a la plancha + palta","Cena: crema de verduras + tofu sellado","Cena exprés: caseína + mantequilla de maní"];
+const LUNCH_DISHES = {
+  A:{1:"Saltado de tofu firme + arroz",2:"Lentejas guisadas + quinua + ensalada",3:"Tacu tacu de pallares + seitán",4:"Ají de garbanzos + arroz",5:"Quinua atamalada + queso fresco + tofu",6:"Frijoles canarios + arroz + queso fresco",0:"Locro de zapallo con quinua + tofu"},
+  B:{1:"Pasta integral + boloñesa de lentejas + parmesano",2:"Bowl de hummus + tofu horneado + pita",3:"Falafel al horno + tabule de quinua + yogur",4:"Berenjenas al horno con lentejas + queso fresco",5:"Risotto de champiñones + tofu",6:"Ensalada griega + garbanzos + queso fresco",0:"Pisto de verduras + soya texturizada + papa"},
+  C:{1:"Tofu teriyaki + arroz + brócoli",2:"Curry de garbanzos + arroz",3:"Salteado de tempeh con pak choi y pimientos",4:"Pad thai de tofu",5:"Bowl de edamame + tofu + arroz + palta",6:"Ramen miso con tofu y fideos",0:"Chaufa de quinua con tofu"},
+  D:{1:"Burrito bowl de frijol negro",2:"Chili vegetariano + arroz",3:"Tacos de frijol negro y queso fresco",4:"Fajitas de tofu + tortillas",5:"Quesadillas de frijol, queso y champiñones",6:"Enchiladas de frijol + cottage",0:"Sopa azteca + tofu + palta"},
+};
+const DISH_NAMES = {
+  refeedDesayuno:"Desayuno refeed (avena + plátano + miel)",
+  refeedCena:"Cena refeed: arroz + tofu + verduras",
+  refeedSnack:"Snack refeed: pan + mermelada + proteína",
+  dietbreakSnack:"Snack diet break: pan con palta",
+  snackExtra:"Snack extra: fruta + yogur",
+  batidoPesas:"Batido peri-entreno (día pesas)",
+  batidoBajo:"Batido peri-entreno (día bajo)",
+};
+const ALL_LUNCHES = []; // para reemplazo de almuerzo (nombre visible + plato de la DB)
+["A","B","C","D"].forEach(L=>{for(let wd=0;wd<7;wd++){ALL_LUNCHES.push({menu:L,wd,name:MENUS[L][wd],dishName:LUNCH_DISHES[L][wd]});}});
 
 const WORKOUTS = {
   1:{name:"Pesas Torso A + cardio",detail:"Press banca 4×5-8 · Remo barra 4×6-10 · Press militar 3×6-10 · Dominadas 3×máx · +25 min caminata en cuesta"},
@@ -309,23 +329,29 @@ function buildDay(ds){
   const slots=SLOTS[type].map(s=>({...s}));
   const lunchMenu = (w&&w.menu!=="Libre") ? w.menu : "A";
   const meals=slots.map(s=>{
-    const m={id:s.id,slot:s.slot,kcal:s.kcal,p:s.p,c:s.c,f:s.f,name:""};
+    // kcal/p/c/f del slot son FALLBACK; mealValue() prioriza los macros de la DB vía dishName
+    const m={id:s.id,slot:s.slot,kcal:s.kcal,p:s.p,c:s.c,f:s.f,name:"",dishName:null};
     if(s.id==="desayuno"){
       m.name = type==="REFEED" ? "Avena 80g + 1.5 scoop + plátano entero + miel 1 cda" : BREAKFASTS[idx%4];
+      m.dishName = type==="REFEED" ? DISH_NAMES.refeedDesayuno : BREAKFAST_DISHES[idx%4];
     }else if(s.id==="almuerzo"){
-      if(w&&w.menu==="Libre"){ m.name="Almuerzo libre (elige una opción del plan)"; }
-      else { m.name=MENUS[lunchMenu][wd]; }
+      if(w&&w.menu==="Libre"){ m.name="Almuerzo libre (elige una opción del plan)"; m.dishName=null; }
+      else { m.name=MENUS[lunchMenu][wd]; m.dishName=LUNCH_DISHES[lunchMenu][wd]; }
       if(type==="REFEED") m.name+=" — doble porción de arroz/pasta/tortillas";
       if(type==="DIETBREAK") m.name+=" (+50% carbo)";
       if(type==="BAJO") m.name+=" — carbo a la mitad, +verdura";
     }else if(s.id==="batido"){
       m.name = type==="PESAS" ? "2 scoops de proteína + plátano" : "2 scoops de proteína (solos)";
+      m.dishName = type==="PESAS" ? DISH_NAMES.batidoPesas : DISH_NAMES.batidoBajo;
     }else if(s.id==="cena"){
       m.name = type==="REFEED" ? "Arroz/pasta 100g seco + tofu/queso + verduras" : DINNERS[idx%4];
+      m.dishName = type==="REFEED" ? DISH_NAMES.refeedCena : DINNER_DISHES[idx%4];
     }else if(s.id==="snack"){
       m.name = type==="REFEED" ? "Pan 2 tajadas + mermelada + 1 scoop en agua" : "Snack: pan con palta / fruta + yogur";
+      m.dishName = type==="REFEED" ? DISH_NAMES.refeedSnack : DISH_NAMES.dietbreakSnack;
     }else if(s.id==="snack_extra"){
       m.name = "Snack extra: fruta + yogur griego";
+      m.dishName = DISH_NAMES.snackExtra;
     }
     return m;
   });
@@ -341,7 +367,21 @@ if(!S.days)S.days={}; if(!S.weights)S.weights={}; if(!S.settings)S.settings={};
 function dayState(ds){if(!S.days[ds])S.days[ds]={meals:{},extras:[],workoutDone:false};const d=S.days[ds];if(!d.meals)d.meals={};if(!d.extras)d.extras=[];return d;}
 function mealState(ds,id){const d=dayState(ds);if(!d.meals[id])d.meals[id]={done:false};return d.meals[id];}
 // valor efectivo de una comida (con override si existe)
-function mealValue(base,ms){const o=ms&&ms.ovr;return{name:o&&o.name!=null?o.name:base.name,kcal:o&&o.kcal!=null?o.kcal:base.kcal,p:o&&o.p!=null?o.p:base.p,c:o&&o.c!=null?o.c:base.c,f:o&&o.f!=null?o.f:base.f};}
+function dishByName(name){return (DB.byName&&name)?DB.byName[name]:null;}
+// Resuelve los macros de una comida del plan:
+// 1) override manual con macros (editar valores / personalizada)
+// 2) macros calculados desde la base de datos por nombre de plato
+// 3) fallback a los valores del plan hardcodeados (DB no conectada)
+function mealValue(base,ms){
+  const o=ms&&ms.ovr;
+  const name=o&&o.name!=null?o.name:base.name;
+  if(o&&o.kcal!=null&&o.dishName==null){
+    return{name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"custom"};
+  }
+  const dn=o&&o.dishName!=null?o.dishName:base.dishName;
+  if(dn&&DB.loaded){const d=dishByName(dn);if(d){const m=dishMacros(d.id);return{name,kcal:m.kcal,p:m.p,c:m.c,f:m.f,src:"db"};}}
+  return{name,kcal:base.kcal,p:base.p,c:base.c,f:base.f,src:"plan"};
+}
 
 // totales CONSUMIDOS (solo comidas marcadas como hechas)
 function dayTotals(ds){
@@ -370,6 +410,12 @@ function paceClass(consumed,target,isToday){
   return"fill-bad";
 }
 function pctW(v,t){return Math.min(100,t?Math.round(v/t*100):0);}
+function dbStatusNote(){
+  if(DB.loaded)return "✓ Macros calculados desde tu base de datos.";
+  if(supa&&!DB.error)return "Cargando macros desde la base de datos…";
+  if(supa&&DB.error)return "⚠️ No se pudo leer la base; mostrando valores del plan.";
+  return "Mostrando valores del plan. Conecta la base de datos en Ajustes para macros por ingrediente.";
+}
 
 /* ============================================================
    RENDER
@@ -447,6 +493,7 @@ function renderDay(){
       <button class="btn btn-sm" onclick="aiSuggest()">✨ Sugiéreme una comida</button>
       <button class="btn btn-sm" onclick="aiReview()">🔍 Revisar mis macros</button>
     </div>
+    <div class="muted small" style="margin-top:8px">${dbStatusNote()}</div>
   </div>
 
   <div class="section-h">Comidas del plan</div>
@@ -567,18 +614,22 @@ function closeModal(){const o=$("#overlay");if(o)o.remove();stopMic();}
 function openReplace(ds,id){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);
   let options=[];
-  if(id==="desayuno")options=BREAKFASTS.map(n=>({name:n}));
-  else if(id==="cena")options=DINNERS.map(n=>({name:n}));
-  else if(id==="almuerzo")options=ALL_LUNCHES.map(l=>({name:l.name,tag:"Menú "+l.menu}));
+  if(id==="desayuno")options=BREAKFASTS.map((n,i)=>({name:n,dishName:BREAKFAST_DISHES[i]}));
+  else if(id==="cena")options=DINNERS.map((n,i)=>({name:n,dishName:DINNER_DISHES[i]}));
+  else if(id==="almuerzo")options=ALL_LUNCHES.map(l=>({name:l.name,dishName:l.dishName,tag:"Menú "+l.menu}));
   else options=[];
-  const optsHtml=options.map((o,i)=>`<button class="opt" onclick="applyReplace('${ds}','${id}',${i})">${esc(o.name)}${o.tag?`<div class="o-meta">${o.tag} · mantiene ${base.kcal} kcal del slot</div>`:`<div class="o-meta">mantiene ${base.kcal} kcal del slot</div>`}</button>`).join("");
+  const optsHtml=options.map((o,i)=>{
+    const d=o.dishName?dishByName(o.dishName):null;const m=d?dishMacros(d.id):null;
+    const meta=m?`${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g`:"macros del plan";
+    return `<button class="opt" onclick="applyReplace('${ds}','${id}',${i})">${esc(o.name)}<div class="o-meta">${o.tag?o.tag+" · ":""}${meta}</div></button>`;
+  }).join("");
   window._replaceOpts={ds,id,options};
   modal(`<h3>Reemplazar — ${base.slot}</h3>
-    <p class="muted small">Elige otra opción del plan (hereda las kcal/macros del slot) o crea una personalizada.</p>
+    <p class="muted small">Elige otra opción del plan (sus macros se calculan desde la base de datos) o crea una personalizada.</p>
     ${optsHtml||'<p class="muted small">Sin opciones de plan para este slot.</p>'}
     <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="openEditor('meal','${ds}','${id}')">✎ Personalizada / editar valores</button>`);
 }
-function applyReplace(ds,id,i){const{options}=window._replaceOpts;const ms=mealState(ds,id);ms.ovr=Object.assign({},ms.ovr,{name:options[i].name});save();closeModal();renderDay();toast("Comida reemplazada");}
+function applyReplace(ds,id,i){const{options}=window._replaceOpts;const o=options[i];const ms=mealState(ds,id);ms.ovr={name:o.name,dishName:o.dishName||null};save();closeModal();renderDay();toast("Comida reemplazada");}
 
 /* editor genérico: comida del plan (override) o extra */
 function openEditor(kind,ds,id){
@@ -811,7 +862,7 @@ function resetData(){if(confirm("¿Borrar todo el progreso (comidas marcadas, ex
    Los macros de cada plato se calculan sumando ingredientes.
    ============================================================ */
 let supa=null;
-let DB={ingredients:[],dishes:[],dishIng:[],diets:[],dietDishes:[],loaded:false,error:null};
+let DB={ingredients:[],dishes:[],dishIng:[],diets:[],dietDishes:[],byName:null,loaded:false,error:null};
 let foodTab="platos";
 
 // Acepta URL completa, link del dashboard, "xxx.supabase.co" o solo el Project ID
@@ -844,6 +895,7 @@ async function dbLoad(){
     ]);
     for(const r of [a,b,c,d,e]) if(r.error) throw r.error;
     DB.ingredients=a.data||[];DB.dishes=b.data||[];DB.dishIng=c.data||[];DB.diets=d.data||[];DB.dietDishes=e.data||[];
+    DB.byName={};DB.dishes.forEach(x=>{DB.byName[x.name]=x;});
     DB.ingredients.sort((x,y)=>(x.category||"").localeCompare(y.category||"")||x.name.localeCompare(y.name));
     DB.dishes.sort((x,y)=>(x.slot||"").localeCompare(y.slot||"")||x.name.localeCompare(y.name));
     DB.diets.sort((x,y)=>(x.code||"").localeCompare(y.code||""));
@@ -1002,11 +1054,14 @@ function registerServiceWorker(){
     navigator.serviceWorker.register("./service-worker.js").catch(e=>console.warn("No se pudo registrar el service worker",e));
   });
 }
+// Carga la base de datos si hay conexión, para que los macros del día salgan de la DB.
+function ensureDB(){if(supa&&!DB.loaded&&!DB.error)dbLoad().then(render);}
 supaInit();
 registerServiceWorker();
 render();
+ensureDB();
 // Carga las credenciales servidas por Vercel y re-renderiza con la conexión lista.
-loadRemoteConfig().then(()=>{supaInit();render();});
+loadRemoteConfig().then(()=>{supaInit();render();ensureDB();});
 </script>
 </body>
 </html>
