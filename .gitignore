@@ -1,0 +1,14 @@
+# Claude Code local
+.claude/
+
+# OS
+.DS_Store
+
+# Dependencies / build (por si se usa Vercel CLI)
+node_modules/
+.vercel/
+
+# Nunca subir secretos
+.env
+.env.local
+*.key
