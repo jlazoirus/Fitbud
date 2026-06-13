@@ -267,6 +267,27 @@ const WORKOUTS = {
   6:{name:"Carrera fácil",detail:"45-60 min zona 2 (conversacional)"},
   0:{name:"Descanso total",detail:"Solo pasos — meta 10,000"},
 };
+// Opciones de entrenamiento intercambiables (para cambiar el del día: pesas <-> correr)
+const WORKOUT_OPTIONS = [
+  {id:"torsoA",kind:"Pesas",...WORKOUTS[1]},
+  {id:"piernaA",kind:"Pesas",...WORKOUTS[2]},
+  {id:"torsoB",kind:"Pesas",...WORKOUTS[4]},
+  {id:"piernaB",kind:"Pesas",...WORKOUTS[5]},
+  {id:"calidad",kind:"Correr",...WORKOUTS[3]},
+  {id:"facil",kind:"Correr",...WORKOUTS[6]},
+  {id:"descanso",kind:"Descanso",...WORKOUTS[0]},
+];
+const WORKOUT_BY_ID={}; WORKOUT_OPTIONS.forEach(o=>{WORKOUT_BY_ID[o.id]=o;});
+const WEEKDAY_WORKOUT_ID={1:"torsoA",2:"piernaA",3:"calidad",4:"torsoB",5:"piernaB",6:"facil",0:"descanso"};
+function effectiveWorkout(ds){
+  const wd=parseYmd(ds).getDay();
+  const plannedId=WEEKDAY_WORKOUT_ID[wd];
+  const st=S.days[ds];
+  const ovrId=st&&st.workoutOverride;
+  const valid=ovrId&&WORKOUT_BY_ID[ovrId];
+  const id=valid?ovrId:plannedId;
+  return {id,workout:WORKOUT_BY_ID[id],plannedId,planned:WORKOUT_BY_ID[plannedId],overridden:!!(valid&&ovrId!==plannedId)};
+}
 
 // metas y macros por slot según tipo de día
 const DAY_TARGET = {
@@ -516,15 +537,19 @@ function renderDay(){
   <button class="btn" style="width:100%" onclick="openEditor('extra')">＋ Agregar comida / snack</button>
 
   <div class="section-h">Entrenamiento</div>
-  <div class="workout">
+  ${(function(){const ew=effectiveWorkout(current);return `<div class="workout">
     <div class="meal-head">
       <button class="chk ${st.workoutDone?'on':''}" onclick="toggleWorkout()">${st.workoutDone?'✓':''}</button>
       <div>
-        <div class="name" style="font-weight:600">${day.workout.name}</div>
-        <div class="detail">${day.workout.detail}</div>
+        <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}</div>
+        <div class="detail">${esc(ew.workout.detail)}</div>
       </div>
     </div>
-  </div>
+    <div class="meal-actions">
+      <button class="btn btn-sm" onclick="openWorkoutPicker('${current}')">Cambiar entrenamiento</button>
+      ${ew.overridden?`<button class="btn btn-sm" onclick="setWorkout('${current}',null)">Volver al plan</button>`:''}
+    </div>
+  </div>`;})()}
 
   ${daySummary(current)}
   `;
@@ -584,6 +609,21 @@ function nav(n){const nd=addDays(current,n);if(inRange(nd)){current=nd;render();
 function toggleMeal(ds,id){const ms=mealState(ds,id);ms.done=!ms.done;commitDay(ds);renderDay();}
 function toggleExtra(ds,i){const d=dayState(ds);d.extras[i].done=!d.extras[i].done;commitDay(ds);renderDay();}
 function toggleWorkout(){const d=dayState(current);d.workoutDone=!d.workoutDone;commitDay(current);renderDay();}
+function openWorkoutPicker(ds){
+  const ew=effectiveWorkout(ds);
+  const groups=[["Pesas","💪"],["Correr","🏃"],["Descanso","🛌"]];
+  let html=`<h3>Cambiar entrenamiento</h3><p class="muted small">El plan de hoy es <b>${esc(ew.planned.name)}</b>. Elige otro (pesas, correr o descanso).</p>`;
+  groups.forEach(([k,ic])=>{
+    const opts=WORKOUT_OPTIONS.filter(o=>o.kind===k);
+    html+=`<div class="section-h" style="margin-left:0">${ic} ${k}</div>`;
+    opts.forEach(o=>{
+      const cur=o.id===ew.id, plan=o.id===ew.plannedId;
+      html+=`<button class="opt" onclick="setWorkout('${ds}','${o.id}')" style="${cur?'border-color:var(--accent)':''}">${esc(o.name)}${cur?' ✓':''}${plan?' <span class="muted small">(plan)</span>':''}<div class="o-meta">${esc(o.detail)}</div></button>`;
+    });
+  });
+  modal(html);
+}
+function setWorkout(ds,id){const d=dayState(ds);if(id&&id!==WEEKDAY_WORKOUT_ID[parseYmd(ds).getDay()])d.workoutOverride=id;else delete d.workoutOverride;commitDay(ds);closeModal();renderDay();toast("Entrenamiento actualizado");}
 function delExtra(ds,i){const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);renderDay();}
 
 /* ---------- Fase 3: VISTA SEMANA ---------- */
