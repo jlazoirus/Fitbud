@@ -6,6 +6,7 @@
 -- ============================================================
 
 -- Limpieza idempotente (puedes re-ejecutar este archivo sin error)
+drop table if exists day_log cascade;
 drop table if exists diet_dishes cascade;
 drop table if exists diet_days cascade;
 drop table if exists diets cascade;
@@ -61,6 +62,13 @@ create table diet_dishes (
   slot      text
 );
 
+-- ---------- REGISTRO DE CONSUMO DIARIO (estado del día como JSON) ----------
+create table day_log (
+  log_date    date primary key,
+  state       jsonb not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now()
+);
+
 create index on dish_ingredients (dish_id);
 create index on dish_ingredients (ingredient_id);
 create index on diet_dishes (diet_id);
@@ -99,9 +107,11 @@ alter table dishes           enable row level security;
 alter table dish_ingredients enable row level security;
 alter table diets            enable row level security;
 alter table diet_dishes      enable row level security;
+alter table day_log          enable row level security;
 
 create policy "anon all ingredients"      on ingredients      for all using (true) with check (true);
 create policy "anon all dishes"           on dishes           for all using (true) with check (true);
 create policy "anon all dish_ingredients" on dish_ingredients for all using (true) with check (true);
 create policy "anon all diets"            on diets            for all using (true) with check (true);
 create policy "anon all diet_dishes"      on diet_dishes      for all using (true) with check (true);
+create policy "anon all day_log"          on day_log          for all using (true) with check (true);

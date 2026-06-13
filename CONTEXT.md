@@ -88,7 +88,8 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Syntax check del JS embebido:** extraer el último `<script>` de index.html y `node --check`.
 
 ## 10. Buenos puntos de extensión (ideas para nuevas funcionalidades)
-1. ~~Conectar HOY con Supabase~~ ✅ **Hecho** — los macros del día salen de la DB vía `dishName` + `mealValue()` (fallback a `SLOTS`). Posible mejora: elegir las comidas del día directamente desde `diet_dishes` en vez de los arrays en código, y modelar las porciones especiales de REFEED/DIETBREAK (hoy el almuerzo refeed usa el plato estándar, sin la doble porción).
+1. ~~Conectar HOY con Supabase~~ ✅ **Hecho** — macros del día desde la DB vía `dishName` + `mealValue()`; el **almuerzo** se lee de `diet_dishes` (`dietLunchDish()`), así reasignar/renombrar el plato en Supabase se refleja. Fallback al plan en código. Pendiente menor: porciones especiales de REFEED/DIETBREAK (el almuerzo refeed usa el plato estándar sin la doble porción).
+2b. ~~Historial de consumo en Supabase~~ ✅ **Hecho** — tabla `day_log(log_date pk, state jsonb)`. `commitDay(ds)` sube el estado del día (comidas/extras/entreno) en cada cambio; `syncDay(ds)`/`pullDay(ds)` lo baja al abrir/navegar un día. localStorage queda como caché offline. Migración: `supabase/day_log.sql`. **Pendiente:** el peso (`S.weights`) sigue solo en localStorage; resolución de conflictos es last-write-wins (sin cola offline).
 2. **Historial de consumo en Supabase:** hoy el progreso diario vive solo en localStorage. Tabla `log(date, dish_id/custom, grams, done...)` para sync entre dispositivos.
 3. **Auth de Supabase** para proteger escritura (multiusuario o solo dueño).
 4. **Editor de dietas** (hoy `foodsDiets` es solo lectura): asignar/editar `diet_dishes`.
