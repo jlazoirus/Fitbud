@@ -9,6 +9,6 @@
 - [x] Fase 6 — Integración Claude API
 - [x] Fase 7 — Entrada por voz
 - [x] Fase 8 — Extras
-- [ ] Fase 9 — Despliegue en Vercel
+- [x] Fase 9 — Despliegue (GitHub Pages activado; instrucciones de Vercel en README)
 
-Última fase completada: Fase 8 — Extras (peso + gráfico, indicador de semana, resumen del día)
+Última fase completada: Fase 9 — Despliegue
