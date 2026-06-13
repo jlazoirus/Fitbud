@@ -3,7 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Tracker PWA del plan nutricional y de entrenamiento Fitbud.">
 <meta name="theme-color" content="#0f172a">
+<meta name="color-scheme" content="dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fitbud">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="assets/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="assets/icon-192.png">
 <title>Fitbud — Tracker plan 10 semanas</title>
 <style>
   :root{
@@ -121,6 +130,8 @@
   .toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--line);padding:9px 14px;border-radius:999px;font-size:13px;z-index:200;opacity:0;transition:opacity .2s}
   .toast.show{opacity:1}
 </style>
+<!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
+<script src="config.js"></script>
 <!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -136,6 +147,41 @@
    Fases 1-8: datos, vista HOY, navegación, reemplazos,
    macros en vivo, IA (Claude API), voz y extras.
    ============================================================ */
+
+/* ---------- CONFIGURACIÓN RUNTIME (config.js + overrides locales) ---------- */
+const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const RAW_CONFIG = window.FITBUD_CONFIG || {};
+const CONFIG = {
+  anthropic:{
+    apiKey:String((RAW_CONFIG.anthropic&&RAW_CONFIG.anthropic.apiKey)||RAW_CONFIG.anthropicApiKey||"").trim(),
+    model:String((RAW_CONFIG.anthropic&&RAW_CONFIG.anthropic.model)||RAW_CONFIG.anthropicModel||DEFAULT_MODEL).trim()||DEFAULT_MODEL,
+  },
+  supabase:{
+    url:String((RAW_CONFIG.supabase&&RAW_CONFIG.supabase.url)||RAW_CONFIG.supabaseUrl||"").trim(),
+    publishableKey:String((RAW_CONFIG.supabase&&(RAW_CONFIG.supabase.publishableKey||RAW_CONFIG.supabase.key))||RAW_CONFIG.supabasePublishableKey||RAW_CONFIG.supabaseKey||"").trim(),
+  },
+  pwa:{
+    registerServiceWorker:!(RAW_CONFIG.pwa&&RAW_CONFIG.pwa.registerServiceWorker===false)&&RAW_CONFIG.registerServiceWorker!==false,
+  },
+};
+
+function effectiveSettings(){
+  const local=S.settings||{};
+  return {
+    apiKey:local.apiKey||CONFIG.anthropic.apiKey,
+    model:local.model||CONFIG.anthropic.model||DEFAULT_MODEL,
+    supaUrl:local.supaUrl||CONFIG.supabase.url,
+    supaKey:local.supaKey||CONFIG.supabase.publishableKey,
+  };
+}
+function settingSource(name){
+  const local=S.settings||{};
+  if(name==="apiKey")return local.apiKey?"local":(CONFIG.anthropic.apiKey?"config":"");
+  if(name==="model")return local.model?"local":(CONFIG.anthropic.model?"config":"");
+  if(name==="supabase")return (local.supaUrl||local.supaKey)?"local":((CONFIG.supabase.url||CONFIG.supabase.publishableKey)?"config":"");
+  return "";
+}
+function maskedSecret(v){return v?("•".repeat(Math.max(0,v.length-4))+v.slice(-4)):"";}
 
 /* ---------- Fase 1: CAPA DE DATOS ---------- */
 const START = "2026-06-13";   // sábado
@@ -279,7 +325,7 @@ const KEY="fitbud_v1";
 let S=load();
 function load(){try{const o=JSON.parse(localStorage.getItem(KEY));return o&&typeof o==="object"?o:{};}catch(e){return{};}}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));}
-if(!S.days)S.days={}; if(!S.weights)S.weights={}; if(!S.settings)S.settings={model:"claude-haiku-4-5-20251001"};
+if(!S.days)S.days={}; if(!S.weights)S.weights={}; if(!S.settings)S.settings={};
 function dayState(ds){if(!S.days[ds])S.days[ds]={meals:{},extras:[],workoutDone:false};const d=S.days[ds];if(!d.meals)d.meals={};if(!d.extras)d.extras=[];return d;}
 function mealState(ds,id){const d=dayState(ds);if(!d.meals[id])d.meals[id]={done:false};return d.meals[id];}
 // valor efectivo de una comida (con override si existe)
@@ -533,7 +579,7 @@ function openEditor(kind,ds,id){
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
 function editorSheet(title,pre){
-  const aiOn=!!S.settings.apiKey;
+  const aiOn=!!effectiveSettings().apiKey;
   modal(`<h3>${title}</h3>
     <div class="field"><label>Descripción</label>
       <div class="row"><textarea id="f_name" rows="2" placeholder="Ej. 2 panes con palta y café">${esc(pre.name||"")}</textarea>
@@ -563,12 +609,13 @@ function saveEditor(){
    ============================================================ */
 const SYS_PROMPT="El usuario es vegetariano, no come huevo, toma proteína en polvo y busca alta proteína (~180 g/día) en déficit agresivo. Da estimaciones realistas de porciones reales, con kcal y macros.";
 async function callClaude(userText,maxTokens){
-  const key=S.settings.apiKey;
+  const cfg=effectiveSettings();
+  const key=cfg.apiKey;
   if(!key)throw new Error("No hay API key. Configúrala en Ajustes.");
   const res=await fetch("https://api.anthropic.com/v1/messages",{
     method:"POST",
     headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true","content-type":"application/json"},
-    body:JSON.stringify({model:S.settings.model||"claude-haiku-4-5-20251001",max_tokens:maxTokens||512,system:SYS_PROMPT,messages:[{role:"user",content:userText}]})
+    body:JSON.stringify({model:cfg.model||DEFAULT_MODEL,max_tokens:maxTokens||512,system:SYS_PROMPT,messages:[{role:"user",content:userText}]})
   });
   if(!res.ok){const e=await res.text();throw new Error("API "+res.status+": "+e.slice(0,200));}
   const data=await res.json();
@@ -596,7 +643,7 @@ async function aiEstimate(){
 
 // IA 2 — sugerir comidas
 async function aiSuggest(){
-  if(!S.settings.apiKey){toast("Activa tu API key en Ajustes");setView("settings");return;}
+  if(!effectiveSettings().apiKey){toast("Activa tu API key en Ajustes");setView("settings");return;}
   const{t,target}=dayTotals(current);const day=buildDay(current);
   const remK=Math.max(0,target.kcal-t.kcal),remP=Math.max(0,target.p-t.p);
   modal(`<h3>✨ Sugerencia de comida</h3><div id="aiOut"><div class="ai-box">Pensando opciones…</div></div>`);
@@ -611,7 +658,7 @@ function addSuggestion(s){const o=JSON.parse(s);const d=dayState(current);d.extr
 
 // IA 3 — revisar mis macros
 async function aiReview(){
-  if(!S.settings.apiKey){toast("Activa tu API key en Ajustes");setView("settings");return;}
+  if(!effectiveSettings().apiKey){toast("Activa tu API key en Ajustes");setView("settings");return;}
   const{t,target}=dayTotals(current);const day=buildDay(current);
   const now=new Date();const hora=now.getHours()+":"+String(now.getMinutes()).padStart(2,"0");
   modal(`<h3>🔍 Revisión de macros</h3><div id="aiOut"><div class="ai-box">Analizando…</div></div>`);
@@ -627,7 +674,7 @@ async function aiReview(){
    ============================================================ */
 let recog=null;
 function toggleMic(){
-  if(!S.settings.apiKey){toast("Activa la API key en Ajustes para usar voz");return;}
+  if(!effectiveSettings().apiKey){toast("Activa la API key en Ajustes para usar voz");return;}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast("Tu navegador no soporta dictado por voz");return;}
   if(recog){stopMic();return;}
@@ -671,21 +718,30 @@ function weightChart(){
 }
 
 function renderSettings(){
-  const k=S.settings.apiKey;const masked=k?("•".repeat(Math.max(0,k.length-4))+k.slice(-4)):"";
+  const cfg=effectiveSettings();
+  const k=cfg.apiKey;
+  const masked=maskedSecret(k);
+  const keySource=settingSource("apiKey");
+  const modelSource=settingSource("model");
+  const supaSource=settingSource("supabase");
+  const supaConfigured=!!(cfg.supaUrl&&cfg.supaKey);
+  const keyNote=keySource==="config"?"Leyendo desde config.js. Un valor guardado aquí sobrescribe este navegador.":keySource==="local"?"Usando override local de este navegador.":"Puedes definirla en config.js o guardarla solo en este navegador.";
+  const supaNote=supaSource==="config"?"Leyendo credenciales desde config.js. Los campos de abajo pueden sobrescribir este navegador.":supaSource==="local"?"Usando override local de este navegador.":"Define Supabase en config.js para que la app conecte sola.";
   $("#app").innerHTML=`<header><h2>⚙️ Ajustes</h2></header>
     <div class="dash">
       <div class="field"><label>API key de Anthropic (console.anthropic.com)</label>
         <input id="set_key" type="password" placeholder="${k?masked:'sk-ant-...'}" value="">
-        <div class="muted small" style="margin-top:6px">Se guarda solo en este navegador (localStorage). Nunca se sube al repo.</div>
+        <div class="muted small" style="margin-top:6px">${keyNote}</div>
       </div>
       <div class="field"><label>Modelo</label>
         <select id="set_model">
-          <option value="claude-haiku-4-5-20251001" ${S.settings.model==="claude-haiku-4-5-20251001"?"selected":""}>Haiku 4.5 (rápido y económico)</option>
-          <option value="claude-sonnet-4-6" ${S.settings.model==="claude-sonnet-4-6"?"selected":""}>Sonnet 4.6 (sugerencias más elaboradas)</option>
+          <option value="claude-haiku-4-5-20251001" ${cfg.model==="claude-haiku-4-5-20251001"?"selected":""}>Haiku 4.5 (rápido y económico)</option>
+          <option value="claude-sonnet-4-6" ${cfg.model==="claude-sonnet-4-6"?"selected":""}>Sonnet 4.6 (sugerencias más elaboradas)</option>
         </select>
+        <div class="muted small" style="margin-top:6px">Origen: ${modelSource||"valor por defecto"}.</div>
       </div>
       <button class="btn btn-accent" style="width:100%" onclick="saveSettings()">Guardar</button>
-      ${k?`<button class="btn" style="width:100%;margin-top:8px" onclick="clearKey()">Borrar API key</button>`:""}
+      ${S.settings.apiKey?`<button class="btn" style="width:100%;margin-top:8px" onclick="clearKey()">Borrar API key local</button>`:""}
     </div>
     <div class="dash">
       <div class="row between"><b>Estado de IA y voz</b><span class="badge ${k?'b-PESAS':'b-Libre'}">${k?'Activadas':'Manual'}</span></div>
@@ -693,16 +749,16 @@ function renderSettings(){
     </div>
 
     <div class="dash">
-      <div class="row between"><b>🗄️ Base de datos (Supabase)</b><span class="badge ${supa?'b-BAJO':'b-Libre'}">${supa?'Conectada':'Sin conectar'}</span></div>
-      <div class="muted small" style="margin:6px 0 10px">Guarda ingredientes, platos y dietas, y calcula sus macros. Crea un proyecto gratis en supabase.com, corre el SQL de la carpeta <code>supabase/</code> y pega aquí el Project ID (o la URL) y la <b>Publishable key</b> (Settings → API Keys).</div>
+      <div class="row between"><b>🗄️ Base de datos (Supabase)</b><span class="badge ${supa?'b-BAJO':'b-Libre'}">${supa?'Conectada':(supaConfigured?'Config pendiente':'Sin conectar')}</span></div>
+      <div class="muted small" style="margin:6px 0 10px">${supaNote}</div>
       <div class="field"><label>Project URL o ID</label>
-        <input id="set_supaurl" type="text" placeholder="tu-project-id  ó  https://xxxxx.supabase.co" value="${esc(S.settings.supaUrl||'')}">
+        <input id="set_supaurl" type="text" placeholder="tu-project-id  ó  https://xxxxx.supabase.co" value="${esc(cfg.supaUrl||'')}">
       </div>
       <div class="field"><label>Publishable key (sb_publishable_…)</label>
-        <input id="set_supakey" type="password" placeholder="${S.settings.supaKey?'•••• guardada':'sb_publishable_...'}" value="">
+        <input id="set_supakey" type="password" placeholder="${cfg.supaKey?maskedSecret(cfg.supaKey):'sb_publishable_...'}" value="">
       </div>
       <button class="btn btn-accent" style="width:100%" onclick="saveSupabase()">Guardar y conectar</button>
-      ${S.settings.supaKey?`<button class="btn" style="width:100%;margin-top:8px" onclick="clearSupabase()">Desconectar</button>`:""}
+      ${(S.settings.supaUrl||S.settings.supaKey)?`<button class="btn" style="width:100%;margin-top:8px" onclick="clearSupabase()">Borrar conexión local</button>`:""}
       ${DB.error&&DB.error!=='no-config'?`<div class="ai-box">⚠️ ${esc(DB.error)}</div>`:""}
     </div>
 
@@ -721,8 +777,8 @@ function saveSupabase(){
   toast("Conectando…");
   dbLoad().then(()=>{renderSettings();toast(DB.error?"Error al conectar":"Conectado ✓");});
 }
-function clearSupabase(){delete S.settings.supaKey;delete S.settings.supaUrl;save();supa=null;DB.loaded=false;DB.error=null;toast("Desconectado");renderSettings();}
-function clearKey(){delete S.settings.apiKey;save();toast("API key borrada");renderSettings();}
+function clearSupabase(){delete S.settings.supaKey;delete S.settings.supaUrl;save();supa=null;DB.loaded=false;DB.error=null;supaInit();toast(supa?"Override borrado; usando config.js":"Desconectado");renderSettings();}
+function clearKey(){delete S.settings.apiKey;save();toast(CONFIG.anthropic.apiKey?"Override borrado; usando config.js":"API key borrada");renderSettings();}
 function resetData(){if(confirm("¿Borrar todo el progreso (comidas marcadas, extras, pesos)? La API key se conserva."))  {const set=S.settings;S={days:{},weights:{},settings:set};save();toast("Progreso borrado");render();}}
 
 /* ============================================================
@@ -745,9 +801,10 @@ function supaUrlFrom(v){
 }
 function supaInit(){
   supa=null;
-  const url=supaUrlFrom(S.settings.supaUrl);
-  if(url&&S.settings.supaKey&&window.supabase&&window.supabase.createClient){
-    try{supa=window.supabase.createClient(url,S.settings.supaKey);}catch(e){supa=null;}
+  const cfg=effectiveSettings();
+  const url=supaUrlFrom(cfg.supaUrl);
+  if(url&&cfg.supaKey&&window.supabase&&window.supabase.createClient){
+    try{supa=window.supabase.createClient(url,cfg.supaKey);}catch(e){supa=null;}
   }
   return supa;
 }
@@ -912,7 +969,17 @@ async function deleteDish(id){
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 /* ---------- init ---------- */
+function registerServiceWorker(){
+  if(!CONFIG.pwa.registerServiceWorker||!("serviceWorker" in navigator))return;
+  const host=location.hostname;
+  const secure=location.protocol==="https:"||host==="localhost"||host==="127.0.0.1"||host==="::1";
+  if(!secure)return;
+  window.addEventListener("load",()=>{
+    navigator.serviceWorker.register("./service-worker.js").catch(e=>console.warn("No se pudo registrar el service worker",e));
+  });
+}
 supaInit();
+registerServiceWorker();
 render();
 </script>
 </body>

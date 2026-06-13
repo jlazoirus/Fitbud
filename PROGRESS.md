@@ -10,5 +10,6 @@
 - [x] Fase 7 — Entrada por voz
 - [x] Fase 8 — Extras
 - [x] Fase 9 — Despliegue (GitHub Pages activado; instrucciones de Vercel en README)
+- [x] Fase 10 — Config runtime + PWA
 
-Última fase completada: Fase 9 — Despliegue
+Última fase completada: Fase 10 — Config runtime + PWA

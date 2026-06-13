@@ -12,3 +12,4 @@ Cada fase es autocontenida y deja la app funcionando. Al terminar cada una: veri
 - **Fase 7 — Entrada por voz.** Micrófono con Web Speech API en español que alimenta al estimador de la Fase 6. Commit.
 - **Fase 8 — Extras.** Registro de peso + gráfico, indicador de semana, resumen del día. Commit.
 - **Fase 9 — Despliegue en Vercel.** Subir a GitHub y desplegar en Vercel (gratis). Verificar que el micrófono y la API funcionen en la URL HTTPS. Commit final y entregar la URL.
+- **Fase 10 — Config runtime + PWA.** Mover credenciales/servicios a `config.js` con overrides locales opcionales, agregar manifest, service worker e íconos instalables. Verificar app en localhost. Commit.
