@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v1";
+const CACHE_NAME = "fitbud-pwa-v2";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -35,6 +35,11 @@ self.addEventListener("fetch", event => {
   }
 
   if (url.origin === self.location.origin) {
+    // Nunca cachear las funciones serverless: siempre a la red.
+    if (url.pathname.startsWith("/api/")) {
+      event.respondWith(fetch(request));
+      return;
+    }
     if (url.pathname.endsWith("/config.js")) {
       event.respondWith(networkFirst(request));
       return;
