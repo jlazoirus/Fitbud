@@ -121,6 +121,8 @@
   .toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);background:var(--card2);border:1px solid var(--line);padding:9px 14px;border-radius:999px;font-size:13px;z-index:200;opacity:0;transition:opacity .2s}
   .toast.show{opacity:1}
 </style>
+<!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="app"></div>
@@ -320,16 +322,17 @@ function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show"
 function render(){
   renderTabs();
   if(view==="week")return renderWeek();
+  if(view==="foods")return renderFoods();
   if(view==="weight")return renderWeight();
   if(view==="settings")return renderSettings();
   renderDay();
 }
 
 function renderTabs(){
-  const tabs=[["day","Hoy","🏠"],["week","Semana","📅"],["weight","Peso","⚖️"],["settings","Ajustes","⚙️"]];
+  const tabs=[["day","Hoy","🏠"],["week","Semana","📅"],["foods","Alimentos","🥗"],["weight","Peso","⚖️"],["settings","Ajustes","⚙️"]];
   $("#tabs").innerHTML=tabs.map(([v,l,i])=>`<button class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${i}</span>${l}</button>`).join("");
 }
-function setView(v){view=v;if(v==="day")current=clampDate(current);render();window.scrollTo(0,0);}
+function setView(v){view=v;if(v==="day")current=clampDate(current);if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}render();window.scrollTo(0,0);}
 
 /* ---------- Fase 2 + 5: VISTA HOY ---------- */
 function renderDay(){
@@ -688,20 +691,218 @@ function renderSettings(){
       <div class="row between"><b>Estado de IA y voz</b><span class="badge ${k?'b-PESAS':'b-Libre'}">${k?'Activadas':'Manual'}</span></div>
       <div class="muted small" style="margin-top:6px">Sin API key el tracker funciona 100% manual. Con key se habilitan: estimar comida, sugerir comidas, revisar macros y dictado por voz.</div>
     </div>
+
+    <div class="dash">
+      <div class="row between"><b>🗄️ Base de datos (Supabase)</b><span class="badge ${supa?'b-BAJO':'b-Libre'}">${supa?'Conectada':'Sin conectar'}</span></div>
+      <div class="muted small" style="margin:6px 0 10px">Guarda ingredientes, platos y dietas, y calcula sus macros. Crea un proyecto gratis en supabase.com, corre el SQL de la carpeta <code>supabase/</code> y pega aquí la URL y la <b>anon key</b> (Settings → API).</div>
+      <div class="field"><label>Project URL</label>
+        <input id="set_supaurl" type="text" placeholder="https://xxxxx.supabase.co" value="${esc(S.settings.supaUrl||'')}">
+      </div>
+      <div class="field"><label>Anon public key</label>
+        <input id="set_supakey" type="password" placeholder="${S.settings.supaKey?'•••• guardada':'eyJ...'}" value="">
+      </div>
+      <button class="btn btn-accent" style="width:100%" onclick="saveSupabase()">Guardar y conectar</button>
+      ${S.settings.supaKey?`<button class="btn" style="width:100%;margin-top:8px" onclick="clearSupabase()">Desconectar</button>`:""}
+      ${DB.error&&DB.error!=='no-config'?`<div class="ai-box">⚠️ ${esc(DB.error)}</div>`:""}
+    </div>
+
     <div class="dash">
       <b>Datos</b>
-      <div class="muted small" style="margin:6px 0 10px">Todo tu progreso se guarda en este dispositivo.</div>
-      <button class="btn" style="width:100%" onclick="resetData()">Borrar todo el progreso</button>
+      <div class="muted small" style="margin:6px 0 10px">Tu progreso diario (comidas marcadas, pesos) se guarda en este dispositivo. Los alimentos viven en Supabase.</div>
+      <button class="btn" style="width:100%" onclick="resetData()">Borrar todo el progreso local</button>
     </div>`;
 }
 function saveSettings(){const v=$("#set_key").value.trim();if(v)S.settings.apiKey=v;S.settings.model=$("#set_model").value;save();toast("Ajustes guardados");renderSettings();}
+function saveSupabase(){
+  const url=$("#set_supaurl").value.trim();const key=$("#set_supakey").value.trim();
+  S.settings.supaUrl=url; if(key)S.settings.supaKey=key; save();
+  supaInit(); DB.loaded=false; DB.error=null;
+  if(!supa){toast("Faltan datos o la librería no cargó");renderSettings();return;}
+  toast("Conectando…");
+  dbLoad().then(()=>{renderSettings();toast(DB.error?"Error al conectar":"Conectado ✓");});
+}
+function clearSupabase(){delete S.settings.supaKey;delete S.settings.supaUrl;save();supa=null;DB.loaded=false;DB.error=null;toast("Desconectado");renderSettings();}
 function clearKey(){delete S.settings.apiKey;save();toast("API key borrada");renderSettings();}
 function resetData(){if(confirm("¿Borrar todo el progreso (comidas marcadas, extras, pesos)? La API key se conserva."))  {const set=S.settings;S={days:{},weights:{},settings:set};save();toast("Progreso borrado");render();}}
+
+/* ============================================================
+   BASE DE DATOS DE ALIMENTOS (Supabase)
+   ingredientes (por 100g) -> platos (recetas) -> dietas
+   Los macros de cada plato se calculan sumando ingredientes.
+   ============================================================ */
+let supa=null;
+let DB={ingredients:[],dishes:[],dishIng:[],diets:[],dietDishes:[],loaded:false,error:null};
+let foodTab="platos";
+
+function supaInit(){
+  supa=null;
+  if(S.settings.supaUrl&&S.settings.supaKey&&window.supabase&&window.supabase.createClient){
+    try{supa=window.supabase.createClient(S.settings.supaUrl,S.settings.supaKey);}catch(e){supa=null;}
+  }
+  return supa;
+}
+async function dbLoad(){
+  if(!supa){DB.error="no-config";return;}
+  try{
+    const [a,b,c,d,e]=await Promise.all([
+      supa.from("ingredients").select("*"),
+      supa.from("dishes").select("*"),
+      supa.from("dish_ingredients").select("*"),
+      supa.from("diets").select("*"),
+      supa.from("diet_dishes").select("*"),
+    ]);
+    for(const r of [a,b,c,d,e]) if(r.error) throw r.error;
+    DB.ingredients=a.data||[];DB.dishes=b.data||[];DB.dishIng=c.data||[];DB.diets=d.data||[];DB.dietDishes=e.data||[];
+    DB.ingredients.sort((x,y)=>(x.category||"").localeCompare(y.category||"")||x.name.localeCompare(y.name));
+    DB.dishes.sort((x,y)=>(x.slot||"").localeCompare(y.slot||"")||x.name.localeCompare(y.name));
+    DB.diets.sort((x,y)=>(x.code||"").localeCompare(y.code||""));
+    DB.loaded=true;DB.error=null;
+  }catch(e){DB.loaded=false;DB.error=(e&&e.message)||String(e);}
+}
+function ingById(id){return DB.ingredients.find(x=>x.id===id);}
+function macrosFromLines(lines){let t={kcal:0,p:0,c:0,f:0};lines.forEach(l=>{const i=ingById(+l.ingredient_id);if(!i||l.grams==null)return;const g=(+l.grams)/100;t.kcal+=i.kcal*g;t.p+=i.protein_g*g;t.c+=i.carbs_g*g;t.f+=i.fat_g*g;});return{kcal:Math.round(t.kcal),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f)};}
+function dishMacros(dishId){return macrosFromLines(DB.dishIng.filter(x=>x.dish_id===dishId));}
+
+function renderFoods(){
+  if(!supa){
+    $("#app").innerHTML=`<header><h2>🥗 Alimentos</h2></header><div class="dash"><b>Conecta tu base de datos</b><div class="muted small" style="margin:8px 0 12px">Aquí viven los ingredientes, platos y dietas con sus macros calculados. Conéctala en Ajustes (Supabase).</div><button class="btn btn-accent" style="width:100%" onclick="setView('settings')">Ir a Ajustes</button></div>`;return;
+  }
+  if(!DB.loaded&&!DB.error){$("#app").innerHTML=`<header><h2>🥗 Alimentos</h2></header><div class="dash muted">Cargando base de datos…</div>`;dbLoad().then(render);return;}
+  if(DB.error){$("#app").innerHTML=`<header><h2>🥗 Alimentos</h2></header><div class="dash"><div class="ai-box">⚠️ ${esc(DB.error)}</div><button class="btn" style="width:100%;margin-top:10px" onclick="DB.error=null;render();dbLoad().then(render)">Reintentar</button><button class="btn" style="width:100%;margin-top:8px" onclick="setView('settings')">Revisar conexión</button></div>`;return;}
+  const subtabs=[["platos","Platos"],["ingredientes","Ingredientes"],["dietas","Dietas"]];
+  const body=foodTab==="ingredientes"?foodsIngredients():foodTab==="dietas"?foodsDiets():foodsDishes();
+  $("#app").innerHTML=`<header><h2>🥗 Alimentos <span class="muted small">· ${DB.dishes.length} platos · ${DB.ingredients.length} ingredientes</span></h2>
+    <div class="row wrap" style="margin-top:10px">${subtabs.map(([v,l])=>`<button class="btn btn-sm ${foodTab===v?'btn-accent':''}" onclick="setFoodTab('${v}')">${l}</button>`).join("")}</div></header>
+    ${body}`;
+}
+function setFoodTab(t){foodTab=t;render();window.scrollTo(0,0);}
+
+function foodsDishes(){
+  const bySlot={};DB.dishes.forEach(d=>{(bySlot[d.slot||"otros"]=bySlot[d.slot||"otros"]||[]).push(d);});
+  const order=["desayuno","almuerzo","batido","cena","snack","otros"];
+  let html=`<button class="btn btn-accent" style="width:100%;margin-bottom:10px" onclick="editDish(null)">＋ Nuevo plato</button>`;
+  order.forEach(slot=>{if(!bySlot[slot])return;html+=`<div class="section-h">${slot}</div>`;
+    bySlot[slot].forEach(d=>{const m=dishMacros(d.id);
+      html+=`<div class="meal"><div class="meal-head"><div>
+        <div class="name">${esc(d.name)}${d.menu?` <span class="pill">Menú ${d.menu}</span>`:""}</div>
+        <div class="nums"><b>${m.kcal}</b> kcal · P <b>${m.p}</b> · C <b>${m.c}</b> · G <b>${m.f}</b> g</div>
+      </div></div><div class="meal-actions"><button class="btn btn-sm" onclick="editDish(${d.id})">Ver / editar receta</button></div></div>`;
+    });
+  });
+  return html;
+}
+function foodsIngredients(){
+  const byCat={};DB.ingredients.forEach(i=>{(byCat[i.category||"Otros"]=byCat[i.category||"Otros"]||[]).push(i);});
+  let html=`<button class="btn btn-accent" style="width:100%;margin-bottom:10px" onclick="editIngredient(null)">＋ Nuevo ingrediente</button>`;
+  Object.keys(byCat).sort().forEach(cat=>{html+=`<div class="section-h">${esc(cat)}</div>`;
+    byCat[cat].forEach(i=>{html+=`<div class="meal" onclick="editIngredient(${i.id})"><div class="meal-head"><div>
+      <div class="name">${esc(i.name)}</div>
+      <div class="nums muted">por 100 g — <b>${i.kcal}</b> kcal · P <b>${i.protein_g}</b> · C <b>${i.carbs_g}</b> · G <b>${i.fat_g}</b></div>
+    </div></div></div>`;});
+  });
+  return html;
+}
+function foodsDiets(){
+  const dayNames=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+  let html="";
+  DB.diets.forEach(dt=>{
+    const items=DB.dietDishes.filter(x=>x.diet_id===dt.id).sort((a,b)=>(((a.weekday+6)%7)-((b.weekday+6)%7)));
+    let sum={kcal:0,p:0},n=0;
+    const rows=items.map(it=>{const dish=DB.dishes.find(x=>x.id===it.dish_id);if(!dish)return"";const m=dishMacros(dish.id);sum.kcal+=m.kcal;sum.p+=m.p;n++;
+      return `<div class="wk-day"><div class="wk-left"><div class="d">${dayNames[it.weekday]} <span class="muted small">${esc(it.slot||"")}</span></div><div class="m">${esc(dish.name)}</div></div><div class="center"><div style="font-weight:600">${m.kcal}</div><div class="muted small">P${m.p}</div></div></div>`;
+    }).join("");
+    html+=`<div class="section-h">${esc(dt.name)}</div><div class="muted small" style="margin:-4px 2px 8px">${esc(dt.description||"")}${n?` · almuerzo promedio ${Math.round(sum.kcal/n)} kcal / P ${Math.round(sum.p/n)} g`:""}</div>${rows}`;
+  });
+  return html||'<div class="muted small">Sin dietas.</div>';
+}
+
+/* ---- editor de ingrediente ---- */
+function editIngredient(id){
+  const it=id?ingById(id):{name:"",category:"",kcal:"",protein_g:"",carbs_g:"",fat_g:""};
+  window._ing={id};
+  modal(`<h3>${id?"Editar":"Nuevo"} ingrediente <span class="muted small">(valores por 100 g)</span></h3>
+    <div class="field"><label>Nombre</label><input id="ig_name" value="${esc(it.name)}"></div>
+    <div class="field"><label>Categoría</label><input id="ig_cat" value="${esc(it.category||"")}" placeholder="Proteína, Cereal, Verdura…"></div>
+    <div class="grid4">
+      <div class="field"><label>kcal</label><input id="ig_kcal" type="number" inputmode="decimal" value="${it.kcal}"></div>
+      <div class="field"><label>Prot</label><input id="ig_p" type="number" inputmode="decimal" value="${it.protein_g}"></div>
+      <div class="field"><label>Carb</label><input id="ig_c" type="number" inputmode="decimal" value="${it.carbs_g}"></div>
+      <div class="field"><label>Grasa</label><input id="ig_f" type="number" inputmode="decimal" value="${it.fat_g}"></div>
+    </div>
+    <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="saveIngredient()">Guardar</button>
+    ${id?`<button class="btn" style="width:100%;margin-top:8px" onclick="deleteIngredient(${id})">Eliminar</button>`:""}`);
+}
+async function saveIngredient(){
+  const row={name:$("#ig_name").value.trim(),category:$("#ig_cat").value.trim()||null,kcal:+$("#ig_kcal").value||0,protein_g:+$("#ig_p").value||0,carbs_g:+$("#ig_c").value||0,fat_g:+$("#ig_f").value||0};
+  if(!row.name){toast("Pon un nombre");return;}
+  const id=window._ing.id;
+  const res=id?await supa.from("ingredients").update(row).eq("id",id):await supa.from("ingredients").insert(row);
+  if(res.error){toast("Error: "+res.error.message);return;}
+  closeModal();await dbLoad();render();toast("Guardado");
+}
+async function deleteIngredient(id){
+  if(!confirm("¿Eliminar ingrediente? No se puede si está usado en una receta."))return;
+  const res=await supa.from("ingredients").delete().eq("id",id);
+  if(res.error){toast("No se pudo: "+res.error.message);return;}
+  closeModal();await dbLoad();render();toast("Eliminado");
+}
+
+/* ---- editor de plato (con receta) ---- */
+function editDish(id){
+  const dish=id?DB.dishes.find(d=>d.id===id):{name:"",slot:"almuerzo",menu:""};
+  const lines=id?DB.dishIng.filter(x=>x.dish_id===id).map(l=>({ingredient_id:l.ingredient_id,grams:l.grams})):[];
+  window._dish={id,name:dish.name||"",slot:dish.slot||"almuerzo",menu:dish.menu||"",lines};
+  dishModal();
+}
+function dishSync(){const n=document.getElementById("ds_name");if(n)window._dish.name=n.value;}
+function dishModal(){
+  const d=window._dish;const m=macrosFromLines(d.lines);
+  const slots=["desayuno","almuerzo","batido","cena","snack"];
+  const linesHtml=d.lines.map((l,idx)=>`<div class="row" style="margin-bottom:6px">
+    <select onchange="dishLineSet(${idx},'ingredient_id',this.value)" style="flex:1;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px">${DB.ingredients.map(i=>`<option value="${i.id}" ${i.id===+l.ingredient_id?"selected":""}>${esc(i.name)}</option>`).join("")}</select>
+    <input type="number" inputmode="decimal" value="${l.grams}" onchange="dishLineSet(${idx},'grams',this.value)" style="width:64px;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px;text-align:center">
+    <span class="muted small">g</span>
+    <button class="btn btn-sm" onclick="dishLineDel(${idx})">✕</button>
+  </div>`).join("");
+  modal(`<h3>${d.id?"Editar":"Nuevo"} plato</h3>
+    <div class="field"><label>Nombre</label><input id="ds_name" value="${esc(d.name)}"></div>
+    <div class="row">
+      <div class="field" style="flex:1"><label>Slot</label><select id="ds_slot" onchange="window._dish.slot=this.value">${slots.map(s=>`<option ${s===d.slot?"selected":""}>${s}</option>`).join("")}</select></div>
+      <div class="field" style="flex:1"><label>Menú</label><select id="ds_menu" onchange="window._dish.menu=this.value"><option value="">—</option>${["A","B","C","D"].map(x=>`<option ${x===d.menu?"selected":""}>${x}</option>`).join("")}</select></div>
+    </div>
+    <div class="section-h" style="margin-left:0">Ingredientes (g)</div>
+    ${linesHtml||'<div class="muted small">Sin ingredientes aún.</div>'}
+    <button class="btn btn-sm" style="margin-top:6px" onclick="dishLineAdd()">＋ Agregar ingrediente</button>
+    <div class="ai-box" style="margin-top:12px"><b>Macros calculados:</b> ${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g</div>
+    <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveDish()">Guardar plato</button>
+    ${d.id?`<button class="btn" style="width:100%;margin-top:8px" onclick="deleteDish(${d.id})">Eliminar plato</button>`:""}`);
+}
+function dishLineSet(idx,field,val){window._dish.lines[idx][field]=val;dishSync();dishModal();}
+function dishLineDel(idx){dishSync();window._dish.lines.splice(idx,1);dishModal();}
+function dishLineAdd(){if(!DB.ingredients.length){toast("Agrega ingredientes primero");return;}dishSync();window._dish.lines.push({ingredient_id:DB.ingredients[0].id,grams:100});dishModal();}
+async function saveDish(){
+  const d=window._dish;dishSync();d.name=(d.name||"").trim();
+  if(!d.name){toast("Pon un nombre al plato");return;}
+  let dishId=d.id;
+  if(dishId){const r=await supa.from("dishes").update({name:d.name,slot:d.slot,menu:d.menu||null}).eq("id",dishId);if(r.error){toast("Error: "+r.error.message);return;}}
+  else{const r=await supa.from("dishes").insert({name:d.name,slot:d.slot,menu:d.menu||null}).select();if(r.error){toast("Error: "+r.error.message);return;}dishId=r.data[0].id;}
+  await supa.from("dish_ingredients").delete().eq("dish_id",dishId);
+  const rows=d.lines.filter(l=>l.ingredient_id&&l.grams).map(l=>({dish_id:dishId,ingredient_id:+l.ingredient_id,grams:+l.grams}));
+  if(rows.length){const r=await supa.from("dish_ingredients").insert(rows);if(r.error){toast("Error en ingredientes: "+r.error.message);return;}}
+  closeModal();await dbLoad();render();toast("Plato guardado");
+}
+async function deleteDish(id){
+  if(!confirm("¿Eliminar este plato?"))return;
+  const r=await supa.from("dishes").delete().eq("id",id);
+  if(r.error){toast("No se pudo: "+r.error.message);return;}
+  closeModal();await dbLoad();render();toast("Plato eliminado");
+}
 
 /* ---------- util ---------- */
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 /* ---------- init ---------- */
+supaInit();
 render();
 </script>
 </body>

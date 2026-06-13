@@ -27,6 +27,25 @@ Sin API key, el tracker funciona **100% manual**.
 
 > 🔒 La API key vive solo en el `localStorage` de tu navegador. **Nunca** se escribe en el código ni se sube al repo.
 
+## Base de datos de alimentos (Supabase)
+
+La pestaña **Alimentos** usa una base de datos real (Supabase / PostgreSQL) con tres tablas:
+
+- **`ingredients`** — datos nutricionales por 100 g (kcal, proteína, carbos, grasa).
+- **`dishes`** + **`dish_ingredients`** — platos como recetas de ingredientes con gramos.
+- **`diets`** + **`diet_dishes`** — los menús A/B/C/D y qué plato va cada día.
+
+Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se guardan a mano). Desde la app puedes ver, crear y editar ingredientes y platos.
+
+### Configurar (una sola vez)
+
+1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
+2. En el **SQL Editor**, ejecuta primero [`supabase/schema.sql`](supabase/schema.sql) y luego [`supabase/seed.sql`](supabase/seed.sql) (datos precargados: 55 ingredientes, 43 platos, 4 dietas).
+3. En **Project Settings → API**, copia la **Project URL** y la **anon public key**.
+4. En la app → **Ajustes → Base de datos**, pégalas y pulsa *Guardar y conectar*.
+
+> ⚠️ Las políticas RLS del `schema.sql` permiten lectura y escritura al rol anónimo (cómodo para uso personal). Como la URL+anon key viven en tu navegador, cualquiera que las obtenga podría editar. Para proteger la escritura, activa Supabase Auth y cambia las políticas a `to authenticated`.
+
 ## Uso local
 
 Como el micrófono requiere contexto seguro, sírvelo desde `localhost`:
