@@ -1,10 +1,14 @@
 /*
-  Fitbud runtime config.
+  Fitbud runtime config (FALLBACK opcional).
 
-  Este archivo se carga antes de la app. Para un despliegue público,
-  evita poner aquí una API key privada de Claude: cualquier valor en
-  una app estática puede ser leído desde el navegador. Supabase usa una
-  publishable key, pero protege escrituras con RLS/Auth si el sitio es público.
+  En producción las credenciales NO van aquí: viven como variables de
+  entorno en Vercel y la app las obtiene vía /api/config y /api/claude
+  (ver README → Despliegue). Así nada de esto queda en GitHub.
+
+  Este archivo es solo un fallback para desarrollo local sin funciones.
+  ⚠️ NO pongas aquí la API key de Claude si vas a publicar el repo:
+  cualquier valor en una app estática es legible desde el navegador.
+  La publishable key de Supabase sí es pública por diseño (la protege el RLS).
 */
 window.FITBUD_CONFIG = {
   anthropic: {

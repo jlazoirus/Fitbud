@@ -2,7 +2,7 @@
 
 Tracker web/PWA de mi plan nutricional y de entrenamiento de **10 semanas** (sáb 13 jun → dom 23 ago 2026). App estática, sin frameworks ni build step.
 
-**🔗 En vivo:** https://jlazoirus.github.io/Fitbud/
+**🔗 En vivo:** desplegado en Vercel (las credenciales viven como variables de entorno en Vercel, no en este repo).
 
 ## Qué hace
 
@@ -15,40 +15,31 @@ Tracker web/PWA de mi plan nutricional y de entrenamiento de **10 semanas** (sá
 - **Registro de peso** semanal con gráfico de evolución, indicador de semana y resumen del día.
 - **Instalable como PWA** con manifest, íconos y cache offline del shell de la app.
 
-## Configuración
+## Configuración (de dónde salen las credenciales)
 
-La app lee servicios externos desde [`config.js`](config.js) al cargar:
+La app resuelve sus credenciales en este orden de prioridad:
 
-```js
-window.FITBUD_CONFIG = {
-  anthropic: {
-    apiKey: "",
-    model: "claude-haiku-4-5-20251001",
-  },
-  supabase: {
-    url: "",
-    publishableKey: "",
-  },
-  pwa: {
-    registerServiceWorker: true,
-  },
-};
-```
+1. **Override local** guardado en **Ajustes** (solo en tu navegador, `localStorage`). Útil para desarrollo local.
+2. **`/api/config`** — config servida por Vercel desde variables de entorno (**la forma de producción**).
+3. [`config.js`](config.js) — fallback opcional versionado (se deja vacío en el repo).
 
-Los valores guardados en **Ajustes** siguen funcionando como override local del navegador, pero ya no son obligatorios si `config.js` está completo.
+Las funciones serverless ([`api/`](api/)) son el corazón de la seguridad:
 
-## Funciones con IA (opcionales — Claude API)
+- **`/api/claude`** — proxy a la API de Anthropic. La API key vive **solo** en el servidor (variable `ANTHROPIC_API_KEY` en Vercel); nunca llega al navegador ni a GitHub.
+- **`/api/config`** — devuelve al navegador solo datos públicos (URL + publishable key de Supabase, modelo). **No** devuelve la key de Claude.
 
-Define la API key de [console.anthropic.com](https://console.anthropic.com) en `config.js` o guárdala en **Ajustes**. Con ella se habilitan:
+## Funciones con IA (Claude)
+
+Con la IA activa se habilitan:
 
 - **Estimar una comida** (kcal + macros) a partir de una descripción.
 - **Sugerir comidas** según lo que te queda para la meta del día.
 - **Revisar tus macros** con una recomendación concreta.
 - **Dictado por voz** (Web Speech API) para registrar lo que comiste.
 
-Sin API key, el tracker funciona **100% manual**.
+En producción la IA funciona vía el proxy de Vercel. En desarrollo local (sin funciones) puedes pegar una API key en **Ajustes** para una llamada directa. Sin ninguna de las dos, el tracker funciona **100% manual**.
 
-> 🔒 En una app estática, cualquier API key puesta en `config.js` queda visible para el navegador. Úsala así solo en despliegues privados/locales. Para un sitio público, deja Claude vacío o usa un backend/proxy propio.
+> 🔒 Con el proxy, la API key de Claude **nunca** es visible para los usuarios ni queda en el repo. (Una key puesta directamente en `config.js` y publicada sí sería visible; por eso la vía recomendada es Vercel.)
 
 ## Base de datos de alimentos (Supabase)
 
@@ -64,8 +55,8 @@ Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
 2. En el **SQL Editor**, ejecuta primero [`supabase/schema.sql`](supabase/schema.sql) y luego [`supabase/seed.sql`](supabase/seed.sql) (datos precargados: 55 ingredientes, 43 platos, 4 dietas).
-3. En **Project Settings → API Keys**, copia la **Project URL** y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
-4. Pega esos valores en `config.js`. Alternativamente, puedes guardarlos desde **Ajustes → Base de datos** como override local.
+3. En **Project Settings → API Keys**, copia la **Project URL** (o el Project ID) y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
+4. Ponlos como variables de entorno en Vercel (ver despliegue). Para desarrollo local, también puedes guardarlos desde **Ajustes → Base de datos**.
 
 > ⚠️ Las políticas RLS del `schema.sql` permiten lectura y escritura al rol anónimo (cómodo para uso personal). Como la URL + publishable key viven en tu navegador, cualquiera que las obtenga podría editar. Para proteger la escritura, activa Supabase Auth y cambia las políticas a `to authenticated`.
 
@@ -82,21 +73,29 @@ En `localhost` o HTTPS el service worker se registra automáticamente. La primer
 
 ## Despliegue en Vercel (gratis)
 
-La app es estática, así que no necesita configuración de build.
+No hay build: archivos estáticos en la raíz + funciones serverless en [`api/`](api/) (Vercel las detecta solas).
 
-**Opción A — Dashboard (recomendada, auto-deploy):**
-1. [vercel.com](https://vercel.com) → **Add New… → Project**.
-2. Importa el repo `jlazoirus/Fitbud`.
-3. Framework Preset: **Other**. Sin build command ni output dir. **Deploy**.
-4. Cada `git push` vuelve a desplegar solo.
+1. [vercel.com](https://vercel.com) → **Add New… → Project** → importa `jlazoirus/Fitbud`.
+2. Framework Preset: **Other**. Sin build command ni output dir.
+3. En **Settings → Environment Variables**, agrega:
 
-**Opción B — CLI:**
+   | Variable | Valor | ¿Secreta? |
+   |---|---|---|
+   | `ANTHROPIC_API_KEY` | tu key `sk-ant-...` de Claude | **Sí** (solo servidor) |
+   | `SUPABASE_URL` | `https://xxxxx.supabase.co` | No (pública) |
+   | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | No (pública) |
+   | `ANTHROPIC_MODEL` *(opcional)* | `claude-haiku-4-5-20251001` | No |
+
+4. **Deploy**. Cada `git push` redepliega solo.
+
+Así **todas las keys viven en Vercel**, ninguna en GitHub, y la de Claude tampoco es visible en el navegador (pasa por el proxy `/api/claude`).
+
+> **GitHub Pages** puede seguir sirviendo la app como estático, pero ahí **no corren** las funciones `api/`, así que la IA quedaría apagada (salvo que pongas una API key local en Ajustes). El despliegue principal es Vercel.
+
+### CLI (alternativa)
 ```bash
 npm i -g vercel
-vercel          # login la primera vez (con GitHub)
-vercel --prod   # publica producción
+vercel            # login la primera vez (con GitHub)
+vercel env add ANTHROPIC_API_KEY        # y las demás variables
+vercel --prod
 ```
-
-El micrófono y la API funcionan en la URL HTTPS de Vercel.
-
-Alternativas gratis equivalentes: Netlify, Cloudflare Pages o GitHub Pages.

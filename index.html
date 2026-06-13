@@ -165,20 +165,32 @@ const CONFIG = {
   },
 };
 
+// Config remota servida por /api/config (variables de entorno en Vercel).
+// Mantiene las credenciales fuera de GitHub. La API key de Claude NO viaja
+// aquí: vive solo en el servidor y se usa vía el proxy /api/claude.
+let REMOTE={supabase:{url:"",publishableKey:""},anthropic:{model:"",proxy:false}};
+async function loadRemoteConfig(){
+  try{
+    const r=await fetch("/api/config",{cache:"no-store"});
+    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{}};}
+  }catch(e){/* sin funciones serverless (p.ej. GitHub Pages): se ignora */}
+}
 function effectiveSettings(){
   const local=S.settings||{};
   return {
     apiKey:local.apiKey||CONFIG.anthropic.apiKey,
-    model:local.model||CONFIG.anthropic.model||DEFAULT_MODEL,
-    supaUrl:local.supaUrl||CONFIG.supabase.url,
-    supaKey:local.supaKey||CONFIG.supabase.publishableKey,
+    model:local.model||(REMOTE.anthropic&&REMOTE.anthropic.model)||CONFIG.anthropic.model||DEFAULT_MODEL,
+    supaUrl:local.supaUrl||(REMOTE.supabase&&REMOTE.supabase.url)||CONFIG.supabase.url,
+    supaKey:local.supaKey||(REMOTE.supabase&&REMOTE.supabase.publishableKey)||CONFIG.supabase.publishableKey,
   };
 }
+// IA disponible si hay key local/config (llamada directa) o el proxy de Vercel
+function aiAvailable(){return !!effectiveSettings().apiKey||!!(REMOTE.anthropic&&REMOTE.anthropic.proxy);}
 function settingSource(name){
   const local=S.settings||{};
-  if(name==="apiKey")return local.apiKey?"local":(CONFIG.anthropic.apiKey?"config":"");
-  if(name==="model")return local.model?"local":(CONFIG.anthropic.model?"config":"");
-  if(name==="supabase")return (local.supaUrl||local.supaKey)?"local":((CONFIG.supabase.url||CONFIG.supabase.publishableKey)?"config":"");
+  if(name==="apiKey")return local.apiKey?"local":(CONFIG.anthropic.apiKey?"config":((REMOTE.anthropic&&REMOTE.anthropic.proxy)?"vercel":""));
+  if(name==="model")return local.model?"local":((REMOTE.anthropic&&REMOTE.anthropic.model)?"vercel":(CONFIG.anthropic.model?"config":""));
+  if(name==="supabase")return (local.supaUrl||local.supaKey)?"local":((REMOTE.supabase&&(REMOTE.supabase.url||REMOTE.supabase.publishableKey))?"vercel":((CONFIG.supabase.url||CONFIG.supabase.publishableKey)?"config":""));
   return "";
 }
 function maskedSecret(v){return v?("•".repeat(Math.max(0,v.length-4))+v.slice(-4)):"";}
@@ -579,7 +591,7 @@ function openEditor(kind,ds,id){
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
 function editorSheet(title,pre){
-  const aiOn=!!effectiveSettings().apiKey;
+  const aiOn=aiAvailable();
   modal(`<h3>${title}</h3>
     <div class="field"><label>Descripción</label>
       <div class="row"><textarea id="f_name" rows="2" placeholder="Ej. 2 panes con palta y café">${esc(pre.name||"")}</textarea>
@@ -591,7 +603,7 @@ function editorSheet(title,pre){
       <div class="field"><label>Carb g</label><input id="f_c" type="number" inputmode="numeric" value="${pre.c}"></div>
       <div class="field"><label>Grasa g</label><input id="f_f" type="number" inputmode="numeric" value="${pre.f}"></div>
     </div>
-    ${aiOn?`<button class="btn" style="width:100%" onclick="aiEstimate()">✨ Estimar con IA</button>`:`<div class="muted small">💡 Activa tu API key en Ajustes para estimar kcal/macros y dictar por voz.</div>`}
+    ${aiOn?`<button class="btn" style="width:100%" onclick="aiEstimate()">✨ Estimar con IA</button>`:`<div class="muted small">💡 La IA (estimar/dictar) se activa al desplegar en Vercel o con una API key local en Ajustes.</div>`}
     <div id="aiOut"></div>
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
 }
@@ -610,16 +622,27 @@ function saveEditor(){
 const SYS_PROMPT="El usuario es vegetariano, no come huevo, toma proteína en polvo y busca alta proteína (~180 g/día) en déficit agresivo. Da estimaciones realistas de porciones reales, con kcal y macros.";
 async function callClaude(userText,maxTokens){
   const cfg=effectiveSettings();
-  const key=cfg.apiKey;
-  if(!key)throw new Error("No hay API key. Configúrala en Ajustes.");
-  const res=await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST",
-    headers:{"x-api-key":key,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true","content-type":"application/json"},
-    body:JSON.stringify({model:cfg.model||DEFAULT_MODEL,max_tokens:maxTokens||512,system:SYS_PROMPT,messages:[{role:"user",content:userText}]})
+  // 1) Override local: si guardaste una API key en este navegador, llamada directa
+  //    (útil para desarrollo local sin las funciones serverless).
+  if(cfg.apiKey){
+    const res=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{"x-api-key":cfg.apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true","content-type":"application/json"},
+      body:JSON.stringify({model:cfg.model||DEFAULT_MODEL,max_tokens:maxTokens||512,system:SYS_PROMPT,messages:[{role:"user",content:userText}]})
+    });
+    if(!res.ok){const e=await res.text();throw new Error("API "+res.status+": "+e.slice(0,200));}
+    const data=await res.json();
+    return (data.content&&data.content[0]&&data.content[0].text)||"";
+  }
+  // 2) Producción (Vercel): proxy /api/claude. La API key vive solo en el servidor.
+  const res=await fetch("/api/claude",{
+    method:"POST",headers:{"content-type":"application/json"},
+    body:JSON.stringify({userText,system:SYS_PROMPT,maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL})
   });
-  if(!res.ok){const e=await res.text();throw new Error("API "+res.status+": "+e.slice(0,200));}
-  const data=await res.json();
-  return (data.content&&data.content[0]&&data.content[0].text)||"";
+  if(res.status===404)throw new Error("El proxy /api/claude no está disponible. Despliega en Vercel (con ANTHROPIC_API_KEY) o pon una API key local en Ajustes.");
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(data.error||("Error "+res.status));
+  return data.text||"";
 }
 function parseJSON(txt){
   let t=txt.trim().replace(/^```(json)?/i,"").replace(/```$/,"").trim();
@@ -643,7 +666,7 @@ async function aiEstimate(){
 
 // IA 2 — sugerir comidas
 async function aiSuggest(){
-  if(!effectiveSettings().apiKey){toast("Activa tu API key en Ajustes");setView("settings");return;}
+  if(!aiAvailable()){toast("Configura la IA (Vercel o API key local en Ajustes)");setView("settings");return;}
   const{t,target}=dayTotals(current);const day=buildDay(current);
   const remK=Math.max(0,target.kcal-t.kcal),remP=Math.max(0,target.p-t.p);
   modal(`<h3>✨ Sugerencia de comida</h3><div id="aiOut"><div class="ai-box">Pensando opciones…</div></div>`);
@@ -658,7 +681,7 @@ function addSuggestion(s){const o=JSON.parse(s);const d=dayState(current);d.extr
 
 // IA 3 — revisar mis macros
 async function aiReview(){
-  if(!effectiveSettings().apiKey){toast("Activa tu API key en Ajustes");setView("settings");return;}
+  if(!aiAvailable()){toast("Configura la IA (Vercel o API key local en Ajustes)");setView("settings");return;}
   const{t,target}=dayTotals(current);const day=buildDay(current);
   const now=new Date();const hora=now.getHours()+":"+String(now.getMinutes()).padStart(2,"0");
   modal(`<h3>🔍 Revisión de macros</h3><div id="aiOut"><div class="ai-box">Analizando…</div></div>`);
@@ -674,7 +697,7 @@ async function aiReview(){
    ============================================================ */
 let recog=null;
 function toggleMic(){
-  if(!effectiveSettings().apiKey){toast("Activa la API key en Ajustes para usar voz");return;}
+  if(!aiAvailable()){toast("Configura la IA para usar voz (Vercel o API key local)");return;}
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast("Tu navegador no soporta dictado por voz");return;}
   if(recog){stopMic();return;}
@@ -725,8 +748,9 @@ function renderSettings(){
   const modelSource=settingSource("model");
   const supaSource=settingSource("supabase");
   const supaConfigured=!!(cfg.supaUrl&&cfg.supaKey);
-  const keyNote=keySource==="config"?"Leyendo desde config.js. Un valor guardado aquí sobrescribe este navegador.":keySource==="local"?"Usando override local de este navegador.":"Puedes definirla en config.js o guardarla solo en este navegador.";
-  const supaNote=supaSource==="config"?"Leyendo credenciales desde config.js. Los campos de abajo pueden sobrescribir este navegador.":supaSource==="local"?"Usando override local de este navegador.":"Define Supabase en config.js para que la app conecte sola.";
+  const proxyOn=!!(REMOTE.anthropic&&REMOTE.anthropic.proxy);
+  const keyNote=keySource==="vercel"?"La IA usa el proxy de Vercel: la API key vive solo en el servidor. Solo necesitas algo aquí para desarrollo local.":keySource==="config"?"Leyendo desde config.js. Un valor guardado aquí sobrescribe este navegador.":keySource==="local"?"Usando override local de este navegador (llamada directa a Anthropic).":"Opcional: solo para desarrollo local. En producción la key va en Vercel (variable ANTHROPIC_API_KEY).";
+  const supaNote=supaSource==="vercel"?"Credenciales servidas por Vercel (/api/config). Los campos de abajo solo sobrescriben en este navegador.":supaSource==="config"?"Leyendo credenciales desde config.js. Los campos de abajo pueden sobrescribir este navegador.":supaSource==="local"?"Usando override local de este navegador.":"Se configuran en Vercel (variables SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY) o aquí abajo.";
   $("#app").innerHTML=`<header><h2>⚙️ Ajustes</h2></header>
     <div class="dash">
       <div class="field"><label>API key de Anthropic (console.anthropic.com)</label>
@@ -744,8 +768,8 @@ function renderSettings(){
       ${S.settings.apiKey?`<button class="btn" style="width:100%;margin-top:8px" onclick="clearKey()">Borrar API key local</button>`:""}
     </div>
     <div class="dash">
-      <div class="row between"><b>Estado de IA y voz</b><span class="badge ${k?'b-PESAS':'b-Libre'}">${k?'Activadas':'Manual'}</span></div>
-      <div class="muted small" style="margin-top:6px">Sin API key el tracker funciona 100% manual. Con key se habilitan: estimar comida, sugerir comidas, revisar macros y dictado por voz.</div>
+      <div class="row between"><b>Estado de IA y voz</b><span class="badge ${aiAvailable()?'b-PESAS':'b-Libre'}">${aiAvailable()?(proxyOn&&!k?'Vía Vercel':'Activadas'):'Manual'}</span></div>
+      <div class="muted small" style="margin-top:6px">Sin IA el tracker funciona 100% manual. Con el proxy de Vercel (o una API key local) se habilitan: estimar comida, sugerir comidas, revisar macros y dictado por voz.</div>
     </div>
 
     <div class="dash">
@@ -981,6 +1005,8 @@ function registerServiceWorker(){
 supaInit();
 registerServiceWorker();
 render();
+// Carga las credenciales servidas por Vercel y re-renderiza con la conexión lista.
+loadRemoteConfig().then(()=>{supaInit();render();});
 </script>
 </body>
 </html>
