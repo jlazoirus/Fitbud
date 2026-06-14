@@ -269,9 +269,24 @@
   .macro-preview .scard{text-align:left}
   .macro-preview .scard .n{font-size:20px}
   .review-meta{font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-top:7px}
+  .recap{max-width:560px;margin:0 auto}
+  .recap-hero{padding:10px 2px 8px}
+  .recap-hero h1{font-size:34px;line-height:1.02}
+  .recap-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:16px 0}
+  .recap-grid .scard{text-align:left}
+  .recap-grid .scard .n{font-size:22px}
+  .challenge-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .challenge{background:var(--surf2);border:1px solid var(--border-2);border-radius:var(--r-md);padding:14px;text-align:left;min-height:116px}
+  .challenge.selected{border-color:var(--accent);background:var(--accent-dim)}
+  .challenge b{display:block;font-family:var(--font-display);font-size:15px;margin:7px 0 4px}
+  .challenge span{display:block;color:var(--muted);font-size:12px;line-height:1.35}
+  .photo-picker{border:1px dashed var(--border-2);border-radius:var(--r-md);padding:14px;text-align:center}
+  .photo-preview{display:block;width:100%;max-height:360px;object-fit:contain;background:var(--black);border-radius:var(--r-md);margin-bottom:12px}
+  .journey-photo{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:var(--r-md);background:var(--surf2)}
   @media(max-width:380px){
     .onboarding-grid{grid-template-columns:1fr}
     .onboarding h1{font-size:26px}
+    .challenge-grid{grid-template-columns:1fr}
   }
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
@@ -340,11 +355,10 @@ function settingSource(name){
 function maskedSecret(v){return v?("•".repeat(Math.max(0,v.length-4))+v.slice(-4)):"";}
 
 /* ---------- Fase 1: CAPA DE DATOS ---------- */
-const START = "2026-06-13";   // sábado
-const END   = "2026-08-23";   // domingo
-const REFEED_DATES = new Set(["2026-06-27","2026-07-11","2026-08-08","2026-08-22"]);
-
-const WEEKS = [
+const DEFAULT_START = "2026-06-13";   // sábado
+const DEFAULT_END   = "2026-08-23";   // domingo
+const DEFAULT_REFEED_DATES = ["2026-06-27","2026-07-11","2026-08-08","2026-08-22"];
+const DEFAULT_WEEKS = [
   {label:"Arranque", start:"2026-06-13", end:"2026-06-14", menu:"Libre", num:0},
   {label:"S1",  start:"2026-06-15", end:"2026-06-21", menu:"A", num:1},
   {label:"S2",  start:"2026-06-22", end:"2026-06-28", menu:"B", num:2},
@@ -357,8 +371,19 @@ const WEEKS = [
   {label:"S9",  start:"2026-08-10", end:"2026-08-16", menu:"D", num:9},
   {label:"S10", start:"2026-08-17", end:"2026-08-23", menu:"A", num:10},
 ];
-
-const WEIGHT_RANGES = {1:"81.0–81.4",2:"80.2–80.6",3:"79.3–79.8",4:"78.4–79.0",5:"77.5–78.2",6:"78.0–78.8 (sube, normal)",7:"77.0–77.8",8:"76.1–77.0",9:"75.2–76.2",10:"74.3–75.4"};
+const DEFAULT_WEIGHT_RANGES = {1:"81.0–81.4",2:"80.2–80.6",3:"79.3–79.8",4:"78.4–79.0",5:"77.5–78.2",6:"78.0–78.8 (sube, normal)",7:"77.0–77.8",8:"76.1–77.0",9:"75.2–76.2",10:"74.3–75.4"};
+const CYCLE_MENUS=["A","B","C","D","A","B","B","C","D","A"];
+const CHALLENGE_LABELS={
+  maintain:"Mantener lo logrado",
+  continue:"Continuar el mismo objetivo",
+  performance:"Mejorar rendimiento",
+  strength:"Ganar fuerza",
+};
+let START=DEFAULT_START;
+let END=DEFAULT_END;
+let REFEED_DATES=new Set(DEFAULT_REFEED_DATES);
+let WEEKS=DEFAULT_WEEKS.map(w=>({...w}));
+let WEIGHT_RANGES={...DEFAULT_WEIGHT_RANGES};
 
 const BREAKFASTS = [
   "Avena proteica: avena 50g + 1.5 scoop + chía 10g + canela",
@@ -432,19 +457,42 @@ function trainingPrefs(){
   return {primary,strength,days};
 }
 function workoutSchedule(days){
-  const schedules={
+  const challenge=(profile&&profile.prefs&&profile.prefs.challenge)||"";
+  const base={
     3:{1:"fullA",3:"calidad",6:"facil"},
     4:{1:"fullA",3:"calidad",5:"fullB",6:"facil"},
     5:{1:"torsoA",2:"piernaA",3:"calidad",5:"fullB",6:"facil"},
     6:{1:"torsoA",2:"piernaA",3:"calidad",4:"torsoB",5:"piernaB",6:"facil"},
   };
+  const strength={
+    3:{1:"fullA",3:"fullB",6:"facil"},
+    4:{1:"torsoA",2:"piernaA",5:"fullB",6:"facil"},
+    5:{1:"torsoA",2:"piernaA",4:"torsoB",5:"piernaB",6:"facil"},
+    6:base[6],
+  };
+  const performance={
+    3:base[3],
+    4:{1:"fullA",2:"tecnica",3:"calidad",6:"facil"},
+    5:{1:"fullA",2:"tecnica",3:"calidad",5:"fullB",6:"facil"},
+    6:{1:"fullA",2:"tecnica",3:"calidad",4:"fullB",5:"tecnica",6:"facil"},
+  };
+  const schedules=challenge==="strength"?strength:challenge==="performance"?performance:base;
   return schedules[days]||schedules[6];
 }
 function plannedWorkoutId(ds){
   const wd=parseYmd(ds).getDay();
   return workoutSchedule(trainingPrefs().days)[wd]||"descanso";
 }
-function trainingPlanSummary(days,primary){
+function trainingPlanSummary(days,primary,challenge){
+  challenge=challenge||(profile&&profile.prefs&&profile.prefs.challenge)||"";
+  if(challenge==="strength"){
+    const strengthSplit={3:"2 sesiones de fuerza + 1 sesión aeróbica",4:"3 sesiones de fuerza + 1 sesión aeróbica",5:"4 sesiones de fuerza + 1 sesión aeróbica",6:"4 sesiones de fuerza + 2 sesiones aeróbicas"};
+    return `${strengthSplit[days]||strengthSplit[6]} de ${SPORT_LABELS[primary]||SPORT_LABELS.running}.`;
+  }
+  if(challenge==="performance"){
+    const performanceSplit={3:"1 sesión de fuerza + 2 sesiones aeróbicas",4:"1 sesión de fuerza + 3 sesiones aeróbicas",5:"2 sesiones de fuerza + 3 sesiones aeróbicas",6:"2 sesiones de fuerza + 4 sesiones aeróbicas"};
+    return `${performanceSplit[days]||performanceSplit[6]} de ${SPORT_LABELS[primary]||SPORT_LABELS.running}.`;
+  }
   const split={
     3:"1 sesión full-body + 1 sesión de calidad + 1 sesión aeróbica larga",
     4:"2 sesiones full-body + 1 sesión de calidad + 1 sesión aeróbica larga",
@@ -487,6 +535,8 @@ function sportSessions(primary,ds){
       ],
       qualityName:"Running · calidad",
       enduranceName:"Running · fondo fácil",
+      techniqueName:"Running · técnica y economía",
+      technique:"30-40 min suaves + técnica de carrera + 6 progresivos de 15 s, sin acumular fatiga.",
     },
     cycling:{
       kind:"Cycling",
@@ -506,6 +556,8 @@ function sportSessions(primary,ds){
       ],
       qualityName:"Cycling · intervalos",
       enduranceName:"Cycling · fondo",
+      techniqueName:"Cycling · técnica y cadencia",
+      technique:"45-60 min suaves con 6 bloques de 2 min de cadencia alta y pedaleo estable.",
     },
     swimming:{
       kind:"Natación",
@@ -525,12 +577,15 @@ function sportSessions(primary,ds){
       ],
       qualityName:"Natación · técnica e intervalos",
       enduranceName:"Natación · fondo aeróbico",
+      techniqueName:"Natación · técnica",
+      technique:"1200-1800 m suaves con ejercicios de agarre, alineación, respiración y virajes.",
     },
   };
   const p=plans[primary]||plans.running;
   return {
     quality:{id:"calidad",kind:p.kind,name:p.qualityName,detail:p.quality[phase]},
     endurance:{id:"facil",kind:p.kind,name:p.enduranceName,detail:p.endurance[phase]},
+    technique:{id:"tecnica",kind:p.kind,name:p.techniqueName,detail:p.technique},
   };
 }
 function strengthSessions(mode,ds){
@@ -560,7 +615,7 @@ function workoutOptions(ds){
   return [
     strength.fullA,strength.fullB,
     strength.torsoA,strength.piernaA,strength.torsoB,strength.piernaB,
-    sport.quality,sport.endurance,
+    sport.quality,sport.endurance,sport.technique,
     {id:"descanso",kind:"Descanso",name:"Descanso total",detail:"Movilidad suave y caminata opcional. Prioriza sueño y recuperación."},
   ];
 }
@@ -652,6 +707,49 @@ function todayStr(){return ymd(new Date());}
 const DOW=["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 const MON=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
 function prettyDate(s){const d=parseYmd(s);return DOW[d.getDay()]+", "+d.getDate()+" "+MON[d.getMonth()];}
+function validYmd(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!isNaN(parseYmd(s));}
+function cycleNumber(){return Math.max(1,Number.parseInt(profile&&profile.prefs&&profile.prefs.planCycleNumber,10)||1);}
+function buildCycleWeeks(start){
+  return CYCLE_MENUS.map((menu,i)=>({
+    label:"S"+(i+1),
+    start:addDays(start,i*7),
+    end:addDays(start,i*7+6),
+    menu,
+    num:i+1,
+    dietBreak:i===5,
+  }));
+}
+function weekdayInWeek(week,weekday){
+  for(let i=0;i<7;i++){const ds=addDays(week.start,i);if(parseYmd(ds).getDay()===weekday)return ds;}
+  return week.end;
+}
+function buildWeightRanges(prefs){
+  const p=prefs||{};
+  const startWeight=Number(p.cycleStartWeight||p.weightKg);
+  if(!Number.isFinite(startWeight)||startWeight<=0)return Object.fromEntries(Array.from({length:10},(_,i)=>[i+1,"—"]));
+  const rate=p.goal==="deficit"?-.004:p.goal==="volumen"?.002:0;
+  const ranges={};
+  for(let week=1;week<=10;week++){
+    const center=startWeight*Math.pow(1+rate,week-1);
+    ranges[week]=`${(center-.3).toFixed(1)}–${(center+.3).toFixed(1)}`;
+  }
+  return ranges;
+}
+function refreshPlanCalendar(){
+  const p=(profile&&profile.prefs)||{};
+  if(validYmd(p.planStartDate)){
+    START=p.planStartDate;
+    END=validYmd(p.planEndDate)?p.planEndDate:addDays(START,69);
+    WEEKS=buildCycleWeeks(START);
+    REFEED_DATES=new Set([2,4,8,10].map(n=>weekdayInWeek(WEEKS[n-1],6)));
+    WEIGHT_RANGES=buildWeightRanges(p);
+  }else{
+    START=DEFAULT_START;END=DEFAULT_END;
+    WEEKS=DEFAULT_WEEKS.map(w=>({...w}));
+    REFEED_DATES=new Set(DEFAULT_REFEED_DATES);
+    WEIGHT_RANGES={...DEFAULT_WEIGHT_RANGES};
+  }
+}
 
 function weekOf(ds){for(const w of WEEKS){if(ds>=w.start&&ds<=w.end)return w;}return null;}
 function dayType(ds){
@@ -773,6 +871,147 @@ function dbStatusNote(){
 const $=s=>document.querySelector(s);
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1600);}
 
+/* ---------- Cierre de ciclo: recap + siguiente desafío ---------- */
+let recapPhotoFile=null;
+let recapPhotoUrl="";
+let recapChallenge="";
+let cycleHistory=[];
+function planNeedsRecap(){
+  const p=(profile&&profile.prefs)||{};
+  return hasCompleteOnboarding(p)
+    && !p.onboardingPending
+    && todayStr()>END
+    && Number(p.recapCompletedCycle||0)<cycleNumber();
+}
+function cycleSummary(){
+  let ds=START,activeDays=0,bestStreak=0,currentStreak=0,workouts=0,doneMeals=0,plannedMeals=0;
+  while(ds<=END){
+    const st=S.days[ds]||{};
+    const day=buildDay(ds);
+    const mealStates=st.meals||{};
+    const dayMeals=day.meals.reduce((n,m)=>n+(mealStates[m.id]&&mealStates[m.id].done?1:0),0);
+    const dayActive=dayMeals>0||!!st.workoutDone||(Array.isArray(st.extras)&&st.extras.some(x=>x&&x.done));
+    plannedMeals+=day.meals.length;doneMeals+=dayMeals;
+    if(st.workoutDone)workouts++;
+    if(dayActive){activeDays++;currentStreak++;bestStreak=Math.max(bestStreak,currentStreak);}else currentStreak=0;
+    ds=addDays(ds,1);
+  }
+  const weighted=Object.keys(WEIGHT_RANGES).map(Number).filter(n=>wkg(n)!=null).sort((a,b)=>a-b);
+  const firstWeek=weighted[0],lastWeek=weighted[weighted.length-1];
+  const prefs=(profile&&profile.prefs)||{};
+  const initialWeight=Number(prefs.cycleStartWeight);
+  const initialBf=Number(prefs.cycleStartBodyFat);
+  const startWeight=Number.isFinite(initialWeight)&&initialWeight>0?initialWeight:(firstWeek!=null?wkg(firstWeek):null);
+  const startBf=Number.isFinite(initialBf)&&initialBf>0?initialBf:(firstWeek!=null?wbf(firstWeek):null);
+  const endWeight=lastWeek!=null?wkg(lastWeek):null,endBf=lastWeek!=null?wbf(lastWeek):null;
+  return {
+    activeDays,bestStreak,workouts,doneMeals,plannedMeals,
+    mealAdherence:plannedMeals?Math.round(doneMeals/plannedMeals*100):0,
+    startWeight,endWeight,weightChange:startWeight!=null&&endWeight!=null?+(endWeight-startWeight).toFixed(1):null,
+    startBodyFat:startBf,endBodyFat:endBf,bodyFatChange:startBf!=null&&endBf!=null?+(endBf-startBf).toFixed(1):null,
+  };
+}
+function recapDelta(value,suffix){
+  const n=Number(value);
+  if(value==null||!Number.isFinite(n))return "Sin datos";
+  return `${n>0?"+":""}${n.toFixed(1)}${suffix||""}`;
+}
+function renderPlanRecap(){
+  const s=cycleSummary();
+  const selected=recapChallenge;
+  const challenges=[
+    ["maintain","◎","Mantener lo logrado","Consolidar hábitos, peso y composición sin perseguir cambios agresivos."],
+    ["continue","↗","Continuar igual","Seguir avanzando con el mismo objetivo del ciclo que terminaste."],
+    ["performance","◉","Mejorar rendimiento","Priorizar capacidad aeróbica, técnica y recuperación en tu disciplina."],
+    ["strength","＋","Ganar fuerza","Dar más peso a la progresión de fuerza y al desarrollo muscular."],
+  ];
+  const photo=recapPhotoUrl?`<img class="photo-preview" src="${recapPhotoUrl}" alt="Vista previa de tu foto de progreso">`:"";
+  $("#app").innerHTML=`<main class="recap">
+    <div class="recap-hero">
+      <div class="onboarding-brand">CICLO ${cycleNumber()} · COMPLETADO</div>
+      <h1>Diez semanas que ya son tuyas.</h1>
+      <p class="onboarding-copy">Este es el resumen de lo que registraste entre ${prettyDate(START)} y ${prettyDate(END)}.</p>
+    </div>
+    <div class="recap-grid">
+      <div class="scard"><div class="n">${s.workouts}</div><div class="l">entrenamientos completados</div></div>
+      <div class="scard"><div class="n">${s.mealAdherence}%</div><div class="l">comidas del plan registradas</div></div>
+      <div class="scard"><div class="n">${recapDelta(s.weightChange," kg")}</div><div class="l">cambio de peso</div></div>
+      <div class="scard"><div class="n">${s.bestStreak}</div><div class="l">mejor racha de días</div></div>
+    </div>
+    ${s.bodyFatChange!=null?`<div class="alert violet">Composición corporal: ${recapDelta(s.bodyFatChange," puntos de grasa")} durante el ciclo.</div>`:""}
+    <div class="section-h">Foto de progreso</div>
+    <div class="dash photo-picker">
+      ${photo}
+      <div style="font-weight:600">Documenta este momento</div>
+      <div class="muted small" style="margin:5px 0 12px">Toma una foto de cuerpo entero, con luz uniforme y una postura natural. Será privada y solo visible en tu cuenta.</div>
+      <label class="btn btn-accent" style="display:inline-flex;align-items:center;justify-content:center">
+        ${recapPhotoFile?"Cambiar foto":"Tomar o elegir foto"}
+        <input type="file" accept="image/*" capture="environment" onchange="previewRecapPhoto(this)" style="display:none">
+      </label>
+    </div>
+    <div class="section-h">¿Cuál es tu siguiente desafío?</div>
+    <div class="challenge-grid">
+      ${challenges.map(([id,ic,title,copy])=>`<button class="challenge ${selected===id?"selected":""}" data-challenge="${id}" onclick="selectNextChallenge('${id}')"><span style="font-size:20px;color:var(--accent)">${ic}</span><b>${title}</b><span>${copy}</span></button>`).join("")}
+    </div>
+    <button id="nextChallengeBtn" class="btn btn-accent" style="width:100%;margin-top:16px" onclick="startNextChallenge()" ${selected?"":"disabled"}>${selected?"Recalcular mi siguiente plan":"Elige un desafío"}</button>
+    <div id="recapOut" class="muted small center" style="margin-top:9px"></div>
+  </main>`;
+}
+function selectNextChallenge(id){
+  if(!CHALLENGE_LABELS[id])return;
+  recapChallenge=id;
+  document.querySelectorAll(".challenge").forEach(el=>el.classList.toggle("selected",el.dataset.challenge===id));
+  const btn=$("#nextChallengeBtn");
+  if(btn){btn.disabled=false;btn.textContent="Recalcular mi siguiente plan";}
+}
+function previewRecapPhoto(input){
+  const file=input&&input.files&&input.files[0];
+  if(!file)return;
+  if(!file.type.startsWith("image/")){toast("Selecciona una imagen");return;}
+  if(file.size>20*1024*1024){toast("La foto no puede superar 20 MB");return;}
+  recapPhotoFile=file;
+  if(recapPhotoUrl)URL.revokeObjectURL(recapPhotoUrl);
+  recapPhotoUrl=URL.createObjectURL(file);
+  renderPlanRecap();
+}
+function challengeGoal(challenge,currentGoal){
+  if(challenge==="maintain"||challenge==="performance")return "mantenimiento";
+  if(challenge==="strength")return "volumen";
+  return currentGoal||"deficit";
+}
+function applyChallengeDefaults(d,challenge){
+  d.challenge=challenge;
+  d.goal=challengeGoal(challenge,d.goal);
+  if(challenge==="performance"||challenge==="strength")d.trainDays=Math.max(4,+d.trainDays||3);
+}
+async function startNextChallenge(){
+  if(!CHALLENGE_LABELS[recapChallenge]){toast("Elige tu siguiente desafío");return;}
+  const btn=$("#nextChallengeBtn"),out=$("#recapOut");
+  if(btn){btn.disabled=true;btn.textContent="Guardando tu ciclo…";}
+  if(out)out.textContent=recapPhotoFile?"Comprimiendo y guardando tu foto privada…":"Guardando tu resumen…";
+  try{
+    const summary=cycleSummary();
+    const photoPath=recapPhotoFile?await uploadProgressPhoto(recapPhotoFile,cycleNumber()):null;
+    await archiveCompletedCycle(summary,recapChallenge,photoPath);
+    const prefs={...((profile&&profile.prefs)||{}),
+      recapCompletedCycle:cycleNumber(),
+      onboardingPending:true,
+      pendingChallenge:recapChallenge,
+      lastCycleSummary:summary,
+    };
+    const saved=await saveProfilePrefs(prefs);
+    if(saved&&saved.error)throw saved.error;
+    onboardingDraft=onboardingDefaults();
+    applyChallengeDefaults(onboardingDraft,recapChallenge);
+    onboardingActive=true;onboardingStep=1;reviewPromptShown=true;
+    recapPhotoFile=null;if(recapPhotoUrl)URL.revokeObjectURL(recapPhotoUrl);recapPhotoUrl="";
+    render();window.scrollTo(0,0);
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent="Reintentar";}
+    if(out)out.textContent="No se pudo guardar: "+((e&&e.message)||String(e));
+  }
+}
+
 /* ---------- Onboarding: perfil, macros y revisión cada 4 semanas ---------- */
 let onboardingActive=false;
 let onboardingStep=1;
@@ -801,6 +1040,7 @@ function onboardingDefaults(){
     fatTarget:p.fatTarget||"",
     maintenanceCalories:p.maintenanceCalories||"",
     macroMethod:p.macroMethod||"",
+    challenge:p.pendingChallenge||p.challenge||"",
     primarySport:SPORT_LABELS[p.primarySport]?p.primarySport:"running",
     strengthMode:STRENGTH_LABELS[p.strengthMode]?p.strengthMode:"gym",
     trainDays:validTrainingDays(p.trainDays)?+p.trainDays:3,
@@ -902,7 +1142,7 @@ function renderOnboarding(){
         <div class="field"><label>Días por semana</label><select id="ob_days" onchange="updateOnboardingTrainingSummary()">
           ${TRAINING_DAY_OPTIONS.map(o=>`<option value="${o.value}" ${+d.trainDays===o.value?"selected":""}>${o.label}</option>`).join("")}
         </select></div>
-        <div class="ai-box" id="obTrainingSummary"><b>Semana tipo:</b> ${trainingPlanSummary(+d.trainDays,d.primarySport)}</div>
+        <div class="ai-box" id="obTrainingSummary"><b>Semana tipo:</b> ${trainingPlanSummary(+d.trainDays,d.primarySport,d.challenge)}</div>
         <div class="field" style="margin-bottom:0"><label>Lesiones, horarios o notas (opcional)</label><textarea id="ob_trainnote" rows="2">${esc(d.trainNote)}</textarea></div>
       </div>${onboardingButtons(false)}`;
   }else{
@@ -920,7 +1160,10 @@ function renderOnboarding(){
       </div>${onboardingButtons(true)}`;
   }
   $("#tabs").innerHTML="";
-  $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">FITBUD · TU PLAN</div>${onboardingSteps()}${body}</main>`;
+  const challengeNote=d.challenge&&CHALLENGE_LABELS[d.challenge]
+    ? `<div class="alert violet"><b>Siguiente desafío:</b> ${CHALLENGE_LABELS[d.challenge]}. Revisaremos todos tus datos antes de crear las próximas 10 semanas.</div>`
+    :"";
+  $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">FITBUD · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</main>`;
 }
 function readOnboardingStep(){
   const d=onboardingDraft;
@@ -972,7 +1215,7 @@ function onboardingGoalChanged(goal){onboardingDraft.goal=goal;applyCalculatedMa
 function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();renderOnboarding();toast("Metas recalculadas");}
 function updateOnboardingTrainingSummary(){
   const out=$("#obTrainingSummary"),sport=$("#ob_sport"),days=$("#ob_days");
-  if(out&&sport&&days)out.innerHTML=`<b>Semana tipo:</b> ${trainingPlanSummary(+days.value,sport.value)}`;
+  if(out&&sport&&days)out.innerHTML=`<b>Semana tipo:</b> ${trainingPlanSummary(+days.value,sport.value,onboardingDraft&&onboardingDraft.challenge)}`;
 }
 function updateOnboardingActivity(value){
   const out=$("#obActivityDescription"),activity=ACTIVITY_LEVELS[value];
@@ -983,17 +1226,40 @@ async function saveOnboarding(){
   const error=validateOnboardingStep();
   if(error){toast(error);return;}
   const d=onboardingDraft,now=new Date().toISOString();
-  const prefs={...((profile&&profile.prefs)||{}),
+  const previous={...((profile&&profile.prefs)||{})};
+  const newCycle=!!previous.onboardingPending;
+  const firstCycle=!hasCompleteOnboarding(previous);
+  let planStartDate=previous.planStartDate,planEndDate=previous.planEndDate;
+  let planCycleNumber=Math.max(1,Number.parseInt(previous.planCycleNumber,10)||1);
+  if(newCycle){
+    planCycleNumber+=1;
+    planStartDate=todayStr()>END?todayStr():addDays(END,1);
+    planEndDate=addDays(planStartDate,69);
+  }else if(firstCycle&&!validYmd(planStartDate)){
+    planStartDate=todayStr();
+    planEndDate=addDays(planStartDate,69);
+  }
+  const prefs={...previous,
     name:d.name,sex:d.sex,age:d.age,heightCm:d.heightCm,weightKg:d.weightKg,
     bodyFatPct:d.bodyFatPct===""?null:d.bodyFatPct,activityLevel:d.activityLevel,goal:d.goal,
     calorieTarget:d.calorieTarget,proteinTarget:d.proteinTarget,carbTarget:d.carbTarget,fatTarget:d.fatTarget,
     maintenanceCalories:d.maintenanceCalories,macroMethod:d.macroMethod,
+    challenge:d.challenge||previous.pendingChallenge||previous.challenge||(d.goal==="mantenimiento"?"maintain":d.goal==="volumen"?"strength":"continue"),
     primarySport:d.primarySport,strengthMode:d.strengthMode,trainType:d.primarySport,
     trainDays:d.trainDays,trainPlace:d.strengthMode==="bodyweight"?"casa":"gym",trainNote:d.trainNote,
-    diet:d.diet,avoid:d.avoid,foodNote:d.foodNote,onboardingCompletedAt:now,onboardingReviewedAt:now,
+    diet:d.diet,avoid:d.avoid,foodNote:d.foodNote,
+    planCycleNumber,planStartDate,planEndDate,
+    cycleStartWeight:d.weightKg,cycleStartBodyFat:d.bodyFatPct===""?null:d.bodyFatPct,
+    onboardingPending:false,pendingChallenge:null,
+    onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
   };
   const result=await saveProfilePrefs(prefs);
   if(result&&result.error){toast("No se pudo guardar: "+result.error.message);return;}
+  if(newCycle||firstCycle){
+    S.days={};S.weights={};save();
+    await upsertActiveCycle();
+    await pullCycleHistory();
+  }
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
   view="hoy";current=clampDate(todayStr());render();window.scrollTo(0,0);toast("Tu plan quedó actualizado");
 }
@@ -1053,6 +1319,7 @@ function render(){
   if(passwordRecovery){$("#tabs").innerHTML="";return renderPasswordRecovery();}
   if(profile&&!isActive()){ $("#tabs").innerHTML="";return renderInactive(); }
   if(onboardingActive)return renderOnboarding();
+  if(planNeedsRecap()){ $("#tabs").innerHTML="";return renderPlanRecap(); }
   renderTabs();
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
@@ -1108,7 +1375,7 @@ function installDismissed(){return !!(UI&&UI.installDismissed);}
 function removeInstallPrompt(){const el=document.getElementById("a2hs");if(el)el.remove();}
 function dismissInstall(){UI.installDismissed=true;uiSave();removeInstallPrompt();}
 function updateInstallPrompt(){
-  const inApp=session&&profile&&(typeof isActive!=="function"||isActive())&&!onboardingActive&&!passwordRecovery;
+  const inApp=session&&profile&&(typeof isActive!=="function"||isActive())&&!onboardingActive&&!passwordRecovery&&!(typeof planNeedsRecap==="function"&&planNeedsRecap());
   const show=inApp&&isMobileDevice()&&!isStandaloneMode()&&!installDismissed();
   if(!show){removeInstallPrompt();return;}
   if(document.getElementById("a2hs"))return;               // ya visible
@@ -1432,10 +1699,34 @@ function delExtra(ds,i){const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);
 function renderProgress(){
   $("#app").innerHTML=`${screenHeader("Progreso","Tu evolución","progreso")}
     ${progressStats()}
+    ${section("pr.ciclos","Tus ciclos",progressJourney(),`${cycleNumber()}`)}
     ${section("pr.peso","Peso corporal",
       weightChart()+bodyComposition()+
       `<table class="wt"><thead><tr><th>Sem</th><th>Rango kg</th><th>Peso kg</th><th>% grasa</th></tr></thead><tbody>${weightRows()}</tbody></table>`)}
     ${section("pr.semana","Semana",weekSection())}`;
+}
+function progressJourney(){
+  const completed=cycleHistory.filter(row=>row.status==="completed");
+  const current=`<div class="alert violet"><b>Ciclo ${cycleNumber()} en curso</b><br>${prettyDate(START)} → ${prettyDate(END)}${profile&&profile.prefs&&profile.prefs.challenge?` · ${CHALLENGE_LABELS[profile.prefs.challenge]||profile.prefs.challenge}`:""}</div>`;
+  if(!completed.length)return current+'<div class="muted small">Cuando termines tus primeras 10 semanas, aquí quedarán el recap y tus fotos privadas de progreso.</div>';
+  return current+completed.map(row=>{
+    const s=row.summary||{};
+    const photo=row.photo_url?`<img class="journey-photo" src="${row.photo_url}" alt="Foto de progreso del ciclo ${row.cycle_number}">`:"";
+    return `<div class="dash">
+      <div class="row between" style="align-items:flex-start">
+        <div><div class="slot">Ciclo ${row.cycle_number}</div><div class="cl-title">${CHALLENGE_LABELS[row.challenge]||"Ciclo completado"}</div></div>
+        <span class="badge b-PESAS">Completado</span>
+      </div>
+      <div class="muted small" style="margin:4px 0 12px">${prettyDate(row.start_date)} → ${prettyDate(row.end_date)}</div>
+      ${photo}
+      <div class="summary" style="margin-top:12px">
+        <div class="scard"><div class="n">${s.workouts||0}</div><div class="l">entrenamientos</div></div>
+        <div class="scard"><div class="n">${s.mealAdherence||0}%</div><div class="l">adherencia</div></div>
+        <div class="scard"><div class="n">${recapDelta(s.weightChange," kg")}</div><div class="l">cambio de peso</div></div>
+        <div class="scard"><div class="n">${s.bestStreak||0}</div><div class="l">mejor racha</div></div>
+      </div>
+    </div>`;
+  }).join("");
 }
 // Tarjetas de estadísticas (kg, entrenos, racha)
 function progressStats(){
@@ -2228,6 +2519,7 @@ async function loadProfile(){
     else profile={id:uid(),email:(session.user&&session.user.email)||"",is_admin:false,active:true,prefs:{}};
   }catch(e){profile={id:uid(),email:"",is_admin:false,active:true,prefs:{}};}
   if(!profile.prefs||typeof profile.prefs!=="object")profile.prefs={};
+  refreshPlanCalendar();
 }
 async function saveProfilePrefs(prefs){
   if(!supa||!uid())return{error:{message:"Sin sesión"}};
@@ -2238,7 +2530,7 @@ async function saveProfilePrefs(prefs){
     prefs,
     updated_at:new Date().toISOString(),
   },{onConflict:"id"});
-  if(!result.error)profile.prefs=prefs;
+  if(!result.error){profile.prefs=prefs;refreshPlanCalendar();}
   return result;
 }
 async function signIn(email,pwd){
@@ -2254,6 +2546,7 @@ async function signUp(email,pwd){
 async function signOut(){
   if(supa)try{await supa.auth.signOut();}catch(e){}
   session=null;profile=null;view="hoy";
+  refreshPlanCalendar();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
   render();
@@ -2270,10 +2563,12 @@ async function onAuth(){
       return;
     }
     if(supa&&!DB.loaded)await dbLoad();
-    await Promise.all([pullAllDays(),pullWeights()]);
+    await Promise.all([pullAllDays(),pullWeights(),pullCycleHistory()]);
     const prefs=(profile&&profile.prefs)||{};
-    onboardingActive=!hasCompleteOnboarding(prefs);
+    onboardingActive=!!prefs.onboardingPending||!hasCompleteOnboarding(prefs);
     onboardingDraft=onboardingActive?onboardingDefaults():null;
+    if(onboardingDraft&&prefs.pendingChallenge)applyChallengeDefaults(onboardingDraft,prefs.pendingChallenge);
+    if(!onboardingActive)await upsertActiveCycle();
     onboardingStep=1;reviewPromptShown=false;
     view="hoy";current=clampDate(todayStr());
     render();
@@ -2300,6 +2595,64 @@ async function dbLoad(){
   }catch(e){DB.loaded=false;DB.error=(e&&e.message)||String(e);}
 }
 
+/* ---- Historial de ciclos + foto privada de progreso ---- */
+async function compressProgressPhoto(file){
+  const url=URL.createObjectURL(file);
+  try{
+    const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=url;});
+    const maxSide=1600,scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));
+    const canvas=document.createElement("canvas");
+    canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+    canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+    canvas.getContext("2d").drawImage(image,0,0,canvas.width,canvas.height);
+    return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error("No se pudo procesar la foto.")),"image/jpeg",.84));
+  }finally{URL.revokeObjectURL(url);}
+}
+async function uploadProgressPhoto(file,cycleNo){
+  if(!supa||!uid())throw new Error("Inicia sesión para guardar la foto.");
+  let blob;
+  try{blob=await compressProgressPhoto(file);}catch(e){blob=file;}
+  const path=`${uid()}/cycle-${cycleNo}/final-${Date.now()}.${blob.type==="image/jpeg"?"jpg":"img"}`;
+  const result=await supa.storage.from("progress-photos").upload(path,blob,{contentType:blob.type||file.type||"image/jpeg",upsert:true});
+  if(result.error)throw new Error("No se pudo guardar la foto. Aplica supabase/plan_cycles.sql y vuelve a intentar.");
+  return path;
+}
+async function archiveCompletedCycle(summary,challenge,photoPath){
+  if(!supa||!uid())throw new Error("Sin conexión con tu historial.");
+  const currentChallenge=(profile&&profile.prefs&&profile.prefs.challenge)||null;
+  const row={
+    user_id:uid(),cycle_number:cycleNumber(),start_date:START,end_date:END,
+    challenge:currentChallenge,next_challenge:challenge||null,summary:summary||{},photo_path:photoPath||null,
+    status:"completed",completed_at:new Date().toISOString(),
+  };
+  const result=await supa.from("plan_cycles").upsert(row,{onConflict:"user_id,cycle_number"});
+  if(result.error)throw new Error("No se pudo archivar el ciclo. Aplica supabase/plan_cycles.sql.");
+}
+async function upsertActiveCycle(){
+  if(!supa||!uid())return false;
+  const p=(profile&&profile.prefs)||{};
+  const result=await supa.from("plan_cycles").upsert({
+    user_id:uid(),cycle_number:cycleNumber(),start_date:START,end_date:END,
+    challenge:p.challenge||null,status:"active",
+  },{onConflict:"user_id,cycle_number"});
+  return !result.error;
+}
+async function pullCycleHistory(){
+  cycleHistory=[];
+  if(!supa||!uid())return false;
+  try{
+    const result=await supa.from("plan_cycles").select("cycle_number,start_date,end_date,challenge,next_challenge,status,summary,photo_path,completed_at").eq("user_id",uid()).order("cycle_number",{ascending:false});
+    if(result.error)return false;
+    cycleHistory=result.data||[];
+    await Promise.all(cycleHistory.map(async row=>{
+      if(!row.photo_path)return;
+      const signed=await supa.storage.from("progress-photos").createSignedUrl(row.photo_path,3600);
+      if(!signed.error&&signed.data)row.photo_url=signed.data.signedUrl;
+    }));
+    return true;
+  }catch(e){cycleHistory=[];return false;}
+}
+
 /* ---- Registro de consumo en la DB (tabla day_log) ---- */
 // Sube el estado del día (comidas marcadas, extras, entreno) a Supabase.
 async function pushDay(ds){
@@ -2319,7 +2672,7 @@ async function pullDay(ds){
 async function pullAllDays(){
   if(!supa||!uid())return;
   try{
-    const r=await supa.from("day_log").select("log_date,state").eq("user_id",uid());
+    const r=await supa.from("day_log").select("log_date,state").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
     if(!r.error&&Array.isArray(r.data)){r.data.forEach(row=>{if(row.state&&typeof row.state==="object")S.days[row.log_date]=row.state;});save();}
   }catch(e){}
 }
@@ -2333,14 +2686,20 @@ function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view===
 async function pushWeight(week,kg,bf){
   if(!supa||!uid())return;
   try{
-    if(kg==null) await supa.from("weight_log").delete().eq("user_id",uid()).eq("week",week);
-    else await supa.from("weight_log").upsert({user_id:uid(),week:week,kg:kg,bf_pct:(bf==null?null:bf),updated_at:new Date().toISOString()},{onConflict:"user_id,week"});
+    const result=kg==null
+      ?await supa.from("weight_log").delete().eq("user_id",uid()).eq("cycle_start",START).eq("week",week)
+      :await supa.from("weight_log").upsert({user_id:uid(),cycle_start:START,week:week,kg:kg,bf_pct:(bf==null?null:bf),updated_at:new Date().toISOString()},{onConflict:"user_id,cycle_start,week"});
+    if(result.error&&cycleNumber()===1){
+      if(kg==null)await supa.from("weight_log").delete().eq("user_id",uid()).eq("week",week);
+      else await supa.from("weight_log").upsert({user_id:uid(),week:week,kg:kg,bf_pct:(bf==null?null:bf),updated_at:new Date().toISOString()},{onConflict:"user_id,week"});
+    }
   }catch(e){}
 }
 async function pullWeights(){
   if(!supa||!uid())return false;
   try{
-    const r=await supa.from("weight_log").select("week,kg,bf_pct").eq("user_id",uid());
+    let r=await supa.from("weight_log").select("week,kg,bf_pct").eq("user_id",uid()).eq("cycle_start",START);
+    if(r.error&&cycleNumber()===1)r=await supa.from("weight_log").select("week,kg,bf_pct").eq("user_id",uid());
     if(!r.error&&Array.isArray(r.data)){const w={};r.data.forEach(x=>{w[x.week]={kg:Number(x.kg),bf:(x.bf_pct==null?null:Number(x.bf_pct))};});S.weights=w;save();return true;}
   }catch(e){}
   return false;

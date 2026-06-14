@@ -78,6 +78,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 7. REQ-07 - Vista admin para usuarios.
 8. REQ-08 - Generador de dias de dieta con Claude.
 9. REQ-09 - Onboarding de objetivos, macros y preferencias.
+10. REQ-10 - Cierre de ciclo, recap y siguiente desafío.
 
 REQ-08 debe esperar a REQ-01/REQ-02 y preferiblemente a REQ-05/REQ-06, porque necesita recetas confiables, contexto por usuario y control de acceso a IA.
 
@@ -445,6 +446,40 @@ Configurar el perfil completo del usuario al entrar por primera vez y ofrecer un
 - Verificar el limite exacto de 28 dias.
 - Probar calculos con y sin porcentaje de grasa.
 - Comprobar persistencia tras cerrar sesion y volver a entrar.
+
+---
+
+## REQ-10 - Cierre de ciclo, recap y siguiente desafío
+
+**Estado: implementado.**
+
+### Objetivo
+
+Cerrar cada proceso de 10 semanas con un resumen útil, documentar visualmente el progreso y crear el siguiente ciclo a partir de un nuevo desafío.
+
+### Alcance
+
+- Detectar que terminó el ciclo activo y mostrar un recap antes de volver a la vista diaria.
+- Resumir entrenamientos, adherencia a comidas, cambio de peso, grasa corporal y mejor racha.
+- Permitir tomar o elegir una foto de cuerpo entero.
+- Guardar la foto de forma privada por usuario y ciclo.
+- Preguntar si el siguiente desafío es:
+  - mantener lo logrado;
+  - continuar el mismo objetivo;
+  - mejorar rendimiento;
+  - ganar fuerza.
+- Volver a ejecutar el onboarding completo con valores preseleccionados según el desafío.
+- Crear otras 10 semanas con fechas, pesos y progreso independientes.
+- Conservar recaps y fotos anteriores en la vista Progreso.
+
+### Criterios de aceptación
+
+- Un ciclo vencido abre el recap una sola vez.
+- El usuario no pierde el historial anterior al iniciar el siguiente ciclo.
+- Rendimiento prioriza sesiones aeróbicas/técnicas y fuerza prioriza sesiones de fuerza.
+- Las fotos son privadas y solo accesibles por el propietario mediante URL firmada.
+- La migración `supabase/plan_cycles.sql` conserva los pesos existentes.
+- Commit y push propios.
 
 ---
 

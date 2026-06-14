@@ -1,6 +1,6 @@
 # Fitbud 🏋️🥗
 
-Tracker web/PWA de mi plan nutricional y de entrenamiento de **10 semanas** (sáb 13 jun → dom 23 ago 2026). App estática, sin frameworks ni build step.
+Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **10 semanas**. El ciclo original va del sáb 13 jun al dom 23 ago 2026; los siguientes se recalculan por usuario. App estática, sin frameworks ni build step.
 
 **🔗 En vivo:** https://fitbud-green.vercel.app/ (desplegado en Vercel; las credenciales viven como variables de entorno en Vercel, no en este repo).
 
@@ -10,6 +10,7 @@ Tracker web/PWA de mi plan nutricional y de entrenamiento de **10 semanas** (sá
 - **Calorías y macros en vivo** (proteína / carbos / grasa) con barras de progreso; la proteína se destaca con código de color según el ritmo del día.
 - **Flujo inicial personalizado** para calcular calorías y macros, definir objetivo, días de entrenamiento y preferencias alimenticias.
 - **Revisión cada 4 semanas** para actualizar peso, objetivo, macros o preferencias sin perder el progreso.
+- **Cierre de ciclo** con recap de logros, foto privada de cuerpo entero y elección del siguiente desafío antes de recalcular otras 10 semanas.
 - **Tipos de día**: PESAS, BAJO, REFEED y DIET BREAK, cada uno con su meta de kcal y macros.
 - **Marcar** comidas y entrenamiento como completados (se guarda en `localStorage`).
 - **Reemplazar** comidas (otra opción del plan o una personalizada) y **agregar** extras.
@@ -38,6 +39,8 @@ Después del primer inicio de sesión, Fitbud guía al usuario por cuatro pasos:
 4. Preferencias y restricciones alimenticias.
 
 El cálculo usa Katch-McArdle cuando se proporciona el porcentaje de grasa corporal y Mifflin-St Jeor en caso contrario. Las metas quedan guardadas por usuario en `profiles.prefs` y personalizan los tipos de día del plan. Cada 28 días la app pregunta si se desea revisar la configuración; también puede abrirse manualmente desde **Perfil → Recalcular objetivos y preferencias**.
+
+Al terminar las 10 semanas, Fitbud resume entrenamientos, adherencia, cambio de peso, grasa corporal y mejor racha. El usuario puede guardar una foto privada de cuerpo entero y elegir entre mantener, continuar, mejorar rendimiento o ganar fuerza. Esa elección vuelve a abrir el onboarding y crea un ciclo nuevo con fechas, macros y reparto deportivo recalculados.
 
 ## Configuración (de dónde salen las credenciales)
 
@@ -92,11 +95,11 @@ Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se
 ### Preparar la base
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
-2. En el **SQL Editor**, ejecuta primero [`supabase/schema.sql`](supabase/schema.sql) y luego [`supabase/seed.sql`](supabase/seed.sql) (datos precargados: 55 ingredientes, 43 platos, 4 dietas).
+2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql) y [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql). El último crea el historial de ciclos, separa los pesos por ciclo y configura el bucket privado `progress-photos`.
 3. En **Project Settings → API Keys**, copia la **Project URL** (o el Project ID) y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
 4. Ponlos como variables de entorno en Vercel (ver despliegue). Para desarrollo local, también puedes guardarlos desde **Ajustes → Base de datos**.
 
-> ⚠️ Las políticas RLS del `schema.sql` permiten lectura y escritura al rol anónimo (cómodo para uso personal). Como la URL + publishable key viven en tu navegador, cualquiera que las obtenga podría editar. Para proteger la escritura, activa Supabase Auth y cambia las políticas a `to authenticated`.
+> Para una instalación existente que ya usa `auth.sql`, basta ejecutar [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql). Es idempotente y conserva los pesos existentes asignándolos al ciclo inicial.
 
 ## Uso local
 
