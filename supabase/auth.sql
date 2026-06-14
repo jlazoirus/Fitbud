@@ -26,10 +26,13 @@ create table if not exists profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   email       text,
   is_admin    boolean not null default false,
+  active      boolean not null default true,        -- REQ-07: activar/desactivar
   prefs       jsonb not null default '{}'::jsonb,   -- preferencias (dieta, entreno, notas)
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
+-- Por si la tabla ya existía sin la columna (install previo a REQ-07):
+alter table profiles add column if not exists active boolean not null default true;
 
 -- Crea la fila de profile automáticamente cuando se registra un usuario.
 create or replace function handle_new_user()
@@ -93,6 +96,16 @@ as $$
   select coalesce((select is_admin from public.profiles where id = auth.uid()), false);
 $$;
 
+-- Helper: ¿el usuario actual está activo? (REQ-07)
+create or replace function is_active()
+returns boolean
+language sql
+stable
+security definer set search_path = public
+as $$
+  select coalesce((select active from public.profiles where id = auth.uid()), false);
+$$;
+
 -- profiles: cada quien ve/edita su propia fila (los admins pueden ver todas).
 drop policy if exists "own profile select" on profiles;
 drop policy if exists "own profile upsert" on profiles;
@@ -104,14 +117,22 @@ create policy "own profile upsert" on profiles
 create policy "own profile update" on profiles
   for update using (id = auth.uid()) with check (id = auth.uid());
 
--- day_log / weight_log: solo lo del usuario autenticado.
+-- day_log / weight_log: lectura propia; escritura solo si el usuario está activo.
 drop policy if exists "own day_log" on day_log;
-create policy "own day_log" on day_log
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "read own day_log" on day_log;
+drop policy if exists "write own day_log" on day_log;
+create policy "read own day_log"  on day_log for select using (user_id = auth.uid());
+create policy "write own day_log" on day_log for all
+  using (user_id = auth.uid() and is_active())
+  with check (user_id = auth.uid() and is_active());
 
 drop policy if exists "own weight_log" on weight_log;
-create policy "own weight_log" on weight_log
-  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+drop policy if exists "read own weight_log" on weight_log;
+drop policy if exists "write own weight_log" on weight_log;
+create policy "read own weight_log"  on weight_log for select using (user_id = auth.uid());
+create policy "write own weight_log" on weight_log for all
+  using (user_id = auth.uid() and is_active())
+  with check (user_id = auth.uid() and is_active());
 
 -- ============================================================
 -- CATÁLOGO compartido: lectura para autenticados, escritura solo admin.
@@ -128,7 +149,7 @@ begin
     execute format('drop policy if exists "admin write %s" on %I', t, t);
     -- lectura: cualquier usuario autenticado
     execute format($p$create policy "read catalog %s" on %I for select to authenticated using (true)$p$, t, t);
-    -- escritura (insert/update/delete): solo admin
-    execute format($p$create policy "admin write %s" on %I for all to authenticated using (is_admin()) with check (is_admin())$p$, t, t);
+    -- escritura (insert/update/delete): solo admin Y activo
+    execute format($p$create policy "admin write %s" on %I for all to authenticated using (is_admin() and is_active()) with check (is_admin() and is_active())$p$, t, t);
   end loop;
 end $$;

@@ -26,6 +26,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `config.js` | Fallback de config en runtime (`window.FITBUD_CONFIG`). **Vacío en el repo**; producción usa Vercel. |
 | `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. **Exige sesión:** valida el JWT de Supabase (Bearer → `/auth/v1/user`) antes de llamar a Anthropic; sin token válido responde 401 (falla cerrado). |
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
+| `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios, activar/desactivar, cambiar contraseña, enviar reset. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida que quien llama sea admin **activo**. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
 | `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v8`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. |
@@ -84,6 +85,7 @@ Prioridad en `effectiveSettings()`: **override local (Ajustes, localStorage)** �
 | `ANTHROPIC_API_KEY` | proxy `/api/claude` | **Sí** (solo servidor) |
 | `SUPABASE_URL` | `https://<ref>.supabase.co` | No |
 | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | No |
+| `SUPABASE_SERVICE_ROLE_KEY` | funciones admin (`/api/admin`) — listar/activar/desactivar/contraseñas | **Sí** (solo servidor) |
 | `ANTHROPIC_MODEL` (opcional) | modelo por defecto | No |
 
 Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (default), `claude-sonnet-4-6`.

@@ -1036,6 +1036,7 @@ function render(){
   if(view==="perfil")return renderProfile();
   if(isAdmin()&&view==="foods")return renderFoods();
   if(isAdmin()&&view==="settings")return renderSettings();
+  if(isAdmin()&&view==="admin")return renderAdminUsers();
   renderHoy();
 }
 function renderSplash(){$("#app").innerHTML=`<div class="splash"><div class="muted">Cargando…</div></div>`;}
@@ -1479,7 +1480,8 @@ function renderProfile(){
 
   ${isAdmin()?`<div class="section-h">Administración</div>
   <div class="dash">
-    <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona el catálogo de alimentos y la configuración técnica.</div>
+    <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, el catálogo de alimentos y la configuración técnica.</div>
+    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('foods')">🥗 Alimentos (catálogo)</button>
     <button class="btn" style="width:100%" onclick="setView('settings')">⚙️ Ajustes técnicos</button>
   </div>`:""}
@@ -1938,10 +1940,10 @@ async function refreshAuth(){
 async function loadProfile(){
   if(!supa||!uid()){profile=null;return;}
   try{
-    const r=await supa.from("profiles").select("id,email,is_admin,prefs").eq("id",uid()).maybeSingle();
+    const r=await supa.from("profiles").select("id,email,is_admin,active,prefs").eq("id",uid()).maybeSingle();
     if(!r.error&&r.data)profile=r.data;
-    else profile={id:uid(),email:(session.user&&session.user.email)||"",is_admin:false,prefs:{}};
-  }catch(e){profile={id:uid(),email:"",is_admin:false,prefs:{}};}
+    else profile={id:uid(),email:(session.user&&session.user.email)||"",is_admin:false,active:true,prefs:{}};
+  }catch(e){profile={id:uid(),email:"",is_admin:false,active:true,prefs:{}};}
   if(!profile.prefs||typeof profile.prefs!=="object")profile.prefs={};
 }
 async function saveProfilePrefs(prefs){
@@ -2060,6 +2062,64 @@ function syncWeights(){if(supa)pullWeights().then(ok=>{if(ok&&view==="progreso")
 function ingById(id){return DB.ingredients.find(x=>x.id===id);}
 function macrosFromLines(lines){let t={kcal:0,p:0,c:0,f:0};lines.forEach(l=>{const i=ingById(+l.ingredient_id);if(!i||l.grams==null)return;const g=(+l.grams)/100;t.kcal+=i.kcal*g;t.p+=i.protein_g*g;t.c+=i.carbs_g*g;t.f+=i.fat_g*g;});return{kcal:Math.round(t.kcal),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f)};}
 function dishMacros(dishId){return macrosFromLines(DB.dishIng.filter(x=>x.dish_id===dishId));}
+
+/* ============================================================
+   REQ-07: Administración de usuarios (solo admin).
+   Usa /api/admin (service role en el servidor). El cliente solo manda su JWT.
+   ============================================================ */
+function prettyDateTime(iso){try{const d=new Date(iso);if(isNaN(d))return "—";return d.getDate()+" "+MON[d.getMonth()]+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}catch(e){return "—";}}
+async function adminApi(action,payload){
+  const token=session&&session.access_token;
+  if(!token)throw new Error("Sesión requerida.");
+  const res=await fetch("/api/admin",{method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+token},body:JSON.stringify(Object.assign({action},payload||{}))});
+  if(res.status===404)throw new Error("El endpoint /api/admin no está disponible (despliega en Vercel).");
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok)throw new Error(data.error||("Error "+res.status));
+  return data;
+}
+async function renderAdminUsers(){
+  $("#app").innerHTML=`${screenHeader("Usuarios","Administración","perfil")}
+    <button class="btn btn-sm" style="margin-bottom:12px" onclick="setView('perfil')">‹ Volver a Perfil</button>
+    <div id="adminList" class="muted small">Cargando usuarios…</div>`;
+  try{
+    const out=await adminApi("list");
+    $("#adminList").innerHTML=adminUsersHtml(out.users||[]);
+  }catch(e){
+    $("#adminList").innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}<div class="muted small" style="margin-top:8px">Requiere la variable <b>SUPABASE_SERVICE_ROLE_KEY</b> en Vercel.</div></div>`;
+  }
+}
+function adminUsersHtml(users){
+  if(!users.length)return '<div class="muted small">Sin usuarios.</div>';
+  return users.map(u=>{
+    const me=u.id===uid();
+    return `<div class="meal">
+      <div class="meal-head"><div>
+        <div class="name">${esc(u.email||u.id)} ${u.is_admin?'<span class="pill" style="background:var(--accent-dim);color:var(--purple-200)">admin</span>':''}${u.active?'':' <span class="pill" style="background:var(--bad);color:#fff">inactivo</span>'}${me?' <span class="pill">tú</span>':''}</div>
+        <div class="nums muted">creado ${prettyDateTime(u.created_at)} · último acceso ${u.last_sign_in_at?prettyDateTime(u.last_sign_in_at):"nunca"}</div>
+      </div></div>
+      <div class="meal-actions">
+        <button class="btn btn-sm" ${me?'disabled style="opacity:.4"':''} onclick="adminToggleActive('${u.id}',${u.active?'false':'true'})">${u.active?'Desactivar':'Activar'}</button>
+        <button class="btn btn-sm" onclick="adminSetPassword('${u.id}','${esc(u.email||"")}')">Cambiar contraseña</button>
+        <button class="btn btn-sm" onclick="adminResetLink('${esc(u.email||"")}')">Enviar reset</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+async function adminToggleActive(id,active){
+  try{await adminApi("setActive",{userId:id,active});toast(active?"Usuario activado":"Usuario desactivado");renderAdminUsers();}
+  catch(e){toast(e.message);}
+}
+async function adminSetPassword(id,email){
+  const pwd=prompt("Nueva contraseña para "+(email||id)+" (mín. 6 caracteres):");
+  if(pwd==null)return; if(pwd.length<6){toast("Mínimo 6 caracteres");return;}
+  try{await adminApi("setPassword",{userId:id,password:pwd});toast("Contraseña actualizada");}
+  catch(e){toast(e.message);}
+}
+async function adminResetLink(email){
+  if(!email){toast("Ese usuario no tiene email");return;}
+  try{await adminApi("resetPassword",{email});toast("Correo de reseteo enviado a "+email);}
+  catch(e){toast(e.message);}
+}
 
 function renderFoods(){
   if(!supa){

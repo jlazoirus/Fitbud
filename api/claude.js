@@ -13,13 +13,26 @@ async function verifyUser(req) {
   const url = process.env.SUPABASE_URL;
   const apikey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
   if (!url || !apikey) return null;
+  const base = url.replace(/\/$/, "");
   try {
-    const r = await fetch(url.replace(/\/$/, "") + "/auth/v1/user", {
+    const r = await fetch(base + "/auth/v1/user", {
       headers: { Authorization: "Bearer " + token, apikey },
     });
     if (!r.ok) return null;
     const u = await r.json();
-    return u && u.id ? u : null;
+    if (!u || !u.id) return null;
+    // Rechaza usuarios desactivados (profiles.active = false). Lee su propio
+    // perfil con su token (RLS permite ver la fila propia).
+    try {
+      const pr = await fetch(base + "/rest/v1/profiles?id=eq." + u.id + "&select=active", {
+        headers: { Authorization: "Bearer " + token, apikey },
+      });
+      if (pr.ok) {
+        const rows = await pr.json();
+        if (rows && rows[0] && rows[0].active === false) return null;
+      }
+    } catch (_) {}
+    return u;
   } catch (e) {
     return null;
   }
