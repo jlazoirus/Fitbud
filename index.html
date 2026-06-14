@@ -1606,7 +1606,20 @@ function saveProfile(){
 
 /* ---------- LOGIN / REGISTRO ---------- */
 function renderAuth(){
-  if(!supa){ // dev local sin credenciales: pedir conexión Supabase
+  if(!supa){
+    const host=location.hostname;
+    const isLocal=host==="localhost"||host==="127.0.0.1"||host==="::1"||host==="";
+    if(!isLocal){
+      // Producción: las credenciales vienen de /api/config. No mostramos el
+      // formulario de conexión al usuario; si falló, ofrecemos reintentar.
+      $("#app").innerHTML=`<div class="auth">
+        <div class="auth-brand">Fitbud</div>
+        <div class="muted small center" style="margin-bottom:18px">Conectando con el servidor…</div>
+        <div class="center"><button class="btn btn-accent" onclick="retryConnect()">Reintentar</button></div>
+      </div>`;
+      return;
+    }
+    // Dev local sin credenciales: pedir conexión Supabase (solo en localhost).
     const cfg=effectiveSettings();
     $("#app").innerHTML=`<div class="auth">
       <div class="auth-brand">Fitbud</div>
@@ -1636,6 +1649,9 @@ function renderAuth(){
   </div>`;
 }
 function toggleAuthMode(){window._authMode=(window._authMode==="up")?"in":"up";renderAuth();}
+function retryConnect(){
+  loadRemoteConfig().then(()=>{supaInit();setupAuthListener();refreshAuth().then(()=>{session?onAuth():render();});});
+}
 function connectFromAuth(){
   const url=supaUrlFrom($("#au_url").value);const key=$("#au_key").value.trim();
   if(!url||!key){toast("Faltan datos");return;}
@@ -2595,6 +2611,11 @@ function setupAuthListener(){
   });
 }
 async function boot(){
+  // Producción: las credenciales de Supabase llegan de /api/config (Vercel).
+  // Cárgalas ANTES de pintar, para no mostrar la pantalla de "conectar Supabase"
+  // en vez del login. Si ya hay override local, no hace falta esperar.
+  const hasLocalCreds=!!(S.settings&&S.settings.supaUrl&&S.settings.supaKey);
+  if(!hasLocalCreds)await loadRemoteConfig();
   supaInit();
   setupAuthListener();
   await refreshAuth();         // resuelve sesión (authReady=true)
@@ -2605,11 +2626,7 @@ registerServiceWorker();
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;updateInstallPrompt();});
 window.addEventListener("appinstalled",()=>{UI.installDismissed=true;uiSave();removeInstallPrompt();});
 render();                      // splash mientras resolvemos la sesión
-boot();
-// Credenciales servidas por Vercel: si no había conexión local, conecta y reintenta.
-loadRemoteConfig().then(()=>{
-  if(!supa){supaInit();setupAuthListener();refreshAuth().then(()=>{session?onAuth():render();});}
-});
+boot();                        // carga config (Vercel) → conecta Supabase → resuelve sesión
 </script>
 </body>
 </html>
