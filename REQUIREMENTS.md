@@ -412,3 +412,4 @@ Agregar una funcion para generar mas dias de dieta con Claude usando todo el con
 - Mantener la app usable en modo lectura sin login.
 - Cualquier cambio de esquema debe venir con instrucciones de migracion o SQL idempotente.
 - Si un requerimiento necesita partirse, crear un nuevo REQ en este archivo y hacer commit/push solo de esa actualizacion de backlog.
+- Despues de cada implementacion revisar si es necesario actualizar el archivo CONTEXT.md y hacer push al repositorio con el cambio

@@ -31,8 +31,9 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
-| `supabase/day_log.sql` | Migración incremental: tabla `day_log` (consumo diario). |
-| `supabase/weight_log.sql` | Migración incremental: tabla `weight_log` (peso). |
+| `supabase/day_log.sql` | Migración incremental: tabla `day_log` (consumo diario). *(Superado por auth.sql, que la recrea por usuario.)* |
+| `supabase/weight_log.sql` | Migración incremental: tabla `weight_log` (peso). *(Superado por auth.sql.)* |
+| `supabase/auth.sql` | **Multiusuario:** `profiles` (rol admin + prefs), `day_log`/`weight_log` por `user_id`, RLS por usuario y escritura de catálogo solo admin. Correr después de schema/seed. |
 | `plan-10-semanas-recomposicion.md` | Plan original (fuente de verdad de menús, días, entrenos, metas). |
 | `BUILD_PLAN.md`, `PROGRESS.md`, `REQUIREMENTS.md`, `README.md` | Docs del proyecto. |
 
@@ -105,11 +106,29 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 ### Pendiente / ideas
 - **Porciones especiales de REFEED/DIETBREAK:** el almuerzo refeed usa el plato estándar de la DB, sin la doble porción de carbo que indica el plan.
 - **¿El cambio de entreno ajusta el tipo de día/metas?** Hoy cambiar pesas↔correr no cambia `DAY_TARGET` (sigue por el día de semana). Decidir si debería.
-- **Auth de Supabase** para proteger escritura (hoy RLS abierto al rol anónimo).
+- ~~**Auth de Supabase**~~ ✅ Hecho — multiusuario con login; RLS por usuario y escritura de catálogo solo admin (ver §11b).
 - **Editor de dietas** (hoy `foodsDiets` es solo lectura): asignar/editar `diet_dishes` desde la app.
 - **Buscar/filtrar** ingredientes y platos; sugerencias por macros restantes.
 - **Conflictos de sync:** hoy last-write-wins, sin cola offline (cambios hechos sin red se pueden perder si otro dispositivo escribe).
 - **Mejorar la IA:** que sugiera usando platos reales de la DB; cachear respuestas.
+
+## 11b. Multiusuario, auth y roles (nuevo)
+La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migración: `supabase/auth.sql`.
+
+- **Login obligatorio.** Sin sesión se ve `renderAuth()` (login/registro). En dev local sin credenciales, esa pantalla pide conectar Supabase (URL + publishable key → `S.settings`). En producción las da `/api/config`.
+- **Estado:** `session` (Supabase Auth) y `profile` (fila de `profiles`: `is_admin` + `prefs`). `authReady` gatea el render (splash mientras resuelve). `onAuth()` carga perfil + datos al entrar; `setupAuthListener()` reacciona a login/logout/refresh.
+- **Datos por usuario:** `day_log`/`weight_log` llevan `user_id`; `pushDay/pullDay/pushWeight/pullWeights` lo incluyen y RLS lo fuerza. `pullAllDays()` baja todo el historial al entrar (racha/stats). Al login se limpia la caché local (`S.days`/`S.weights`) y manda la DB.
+- **Roles:** `isAdmin()` = `profile.is_admin`. Para hacer admin a alguien: regístralo y en el SQL Editor `update profiles set is_admin=true where email='...'` (esa es la "consola de administración de usuarios": el dashboard de Supabase).
+- **Catálogo compartido:** ingredientes/platos/dietas se leen para cualquier autenticado; escritura solo admin (RLS con `is_admin()`).
+
+### Navegación (nueva IA por rol)
+- Tabs de usuario: **Hoy · Nutrición · Entreno · Progreso · Perfil** (`renderTabs`, 5 fijos).
+- **Hoy** (`renderHoy`): saludo + racha (`streak()`) + hero (anillo kcal + macros) + tarjeta "dieta de hoy" (→Nutrición) + "entreno de hoy" (→Entreno). Siempre muestra el día actual.
+- **Nutrición** (`renderNutrition`): nav de día + hero + comidas del plan + extras + IA.
+- **Entreno** (`renderWorkout`): nav de día + tarjeta de entreno + cambiar/volver al plan + resumen.
+- **Progreso** (`renderProgress`): stats (kg/entrenos/racha) + gráfico+tabla de peso + sección Semana (reusa `goDay`/`weekNav`).
+- **Perfil** (`renderProfile`): preferencias **mixtas** (dieta/objetivo/proteína/alergias + notas libres de alimentación y entreno) → `profiles.prefs` vía `saveProfilePrefs`; cuenta + cerrar sesión; **sección Administración solo admin** con accesos a Alimentos (`renderFoods`) y Ajustes técnicos (`renderSettings`).
+- **IA personalizada:** `buildSysPrompt()` arma el system prompt de Claude desde `profile.prefs` (fallback al texto vegetariano por defecto si no hay prefs).
 
 ## 11. Convenciones / gotchas
 - **Sin build, sin frameworks.** Todo en `index.html`; las funciones se llaman vía `onclick` inline. Mantener ese estilo (vanilla, español en UI/labels).
