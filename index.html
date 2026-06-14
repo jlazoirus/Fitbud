@@ -391,47 +391,6 @@ let WEEKS=DEFAULT_WEEKS.map(w=>({...w}));
 let WEIGHT_RANGES={...DEFAULT_WEIGHT_RANGES};
 let PLAN_DURATION_WEEKS=10;
 
-const BREAKFASTS = [
-  "Avena proteica: avena 50g + 1.5 scoop + chía 10g + canela",
-  "Bowl griego: yogur griego 250g + 1 scoop + granola s/azúcar 25g + frutos rojos",
-  "Panqueques sin huevo: avena 50g + 1.5 scoop + ½ plátano",
-  "Smoothie bowl: 1.5 scoop + frutos congelados 150g + avena 30g + leche vegetal",
-];
-const DINNERS = [
-  "Yogur griego 300g + queso cottage 100g + fruta pequeña",
-  "Ensalada grande + queso fresco a la plancha 150g + ¼ palta + vinagreta",
-  "Crema de verduras + tofu sellado 200g (sillao y kion)",
-  "Cena exprés: batido de caseína + mantequilla de maní 15g",
-];
-// menús por día de semana (0=Dom .. 6=Sáb)
-const MENUS = {
-  A:{1:"Saltado de tofu firme 250g + arroz 150g",2:"Lentejas guisadas 1.5 tazas + quinua 100g + ensalada criolla",3:"Tacu tacu de pallares + seitán a la plancha 120g",4:"Ají de garbanzos (1.5 tazas) + arroz 120g",5:"Quinua atamalada con queso fresco 100g + tofu sellado 150g",6:"Frijoles canarios 1.5 tazas + arroz 80g + queso fresco grillado 120g",0:"Locro de zapallo con quinua + tofu dorado 200g"},
-  B:{1:"Pasta integral 80g + boloñesa de lentejas + parmesano 15g",2:"Bowl de hummus + tofu horneado 150g + pita ½ + verduras asadas",3:"Falafel al horno 6 und + tabule de quinua + yogur de salsa",4:"Berenjenas al horno con lentejas y queso fresco 120g + arroz 100g",5:"Risotto de champiñones + tofu sellado 200g",6:"Ensalada griega + garbanzos 1.5 tazas + queso fresco 120g + aceitunas",0:"Pisto de verduras + soya texturizada 60g + papa pequeña"},
-  C:{1:"Tofu teriyaki 250g + arroz 150g + brócoli al vapor",2:"Curry de garbanzos (leche de coco light) + arroz 120g",3:"Salteado de tempeh 200g con sésamo, pak choi y pimientos",4:"Pad thai de tofu 250g (fideos de arroz 80g, sin huevo)",5:"Bowl de edamame 200g + tofu 150g + arroz 120g + palta ¼",6:"Ramen miso: tofu 250g + fideos 60g + verduras + nori",0:"Chaufa de quinua con tofu 200g y verduras (sin huevo)"},
-  D:{1:"Burrito bowl: frijol negro + arroz 100g + cottage 100g + guacamole",2:"Chili vegetariano (soya + frijoles) + arroz 80g",3:"Tacos de frijol negro y queso fresco (3 tortillas) + repollo",4:"Fajitas de tofu 250g con pimientos + 3 tortillas integrales",5:"Quesadillas integrales (2) con frijol, queso 80g y champiñones",6:"Enchiladas de frijol (3 tortillas, salsa roja) + cottage 100g",0:"Sopa azteca ligera + tofu 200g + tortilla en tiras + palta ¼"},
-};
-// Nombres canónicos de los platos en la base de datos (Supabase). Sirven para
-// resolver los macros de cada comida desde la DB (ingredientes) en vez de los
-// valores hardcodeados de SLOTS. Deben coincidir EXACTO con supabase/seed.sql.
-const BREAKFAST_DISHES = ["Avena proteica","Bowl griego","Panqueques sin huevo","Smoothie bowl"];
-const DINNER_DISHES = ["Cena: yogur griego + cottage + fruta","Cena: queso fresco a la plancha + palta","Cena: crema de verduras + tofu sellado","Cena exprés: caseína + mantequilla de maní"];
-const LUNCH_DISHES = {
-  A:{1:"Saltado de tofu firme + arroz",2:"Lentejas guisadas + quinua + ensalada",3:"Tacu tacu de pallares + seitán",4:"Ají de garbanzos + arroz",5:"Quinua atamalada + queso fresco + tofu",6:"Frijoles canarios + arroz + queso fresco",0:"Locro de zapallo con quinua + tofu"},
-  B:{1:"Pasta integral + boloñesa de lentejas + parmesano",2:"Bowl de hummus + tofu horneado + pita",3:"Falafel al horno + tabule de quinua + yogur",4:"Berenjenas al horno con lentejas + queso fresco",5:"Risotto de champiñones + tofu",6:"Ensalada griega + garbanzos + queso fresco",0:"Pisto de verduras + soya texturizada + papa"},
-  C:{1:"Tofu teriyaki + arroz + brócoli",2:"Curry de garbanzos + arroz",3:"Salteado de tempeh con pak choi y pimientos",4:"Pad thai de tofu",5:"Bowl de edamame + tofu + arroz + palta",6:"Ramen miso con tofu y fideos",0:"Chaufa de quinua con tofu"},
-  D:{1:"Burrito bowl de frijol negro",2:"Chili vegetariano + arroz",3:"Tacos de frijol negro y queso fresco",4:"Fajitas de tofu + tortillas",5:"Quesadillas de frijol, queso y champiñones",6:"Enchiladas de frijol + cottage",0:"Sopa azteca + tofu + palta"},
-};
-const DISH_NAMES = {
-  refeedDesayuno:"Desayuno refeed (avena + plátano + miel)",
-  refeedCena:"Cena refeed: arroz + tofu + verduras",
-  refeedSnack:"Snack refeed: pan + mermelada + proteína",
-  dietbreakSnack:"Snack diet break: pan con palta",
-  snackExtra:"Snack extra: fruta + yogur",
-  batidoPesas:"Batido peri-entreno (día pesas)",
-  batidoBajo:"Batido peri-entreno (día bajo)",
-};
-const ALL_LUNCHES = []; // para reemplazo de almuerzo (nombre visible + plato de la DB)
-["A","B","C","D"].forEach(L=>{for(let wd=0;wd<7;wd++){ALL_LUNCHES.push({menu:L,wd,name:MENUS[L][wd],dishName:LUNCH_DISHES[L][wd]});}});
 
 const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
 const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
@@ -648,12 +607,6 @@ function effectiveWorkout(ds){
 }
 
 // metas y macros por slot según tipo de día
-const DAY_TARGET = {
-  PESAS:{kcal:2000,p:180,c:195,f:55},
-  BAJO:{kcal:1800,p:180,c:150,f:50},
-  REFEED:{kcal:2700,p:160,c:350,f:55},
-  DIETBREAK:{kcal:2750,p:170,c:300,f:70},
-};
 const ACTIVITY_LEVELS={
   light:{label:"Ligera",description:"Trabajo sedentario y caminatas ocasionales",factor:1.35},
   moderate:{label:"Moderada",description:"Vida activa además de los entrenamientos",factor:1.55},
@@ -684,39 +637,18 @@ function profileMacroTargets(){
   const target={kcal:+p.calorieTarget,p:+p.proteinTarget,c:+p.carbTarget,f:+p.fatTarget};
   return Object.values(target).every(v=>Number.isFinite(v)&&v>0)?target:null;
 }
-function effectiveDayTarget(type){
-  const custom=profileMacroTargets();
-  if(custom)return {...custom};
-  return DAY_TARGET[type]||DAY_TARGET.PESAS;
+// Meta del día = las metas personales del usuario (onboarding), iguales todos
+// los días. Sin plan estático: si aún no hay onboarding, un objetivo neutro.
+function effectiveDayTarget(){
+  return profileMacroTargets()||{kcal:2000,p:150,c:200,f:65};
 }
-const SLOTS = {
-  PESAS:[
-    {id:"desayuno",slot:"Desayuno",kcal:450,p:45,c:50,f:10},
-    {id:"almuerzo",slot:"Almuerzo",kcal:650,p:45,c:75,f:22},
-    {id:"batido",  slot:"Batido peri-entreno",kcal:350,p:50,c:45,f:8},
-    {id:"cena",    slot:"Cena",kcal:500,p:40,c:25,f:15},
-  ],
-  BAJO:[
-    {id:"desayuno",slot:"Desayuno",kcal:420,p:45,c:40,f:10},
-    {id:"almuerzo",slot:"Almuerzo",kcal:580,p:45,c:55,f:18},
-    {id:"batido",  slot:"Batido peri-entreno",kcal:280,p:50,c:30,f:6},
-    {id:"cena",    slot:"Cena",kcal:420,p:40,c:25,f:16},
-  ],
-  REFEED:[
-    {id:"desayuno",slot:"Desayuno",kcal:650,p:40,c:110,f:12},
-    {id:"almuerzo",slot:"Almuerzo",kcal:900,p:55,c:140,f:22},
-    {id:"snack",   slot:"Snack",kcal:450,p:25,c:70,f:6},
-    {id:"cena",    slot:"Cena",kcal:700,p:40,c:30,f:15},
-  ],
-  DIETBREAK:[
-    {id:"desayuno",   slot:"Desayuno",kcal:550,p:40,c:65,f:15},
-    {id:"almuerzo",   slot:"Almuerzo",kcal:750,p:50,c:95,f:22},
-    {id:"snack",      slot:"Snack",kcal:450,p:30,c:65,f:12},
-    {id:"cena",       slot:"Cena",kcal:700,p:40,c:45,f:18},
-    {id:"snack_extra",slot:"Snack extra",kcal:300,p:10,c:30,f:3},
-  ],
-};
-
+// Estructura única de comidas para cualquier día (sin tipos de día / menús fijos).
+const BASE_SLOTS=[
+  {id:"desayuno",slot:"Desayuno"},
+  {id:"almuerzo",slot:"Almuerzo"},
+  {id:"cena",    slot:"Cena"},
+  {id:"snack",   slot:"Snack"},
+];
 /* ---- helpers de fecha ---- */
 function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function parseYmd(s){const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d);}
@@ -773,50 +705,12 @@ function refreshPlanCalendar(){
 }
 
 function weekOf(ds){for(const w of WEEKS){if(ds>=w.start&&ds<=w.end)return w;}return null;}
-function dayType(ds){
-  const w=weekOf(ds); const wd=parseYmd(ds).getDay();
-  if(w&&w.dietBreak)return "DIETBREAK";
-  if(REFEED_DATES.has(ds))return "REFEED";
-  if([1,2,4,5].includes(wd))return "PESAS";
-  return "BAJO";
-}
-
-// Construye el día completo (datos base del plan)
+// Construye el día: slots genéricos vacíos que se llenan con la IA (o ediciones
+// del usuario). Sin plan estático, sin menús ni tipos de día.
 function buildDay(ds){
-  const w=weekOf(ds); const wd=parseYmd(ds).getDay();
-  const type=dayType(ds);
-  const idx=Math.round((parseYmd(ds)-parseYmd(START))/86400000); // offset para rotación
-  const slots=SLOTS[type].map(s=>({...s}));
-  const lunchMenu = (w&&w.menu!=="Libre") ? w.menu : "A";
-  const meals=slots.map(s=>{
-    // kcal/p/c/f del slot son FALLBACK; mealValue() prioriza los macros de la DB vía dishName
-    const m={id:s.id,slot:s.slot,kcal:s.kcal,p:s.p,c:s.c,f:s.f,name:"",dishName:null};
-    if(s.id==="desayuno"){
-      m.name = type==="REFEED" ? "Avena 80g + 1.5 scoop + plátano entero + miel 1 cda" : BREAKFASTS[idx%4];
-      m.dishName = type==="REFEED" ? DISH_NAMES.refeedDesayuno : BREAKFAST_DISHES[idx%4];
-    }else if(s.id==="almuerzo"){
-      if(w&&w.menu==="Libre"){ m.name="Almuerzo libre (elige una opción del plan)"; m.dishName=null; }
-      else {
-        const dbLunch=dietLunchDish(lunchMenu,wd); // desde diet_dishes (DB) si está cargada
-        if(dbLunch){ m.name=dbLunch.name; m.dishName=dbLunch.name; }
-        else { m.name=MENUS[lunchMenu][wd]; m.dishName=LUNCH_DISHES[lunchMenu][wd]; }
-      }
-    }else if(s.id==="batido"){
-      m.name = type==="PESAS" ? "2 scoops de proteína + plátano" : "2 scoops de proteína (solos)";
-      m.dishName = type==="PESAS" ? DISH_NAMES.batidoPesas : DISH_NAMES.batidoBajo;
-    }else if(s.id==="cena"){
-      m.name = type==="REFEED" ? "Arroz/pasta 100g seco + tofu/queso + verduras" : DINNERS[idx%4];
-      m.dishName = type==="REFEED" ? DISH_NAMES.refeedCena : DINNER_DISHES[idx%4];
-    }else if(s.id==="snack"){
-      m.name = type==="REFEED" ? "Pan 2 tajadas + mermelada + 1 scoop en agua" : "Snack: pan con palta / fruta + yogur";
-      m.dishName = type==="REFEED" ? DISH_NAMES.refeedSnack : DISH_NAMES.dietbreakSnack;
-    }else if(s.id==="snack_extra"){
-      m.name = "Snack extra: fruta + yogur griego";
-      m.dishName = DISH_NAMES.snackExtra;
-    }
-    return m;
-  });
-  return {ds,wd,type,week:w,target:effectiveDayTarget(type),meals,workout:effectiveWorkout(ds).workout};
+  const w=weekOf(ds);
+  const meals=BASE_SLOTS.map(s=>({id:s.id,slot:s.slot,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
+  return {ds,wd:parseYmd(ds).getDay(),type:null,week:w,target:effectiveDayTarget(),meals,workout:effectiveWorkout(ds).workout};
 }
 
 /* ---------- ESTADO / PERSISTENCIA (localStorage) ---------- */
@@ -830,14 +724,7 @@ function mealState(ds,id){const d=dayState(ds);if(!d.meals[id])d.meals[id]={done
 // valor efectivo de una comida (con override si existe)
 function dishByName(name){return (DB.byName&&name)?DB.byName[name]:null;}
 function dishById(id){return DB.dishes.find(x=>x.id===id)||null;}
-// Almuerzo autoritativo desde la DB (diet_dishes): refleja reasignaciones/renombres
-function dietLunchDish(menuCode,wd){
-  if(!DB.loaded)return null;
-  const dt=DB.diets.find(d=>d.code===menuCode); if(!dt)return null;
-  const dd=DB.dietDishes.find(x=>x.diet_id===dt.id&&x.weekday===wd&&(x.slot==null||x.slot==="almuerzo"));
-  return dd?dishById(dd.dish_id):null;
-}
-// Resuelve los macros de una comida del plan:
+// Resuelve los macros de una comida:
 // 1) override manual con macros (editar valores / personalizada)
 // 2) macros calculados desde la base de datos por nombre de plato
 // 3) fallback a los valores del plan hardcodeados (DB no conectada)
@@ -882,8 +769,8 @@ function pctW(v,t){return Math.min(100,t?Math.round(v/t*100):0);}
 function dbStatusNote(){
   if(DB.loaded)return "✓ Macros calculados desde tu base de datos.";
   if(supa&&!DB.error)return "Cargando macros desde la base de datos…";
-  if(supa&&DB.error)return "⚠️ No se pudo leer la base; mostrando valores del plan.";
-  return "Mostrando valores del plan. Conecta la base de datos en Ajustes para macros por ingrediente.";
+  if(supa&&DB.error)return "⚠️ No se pudo leer la base de datos.";
+  return "Genera tu día/semana con IA o agrega comidas; los macros se calculan por ingredientes.";
 }
 
 /* ============================================================
@@ -1480,7 +1367,7 @@ function dayHeaderNav(ds){
       <button onclick="nav(-1)" ${ds<=START?"disabled style=opacity:.3":""}>‹</button>
       <div class="dtitle">
         <div class="date">${prettyDate(ds)}${isToday?' · <span class="muted small">hoy</span>':''}</div>
-        <div style="margin-top:5px"><span class="badge b-${day.type}">${day.type}</span> <span class="weeknote">${w?w.label:""} · Menú ${w?w.menu:"-"}</span></div>
+        ${w&&w.num?`<div style="margin-top:5px"><span class="weeknote">${w.label==="Arranque"?"Arranque":"Semana "+w.num}</span></div>`:""}
       </div>
       <button onclick="nav(1)" ${ds>=END?"disabled style=opacity:.3":""}>›</button>
     </div>
@@ -1488,8 +1375,6 @@ function dayHeaderNav(ds){
   </header>`;
 }
 function dayAlert(day){
-  if(day.type==="REFEED")return `<div class="alert">⚡ <b>Día REFEED</b> — sube carbohidratos (${day.target.c} g), mantén la grasa baja. Alimenta la sesión aeróbica larga y carga glucógeno.</div>`;
-  if(day.type==="DIETBREAK")return `<div class="alert violet">🟣 <b>Diet break (Semana 6)</b> — mantenimiento ${day.target.kcal} kcal toda la semana. No es retroceso: restaura hormonas y protege músculo.</div>`;
   return "";
 }
 // Tarjeta hero: anillo de kcal + medidores de macros
@@ -1530,7 +1415,7 @@ function renderHoy(){
   $("#app").innerHTML=`
   <header class="shead">
     <div>
-      <div class="shead-sub">${wdName}, ${dayMon} · <span class="badge b-${day.type}">${day.type}</span></div>
+      <div class="shead-sub">${wdName}, ${dayMon}</div>
       <h2>Hola, ${esc(name)}</h2>
     </div>
     <div class="row" style="gap:9px">
@@ -1587,7 +1472,7 @@ function renderNutrition(){
   ${dayHeaderNav(ds)}
   ${weekCta}
   ${section("nut.macros","Macros del día",heroDash(ds)+aiRow)}
-  ${section("nut.plan","Comidas del plan",mealsHtml,`${day.meals.length}`)}
+  ${section("nut.plan","Comidas del día",mealsHtml,`${day.meals.length}`)}
   ${section("nut.extra","Comidas extra",
     (extrasHtml||'<div class="muted small" style="margin:0 2px 8px">Ninguna todavía.</div>')+
     '<button class="btn" style="width:100%" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
@@ -1657,7 +1542,7 @@ function mealCard(ds,b){
       <button class="chk ${ms.done?'on':''}" onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
       <div>
         <div class="slot">${b.slot}</div>
-        <div class="name">${esc(v.name)}</div>
+        <div class="name">${v.name?esc(v.name):'<span class="muted">Sin asignar — genera con IA o elige</span>'}</div>
         <div class="nums"><b>${v.kcal}</b> kcal · P <b>${v.p}</b> · C <b>${v.c}</b> · G <b>${v.f}</b> g</div>
       </div>
     </div>
@@ -1808,22 +1693,20 @@ function bodyComposition(){
 // Lista de días de la semana actual (con navegación), reutiliza goDay
 function weekSection(){
   const w=weekOf(current)||WEEKS[0];
-  const dotColor={PESAS:"var(--pesas)",BAJO:"var(--bajo)",REFEED:"var(--refeed)",DIETBREAK:"var(--dietbreak)"};
   let days=[];let d=w.start;while(d<=w.end){days.push(d);d=addDays(d,1);}
   const rows=days.map(ds=>{
-    const day=buildDay(ds);const{t,target,doneMeals,totMeals}=dayTotals(ds);
-    const lunch=day.meals.find(m=>m.id==="almuerzo");
+    const{t,target,doneMeals,totMeals}=dayTotals(ds);
     return `<div class="wk-day ${ds===todayStr()?'today':''}" onclick="goDay('${ds}')">
       <div class="wk-left">
-        <div class="d">${prettyDate(ds)} <span class="dot" style="background:${dotColor[day.type]}"></span></div>
-        <div class="m">${day.type} · ${esc(lunch?lunch.name.split("—")[0].split("(+")[0]:"")}</div>
+        <div class="d">${prettyDate(ds)} <span class="dot" style="background:var(--accent)"></span></div>
+        <div class="m">${doneMeals}/${totMeals} comidas · ${t.kcal}/${target.kcal} kcal</div>
       </div>
-      <div class="center"><div style="font-weight:600">${t.kcal}/${target.kcal}</div><div class="muted small">${doneMeals}/${totMeals} ✓</div></div>
+      <div class="center"><div style="font-weight:600">${target.p?Math.round(t.p/target.p*100):0}%</div><div class="muted small">proteína</div></div>
     </div>`;
   }).join("");
   return `<div class="row between" style="margin-bottom:10px">
       <button class="btn btn-sm" onclick="weekNav(-1)" ${w.num<=0?'disabled style=opacity:.3':''}>‹</button>
-      <span class="muted small">${w.label==="Arranque"?"Arranque":"Semana "+w.num} · Menú ${w.menu}</span>
+      <span class="muted small">${w.label==="Arranque"?"Arranque":"Semana "+w.num}</span>
       <button class="btn btn-sm" onclick="weekNav(1)" ${w.num>=PLAN_DURATION_WEEKS?'disabled style=opacity:.3':''}>›</button>
     </div>
     ${rows}`;
@@ -2066,20 +1949,17 @@ function closeModal(){const o=$("#overlay");if(o)o.remove();stopMic();}
 
 function openReplace(ds,id){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);
-  let options=[];
-  if(id==="desayuno")options=BREAKFASTS.map((n,i)=>({name:n,dishName:BREAKFAST_DISHES[i]}));
-  else if(id==="cena")options=DINNERS.map((n,i)=>({name:n,dishName:DINNER_DISHES[i]}));
-  else if(id==="almuerzo")options=ALL_LUNCHES.map(l=>({name:l.name,dishName:l.dishName,tag:"Menú "+l.menu}));
-  else options=[];
+  // Opciones desde la base de datos, filtradas por el slot de la comida.
+  const options=(DB.loaded?DB.dishes.filter(d=>(d.slot||"")===id):[]).map(d=>({name:d.name,dishName:d.name}));
   const optsHtml=options.map((o,i)=>{
     const d=o.dishName?dishByName(o.dishName):null;const m=d?dishMacros(d.id):null;
-    const meta=m?`${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g`:"macros del plan";
-    return `<button class="opt" onclick="applyReplace('${ds}','${id}',${i})">${esc(o.name)}<div class="o-meta">${o.tag?o.tag+" · ":""}${meta}</div></button>`;
+    const meta=m?`${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g`:"";
+    return `<button class="opt" onclick="applyReplace('${ds}','${id}',${i})">${esc(o.name)}<div class="o-meta">${meta}</div></button>`;
   }).join("");
   window._replaceOpts={ds,id,options};
   modal(`<h3>Reemplazar — ${base.slot}</h3>
-    <p class="muted small">Elige otra opción del plan (sus macros se calculan desde la base de datos) o crea una personalizada.</p>
-    ${optsHtml||'<p class="muted small">Sin opciones de plan para este slot.</p>'}
+    <p class="muted small">Elige un plato de la base (macros calculados por ingredientes), genera con IA o crea una comida personalizada.</p>
+    ${optsHtml||'<p class="muted small">No hay platos en la base para este slot. Usa “Generar con IA” o crea una personalizada.</p>'}
     <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="openEditor('meal','${ds}','${id}')">✎ Personalizada / editar valores</button>`);
 }
 function applyReplace(ds,id,i){const{options}=window._replaceOpts;const o=options[i];const ms=mealState(ds,id);ms.ovr={name:o.name,dishName:o.dishName||null};commitDay(ds);closeModal();render();toast("Comida reemplazada");}
@@ -2201,7 +2081,7 @@ async function aiSuggest(){
   const remK=Math.max(0,target.kcal-t.kcal),remP=Math.max(0,target.p-t.p);
   modal(`<h3>✨ Sugerencia de comida</h3><div id="aiOut"><div class="ai-box">Pensando opciones…</div></div>`);
   try{
-    const txt=await callClaude(`Día tipo ${day.type}. Me quedan ${remK} kcal y ${remP} g de proteína para la meta. Sugiere 2-3 comidas vegetarianas (sin huevo, puede usar proteína en polvo). Responde SOLO JSON: {"opciones":[{"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n}]}`,600);
+    const txt=await callClaude(`Me quedan ${remK} kcal y ${remP} g de proteína para la meta del día. Sugiere 2-3 comidas vegetarianas (sin huevo, puede usar proteína en polvo). Responde SOLO JSON: {"opciones":[{"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n}]}`,600);
     const j=parseJSON(txt);
     const html=j.opciones.map((o,i)=>`<button class="opt" onclick='addSuggestion(${JSON.stringify(JSON.stringify(o))})'>${esc(o.nombre)}<div class="o-meta">${Math.round(o.kcal)} kcal · P ${Math.round(o.proteina_g)} · C ${Math.round(o.carbohidratos_g)} · G ${Math.round(o.grasa_g)} g · toca para agregar</div></button>`).join("");
     $("#aiOut").innerHTML=html;
@@ -2264,11 +2144,11 @@ function validateGeneratedDay(j,day,target){
 }
 // Núcleo reutilizable: genera UN día a la medida de los macros del usuario y lo valida.
 async function generateOneDay(ds){
-  const day=buildDay(ds); const target=effectiveDayTarget(day.type)||day.target;
+  const day=buildDay(ds); const target=effectiveDayTarget();
   const slots=day.meals.map(m=>`${m.id} (${m.slot})`).join(", ");
   const dishList=DB.loaded?DB.dishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
   const recent=recentMealNames(ds,5);
-  const prompt=`Genera el plan de comidas de UN día tipo ${day.type} para ${prettyDate(ds)}.
+  const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
 Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carbohidratos, ${target.f} g grasa.
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
 Platos disponibles (reutilízalos cuando encajen; puedes crear variantes coherentes): ${dishList}.
@@ -2283,7 +2163,7 @@ Responde SOLO JSON válido, sin texto extra:
 async function aiGenerateDay(){
   if(!aiAvailable()){toast("Configura la IA (Vercel o API key local en Ajustes)");setView("settings");return;}
   const ds=current; const day=buildDay(ds);
-  modal(`<h3>🍽️ Generar día con IA</h3><div id="genOut"><div class="ai-box">Generando un día tipo <b>${day.type}</b> a la medida de tus metas…</div></div>`);
+  modal(`<h3>🍽️ Generar día con IA</h3><div id="genOut"><div class="ai-box">Generando tu día a la medida de tus metas…</div></div>`);
   try{
     const {res,target}=await generateOneDay(ds);
     window._genDay={ds,comidas:res.comidas};
@@ -2302,7 +2182,7 @@ async function aiGenerateWeek(){
   let okN=0; const problems=[];
   for(let i=0;i<days.length;i++){
     const ds=days[i];
-    const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Generando ${label}: día ${i+1} de ${days.length}<br><span class="muted small">${prettyDate(ds)} (${buildDay(ds).type})…</span></div>`;
+    const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Generando ${label}: día ${i+1} de ${days.length}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
     try{
       const {res}=await generateOneDay(ds);
       if(res.ok){applyDayComidas(ds,res.comidas);okN++;}
@@ -2357,7 +2237,7 @@ async function aiReview(){
   const now=new Date();const hora=now.getHours()+":"+String(now.getMinutes()).padStart(2,"0");
   modal(`<h3>🔍 Revisión de macros</h3><div id="aiOut"><div class="ai-box">Analizando…</div></div>`);
   try{
-    const txt=await callClaude(`Son las ${hora}. Día tipo ${day.type}. Llevo consumido: ${t.kcal} kcal, ${t.p} g proteína, ${t.c} g carbos, ${t.f} g grasa. Metas del día: ${target.kcal} kcal, ${target.p} P, ${target.c} C, ${target.f} G. Evalúa brevemente cómo voy y da UNA sugerencia concreta (vegetariana sin huevo). Responde SOLO JSON: {"evaluacion":"...","sugerencia":"..."}`,400);
+    const txt=await callClaude(`Son las ${hora}. Llevo consumido: ${t.kcal} kcal, ${t.p} g proteína, ${t.c} g carbos, ${t.f} g grasa. Metas del día: ${target.kcal} kcal, ${target.p} P, ${target.c} C, ${target.f} G. Evalúa brevemente cómo voy y da UNA sugerencia concreta (vegetariana sin huevo). Responde SOLO JSON: {"evaluacion":"...","sugerencia":"..."}`,400);
     const j=parseJSON(txt);
     $("#aiOut").innerHTML=`<div class="ai-box"><b>Evaluación:</b> ${esc(j.evaluacion)}\n\n<b>Sugerencia:</b> ${esc(j.sugerencia)}</div>`;
   }catch(e){$("#aiOut").innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}</div>`;}
