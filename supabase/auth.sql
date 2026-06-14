@@ -71,6 +71,7 @@ create table weight_log (
   user_id     uuid not null references auth.users(id) on delete cascade,
   week        int not null,            -- 1..10 (semana del plan)
   kg          numeric not null,
+  bf_pct      numeric,                 -- % grasa corporal (opcional)
   updated_at  timestamptz not null default now(),
   primary key (user_id, week)
 );

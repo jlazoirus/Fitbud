@@ -803,7 +803,9 @@ function heroDash(ds){
 
 /* ---------- HOME (Hoy): dieta de hoy + racha + entreno ---------- */
 function renderHoy(){
-  current=clampDate(todayStr());        // Home siempre muestra hoy
+  const today=todayStr();
+  current=clampDate(today);              // Home siempre muestra hoy (acotado al plan)
+  const planEnded=today>END, planNotStarted=today<START;
   const ds=current; const day=buildDay(ds); const st=dayState(ds);
   const {doneMeals,totMeals}=dayTotals(ds);
   const name=profileName(); const stk=streak(); const ew=effectiveWorkout(ds);
@@ -819,6 +821,7 @@ function renderHoy(){
       <div class="avatar">${esc((name[0]||"F").toUpperCase())}</div>
     </div>
   </header>
+  ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}. Mostrando el primer día.</div>`:""}
   ${dayAlert(day)}
   ${heroDash(ds)}
 
@@ -1005,14 +1008,15 @@ function renderProgress(){
     ${progressStats()}
     <div class="section-h">Peso corporal</div>
     ${weightChart()}
-    <table class="wt"><thead><tr><th>Sem</th><th>Rango esperado</th><th>Tu promedio</th></tr></thead><tbody>${weightRows()}</tbody></table>
+    ${bodyComposition()}
+    <table class="wt"><thead><tr><th>Sem</th><th>Rango kg</th><th>Peso kg</th><th>% grasa</th></tr></thead><tbody>${weightRows()}</tbody></table>
     <div class="section-h">Semana</div>
     ${weekSection()}`;
 }
 // Tarjetas de estadísticas (kg, entrenos, racha)
 function progressStats(){
   const entrenos=Object.values(S.days).filter(d=>d&&d.workoutDone).length;
-  const ws=Object.keys(WEIGHT_RANGES).map(n=>S.weights[n]).filter(v=>v!=null);
+  const ws=Object.keys(WEIGHT_RANGES).map(n=>wkg(n)).filter(v=>v!=null);
   const lost=ws.length>=2?(ws[0]-ws[ws.length-1]):0;
   const lostTxt=lost>0?"-"+lost.toFixed(1):(lost<0?"+"+(-lost).toFixed(1):"0");
   return `<div class="summary" style="grid-template-columns:1fr 1fr 1fr">
@@ -1023,9 +1027,32 @@ function progressStats(){
 }
 function weightRows(){
   return Object.keys(WEIGHT_RANGES).map(n=>{
-    const val=S.weights[n]!=null?S.weights[n]:"";
-    return `<tr><td>S${n}</td><td class="muted">${WEIGHT_RANGES[n]}</td><td><input type="number" step="0.1" inputmode="decimal" value="${val}" onchange="setWeight(${n},this.value)"></td></tr>`;
+    const kg=wkg(n), bf=wbf(n);
+    return `<tr><td>S${n}</td><td class="muted">${WEIGHT_RANGES[n].replace(/ .*/,'')}</td>
+      <td><input type="number" step="0.1" inputmode="decimal" value="${kg!=null?kg:""}" onchange="setWeight(${n},this.value)" placeholder="kg"></td>
+      <td><input type="number" step="0.1" inputmode="decimal" value="${bf!=null?bf:""}" onchange="setBodyFat(${n},this.value)" placeholder="%"></td></tr>`;
   }).join("");
+}
+// Resumen de composición corporal: masa grasa/magra de la última semana + cambios.
+function bodyComposition(){
+  const last=lastWeighedWeek(); if(last==null)return "";
+  const comp=composition(last);
+  // semana previa con datos para los deltas
+  const prevWk=Object.keys(WEIGHT_RANGES).map(Number).filter(n=>n<last&&wkg(n)!=null).sort((a,b)=>b-a)[0];
+  const dKg=prevWk!=null?(wkg(last)-wkg(prevWk)):null;
+  const dBf=(prevWk!=null&&wbf(last)!=null&&wbf(prevWk)!=null)?(wbf(last)-wbf(prevWk)):null;
+  const sign=v=>v>0?"+"+v.toFixed(1):v.toFixed(1);
+  const cards=[];
+  if(comp){
+    cards.push(`<div class="scard"><div class="n">${comp.lean.toFixed(1)}</div><div class="l">masa magra kg</div></div>`);
+    cards.push(`<div class="scard"><div class="n">${comp.fat.toFixed(1)}</div><div class="l">masa grasa kg</div></div>`);
+  }
+  if(dKg!=null) cards.push(`<div class="scard"><div class="n" style="color:${dKg<=0?'var(--good)':'var(--warn)'}">${sign(dKg)}</div><div class="l">Δ peso (sem)</div></div>`);
+  if(dBf!=null) cards.push(`<div class="scard"><div class="n" style="color:${dBf<=0?'var(--good)':'var(--warn)'}">${sign(dBf)}</div><div class="l">Δ grasa %</div></div>`);
+  if(!cards.length)return "";
+  const cols=Math.min(cards.length,2);
+  return `<div class="muted small" style="margin:0 4px 8px">Composición · semana ${last}${wbf(last)!=null?` · ${wbf(last)}% grasa`:""}</div>
+    <div class="summary" style="grid-template-columns:repeat(${cols},1fr);margin-bottom:14px">${cards.join("")}</div>`;
 }
 // Lista de días de la semana actual (con navegación), reutiliza goDay
 function weekSection(){
@@ -1383,20 +1410,50 @@ function stopMic(){if(recog){try{recog.stop();}catch(e){}recog=null;}const btn=$
 /* ============================================================
    Fase 8: PESO + GRÁFICO  ·  AJUSTES
    ============================================================ */
-function setWeight(n,v){if(v===""){delete S.weights[n];pushWeight(n,null);}else{S.weights[n]=+v;pushWeight(n,+v);}save();renderProgress();}
+// --- modelo de peso: S.weights[n] puede ser número (legado, solo kg) u objeto {kg,bf}.
+function wEntry(n){const v=S.weights[n];if(v==null)return null;return typeof v==="object"?v:{kg:+v,bf:null};}
+function wkg(n){const e=wEntry(n);return e&&e.kg!=null?+e.kg:null;}
+function wbf(n){const e=wEntry(n);return e&&e.bf!=null?+e.bf:null;}
+function setWeightEntry(n,patch){
+  const e=wEntry(n); const cur=e?{kg:e.kg,bf:e.bf}:{kg:null,bf:null};
+  if("kg" in patch) cur.kg=(patch.kg===""||patch.kg==null)?null:+patch.kg;
+  if("bf" in patch) cur.bf=(patch.bf===""||patch.bf==null)?null:+patch.bf;
+  if(cur.kg==null&&cur.bf==null) delete S.weights[n];
+  else S.weights[n]={kg:cur.kg,bf:cur.bf};
+  pushWeight(n, cur.kg==null?null:cur.kg, cur.bf);
+  save();renderProgress();
+}
+function setWeight(n,v){setWeightEntry(n,{kg:v});}
+function setBodyFat(n,v){setWeightEntry(n,{bf:v});}
+// Composición corporal derivada para una semana con peso y % grasa.
+function composition(n){const kg=wkg(n),bf=wbf(n);if(kg==null||bf==null)return null;const fat=kg*bf/100;return{kg,bf,fat,lean:kg-fat};}
+// Última semana (mayor índice) con datos de peso.
+function lastWeighedWeek(){const ks=Object.keys(WEIGHT_RANGES).map(Number).filter(n=>wkg(n)!=null);return ks.length?Math.max(...ks):null;}
 function weightChart(){
-  const pts=Object.keys(WEIGHT_RANGES).map(n=>({x:+n,y:S.weights[n]})).filter(p=>p.y!=null);
+  const pts=Object.keys(WEIGHT_RANGES).map(n=>({x:+n,y:wkg(n)})).filter(p=>p.y!=null);
   if(pts.length<1)return `<div class="chart muted small center">Ingresa tu peso semanal para ver el gráfico de evolución.</div>`;
   const W=520,H=160,pad=28;const xs=p=>pad+(p.x-1)/9*(W-pad*2);
   const allY=pts.map(p=>p.y).concat([74,82]);const minY=Math.min(...allY)-0.5,maxY=Math.max(...allY)+0.5;
   const ys=y=>H-pad-(y-minY)/(maxY-minY)*(H-pad*2);
   const line=pts.map((p,i)=>(i?"L":"M")+xs(p).toFixed(1)+" "+ys(p.y).toFixed(1)).join(" ");
   const dots=pts.map(p=>`<circle cx="${xs(p).toFixed(1)}" cy="${ys(p.y).toFixed(1)}" r="3.5" fill="var(--accent)"/>`).join("");
+  // Overlay de % grasa corporal (eje propio, en terracota) si hay datos.
+  const bfpts=Object.keys(WEIGHT_RANGES).map(n=>({x:+n,y:wbf(n)})).filter(p=>p.y!=null);
+  let bfLayer="";
+  if(bfpts.length>=1){
+    const bfAll=bfpts.map(p=>p.y);const bMin=Math.min(...bfAll)-1,bMax=Math.max(...bfAll)+1;
+    const bys=y=>H-pad-(y-bMin)/((bMax-bMin)||1)*(H-pad*2);
+    const bline=bfpts.map((p,i)=>(i?"L":"M")+xs(p).toFixed(1)+" "+bys(p.y).toFixed(1)).join(" ");
+    const bdots=bfpts.map(p=>`<circle cx="${xs(p).toFixed(1)}" cy="${bys(p.y).toFixed(1)}" r="3" fill="var(--terra-400)"/>`).join("");
+    bfLayer=`<path d="${bline}" fill="none" stroke="var(--terra-400)" stroke-width="1.6" stroke-dasharray="2 2"/>${bdots}
+      <text x="${pad}" y="12" fill="var(--terra-300)" font-size="10">% grasa</text>`;
+  }
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" width="100%">
     <line x1="${pad}" y1="${ys(82)}" x2="${W-pad}" y2="${ys(82)}" stroke="var(--line)" stroke-dasharray="3 3"/>
     <line x1="${pad}" y1="${ys(74.5)}" x2="${W-pad}" y2="${ys(74.5)}" stroke="var(--good)" stroke-dasharray="3 3"/>
     <text x="${W-pad}" y="${ys(74.5)-4}" fill="var(--good)" font-size="10" text-anchor="end">meta ~74.5</text>
     <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>${dots}
+    ${bfLayer}
   </svg></div>`;
 }
 
@@ -1627,19 +1684,20 @@ function commitDay(ds){save();pushDay(ds);}
 // Trae el día desde la DB y re-renderiza si seguimos viéndolo.
 function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view==="nutricion")&&current===ds)render();});}
 
-/* ---- Registro de peso en la DB (tabla weight_log) ---- */
-async function pushWeight(week,kg){
+/* ---- Registro de peso + % grasa en la DB (tabla weight_log) ---- */
+// kg es NOT NULL: sin peso no hay fila (el % grasa acompaña al peso).
+async function pushWeight(week,kg,bf){
   if(!supa||!uid())return;
   try{
     if(kg==null) await supa.from("weight_log").delete().eq("user_id",uid()).eq("week",week);
-    else await supa.from("weight_log").upsert({user_id:uid(),week:week,kg:kg,updated_at:new Date().toISOString()},{onConflict:"user_id,week"});
+    else await supa.from("weight_log").upsert({user_id:uid(),week:week,kg:kg,bf_pct:(bf==null?null:bf),updated_at:new Date().toISOString()},{onConflict:"user_id,week"});
   }catch(e){}
 }
 async function pullWeights(){
   if(!supa||!uid())return false;
   try{
-    const r=await supa.from("weight_log").select("week,kg").eq("user_id",uid());
-    if(!r.error&&Array.isArray(r.data)){const w={};r.data.forEach(x=>{w[x.week]=Number(x.kg);});S.weights=w;save();return true;}
+    const r=await supa.from("weight_log").select("week,kg,bf_pct").eq("user_id",uid());
+    if(!r.error&&Array.isArray(r.data)){const w={};r.data.forEach(x=>{w[x.week]={kg:Number(x.kg),bf:(x.bf_pct==null?null:Number(x.bf_pct))};});S.weights=w;save();return true;}
   }catch(e){}
   return false;
 }
