@@ -22,8 +22,9 @@ Cada usuario configura en **Perfil**:
 
 - una disciplina principal: **Running**, **Cycling** o **Natación**;
 - un complemento de fuerza: **Gimnasio** o **Peso corporal**.
+- entre **3 y 6 días de entrenamiento por semana**; 3 días es el mínimo recomendado.
 
-La semana combina cuatro sesiones de fuerza, una sesión de calidad de la disciplina principal, una sesión aeróbica larga y un día de descanso. El volumen progresa durante las 10 semanas, con descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
+El reparto se adapta al tiempo disponible: con 3 días prioriza una sesión full-body y dos sesiones de la disciplina; al elegir más días aumenta progresivamente el trabajo de fuerza hasta llegar a cuatro sesiones de fuerza y dos aeróbicas con 6 días. El volumen progresa durante las 10 semanas, con descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
 
 ## Configuración (de dónde salen las credenciales)
 
