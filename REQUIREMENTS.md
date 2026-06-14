@@ -116,7 +116,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Suscripcion | No existe | Falta oferta de 1/3 meses, checkout, webhooks, entitlement, renovacion, cancelacion y expiracion |
 | Seguridad y privacidad | Auth, RLS y fotos privadas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
 | Operacion | Admin de usuarios y catalogo de alimentos | Faltan contenidos de ejercicios, media, prompts/versiones, soporte, metricas de IA y costos |
-| Lenguaje (Principio 9) | La UI viva expone "IA" a todos los usuarios (viola el principio HOY) | Barrido de copy a vocabulario de coach (REQ-31, urgente e inmediato) |
+| Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
 | Consumo de generacion | No hay limite; los generadores de REQ-08 son ilimitados | Cuota diaria server-side y reutilizacion controlada de opciones (REQ-32) |
 | PWA y sincronizacion | Instalable, cache y safe areas de iPhone | Falta cola offline, conflictos, recuperacion ante fallos y pruebas end-to-end de journeys |
 
@@ -150,7 +150,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 ### Fase A - Fundamentos del coach
 
-0. REQ-31 - Tecnologia invisible (lenguaje). **Hacer YA**: barrido de copy, sin dependencias; la app ya viola el Principio 9 en produccion.
+0. REQ-31 - Tecnologia invisible (lenguaje). **Implementado**: copy operativo de coach y diagnostico tecnico solo para administradores.
 12. REQ-12 - Perfil flexible de alimentacion y entrenamiento.
 13. REQ-13 - Modelo de planes versionados.
 14. REQ-14 - Seguridad, consentimiento y privacidad.
@@ -1606,9 +1606,9 @@ Proteger los journeys criticos antes de cobrar y reducir regresiones en PWA movi
 
 ## REQ-31 - Tecnologia invisible (lenguaje de producto)
 
-**Estado: pendiente PRIORITARIO E INMEDIATO.**
+**Estado: implementado.**
 
-La app en produccion (commit `9e3fa4e`) ya viola el Principio 9: muestra "Generar dia con IA", "Generar este dia", "genera con IA", "Generar semana", el modal "Generar dia con IA" y notas tipo "los macros se calculan..." a todos los usuarios. Es un barrido de textos, barato y desplegable por si solo; **no depende del sistema de cuotas (REQ-32)** y deberia hacerse antes que casi todo lo demas de Fase A/B.
+La implementacion reemplaza el copy operativo por lenguaje de coach, neutraliza errores tecnicos para usuarios normales, filtra referencias tecnicas de respuestas dinamicas y conserva proveedor, modelo y diagnostico en Ajustes para administradores. El manifiesto y la descripcion publica tampoco exponen el origen tecnico.
 
 ### Objetivo
 

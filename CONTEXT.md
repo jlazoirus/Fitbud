@@ -14,6 +14,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Persistencia:** la **fuente de verdad es Supabase**; `localStorage` (clave `fitbud_v1`) es solo **caché offline** que la espeja. Ningún dato del usuario vive solo en el navegador (el progreso diario va a `day_log` y el peso a `weight_log`). Lo único local-de-dispositivo son los overrides de credenciales en Ajustes (en producción vienen de Vercel).
 - **Base de datos:** Supabase (PostgreSQL) — catálogo de alimentos (ingredientes/platos/dietas), consumo diario (`day_log`) y peso (`weight_log`).
 - **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador. El proxy exige sesión: el cliente manda el token de Supabase en `Authorization: Bearer` y el server lo valida (401 si falta/!válido). Funciones: estimar comida, sugerir, revisar macros y **generar un día completo** (`aiGenerateDay` → `validateGeneratedDay` valida huevo/restricciones/macros/repetición antes de dejar aplicar; se guarda como override por día en `day_log`).
+- **Lenguaje de producto:** usuarios normales ven "tu coach", "preparar" y "otra opción"; no ven proveedor, modelo, prompts, tokens ni detalles de configuración. Los errores se neutralizan y el texto dinámico se filtra antes de mostrarlo. Los administradores conservan el diagnóstico técnico en Ajustes.
 - **Hosting:** Vercel (estático + funciones en `api/`). No hay build.
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
 
@@ -28,7 +29,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
 | `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios paginados, bloquear/desbloquear en Auth + `profiles.active`, cambiar contraseña y enviar reset. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida admin activo, impide auto-desactivación y conserva al último admin. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v14`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v15`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. El layout respeta `safe-area-inset-*` para no quedar bajo la barra de estado ni el indicador de inicio de iOS. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |

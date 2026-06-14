@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Fitbros — tu cuerpo, tu sistema. Nutrición y entrenamiento personalizados con IA.">
+<meta name="description" content="Fitbros — tu cuerpo, tu sistema. Nutrición y entrenamiento personalizados para tu día a día.">
 <meta name="theme-color" content="#07070f">
 <meta name="color-scheme" content="dark">
 <meta name="mobile-web-app-capable" content="yes">
@@ -346,6 +346,39 @@ function effectiveSettings(){
 }
 // IA disponible si hay key local/config (llamada directa) o el proxy de Vercel
 function aiAvailable(){return !!effectiveSettings().apiKey||!!(REMOTE.anthropic&&REMOTE.anthropic.proxy);}
+function coachUnavailable(){
+  if(aiAvailable())return false;
+  if(typeof isAdmin==="function"&&isAdmin()){
+    toast("Configura el servicio del coach en Ajustes");
+    setView("settings");
+  }else{
+    toast("Tu coach no está disponible en este momento. Intenta más tarde.");
+  }
+  return true;
+}
+function coachErrorMessage(error){
+  const message=String(error&&error.message||"").trim();
+  if(typeof isAdmin==="function"&&isAdmin())return message||"No se pudo completar la acción.";
+  if(/desactivad/i.test(message))return "Tu cuenta está desactivada.";
+  if(/sesi[oó]n/i.test(message))return "Vuelve a iniciar sesión para continuar con tu coach.";
+  return "Tu coach no pudo completar esta acción. Intenta de nuevo.";
+}
+function coachCopy(value){
+  return String(value||"")
+    .replace(/\bcomo\s+(?:un[ao]?\s+)?(?:inteligencia artificial|IA|AI)(?:\s+de\s+(?:Anthropic|Claude(?:(?:[-\w.]+)|(?:\s+(?:Haiku|Sonnet)(?:\s*[\w.-]+)?))?))?/gi,"Como tu coach")
+    .replace(/\bclaude(?:(?:[-\w.]+)|(?:\s+(?:haiku|sonnet)(?:\s*[\w.-]+)?))?\b/gi,"tu coach")
+    .replace(/\b(?:haiku|sonnet)(?:\s*[\w.-]+)?\b/gi,"tu coach")
+    .replace(/\banthropic\b/gi,"tu coach")
+    .replace(/\binteligencia artificial\b/gi,"tu coach")
+    .replace(/\b(?:IA|AI)\b/gi,"tu coach")
+    .replace(/\busando tu coach\b/gi,"")
+    .replace(/\bprompts?\b/gi,"pedido")
+    .replace(/\btokens?\b/gi,"recursos")
+    .replace(/\s+([,.])/g,"$1")
+    .replace(/\s{2,}/g," ")
+    .replace(/(^|[.!?]\s+)tu coach\b/g,"$1Tu coach")
+    .trim();
+}
 function settingSource(name){
   const local=S.settings||{};
   if(name==="apiKey")return local.apiKey?"local":(CONFIG.anthropic.apiKey?"config":((REMOTE.anthropic&&REMOTE.anthropic.proxy)?"vercel":""));
@@ -770,7 +803,7 @@ function dbStatusNote(){
   if(DB.loaded)return "✓ Macros calculados desde tu base de datos.";
   if(supa&&!DB.error)return "Cargando macros desde la base de datos…";
   if(supa&&DB.error)return "⚠️ No se pudo leer la base de datos.";
-  return "Genera tu día/semana con IA o agrega comidas; los macros se calculan por ingredientes.";
+  return "Prepara tu día o semana con tu coach, o agrega comidas; los macros se calculan por ingredientes.";
 }
 
 /* ============================================================
@@ -1060,7 +1093,7 @@ function renderOnboarding(){
   }else{
     const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]];
     body=`<h1>Ajusta tus preferencias alimenticias</h1>
-      <p class="onboarding-copy">La dieta y las sugerencias de IA usarán estas restricciones como contexto.</p>
+      <p class="onboarding-copy">Tu coach usará estas restricciones para personalizar la dieta y sus sugerencias.</p>
       <div class="dash">
         <label class="muted small">Tipo de dieta y restricciones</label>
         <div class="chips" style="margin:10px 0 16px">
@@ -1260,7 +1293,7 @@ function renderInactive(){
     <div class="auth-brand">Fitbros</div>
     <div class="dash">
       <h3>Cuenta desactivada</h3>
-      <p class="muted small">La cuenta ${esc(email)} no puede modificar datos ni usar la IA. Contacta a un administrador para reactivarla.</p>
+      <p class="muted small">La cuenta ${esc(email)} no puede modificar datos ni pedir nuevas recomendaciones. Contacta a un administrador para reactivarla.</p>
       <button type="button" class="btn" style="width:100%;margin-top:8px" onclick="signOutUser(this)">Cerrar sesión</button>
     </div>
   </div>`;
@@ -1450,21 +1483,21 @@ function renderHoy(){
   `;
 }
 
-/* ---------- NUTRICIÓN: detalle de comidas + IA ---------- */
+/* ---------- NUTRICIÓN: detalle de comidas + coach ---------- */
 function renderNutrition(){
   const ds=current; const st=dayState(ds); const day=buildDay(ds);
   const w=weekOf(ds)||WEEKS[0]; const hasPlan=weekHasGeneratedPlan(w);
   const mealsHtml=day.meals.map(b=>mealCard(ds,b)).join("");
   const extrasHtml=st.extras.map((e,i)=>extraCard(ds,e,i)).join("");
   const weekCta=aiAvailable()?(hasPlan
-    ? `<div class="row wrap" style="margin:0 0 12px"><button class="btn btn-sm" onclick="aiGenerateWeek()">🔄 Regenerar mi semana con IA</button></div>`
+    ? `<div class="row wrap" style="margin:0 0 12px"><button class="btn btn-sm" onclick="aiGenerateWeek()">🔄 Preparar otra semana</button></div>`
     : `<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <span>🍽️ Arma tu semana a la medida de tus macros.</span>
-        <button class="btn btn-sm btn-accent" style="white-space:nowrap" onclick="aiGenerateWeek()">Generar semana</button>
+        <button class="btn btn-sm btn-accent" style="white-space:nowrap" onclick="aiGenerateWeek()">Preparar semana</button>
       </div>`):"";
   const aiRow=`<div class="row wrap" style="margin:12px 0 4px">
-    <button class="btn btn-sm" onclick="aiGenerateDay()">🍽️ Generar este día</button>
-    <button class="btn btn-sm" onclick="aiSuggest()">✨ Sugiéreme una comida</button>
+    <button class="btn btn-sm" onclick="aiGenerateDay()">🍽️ Preparar este día</button>
+    <button class="btn btn-sm" onclick="aiSuggest()">✨ Ver otra opción de comida</button>
     <button class="btn btn-sm" onclick="aiReview()">🔍 Revisar mis macros</button>
   </div>
   <div class="muted small">${dbStatusNote()}</div>`;
@@ -1515,7 +1548,7 @@ function renderWorkout(){
 // Receta (ingredientes + gramos) de la comida, desde la DB, respetando override.
 function mealRecipe(b,ms){
   const o=ms&&ms.ovr;
-  // Comida generada por IA: trae sus propios ingredientes con gramos.
+  // Una comida preparada por el coach trae sus propios ingredientes con gramos.
   if(o&&Array.isArray(o.ingredientes)&&o.ingredientes.length){
     const lines=o.ingredientes.map(x=>({name:x.nombre||x.name||"(ingrediente)",grams:+(x.gramos!=null?x.gramos:x.grams)})).filter(l=>l.grams>0);
     if(lines.length)return{dish:{name:o.name},lines,generated:true};
@@ -1535,14 +1568,14 @@ function mealCard(ds,b){
   const recipeHtml=r?`
     <div class="recipe">
       ${r.lines.map(l=>`<div class="r-row"><span>${esc(l.name)}</span><span class="g">${l.grams} g</span></div>`).join("")}
-      <div class="r-foot">${r.lines.length} ingredientes · ${r.generated?"generado por IA":"macros calculados desde la receta"}</div>
+      <div class="r-foot">${r.lines.length} ingredientes · ${r.generated?"opción de tu coach":"macros calculados desde la receta"}</div>
     </div>`:"";
   return `<div class="meal ${ms.done?'done':''}">
     <div class="meal-head">
       <button class="chk ${ms.done?'on':''}" onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
       <div>
         <div class="slot">${b.slot}</div>
-        <div class="name">${v.name?esc(v.name):'<span class="muted">Sin asignar — genera con IA o elige</span>'}</div>
+        <div class="name">${v.name?esc(v.name):'<span class="muted">Sin asignar — prepara una opción con tu coach o elige</span>'}</div>
         <div class="nums"><b>${v.kcal}</b> kcal · P <b>${v.p}</b> · C <b>${v.c}</b> · G <b>${v.f}</b> g</div>
       </div>
     </div>
@@ -1958,8 +1991,8 @@ function openReplace(ds,id){
   }).join("");
   window._replaceOpts={ds,id,options};
   modal(`<h3>Reemplazar — ${base.slot}</h3>
-    <p class="muted small">Elige un plato de la base (macros calculados por ingredientes), genera con IA o crea una comida personalizada.</p>
-    ${optsHtml||'<p class="muted small">No hay platos en la base para este slot. Usa “Generar con IA” o crea una personalizada.</p>'}
+    <p class="muted small">Elige un plato de la base con macros calculados por ingredientes o crea una comida personalizada.</p>
+    ${optsHtml||'<p class="muted small">No hay platos en la base para este espacio. Puedes crear una comida personalizada.</p>'}
     <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="openEditor('meal','${ds}','${id}')">✎ Personalizada / editar valores</button>`);
 }
 function applyReplace(ds,id,i){const{options}=window._replaceOpts;const o=options[i];const ms=mealState(ds,id);ms.ovr={name:o.name,dishName:o.dishName||null};commitDay(ds);closeModal();render();toast("Comida reemplazada");}
@@ -1979,7 +2012,7 @@ function editorSheet(title,pre){
   modal(`<h3>${title}</h3>
     <div class="field"><label>Descripción</label>
       <div class="row"><textarea id="f_name" rows="2" placeholder="Ej. 2 panes con palta y café">${esc(pre.name||"")}</textarea>
-      <button class="mic" id="micBtn" onclick="toggleMic()" title="${aiOn?'Dictar':'Activa la API key en Ajustes para usar voz'}">🎤</button></div>
+      <button class="mic" id="micBtn" onclick="toggleMic()" title="${aiOn?'Dictar':'El dictado no está disponible ahora'}">🎤</button></div>
     </div>
     <div class="grid4">
       <div class="field"><label>kcal</label><input id="f_kcal" type="number" inputmode="numeric" value="${pre.kcal}"></div>
@@ -1987,7 +2020,7 @@ function editorSheet(title,pre){
       <div class="field"><label>Carb g</label><input id="f_c" type="number" inputmode="numeric" value="${pre.c}"></div>
       <div class="field"><label>Grasa g</label><input id="f_f" type="number" inputmode="numeric" value="${pre.f}"></div>
     </div>
-    ${aiOn?`<button class="btn" style="width:100%" onclick="aiEstimate()">✨ Estimar con IA</button>`:`<div class="muted small">💡 La IA (estimar/dictar) se activa al desplegar en Vercel o con una API key local en Ajustes.</div>`}
+    ${aiOn?`<button class="btn" style="width:100%" onclick="aiEstimate()">✨ Estimar macros</button>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
     <div id="aiOut"></div>
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
 }
@@ -2007,7 +2040,7 @@ function saveEditor(){
 const DIET_LABELS={vegetariano:"vegetariano",vegano:"vegano",sin_huevo:"sin huevo",sin_lacteos:"sin lácteos",sin_gluten:"sin gluten",omnivoro:"omnívoro"};
 function buildSysPrompt(){
   const p=(profile&&profile.prefs)||{};
-  const base="Da estimaciones realistas de porciones reales, con kcal y macros.";
+  const base="Da estimaciones realistas de porciones reales, con kcal y macros. Habla como el coach del usuario y no menciones tecnología, proveedores, modelos, prompts ni tokens.";
   const parts=[];
   if(Array.isArray(p.diet)&&p.diet.length)parts.push("Dieta: "+p.diet.map(d=>DIET_LABELS[d]||d).join(", ")+".");
   if(p.goal)parts.push("Objetivo: "+({deficit:"déficit calórico",mantenimiento:"mantenimiento",volumen:"volumen/superávit"}[p.goal]||p.goal)+".");
@@ -2044,7 +2077,7 @@ async function callClaude(userText,maxTokens){
   // 2) Producción (Vercel): proxy /api/claude. La API key vive solo en el servidor.
   //    El proxy exige sesión: enviamos el token de Supabase (Bearer) para que valide.
   const token=session&&session.access_token;
-  if(!token)throw new Error("Inicia sesión para usar la IA.");
+  if(!token)throw new Error("Inicia sesión para usar tu coach.");
   const res=await fetch("/api/claude",{
     method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+token},
     body:JSON.stringify({userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL})
@@ -2070,24 +2103,24 @@ async function aiEstimate(){
     const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". Responde SOLO JSON: {"kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve"}`,400);
     const j=parseJSON(txt);
     $("#f_kcal").value=Math.round(j.kcal);$("#f_p").value=Math.round(j.proteina_g);$("#f_c").value=Math.round(j.carbohidratos_g);$("#f_f").value=Math.round(j.grasa_g);
-    out.innerHTML=`<div class="ai-box">✓ ${esc(j.nota||"Estimado. Revisa y ajusta si quieres.")}</div>`;
-  }catch(e){out.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}</div>`;}
+    out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}</div>`;
+  }catch(e){out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
 }
 
 // IA 2 — sugerir comidas
 async function aiSuggest(){
-  if(!aiAvailable()){toast("Configura la IA (Vercel o API key local en Ajustes)");setView("settings");return;}
+  if(coachUnavailable())return;
   const{t,target}=dayTotals(current);const day=buildDay(current);
   const remK=Math.max(0,target.kcal-t.kcal),remP=Math.max(0,target.p-t.p);
-  modal(`<h3>✨ Sugerencia de comida</h3><div id="aiOut"><div class="ai-box">Pensando opciones…</div></div>`);
+  modal(`<h3>✨ Otra opción de comida</h3><div id="aiOut"><div class="ai-box">Buscando opciones…</div></div>`);
   try{
     const txt=await callClaude(`Me quedan ${remK} kcal y ${remP} g de proteína para la meta del día. Sugiere 2-3 comidas vegetarianas (sin huevo, puede usar proteína en polvo). Responde SOLO JSON: {"opciones":[{"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n}]}`,600);
     const j=parseJSON(txt);
-    const html=j.opciones.map((o,i)=>`<button class="opt" onclick='addSuggestion(${JSON.stringify(JSON.stringify(o))})'>${esc(o.nombre)}<div class="o-meta">${Math.round(o.kcal)} kcal · P ${Math.round(o.proteina_g)} · C ${Math.round(o.carbohidratos_g)} · G ${Math.round(o.grasa_g)} g · toca para agregar</div></button>`).join("");
+    const html=j.opciones.map((o,i)=>`<button class="opt" onclick='addSuggestion(${JSON.stringify(JSON.stringify(o))})'>${esc(coachCopy(o.nombre))}<div class="o-meta">${Math.round(o.kcal)} kcal · P ${Math.round(o.proteina_g)} · C ${Math.round(o.carbohidratos_g)} · G ${Math.round(o.grasa_g)} g · toca para agregar</div></button>`).join("");
     $("#aiOut").innerHTML=html;
-  }catch(e){$("#aiOut").innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}</div>`;}
+  }catch(e){$("#aiOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
 }
-function addSuggestion(s){const o=JSON.parse(s);const d=dayState(current);d.extras.push({name:o.nombre,kcal:Math.round(o.kcal),p:Math.round(o.proteina_g),c:Math.round(o.carbohidratos_g),f:Math.round(o.grasa_g),done:true});commitDay(current);closeModal();render();toast("Comida agregada");}
+function addSuggestion(s){const o=JSON.parse(s);const d=dayState(current);d.extras.push({name:coachCopy(o.nombre),kcal:Math.round(o.kcal),p:Math.round(o.proteina_g),c:Math.round(o.carbohidratos_g),f:Math.round(o.grasa_g),done:true});commitDay(current);closeModal();render();toast("Comida agregada");}
 
 /* ============================================================
    REQ-08 — Generador de días de dieta con Claude.
@@ -2118,8 +2151,8 @@ function validateGeneratedDay(j,day,target){
   let tot={kcal:0,p:0,c:0,f:0}; const comidas=[];
   j.comidas.forEach((c,idx)=>{
     const slot_id=c.slot_id||c.slot||slotIds[idx]||("slot"+idx);
-    const nombre=(c.nombre||c.name||"").trim();
-    const ings=Array.isArray(c.ingredientes)?c.ingredientes.map(x=>({nombre:(x.nombre||x.name||"").trim(),gramos:+(x.gramos!=null?x.gramos:x.grams)})):[];
+    const nombre=coachCopy((c.nombre||c.name||"").trim());
+    const ings=Array.isArray(c.ingredientes)?c.ingredientes.map(x=>({nombre:coachCopy((x.nombre||x.name||"").trim()),gramos:+(x.gramos!=null?x.gramos:x.grams)})):[];
     if(!nombre)issues.push(`Comida ${idx+1} sin nombre.`);
     if(!ings.length)issues.push(`"${nombre||("Comida "+(idx+1))}" sin ingredientes.`);
     ings.forEach(g=>{if(!(g.gramos>0))issues.push(`"${nombre}": gramos inválidos en "${g.nombre}".`);});
@@ -2140,7 +2173,7 @@ function validateGeneratedDay(j,day,target){
   if(off(tot.kcal,target.kcal,0.15))issues.push(`kcal del día ${Math.round(tot.kcal)} fuera de ±15% de ${target.kcal}.`);
   if(tot.p<target.p*0.85)issues.push(`Proteína ${Math.round(tot.p)} g por debajo del 85% de la meta (${target.p} g).`);
   if(off(tot.c,target.c,0.3))warns.push(`Carbohidratos ${Math.round(tot.c)} g lejos de la meta (${target.c} g).`);
-  return{ok:issues.length===0,issues,warns,comidas,totals:{kcal:Math.round(tot.kcal),p:Math.round(tot.p),c:Math.round(tot.c),f:Math.round(tot.f)},explicacion:(j.explicacion||j.explicación||"").trim()};
+  return{ok:issues.length===0,issues,warns,comidas,totals:{kcal:Math.round(tot.kcal),p:Math.round(tot.p),c:Math.round(tot.c),f:Math.round(tot.f)},explicacion:coachCopy((j.explicacion||j.explicación||"").trim())};
 }
 // Núcleo reutilizable: genera UN día a la medida de los macros del usuario y lo valida.
 async function generateOneDay(ds){
@@ -2161,41 +2194,41 @@ Responde SOLO JSON válido, sin texto extra:
   return {res:validateGeneratedDay(j,day,target),day,target};
 }
 async function aiGenerateDay(){
-  if(!aiAvailable()){toast("Configura la IA (Vercel o API key local en Ajustes)");setView("settings");return;}
+  if(coachUnavailable())return;
   const ds=current; const day=buildDay(ds);
-  modal(`<h3>🍽️ Generar día con IA</h3><div id="genOut"><div class="ai-box">Generando tu día a la medida de tus metas…</div></div>`);
+  modal(`<h3>🍽️ Preparar mi día</h3><div id="genOut"><div class="ai-box">Estamos preparando tu día a la medida de tus metas…</div></div>`);
   try{
     const {res,target}=await generateOneDay(ds);
     window._genDay={ds,comidas:res.comidas};
     $("#genOut").innerHTML=genReviewHtml(res,target);
-  }catch(e){$("#genOut").innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}</div>`;}
+  }catch(e){$("#genOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
 }
 // --- Plan semanal personalizado (se guarda como overrides por día, por usuario) ---
 function weekDays(w){const days=[];let d=w.start;while(d<=w.end){if(d>=START&&d<=END)days.push(d);d=addDays(d,1);}return days;}
 function weekHasGeneratedPlan(w){return weekDays(w).some(ds=>{const st=S.days&&S.days[ds];return st&&st.meals&&Object.values(st.meals).some(m=>m&&m.ovr&&m.ovr.gen);});}
 async function aiGenerateWeek(){
-  if(!aiAvailable()){toast("Configura la IA (Vercel o API key local en Ajustes)");setView("settings");return;}
+  if(coachUnavailable())return;
   const w=weekOf(current)||WEEKS[0]; const days=weekDays(w);
   if(!days.length){toast("Esta semana está fuera del plan");return;}
   const label=w.num?("Semana "+w.num):"Semana de arranque";
-  modal(`<h3>📅 Generar mi semana</h3><div id="genwOut"><div class="ai-box">Preparando ${days.length} días a tu medida…</div></div>`);
+  modal(`<h3>📅 Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida…</div></div>`);
   let okN=0; const problems=[];
   for(let i=0;i<days.length;i++){
     const ds=days[i];
-    const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Generando ${label}: día ${i+1} de ${days.length}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
+    const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Preparando ${label}: día ${i+1} de ${days.length}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
     try{
       const {res}=await generateOneDay(ds);
       if(res.ok){applyDayComidas(ds,res.comidas);okN++;}
       else problems.push(prettyDate(ds)+": "+(res.issues[0]||"no válido"));
-    }catch(e){problems.push(prettyDate(ds)+": "+(e.message||"error"));}
+    }catch(e){problems.push(prettyDate(ds)+": "+coachErrorMessage(e));}
   }
   if(view==="nutricion"||view==="hoy")render();
   const el=$("#genwOut");
-  if(el)el.innerHTML=`<div class="ai-box">✓ ${okN}/${days.length} días generados y guardados en tu plan.</div>
-    ${problems.length?`<div class="ai-box">⚠️ No se generaron:<br>${problems.map(esc).join("<br>")}<div class="muted small" style="margin-top:6px">Reintenta o usa "Generar día con IA" para esos.</div></div>`:""}
+  if(el)el.innerHTML=`<div class="ai-box">✓ ${okN}/${days.length} días preparados y guardados en tu plan.</div>
+    ${problems.length?`<div class="ai-box">⚠️ No se pudieron preparar:<br>${problems.map(esc).join("<br>")}<div class="muted small" style="margin-top:6px">Reintenta o usa "Preparar este día" para esos.</div></div>`:""}
     <div class="row wrap" style="margin-top:12px">
       <button class="btn btn-accent" onclick="closeModal()">Listo</button>
-      <button class="btn" onclick="aiGenerateWeek()">Regenerar semana</button>
+      <button class="btn" onclick="aiGenerateWeek()">Preparar otra semana</button>
     </div>`;
 }
 function genReviewHtml(res,target){
@@ -2227,20 +2260,20 @@ function applyDayComidas(ds,comidas){
 function applyGeneratedDay(){
   const g=window._genDay; if(!g||!g.comidas){closeModal();return;}
   applyDayComidas(g.ds,g.comidas);
-  window._genDay=null;closeModal();render();toast("Día generado aplicado");
+  window._genDay=null;closeModal();render();toast("Día aplicado a tu plan");
 }
 
 // IA 3 — revisar mis macros
 async function aiReview(){
-  if(!aiAvailable()){toast("Configura la IA (Vercel o API key local en Ajustes)");setView("settings");return;}
+  if(coachUnavailable())return;
   const{t,target}=dayTotals(current);const day=buildDay(current);
   const now=new Date();const hora=now.getHours()+":"+String(now.getMinutes()).padStart(2,"0");
   modal(`<h3>🔍 Revisión de macros</h3><div id="aiOut"><div class="ai-box">Analizando…</div></div>`);
   try{
     const txt=await callClaude(`Son las ${hora}. Llevo consumido: ${t.kcal} kcal, ${t.p} g proteína, ${t.c} g carbos, ${t.f} g grasa. Metas del día: ${target.kcal} kcal, ${target.p} P, ${target.c} C, ${target.f} G. Evalúa brevemente cómo voy y da UNA sugerencia concreta (vegetariana sin huevo). Responde SOLO JSON: {"evaluacion":"...","sugerencia":"..."}`,400);
     const j=parseJSON(txt);
-    $("#aiOut").innerHTML=`<div class="ai-box"><b>Evaluación:</b> ${esc(j.evaluacion)}\n\n<b>Sugerencia:</b> ${esc(j.sugerencia)}</div>`;
-  }catch(e){$("#aiOut").innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}</div>`;}
+    $("#aiOut").innerHTML=`<div class="ai-box"><b>Evaluación:</b> ${esc(coachCopy(j.evaluacion))}\n\n<b>Sugerencia:</b> ${esc(coachCopy(j.sugerencia))}</div>`;
+  }catch(e){$("#aiOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
 }
 
 /* ============================================================
@@ -2248,7 +2281,7 @@ async function aiReview(){
    ============================================================ */
 let recog=null;
 function toggleMic(){
-  if(!aiAvailable()){toast("Configura la IA para usar voz (Vercel o API key local)");return;}
+  if(coachUnavailable())return;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){toast("Tu navegador no soporta dictado por voz");return;}
   if(recog){stopMic();return;}

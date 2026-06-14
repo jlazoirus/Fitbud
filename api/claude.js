@@ -48,7 +48,7 @@ export default async function handler(req, res) {
   // Requiere sesión válida de Supabase: sin esto no se llama a Anthropic.
   const user = await verifyUser(req);
   if (!user) {
-    res.status(401).json({ error: "Sesión requerida para usar la IA." });
+    res.status(401).json({ error: "Sesión requerida para usar tu coach." });
     return;
   }
   try {
