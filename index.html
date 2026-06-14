@@ -3,20 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Tracker PWA del plan nutricional y de entrenamiento Fitbud.">
+<meta name="description" content="Fitbros — tu cuerpo, tu sistema. Nutrición y entrenamiento personalizados con IA.">
 <meta name="theme-color" content="#07070f">
 <meta name="color-scheme" content="dark">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="application-name" content="Fitbros">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Fitbud">
+<meta name="apple-mobile-web-app-title" content="Fitbros">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon-192.png" sizes="192x192">
-<link rel="apple-touch-icon" href="assets/icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<title>Fitbud — Tracker plan 10 semanas</title>
+<title>Fitbros — Tu cuerpo, tu sistema</title>
 <style>
   /* ════════════════════════════════════════════
      FITBROS — Mobile design tokens
@@ -302,7 +303,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Fitbud — tracker del plan de 10 semanas (un solo archivo)
+   Fitbros — tracker de nutrición y entrenamiento con IA (un solo archivo)
    Fases 1-8: datos, vista HOY, navegación, reemplazos,
    macros en vivo, IA (Claude API), voz y extras.
    ============================================================ */
@@ -1163,7 +1164,7 @@ function renderOnboarding(){
   const challengeNote=d.challenge&&CHALLENGE_LABELS[d.challenge]
     ? `<div class="alert violet"><b>Siguiente desafío:</b> ${CHALLENGE_LABELS[d.challenge]}. Revisaremos todos tus datos antes de crear las próximas 10 semanas.</div>`
     :"";
-  $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">FITBUD · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</main>`;
+  $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">FITBROS · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</main>`;
 }
 function readOnboardingStep(){
   const d=onboardingDraft;
@@ -1334,7 +1335,7 @@ function renderSplash(){$("#app").innerHTML=`<div class="splash"><div class="mut
 function renderInactive(){
   const email=(session&&session.user&&session.user.email)||"";
   $("#app").innerHTML=`<div class="auth">
-    <div class="auth-brand">Fitbud</div>
+    <div class="auth-brand">Fitbros</div>
     <div class="dash">
       <h3>Cuenta desactivada</h3>
       <p class="muted small">La cuenta ${esc(email)} no puede modificar datos ni usar la IA. Contacta a un administrador para reactivarla.</p>
@@ -1390,7 +1391,7 @@ function updateInstallPrompt(){
   el.id="a2hs"; el.className="a2hs";
   el.innerHTML=`<div class="a2hs-ic">📲</div>
     <div class="a2hs-body">
-      <div class="a2hs-title">Agrega Fitbud a tu inicio</div>
+      <div class="a2hs-title">Agrega Fitbros a tu inicio</div>
       <div class="a2hs-txt">${txt}</div>
       <div class="a2hs-actions">${action}<button class="btn btn-sm" onclick="dismissInstall()">${action?'Ahora no':'Entendido'}</button></div>
     </div>
@@ -1904,7 +1905,7 @@ function renderAuth(){
       // Producción: las credenciales vienen de /api/config. No mostramos el
       // formulario de conexión al usuario; si falló, ofrecemos reintentar.
       $("#app").innerHTML=`<div class="auth">
-        <div class="auth-brand">Fitbud</div>
+        <div class="auth-brand">Fitbros</div>
         <div class="muted small center" style="margin-bottom:18px">Conectando con el servidor…</div>
         <div class="center"><button class="btn btn-accent" onclick="retryConnect()">Reintentar</button></div>
       </div>`;
@@ -1913,7 +1914,7 @@ function renderAuth(){
     // Dev local sin credenciales: pedir conexión Supabase (solo en localhost).
     const cfg=effectiveSettings();
     $("#app").innerHTML=`<div class="auth">
-      <div class="auth-brand">Fitbud</div>
+      <div class="auth-brand">Fitbros</div>
       <div class="muted small center" style="margin-bottom:18px">Conecta tu proyecto Supabase para continuar.</div>
       <div class="dash">
         <div class="field"><label>Project URL o ID</label><input id="au_url" value="${esc(cfg.supaUrl||"")}" placeholder="xxxx ó https://xxxx.supabase.co"></div>
@@ -1925,7 +1926,7 @@ function renderAuth(){
   }
   const mode=window._authMode||"in";
   $("#app").innerHTML=`<div class="auth">
-    <div class="auth-brand">Fitbud</div>
+    <div class="auth-brand">Fitbros</div>
     <div class="muted small center" style="margin-bottom:20px">${mode==="in"?"Inicia sesión para continuar":"Crea tu cuenta"}</div>
     <div class="dash">
       <div class="field"><label>Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
@@ -1975,7 +1976,7 @@ async function requestOwnPasswordReset(){
 }
 function renderPasswordRecovery(){
   $("#app").innerHTML=`<div class="auth">
-    <div class="auth-brand">Fitbud</div>
+    <div class="auth-brand">Fitbros</div>
     <div class="muted small center" style="margin-bottom:20px">Define una nueva contraseña para tu cuenta.</div>
     <div class="dash">
       <div class="field"><label>Nueva contraseña</label><input id="recovery_pwd" type="password" autocomplete="new-password" minlength="8"></div>

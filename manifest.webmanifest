@@ -1,7 +1,7 @@
 {
-  "name": "Fitbud",
-  "short_name": "Fitbud",
-  "description": "Tracker del plan nutricional y de entrenamiento de 10 semanas.",
+  "name": "Fitbros",
+  "short_name": "Fitbros",
+  "description": "Tu cuerpo, tu sistema. Nutrición y entrenamiento personalizados con IA.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
