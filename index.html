@@ -613,18 +613,8 @@ function profileMacroTargets(){
 }
 function effectiveDayTarget(type){
   const custom=profileMacroTargets();
-  if(!custom)return DAY_TARGET[type];
-  const base=DAY_TARGET.PESAS;
-  const plan=DAY_TARGET[type]||base;
-  const target={
-    kcal:Math.round(custom.kcal*(plan.kcal/base.kcal)/10)*10,
-    p:Math.round(custom.p*(plan.p/base.p)),
-    c:Math.round(custom.c*(plan.c/base.c)),
-    f:Math.round(custom.f*(plan.f/base.f)),
-  };
-  const maintenance=+((profile&&profile.prefs&&profile.prefs.maintenanceCalories)||0);
-  if(type==="DIETBREAK"&&maintenance>0)target.kcal=Math.round(maintenance/10)*10;
-  return target;
+  if(custom)return {...custom};
+  return DAY_TARGET[type]||DAY_TARGET.PESAS;
 }
 const SLOTS = {
   PESAS:[
@@ -1536,7 +1526,7 @@ function renderProfile(){
   <div class="section-h">Objetivo y macros</div>
   <div class="dash">
     ${macros?`<div class="macro-preview" style="margin-top:0">
-      <div class="scard"><div class="n">${macros.kcal}</div><div class="l">kcal base</div></div>
+      <div class="scard"><div class="n">${macros.kcal}</div><div class="l">kcal diarias</div></div>
       <div class="scard"><div class="n">${macros.p} g</div><div class="l">proteína</div></div>
       <div class="scard"><div class="n">${macros.c} g</div><div class="l">carbohidratos</div></div>
       <div class="scard"><div class="n">${macros.f} g</div><div class="l">grasas</div></div>

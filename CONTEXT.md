@@ -17,7 +17,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Hosting:** Vercel (estático + funciones en `api/`). No hay build.
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
 
-> **Macros del día (resuelto):** la vista HOY toma los macros de cada comida desde la **base de datos** (calculados por ingredientes), no de valores fijos. `mealValue()` resuelve con esta prioridad: **1)** override manual → **2)** macros de la DB por `dishName` → **3)** fallback a `SLOTS`. Las metas del usuario se calculan en el onboarding y `effectiveDayTarget()` las adapta a PESAS/BAJO/REFEED/DIETBREAK conservando las proporciones del plan.
+> **Macros del día (resuelto):** la vista HOY toma los macros de cada comida desde la **base de datos** (calculados por ingredientes), no de valores fijos. `mealValue()` resuelve con esta prioridad: **1)** override manual → **2)** macros de la DB por `dishName` → **3)** fallback a `SLOTS`. Las metas guardadas por el usuario son la fuente directa para Home, Nutrición y generación con IA; `DAY_TARGET` solo se usa como fallback para perfiles que todavía no tienen metas calculadas.
 
 ## 3. Mapa de archivos
 | Archivo | Qué es |
@@ -28,7 +28,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
 | `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios paginados, bloquear/desbloquear en Auth + `profiles.active`, cambiar contraseña y enviar reset. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida admin activo, impide auto-desactivación y conserva al último admin. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v10`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v11`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. El layout respeta `safe-area-inset-*` para no quedar bajo la barra de estado ni el indicador de inicio de iOS. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
@@ -40,7 +40,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 
 ## 4. Estructura interna de index.html (con líneas aprox.)
 - **Config runtime** (~151): `CONFIG` (de `config.js`), `REMOTE` (de `/api/config`), `effectiveSettings()` (prioridad: override local en Ajustes → REMOTE/Vercel → config.js), `aiAvailable()`, `settingSource()`.
-- **Capa de datos:** calendario del plan, menús, generadores de entrenamiento, `DAY_TARGET` (proporciones base), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales por tipo de día).
+- **Capa de datos:** calendario del plan, menús, generadores de entrenamiento, `DAY_TARGET` (fallback sin perfil), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales exactas).
 - **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → alimentación. `hasCompleteOnboarding()` obliga a completarlo una vez y `profileReviewDue()` solicita revisión cada 28 días. Todo se guarda con `upsert` en `profiles.prefs`, por lo que también se recupera si faltara la fila creada por el trigger.
 - **Entrenamiento:** cada perfil elige `primarySport` (`running|cycling|swimming`), `strengthMode` (`gym|bodyweight`) y `trainDays` (3-6). `workoutSchedule(days)` define el reparto semanal, `workoutOptions(ds)` genera las sesiones progresivas y `effectiveWorkout(ds)` resuelve overrides diarios. UI: Perfil + `openWorkoutPicker(ds)` + `setWorkout(ds,id)`.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
@@ -56,7 +56,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 
 ## 5. Modelo de datos del plan (reglas)
 - **Tipos de día:** PESAS (Lun/Mar/Jue/Vie), BAJO (Mié/Sáb/Dom), REFEED (sáb 27 jun, 11 jul, 8 ago, 22 ago), DIETBREAK (toda la semana 6, 20–26 jul).
-- **Metas:** `DAY_TARGET` conserva las proporciones base PESAS/BAJO/REFEED/DIETBREAK. El onboarding calcula la base personal con Katch-McArdle (si hay % de grasa) o Mifflin-St Jeor; `effectiveDayTarget()` escala cada tipo de día y usa mantenimiento para DIETBREAK.
+- **Metas:** el onboarding calcula la meta diaria personal con Katch-McArdle (si hay % de grasa) o Mifflin-St Jeor. `effectiveDayTarget()` devuelve exactamente esas kcal/proteína/carbohidratos/grasas en Home, Nutrición y prompts de IA. `DAY_TARGET` conserva los valores históricos por tipo de día únicamente como fallback.
 - **Menús (`MENUS`):** A Criollo, B Mediterráneo, C Asiático, D Mexicano — asignados por semana en `WEEKS`. Desayunos/cenas rotan; almuerzo según menú+día (autoritativo desde `diet_dishes` en la DB).
 - **Entrenamiento:** plan combinado por perfil: Running/Cycling/Natación + Gimnasio/Peso corporal, entre 3 y 6 días/semana. El reparto aumenta desde 1 full-body + 2 sesiones aeróbicas hasta 4 sesiones de fuerza + calidad + fondo; progresa por bloques durante 10 semanas. Sigue siendo **intercambiable por día** vía `workoutOverride`.
 
