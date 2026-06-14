@@ -13,7 +13,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Frontend:** un único `index.html` (HTML+CSS+JS inline). Mobile-first. Sin dependencias salvo `supabase-js` por CDN (jsDelivr).
 - **Persistencia:** la **fuente de verdad es Supabase**; `localStorage` (clave `fitbud_v1`) es solo **caché offline** que la espeja. Ningún dato del usuario vive solo en el navegador (el progreso diario va a `day_log` y el peso a `weight_log`). Lo único local-de-dispositivo son los overrides de credenciales en Ajustes (en producción vienen de Vercel).
 - **Base de datos:** Supabase (PostgreSQL) — catálogo de alimentos (ingredientes/platos/dietas), consumo diario (`day_log`) y peso (`weight_log`).
-- **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador. El proxy exige sesión: el cliente manda el token de Supabase en `Authorization: Bearer` y el server lo valida (401 si falta/!válido).
+- **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador. El proxy exige sesión: el cliente manda el token de Supabase en `Authorization: Bearer` y el server lo valida (401 si falta/!válido). Funciones: estimar comida, sugerir, revisar macros y **generar un día completo** (`aiGenerateDay` → `validateGeneratedDay` valida huevo/restricciones/macros/repetición antes de dejar aplicar; se guarda como override por día en `day_log`).
 - **Hosting:** Vercel (estático + funciones en `api/`). No hay build.
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
 
