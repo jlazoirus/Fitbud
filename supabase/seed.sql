@@ -128,50 +128,50 @@ from (values
   ('Smoothie bowl','Proteína en polvo',45),('Smoothie bowl','Frutos congelados',150),('Smoothie bowl','Avena',30),('Smoothie bowl','Leche vegetal',200),
   ('Desayuno refeed (avena + plátano + miel)','Avena',80),('Desayuno refeed (avena + plátano + miel)','Proteína en polvo',45),('Desayuno refeed (avena + plátano + miel)','Plátano',120),('Desayuno refeed (avena + plátano + miel)','Miel',20),
   -- Batidos
-  ('Batido peri-entreno (día pesas)','Proteína en polvo',60),('Batido peri-entreno (día pesas)','Plátano',120),
-  ('Batido peri-entreno (día bajo)','Proteína en polvo',60),('Batido peri-entreno (día bajo)','Leche vegetal',150),
+  ('Batido peri-entreno (día pesas)','Proteína en polvo',70),('Batido peri-entreno (día pesas)','Plátano',120),
+  ('Batido peri-entreno (día bajo)','Proteína en polvo',60),('Batido peri-entreno (día bajo)','Leche vegetal',150),('Batido peri-entreno (día bajo)','Plátano',60),
   -- Cenas
-  ('Cena: yogur griego + cottage + fruta','Yogur griego natural 0%',300),('Cena: yogur griego + cottage + fruta','Queso cottage',100),('Cena: yogur griego + cottage + fruta','Fruta pequeña (manzana)',100),
-  ('Cena: queso fresco a la plancha + palta','Queso fresco',180),('Cena: queso fresco a la plancha + palta','Palta',35),('Cena: queso fresco a la plancha + palta','Verduras mixtas',200),('Cena: queso fresco a la plancha + palta','Aceite de oliva',5),
+  ('Cena: yogur griego + cottage + fruta','Yogur griego natural 0%',300),('Cena: yogur griego + cottage + fruta','Queso cottage',100),('Cena: yogur griego + cottage + fruta','Fruta pequeña (manzana)',100),('Cena: yogur griego + cottage + fruta','Chía',15),
+  ('Cena: queso fresco a la plancha + palta','Queso fresco',200),('Cena: queso fresco a la plancha + palta','Palta',30),('Cena: queso fresco a la plancha + palta','Verduras mixtas',200),
   ('Cena: crema de verduras + tofu sellado','Tofu firme',200),('Cena: crema de verduras + tofu sellado','Verduras mixtas',250),('Cena: crema de verduras + tofu sellado','Aceite de oliva',5),
   ('Cena exprés: caseína + mantequilla de maní','Caseína en polvo',40),('Cena exprés: caseína + mantequilla de maní','Mantequilla de maní',15),('Cena exprés: caseína + mantequilla de maní','Leche vegetal',200),
-  ('Cena refeed: arroz + tofu + verduras','Arroz cocido',250),('Cena refeed: arroz + tofu + verduras','Tofu firme',200),('Cena refeed: arroz + tofu + verduras','Verduras mixtas',100),
+  ('Cena refeed: arroz + tofu + verduras','Arroz cocido',100),('Cena refeed: arroz + tofu + verduras','Tofu firme',250),('Cena refeed: arroz + tofu + verduras','Verduras mixtas',100),
   -- Snacks
   ('Snack refeed: pan + mermelada + proteína','Pan de molde',80),('Snack refeed: pan + mermelada + proteína','Mermelada',30),('Snack refeed: pan + mermelada + proteína','Proteína en polvo',30),
-  ('Snack diet break: pan con palta','Pan de molde',60),('Snack diet break: pan con palta','Palta',50),
-  ('Snack extra: fruta + yogur','Yogur griego natural 0%',200),('Snack extra: fruta + yogur','Fruta pequeña (manzana)',120),
+  ('Snack diet break: pan con palta','Pan de molde',100),('Snack diet break: pan con palta','Palta',40),('Snack diet break: pan con palta','Proteína en polvo',25),
+  ('Snack extra: fruta + yogur','Yogur griego natural 0%',100),('Snack extra: fruta + yogur','Fruta pequeña (manzana)',120),('Snack extra: fruta + yogur','Granola sin azúcar',20),
   -- Menú A
   ('Saltado de tofu firme + arroz','Tofu firme',250),('Saltado de tofu firme + arroz','Arroz cocido',200),('Saltado de tofu firme + arroz','Cebolla',50),('Saltado de tofu firme + arroz','Tomate',50),('Saltado de tofu firme + arroz','Aceite de oliva',8),
   ('Lentejas guisadas + quinua + ensalada','Lentejas cocidas',350),('Lentejas guisadas + quinua + ensalada','Quinua cocida',120),('Lentejas guisadas + quinua + ensalada','Verduras mixtas',100),('Lentejas guisadas + quinua + ensalada','Aceite de oliva',5),
   ('Tacu tacu de pallares + seitán','Pallares cocidos',250),('Tacu tacu de pallares + seitán','Seitán',120),('Tacu tacu de pallares + seitán','Aceite de oliva',8),
-  ('Ají de garbanzos + arroz','Garbanzos cocidos',280),('Ají de garbanzos + arroz','Leche evaporada light',50),('Ají de garbanzos + arroz','Arroz cocido',120),
+  ('Ají de garbanzos + arroz','Garbanzos cocidos',250),('Ají de garbanzos + arroz','Leche evaporada light',50),('Ají de garbanzos + arroz','Arroz cocido',80),('Ají de garbanzos + arroz','Queso fresco',60),
   ('Quinua atamalada + queso fresco + tofu','Quinua cocida',200),('Quinua atamalada + queso fresco + tofu','Queso fresco',100),('Quinua atamalada + queso fresco + tofu','Tofu firme',150),
   ('Frijoles canarios + arroz + queso fresco','Frijoles canarios cocidos',250),('Frijoles canarios + arroz + queso fresco','Arroz cocido',80),('Frijoles canarios + arroz + queso fresco','Queso fresco',120),
   ('Locro de zapallo con quinua + tofu','Zapallo',200),('Locro de zapallo con quinua + tofu','Quinua cocida',120),('Locro de zapallo con quinua + tofu','Tofu firme',200),
   -- Menú B
-  ('Pasta integral + boloñesa de lentejas + parmesano','Pasta integral seca',80),('Pasta integral + boloñesa de lentejas + parmesano','Lentejas cocidas',250),('Pasta integral + boloñesa de lentejas + parmesano','Parmesano',15),('Pasta integral + boloñesa de lentejas + parmesano','Tomate',80),
+  ('Pasta integral + boloñesa de lentejas + parmesano','Pasta integral seca',60),('Pasta integral + boloñesa de lentejas + parmesano','Lentejas cocidas',250),('Pasta integral + boloñesa de lentejas + parmesano','Parmesano',30),('Pasta integral + boloñesa de lentejas + parmesano','Tomate',80),('Pasta integral + boloñesa de lentejas + parmesano','Aceite de oliva',8),
   ('Bowl de hummus + tofu horneado + pita','Hummus',100),('Bowl de hummus + tofu horneado + pita','Tofu firme',150),('Bowl de hummus + tofu horneado + pita','Pan pita integral',50),('Bowl de hummus + tofu horneado + pita','Verduras mixtas',100),
   ('Falafel al horno + tabule de quinua + yogur','Garbanzos cocidos',200),('Falafel al horno + tabule de quinua + yogur','Quinua cocida',120),('Falafel al horno + tabule de quinua + yogur','Yogur griego natural 0%',80),('Falafel al horno + tabule de quinua + yogur','Aceite de oliva',8),
   ('Berenjenas al horno con lentejas + queso fresco','Berenjena',150),('Berenjenas al horno con lentejas + queso fresco','Lentejas cocidas',200),('Berenjenas al horno con lentejas + queso fresco','Queso fresco',120),('Berenjenas al horno con lentejas + queso fresco','Arroz cocido',100),
   ('Risotto de champiñones + tofu','Arroz cocido',200),('Risotto de champiñones + tofu','Champiñones',150),('Risotto de champiñones + tofu','Tofu firme',200),('Risotto de champiñones + tofu','Parmesano',10),
   ('Ensalada griega + garbanzos + queso fresco','Garbanzos cocidos',250),('Ensalada griega + garbanzos + queso fresco','Queso fresco',120),('Ensalada griega + garbanzos + queso fresco','Aceitunas',30),('Ensalada griega + garbanzos + queso fresco','Verduras mixtas',150),
-  ('Pisto de verduras + soya texturizada + papa','Soya texturizada (seca)',60),('Pisto de verduras + soya texturizada + papa','Verduras mixtas',200),('Pisto de verduras + soya texturizada + papa','Papa',150),('Pisto de verduras + soya texturizada + papa','Aceite de oliva',8),
+  ('Pisto de verduras + soya texturizada + papa','Soya texturizada (seca)',70),('Pisto de verduras + soya texturizada + papa','Verduras mixtas',200),('Pisto de verduras + soya texturizada + papa','Papa',250),('Pisto de verduras + soya texturizada + papa','Aceite de oliva',10),
   -- Menú C
   ('Tofu teriyaki + arroz + brócoli','Tofu firme',250),('Tofu teriyaki + arroz + brócoli','Arroz cocido',200),('Tofu teriyaki + arroz + brócoli','Brócoli',150),
-  ('Curry de garbanzos + arroz','Garbanzos cocidos',250),('Curry de garbanzos + arroz','Leche de coco light',80),('Curry de garbanzos + arroz','Arroz cocido',100),
-  ('Salteado de tempeh con pak choi y pimientos','Tempeh',200),('Salteado de tempeh con pak choi y pimientos','Pak choi',150),('Salteado de tempeh con pak choi y pimientos','Pimiento',100),('Salteado de tempeh con pak choi y pimientos','Aceite de oliva',8),
+  ('Curry de garbanzos + arroz','Garbanzos cocidos',250),('Curry de garbanzos + arroz','Leche de coco light',80),('Curry de garbanzos + arroz','Arroz cocido',100),('Curry de garbanzos + arroz','Tofu firme',120),
+  ('Salteado de tempeh con pak choi y pimientos','Tempeh',200),('Salteado de tempeh con pak choi y pimientos','Pak choi',150),('Salteado de tempeh con pak choi y pimientos','Pimiento',100),('Salteado de tempeh con pak choi y pimientos','Aceite de oliva',8),('Salteado de tempeh con pak choi y pimientos','Arroz cocido',200),
   ('Pad thai de tofu','Tofu firme',250),('Pad thai de tofu','Fideos de arroz secos',60),('Pad thai de tofu','Maní',15),('Pad thai de tofu','Verduras mixtas',100),
   ('Bowl de edamame + tofu + arroz + palta','Edamame',200),('Bowl de edamame + tofu + arroz + palta','Tofu firme',150),('Bowl de edamame + tofu + arroz + palta','Arroz cocido',120),('Bowl de edamame + tofu + arroz + palta','Palta',30),
   ('Ramen miso con tofu y fideos','Tofu firme',250),('Ramen miso con tofu y fideos','Fideos de trigo secos',60),('Ramen miso con tofu y fideos','Verduras mixtas',100),('Ramen miso con tofu y fideos','Alga nori',5),
   ('Chaufa de quinua con tofu','Quinua cocida',200),('Chaufa de quinua con tofu','Tofu firme',200),('Chaufa de quinua con tofu','Verduras mixtas',100),
   -- Menú D
   ('Burrito bowl de frijol negro','Frijoles negros cocidos',250),('Burrito bowl de frijol negro','Arroz cocido',100),('Burrito bowl de frijol negro','Queso cottage',100),('Burrito bowl de frijol negro','Palta',40),
-  ('Chili vegetariano + arroz','Soya texturizada (seca)',60),('Chili vegetariano + arroz','Frijoles negros cocidos',200),('Chili vegetariano + arroz','Tomate',100),('Chili vegetariano + arroz','Arroz cocido',80),
+  ('Chili vegetariano + arroz','Soya texturizada (seca)',60),('Chili vegetariano + arroz','Frijoles negros cocidos',200),('Chili vegetariano + arroz','Tomate',100),('Chili vegetariano + arroz','Arroz cocido',80),('Chili vegetariano + arroz','Aceite de oliva',12),
   ('Tacos de frijol negro y queso fresco','Frijoles negros cocidos',200),('Tacos de frijol negro y queso fresco','Queso fresco',100),('Tacos de frijol negro y queso fresco','Tortilla de maíz',75),('Tacos de frijol negro y queso fresco','Repollo',100),
   ('Fajitas de tofu + tortillas','Tofu firme',250),('Fajitas de tofu + tortillas','Pimiento',100),('Fajitas de tofu + tortillas','Cebolla',50),('Fajitas de tofu + tortillas','Tortilla integral de trigo',75),
   ('Quesadillas de frijol, queso y champiñones','Tortilla integral de trigo',80),('Quesadillas de frijol, queso y champiñones','Frijoles negros cocidos',150),('Quesadillas de frijol, queso y champiñones','Queso fresco',80),('Quesadillas de frijol, queso y champiñones','Champiñones',80),
-  ('Enchiladas de frijol + cottage','Frijoles negros cocidos',200),('Enchiladas de frijol + cottage','Tortilla de maíz',75),('Enchiladas de frijol + cottage','Queso cottage',100),('Enchiladas de frijol + cottage','Tomate',50),
-  ('Sopa azteca + tofu + palta','Tofu firme',200),('Sopa azteca + tofu + palta','Tortilla de maíz',50),('Sopa azteca + tofu + palta','Palta',40),('Sopa azteca + tofu + palta','Verduras mixtas',150)
+  ('Enchiladas de frijol + cottage','Frijoles negros cocidos',200),('Enchiladas de frijol + cottage','Tortilla de maíz',75),('Enchiladas de frijol + cottage','Queso cottage',100),('Enchiladas de frijol + cottage','Tomate',50),('Enchiladas de frijol + cottage','Aceite de oliva',10),
+  ('Sopa azteca + tofu + palta','Tofu firme',200),('Sopa azteca + tofu + palta','Tortilla de maíz',90),('Sopa azteca + tofu + palta','Palta',40),('Sopa azteca + tofu + palta','Verduras mixtas',150)
 ) as v(dish_name, ing_name, grams)
 join dishes d      on d.name = v.dish_name
 join ingredients i on i.name = v.ing_name;

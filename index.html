@@ -339,14 +339,13 @@ const DISH_NAMES = {
 const ALL_LUNCHES = []; // para reemplazo de almuerzo (nombre visible + plato de la DB)
 ["A","B","C","D"].forEach(L=>{for(let wd=0;wd<7;wd++){ALL_LUNCHES.push({menu:L,wd,name:MENUS[L][wd],dishName:LUNCH_DISHES[L][wd]});}});
 
-const WEEKDAY_WORKOUT_ID={1:"torsoA",2:"piernaA",3:"calidad",4:"torsoB",5:"piernaB",6:"facil",0:"descanso"};
-
 const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
 const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
 function trainingPrefs(){
   const p=(profile&&profile.prefs)||{};
   let primary=SPORT_LABELS[p.primarySport]?p.primarySport:"";
   let strength=STRENGTH_LABELS[p.strengthMode]?p.strengthMode:"";
+  let days=Number.parseInt(p.trainDays,10);
   // Compatibilidad con preferencias guardadas antes de existir el plan combinado.
   if(!primary){
     if(p.trainType==="cycling")primary="cycling";
@@ -354,7 +353,30 @@ function trainingPrefs(){
     else primary="running";
   }
   if(!strength)strength=p.trainPlace==="casa"?"bodyweight":"gym";
-  return {primary,strength};
+  if(!Number.isInteger(days)||days<3||days>6)days=6;
+  return {primary,strength,days};
+}
+function workoutSchedule(days){
+  const schedules={
+    3:{1:"fullA",3:"calidad",6:"facil"},
+    4:{1:"fullA",3:"calidad",5:"fullB",6:"facil"},
+    5:{1:"torsoA",2:"piernaA",3:"calidad",5:"fullB",6:"facil"},
+    6:{1:"torsoA",2:"piernaA",3:"calidad",4:"torsoB",5:"piernaB",6:"facil"},
+  };
+  return schedules[days]||schedules[6];
+}
+function plannedWorkoutId(ds){
+  const wd=parseYmd(ds).getDay();
+  return workoutSchedule(trainingPrefs().days)[wd]||"descanso";
+}
+function trainingPlanSummary(days,primary){
+  const split={
+    3:"1 sesión full-body + 1 sesión de calidad + 1 sesión aeróbica larga",
+    4:"2 sesiones full-body + 1 sesión de calidad + 1 sesión aeróbica larga",
+    5:"3 sesiones de fuerza + 1 sesión de calidad + 1 sesión aeróbica larga",
+    6:"4 sesiones de fuerza + 1 sesión de calidad + 1 sesión aeróbica larga",
+  };
+  return `${split[days]||split[6]} de ${SPORT_LABELS[primary]||SPORT_LABELS.running}.`;
 }
 function trainingWeek(ds){
   const w=weekOf(ds);
@@ -546,9 +568,6 @@ function buildDay(ds){
         if(dbLunch){ m.name=dbLunch.name; m.dishName=dbLunch.name; }
         else { m.name=MENUS[lunchMenu][wd]; m.dishName=LUNCH_DISHES[lunchMenu][wd]; }
       }
-      if(type==="REFEED") m.name+=" — doble porción de arroz/pasta/tortillas";
-      if(type==="DIETBREAK") m.name+=" (+50% carbo)";
-      if(type==="BAJO") m.name+=" — carbo a la mitad, +verdura";
     }else if(s.id==="batido"){
       m.name = type==="PESAS" ? "2 scoops de proteína + plátano" : "2 scoops de proteína (solos)";
       m.dishName = type==="PESAS" ? DISH_NAMES.batidoPesas : DISH_NAMES.batidoBajo;

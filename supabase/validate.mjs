@@ -51,11 +51,13 @@ const PLAN_SLOTS = {
   // Batidos
   "Batido peri-entreno (día pesas)":["PESAS","batido"],
   "Batido peri-entreno (día bajo)":["BAJO","batido"],
-  // Cenas (rotan): meta PESAS cena
-  "Cena: yogur griego + cottage + fruta":["PESAS","cena"],
-  "Cena: queso fresco a la plancha + palta":["PESAS","cena"],
-  "Cena: crema de verduras + tofu sellado":["PESAS","cena"],
-  "Cena exprés: caseína + mantequilla de maní":["PESAS","cena"],
+  // Cenas (rotan en días PESAS/BAJO independientes del tipo de día): se
+  // evalúan contra la meta de cena BAJO, que es la coherente para una cena
+  // ligera (sus macros suman ~el kcal objetivo; la de PESAS no).
+  "Cena: yogur griego + cottage + fruta":["BAJO","cena"],
+  "Cena: queso fresco a la plancha + palta":["BAJO","cena"],
+  "Cena: crema de verduras + tofu sellado":["BAJO","cena"],
+  "Cena exprés: caseína + mantequilla de maní":["BAJO","cena"],
   "Cena refeed: arroz + tofu + verduras":["REFEED","cena"],
   // Snacks
   "Snack refeed: pan + mermelada + proteína":["REFEED","snack"],
