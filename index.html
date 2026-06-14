@@ -253,13 +253,20 @@
   .chips{display:flex;flex-wrap:wrap;gap:8px}
   .chip-check{display:inline-flex;align-items:center;gap:7px;background:var(--surf3);border:1px solid var(--border-2);border-radius:999px;padding:7px 13px;font-size:13px;cursor:pointer;user-select:none}
   .chip-check input{accent-color:var(--accent);width:15px;height:15px}
+  .availability{display:grid;gap:8px;margin-top:9px}
+  .availability-day{display:grid;grid-template-columns:minmax(108px,1fr) minmax(126px,1.2fr);gap:10px;align-items:center;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:10px 11px}
+  .availability-day label{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;cursor:pointer}
+  .availability-day input[type="checkbox"]{accent-color:var(--accent);width:17px;height:17px}
+  .availability-day select{width:100%;min-width:0;background:var(--surf2);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:9px;font-family:inherit}
+  .availability-day select:disabled{opacity:.45}
+  .field-note{color:var(--muted);font-size:11px;line-height:1.4;margin-top:5px}
 
   /* Onboarding y revisión periódica del perfil */
   .onboarding{max-width:560px;margin:0 auto;padding:24px 14px 50px}
   .onboarding-brand{font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--purple-200);margin-bottom:22px}
   .onboarding h1{font-size:30px;line-height:1.08;margin-bottom:8px}
   .onboarding-copy{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:18px}
-  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:24px}
+  .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:24px}
   .step{height:5px;background:var(--surf3);border-radius:999px;overflow:hidden}
   .step.on{background:var(--accent)}
   .onboarding-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
@@ -286,6 +293,7 @@
   .journey-photo{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:var(--r-md);background:var(--surf2)}
   @media(max-width:380px){
     .onboarding-grid{grid-template-columns:1fr}
+    .availability-day{grid-template-columns:1fr}
     .onboarding h1{font-size:26px}
     .challenge-grid{grid-template-columns:1fr}
   }
@@ -427,14 +435,30 @@ let PLAN_DURATION_WEEKS=10;
 
 const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
 const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
+const PROFILE_SCHEMA_VERSION=2;
 const MIN_TRAINING_DAYS=3;
 const MAX_TRAINING_DAYS=6;
-const TRAINING_DAY_OPTIONS=[
-  {value:3,label:"3 días · mínimo recomendado"},
-  {value:4,label:"4 días"},
-  {value:5,label:"5 días"},
-  {value:6,label:"6 días"},
+const WEEKDAY_OPTIONS=[
+  {value:1,label:"Lunes",short:"Lun"},
+  {value:2,label:"Martes",short:"Mar"},
+  {value:3,label:"Miércoles",short:"Mié"},
+  {value:4,label:"Jueves",short:"Jue"},
+  {value:5,label:"Viernes",short:"Vie"},
+  {value:6,label:"Sábado",short:"Sáb"},
+  {value:0,label:"Domingo",short:"Dom"},
 ];
+const TRAINING_LOCATION_LABELS={gym:"Gimnasio",home:"Casa",outdoor:"Exterior",pool:"Piscina"};
+const TRAINING_PRIORITY_LABELS={composition:"Composición corporal",performance:"Rendimiento",strength:"Fuerza",health:"Salud general"};
+const TRAINING_EXPERIENCE_LABELS={beginner:"Principiante",intermediate:"Intermedio",advanced:"Avanzado"};
+const TRAINING_TIME_LABELS={morning:"Mañana",midday:"Mediodía",afternoon:"Tarde",evening:"Noche",flexible:"Flexible"};
+const EQUIPMENT_LABELS={
+  bodyweight:"Peso corporal",bands:"Bandas",dumbbells:"Mancuernas",barbell:"Barra y discos",
+  machines:"Máquinas",pullup:"Barra de dominadas",bike:"Bicicleta",trainer:"Rodillo",pool_gear:"Material de piscina",
+};
+const FOOD_BUDGET_LABELS={low:"Ajustado",medium:"Moderado",flexible:"Flexible"};
+const REPEAT_LABELS={low:"Poca repetición",moderate:"Repetir 2-3 veces",high:"Priorizar practicidad"};
+const CUISINE_LABELS={peruvian:"Peruana",mediterranean:"Mediterránea",asian:"Asiática",mexican:"Mexicana",italian:"Italiana",latin:"Latinoamericana"};
+const PREPARATION_LABELS={quick:"Rápidas",batch:"Cocinar por tandas",no_cook:"Sin cocinar",one_pot:"Una sola olla",oven:"Horno",grill:"Plancha o parrilla"};
 function validTrainingDays(value){
   const days=Number.parseInt(value,10);
   return Number.isInteger(days)&&days>=MIN_TRAINING_DAYS&&days<=MAX_TRAINING_DAYS;
@@ -444,55 +468,165 @@ function resolvedPlanDuration(prefs){
   const duration=Number.parseInt(prefs&&prefs.planDurationWeeks,10);
   return validPlanDuration(duration)?duration:10;
 }
-function trainingPrefs(){
-  const p=(profile&&profile.prefs)||{};
-  let primary=SPORT_LABELS[p.primarySport]?p.primarySport:"";
-  let strength=STRENGTH_LABELS[p.strengthMode]?p.strengthMode:"";
-  let days=Number.parseInt(p.trainDays,10);
-  // Compatibilidad con preferencias guardadas antes de existir el plan combinado.
-  if(!primary){
-    if(p.trainType==="cycling")primary="cycling";
-    else if(p.trainType==="swimming"||p.trainType==="natacion")primary="swimming";
-    else primary="running";
-  }
-  if(!strength)strength=p.trainPlace==="casa"?"bodyweight":"gym";
-  if(!validTrainingDays(days))days=MAX_TRAINING_DAYS;
-  return {primary,strength,days};
+function normalizedList(value,allowed){
+  const list=Array.isArray(value)?value:[];
+  return [...new Set(list.filter(item=>allowed.includes(item)))];
 }
-function workoutSchedule(days){
-  const challenge=(profile&&profile.prefs&&profile.prefs.challenge)||"";
+function defaultTrainingDays(count){
+  const defaults={3:[1,3,6],4:[1,3,5,6],5:[1,2,3,5,6],6:[1,2,3,4,5,6]};
+  return (defaults[validTrainingDays(count)?+count:3]||defaults[3]).slice();
+}
+function normalizedTrainingDays(value,count){
+  const valid=[...new Set((Array.isArray(value)?value:[]).map(Number).filter(day=>WEEKDAY_OPTIONS.some(o=>o.value===day)))];
+  valid.sort((a,b)=>WEEKDAY_OPTIONS.findIndex(o=>o.value===a)-WEEKDAY_OPTIONS.findIndex(o=>o.value===b));
+  return valid.length>=MIN_TRAINING_DAYS&&valid.length<=MAX_TRAINING_DAYS?valid:defaultTrainingDays(count);
+}
+function defaultMealTimes(count){
+  const presets={
+    2:["10:00","19:00"],
+    3:["08:00","13:00","19:00"],
+    4:["08:00","12:30","17:00","20:30"],
+    5:["07:30","11:00","14:00","17:30","20:30"],
+    6:["07:30","10:30","13:00","16:00","19:00","21:00"],
+  };
+  return (presets[count]||presets[4]).slice();
+}
+function validTime(value){return typeof value==="string"&&/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);}
+function normalizedMealTimes(value,count){
+  const fallback=defaultMealTimes(count);
+  const source=Array.isArray(value)?value:[];
+  return fallback.map((time,index)=>validTime(source[index])?source[index]:time);
+}
+function inferredTrainingPriority(p){
+  if(TRAINING_PRIORITY_LABELS[p.trainingPriority])return p.trainingPriority;
+  if(p.challenge==="performance")return "performance";
+  if(p.challenge==="strength")return "strength";
+  return p.goal==="mantenimiento"?"health":"composition";
+}
+function baseWorkoutTemplate(days,priority){
   const base={
-    3:{1:"fullA",3:"calidad",6:"facil"},
-    4:{1:"fullA",3:"calidad",5:"fullB",6:"facil"},
-    5:{1:"torsoA",2:"piernaA",3:"calidad",5:"fullB",6:"facil"},
-    6:{1:"torsoA",2:"piernaA",3:"calidad",4:"torsoB",5:"piernaB",6:"facil"},
+    3:["fullA","calidad","facil"],
+    4:["fullA","calidad","fullB","facil"],
+    5:["torsoA","piernaA","calidad","fullB","facil"],
+    6:["torsoA","piernaA","calidad","torsoB","piernaB","facil"],
   };
   const strength={
-    3:{1:"fullA",3:"fullB",6:"facil"},
-    4:{1:"torsoA",2:"piernaA",5:"fullB",6:"facil"},
-    5:{1:"torsoA",2:"piernaA",4:"torsoB",5:"piernaB",6:"facil"},
+    3:["fullA","fullB","facil"],
+    4:["torsoA","piernaA","fullB","facil"],
+    5:["torsoA","piernaA","torsoB","piernaB","facil"],
     6:base[6],
   };
   const performance={
     3:base[3],
-    4:{1:"fullA",2:"tecnica",3:"calidad",6:"facil"},
-    5:{1:"fullA",2:"tecnica",3:"calidad",5:"fullB",6:"facil"},
-    6:{1:"fullA",2:"tecnica",3:"calidad",4:"fullB",5:"tecnica",6:"facil"},
+    4:["fullA","tecnica","calidad","facil"],
+    5:["fullA","tecnica","calidad","fullB","facil"],
+    6:["fullA","tecnica","calidad","fullB","tecnica","facil"],
   };
-  const schedules=challenge==="strength"?strength:challenge==="performance"?performance:base;
-  return schedules[days]||schedules[6];
+  const templates=priority==="strength"?strength:priority==="performance"?performance:base;
+  return (templates[days]||templates[3]).slice();
+}
+function defaultTrainingLocations(primary,strength,dayIds,priority){
+  const sessions=baseWorkoutTemplate(dayIds.length,priority);
+  const strengthIds=new Set(["fullA","fullB","torsoA","torsoB","piernaA","piernaB"]);
+  return Object.fromEntries(dayIds.map((day,index)=>{
+    const session=sessions[index];
+    const location=strengthIds.has(session)?(strength==="bodyweight"?"home":"gym"):(primary==="swimming"?"pool":"outdoor");
+    return [day,location];
+  }));
+}
+function migrateProfilePrefs(source){
+  const p={...(source&&typeof source==="object"?source:{})};
+  let primary=SPORT_LABELS[p.primarySport]?p.primarySport:"";
+  if(!primary)primary=p.trainType==="cycling"?"cycling":(p.trainType==="swimming"||p.trainType==="natacion")?"swimming":"running";
+  const strength=STRENGTH_LABELS[p.strengthMode]?p.strengthMode:(p.trainPlace==="casa"?"bodyweight":"gym");
+  const legacyCount=validTrainingDays(p.trainDays)?+p.trainDays:3;
+  const trainingDays=normalizedTrainingDays(p.trainingDays,legacyCount);
+  const trainingPriority=inferredTrainingPriority(p);
+  const locationDefaults=defaultTrainingLocations(primary,strength,trainingDays,trainingPriority);
+  const trainingLocations={...locationDefaults};
+  if(p.trainingLocations&&typeof p.trainingLocations==="object"){
+    trainingDays.forEach(day=>{
+      const value=p.trainingLocations[day];
+      if(TRAINING_LOCATION_LABELS[value])trainingLocations[day]=value;
+    });
+  }
+  const mealCount=Math.min(6,Math.max(2,Number.parseInt(p.mealCount,10)||4));
+  const allergies=String(p.allergies!=null?p.allergies:(p.avoid||"")).trim();
+  const dislikedIngredients=String(p.dislikedIngredients||"").trim();
+  const equipmentDefault=strength==="bodyweight"?["bodyweight"]:["dumbbells","barbell","machines"];
+  const prefs={...p,
+    profileSchemaVersion:PROFILE_SCHEMA_VERSION,
+    primarySport:primary,
+    strengthMode:strength,
+    trainType:primary,
+    trainDays:trainingDays.length,
+    trainingDays,
+    trainingLocations,
+    sessionMinutes:Math.min(180,Math.max(20,Number.parseInt(p.sessionMinutes,10)||60)),
+    equipment:normalizedList(p.equipment,Object.keys(EQUIPMENT_LABELS)),
+    trainingExperience:TRAINING_EXPERIENCE_LABELS[p.trainingExperience]?p.trainingExperience:"beginner",
+    trainingPriority,
+    preferredTrainingTime:TRAINING_TIME_LABELS[p.preferredTrainingTime]?p.preferredTrainingTime:"flexible",
+    injuries:String(p.injuries||"").trim(),
+    limitations:String(p.limitations||p.trainNote||"").trim(),
+    avoidMovements:String(p.avoidMovements||"").trim(),
+    mealCount,
+    mealTimes:normalizedMealTimes(p.mealTimes,mealCount),
+    eatingWindowStart:validTime(p.eatingWindowStart)?p.eatingWindowStart:defaultMealTimes(mealCount)[0],
+    eatingWindowEnd:validTime(p.eatingWindowEnd)?p.eatingWindowEnd:defaultMealTimes(mealCount).slice(-1)[0],
+    mainMealIndex:Math.min(mealCount,Math.max(1,Number.parseInt(p.mainMealIndex,10)||Math.min(2,mealCount))),
+    cookingMinutes:Math.min(180,Math.max(5,Number.parseInt(p.cookingMinutes,10)||30)),
+    foodBudget:FOOD_BUDGET_LABELS[p.foodBudget]?p.foodBudget:"medium",
+    repeatPreference:REPEAT_LABELS[p.repeatPreference]?p.repeatPreference:"moderate",
+    preferredCuisines:normalizedList(p.preferredCuisines,Object.keys(CUISINE_LABELS)),
+    preferredPreparations:normalizedList(p.preferredPreparations,Object.keys(PREPARATION_LABELS)),
+    preferredIngredients:String(p.preferredIngredients||"").trim(),
+    foodNotes:String(p.foodNotes||p.foodNote||"").trim(),
+    allergies,
+    dislikedIngredients,
+  };
+  if(!prefs.equipment.length)prefs.equipment=equipmentDefault;
+  prefs.avoid=[prefs.allergies,prefs.dislikedIngredients].filter(Boolean).join(", ");
+  prefs.trainPlace=strength==="bodyweight"?"casa":"gym";
+  prefs.trainNote=[prefs.injuries,prefs.limitations,prefs.avoidMovements].filter(Boolean).join(". ");
+  return prefs;
+}
+function trainingPrefs(){
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
+  return {
+    primary:p.primarySport,strength:p.strengthMode,days:p.trainingDays.length,
+    dayIds:p.trainingDays,locations:p.trainingLocations,sessionMinutes:p.sessionMinutes,
+    equipment:p.equipment,experience:p.trainingExperience,priority:p.trainingPriority,
+    preferredTime:p.preferredTrainingTime,injuries:p.injuries,
+    limitations:p.limitations,avoidMovements:p.avoidMovements,
+  };
+}
+function workoutSchedule(days,dayIds,priority,locations,primary){
+  const selected=normalizedTrainingDays(dayIds,days);
+  const sessions=baseWorkoutTemplate(selected.length,priority);
+  const sportIds=new Set(["calidad","facil","tecnica"]);
+  const remaining=sessions.slice();
+  const assigned={};
+  selected.forEach(day=>{
+    const location=locations&&locations[day];
+    const prefersSport=(primary==="swimming"&&location==="pool")||(primary!=="swimming"&&location==="outdoor");
+    const index=remaining.findIndex(id=>sportIds.has(id)===prefersSport);
+    assigned[day]=remaining.splice(index>=0?index:0,1)[0];
+  });
+  return assigned;
 }
 function plannedWorkoutId(ds){
+  const prefs=trainingPrefs();
   const wd=parseYmd(ds).getDay();
-  return workoutSchedule(trainingPrefs().days)[wd]||"descanso";
+  return workoutSchedule(prefs.days,prefs.dayIds,prefs.priority,prefs.locations,prefs.primary)[wd]||"descanso";
 }
-function trainingPlanSummary(days,primary,challenge){
-  challenge=challenge||(profile&&profile.prefs&&profile.prefs.challenge)||"";
-  if(challenge==="strength"){
+function trainingPlanSummary(days,primary,priority){
+  priority=priority||inferredTrainingPriority((profile&&profile.prefs)||{});
+  if(priority==="strength"){
     const strengthSplit={3:"2 sesiones de fuerza + 1 sesión aeróbica",4:"3 sesiones de fuerza + 1 sesión aeróbica",5:"4 sesiones de fuerza + 1 sesión aeróbica",6:"4 sesiones de fuerza + 2 sesiones aeróbicas"};
     return `${strengthSplit[days]||strengthSplit[6]} de ${SPORT_LABELS[primary]||SPORT_LABELS.running}.`;
   }
-  if(challenge==="performance"){
+  if(priority==="performance"){
     const performanceSplit={3:"1 sesión de fuerza + 2 sesiones aeróbicas",4:"1 sesión de fuerza + 3 sesiones aeróbicas",5:"2 sesiones de fuerza + 3 sesiones aeróbicas",6:"2 sesiones de fuerza + 4 sesiones aeróbicas"};
     return `${performanceSplit[days]||performanceSplit[6]} de ${SPORT_LABELS[primary]||SPORT_LABELS.running}.`;
   }
@@ -923,7 +1057,12 @@ function challengeGoal(challenge,currentGoal){
 function applyChallengeDefaults(d,challenge){
   d.challenge=challenge;
   d.goal=challengeGoal(challenge,d.goal);
-  if(challenge==="performance"||challenge==="strength")d.trainDays=Math.max(4,+d.trainDays||3);
+  if(challenge==="performance"||challenge==="strength"){
+    d.trainingPriority=challenge;
+    if((d.trainingDays||[]).length<4)d.trainingDays=defaultTrainingDays(4);
+    d.trainDays=d.trainingDays.length;
+    d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority);
+  }
 }
 async function startNextChallenge(){
   if(!CHALLENGE_LABELS[recapChallenge]){toast("Elige tu siguiente desafío");return;}
@@ -965,7 +1104,7 @@ function latestLoggedWeight(){
   return typeof value==="object"?(+value.kg||null):(+value||null);
 }
 function onboardingDefaults(){
-  const p=(profile&&profile.prefs)||{};
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   return {
     name:p.name||"",
     sex:p.sex||"",
@@ -983,17 +1122,38 @@ function onboardingDefaults(){
     macroMethod:p.macroMethod||"",
     challenge:p.pendingChallenge||p.challenge||"",
     planDurationWeeks:resolvedPlanDuration(p),
-    primarySport:SPORT_LABELS[p.primarySport]?p.primarySport:"running",
-    strengthMode:STRENGTH_LABELS[p.strengthMode]?p.strengthMode:"gym",
-    trainDays:validTrainingDays(p.trainDays)?+p.trainDays:3,
-    trainNote:p.trainNote||"",
+    primarySport:p.primarySport,
+    strengthMode:p.strengthMode,
+    trainDays:p.trainingDays.length,
+    trainingDays:p.trainingDays.slice(),
+    trainingLocations:{...p.trainingLocations},
+    sessionMinutes:p.sessionMinutes,
+    equipment:p.equipment.slice(),
+    trainingExperience:p.trainingExperience,
+    trainingPriority:p.trainingPriority,
+    preferredTrainingTime:p.preferredTrainingTime,
+    injuries:p.injuries,
+    limitations:p.limitations,
+    avoidMovements:p.avoidMovements,
     diet:Array.isArray(p.diet)?p.diet.slice():[],
-    avoid:p.avoid||"",
-    foodNote:p.foodNote||"",
+    mealCount:p.mealCount,
+    mealTimes:p.mealTimes.slice(),
+    eatingWindowStart:p.eatingWindowStart,
+    eatingWindowEnd:p.eatingWindowEnd,
+    mainMealIndex:p.mainMealIndex,
+    cookingMinutes:p.cookingMinutes,
+    foodBudget:p.foodBudget,
+    repeatPreference:p.repeatPreference,
+    preferredCuisines:p.preferredCuisines.slice(),
+    preferredPreparations:p.preferredPreparations.slice(),
+    preferredIngredients:p.preferredIngredients,
+    foodNotes:p.foodNotes,
+    allergies:p.allergies,
+    dislikedIngredients:p.dislikedIngredients,
   };
 }
 function hasCompleteOnboarding(prefs){
-  const p=prefs||{};
+  const p=migrateProfilePrefs(prefs||{});
   return !!p.onboardingCompletedAt
     && Number(p.calorieTarget)>0
     && Number(p.proteinTarget)>0
@@ -1001,7 +1161,7 @@ function hasCompleteOnboarding(prefs){
     && Number(p.fatTarget)>0
     && SPORT_LABELS[p.primarySport]
     && STRENGTH_LABELS[p.strengthMode]
-    && validTrainingDays(p.trainDays);
+    && validTrainingDays(p.trainingDays.length);
 }
 function profileReviewDue(prefs,now){
   if(!hasCompleteOnboarding(prefs))return false;
@@ -1017,13 +1177,103 @@ function startOnboarding(){
   window.scrollTo(0,0);
 }
 function onboardingSteps(){
-  return `<div class="steps" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
+  return `<div class="steps" aria-label="Paso ${onboardingStep} de 5">${[1,2,3,4,5].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
 }
 function onboardingButtons(last){
   return `<div class="onboarding-actions">
     ${onboardingStep>1?'<button class="btn" onclick="onboardingBack()">Atrás</button>':""}
     <button class="btn btn-accent" onclick="${last?"saveOnboarding()":"onboardingNext()"}">${last?"Guardar mi plan":"Continuar"}</button>
   </div>`;
+}
+function checkChips(prefix,labels,selected){
+  const values=Array.isArray(selected)?selected:[];
+  return Object.entries(labels).map(([value,label])=>`<label class="chip-check"><input type="checkbox" id="${prefix}_${value}" ${values.includes(value)?"checked":""}><span>${label}</span></label>`).join("");
+}
+function trainingAvailabilityHtml(prefix,d){
+  return `<div class="availability">${WEEKDAY_OPTIONS.map(day=>{
+    const checked=(d.trainingDays||[]).includes(day.value);
+    const location=TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day.value]]
+      ?d.trainingLocations[day.value]
+      :(d.primarySport==="swimming"?"pool":d.strengthMode==="bodyweight"?"home":"gym");
+    return `<div class="availability-day">
+      <label><input type="checkbox" id="${prefix}_day_${day.value}" ${checked?"checked":""} onchange="toggleTrainingDay('${prefix}',${day.value})">${day.label}</label>
+      <select id="${prefix}_location_${day.value}" ${checked?"":"disabled"} aria-label="Lugar para ${day.label}">
+        ${Object.entries(TRAINING_LOCATION_LABELS).map(([value,label])=>`<option value="${value}" ${location===value?"selected":""}>${label}</option>`).join("")}
+      </select>
+    </div>`;
+  }).join("")}</div>`;
+}
+function mealTimesHtml(prefix,d){
+  return `<div class="onboarding-grid">${Array.from({length:d.mealCount},(_,index)=>`<div class="field">
+    <label>Comida ${index+1}</label><input id="${prefix}_meal_time_${index}" type="time" value="${d.mealTimes[index]||defaultMealTimes(d.mealCount)[index]}">
+  </div>`).join("")}</div>`;
+}
+function checkedValues(prefix,labels){
+  return Object.keys(labels).filter(value=>{const el=$("#"+prefix+"_"+value);return !!(el&&el.checked);});
+}
+function readTrainingFields(prefix,d){
+  d.primarySport=$("#"+prefix+"_sport").value;
+  d.strengthMode=$("#"+prefix+"_strength").value;
+  d.planDurationWeeks=+$("#"+prefix+"_duration").value;
+  d.trainingPriority=$("#"+prefix+"_priority").value;
+  d.trainingExperience=$("#"+prefix+"_experience").value;
+  d.sessionMinutes=+$("#"+prefix+"_minutes").value;
+  d.preferredTrainingTime=$("#"+prefix+"_time").value;
+  d.trainingDays=WEEKDAY_OPTIONS.filter(day=>{const el=$("#"+prefix+"_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
+  d.trainDays=d.trainingDays.length;
+  d.trainingLocations={};
+  d.trainingDays.forEach(day=>{d.trainingLocations[day]=$("#"+prefix+"_location_"+day).value;});
+  d.equipment=checkedValues(prefix+"_equipment",EQUIPMENT_LABELS);
+  d.injuries=$("#"+prefix+"_injuries").value.trim();
+  d.limitations=$("#"+prefix+"_limitations").value.trim();
+  d.avoidMovements=$("#"+prefix+"_avoid_movements").value.trim();
+}
+function readFoodScheduleFields(prefix,d){
+  d.mealCount=+$("#"+prefix+"_meal_count").value;
+  d.mealTimes=Array.from({length:d.mealCount},(_,index)=>$("#"+prefix+"_meal_time_"+index).value);
+  d.eatingWindowStart=$("#"+prefix+"_window_start").value;
+  d.eatingWindowEnd=$("#"+prefix+"_window_end").value;
+  d.mainMealIndex=+$("#"+prefix+"_main_meal").value;
+  d.cookingMinutes=+$("#"+prefix+"_cooking").value;
+  d.foodBudget=$("#"+prefix+"_budget").value;
+  d.repeatPreference=$("#"+prefix+"_repeat").value;
+}
+function timeMinutes(value){
+  if(!validTime(value))return null;
+  const [hours,minutes]=value.split(":").map(Number);
+  return hours*60+minutes;
+}
+function validateTrainingProfile(d){
+  if(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validPlanDuration(d.planDurationWeeks))return "Completa la base de tu plan de entrenamiento";
+  if(!validTrainingDays((d.trainingDays||[]).length))return `Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días exactos para entrenar`;
+  if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))return "Elige el lugar de entrenamiento para cada día disponible";
+  if(d.primarySport==="swimming"){
+    const poolDays=d.trainingDays.filter(day=>d.trainingLocations[day]==="pool").length;
+    const swimSessions=baseWorkoutTemplate(d.trainingDays.length,d.trainingPriority).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
+    if(poolDays<swimSessions)return `Con esta prioridad necesitas acceso a piscina ${swimSessions} ${swimSessions===1?"día":"días"} por semana`;
+  }
+  if(!Number.isFinite(d.sessionMinutes)||d.sessionMinutes<20||d.sessionMinutes>180)return "Los minutos por sesión deben estar entre 20 y 180";
+  if(!TRAINING_EXPERIENCE_LABELS[d.trainingExperience]||!TRAINING_PRIORITY_LABELS[d.trainingPriority]||!TRAINING_TIME_LABELS[d.preferredTrainingTime])return "Completa tu experiencia, prioridad y horario";
+  if(!Array.isArray(d.equipment)||!d.equipment.length)return "Selecciona al menos un recurso o equipo disponible";
+  return "";
+}
+function validateFoodSchedule(d){
+  if(!Number.isInteger(d.mealCount)||d.mealCount<2||d.mealCount>6)return "Elige entre 2 y 6 comidas al día";
+  if(!Array.isArray(d.mealTimes)||d.mealTimes.length!==d.mealCount||d.mealTimes.some(time=>!validTime(time)))return "Completa un horario aproximado para cada comida";
+  const start=timeMinutes(d.eatingWindowStart),end=timeMinutes(d.eatingWindowEnd);
+  if(start==null||end==null||end<=start)return "La ventana de alimentación debe terminar después de comenzar";
+  const times=d.mealTimes.map(timeMinutes);
+  if(times.some(time=>time<start||time>end))return "Los horarios de comida deben quedar dentro de tu ventana de alimentación";
+  if(times.some((time,index)=>index>0&&time<=times[index-1]))return "Ordena los horarios de comida de más temprano a más tarde";
+  if(d.mainMealIndex<1||d.mainMealIndex>d.mealCount)return "Elige tu comida principal";
+  if(!Number.isFinite(d.cookingMinutes)||d.cookingMinutes<5||d.cookingMinutes>180)return "El tiempo para cocinar debe estar entre 5 y 180 minutos";
+  if(!FOOD_BUDGET_LABELS[d.foodBudget]||!REPEAT_LABELS[d.repeatPreference])return "Completa presupuesto y frecuencia de repetición";
+  return "";
+}
+function validateFoodPreferences(d){
+  if(!Array.isArray(d.diet)||!d.diet.length)return "Elige al menos un patrón de alimentación";
+  if(d.diet.includes("omnivoro")&&(d.diet.includes("vegetariano")||d.diet.includes("vegano")))return "Omnívoro no puede combinarse con vegetariano o vegano";
+  return "";
 }
 function renderOnboarding(){
   if(!onboardingDraft)onboardingDraft=onboardingDefaults();
@@ -1073,35 +1323,79 @@ function renderOnboarding(){
       </div>${onboardingButtons(false)}`;
   }else if(onboardingStep===3){
     body=`<h1>Arma tu semana de entrenamiento</h1>
-      <p class="onboarding-copy">Elige una disciplina principal y combínala con fuerza. Tres días es el mínimo recomendado.</p>
+      <p class="onboarding-copy">Elige los días y recursos que realmente tienes. Recomendamos al menos tres sesiones para combinar tu disciplina con fuerza y recuperación.</p>
       <div class="dash">
-        <div class="field" style="margin-top:0"><label>Disciplina principal</label><select id="ob_sport" onchange="updateOnboardingTrainingSummary()">
-          ${Object.entries(SPORT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.primarySport,v)}>${l}</option>`).join("")}
-        </select></div>
-        <div class="field"><label>Trabajo de fuerza</label><select id="ob_strength">
-          ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.strengthMode,v)}>${l}</option>`).join("")}
-        </select></div>
-        <div class="field"><label>Duración del plan</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
-          ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
-        </select></div>
-        <div class="field"><label>Días por semana</label><select id="ob_days" onchange="updateOnboardingTrainingSummary()">
-          ${TRAINING_DAY_OPTIONS.map(o=>`<option value="${o.value}" ${+d.trainDays===o.value?"selected":""}>${o.label}</option>`).join("")}
-        </select></div>
-        <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(+d.trainDays,d.primarySport,d.challenge)}</div>
-        <div class="field" style="margin-bottom:0"><label>Lesiones, horarios o notas (opcional)</label><textarea id="ob_trainnote" rows="2">${esc(d.trainNote)}</textarea></div>
+        <div class="onboarding-grid">
+          <div class="field" style="margin-top:0"><label>Disciplina principal</label><select id="ob_sport" onchange="updateOnboardingTrainingSummary()">
+            ${Object.entries(SPORT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.primarySport,v)}>${l}</option>`).join("")}
+          </select></div>
+          <div class="field" style="margin-top:0"><label>Trabajo de fuerza</label><select id="ob_strength" onchange="updateOnboardingTrainingSummary()">
+            ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.strengthMode,v)}>${l}</option>`).join("")}
+          </select></div>
+          <div class="field"><label>Duración del plan</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
+            ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
+          </select></div>
+          <div class="field"><label>Prioridad</label><select id="ob_priority" onchange="updateOnboardingTrainingSummary()">
+            ${Object.entries(TRAINING_PRIORITY_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.trainingPriority,v)}>${l}</option>`).join("")}
+          </select></div>
+          <div class="field"><label>Experiencia</label><select id="ob_experience">
+            ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.trainingExperience,v)}>${l}</option>`).join("")}
+          </select></div>
+          <div class="field"><label>Minutos por sesión</label><input id="ob_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${d.sessionMinutes}"></div>
+          <div class="field"><label>Horario preferido</label><select id="ob_time">
+            ${Object.entries(TRAINING_TIME_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.preferredTrainingTime,v)}>${l}</option>`).join("")}
+          </select></div>
+        </div>
+        <label class="muted small">Días disponibles y lugar real</label>
+        ${trainingAvailabilityHtml("ob",d)}
+        <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority)}</div>
+        <div class="field"><label>Equipo disponible</label><div class="chips">${checkChips("ob_equipment",EQUIPMENT_LABELS,d.equipment)}</div></div>
+        <div class="field"><label>Lesiones actuales (opcional)</label><input id="ob_injuries" value="${esc(d.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
+        <div class="field"><label>Limitaciones relevantes (opcional)</label><input id="ob_limitations" value="${esc(d.limitations)}" placeholder="Ej. no puedo correr más de 20 minutos"></div>
+        <div class="field" style="margin-bottom:0"><label>Movimientos a evitar (opcional)</label><input id="ob_avoid_movements" value="${esc(d.avoidMovements)}" placeholder="Ej. saltos, press sobre la cabeza"></div>
+      </div>${onboardingButtons(false)}`;
+  }else if(onboardingStep===4){
+    body=`<h1>Organiza tus comidas alrededor de tu día</h1>
+      <p class="onboarding-copy">Define una estructura realista. Más adelante tu plan podrá repartir porciones y horarios sin asumir cuatro comidas para todos.</p>
+      <div class="dash">
+        <div class="onboarding-grid">
+          <div class="field" style="margin-top:0"><label>Comidas al día</label><select id="ob_meal_count" onchange="updateOnboardingMealCount(this.value)">
+            ${[2,3,4,5,6].map(value=>`<option value="${value}" ${d.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
+          </select></div>
+          <div class="field" style="margin-top:0"><label>Comida principal</label><select id="ob_main_meal">
+            ${Array.from({length:d.mealCount},(_,index)=>`<option value="${index+1}" ${d.mainMealIndex===index+1?"selected":""}>Comida ${index+1}</option>`).join("")}
+          </select></div>
+          <div class="field"><label>Inicio de ventana</label><input id="ob_window_start" type="time" value="${d.eatingWindowStart}"></div>
+          <div class="field"><label>Fin de ventana</label><input id="ob_window_end" type="time" value="${d.eatingWindowEnd}"></div>
+        </div>
+        <label class="muted small">Horarios aproximados</label>
+        ${mealTimesHtml("ob",d)}
+        <div class="onboarding-grid">
+          <div class="field"><label>Minutos para cocinar</label><input id="ob_cooking" type="number" inputmode="numeric" min="5" max="180" step="5" value="${d.cookingMinutes}"></div>
+          <div class="field"><label>Presupuesto</label><select id="ob_budget">
+            ${Object.entries(FOOD_BUDGET_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.foodBudget,v)}>${l}</option>`).join("")}
+          </select></div>
+          <div class="field"><label>Repetición aceptable</label><select id="ob_repeat">
+            ${Object.entries(REPEAT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.repeatPreference,v)}>${l}</option>`).join("")}
+          </select></div>
+        </div>
       </div>${onboardingButtons(false)}`;
   }else{
     const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]];
     body=`<h1>Ajusta tus preferencias alimenticias</h1>
-      <p class="onboarding-copy">Tu coach usará estas restricciones para personalizar la dieta y sus sugerencias.</p>
+      <p class="onboarding-copy">Separamos alergias y restricciones duras de los gustos. Tu coach nunca debe tratar una alergia como una simple preferencia.</p>
       <div class="dash">
-        <label class="muted small">Tipo de dieta y restricciones</label>
+        <label class="muted small">Patrón de alimentación y restricciones generales</label>
         <div class="chips" style="margin:10px 0 16px">
           ${dietOptions.map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}
         </div>
-        <div class="field"><label>Alergias o alimentos a evitar</label><input id="ob_avoid" value="${esc(d.avoid)}" placeholder="maní, mariscos..."></div>
-        <div class="field"><label>Preferencias adicionales</label><textarea id="ob_foodnote" rows="3" placeholder="Comidas favoritas, ingredientes que no te gustan...">${esc(d.foodNote)}</textarea></div>
-        <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainDays} días · ${SPORT_LABELS[d.primarySport]} + ${STRENGTH_LABELS[d.strengthMode]}</div>
+        <div class="field"><label>Cocinas preferidas</label><div class="chips">${checkChips("ob_cuisine",CUISINE_LABELS,d.preferredCuisines)}</div></div>
+        <div class="field"><label>Preparaciones preferidas</label><div class="chips">${checkChips("ob_preparation",PREPARATION_LABELS,d.preferredPreparations)}</div></div>
+        <div class="field"><label>Ingredientes que disfrutas</label><input id="ob_preferred_ingredients" value="${esc(d.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
+        <div class="field"><label>Otras preferencias (opcional)</label><textarea id="ob_food_notes" rows="2" placeholder="Ej. prefiero desayunos salados">${esc(d.foodNotes)}</textarea></div>
+        <div class="field"><label>Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se validan como exclusiones obligatorias.</div></div>
+        <div class="field"><label>Ingredientes que no te gustan</label><input id="ob_disliked" value="${esc(d.dislikedIngredients)}" placeholder="tofu, aceitunas..."><div class="field-note">Son preferencias blandas: se evitan cuando existe una alternativa viable.</div></div>
+        <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Comidas:</b> ${d.mealCount} entre ${d.eatingWindowStart} y ${d.eatingWindowEnd}<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainingDays.length} días · ${SPORT_LABELS[d.primarySport]} + ${STRENGTH_LABELS[d.strengthMode]}</div>
       </div>${onboardingButtons(true)}`;
   }
   $("#tabs").innerHTML="";
@@ -1120,12 +1414,17 @@ function readOnboardingStep(){
     d.goal=$("#ob_goal").value;d.calorieTarget=+$("#ob_kcal").value;d.proteinTarget=+$("#ob_protein").value;
     d.carbTarget=+$("#ob_carbs").value;d.fatTarget=+$("#ob_fat").value;
   }else if(onboardingStep===3){
-    d.primarySport=$("#ob_sport").value;d.strengthMode=$("#ob_strength").value;
-    d.planDurationWeeks=+$("#ob_duration").value;
-    d.trainDays=+$("#ob_days").value;d.trainNote=$("#ob_trainnote").value.trim();
+    readTrainingFields("ob",d);
+  }else if(onboardingStep===4){
+    readFoodScheduleFields("ob",d);
   }else{
     d.diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>$("#ob_diet_"+v).checked);
-    d.avoid=$("#ob_avoid").value.trim();d.foodNote=$("#ob_foodnote").value.trim();
+    d.preferredCuisines=checkedValues("ob_cuisine",CUISINE_LABELS);
+    d.preferredPreparations=checkedValues("ob_preparation",PREPARATION_LABELS);
+    d.preferredIngredients=$("#ob_preferred_ingredients").value.trim();
+    d.foodNotes=$("#ob_food_notes").value.trim();
+    d.allergies=$("#ob_allergies").value.trim();
+    d.dislikedIngredients=$("#ob_disliked").value.trim();
   }
 }
 function validateOnboardingStep(){
@@ -1139,7 +1438,9 @@ function validateOnboardingStep(){
     if(d.bodyFatPct!==""&&(d.bodyFatPct<3||d.bodyFatPct>60))return "El porcentaje de grasa debe estar entre 3% y 60%";
   }
   if(onboardingStep===2&&[d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].some(v=>!Number.isFinite(v)||v<=0))return "Completa las cuatro metas de nutrición";
-  if(onboardingStep===3&&(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validTrainingDays(d.trainDays)||!validPlanDuration(d.planDurationWeeks)))return "Completa tu plan de entrenamiento";
+  if(onboardingStep===3)return validateTrainingProfile(d);
+  if(onboardingStep===4)return validateFoodSchedule(d);
+  if(onboardingStep===5)return validateFoodPreferences(d);
   return "";
 }
 function applyCalculatedMacros(){
@@ -1153,15 +1454,44 @@ function onboardingNext(){
   const error=validateOnboardingStep();
   if(error){toast(error);return;}
   if(onboardingStep===1)applyCalculatedMacros();
-  onboardingStep=Math.min(4,onboardingStep+1);
+  onboardingStep=Math.min(5,onboardingStep+1);
   renderOnboarding();window.scrollTo(0,0);
 }
 function onboardingBack(){readOnboardingStep();onboardingStep=Math.max(1,onboardingStep-1);renderOnboarding();window.scrollTo(0,0);}
 function onboardingGoalChanged(goal){onboardingDraft.goal=goal;applyCalculatedMacros();renderOnboarding();}
 function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();renderOnboarding();toast("Metas recalculadas");}
 function updateOnboardingTrainingSummary(){
-  const out=$("#obTrainingSummary"),sport=$("#ob_sport"),days=$("#ob_days"),duration=$("#ob_duration");
-  if(out&&sport&&days&&duration)out.innerHTML=`<b>${duration.value} semanas.</b> ${trainingPlanSummary(+days.value,sport.value,onboardingDraft&&onboardingDraft.challenge)}`;
+  const out=$("#obTrainingSummary"),sport=$("#ob_sport"),duration=$("#ob_duration"),priority=$("#ob_priority");
+  if(!out||!sport||!duration||!priority)return;
+  const dayIds=WEEKDAY_OPTIONS.filter(day=>{const el=$("#ob_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
+  const labels=dayIds.map(day=>WEEKDAY_OPTIONS.find(option=>option.value===day).short).join(", ");
+  const impact=dayIds.length<MIN_TRAINING_DAYS
+    ?`Elige al menos ${MIN_TRAINING_DAYS} días para combinar fuerza y ${SPORT_LABELS[sport.value]||"tu disciplina"}.`
+    :trainingPlanSummary(dayIds.length,sport.value,priority.value);
+  out.innerHTML=`<b>${duration.value} semanas · ${dayIds.length} días${labels?" ("+labels+")":""}.</b> ${impact}`;
+}
+function toggleTrainingDay(prefix,day){
+  const checkbox=$("#"+prefix+"_day_"+day),location=$("#"+prefix+"_location_"+day);
+  if(location)location.disabled=!(checkbox&&checkbox.checked);
+  if(prefix==="ob")updateOnboardingTrainingSummary();else updateTrainingSummary();
+}
+function updateOnboardingMealCount(value){
+  const previousCount=onboardingDraft.mealCount;
+  onboardingDraft.mealTimes=Array.from({length:previousCount},(_,index)=>{
+    const input=$("#ob_meal_time_"+index);
+    return input&&validTime(input.value)?input.value:onboardingDraft.mealTimes[index];
+  });
+  onboardingDraft.eatingWindowStart=$("#ob_window_start").value;
+  onboardingDraft.eatingWindowEnd=$("#ob_window_end").value;
+  onboardingDraft.mainMealIndex=+$("#ob_main_meal").value;
+  onboardingDraft.cookingMinutes=+$("#ob_cooking").value;
+  onboardingDraft.foodBudget=$("#ob_budget").value;
+  onboardingDraft.repeatPreference=$("#ob_repeat").value;
+  const count=Math.min(6,Math.max(2,+value||4));
+  onboardingDraft.mealCount=count;
+  onboardingDraft.mealTimes=defaultMealTimes(count);
+  onboardingDraft.mainMealIndex=Math.min(count,onboardingDraft.mainMealIndex||2);
+  renderOnboarding();
 }
 function updateOnboardingActivity(value){
   const out=$("#obActivityDescription"),activity=ACTIVITY_LEVELS[value];
@@ -1172,7 +1502,7 @@ async function saveOnboarding(){
   const error=validateOnboardingStep();
   if(error){toast(error);return;}
   const d=onboardingDraft,now=new Date().toISOString();
-  const previous={...((profile&&profile.prefs)||{})};
+  const previous=migrateProfilePrefs((profile&&profile.prefs)||{});
   const newCycle=!!previous.onboardingPending;
   const firstCycle=!hasCompleteOnboarding(previous);
   const duration=validPlanDuration(d.planDurationWeeks)?+d.planDurationWeeks:10;
@@ -1194,14 +1524,26 @@ async function saveOnboarding(){
   }
   const calendarChanged=durationChanged||previous.planStartDate!==planStartDate||previous.planEndDate!==planEndDate;
   const prefs={...previous,
+    profileSchemaVersion:PROFILE_SCHEMA_VERSION,
     name:d.name,sex:d.sex,age:d.age,heightCm:d.heightCm,weightKg:d.weightKg,
     bodyFatPct:d.bodyFatPct===""?null:d.bodyFatPct,activityLevel:d.activityLevel,goal:d.goal,
     calorieTarget:d.calorieTarget,proteinTarget:d.proteinTarget,carbTarget:d.carbTarget,fatTarget:d.fatTarget,
     maintenanceCalories:d.maintenanceCalories,macroMethod:d.macroMethod,
     challenge:d.challenge||previous.pendingChallenge||previous.challenge||(d.goal==="mantenimiento"?"maintain":d.goal==="volumen"?"strength":"continue"),
     primarySport:d.primarySport,strengthMode:d.strengthMode,trainType:d.primarySport,
-    trainDays:d.trainDays,trainPlace:d.strengthMode==="bodyweight"?"casa":"gym",trainNote:d.trainNote,
-    diet:d.diet,avoid:d.avoid,foodNote:d.foodNote,
+    trainDays:d.trainingDays.length,trainingDays:d.trainingDays,trainingLocations:d.trainingLocations,
+    sessionMinutes:d.sessionMinutes,equipment:d.equipment,trainingExperience:d.trainingExperience,
+    trainingPriority:d.trainingPriority,preferredTrainingTime:d.preferredTrainingTime,
+    injuries:d.injuries,limitations:d.limitations,avoidMovements:d.avoidMovements,
+    trainPlace:d.strengthMode==="bodyweight"?"casa":"gym",
+    trainNote:[d.injuries,d.limitations,d.avoidMovements].filter(Boolean).join(". "),
+    diet:d.diet,mealCount:d.mealCount,mealTimes:d.mealTimes,
+    eatingWindowStart:d.eatingWindowStart,eatingWindowEnd:d.eatingWindowEnd,mainMealIndex:d.mainMealIndex,
+    cookingMinutes:d.cookingMinutes,foodBudget:d.foodBudget,repeatPreference:d.repeatPreference,
+    preferredCuisines:d.preferredCuisines,preferredPreparations:d.preferredPreparations,
+    preferredIngredients:d.preferredIngredients,foodNotes:d.foodNotes,
+    allergies:d.allergies,dislikedIngredients:d.dislikedIngredients,
+    avoid:[d.allergies,d.dislikedIngredients].filter(Boolean).join(", "),
     planCycleNumber,planStartDate,planEndDate,planDurationWeeks:duration,
     cycleStartWeight:d.weightKg,cycleStartBodyFat:d.bodyFatPct===""?null:d.bodyFatPct,
     onboardingPending:false,pendingChallenge:null,
@@ -1517,12 +1859,13 @@ function renderNutrition(){
 function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
   const training=trainingPrefs();
+  const location=training.locations[parseYmd(ds).getDay()];
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
   <div class="dash" style="padding:12px 14px">
     <div class="row between">
       <div>
-        <div class="muted small">Plan combinado · ${training.days} días/semana · ${PLAN_DURATION_WEEKS} semanas</div>
+        <div class="muted small">Plan combinado · ${training.days} días/semana · ${PLAN_DURATION_WEEKS} semanas${location?` · ${TRAINING_LOCATION_LABELS[location]}`:""}</div>
         <div style="font-weight:700;margin-top:3px">${SPORT_LABELS[training.primary]} + ${STRENGTH_LABELS[training.strength]}</div>
       </div>
       <button class="btn btn-sm" onclick="setView('perfil')">Configurar</button>
@@ -1749,19 +2092,14 @@ function weekNav(n){const w=weekOf(current)||WEEKS[0];const i=WEEKS.indexOf(w)+n
 
 /* ---------- PERFIL: preferencias (mixto) + cuenta + admin ---------- */
 function renderProfile(){
-  const p=(profile&&profile.prefs)||{};
-  const training=trainingPrefs();
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const macros=profileMacroTargets();
   const diet=Array.isArray(p.diet)?p.diet:[];
   const chk=v=>diet.includes(v)?"checked":"";
   const sel=(a,b)=>a===b?"selected":"";
   const email=(session&&session.user&&session.user.email)||"";
-  const storedDays=Number.parseInt(p.trainDays,10);
   const duration=resolvedPlanDuration(p);
-  const needsTrainingPlan=!SPORT_LABELS[p.primarySport]||!STRENGTH_LABELS[p.strengthMode]||!validTrainingDays(storedDays);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
-
-  ${needsTrainingPlan?`<div class="alert"><b>Configura tu plan deportivo</b> · elige disciplina, tipo de fuerza y al menos 3 días de entrenamiento por semana.</div>`:""}
 
   <div class="dash">
     <div class="field" style="margin:0"><label>Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
@@ -1781,33 +2119,71 @@ function renderProfile(){
 
   <div class="section-h">Preferencias alimenticias</div>
   <div class="dash">
-    <label class="muted small">Tipo de dieta</label>
+    <label class="muted small">Patrón de alimentación y restricciones generales</label>
     <div class="chips" style="margin:9px 0 4px">
       ${[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]].map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="pf_diet_${v}" ${chk(v)}><span>${l}</span></label>`).join("")}
     </div>
-    <div class="field"><label>Alergias / evitar</label><input id="pf_avoid" value="${esc(p.avoid||"")}" placeholder="maní, mariscos…"></div>
-    <div class="field" style="margin-bottom:0"><label>Nota libre (alimentación)</label><textarea id="pf_foodnote" rows="2" placeholder="Ej. prefiero comidas peruanas, no me gusta el tofu…">${esc(p.foodNote||"")}</textarea></div>
+    <div class="onboarding-grid">
+      <div class="field"><label>Comidas al día</label><select id="pf_meal_count" onchange="updateProfileMealCount(this.value)">
+        ${[2,3,4,5,6].map(value=>`<option value="${value}" ${p.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
+      </select></div>
+      <div class="field"><label>Comida principal</label><select id="pf_main_meal">
+        ${Array.from({length:p.mealCount},(_,index)=>`<option value="${index+1}" ${p.mainMealIndex===index+1?"selected":""}>Comida ${index+1}</option>`).join("")}
+      </select></div>
+      <div class="field"><label>Inicio de ventana</label><input id="pf_window_start" type="time" value="${p.eatingWindowStart}"></div>
+      <div class="field"><label>Fin de ventana</label><input id="pf_window_end" type="time" value="${p.eatingWindowEnd}"></div>
+    </div>
+    <label class="muted small">Horarios aproximados</label>
+    <div id="pfMealTimes">${mealTimesHtml("pf",p)}</div>
+    <div class="onboarding-grid">
+      <div class="field"><label>Minutos para cocinar</label><input id="pf_cooking" type="number" inputmode="numeric" min="5" max="180" step="5" value="${p.cookingMinutes}"></div>
+      <div class="field"><label>Presupuesto</label><select id="pf_budget">
+        ${Object.entries(FOOD_BUDGET_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.foodBudget,v)}>${l}</option>`).join("")}
+      </select></div>
+      <div class="field"><label>Repetición aceptable</label><select id="pf_repeat">
+        ${Object.entries(REPEAT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.repeatPreference,v)}>${l}</option>`).join("")}
+      </select></div>
+    </div>
+    <div class="field"><label>Cocinas preferidas</label><div class="chips">${checkChips("pf_cuisine",CUISINE_LABELS,p.preferredCuisines)}</div></div>
+    <div class="field"><label>Preparaciones preferidas</label><div class="chips">${checkChips("pf_preparation",PREPARATION_LABELS,p.preferredPreparations)}</div></div>
+    <div class="field"><label>Ingredientes que disfrutas</label><input id="pf_preferred_ingredients" value="${esc(p.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
+    <div class="field"><label>Otras preferencias (opcional)</label><textarea id="pf_food_notes" rows="2" placeholder="Ej. prefiero desayunos salados">${esc(p.foodNotes)}</textarea></div>
+    <div class="field"><label>Alergias y restricciones duras</label><input id="pf_allergies" value="${esc(p.allergies)}" placeholder="maní, mariscos…"><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
+    <div class="field" style="margin-bottom:0"><label>Ingredientes que no te gustan</label><input id="pf_disliked" value="${esc(p.dislikedIngredients)}" placeholder="tofu, aceitunas…"><div class="field-note">Se evitan cuando existe una alternativa viable.</div></div>
   </div>
 
   <div class="section-h">Preferencias de entrenamiento</div>
   <div class="dash">
-    <div class="muted small" style="margin-bottom:10px">El plan combina siempre una disciplina aeróbica con fuerza. Puedes usar un bloque corto de 4 semanas o un proceso completo de 10.</div>
-    <div class="row" style="gap:10px">
-      <div class="field" style="flex:1"><label>Disciplina principal</label><select id="pf_primarysport" onchange="updateTrainingSummary()">
-        ${[["running","Running"],["cycling","Cycling"],["swimming","Natación"]].map(([v,l])=>`<option value="${v}" ${sel(training.primary,v)}>${l}</option>`).join("")}
+    <div class="muted small" style="margin-bottom:10px">El plan usa tus días y lugares reales. Cambiar disponibilidad ajusta las próximas sesiones sin borrar lo que ya registraste.</div>
+    <div class="onboarding-grid">
+      <div class="field"><label>Disciplina principal</label><select id="pf_sport" onchange="updateTrainingSummary()">
+        ${Object.entries(SPORT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.primarySport,v)}>${l}</option>`).join("")}
       </select></div>
-      <div class="field" style="flex:1"><label>Fuerza recomendada</label><select id="pf_strengthmode" onchange="updateTrainingSummary()">
-        ${[["gym","Gimnasio"],["bodyweight","Peso corporal"]].map(([v,l])=>`<option value="${v}" ${sel(training.strength,v)}>${l}</option>`).join("")}
+      <div class="field"><label>Trabajo de fuerza</label><select id="pf_strength" onchange="updateTrainingSummary()">
+        ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.strengthMode,v)}>${l}</option>`).join("")}
+      </select></div>
+      <div class="field"><label>Prioridad</label><select id="pf_priority" onchange="updateTrainingSummary()">
+        ${Object.entries(TRAINING_PRIORITY_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.trainingPriority,v)}>${l}</option>`).join("")}
+      </select></div>
+      <div class="field"><label>Experiencia</label><select id="pf_experience">
+        ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.trainingExperience,v)}>${l}</option>`).join("")}
+      </select></div>
+      <div class="field"><label>Minutos por sesión</label><input id="pf_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${p.sessionMinutes}"></div>
+      <div class="field"><label>Horario preferido</label><select id="pf_time">
+        ${Object.entries(TRAINING_TIME_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.preferredTrainingTime,v)}>${l}</option>`).join("")}
       </select></div>
     </div>
-    <div class="field"><label>Días de entrenamiento por semana</label><select id="pf_traindays" onchange="updateTrainingSummary()">
-      ${TRAINING_DAY_OPTIONS.map(o=>`<option value="${o.value}" ${training.days===o.value?"selected":""}>${o.label}</option>`).join("")}
-    </select><div class="muted small" style="margin-top:6px">Recomendamos entrenar al menos 3 días y conservar como mínimo un día de descanso.</div></div>
+    <label class="muted small">Días disponibles y lugar real</label>
+    ${trainingAvailabilityHtml("pf",p)}
+    <div class="field-note">Recomendamos entre 3 y 6 días para combinar fuerza, tu disciplina y al menos un día de descanso.</div>
     <div class="field"><label>Duración del plan</label><select id="pf_duration" onchange="updateTrainingSummary()">
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">Al cambiarla se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
-    <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas.</b> ${trainingPlanSummary(training.days,training.primary)}</div>
-    <div class="field" style="margin-bottom:0"><label>Nota libre (entrenamiento)</label><textarea id="pf_trainnote" rows="2" placeholder="Ej. lesión de hombro, entreno en las mañanas…">${esc(p.trainNote||"")}</textarea></div>
+    <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority)}</div>
+    <div class="field"><label>Equipo disponible</label><div class="chips">${checkChips("pf_equipment",EQUIPMENT_LABELS,p.equipment)}</div></div>
+    <div class="field"><label>Lesiones actuales (opcional)</label><input id="pf_injuries" value="${esc(p.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
+    <div class="field"><label>Limitaciones relevantes (opcional)</label><input id="pf_limitations" value="${esc(p.limitations)}" placeholder="Ej. no puedo correr más de 20 minutos"></div>
+    <div class="field" style="margin-bottom:0"><label>Movimientos a evitar (opcional)</label><input id="pf_avoid_movements" value="${esc(p.avoidMovements)}" placeholder="Ej. saltos, press sobre la cabeza"></div>
   </div>
 
   <button class="btn btn-accent" style="width:100%" onclick="saveProfile()">Guardar preferencias</button>
@@ -1827,37 +2203,76 @@ function renderProfile(){
   </div>`;
 }
 function updateTrainingSummary(){
-  const sport=$("#pf_primarysport"),days=$("#pf_traindays"),duration=$("#pf_duration"),out=$("#trainingSummary");
-  if(out&&sport&&days&&duration)out.innerHTML=`<b>${duration.value} semanas.</b> ${trainingPlanSummary(+days.value,sport.value)}`;
+  const sport=$("#pf_sport"),duration=$("#pf_duration"),priority=$("#pf_priority"),out=$("#trainingSummary");
+  if(!out||!sport||!duration||!priority)return;
+  const dayIds=WEEKDAY_OPTIONS.filter(day=>{const el=$("#pf_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
+  const labels=dayIds.map(day=>WEEKDAY_OPTIONS.find(option=>option.value===day).short).join(", ");
+  const impact=dayIds.length<MIN_TRAINING_DAYS
+    ?`Elige al menos ${MIN_TRAINING_DAYS} días para sostener un plan combinado.`
+    :trainingPlanSummary(dayIds.length,sport.value,priority.value);
+  out.innerHTML=`<b>${duration.value} semanas · ${dayIds.length} días${labels?" ("+labels+")":""}.</b> ${impact}`;
+}
+function updateProfileMealCount(value){
+  const count=Math.min(6,Math.max(2,+value||4));
+  const d={mealCount:count,mealTimes:defaultMealTimes(count)};
+  const container=$("#pfMealTimes");
+  if(container)container.innerHTML=mealTimesHtml("pf",d);
+  const main=$("#pf_main_meal"),previous=main?+main.value:Math.min(2,count);
+  if(main)main.innerHTML=Array.from({length:count},(_,index)=>`<option value="${index+1}" ${Math.min(previous,count)===index+1?"selected":""}>Comida ${index+1}</option>`).join("");
 }
 async function saveProfile(){
-  const previous={...((profile&&profile.prefs)||{})};
+  const previous=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const draft={...previous};
   const diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#pf_diet_"+v);return el&&el.checked;});
-  const primarySport=$("#pf_primarysport").value;
-  const strengthMode=$("#pf_strengthmode").value;
-  const trainDays=+$("#pf_traindays").value;
-  const planDurationWeeks=+$("#pf_duration").value;
-  if(!validTrainingDays(trainDays)){toast(`Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días de entrenamiento`);return;}
+  draft.diet=diet;
+  readFoodScheduleFields("pf",draft);
+  readTrainingFields("pf",draft);
+  const trainingError=validateTrainingProfile(draft);
+  if(trainingError){toast(trainingError);return;}
+  const foodError=validateFoodSchedule(draft);
+  if(foodError){toast(foodError);return;}
+  const preferenceError=validateFoodPreferences(draft);
+  if(preferenceError){toast(preferenceError);return;}
+  const planDurationWeeks=draft.planDurationWeeks;
   if(!validPlanDuration(planDurationWeeks)){toast("Elige un plan de 4 o 10 semanas");return;}
   const durationChanged=planDurationWeeks!==resolvedPlanDuration(previous);
   const planStartDate=validYmd(previous.planStartDate)?previous.planStartDate:START;
   const planEndDate=planEndFor(planStartDate,planDurationWeeks);
   const calendarChanged=durationChanged||previous.planStartDate!==planStartDate||previous.planEndDate!==planEndDate;
   const prefs={...previous,
+    profileSchemaVersion:PROFILE_SCHEMA_VERSION,
     name:$("#pf_name").value.trim(),
     diet,
-    avoid:$("#pf_avoid").value.trim(),
-    foodNote:$("#pf_foodnote").value.trim(),
-    primarySport,
-    strengthMode,
-    trainType:primarySport,
-    trainDays,
-    trainPlace:strengthMode==="bodyweight"?"casa":"gym",
-    trainNote:$("#pf_trainnote").value.trim(),
+    mealCount:draft.mealCount,mealTimes:draft.mealTimes,
+    eatingWindowStart:draft.eatingWindowStart,eatingWindowEnd:draft.eatingWindowEnd,mainMealIndex:draft.mainMealIndex,
+    cookingMinutes:draft.cookingMinutes,foodBudget:draft.foodBudget,repeatPreference:draft.repeatPreference,
+    preferredCuisines:checkedValues("pf_cuisine",CUISINE_LABELS),
+    preferredPreparations:checkedValues("pf_preparation",PREPARATION_LABELS),
+    preferredIngredients:$("#pf_preferred_ingredients").value.trim(),
+    foodNotes:$("#pf_food_notes").value.trim(),
+    allergies:$("#pf_allergies").value.trim(),
+    dislikedIngredients:$("#pf_disliked").value.trim(),
+    primarySport:draft.primarySport,
+    strengthMode:draft.strengthMode,
+    trainType:draft.primarySport,
+    trainDays:draft.trainingDays.length,
+    trainingDays:draft.trainingDays,
+    trainingLocations:draft.trainingLocations,
+    sessionMinutes:draft.sessionMinutes,
+    equipment:draft.equipment,
+    trainingExperience:draft.trainingExperience,
+    trainingPriority:draft.trainingPriority,
+    preferredTrainingTime:draft.preferredTrainingTime,
+    injuries:draft.injuries,
+    limitations:draft.limitations,
+    avoidMovements:draft.avoidMovements,
+    trainPlace:draft.strengthMode==="bodyweight"?"casa":"gym",
     planDurationWeeks,
     planStartDate,
     planEndDate,
   };
+  prefs.avoid=[prefs.allergies,prefs.dislikedIngredients].filter(Boolean).join(", ");
+  prefs.trainNote=[prefs.injuries,prefs.limitations,prefs.avoidMovements].filter(Boolean).join(". ");
   const result=await saveProfilePrefs(prefs);
   if(result&&result.error){toast("Error: "+result.error.message);return;}
   if(calendarChanged){await upsertActiveCycle();await pullCycleHistory();}
@@ -2039,25 +2454,45 @@ function saveEditor(){
 // Arma el system prompt de Claude desde las preferencias del perfil.
 const DIET_LABELS={vegetariano:"vegetariano",vegano:"vegano",sin_huevo:"sin huevo",sin_lacteos:"sin lácteos",sin_gluten:"sin gluten",omnivoro:"omnívoro"};
 function buildSysPrompt(){
-  const p=(profile&&profile.prefs)||{};
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const base="Da estimaciones realistas de porciones reales, con kcal y macros. Habla como el coach del usuario y no menciones tecnología, proveedores, modelos, prompts ni tokens.";
-  const parts=[];
-  if(Array.isArray(p.diet)&&p.diet.length)parts.push("Dieta: "+p.diet.map(d=>DIET_LABELS[d]||d).join(", ")+".");
-  if(p.goal)parts.push("Objetivo: "+({deficit:"déficit calórico",mantenimiento:"mantenimiento",volumen:"volumen/superávit"}[p.goal]||p.goal)+".");
-  if(p.calorieTarget)parts.push("Meta base: "+p.calorieTarget+" kcal/día.");
-  if(p.proteinTarget)parts.push("Meta de proteína: "+p.proteinTarget+" g/día.");
-  if(p.carbTarget)parts.push("Meta de carbohidratos: "+p.carbTarget+" g/día.");
-  if(p.fatTarget)parts.push("Meta de grasas: "+p.fatTarget+" g/día.");
-  if(p.weightKg)parts.push("Peso actual: "+p.weightKg+" kg"+(p.bodyFatPct?" y "+p.bodyFatPct+"% de grasa corporal":"")+".");
-  if(p.avoid&&p.avoid.trim())parts.push("Evitar: "+p.avoid.trim()+".");
-  if(p.foodNote&&p.foodNote.trim())parts.push("Notas de alimentación: "+p.foodNote.trim()+".");
-  const tt=[];
-  const training=trainingPrefs();
-  tt.push(SPORT_LABELS[training.primary]+" + "+STRENGTH_LABELS[training.strength]);
-  tt.push(training.days+" sesiones/semana");
-  if(tt.length||p.trainNote)parts.push("Entrenamiento: "+tt.join(", ")+(p.trainNote&&p.trainNote.trim()?". "+p.trainNote.trim():"")+".");
-  if(!parts.length)return "El usuario es vegetariano, no come huevo, toma proteína en polvo y busca alta proteína (~180 g/día) en déficit agresivo. "+base;
-  return "Perfil del usuario — "+parts.join(" ")+" "+base+" Respeta SIEMPRE estas preferencias y restricciones alimenticias.";
+  const context={
+    schema_version:p.profileSchemaVersion,
+    body:{weight_kg:+p.weightKg||null,body_fat_pct:+p.bodyFatPct||null},
+    nutrition:{
+      diet:(p.diet||[]).map(d=>DIET_LABELS[d]||d),
+      goal:p.goal||null,
+      daily_targets:{kcal:+p.calorieTarget||null,protein_g:+p.proteinTarget||null,carbs_g:+p.carbTarget||null,fat_g:+p.fatTarget||null},
+      meals_per_day:p.mealCount,
+      meal_times:p.mealTimes,
+      eating_window:{start:p.eatingWindowStart,end:p.eatingWindowEnd},
+      main_meal:p.mainMealIndex,
+      cooking_minutes:p.cookingMinutes,
+      budget:p.foodBudget,
+      repetition:p.repeatPreference,
+      preferred_cuisines:p.preferredCuisines,
+      preferred_preparations:p.preferredPreparations,
+      preferred_ingredients:p.preferredIngredients||null,
+      notes:p.foodNotes||null,
+      hard_restrictions:p.allergies||null,
+      disliked_ingredients:p.dislikedIngredients||null,
+    },
+    training:{
+      primary_sport:p.primarySport,
+      strength_mode:p.strengthMode,
+      available_days:p.trainingDays,
+      location_by_day:p.trainingLocations,
+      session_minutes:p.sessionMinutes,
+      equipment:p.equipment,
+      experience:p.trainingExperience,
+      priority:p.trainingPriority,
+      preferred_time:p.preferredTrainingTime,
+      injuries:p.injuries||null,
+      limitations:p.limitations||null,
+      avoid_movements:p.avoidMovements||null,
+    },
+  };
+  return `Perfil estructurado del usuario (JSON): ${JSON.stringify(context)}. ${base} Las restricciones duras son obligatorias; los ingredientes no preferidos son preferencias blandas. Respeta siempre el perfil y no inventes recursos que el usuario no tiene.`;
 }
 async function callClaude(userText,maxTokens){
   if(!isActive())throw new Error("Tu cuenta está desactivada.");
@@ -2114,7 +2549,7 @@ async function aiSuggest(){
   const remK=Math.max(0,target.kcal-t.kcal),remP=Math.max(0,target.p-t.p);
   modal(`<h3>✨ Otra opción de comida</h3><div id="aiOut"><div class="ai-box">Buscando opciones…</div></div>`);
   try{
-    const txt=await callClaude(`Me quedan ${remK} kcal y ${remP} g de proteína para la meta del día. Sugiere 2-3 comidas vegetarianas (sin huevo, puede usar proteína en polvo). Responde SOLO JSON: {"opciones":[{"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n}]}`,600);
+    const txt=await callClaude(`Me quedan ${remK} kcal y ${remP} g de proteína para la meta del día. Sugiere 2-3 comidas que respeten el perfil estructurado, sus restricciones y recursos. Responde SOLO JSON: {"opciones":[{"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n}]}`,600);
     const j=parseJSON(txt);
     const html=j.opciones.map((o,i)=>`<button class="opt" onclick='addSuggestion(${JSON.stringify(JSON.stringify(o))})'>${esc(coachCopy(o.nombre))}<div class="o-meta">${Math.round(o.kcal)} kcal · P ${Math.round(o.proteina_g)} · C ${Math.round(o.carbohidratos_g)} · G ${Math.round(o.grasa_g)} g · toca para agregar</div></button>`).join("");
     $("#aiOut").innerHTML=html;
@@ -2144,8 +2579,8 @@ function validateGeneratedDay(j,day,target){
   const issues=[], warns=[];
   if(!j||!Array.isArray(j.comidas)||!j.comidas.length){return{ok:false,issues:["La respuesta no trae comidas."]};}
   const slotIds=day.meals.map(m=>m.id);
-  const prefs=(profile&&profile.prefs)||{};
-  const noEgg=!Array.isArray(prefs.diet)||prefs.diet.indexOf("omnivoro")<0; // por defecto sin huevo
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const noEgg=Array.isArray(prefs.diet)&&(prefs.diet.includes("sin_huevo")||prefs.diet.includes("vegano"));
   const recent=recentMealNames(day.ds,5).map(s=>s.toLowerCase());
   const knownIng=new Set((DB.ingredients||[]).map(i=>i.name.toLowerCase()));
   let tot={kcal:0,p:0,c:0,f:0}; const comidas=[];
@@ -2161,7 +2596,8 @@ function validateGeneratedDay(j,day,target){
     // huevo / restricción
     const hay=(nombre+" "+ings.map(g=>g.nombre).join(" ")).toLowerCase();
     if(noEgg&&/\bhuevo|clara de huevo|yema\b/.test(hay))issues.push(`"${nombre}" contiene huevo (restricción del perfil).`);
-    if(prefs.avoid){prefs.avoid.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(Boolean).forEach(a=>{if(hay.includes(a))issues.push(`"${nombre}" incluye "${a}" (en tu lista de evitar).`);});}
+    if(prefs.allergies){prefs.allergies.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(Boolean).forEach(a=>{if(hay.includes(a))issues.push(`"${nombre}" incluye "${a}" (restricción obligatoria).`);});}
+    if(prefs.dislikedIngredients){prefs.dislikedIngredients.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(Boolean).forEach(a=>{if(hay.includes(a))warns.push(`"${nombre}" incluye "${a}", que marcaste como no preferido.`);});}
     // ingredientes nuevos (no en la DB)
     const nuevos=ings.filter(g=>g.nombre&&!knownIng.has(g.nombre.toLowerCase())).map(g=>g.nombre);
     if(nuevos.length&&DB.loaded)warns.push(`"${nombre}": ingredientes nuevos (${nuevos.join(", ")}).`);
@@ -2270,7 +2706,7 @@ async function aiReview(){
   const now=new Date();const hora=now.getHours()+":"+String(now.getMinutes()).padStart(2,"0");
   modal(`<h3>🔍 Revisión de macros</h3><div id="aiOut"><div class="ai-box">Analizando…</div></div>`);
   try{
-    const txt=await callClaude(`Son las ${hora}. Llevo consumido: ${t.kcal} kcal, ${t.p} g proteína, ${t.c} g carbos, ${t.f} g grasa. Metas del día: ${target.kcal} kcal, ${target.p} P, ${target.c} C, ${target.f} G. Evalúa brevemente cómo voy y da UNA sugerencia concreta (vegetariana sin huevo). Responde SOLO JSON: {"evaluacion":"...","sugerencia":"..."}`,400);
+    const txt=await callClaude(`Son las ${hora}. Llevo consumido: ${t.kcal} kcal, ${t.p} g proteína, ${t.c} g carbos, ${t.f} g grasa. Metas del día: ${target.kcal} kcal, ${target.p} P, ${target.c} C, ${target.f} G. Evalúa brevemente cómo voy y da UNA sugerencia concreta que respete el perfil estructurado. Responde SOLO JSON: {"evaluacion":"...","sugerencia":"..."}`,400);
     const j=parseJSON(txt);
     $("#aiOut").innerHTML=`<div class="ai-box"><b>Evaluación:</b> ${esc(coachCopy(j.evaluacion))}\n\n<b>Sugerencia:</b> ${esc(coachCopy(j.sugerencia))}</div>`;
   }catch(e){$("#aiOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
@@ -2487,6 +2923,18 @@ async function loadProfile(){
     else profile={id:uid(),email:(session.user&&session.user.email)||"",is_admin:false,active:true,prefs:{}};
   }catch(e){profile={id:uid(),email:"",is_admin:false,active:true,prefs:{}};}
   if(!profile.prefs||typeof profile.prefs!=="object")profile.prefs={};
+  const needsMigration=Number(profile.prefs.profileSchemaVersion||0)<PROFILE_SCHEMA_VERSION;
+  profile.prefs=migrateProfilePrefs(profile.prefs);
+  if(needsMigration&&supa&&uid()){
+    try{
+      await supa.from("profiles").upsert({
+        id:uid(),
+        email:(session&&session.user&&session.user.email)||profile.email||"",
+        prefs:profile.prefs,
+        updated_at:new Date().toISOString(),
+      },{onConflict:"id"});
+    }catch(e){/* los defaults siguen disponibles en memoria y se reintentará al guardar */}
+  }
   refreshPlanCalendar();
 }
 async function saveProfilePrefs(prefs){

@@ -89,8 +89,8 @@ Estado funcional auditado el 14 de junio de 2026:
 - Ciclos personales de 4 o 10 semanas, onboarding, revision cada 28 dias, recap y foto privada al cerrar un ciclo.
 - Ya no existe un menu estatico ni tipos de dia PESAS/BAJO/REFEED/DIETBREAK: cada dia parte de slots vacios y se completa con IA, catalogo o edicion.
 - Las metas personales de macros son uniformes para todos los dias y sirven como fuente de verdad para Home, Nutricion y generacion con IA.
-- Preferencias actuales de entrenamiento: running, cycling o natacion combinados con gimnasio o peso corporal; 3 a 6 dias por semana.
-- Preferencias actuales de alimentacion: tipo de dieta, restricciones, alimentos a evitar y nota libre.
+- Perfil flexible versionado: 2 a 6 comidas con horarios/logistica; alergias separadas de gustos; dias, lugares, recursos, experiencia y limitaciones de entrenamiento.
+- Preferencias de entrenamiento: running, cycling o natacion combinados con gimnasio o peso corporal; 3 a 6 dias exactos por semana y lugar por dia.
 - Claude puede estimar y sugerir comidas, revisar macros y generar un dia o una semana de dieta.
 - Racha actual basada en cualquier actividad registrada; no distingue cumplimiento nutricional, entrenamiento ni descanso planificado.
 - Entrenamientos actuales descritos como texto compacto; no existe catalogo de ejercicios, ejecucion por series ni demostraciones animadas.
@@ -104,7 +104,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Flujo | Estado actual | Brecha principal |
 |---|---|---|
 | Registro y acceso | Login, registro, reset y admin disponibles | Falta relacionar acceso con suscripcion y ofrecer una muestra clara antes del pago |
-| Onboarding | Calcula macros, objetivo, deporte, fuerza, dias, duracion y restricciones | Faltan numero de comidas, horarios, presupuesto, cocina, dias exactos, duracion por sesion, equipamiento, experiencia y limitaciones |
+| Onboarding | Perfil v2 implementado: macros, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | Falta usar el numero variable de comidas al construir el plan nutricional (REQ-18) |
 | Home diario | Muestra macros, dieta, entrenamiento y racha | Falta priorizacion inteligente, estado del dia, proxima accion y contingencias |
 | Nutricion | Recetas, macros, checks, reemplazos y generacion IA diaria/semanal | Falta plan por numero de comidas, opciones equivalentes, lista de compras, contexto de presupuesto/tiempo y versionado |
 | Entrenamiento | Plan combinado y reemplazo de sesion | Falta detalle para principiantes, series ejecutadas, cargas, temporizadores, sustituciones y GIF animado por ejercicio |
@@ -654,7 +654,9 @@ Permitir que cada usuario elija entre un bloque corto de 4 semanas y un proceso 
 
 ## REQ-12 - Perfil flexible de alimentacion y entrenamiento
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementacion amplía onboarding y Perfil a cinco pasos, guarda preferencias estructuradas en `profiles.prefs` con `profileSchemaVersion: 2`, migra perfiles heredados con defaults sin reabrir onboarding y adapta el calendario de entrenamiento a los dias/lugares seleccionados. El contexto del coach recibe el perfil como JSON estructurado y las alergias se validan como restricciones duras, separadas de ingredientes no preferidos.
 
 ### Objetivo
 
