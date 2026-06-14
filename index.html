@@ -346,6 +346,18 @@ const ALL_LUNCHES = []; // para reemplazo de almuerzo (nombre visible + plato de
 
 const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
 const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
+const MIN_TRAINING_DAYS=3;
+const MAX_TRAINING_DAYS=6;
+const TRAINING_DAY_OPTIONS=[
+  {value:3,label:"3 días · mínimo recomendado"},
+  {value:4,label:"4 días"},
+  {value:5,label:"5 días"},
+  {value:6,label:"6 días"},
+];
+function validTrainingDays(value){
+  const days=Number.parseInt(value,10);
+  return Number.isInteger(days)&&days>=MIN_TRAINING_DAYS&&days<=MAX_TRAINING_DAYS;
+}
 function trainingPrefs(){
   const p=(profile&&profile.prefs)||{};
   let primary=SPORT_LABELS[p.primarySport]?p.primarySport:"";
@@ -358,7 +370,7 @@ function trainingPrefs(){
     else primary="running";
   }
   if(!strength)strength=p.trainPlace==="casa"?"bodyweight":"gym";
-  if(!Number.isInteger(days)||days<3||days>6)days=6;
+  if(!validTrainingDays(days))days=MAX_TRAINING_DAYS;
   return {primary,strength,days};
 }
 function workoutSchedule(days){
@@ -1050,7 +1062,7 @@ function renderProfile(){
   const sel=(a,b)=>a===b?"selected":"";
   const email=(session&&session.user&&session.user.email)||"";
   const storedDays=Number.parseInt(p.trainDays,10);
-  const needsTrainingPlan=!SPORT_LABELS[p.primarySport]||!STRENGTH_LABELS[p.strengthMode]||!Number.isInteger(storedDays)||storedDays<3||storedDays>6;
+  const needsTrainingPlan=!SPORT_LABELS[p.primarySport]||!STRENGTH_LABELS[p.strengthMode]||!validTrainingDays(storedDays);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
 
   ${needsTrainingPlan?`<div class="alert"><b>Configura tu plan deportivo</b> · elige disciplina, tipo de fuerza y al menos 3 días de entrenamiento por semana.</div>`:""}
@@ -1090,7 +1102,7 @@ function renderProfile(){
       </select></div>
     </div>
     <div class="field"><label>Días de entrenamiento por semana</label><select id="pf_traindays" onchange="updateTrainingSummary()">
-      ${[[3,"3 días · mínimo recomendado"],[4,"4 días"],[5,"5 días"],[6,"6 días"]].map(([v,l])=>`<option value="${v}" ${training.days===v?"selected":""}>${l}</option>`).join("")}
+      ${TRAINING_DAY_OPTIONS.map(o=>`<option value="${o.value}" ${training.days===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">Recomendamos entrenar al menos 3 días y conservar como mínimo un día de descanso.</div></div>
     <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>Semana tipo:</b> ${trainingPlanSummary(training.days,training.primary)}</div>
     <div class="field" style="margin-bottom:0"><label>Nota libre (entrenamiento)</label><textarea id="pf_trainnote" rows="2" placeholder="Ej. lesión de hombro, entreno en las mañanas…">${esc(p.trainNote||"")}</textarea></div>
@@ -1120,7 +1132,7 @@ function saveProfile(){
   const primarySport=$("#pf_primarysport").value;
   const strengthMode=$("#pf_strengthmode").value;
   const trainDays=+$("#pf_traindays").value;
-  if(trainDays<3||trainDays>6){toast("Elige entre 3 y 6 días de entrenamiento");return;}
+  if(!validTrainingDays(trainDays)){toast(`Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días de entrenamiento`);return;}
   const prefs={
     name:$("#pf_name").value.trim(),
     diet,
@@ -1562,7 +1574,7 @@ async function onAuth(){
     await Promise.all([pullAllDays(),pullWeights()]);
     const prefs=(profile&&profile.prefs)||{};
     const days=Number.parseInt(prefs.trainDays,10);
-    const needsTrainingPlan=!SPORT_LABELS[prefs.primarySport]||!STRENGTH_LABELS[prefs.strengthMode]||!Number.isInteger(days)||days<3||days>6;
+    const needsTrainingPlan=!SPORT_LABELS[prefs.primarySport]||!STRENGTH_LABELS[prefs.strengthMode]||!validTrainingDays(days);
     view=needsTrainingPlan?"perfil":"hoy";current=clampDate(todayStr());
     render();
   }finally{_authBusy=false;}
