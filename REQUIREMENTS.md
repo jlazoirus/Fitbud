@@ -30,6 +30,7 @@ La promesa no debe ser "la IA genera texto". La promesa debe ser: **"Siempre ten
 6. **Motivacion sostenible.** Descansos planificados y dias incompletos no deben convertir la experiencia en castigo.
 7. **Privacidad por defecto.** Fotos, salud, progreso, conversaciones y preferencias son privadas por usuario.
 8. **Costo controlado.** Toda funcion de IA debe tener limites, trazabilidad, validacion y una alternativa sin IA cuando sea posible.
+9. **Tecnologia invisible para el usuario.** La experiencia para usuarios no administradores habla de su coach, plan y opciones; no menciona IA, Claude, modelos, prompts, tokens ni el origen tecnico de una recomendacion.
 
 ## Protocolo obligatorio antes de cada requerimiento
 
@@ -114,6 +115,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Suscripcion | No existe | Falta oferta de 1/3 meses, checkout, webhooks, entitlement, renovacion, cancelacion y expiracion |
 | Seguridad y privacidad | Auth, RLS y fotos privadas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
 | Operacion | Admin de usuarios y catalogo de alimentos | Faltan contenidos de ejercicios, media, prompts/versiones, soporte, metricas de IA y costos |
+| Lenguaje y consumo | La UI actual expone botones y mensajes con "IA" y no limita generaciones | Falta vocabulario de coach, cuota diaria server-side y reutilizacion controlada de opciones |
 | PWA y sincronizacion | Instalable, cache y safe areas de iPhone | Falta cola offline, conflictos, recuperacion ante fallos y pruebas end-to-end de journeys |
 
 ## Journey objetivo
@@ -151,6 +153,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 14. REQ-14 - Seguridad, consentimiento y privacidad.
 15. REQ-15 - Biblioteca de ejercicios y demostraciones animadas.
 16. REQ-16 - Reproductor de entrenamiento para principiantes.
+31. REQ-31 - Tecnologia invisible, cuotas y reutilizacion de opciones. Implementar antes de REQ-17/REQ-18.
 
 ### Fase B - Inteligencia y adaptacion
 
@@ -180,7 +183,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 REQ-08 debe esperar a REQ-01/REQ-02 y preferiblemente a REQ-05/REQ-06, porque necesita recetas confiables, contexto por usuario y control de acceso a IA.
 
-Los requerimientos REQ-12 a REQ-30 son el backlog recomendado para completar la vision comercial. Las dependencias de cada uno mandan sobre el orden numerico cuando exista una razon tecnica.
+Los requerimientos REQ-12 a REQ-31 son el backlog recomendado para completar la vision comercial. Las dependencias de cada uno mandan sobre el orden numerico cuando exista una razon tecnica.
 
 ---
 
@@ -737,7 +740,7 @@ Establecer los limites de un coach de bienestar antes de ampliar recomendaciones
 - Añadir consentimiento versionado para:
   - tratamiento de datos corporales y de progreso;
   - fotos privadas;
-  - recomendaciones generadas por IA;
+  - recomendaciones automatizadas del coach;
   - correos de seguimiento y marketing por separado.
 - Incorporar un cuestionario basico de aptitud y senales de alerta antes de generar entrenamiento.
 - Mostrar instrucciones claras para detener un ejercicio ante dolor, mareo u otros sintomas de riesgo.
@@ -747,6 +750,7 @@ Establecer los limites de un coach de bienestar antes de ampliar recomendaciones
 - Definir retencion, anonimizado y eliminacion de datos tras cancelar.
 - Mantener fotos privadas con URLs firmadas de corta duracion.
 - Registrar la version de terminos y consentimiento aceptada.
+- La interfaz operativa no debe mencionar IA o proveedores. Privacidad y terminos deben describir el procesamiento automatizado con el nivel de transparencia que exija la revision legal.
 
 ### Criterios de aceptacion
 
@@ -1571,6 +1575,119 @@ Proteger los journeys criticos antes de cobrar y reducir regresiones en PWA movi
 
 ---
 
+## REQ-31 - Tecnologia invisible, cuotas y reutilizacion de opciones
+
+**Estado: pendiente prioritario.**
+
+### Objetivo
+
+Mantener la experiencia enfocada en Fitbros como coach, controlar el costo diario de generar dietas y rutinas, y seguir ofreciendo alternativas utiles cuando se agote el presupuesto de generacion nueva.
+
+### Dependencias
+
+- Requiere REQ-05/REQ-06 para identidad y control server-side.
+- Debe implementarse antes de ampliar los generadores de REQ-17 y REQ-18.
+- Debe integrarse con entitlement en REQ-25 y analitica en REQ-27.
+
+### Lenguaje de producto
+
+- Para cualquier usuario no administrador queda prohibido mostrar en la UI operativa:
+  - `IA`, `AI`, `inteligencia artificial` o `Claude`;
+  - nombre de proveedor o modelo;
+  - prompt, tokens, costo o detalles de generacion;
+  - textos como "generado por IA", "la IA esta pensando" o "configura la IA".
+- Usar lenguaje de producto:
+  - "tu coach";
+  - "preparar mi semana";
+  - "crear mi dieta";
+  - "crear mi rutina";
+  - "ver otra opcion";
+  - "personalizar";
+  - "estamos preparando tu plan".
+- Los administradores si pueden ver proveedor, modelo, consumo, validaciones, errores y origen de cada resultado.
+- Los textos legales y de privacidad deben tratar la automatizacion segun lo definido en REQ-14, fuera de la experiencia operativa normal.
+- Auditar todos los textos visibles actuales, estados de carga, errores, modales, botones y mensajes offline.
+
+### Cuota diaria
+
+- Definir cuotas configurables y separadas por accion, como minimo:
+  - dieta de un dia;
+  - dieta de una semana;
+  - nueva opcion de comida;
+  - plan de entrenamiento;
+  - reemplazo o nueva sesion de entrenamiento.
+- La configuracion puede variar por producto, entitlement o acceso de cortesia y no debe quedar hardcodeada en `index.html`.
+- Cada click intencional aceptado por el servidor reserva exactamente una unidad de la accion correspondiente.
+- Dobles clicks, reintentos de red y requests con el mismo ID deben ser idempotentes y descontar una sola vez.
+- Si la generacion falla por un error tecnico antes de producir una opcion valida, la unidad se devuelve.
+- La ventana diaria se calcula con la zona horaria guardada del usuario.
+- El contador y las unidades restantes nunca se muestran al usuario no administrador.
+- El limite debe comprobarse y consumirse atomicamente en servidor; `localStorage` no puede ser la fuente de verdad.
+- Renderizar una pantalla, revisar un resultado ya existente o aplicar una opcion no vuelve a consumir cuota.
+
+### Reutilizacion despues de la cuota
+
+- Cuando aun existe cuota, solicitar una opcion nueva, validarla y guardarla en un pool privado del usuario.
+- Cuando se agota la cuota, no realizar otra llamada al proveedor. Resolver en este orden:
+  - opciones validas que el usuario todavia no vio;
+  - opciones menos recientemente mostradas al mismo usuario;
+  - variantes deterministas construidas desde catalogos y plantillas aprobadas.
+- Despues del numero configurado de opciones nuevas, se permite repetir dietas o rutinas previamente mostradas.
+- La seleccion debe evitar repetir inmediatamente la ultima opcion cuando exista otra compatible.
+- Antes de reutilizar, validar nuevamente contra:
+  - macros y numero de comidas actuales;
+  - alergias y restricciones;
+  - objetivo, dias y duracion del plan;
+  - lugar, equipamiento, experiencia y limitaciones;
+  - version vigente del catalogo de recetas/ejercicios.
+- Si cambio el perfil y una opcion dejo de ser compatible, no se puede mostrar.
+- Los resultados personales nunca se comparten entre usuarios. Un cache comun solo puede contener plantillas anonimas sin datos, notas ni historial personal.
+- La UI debe usar "otra opcion" o "alternativa" y no afirmar que el resultado es nuevo, unico o recien generado.
+
+### Persistencia y administracion
+
+- Crear politicas y registros server-side con:
+  - usuario;
+  - tipo de accion;
+  - fecha/ventana de consumo;
+  - ID idempotente;
+  - estado reservado, completado, devuelto o reutilizado;
+  - origen `fresh`, `user_pool` o `template`;
+  - referencia al resultado mostrado;
+  - timestamps y costo interno cuando aplique.
+- Guardar historial de impresiones para ordenar por menos recientemente mostrado.
+- Permitir al admin:
+  - configurar cuotas por accion/producto;
+  - ver consumo nuevo frente a reutilizado;
+  - detectar abuso y errores;
+  - otorgar o reiniciar cuota de cortesia;
+  - desactivar temporalmente una funcion costosa.
+- No exponer estos endpoints ni campos en consultas accesibles a usuarios normales.
+
+### Criterios de aceptacion
+
+- Ninguna pantalla operativa para usuarios no administradores contiene `IA`, `AI`, `Claude`, modelos, prompts, tokens o contadores.
+- El mismo request repetido descuenta una sola unidad.
+- Dos requests simultaneos no pueden superar la cuota diaria.
+- Un fallo tecnico devuelve la unidad reservada.
+- Al agotar la cuota, las acciones siguen respondiendo con opciones compatibles sin nuevas llamadas al proveedor.
+- Las repeticiones empiezan solo despues de agotar las opciones nuevas disponibles y evitan la opcion mostrada inmediatamente antes.
+- Cambiar una alergia, macros, equipo o limitacion invalida opciones incompatibles del pool.
+- El admin puede comprobar si una respuesta fue nueva o reutilizada y modificar la politica sin desplegar codigo.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Buscar textos visibles prohibidos en HTML/JS y recorrer todos los flujos como usuario normal.
+- Probar cuotas de dieta y entrenamiento con limites pequenos.
+- Lanzar dobles clicks y requests concurrentes.
+- Simular error del proveedor y confirmar devolucion.
+- Agotar cuota y verificar orden `no vista` → `menos reciente` → `plantilla`.
+- Cambiar preferencias despues de llenar el pool y confirmar revalidacion.
+- Probar que un usuario no pueda leer pool, cuota o historial de otro.
+
+---
+
 ## Notas de implementacion para agentes
 
 - No guardar secrets en Git.
@@ -1581,6 +1698,7 @@ Proteger los journeys criticos antes de cobrar y reducir regresiones en PWA movi
 - Despues de cada implementacion revisar si es necesario actualizar el archivo CONTEXT.md y hacer push al repositorio con el cambio
 - No incluir cambios ajenos o no relacionados que ya existan en el worktree.
 - Toda funcion IA debe tener schema de salida, validacion, timeout, manejo de error y limite de uso.
+- Ningun texto operativo para usuarios no administradores debe mencionar IA, Claude, modelos, prompts, tokens o cuotas internas.
 - Toda mutacion sensible debe comprobar autenticacion, usuario activo y entitlement en servidor.
 - Toda UI nueva debe probarse como PWA movil y respetar safe areas.
 - Todo cambio SQL debe ser idempotente o incluir una ruta explicita de migracion y rollback.
