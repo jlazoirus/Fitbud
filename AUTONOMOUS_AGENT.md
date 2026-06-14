@@ -32,7 +32,8 @@ Nunca implementar dos requerimientos, crear dos commits o hacer dos pushes en un
 3. Confirmar que:
    - el worktree esta limpio;
    - la rama es `main`;
-   - `HEAD` coincide con `origin/main`;
+   - el selector hizo `git fetch origin main`;
+   - `HEAD` coincide con el `origin/main` actualizado;
    - no existe otro agente activo.
 4. Leer completos:
    - el commit anterior con `git show --stat --format=fuller HEAD`;
@@ -137,13 +138,35 @@ git diff --check
 git diff --cached --check
 ```
 
-Crear un solo commit y ejecutar:
+Justo antes del commit, ejecutar `git fetch origin main` y confirmar que `HEAD` aun coincide con `origin/main`. Si el remoto avanzo, detenerse sin crear el commit y reportar trabajo concurrente.
+
+Crear un solo commit. Despues del commit, ejecutar:
+
+```bash
+node scripts/agent-next-requirement.mjs --check-publish
+```
+
+Solo si devuelve `action: "ready_to_push"`, ejecutar:
 
 ```bash
 git push origin main
 ```
 
 Confirmar despues que `HEAD` coincide con `origin/main`.
+
+### Push rechazado
+
+Si el push es rechazado por `non-fast-forward`:
+
+1. No forzar el push y no crear otro commit.
+2. Ejecutar `git fetch origin main`.
+3. Confirmar que el worktree esta limpio y que solo existe el commit del requerimiento local.
+4. Ejecutar `git rebase origin/main`.
+5. Si hay conflicto, ejecutar `git rebase --abort`, conservar el commit local y detenerse con un reporte de bloqueo.
+6. Si el rebase termina, volver a ejecutar todas las verificaciones del requerimiento.
+7. Ejecutar otra vez `node scripts/agent-next-requirement.mjs --check-publish`.
+8. Reintentar el push una sola vez. El limite total es `maxPushAttempts`.
+9. Si vuelve a fallar, detenerse sin force-push y reportar el commit local pendiente.
 
 ## Bloqueos y limites
 
@@ -157,6 +180,8 @@ Detenerse sin commit ni push cuando ocurra una condicion de `stopConditions` o c
 - se detecte trabajo concurrente.
 
 El reporte debe indicar requerimiento, evidencia, trabajo intentado y decision necesaria. No marcarlo implementado.
+
+El selector libera automaticamente el lock cuando el preflight devuelve `stop`. El agente sigue siendo responsable de liberarlo en cualquier salida posterior.
 
 ## Loop de mejora
 

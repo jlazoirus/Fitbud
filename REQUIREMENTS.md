@@ -1606,7 +1606,9 @@ Proteger los journeys criticos antes de cobrar y reducir regresiones en PWA movi
 
 ## REQ-31 - Tecnologia invisible (lenguaje de producto)
 
-**Estado: pendiente PRIORITARIO E INMEDIATO.** La app en produccion (commit `9e3fa4e`) ya viola el Principio 9: muestra "Generar dia con IA", "Generar este dia", "genera con IA", "Generar semana", el modal "Generar dia con IA" y notas tipo "los macros se calculan..." a todos los usuarios. Es un barrido de textos, barato y desplegable por si solo; **no depende del sistema de cuotas (REQ-32)** y deberia hacerse antes que casi todo lo demas de Fase A/B.
+**Estado: pendiente PRIORITARIO E INMEDIATO.**
+
+La app en produccion (commit `9e3fa4e`) ya viola el Principio 9: muestra "Generar dia con IA", "Generar este dia", "genera con IA", "Generar semana", el modal "Generar dia con IA" y notas tipo "los macros se calculan..." a todos los usuarios. Es un barrido de textos, barato y desplegable por si solo; **no depende del sistema de cuotas (REQ-32)** y deberia hacerse antes que casi todo lo demas de Fase A/B.
 
 ### Objetivo
 

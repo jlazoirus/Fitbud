@@ -22,6 +22,19 @@ function output(value) {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 
+function fetchOriginBranch() {
+  try {
+    git("fetch", "--quiet", "origin", config.branch);
+    return null;
+  } catch (error) {
+    return {
+      action: "stop",
+      reason: "remote_fetch_failed",
+      message: error.stderr ? String(error.stderr).trim() : error.message,
+    };
+  }
+}
+
 function releaseLock() {
   if (fs.existsSync(lockPath)) fs.unlinkSync(lockPath);
   output({ action: "released", lockPath });
@@ -59,7 +72,7 @@ function parseRequirements(markdown) {
     const start = match.index;
     const end = index + 1 < matches.length ? matches[index + 1].index : markdown.length;
     const body = markdown.slice(start, end);
-    const statusMatch = body.match(/^\*\*Estado:\s*([^*]+)\*\*$/m);
+    const statusMatch = body.match(/^\*\*Estado:\s*(.+?)\*\*/m);
     const status = statusMatch ? statusMatch[1].trim() : "sin estado";
     result.set(match[1], {
       id: match[1],
@@ -74,23 +87,53 @@ function parseRequirements(markdown) {
   return result;
 }
 
+function selfTest() {
+  const sample = [
+    "## REQ-31 - Tecnologia invisible",
+    "",
+    "**Estado: pendiente PRIORITARIO.** Texto explicativo con **enfasis**.",
+    "",
+    "## REQ-32 - Cuotas",
+    "",
+    "**Estado: implementado.**",
+  ].join("\n");
+  const parsed = parseRequirements(sample);
+  const req31 = parsed.get("REQ-31");
+  const req32 = parsed.get("REQ-32");
+
+  if (!req31 || !req31.pending || req31.status !== "pendiente PRIORITARIO.") {
+    throw new Error(`REQ-31 status parse failed: ${JSON.stringify(req31)}`);
+  }
+  if (!req32 || !req32.implemented) {
+    throw new Error(`REQ-32 status parse failed: ${JSON.stringify(req32)}`);
+  }
+  if (config.queue[0] !== "REQ-31" || !config.queue.includes("REQ-32") || !config.queue.includes("REQ-33")) {
+    throw new Error("Requirement queue priority is invalid");
+  }
+
+  return { action: "self_test_passed", parser: true, queue: true };
+}
+
 function selectNext() {
   const branch = git("branch", "--show-current");
   const dirty = git("status", "--porcelain");
   const head = git("rev-parse", "HEAD");
-  let upstream = "";
-
-  try {
-    upstream = git("rev-parse", "origin/main");
-  } catch {
-    return { action: "stop", reason: "origin_main_unavailable", branch, head };
-  }
 
   if (branch !== config.branch) {
     return { action: "stop", reason: "branch_mismatch", expected: config.branch, actual: branch };
   }
   if (dirty) {
     return { action: "stop", reason: "dirty_worktree", files: dirty.split("\n") };
+  }
+
+  const fetchError = fetchOriginBranch();
+  if (fetchError) return { ...fetchError, branch, head };
+
+  let upstream = "";
+  try {
+    upstream = git("rev-parse", `origin/${config.branch}`);
+  } catch {
+    return { action: "stop", reason: "origin_branch_unavailable", branch, head };
   }
   if (head !== upstream) {
     return { action: "stop", reason: "remote_ahead_or_diverged", head, upstream };
@@ -143,8 +186,48 @@ function selectNext() {
   };
 }
 
-if (args.has("--release")) {
+function checkPublish() {
+  const branch = git("branch", "--show-current");
+  const dirty = git("status", "--porcelain");
+  const head = git("rev-parse", "HEAD");
+
+  if (branch !== config.branch) {
+    return { action: "stop", reason: "branch_mismatch", expected: config.branch, actual: branch };
+  }
+  if (dirty) {
+    return { action: "stop", reason: "dirty_worktree_before_push", files: dirty.split("\n") };
+  }
+
+  const fetchError = fetchOriginBranch();
+  if (fetchError) return { ...fetchError, branch, head };
+
+  const upstream = git("rev-parse", `origin/${config.branch}`);
+  let parent = "";
+  try {
+    parent = git("rev-parse", "HEAD^");
+  } catch {
+    return { action: "stop", reason: "commit_parent_unavailable", head, upstream };
+  }
+
+  if (parent !== upstream) {
+    return {
+      action: "stop",
+      reason: "remote_advanced_during_run",
+      head,
+      parent,
+      upstream,
+    };
+  }
+
+  return { action: "ready_to_push", head, parent, upstream };
+}
+
+if (args.has("--self-test")) {
+  output(selfTest());
+} else if (args.has("--release")) {
   releaseLock();
+} else if (args.has("--check-publish")) {
+  output(checkPublish());
 } else {
   let lock = null;
   if (args.has("--acquire")) {
@@ -157,5 +240,13 @@ if (args.has("--release")) {
     }
   }
 
-  if (process.exitCode !== 2) output({ ...selectNext(), lock });
+  if (process.exitCode !== 2) {
+    const selection = selectNext();
+    let lockReleased = false;
+    if (selection.action === "stop" && lock && fs.existsSync(lockPath)) {
+      fs.unlinkSync(lockPath);
+      lockReleased = true;
+    }
+    output({ ...selection, lock, lockReleased });
+  }
 }
