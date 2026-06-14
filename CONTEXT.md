@@ -27,7 +27,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. |
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v2`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v4`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
@@ -39,8 +39,8 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 
 ## 4. Estructura interna de index.html (con líneas aprox.)
 - **Config runtime** (~151): `CONFIG` (de `config.js`), `REMOTE` (de `/api/config`), `effectiveSettings()` (prioridad: override local en Ajustes → REMOTE/Vercel → config.js), `aiAvailable()`, `settingSource()`.
-- **Capa de datos** (~198): `START`/`END`, `WEEKS` (11 semanas incl. "Arranque"), `REFEED_DATES`, `BREAKFASTS`/`DINNERS`/`MENUS` (A/B/C/D por día de semana), `WORKOUTS`, `DAY_TARGET` (metas por tipo de día), `SLOTS` (kcal+macros por slot y tipo de día).
-- **Entrenamiento:** `WORKOUT_OPTIONS` (con `id` y `kind` Pesas/Correr/Descanso), `WEEKDAY_WORKOUT_ID` (plan por día), `effectiveWorkout(ds)` (resuelve override del día sobre el plan). UI: `openWorkoutPicker(ds)` + `setWorkout(ds,id)`.
+- **Capa de datos** (~198): `START`/`END`, `WEEKS` (11 semanas incl. "Arranque"), `REFEED_DATES`, `BREAKFASTS`/`DINNERS`/`MENUS` (A/B/C/D por día de semana), generadores de entrenamiento, `DAY_TARGET` (metas por tipo de día), `SLOTS` (kcal+macros por slot y tipo de día).
+- **Entrenamiento:** cada perfil elige `primarySport` (`running|cycling|swimming`) y `strengthMode` (`gym|bodyweight`). `workoutOptions(ds)` genera las sesiones progresivas de la semana, `WEEKDAY_WORKOUT_ID` define el reparto y `effectiveWorkout(ds)` resuelve overrides diarios. UI: Perfil + `openWorkoutPicker(ds)` + `setWorkout(ds,id)`.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
 - **Estado/persistencia** (~335): `S` (objeto raíz, cacheado en localStorage), `dayState(ds)` (campos: `meals{id:{done,ovr}}`, `extras[]`, `workoutDone`, `workoutOverride`), `mealState`, `mealValue` (resuelve macros: override manual → DB por `dishName` → fallback plan), `dayTotals(ds)` (suma solo comidas marcadas `done`).
 - **Sincronización con la DB:** `commitDay(ds)`=`save()`+`pushDay(ds)` (upsert a `day_log`); `pullDay(ds)`/`syncDay(ds)` bajan el día; `pushWeight`/`pullWeights`/`syncWeights` para `weight_log`. Se llama `commitDay` en cada mutación del día (toggles, reemplazo, editor, sugerencia IA, cambio de entreno) y `syncDay`/`syncWeights` al arrancar, navegar y conectar.
@@ -56,7 +56,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Tipos de día:** PESAS (Lun/Mar/Jue/Vie), BAJO (Mié/Sáb/Dom), REFEED (sáb 27 jun, 11 jul, 8 ago, 22 ago), DIETBREAK (toda la semana 6, 20–26 jul).
 - **Metas (`DAY_TARGET`):** PESAS 2000/180P/195C/55G · BAJO 1800/180/150/50 · REFEED 2700/160/350/55 · DIETBREAK 2750/170/300/70.
 - **Menús (`MENUS`):** A Criollo, B Mediterráneo, C Asiático, D Mexicano — asignados por semana en `WEEKS`. Desayunos/cenas rotan; almuerzo según menú+día (autoritativo desde `diet_dishes` en la DB).
-- **Entrenamiento:** plan fijo por día de semana (`WEEKDAY_WORKOUT_ID`), pero **intercambiable por día** (pesas/correr/descanso) vía `workoutOverride` en el estado del día.
+- **Entrenamiento:** plan combinado por perfil: Running/Cycling/Natación + Gimnasio/Peso corporal. Reparte 4 sesiones de fuerza, calidad, fondo y descanso; progresa por bloques durante 10 semanas. Sigue siendo **intercambiable por día** vía `workoutOverride`.
 
 ## 6. Base de datos Supabase
 Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
@@ -101,7 +101,8 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Macros del día desde la DB** — vía `dishName` + `mealValue()`; el almuerzo se lee de `diet_dishes` (`dietLunchDish()`), así reasignar/renombrar el plato en Supabase se refleja. Fallback al plan.
 - **Consumo diario en la DB** — `day_log` + `commitDay`/`pullDay`/`syncDay`. Sincroniza entre dispositivos; localStorage es caché.
 - **Peso en la DB** — `weight_log` + `pushWeight`/`pullWeights`/`syncWeights`. Nada del usuario vive solo en el navegador.
-- **Cambiar el entrenamiento del día** (pesas/correr/descanso) — `WORKOUT_OPTIONS` + `effectiveWorkout` + `workoutOverride` (sincroniza vía `day_log`).
+- **Plan deportivo configurable** — `primarySport` + `strengthMode` en `profiles.prefs`; sesiones progresivas generadas por `workoutOptions(ds)`.
+- **Cambiar el entrenamiento del día** — `effectiveWorkout` + `workoutOverride` (sincroniza vía `day_log`).
 
 ### Pendiente / ideas
 - **Porciones especiales de REFEED/DIETBREAK:** el almuerzo refeed usa el plato estándar de la DB, sin la doble porción de carbo que indica el plan.
@@ -127,7 +128,7 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 - **Nutrición** (`renderNutrition`): nav de día + hero + comidas del plan + extras + IA.
 - **Entreno** (`renderWorkout`): nav de día + tarjeta de entreno + cambiar/volver al plan + resumen.
 - **Progreso** (`renderProgress`): stats (kg/entrenos/racha) + gráfico+tabla de peso + sección Semana (reusa `goDay`/`weekNav`).
-- **Perfil** (`renderProfile`): preferencias **mixtas** (dieta/objetivo/proteína/alergias + notas libres de alimentación y entreno) → `profiles.prefs` vía `saveProfilePrefs`; cuenta + cerrar sesión; **sección Administración solo admin** con accesos a Alimentos (`renderFoods`) y Ajustes técnicos (`renderSettings`).
+- **Perfil** (`renderProfile`): preferencias **mixtas** (dieta/objetivo/proteína/alergias + disciplina principal + tipo de fuerza + notas libres) → `profiles.prefs` vía `saveProfilePrefs`; cuenta + cerrar sesión; **sección Administración solo admin** con accesos a Alimentos (`renderFoods`) y Ajustes técnicos (`renderSettings`).
 - **IA personalizada:** `buildSysPrompt()` arma el system prompt de Claude desde `profile.prefs` (fallback al texto vegetariano por defecto si no hay prefs).
 
 ## 11. Convenciones / gotchas

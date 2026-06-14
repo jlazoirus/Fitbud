@@ -339,35 +339,138 @@ const DISH_NAMES = {
 const ALL_LUNCHES = []; // para reemplazo de almuerzo (nombre visible + plato de la DB)
 ["A","B","C","D"].forEach(L=>{for(let wd=0;wd<7;wd++){ALL_LUNCHES.push({menu:L,wd,name:MENUS[L][wd],dishName:LUNCH_DISHES[L][wd]});}});
 
-const WORKOUTS = {
-  1:{name:"Pesas Torso A + cardio",detail:"Press banca 4×5-8 · Remo barra 4×6-10 · Press militar 3×6-10 · Dominadas 3×máx · +25 min caminata en cuesta"},
-  2:{name:"Pesas Pierna A",detail:"Sentadilla 4×5-8 · Peso muerto rumano 3×8-10 · Zancadas 3×10/lado · Gemelo 4×12"},
-  3:{name:"Carrera calidad",detail:"6×800m fuerte (rec. 2 min) o 30 min tempo"},
-  4:{name:"Pesas Torso B + cardio",detail:"Press inclinado 4×6-10 · Remo sentado 4×8-12 · Fondos 3×máx · Curl + tríceps 3×10-12 · +25 min caminata en cuesta"},
-  5:{name:"Pesas Pierna B",detail:"Prensa 4×8-12 · Hip thrust 4×8-10 · Búlgaras 3×10/lado · Femoral 3×10-12"},
-  6:{name:"Carrera fácil",detail:"45-60 min zona 2 (conversacional)"},
-  0:{name:"Descanso total",detail:"Solo pasos — meta 10,000"},
-};
-// Opciones de entrenamiento intercambiables (para cambiar el del día: pesas <-> correr)
-const WORKOUT_OPTIONS = [
-  {id:"torsoA",kind:"Pesas",...WORKOUTS[1]},
-  {id:"piernaA",kind:"Pesas",...WORKOUTS[2]},
-  {id:"torsoB",kind:"Pesas",...WORKOUTS[4]},
-  {id:"piernaB",kind:"Pesas",...WORKOUTS[5]},
-  {id:"calidad",kind:"Correr",...WORKOUTS[3]},
-  {id:"facil",kind:"Correr",...WORKOUTS[6]},
-  {id:"descanso",kind:"Descanso",...WORKOUTS[0]},
-];
-const WORKOUT_BY_ID={}; WORKOUT_OPTIONS.forEach(o=>{WORKOUT_BY_ID[o.id]=o;});
 const WEEKDAY_WORKOUT_ID={1:"torsoA",2:"piernaA",3:"calidad",4:"torsoB",5:"piernaB",6:"facil",0:"descanso"};
+
+const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
+const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
+function trainingPrefs(){
+  const p=(profile&&profile.prefs)||{};
+  let primary=SPORT_LABELS[p.primarySport]?p.primarySport:"";
+  let strength=STRENGTH_LABELS[p.strengthMode]?p.strengthMode:"";
+  // Compatibilidad con preferencias guardadas antes de existir el plan combinado.
+  if(!primary){
+    if(p.trainType==="cycling")primary="cycling";
+    else if(p.trainType==="swimming"||p.trainType==="natacion")primary="swimming";
+    else primary="running";
+  }
+  if(!strength)strength=p.trainPlace==="casa"?"bodyweight":"gym";
+  return {primary,strength};
+}
+function trainingWeek(ds){
+  const w=weekOf(ds);
+  return w&&w.num?w.num:1;
+}
+function strengthProgression(ds){
+  const n=trainingWeek(ds);
+  if(n<=2)return "Base: 3 series por ejercicio, deja 3 repeticiones en reserva.";
+  if(n<=5)return "Progresión: 4 series principales, sube carga o repeticiones con buena técnica.";
+  if(n===6)return "Descarga: 2 series por ejercicio al 60-70% del esfuerzo habitual.";
+  if(n<=9)return "Bloque fuerte: 4 series principales, deja 1-2 repeticiones en reserva.";
+  return "Consolidación: 2-3 series, sin llegar al fallo y priorizando técnica.";
+}
+function sportSessions(primary,ds){
+  const n=trainingWeek(ds);
+  const phase=n<=2?0:n<=5?1:n===6?2:n<=9?3:4;
+  const plans={
+    running:{
+      kind:"Running",
+      quality:[
+        "Calienta 10 min · 6×400 m a RPE 7, recuperación 90 s · enfría 10 min.",
+        "Calienta 12 min · 5×800 m a RPE 8, recuperación 2 min · enfría 10 min.",
+        "Descarga: 25-30 min suave + 4 progresivos de 15 s.",
+        "Calienta 12 min · 4×1 km a ritmo controlado fuerte, recuperación 2 min · enfría 10 min.",
+        "Activación: 20 min suave + 4×200 m ágiles, sin fatiga.",
+      ],
+      endurance:[
+        "45-55 min en zona 2, ritmo conversacional.",
+        "55-70 min en zona 2; termina 10 min a ritmo estable.",
+        "Descarga: 40-45 min muy suave.",
+        "65-80 min en zona 2; hidrátate y mantén ritmo sostenible.",
+        "40-50 min suave o test controlado de 5 km si estás recuperado.",
+      ],
+      qualityName:"Running · calidad",
+      enduranceName:"Running · fondo fácil",
+    },
+    cycling:{
+      kind:"Cycling",
+      quality:[
+        "Calienta 12 min · 6×2 min fuerte a RPE 7, 2 min suave · enfría 10 min.",
+        "Calienta 15 min · 5×4 min a RPE 8, 3 min suave · enfría 10 min.",
+        "Descarga: 35-45 min de pedaleo fácil con cadencia cómoda.",
+        "Calienta 15 min · 4×6 min a umbral controlado, 3 min suave · enfría 10 min.",
+        "Activación: 35 min suave + 4 aceleraciones de 20 s.",
+      ],
+      endurance:[
+        "60-75 min en zona 2, cadencia estable.",
+        "75-105 min en zona 2; practica hidratación.",
+        "Descarga: 50-60 min muy fácil.",
+        "90-120 min en zona 2 con 3 bloques de 8 min a ritmo tempo.",
+        "60-75 min fácil, sin acumular fatiga.",
+      ],
+      qualityName:"Cycling · intervalos",
+      enduranceName:"Cycling · fondo",
+    },
+    swimming:{
+      kind:"Natación",
+      quality:[
+        "200 m suave · 8×50 m técnica · 8×50 m a RPE 7 con 20 s de pausa · 200 m suave.",
+        "300 m suave · 6×50 m técnica · 6×100 m a RPE 8 con 30 s de pausa · 200 m suave.",
+        "Descarga: 800-1200 m cómodos, priorizando técnica y respiración.",
+        "300 m suave · 4×50 m técnica · 4×200 m a ritmo sostenido con 40 s de pausa · 200 m suave.",
+        "Activación: 800-1000 m suaves + 4×25 m ágiles.",
+      ],
+      endurance:[
+        "1200-1600 m continuos suaves o bloques de 200 m con 30 s de pausa.",
+        "1600-2200 m aeróbicos, alternando 300 m estable + 100 m suave.",
+        "Descarga: 1000-1400 m muy suaves.",
+        "2000-2600 m aeróbicos; técnica estable antes que velocidad.",
+        "1200-1600 m cómodos, sin fatiga residual.",
+      ],
+      qualityName:"Natación · técnica e intervalos",
+      enduranceName:"Natación · fondo aeróbico",
+    },
+  };
+  const p=plans[primary]||plans.running;
+  return {
+    quality:{id:"calidad",kind:p.kind,name:p.qualityName,detail:p.quality[phase]},
+    endurance:{id:"facil",kind:p.kind,name:p.enduranceName,detail:p.endurance[phase]},
+  };
+}
+function strengthSessions(mode,ds){
+  const progress=strengthProgression(ds);
+  const gym={
+    torsoA:{id:"torsoA",kind:"Gimnasio",name:"Gimnasio · Torso A",detail:"Press banca 6-10 · Remo 8-12 · Press militar 8-12 · Jalón o dominadas 8-12. "+progress},
+    piernaA:{id:"piernaA",kind:"Gimnasio",name:"Gimnasio · Pierna A",detail:"Sentadilla 6-10 · Peso muerto rumano 8-12 · Zancadas 10/lado · Gemelos 12-15. "+progress},
+    torsoB:{id:"torsoB",kind:"Gimnasio",name:"Gimnasio · Torso B",detail:"Press inclinado 8-12 · Remo sentado 8-12 · Fondos o flexiones 8-15 · Curl y tríceps 10-15. "+progress},
+    piernaB:{id:"piernaB",kind:"Gimnasio",name:"Gimnasio · Pierna B",detail:"Prensa 8-12 · Hip thrust 8-12 · Búlgaras 10/lado · Femoral 10-15. "+progress},
+  };
+  const bodyweight={
+    torsoA:{id:"torsoA",kind:"Peso corporal",name:"Peso corporal · Superior A",detail:"Flexiones · Remo invertido o con banda · Pike push-ups · Dominadas asistidas. "+progress},
+    piernaA:{id:"piernaA",kind:"Peso corporal",name:"Peso corporal · Pierna A",detail:"Sentadilla tempo · Zancadas · Puente de glúteo a una pierna · Gemelos. "+progress},
+    torsoB:{id:"torsoB",kind:"Peso corporal",name:"Peso corporal · Superior B",detail:"Flexiones inclinadas/declinadas · Remo con banda · Fondos asistidos · Plancha con toque de hombro. "+progress},
+    piernaB:{id:"piernaB",kind:"Peso corporal",name:"Peso corporal · Pierna B",detail:"Búlgaras · Peso muerto a una pierna · Step-ups · Curl femoral deslizante · Core. "+progress},
+  };
+  return mode==="bodyweight"?bodyweight:gym;
+}
+function workoutOptions(ds){
+  const prefs=trainingPrefs();
+  const strength=strengthSessions(prefs.strength,ds);
+  const sport=sportSessions(prefs.primary,ds);
+  return [
+    strength.torsoA,strength.piernaA,strength.torsoB,strength.piernaB,
+    sport.quality,sport.endurance,
+    {id:"descanso",kind:"Descanso",name:"Descanso total",detail:"Movilidad suave y caminata opcional. Prioriza sueño y recuperación."},
+  ];
+}
+function workoutById(ds,id){return workoutOptions(ds).find(o=>o.id===id)||null;}
 function effectiveWorkout(ds){
   const wd=parseYmd(ds).getDay();
   const plannedId=WEEKDAY_WORKOUT_ID[wd];
   const st=S.days[ds];
   const ovrId=st&&st.workoutOverride;
-  const valid=ovrId&&WORKOUT_BY_ID[ovrId];
+  const valid=ovrId&&workoutById(ds,ovrId);
   const id=valid?ovrId:plannedId;
-  return {id,workout:WORKOUT_BY_ID[id],plannedId,planned:WORKOUT_BY_ID[plannedId],overridden:!!(valid&&ovrId!==plannedId)};
+  return {id,workout:workoutById(ds,id),plannedId,planned:workoutById(ds,plannedId),overridden:!!(valid&&ovrId!==plannedId)};
 }
 
 // metas y macros por slot según tipo de día
@@ -461,7 +564,7 @@ function buildDay(ds){
     }
     return m;
   });
-  return {ds,wd,type,week:w,target:DAY_TARGET[type],meals,workout:WORKOUTS[wd]};
+  return {ds,wd,type,week:w,target:DAY_TARGET[type],meals,workout:effectiveWorkout(ds).workout};
 }
 
 /* ---------- ESTADO / PERSISTENCIA (localStorage) ---------- */
@@ -628,7 +731,7 @@ function dayHeaderNav(ds){
   </header>`;
 }
 function dayAlert(day){
-  if(day.type==="REFEED")return `<div class="alert">⚡ <b>Día REFEED</b> — sube carbohidratos (${day.target.c} g), mantén la grasa baja. Alimenta la carrera larga y carga glucógeno.</div>`;
+  if(day.type==="REFEED")return `<div class="alert">⚡ <b>Día REFEED</b> — sube carbohidratos (${day.target.c} g), mantén la grasa baja. Alimenta la sesión aeróbica larga y carga glucógeno.</div>`;
   if(day.type==="DIETBREAK")return `<div class="alert violet">🟣 <b>Diet break (Semana 6)</b> — mantenimiento ${day.target.kcal} kcal toda la semana. No es retroceso: restaura hormonas y protege músculo.</div>`;
   return "";
 }
@@ -728,8 +831,18 @@ function renderNutrition(){
 /* ---------- ENTRENO: detalle del entrenamiento del día ---------- */
 function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
+  const training=trainingPrefs();
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
+  <div class="dash" style="padding:12px 14px">
+    <div class="row between">
+      <div>
+        <div class="muted small">Plan combinado · 10 semanas</div>
+        <div style="font-weight:700;margin-top:3px">${SPORT_LABELS[training.primary]} + ${STRENGTH_LABELS[training.strength]}</div>
+      </div>
+      <button class="btn btn-sm" onclick="setView('perfil')">Configurar</button>
+    </div>
+  </div>
   <div class="workout">
     <div class="meal-head">
       <button class="chk ${st.workoutDone?'on':''}" onclick="toggleWorkout()">${st.workoutDone?'✓':''}</button>
@@ -803,10 +916,12 @@ function toggleExtra(ds,i){const d=dayState(ds);d.extras[i].done=!d.extras[i].do
 function toggleWorkout(){const d=dayState(current);d.workoutDone=!d.workoutDone;commitDay(current);render();}
 function openWorkoutPicker(ds){
   const ew=effectiveWorkout(ds);
-  const groups=[["Pesas","💪"],["Correr","🏃"],["Descanso","🛌"]];
-  let html=`<h3>Cambiar entrenamiento</h3><p class="muted small">El plan de hoy es <b>${esc(ew.planned.name)}</b>. Elige otro (pesas, correr o descanso).</p>`;
+  const prefs=trainingPrefs();
+  const options=workoutOptions(ds);
+  const groups=[[STRENGTH_LABELS[prefs.strength],"💪"],[SPORT_LABELS[prefs.primary],"◉"],["Descanso","☾"]];
+  let html=`<h3>Cambiar entrenamiento</h3><p class="muted small">Tu plan combina <b>${SPORT_LABELS[prefs.primary]}</b> con <b>${STRENGTH_LABELS[prefs.strength]}</b>. La sesión planificada es <b>${esc(ew.planned.name)}</b>.</p>`;
   groups.forEach(([k,ic])=>{
-    const opts=WORKOUT_OPTIONS.filter(o=>o.kind===k);
+    const opts=options.filter(o=>o.kind===k);
     html+=`<div class="section-h" style="margin-left:0">${ic} ${k}</div>`;
     opts.forEach(o=>{
       const cur=o.id===ew.id, plan=o.id===ew.plannedId;
@@ -875,11 +990,15 @@ function weekNav(n){const w=weekOf(current)||WEEKS[0];const i=WEEKS.indexOf(w)+n
 /* ---------- PERFIL: preferencias (mixto) + cuenta + admin ---------- */
 function renderProfile(){
   const p=(profile&&profile.prefs)||{};
+  const training=trainingPrefs();
   const diet=Array.isArray(p.diet)?p.diet:[];
   const chk=v=>diet.includes(v)?"checked":"";
   const sel=(a,b)=>a===b?"selected":"";
   const email=(session&&session.user&&session.user.email)||"";
+  const needsTrainingPlan=!SPORT_LABELS[p.primarySport]||!STRENGTH_LABELS[p.strengthMode];
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
+
+  ${needsTrainingPlan?`<div class="alert"><b>Configura tu plan deportivo</b> · elige una disciplina principal y cómo harás las sesiones de fuerza.</div>`:""}
 
   <div class="dash">
     <div class="field" style="margin:0"><label>Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
@@ -906,15 +1025,16 @@ function renderProfile(){
 
   <div class="section-h">Preferencias de entrenamiento</div>
   <div class="dash">
+    <div class="muted small" style="margin-bottom:10px">El plan de 10 semanas combina siempre una disciplina aeróbica con fuerza para mejorar rendimiento y conservar masa muscular.</div>
     <div class="row" style="gap:10px">
-      <div class="field" style="flex:1"><label>Tipo</label><select id="pf_traintype">
-        ${[["","—"],["pesas","Pesas"],["correr","Correr"],["híbrido","Híbrido"],["funcional","Funcional"]].map(([v,l])=>`<option value="${v}" ${sel(p.trainType||"",v)}>${l}</option>`).join("")}
+      <div class="field" style="flex:1"><label>Disciplina principal</label><select id="pf_primarysport">
+        ${[["running","Running"],["cycling","Cycling"],["swimming","Natación"]].map(([v,l])=>`<option value="${v}" ${sel(training.primary,v)}>${l}</option>`).join("")}
       </select></div>
-      <div class="field" style="flex:1"><label>Días/semana</label><input id="pf_traindays" type="number" inputmode="numeric" value="${p.trainDays||""}" placeholder="5"></div>
+      <div class="field" style="flex:1"><label>Fuerza recomendada</label><select id="pf_strengthmode">
+        ${[["gym","Gimnasio"],["bodyweight","Peso corporal"]].map(([v,l])=>`<option value="${v}" ${sel(training.strength,v)}>${l}</option>`).join("")}
+      </select></div>
     </div>
-    <div class="field"><label>Lugar</label><select id="pf_trainplace">
-      ${[["","—"],["gym","Gimnasio"],["casa","Casa"],["mixto","Mixto"]].map(([v,l])=>`<option value="${v}" ${sel(p.trainPlace||"",v)}>${l}</option>`).join("")}
-    </select></div>
+    <div class="ai-box" style="margin:0 0 10px"><b>Semana tipo:</b> 4 sesiones de fuerza + 1 sesión de calidad de ${SPORT_LABELS[training.primary]} + 1 sesión aeróbica larga + 1 día de descanso.</div>
     <div class="field" style="margin-bottom:0"><label>Nota libre (entrenamiento)</label><textarea id="pf_trainnote" rows="2" placeholder="Ej. lesión de hombro, entreno en las mañanas…">${esc(p.trainNote||"")}</textarea></div>
   </div>
 
@@ -935,6 +1055,8 @@ function renderProfile(){
 }
 function saveProfile(){
   const diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#pf_diet_"+v);return el&&el.checked;});
+  const primarySport=$("#pf_primarysport").value;
+  const strengthMode=$("#pf_strengthmode").value;
   const prefs={
     name:$("#pf_name").value.trim(),
     diet,
@@ -942,9 +1064,11 @@ function saveProfile(){
     proteinTarget:+$("#pf_prot").value||null,
     avoid:$("#pf_avoid").value.trim(),
     foodNote:$("#pf_foodnote").value.trim(),
-    trainType:$("#pf_traintype").value,
-    trainDays:+$("#pf_traindays").value||null,
-    trainPlace:$("#pf_trainplace").value,
+    primarySport,
+    strengthMode,
+    trainType:primarySport,
+    trainDays:6,
+    trainPlace:strengthMode==="bodyweight"?"casa":"gym",
     trainNote:$("#pf_trainnote").value.trim(),
   };
   saveProfilePrefs(prefs).then(r=>{toast(r&&r.error?("Error: "+r.error.message):"Preferencias guardadas");render();});
@@ -1082,9 +1206,9 @@ function buildSysPrompt(){
   if(p.avoid&&p.avoid.trim())parts.push("Evitar: "+p.avoid.trim()+".");
   if(p.foodNote&&p.foodNote.trim())parts.push("Notas de alimentación: "+p.foodNote.trim()+".");
   const tt=[];
-  if(p.trainType)tt.push(p.trainType);
-  if(p.trainDays)tt.push(p.trainDays+" días/sem");
-  if(p.trainPlace)tt.push(p.trainPlace);
+  const training=trainingPrefs();
+  tt.push(SPORT_LABELS[training.primary]+" + "+STRENGTH_LABELS[training.strength]);
+  tt.push("6 sesiones/semana");
   if(tt.length||p.trainNote)parts.push("Entrenamiento: "+tt.join(", ")+(p.trainNote&&p.trainNote.trim()?". "+p.trainNote.trim():"")+".");
   if(!parts.length)return "El usuario es vegetariano, no come huevo, toma proteína en polvo y busca alta proteína (~180 g/día) en déficit agresivo. "+base;
   return "Perfil del usuario — "+parts.join(" ")+" "+base+" Respeta SIEMPRE estas preferencias y restricciones alimenticias.";
@@ -1372,7 +1496,9 @@ async function onAuth(){
     S.days={};S.weights={};save();   // descarta caché de otra sesión; la DB manda
     if(supa&&!DB.loaded)await dbLoad();
     await Promise.all([pullAllDays(),pullWeights()]);
-    view="hoy";current=clampDate(todayStr());
+    const prefs=(profile&&profile.prefs)||{};
+    const needsTrainingPlan=!SPORT_LABELS[prefs.primarySport]||!STRENGTH_LABELS[prefs.strengthMode];
+    view=needsTrainingPlan?"perfil":"hoy";current=clampDate(todayStr());
     render();
   }finally{_authBusy=false;}
 }

@@ -13,7 +13,17 @@ Tracker web/PWA de mi plan nutricional y de entrenamiento de **10 semanas** (sá
 - **Reemplazar** comidas (otra opción del plan o una personalizada) y **agregar** extras.
 - **Navegación** día anterior/siguiente y vista de semana completa.
 - **Registro de peso** semanal con gráfico de evolución, indicador de semana y resumen del día.
+- **Plan deportivo configurable**: elige Running, Cycling o Natación y combínalo siempre con fuerza en gimnasio o con peso corporal durante las 10 semanas.
 - **Instalable como PWA** con manifest, íconos y cache offline del shell de la app.
+
+## Plan de entrenamiento
+
+Cada usuario configura en **Perfil**:
+
+- una disciplina principal: **Running**, **Cycling** o **Natación**;
+- un complemento de fuerza: **Gimnasio** o **Peso corporal**.
+
+La semana combina cuatro sesiones de fuerza, una sesión de calidad de la disciplina principal, una sesión aeróbica larga y un día de descanso. El volumen progresa durante las 10 semanas, con descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
 
 ## Configuración (de dónde salen las credenciales)
 
