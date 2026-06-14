@@ -1025,9 +1025,12 @@ function screenHeader(title,sub,icon){
 }
 
 let authReady=false;   // true cuando ya resolvimos la sesión de Supabase
+let passwordRecovery=false;
 function render(){
   if(!authReady){$("#tabs").innerHTML="";return renderSplash();}
   if(!session){$("#tabs").innerHTML="";return renderAuth();}
+  if(passwordRecovery){$("#tabs").innerHTML="";return renderPasswordRecovery();}
+  if(profile&&!isActive()){ $("#tabs").innerHTML="";return renderInactive(); }
   if(onboardingActive)return renderOnboarding();
   renderTabs();
   if(view==="nutricion")return renderNutrition();
@@ -1040,6 +1043,17 @@ function render(){
   renderHoy();
 }
 function renderSplash(){$("#app").innerHTML=`<div class="splash"><div class="muted">Cargando…</div></div>`;}
+function renderInactive(){
+  const email=(session&&session.user&&session.user.email)||"";
+  $("#app").innerHTML=`<div class="auth">
+    <div class="auth-brand">Fitbud</div>
+    <div class="dash">
+      <h3>Cuenta desactivada</h3>
+      <p class="muted small">La cuenta ${esc(email)} no puede modificar datos ni usar la IA. Contacta a un administrador para reactivarla.</p>
+      <button class="btn" style="width:100%;margin-top:8px" onclick="signOut()">Cerrar sesión</button>
+    </div>
+  </div>`;
+}
 
 // Íconos de línea (estilo Fitbros). Cada uno es el contenido de un <svg> 24×24.
 const TAB_ICONS={
@@ -1086,7 +1100,7 @@ function renderTabs(){
   $("#tabs").innerHTML=tabs.map(([v,l])=>`<button class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
 }
 function setView(v){
-  if((v==="foods"||v==="settings")&&!isAdmin())v="perfil";
+  if((v==="foods"||v==="settings"||v==="admin")&&!isAdmin())v="perfil";
   view=v;
   if(v==="hoy")current=clampDate(todayStr());
   if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}
@@ -1548,7 +1562,10 @@ function renderAuth(){
       <button class="btn btn-accent" style="width:100%" onclick="doAuth()">${mode==="in"?"Entrar":"Registrarme"}</button>
       <div id="auOut" class="muted small" style="margin-top:10px"></div>
     </div>
-    <div class="center" style="margin-top:14px"><button class="btn btn-sm" onclick="toggleAuthMode()">${mode==="in"?"¿No tienes cuenta? Regístrate":"¿Ya tienes cuenta? Inicia sesión"}</button></div>
+    <div class="center" style="margin-top:14px">
+      <button class="btn btn-sm" onclick="toggleAuthMode()">${mode==="in"?"¿No tienes cuenta? Regístrate":"¿Ya tienes cuenta? Inicia sesión"}</button>
+      ${mode==="in"?'<button class="btn btn-sm" style="margin-top:8px" onclick="requestOwnPasswordReset()">Olvidé mi contraseña</button>':""}
+    </div>
   </div>`;
 }
 function toggleAuthMode(){window._authMode=(window._authMode==="up")?"in":"up";renderAuth();}
@@ -1572,6 +1589,40 @@ async function doAuth(){
   if(mode==="up"&&!(r.data&&r.data.session)){if(out)out.textContent="Cuenta creada. Confirma tu correo y luego inicia sesión.";window._authMode="in";return;}
   const{data}=await supa.auth.getSession();session=(data&&data.session)||null;
   if(session)onAuth();
+}
+async function requestOwnPasswordReset(){
+  const email=$("#au_email")&&$("#au_email").value.trim();
+  const out=$("#auOut");
+  if(!email){if(out)out.textContent="Escribe tu correo primero";return;}
+  if(out)out.textContent="Enviando…";
+  const redirectTo=location.origin+location.pathname;
+  const result=await supa.auth.resetPasswordForEmail(email,{redirectTo});
+  if(out)out.textContent=result.error?("⚠️ "+result.error.message):"Revisa tu correo para crear una nueva contraseña.";
+}
+function renderPasswordRecovery(){
+  $("#app").innerHTML=`<div class="auth">
+    <div class="auth-brand">Fitbud</div>
+    <div class="muted small center" style="margin-bottom:20px">Define una nueva contraseña para tu cuenta.</div>
+    <div class="dash">
+      <div class="field"><label>Nueva contraseña</label><input id="recovery_pwd" type="password" autocomplete="new-password" minlength="8"></div>
+      <div class="field"><label>Confirmar contraseña</label><input id="recovery_confirm" type="password" autocomplete="new-password" minlength="8"></div>
+      <button class="btn btn-accent" style="width:100%" onclick="finishPasswordRecovery()">Actualizar contraseña</button>
+      <div id="recoveryOut" class="muted small" style="margin-top:10px"></div>
+    </div>
+  </div>`;
+}
+async function finishPasswordRecovery(){
+  const pwd=$("#recovery_pwd").value,confirmPwd=$("#recovery_confirm").value,out=$("#recoveryOut");
+  if(pwd.length<8){out.textContent="Usa al menos 8 caracteres.";return;}
+  if(pwd!==confirmPwd){out.textContent="Las contraseñas no coinciden.";return;}
+  out.textContent="Actualizando…";
+  const result=await supa.auth.updateUser({password:pwd});
+  if(result.error){out.textContent="⚠️ "+result.error.message;return;}
+  if(history&&history.replaceState)history.replaceState({},document.title,location.pathname);
+  passwordRecovery=false;
+  await signOut();
+  window._authMode="in";
+  toast("Contraseña actualizada. Inicia sesión nuevamente.");
 }
 
 /* ============================================================
@@ -1667,6 +1718,7 @@ function buildSysPrompt(){
   return "Perfil del usuario — "+parts.join(" ")+" "+base+" Respeta SIEMPRE estas preferencias y restricciones alimenticias.";
 }
 async function callClaude(userText,maxTokens){
+  if(!isActive())throw new Error("Tu cuenta está desactivada.");
   const cfg=effectiveSettings();
   // 1) Override local: si guardaste una API key en este navegador, llamada directa
   //    (útil para desarrollo local sin las funciones serverless).
@@ -2014,6 +2066,7 @@ function supaInit(){
    ============================================================ */
 function uid(){return session&&session.user?session.user.id:null;}
 function isAdmin(){return !!(profile&&profile.is_admin);}
+function isActive(){return !profile||profile.active!==false;}
 function profileName(){
   const p=(profile&&profile.prefs)||{};
   if(p.name&&p.name.trim())return p.name.trim();
@@ -2057,6 +2110,7 @@ async function loadProfile(){
 }
 async function saveProfilePrefs(prefs){
   if(!supa||!uid())return{error:{message:"Sin sesión"}};
+  if(!isActive())return{error:{message:"Cuenta desactivada"}};
   const result=await supa.from("profiles").upsert({
     id:uid(),
     email:(session&&session.user&&session.user.email)||"",
@@ -2079,7 +2133,7 @@ async function signUp(email,pwd){
 async function signOut(){
   if(supa)try{await supa.auth.signOut();}catch(e){}
   session=null;profile=null;view="hoy";
-  onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;
+  onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
   render();
 }
@@ -2090,6 +2144,10 @@ async function onAuth(){
   try{
     await loadProfile();
     S.days={};S.weights={};save();   // descarta caché de otra sesión; la DB manda
+    if(!isActive()){
+      onboardingActive=false;onboardingDraft=null;view="hoy";render();
+      return;
+    }
     if(supa&&!DB.loaded)await dbLoad();
     await Promise.all([pullAllDays(),pullWeights()]);
     const prefs=(profile&&profile.prefs)||{};
@@ -2176,6 +2234,7 @@ function dishMacros(dishId){return macrosFromLines(DB.dishIng.filter(x=>x.dish_i
    REQ-07: Administración de usuarios (solo admin).
    Usa /api/admin (service role en el servidor). El cliente solo manda su JWT.
    ============================================================ */
+let adminUsersCache=[];
 function prettyDateTime(iso){try{const d=new Date(iso);if(isNaN(d))return "—";return d.getDate()+" "+MON[d.getMonth()]+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}catch(e){return "—";}}
 async function adminApi(action,payload){
   const token=session&&session.access_token;
@@ -2188,17 +2247,40 @@ async function adminApi(action,payload){
 }
 async function renderAdminUsers(){
   $("#app").innerHTML=`${screenHeader("Usuarios","Administración","perfil")}
-    <button class="btn btn-sm" style="margin-bottom:12px" onclick="setView('perfil')">‹ Volver a Perfil</button>
+    <div class="row between wrap" style="margin-bottom:12px">
+      <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
+      <button class="btn btn-sm" onclick="renderAdminUsers()">Actualizar</button>
+    </div>
     <div id="adminList" class="muted small">Cargando usuarios…</div>`;
   try{
     const out=await adminApi("list");
-    $("#adminList").innerHTML=adminUsersHtml(out.users||[]);
+    adminUsersCache=out.users||[];
+    const list=$("#adminList");if(!list)return;
+    const active=adminUsersCache.filter(u=>u.active).length;
+    const admins=adminUsersCache.filter(u=>u.is_admin&&u.active).length;
+    list.innerHTML=`<div class="summary" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+        <div class="scard"><div class="n">${adminUsersCache.length}</div><div class="l">usuarios</div></div>
+        <div class="scard"><div class="n">${active}</div><div class="l">activos</div></div>
+        <div class="scard"><div class="n">${admins}</div><div class="l">admins activos</div></div>
+      </div>
+      <div class="row" style="align-items:flex-end;margin-bottom:12px">
+        <div class="field" style="flex:1;margin:0"><label>Buscar</label><input id="adminSearch" type="search" placeholder="correo" oninput="filterAdminUsers()"></div>
+        <div class="field" style="width:130px;margin:0"><label>Estado</label><select id="adminStatus" onchange="filterAdminUsers()"><option value="all">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option></select></div>
+      </div>
+      <div id="adminCards"></div>`;
+    filterAdminUsers();
   }catch(e){
-    $("#adminList").innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}<div class="muted small" style="margin-top:8px">Requiere la variable <b>SUPABASE_SERVICE_ROLE_KEY</b> en Vercel.</div></div>`;
+    const list=$("#adminList");if(list)list.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}<div class="muted small" style="margin-top:8px">Requiere SUPABASE_SERVICE_ROLE_KEY en Vercel y la migración supabase/admin.sql aplicada.</div></div>`;
   }
 }
+function filterAdminUsers(){
+  const search=($("#adminSearch")&&$("#adminSearch").value||"").trim().toLowerCase();
+  const status=($("#adminStatus")&&$("#adminStatus").value)||"all";
+  const users=adminUsersCache.filter(u=>(!search||(u.email||"").toLowerCase().includes(search))&&(status==="all"||(status==="active")===u.active));
+  const cards=$("#adminCards");if(cards)cards.innerHTML=adminUsersHtml(users);
+}
 function adminUsersHtml(users){
-  if(!users.length)return '<div class="muted small">Sin usuarios.</div>';
+  if(!users.length)return '<div class="muted small">No hay usuarios que coincidan.</div>';
   return users.map(u=>{
     const me=u.id===uid();
     return `<div class="meal">
@@ -2208,25 +2290,40 @@ function adminUsersHtml(users){
       </div></div>
       <div class="meal-actions">
         <button class="btn btn-sm" ${me?'disabled style="opacity:.4"':''} onclick="adminToggleActive('${u.id}',${u.active?'false':'true'})">${u.active?'Desactivar':'Activar'}</button>
-        <button class="btn btn-sm" onclick="adminSetPassword('${u.id}','${esc(u.email||"")}')">Cambiar contraseña</button>
-        <button class="btn btn-sm" onclick="adminResetLink('${esc(u.email||"")}')">Enviar reset</button>
+        <button class="btn btn-sm" onclick="adminSetPassword('${u.id}')">Cambiar contraseña</button>
+        <button class="btn btn-sm" onclick="adminResetLink('${u.id}')">Enviar reset</button>
       </div>
     </div>`;
   }).join("");
 }
 async function adminToggleActive(id,active){
+  const user=adminUsersCache.find(u=>u.id===id);
+  if(!active&&!confirm(`¿Desactivar ${user&&user.email?user.email:"este usuario"}? Se cerrará su acceso y no podrá escribir ni usar IA.`))return;
   try{await adminApi("setActive",{userId:id,active});toast(active?"Usuario activado":"Usuario desactivado");renderAdminUsers();}
   catch(e){toast(e.message);}
 }
-async function adminSetPassword(id,email){
-  const pwd=prompt("Nueva contraseña para "+(email||id)+" (mín. 6 caracteres):");
-  if(pwd==null)return; if(pwd.length<6){toast("Mínimo 6 caracteres");return;}
-  try{await adminApi("setPassword",{userId:id,password:pwd});toast("Contraseña actualizada");}
+function adminSetPassword(id){
+  const user=adminUsersCache.find(u=>u.id===id);window._adminPasswordUser=user||{id};
+  modal(`<h3>Cambiar contraseña</h3>
+    <p class="muted small">${esc((user&&user.email)||id)}</p>
+    <div class="field"><label>Nueva contraseña</label><input id="adminPwd" type="password" autocomplete="new-password" minlength="8"></div>
+    <div class="field"><label>Confirmar contraseña</label><input id="adminPwdConfirm" type="password" autocomplete="new-password" minlength="8"></div>
+    <button class="btn btn-accent" style="width:100%" onclick="saveAdminPassword()">Actualizar contraseña</button>
+    <div id="adminPwdOut" class="muted small" style="margin-top:8px"></div>`);
+}
+async function saveAdminPassword(){
+  const user=window._adminPasswordUser,pwd=$("#adminPwd").value,confirmPwd=$("#adminPwdConfirm").value,out=$("#adminPwdOut");
+  if(pwd.length<8){out.textContent="Usa al menos 8 caracteres.";return;}
+  if(pwd!==confirmPwd){out.textContent="Las contraseñas no coinciden.";return;}
+  out.textContent="Actualizando…";
+  try{await adminApi("setPassword",{userId:user.id,password:pwd});closeModal();toast("Contraseña actualizada");}
   catch(e){toast(e.message);}
 }
-async function adminResetLink(email){
-  if(!email){toast("Ese usuario no tiene email");return;}
-  try{await adminApi("resetPassword",{email});toast("Correo de reseteo enviado a "+email);}
+async function adminResetLink(id){
+  const user=adminUsersCache.find(u=>u.id===id);
+  if(!user||!user.email){toast("Ese usuario no tiene correo");return;}
+  if(!confirm("¿Enviar un enlace de recuperación a "+user.email+"?"))return;
+  try{await adminApi("resetPassword",{userId:id,redirectTo:location.origin+location.pathname});toast("Correo de recuperación enviado");}
   catch(e){toast(e.message);}
 }
 
@@ -2387,7 +2484,8 @@ function setupAuthListener(){
   if(!supa||window._authSub)return;
   window._authSub=supa.auth.onAuthStateChange((event,sess)=>{
     session=sess||null;
-    if(event==="SIGNED_OUT"){profile=null;view="hoy";onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;render();}
+    if(event==="PASSWORD_RECOVERY"){passwordRecovery=true;authReady=true;render();}
+    else if(event==="SIGNED_OUT"){profile=null;view="hoy";onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;render();}
     else if(event==="SIGNED_IN"){if(!profile||profile.id!==uid())onAuth();}
   });
 }

@@ -26,9 +26,9 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `config.js` | Fallback de config en runtime (`window.FITBUD_CONFIG`). **Vacío en el repo**; producción usa Vercel. |
 | `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. **Exige sesión:** valida el JWT de Supabase (Bearer → `/auth/v1/user`) antes de llamar a Anthropic; sin token válido responde 401 (falla cerrado). |
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
-| `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios, activar/desactivar, cambiar contraseña, enviar reset. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida que quien llama sea admin **activo**. |
+| `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios paginados, bloquear/desbloquear en Auth + `profiles.active`, cambiar contraseña y enviar reset. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida admin activo, impide auto-desactivación y conserva al último admin. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v8`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v9`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
@@ -70,7 +70,7 @@ Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
 - `day_log(log_date pk, state jsonb, updated_at)` — consumo del día (comidas/extras/entreno/override) como documento JSON.
 - `weight_log(week pk, kg, updated_at)` — peso semanal.
 - Vista `dish_macros` — macros calculados por plato (suma de ingredientes), `security_invoker`.
-- **RLS (con `auth.sql` aplicado):** escritura anónima eliminada. Catálogo (ingredientes/platos/dietas) = lectura para `authenticated`, escritura solo `is_admin()`. `day_log`/`weight_log` = solo filas del `auth.uid()`. (Las políticas "anon all" de `schema.sql` las reemplaza `auth.sql`.)
+- **RLS (con `auth.sql` + `admin.sql`):** escritura anónima eliminada. `day_log`/`weight_log` solo permiten escritura propia a usuarios activos; catálogo solo a admins activos. El trigger `protect_profile_system_fields` impide que un usuario cambie sus propios campos `is_admin` o `active`; la API admin usa service role.
 - **Cálculo de macros:** `macros = Σ ingrediente(por_100g) × gramos/100`. En la app se hace en cliente (`macrosFromLines`).
 - **Re-seed:** `seed.sql` hace `truncate ... restart identity cascade` (es re-ejecutable).
 
@@ -123,7 +123,7 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 - **Login obligatorio.** Sin sesión se ve `renderAuth()` (login/registro). En dev local sin credenciales, esa pantalla pide conectar Supabase (URL + publishable key → `S.settings`). En producción las da `/api/config`.
 - **Estado:** `session` (Supabase Auth) y `profile` (fila de `profiles`: `is_admin` + `prefs`). `authReady` gatea el render (splash mientras resuelve). `onAuth()` carga perfil + datos al entrar; `setupAuthListener()` reacciona a login/logout/refresh.
 - **Datos por usuario:** `day_log`/`weight_log` llevan `user_id`; `pushDay/pullDay/pushWeight/pullWeights` lo incluyen y RLS lo fuerza. `pullAllDays()` baja todo el historial al entrar (racha/stats). Al login se limpia la caché local (`S.days`/`S.weights`) y manda la DB.
-- **Roles:** `isAdmin()` = `profile.is_admin`. Para hacer admin a alguien: regístralo y en el SQL Editor `update profiles set is_admin=true where email='...'` (esa es la "consola de administración de usuarios": el dashboard de Supabase).
+- **Roles:** `isAdmin()` = `profile.is_admin`; `isActive()` controla acceso a la app. El primer admin se promueve por SQL (`update profiles set is_admin=true where email='...'`). Después, Perfil → Usuarios permite activar/desactivar y gestionar contraseñas.
 - **Catálogo compartido:** ingredientes/platos/dietas se leen para cualquier autenticado; escritura solo admin (RLS con `is_admin()`).
 
 ### Navegación (nueva IA por rol)
@@ -132,7 +132,7 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 - **Nutrición** (`renderNutrition`): nav de día + hero + comidas del plan + extras + IA.
 - **Entreno** (`renderWorkout`): nav de día + tarjeta de entreno + cambiar/volver al plan + resumen.
 - **Progreso** (`renderProgress`): stats (kg/entrenos/racha) + gráfico+tabla de peso + sección Semana (reusa `goDay`/`weekNav`).
-- **Perfil** (`renderProfile`): preferencias **mixtas** (dieta/objetivo/proteína/alergias + disciplina principal + tipo de fuerza + días/semana + notas libres) → `profiles.prefs` vía `saveProfilePrefs`; cuenta + cerrar sesión; **sección Administración solo admin** con accesos a Alimentos (`renderFoods`) y Ajustes técnicos (`renderSettings`).
+- **Perfil** (`renderProfile`): preferencias mixtas → `profiles.prefs`; cuenta + cerrar sesión; sección Administración solo admin con Usuarios, Alimentos y Ajustes. Usuarios inactivos ven `renderInactive()`. `PASSWORD_RECOVERY` abre una pantalla para definir y confirmar la nueva contraseña.
 - **IA personalizada:** `buildSysPrompt()` arma el system prompt de Claude desde `profile.prefs` (fallback al texto vegetariano por defecto si no hay prefs).
 
 ## 11. Convenciones / gotchas

@@ -23,15 +23,12 @@ async function verifyUser(req) {
     if (!u || !u.id) return null;
     // Rechaza usuarios desactivados (profiles.active = false). Lee su propio
     // perfil con su token (RLS permite ver la fila propia).
-    try {
-      const pr = await fetch(base + "/rest/v1/profiles?id=eq." + u.id + "&select=active", {
-        headers: { Authorization: "Bearer " + token, apikey },
-      });
-      if (pr.ok) {
-        const rows = await pr.json();
-        if (rows && rows[0] && rows[0].active === false) return null;
-      }
-    } catch (_) {}
+    const pr = await fetch(base + "/rest/v1/profiles?id=eq." + u.id + "&select=active", {
+      headers: { Authorization: "Bearer " + token, apikey },
+    });
+    if (!pr.ok) return null;
+    const rows = await pr.json();
+    if (!Array.isArray(rows) || !rows[0] || rows[0].active === false) return null;
     return u;
   } catch (e) {
     return null;

@@ -51,6 +51,20 @@ Las funciones serverless ([`api/`](api/)) son el corazón de la seguridad:
 
 - **`/api/claude`** — proxy a la API de Anthropic. La API key vive **solo** en el servidor (variable `ANTHROPIC_API_KEY` en Vercel); nunca llega al navegador ni a GitHub.
 - **`/api/config`** — devuelve al navegador solo datos públicos (URL + publishable key de Supabase, modelo). **No** devuelve la key de Claude.
+- **`/api/admin`** — lista, activa/desactiva y cambia contraseñas. Exige un administrador activo y usa `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor.
+
+## Administración de usuarios
+
+Los administradores tienen una vista **Perfil → Usuarios** con búsqueda y filtros. Desde allí pueden:
+
+- activar o desactivar cuentas;
+- asignar una nueva contraseña;
+- enviar un correo de recuperación;
+- consultar fecha de alta y último acceso.
+
+Desactivar una cuenta actualiza `profiles.active` y bloquea al usuario en Supabase Auth. También queda protegido por RLS y no puede escribir ni usar Claude. El servidor impide que un administrador se desactive a sí mismo o desactive al último administrador activo.
+
+Para habilitar esta función en una instalación existente, ejecuta [`supabase/admin.sql`](supabase/admin.sql) en el SQL Editor. La migración también evita que un usuario pueda elevarse a administrador o cambiar su propio estado mediante una llamada directa a REST.
 
 ## Funciones con IA (Claude)
 
@@ -108,6 +122,7 @@ No hay build: archivos estáticos en la raíz + funciones serverless en [`api/`]
    | `ANTHROPIC_API_KEY` | tu key `sk-ant-...` de Claude | **Sí** (solo servidor) |
    | `SUPABASE_URL` | `https://xxxxx.supabase.co` | No (pública) |
    | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | No (pública) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | service role para `/api/admin` | **Sí (solo servidor)** |
    | `ANTHROPIC_MODEL` *(opcional)* | `claude-haiku-4-5-20251001` | No |
 
 4. **Deploy**. Cada `git push` redepliega solo.

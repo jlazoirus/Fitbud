@@ -16,7 +16,45 @@ as $$
   select coalesce((select active from public.profiles where id = auth.uid()), false);
 $$;
 
--- 3) day_log / weight_log: lectura propia; escritura solo si está activo.
+-- 3) Impide que un usuario cambie directamente is_admin/active en su perfil.
+create or replace function protect_profile_system_fields()
+returns trigger
+language plpgsql security definer set search_path = public
+as $$
+begin
+  if auth.role() <> 'service_role' then
+    if tg_op = 'INSERT' then
+      new.is_admin := false;
+      new.active := true;
+    else
+      new.id := old.id;
+      new.is_admin := old.is_admin;
+      new.active := old.active;
+      new.created_at := old.created_at;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_profile_system_fields_trigger on profiles;
+create trigger protect_profile_system_fields_trigger
+  before insert or update on profiles
+  for each row execute function protect_profile_system_fields();
+
+drop policy if exists "own profile select" on profiles;
+drop policy if exists "own profile upsert" on profiles;
+drop policy if exists "own profile update" on profiles;
+create policy "own profile select" on profiles
+  for select using (id = auth.uid() or (is_admin() and is_active()));
+create policy "own profile upsert" on profiles
+  for insert with check (id = auth.uid());
+create policy "own profile update" on profiles
+  for update
+  using (id = auth.uid() and is_active())
+  with check (id = auth.uid() and is_active());
+
+-- 4) day_log / weight_log: lectura propia; escritura solo si está activo.
 drop policy if exists "own day_log" on day_log;
 drop policy if exists "read own day_log" on day_log;
 drop policy if exists "write own day_log" on day_log;
@@ -33,7 +71,7 @@ create policy "write own weight_log" on weight_log for all
   using (user_id = auth.uid() and is_active())
   with check (user_id = auth.uid() and is_active());
 
--- 4) Catálogo: escritura solo admin Y activo.
+-- 5) Catálogo: escritura solo admin Y activo.
 do $$
 declare t text;
 begin
@@ -45,5 +83,4 @@ begin
   end loop;
 end $$;
 
--- 5) Admins pueden leer todas las filas de profiles (para la vista admin).
---    (La lectura ya estaba: "own profile select" incluye is_admin().)
+-- La API administrativa usa service role y por tanto no depende de RLS.

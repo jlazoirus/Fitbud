@@ -106,16 +106,47 @@ as $$
   select coalesce((select active from public.profiles where id = auth.uid()), false);
 $$;
 
--- profiles: cada quien ve/edita su propia fila (los admins pueden ver todas).
+-- Los usuarios pueden editar sus preferencias, pero NUNCA elevarse a admin ni
+-- cambiar su propio estado. La service role (API admin) sí puede hacerlo.
+create or replace function protect_profile_system_fields()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  if auth.role() <> 'service_role' then
+    if tg_op = 'INSERT' then
+      new.is_admin := false;
+      new.active := true;
+    else
+      new.id := old.id;
+      new.is_admin := old.is_admin;
+      new.active := old.active;
+      new.created_at := old.created_at;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists protect_profile_system_fields_trigger on profiles;
+create trigger protect_profile_system_fields_trigger
+  before insert or update on profiles
+  for each row execute function protect_profile_system_fields();
+
+-- profiles: cada quien ve su fila y la actualiza solo mientras esté activo.
+-- Los admins activos pueden leer todas para la consola de usuarios.
 drop policy if exists "own profile select" on profiles;
 drop policy if exists "own profile upsert" on profiles;
 drop policy if exists "own profile update" on profiles;
 create policy "own profile select" on profiles
-  for select using (id = auth.uid() or is_admin());
+  for select using (id = auth.uid() or (is_admin() and is_active()));
 create policy "own profile upsert" on profiles
   for insert with check (id = auth.uid());
 create policy "own profile update" on profiles
-  for update using (id = auth.uid()) with check (id = auth.uid());
+  for update
+  using (id = auth.uid() and is_active())
+  with check (id = auth.uid() and is_active());
 
 -- day_log / weight_log: lectura propia; escritura solo si el usuario está activo.
 drop policy if exists "own day_log" on day_log;

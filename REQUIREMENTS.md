@@ -307,6 +307,8 @@ Permitir mas de un usuario con datos separados: progreso diario, pesos, grasa co
 
 ## REQ-07 - Vista admin para usuarios
 
+**Estado: implementado y endurecido.**
+
 ### Objetivo
 
 Agregar una vista de administrador para activar/desactivar usuarios y cambiar contrasenas.
@@ -325,6 +327,10 @@ Agregar una vista de administrador para activar/desactivar usuarios y cambiar co
   - cambiar contrasena o generar reset;
   - ver fecha de creacion/ultimo acceso si esta disponible.
 - Usuarios desactivados no pueden escribir ni usar IA.
+- Desactivar también bloquea el inicio de sesión en Supabase Auth.
+- El servidor impide auto-desactivación y conservará al menos un administrador activo.
+- Los campos `profiles.is_admin` y `profiles.active` no pueden modificarse desde una sesión normal.
+- El enlace de recuperación vuelve a una pantalla funcional para definir la nueva contraseña.
 
 ### Criterios de aceptacion
 
