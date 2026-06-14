@@ -222,6 +222,18 @@
   .toast{position:fixed;bottom:calc(82px + var(--safe-bottom));left:50%;transform:translateX(-50%);background:var(--surf3);border:1px solid var(--border-2);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;opacity:0;transition:opacity .2s;box-shadow:0 8px 24px rgba(0,0,0,.4)}
   .toast.show{opacity:1}
 
+  /* Sugerencia "agregar a pantalla de inicio" (solo móvil) */
+  .a2hs{position:fixed;left:10px;right:10px;bottom:calc(82px + var(--safe-bottom,0px));max-width:540px;margin:0 auto;z-index:60;
+    background:linear-gradient(160deg,var(--surf2),var(--surf1));border:1px solid var(--border-acc);border-radius:var(--r-lg);
+    padding:14px 40px 14px 14px;box-shadow:0 12px 40px rgba(0,0,0,.55);display:flex;gap:12px;align-items:flex-start;animation:a2hsIn .25s ease}
+  .a2hs .a2hs-ic{font-size:22px;flex:0 0 auto;line-height:1.1}
+  .a2hs .a2hs-body{flex:1;min-width:0}
+  .a2hs .a2hs-title{font-family:var(--font-display);font-weight:700;font-size:15px}
+  .a2hs .a2hs-txt{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+  .a2hs .a2hs-actions{display:flex;gap:8px;margin-top:11px;flex-wrap:wrap}
+  .a2hs .a2hs-x{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:999px;background:var(--surf3);color:var(--muted);font-size:15px;border:none}
+  @keyframes a2hsIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
   /* Card-link: tarjeta que lleva a otra vista (Home → Nutrición/Entreno) */
   .card-link{display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s}
   .card-link:not(.workout){background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px}
@@ -1045,6 +1057,7 @@ function screenHeader(title,sub,icon){
 let authReady=false;   // true cuando ya resolvimos la sesión de Supabase
 let passwordRecovery=false;
 function render(){
+  updateInstallPrompt();
   if(!authReady){$("#tabs").innerHTML="";return renderSplash();}
   if(!session){$("#tabs").innerHTML="";return renderAuth();}
   if(passwordRecovery){$("#tabs").innerHTML="";return renderPasswordRecovery();}
@@ -1095,6 +1108,44 @@ function chevron(){return `<svg class="chev" width="18" height="18" viewBox="0 0
 const UI_KEY="fitbud_ui";
 let UI=(()=>{try{return JSON.parse(localStorage.getItem(UI_KEY))||{}}catch(e){return{}}})();
 function uiSave(){try{localStorage.setItem(UI_KEY,JSON.stringify(UI))}catch(e){}}
+
+/* ---- Sugerencia: agregar a la pantalla de inicio (solo móvil, una vez) ---- */
+let deferredInstallPrompt=null;
+function isStandaloneMode(){return (window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||window.navigator.standalone===true;}
+function isIOSDevice(){return /iphone|ipad|ipod/i.test(navigator.userAgent||"")&&!window.MSStream;}
+function isMobileDevice(){return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent||"");}
+function installDismissed(){return !!(UI&&UI.installDismissed);}
+function removeInstallPrompt(){const el=document.getElementById("a2hs");if(el)el.remove();}
+function dismissInstall(){UI.installDismissed=true;uiSave();removeInstallPrompt();}
+function updateInstallPrompt(){
+  const inApp=session&&profile&&(typeof isActive!=="function"||isActive())&&!onboardingActive&&!passwordRecovery;
+  const show=inApp&&isMobileDevice()&&!isStandaloneMode()&&!installDismissed();
+  if(!show){removeInstallPrompt();return;}
+  if(document.getElementById("a2hs"))return;               // ya visible
+  const ios=isIOSDevice(), canPrompt=!!deferredInstallPrompt;
+  const txt=ios
+    ? 'Pulsa <b>Compartir</b> y luego <b>“Añadir a pantalla de inicio”</b> para abrirla como app.'
+    : canPrompt
+      ? 'Instálala para abrirla a pantalla completa, como una app de tu celular.'
+      : 'Abre el menú de tu navegador y elige <b>“Instalar app”</b> o <b>“Añadir a pantalla de inicio”</b>.';
+  const action=(!ios&&canPrompt)?'<button class="btn btn-sm btn-accent" onclick="installApp()">Instalar</button>':'';
+  const el=document.createElement("div");
+  el.id="a2hs"; el.className="a2hs";
+  el.innerHTML=`<div class="a2hs-ic">📲</div>
+    <div class="a2hs-body">
+      <div class="a2hs-title">Agrega Fitbud a tu inicio</div>
+      <div class="a2hs-txt">${txt}</div>
+      <div class="a2hs-actions">${action}<button class="btn btn-sm" onclick="dismissInstall()">${action?'Ahora no':'Entendido'}</button></div>
+    </div>
+    <button class="a2hs-x" aria-label="Cerrar" onclick="dismissInstall()">✕</button>`;
+  document.body.appendChild(el);
+}
+async function installApp(){
+  const dp=deferredInstallPrompt; deferredInstallPrompt=null;
+  if(!dp){dismissInstall();return;}
+  try{ dp.prompt(); await dp.userChoice; }catch(e){}
+  UI.installDismissed=true; uiSave(); removeInstallPrompt();   // no volver a sugerir tras el intento
+}
 function isCollapsed(key){return !!(UI.collapsed&&UI.collapsed[key]);}
 function toggleSection(key,btn){
   UI.collapsed=UI.collapsed||{};
@@ -2560,6 +2611,9 @@ async function boot(){
   if(session)await onAuth(); else render();
 }
 registerServiceWorker();
+// Captura el evento de instalación (Android/Chrome) y oculta la sugerencia si ya se instaló.
+window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;updateInstallPrompt();});
+window.addEventListener("appinstalled",()=>{UI.installDismissed=true;uiSave();removeInstallPrompt();});
 render();                      // splash mientras resolvemos la sesión
 boot();
 // Credenciales servidas por Vercel: si no había conexión local, conecta y reintenta.
