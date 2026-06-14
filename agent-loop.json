@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "name": "fitbros-autonomous-product-developer",
+  "repository": "/Users/jonathan/Fitbud",
+  "branch": "main",
+  "requirementFile": "REQUIREMENTS.md",
+  "contextFiles": [
+    "CONTEXT.md",
+    "README.md"
+  ],
+  "queue": [
+    "REQ-12",
+    "REQ-13",
+    "REQ-14",
+    "REQ-15",
+    "REQ-16",
+    "REQ-31",
+    "REQ-17",
+    "REQ-18",
+    "REQ-19",
+    "REQ-20",
+    "REQ-21",
+    "REQ-22",
+    "REQ-23",
+    "REQ-24",
+    "REQ-25",
+    "REQ-26",
+    "REQ-27",
+    "REQ-28",
+    "REQ-29",
+    "REQ-30"
+  ],
+  "limits": {
+    "requirementsPerRun": 1,
+    "commitsPerRun": 1,
+    "pushesPerRun": 1,
+    "runsPerDay": 1,
+    "maxImplementationAttempts": 2,
+    "maxWallClockMinutes": 90,
+    "lockStaleMinutes": 180,
+    "paidExternalCallsPerRun": 0,
+    "allowNewRuntimeDependency": false
+  },
+  "continuousImprovement": {
+    "auditWhenQueueIsComplete": true,
+    "includeUnlistedPendingRequirements": true,
+    "newRequirementsPerAudit": 1,
+    "requireEvidence": true
+  },
+  "stopConditions": [
+    "dirty_worktree",
+    "branch_mismatch",
+    "remote_ahead_or_diverged",
+    "missing_credentials_or_external_decision",
+    "production_migration_required",
+    "legal_or_medical_decision_required",
+    "payment_provider_decision_required",
+    "acceptance_criteria_cannot_be_completed",
+    "test_failure_not_resolved_within_attempt_budget",
+    "time_budget_exhausted"
+  ]
+}
