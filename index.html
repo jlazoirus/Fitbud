@@ -1339,7 +1339,7 @@ function renderInactive(){
     <div class="dash">
       <h3>Cuenta desactivada</h3>
       <p class="muted small">La cuenta ${esc(email)} no puede modificar datos ni usar la IA. Contacta a un administrador para reactivarla.</p>
-      <button class="btn" style="width:100%;margin-top:8px" onclick="signOut()">Cerrar sesión</button>
+      <button type="button" class="btn" style="width:100%;margin-top:8px" onclick="signOutUser(this)">Cerrar sesión</button>
     </div>
   </div>`;
 }
@@ -1868,7 +1868,7 @@ function renderProfile(){
   <div class="section-h">Cuenta</div>
   <div class="dash">
     <div class="row between"><span class="muted small">${esc(email)}</span><span class="badge ${isAdmin()?'b-PESAS':'b-Libre'}">${isAdmin()?'Admin':'Usuario'}</span></div>
-    <button class="btn" style="width:100%;margin-top:12px" onclick="signOut()">Cerrar sesión</button>
+    <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="signOutUser(this)">Cerrar sesión</button>
   </div>`;
 }
 function updateTrainingSummary(){
@@ -1995,7 +1995,7 @@ async function finishPasswordRecovery(){
   if(result.error){out.textContent="⚠️ "+result.error.message;return;}
   if(history&&history.replaceState)history.replaceState({},document.title,location.pathname);
   passwordRecovery=false;
-  await signOut();
+  await signOutUser();
   window._authMode="in";
   toast("Contraseña actualizada. Inicia sesión nuevamente.");
 }
@@ -2544,13 +2544,47 @@ async function signUp(email,pwd){
   const r=await supa.auth.signUp({email,password:pwd});
   return r;
 }
-async function signOut(){
-  if(supa)try{await supa.auth.signOut();}catch(e){}
+let _signOutBusy=false;
+function clearSignedOutState(){
   session=null;profile=null;view="hoy";
   refreshPlanCalendar();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;
+  cycleHistory=[];recapPhotoFile=null;recapChallenge="";
+  if(recapPhotoUrl)URL.revokeObjectURL(recapPhotoUrl);
+  recapPhotoUrl="";
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
+  authReady=true;
+  const overlay=$("#overlay");if(overlay)overlay.remove();
   render();
+}
+function clearStoredAuthSession(client){
+  const keys=[];
+  const storageKey=client&&client.auth&&client.auth.storageKey;
+  if(storageKey)keys.push(storageKey);
+  try{
+    const ref=new URL(supaUrlFrom(effectiveSettings().supaUrl)).hostname.split(".")[0];
+    if(ref)keys.push(`sb-${ref}-auth-token`);
+  }catch(e){}
+  keys.forEach(key=>{try{localStorage.removeItem(key);}catch(e){}});
+}
+async function signOutUser(button){
+  if(_signOutBusy)return;
+  _signOutBusy=true;
+  if(button){button.disabled=true;button.textContent="Cerrando sesión…";}
+  const client=supa;
+  clearSignedOutState();
+  try{
+    if(client){
+      const result=await Promise.race([
+        client.auth.signOut({scope:"local"}),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error("Tiempo de espera agotado")),8000)),
+      ]);
+      if(result&&result.error)throw result.error;
+    }
+  }catch(e){
+    clearStoredAuthSession(client);
+    console.warn("La sesión remota no respondió; se eliminó la sesión local.",e);
+  }finally{_signOutBusy=false;}
 }
 // Reacciona a login/logout y recarga datos del usuario (idempotente).
 let _authBusy=false;
@@ -2966,7 +3000,7 @@ function setupAuthListener(){
   window._authSub=supa.auth.onAuthStateChange((event,sess)=>{
     session=sess||null;
     if(event==="PASSWORD_RECOVERY"){passwordRecovery=true;authReady=true;render();}
-    else if(event==="SIGNED_OUT"){profile=null;view="hoy";onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;render();}
+    else if(event==="SIGNED_OUT")clearSignedOutState();
     else if(event==="SIGNED_IN"){if(!profile||profile.id!==uid())onAuth();}
   });
 }
