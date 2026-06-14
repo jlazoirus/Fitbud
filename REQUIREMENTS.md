@@ -77,6 +77,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 6. REQ-06 - Persistencia separada por usuario.
 7. REQ-07 - Vista admin para usuarios.
 8. REQ-08 - Generador de dias de dieta con Claude.
+9. REQ-09 - Onboarding de objetivos, macros y preferencias.
 
 REQ-08 debe esperar a REQ-01/REQ-02 y preferiblemente a REQ-05/REQ-06, porque necesita recetas confiables, contexto por usuario y control de acceso a IA.
 
@@ -401,6 +402,43 @@ Agregar una funcion para generar mas dias de dieta con Claude usando todo el con
 - Probar respuesta mockeada si no se quiere gastar API.
 - Probar con Claude real en Vercel si hay key.
 - Verificar que una respuesta invalida no se guarda.
+
+---
+
+## REQ-09 - Onboarding de objetivos, macros y preferencias
+
+### Objetivo
+
+Configurar el perfil completo del usuario al entrar por primera vez y ofrecer una revision cada cuatro semanas.
+
+### Alcance
+
+- Solicitar datos corporales, nivel de actividad y objetivo.
+- Calcular calorias, proteina, carbohidratos y grasas con una formula documentada.
+- Permitir editar las metas calculadas antes de guardarlas.
+- Configurar disciplina, fuerza y entre 3 y 6 dias de entrenamiento.
+- Capturar restricciones y preferencias alimenticias.
+- Guardar todo por usuario en `profiles.prefs`.
+- Personalizar las metas de PESAS, BAJO, REFEED y DIETBREAK.
+- Volver a preguntar cada 28 dias si el usuario desea actualizar el plan.
+- Permitir abrir el flujo manualmente desde Perfil.
+
+### Criterios de aceptacion
+
+- Un perfil incompleto entra directamente al onboarding.
+- Katch-McArdle se usa cuando existe porcentaje de grasa; Mifflin-St Jeor en caso contrario.
+- Las calorias coinciden con la suma de macros base.
+- El usuario puede mantener sus valores actuales durante la revision periodica.
+- El guardado usa `upsert` y no depende de que el trigger haya creado previamente la fila de perfil.
+- La interfaz funciona sin overflow horizontal en movil.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Probar los cuatro pasos con perfil vacio y con perfil prellenado.
+- Verificar el limite exacto de 28 dias.
+- Probar calculos con y sin porcentaje de grasa.
+- Comprobar persistencia tras cerrar sesion y volver a entrar.
 
 ---
 

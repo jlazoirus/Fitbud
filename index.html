@@ -841,11 +841,11 @@ function renderOnboarding(){
           <div class="field"><label>Estatura (cm)</label><input id="ob_height" type="number" inputmode="decimal" min="130" max="230" value="${d.heightCm}" placeholder="175"></div>
           <div class="field"><label>Peso actual (kg)</label><input id="ob_weight" type="number" inputmode="decimal" min="35" max="250" step=".1" value="${d.weightKg}" placeholder="80"></div>
           <div class="field"><label>Grasa corporal % (opcional)</label><input id="ob_bf" type="number" inputmode="decimal" min="3" max="60" step=".1" value="${d.bodyFatPct}" placeholder="20"></div>
-          <div class="field"><label>Actividad fuera del entrenamiento</label><select id="ob_activity">
+          <div class="field"><label>Nivel de actividad habitual</label><select id="ob_activity" onchange="updateOnboardingActivity(this.value)">
             ${Object.entries(ACTIVITY_LEVELS).map(([v,o])=>`<option value="${v}" ${sel(d.activityLevel,v)}>${o.label}</option>`).join("")}
           </select></div>
         </div>
-        <div class="muted small">${esc(ACTIVITY_LEVELS[d.activityLevel].description)}</div>
+        <div class="muted small" id="obActivityDescription">${esc(ACTIVITY_LEVELS[d.activityLevel].description)}</div>
       </div>${onboardingButtons(false)}`;
   }else if(onboardingStep===2){
     body=`<h1>Define tu objetivo y tus macros</h1>
@@ -953,6 +953,10 @@ function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();re
 function updateOnboardingTrainingSummary(){
   const out=$("#obTrainingSummary"),sport=$("#ob_sport"),days=$("#ob_days");
   if(out&&sport&&days)out.innerHTML=`<b>Semana tipo:</b> ${trainingPlanSummary(+days.value,sport.value)}`;
+}
+function updateOnboardingActivity(value){
+  const out=$("#obActivityDescription"),activity=ACTIVITY_LEVELS[value];
+  if(out&&activity)out.textContent=activity.description;
 }
 async function saveOnboarding(){
   readOnboardingStep();
@@ -1942,7 +1946,12 @@ async function loadProfile(){
 }
 async function saveProfilePrefs(prefs){
   if(!supa||!uid())return{error:{message:"Sin sesión"}};
-  const result=await supa.from("profiles").update({prefs,updated_at:new Date().toISOString()}).eq("id",uid());
+  const result=await supa.from("profiles").upsert({
+    id:uid(),
+    email:(session&&session.user&&session.user.email)||"",
+    prefs,
+    updated_at:new Date().toISOString(),
+  },{onConflict:"id"});
   if(!result.error)profile.prefs=prefs;
   return result;
 }

@@ -27,7 +27,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. **Exige sesión:** valida el JWT de Supabase (Bearer → `/auth/v1/user`) antes de llamar a Anthropic; sin token válido responde 401 (falla cerrado). |
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v7`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v8`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
@@ -40,7 +40,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 ## 4. Estructura interna de index.html (con líneas aprox.)
 - **Config runtime** (~151): `CONFIG` (de `config.js`), `REMOTE` (de `/api/config`), `effectiveSettings()` (prioridad: override local en Ajustes → REMOTE/Vercel → config.js), `aiAvailable()`, `settingSource()`.
 - **Capa de datos:** calendario del plan, menús, generadores de entrenamiento, `DAY_TARGET` (proporciones base), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales por tipo de día).
-- **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → alimentación. `hasCompleteOnboarding()` obliga a completarlo una vez y `profileReviewDue()` solicita revisión cada 28 días. Todo se guarda en `profiles.prefs`.
+- **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → alimentación. `hasCompleteOnboarding()` obliga a completarlo una vez y `profileReviewDue()` solicita revisión cada 28 días. Todo se guarda con `upsert` en `profiles.prefs`, por lo que también se recupera si faltara la fila creada por el trigger.
 - **Entrenamiento:** cada perfil elige `primarySport` (`running|cycling|swimming`), `strengthMode` (`gym|bodyweight`) y `trainDays` (3-6). `workoutSchedule(days)` define el reparto semanal, `workoutOptions(ds)` genera las sesiones progresivas y `effectiveWorkout(ds)` resuelve overrides diarios. UI: Perfil + `openWorkoutPicker(ds)` + `setWorkout(ds,id)`.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
 - **Estado/persistencia** (~335): `S` (objeto raíz, cacheado en localStorage), `dayState(ds)` (campos: `meals{id:{done,ovr}}`, `extras[]`, `workoutDone`, `workoutOverride`), `mealState`, `mealValue` (resuelve macros: override manual → DB por `dishName` → fallback plan), `dayTotals(ds)` (suma solo comidas marcadas `done`).
