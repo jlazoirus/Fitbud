@@ -47,16 +47,28 @@
     --font-body:'DM Sans',system-ui,sans-serif;
     --font-mono:'JetBrains Mono',ui-monospace,monospace;
     --r-sm:12px; --r-md:16px; --r-lg:22px;
+    /* Bordes seguros para iPhone en modo PWA/standalone. */
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-right:env(safe-area-inset-right,0px);
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+    --safe-left:env(safe-area-inset-left,0px);
   }
   *{box-sizing:border-box}
+  html{min-height:100%;background:var(--black)}
   body{
-    font-family:var(--font-body);background:var(--black);color:var(--txt);margin:0;padding:0;
+    font-family:var(--font-body);background:var(--black);color:var(--txt);margin:0;padding:0;min-height:100vh;min-height:100dvh;overflow-x:hidden;
     -webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;
     background-image:radial-gradient(circle at 12% 8%,rgba(124,92,252,.10),transparent 42%),
                      radial-gradient(circle at 90% 96%,rgba(200,100,60,.07),transparent 46%);
     background-attachment:fixed;
   }
-  #app{max-width:560px;margin:0 auto;padding:14px 14px 100px}
+  #app{
+    width:100%;max-width:560px;min-height:100dvh;margin:0 auto;
+    padding:calc(14px + var(--safe-top))
+            max(14px,var(--safe-right))
+            calc(88px + var(--safe-bottom))
+            max(14px,var(--safe-left));
+  }
   h1,h2,h3{margin:0;font-family:var(--font-display);letter-spacing:-.02em}
   button{font-family:inherit;cursor:pointer;border:none;border-radius:var(--r-sm);color:var(--txt)}
   .btn{background:var(--surf2);padding:9px 14px;font-size:14px;font-weight:500;border:1px solid var(--border-2);border-radius:999px;transition:.15s}
@@ -155,7 +167,13 @@
   .workout .detail{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.45}
 
   /* Tabs */
-  .tabs{position:fixed;bottom:0;left:0;right:0;background:rgba(7,7,15,.86);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;justify-content:space-between;max-width:560px;margin:0 auto;padding:10px 10px max(18px,env(safe-area-inset-bottom));z-index:50}
+  .tabs{
+    position:fixed;bottom:0;left:0;right:0;width:100%;max-width:560px;margin:0 auto;
+    background:rgba(7,7,15,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border-top:1px solid var(--border);display:flex;justify-content:space-between;
+    padding:10px max(10px,var(--safe-right)) max(12px,var(--safe-bottom)) max(10px,var(--safe-left));
+    z-index:50;
+  }
   .tabs button{flex:1;background:transparent;border:none;color:var(--muted);padding:2px 0;font-size:10px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:0;transition:.15s}
   .tabs button .ic{font-size:18px;width:46px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:10px;transition:.15s}
   .tabs button.active{color:var(--accent);font-weight:600}
@@ -171,7 +189,7 @@
 
   /* Modal */
   .overlay{position:fixed;inset:0;background:rgba(5,5,9,.72);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:flex;align-items:flex-end;justify-content:center;z-index:100;padding:0}
-  .sheet{background:var(--surf2);width:100%;max-width:560px;border-radius:var(--r-lg) var(--r-lg) 0 0;border:1px solid var(--border-2);border-bottom:none;padding:18px 18px max(18px,env(safe-area-inset-bottom));max-height:88vh;overflow:auto;box-shadow:0 -12px 40px rgba(0,0,0,.5)}
+  .sheet{background:var(--surf2);width:100%;max-width:560px;border-radius:var(--r-lg) var(--r-lg) 0 0;border:1px solid var(--border-2);border-bottom:none;padding:18px max(18px,var(--safe-right)) max(18px,var(--safe-bottom)) max(18px,var(--safe-left));max-height:88vh;max-height:88dvh;overflow:auto;box-shadow:0 -12px 40px rgba(0,0,0,.5)}
   .sheet h3{font-family:var(--font-display);font-weight:700;font-size:18px;margin-bottom:4px;letter-spacing:-.02em}
   .field{margin:12px 0}
   .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:500}
@@ -201,7 +219,7 @@
   .scard{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;text-align:center}
   .scard .n{font-family:var(--font-display);font-size:24px;font-weight:800;letter-spacing:-.02em}
   .scard .l{font-size:11px;color:var(--muted);margin-top:3px}
-  .toast{position:fixed;bottom:92px;left:50%;transform:translateX(-50%);background:var(--surf3);border:1px solid var(--border-2);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;opacity:0;transition:opacity .2s;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast{position:fixed;bottom:calc(82px + var(--safe-bottom));left:50%;transform:translateX(-50%);background:var(--surf3);border:1px solid var(--border-2);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;opacity:0;transition:opacity .2s;box-shadow:0 8px 24px rgba(0,0,0,.4)}
   .toast.show{opacity:1}
 
   /* Card-link: tarjeta que lleva a otra vista (Home → Nutrición/Entreno) */
