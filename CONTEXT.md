@@ -13,21 +13,21 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Frontend:** un único `index.html` (HTML+CSS+JS inline). Mobile-first. Sin dependencias salvo `supabase-js` por CDN (jsDelivr).
 - **Persistencia:** la **fuente de verdad es Supabase**; `localStorage` (clave `fitbud_v1`) es solo **caché offline** que la espeja. Ningún dato del usuario vive solo en el navegador (el progreso diario va a `day_log` y el peso a `weight_log`). Lo único local-de-dispositivo son los overrides de credenciales en Ajustes (en producción vienen de Vercel).
 - **Base de datos:** Supabase (PostgreSQL) — catálogo de alimentos (ingredientes/platos/dietas), consumo diario (`day_log`) y peso (`weight_log`).
-- **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador.
+- **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador. El proxy exige sesión: el cliente manda el token de Supabase en `Authorization: Bearer` y el server lo valida (401 si falta/!válido).
 - **Hosting:** Vercel (estático + funciones en `api/`). No hay build.
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
 
-> **Macros del día (resuelto):** la vista HOY ya toma los macros de cada comida desde la **base de datos** (calculados por ingredientes), no de valores fijos. `buildDay` asigna a cada comida un `dishName` (nombre canónico del plato en la DB; ver `BREAKFAST_DISHES`, `DINNER_DISHES`, `LUNCH_DISHES`, `DISH_NAMES`), y `mealValue()` resuelve con esta prioridad: **1)** override manual (editar/personalizar) → **2)** macros de la DB por `dishName` → **3)** fallback a `SLOTS` (valores del plan) si la DB no está conectada. `DAY_TARGET` (metas diarias) sí sigue siendo constante del plan, a propósito. La DB se carga al arrancar (`ensureDB()`), no solo en la pestaña Alimentos.
+> **Macros del día (resuelto):** la vista HOY toma los macros de cada comida desde la **base de datos** (calculados por ingredientes), no de valores fijos. `mealValue()` resuelve con esta prioridad: **1)** override manual → **2)** macros de la DB por `dishName` → **3)** fallback a `SLOTS`. Las metas del usuario se calculan en el onboarding y `effectiveDayTarget()` las adapta a PESAS/BAJO/REFEED/DIETBREAK conservando las proporciones del plan.
 
 ## 3. Mapa de archivos
 | Archivo | Qué es |
 |---|---|
 | `index.html` | **Toda la app** (~1160 líneas): datos, estado, render, vistas, IA, voz, DB, sync. |
 | `config.js` | Fallback de config en runtime (`window.FITBUD_CONFIG`). **Vacío en el repo**; producción usa Vercel. |
-| `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. |
+| `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. **Exige sesión:** valida el JWT de Supabase (Bearer → `/auth/v1/user`) antes de llamar a Anthropic; sin token válido responde 401 (falla cerrado). |
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v6`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v7`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
@@ -39,7 +39,8 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 
 ## 4. Estructura interna de index.html (con líneas aprox.)
 - **Config runtime** (~151): `CONFIG` (de `config.js`), `REMOTE` (de `/api/config`), `effectiveSettings()` (prioridad: override local en Ajustes → REMOTE/Vercel → config.js), `aiAvailable()`, `settingSource()`.
-- **Capa de datos** (~198): `START`/`END`, `WEEKS` (11 semanas incl. "Arranque"), `REFEED_DATES`, `BREAKFASTS`/`DINNERS`/`MENUS` (A/B/C/D por día de semana), generadores de entrenamiento, `DAY_TARGET` (metas por tipo de día), `SLOTS` (kcal+macros por slot y tipo de día).
+- **Capa de datos:** calendario del plan, menús, generadores de entrenamiento, `DAY_TARGET` (proporciones base), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales por tipo de día).
+- **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → alimentación. `hasCompleteOnboarding()` obliga a completarlo una vez y `profileReviewDue()` solicita revisión cada 28 días. Todo se guarda en `profiles.prefs`.
 - **Entrenamiento:** cada perfil elige `primarySport` (`running|cycling|swimming`), `strengthMode` (`gym|bodyweight`) y `trainDays` (3-6). `workoutSchedule(days)` define el reparto semanal, `workoutOptions(ds)` genera las sesiones progresivas y `effectiveWorkout(ds)` resuelve overrides diarios. UI: Perfil + `openWorkoutPicker(ds)` + `setWorkout(ds,id)`.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
 - **Estado/persistencia** (~335): `S` (objeto raíz, cacheado en localStorage), `dayState(ds)` (campos: `meals{id:{done,ovr}}`, `extras[]`, `workoutDone`, `workoutOverride`), `mealState`, `mealValue` (resuelve macros: override manual → DB por `dishName` → fallback plan), `dayTotals(ds)` (suma solo comidas marcadas `done`).
@@ -54,7 +55,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 
 ## 5. Modelo de datos del plan (reglas)
 - **Tipos de día:** PESAS (Lun/Mar/Jue/Vie), BAJO (Mié/Sáb/Dom), REFEED (sáb 27 jun, 11 jul, 8 ago, 22 ago), DIETBREAK (toda la semana 6, 20–26 jul).
-- **Metas (`DAY_TARGET`):** PESAS 2000/180P/195C/55G · BAJO 1800/180/150/50 · REFEED 2700/160/350/55 · DIETBREAK 2750/170/300/70.
+- **Metas:** `DAY_TARGET` conserva las proporciones base PESAS/BAJO/REFEED/DIETBREAK. El onboarding calcula la base personal con Katch-McArdle (si hay % de grasa) o Mifflin-St Jeor; `effectiveDayTarget()` escala cada tipo de día y usa mantenimiento para DIETBREAK.
 - **Menús (`MENUS`):** A Criollo, B Mediterráneo, C Asiático, D Mexicano — asignados por semana en `WEEKS`. Desayunos/cenas rotan; almuerzo según menú+día (autoritativo desde `diet_dishes` en la DB).
 - **Entrenamiento:** plan combinado por perfil: Running/Cycling/Natación + Gimnasio/Peso corporal, entre 3 y 6 días/semana. El reparto aumenta desde 1 full-body + 2 sesiones aeróbicas hasta 4 sesiones de fuerza + calidad + fondo; progresa por bloques durante 10 semanas. Sigue siendo **intercambiable por día** vía `workoutOverride`.
 
@@ -68,7 +69,7 @@ Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
 - `day_log(log_date pk, state jsonb, updated_at)` — consumo del día (comidas/extras/entreno/override) como documento JSON.
 - `weight_log(week pk, kg, updated_at)` — peso semanal.
 - Vista `dish_macros` — macros calculados por plato (suma de ingredientes), `security_invoker`.
-- **RLS:** políticas permiten todo al rol anónimo (publishable key). Para blindar escritura: Supabase Auth + cambiar a `to authenticated`.
+- **RLS (con `auth.sql` aplicado):** escritura anónima eliminada. Catálogo (ingredientes/platos/dietas) = lectura para `authenticated`, escritura solo `is_admin()`. `day_log`/`weight_log` = solo filas del `auth.uid()`. (Las políticas "anon all" de `schema.sql` las reemplaza `auth.sql`.)
 - **Cálculo de macros:** `macros = Σ ingrediente(por_100g) × gramos/100`. En la app se hace en cliente (`macrosFromLines`).
 - **Re-seed:** `seed.sql` hace `truncate ... restart identity cascade` (es re-ejecutable).
 
@@ -103,10 +104,11 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Peso en la DB** — `weight_log` + `pushWeight`/`pullWeights`/`syncWeights`. Nada del usuario vive solo en el navegador.
 - **Plan deportivo configurable** — `primarySport` + `strengthMode` + `trainDays` en `profiles.prefs`; reparto con `workoutSchedule(days)` y sesiones progresivas con `workoutOptions(ds)`.
 - **Cambiar el entrenamiento del día** — `effectiveWorkout` + `workoutOverride` (sincroniza vía `day_log`).
+- **Onboarding y revisión periódica** — calcula macros, reúne objetivo y preferencias, se activa al primer login y vuelve a preguntar cada 28 días.
 
 ### Pendiente / ideas
 - **Porciones especiales de REFEED/DIETBREAK:** el almuerzo refeed usa el plato estándar de la DB, sin la doble porción de carbo que indica el plan.
-- **¿El cambio de entreno ajusta el tipo de día/metas?** Hoy cambiar pesas↔correr no cambia `DAY_TARGET` (sigue por el día de semana). Decidir si debería.
+- **¿El cambio de entreno ajusta el tipo de día/metas?** Hoy cambiar pesas↔correr no cambia el tipo de día (sigue por el día de semana). Decidir si debería.
 - ~~**Auth de Supabase**~~ ✅ Hecho — multiusuario con login; RLS por usuario y escritura de catálogo solo admin (ver §11b).
 - **Editor de dietas** (hoy `foodsDiets` es solo lectura): asignar/editar `diet_dishes` desde la app.
 - **Buscar/filtrar** ingredientes y platos; sugerencias por macros restantes.

@@ -4,6 +4,27 @@
 const ALLOWED_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"];
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
+// Verifica el token de Supabase (Bearer) contra /auth/v1/user.
+// Falla cerrado: sin token válido o sin config de Supabase => no autenticado.
+async function verifyUser(req) {
+  const auth = req.headers.authorization || req.headers.Authorization || "";
+  const token = typeof auth === "string" && auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) return null;
+  const url = process.env.SUPABASE_URL;
+  const apikey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!url || !apikey) return null;
+  try {
+    const r = await fetch(url.replace(/\/$/, "") + "/auth/v1/user", {
+      headers: { Authorization: "Bearer " + token, apikey },
+    });
+    if (!r.ok) return null;
+    const u = await r.json();
+    return u && u.id ? u : null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Método no permitido" });
@@ -12,6 +33,12 @@ export default async function handler(req, res) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) {
     res.status(500).json({ error: "Falta ANTHROPIC_API_KEY en el servidor (Vercel → Environment Variables)." });
+    return;
+  }
+  // Requiere sesión válida de Supabase: sin esto no se llama a Anthropic.
+  const user = await verifyUser(req);
+  if (!user) {
+    res.status(401).json({ error: "Sesión requerida para usar la IA." });
     return;
   }
   try {

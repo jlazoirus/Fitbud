@@ -8,6 +8,8 @@ Tracker web/PWA de mi plan nutricional y de entrenamiento de **10 semanas** (sá
 
 - **Vista HOY** según la fecha real: comidas del plan, entrenamiento y metas del día.
 - **Calorías y macros en vivo** (proteína / carbos / grasa) con barras de progreso; la proteína se destaca con código de color según el ritmo del día.
+- **Flujo inicial personalizado** para calcular calorías y macros, definir objetivo, días de entrenamiento y preferencias alimenticias.
+- **Revisión cada 4 semanas** para actualizar peso, objetivo, macros o preferencias sin perder el progreso.
 - **Tipos de día**: PESAS, BAJO, REFEED y DIET BREAK, cada uno con su meta de kcal y macros.
 - **Marcar** comidas y entrenamiento como completados (se guarda en `localStorage`).
 - **Reemplazar** comidas (otra opción del plan o una personalizada) y **agregar** extras.
@@ -25,6 +27,17 @@ Cada usuario configura en **Perfil**:
 - entre **3 y 6 días de entrenamiento por semana**; 3 días es el mínimo recomendado.
 
 El reparto se adapta al tiempo disponible: con 3 días prioriza una sesión full-body y dos sesiones de la disciplina; al elegir más días aumenta progresivamente el trabajo de fuerza hasta llegar a cuatro sesiones de fuerza y dos aeróbicas con 6 días. El volumen progresa durante las 10 semanas, con descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
+
+## Configuración inicial y macros
+
+Después del primer inicio de sesión, Fitbud guía al usuario por cuatro pasos:
+
+1. Datos corporales y nivel de actividad.
+2. Objetivo y cálculo editable de calorías, proteína, carbohidratos y grasas.
+3. Disciplina, modalidad de fuerza y días de entrenamiento.
+4. Preferencias y restricciones alimenticias.
+
+El cálculo usa Katch-McArdle cuando se proporciona el porcentaje de grasa corporal y Mifflin-St Jeor en caso contrario. Las metas quedan guardadas por usuario en `profiles.prefs` y personalizan los tipos de día del plan. Cada 28 días la app pregunta si se desea revisar la configuración; también puede abrirse manualmente desde **Perfil → Recalcular objetivos y preferencias**.
 
 ## Configuración (de dónde salen las credenciales)
 

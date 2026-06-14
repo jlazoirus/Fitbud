@@ -753,6 +753,243 @@ function dbStatusNote(){
 const $=s=>document.querySelector(s);
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1600);}
 
+/* ---------- Onboarding: perfil, macros y revisión cada 4 semanas ---------- */
+let onboardingActive=false;
+let onboardingStep=1;
+let onboardingDraft=null;
+let reviewPromptShown=false;
+function latestLoggedWeight(){
+  const weeks=Object.keys(S.weights||{}).map(Number).filter(Number.isFinite).sort((a,b)=>b-a);
+  if(!weeks.length)return null;
+  const value=S.weights[weeks[0]];
+  return typeof value==="object"?(+value.kg||null):(+value||null);
+}
+function onboardingDefaults(){
+  const p=(profile&&profile.prefs)||{};
+  return {
+    name:p.name||"",
+    sex:p.sex||"",
+    age:p.age||"",
+    heightCm:p.heightCm||"",
+    weightKg:p.weightKg||latestLoggedWeight()||"",
+    bodyFatPct:p.bodyFatPct||"",
+    activityLevel:ACTIVITY_LEVELS[p.activityLevel]?p.activityLevel:"moderate",
+    goal:p.goal||"deficit",
+    calorieTarget:p.calorieTarget||"",
+    proteinTarget:p.proteinTarget||"",
+    carbTarget:p.carbTarget||"",
+    fatTarget:p.fatTarget||"",
+    maintenanceCalories:p.maintenanceCalories||"",
+    macroMethod:p.macroMethod||"",
+    primarySport:SPORT_LABELS[p.primarySport]?p.primarySport:"running",
+    strengthMode:STRENGTH_LABELS[p.strengthMode]?p.strengthMode:"gym",
+    trainDays:validTrainingDays(p.trainDays)?+p.trainDays:3,
+    trainNote:p.trainNote||"",
+    diet:Array.isArray(p.diet)?p.diet.slice():[],
+    avoid:p.avoid||"",
+    foodNote:p.foodNote||"",
+  };
+}
+function hasCompleteOnboarding(prefs){
+  const p=prefs||{};
+  return !!p.onboardingCompletedAt
+    && Number(p.calorieTarget)>0
+    && Number(p.proteinTarget)>0
+    && Number(p.carbTarget)>0
+    && Number(p.fatTarget)>0
+    && SPORT_LABELS[p.primarySport]
+    && STRENGTH_LABELS[p.strengthMode]
+    && validTrainingDays(p.trainDays);
+}
+function profileReviewDue(prefs,now){
+  if(!hasCompleteOnboarding(prefs))return false;
+  const stamp=Date.parse(prefs.onboardingReviewedAt||prefs.onboardingCompletedAt);
+  return Number.isFinite(stamp)&&(now==null?Date.now():now)-stamp>=PROFILE_REVIEW_MS;
+}
+function startOnboarding(){
+  onboardingDraft=onboardingDefaults();
+  onboardingActive=true;
+  onboardingStep=1;
+  closeModal();
+  render();
+  window.scrollTo(0,0);
+}
+function onboardingSteps(){
+  return `<div class="steps" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
+}
+function onboardingButtons(last){
+  return `<div class="onboarding-actions">
+    ${onboardingStep>1?'<button class="btn" onclick="onboardingBack()">Atrás</button>':""}
+    <button class="btn btn-accent" onclick="${last?"saveOnboarding()":"onboardingNext()"}">${last?"Guardar mi plan":"Continuar"}</button>
+  </div>`;
+}
+function renderOnboarding(){
+  if(!onboardingDraft)onboardingDraft=onboardingDefaults();
+  const d=onboardingDraft;
+  const sel=(a,b)=>a===b?"selected":"";
+  let body="";
+  if(onboardingStep===1){
+    body=`<h1>Primero, conozcamos tu punto de partida</h1>
+      <p class="onboarding-copy">Estos datos se usan para estimar tu gasto energético. El porcentaje de grasa es opcional, pero mejora el cálculo si lo conoces.</p>
+      <div class="dash">
+        <div class="field" style="margin-top:0"><label>Nombre</label><input id="ob_name" value="${esc(d.name)}" autocomplete="name" placeholder="Tu nombre"></div>
+        <div class="onboarding-grid">
+          <div class="field"><label>Sexo para la fórmula</label><select id="ob_sex">
+            <option value="">Selecciona</option><option value="male" ${sel(d.sex,"male")}>Masculino</option><option value="female" ${sel(d.sex,"female")}>Femenino</option>
+          </select></div>
+          <div class="field"><label>Edad</label><input id="ob_age" type="number" inputmode="numeric" min="16" max="90" value="${d.age}" placeholder="30"></div>
+          <div class="field"><label>Estatura (cm)</label><input id="ob_height" type="number" inputmode="decimal" min="130" max="230" value="${d.heightCm}" placeholder="175"></div>
+          <div class="field"><label>Peso actual (kg)</label><input id="ob_weight" type="number" inputmode="decimal" min="35" max="250" step=".1" value="${d.weightKg}" placeholder="80"></div>
+          <div class="field"><label>Grasa corporal % (opcional)</label><input id="ob_bf" type="number" inputmode="decimal" min="3" max="60" step=".1" value="${d.bodyFatPct}" placeholder="20"></div>
+          <div class="field"><label>Actividad fuera del entrenamiento</label><select id="ob_activity">
+            ${Object.entries(ACTIVITY_LEVELS).map(([v,o])=>`<option value="${v}" ${sel(d.activityLevel,v)}>${o.label}</option>`).join("")}
+          </select></div>
+        </div>
+        <div class="muted small">${esc(ACTIVITY_LEVELS[d.activityLevel].description)}</div>
+      </div>${onboardingButtons(false)}`;
+  }else if(onboardingStep===2){
+    body=`<h1>Define tu objetivo y tus macros</h1>
+      <p class="onboarding-copy">Calculamos una referencia inicial. Puedes ajustar cualquier valor antes de guardar.</p>
+      <div class="dash">
+        <div class="field" style="margin-top:0"><label>Objetivo principal</label><select id="ob_goal" onchange="onboardingGoalChanged(this.value)">
+          <option value="deficit" ${sel(d.goal,"deficit")}>Perder grasa</option>
+          <option value="mantenimiento" ${sel(d.goal,"mantenimiento")}>Mantener peso y recomponer</option>
+          <option value="volumen" ${sel(d.goal,"volumen")}>Ganar masa muscular</option>
+        </select></div>
+        <div class="macro-preview">
+          <div class="scard"><div class="n">${d.calorieTarget||"—"}</div><div class="l">kcal / día</div></div>
+          <div class="scard"><div class="n">${d.maintenanceCalories||"—"}</div><div class="l">kcal mantenimiento</div></div>
+        </div>
+        <div class="onboarding-grid">
+          <div class="field"><label>Calorías</label><input id="ob_kcal" type="number" inputmode="numeric" value="${d.calorieTarget}"></div>
+          <div class="field"><label>Proteína (g)</label><input id="ob_protein" type="number" inputmode="numeric" value="${d.proteinTarget}"></div>
+          <div class="field"><label>Carbohidratos (g)</label><input id="ob_carbs" type="number" inputmode="numeric" value="${d.carbTarget}"></div>
+          <div class="field"><label>Grasas (g)</label><input id="ob_fat" type="number" inputmode="numeric" value="${d.fatTarget}"></div>
+        </div>
+        <button class="btn btn-sm" onclick="recalculateOnboarding()">Recalcular valores</button>
+        <div class="review-meta">Fórmula: ${esc(d.macroMethod||"estimación energética")}</div>
+      </div>${onboardingButtons(false)}`;
+  }else if(onboardingStep===3){
+    body=`<h1>Arma tu semana de entrenamiento</h1>
+      <p class="onboarding-copy">Elige una disciplina principal y combínala con fuerza. Tres días es el mínimo recomendado.</p>
+      <div class="dash">
+        <div class="field" style="margin-top:0"><label>Disciplina principal</label><select id="ob_sport" onchange="updateOnboardingTrainingSummary()">
+          ${Object.entries(SPORT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.primarySport,v)}>${l}</option>`).join("")}
+        </select></div>
+        <div class="field"><label>Trabajo de fuerza</label><select id="ob_strength">
+          ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.strengthMode,v)}>${l}</option>`).join("")}
+        </select></div>
+        <div class="field"><label>Días por semana</label><select id="ob_days" onchange="updateOnboardingTrainingSummary()">
+          ${TRAINING_DAY_OPTIONS.map(o=>`<option value="${o.value}" ${+d.trainDays===o.value?"selected":""}>${o.label}</option>`).join("")}
+        </select></div>
+        <div class="ai-box" id="obTrainingSummary"><b>Semana tipo:</b> ${trainingPlanSummary(+d.trainDays,d.primarySport)}</div>
+        <div class="field" style="margin-bottom:0"><label>Lesiones, horarios o notas (opcional)</label><textarea id="ob_trainnote" rows="2">${esc(d.trainNote)}</textarea></div>
+      </div>${onboardingButtons(false)}`;
+  }else{
+    const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]];
+    body=`<h1>Ajusta tus preferencias alimenticias</h1>
+      <p class="onboarding-copy">La dieta y las sugerencias de IA usarán estas restricciones como contexto.</p>
+      <div class="dash">
+        <label class="muted small">Tipo de dieta y restricciones</label>
+        <div class="chips" style="margin:10px 0 16px">
+          ${dietOptions.map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}
+        </div>
+        <div class="field"><label>Alergias o alimentos a evitar</label><input id="ob_avoid" value="${esc(d.avoid)}" placeholder="maní, mariscos..."></div>
+        <div class="field"><label>Preferencias adicionales</label><textarea id="ob_foodnote" rows="3" placeholder="Comidas favoritas, ingredientes que no te gustan...">${esc(d.foodNote)}</textarea></div>
+        <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Entrenamiento:</b> ${d.trainDays} días · ${SPORT_LABELS[d.primarySport]} + ${STRENGTH_LABELS[d.strengthMode]}</div>
+      </div>${onboardingButtons(true)}`;
+  }
+  $("#tabs").innerHTML="";
+  $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">FITBUD · TU PLAN</div>${onboardingSteps()}${body}</main>`;
+}
+function readOnboardingStep(){
+  const d=onboardingDraft;
+  if(onboardingStep===1){
+    d.name=$("#ob_name").value.trim();d.sex=$("#ob_sex").value;d.age=+$("#ob_age").value;
+    d.heightCm=+$("#ob_height").value;d.weightKg=+$("#ob_weight").value;
+    d.bodyFatPct=$("#ob_bf").value?+$("#ob_bf").value:"";d.activityLevel=$("#ob_activity").value;
+  }else if(onboardingStep===2){
+    d.goal=$("#ob_goal").value;d.calorieTarget=+$("#ob_kcal").value;d.proteinTarget=+$("#ob_protein").value;
+    d.carbTarget=+$("#ob_carbs").value;d.fatTarget=+$("#ob_fat").value;
+  }else if(onboardingStep===3){
+    d.primarySport=$("#ob_sport").value;d.strengthMode=$("#ob_strength").value;
+    d.trainDays=+$("#ob_days").value;d.trainNote=$("#ob_trainnote").value.trim();
+  }else{
+    d.diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>$("#ob_diet_"+v).checked);
+    d.avoid=$("#ob_avoid").value.trim();d.foodNote=$("#ob_foodnote").value.trim();
+  }
+}
+function validateOnboardingStep(){
+  const d=onboardingDraft;
+  if(onboardingStep===1){
+    if(!d.name)return "Escribe tu nombre";
+    if(!["male","female"].includes(d.sex))return "Selecciona el sexo usado para el cálculo";
+    if(d.age<16||d.age>90)return "La edad debe estar entre 16 y 90 años";
+    if(d.heightCm<130||d.heightCm>230)return "Revisa tu estatura";
+    if(d.weightKg<35||d.weightKg>250)return "Revisa tu peso";
+    if(d.bodyFatPct!==""&&(d.bodyFatPct<3||d.bodyFatPct>60))return "El porcentaje de grasa debe estar entre 3% y 60%";
+  }
+  if(onboardingStep===2&&[d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].some(v=>!Number.isFinite(v)||v<=0))return "Completa las cuatro metas de nutrición";
+  if(onboardingStep===3&&(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validTrainingDays(d.trainDays)))return "Completa tu plan de entrenamiento";
+  return "";
+}
+function applyCalculatedMacros(){
+  const result=calculateMacroTargets(onboardingDraft);
+  onboardingDraft.calorieTarget=result.kcal;onboardingDraft.proteinTarget=result.p;
+  onboardingDraft.carbTarget=result.c;onboardingDraft.fatTarget=result.f;
+  onboardingDraft.maintenanceCalories=result.maintenance;onboardingDraft.macroMethod=result.method;
+}
+function onboardingNext(){
+  readOnboardingStep();
+  const error=validateOnboardingStep();
+  if(error){toast(error);return;}
+  if(onboardingStep===1)applyCalculatedMacros();
+  onboardingStep=Math.min(4,onboardingStep+1);
+  renderOnboarding();window.scrollTo(0,0);
+}
+function onboardingBack(){readOnboardingStep();onboardingStep=Math.max(1,onboardingStep-1);renderOnboarding();window.scrollTo(0,0);}
+function onboardingGoalChanged(goal){onboardingDraft.goal=goal;applyCalculatedMacros();renderOnboarding();}
+function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();renderOnboarding();toast("Metas recalculadas");}
+function updateOnboardingTrainingSummary(){
+  const out=$("#obTrainingSummary"),sport=$("#ob_sport"),days=$("#ob_days");
+  if(out&&sport&&days)out.innerHTML=`<b>Semana tipo:</b> ${trainingPlanSummary(+days.value,sport.value)}`;
+}
+async function saveOnboarding(){
+  readOnboardingStep();
+  const error=validateOnboardingStep();
+  if(error){toast(error);return;}
+  const d=onboardingDraft,now=new Date().toISOString();
+  const prefs={...((profile&&profile.prefs)||{}),
+    name:d.name,sex:d.sex,age:d.age,heightCm:d.heightCm,weightKg:d.weightKg,
+    bodyFatPct:d.bodyFatPct===""?null:d.bodyFatPct,activityLevel:d.activityLevel,goal:d.goal,
+    calorieTarget:d.calorieTarget,proteinTarget:d.proteinTarget,carbTarget:d.carbTarget,fatTarget:d.fatTarget,
+    maintenanceCalories:d.maintenanceCalories,macroMethod:d.macroMethod,
+    primarySport:d.primarySport,strengthMode:d.strengthMode,trainType:d.primarySport,
+    trainDays:d.trainDays,trainPlace:d.strengthMode==="bodyweight"?"casa":"gym",trainNote:d.trainNote,
+    diet:d.diet,avoid:d.avoid,foodNote:d.foodNote,onboardingCompletedAt:now,onboardingReviewedAt:now,
+  };
+  const result=await saveProfilePrefs(prefs);
+  if(result&&result.error){toast("No se pudo guardar: "+result.error.message);return;}
+  onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
+  view="hoy";current=clampDate(todayStr());render();window.scrollTo(0,0);toast("Tu plan quedó actualizado");
+}
+function maybePromptProfileReview(){
+  if(reviewPromptShown||onboardingActive||!session)return;
+  const p=(profile&&profile.prefs)||{};
+  if(!profileReviewDue(p))return;
+  reviewPromptShown=true;
+  modal(`<h3>Han pasado 4 semanas</h3>
+    <p class="muted small">¿Deseas actualizar tu peso, objetivo, macros o preferencias para el siguiente bloque?</p>
+    <button class="btn btn-accent" style="width:100%" onclick="startOnboarding()">Revisar mi plan</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="keepCurrentProfile()">Mantenerlo por ahora</button>`);
+}
+async function keepCurrentProfile(){
+  const prefs={...((profile&&profile.prefs)||{}),onboardingReviewedAt:new Date().toISOString()};
+  const result=await saveProfilePrefs(prefs);
+  if(result&&result.error){toast("No se pudo guardar: "+result.error.message);return;}
+  closeModal();toast(`Te preguntaremos de nuevo en ${PROFILE_REVIEW_DAYS} días`);
+}
+
 /* ---------- Componentes compartidos (jerarquía del design system) ---------- */
 // Anillo de progreso SVG (Ring). pct 0..1, centerHtml va en el centro.
 function ring(pct,centerHtml,opt){
@@ -787,6 +1024,7 @@ let authReady=false;   // true cuando ya resolvimos la sesión de Supabase
 function render(){
   if(!authReady){$("#tabs").innerHTML="";return renderSplash();}
   if(!session){$("#tabs").innerHTML="";return renderAuth();}
+  if(onboardingActive)return renderOnboarding();
   renderTabs();
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
@@ -1178,6 +1416,7 @@ function weekNav(n){const w=weekOf(current)||WEEKS[0];const i=WEEKS.indexOf(w)+n
 function renderProfile(){
   const p=(profile&&profile.prefs)||{};
   const training=trainingPrefs();
+  const macros=profileMacroTargets();
   const diet=Array.isArray(p.diet)?p.diet:[];
   const chk=v=>diet.includes(v)?"checked":"";
   const sel=(a,b)=>a===b?"selected":"";
@@ -1192,20 +1431,23 @@ function renderProfile(){
     <div class="field" style="margin:0"><label>Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
   </div>
 
+  <div class="section-h">Objetivo y macros</div>
+  <div class="dash">
+    ${macros?`<div class="macro-preview" style="margin-top:0">
+      <div class="scard"><div class="n">${macros.kcal}</div><div class="l">kcal base</div></div>
+      <div class="scard"><div class="n">${macros.p} g</div><div class="l">proteína</div></div>
+      <div class="scard"><div class="n">${macros.c} g</div><div class="l">carbohidratos</div></div>
+      <div class="scard"><div class="n">${macros.f} g</div><div class="l">grasas</div></div>
+    </div>
+    <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${p.goal==="volumen"?"ganar masa":p.goal==="mantenimiento"?"mantenimiento y recomposición":"pérdida de grasa"}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
+    <button class="btn" style="width:100%" onclick="startOnboarding()">Recalcular objetivos y preferencias</button>
+  </div>
+
   <div class="section-h">Preferencias alimenticias</div>
   <div class="dash">
     <label class="muted small">Tipo de dieta</label>
     <div class="chips" style="margin:9px 0 4px">
       ${[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]].map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="pf_diet_${v}" ${chk(v)}><span>${l}</span></label>`).join("")}
-    </div>
-    <div class="row" style="gap:10px">
-      <div class="field" style="flex:1"><label>Objetivo</label><select id="pf_goal">
-        <option value="" ${sel(p.goal||"","")}>—</option>
-        <option value="deficit" ${sel(p.goal,"deficit")}>Déficit</option>
-        <option value="mantenimiento" ${sel(p.goal,"mantenimiento")}>Mantenimiento</option>
-        <option value="volumen" ${sel(p.goal,"volumen")}>Volumen</option>
-      </select></div>
-      <div class="field" style="flex:1"><label>Proteína (g/día)</label><input id="pf_prot" type="number" inputmode="numeric" value="${p.proteinTarget||""}" placeholder="180"></div>
     </div>
     <div class="field"><label>Alergias / evitar</label><input id="pf_avoid" value="${esc(p.avoid||"")}" placeholder="maní, mariscos…"></div>
     <div class="field" style="margin-bottom:0"><label>Nota libre (alimentación)</label><textarea id="pf_foodnote" rows="2" placeholder="Ej. prefiero comidas peruanas, no me gusta el tofu…">${esc(p.foodNote||"")}</textarea></div>
@@ -1254,11 +1496,9 @@ function saveProfile(){
   const strengthMode=$("#pf_strengthmode").value;
   const trainDays=+$("#pf_traindays").value;
   if(!validTrainingDays(trainDays)){toast(`Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días de entrenamiento`);return;}
-  const prefs={
+  const prefs={...((profile&&profile.prefs)||{}),
     name:$("#pf_name").value.trim(),
     diet,
-    goal:$("#pf_goal").value,
-    proteinTarget:+$("#pf_prot").value||null,
     avoid:$("#pf_avoid").value.trim(),
     foodNote:$("#pf_foodnote").value.trim(),
     primarySport,
@@ -1399,7 +1639,11 @@ function buildSysPrompt(){
   const parts=[];
   if(Array.isArray(p.diet)&&p.diet.length)parts.push("Dieta: "+p.diet.map(d=>DIET_LABELS[d]||d).join(", ")+".");
   if(p.goal)parts.push("Objetivo: "+({deficit:"déficit calórico",mantenimiento:"mantenimiento",volumen:"volumen/superávit"}[p.goal]||p.goal)+".");
-  if(p.proteinTarget)parts.push("Meta de proteína ~"+p.proteinTarget+" g/día.");
+  if(p.calorieTarget)parts.push("Meta base: "+p.calorieTarget+" kcal/día.");
+  if(p.proteinTarget)parts.push("Meta de proteína: "+p.proteinTarget+" g/día.");
+  if(p.carbTarget)parts.push("Meta de carbohidratos: "+p.carbTarget+" g/día.");
+  if(p.fatTarget)parts.push("Meta de grasas: "+p.fatTarget+" g/día.");
+  if(p.weightKg)parts.push("Peso actual: "+p.weightKg+" kg"+(p.bodyFatPct?" y "+p.bodyFatPct+"% de grasa corporal":"")+".");
   if(p.avoid&&p.avoid.trim())parts.push("Evitar: "+p.avoid.trim()+".");
   if(p.foodNote&&p.foodNote.trim())parts.push("Notas de alimentación: "+p.foodNote.trim()+".");
   const tt=[];
@@ -1425,8 +1669,11 @@ async function callClaude(userText,maxTokens){
     return (data.content&&data.content[0]&&data.content[0].text)||"";
   }
   // 2) Producción (Vercel): proxy /api/claude. La API key vive solo en el servidor.
+  //    El proxy exige sesión: enviamos el token de Supabase (Bearer) para que valide.
+  const token=session&&session.access_token;
+  if(!token)throw new Error("Inicia sesión para usar la IA.");
   const res=await fetch("/api/claude",{
-    method:"POST",headers:{"content-type":"application/json"},
+    method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+token},
     body:JSON.stringify({userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL})
   });
   if(res.status===404)throw new Error("El proxy /api/claude no está disponible. Despliega en Vercel (con ANTHROPIC_API_KEY) o pon una API key local en Ajustes.");
@@ -1695,8 +1942,9 @@ async function loadProfile(){
 }
 async function saveProfilePrefs(prefs){
   if(!supa||!uid())return{error:{message:"Sin sesión"}};
-  profile.prefs=prefs;
-  return await supa.from("profiles").update({prefs,updated_at:new Date().toISOString()}).eq("id",uid());
+  const result=await supa.from("profiles").update({prefs,updated_at:new Date().toISOString()}).eq("id",uid());
+  if(!result.error)profile.prefs=prefs;
+  return result;
 }
 async function signIn(email,pwd){
   if(!supa)return{error:{message:"Conecta Supabase primero"}};
@@ -1711,6 +1959,7 @@ async function signUp(email,pwd){
 async function signOut(){
   if(supa)try{await supa.auth.signOut();}catch(e){}
   session=null;profile=null;view="hoy";
+  onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
   render();
 }
@@ -1724,10 +1973,12 @@ async function onAuth(){
     if(supa&&!DB.loaded)await dbLoad();
     await Promise.all([pullAllDays(),pullWeights()]);
     const prefs=(profile&&profile.prefs)||{};
-    const days=Number.parseInt(prefs.trainDays,10);
-    const needsTrainingPlan=!SPORT_LABELS[prefs.primarySport]||!STRENGTH_LABELS[prefs.strengthMode]||!validTrainingDays(days);
-    view=needsTrainingPlan?"perfil":"hoy";current=clampDate(todayStr());
+    onboardingActive=!hasCompleteOnboarding(prefs);
+    onboardingDraft=onboardingActive?onboardingDefaults():null;
+    onboardingStep=1;reviewPromptShown=false;
+    view="hoy";current=clampDate(todayStr());
     render();
+    if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
   }finally{_authBusy=false;}
 }
 async function dbLoad(){
@@ -1958,7 +2209,7 @@ function setupAuthListener(){
   if(!supa||window._authSub)return;
   window._authSub=supa.auth.onAuthStateChange((event,sess)=>{
     session=sess||null;
-    if(event==="SIGNED_OUT"){profile=null;view="hoy";render();}
+    if(event==="SIGNED_OUT"){profile=null;view="hoy";onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;render();}
     else if(event==="SIGNED_IN"){if(!profile||profile.id!==uid())onAuth();}
   });
 }
