@@ -1,4 +1,4 @@
-# Plan de requerimientos de producto - Fitbud / Fitbros
+# Plan de requerimientos de producto - Fitbros
 
 Este documento es el backlog operativo para Codex y Claude Code. La regla base es:
 
@@ -112,10 +112,12 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Falta comparar tendencias, hitos y explicar que cambio en el plan |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
 | Recordatorios | No existe | Falta programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
+| Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
 | Suscripcion | No existe | Falta oferta de 1/3 meses, checkout, webhooks, entitlement, renovacion, cancelacion y expiracion |
 | Seguridad y privacidad | Auth, RLS y fotos privadas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
 | Operacion | Admin de usuarios y catalogo de alimentos | Faltan contenidos de ejercicios, media, prompts/versiones, soporte, metricas de IA y costos |
-| Lenguaje y consumo | La UI actual expone botones y mensajes con "IA" y no limita generaciones | Falta vocabulario de coach, cuota diaria server-side y reutilizacion controlada de opciones |
+| Lenguaje (Principio 9) | La UI viva expone "IA" a todos los usuarios (viola el principio HOY) | Barrido de copy a vocabulario de coach (REQ-31, urgente e inmediato) |
+| Consumo de generacion | No hay limite; los generadores de REQ-08 son ilimitados | Cuota diaria server-side y reutilizacion controlada de opciones (REQ-32) |
 | PWA y sincronizacion | Instalable, cache y safe areas de iPhone | Falta cola offline, conflictos, recuperacion ante fallos y pruebas end-to-end de journeys |
 
 ## Journey objetivo
@@ -148,12 +150,13 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 ### Fase A - Fundamentos del coach
 
+0. REQ-31 - Tecnologia invisible (lenguaje). **Hacer YA**: barrido de copy, sin dependencias; la app ya viola el Principio 9 en produccion.
 12. REQ-12 - Perfil flexible de alimentacion y entrenamiento.
 13. REQ-13 - Modelo de planes versionados.
 14. REQ-14 - Seguridad, consentimiento y privacidad.
 15. REQ-15 - Biblioteca de ejercicios y demostraciones animadas.
 16. REQ-16 - Reproductor de entrenamiento para principiantes.
-31. REQ-31 - Tecnologia invisible, cuotas y reutilizacion de opciones. Implementar antes de REQ-17/REQ-18.
+32. REQ-32 - Cuotas diarias y reutilizacion de opciones. Implementar antes de ampliar REQ-17/REQ-18 y retrofitear a REQ-08.
 
 ### Fase B - Inteligencia y adaptacion
 
@@ -171,6 +174,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 ### Fase D - Monetizacion
 
+33. REQ-33 - Landing publica y funnel de adquisicion. Precede a REQ-25/REQ-26: sin superficie publica no hay embudo de venta.
 25. REQ-25 - Oferta, entitlement y paywall.
 26. REQ-26 - Checkout y ciclo de facturacion.
 
@@ -183,7 +187,22 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 REQ-08 debe esperar a REQ-01/REQ-02 y preferiblemente a REQ-05/REQ-06, porque necesita recetas confiables, contexto por usuario y control de acceso a IA.
 
-Los requerimientos REQ-12 a REQ-31 son el backlog recomendado para completar la vision comercial. Las dependencias de cada uno mandan sobre el orden numerico cuando exista una razon tecnica.
+Los requerimientos REQ-12 a REQ-33 son el backlog recomendado para completar la vision comercial. Las dependencias de cada uno mandan sobre el orden numerico cuando exista una razon tecnica.
+
+### Frontera de MVP para el primer cobro
+
+No se necesitan los 33 REQ para vender la primera suscripcion. **MVP de lanzamiento pago** (lo minimo para cobrar con una experiencia honesta):
+
+- REQ-31 (lenguaje invisible) — bloqueante de imagen.
+- REQ-12 (perfil flexible) y REQ-18 (dieta IA flexible por # de comidas/preferencias).
+- REQ-15 en version reducida + REQ-16 (rutina guiada con descripcion y demostracion para principiantes).
+- REQ-23 (rachas justas) para retencion.
+- REQ-32 (cuota+reutilizacion) para controlar costo antes de abrir el grifo.
+- REQ-14 (consentimiento/privacidad minimos) + REQ-33 (landing) + REQ-25/REQ-26 (paywall y checkout).
+
+**Diferibles tras el primer cobro** (mejoran, no bloquean): REQ-13 (versionado completo), REQ-17 (generador de entrenamiento full), REQ-19 (contingencias), REQ-20 (check-in adaptativo), REQ-21 (coach conversacional), REQ-27 (analitica), REQ-28 (offline), REQ-29 (modularizacion), REQ-30 (e2e). Se recomienda igual REQ-27 minimo y REQ-30 smoke antes de escalar trafico.
+
+**Decision de producto pendiente (define la conversion):** cuando se entrega el primer valor. Recomendado: registro → onboarding → **un primer plan/dia gratis** (trial de valor) → paywall para seguir generando/adaptando. Confirmar antes de construir REQ-25/REQ-33.
 
 ---
 
@@ -333,7 +352,7 @@ Hacer que los bloques de dieta, macros, comidas, entrenamiento, resumen, aliment
 
 ## REQ-05 - Login simple y modo publico solo lectura para DB e IA
 
-**Estado: implementado con una decision posterior: el login es obligatorio. El modo muestra comercial se redefine en REQ-25.**
+**Estado: implementado, pero con una decision posterior que invalida parte del alcance original: el login es OBLIGATORIO. Hoy no existe modo anonimo de solo lectura; la primera pantalla es el login. La experiencia de visitante/muestra y el funnel comercial se definen en REQ-25 y en el nuevo REQ-33 (landing publica). Los criterios de "usuario anonimo" de abajo quedan derogados y se conservan solo como historia.**
 
 ### Objetivo
 
@@ -358,19 +377,22 @@ Agregar una capa de login sencilla para permitir escritura en base de datos y us
   - no expone keys.
 - La app debe degradar bien cuando no hay sesion: botones deshabilitados o mensajes claros.
 
-### Criterios de aceptacion
+### Criterios de aceptacion (vigentes)
 
-- Usuario anonimo puede ver la app en modo lectura.
-- Usuario anonimo no puede modificar DB ni usar IA.
-- Usuario autenticado puede usar IA y acciones permitidas.
+- Sin sesion no se puede ver el plan ni navegar la app: la primera pantalla es el login (decision: login obligatorio).
+- Usuario no autenticado no puede modificar DB ni usar funciones del coach.
+- Usuario autenticado activo puede usar las funciones permitidas.
 - RLS ya no permite escritura anonima.
-- `/api/claude` rechaza llamadas sin sesion.
+- `/api/claude` rechaza llamadas sin sesion valida (y bloquea usuarios inactivos).
 - Commit y push propios.
+
+### Criterios derogados (historia, ya no aplican)
+
+- ~~Usuario anonimo puede ver la app en modo lectura.~~ (Se decidio login obligatorio; el acceso de visitante a una muestra se rehace en REQ-33.)
 
 ### Verificacion sugerida
 
-- Probar flujo no logueado.
-- Probar flujo logueado.
+- Probar flujo logueado y confirmar que sin sesion solo se ve el login.
 - Intentar una llamada directa a `/api/claude` sin token y verificar rechazo.
 - Revisar politicas RLS.
 
@@ -613,9 +635,9 @@ Permitir que cada usuario elija entre un bloque corto de 4 semanas y un proceso 
 
 - Elegir la duración durante el onboarding inicial y al iniciar un nuevo desafío.
 - Editar la duración en cualquier momento desde Perfil.
-- Ajustar fecha final, calendario, semanas de peso, refeeds y progresión de entrenamiento.
-- Mantener una progresión compacta con consolidación en la semana 4.
-- Mantener descarga en la semana 6 y consolidación en la semana 10 para el plan largo.
+- Ajustar fecha final, calendario y semanas de peso del ciclo.
+- La progresión por semanas es del **entrenamiento** (consolidación/descarga), no de la nutrición: tras quitar el plan estático (commit `9e3fa4e`) ya no existen tipos de día ni refeeds; los macros son uniformes todos los días y las comidas se arman por usuario.
+- Periodización de entrenamiento: consolidación en la semana 4 (plan corto) y descarga en la semana 6 + consolidación en la semana 10 (plan largo). Esto debe quedar a cargo del generador de entrenamiento (REQ-17); mientras tanto el código de ciclos conserva el andamiaje sin efecto nutricional.
 - Conservar los registros existentes al acortar o ampliar el ciclo.
 - Mostrar la duración correcta en Home, Progreso, onboarding y recap.
 
@@ -783,6 +805,10 @@ Crear una fuente de verdad de ejercicios que permita explicar cada movimiento a 
 
 - Debe aplicar las reglas de seguridad de REQ-14.
 
+### Decision previa bloqueante (build vs buy)
+
+- Conseguir cientos de demostraciones animadas con licencia es un sub-proyecto de contenido y legal por si solo. Antes de codificar este REQ hay que decidir y documentar la fuente: **licenciar** una libreria de ejercicios (p. ej. proveedores con API/licencia comercial), **grabar/producir** propio, o **generar**. La eleccion condiciona costo, esquema de `fuente/licencia` y tiempos. No empezar la carga de media sin esta decision.
+
 ### Alcance
 
 - Crear catalogo de ejercicios para gimnasio, peso corporal, running, cycling y natacion.
@@ -941,6 +967,7 @@ Generar una semana nutricional por usuario que respete macros, numero de comidas
 ### Alcance
 
 - Generar semanas rodantes, no diez semanas de contenido repetido en una sola llamada.
+- Hacer variable el numero de comidas en la UI: hoy `BASE_SLOTS` esta fijo en 4 (desayuno/almuerzo/cena/snack). Home y Nutricion deben renderizar entre 2 y 6 slots segun el perfil, y el reparto de macros por comida debe ajustarse a ese numero.
 - Respetar:
   - 2 a 6 comidas por dia;
   - horarios y ventana alimenticia;
@@ -1241,6 +1268,7 @@ Enviar un recordatorio util al final del dia solo cuando el usuario lo autorizo 
   - hora limite;
   - dias habilitados;
   - recordatorios de nutricion, entrenamiento o ambos.
+- Definir la infraestructura antes de implementar: **scheduler** (Vercel Cron o Supabase `pg_cron`) y **proveedor de correo transaccional** (p. ej. Resend, Postmark o SES) con dominio verificado. El secreto del proveedor vive solo en el servidor.
 - Ejecutar un job seguro que determine por usuario:
   - si habia entrenamiento programado y no esta completado;
   - si la nutricion esta por debajo del umbral definido;
@@ -1406,6 +1434,7 @@ Medir si la experiencia crea valor, donde se abandona y cuanto cuesta operar la 
   - tasa de aceptacion de IA;
   - costo por usuario activo;
   - errores por flujo.
+- Contabilizar el costo por **accion de producto**, no solo por llamada: una accion puede disparar varias llamadas al proveedor (p. ej. "preparar mi semana" hace ~7 generaciones de dia). El costo de la unidad de cuota (REQ-32) debe sumar todas sus llamadas.
 - Añadir limites y alertas de consumo por usuario/funcion.
 - Versionar prompts y permitir feature flags.
 
@@ -1575,19 +1604,17 @@ Proteger los journeys criticos antes de cobrar y reducir regresiones en PWA movi
 
 ---
 
-## REQ-31 - Tecnologia invisible, cuotas y reutilizacion de opciones
+## REQ-31 - Tecnologia invisible (lenguaje de producto)
 
-**Estado: pendiente prioritario.**
+**Estado: pendiente PRIORITARIO E INMEDIATO.** La app en produccion (commit `9e3fa4e`) ya viola el Principio 9: muestra "Generar dia con IA", "Generar este dia", "genera con IA", "Generar semana", el modal "Generar dia con IA" y notas tipo "los macros se calculan..." a todos los usuarios. Es un barrido de textos, barato y desplegable por si solo; **no depende del sistema de cuotas (REQ-32)** y deberia hacerse antes que casi todo lo demas de Fase A/B.
 
 ### Objetivo
 
-Mantener la experiencia enfocada en Fitbros como coach, controlar el costo diario de generar dietas y rutinas, y seguir ofreciendo alternativas utiles cuando se agote el presupuesto de generacion nueva.
+Que ningun usuario no administrador vea en la UI operativa la palabra IA, el proveedor, el modelo, prompts, tokens ni el origen tecnico de una recomendacion. La experiencia habla de "tu coach", "tu plan" y "otra opcion".
 
 ### Dependencias
 
-- Requiere REQ-05/REQ-06 para identidad y control server-side.
-- Debe implementarse antes de ampliar los generadores de REQ-17 y REQ-18.
-- Debe integrarse con entitlement en REQ-25 y analitica en REQ-27.
+- Ninguna tecnica: es un cambio de copy. Idealmente antes de sumar mas superficies de generacion.
 
 ### Lenguaje de producto
 
@@ -1607,6 +1634,33 @@ Mantener la experiencia enfocada en Fitbros como coach, controlar el costo diari
 - Los administradores si pueden ver proveedor, modelo, consumo, validaciones, errores y origen de cada resultado.
 - Los textos legales y de privacidad deben tratar la automatizacion segun lo definido en REQ-14, fuera de la experiencia operativa normal.
 - Auditar todos los textos visibles actuales, estados de carga, errores, modales, botones y mensajes offline.
+
+### Criterios de aceptacion
+
+- Ninguna pantalla operativa para usuarios no administradores contiene `IA`, `AI`, `Claude`, modelos, prompts, tokens ni "generado por...".
+- Los administradores si pueden ver proveedor, modelo, validaciones, errores y origen de cada resultado.
+- Se auditaron botones, secciones, modales, estados de carga/vacio, errores, mensajes offline y el banner de instalacion.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- `grep` de textos prohibidos (`IA`, `AI`, `Claude`, "genera con", "configura la IA", "generado por") en HTML/JS y recorrer todos los flujos como usuario normal.
+
+---
+
+## REQ-32 - Cuotas diarias y reutilizacion de opciones
+
+**Estado: pendiente.**
+
+### Objetivo
+
+Controlar el costo diario de generar dietas y rutinas y seguir ofreciendo alternativas utiles cuando se agote el presupuesto de generacion nueva, sin mostrar nunca el contador al usuario.
+
+### Dependencias
+
+- Requiere REQ-05/REQ-06 para identidad y control server-side.
+- Debe implementarse antes de ampliar los generadores de REQ-17 y REQ-18, y debe retrofitearse a los generadores YA vivos de REQ-08 (dia/semana), que hoy no tienen cuota.
+- Debe integrarse con entitlement en REQ-25 y analitica en REQ-27.
 
 ### Cuota diaria
 
@@ -1685,6 +1739,46 @@ Mantener la experiencia enfocada en Fitbros como coach, controlar el costo diari
 - Agotar cuota y verificar orden `no vista` → `menos reciente` → `plantilla`.
 - Cambiar preferencias despues de llenar el pool y confirmar revalidacion.
 - Probar que un usuario no pueda leer pool, cuota o historial de otro.
+
+---
+
+## REQ-33 - Landing publica y funnel de adquisicion
+
+**Estado: pendiente.**
+
+### Objetivo
+
+Crear la superficie publica que hoy no existe (la primera pantalla es el login) para que un visitante entienda la oferta, vea una muestra y se convierta en cuenta y suscripcion. Es el paso 1 del journey objetivo y un prerequisito real de la monetizacion.
+
+### Dependencias
+
+- Se coordina con REQ-25 (oferta/paywall) y REQ-26 (checkout).
+- Reusa el branding de Fitbros (paleta purpura/terracota, Syne/DM Sans) ya en la app y el `Fitbros Landing.html` del brandbook como referencia visual.
+
+### Alcance
+
+- Pagina(s) publica(s) sin login: propuesta de valor ("siempre tengo algo viable para comer y entrenar hoy"), como funciona, paquetes de 1 y 3 meses, prueba social y FAQ.
+- Muestra no personalizada del producto (capturas o demo guiada) sin exponer IA/proveedor (Principio 9 / REQ-31).
+- CTA claro a registro; tras registrarse, continuar al onboarding y al primer valor segun la decision de trial.
+- SEO basico, Open Graph/sharing, rendimiento y accesibilidad; respetar safe areas en movil.
+- Definir el momento de paywall respecto al primer plan gratis (ver "Decision de producto pendiente" en Orden sugerido).
+- No hardcodear precios: leerlos del catalogo de REQ-25.
+- Medir el funnel (visita → registro → onboarding → primer plan → checkout) con REQ-27.
+
+### Criterios de aceptacion
+
+- Un visitante sin cuenta puede entender la oferta y los paquetes sin iniciar sesion.
+- Ningun texto publico menciona IA, modelos ni proveedores.
+- El CTA lleva a registro y de ahi al onboarding sin callejones.
+- Los precios mostrados provienen del catalogo, no de constantes en el codigo.
+- Funciona y se ve correcto en movil instalado y en navegador.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Recorrer visita → registro → onboarding como usuario nuevo.
+- Revisar que no haya terminos prohibidos en el HTML publico.
+- Probar Open Graph y rendimiento en movil.
 
 ---
 
