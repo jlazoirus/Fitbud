@@ -79,6 +79,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 8. REQ-08 - Generador de dias de dieta con Claude.
 9. REQ-09 - Onboarding de objetivos, macros y preferencias.
 10. REQ-10 - Cierre de ciclo, recap y siguiente desafío.
+11. REQ-11 - Duración configurable del plan.
 
 REQ-08 debe esperar a REQ-01/REQ-02 y preferiblemente a REQ-05/REQ-06, porque necesita recetas confiables, contexto por usuario y control de acceso a IA.
 
@@ -455,7 +456,7 @@ Configurar el perfil completo del usuario al entrar por primera vez y ofrecer un
 
 ### Objetivo
 
-Cerrar cada proceso de 10 semanas con un resumen útil, documentar visualmente el progreso y crear el siguiente ciclo a partir de un nuevo desafío.
+Cerrar cada proceso de 4 o 10 semanas con un resumen útil, documentar visualmente el progreso y crear el siguiente ciclo a partir de un nuevo desafío.
 
 ### Alcance
 
@@ -469,7 +470,7 @@ Cerrar cada proceso de 10 semanas con un resumen útil, documentar visualmente e
   - mejorar rendimiento;
   - ganar fuerza.
 - Volver a ejecutar el onboarding completo con valores preseleccionados según el desafío.
-- Crear otras 10 semanas con fechas, pesos y progreso independientes.
+- Crear otro ciclo con la duración elegida, fechas, pesos y progreso independientes.
 - Conservar recaps y fotos anteriores en la vista Progreso.
 
 ### Criterios de aceptación
@@ -479,6 +480,35 @@ Cerrar cada proceso de 10 semanas con un resumen útil, documentar visualmente e
 - Rendimiento prioriza sesiones aeróbicas/técnicas y fuerza prioriza sesiones de fuerza.
 - Las fotos son privadas y solo accesibles por el propietario mediante URL firmada.
 - La migración `supabase/plan_cycles.sql` conserva los pesos existentes.
+- Commit y push propios.
+
+---
+
+## REQ-11 - Duración configurable del plan
+
+**Estado: implementado.**
+
+### Objetivo
+
+Permitir que cada usuario elija entre un bloque corto de 4 semanas y un proceso completo de 10 semanas.
+
+### Alcance
+
+- Elegir la duración durante el onboarding inicial y al iniciar un nuevo desafío.
+- Editar la duración en cualquier momento desde Perfil.
+- Ajustar fecha final, calendario, semanas de peso, refeeds y progresión de entrenamiento.
+- Mantener una progresión compacta con consolidación en la semana 4.
+- Mantener descarga en la semana 6 y consolidación en la semana 10 para el plan largo.
+- Conservar los registros existentes al acortar o ampliar el ciclo.
+- Mostrar la duración correcta en Home, Progreso, onboarding y recap.
+
+### Criterios de aceptación
+
+- Un plan de 4 semanas abarca exactamente 28 días y contiene cuatro semanas.
+- Un plan de 10 semanas abarca exactamente 70 días y contiene diez semanas.
+- Cambiar la duración desde Perfil actualiza el ciclo activo sin borrar datos.
+- El recap aparece al terminar la duración elegida.
+- Los perfiles existentes conservan 10 semanas por defecto.
 - Commit y push propios.
 
 ---

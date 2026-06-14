@@ -80,7 +80,7 @@ create table weight_log (
   primary key (user_id, cycle_start, week)
 );
 
--- ---------- CICLOS DE 10 SEMANAS + RECAP ----------
+-- ---------- CICLOS DE 4 O 10 SEMANAS + RECAP ----------
 create table if not exists plan_cycles (
   id             bigint generated always as identity primary key,
   user_id        uuid not null references auth.users(id) on delete cascade,

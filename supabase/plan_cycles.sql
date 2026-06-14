@@ -1,5 +1,5 @@
 -- ============================================================
--- Fitbud — ciclos sucesivos de 10 semanas + fotos de progreso
+-- Fitbud — ciclos sucesivos de 4 o 10 semanas + fotos de progreso
 -- Idempotente. Ejecuta después de supabase/auth.sql.
 -- ============================================================
 

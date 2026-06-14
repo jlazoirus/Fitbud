@@ -374,6 +374,10 @@ const DEFAULT_WEEKS = [
 ];
 const DEFAULT_WEIGHT_RANGES = {1:"81.0–81.4",2:"80.2–80.6",3:"79.3–79.8",4:"78.4–79.0",5:"77.5–78.2",6:"78.0–78.8 (sube, normal)",7:"77.0–77.8",8:"76.1–77.0",9:"75.2–76.2",10:"74.3–75.4"};
 const CYCLE_MENUS=["A","B","C","D","A","B","B","C","D","A"];
+const PLAN_DURATION_OPTIONS=[
+  {value:4,label:"4 semanas · bloque corto"},
+  {value:10,label:"10 semanas · proceso completo"},
+];
 const CHALLENGE_LABELS={
   maintain:"Mantener lo logrado",
   continue:"Continuar el mismo objetivo",
@@ -385,6 +389,7 @@ let END=DEFAULT_END;
 let REFEED_DATES=new Set(DEFAULT_REFEED_DATES);
 let WEEKS=DEFAULT_WEEKS.map(w=>({...w}));
 let WEIGHT_RANGES={...DEFAULT_WEIGHT_RANGES};
+let PLAN_DURATION_WEEKS=10;
 
 const BREAKFASTS = [
   "Avena proteica: avena 50g + 1.5 scoop + chía 10g + canela",
@@ -441,6 +446,11 @@ const TRAINING_DAY_OPTIONS=[
 function validTrainingDays(value){
   const days=Number.parseInt(value,10);
   return Number.isInteger(days)&&days>=MIN_TRAINING_DAYS&&days<=MAX_TRAINING_DAYS;
+}
+function validPlanDuration(value){return PLAN_DURATION_OPTIONS.some(o=>o.value===Number(value));}
+function resolvedPlanDuration(prefs){
+  const duration=Number.parseInt(prefs&&prefs.planDurationWeeks,10);
+  return validPlanDuration(duration)?duration:10;
 }
 function trainingPrefs(){
   const p=(profile&&profile.prefs)||{};
@@ -508,6 +518,11 @@ function trainingWeek(ds){
 }
 function strengthProgression(ds){
   const n=trainingWeek(ds);
+  if(PLAN_DURATION_WEEKS===4){
+    if(n===1)return "Base: 3 series por ejercicio, deja 3 repeticiones en reserva.";
+    if(n<=3)return "Progresión: sube carga o repeticiones con buena técnica y deja 1-2 repeticiones en reserva.";
+    return "Consolidación: reduce el volumen, conserva intensidad y registra tus mejores series técnicas.";
+  }
   if(n<=2)return "Base: 3 series por ejercicio, deja 3 repeticiones en reserva.";
   if(n<=5)return "Progresión: 4 series principales, sube carga o repeticiones con buena técnica.";
   if(n===6)return "Descarga: 2 series por ejercicio al 60-70% del esfuerzo habitual.";
@@ -516,7 +531,9 @@ function strengthProgression(ds){
 }
 function sportSessions(primary,ds){
   const n=trainingWeek(ds);
-  const phase=n<=2?0:n<=5?1:n===6?2:n<=9?3:4;
+  const phase=PLAN_DURATION_WEEKS===4
+    ? (n===1?0:n<=3?1:4)
+    : (n<=2?0:n<=5?1:n===6?2:n<=9?3:4);
   const plans={
     running:{
       kind:"Running",
@@ -710,8 +727,9 @@ const MON=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","di
 function prettyDate(s){const d=parseYmd(s);return DOW[d.getDay()]+", "+d.getDate()+" "+MON[d.getMonth()];}
 function validYmd(s){return typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s)&&!isNaN(parseYmd(s));}
 function cycleNumber(){return Math.max(1,Number.parseInt(profile&&profile.prefs&&profile.prefs.planCycleNumber,10)||1);}
-function buildCycleWeeks(start){
-  return CYCLE_MENUS.map((menu,i)=>({
+function planEndFor(start,duration){return addDays(start,(validPlanDuration(duration)?+duration:10)*7-1);}
+function buildCycleWeeks(start,duration){
+  return CYCLE_MENUS.slice(0,duration).map((menu,i)=>({
     label:"S"+(i+1),
     start:addDays(start,i*7),
     end:addDays(start,i*7+6),
@@ -727,10 +745,10 @@ function weekdayInWeek(week,weekday){
 function buildWeightRanges(prefs){
   const p=prefs||{};
   const startWeight=Number(p.cycleStartWeight||p.weightKg);
-  if(!Number.isFinite(startWeight)||startWeight<=0)return Object.fromEntries(Array.from({length:10},(_,i)=>[i+1,"—"]));
+  if(!Number.isFinite(startWeight)||startWeight<=0)return Object.fromEntries(Array.from({length:PLAN_DURATION_WEEKS},(_,i)=>[i+1,"—"]));
   const rate=p.goal==="deficit"?-.004:p.goal==="volumen"?.002:0;
   const ranges={};
-  for(let week=1;week<=10;week++){
+  for(let week=1;week<=PLAN_DURATION_WEEKS;week++){
     const center=startWeight*Math.pow(1+rate,week-1);
     ranges[week]=`${(center-.3).toFixed(1)}–${(center+.3).toFixed(1)}`;
   }
@@ -739,12 +757,14 @@ function buildWeightRanges(prefs){
 function refreshPlanCalendar(){
   const p=(profile&&profile.prefs)||{};
   if(validYmd(p.planStartDate)){
+    PLAN_DURATION_WEEKS=resolvedPlanDuration(p);
     START=p.planStartDate;
-    END=validYmd(p.planEndDate)?p.planEndDate:addDays(START,69);
-    WEEKS=buildCycleWeeks(START);
-    REFEED_DATES=new Set([2,4,8,10].map(n=>weekdayInWeek(WEEKS[n-1],6)));
+    END=planEndFor(START,PLAN_DURATION_WEEKS);
+    WEEKS=buildCycleWeeks(START,PLAN_DURATION_WEEKS);
+    REFEED_DATES=new Set([2,4,8,10].filter(n=>n<=PLAN_DURATION_WEEKS).map(n=>weekdayInWeek(WEEKS[n-1],6)));
     WEIGHT_RANGES=buildWeightRanges(p);
   }else{
+    PLAN_DURATION_WEEKS=10;
     START=DEFAULT_START;END=DEFAULT_END;
     WEEKS=DEFAULT_WEEKS.map(w=>({...w}));
     REFEED_DATES=new Set(DEFAULT_REFEED_DATES);
@@ -930,7 +950,7 @@ function renderPlanRecap(){
   $("#app").innerHTML=`<main class="recap">
     <div class="recap-hero">
       <div class="onboarding-brand">CICLO ${cycleNumber()} · COMPLETADO</div>
-      <h1>Diez semanas que ya son tuyas.</h1>
+      <h1>${PLAN_DURATION_WEEKS} semanas que ya son tuyas.</h1>
       <p class="onboarding-copy">Este es el resumen de lo que registraste entre ${prettyDate(START)} y ${prettyDate(END)}.</p>
     </div>
     <div class="recap-grid">
@@ -1042,6 +1062,7 @@ function onboardingDefaults(){
     maintenanceCalories:p.maintenanceCalories||"",
     macroMethod:p.macroMethod||"",
     challenge:p.pendingChallenge||p.challenge||"",
+    planDurationWeeks:resolvedPlanDuration(p),
     primarySport:SPORT_LABELS[p.primarySport]?p.primarySport:"running",
     strengthMode:STRENGTH_LABELS[p.strengthMode]?p.strengthMode:"gym",
     trainDays:validTrainingDays(p.trainDays)?+p.trainDays:3,
@@ -1140,10 +1161,13 @@ function renderOnboarding(){
         <div class="field"><label>Trabajo de fuerza</label><select id="ob_strength">
           ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.strengthMode,v)}>${l}</option>`).join("")}
         </select></div>
+        <div class="field"><label>Duración del plan</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
+          ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
+        </select></div>
         <div class="field"><label>Días por semana</label><select id="ob_days" onchange="updateOnboardingTrainingSummary()">
           ${TRAINING_DAY_OPTIONS.map(o=>`<option value="${o.value}" ${+d.trainDays===o.value?"selected":""}>${o.label}</option>`).join("")}
         </select></div>
-        <div class="ai-box" id="obTrainingSummary"><b>Semana tipo:</b> ${trainingPlanSummary(+d.trainDays,d.primarySport,d.challenge)}</div>
+        <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(+d.trainDays,d.primarySport,d.challenge)}</div>
         <div class="field" style="margin-bottom:0"><label>Lesiones, horarios o notas (opcional)</label><textarea id="ob_trainnote" rows="2">${esc(d.trainNote)}</textarea></div>
       </div>${onboardingButtons(false)}`;
   }else{
@@ -1157,12 +1181,12 @@ function renderOnboarding(){
         </div>
         <div class="field"><label>Alergias o alimentos a evitar</label><input id="ob_avoid" value="${esc(d.avoid)}" placeholder="maní, mariscos..."></div>
         <div class="field"><label>Preferencias adicionales</label><textarea id="ob_foodnote" rows="3" placeholder="Comidas favoritas, ingredientes que no te gustan...">${esc(d.foodNote)}</textarea></div>
-        <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Entrenamiento:</b> ${d.trainDays} días · ${SPORT_LABELS[d.primarySport]} + ${STRENGTH_LABELS[d.strengthMode]}</div>
+        <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainDays} días · ${SPORT_LABELS[d.primarySport]} + ${STRENGTH_LABELS[d.strengthMode]}</div>
       </div>${onboardingButtons(true)}`;
   }
   $("#tabs").innerHTML="";
   const challengeNote=d.challenge&&CHALLENGE_LABELS[d.challenge]
-    ? `<div class="alert violet"><b>Siguiente desafío:</b> ${CHALLENGE_LABELS[d.challenge]}. Revisaremos todos tus datos antes de crear las próximas 10 semanas.</div>`
+    ? `<div class="alert violet"><b>Siguiente desafío:</b> ${CHALLENGE_LABELS[d.challenge]}. Revisaremos todos tus datos antes de crear las próximas ${d.planDurationWeeks} semanas.</div>`
     :"";
   $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">FITBROS · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</main>`;
 }
@@ -1177,6 +1201,7 @@ function readOnboardingStep(){
     d.carbTarget=+$("#ob_carbs").value;d.fatTarget=+$("#ob_fat").value;
   }else if(onboardingStep===3){
     d.primarySport=$("#ob_sport").value;d.strengthMode=$("#ob_strength").value;
+    d.planDurationWeeks=+$("#ob_duration").value;
     d.trainDays=+$("#ob_days").value;d.trainNote=$("#ob_trainnote").value.trim();
   }else{
     d.diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>$("#ob_diet_"+v).checked);
@@ -1194,7 +1219,7 @@ function validateOnboardingStep(){
     if(d.bodyFatPct!==""&&(d.bodyFatPct<3||d.bodyFatPct>60))return "El porcentaje de grasa debe estar entre 3% y 60%";
   }
   if(onboardingStep===2&&[d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].some(v=>!Number.isFinite(v)||v<=0))return "Completa las cuatro metas de nutrición";
-  if(onboardingStep===3&&(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validTrainingDays(d.trainDays)))return "Completa tu plan de entrenamiento";
+  if(onboardingStep===3&&(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validTrainingDays(d.trainDays)||!validPlanDuration(d.planDurationWeeks)))return "Completa tu plan de entrenamiento";
   return "";
 }
 function applyCalculatedMacros(){
@@ -1215,8 +1240,8 @@ function onboardingBack(){readOnboardingStep();onboardingStep=Math.max(1,onboard
 function onboardingGoalChanged(goal){onboardingDraft.goal=goal;applyCalculatedMacros();renderOnboarding();}
 function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();renderOnboarding();toast("Metas recalculadas");}
 function updateOnboardingTrainingSummary(){
-  const out=$("#obTrainingSummary"),sport=$("#ob_sport"),days=$("#ob_days");
-  if(out&&sport&&days)out.innerHTML=`<b>Semana tipo:</b> ${trainingPlanSummary(+days.value,sport.value,onboardingDraft&&onboardingDraft.challenge)}`;
+  const out=$("#obTrainingSummary"),sport=$("#ob_sport"),days=$("#ob_days"),duration=$("#ob_duration");
+  if(out&&sport&&days&&duration)out.innerHTML=`<b>${duration.value} semanas.</b> ${trainingPlanSummary(+days.value,sport.value,onboardingDraft&&onboardingDraft.challenge)}`;
 }
 function updateOnboardingActivity(value){
   const out=$("#obActivityDescription"),activity=ACTIVITY_LEVELS[value];
@@ -1230,16 +1255,24 @@ async function saveOnboarding(){
   const previous={...((profile&&profile.prefs)||{})};
   const newCycle=!!previous.onboardingPending;
   const firstCycle=!hasCompleteOnboarding(previous);
+  const duration=validPlanDuration(d.planDurationWeeks)?+d.planDurationWeeks:10;
+  const durationChanged=duration!==resolvedPlanDuration(previous);
   let planStartDate=previous.planStartDate,planEndDate=previous.planEndDate;
   let planCycleNumber=Math.max(1,Number.parseInt(previous.planCycleNumber,10)||1);
   if(newCycle){
     planCycleNumber+=1;
     planStartDate=todayStr()>END?todayStr():addDays(END,1);
-    planEndDate=addDays(planStartDate,69);
+    planEndDate=planEndFor(planStartDate,duration);
   }else if(firstCycle&&!validYmd(planStartDate)){
     planStartDate=todayStr();
-    planEndDate=addDays(planStartDate,69);
+    planEndDate=planEndFor(planStartDate,duration);
+  }else if(validYmd(planStartDate)){
+    planEndDate=planEndFor(planStartDate,duration);
+  }else{
+    planStartDate=START;
+    planEndDate=planEndFor(planStartDate,duration);
   }
+  const calendarChanged=durationChanged||previous.planStartDate!==planStartDate||previous.planEndDate!==planEndDate;
   const prefs={...previous,
     name:d.name,sex:d.sex,age:d.age,heightCm:d.heightCm,weightKg:d.weightKg,
     bodyFatPct:d.bodyFatPct===""?null:d.bodyFatPct,activityLevel:d.activityLevel,goal:d.goal,
@@ -1249,7 +1282,7 @@ async function saveOnboarding(){
     primarySport:d.primarySport,strengthMode:d.strengthMode,trainType:d.primarySport,
     trainDays:d.trainDays,trainPlace:d.strengthMode==="bodyweight"?"casa":"gym",trainNote:d.trainNote,
     diet:d.diet,avoid:d.avoid,foodNote:d.foodNote,
-    planCycleNumber,planStartDate,planEndDate,
+    planCycleNumber,planStartDate,planEndDate,planDurationWeeks:duration,
     cycleStartWeight:d.weightKg,cycleStartBodyFat:d.bodyFatPct===""?null:d.bodyFatPct,
     onboardingPending:false,pendingChallenge:null,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
@@ -1258,6 +1291,8 @@ async function saveOnboarding(){
   if(result&&result.error){toast("No se pudo guardar: "+result.error.message);return;}
   if(newCycle||firstCycle){
     S.days={};S.weights={};save();
+  }
+  if(newCycle||firstCycle||calendarChanged){
     await upsertActiveCycle();
     await pullCycleHistory();
   }
@@ -1569,7 +1604,7 @@ function renderWorkout(){
   <div class="dash" style="padding:12px 14px">
     <div class="row between">
       <div>
-        <div class="muted small">Plan combinado · ${training.days} días/semana · 10 semanas</div>
+        <div class="muted small">Plan combinado · ${training.days} días/semana · ${PLAN_DURATION_WEEKS} semanas</div>
         <div style="font-weight:700;margin-top:3px">${SPORT_LABELS[training.primary]} + ${STRENGTH_LABELS[training.strength]}</div>
       </div>
       <button class="btn btn-sm" onclick="setView('perfil')">Configurar</button>
@@ -1669,7 +1704,7 @@ function daySummary(ds){
     <div class="scard"><div class="n">${doneMeals}/${totMeals}</div><div class="l">comidas cumplidas</div></div>
     <div class="scard"><div class="n">${wOk?'✓':'—'}</div><div class="l">entrenamiento</div></div>
   </div>
-  <div class="muted small center" style="margin-top:10px">${w?(w.num?("Semana "+w.num+" de 10"):"Semana de arranque"):""} · faltan ${daysLeft} días para el final</div>`);
+  <div class="muted small center" style="margin-top:10px">${w?(w.num?("Semana "+w.num+" de "+PLAN_DURATION_WEEKS):"Semana de arranque"):""} · faltan ${daysLeft} días para el final</div>`);
 }
 
 /* ---------- acciones ---------- */
@@ -1709,7 +1744,7 @@ function renderProgress(){
 function progressJourney(){
   const completed=cycleHistory.filter(row=>row.status==="completed");
   const current=`<div class="alert violet"><b>Ciclo ${cycleNumber()} en curso</b><br>${prettyDate(START)} → ${prettyDate(END)}${profile&&profile.prefs&&profile.prefs.challenge?` · ${CHALLENGE_LABELS[profile.prefs.challenge]||profile.prefs.challenge}`:""}</div>`;
-  if(!completed.length)return current+'<div class="muted small">Cuando termines tus primeras 10 semanas, aquí quedarán el recap y tus fotos privadas de progreso.</div>';
+  if(!completed.length)return current+`<div class="muted small">Cuando termines este ciclo de ${PLAN_DURATION_WEEKS} semanas, aquí quedarán el recap y tus fotos privadas de progreso.</div>`;
   return current+completed.map(row=>{
     const s=row.summary||{};
     const photo=row.photo_url?`<img class="journey-photo" src="${row.photo_url}" alt="Foto de progreso del ciclo ${row.cycle_number}">`:"";
@@ -1789,7 +1824,7 @@ function weekSection(){
   return `<div class="row between" style="margin-bottom:10px">
       <button class="btn btn-sm" onclick="weekNav(-1)" ${w.num<=0?'disabled style=opacity:.3':''}>‹</button>
       <span class="muted small">${w.label==="Arranque"?"Arranque":"Semana "+w.num} · Menú ${w.menu}</span>
-      <button class="btn btn-sm" onclick="weekNav(1)" ${w.num>=10?'disabled style=opacity:.3':''}>›</button>
+      <button class="btn btn-sm" onclick="weekNav(1)" ${w.num>=PLAN_DURATION_WEEKS?'disabled style=opacity:.3':''}>›</button>
     </div>
     ${rows}`;
 }
@@ -1806,6 +1841,7 @@ function renderProfile(){
   const sel=(a,b)=>a===b?"selected":"";
   const email=(session&&session.user&&session.user.email)||"";
   const storedDays=Number.parseInt(p.trainDays,10);
+  const duration=resolvedPlanDuration(p);
   const needsTrainingPlan=!SPORT_LABELS[p.primarySport]||!STRENGTH_LABELS[p.strengthMode]||!validTrainingDays(storedDays);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
 
@@ -1839,7 +1875,7 @@ function renderProfile(){
 
   <div class="section-h">Preferencias de entrenamiento</div>
   <div class="dash">
-    <div class="muted small" style="margin-bottom:10px">El plan de 10 semanas combina siempre una disciplina aeróbica con fuerza para mejorar rendimiento y conservar masa muscular.</div>
+    <div class="muted small" style="margin-bottom:10px">El plan combina siempre una disciplina aeróbica con fuerza. Puedes usar un bloque corto de 4 semanas o un proceso completo de 10.</div>
     <div class="row" style="gap:10px">
       <div class="field" style="flex:1"><label>Disciplina principal</label><select id="pf_primarysport" onchange="updateTrainingSummary()">
         ${[["running","Running"],["cycling","Cycling"],["swimming","Natación"]].map(([v,l])=>`<option value="${v}" ${sel(training.primary,v)}>${l}</option>`).join("")}
@@ -1851,7 +1887,10 @@ function renderProfile(){
     <div class="field"><label>Días de entrenamiento por semana</label><select id="pf_traindays" onchange="updateTrainingSummary()">
       ${TRAINING_DAY_OPTIONS.map(o=>`<option value="${o.value}" ${training.days===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">Recomendamos entrenar al menos 3 días y conservar como mínimo un día de descanso.</div></div>
-    <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>Semana tipo:</b> ${trainingPlanSummary(training.days,training.primary)}</div>
+    <div class="field"><label>Duración del plan</label><select id="pf_duration" onchange="updateTrainingSummary()">
+      ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
+    </select><div class="muted small" style="margin-top:6px">Al cambiarla se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
+    <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas.</b> ${trainingPlanSummary(training.days,training.primary)}</div>
     <div class="field" style="margin-bottom:0"><label>Nota libre (entrenamiento)</label><textarea id="pf_trainnote" rows="2" placeholder="Ej. lesión de hombro, entreno en las mañanas…">${esc(p.trainNote||"")}</textarea></div>
   </div>
 
@@ -1872,16 +1911,23 @@ function renderProfile(){
   </div>`;
 }
 function updateTrainingSummary(){
-  const sport=$("#pf_primarysport");const days=$("#pf_traindays");const out=$("#trainingSummary");
-  if(out&&sport&&days)out.innerHTML=`<b>Semana tipo:</b> ${trainingPlanSummary(+days.value,sport.value)}`;
+  const sport=$("#pf_primarysport"),days=$("#pf_traindays"),duration=$("#pf_duration"),out=$("#trainingSummary");
+  if(out&&sport&&days&&duration)out.innerHTML=`<b>${duration.value} semanas.</b> ${trainingPlanSummary(+days.value,sport.value)}`;
 }
-function saveProfile(){
+async function saveProfile(){
+  const previous={...((profile&&profile.prefs)||{})};
   const diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#pf_diet_"+v);return el&&el.checked;});
   const primarySport=$("#pf_primarysport").value;
   const strengthMode=$("#pf_strengthmode").value;
   const trainDays=+$("#pf_traindays").value;
+  const planDurationWeeks=+$("#pf_duration").value;
   if(!validTrainingDays(trainDays)){toast(`Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días de entrenamiento`);return;}
-  const prefs={...((profile&&profile.prefs)||{}),
+  if(!validPlanDuration(planDurationWeeks)){toast("Elige un plan de 4 o 10 semanas");return;}
+  const durationChanged=planDurationWeeks!==resolvedPlanDuration(previous);
+  const planStartDate=validYmd(previous.planStartDate)?previous.planStartDate:START;
+  const planEndDate=planEndFor(planStartDate,planDurationWeeks);
+  const calendarChanged=durationChanged||previous.planStartDate!==planStartDate||previous.planEndDate!==planEndDate;
+  const prefs={...previous,
     name:$("#pf_name").value.trim(),
     diet,
     avoid:$("#pf_avoid").value.trim(),
@@ -1892,8 +1938,16 @@ function saveProfile(){
     trainDays,
     trainPlace:strengthMode==="bodyweight"?"casa":"gym",
     trainNote:$("#pf_trainnote").value.trim(),
+    planDurationWeeks,
+    planStartDate,
+    planEndDate,
   };
-  saveProfilePrefs(prefs).then(r=>{toast(r&&r.error?("Error: "+r.error.message):"Preferencias guardadas");render();});
+  const result=await saveProfilePrefs(prefs);
+  if(result&&result.error){toast("Error: "+result.error.message);return;}
+  if(calendarChanged){await upsertActiveCycle();await pullCycleHistory();}
+  current=clampDate(current);
+  render();
+  toast(durationChanged?`Plan ajustado a ${planDurationWeeks} semanas`:"Preferencias guardadas");
 }
 
 /* ---------- LOGIN / REGISTRO ---------- */
@@ -2353,7 +2407,7 @@ function lastWeighedWeek(){const ks=Object.keys(WEIGHT_RANGES).map(Number).filte
 function weightChart(){
   const pts=Object.keys(WEIGHT_RANGES).map(n=>({x:+n,y:wkg(n)})).filter(p=>p.y!=null);
   if(pts.length<1)return `<div class="chart muted small center">Ingresa tu peso semanal para ver el gráfico de evolución.</div>`;
-  const W=520,H=160,pad=28;const xs=p=>pad+(p.x-1)/9*(W-pad*2);
+  const W=520,H=160,pad=28;const span=Math.max(1,PLAN_DURATION_WEEKS-1);const xs=p=>pad+(p.x-1)/span*(W-pad*2);
   const allY=pts.map(p=>p.y).concat([74,82]);const minY=Math.min(...allY)-0.5,maxY=Math.max(...allY)+0.5;
   const ys=y=>H-pad-(y-minY)/(maxY-minY)*(H-pad*2);
   const line=pts.map((p,i)=>(i?"L":"M")+xs(p).toFixed(1)+" "+ys(p.y).toFixed(1)).join(" ");

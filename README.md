@@ -1,6 +1,6 @@
 # Fitbud 🏋️🥗
 
-Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **10 semanas**. El ciclo original va del sáb 13 jun al dom 23 ago 2026; los siguientes se recalculan por usuario. App estática, sin frameworks ni build step.
+Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 10 semanas**. El ciclo original va del sáb 13 jun al dom 23 ago 2026; los siguientes se recalculan por usuario. App estática, sin frameworks ni build step.
 
 **🔗 En vivo:** https://fitbud-green.vercel.app/ (desplegado en Vercel; las credenciales viven como variables de entorno en Vercel, no en este repo).
 
@@ -10,13 +10,13 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **10 s
 - **Calorías y macros en vivo** (proteína / carbos / grasa) con barras de progreso; la proteína se destaca con código de color según el ritmo del día.
 - **Flujo inicial personalizado** para calcular calorías y macros, definir objetivo, días de entrenamiento y preferencias alimenticias.
 - **Revisión cada 4 semanas** para actualizar peso, objetivo, macros o preferencias sin perder el progreso.
-- **Cierre de ciclo** con recap de logros, foto privada de cuerpo entero y elección del siguiente desafío antes de recalcular otras 10 semanas.
+- **Cierre de ciclo** con recap de logros, foto privada de cuerpo entero y elección del siguiente desafío antes de recalcular el próximo bloque.
 - **Tipos de día**: PESAS, BAJO, REFEED y DIET BREAK, cada uno con su meta de kcal y macros.
 - **Marcar** comidas y entrenamiento como completados (se guarda en `localStorage`).
 - **Reemplazar** comidas (otra opción del plan o una personalizada) y **agregar** extras.
 - **Navegación** día anterior/siguiente y vista de semana completa.
 - **Registro de peso** semanal con gráfico de evolución, indicador de semana y resumen del día.
-- **Plan deportivo configurable**: elige Running, Cycling o Natación y combínalo siempre con fuerza en gimnasio o con peso corporal durante las 10 semanas.
+- **Plan deportivo configurable**: elige 4 o 10 semanas, Running, Cycling o Natación y combínalo siempre con fuerza en gimnasio o con peso corporal.
 - **Instalable como PWA** con manifest, íconos y cache offline del shell de la app.
 
 ## Plan de entrenamiento
@@ -27,7 +27,7 @@ Cada usuario configura en **Perfil**:
 - un complemento de fuerza: **Gimnasio** o **Peso corporal**.
 - entre **3 y 6 días de entrenamiento por semana**; 3 días es el mínimo recomendado.
 
-El reparto se adapta al tiempo disponible: con 3 días prioriza una sesión full-body y dos sesiones de la disciplina; al elegir más días aumenta progresivamente el trabajo de fuerza hasta llegar a cuatro sesiones de fuerza y dos aeróbicas con 6 días. El volumen progresa durante las 10 semanas, con descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
+El reparto se adapta al tiempo disponible: con 3 días prioriza una sesión full-body y dos sesiones de la disciplina; al elegir más días aumenta progresivamente el trabajo de fuerza hasta llegar a cuatro sesiones de fuerza y dos aeróbicas con 6 días. El bloque de 4 semanas usa una progresión compacta y el de 10 semanas incluye descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
 
 ## Configuración inicial y macros
 
@@ -40,7 +40,7 @@ Después del primer inicio de sesión, Fitbud guía al usuario por cuatro pasos:
 
 El cálculo usa Katch-McArdle cuando se proporciona el porcentaje de grasa corporal y Mifflin-St Jeor en caso contrario. Las metas quedan guardadas por usuario en `profiles.prefs` y personalizan los tipos de día del plan. Cada 28 días la app pregunta si se desea revisar la configuración; también puede abrirse manualmente desde **Perfil → Recalcular objetivos y preferencias**.
 
-Al terminar las 10 semanas, Fitbud resume entrenamientos, adherencia, cambio de peso, grasa corporal y mejor racha. El usuario puede guardar una foto privada de cuerpo entero y elegir entre mantener, continuar, mejorar rendimiento o ganar fuerza. Esa elección vuelve a abrir el onboarding y crea un ciclo nuevo con fechas, macros y reparto deportivo recalculados.
+Al terminar la duración elegida, Fitbud resume entrenamientos, adherencia, cambio de peso, grasa corporal y mejor racha. El usuario puede guardar una foto privada de cuerpo entero y elegir entre mantener, continuar, mejorar rendimiento o ganar fuerza. Esa elección vuelve a abrir el onboarding y crea un ciclo nuevo de 4 o 10 semanas con fechas, macros y reparto deportivo recalculados.
 
 ## Configuración (de dónde salen las credenciales)
 

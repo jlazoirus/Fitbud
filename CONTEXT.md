@@ -3,7 +3,7 @@
 Documento de handoff para retomar el proyecto en otra sesión sin perder contexto.
 
 ## 1. Qué es
-PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) que gestiona **ciclos sucesivos de 10 semanas** de nutrición y entrenamiento. El ciclo original fue sáb 13 jun 2026 → dom 23 ago 2026; los siguientes se generan por usuario. Calcula calorías y macros, tiene funciones de IA (Claude) y una base de datos de alimentos (Supabase).
+PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) que gestiona **ciclos sucesivos de 4 o 10 semanas** de nutrición y entrenamiento. El ciclo original fue sáb 13 jun 2026 → dom 23 ago 2026; los siguientes se generan por usuario. Calcula calorías y macros, tiene funciones de IA (Claude) y una base de datos de alimentos (Supabase).
 
 - **Repo:** https://github.com/jlazoirus/Fitbud (público)
 - **En vivo (producción):** https://fitbud-green.vercel.app/
@@ -28,21 +28,21 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
 | `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios paginados, bloquear/desbloquear en Auth + `profiles.active`, cambiar contraseña y enviar reset. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida admin activo, impide auto-desactivación y conserva al último admin. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v13`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v14`. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. El layout respeta `safe-area-inset-*` para no quedar bajo la barra de estado ni el indicador de inicio de iOS. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
 | `supabase/day_log.sql` | Migración incremental: tabla `day_log` (consumo diario). *(Superado por auth.sql, que la recrea por usuario.)* |
 | `supabase/weight_log.sql` | Migración incremental: tabla `weight_log` (peso). *(Superado por auth.sql.)* |
 | `supabase/auth.sql` | **Multiusuario:** `profiles` (rol admin + prefs), `day_log`/`weight_log` por `user_id`, RLS por usuario y escritura de catálogo solo admin. Correr después de schema/seed. |
-| `supabase/plan_cycles.sql` | Migración idempotente para ciclos sucesivos: `plan_cycles`, pesos separados por `cycle_start` y bucket privado `progress-photos` con RLS. |
+| `supabase/plan_cycles.sql` | Migración idempotente para ciclos sucesivos: `plan_cycles`, pesos separados por `cycle_start` y bucket privado `progress-photos` con RLS. La duración se infiere de las fechas y se configura en `profiles.prefs.planDurationWeeks`. |
 | `plan-10-semanas-recomposicion.md` | Plan original (fuente de verdad de menús, días, entrenos, metas). |
 | `BUILD_PLAN.md`, `PROGRESS.md`, `REQUIREMENTS.md`, `README.md` | Docs del proyecto. |
 
 ## 4. Estructura interna de index.html (con líneas aprox.)
 - **Config runtime** (~151): `CONFIG` (de `config.js`), `REMOTE` (de `/api/config`), `effectiveSettings()` (prioridad: override local en Ajustes → REMOTE/Vercel → config.js), `aiAvailable()`, `settingSource()`.
-- **Capa de datos:** calendario dinámico por perfil (`planStartDate`/`planEndDate`/`planCycleNumber`), menús, generadores de entrenamiento, `DAY_TARGET` (fallback sin perfil), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales exactas).
-- **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → alimentación. `hasCompleteOnboarding()` obliga a completarlo una vez y `profileReviewDue()` solicita revisión cada 28 días. Al cerrar un ciclo, `renderPlanRecap()` archiva métricas/foto, guarda `onboardingPending` y vuelve a ejecutar el journey para crear las siguientes 10 semanas.
+- **Capa de datos:** calendario dinámico por perfil (`planStartDate`/`planEndDate`/`planCycleNumber`/`planDurationWeeks`), menús, generadores de entrenamiento, `DAY_TARGET` (fallback sin perfil), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales exactas).
+- **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento (incluida duración 4/10 semanas) → alimentación. `hasCompleteOnboarding()` obliga a completarlo una vez y `profileReviewDue()` solicita revisión cada 28 días. Al cerrar un ciclo, `renderPlanRecap()` archiva métricas/foto, guarda `onboardingPending` y vuelve a ejecutar el journey.
 - **Cierre de sesión:** `signOutUser()` limpia la UI y el cache del usuario de inmediato, solicita a Supabase un cierre local y elimina la sesión persistida como fallback si la red no responde.
 - **Entrenamiento:** cada perfil elige `primarySport` (`running|cycling|swimming`), `strengthMode` (`gym|bodyweight`) y `trainDays` (3-6). `workoutSchedule(days)` define el reparto semanal, `workoutOptions(ds)` genera las sesiones progresivas y `effectiveWorkout(ds)` resuelve overrides diarios. UI: Perfil + `openWorkoutPicker(ds)` + `setWorkout(ds,id)`.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
@@ -60,7 +60,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Tipos de día:** PESAS (Lun/Mar/Jue/Vie), BAJO (Mié/Sáb/Dom), REFEED (sáb 27 jun, 11 jul, 8 ago, 22 ago), DIETBREAK (toda la semana 6, 20–26 jul).
 - **Metas:** el onboarding calcula la meta diaria personal con Katch-McArdle (si hay % de grasa) o Mifflin-St Jeor. `effectiveDayTarget()` devuelve exactamente esas kcal/proteína/carbohidratos/grasas en Home, Nutrición y prompts de IA. `DAY_TARGET` conserva los valores históricos por tipo de día únicamente como fallback.
 - **Menús (`MENUS`):** A Criollo, B Mediterráneo, C Asiático, D Mexicano — asignados por semana en `WEEKS`. Desayunos/cenas rotan; almuerzo según menú+día (autoritativo desde `diet_dishes` en la DB).
-- **Entrenamiento:** plan combinado por perfil: Running/Cycling/Natación + Gimnasio/Peso corporal, entre 3 y 6 días/semana. `challenge=performance` prioriza sesiones aeróbicas/técnicas y `challenge=strength` prioriza fuerza, manteniendo siempre ambas capacidades. Sigue siendo **intercambiable por día** vía `workoutOverride`.
+- **Entrenamiento:** plan combinado por perfil: 4 o 10 semanas, Running/Cycling/Natación + Gimnasio/Peso corporal, entre 3 y 6 días/semana. `challenge=performance` prioriza sesiones aeróbicas/técnicas y `challenge=strength` prioriza fuerza, manteniendo siempre ambas capacidades. Sigue siendo **intercambiable por día** vía `workoutOverride`.
 
 ## 6. Base de datos Supabase
 Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
