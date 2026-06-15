@@ -849,13 +849,25 @@ function profileMacroTargetsFromPrefs(source){
 function effectiveDayTarget(source){
   return profileMacroTargetsFromPrefs(source||((profile&&profile.prefs)||{}))||{kcal:2000,p:150,c:200,f:65};
 }
-// Estructura única de comidas para cualquier día (sin tipos de día / menús fijos).
-const BASE_SLOTS=[
-  {id:"desayuno",slot:"Desayuno"},
-  {id:"almuerzo",slot:"Almuerzo"},
-  {id:"cena",    slot:"Cena"},
-  {id:"snack",   slot:"Snack"},
-];
+// Estructura de comidas del día según cuántas come el usuario (2-6, perfil v2).
+// Conserva los ids históricos (desayuno/almuerzo/cena/snack) para no perder los
+// datos ya guardados en day_log; los ids nuevos solo aparecen con 5-6 comidas.
+const MEAL_SLOT_TEMPLATES={
+  2:[["desayuno","Desayuno"],["cena","Cena"]],
+  3:[["desayuno","Desayuno"],["almuerzo","Almuerzo"],["cena","Cena"]],
+  4:[["desayuno","Desayuno"],["almuerzo","Almuerzo"],["snack","Snack"],["cena","Cena"]],
+  5:[["desayuno","Desayuno"],["media_manana","Media mañana"],["almuerzo","Almuerzo"],["merienda","Merienda"],["cena","Cena"]],
+  6:[["desayuno","Desayuno"],["media_manana","Media mañana"],["almuerzo","Almuerzo"],["merienda","Merienda"],["cena","Cena"],["recena","Recena"]],
+};
+// Fallback (4 comidas) para cuando aún no hay perfil cargado.
+const BASE_SLOTS=MEAL_SLOT_TEMPLATES[4].map(([id,slot])=>({id,slot}));
+// Slots reales del día a partir del perfil: cantidad de comidas + sus horarios.
+function mealSlotsForPrefs(prefs){
+  const p=migrateProfilePrefs(prefs||{});
+  const tpl=MEAL_SLOT_TEMPLATES[p.mealCount]||MEAL_SLOT_TEMPLATES[4];
+  const times=normalizedMealTimes(p.mealTimes,p.mealCount);
+  return tpl.map(([id,slot],i)=>({id,slot,time:times[i]||null}));
+}
 /* ---- helpers de fecha ---- */
 function ymd(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
 function parseYmd(s){const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d);}
@@ -980,7 +992,7 @@ function planSnapshotDigest(prefs,meta){
     },
     targets:effectiveDayTarget(normalized),
     training,
-    slots:BASE_SLOTS.slice(0,normalized.mealCount).map((slot,index)=>({id:slot.id,label:slot.slot,time:normalized.mealTimes[index]||null})),
+    slots:mealSlotsForPrefs(normalized).map(s=>({id:s.id,label:s.slot,time:s.time})),
     origin:{
       source:(meta&&meta.source)||"manual",
       reason:(meta&&meta.reason)||"",
@@ -1045,7 +1057,7 @@ function weekOf(ds,prefs){
 // del usuario). Sin plan estático, sin menús ni tipos de día.
 function buildDay(ds,prefsOverride){
   const ctx=planContextForDate(ds,prefsOverride);
-  const meals=BASE_SLOTS.map(s=>({id:s.id,slot:s.slot,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
+  const meals=mealSlotsForPrefs(ctx.prefs).map(s=>({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
   return {ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(ctx.prefs),meals,workout:effectiveWorkout(ds,ctx.prefs).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
 }
 
@@ -3151,7 +3163,7 @@ function validateGeneratedDay(j,day,target){
 // Núcleo reutilizable: genera UN día a la medida de los macros del usuario y lo valida.
 async function generateOneDay(ds){
   const day=buildDay(ds); const target=effectiveDayTarget();
-  const slots=day.meals.map(m=>`${m.id} (${m.slot})`).join(", ");
+  const slots=day.meals.map(m=>`${m.id} (${m.slot}${m.time?", ~"+m.time:""})`).join(", ");
   const dishList=DB.loaded?DB.dishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
   const recent=recentMealNames(ds,5);
   const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
