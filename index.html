@@ -3018,6 +3018,7 @@ function renderWorkout(){
       ${restDay?'<span class="muted small">Descanso planificado: no cuenta como sesión incompleta.</span>':""}
       <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()||execution||st.workoutDone?"disabled":""}>Cambiar entrenamiento</button>
       ${ew.overridden&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
+      ${!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar hoy:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','casa')">En casa</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','equipo')">Sin equipo</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
   </div>`)}
   ${execution?renderWorkoutExecution(ds,execution):""}
@@ -3064,6 +3065,8 @@ function mealCard(ds,b){
       ${r?`<button class="btn btn-sm" onclick="toggleRecipe(this)">Ver receta</button>`:""}
       <button class="btn btn-sm" onclick="openReplace('${ds}','${b.id}')">Reemplazar</button>
       <button class="btn btn-sm" onclick="openEditor('meal','${ds}','${b.id}')">Editar valores</button>
+      ${!ms.done?`<button class="btn btn-sm" onclick="openMealContingency('${ds}','${b.id}')">Adaptar</button>`:""}
+      ${ms.ovr&&ms.ovr.contingencyReason?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
     </div>
     ${recipeHtml}
   </div>`;
@@ -3104,7 +3107,8 @@ function daySummary(ds){
     <div class="scard"><div class="n">${doneMeals}/${totMeals}</div><div class="l">comidas cumplidas</div></div>
     <div class="scard"><div class="n">${workoutSummary}</div><div class="l">entrenamiento</div></div>
   </div>
-  <div class="muted small center" style="margin-top:10px">${w?(w.num?("Semana "+w.num+" de "+PLAN_DURATION_WEEKS):"Semana de arranque"):""} · faltan ${daysLeft} días para el final</div>`);
+  <div class="muted small center" style="margin-top:10px">${w?(w.num?("Semana "+w.num+" de "+PLAN_DURATION_WEEKS):"Semana de arranque"):""} · faltan ${daysLeft} días para el final</div>
+  ${(()=>{const clog=st.contingencyLog||[];if(!clog.length)return"";const labels={meal_replace:"comida adaptada",meal_revert:"comida restaurada",workout_change:"entrenamiento cambiado",missed_session:"sesión no realizada"};return`<div class="muted small center" style="margin-top:4px">Adaptaciones: ${clog.map(e=>labels[e.type]||e.type).join(", ")}</div>`;})()}`);
 }
 
 /* ---------- acciones ---------- */
@@ -3646,22 +3650,114 @@ function modal(html){
 }
 function closeModal(){const o=$("#overlay");if(o)o.remove();stopMic();}
 
-function openReplace(ds,id){
+function openReplace(ds,id,reason){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);
+  const ms=mealState(ds,id);const currentVal=mealValue(base,ms);
   // Opciones desde la base de datos, filtradas por el slot de la comida.
   const options=(DB.loaded?DB.dishes.filter(d=>(d.slot||"")===id):[]).map(d=>({name:d.name,dishName:d.name}));
   const optsHtml=options.map((o,i)=>{
     const d=o.dishName?dishByName(o.dishName):null;const m=d?dishMacros(d.id):null;
-    const meta=m?`${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g`:"";
-    return `<button class="opt" onclick="applyReplace('${ds}','${id}',${i})">${esc(o.name)}<div class="o-meta">${meta}</div></button>`;
+    const deltaKcal=m&&currentVal.kcal?m.kcal-currentVal.kcal:null;
+    const deltaStr=deltaKcal!=null?` <span class="muted">(${deltaKcal>0?"+":""}${deltaKcal} kcal)</span>`:"";
+    const meta=m?`${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g${deltaStr}`:"";
+    return `<button class="opt" onclick="applyReplace('${ds}','${id}',${i},'${reason||""}')">${esc(o.name)}<div class="o-meta">${meta}</div></button>`;
   }).join("");
+  const reasonLabel={no_cook:"Sin cocina",eat_out:"Comer fuera",missing_ingredient:"Sin ingrediente"}[reason]||"Reemplazar";
+  const reasonHint={no_cook:"Elige una opción que no requiera cocinar.",eat_out:"Elige el equivalente más cercano para comer afuera.",missing_ingredient:"Elige otro plato compatible con tus metas."}[reason]||"Elige un plato de la base con macros calculados por ingredientes o crea una comida personalizada.";
+  const scopeHtml=reason?`<div class="row" style="margin:10px 0 4px;gap:8px">
+    <label class="muted small"><input type="radio" name="replScope" value="day" checked> Solo hoy</label>
+    <label class="muted small"><input type="radio" name="replScope" value="week"> Esta semana</label>
+  </div>`:"";
   window._replaceOpts={ds,id,options};
-  modal(`<h3>Reemplazar — ${base.slot}</h3>
-    <p class="muted small">Elige un plato de la base con macros calculados por ingredientes o crea una comida personalizada.</p>
+  modal(`<h3>${reasonLabel} — ${esc(base.slot)}</h3>
+    <p class="muted small">${reasonHint}${currentVal.kcal?` Actual: ${currentVal.kcal} kcal.`:""}</p>
+    ${scopeHtml}
     ${optsHtml||'<p class="muted small">No hay platos en la base para este espacio. Puedes crear una comida personalizada.</p>'}
     <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="openEditor('meal','${ds}','${id}')">✎ Personalizada / editar valores</button>`);
 }
-function applyReplace(ds,id,i){const{options}=window._replaceOpts;const o=options[i];const ms=mealState(ds,id);ms.ovr={name:o.name,dishName:o.dishName||null};commitDay(ds);closeModal();render();toast("Comida reemplazada");}
+function applyReplace(ds,id,i,reason){
+  const{options}=window._replaceOpts;const o=options[i];const ms=mealState(ds,id);
+  const prev=ms.ovr?ms.ovr.name:null;
+  ms.ovr={name:o.name,dishName:o.dishName||null};
+  if(reason)ms.ovr.contingencyReason=reason;
+  addContingencyEntry(ds,{type:"meal_replace",id,reason:reason||null,chosen:o.name,prev});
+  const scope=(document.querySelector("input[name='replScope']:checked")||{}).value||"day";
+  if(scope==="week"&&reason)propagateMealOverride(ds,id,{...ms.ovr});
+  commitDay(ds);closeModal();render();toast("Comida actualizada");
+}
+
+/* ---- Contingencia: helpers ---- */
+function addContingencyEntry(ds,entry){
+  const st=dayState(ds);if(!st.contingencyLog)st.contingencyLog=[];
+  st.contingencyLog.push(Object.assign({at:new Date().toISOString()},entry));
+}
+function revertMeal(ds,id){
+  const ms=mealState(ds,id);const prev=ms.ovr?ms.ovr.name:null;
+  delete ms.ovr;addContingencyEntry(ds,{type:"meal_revert",id,prev});
+  commitDay(ds);render();toast("Comida restaurada al plan original");
+}
+function propagateMealOverride(ds,id,ovr){
+  const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||(WEEKS&&WEEKS[0]);if(!w)return;
+  weekDays(w).filter(d=>d>ds).forEach(d=>{
+    const day=buildDay(d);if(!day.meals.find(m=>m.id===id))return;
+    const ms=mealState(d,id);if(!ms.done){ms.ovr=Object.assign({},ovr);commitDay(d);}
+  });
+}
+function openMealContingency(ds,id){
+  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
+  modal(`<h3>Adaptar — ${esc(base.slot)}</h3>
+    <p class="muted small">¿Cuál es la situación hoy?</p>
+    <button class="opt" onclick="openReplace('${ds}','${id}','no_cook')">🍱 No puedo cocinar<div class="o-meta">Opciones que no requieren preparación</div></button>
+    <button class="opt" onclick="openReplace('${ds}','${id}','eat_out')">🍽️ Voy a comer fuera<div class="o-meta">Busca el equivalente más cercano</div></button>
+    <button class="opt" onclick="openReplace('${ds}','${id}','missing_ingredient')">🛒 No conseguí un ingrediente<div class="o-meta">Elige otro plato compatible con tus metas</div></button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+}
+/* ---- Contingencia: entrenamiento ---- */
+function openWorkoutContingency(ds,reason){
+  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  const execution=normalizedWorkoutExecution(ds);
+  if(execution||dayState(ds).workoutDone){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
+  const ew=effectiveWorkout(ds);const allOpts=workoutOptions(ds);
+  const titles={tiempo:"Solo tengo poco tiempo",casa:"Hoy entreno en casa",equipo:"Sin acceso al equipo"};
+  const hints={tiempo:"Elige la sesión más eficiente o descansa activamente.",casa:"Elige una opción que puedas hacer en casa.",equipo:"Opciones sin equipamiento especializado."};
+  let filtered=allOpts;
+  if(reason==="equipo"||reason==="casa"){
+    const bwIds=allOpts.filter(o=>o.id&&(o.id.startsWith("bw")||o.kind==="Descanso"||(exerciseArray(o.exerciseIds).every(sid=>{const ex=exerciseBySlug(sid);return!ex||!ex.equipment||ex.equipment.length===0||ex.equipment.includes("ninguno")||ex.equipment.includes("bodyweight");}))));
+    if(bwIds.length)filtered=bwIds;
+  }
+  const optsHtml=filtered.map(o=>{
+    const cur=o.id===ew.id;
+    return `<button class="opt" onclick="applyWorkoutContingency('${ds}','${o.id}','${reason}')" style="${cur?'border-color:var(--accent)':''}">${esc(o.name)}${cur?' ✓':''}<div class="o-meta">${esc(o.detail)}</div></button>`;
+  }).join("");
+  modal(`<h3>${titles[reason]||"Adaptar entrenamiento"}</h3>
+    <p class="muted small">${hints[reason]||""} Planificado hoy: <b>${esc(ew.planned.name)}</b>.</p>
+    ${optsHtml}`);
+}
+function applyWorkoutContingency(ds,id,reason){
+  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  const planned=plannedWorkoutId(ds);
+  const d=dayState(ds);const prev=d.workoutOverride||planned;
+  if(id&&id!==planned)d.workoutOverride=id;else delete d.workoutOverride;
+  addContingencyEntry(ds,{type:"workout_change",reason,chosen:id,prev});
+  commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");
+}
+function openMissedSession(ds){
+  if(dayState(ds).workoutDone||normalizedWorkoutExecution(ds)){toast("Este día ya tiene una sesión registrada");return;}
+  const ew=effectiveWorkout(ds);
+  if(ew.workout.id==="descanso"){toast("Este día ya es un descanso planificado");return;}
+  modal(`<h3>Me perdí la sesión</h3>
+    <p class="muted small">Sesión de hoy: <b>${esc(ew.planned.name)}</b>. ¿Qué prefieres hacer?</p>
+    <button class="opt" onclick="applyMissedSession('${ds}','continue')">✓ Seguir con el plan<div class="o-meta">No duplicas carga; continúas normalmente desde mañana.</div></button>
+    <button class="opt" onclick="applyMissedSession('${ds}','reschedule')">↩ Recuperarla en otro momento<div class="o-meta">Registras la intención; tú decides cuándo hacerla.</div></button>
+    <button class="opt" onclick="applyMissedSession('${ds}','rest')">☾ Convertir en descanso<div class="o-meta">Marcas el día como descanso planificado; no cuenta como sesión perdida.</div></button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+}
+function applyMissedSession(ds,action){
+  const ew=effectiveWorkout(ds);
+  addContingencyEntry(ds,{type:"missed_session",action,session:ew.planned.name});
+  if(action==="rest"){const d=dayState(ds);d.workoutOverride="descanso";commitDay(ds);closeModal();render();toast("Día marcado como descanso planificado");}
+  else{commitDay(ds);closeModal();render();toast(action==="reschedule"?"Registrado: recuperar en otro momento":"Registrado: seguir con el plan desde mañana");}
+}
 
 /* editor genérico: comida del plan (override) o extra */
 function openEditor(kind,ds,id){

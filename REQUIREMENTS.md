@@ -162,7 +162,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 17. REQ-17 - Generador IA de planes de entrenamiento. **Implementado**.
 18. REQ-18 - Generador IA de planes nutricionales flexibles. **Implementado**.
-19. REQ-19 - Reemplazos y modo contingencia.
+19. REQ-19 - Reemplazos y modo contingencia. **Implementado**.
 20. REQ-20 - Check-in semanal y ajuste adaptativo.
 21. REQ-21 - Centro conversacional del coach.
 
@@ -1026,7 +1026,9 @@ Generar una semana nutricional por usuario que respete macros, numero de comidas
 
 ## REQ-19 - Reemplazos y modo contingencia
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementación agrega acciones rápidas de contingencia para nutrición ("Adaptar" → No puedo cocinar / Voy a comer fuera / Sin ingrediente) y entrenamiento ("Solo 20 min" / "En casa" / "Sin equipo" / "Me perdí la sesión"). Los reemplazos de comida muestran el delta de kcal respecto al plato actual, permiten elegir el alcance (solo hoy o toda la semana) y registran motivo, opción elegida y timestamp en `day_log.state.contingencyLog`. El botón "Volver al plan" revierte overrides de contingencia. La sesión perdida ofrece tres acciones: seguir con el plan, recuperar en otro momento o convertir en descanso planificado. El resumen del día lista las adaptaciones registradas. Ninguna contingencia reescribe días ya completados.
 
 ### Objetivo
 
