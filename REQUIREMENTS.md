@@ -1075,7 +1075,9 @@ Permitir que el usuario adapte el dia real sin abandonar el plan cuando cambia s
 
 ## REQ-20 - Check-in semanal y ajuste adaptativo
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementación agrega un check-in semanal opcional que aparece en Progreso al inicio de cada nueva semana del ciclo. El formulario recoge peso (opcional), escala 1-5 para hambre, energía, sueño, estrés, recuperación muscular, dificultad percibida y adherencia nutricional, más sesiones realizadas (pre-calculadas desde el historial) y texto libre para molestias. Un motor determinista analiza las respuestas y propone ajustes de ±0-200 kcal/día (proteína fija; carbs y grasas escalan proporcionalmente) o recomendaciones de intensidad de entrenamiento. Una señal de alerta (dolor) bloquea recomendaciones de entrenamiento y solicita consulta profesional. El usuario ve un delta antes/después antes de confirmar. Los check-ins se guardan en `profiles.prefs.weeklyCheckins` (no requiere migración SQL). El recap del ciclo muestra cuántos ajustes se aceptaron.
 
 ### Objetivo
 

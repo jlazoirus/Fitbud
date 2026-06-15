@@ -383,6 +383,17 @@
     .set-row{grid-template-columns:36px 1fr 1fr}
     .set-row .set-rpe{grid-column:2 / -1}
   }
+  /* Check-in semanal (REQ-20) */
+  .ci-banner{background:linear-gradient(135deg,var(--accent-dim),rgba(200,100,60,.10));border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:16px;margin-bottom:14px}
+  .ci-scale{display:flex;gap:6px;margin-top:7px}
+  .ci-scale button{flex:1;height:38px;border-radius:var(--r-sm);background:var(--surf3);border:1px solid var(--border-2);color:var(--muted);font-size:13px;font-weight:600;transition:.15s;line-height:1}
+  .ci-scale button.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+  .ci-scale-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-top:3px}
+  .ci-delta{background:var(--surf3);border-radius:var(--r-md);padding:12px 14px;margin:10px 0}
+  .ci-delta .ci-dlab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+  .ci-delta .ci-drow{display:flex;justify-content:space-between;font-size:14px;margin:3px 0}
+  .ci-dpos{color:var(--good);font-family:var(--font-mono);font-size:12px}
+  .ci-dneg{color:var(--warn);font-family:var(--font-mono);font-size:12px}
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
 <script src="config.js"></script>
@@ -1318,6 +1329,7 @@ function cycleSummary(){
     mealAdherence:plannedMeals?Math.round(doneMeals/plannedMeals*100):0,
     startWeight,endWeight,weightChange:startWeight!=null&&endWeight!=null?+(endWeight-startWeight).toFixed(1):null,
     startBodyFat:startBf,endBodyFat:endBf,bodyFatChange:startBf!=null&&endBf!=null?+(endBf-startBf).toFixed(1):null,
+    checkinsAccepted:getWeeklyCheckins().filter(c=>c.accepted).length,
   };
 }
 function recapDelta(value,suffix){
@@ -1364,6 +1376,7 @@ function renderPlanRecap(){
       <div class="scard"><div class="n">${s.mealAdherence}%</div><div class="l">comidas del plan registradas</div></div>
       <div class="scard"><div class="n">${recapDelta(s.weightChange," kg")}</div><div class="l">cambio de peso</div></div>
       <div class="scard"><div class="n">${s.bestStreak}</div><div class="l">mejor racha de días</div></div>
+      ${s.checkinsAccepted>0?`<div class="scard" style="grid-column:1 / -1"><div class="n">${s.checkinsAccepted}</div><div class="l">ajustes semanales aceptados</div></div>`:""}
     </div>
     ${s.bodyFatChange!=null?`<div class="alert violet">Composición corporal: ${recapDelta(s.bodyFatChange," puntos de grasa")} durante el ciclo.</div>`:""}
     <div class="section-h">Foto de progreso</div>
@@ -3151,12 +3164,13 @@ function delExtra(ds,i){const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);
 /* ---------- PROGRESO: stats + peso + semana ---------- */
 function renderProgress(){
   $("#app").innerHTML=`${screenHeader("Progreso","Tu evolución","progreso")}
+    ${weeklyCheckinBanner()}
     ${progressStats()}
     ${section("pr.ciclos","Tus ciclos",progressJourney(),`${cycleNumber()}`)}
     ${section("pr.peso","Peso corporal",
       weightChart()+bodyComposition()+
       `<table class="wt"><thead><tr><th>Sem</th><th>Rango kg</th><th>Peso kg</th><th>% grasa</th></tr></thead><tbody>${weightRows()}</tbody></table>`)}
-    ${section("pr.semana","Semana",weekSection())}`;
+    ${section("pr.semana","Semana",weekSection()+weeklyCheckinHistory())}`;
 }
 function progressJourney(){
   const completed=cycleHistory.filter(row=>row.status==="completed");
@@ -5993,6 +6007,317 @@ async function deleteDish(id){
   const r=await supa.from("dishes").delete().eq("id",id);
   if(r.error){toast("No se pudo: "+r.error.message);return;}
   closeModal();await dbLoad();render();toast("Plato eliminado");
+}
+
+/* ============================================================
+   REQ-20: Check-in semanal y ajuste adaptativo
+   ============================================================ */
+const CHECKIN_MAX_KCAL_ADJUST=200;  // límite absoluto por semana
+const CHECKIN_MIN_KCAL=1200;        // mínimo seguro
+
+function getWeeklyCheckins(){
+  return Array.isArray(profile&&profile.prefs&&profile.prefs.weeklyCheckins)
+    ?profile.prefs.weeklyCheckins:[];
+}
+
+// Devuelve {key, num, start, end} si hay check-in pendiente para la semana anterior, o null.
+function weeklyCheckinDue(){
+  if(!profile||!session||!isActive())return null;
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const calendar=planCalendarForPrefs(prefs);
+  const today=todayStr();
+  const currentWeek=calendar.weeks.find(w=>today>=w.start&&today<=w.end);
+  if(!currentWeek||!currentWeek.num||currentWeek.num<2)return null;
+  const dueNum=currentWeek.num-1;
+  const dueWeek=calendar.weeks.find(w=>w.num===dueNum);
+  if(!dueWeek)return null;
+  const key=cycleNumber()+"-w"+dueNum;
+  if(getWeeklyCheckins().find(c=>c.wk===key))return null;
+  return{key,num:dueNum,start:dueWeek.start,end:dueWeek.end};
+}
+
+function weeklyCheckinBanner(){
+  const due=weeklyCheckinDue();if(!due)return"";
+  return`<div class="ci-banner">
+    <div class="section-h" style="margin:0 0 3px">Check-in · Semana ${due.num}</div>
+    <div style="font-size:15px;font-weight:600;font-family:var(--font-display)">${prettyDate(due.start).split(",")[0]} – ${prettyDate(due.end).split(",")[0]}</div>
+    <div class="muted small" style="margin:5px 0 12px">Revisa cómo fue tu semana y recibe ajustes a tu plan para la siguiente.</div>
+    <div class="row" style="gap:8px">
+      <button class="btn btn-accent btn-sm" onclick="openWeeklyCheckin()">Iniciar check-in</button>
+      <button class="btn btn-sm" onclick="skipWeeklyCheckin('${due.key}')">Omitir esta semana</button>
+    </div>
+  </div>`;
+}
+
+// Calcula sesiones planificadas/realizadas en la semana y peso previo.
+function weeklyCheckinStats(weekStart,weekEnd,weekNum){
+  const days=[];let d=weekStart;
+  while(d<=weekEnd&&d<=todayStr()){days.push(d);d=addDays(d,1);}
+  let planned=0,done=0;
+  days.forEach(ds=>{
+    const wid=plannedWorkoutId(ds);
+    if(wid&&wid!=="descanso")planned++;
+    const st=S.days[ds]||{};
+    if(workoutHasRecordedActivity(st)||st.workoutDone)done++;
+  });
+  const prevWeekNum=weekNum>1?weekNum-1:null;
+  return{
+    sessionsPlanned:planned,sessionsDone:done,
+    prevWeight:prevWeekNum?wkg(prevWeekNum):null,
+    currentWeight:wkg(weekNum),
+  };
+}
+
+// Abre el modal del formulario de check-in semanal.
+function openWeeklyCheckin(){
+  const due=weeklyCheckinDue();if(!due)return;
+  const stats=weeklyCheckinStats(due.start,due.end,due.num);
+  const scaleField=(name,label,low,high)=>`
+    <div class="field">
+      <label style="font-size:13px">${label}</label>
+      <div class="ci-scale" data-scale="${name}">
+        ${[1,2,3,4,5].map(v=>`<button type="button" onclick="ciSel('${name}',${v})" data-v="${v}">${v}</button>`).join("")}
+      </div>
+      <div class="ci-scale-lbl"><span>${low}</span><span>${high}</span></div>
+    </div>`;
+  window._ciDue=due;
+  modal(`<h3>Check-in · Semana ${due.num}</h3>
+    <p class="muted small">${prettyDate(due.start)} – ${prettyDate(due.end)}<br>${stats.sessionsDone} de ${stats.sessionsPlanned} sesiones registradas esta semana</p>
+    <div class="section-h" style="margin:12px 0 4px">Peso esta semana (opcional)</div>
+    <div class="row" style="gap:8px">
+      <div class="field" style="flex:1;margin:4px 0"><input id="ci_kg" type="number" step="0.1" inputmode="decimal" placeholder="kg" value="${stats.currentWeight||''}"></div>
+      <div class="field" style="flex:1;margin:4px 0"><input id="ci_bf" type="number" step="0.1" inputmode="decimal" placeholder="% grasa (opc.)"></div>
+    </div>
+    <div class="section-h" style="margin:12px 0 0">¿Cómo fue tu semana?</div>
+    ${scaleField("hunger","Hambre","Poca","Mucha")}
+    ${scaleField("energy","Energía","Baja","Alta")}
+    ${scaleField("sleep","Sueño y descanso","Mal","Bien")}
+    ${scaleField("stress","Nivel de estrés","Alto","Bajo")}
+    ${scaleField("soreness","Recuperación muscular","Lenta","Buena")}
+    ${scaleField("difficulty","Dificultad percibida","Fácil","Exigente")}
+    <div class="section-h" style="margin:12px 0 0">Adherencia</div>
+    ${scaleField("nutrition","Comidas según tu plan","Ninguna","Todas")}
+    <div class="field">
+      <label style="font-size:13px">Sesiones de entrenamiento completadas</label>
+      <div class="row" style="gap:10px;margin-top:7px">
+        <input id="ci_done" type="number" min="0" max="7" inputmode="numeric" value="${stats.sessionsDone}" style="max-width:72px;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:10px;font-size:15px">
+        <span class="muted small" style="align-self:center">de ${stats.sessionsPlanned} planificadas</span>
+      </div>
+    </div>
+    <div class="field"><label style="font-size:13px">¿Alguna molestia o dolor nuevo?</label>
+      <textarea id="ci_injuries" rows="2" placeholder="Ej. rodilla, hombro… (opcional)" style="width:100%;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:10px;font-size:14px;font-family:inherit;resize:none"></textarea>
+    </div>
+    <div class="row" style="gap:8px;margin-top:14px">
+      <button class="btn btn-accent" style="flex:1" onclick="submitWeeklyCheckin()">Ver mi ajuste</button>
+      <button class="btn" onclick="skipWeeklyCheckin('${due.key}')">Omitir</button>
+    </div>`);
+}
+
+// Selecciona un valor en la escala 1-5 del check-in.
+function ciSel(name,val){
+  const scale=document.querySelector('.ci-scale[data-scale="'+name+'"]');
+  if(!scale)return;
+  scale.querySelectorAll("button").forEach(b=>b.classList.toggle("sel",+b.dataset.v===val));
+}
+function readCiScale(name){
+  const btn=document.querySelector('.ci-scale[data-scale="'+name+'"] button.sel');
+  return btn?+btn.dataset.v:null;
+}
+
+// Motor determinista: analiza las respuestas y propone un ajuste dentro de límites documentados.
+// Límites: ±200 kcal/día máximo por semana · mínimo absoluto 1200 kcal/día.
+// Señal de alerta (dolor) → bloquea recomendaciones de entrenamiento.
+function analyzeCheckinAnswers(answers,prefs){
+  const details=[];
+  let calorieAdjust=0,intensityAdj=null,safetyFlag=false;
+  const goal=prefs.goal||"deficit";
+  const kcal=+prefs.calorieTarget||2000;
+
+  // 1. Señales de alerta de seguridad
+  if(answers.injuries&&answers.injuries.trim()){
+    safetyFlag=true;
+    details.push("Mencionas dolor o molestias: consulta con un profesional antes de ajustar el entrenamiento.");
+  }
+
+  // 2. Análisis de peso (si hay datos de semana anterior y actual)
+  const w=answers.weight,pw=answers.prevWeight;
+  if(w&&pw){
+    const delta=w-pw;
+    if(goal==="surplus"){
+      if(delta<0.15){calorieAdjust+=100;details.push("Ganancia de peso menor a lo esperado: añadir calorías.");}
+      else if(delta>0.6){calorieAdjust-=100;details.push("Ganancia rápida: reducir un poco para cuidar la composición.");}
+    }else if(goal==="maintain"){
+      if(delta>0.4){calorieAdjust-=100;details.push("Peso subiendo en mantenimiento: ajustar calorías.");}
+      else if(delta<-0.4){calorieAdjust+=100;details.push("Peso bajando más de lo esperado: añadir calorías.");}
+    }else{// deficit
+      if(delta>0.3){calorieAdjust-=100;details.push("El peso subió esta semana: ajustar calorías.");}
+      else if(delta<-0.8){calorieAdjust+=100;details.push("Pérdida muy rápida: añadir calorías para proteger músculo.");}
+    }
+  }
+
+  // 3. Hambre y energía
+  if(answers.hunger>=4&&answers.energy<=2){
+    if(calorieAdjust===0){calorieAdjust+=100;details.push("Hambre alta y energía baja: añadir calorías.");}
+    else details.push("Hambre alta y energía baja: revisa la distribución de comidas.");
+  }else if(answers.hunger>=4&&calorieAdjust<=0){
+    calorieAdjust+=Math.min(100,Math.abs(calorieAdjust)+50);
+    details.push("Sensación de hambre elevada durante la semana.");
+  }else if(answers.energy<=2&&answers.sleep<=2){
+    details.push("Energía y sueño bajos: prioriza el descanso y revisa la distribución de macros.");
+  }
+
+  // 4. Adherencia nutricional baja → no cambiar calorías, pedir consistencia
+  if((answers.nutrition||3)<=2&&calorieAdjust===0){
+    details.push("Adherencia al plan baja: la prioridad de la próxima semana es la consistencia.");
+  }
+
+  // 5. Recuperación y dificultad de entrenamiento (solo sin señal de alerta)
+  if(!safetyFlag){
+    if((answers.difficulty||3)>=5||(answers.soreness||3)<=1){
+      intensityAdj="reduce";
+      details.push("Alta fatiga o recuperación lenta: reduce la intensidad o añade un descanso activo.");
+    }else if((answers.difficulty||3)<=2&&(answers.soreness||3)>=4){
+      intensityAdj="increase";
+      details.push("Carga percibida baja y buena recuperación: puedes subir el desafío progresivamente.");
+    }
+  }
+
+  // 6. Aplicar límites de seguridad documentados
+  calorieAdjust=Math.max(-CHECKIN_MAX_KCAL_ADJUST,Math.min(CHECKIN_MAX_KCAL_ADJUST,calorieAdjust));
+  if(kcal+calorieAdjust<CHECKIN_MIN_KCAL)calorieAdjust=CHECKIN_MIN_KCAL-kcal;
+
+  const keep=calorieAdjust===0&&!intensityAdj&&!safetyFlag;
+  const reason=details.length?details.join(" "):(keep?"Tu progreso esta semana está dentro de lo esperado.":"Ajuste sugerido según tu seguimiento.");
+  return{keep,calorieAdjust,intensityAdj,reason,safetyFlag,details};
+}
+
+// Lee el formulario, corre el análisis y muestra la propuesta en el mismo modal.
+function submitWeeklyCheckin(){
+  const due=window._ciDue;if(!due)return;
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const stats=weeklyCheckinStats(due.start,due.end,due.num);
+  const answers={
+    weight:+$("#ci_kg").value||null,
+    bodyFat:+$("#ci_bf").value||null,
+    hunger:readCiScale("hunger"),
+    energy:readCiScale("energy"),
+    sleep:readCiScale("sleep"),
+    stress:readCiScale("stress"),
+    soreness:readCiScale("soreness"),
+    difficulty:readCiScale("difficulty"),
+    nutrition:readCiScale("nutrition"),
+    sessionsDone:+$("#ci_done").value||0,
+    sessionsPlanned:stats.sessionsPlanned,
+    injuries:($("#ci_injuries").value||"").trim(),
+    prevWeight:stats.prevWeight,
+  };
+  const proposal=analyzeCheckinAnswers(answers,prefs);
+  // Calcular nuevos macros: proteína fija, carbs y grasas escalan proporcionalmente.
+  const kcal=+prefs.calorieTarget||2000;
+  const newKcal=kcal+proposal.calorieAdjust;
+  const protKcal=(+prefs.proteinTarget||0)*4;
+  const oldRem=Math.max(0,kcal-protKcal);
+  const newRem=Math.max(0,newKcal-protKcal);
+  const ratio=oldRem>0?newRem/oldRem:1;
+  const newCarb=Math.round((+prefs.carbTarget||0)*ratio);
+  const newFat=Math.round((+prefs.fatTarget||0)*ratio);
+  const prot=+prefs.proteinTarget||0;
+  window._ciData={due,answers,proposal,newKcal,newCarb,newFat,prot};
+
+  const ds=n=>n>0?"+"+n:""+n;
+  const safeNote=proposal.safetyFlag
+    ?`<div class="alert" style="margin-top:10px">⚠️ Tienes una señal de alerta. Consulta con un profesional antes de aumentar la intensidad.</div>`:"";
+  const keepBlock=proposal.keep
+    ?`<div class="ai-box" style="margin-top:10px">✓ Tu plan está bien calibrado. Sigue igual la próxima semana.</div>`:"";
+  const calorieBlock=proposal.calorieAdjust!==0
+    ?`<div class="ci-delta">
+        <div class="ci-dlab">Calorías diarias</div>
+        <div class="ci-drow"><span>${kcal} kcal → <b>${newKcal} kcal</b></span>
+          <span class="${proposal.calorieAdjust>0?"ci-dpos":"ci-dneg"}">${ds(proposal.calorieAdjust)} kcal/día</span></div>
+        <div class="ci-drow muted small"><span>Prot ${prot} g (sin cambio) · Carb ${Math.round(+prefs.carbTarget||0)} → ${newCarb} g · Grasa ${Math.round(+prefs.fatTarget||0)} → ${newFat} g</span></div>
+      </div>`:"";
+  const intensityNote=proposal.intensityAdj
+    ?`<div class="ai-box" style="margin-top:10px;border-color:${proposal.intensityAdj==="reduce"?"var(--warn)":"var(--border-acc)"}">${proposal.intensityAdj==="reduce"
+      ?"Recomendación: esta semana prioriza el descanso y reduce la carga. Puedes usar las opciones de adaptación en Entreno."
+      :"Recomendación: tu cuerpo responde bien. Añade carga progresiva en tus series principales."}</div>`:"";
+
+  const el=document.querySelector(".sheet");
+  if(el)el.innerHTML=`<div class="closebar"><button onclick="closeModal()">✕</button></div>
+    <h3>Ajuste · Semana ${due.num+1}</h3>
+    <p class="muted small">${esc(proposal.reason)}</p>
+    ${safeNote}${keepBlock}${calorieBlock}${intensityNote}
+    <div class="muted small" style="margin-top:12px">Ajuste máximo: ±${CHECKIN_MAX_KCAL_ADJUST} kcal/día. Aplica desde mañana y no modifica días ya registrados.</div>
+    <div class="row" style="gap:8px;margin-top:16px;flex-wrap:wrap">
+      ${!proposal.keep?`<button class="btn btn-accent" style="flex:1" onclick="applyWeeklyCheckinProposal('${due.key}')">Aplicar ajuste</button>`:""}
+      <button class="btn${proposal.keep?" btn-accent":""}" style="${proposal.keep?"flex:1":""}" onclick="declineWeeklyCheckinProposal('${due.key}')">${proposal.keep?"Entendido":"Mantener el plan actual"}</button>
+    </div>`;
+}
+
+// Aplica el ajuste de macros al perfil y guarda el check-in.
+async function applyWeeklyCheckinProposal(weekKey){
+  const d=window._ciData;if(!d)return;
+  const prefs=migrateProfilePrefs({...((profile&&profile.prefs)||{})});
+  if(d.proposal.calorieAdjust!==0){
+    prefs.calorieTarget=d.newKcal;
+    prefs.carbTarget=d.newCarb;
+    prefs.fatTarget=d.newFat;
+  }
+  const checkin={wk:weekKey,num:d.due.num,start:d.due.start,end:d.due.end,
+    at:new Date().toISOString(),answers:d.answers,proposal:d.proposal,accepted:true,skipped:false};
+  if(!Array.isArray(prefs.weeklyCheckins))prefs.weeklyCheckins=[];
+  prefs.weeklyCheckins.push(checkin);
+  window._ciData=null;
+  const result=await saveProfilePrefs(prefs,{source:"checkin",reason:"check-in semanal "+weekKey});
+  closeModal();
+  if(result&&result.error){toast("No se pudo guardar el ajuste");return;}
+  render();toast("Ajuste aplicado para la próxima semana");
+}
+
+// Guarda el check-in sin aplicar cambios de macros.
+async function declineWeeklyCheckinProposal(weekKey){
+  const d=window._ciData;
+  const prefs=migrateProfilePrefs({...((profile&&profile.prefs)||{})});
+  const checkin={wk:weekKey,num:d?d.due.num:0,start:d?d.due.start:"",end:d?d.due.end:"",
+    at:new Date().toISOString(),answers:d?d.answers:{},proposal:d?d.proposal:{},accepted:false,skipped:false};
+  if(!Array.isArray(prefs.weeklyCheckins))prefs.weeklyCheckins=[];
+  prefs.weeklyCheckins.push(checkin);
+  window._ciData=null;
+  await saveProfilePrefs(prefs,{source:"checkin",reason:"check-in mantenido "+weekKey});
+  closeModal();render();toast("Plan sin cambios para la próxima semana");
+}
+
+// Registra el check-in como omitido (no vuelve a aparecer esta semana).
+async function skipWeeklyCheckin(weekKey){
+  const prefs=migrateProfilePrefs({...((profile&&profile.prefs)||{})});
+  if(!Array.isArray(prefs.weeklyCheckins))prefs.weeklyCheckins=[];
+  if(!prefs.weeklyCheckins.find(c=>c.wk===weekKey)){
+    const due=weeklyCheckinDue()||{num:0,start:"",end:""};
+    prefs.weeklyCheckins.push({wk:weekKey,num:due.num,start:due.start,end:due.end,
+      at:new Date().toISOString(),answers:{},proposal:{},accepted:false,skipped:true});
+  }
+  await saveProfilePrefs(prefs,{source:"checkin",reason:"check-in omitido "+weekKey});
+  closeModal();render();toast("Check-in omitido para esta semana");
+}
+
+// Historial de check-ins completados para mostrar en Progreso.
+function weeklyCheckinHistory(){
+  const checkins=getWeeklyCheckins().filter(c=>!c.skipped&&c.answers&&Object.keys(c.answers).length>0);
+  if(!checkins.length)return"";
+  const rows=[...checkins].reverse().slice(0,5).map(c=>{
+    const adj=c.proposal&&c.proposal.calorieAdjust;
+    const adjStr=adj?(adj>0?"+"+adj+" kcal":adj+" kcal"):"sin cambio";
+    const status=c.accepted
+      ?`<span class="badge b-PESAS">Aplicado · ${adjStr}</span>`
+      :`<span class="badge b-Libre">Mantenido</span>`;
+    return`<div class="wk-day" style="cursor:default">
+      <div class="wk-left">
+        <div class="d">Semana ${c.num}</div>
+        <div class="m">${prettyDate(c.start).split(",")[0]} – ${prettyDate(c.end).split(",")[0]}</div>
+      </div>
+      ${status}
+    </div>`;
+  }).join("");
+  return`<div class="section-h" style="margin:18px 4px 8px">Check-ins realizados</div>${rows}`;
 }
 
 /* ---------- util ---------- */
