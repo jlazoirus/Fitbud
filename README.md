@@ -18,6 +18,7 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 - **Navegación** día anterior/siguiente y vista de semana completa.
 - **Registro de peso** semanal con gráfico de evolución, indicador de semana y resumen del día.
 - **Plan deportivo configurable**: elige 4 o 10 semanas, Running, Cycling o Natación y combínalo siempre con fuerza en gimnasio o con peso corporal.
+- **Ejercicios guiados**: cada rutina enlaza un catálogo propio con instrucciones, respiración, errores comunes, señales de seguridad y demostraciones SVG animadas que se pueden pausar.
 - **Instalable como PWA** con manifest, íconos y cache offline del shell de la app.
 
 ## Plan de entrenamiento
@@ -30,6 +31,8 @@ Cada usuario configura en **Perfil**:
 - minutos por sesión, equipo, experiencia, prioridad, horario y movimientos a evitar.
 
 El reparto se adapta a la disponibilidad real y coloca las sesiones deportivas en los días compatibles con piscina o exterior. Natación valida que existan suficientes días con piscina. El bloque de 4 semanas usa una progresión compacta y el de 10 semanas incluye descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
+
+Todas las sesiones publicadas usan IDs del catálogo de ejercicios, no nombres libres. La vista **Entreno** muestra la demostración y las instrucciones de cada movimiento; `prefers-reduced-motion` deja la ilustración estática. Los administradores pueden buscar, filtrar, crear, editar o archivar ejercicios desde **Perfil → Ejercicios** y revisar que cada registro tenga fuente, licencia y media.
 
 ## Configuración inicial y macros
 
@@ -108,11 +111,18 @@ Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se
 ### Preparar la base
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
-2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) y [`supabase/privacy.sql`](supabase/privacy.sql). Los dos últimos crean planes, ciclos, fotos de progreso personal con acceso protegido y los registros versionados de consentimiento y aptitud.
+2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql), [`supabase/privacy.sql`](supabase/privacy.sql) y [`supabase/exercises.sql`](supabase/exercises.sql). Las migraciones finales crean planes, privacidad y la biblioteca compartida de ejercicios con RLS.
 3. En **Project Settings → API Keys**, copia la **Project URL** (o el Project ID) y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
 4. Ponlos como variables de entorno en Vercel (ver despliegue). Para desarrollo local, también puedes guardarlos desde **Ajustes → Base de datos**.
 
-> Para una instalación existente, ejecuta las migraciones idempotentes pendientes en orden: [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) si aún no se aplicó y después [`supabase/privacy.sql`](supabase/privacy.sql). No se ejecutan automáticamente en producción.
+> Para una instalación existente, ejecuta las migraciones idempotentes pendientes en orden: [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) si aún no se aplicó, después [`supabase/privacy.sql`](supabase/privacy.sql) y finalmente [`supabase/exercises.sql`](supabase/exercises.sql). No se ejecutan automáticamente en producción.
+
+El catálogo base se mantiene en [`exercise-catalog.js`](exercise-catalog.js). Después de editarlo, regenera la migración y valida referencias con:
+
+```bash
+node scripts/generate-exercise-sql.mjs
+node scripts/validate-exercises.mjs
+```
 
 ## Uso local
 

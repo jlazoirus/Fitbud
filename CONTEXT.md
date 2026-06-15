@@ -19,6 +19,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Privacidad y seguridad:** `user_consents` y `safety_screenings` guardan aceptación y aptitud por versión. Edad mínima 18 años. La interfaz presenta un solo permiso esencial para personalizar el plan y un segundo permiso opcional para fotos; no solicita correo o marketing. Sin el permiso vigente no se crea/adapta el plan ni se llama al coach; una señal de alerta reemplaza la rutina por una pausa segura.
 - **Hosting:** Vercel (estático + funciones en `api/`). No hay build.
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
+- **Biblioteca de ejercicios:** `exercise-catalog.js` aporta 40 ejercicios propios y el mapeo por ID de todas las rutinas actuales. Supabase (`exercises`) pasa a ser la fuente compartida después de aplicar la migración; el catálogo empaquetado es el fallback.
 
 > **Macros del día (resuelto):** la vista HOY toma los macros de cada comida desde la **base de datos** (calculados por ingredientes), no de valores fijos. `mealValue()` resuelve con esta prioridad: **1)** override manual → **2)** macros de la DB por `dishName` → **3)** fallback a `SLOTS`. Las metas guardadas por el usuario son la fuente directa para Home, Nutrición y generación con IA; `DAY_TARGET` solo se usa como fallback para perfiles que todavía no tienen metas calculadas.
 
@@ -32,7 +33,8 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios paginados, bloquear/desbloquear en Auth + `profiles.active`, cambiar contraseña, enviar reset y preparar una cuenta QA reiniciable. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida admin activo, impide auto-desactivación y conserva al último admin. |
 | `api/privacy.js` | Exporta un JSON legible del usuario autenticado o elimina fotos + cuenta Auth tras confirmar `BORRAR <email>`. Usa service role solo en servidor y protege al último admin. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v17`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v20`. |
+| `exercise-catalog.js` | Catálogo local propio de 40 ejercicios y mapeo de cada variante de rutina a IDs estables. También alimenta la generación reproducible del SQL. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. El layout respeta `safe-area-inset-*` para no quedar bajo la barra de estado ni el indicador de inicio de iOS. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
@@ -41,6 +43,8 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `supabase/auth.sql` | **Multiusuario:** `profiles` (rol admin + prefs), `day_log`/`weight_log` por `user_id`, RLS por usuario y escritura de catálogo solo admin. Correr después de schema/seed. |
 | `supabase/plan_cycles.sql` | Migración idempotente para ciclos sucesivos: `plan_versions`, `plan_cycles`, `day_log.plan_version_id`, pesos separados por `cycle_start` y bucket privado `progress-photos` con RLS. La duración se infiere de las fechas y se configura en `profiles.prefs.planDurationWeeks`. |
 | `supabase/privacy.sql` | Migración idempotente de `user_consents` y `safety_screenings`, ambas aisladas por usuario con RLS. Ejecutar después de `plan_cycles.sql`. |
+| `supabase/exercises.sql` | Migración idempotente de la biblioteca de ejercicios, fuente/licencia, media procedimental, RLS y seed de las rutinas actuales. Ejecutar después de `auth.sql`; no se aplica automáticamente. |
+| `scripts/generate-exercise-sql.mjs`, `scripts/validate-exercises.mjs` | Regeneran el seed SQL desde el catálogo y validan completitud, media propia y referencias de todas las rutinas. |
 | `PRIVACY.md` | Política operativa preliminar: edad, consentimiento, aptitud, retención, exportación y borrado. Requiere revisión legal antes del lanzamiento comercial. |
 | `plan-10-semanas-recomposicion.md` | Plan original (fuente de verdad de menús, días, entrenos, metas). |
 | `BUILD_PLAN.md`, `PROGRESS.md`, `REQUIREMENTS.md`, `README.md` | Docs del proyecto. |
@@ -50,7 +54,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Capa de datos:** calendario dinámico por perfil (`planStartDate`/`planEndDate`/`planCycleNumber`/`planDurationWeeks`), menús, generadores de entrenamiento, `DAY_TARGET` (fallback sin perfil), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales exactas).
 - **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → logística de comidas → preferencias, permiso esencial, fotos opcionales y evaluación de seguridad. `migrateProfilePrefs()` normaliza el esquema v2; `hasCompleteOnboarding()` no bloquea perfiles heredados y `profileReviewDue()` solicita revisión cada 28 días.
 - **Cierre de sesión:** `signOutUser()` limpia la UI y el cache del usuario de inmediato, solicita a Supabase un cierre local y elimina la sesión persistida como fallback si la red no responde.
-- **Entrenamiento:** cada perfil elige disciplina, fuerza, 3-6 días exactos, lugar por día, minutos, equipo, experiencia, prioridad y limitaciones. `workoutSchedule()` asigna fuerza/deporte; `effectiveWorkout(ds)` conserva overrides y devuelve `safety_hold` si la evaluación tiene una señal de alerta.
+- **Entrenamiento:** cada perfil elige disciplina, fuerza, 3-6 días exactos, lugar por día, minutos, equipo, experiencia, prioridad y limitaciones. `workoutSchedule()` asigna fuerza/deporte; `effectiveWorkout(ds)` conserva overrides y devuelve `safety_hold` si la evaluación tiene una señal de alerta. Cada sesión lleva `exerciseIds` y `renderWorkout()` resuelve instrucciones y demostraciones desde el catálogo activo.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
 - **Estado/persistencia** (~335): `S` (objeto raíz, cacheado en localStorage), `dayState(ds)` (campos: `meals{id:{done,ovr}}`, `extras[]`, `workoutDone`, `workoutOverride`), `mealState`, `mealValue` (resuelve macros: override manual → DB por `dishName` → fallback plan), `dayTotals(ds)` (suma solo comidas marcadas `done`).
 - **Sincronización con la DB:** `commitDay(ds)`=`save()`+`pushDay(ds)` (upsert a `day_log` con `plan_version_id`); `pullDay(ds)`/`syncDay(ds)` bajan el día; `pushWeight`/`pullWeights`/`syncWeights` para `weight_log`; `pullPlanVersions()`/`ensurePlanVersion()` mantienen el snapshot prescrito. Se llama `commitDay` en cada mutación del día (toggles, reemplazo, editor, sugerencia IA, cambio de entreno) y `syncDay`/`syncWeights` al arrancar, navegar y conectar.
@@ -59,7 +63,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Comidas:** `mealCard`, `extraCard`, `toggleMeal/Extra/Workout`, `openReplace`/`applyReplace`, `openEditor`/`editorSheet`/`saveEditor` (comidas personalizadas / editar valores).
 - **IA (Claude)** (~619): `callClaude(userText,maxTokens)` → si hay key local llama directo a Anthropic; si no, usa `/api/claude`. `parseJSON()` (limpia ```json). `aiEstimate()` (IA1 estimar comida), `aiSuggest()` (IA2 sugerir), `aiReview()` (IA3 revisar macros). System prompt vegetariano sin huevo.
 - **Voz** (~695): `toggleMic()`/`stopMic()` con Web Speech API (`es-PE`, fallback `es-ES`), alimenta el campo del editor.
-- **Supabase / Alimentos** (~808): `supa` (cliente), `DB` (cache: ingredients/dishes/dishIng/diets/dietDishes), `supaUrlFrom()` (acepta ID, URL o link dashboard), `supaInit()`, `dbLoad()`, `macrosFromLines()`/`dishMacros()` (cálculo de macros), `foodsDishes/foodsIngredients/foodsDiets`, editores CRUD `editIngredient/saveIngredient/deleteIngredient`, `editDish/dishModal/dishLineSet/saveDish/deleteDish`.
+- **Supabase / Catálogos**: `DB` cachea alimentos y ejercicios; `dbLoad()` usa `exercises` cuando existe y degrada al catálogo local si la migración está pendiente. Alimentos conserva sus editores y `renderExerciseAdmin()` añade filtros, validación, CRUD y archivado solo para admin.
 - **Init** (final): `supaInit(); registerServiceWorker(); render(); ensureDB(); syncDay(current); syncWeights();` y de nuevo tras `loadRemoteConfig().then(...)` (por si las credenciales llegan de Vercel).
 
 ## 5. Modelo de datos del plan (reglas)
@@ -81,9 +85,10 @@ Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
 - `plan_cycles(user_id, cycle_number, start_date, end_date, challenge, summary, photo_path)` — recap e historial.
 - `user_consents(user_id, consent_type, policy_version, status, timestamps)` — aceptación/retiro por propósito y versión.
 - `safety_screenings(user_id, screening_version, responses, has_red_flags, cleared_for_training)` — aptitud versionada.
+- `exercises(slug, aliases, discipline, level, equipment, places, muscles, movement_pattern, instructions, safety, media, source, license, active)` — biblioteca compartida de movimientos y sesiones deportivas.
 - Storage privado `progress-photos/<user_id>/cycle-N/...` — fotos de progreso con URLs firmadas.
 - Vista `dish_macros` — macros calculados por plato (suma de ingredientes), `security_invoker`.
-- **RLS (con `auth.sql` + `plan_cycles.sql` + `privacy.sql`):** escritura anónima eliminada. Datos, planes, consentimientos y evaluaciones solo permiten acceso propio; catálogo solo a admins activos. Las APIs admin/privacidad usan service role exclusivamente en servidor.
+- **RLS (con `auth.sql` + `plan_cycles.sql` + `privacy.sql` + `exercises.sql`):** escritura anónima eliminada. Datos, planes, consentimientos y evaluaciones solo permiten acceso propio; catálogos solo permiten escritura a admins activos. Las APIs admin/privacidad usan service role exclusivamente en servidor.
 - **Cálculo de macros:** `macros = Σ ingrediente(por_100g) × gramos/100`. En la app se hace en cliente (`macrosFromLines`).
 - **Re-seed:** `seed.sql` hace `truncate ... restart identity cascade` (es re-ejecutable).
 
@@ -120,6 +125,7 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Peso en la DB** — `weight_log` + `pushWeight`/`pullWeights`/`syncWeights`. Nada del usuario vive solo en el navegador.
 - **Plan deportivo configurable** — `primarySport` + `strengthMode` + `trainDays` en `profiles.prefs`; reparto con `workoutSchedule(days)` y sesiones progresivas con `workoutOptions(ds)`.
 - **Cambiar el entrenamiento del día** — `effectiveWorkout` + `workoutOverride` (sincroniza vía `day_log`).
+- **Biblioteca guiada de ejercicios** — 40 registros propios cubren gimnasio, peso corporal, running, cycling y natación; todas las rutinas usan IDs, la UI permite pausar animaciones y el admin valida fuente/licencia antes de publicar.
 - **Onboarding y revisión periódica** — calcula macros, reúne objetivo y preferencias, se activa al primer login y vuelve a preguntar cada 28 días.
 - **Perfil flexible v2** — estructura logística de comidas, restricciones duras/blandas y disponibilidad deportiva; migra perfiles existentes y alimenta al coach como JSON.
 - **Privacidad y seguridad** — consentimientos versionados, gate para cuentas existentes, pausa de entrenamiento por alertas, guardrails server-side, exportación y borrado.
@@ -146,7 +152,7 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 - Tabs de usuario: **Hoy · Nutrición · Entreno · Progreso · Perfil** (`renderTabs`, 5 fijos).
 - **Hoy** (`renderHoy`): saludo + racha (`streak()`) + hero (anillo kcal + macros) + tarjeta "dieta de hoy" (→Nutrición) + "entreno de hoy" (→Entreno). Siempre muestra el día actual.
 - **Nutrición** (`renderNutrition`): nav de día + hero + comidas del plan + extras + IA.
-- **Entreno** (`renderWorkout`): nav de día + tarjeta de entreno + cambiar/volver al plan + resumen.
+- **Entreno** (`renderWorkout`): nav de día + tarjeta de entreno + ejercicios guiados con demostración, instrucciones y seguridad + cambiar/volver al plan + resumen.
 - **Progreso** (`renderProgress`): stats (kg/entrenos/racha) + gráfico+tabla de peso + sección Semana (reusa `goDay`/`weekNav`).
 - **Perfil** (`renderProfile`): edita macros, logística alimentaria, restricciones, disponibilidad, lugares y recursos → `profiles.prefs`; cuenta + cerrar sesión; Administración solo admin.
 - **Coach personalizado:** `buildSysPrompt()` serializa el perfil v2 como JSON estructurado para separar restricciones obligatorias, gustos y recursos.

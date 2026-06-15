@@ -166,6 +166,55 @@
   .workout{background:linear-gradient(160deg,rgba(200,100,60,.16),var(--surf1));border:1px solid var(--terra-dim);border-radius:var(--r-lg);padding:16px}
   .workout .name{font-family:var(--font-display);font-size:17px}
   .workout .detail{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.45}
+  .exercise-list{display:grid;gap:12px}
+  .exercise-card{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+  .exercise-card.inactive{opacity:.62}
+  .exercise-demo{position:relative;background:linear-gradient(145deg,var(--surf3),var(--surf2));border-bottom:1px solid var(--border);min-height:164px;display:flex;align-items:center;justify-content:center}
+  .exercise-demo svg{display:block;width:100%;height:164px;color:var(--purple-200)}
+  .exercise-demo .demo-floor{stroke:var(--border-2);stroke-width:3}
+  .exercise-demo .demo-athlete{transform-box:fill-box;transform-origin:center}
+  .exercise-demo .demo-body{stroke:currentColor;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+  .exercise-demo .demo-head{fill:var(--terra-300)}
+  .exercise-demo .demo-prop{stroke:var(--muted2);stroke-width:5;fill:none}
+  .demo-squat .demo-athlete{animation:demoSquat 2.2s ease-in-out infinite}
+  .demo-hinge .demo-athlete{animation:demoHinge 2.2s ease-in-out infinite}
+  .demo-push .demo-athlete{animation:demoPush 1.8s ease-in-out infinite}
+  .demo-pull .demo-athlete{animation:demoPull 2s ease-in-out infinite}
+  .demo-lunge .demo-athlete{animation:demoLunge 2.4s ease-in-out infinite}
+  .demo-bridge .demo-athlete{animation:demoBridge 2.2s ease-in-out infinite}
+  .demo-core .demo-athlete{animation:demoCore 2.6s ease-in-out infinite}
+  .demo-calf .demo-athlete{animation:demoCalf 1.8s ease-in-out infinite}
+  .demo-isolation .demo-athlete{animation:demoIsolation 1.8s ease-in-out infinite}
+  .demo-run .demo-athlete{animation:demoRun 1.2s ease-in-out infinite}
+  .demo-cycle .demo-crank{transform-box:fill-box;transform-origin:center;animation:demoCycle .9s linear infinite}
+  .demo-swim .demo-athlete{animation:demoSwim 2s ease-in-out infinite}
+  .exercise-card.paused .demo-athlete,.exercise-card.paused .demo-crank{animation-play-state:paused}
+  @keyframes demoSquat{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(22px) scaleY(.82)}}
+  @keyframes demoHinge{0%,100%{transform:rotate(0)}50%{transform:rotate(28deg) translate(8px,10px)}}
+  @keyframes demoPush{0%,100%{transform:translateY(-9px)}50%{transform:translateY(12px)}}
+  @keyframes demoPull{0%,100%{transform:translateX(12px)}50%{transform:translateX(-12px)}}
+  @keyframes demoLunge{0%,100%{transform:translate(0,0)}50%{transform:translate(18px,18px) scaleY(.88)}}
+  @keyframes demoBridge{0%,100%{transform:rotate(0) translateY(8px)}50%{transform:rotate(-10deg) translateY(-10px)}}
+  @keyframes demoCore{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+  @keyframes demoCalf{0%,100%{transform:translateY(8px)}50%{transform:translateY(-9px)}}
+  @keyframes demoIsolation{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(8deg)}}
+  @keyframes demoRun{0%,100%{transform:translate(-9px,0) rotate(-2deg)}50%{transform:translate(9px,-6px) rotate(2deg)}}
+  @keyframes demoCycle{to{transform:rotate(360deg)}}
+  @keyframes demoSwim{0%,100%{transform:translateX(-12px) rotate(-2deg)}50%{transform:translateX(12px) rotate(2deg)}}
+  .exercise-body{padding:14px 15px}
+  .exercise-title{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .exercise-title h3{font-family:var(--font-display);font-size:16px;margin:0}
+  .exercise-meta{font-size:11px;color:var(--muted);margin-top:4px}
+  .exercise-copy{font-size:13px;line-height:1.48;color:var(--muted);margin-top:10px}
+  .exercise-copy b{color:var(--txt)}
+  .exercise-steps{margin:8px 0 0;padding-left:20px;color:var(--txt);font-size:13px;line-height:1.5}
+  .exercise-safety{margin-top:10px;padding:10px;border-radius:var(--r-sm);background:rgba(220,80,80,.08);border:1px solid rgba(220,80,80,.2);font-size:12px;line-height:1.45}
+  .exercise-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+  .exercise-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .exercise-filters input,.exercise-filters select{width:100%;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:10px;font:inherit}
+  @media(prefers-reduced-motion:reduce){
+    .exercise-demo .demo-athlete,.exercise-demo .demo-crank{animation:none!important}
+  }
 
   /* Tabs */
   .tabs{
@@ -298,10 +347,13 @@
     .availability-day{grid-template-columns:1fr}
     .onboarding h1{font-size:26px}
     .challenge-grid{grid-template-columns:1fr}
+    .exercise-filters{grid-template-columns:1fr}
   }
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
 <script src="config.js"></script>
+<!-- Catálogo local de respaldo; Supabase pasa a ser la fuente al aplicar exercises.sql. -->
+<script src="exercise-catalog.js"></script>
 <!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -628,6 +680,8 @@ function trainingPrefsFromPrefs(source){
 function trainingPrefs(){
   return trainingPrefsFromPrefs((profile&&profile.prefs)||{});
 }
+const LOCAL_EXERCISES=Array.isArray(window.FITBUD_EXERCISES)?window.FITBUD_EXERCISES:[];
+const WORKOUT_EXERCISE_IDS=window.FITBUD_WORKOUT_EXERCISES||{};
 function workoutSchedule(days,dayIds,priority,locations,primary){
   const selected=normalizedTrainingDays(dayIds,days);
   const sessions=baseWorkoutTemplate(selected.length,priority);
@@ -757,11 +811,16 @@ function sportSessions(primary,ds,prefs){
     },
   };
   const p=plans[primary]||plans.running;
-  return {
+  const sessions={
     quality:{id:"calidad",kind:p.kind,name:p.qualityName,detail:p.quality[phase]},
     endurance:{id:"facil",kind:p.kind,name:p.enduranceName,detail:p.endurance[phase]},
     technique:{id:"tecnica",kind:p.kind,name:p.techniqueName,detail:p.technique},
   };
+  const ids=WORKOUT_EXERCISE_IDS[primary]||{};
+  sessions.quality.exerciseIds=ids.calidad||[];
+  sessions.endurance.exerciseIds=ids.facil||[];
+  sessions.technique.exerciseIds=ids.tecnica||[];
+  return sessions;
 }
 function strengthSessions(mode,ds,prefs){
   const progress=strengthProgression(ds,prefs);
@@ -781,7 +840,13 @@ function strengthSessions(mode,ds,prefs){
     torsoB:{id:"torsoB",kind:"Peso corporal",name:"Peso corporal · Superior B",detail:"Flexiones inclinadas/declinadas · Remo con banda · Fondos asistidos · Plancha con toque de hombro. "+progress},
     piernaB:{id:"piernaB",kind:"Peso corporal",name:"Peso corporal · Pierna B",detail:"Búlgaras · Peso muerto a una pierna · Step-ups · Curl femoral deslizante · Core. "+progress},
   };
-  return mode==="bodyweight"?bodyweight:gym;
+  const sessions=mode==="bodyweight"?bodyweight:gym;
+  const ids=WORKOUT_EXERCISE_IDS[mode==="bodyweight"?"bodyweight":"gym"]||{};
+  Object.entries(sessions).forEach(([key,session])=>{
+    session.exerciseIds=ids[key]||[];
+    session.detail=`${session.exerciseIds.length} ejercicios guiados con demostración, instrucciones y alternativas. ${progress}`;
+  });
+  return sessions;
 }
 function workoutOptions(ds,prefs){
   const training=trainingPrefsFromPrefs(prefs||planPrefsForDate(ds));
@@ -791,7 +856,7 @@ function workoutOptions(ds,prefs){
     strength.fullA,strength.fullB,
     strength.torsoA,strength.piernaA,strength.torsoB,strength.piernaB,
     sport.quality,sport.endurance,sport.technique,
-    {id:"descanso",kind:"Descanso",name:"Descanso total",detail:"Movilidad suave y caminata opcional. Prioriza sueño y recuperación."},
+    {id:"descanso",kind:"Descanso",name:"Descanso total",detail:"Movilidad suave y caminata opcional. Prioriza sueño y recuperación.",exerciseIds:[]},
   ];
 }
 function workoutById(ds,id,prefs){return workoutOptions(ds,prefs).find(o=>o.id===id)||null;}
@@ -1415,6 +1480,7 @@ function safetyHoldWorkout(){
     kind:"Seguridad",
     name:"Entrenamiento en pausa",
     detail:"Tu evaluación tiene una señal de alerta. No entrenes con este plan hasta recibir orientación de un profesional de salud.",
+    exerciseIds:[],
   };
 }
 function privacyApiMessage(error){
@@ -2042,6 +2108,7 @@ function render(){
   if(view==="progreso")return renderProgress();
   if(view==="perfil")return renderProfile();
   if(isAdmin()&&view==="foods")return renderFoods();
+  if(isAdmin()&&view==="exercises")return renderExerciseAdmin();
   if(isAdmin()&&view==="settings")return renderSettings();
   if(isAdmin()&&view==="admin")return renderAdminUsers();
   renderHoy();
@@ -2142,7 +2209,7 @@ function renderTabs(){
   $("#tabs").innerHTML=tabs.map(([v,l])=>`<button class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
 }
 function setView(v){
-  if((v==="foods"||v==="settings"||v==="admin")&&!isAdmin())v="perfil";
+  if((v==="foods"||v==="exercises"||v==="settings"||v==="admin")&&!isAdmin())v="perfil";
   view=v;
   if(v==="hoy")current=clampDate(todayStr());
   if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}
@@ -2274,6 +2341,97 @@ function renderNutrition(){
   `;
 }
 
+/* ---------- Biblioteca de ejercicios (REQ-15) ---------- */
+function exerciseArray(value){
+  if(Array.isArray(value))return value;
+  if(typeof value==="string"){
+    try{const parsed=JSON.parse(value);if(Array.isArray(parsed))return parsed;}catch(e){}
+  }
+  return [];
+}
+function exerciseCatalog(includeInactive){
+  const source=DB.exerciseReady?DB.exercises:LOCAL_EXERCISES;
+  return source.filter(ex=>includeInactive||ex.active!==false);
+}
+function exerciseBySlug(slug,includeInactive){
+  return exerciseCatalog(includeInactive).find(ex=>ex.slug===slug)||null;
+}
+function exerciseLevelLabel(level){
+  return TRAINING_EXPERIENCE_LABELS[level]||"Principiante";
+}
+const EXERCISE_DISCIPLINE_LABELS={
+  gym:"Gimnasio",bodyweight:"Peso corporal",strength:"Fuerza",
+  running:"Running",cycling:"Cycling",swimming:"Natación",
+};
+function exerciseDemoSvg(exercise){
+  const key=exercise.media_key||exercise.static_key||"core";
+  const commonStart=`<line class="demo-floor" x1="28" y1="132" x2="212" y2="132"/>`;
+  let figure="";
+  if(key==="cycle"){
+    figure=`<circle class="demo-prop" cx="75" cy="108" r="29"/><circle class="demo-prop" cx="169" cy="108" r="29"/>
+      <path class="demo-prop" d="M75 108l38-38 25 38H75l20-25h43"/>
+      <g class="demo-athlete"><circle class="demo-head" cx="119" cy="39" r="10"/><path class="demo-body" d="M117 50l-8 25 29 10m-29-10-20 25m49-15 20-5"/>
+      <g class="demo-crank"><path class="demo-body" d="M113 80l-15 22m15-22 19 18"/></g></g>`;
+  }else if(key==="swim"){
+    figure=`<path class="demo-prop" d="M22 112c18-8 36 8 54 0s36 8 54 0 36 8 54 0 28 5 34 0"/>
+      <g class="demo-athlete"><circle class="demo-head" cx="70" cy="78" r="10"/><path class="demo-body" d="M82 81l62 9m-51-7-25 24m53-20 34-20m-11 23 36 15"/></g>`;
+  }else if(key==="push"){
+    figure=`${commonStart}<g class="demo-athlete"><circle class="demo-head" cx="58" cy="83" r="10"/><path class="demo-body" d="M70 88l74 20 35 6m-77-17-17 30m53-20-7 25"/></g>`;
+  }else if(key==="bridge"||key==="core"){
+    figure=`${commonStart}<g class="demo-athlete"><circle class="demo-head" cx="48" cy="104" r="10"/><path class="demo-body" d="M60 107l64-10 30 22m-31-22 24-28m-50 32-12 29"/></g>`;
+  }else if(key==="pull"){
+    figure=`${commonStart}<path class="demo-prop" d="M174 34v98M156 36h36"/><g class="demo-athlete"><circle class="demo-head" cx="99" cy="55" r="11"/><path class="demo-body" d="M101 68l3 39m0-24 38-25m-38 49-22 24m22-24 24 24"/></g>`;
+  }else{
+    figure=`${commonStart}<g class="demo-athlete"><circle class="demo-head" cx="112" cy="38" r="11"/><path class="demo-body" d="M112 51l1 45m0-28-27 20m27-20 29 15m-29 13-23 35m23-35 28 35"/></g>`;
+  }
+  return `<svg class="demo-${esc(key)}" viewBox="0 0 240 150" role="img" aria-label="Demostración animada de ${esc(exercise.name)}">${figure}</svg>`;
+}
+function toggleExerciseMotion(button){
+  const card=button.closest(".exercise-card");
+  if(!card)return;
+  const paused=card.classList.toggle("paused");
+  button.textContent=paused?"Reproducir":"Pausar";
+  button.setAttribute("aria-pressed",String(paused));
+}
+function exerciseCard(exercise,admin){
+  const steps=exerciseArray(exercise.steps);
+  const errors=exerciseArray(exercise.common_errors);
+  const signals=exerciseArray(exercise.safety_signals);
+  const equipment=exerciseArray(exercise.equipment);
+  const muscles=exerciseArray(exercise.muscles);
+  const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const pausedByDefault=reduced||admin;
+  const issues=validateExerciseRecord(exercise);
+  return `<article class="exercise-card ${pausedByDefault?"paused":""} ${exercise.active===false?"inactive":""}" data-exercise="${esc(exercise.slug)}">
+    <div class="exercise-demo">${exerciseDemoSvg(exercise)}</div>
+    <div class="exercise-body">
+      <div class="exercise-title">
+        <div><h3>${esc(exercise.name)}</h3><div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(equipment.join(", "))}`:""}</div></div>
+        ${exercise.active===false?'<span class="badge b-Libre">Archivado</span>':""}
+      </div>
+      <div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
+      <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
+      <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
+      <div class="exercise-copy"><b>Errores comunes:</b> ${esc(errors.join(" · "))}</div>
+      <div class="exercise-copy"><b>Más fácil:</b> ${esc(exercise.regression)}<br><b>Más difícil:</b> ${esc(exercise.progression)}</div>
+      <div class="exercise-safety"><b>Detente si:</b> ${esc(signals.join(" · "))}</div>
+      ${admin?`<div class="exercise-copy"><b>Músculos:</b> ${esc(muscles.join(", "))}<br><b>Fuente/licencia:</b> ${esc(exercise.source_name)} · ${esc(exercise.license_name)}${issues.length?`<br><b style="color:var(--bad)">Incompleto:</b> ${esc(issues.join(", "))}`:""}</div>`:""}
+      <div class="exercise-actions">
+        ${reduced?'<button class="btn btn-sm" disabled>Movimiento reducido</button>':`<button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>`}
+        ${admin&&DB.exerciseReady?`<button class="btn btn-sm" onclick="editExercise('${esc(exercise.slug)}')">Editar</button>`:""}
+      </div>
+    </div>
+  </article>`;
+}
+function workoutExercisesHtml(workout){
+  const ids=exerciseArray(workout&&workout.exerciseIds);
+  if(!ids.length)return "";
+  const records=ids.map(slug=>exerciseBySlug(slug)).filter(Boolean);
+  const missing=ids.filter(slug=>!exerciseBySlug(slug));
+  return `${missing.length?'<div class="alert">Esta rutina necesita una actualización de contenido antes de completarse. Elige otra opción o contacta a soporte.</div>':""}
+    <div class="exercise-list">${records.map(ex=>exerciseCard(ex,false)).join("")}</div>`;
+}
+
 /* ---------- ENTRENO: detalle del entrenamiento del día ---------- */
 function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
@@ -2307,6 +2465,7 @@ function renderWorkout(){
       ${ew.overridden?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
     </div>
   </div>`)}
+  ${exerciseArray(ew.workout.exerciseIds).length?section("wk.ejercicios","Ejercicios guiados",workoutExercisesHtml(ew.workout),`${exerciseArray(ew.workout.exerciseIds).length}`):""}
   ${daySummary(ds)}
   `;
 }
@@ -2643,9 +2802,10 @@ function renderProfile(){
 
   ${isAdmin()?`<div class="section-h">Administración</div>
   <div class="dash">
-    <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, el catálogo de alimentos y la configuración técnica.</div>
+    <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, alimentos, ejercicios y la configuración técnica.</div>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('foods')">🥗 Alimentos (catálogo)</button>
+    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('exercises')">🏋️ Ejercicios (catálogo)</button>
     <button class="btn" style="width:100%" onclick="setView('settings')">⚙️ Ajustes técnicos</button>
   </div>`:""}
 
@@ -3385,7 +3545,11 @@ function resetData(){if(confirm("¿Borrar todo el progreso (comidas marcadas, ex
 let supa=null;
 let session=null;   // sesión de Supabase Auth (null = sin login)
 let profile=null;   // fila de profiles (is_admin + prefs)
-let DB={ingredients:[],dishes:[],dishIng:[],diets:[],dietDishes:[],byName:null,loaded:false,error:null};
+let DB={
+  ingredients:[],dishes:[],dishIng:[],diets:[],dietDishes:[],byName:null,
+  exercises:LOCAL_EXERCISES.map(x=>({...x})),exerciseReady:false,exerciseError:null,
+  loaded:false,error:null,
+};
 let foodTab="platos";
 
 // Acepta URL completa, link del dashboard, "xxx.supabase.co" o solo el Project ID
@@ -3591,19 +3755,30 @@ async function onAuth(){
 async function dbLoad(){
   if(!supa){DB.error="no-config";return;}
   try{
-    const [a,b,c,d,e]=await Promise.all([
+    const [a,b,c,d,e,f]=await Promise.all([
       supa.from("ingredients").select("*"),
       supa.from("dishes").select("*"),
       supa.from("dish_ingredients").select("*"),
       supa.from("diets").select("*"),
       supa.from("diet_dishes").select("*"),
+      supa.from("exercises").select("*"),
     ]);
     for(const r of [a,b,c,d,e]) if(r.error) throw r.error;
     DB.ingredients=a.data||[];DB.dishes=b.data||[];DB.dishIng=c.data||[];DB.diets=d.data||[];DB.dietDishes=e.data||[];
+    if(f.error){
+      DB.exercises=LOCAL_EXERCISES.map(x=>({...x}));
+      DB.exerciseReady=false;
+      DB.exerciseError=(f.error&&f.error.message)||String(f.error);
+    }else{
+      DB.exercises=f.data||[];
+      DB.exerciseReady=true;
+      DB.exerciseError=null;
+    }
     DB.byName={};DB.dishes.forEach(x=>{DB.byName[x.name]=x;});
     DB.ingredients.sort((x,y)=>(x.category||"").localeCompare(y.category||"")||x.name.localeCompare(y.name));
     DB.dishes.sort((x,y)=>(x.slot||"").localeCompare(y.slot||"")||x.name.localeCompare(y.name));
     DB.diets.sort((x,y)=>(x.code||"").localeCompare(y.code||""));
+    DB.exercises.sort((x,y)=>(x.discipline||"").localeCompare(y.discipline||"")||x.name.localeCompare(y.name));
     DB.loaded=true;DB.error=null;
   }catch(e){DB.loaded=false;DB.error=(e&&e.message)||String(e);}
 }
@@ -4027,6 +4202,170 @@ async function adminResetLink(id){
   if(!confirm("¿Enviar un enlace de recuperación a "+user.email+"?"))return;
   try{await adminApi("resetPassword",{userId:id,redirectTo:location.origin+location.pathname});toast("Correo de recuperación enviado");}
   catch(e){toast(e.message);}
+}
+
+/* ============================================================
+   REQ-15: catálogo administrativo de ejercicios.
+   La migración exercises.sql habilita persistencia; antes de aplicarla se
+   muestra el catálogo propio empaquetado como respaldo de solo lectura.
+   ============================================================ */
+function exerciseTextList(value){
+  return String(value||"").split(/\n|,/).map(x=>x.trim()).filter(Boolean);
+}
+function validateExerciseRecord(exercise){
+  const issues=[];
+  const requiredText=["slug","name","discipline","level","movement_pattern","start_position","breathing","regression","progression","media_key","static_key","source_name","license_name"];
+  requiredText.forEach(key=>{if(!String(exercise&&exercise[key]||"").trim())issues.push(key);});
+  ["steps","common_errors","safety_signals","contraindications"].forEach(key=>{if(!exerciseArray(exercise&&exercise[key]).length)issues.push(key);});
+  if(exercise&&exercise.source_url&&/^https?:\/\//i.test(exercise.source_url))issues.push("media externa");
+  return issues;
+}
+function renderExerciseAdmin(){
+  if(!supa){
+    $("#app").innerHTML=`${screenHeader("Ejercicios","Administración","entreno")}<div class="dash">Conecta Supabase para administrar el catálogo.</div>`;
+    return;
+  }
+  if(!DB.loaded&&!DB.error){
+    $("#app").innerHTML=`${screenHeader("Ejercicios","Administración","entreno")}<div class="dash muted">Cargando catálogo…</div>`;
+    dbLoad().then(render);return;
+  }
+  const catalog=exerciseCatalog(true);
+  const disciplines=[...new Set(catalog.map(ex=>ex.discipline).filter(Boolean))].sort();
+  const places=[...new Set(catalog.flatMap(ex=>exerciseArray(ex.places)))].sort();
+  $("#app").innerHTML=`${screenHeader("Ejercicios",`${catalog.filter(ex=>ex.active!==false).length} activos · contenido propio`,"entreno")}
+    <div class="row between wrap" style="margin-bottom:12px">
+      <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
+      <button class="btn btn-sm" onclick="dbLoad().then(render)">Actualizar</button>
+    </div>
+    ${DB.exerciseReady?"":`<div class="alert"><b>Catálogo en modo local.</b><br>Aplica <code>supabase/exercises.sql</code> para habilitar edición y convertir Supabase en la fuente compartida.</div>`}
+    <div class="exercise-filters">
+      <input id="exf_q" placeholder="Buscar nombre o alias" oninput="filterExerciseCards()">
+      <select id="exf_discipline" onchange="filterExerciseCards()"><option value="">Todas las disciplinas</option>${disciplines.map(value=>`<option value="${esc(value)}">${esc(EXERCISE_DISCIPLINE_LABELS[value]||value)}</option>`).join("")}</select>
+      <select id="exf_place" onchange="filterExerciseCards()"><option value="">Todos los lugares</option>${places.map(value=>`<option value="${esc(value)}">${esc(value)}</option>`).join("")}</select>
+      <select id="exf_level" onchange="filterExerciseCards()"><option value="">Todos los niveles</option>${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([value,label])=>`<option value="${value}">${label}</option>`).join("")}</select>
+      <input id="exf_equipment" placeholder="Equipo: banda, cable…" oninput="filterExerciseCards()">
+      <input id="exf_limitation" placeholder="Excluir limitación: rodilla…" oninput="filterExerciseCards()">
+    </div>
+    <button class="btn btn-accent" style="width:100%;margin-bottom:12px" onclick="editExercise(null)" ${DB.exerciseReady?"":"disabled"}>＋ Nuevo ejercicio</button>
+    <div id="exerciseAdminList" class="exercise-list">${catalog.map(ex=>exerciseCard(ex,true)).join("")}</div>`;
+}
+function filterExerciseCards(){
+  const q=($("#exf_q")&&$("#exf_q").value||"").trim().toLowerCase();
+  const discipline=($("#exf_discipline")&&$("#exf_discipline").value)||"";
+  const place=($("#exf_place")&&$("#exf_place").value)||"";
+  const level=($("#exf_level")&&$("#exf_level").value)||"";
+  const equipment=($("#exf_equipment")&&$("#exf_equipment").value||"").trim().toLowerCase();
+  const limitation=($("#exf_limitation")&&$("#exf_limitation").value||"").trim().toLowerCase();
+  document.querySelectorAll("#exerciseAdminList .exercise-card").forEach(card=>{
+    const ex=exerciseBySlug(card.dataset.exercise,true);
+    if(!ex)return;
+    const searchable=[ex.name,...exerciseArray(ex.aliases)].join(" ").toLowerCase();
+    const equipmentText=exerciseArray(ex.equipment).join(" ").toLowerCase();
+    const contraindications=exerciseArray(ex.contraindications).join(" ").toLowerCase();
+    const visible=(!q||searchable.includes(q))
+      &&(!discipline||ex.discipline===discipline)
+      &&(!place||exerciseArray(ex.places).includes(place))
+      &&(!level||ex.level===level)
+      &&(!equipment||equipmentText.includes(equipment))
+      &&(!limitation||!contraindications.includes(limitation));
+    card.style.display=visible?"":"none";
+  });
+}
+function exerciseFieldValue(exercise,key,separator){
+  return esc(exerciseArray(exercise[key]).join(separator||", "));
+}
+function editExercise(slug){
+  if(!DB.exerciseReady){toast("Aplica supabase/exercises.sql para editar");return;}
+  const existing=slug?exerciseBySlug(slug,true):null;
+  const ex=existing||{
+    slug:"",name:"",aliases:[],discipline:"bodyweight",level:"beginner",equipment:[],places:["home"],
+    muscles:[],movement_pattern:"core",start_position:"",steps:[],breathing:"",common_errors:[],
+    safety_signals:[],regression:"",progression:"",substitute_slugs:[],contraindications:[],
+    media_type:"inline_svg",media_key:"core",static_key:"core",source_name:"Fitbros Studio",
+    source_url:"",license_name:"Contenido propio Fitbros",attribution:"Fitbros Studio",active:true,
+  };
+  window._exerciseOriginal=slug||null;
+  const mediaKeys=["squat","hinge","push","pull","lunge","bridge","core","calf","isolation","run","cycle","swim"];
+  modal(`<h3>${existing?"Editar":"Nuevo"} ejercicio</h3>
+    <div class="onboarding-grid">
+      <div class="field"><label>ID estable</label><input id="ex_slug" value="${esc(ex.slug)}" ${existing?"disabled":""} placeholder="sentadilla-copa"></div>
+      <div class="field"><label>Nombre</label><input id="ex_name" value="${esc(ex.name)}"></div>
+      <div class="field"><label>Disciplina</label><select id="ex_discipline">${["gym","bodyweight","strength","running","cycling","swimming"].map(value=>`<option value="${value}" ${ex.discipline===value?"selected":""}>${value}</option>`).join("")}</select></div>
+      <div class="field"><label>Nivel</label><select id="ex_level">${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([value,label])=>`<option value="${value}" ${ex.level===value?"selected":""}>${label}</option>`).join("")}</select></div>
+      <div class="field"><label>Patrón</label><input id="ex_pattern" value="${esc(ex.movement_pattern)}"></div>
+      <div class="field"><label>Demostración</label><select id="ex_media_key">${mediaKeys.map(value=>`<option value="${value}" ${ex.media_key===value?"selected":""}>${value}</option>`).join("")}</select></div>
+    </div>
+    <div class="field"><label>Aliases (comas)</label><input id="ex_aliases" value="${exerciseFieldValue(ex,"aliases")}"></div>
+    <div class="field"><label>Equipo (comas)</label><input id="ex_equipment" value="${exerciseFieldValue(ex,"equipment")}"></div>
+    <div class="field"><label>Lugares (comas)</label><input id="ex_places" value="${exerciseFieldValue(ex,"places")}"></div>
+    <div class="field"><label>Grupos musculares (comas)</label><input id="ex_muscles" value="${exerciseFieldValue(ex,"muscles")}"></div>
+    <div class="field"><label>Posición inicial</label><textarea id="ex_start" rows="2">${esc(ex.start_position)}</textarea></div>
+    <div class="field"><label>Pasos (uno por línea)</label><textarea id="ex_steps" rows="4">${exerciseFieldValue(ex,"steps","\n")}</textarea></div>
+    <div class="field"><label>Respiración</label><textarea id="ex_breathing" rows="2">${esc(ex.breathing)}</textarea></div>
+    <div class="field"><label>Errores comunes (uno por línea)</label><textarea id="ex_errors" rows="3">${exerciseFieldValue(ex,"common_errors","\n")}</textarea></div>
+    <div class="field"><label>Señales para detenerse (una por línea)</label><textarea id="ex_safety" rows="3">${exerciseFieldValue(ex,"safety_signals","\n")}</textarea></div>
+    <div class="field"><label>Regresión</label><input id="ex_regression" value="${esc(ex.regression)}"></div>
+    <div class="field"><label>Progresión</label><input id="ex_progression" value="${esc(ex.progression)}"></div>
+    <div class="field"><label>Sustitutos por ID (comas)</label><input id="ex_substitutes" value="${exerciseFieldValue(ex,"substitute_slugs")}"></div>
+    <div class="field"><label>Contraindicaciones/limitaciones (una por línea)</label><textarea id="ex_contraindications" rows="3">${exerciseFieldValue(ex,"contraindications","\n")}</textarea></div>
+    <div class="onboarding-grid">
+      <div class="field"><label>Fuente</label><input id="ex_source" value="${esc(ex.source_name)}"></div>
+      <div class="field"><label>Licencia</label><input id="ex_license" value="${esc(ex.license_name)}"></div>
+      <div class="field"><label>Atribución</label><input id="ex_attribution" value="${esc(ex.attribution||"")}"></div>
+    </div>
+    <label class="chip-check" style="display:flex;margin-bottom:12px"><input id="ex_active" type="checkbox" ${ex.active!==false?"checked":""}><span>Ejercicio activo y publicable</span></label>
+    <button class="btn btn-accent" style="width:100%" onclick="saveExercise()">Guardar ejercicio</button>
+    ${existing&&ex.active!==false?`<button class="btn" style="width:100%;margin-top:8px" onclick="archiveExercise('${esc(ex.slug)}')">Archivar ejercicio</button>`:""}`);
+}
+function readExerciseEditor(){
+  const mediaKey=$("#ex_media_key").value;
+  return {
+    slug:$("#ex_slug").value.trim().toLowerCase(),
+    name:$("#ex_name").value.trim(),
+    aliases:exerciseTextList($("#ex_aliases").value),
+    discipline:$("#ex_discipline").value,
+    level:$("#ex_level").value,
+    equipment:exerciseTextList($("#ex_equipment").value),
+    places:exerciseTextList($("#ex_places").value),
+    muscles:exerciseTextList($("#ex_muscles").value),
+    movement_pattern:$("#ex_pattern").value.trim(),
+    start_position:$("#ex_start").value.trim(),
+    steps:exerciseTextList($("#ex_steps").value),
+    breathing:$("#ex_breathing").value.trim(),
+    common_errors:exerciseTextList($("#ex_errors").value),
+    safety_signals:exerciseTextList($("#ex_safety").value),
+    regression:$("#ex_regression").value.trim(),
+    progression:$("#ex_progression").value.trim(),
+    substitute_slugs:exerciseTextList($("#ex_substitutes").value),
+    contraindications:exerciseTextList($("#ex_contraindications").value),
+    media_type:"inline_svg",
+    media_key:mediaKey,
+    static_key:mediaKey,
+    source_name:$("#ex_source").value.trim(),
+    source_url:"",
+    license_name:$("#ex_license").value.trim(),
+    attribution:$("#ex_attribution").value.trim()||null,
+    active:$("#ex_active").checked,
+    updated_at:new Date().toISOString(),
+  };
+}
+async function saveExercise(){
+  const row=readExerciseEditor();
+  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(row.slug)){toast("El ID debe usar minúsculas y guiones");return;}
+  const issues=validateExerciseRecord(row);
+  if(issues.length){toast("Completa: "+issues.join(", "));return;}
+  const original=window._exerciseOriginal;
+  const result=original
+    ?await supa.from("exercises").update(row).eq("slug",original)
+    :await supa.from("exercises").insert(row);
+  if(result.error){toast("No se pudo guardar: "+result.error.message);return;}
+  closeModal();await dbLoad();render();toast("Ejercicio guardado");
+}
+async function archiveExercise(slug){
+  if(!confirm("¿Archivar este ejercicio? Las rutinas que lo usen deberán sustituirlo antes de publicarse."))return;
+  const result=await supa.from("exercises").update({active:false,updated_at:new Date().toISOString()}).eq("slug",slug);
+  if(result.error){toast("No se pudo archivar: "+result.error.message);return;}
+  closeModal();await dbLoad();render();toast("Ejercicio archivado");
 }
 
 function renderFoods(){

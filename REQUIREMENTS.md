@@ -93,7 +93,7 @@ Estado funcional auditado el 14 de junio de 2026:
 - Preferencias de entrenamiento: running, cycling o natacion combinados con gimnasio o peso corporal; 3 a 6 dias exactos por semana y lugar por dia.
 - Claude puede estimar y sugerir comidas, revisar macros y generar un dia o una semana de dieta.
 - Racha actual basada en cualquier actividad registrada; no distingue cumplimiento nutricional, entrenamiento ni descanso planificado.
-- Entrenamientos actuales descritos como texto compacto; no existe catalogo de ejercicios, ejecucion por series ni demostraciones animadas.
+- Entrenamientos actuales enlazan un catalogo propio de 40 ejercicios con instrucciones, seguridad y demostraciones SVG animadas; aun falta ejecucion por series y temporizadores.
 - No existe todavia facturacion, entitlement de suscripcion, paywall, recordatorios por correo, check-in semanal adaptativo ni un centro conversacional de coach.
 - La fuente de verdad personal es Supabase y `localStorage` actua como cache, pero la sincronizacion sigue siendo last-write-wins sin cola offline.
 
@@ -107,7 +107,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Onboarding | Perfil v2 implementado: macros, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | Falta usar el numero variable de comidas al construir el plan nutricional (REQ-18) |
 | Home diario | Muestra macros, dieta, entrenamiento y racha | Falta priorizacion inteligente, estado del dia, proxima accion y contingencias |
 | Nutricion | Recetas, macros, checks, reemplazos y generacion IA diaria/semanal | Falta plan por numero de comidas, opciones equivalentes, lista de compras, contexto de presupuesto/tiempo y versionado |
-| Entrenamiento | Plan combinado y reemplazo de sesion | Falta detalle para principiantes, series ejecutadas, cargas, temporizadores, sustituciones y GIF animado por ejercicio |
+| Entrenamiento | Plan combinado, reemplazo de sesion y biblioteca guiada con demostraciones animadas | Falta reproductor por series, cargas, temporizadores y sustituciones durante la ejecucion |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
 | Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Falta comparar tendencias, hitos y explicar que cambio en el plan |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
@@ -115,7 +115,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
 | Suscripcion | No existe | Falta oferta de 1/3 meses, checkout, webhooks, entitlement, renovacion, cancelacion y expiracion |
 | Seguridad y privacidad | Auth, RLS y fotos de progreso personal protegidas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
-| Operacion | Admin de usuarios y catalogo de alimentos | Faltan contenidos de ejercicios, media, prompts/versiones, soporte, metricas de IA y costos |
+| Operacion | Admin de usuarios, alimentos y ejercicios con fuente/licencia | Faltan prompts/versiones, soporte, metricas de IA y costos |
 | Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
 | Consumo de generacion | No hay limite; los generadores de REQ-08 son ilimitados | Cuota diaria server-side y reutilizacion controlada de opciones (REQ-32) |
 | PWA y sincronizacion | Instalable, cache y safe areas de iPhone | Falta cola offline, conflictos, recuperacion ante fallos y pruebas end-to-end de journeys |
@@ -807,7 +807,9 @@ Establecer los limites de un coach de bienestar antes de ampliar recomendaciones
 
 ## REQ-15 - Biblioteca de ejercicios y demostraciones animadas
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementacion adopta produccion propia Fitbros: 40 ejercicios cubren todas las rutinas actuales de gimnasio, peso corporal, running, cycling y natacion. Cada sesion usa IDs estables del catalogo; Entreno muestra instrucciones, respiracion, errores, senales de seguridad, regresion/progresion y una demostracion SVG animada que puede pausarse y queda estatica con movimiento reducido. `supabase/exercises.sql` crea la fuente compartida con RLS y CRUD admin; `exercise-catalog.js` mantiene un respaldo local generado desde el mismo contenido hasta aplicar la migracion.
 
 ### Objetivo
 
@@ -819,6 +821,7 @@ Crear una fuente de verdad de ejercicios que permita explicar cada movimiento a 
 
 ### Decision previa bloqueante (build vs buy)
 
+- **Decision resuelta:** producir demostraciones SVG procedimentales propias, alojadas en la app y registradas como contenido de Fitbros. No se usan hotlinks, APIs pagadas ni media de terceros.
 - Conseguir cientos de demostraciones animadas con licencia es un sub-proyecto de contenido y legal por si solo. Antes de codificar este REQ hay que decidir y documentar la fuente: **licenciar** una libreria de ejercicios (p. ej. proveedores con API/licencia comercial), **grabar/producir** propio, o **generar**. La eleccion condiciona costo, esquema de `fuente/licencia` y tiempos. No empezar la carga de media sin esta decision.
 
 ### Alcance
