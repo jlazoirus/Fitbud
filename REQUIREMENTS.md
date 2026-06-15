@@ -759,7 +759,9 @@ Separar el plan prescrito de lo que el usuario ejecuto para poder generar, adapt
 
 ## REQ-14 - Seguridad, consentimiento y privacidad
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementacion agrega consentimientos versionados y separados, edad minima de 18 anos, evaluacion de aptitud con pausa de entrenamiento ante senales de alerta, guardrails obligatorios en cliente y servidor, y un Centro de privacidad para permisos opcionales, exportacion JSON y borrado verificable de cuenta y fotos. `supabase/privacy.sql` crea las tablas con RLS; `PRIVACY.md` define retencion y queda marcado para revision legal profesional.
 
 ### Objetivo
 

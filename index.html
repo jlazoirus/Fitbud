@@ -175,6 +175,7 @@
     padding:10px max(10px,var(--safe-right)) max(12px,var(--safe-bottom)) max(10px,var(--safe-left));
     z-index:50;
   }
+  .tabs:empty{display:none}
   .tabs button{flex:1;background:transparent;border:none;color:var(--muted);padding:2px 0;font-size:10px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:0;transition:.15s}
   .tabs button .ic{font-size:18px;width:46px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:10px;transition:.15s}
   .tabs button.active{color:var(--accent);font-weight:600}
@@ -272,6 +273,7 @@
   .onboarding-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
   .onboarding-actions{display:flex;gap:10px;margin-top:18px}
   .onboarding-actions .btn{min-height:44px}
+  .privacy-control{min-height:44px}
   .onboarding-actions .btn-accent{flex:1}
   .macro-preview{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:14px 0}
   .macro-preview .scard{text-align:left}
@@ -439,6 +441,16 @@ let PLAN_VERSIONS_ERROR=null;
 const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
 const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
 const PROFILE_SCHEMA_VERSION=2;
+const CONSENT_POLICY_VERSION="2026-06-15";
+const SAFETY_SCREENING_VERSION="2026-06-15";
+const MINIMUM_AGE=18;
+const REQUIRED_CONSENTS=["body_progress","automated_coach"];
+const SAFETY_QUESTIONS=[
+  ["chest_pain","¿Tienes dolor de pecho durante la actividad o en reposo?"],
+  ["fainting_dizziness","¿Has tenido desmayos o mareos importantes recientemente?"],
+  ["clinician_restriction","¿Un profesional te indicó limitar o evitar el ejercicio?"],
+  ["acute_injury","¿Tienes una lesión aguda o dolor que empeora al moverte?"],
+];
 const MIN_TRAINING_DAYS=3;
 const MAX_TRAINING_DAYS=6;
 const WEEKDAY_OPTIONS=[
@@ -784,6 +796,10 @@ function workoutOptions(ds,prefs){
 }
 function workoutById(ds,id,prefs){return workoutOptions(ds,prefs).find(o=>o.id===id)||null;}
 function effectiveWorkout(ds,prefs){
+  if(trainingSafetyHold()&&ds>=todayStr()){
+    const hold=safetyHoldWorkout();
+    return {id:hold.id,workout:hold,plannedId:hold.id,planned:hold,overridden:false};
+  }
   const resolvedPrefs=prefs||planPrefsForDate(ds);
   const plannedId=plannedWorkoutId(ds,resolvedPrefs);
   const st=S.days[ds];
@@ -1144,6 +1160,24 @@ function recapDelta(value,suffix){
   if(value==null||!Number.isFinite(n))return "Sin datos";
   return `${n>0?"+":""}${n.toFixed(1)}${suffix||""}`;
 }
+function recapPhotoSection(photo){
+  if(!hasCurrentConsent("progress_photos")){
+    return `<div class="dash photo-picker">
+      <div style="font-weight:600">Foto privada opcional</div>
+      <div class="muted small" style="margin:5px 0 12px">Puedes completar el ciclo sin foto. Para guardarla necesitamos un permiso separado.</div>
+      <button class="btn" onclick="openPhotoConsent()">Autorizar fotos privadas</button>
+    </div>`;
+  }
+  return `<div class="dash photo-picker">
+    ${photo}
+    <div style="font-weight:600">Documenta este momento</div>
+    <div class="muted small" style="margin:5px 0 12px">Toma una foto de cuerpo entero, con luz uniforme y una postura natural. Será privada y solo visible en tu cuenta.</div>
+    <label class="btn btn-accent" style="display:inline-flex;align-items:center;justify-content:center">
+      ${recapPhotoFile?"Cambiar foto":"Tomar o elegir foto"}
+      <input type="file" accept="image/*" capture="environment" onchange="previewRecapPhoto(this)" style="display:none">
+    </label>
+  </div>`;
+}
 function renderPlanRecap(){
   const s=cycleSummary();
   const selected=recapChallenge;
@@ -1168,15 +1202,7 @@ function renderPlanRecap(){
     </div>
     ${s.bodyFatChange!=null?`<div class="alert violet">Composición corporal: ${recapDelta(s.bodyFatChange," puntos de grasa")} durante el ciclo.</div>`:""}
     <div class="section-h">Foto de progreso</div>
-    <div class="dash photo-picker">
-      ${photo}
-      <div style="font-weight:600">Documenta este momento</div>
-      <div class="muted small" style="margin:5px 0 12px">Toma una foto de cuerpo entero, con luz uniforme y una postura natural. Será privada y solo visible en tu cuenta.</div>
-      <label class="btn btn-accent" style="display:inline-flex;align-items:center;justify-content:center">
-        ${recapPhotoFile?"Cambiar foto":"Tomar o elegir foto"}
-        <input type="file" accept="image/*" capture="environment" onchange="previewRecapPhoto(this)" style="display:none">
-      </label>
-    </div>
+    ${recapPhotoSection(photo)}
     <div class="section-h">¿Cuál es tu siguiente desafío?</div>
     <div class="challenge-grid">
       ${challenges.map(([id,ic,title,copy])=>`<button class="challenge ${selected===id?"selected":""}" data-challenge="${id}" onclick="selectNextChallenge('${id}')"><span style="font-size:20px;color:var(--accent)">${ic}</span><b>${title}</b><span>${copy}</span></button>`).join("")}
@@ -1184,6 +1210,29 @@ function renderPlanRecap(){
     <button id="nextChallengeBtn" class="btn btn-accent" style="width:100%;margin-top:16px" onclick="startNextChallenge()" ${selected?"":"disabled"}>${selected?"Recalcular mi siguiente plan":"Elige un desafío"}</button>
     <div id="recapOut" class="muted small center" style="margin-top:9px"></div>
   </main>`;
+}
+function openPhotoConsent(){
+  modal(`<h3>Fotos privadas de progreso</h3>
+    <p class="muted small">La foto se guarda en almacenamiento privado y se muestra con un enlace temporal de una hora. No es obligatoria para continuar.</p>
+    <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="photoConsentAck"><span>Autorizo guardar fotos privadas de progreso.</span></label>
+    <button class="btn btn-accent" style="width:100%" onclick="acceptPhotoConsent()">Autorizar</button>`);
+}
+async function acceptPhotoConsent(){
+  if(!$("#photoConsentAck").checked){toast("Confirma el permiso para guardar fotos");return;}
+  const now=new Date().toISOString();
+  const result=await supa.from("user_consents").upsert({
+    user_id:uid(),
+    consent_type:"progress_photos",
+    policy_version:CONSENT_POLICY_VERSION,
+    status:"accepted",
+    accepted_at:now,
+    withdrawn_at:null,
+    source:"photo_prompt",
+    metadata:{legal_review_required:true},
+    updated_at:now,
+  },{onConflict:"user_id,consent_type,policy_version"});
+  if(result.error){toast(privacyApiMessage(result.error));return;}
+  await loadPrivacyState();closeModal();render();toast("Fotos privadas autorizadas");
 }
 function selectNextChallenge(id){
   if(!CHALLENGE_LABELS[id])return;
@@ -1193,6 +1242,7 @@ function selectNextChallenge(id){
   if(btn){btn.disabled=false;btn.textContent="Recalcular mi siguiente plan";}
 }
 function previewRecapPhoto(input){
+  if(!hasCurrentConsent("progress_photos")){toast("Autoriza las fotos privadas antes de elegir una");return;}
   const file=input&&input.files&&input.files[0];
   if(!file)return;
   if(!file.type.startsWith("image/")){toast("Selecciona una imagen");return;}
@@ -1258,6 +1308,7 @@ function latestLoggedWeight(){
 }
 function onboardingDefaults(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const responses=(safetyScreening&&safetyScreening.responses)||{};
   return {
     name:p.name||"",
     sex:p.sex||"",
@@ -1303,6 +1354,13 @@ function onboardingDefaults(){
     foodNotes:p.foodNotes,
     allergies:p.allergies,
     dislikedIngredients:p.dislikedIngredients,
+    consentBody:hasCurrentConsent("body_progress"),
+    consentCoach:hasCurrentConsent("automated_coach"),
+    consentPhotos:hasCurrentConsent("progress_photos"),
+    consentFollowup:hasCurrentConsent("email_followup"),
+    consentMarketing:hasCurrentConsent("email_marketing"),
+    ageConfirmed:!!(safetyScreening&&safetyScreening.age_confirmed),
+    safetyResponses:Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,responses[key]===true?"yes":responses[key]===false?"no":""])),
   };
 }
 function hasCompleteOnboarding(prefs){
@@ -1320,6 +1378,167 @@ function profileReviewDue(prefs,now){
   if(!hasCompleteOnboarding(prefs))return false;
   const stamp=Date.parse(prefs.onboardingReviewedAt||prefs.onboardingCompletedAt);
   return Number.isFinite(stamp)&&(now==null?Date.now():now)-stamp>=PROFILE_REVIEW_MS;
+}
+let privacyReady=false;
+let privacyError="";
+let consentRecords=[];
+let safetyScreening=null;
+function consentRecord(type){
+  return consentRecords.find(row=>row.consent_type===type&&row.policy_version===CONSENT_POLICY_VERSION)||null;
+}
+function hasCurrentConsent(type){
+  const row=consentRecord(type);
+  return !!(row&&row.status==="accepted");
+}
+function hasRequiredConsents(){return REQUIRED_CONSENTS.every(hasCurrentConsent);}
+function hasCurrentScreening(){
+  const age=Number(profile&&profile.prefs&&profile.prefs.age);
+  return !!(Number.isFinite(age)&&age>=MINIMUM_AGE&&safetyScreening&&safetyScreening.screening_version===SAFETY_SCREENING_VERSION&&safetyScreening.age_confirmed);
+}
+function privacyGateRequired(){
+  return hasCompleteOnboarding((profile&&profile.prefs)||{})&&(!hasRequiredConsents()||!hasCurrentScreening());
+}
+function trainingSafetyHold(){
+  return !hasCurrentScreening()||!!(safetyScreening&&safetyScreening.has_red_flags)||!(safetyScreening&&safetyScreening.cleared_for_training);
+}
+function safetyHoldWorkout(){
+  return {
+    id:"safety_hold",
+    kind:"Seguridad",
+    name:"Entrenamiento en pausa",
+    detail:"Tu evaluación tiene una señal de alerta. No entrenes con este plan hasta recibir orientación de un profesional de salud.",
+  };
+}
+function privacyApiMessage(error){
+  const message=String(error&&error.message||error||"");
+  if(/user_consents|safety_screenings|relation|schema cache|privacy/i.test(message))return "Aplica supabase/privacy.sql para habilitar privacidad y seguridad.";
+  return message||"No se pudo cargar la configuración de privacidad.";
+}
+async function loadPrivacyState(){
+  privacyReady=false;privacyError="";consentRecords=[];safetyScreening=null;
+  if(!supa||!uid()){privacyReady=true;return false;}
+  try{
+    const [consents,screening]=await Promise.all([
+      supa.from("user_consents").select("*").eq("user_id",uid()).eq("policy_version",CONSENT_POLICY_VERSION),
+      supa.from("safety_screenings").select("*").eq("user_id",uid()).eq("screening_version",SAFETY_SCREENING_VERSION).maybeSingle(),
+    ]);
+    if(consents.error)throw consents.error;
+    if(screening.error)throw screening.error;
+    consentRecords=consents.data||[];
+    safetyScreening=screening.data||null;
+    return true;
+  }catch(e){
+    privacyError=privacyApiMessage(e);
+    return false;
+  }finally{privacyReady=true;}
+}
+function privacyChoicesFrom(source){
+  return {
+    body_progress:!!source.consentBody,
+    automated_coach:!!source.consentCoach,
+    progress_photos:!!source.consentPhotos,
+    email_followup:!!source.consentFollowup,
+    email_marketing:!!source.consentMarketing,
+  };
+}
+async function savePrivacyChoices(source,origin){
+  if(!supa||!uid())return{error:{message:"Sin sesión"}};
+  const choices=privacyChoicesFrom(source||{});
+  if(!choices.body_progress||!choices.automated_coach)return{error:{message:"Faltan consentimientos obligatorios"}};
+  const age=Number(source.age!=null?source.age:(profile&&profile.prefs&&profile.prefs.age));
+  if(age<MINIMUM_AGE||!source.ageConfirmed)return{error:{message:`Debes confirmar que tienes al menos ${MINIMUM_AGE} años`}};
+  const responses=Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,source.safetyResponses&&source.safetyResponses[key]==="yes"]));
+  if(SAFETY_QUESTIONS.some(([key])=>!["yes","no"].includes(source.safetyResponses&&source.safetyResponses[key])))return{error:{message:"Cuestionario de seguridad incompleto"}};
+  const now=new Date().toISOString();
+  const rows=Object.entries(choices).map(([type,accepted])=>({
+    user_id:uid(),
+    consent_type:type,
+    policy_version:CONSENT_POLICY_VERSION,
+    status:accepted?"accepted":"withdrawn",
+    accepted_at:accepted?now:null,
+    withdrawn_at:accepted?null:now,
+    source:origin||"app",
+    metadata:{legal_review_required:true},
+    updated_at:now,
+  }));
+  const hasRedFlags=Object.values(responses).some(Boolean);
+  const [consents,screening]=await Promise.all([
+    supa.from("user_consents").upsert(rows,{onConflict:"user_id,consent_type,policy_version"}),
+    supa.from("safety_screenings").upsert({
+      user_id:uid(),
+      screening_version:SAFETY_SCREENING_VERSION,
+      age_confirmed:true,
+      responses,
+      has_red_flags:hasRedFlags,
+      cleared_for_training:!hasRedFlags,
+      completed_at:now,
+      updated_at:now,
+    },{onConflict:"user_id,screening_version"}),
+  ]);
+  if(consents.error)return{error:consents.error};
+  if(screening.error)return{error:screening.error};
+  await loadPrivacyState();
+  return{error:null};
+}
+function renderPrivacyUnavailable(){
+  $("#tabs").innerHTML="";
+  $("#app").innerHTML=`<main class="onboarding">
+    <div class="onboarding-brand">FITBROS · PRIVACIDAD</div>
+    <h1>No podemos continuar todavía</h1>
+    <p class="onboarding-copy">La protección de tus datos y la evaluación de seguridad deben estar disponibles antes de crear o adaptar un plan.</p>
+    <div class="alert">${esc(isAdmin()?privacyError:"Intenta nuevamente más tarde. Si continúa, contacta a soporte.")}</div>
+    <button class="btn" style="width:100%" onclick="loadPrivacyState().then(render)">Reintentar</button>
+  </main>`;
+}
+function renderPrivacyGate(){
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const responses=(safetyScreening&&safetyScreening.responses)||{};
+  $("#tabs").innerHTML="";
+  $("#app").innerHTML=`<main class="onboarding">
+    <div class="onboarding-brand">FITBROS · PRIVACIDAD Y SEGURIDAD</div>
+    <h1>Revisa cómo cuidamos tu plan</h1>
+    <p class="onboarding-copy">Necesitamos tu aceptación vigente y una evaluación breve antes de seguir creando recomendaciones.</p>
+    <div class="dash">
+      <div class="alert violet"><b>Fitbros no sustituye atención médica.</b><br>Detén el ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
+      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_age"><span>Confirmo que tengo al menos ${MINIMUM_AGE} años.</span></label>
+      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_body" ${hasCurrentConsent("body_progress")?"checked":""}><span>Acepto el tratamiento de mis datos corporales y de progreso.</span></label>
+      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_coach" ${hasCurrentConsent("automated_coach")?"checked":""}><span>Acepto recomendaciones automatizadas de bienestar.</span></label>
+      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Opcional: fotos privadas de progreso.</span></label>
+      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_followup" ${hasCurrentConsent("email_followup")?"checked":""}><span>Opcional: correos de seguimiento.</span></label>
+      <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pg_marketing" ${hasCurrentConsent("email_marketing")?"checked":""}><span>Opcional: correos de novedades y marketing.</span></label>
+      ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("pg_"+key,responses[key]===true?"yes":responses[key]===false?"no":"")}</div>`).join("")}
+      <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
+    </div>
+    <button id="privacyGateBtn" class="btn btn-accent privacy-control" style="width:100%" onclick="savePrivacyGate()">Aceptar y continuar</button>
+  </main>`;
+}
+async function savePrivacyGate(){
+  const data={
+    age:Number(profile&&profile.prefs&&profile.prefs.age),
+    ageConfirmed:$("#pg_age").checked,
+    consentBody:$("#pg_body").checked,
+    consentCoach:$("#pg_coach").checked,
+    consentPhotos:$("#pg_photos").checked,
+    consentFollowup:$("#pg_followup").checked,
+    consentMarketing:$("#pg_marketing").checked,
+    safetyResponses:Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,$("#pg_"+key).value])),
+  };
+  const button=$("#privacyGateBtn");
+  if(button){button.disabled=true;button.textContent="Guardando…";}
+  const result=await savePrivacyChoices(data,"privacy_center");
+  if(result&&result.error){
+    if(button){button.disabled=false;button.textContent="Aceptar y continuar";}
+    toast(result.error.message);return;
+  }
+  render();window.scrollTo(0,0);
+  toast(trainingSafetyHold()?"Entrenamiento pausado por seguridad":"Privacidad actualizada");
+}
+function openPrivacyNotice(){
+  modal(`<h3>Privacidad y bienestar</h3>
+    <p class="muted small">Fitbros usa tus datos corporales, preferencias y progreso para crear y adaptar tu plan. El procesamiento automatizado no diagnostica, no prescribe tratamientos y no sustituye a un profesional.</p>
+    <p class="muted small">Las fotos son opcionales, privadas y se muestran mediante enlaces temporales. Puedes retirar correos o fotos, exportar tus datos y borrar tu cuenta desde Perfil.</p>
+    <div class="alert">Texto preliminar pendiente de revisión profesional antes del lanzamiento comercial. Versión ${CONSENT_POLICY_VERSION}.</div>
+    <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`);
 }
 function startOnboarding(){
   onboardingDraft=onboardingDefaults();
@@ -1363,6 +1582,13 @@ function mealTimesHtml(prefix,d){
 }
 function checkedValues(prefix,labels){
   return Object.keys(labels).filter(value=>{const el=$("#"+prefix+"_"+value);return !!(el&&el.checked);});
+}
+function safetySelect(id,value){
+  return `<select id="${id}">
+    <option value="">Selecciona</option>
+    <option value="no" ${value==="no"?"selected":""}>No</option>
+    <option value="yes" ${value==="yes"?"selected":""}>Sí</option>
+  </select>`;
 }
 function readTrainingFields(prefix,d){
   d.primarySport=$("#"+prefix+"_sport").value;
@@ -1442,7 +1668,7 @@ function renderOnboarding(){
           <div class="field"><label>Sexo para la fórmula</label><select id="ob_sex">
             <option value="">Selecciona</option><option value="male" ${sel(d.sex,"male")}>Masculino</option><option value="female" ${sel(d.sex,"female")}>Femenino</option>
           </select></div>
-          <div class="field"><label>Edad</label><input id="ob_age" type="number" inputmode="numeric" min="16" max="90" value="${d.age}" placeholder="30"></div>
+          <div class="field"><label>Edad</label><input id="ob_age" type="number" inputmode="numeric" min="${MINIMUM_AGE}" max="90" value="${d.age}" placeholder="30"></div>
           <div class="field"><label>Estatura (cm)</label><input id="ob_height" type="number" inputmode="decimal" min="130" max="230" value="${d.heightCm}" placeholder="175"></div>
           <div class="field"><label>Peso actual (kg)</label><input id="ob_weight" type="number" inputmode="decimal" min="35" max="250" step=".1" value="${d.weightKg}" placeholder="80"></div>
           <div class="field"><label>Grasa corporal % (opcional)</label><input id="ob_bf" type="number" inputmode="decimal" min="3" max="60" step=".1" value="${d.bodyFatPct}" placeholder="20"></div>
@@ -1549,6 +1775,19 @@ function renderOnboarding(){
         <div class="field"><label>Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se validan como exclusiones obligatorias.</div></div>
         <div class="field"><label>Ingredientes que no te gustan</label><input id="ob_disliked" value="${esc(d.dislikedIngredients)}" placeholder="tofu, aceitunas..."><div class="field-note">Son preferencias blandas: se evitan cuando existe una alternativa viable.</div></div>
         <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Comidas:</b> ${d.mealCount} entre ${d.eatingWindowStart} y ${d.eatingWindowEnd}<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainingDays.length} días · ${SPORT_LABELS[d.primarySport]} + ${STRENGTH_LABELS[d.strengthMode]}</div>
+      </div>
+      <div class="section-h" style="margin-left:0">Privacidad y seguridad</div>
+      <div class="dash">
+        <div class="alert violet"><b>Fitbros es bienestar, no atención médica.</b><br>Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
+        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_age_confirmed" ${d.ageConfirmed?"checked":""}><span>Confirmo que tengo al menos ${MINIMUM_AGE} años.</span></label>
+        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_body" ${d.consentBody?"checked":""}><span>Acepto el tratamiento de mis datos corporales y de progreso para crear y seguir mi plan.</span></label>
+        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_coach" ${d.consentCoach?"checked":""}><span>Acepto recomendaciones automatizadas de bienestar y entiendo que no sustituyen a un profesional.</span></label>
+        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_photos" ${d.consentPhotos?"checked":""}><span>Opcional: autorizo guardar fotos privadas de progreso.</span></label>
+        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_followup" ${d.consentFollowup?"checked":""}><span>Opcional: autorizo correos de seguimiento de mi plan.</span></label>
+        <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="ob_consent_marketing" ${d.consentMarketing?"checked":""}><span>Opcional: autorizo correos de novedades y marketing.</span></label>
+        <div class="muted small" style="margin-bottom:8px">Evaluación básica antes de habilitar entrenamiento</div>
+        ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("ob_safety_"+key,d.safetyResponses[key])}</div>`).join("")}
+        <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
       </div>${onboardingButtons(true)}`;
   }
   $("#tabs").innerHTML="";
@@ -1578,6 +1817,13 @@ function readOnboardingStep(){
     d.foodNotes=$("#ob_food_notes").value.trim();
     d.allergies=$("#ob_allergies").value.trim();
     d.dislikedIngredients=$("#ob_disliked").value.trim();
+    d.ageConfirmed=$("#ob_age_confirmed").checked;
+    d.consentBody=$("#ob_consent_body").checked;
+    d.consentCoach=$("#ob_consent_coach").checked;
+    d.consentPhotos=$("#ob_consent_photos").checked;
+    d.consentFollowup=$("#ob_consent_followup").checked;
+    d.consentMarketing=$("#ob_consent_marketing").checked;
+    d.safetyResponses=Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,$("#ob_safety_"+key).value]));
   }
 }
 function validateOnboardingStep(){
@@ -1585,7 +1831,7 @@ function validateOnboardingStep(){
   if(onboardingStep===1){
     if(!d.name)return "Escribe tu nombre";
     if(!["male","female"].includes(d.sex))return "Selecciona el sexo usado para el cálculo";
-    if(d.age<16||d.age>90)return "La edad debe estar entre 16 y 90 años";
+    if(d.age<MINIMUM_AGE||d.age>90)return `Debes tener entre ${MINIMUM_AGE} y 90 años`;
     if(d.heightCm<130||d.heightCm>230)return "Revisa tu estatura";
     if(d.weightKg<35||d.weightKg>250)return "Revisa tu peso";
     if(d.bodyFatPct!==""&&(d.bodyFatPct<3||d.bodyFatPct>60))return "El porcentaje de grasa debe estar entre 3% y 60%";
@@ -1593,7 +1839,13 @@ function validateOnboardingStep(){
   if(onboardingStep===2&&[d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].some(v=>!Number.isFinite(v)||v<=0))return "Completa las cuatro metas de nutrición";
   if(onboardingStep===3)return validateTrainingProfile(d);
   if(onboardingStep===4)return validateFoodSchedule(d);
-  if(onboardingStep===5)return validateFoodPreferences(d);
+  if(onboardingStep===5){
+    const foodError=validateFoodPreferences(d);
+    if(foodError)return foodError;
+    if(!d.ageConfirmed||d.age<MINIMUM_AGE)return `Confirma que tienes al menos ${MINIMUM_AGE} años`;
+    if(!d.consentBody||!d.consentCoach)return "Acepta los consentimientos necesarios para crear tu plan";
+    if(SAFETY_QUESTIONS.some(([key])=>!["yes","no"].includes(d.safetyResponses&&d.safetyResponses[key])))return "Responde las cuatro preguntas de seguridad";
+  }
   return "";
 }
 function applyCalculatedMacros(){
@@ -1655,6 +1907,8 @@ async function saveOnboarding(){
   const error=validateOnboardingStep();
   if(error){toast(error);return;}
   const d=onboardingDraft,now=new Date().toISOString();
+  const privacyResult=await savePrivacyChoices(d,"onboarding");
+  if(privacyResult&&privacyResult.error){toast("No se pudo guardar privacidad: "+privacyResult.error.message);return;}
   const previous=migrateProfilePrefs((profile&&profile.prefs)||{});
   const newCycle=!!previous.onboardingPending;
   const firstCycle=!hasCompleteOnboarding(previous);
@@ -1781,7 +2035,10 @@ function render(){
   if(!session){$("#tabs").innerHTML="";return renderAuth();}
   if(passwordRecovery){$("#tabs").innerHTML="";return renderPasswordRecovery();}
   if(profile&&!isActive()){ $("#tabs").innerHTML="";return renderInactive(); }
+  if(!privacyReady){$("#tabs").innerHTML="";return renderSplash();}
+  if(privacyError)return renderPrivacyUnavailable();
   if(onboardingActive)return renderOnboarding();
+  if(privacyGateRequired())return renderPrivacyGate();
   if(planNeedsRecap()){ $("#tabs").innerHTML="";return renderPlanRecap(); }
   renderTabs();
   if(view==="nutricion")return renderNutrition();
@@ -1838,7 +2095,7 @@ function installDismissed(){return !!(UI&&UI.installDismissed);}
 function removeInstallPrompt(){const el=document.getElementById("a2hs");if(el)el.remove();}
 function dismissInstall(){UI.installDismissed=true;uiSave();removeInstallPrompt();}
 function updateInstallPrompt(){
-  const inApp=session&&profile&&(typeof isActive!=="function"||isActive())&&!onboardingActive&&!passwordRecovery&&!(typeof planNeedsRecap==="function"&&planNeedsRecap());
+  const inApp=session&&profile&&(typeof isActive!=="function"||isActive())&&privacyReady&&!privacyError&&!privacyGateRequired()&&!onboardingActive&&!passwordRecovery&&!(typeof planNeedsRecap==="function"&&planNeedsRecap());
   const show=inApp&&isMobileDevice()&&!isStandaloneMode()&&!installDismissed();
   if(!show){removeInstallPrompt();return;}
   if(document.getElementById("a2hs"))return;               // ya visible
@@ -1964,6 +2221,7 @@ function renderHoy(){
     </div>
   </header>
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}. Mostrando el primer día.</div>`:""}
+  ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
   ${dayAlert(day)}
   ${heroDash(ds)}
 
@@ -1979,7 +2237,7 @@ function renderHoy(){
   <div class="section-h">Entrenamiento de hoy</div>
   <div class="workout card-link" onclick="setView('entreno')">
     <div class="meal-head" style="flex:1;min-width:0">
-      <button class="chk ${st.workoutDone?'on':''}" onclick="event.stopPropagation();toggleWorkout()">${st.workoutDone?'✓':''}</button>
+      <button class="chk ${st.workoutDone?'on':''}" onclick="event.stopPropagation();toggleWorkout()" ${trainingSafetyHold()?"disabled":""}>${st.workoutDone?'✓':''}</button>
       <div>
         <div class="name" style="font-weight:600">${esc(ew.workout.name)}</div>
         <div class="detail">${esc(ew.workout.detail)}</div>
@@ -2025,8 +2283,12 @@ function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
   const training=trainingPrefs();
   const location=training.locations[parseYmd(ds).getDay()];
+  const safetyNotice=trainingSafetyHold()
+    ? `<div class="alert"><b>Entrenamiento pausado por seguridad.</b><br>No inicies esta rutina hasta recibir orientación de un profesional. Nutrición, historial y exportación siguen disponibles.</div>`
+    : `<div class="alert violet"><b>Señales para detenerte:</b><br>Dolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.</div>`;
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
+  ${safetyNotice}
   <div class="dash" style="padding:12px 14px">
     <div class="row between">
       <div>
@@ -2038,14 +2300,14 @@ function renderWorkout(){
   </div>
   ${section("wk.entreno","Entrenamiento",`<div class="workout">
     <div class="meal-head">
-      <button class="chk ${st.workoutDone?'on':''}" onclick="toggleWorkout()">${st.workoutDone?'✓':''}</button>
+      <button class="chk ${st.workoutDone?'on':''}" onclick="toggleWorkout()" ${trainingSafetyHold()?"disabled":""}>${st.workoutDone?'✓':''}</button>
       <div>
         <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}</div>
         <div class="detail">${esc(ew.workout.detail)}</div>
       </div>
     </div>
     <div class="meal-actions">
-      <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')">Cambiar entrenamiento</button>
+      <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()?"disabled":""}>Cambiar entrenamiento</button>
       ${ew.overridden?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
     </div>
   </div>`)}
@@ -2137,8 +2399,12 @@ function daySummary(ds){
 function nav(n){const nd=addDays(current,n);if(inRange(nd)){current=nd;render();window.scrollTo(0,0);syncDay(current);}}
 function toggleMeal(ds,id){const ms=mealState(ds,id);ms.done=!ms.done;commitDay(ds);render();}
 function toggleExtra(ds,i){const d=dayState(ds);d.extras[i].done=!d.extras[i].done;commitDay(ds);render();}
-function toggleWorkout(){const d=dayState(current);d.workoutDone=!d.workoutDone;commitDay(current);render();}
+function toggleWorkout(){
+  if(trainingSafetyHold()){toast("El entrenamiento está pausado hasta una evaluación profesional");return;}
+  const d=dayState(current);d.workoutDone=!d.workoutDone;commitDay(current);render();
+}
 function openWorkoutPicker(ds){
+  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
   const ew=effectiveWorkout(ds);
   const prefs=trainingPrefs();
   const options=workoutOptions(ds);
@@ -2154,7 +2420,10 @@ function openWorkoutPicker(ds){
   });
   modal(html);
 }
-function setWorkout(ds,id){const d=dayState(ds);if(id&&id!==plannedWorkoutId(ds))d.workoutOverride=id;else delete d.workoutOverride;commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");}
+function setWorkout(ds,id){
+  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  const d=dayState(ds);if(id&&id!==plannedWorkoutId(ds))d.workoutOverride=id;else delete d.workoutOverride;commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");
+}
 function delExtra(ds,i){const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);render();}
 
 /* ---------- PROGRESO: stats + peso + semana ---------- */
@@ -2363,6 +2632,20 @@ function renderProfile(){
 
   <button class="btn btn-accent" style="width:100%" onclick="saveProfile()">Guardar preferencias</button>
 
+  <div class="section-h">Privacidad y seguridad</div>
+  <div class="dash">
+    <div class="row between" style="margin-bottom:10px"><span class="muted small">Aviso vigente</span><span class="badge b-Libre">${CONSENT_POLICY_VERSION}</span></div>
+    <div class="alert ${trainingSafetyHold()?"":"violet"}"><b>${trainingSafetyHold()?"Entrenamiento pausado":"Evaluación de seguridad vigente"}</b><br>${trainingSafetyHold()?"Una respuesta requiere orientación profesional antes de retomar rutinas.":"Recuerda detenerte ante dolor, mareo, desmayo o falta de aire inusual."}</div>
+    <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pf_consent_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Fotos privadas de progreso</span></label>
+    <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pf_consent_followup" ${hasCurrentConsent("email_followup")?"checked":""}><span>Correos de seguimiento</span></label>
+    <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pf_consent_marketing" ${hasCurrentConsent("email_marketing")?"checked":""}><span>Correos de novedades y marketing</span></label>
+    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="saveOptionalConsents()">Guardar permisos opcionales</button>
+    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="renderPrivacyGate();window.scrollTo(0,0)">Revisar consentimientos y seguridad</button>
+    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
+    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="exportPersonalData(this)">Exportar mis datos</button>
+    <button class="btn privacy-control" style="width:100%;border-color:var(--bad);color:var(--bad)" onclick="openDeleteAccount()">Borrar mi cuenta y datos</button>
+  </div>
+
   ${isAdmin()?`<div class="section-h">Administración</div>
   <div class="dash">
     <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, el catálogo de alimentos y la configuración técnica.</div>
@@ -2454,6 +2737,81 @@ async function saveProfile(){
   current=clampDate(current);
   render();
   toast(durationChanged?`Plan ajustado a ${planDurationWeeks} semanas`:"Preferencias guardadas");
+}
+async function saveOptionalConsents(){
+  const choices={
+    progress_photos:$("#pf_consent_photos").checked,
+    email_followup:$("#pf_consent_followup").checked,
+    email_marketing:$("#pf_consent_marketing").checked,
+  };
+  const now=new Date().toISOString();
+  const rows=Object.entries(choices).map(([type,accepted])=>{
+    const previous=consentRecord(type);
+    return {
+      user_id:uid(),
+      consent_type:type,
+      policy_version:CONSENT_POLICY_VERSION,
+      status:accepted?"accepted":"withdrawn",
+      accepted_at:accepted?(previous&&previous.status==="accepted"?previous.accepted_at:now):null,
+      withdrawn_at:accepted?null:now,
+      source:"privacy_center",
+      metadata:{legal_review_required:true},
+      updated_at:now,
+    };
+  });
+  const result=await supa.from("user_consents").upsert(rows,{onConflict:"user_id,consent_type,policy_version"});
+  if(result.error){toast(privacyApiMessage(result.error));return;}
+  await loadPrivacyState();
+  await pullCycleHistory();
+  render();toast("Permisos actualizados");
+}
+async function privacyRequest(method,body){
+  const token=session&&session.access_token;
+  if(!token)throw new Error("Vuelve a iniciar sesión.");
+  const response=await fetch("/api/privacy",{
+    method,
+    headers:{"authorization":"Bearer "+token,...(body?{"content-type":"application/json"}:{})},
+    body:body?JSON.stringify(body):undefined,
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||("Error "+response.status));
+  return data;
+}
+async function exportPersonalData(button){
+  if(button){button.disabled=true;button.textContent="Preparando exportación…";}
+  try{
+    const data=await privacyRequest("GET");
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;link.download=`fitbros-datos-${todayStr()}.json`;
+    document.body.appendChild(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    toast("Exportación descargada");
+  }catch(e){toast(isAdmin()?String(e.message||e):"No se pudo preparar la exportación. Intenta de nuevo.");}
+  finally{if(button){button.disabled=false;button.textContent="Exportar mis datos";}}
+}
+function openDeleteAccount(){
+  const email=(session&&session.user&&session.user.email)||"";
+  modal(`<h3>Borrar cuenta y datos</h3>
+    <div class="alert"><b>Esta acción es irreversible.</b><br>Se borrarán tu cuenta, planes, progreso, consentimientos y fotos privadas.</div>
+    <p class="muted small">Escribe <b>BORRAR ${esc(email)}</b> para confirmar.</p>
+    <div class="field"><input id="deleteAccountConfirmation" autocomplete="off" placeholder="BORRAR ${esc(email)}"></div>
+    <button id="deleteAccountBtn" class="btn privacy-control" style="width:100%;border-color:var(--bad);color:var(--bad)" onclick="deleteMyAccount()">Borrar definitivamente</button>`);
+}
+async function deleteMyAccount(){
+  const confirmation=$("#deleteAccountConfirmation").value.trim();
+  const button=$("#deleteAccountBtn");
+  if(button){button.disabled=true;button.textContent="Borrando…";}
+  try{
+    await privacyRequest("DELETE",{confirmation});
+    closeModal();
+    clearSignedOutState();
+    toast("Cuenta borrada");
+  }catch(e){
+    if(button){button.disabled=false;button.textContent="Borrar definitivamente";}
+    toast(isAdmin()?String(e.message||e):"No se pudo borrar la cuenta. Revisa la confirmación e intenta de nuevo.");
+  }
 }
 
 /* ---------- LOGIN / REGISTRO ---------- */
@@ -2630,7 +2988,10 @@ function saveEditor(){
 const DIET_LABELS={vegetariano:"vegetariano",vegano:"vegano",sin_huevo:"sin huevo",sin_lacteos:"sin lácteos",sin_gluten:"sin gluten",omnivoro:"omnívoro"};
 function buildSysPrompt(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const base="Da estimaciones realistas de porciones reales, con kcal y macros. Habla como el coach del usuario y no menciones tecnología, proveedores, modelos, prompts ni tokens.";
+  const safety=trainingSafetyHold()
+    ?"La evaluación tiene una señal de alerta: no propongas rutinas, progresiones ni formas de entrenar; indica detener actividad y buscar evaluación profesional."
+    :"Ante dolor de pecho, mareo, desmayo, falta de aire inusual, lesión aguda u otra señal de alerta, indica detener la actividad y buscar evaluación profesional.";
+  const base=`Da estimaciones realistas de porciones reales, con kcal y macros. Habla como el coach del usuario y no menciones tecnología, proveedores, modelos, prompts ni tokens. No diagnostiques, no prescribas tratamientos, no cambies medicación y no sustituyas a un profesional de salud. ${safety}`;
   const context={
     schema_version:p.profileSchemaVersion,
     body:{weight_kg:+p.weightKg||null,body_fat_pct:+p.bodyFatPct||null},
@@ -2671,6 +3032,7 @@ function buildSysPrompt(){
 }
 async function callClaude(userText,maxTokens){
   if(!isActive())throw new Error("Tu cuenta está desactivada.");
+  if(!hasRequiredConsents()||!hasCurrentScreening())throw new Error("Revisa privacidad y seguridad antes de usar tu coach.");
   const cfg=effectiveSettings();
   // 1) Override local: si guardaste una API key en este navegador, llamada directa
   //    (útil para desarrollo local sin las funciones serverless).
@@ -3158,6 +3520,7 @@ function clearSignedOutState(){
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;
   cycleHistory=[];recapPhotoFile=null;recapChallenge="";
   PLAN_VERSIONS=[];PLAN_VERSIONS_LOADED=false;PLAN_VERSIONS_ERROR=null;
+  privacyReady=false;privacyError="";consentRecords=[];safetyScreening=null;
   if(recapPhotoUrl)URL.revokeObjectURL(recapPhotoUrl);
   recapPhotoUrl="";
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
@@ -3200,18 +3563,20 @@ async function onAuth(){
   if(_authBusy)return; _authBusy=true;
   try{
     await loadProfile();
+    await loadPrivacyState();
     S.days={};S.weights={};save();   // descarta caché de otra sesión; la DB manda
     if(!isActive()){
       onboardingActive=false;onboardingDraft=null;view="hoy";render();
       return;
     }
+    if(privacyError){onboardingActive=false;onboardingDraft=null;view="hoy";render();return;}
     if(supa&&!DB.loaded)await dbLoad();
     const prefs=(profile&&profile.prefs)||{};
     onboardingActive=!!prefs.onboardingPending||!hasCompleteOnboarding(prefs);
     onboardingDraft=onboardingActive?onboardingDefaults():null;
     if(onboardingDraft&&prefs.pendingChallenge)applyChallengeDefaults(onboardingDraft,prefs.pendingChallenge);
     await Promise.all([pullPlanVersions(),pullCycleHistory()]);
-    if(!onboardingActive){
+    if(!onboardingActive&&hasRequiredConsents()&&hasCurrentScreening()){
       const version=await ensurePlanVersion({
         prefs,
         source:prefs.planCycleNumber&&Number(prefs.planCycleNumber)>1?"migration":"migration",
@@ -3265,6 +3630,7 @@ async function compressProgressPhoto(file){
 }
 async function uploadProgressPhoto(file,cycleNo){
   if(!supa||!uid())throw new Error("Inicia sesión para guardar la foto.");
+  if(!hasCurrentConsent("progress_photos"))throw new Error("Autoriza las fotos privadas antes de guardar.");
   let blob;
   try{blob=await compressProgressPhoto(file);}catch(e){blob=file;}
   const path=`${uid()}/cycle-${cycleNo}/final-${Date.now()}.${blob.type==="image/jpeg"?"jpg":"img"}`;
@@ -3300,7 +3666,7 @@ async function pullCycleHistory(){
     if(result.error)return false;
     cycleHistory=result.data||[];
     await Promise.all(cycleHistory.map(async row=>{
-      if(!row.photo_path)return;
+      if(!row.photo_path||!hasCurrentConsent("progress_photos"))return;
       const signed=await supa.storage.from("progress-photos").createSignedUrl(row.photo_path,3600);
       if(!signed.error&&signed.data)row.photo_url=signed.data.signedUrl;
     }));
