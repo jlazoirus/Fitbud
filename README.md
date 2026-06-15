@@ -21,6 +21,7 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 - **Plan de entrenamiento personalizado**: prepara, revisa y activa 4 o 10 semanas completas usando solo días, lugares, recursos y ejercicios compatibles; permite cambiar una semana o sesión sin rehacer el resto.
 - **Ejercicios guiados**: cada rutina enlaza un catálogo propio con instrucciones, respiración, errores comunes, señales de seguridad y demostraciones SVG animadas que se pueden pausar.
 - **Reproductor de entrenamiento**: calentamiento, series o intervalos, carga/repeticiones/RPE, descansos temporizados, sustituciones y cierre completo o parcial recuperable al reabrir la PWA.
+- **Plan nutricional flexible**: genera días y semanas completas respetando número de comidas, horarios, tiempo de cocina, presupuesto y alergias; muestra borrador con lista de compras antes de aplicar y permite cambiar una comida sin afectar las demás.
 - **Consumo controlado del coach**: cada acción reserva una unidad server-side; al alcanzar el límite reutiliza opciones compatibles o una alternativa determinista sin mostrar contadores.
 - **Instalable como PWA** con manifest, íconos y cache offline del shell de la app.
 

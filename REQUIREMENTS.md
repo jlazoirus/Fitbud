@@ -104,9 +104,9 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Flujo | Estado actual | Brecha principal |
 |---|---|---|
 | Registro y acceso | Login, registro, reset y admin disponibles | Falta relacionar acceso con suscripcion y ofrecer una muestra clara antes del pago |
-| Onboarding | Perfil v3 implementado: macros, zona horaria, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | Falta usar el numero variable de comidas al construir el plan nutricional (REQ-18) |
+| Onboarding | Perfil v3 implementado: macros, zona horaria, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | - |
 | Home diario | Muestra macros, dieta, entrenamiento y racha | Falta priorizacion inteligente, estado del dia, proxima accion y contingencias |
-| Nutricion | Recetas, macros, checks, reemplazos y generacion IA diaria/semanal | Falta plan por numero de comidas, opciones equivalentes, lista de compras, contexto de presupuesto/tiempo y versionado |
+| Nutricion | Recetas, macros, checks, reemplazos, generacion IA diaria/semanal con borrador+lista de compras y regeneracion por comida | Falta contingencia nutricional y reemplazos equivalentes (REQ-19) |
 | Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20) |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
 | Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Falta comparar tendencias, hitos y explicar que cambio en el plan |
@@ -161,7 +161,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 ### Fase B - Inteligencia y adaptacion
 
 17. REQ-17 - Generador IA de planes de entrenamiento. **Implementado**.
-18. REQ-18 - Generador IA de planes nutricionales flexibles.
+18. REQ-18 - Generador IA de planes nutricionales flexibles. **Implementado**.
 19. REQ-19 - Reemplazos y modo contingencia.
 20. REQ-20 - Check-in semanal y ajuste adaptativo.
 21. REQ-21 - Centro conversacional del coach.
@@ -973,7 +973,9 @@ Generar un plan de 4 o 10 semanas que combine la disciplina principal con fuerza
 
 ## REQ-18 - Generador IA de planes nutricionales flexibles
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementacion adapta la UI a 2-6 comidas segun el perfil, distribuye macros con peso mayor en la comida principal, enriquece el prompt con tiempo de cocina/presupuesto/dia de entrenamiento, muestra un borrador de semana para revisar antes de aplicar, genera lista de compras agregada y permite regenerar cualquier comida individual sin afectar las demas.
 
 ### Objetivo
 

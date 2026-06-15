@@ -3867,8 +3867,22 @@ function splitDailyTarget(total,count,index){
   const base=Math.floor(Number(total||0)/count);
   return index===count-1?Math.round(Number(total||0)-base*(count-1)):base;
 }
+// Distribución ponderada: la comida principal recibe el 30 % y el resto se distribuye uniformemente.
+function weightedMealSplit(total,count,index,mainIndex){
+  if(count<=1||!Number.isInteger(mainIndex)||mainIndex<0||mainIndex>=count)
+    return splitDailyTarget(total,count,index);
+  const main=Math.round(Number(total||0)*0.3);
+  const rest=Number(total||0)-main;
+  const otherCount=count-1;
+  if(index===mainIndex)return main;
+  const otherIndex=index<mainIndex?index:index-1;
+  const base=Math.floor(rest/otherCount);
+  return otherIndex===otherCount-1?Math.round(rest-base*(otherCount-1)):base;
+}
 function deterministicDayPayload(ds){
   const day=buildDay(ds),target=effectiveDayTarget(),count=day.meals.length;
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const mainIndex=Math.min(Math.max(1,prefs.mainMealIndex||2),count)-1;
   const proteinName=compatibleIngredient(
     ["Proteína vegetal en polvo","Seitán","Tofu firme","Lentejas cocidas"],
     "Fuente de proteína compatible"
@@ -3876,9 +3890,9 @@ function deterministicDayPayload(ds){
   const carbName=compatibleIngredient(["Arroz cocido","Quinua cocida","Papa","Avena"],"Fuente de carbohidratos compatible");
   const fatName=compatibleIngredient(["Aceite de oliva","Palta","Chía"],"Fuente de grasas compatible");
   const comidas=day.meals.map((meal,index)=>{
-    const p=splitDailyTarget(target.p,count,index);
-    const c=splitDailyTarget(target.c,count,index);
-    const f=splitDailyTarget(target.f,count,index);
+    const p=weightedMealSplit(target.p,count,index,mainIndex);
+    const c=weightedMealSplit(target.c,count,index,mainIndex);
+    const f=weightedMealSplit(target.f,count,index,mainIndex);
     return {
       slot_id:meal.id,
       nombre:`${meal.slot} práctica ajustada a tus metas`,
@@ -3888,7 +3902,7 @@ function deterministicDayPayload(ds){
         {nombre:fatName,gramos:Math.max(3,Math.round(f))},
         {nombre:"Verduras variadas compatibles",gramos:100},
       ],
-      kcal:splitDailyTarget(target.kcal,count,index),
+      kcal:weightedMealSplit(target.kcal,count,index,mainIndex),
       proteina_g:p,carbohidratos_g:c,grasa_g:f,
     };
   });
@@ -3906,6 +3920,21 @@ function deterministicSuggestionPayload(remK,remP){
     const c=Math.max(5,Math.round((kcal-p*4-f*9)/4));
     return {nombre,kcal,proteina_g:p,carbohidratos_g:c,grasa_g:f};
   })};
+}
+// Agrega ingredientes de todos los días generados y devuelve la lista ordenada por gramos.
+function buildShoppingList(daysData){
+  const totals=new Map();
+  (daysData||[]).forEach(d=>{
+    (d.comidas||[]).forEach(c=>{
+      (c.ingredientes||[]).forEach(g=>{
+        const key=(g.nombre||"").trim().toLowerCase();
+        if(!key)return;
+        const prev=totals.get(key)||{nombre:g.nombre,gramos:0};
+        totals.set(key,{nombre:prev.nombre,gramos:prev.gramos+Math.round(Number(g.gramos||0))});
+      });
+    });
+  });
+  return [...totals.values()].sort((a,b)=>b.gramos-a.gramos);
 }
 function dietQuotaValidation(ds){
   const day=buildDay(ds);
@@ -4343,12 +4372,17 @@ function validateGeneratedDay(j,day,target){
 // Núcleo reutilizable: genera UN día a la medida de los macros del usuario y lo valida.
 async function generateOneDay(ds,coachRequest){
   const day=buildDay(ds); const target=effectiveDayTarget();
-  const slots=day.meals.map(m=>`${m.id} (${m.slot}${m.time?", ~"+m.time:""})`).join(", ");
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const mainMealIdx=Math.min(Math.max(1,prefs.mainMealIndex||2),day.meals.length)-1;
+  const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
+  const slots=day.meals.map((m,i)=>`${m.id} (${m.slot}${m.time?", ~"+m.time:""}${i===mainMealIdx?" [comida principal]":""})`).join(", ");
   const dishList=DB.loaded?DB.dishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
   const recent=recentMealNames(ds,5);
+  const cookCtx=`Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
   const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
 Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carbohidratos, ${target.f} g grasa.
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
+${cookCtx}
 Platos disponibles (reutilízalos cuando encajen; puedes crear variantes coherentes): ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}.
 Cada comida debe llevar ingredientes reales con gramos y macros que sumen cerca de la meta del día.
@@ -4390,25 +4424,22 @@ async function aiGenerateWeek(){
   if(!days.length){endCoachAction(actionKey);toast("Esta semana está fuera del plan");return;}
   const label=w.num?("Semana "+w.num):"Semana de arranque";
   modal(`<h3>📅 Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida…</div></div>`);
-  let okN=0; const problems=[];
-  for(let i=0;i<days.length;i++){
-    const ds=days[i];
-    const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Preparando ${label}: día ${i+1} de ${days.length}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
-    try{
-      const {res}=await generateOneDay(ds,{action:"diet_week",requestId,partKey:"day-"+(i+1)});
-      if(res.ok){applyDayComidas(ds,res.comidas);okN++;}
-      else problems.push(prettyDate(ds)+": "+(res.issues[0]||"no válido"));
-    }catch(e){problems.push(prettyDate(ds)+": "+coachErrorMessage(e));}
-  }
-  if(view==="nutricion"||view==="hoy")render();
-  const el=$("#genwOut");
-  if(el)el.innerHTML=`<div class="ai-box">✓ ${okN}/${days.length} días preparados y guardados en tu plan.</div>
-    ${problems.length?`<div class="ai-box">⚠️ No se pudieron preparar:<br>${problems.map(esc).join("<br>")}<div class="muted small" style="margin-top:6px">Reintenta o usa "Preparar este día" para esos.</div></div>`:""}
-    <div class="row wrap" style="margin-top:12px">
-      <button class="btn btn-accent" onclick="closeModal()">Listo</button>
-      <button class="btn" onclick="aiGenerateWeek()">Preparar otra semana</button>
-    </div>`;
-  endCoachAction(actionKey);
+  const daysData=[]; const problems=[];
+  try{
+    for(let i=0;i<days.length;i++){
+      const ds=days[i];
+      const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Preparando ${label}: día ${i+1} de ${days.length}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
+      try{
+        const {res}=await generateOneDay(ds,{action:"diet_week",requestId,partKey:"day-"+(i+1)});
+        if(res.ok)daysData.push({ds,comidas:res.comidas});
+        else problems.push(prettyDate(ds)+": "+(res.issues[0]||"no válido"));
+      }catch(e){problems.push(prettyDate(ds)+": "+coachErrorMessage(e));}
+    }
+    window._genWeek={week:w,label,daysData,problems};
+    const el=$("#genwOut");if(el)el.innerHTML=genWeekReviewHtml();
+  }catch(e){
+    const el=$("#genwOut");if(el)el.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;
+  }finally{endCoachAction(actionKey);}
 }
 function genReviewHtml(res,target){
   const t=res.totals||{kcal:0,p:0,c:0,f:0};
@@ -4416,6 +4447,7 @@ function genReviewHtml(res,target){
     <b>${esc(c.nombre)}</b> <span class="muted small">(${c.slot_id})</span>
     <div class="o-meta">${c.kcal} kcal · P ${c.proteina_g} · C ${c.carbohidratos_g} · G ${c.grasa_g} g</div>
     <div class="muted small" style="margin-top:4px">${c.ingredientes.map(g=>esc(g.nombre)+" "+g.gramos+"g").join(" · ")}</div>
+    <div style="margin-top:6px"><button class="btn btn-sm" onclick="regenerateGenMeal('${c.slot_id}')">Otra opción</button></div>
   </div>`).join("");
   const issues=res.issues&&res.issues.length?`<div class="ai-box" style="border-color:var(--bad)">✗ No se puede aplicar:<br>${res.issues.map(esc).join("<br>")}</div>`:"";
   const warns=res.warns&&res.warns.length?`<div class="ai-box">⚠️ ${res.warns.map(esc).join("<br>")}</div>`:"";
@@ -4440,6 +4472,109 @@ function applyGeneratedDay(){
   const g=window._genDay; if(!g||!g.comidas){closeModal();return;}
   applyDayComidas(g.ds,g.comidas);
   window._genDay=null;closeModal();render();toast("Día aplicado a tu plan");
+}
+// --- Revisión de semana: borrador → confirmar → aplicar ---
+function genWeekReviewHtml(){
+  const draft=window._genWeek;if(!draft)return '<div class="ai-box">El borrador ya no está disponible.</div>';
+  const days=draft.daysData.map((d,index)=>`<details class="dash" ${index===0?"open":""}>
+    <summary><b>${esc(prettyDate(d.ds))}</b> <span class="muted small">${d.comidas.length} comidas</span></summary>
+    ${d.comidas.map(c=>`<div class="opt" style="cursor:default;margin:6px 0">
+      <b>${esc(c.nombre)}</b> <span class="muted small">(${c.slot_id})</span>
+      <div class="o-meta">${c.kcal} kcal · P ${c.proteina_g} · C ${c.carbohidratos_g} · G ${c.grasa_g} g</div>
+      <div class="muted small" style="margin-top:4px">${c.ingredientes.map(g=>esc(g.nombre)+" "+g.gramos+"g").join(" · ")}</div>
+    </div>`).join("")}
+    <button class="btn btn-sm" style="margin-top:6px" onclick="regenerateDayInWeekDraft(${index})">Preparar otro ${esc(prettyDate(d.ds).split(",")[0])}</button>
+  </details>`).join("");
+  const problems=draft.problems&&draft.problems.length
+    ?`<div class="ai-box">⚠️ No se pudieron preparar: ${draft.problems.map(esc).join(", ")}.</div>`:"";
+  const shopping=buildShoppingList(draft.daysData);
+  const shopHtml=shopping.length
+    ?`<details class="dash"><summary><b>Lista de compras</b> <span class="muted small">${shopping.length} ingredientes</span></summary>
+      <div style="columns:2;gap:12px;margin-top:8px">${shopping.map(item=>`<div class="muted small">${esc(item.nombre)} <b>${item.gramos} g</b></div>`).join("")}</div>
+    </details>`:"";
+  return `<div class="ai-box"><b>${draft.daysData.length} días preparados.</b> Revisa cada día antes de aplicar; los cambios no se guardan hasta confirmar.</div>
+    ${problems}${days}${shopHtml}
+    <div class="row wrap" style="margin-top:12px">
+      <button class="btn btn-accent" onclick="applyWeekPlan()">Aplicar semana</button>
+      <button class="btn" onclick="aiGenerateWeek()">Preparar otra semana</button>
+      <button class="btn" onclick="closeModal()">Descartar</button>
+    </div>`;
+}
+function applyWeekPlan(){
+  const draft=window._genWeek;if(!draft||!draft.daysData.length){closeModal();return;}
+  draft.daysData.forEach(d=>applyDayComidas(d.ds,d.comidas));
+  window._genWeek=null;closeModal();render();toast(`${draft.daysData.length} días aplicados a tu plan`);
+}
+async function regenerateDayInWeekDraft(index){
+  const draft=window._genWeek;if(!draft)return;
+  const d=draft.daysData[index];if(!d)return;
+  const actionKey="diet_week_regen_"+index;
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
+  const out=$("#genwOut");if(out)out.innerHTML=`<div class="ai-box">Preparando otro ${esc(prettyDate(d.ds))}…</div>`;
+  try{
+    const {res}=await generateOneDay(d.ds,{action:"diet_week",requestId,partKey:"day-regen"});
+    if(res.ok){
+      draft.daysData[index]={ds:d.ds,comidas:res.comidas};
+      if(out)out.innerHTML=genWeekReviewHtml();
+    }else{
+      if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(res.issues[0]||"El día no pasó las validaciones.")}</div>
+        <div style="margin-top:8px"><button class="btn btn-sm" onclick="document.querySelector('#genwOut').innerHTML=genWeekReviewHtml()">Volver al borrador</button></div>`;
+    }
+  }catch(e){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>
+    <div style="margin-top:8px"><button class="btn btn-sm" onclick="document.querySelector('#genwOut').innerHTML=genWeekReviewHtml()">Volver al borrador</button></div>`;}
+  finally{endCoachAction(actionKey);}
+}
+// Regenera una sola comida del borrador del día sin afectar las demás.
+async function regenerateGenMeal(slotId){
+  const draft=window._genDay;if(!draft)return;
+  const actionKey="diet_meal_"+slotId;
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
+  const day=buildDay(draft.ds);const target=effectiveDayTarget();
+  const slot=day.meals.find(m=>m.id===slotId);if(!slot){endCoachAction(actionKey);return;}
+  const others=draft.comidas.filter(c=>c.slot_id!==slotId);
+  const usedKcal=others.reduce((s,c)=>s+Number(c.kcal||0),0);
+  const usedP=others.reduce((s,c)=>s+Number(c.proteina_g||0),0);
+  const usedC=others.reduce((s,c)=>s+Number(c.carbohidratos_g||0),0);
+  const usedF=others.reduce((s,c)=>s+Number(c.grasa_g||0),0);
+  const remKcal=Math.max(50,target.kcal-usedKcal);
+  const remP=Math.max(5,target.p-usedP);
+  const remC=Math.max(5,target.c-usedC);
+  const remF=Math.max(2,target.f-usedF);
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const dishList=DB.loaded?DB.dishes.slice(0,40).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(sin base de datos)";
+  const out=$("#genOut");if(out)out.innerHTML=`<div class="ai-box">Buscando otra opción para ${esc(slot.slot)}…</div>`;
+  try{
+    const prompt=`Sugiere UNA comida diferente para el slot "${slot.slot}" (id: ${slotId}) del ${prettyDate(draft.ds)}.
+Macros disponibles para este slot: ${remKcal} kcal, ${remP} g proteína, ${remC} g carbos, ${remF} g grasa.
+Tiempo: ≤${prefs.cookingMinutes||30} min. No repitas: ${draft.comidas.map(c=>c.nombre).join(", ")}.
+Platos de referencia: ${dishList.slice(0,400)}.
+Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","comidas":[{"slot_id":"${slotId}","nombre":"...","ingredientes":[{"nombre":"...","gramos":0}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
+    const fallbackMeal={slot_id:slotId,nombre:`${slot.slot} práctica`,ingredientes:[{nombre:"Alimento compatible",gramos:100}],kcal:Math.round(remKcal),proteina_g:Math.round(remP),carbohidratos_g:Math.round(remC),grasa_g:Math.round(remF)};
+    const fallback=JSON.stringify({explicacion:"Alternativa práctica para el slot.",comidas:[fallbackMeal]});
+    const validation={expectedMeals:1,slots:[slotId],target:{kcal:remKcal,p:remP,c:remC,f:remF},hardRestrictions:coachHardRestrictions()};
+    const quota=coachQuota("diet_day",requestId,"slot-"+slotId,fallback,validation,slotId+":"+draft.ds);
+    const txt=await callClaude(prompt,500,quota);
+    const parsed=parseJSON(txt);
+    const oneMeal=(Array.isArray(parsed.comidas)&&parsed.comidas[0])||parsed;
+    if(!oneMeal||!String(oneMeal.nombre||"").trim())throw new Error("La opción no tiene formato válido.");
+    const nombre=coachCopy(String(oneMeal.nombre).trim());
+    const ings=Array.isArray(oneMeal.ingredientes)?oneMeal.ingredientes.map(x=>({nombre:coachCopy((x.nombre||"").trim()),gramos:+x.gramos})):[];
+    const hay=(nombre+" "+ings.map(g=>g.nombre).join(" ")).toLowerCase();
+    if(coachHardRestrictions().some(term=>hay.includes(term)))throw new Error("La opción contiene una restricción del perfil.");
+    const meal={slot_id:slotId,nombre,ingredientes:ings,kcal:Math.round(+oneMeal.kcal||remKcal),proteina_g:Math.round(+oneMeal.proteina_g||remP),carbohidratos_g:Math.round(+oneMeal.carbohidratos_g||remC),grasa_g:Math.round(+oneMeal.grasa_g||remF)};
+    draft.comidas=draft.comidas.map(c=>c.slot_id===slotId?meal:c);
+    const updatedRes=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
+    if(out)out.innerHTML=genReviewHtml(updatedRes,target);
+  }catch(e){
+    if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>
+      <div style="margin-top:8px"><button class="btn btn-sm" onclick="regenerateGenMealRestore()">Volver al borrador</button></div>`;
+  }finally{endCoachAction(actionKey);}
+}
+function regenerateGenMealRestore(){
+  const draft=window._genDay;if(!draft)return;
+  const day=buildDay(draft.ds);const target=effectiveDayTarget();
+  const res=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
+  const out=$("#genOut");if(out)out.innerHTML=genReviewHtml(res,target);
 }
 
 // IA 3 — revisar mis macros
