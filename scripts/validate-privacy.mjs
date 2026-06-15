@@ -22,6 +22,11 @@ const required = {
     "exportPersonalData",
     "deleteMyAccount",
     "trainingSafetyHold",
+    'id="ob_consent_core"',
+    'id="ob_consent_photos"',
+    'id="pg_consent_core"',
+    'id="pg_consent_photos"',
+    "No vendemos tus datos ni los usamos para publicidad",
   ],
 };
 
@@ -31,6 +36,25 @@ for (const [file, needles] of Object.entries(required)) {
   for (const needle of needles) {
     if (!text.includes(needle)) missing.push(file + ": " + needle);
   }
+}
+
+const index = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const removedConsentControls = [
+  "ob_age_confirmed",
+  "ob_consent_body",
+  "ob_consent_coach",
+  "ob_consent_followup",
+  "ob_consent_marketing",
+  "pg_age",
+  "pg_body",
+  "pg_coach",
+  "pg_followup",
+  "pg_marketing",
+  "pf_consent_followup",
+  "pf_consent_marketing",
+];
+for (const id of removedConsentControls) {
+  if (index.includes(`id="${id}"`)) missing.push("index.html: control redundante " + id);
 }
 
 if (missing.length) {

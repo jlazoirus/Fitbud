@@ -3,7 +3,7 @@
 // Nunca se envía al navegador ni se guarda en GitHub.
 const ALLOWED_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"];
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
-const CONSENT_POLICY_VERSION = "2026-06-15";
+const CONSENT_POLICY_VERSION = "2026-06-15-v2";
 const SAFETY_SCREENING_VERSION = "2026-06-15";
 const REQUIRED_CONSENTS = ["body_progress", "automated_coach"];
 const SERVER_GUARDRAILS = [

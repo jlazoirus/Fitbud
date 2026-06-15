@@ -61,7 +61,7 @@ async function listStorageLevel(e, prefix) {
   const data = await responseJson(response);
   if (!response.ok) {
     if (response.status === 404) return [];
-    throw new Error(apiError(data, "No se pudo listar las fotos privadas."));
+    throw new Error(apiError(data, "No se pudieron listar las fotos de progreso personal."));
   }
   return Array.isArray(data) ? data : [];
 }
@@ -140,7 +140,7 @@ async function deletePhotos(e, userId) {
     body: JSON.stringify({ prefixes: paths }),
   });
   const data = await responseJson(response);
-  if (!response.ok) throw new Error(apiError(data, "No se pudieron borrar las fotos privadas."));
+  if (!response.ok) throw new Error(apiError(data, "No se pudieron borrar las fotos de progreso personal."));
 }
 
 async function deleteUser(user, e) {

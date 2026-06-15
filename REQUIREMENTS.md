@@ -86,7 +86,7 @@ El commit actual leido para preparar esta lista fue:
 Estado funcional auditado el 14 de junio de 2026:
 
 - Login obligatorio con Supabase Auth, perfiles separados, roles, administracion y cierre de sesion.
-- Ciclos personales de 4 o 10 semanas, onboarding, revision cada 28 dias, recap y foto privada al cerrar un ciclo.
+- Ciclos personales de 4 o 10 semanas, onboarding, revision cada 28 dias, recap y foto de progreso personal al cerrar un ciclo.
 - Ya no existe un menu estatico ni tipos de dia PESAS/BAJO/REFEED/DIETBREAK: cada dia parte de slots vacios y se completa con IA, catalogo o edicion.
 - Las metas personales de macros son uniformes para todos los dias y sirven como fuente de verdad para Home, Nutricion y generacion con IA.
 - Perfil flexible versionado: 2 a 6 comidas con horarios/logistica; alergias separadas de gustos; dias, lugares, recursos, experiencia y limitaciones de entrenamiento.
@@ -114,7 +114,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Recordatorios | No existe | Falta programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
 | Suscripcion | No existe | Falta oferta de 1/3 meses, checkout, webhooks, entitlement, renovacion, cancelacion y expiracion |
-| Seguridad y privacidad | Auth, RLS y fotos privadas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
+| Seguridad y privacidad | Auth, RLS y fotos de progreso personal protegidas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
 | Operacion | Admin de usuarios y catalogo de alimentos | Faltan contenidos de ejercicios, media, prompts/versiones, soporte, metricas de IA y costos |
 | Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
 | Consumo de generacion | No hay limite; los generadores de REQ-08 son ilimitados | Cuota diaria server-side y reutilizacion controlada de opciones (REQ-32) |
@@ -761,7 +761,7 @@ Separar el plan prescrito de lo que el usuario ejecuto para poder generar, adapt
 
 **Estado: implementado.**
 
-La implementacion agrega consentimientos versionados y separados, edad minima de 18 anos, evaluacion de aptitud con pausa de entrenamiento ante senales de alerta, guardrails obligatorios en cliente y servidor, y un Centro de privacidad para permisos opcionales, exportacion JSON y borrado verificable de cuenta y fotos. `supabase/privacy.sql` crea las tablas con RLS; `PRIVACY.md` define retencion y queda marcado para revision legal profesional.
+La implementacion agrega consentimientos versionados, edad minima de 18 anos, evaluacion de aptitud con pausa de entrenamiento ante senales de alerta, guardrails obligatorios en cliente y servidor, y un Centro de privacidad para fotos opcionales, exportacion JSON y borrado verificable de cuenta y fotos. La experiencia presenta un solo check esencial para personalizar el plan y un segundo check opcional para fotos; no solicita permisos de correo o marketing. `supabase/privacy.sql` crea las tablas con RLS; `PRIVACY.md` define retencion y queda marcado para revision legal profesional.
 
 ### Objetivo
 
@@ -769,24 +769,23 @@ Establecer los limites de un coach de bienestar antes de ampliar recomendaciones
 
 ### Alcance
 
-- Añadir consentimiento versionado para:
-  - tratamiento de datos corporales y de progreso;
-  - fotos privadas;
-  - recomendaciones automatizadas del coach;
-  - correos de seguimiento y marketing por separado.
+- Añadir consentimiento versionado con una experiencia de maximo dos checks:
+  - un permiso esencial para tratamiento de datos corporales, progreso y recomendaciones del coach;
+  - un permiso opcional para fotos de progreso personal.
+- No solicitar permisos de correo o marketing hasta que exista una funcion contextual que los necesite.
 - Incorporar un cuestionario basico de aptitud y senales de alerta antes de generar entrenamiento.
 - Mostrar instrucciones claras para detener un ejercicio ante dolor, mareo u otros sintomas de riesgo.
 - La IA no debe diagnosticar, prescribir tratamientos ni reemplazar a un profesional.
 - Definir la politica de edad minima antes del lanzamiento comercial; no habilitar menores sin el tratamiento legal y de consentimiento correspondiente.
 - Permitir exportar y solicitar borrado de cuenta, progreso, conversaciones y fotos.
 - Definir retencion, anonimizado y eliminacion de datos tras cancelar.
-- Mantener fotos privadas con URLs firmadas de corta duracion.
+- Mantener las fotos de progreso personal protegidas con URLs firmadas de corta duracion.
 - Registrar la version de terminos y consentimiento aceptada.
 - La interfaz operativa no debe mencionar IA o proveedores. Privacidad y terminos deben describir el procesamiento automatizado con el nivel de transparencia que exija la revision legal.
 
 ### Criterios de aceptacion
 
-- Ningun plan se genera sin los consentimientos obligatorios vigentes.
+- Ningun plan se genera sin el permiso esencial vigente.
 - El consentimiento de recordatorios puede retirarse sin cancelar la cuenta.
 - Exportar datos produce un archivo legible con la informacion del usuario.
 - Borrar cuenta elimina o agenda de forma verificable sus datos y archivos.

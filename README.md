@@ -9,9 +9,9 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 - **Vista HOY** según la fecha real: comidas del plan, entrenamiento y metas del día.
 - **Calorías y macros en vivo** (proteína / carbos / grasa) con barras de progreso; la proteína se destaca con código de color según el ritmo del día.
 - **Perfil flexible** para calcular macros y registrar horarios de comida, presupuesto, alergias, días/lugares de entrenamiento, equipo, experiencia y limitaciones.
-- **Privacidad y seguridad versionadas**: edad mínima de 18 años, consentimientos separados, evaluación de aptitud, exportación y borrado de cuenta.
+- **Privacidad y seguridad versionadas**: edad mínima de 18 años, un permiso esencial y fotos opcionales, evaluación de aptitud, exportación y borrado de cuenta.
 - **Revisión cada 4 semanas** para actualizar peso, objetivo, macros o preferencias sin perder el progreso.
-- **Cierre de ciclo** con recap de logros, foto privada de cuerpo entero y elección del siguiente desafío antes de recalcular el próximo bloque.
+- **Cierre de ciclo** con recap de logros, foto de progreso personal de cuerpo entero y elección del siguiente desafío antes de recalcular el próximo bloque.
 - **Tipos de día**: PESAS, BAJO, REFEED y DIET BREAK, cada uno con su meta de kcal y macros.
 - **Marcar** comidas y entrenamiento como completados (se guarda en `localStorage`).
 - **Reemplazar** comidas (otra opción del plan o una personalizada) y **agregar** extras.
@@ -43,7 +43,7 @@ Después del primer inicio de sesión, Fitbud guía al usuario por cinco pasos:
 
 El cálculo usa Katch-McArdle cuando se proporciona el porcentaje de grasa corporal y Mifflin-St Jeor en caso contrario. El perfil queda guardado por usuario en `profiles.prefs` con `profileSchemaVersion: 2`; las cuentas existentes reciben defaults compatibles sin repetir el onboarding. Los consentimientos y la evaluación viven en tablas versionadas independientes. Cada 28 días la app pregunta si se desea revisar la configuración; también puede abrirse manualmente desde **Perfil → Recalcular objetivos y preferencias**.
 
-Al terminar la duración elegida, Fitbud resume entrenamientos, adherencia, cambio de peso, grasa corporal y mejor racha. El usuario puede guardar una foto privada de cuerpo entero y elegir entre mantener, continuar, mejorar rendimiento o ganar fuerza. Esa elección vuelve a abrir el onboarding y crea un ciclo nuevo de 4 o 10 semanas con fechas, macros y reparto deportivo recalculados.
+Al terminar la duración elegida, Fitbud resume entrenamientos, adherencia, cambio de peso, grasa corporal y mejor racha. El usuario puede guardar una foto de progreso personal de cuerpo entero y elegir entre mantener, continuar, mejorar rendimiento o ganar fuerza. Esa elección vuelve a abrir el onboarding y crea un ciclo nuevo de 4 o 10 semanas con fechas, macros y reparto deportivo recalculados.
 
 ## Configuración (de dónde salen las credenciales)
 
@@ -62,7 +62,7 @@ Las funciones serverless ([`api/`](api/)) son el corazón de la seguridad:
 
 ## Privacidad y seguridad
 
-Ningún plan nuevo ni llamada del coach se habilita sin los consentimientos obligatorios y la evaluación de seguridad vigentes. Una señal de alerta pausa las rutinas y mantiene disponibles nutrición, historial y exportación. Fotos y correos son opcionales y se gestionan por separado desde **Perfil → Privacidad y seguridad**.
+Ningún plan nuevo ni llamada del coach se habilita sin el permiso esencial y la evaluación de seguridad vigentes. La interfaz reúne el uso de datos para personalizar el plan en un solo check y deja como segundo check opcional únicamente las fotos de progreso personal. Fitbros no vende estos datos ni los usa para publicidad. Una señal de alerta pausa las rutinas y mantiene disponibles nutrición, historial y exportación.
 
 La política operativa, retención y advertencias para revisión legal están en [`PRIVACY.md`](PRIVACY.md). El texto es preliminar y requiere revisión profesional antes del lanzamiento comercial.
 
@@ -105,7 +105,7 @@ Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se
 ### Preparar la base
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
-2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) y [`supabase/privacy.sql`](supabase/privacy.sql). Los dos últimos crean planes/ciclos/fotos privadas y los registros versionados de consentimiento y aptitud.
+2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) y [`supabase/privacy.sql`](supabase/privacy.sql). Los dos últimos crean planes, ciclos, fotos de progreso personal con acceso protegido y los registros versionados de consentimiento y aptitud.
 3. En **Project Settings → API Keys**, copia la **Project URL** (o el Project ID) y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
 4. Ponlos como variables de entorno en Vercel (ver despliegue). Para desarrollo local, también puedes guardarlos desde **Ajustes → Base de datos**.
 

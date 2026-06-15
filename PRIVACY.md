@@ -1,6 +1,6 @@
 # Privacidad, consentimiento y seguridad de Fitbros
 
-**Version operativa:** 2026-06-15
+**Version operativa:** 2026-06-15-v2
 **Estado legal:** texto preliminar. Requiere revision profesional antes de un lanzamiento comercial.
 
 ## Alcance
@@ -9,17 +9,16 @@ Fitbros es una herramienta de bienestar. No diagnostica enfermedades, no prescri
 
 La edad minima operativa es **18 anos**. No se habilitan cuentas de menores hasta definir el tratamiento legal y los consentimientos correspondientes.
 
-## Consentimientos separados
+## Consentimiento simple
 
-Fitbros registra por usuario, tipo y version:
+La interfaz solicita como maximo dos permisos:
 
-- tratamiento de datos corporales y de progreso;
-- recomendaciones automatizadas del coach;
-- almacenamiento de fotos privadas;
-- correos de seguimiento;
-- correos de marketing.
+- un permiso necesario para usar datos corporales, preferencias y progreso con el unico fin de crear, adaptar y dar seguimiento al plan;
+- un permiso opcional para guardar fotos de progreso personal y comparar el avance.
 
-Los dos primeros son necesarios para crear y adaptar un plan. Fotos y correos son opcionales. Retirar correos o fotos no cancela la cuenta. Una nueva version de esta politica exige una nueva aceptacion de los consentimientos obligatorios.
+Para conservar una auditoria precisa, el permiso necesario se registra internamente en los propositos de datos corporales y recomendaciones del coach, aunque el usuario lo acepta mediante un solo check. Los permisos de correo y marketing no se solicitan en este flujo y quedan retirados. Una nueva version de esta politica exige una nueva aceptacion del permiso necesario.
+
+Fitbros no vende los datos personales ni los usa para publicidad. Los datos se procesan para personalizar entrenamientos, alimentacion y seguimiento, o para mostrar el progreso solicitado por el usuario.
 
 ## Aptitud y senales de alerta
 

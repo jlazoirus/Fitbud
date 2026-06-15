@@ -194,7 +194,7 @@ create policy "write own plan_cycles" on plan_cycles
   for all using (user_id = auth.uid() and is_active())
   with check (user_id = auth.uid() and is_active());
 
--- Fotos privadas. La primera carpeta del objeto debe ser el UUID del usuario.
+-- Fotos de progreso personal con acceso protegido. La primera carpeta del objeto debe ser el UUID del usuario.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('progress-photos','progress-photos',false,20971520,array['image/jpeg','image/png','image/webp','image/heic','image/heif'])
 on conflict (id) do update set

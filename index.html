@@ -441,7 +441,7 @@ let PLAN_VERSIONS_ERROR=null;
 const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
 const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
 const PROFILE_SCHEMA_VERSION=2;
-const CONSENT_POLICY_VERSION="2026-06-15";
+const CONSENT_POLICY_VERSION="2026-06-15-v2";
 const SAFETY_SCREENING_VERSION="2026-06-15";
 const MINIMUM_AGE=18;
 const REQUIRED_CONSENTS=["body_progress","automated_coach"];
@@ -1175,9 +1175,9 @@ function recapDelta(value,suffix){
 function recapPhotoSection(photo){
   if(!hasCurrentConsent("progress_photos")){
     return `<div class="dash photo-picker">
-      <div style="font-weight:600">Foto privada opcional</div>
+      <div style="font-weight:600">Foto de progreso personal opcional</div>
       <div class="muted small" style="margin:5px 0 12px">Puedes completar el ciclo sin foto. Para guardarla necesitamos un permiso separado.</div>
-      <button class="btn" onclick="openPhotoConsent()">Autorizar fotos privadas</button>
+      <button class="btn" onclick="openPhotoConsent()">Autorizar fotos de progreso personal</button>
     </div>`;
   }
   return `<div class="dash photo-picker">
@@ -1224,9 +1224,9 @@ function renderPlanRecap(){
   </main>`;
 }
 function openPhotoConsent(){
-  modal(`<h3>Fotos privadas de progreso</h3>
-    <p class="muted small">La foto se guarda en almacenamiento privado y se muestra con un enlace temporal de una hora. No es obligatoria para continuar.</p>
-    <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="photoConsentAck"><span>Autorizo guardar fotos privadas de progreso.</span></label>
+  modal(`<h3>Fotos de progreso personal</h3>
+    <p class="muted small">La foto solo sirve para que compares tu progreso. Se guarda en un espacio privado de tu cuenta, se muestra mediante un enlace temporal y no se usa para publicidad.</p>
+    <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="photoConsentAck"><span>Quiero guardar esta foto de progreso personal para comparar mi avance.</span></label>
     <button class="btn btn-accent" style="width:100%" onclick="acceptPhotoConsent()">Autorizar</button>`);
 }
 async function acceptPhotoConsent(){
@@ -1244,7 +1244,7 @@ async function acceptPhotoConsent(){
     updated_at:now,
   },{onConflict:"user_id,consent_type,policy_version"});
   if(result.error){toast(privacyApiMessage(result.error));return;}
-  await loadPrivacyState();closeModal();render();toast("Fotos privadas autorizadas");
+  await loadPrivacyState();closeModal();render();toast("Fotos de progreso personal autorizadas");
 }
 function selectNextChallenge(id){
   if(!CHALLENGE_LABELS[id])return;
@@ -1254,7 +1254,7 @@ function selectNextChallenge(id){
   if(btn){btn.disabled=false;btn.textContent="Recalcular mi siguiente plan";}
 }
 function previewRecapPhoto(input){
-  if(!hasCurrentConsent("progress_photos")){toast("Autoriza las fotos privadas antes de elegir una");return;}
+  if(!hasCurrentConsent("progress_photos")){toast("Autoriza las fotos de progreso personal antes de elegir una");return;}
   const file=input&&input.files&&input.files[0];
   if(!file)return;
   if(!file.type.startsWith("image/")){toast("Selecciona una imagen");return;}
@@ -1283,7 +1283,7 @@ async function startNextChallenge(){
   if(!CHALLENGE_LABELS[recapChallenge]){toast("Elige tu siguiente desafío");return;}
   const btn=$("#nextChallengeBtn"),out=$("#recapOut");
   if(btn){btn.disabled=true;btn.textContent="Guardando tu ciclo…";}
-  if(out)out.textContent=recapPhotoFile?"Comprimiendo y guardando tu foto privada…":"Guardando tu resumen…";
+  if(out)out.textContent=recapPhotoFile?"Comprimiendo y guardando tu foto de progreso personal…":"Guardando tu resumen…";
   try{
     const summary=cycleSummary();
     const photoPath=recapPhotoFile?await uploadProgressPhoto(recapPhotoFile,cycleNumber()):null;
@@ -1366,12 +1366,8 @@ function onboardingDefaults(){
     foodNotes:p.foodNotes,
     allergies:p.allergies,
     dislikedIngredients:p.dislikedIngredients,
-    consentBody:hasCurrentConsent("body_progress"),
-    consentCoach:hasCurrentConsent("automated_coach"),
+    consentCore:hasRequiredConsents(),
     consentPhotos:hasCurrentConsent("progress_photos"),
-    consentFollowup:hasCurrentConsent("email_followup"),
-    consentMarketing:hasCurrentConsent("email_marketing"),
-    ageConfirmed:!!(safetyScreening&&safetyScreening.age_confirmed),
     safetyResponses:Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,responses[key]===true?"yes":responses[key]===false?"no":""])),
   };
 }
@@ -1446,19 +1442,19 @@ async function loadPrivacyState(){
 }
 function privacyChoicesFrom(source){
   return {
-    body_progress:!!source.consentBody,
-    automated_coach:!!source.consentCoach,
+    body_progress:!!source.consentCore,
+    automated_coach:!!source.consentCore,
     progress_photos:!!source.consentPhotos,
-    email_followup:!!source.consentFollowup,
-    email_marketing:!!source.consentMarketing,
+    email_followup:false,
+    email_marketing:false,
   };
 }
 async function savePrivacyChoices(source,origin){
   if(!supa||!uid())return{error:{message:"Sin sesión"}};
   const choices=privacyChoicesFrom(source||{});
-  if(!choices.body_progress||!choices.automated_coach)return{error:{message:"Faltan consentimientos obligatorios"}};
+  if(!source.consentCore)return{error:{message:"Acepta el uso esencial de datos para personalizar tu plan"}};
   const age=Number(source.age!=null?source.age:(profile&&profile.prefs&&profile.prefs.age));
-  if(age<MINIMUM_AGE||!source.ageConfirmed)return{error:{message:`Debes confirmar que tienes al menos ${MINIMUM_AGE} años`}};
+  if(age<MINIMUM_AGE)return{error:{message:`Debes tener al menos ${MINIMUM_AGE} años`}};
   const responses=Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,source.safetyResponses&&source.safetyResponses[key]==="yes"]));
   if(SAFETY_QUESTIONS.some(([key])=>!["yes","no"].includes(source.safetyResponses&&source.safetyResponses[key])))return{error:{message:"Cuestionario de seguridad incompleto"}};
   const now=new Date().toISOString();
@@ -1508,17 +1504,15 @@ function renderPrivacyGate(){
   $("#tabs").innerHTML="";
   $("#app").innerHTML=`<main class="onboarding">
     <div class="onboarding-brand">FITBROS · PRIVACIDAD Y SEGURIDAD</div>
-    <h1>Revisa cómo cuidamos tu plan</h1>
-    <p class="onboarding-copy">Necesitamos tu aceptación vigente y una evaluación breve antes de seguir creando recomendaciones.</p>
+    <h1>Tus datos trabajan para ti</h1>
+    <p class="onboarding-copy">Solo usamos lo necesario para adaptar tu plan y ayudarte a revisar tu progreso.</p>
     <div class="dash">
-      <div class="alert violet"><b>Fitbros no sustituye atención médica.</b><br>Detén el ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
-      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_age"><span>Confirmo que tengo al menos ${MINIMUM_AGE} años.</span></label>
-      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_body" ${hasCurrentConsent("body_progress")?"checked":""}><span>Acepto el tratamiento de mis datos corporales y de progreso.</span></label>
-      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_coach" ${hasCurrentConsent("automated_coach")?"checked":""}><span>Acepto recomendaciones automatizadas de bienestar.</span></label>
-      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Opcional: fotos privadas de progreso.</span></label>
-      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_followup" ${hasCurrentConsent("email_followup")?"checked":""}><span>Opcional: correos de seguimiento.</span></label>
-      <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pg_marketing" ${hasCurrentConsent("email_marketing")?"checked":""}><span>Opcional: correos de novedades y marketing.</span></label>
+      <div class="alert violet"><b>Sin usos ocultos.</b><br>No vendemos tus datos ni los usamos para publicidad. Se procesan únicamente para personalizar tus entrenamientos, alimentación y seguimiento.</div>
+      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_consent_core" ${hasRequiredConsents()?"checked":""}><span>Acepto que Fitbros use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
+      <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pg_consent_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Opcional: guardar fotos de progreso personal para comparar mi avance.</span></label>
+      <div class="muted small" style="margin-bottom:8px"><b>Antes de entrenar:</b> estas preguntas nos ayudan a evitar recomendaciones que podrían no ser adecuadas para ti.</div>
       ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("pg_"+key,responses[key]===true?"yes":responses[key]===false?"no":"")}</div>`).join("")}
+      <div class="alert"><b>Fitbros no sustituye atención médica.</b><br>Detén el ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
       <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
     </div>
     <button id="privacyGateBtn" class="btn btn-accent privacy-control" style="width:100%" onclick="savePrivacyGate()">Aceptar y continuar</button>
@@ -1527,12 +1521,8 @@ function renderPrivacyGate(){
 async function savePrivacyGate(){
   const data={
     age:Number(profile&&profile.prefs&&profile.prefs.age),
-    ageConfirmed:$("#pg_age").checked,
-    consentBody:$("#pg_body").checked,
-    consentCoach:$("#pg_coach").checked,
-    consentPhotos:$("#pg_photos").checked,
-    consentFollowup:$("#pg_followup").checked,
-    consentMarketing:$("#pg_marketing").checked,
+    consentCore:$("#pg_consent_core").checked,
+    consentPhotos:$("#pg_consent_photos").checked,
     safetyResponses:Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,$("#pg_"+key).value])),
   };
   const button=$("#privacyGateBtn");
@@ -1546,9 +1536,10 @@ async function savePrivacyGate(){
   toast(trainingSafetyHold()?"Entrenamiento pausado por seguridad":"Privacidad actualizada");
 }
 function openPrivacyNotice(){
-  modal(`<h3>Privacidad y bienestar</h3>
-    <p class="muted small">Fitbros usa tus datos corporales, preferencias y progreso para crear y adaptar tu plan. El procesamiento automatizado no diagnostica, no prescribe tratamientos y no sustituye a un profesional.</p>
-    <p class="muted small">Las fotos son opcionales, privadas y se muestran mediante enlaces temporales. Puedes retirar correos o fotos, exportar tus datos y borrar tu cuenta desde Perfil.</p>
+  modal(`<h3>Privacidad sencilla</h3>
+    <p class="muted small">Tus datos corporales, preferencias y registros de progreso se usan únicamente para crear recomendaciones más útiles y mostrarte cómo avanzas.</p>
+    <p class="muted small">No vendemos tus datos ni los usamos para publicidad. Las fotos son opcionales, privadas y se muestran mediante enlaces temporales.</p>
+    <p class="muted small">Puedes retirar el permiso de fotos, exportar tus datos o borrar tu cuenta desde Perfil. Fitbros no diagnostica ni sustituye a un profesional.</p>
     <div class="alert">Texto preliminar pendiente de revisión profesional antes del lanzamiento comercial. Versión ${CONSENT_POLICY_VERSION}.</div>
     <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`);
 }
@@ -1790,15 +1781,12 @@ function renderOnboarding(){
       </div>
       <div class="section-h" style="margin-left:0">Privacidad y seguridad</div>
       <div class="dash">
-        <div class="alert violet"><b>Fitbros es bienestar, no atención médica.</b><br>Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
-        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_age_confirmed" ${d.ageConfirmed?"checked":""}><span>Confirmo que tengo al menos ${MINIMUM_AGE} años.</span></label>
-        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_body" ${d.consentBody?"checked":""}><span>Acepto el tratamiento de mis datos corporales y de progreso para crear y seguir mi plan.</span></label>
-        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_coach" ${d.consentCoach?"checked":""}><span>Acepto recomendaciones automatizadas de bienestar y entiendo que no sustituyen a un profesional.</span></label>
-        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_photos" ${d.consentPhotos?"checked":""}><span>Opcional: autorizo guardar fotos privadas de progreso.</span></label>
-        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_followup" ${d.consentFollowup?"checked":""}><span>Opcional: autorizo correos de seguimiento de mi plan.</span></label>
-        <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="ob_consent_marketing" ${d.consentMarketing?"checked":""}><span>Opcional: autorizo correos de novedades y marketing.</span></label>
-        <div class="muted small" style="margin-bottom:8px">Evaluación básica antes de habilitar entrenamiento</div>
+        <div class="alert violet"><b>Tus datos trabajan para ti.</b><br>No los vendemos ni los usamos para publicidad. Solo los procesamos para adaptar tu plan y ayudarte a revisar tu progreso.</div>
+        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_core" ${d.consentCore?"checked":""}><span>Acepto que Fitbros use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
+        <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="ob_consent_photos" ${d.consentPhotos?"checked":""}><span>Opcional: guardar fotos de progreso personal para comparar mi avance.</span></label>
+        <div class="muted small" style="margin-bottom:8px"><b>Antes de entrenar:</b> responde estas preguntas para evitar recomendaciones que podrían no ser adecuadas para ti.</div>
         ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("ob_safety_"+key,d.safetyResponses[key])}</div>`).join("")}
+        <div class="alert"><b>Fitbros es bienestar, no atención médica.</b><br>Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
         <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
       </div>${onboardingButtons(true)}`;
   }
@@ -1829,12 +1817,8 @@ function readOnboardingStep(){
     d.foodNotes=$("#ob_food_notes").value.trim();
     d.allergies=$("#ob_allergies").value.trim();
     d.dislikedIngredients=$("#ob_disliked").value.trim();
-    d.ageConfirmed=$("#ob_age_confirmed").checked;
-    d.consentBody=$("#ob_consent_body").checked;
-    d.consentCoach=$("#ob_consent_coach").checked;
+    d.consentCore=$("#ob_consent_core").checked;
     d.consentPhotos=$("#ob_consent_photos").checked;
-    d.consentFollowup=$("#ob_consent_followup").checked;
-    d.consentMarketing=$("#ob_consent_marketing").checked;
     d.safetyResponses=Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,$("#ob_safety_"+key).value]));
   }
 }
@@ -1854,8 +1838,8 @@ function validateOnboardingStep(){
   if(onboardingStep===5){
     const foodError=validateFoodPreferences(d);
     if(foodError)return foodError;
-    if(!d.ageConfirmed||d.age<MINIMUM_AGE)return `Confirma que tienes al menos ${MINIMUM_AGE} años`;
-    if(!d.consentBody||!d.consentCoach)return "Acepta los consentimientos necesarios para crear tu plan";
+    if(d.age<MINIMUM_AGE)return `Debes tener al menos ${MINIMUM_AGE} años`;
+    if(!d.consentCore)return "Acepta el uso esencial de datos para crear tu plan";
     if(SAFETY_QUESTIONS.some(([key])=>!["yes","no"].includes(d.safetyResponses&&d.safetyResponses[key])))return "Responde las cuatro preguntas de seguridad";
   }
   return "";
@@ -2451,7 +2435,7 @@ function renderProgress(){
 function progressJourney(){
   const completed=cycleHistory.filter(row=>row.status==="completed");
   const current=`<div class="alert violet"><b>Ciclo ${cycleNumber()} en curso</b><br>${prettyDate(START)} → ${prettyDate(END)}${profile&&profile.prefs&&profile.prefs.challenge?` · ${CHALLENGE_LABELS[profile.prefs.challenge]||profile.prefs.challenge}`:""}</div>`;
-  if(!completed.length)return current+`<div class="muted small">Cuando termines este ciclo de ${PLAN_DURATION_WEEKS} semanas, aquí quedarán el recap y tus fotos privadas de progreso.</div>`;
+  if(!completed.length)return current+`<div class="muted small">Cuando termines este ciclo de ${PLAN_DURATION_WEEKS} semanas, aquí quedarán el recap y tus fotos de progreso personal.</div>`;
   return current+completed.map(row=>{
     const s=row.summary||{};
     const photo=row.photo_url?`<img class="journey-photo" src="${row.photo_url}" alt="Foto de progreso del ciclo ${row.cycle_number}">`:"";
@@ -2647,12 +2631,11 @@ function renderProfile(){
   <div class="section-h">Privacidad y seguridad</div>
   <div class="dash">
     <div class="row between" style="margin-bottom:10px"><span class="muted small">Aviso vigente</span><span class="badge b-Libre">${CONSENT_POLICY_VERSION}</span></div>
+    <div class="alert violet"><b>Uso claro y limitado.</b><br>Tus datos se usan para personalizar tu plan y mostrar tu progreso. No los vendemos ni los usamos para publicidad.</div>
     <div class="alert ${trainingSafetyHold()?"":"violet"}"><b>${trainingSafetyHold()?"Entrenamiento pausado":"Evaluación de seguridad vigente"}</b><br>${trainingSafetyHold()?"Una respuesta requiere orientación profesional antes de retomar rutinas.":"Recuerda detenerte ante dolor, mareo, desmayo o falta de aire inusual."}</div>
-    <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pf_consent_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Fotos privadas de progreso</span></label>
-    <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pf_consent_followup" ${hasCurrentConsent("email_followup")?"checked":""}><span>Correos de seguimiento</span></label>
-    <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pf_consent_marketing" ${hasCurrentConsent("email_marketing")?"checked":""}><span>Correos de novedades y marketing</span></label>
-    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="saveOptionalConsents()">Guardar permisos opcionales</button>
-    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="renderPrivacyGate();window.scrollTo(0,0)">Revisar consentimientos y seguridad</button>
+    <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pf_consent_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Guardar fotos de progreso personal para comparar mi avance</span></label>
+    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="saveOptionalConsents()">Guardar permiso de fotos</button>
+    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="renderPrivacyGate();window.scrollTo(0,0)">Revisar privacidad y seguridad</button>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="exportPersonalData(this)">Exportar mis datos</button>
     <button class="btn privacy-control" style="width:100%;border-color:var(--bad);color:var(--bad)" onclick="openDeleteAccount()">Borrar mi cuenta y datos</button>
@@ -2753,8 +2736,6 @@ async function saveProfile(){
 async function saveOptionalConsents(){
   const choices={
     progress_photos:$("#pf_consent_photos").checked,
-    email_followup:$("#pf_consent_followup").checked,
-    email_marketing:$("#pf_consent_marketing").checked,
   };
   const now=new Date().toISOString();
   const rows=Object.entries(choices).map(([type,accepted])=>{
@@ -2806,7 +2787,7 @@ async function exportPersonalData(button){
 function openDeleteAccount(){
   const email=(session&&session.user&&session.user.email)||"";
   modal(`<h3>Borrar cuenta y datos</h3>
-    <div class="alert"><b>Esta acción es irreversible.</b><br>Se borrarán tu cuenta, planes, progreso, consentimientos y fotos privadas.</div>
+    <div class="alert"><b>Esta acción es irreversible.</b><br>Se borrarán tu cuenta, planes, progreso, consentimientos y fotos de progreso personal.</div>
     <p class="muted small">Escribe <b>BORRAR ${esc(email)}</b> para confirmar.</p>
     <div class="field"><input id="deleteAccountConfirmation" autocomplete="off" placeholder="BORRAR ${esc(email)}"></div>
     <button id="deleteAccountBtn" class="btn privacy-control" style="width:100%;border-color:var(--bad);color:var(--bad)" onclick="deleteMyAccount()">Borrar definitivamente</button>`);
@@ -3627,7 +3608,7 @@ async function dbLoad(){
   }catch(e){DB.loaded=false;DB.error=(e&&e.message)||String(e);}
 }
 
-/* ---- Historial de ciclos + foto privada de progreso ---- */
+/* ---- Historial de ciclos + foto de progreso personal ---- */
 async function compressProgressPhoto(file){
   const url=URL.createObjectURL(file);
   try{
@@ -3642,7 +3623,7 @@ async function compressProgressPhoto(file){
 }
 async function uploadProgressPhoto(file,cycleNo){
   if(!supa||!uid())throw new Error("Inicia sesión para guardar la foto.");
-  if(!hasCurrentConsent("progress_photos"))throw new Error("Autoriza las fotos privadas antes de guardar.");
+  if(!hasCurrentConsent("progress_photos"))throw new Error("Autoriza las fotos de progreso personal antes de guardar.");
   let blob;
   try{blob=await compressProgressPhoto(file);}catch(e){blob=file;}
   const path=`${uid()}/cycle-${cycleNo}/final-${Date.now()}.${blob.type==="image/jpeg"?"jpg":"img"}`;
