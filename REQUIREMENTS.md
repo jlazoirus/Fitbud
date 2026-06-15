@@ -93,7 +93,7 @@ Estado funcional auditado el 14 de junio de 2026:
 - Preferencias de entrenamiento: running, cycling o natacion combinados con gimnasio o peso corporal; 3 a 6 dias exactos por semana y lugar por dia.
 - Claude puede estimar y sugerir comidas, revisar macros y generar un dia o una semana de dieta.
 - Racha actual basada en cualquier actividad registrada; no distingue cumplimiento nutricional, entrenamiento ni descanso planificado.
-- Entrenamientos actuales enlazan un catalogo propio de 40 ejercicios con instrucciones, seguridad y demostraciones SVG animadas; aun falta ejecucion por series y temporizadores.
+- Entrenamientos actuales enlazan un catalogo propio de 40 ejercicios y cuentan con reproductor recuperable por bloques, series, cargas, RPE y temporizadores.
 - No existe todavia facturacion, entitlement de suscripcion, paywall, recordatorios por correo, check-in semanal adaptativo ni un centro conversacional de coach.
 - La fuente de verdad personal es Supabase y `localStorage` actua como cache, pero la sincronizacion sigue siendo last-write-wins sin cola offline.
 
@@ -107,7 +107,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Onboarding | Perfil v2 implementado: macros, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | Falta usar el numero variable de comidas al construir el plan nutricional (REQ-18) |
 | Home diario | Muestra macros, dieta, entrenamiento y racha | Falta priorizacion inteligente, estado del dia, proxima accion y contingencias |
 | Nutricion | Recetas, macros, checks, reemplazos y generacion IA diaria/semanal | Falta plan por numero de comidas, opciones equivalentes, lista de compras, contexto de presupuesto/tiempo y versionado |
-| Entrenamiento | Plan combinado, reemplazo de sesion y biblioteca guiada con demostraciones animadas | Falta reproductor por series, cargas, temporizadores y sustituciones durante la ejecucion |
+| Entrenamiento | Plan combinado, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta generar y adaptar planes completos de 4/10 semanas (REQ-17) |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
 | Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Falta comparar tendencias, hitos y explicar que cambio en el plan |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
@@ -155,7 +155,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 13. REQ-13 - Modelo de planes versionados. **Implementado**.
 14. REQ-14 - Seguridad, consentimiento y privacidad.
 15. REQ-15 - Biblioteca de ejercicios y demostraciones animadas.
-16. REQ-16 - Reproductor de entrenamiento para principiantes.
+16. REQ-16 - Reproductor de entrenamiento para principiantes. **Implementado**.
 32. REQ-32 - Cuotas diarias y reutilizacion de opciones. Implementar antes de ampliar REQ-17/REQ-18 y retrofitear a REQ-08.
 
 ### Fase B - Inteligencia y adaptacion
@@ -866,7 +866,9 @@ Crear una fuente de verdad de ejercicios que permita explicar cada movimiento a 
 
 ## REQ-16 - Reproductor de entrenamiento para principiantes
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementacion convierte cada sesion en una prescripcion ordenada con calentamiento, bloque principal y vuelta a la calma. Fuerza registra carga, repeticiones y RPE por serie, usa descansos recuperables y permite regresion, progresion o sustitucion compatible conservando el volumen. Running, cycling y natacion se descomponen en bloques temporizados con objetivo, intensidad y recuperacion. El estado completo vive en `day_log.state.workoutExecution`, por lo que pausar, cerrar y volver a abrir la PWA recupera el avance. El cierre pregunta por dificultad y senales anormales; dolor, pasos omitidos o volumen incompleto producen un resultado parcial en vez de marcar la sesion como completada.
 
 ### Objetivo
 

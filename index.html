@@ -212,6 +212,37 @@
   .exercise-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
   .exercise-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
   .exercise-filters input,.exercise-filters select{width:100%;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:10px;font:inherit}
+  .player-overview{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
+  .player-progress{height:9px;background:var(--surf3);border-radius:999px;overflow:hidden;margin-top:11px}
+  .player-progress i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--terra-400));border-radius:999px}
+  .player-clock{font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--purple-200);white-space:nowrap}
+  .player-step{background:linear-gradient(155deg,var(--surf2),var(--surf1));border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:16px;margin-bottom:12px}
+  .player-phase{font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
+  .player-step h3{font-size:21px;margin-top:5px}
+  .player-target{font-size:14px;line-height:1.45;margin-top:8px}
+  .player-dose{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
+  .player-dose .scard{padding:10px 8px}
+  .player-dose .n{font-size:16px}
+  .player-timer{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px;background:var(--black);border:1px solid var(--border);border-radius:var(--r-md);margin:12px 0}
+  .workout-timer-value{font-family:var(--font-mono);font-size:44px;font-weight:700;letter-spacing:-.04em}
+  .player-controls{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+  .player-controls .btn{min-height:48px;border-radius:var(--r-md);white-space:normal}
+  .player-controls .primary{grid-column:1 / -1}
+  .set-list{display:grid;gap:8px;margin-top:12px}
+  .set-row{display:grid;grid-template-columns:38px minmax(70px,1fr) minmax(70px,1fr) minmax(62px,.8fr);gap:7px;align-items:end;background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
+  .set-row.done{border-color:var(--good);background:var(--good-dim)}
+  .set-row label{font-size:10px;color:var(--muted);display:block}
+  .set-row input{width:100%;min-width:0;background:var(--surf2);border:1px solid var(--border-2);border-radius:10px;color:var(--txt);padding:9px 7px;font:inherit}
+  .set-row .chk{margin-bottom:2px}
+  .player-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
+  .player-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:5px}
+  .player-status i{width:8px;height:8px;border-radius:999px;background:var(--muted2)}
+  .player-status.completed i{background:var(--good)}
+  .player-status.partial i{background:var(--warn)}
+  .player-status.in_progress i{background:var(--accent)}
+  .player-status.paused i{background:var(--terra-300)}
+  .player-active-exercise{margin-top:12px}
+  .player-active-exercise .exercise-card{border-color:var(--border-acc)}
   @media(prefers-reduced-motion:reduce){
     .exercise-demo .demo-athlete,.exercise-demo .demo-crank{animation:none!important}
   }
@@ -348,12 +379,17 @@
     .onboarding h1{font-size:26px}
     .challenge-grid{grid-template-columns:1fr}
     .exercise-filters{grid-template-columns:1fr}
+    .player-dose{grid-template-columns:1fr 1fr}
+    .set-row{grid-template-columns:36px 1fr 1fr}
+    .set-row .set-rpe{grid-column:2 / -1}
   }
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
 <script src="config.js"></script>
 <!-- Catálogo local de respaldo; Supabase pasa a ser la fuente al aplicar exercises.sql. -->
 <script src="exercise-catalog.js"></script>
+<!-- Dominio del reproductor guiado; sin dependencias y validable en Node. -->
+<script src="workout-player.js"></script>
 <!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -682,6 +718,7 @@ function trainingPrefs(){
 }
 const LOCAL_EXERCISES=Array.isArray(window.FITBUD_EXERCISES)?window.FITBUD_EXERCISES:[];
 const WORKOUT_EXERCISE_IDS=window.FITBUD_WORKOUT_EXERCISES||{};
+const WORKOUT_PLAYER=window.FITBUD_WORKOUT_PLAYER;
 function workoutSchedule(days,dayIds,priority,locations,primary){
   const selected=normalizedTrainingDays(dayIds,days);
   const sessions=baseWorkoutTemplate(selected.length,priority);
@@ -820,6 +857,10 @@ function sportSessions(primary,ds,prefs){
   sessions.quality.exerciseIds=ids.calidad||[];
   sessions.endurance.exerciseIds=ids.facil||[];
   sessions.technique.exerciseIds=ids.tecnica||[];
+  Object.values(sessions).forEach(session=>{
+    session.sport=primary;
+    session.phaseIndex=phase;
+  });
   return sessions;
 }
 function strengthSessions(mode,ds,prefs){
@@ -844,6 +885,7 @@ function strengthSessions(mode,ds,prefs){
   const ids=WORKOUT_EXERCISE_IDS[mode==="bodyweight"?"bodyweight":"gym"]||{};
   Object.entries(sessions).forEach(([key,session])=>{
     session.exerciseIds=ids[key]||[];
+    session.strengthMode=mode;
     session.detail=`${session.exerciseIds.length} ejercicios guiados con demostración, instrucciones y alternativas. ${progress}`;
   });
   return sessions;
@@ -1205,15 +1247,17 @@ function planNeedsRecap(){
     && Number(p.recapCompletedCycle||0)<cycleNumber();
 }
 function cycleSummary(){
-  let ds=START,activeDays=0,bestStreak=0,currentStreak=0,workouts=0,doneMeals=0,plannedMeals=0;
+  let ds=START,activeDays=0,bestStreak=0,currentStreak=0,workouts=0,partialWorkouts=0,doneMeals=0,plannedMeals=0;
   while(ds<=END){
     const st=S.days[ds]||{};
     const day=buildDay(ds);
     const mealStates=st.meals||{};
     const dayMeals=day.meals.reduce((n,m)=>n+(mealStates[m.id]&&mealStates[m.id].done?1:0),0);
-    const dayActive=dayMeals>0||!!st.workoutDone||(Array.isArray(st.extras)&&st.extras.some(x=>x&&x.done));
+    const workoutOutcome=workoutOutcomeForState(st);
+    const dayActive=dayMeals>0||workoutHasRecordedActivity(st)||(Array.isArray(st.extras)&&st.extras.some(x=>x&&x.done));
     plannedMeals+=day.meals.length;doneMeals+=dayMeals;
-    if(st.workoutDone)workouts++;
+    if(workoutOutcome==="completed")workouts++;
+    if(workoutOutcome==="partial")partialWorkouts++;
     if(dayActive){activeDays++;currentStreak++;bestStreak=Math.max(bestStreak,currentStreak);}else currentStreak=0;
     ds=addDays(ds,1);
   }
@@ -1226,7 +1270,7 @@ function cycleSummary(){
   const startBf=Number.isFinite(initialBf)&&initialBf>0?initialBf:(firstWeek!=null?wbf(firstWeek):null);
   const endWeight=lastWeek!=null?wkg(lastWeek):null,endBf=lastWeek!=null?wbf(lastWeek):null;
   return {
-    activeDays,bestStreak,workouts,doneMeals,plannedMeals,
+    activeDays,bestStreak,workouts,partialWorkouts,doneMeals,plannedMeals,
     mealAdherence:plannedMeals?Math.round(doneMeals/plannedMeals*100):0,
     startWeight,endWeight,weightChange:startWeight!=null&&endWeight!=null?+(endWeight-startWeight).toFixed(1):null,
     startBodyFat:startBf,endBodyFat:endBf,bodyFatChange:startBf!=null&&endBf!=null?+(endBf-startBf).toFixed(1):null,
@@ -2214,7 +2258,7 @@ function setView(v){
   if(v==="hoy")current=clampDate(todayStr());
   if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}
   render();window.scrollTo(0,0);
-  if(v==="nutricion"||v==="hoy")syncDay(current);
+  if(v==="nutricion"||v==="hoy"||v==="entreno")syncDay(current);
   if(v==="progreso")syncWeights();
 }
 
@@ -2271,6 +2315,9 @@ function renderHoy(){
   const ds=current; const day=buildDay(ds); const st=dayState(ds);
   const {doneMeals,totMeals}=dayTotals(ds);
   const name=profileName(); const stk=streak(); const ew=effectiveWorkout(ds);
+  const workoutExecution=normalizedWorkoutExecution(ds);
+  const workoutOutcome=workoutOutcomeForState(st);
+  const workoutProgress=workoutExecution?WORKOUT_PLAYER.progress(workoutExecution):null;
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
   $("#app").innerHTML=`
   <header class="shead">
@@ -2300,10 +2347,10 @@ function renderHoy(){
   <div class="section-h">Entrenamiento de hoy</div>
   <div class="workout card-link" onclick="setView('entreno')">
     <div class="meal-head" style="flex:1;min-width:0">
-      <button class="chk ${st.workoutDone?'on':''}" onclick="event.stopPropagation();toggleWorkout()" ${trainingSafetyHold()?"disabled":""}>${st.workoutDone?'✓':''}</button>
       <div>
         <div class="name" style="font-weight:600">${esc(ew.workout.name)}</div>
-        <div class="detail">${esc(ew.workout.detail)}</div>
+        <div class="detail">${workoutProgress&&["in_progress","paused"].includes(workoutOutcome)?`${workoutProgress.completed}/${workoutProgress.total} bloques registrados · `:""}${esc(ew.workout.detail)}</div>
+        ${workoutStatusHtml(ds,workoutExecution)}
       </div>
     </div>
     ${chevron()}
@@ -2432,11 +2479,462 @@ function workoutExercisesHtml(workout){
     <div class="exercise-list">${records.map(ex=>exerciseCard(ex,false)).join("")}</div>`;
 }
 
+/* ---------- Reproductor guiado de entrenamiento (REQ-16) ---------- */
+function workoutPrescription(ds){
+  const ew=effectiveWorkout(ds);
+  const exercises=exerciseArray(ew.workout&&ew.workout.exerciseIds).map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
+  const prefs=trainingPrefsFromPrefs(planPrefsForDate(ds));
+  return WORKOUT_PLAYER.buildPrescription({
+    workout:ew.workout,
+    exercises,
+    context:{
+      week:trainingWeek(ds,planPrefsForDate(ds)),
+      durationWeeks:resolvedPlanDuration(planPrefsForDate(ds)),
+      sessionMinutes:prefs.sessionMinutes,
+    },
+  });
+}
+function workoutContentIssues(ds){
+  const workout=effectiveWorkout(ds).workout;
+  return exerciseArray(workout&&workout.exerciseIds).filter(slug=>!exerciseBySlug(slug));
+}
+function normalizedWorkoutExecution(ds){
+  const st=dayState(ds);
+  const saved=st.workoutExecution;
+  if(!saved)return null;
+  const normalized=WORKOUT_PLAYER.normalizeExecution(saved,workoutPrescription(ds),Date.now());
+  if(!normalized)return null;
+  st.workoutExecution=normalized;
+  return normalized;
+}
+function workoutOutcomeForState(st){
+  const execution=st&&st.workoutExecution;
+  if(execution){
+    const outcome=WORKOUT_PLAYER.outcome(execution);
+    if(outcome!=="pending")return outcome;
+  }
+  return st&&st.workoutDone?"completed":"pending";
+}
+function workoutOutcomeForDay(ds){return workoutOutcomeForState(S.days[ds]||{});}
+function workoutHasRecordedActivity(st){
+  const outcome=workoutOutcomeForState(st);
+  if(outcome==="completed"||outcome==="partial")return true;
+  const execution=st&&st.workoutExecution;
+  if(!execution||!Array.isArray(execution.steps))return false;
+  return execution.steps.some(step=>step.status==="done"||step.status==="skipped"||(Array.isArray(step.sets)&&step.sets.some(set=>set&&set.done)));
+}
+function workoutStatusLabel(outcome){
+  return {
+    completed:"Completado",
+    partial:"Parcial",
+    paused:"Pausado",
+    in_progress:"En curso",
+    pending:"Pendiente",
+  }[outcome]||"Pendiente";
+}
+function workoutStatusHtml(ds,execution){
+  const outcome=execution?WORKOUT_PLAYER.outcome(execution):workoutOutcomeForDay(ds);
+  const progress=execution?WORKOUT_PLAYER.progress(execution):null;
+  const detail=progress&&outcome!=="completed"&&outcome!=="partial"?` · ${progress.completed}/${progress.total} bloques`:"";
+  return `<span class="player-status ${outcome}"><i></i>${workoutStatusLabel(outcome)}${detail}</span>`;
+}
+function formatWorkoutTime(seconds){
+  const total=Math.max(0,Math.round(Number(seconds)||0));
+  const hours=Math.floor(total/3600),minutes=Math.floor((total%3600)/60),secs=total%60;
+  return hours?`${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`:`${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
+}
+function workoutPhaseLabel(phase){
+  return {warmup:"Calentamiento",main:"Bloque principal",recovery:"Recuperación",cooldown:"Vuelta a la calma"}[phase]||"Sesión";
+}
+function workoutVariationLabel(step,exercise){
+  if(step.variation==="regression")return exercise&&exercise.regression?`Versión más fácil: ${exercise.regression}`:"Versión más fácil";
+  if(step.variation==="progression")return exercise&&exercise.progression?`Progresión: ${exercise.progression}`:"Progresión";
+  if(step.exerciseSlug!==step.originalExerciseSlug)return "Ejercicio sustituido conservando series y objetivo";
+  return "";
+}
+function currentWorkoutStep(execution){
+  if(!execution||!execution.steps.length)return null;
+  return execution.steps[Math.min(execution.steps.length-1,Math.max(0,execution.currentStep||0))]||null;
+}
+function nextWorkoutStepIndex(execution,from){
+  for(let index=Math.max(0,Number(from)||0);index<execution.steps.length;index++){
+    if(execution.steps[index].status==="pending")return index;
+  }
+  for(let index=0;index<Math.max(0,Number(from)||0);index++){
+    if(execution.steps[index].status==="pending")return index;
+  }
+  return -1;
+}
+function captureWorkoutElapsed(execution){
+  execution.elapsedSeconds=WORKOUT_PLAYER.elapsedSeconds(execution,Date.now());
+  execution.resumedAt=null;
+}
+function persistWorkoutExecution(ds,execution,rerender){
+  const st=dayState(ds);
+  execution.updatedAt=new Date().toISOString();
+  st.workoutExecution=execution;
+  st.workoutDone=execution.status==="completed";
+  commitDay(ds);
+  if(rerender!==false)render();
+}
+function startWorkoutExecution(ds){
+  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  const prescription=workoutPrescription(ds);
+  if(prescription.sessionType==="rest"){toast("Hoy corresponde descanso planificado");return;}
+  if(workoutContentIssues(ds).length){toast("Esta sesión necesita actualizar su contenido antes de iniciarse");return;}
+  const st=dayState(ds);
+  if(st.workoutDone&&!st.workoutExecution){toast("Este día ya figura como completado en el historial anterior");return;}
+  if(st.workoutExecution){toast("Este día ya tiene una sesión registrada");return;}
+  st.workoutExecution=WORKOUT_PLAYER.createExecution(prescription,Date.now());
+  st.workoutDone=false;
+  commitDay(ds);render();toast("Sesión iniciada");
+}
+function pauseResumeWorkoutExecution(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  if(execution.status==="in_progress"){
+    captureWorkoutElapsed(execution);
+    execution.status="paused";
+    if(execution.timer){
+      execution.timer.remainingSeconds=WORKOUT_PLAYER.timerRemaining(execution.timer,Date.now());
+      execution.timer.running=false;execution.timer.endsAt=null;
+    }
+  }else if(execution.status==="paused"){
+    execution.status="in_progress";execution.resumedAt=new Date().toISOString();
+    if(execution.timer&&execution.timer.remainingSeconds>0){
+      execution.timer.running=true;
+      execution.timer.endsAt=new Date(Date.now()+execution.timer.remainingSeconds*1000).toISOString();
+    }
+  }else return;
+  persistWorkoutExecution(ds,execution,true);
+}
+function startWorkoutTimer(ds,seconds,kind){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
+  const step=currentWorkoutStep(execution);
+  const total=Math.max(1,Math.round(Number(seconds)||0));
+  execution.timer={
+    kind:kind||"step",
+    stepId:step&&step.id||null,
+    totalSeconds:total,
+    remainingSeconds:total,
+    running:true,
+    endsAt:new Date(Date.now()+total*1000).toISOString(),
+  };
+  persistWorkoutExecution(ds,execution,true);
+}
+function startCurrentWorkoutStep(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
+  const step=currentWorkoutStep(execution);
+  if(!step||step.type!=="timed")return;
+  startWorkoutTimer(ds,step.durationSeconds,"step");
+}
+function toggleWorkoutTimer(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||!execution.timer)return;
+  const remaining=WORKOUT_PLAYER.timerRemaining(execution.timer,Date.now());
+  execution.timer.remainingSeconds=remaining;
+  execution.timer.running=!execution.timer.running&&remaining>0;
+  execution.timer.endsAt=execution.timer.running?new Date(Date.now()+remaining*1000).toISOString():null;
+  persistWorkoutExecution(ds,execution,true);
+}
+function addWorkoutTimer(ds,seconds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||!execution.timer)return;
+  const remaining=WORKOUT_PLAYER.timerRemaining(execution.timer,Date.now())+Math.max(1,Number(seconds)||0);
+  execution.timer.remainingSeconds=remaining;
+  if(execution.timer.running)execution.timer.endsAt=new Date(Date.now()+remaining*1000).toISOString();
+  persistWorkoutExecution(ds,execution,true);
+}
+function finishTimedWorkoutStep(ds,skipped){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step)return;
+  step.status=skipped?"skipped":"done";
+  step.completedAt=new Date().toISOString();
+  execution.timer=null;
+  const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
+  if(next>=0)execution.currentStep=next;
+  persistWorkoutExecution(ds,execution,true);
+  if(next<0)toast("Todos los bloques están registrados. Finaliza la sesión.");
+}
+function skipWorkoutTimer(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||!execution.timer)return;
+  if(execution.timer.kind==="step")return finishTimedWorkoutStep(ds,true);
+  execution.timer=null;persistWorkoutExecution(ds,execution,true);toast("Descanso omitido");
+}
+function completeWorkoutStep(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step)return;
+  if(step.type==="strength"){
+    const completed=step.sets.filter(set=>set.done).length;
+    if(!completed){toast("Registra al menos una serie antes de avanzar");return;}
+  }
+  step.status="done";step.completedAt=new Date().toISOString();execution.timer=null;
+  const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
+  if(next>=0)execution.currentStep=next;
+  persistWorkoutExecution(ds,execution,true);
+  if(next<0)toast("Todos los bloques están registrados. Finaliza la sesión.");
+}
+function skipWorkoutStep(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step)return;
+  step.status="skipped";step.completedAt=new Date().toISOString();execution.timer=null;
+  const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
+  if(next>=0)execution.currentStep=next;
+  persistWorkoutExecution(ds,execution,true);
+}
+function saveWorkoutSetField(ds,stepIndex,setIndex,field,value){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=execution.steps[stepIndex],set=step&&step.sets&&step.sets[setIndex];if(!set)return;
+  set[field]=field==="load"?String(value||""):((value===""||value==null)?null:Number(value));
+  persistWorkoutExecution(ds,execution,false);
+}
+function toggleWorkoutSet(ds,stepIndex,setIndex){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
+  const step=execution.steps[stepIndex],set=step&&step.sets&&step.sets[setIndex];if(!set)return;
+  set.done=!set.done;
+  if(set.done){
+    if(set.reps==null)set.reps=step.defaultReps;
+    if(set.rpe==null)set.rpe=step.targetRpe;
+    set.completedAt=new Date().toISOString();
+  }else set.completedAt=null;
+  persistWorkoutExecution(ds,execution,true);
+  if(set.done&&setIndex<step.sets.length-1)startWorkoutTimer(ds,step.restSeconds,"rest");
+}
+function setWorkoutVariation(ds,variation){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
+  step.variation=variation;
+  persistWorkoutExecution(ds,execution,true);
+  toast(variation==="regression"?"Versión más fácil seleccionada":"Progresión seleccionada");
+}
+function exerciseCompatibleForWorkout(exercise,ds){
+  if(!exercise||exercise.active===false)return false;
+  const training=trainingPrefsFromPrefs(planPrefsForDate(ds));
+  const location=training.locations[parseYmd(ds).getDay()];
+  const places=exerciseArray(exercise.places);
+  if(location&&places.length&&!places.includes(location))return false;
+  const blocked=[training.injuries,training.limitations,training.avoidMovements].filter(Boolean).join(" ").toLowerCase();
+  if(!blocked)return true;
+  const contraindications=exerciseArray(exercise.contraindications).join(" ").toLowerCase();
+  const identity=[exercise.name,exercise.movement_pattern,contraindications].join(" ").toLowerCase();
+  return !blocked.split(/[,.;]/).map(item=>item.trim()).filter(item=>item.length>3).some(item=>identity.includes(item));
+}
+function openExerciseSubstitution(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
+  const currentExercise=exerciseBySlug(step.exerciseSlug,true);
+  if(!currentExercise){toast("No se pudo resolver el ejercicio actual");return;}
+  const direct=exerciseArray(currentExercise&&currentExercise.substitute_slugs);
+  const samePattern=exerciseCatalog(false).filter(ex=>ex.movement_pattern===currentExercise.movement_pattern).map(ex=>ex.slug);
+  const candidates=[...new Set(direct.concat(samePattern))]
+    .filter(slug=>slug!==step.exerciseSlug)
+    .map(slug=>exerciseBySlug(slug))
+    .filter(ex=>exerciseCompatibleForWorkout(ex,ds));
+  const body=candidates.length?candidates.map(ex=>`<button class="opt" onclick="applyExerciseSubstitution('${ds}','${esc(ex.slug)}')">
+      <b>${esc(ex.name)}</b><div class="o-meta">${esc(ex.regression)} · mismo patrón: ${esc(ex.movement_pattern)}</div>
+    </button>`).join(""):'<div class="alert">No hay una sustitución compatible con tu lugar y limitaciones actuales.</div>';
+  modal(`<h3>Sustituir ejercicio</h3>
+    <p class="muted small">Se conservan las series, repeticiones y el objetivo del movimiento.</p>${body}`);
+}
+function applyExerciseSubstitution(ds,slug){
+  const exercise=exerciseBySlug(slug);if(!exercise||!exerciseCompatibleForWorkout(exercise,ds))return;
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
+  step.exerciseSlug=slug;step.label=exercise.name;step.variation="substitution";
+  persistWorkoutExecution(ds,execution,false);closeModal();render();toast("Ejercicio sustituido");
+}
+function workoutFullyCompleted(execution){
+  return execution.steps.every(step=>{
+    if(step.status!=="done")return false;
+    return step.type!=="strength"||step.sets.every(set=>set.done);
+  });
+}
+function openFinishWorkout(ds,partial){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const complete=workoutFullyCompleted(execution);
+  if(execution.status==="in_progress"){
+    captureWorkoutElapsed(execution);
+    execution.status="paused";
+    if(execution.timer){
+      execution.timer.remainingSeconds=WORKOUT_PLAYER.timerRemaining(execution.timer,Date.now());
+      execution.timer.running=false;execution.timer.endsAt=null;
+    }
+    persistWorkoutExecution(ds,execution,true);
+  }
+  modal(`<h3>${partial||!complete?"Cerrar sesión parcial":"Finalizar sesión"}</h3>
+    <p class="muted small">Antes de guardar, registra cómo se sintió la sesión. El historial conservará lo realmente ejecutado.</p>
+    <div class="field"><label>¿Sentiste dolor o malestar anormal?</label><select id="finishPain">
+      <option value="">Selecciona</option><option value="none">No</option>
+      <option value="discomfort">Molestia que alteró la técnica</option>
+      <option value="sharp_pain">Dolor agudo</option><option value="dizziness">Mareo o falta de aire inusual</option>
+    </select></div>
+    <div class="field"><label>Dificultad general</label><select id="finishDifficulty">
+      <option value="">Selecciona</option><option value="easy">Más fácil de lo esperado</option>
+      <option value="expected">Adecuada</option><option value="hard">Más difícil de lo esperado</option>
+    </select></div>
+    <div class="field"><label>Notas opcionales</label><textarea id="finishNotes" rows="3" placeholder="Carga, técnica, energía o cualquier contexto útil">${esc(execution.notes||"")}</textarea></div>
+    <button class="btn btn-accent" style="width:100%" onclick="finishWorkoutExecution('${ds}',${partial||!complete})">Guardar resultado</button>`);
+}
+function finishWorkoutExecution(ds,partialRequested){
+  const pain=$("#finishPain").value,difficulty=$("#finishDifficulty").value;
+  if(!pain||!difficulty){toast("Completa las dos preguntas de cierre");return;}
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  captureWorkoutElapsed(execution);
+  const complete=workoutFullyCompleted(execution);
+  const safetyIssue=pain!=="none";
+  execution.status=(!partialRequested&&complete&&!safetyIssue)?"completed":"partial";
+  execution.completedAt=new Date().toISOString();
+  execution.timer=null;
+  execution.pain=pain;
+  execution.difficulty=difficulty;
+  execution.notes=$("#finishNotes").value.trim();
+  execution.needsReview=safetyIssue;
+  persistWorkoutExecution(ds,execution,false);closeModal();render();
+  toast(execution.status==="completed"?"Sesión completada":"Sesión guardada como parcial");
+}
+function resumePartialWorkout(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
+  execution.status="in_progress";execution.completedAt=null;execution.resumedAt=new Date().toISOString();
+  execution.pain="";execution.difficulty="";
+  const next=nextWorkoutStepIndex(execution,0);
+  execution.currentStep=next>=0?next:Math.max(0,execution.steps.length-1);
+  persistWorkoutExecution(ds,execution,true);
+}
+function discardWorkoutExecution(ds){
+  if(!confirm("¿Descartar esta sesión en curso? Se perderán las series y bloques registrados hoy."))return;
+  const st=dayState(ds);delete st.workoutExecution;st.workoutDone=false;commitDay(ds);render();toast("Sesión descartada");
+}
+let workoutTimerCompleting=false;
+function workoutTimerTick(){
+  if(view!=="entreno"||!session)return;
+  const execution=normalizedWorkoutExecution(current);
+  const clock=document.querySelector(".player-clock");
+  if(clock&&execution)clock.textContent=formatWorkoutTime(WORKOUT_PLAYER.elapsedSeconds(execution,Date.now()));
+  const timer=document.querySelector(".workout-timer-value");
+  if(!timer||!execution||!execution.timer)return;
+  const remaining=WORKOUT_PLAYER.timerRemaining(execution.timer,Date.now());
+  timer.textContent=formatWorkoutTime(remaining);
+  if(remaining>0||!execution.timer.running||workoutTimerCompleting)return;
+  workoutTimerCompleting=true;
+  const kind=execution.timer.kind;
+  if(kind==="step")finishTimedWorkoutStep(current,false);
+  else{
+    execution.timer=null;persistWorkoutExecution(current,execution,true);toast("Descanso terminado");
+  }
+  setTimeout(()=>{workoutTimerCompleting=false;},250);
+}
+function renderWorkoutTimer(ds,execution,step){
+  const timer=execution.timer;
+  if(!timer)return `<button class="btn btn-accent" style="width:100%;min-height:48px" onclick="startCurrentWorkoutStep('${ds}')">Iniciar bloque</button>`;
+  const remaining=WORKOUT_PLAYER.timerRemaining(timer,Date.now());
+  return `<div class="player-timer">
+    <div class="muted small">${timer.kind==="rest"?"Descanso":"Tiempo del bloque"}</div>
+    <div class="workout-timer-value">${formatWorkoutTime(remaining)}</div>
+    <div class="row wrap" style="justify-content:center">
+      <button class="btn btn-sm" onclick="toggleWorkoutTimer('${ds}')">${timer.running?"Pausar":"Reanudar"}</button>
+      <button class="btn btn-sm" onclick="addWorkoutTimer('${ds}',15)">+15 s</button>
+      <button class="btn btn-sm" onclick="skipWorkoutTimer('${ds}')">Omitir</button>
+    </div>
+  </div>`;
+}
+function renderStrengthSet(ds,step,stepIndex,set,setIndex){
+  return `<div class="set-row ${set.done?"done":""}">
+    <button class="chk ${set.done?"on":""}" aria-label="Serie ${setIndex+1}" onclick="toggleWorkoutSet('${ds}',${stepIndex},${setIndex})">${set.done?"✓":setIndex+1}</button>
+    <div><label>${step.unit==="seg"?"Segundos":"Repeticiones"}</label><input type="number" min="0" inputmode="decimal" value="${set.reps==null?"":esc(set.reps)}" placeholder="${esc(step.defaultReps)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'reps',this.value)"></div>
+    <div><label>Carga / asistencia</label><input type="text" value="${esc(set.load||"")}" placeholder="kg o variante" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'load',this.value)"></div>
+    <div class="set-rpe"><label>RPE</label><input type="number" min="1" max="10" inputmode="decimal" value="${set.rpe==null?"":esc(set.rpe)}" placeholder="${esc(step.targetRpe)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'rpe',this.value)"></div>
+  </div>`;
+}
+function renderActiveWorkoutStep(ds,execution){
+  const step=currentWorkoutStep(execution);
+  if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza la sesión para guardar el resultado.</div>';
+  const stepIndex=execution.steps.indexOf(step);
+  if(step.type==="timed"){
+    return `<div class="player-step">
+      <div class="player-phase">${workoutPhaseLabel(step.phase)} · bloque ${stepIndex+1} de ${execution.steps.length}</div>
+      <h3>${esc(step.label)}</h3>
+      <div class="player-target"><b>Objetivo:</b> ${esc(step.target)}<br><b>Intensidad:</b> ${esc(step.intensity)}</div>
+      ${renderWorkoutTimer(ds,execution,step)}
+      <div class="player-controls">
+        <button class="btn" onclick="skipWorkoutStep('${ds}')">Omitir bloque</button>
+        <button class="btn" onclick="completeWorkoutStep('${ds}')">Marcar completado</button>
+      </div>
+    </div>`;
+  }
+  const exercise=exerciseBySlug(step.exerciseSlug,true);
+  const variation=workoutVariationLabel(step,exercise);
+  return `<div class="player-step">
+    <div class="player-phase">${workoutPhaseLabel(step.phase)} · ejercicio ${stepIndex} de ${execution.steps.length-2}</div>
+    <h3>${esc(exercise?exercise.name:step.label)}</h3>
+    <div class="player-dose">
+      <div class="scard"><div class="n">${step.prescribedSets}</div><div class="l">series</div></div>
+      <div class="scard"><div class="n">${esc(step.reps)}</div><div class="l">reps objetivo</div></div>
+      <div class="scard"><div class="n">${step.restSeconds}s</div><div class="l">descanso</div></div>
+      <div class="scard"><div class="n">${esc(step.tempo)}</div><div class="l">tempo</div></div>
+      <div class="scard"><div class="n">RPE ${step.targetRpe}</div><div class="l">esfuerzo</div></div>
+      <div class="scard"><div class="n">${step.targetRir} RIR</div><div class="l">reserva</div></div>
+    </div>
+    <div class="muted small"><b style="color:var(--txt)">Carga sugerida:</b> ${esc(step.suggestedLoad)}</div>
+    ${variation?`<div class="alert violet" style="margin-top:10px">${esc(variation)}</div>`:""}
+    ${execution.timer&&execution.timer.kind==="rest"?renderWorkoutTimer(ds,execution,step):""}
+    <div class="set-list">${step.sets.map((set,index)=>renderStrengthSet(ds,step,stepIndex,set,index)).join("")}</div>
+    <div class="row wrap" style="margin-top:12px">
+      <button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','regression')">Usar versión más fácil</button>
+      <button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','progression')">Usar progresión</button>
+      <button class="btn btn-sm" onclick="openExerciseSubstitution('${ds}')">Sustituir</button>
+    </div>
+    ${exercise?`<div class="player-active-exercise">${exerciseCard(exercise,false)}</div>`:""}
+    <div class="player-controls">
+      <button class="btn" onclick="skipWorkoutStep('${ds}')">Omitir ejercicio</button>
+      <button class="btn btn-accent" onclick="completeWorkoutStep('${ds}')">Siguiente ejercicio</button>
+    </div>
+  </div>`;
+}
+function renderWorkoutExecution(ds,execution){
+  const progress=WORKOUT_PLAYER.progress(execution);
+  const elapsed=WORKOUT_PLAYER.elapsedSeconds(execution,Date.now());
+  const percentage=progress.total?Math.round((progress.completed+progress.skipped)/progress.total*100):0;
+  if(execution.status==="completed"||execution.status==="partial"){
+    const sets=WORKOUT_PLAYER.strengthTotals(execution);
+    const painLabels={none:"Sin dolor anormal",discomfort:"Molestia que alteró la técnica",sharp_pain:"Dolor agudo",dizziness:"Mareo o falta de aire inusual"};
+    const difficultyLabels={easy:"Más fácil de lo esperado",expected:"Dificultad adecuada",hard:"Más difícil de lo esperado"};
+    return `<div class="dash">
+      <div class="row between"><div><div class="slot">Resultado real</div><div class="cl-title">${execution.status==="completed"?"Sesión completada":"Sesión parcial"}</div></div>${workoutStatusHtml(ds,execution)}</div>
+      ${execution.needsReview?'<div class="alert" style="margin-top:12px"><b>No repitas la sesión por ahora.</b><br>La señal registrada requiere orientación profesional antes de volver a exigir esa zona o intensidad.</div>':""}
+      <div class="player-summary">
+        <div class="scard"><div class="n">${formatWorkoutTime(elapsed)}</div><div class="l">duración real</div></div>
+        <div class="scard"><div class="n">${progress.completed}/${progress.total}</div><div class="l">bloques completados</div></div>
+        ${sets.totalSets?`<div class="scard"><div class="n">${sets.completedSets}/${sets.totalSets}</div><div class="l">series registradas</div></div>`:""}
+        <div class="scard"><div class="n">${progress.skipped}</div><div class="l">bloques omitidos</div></div>
+      </div>
+      <div class="muted small">${esc(painLabels[execution.pain]||"Cierre sin respuesta")} · ${esc(difficultyLabels[execution.difficulty]||"Dificultad sin respuesta")}</div>
+      ${execution.notes?`<div class="exercise-copy"><b>Notas:</b> ${esc(execution.notes)}</div>`:""}
+      ${execution.status==="partial"&&!execution.needsReview&&progress.remaining?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="resumePartialWorkout('${ds}')">Continuar sesión</button>`:""}
+    </div>`;
+  }
+  return `<div class="dash">
+    <div class="player-overview">
+      <div><div class="slot">${esc(execution.objective)}</div><div class="cl-title">${progress.completed}/${progress.total} bloques registrados</div>${workoutStatusHtml(ds,execution)}</div>
+      <div class="player-clock">${formatWorkoutTime(elapsed)}</div>
+    </div>
+    <div class="player-progress"><i style="width:${percentage}%"></i></div>
+    <div class="muted small" style="margin-top:8px">Duración estimada: ${execution.estimatedMinutes} min · el progreso se guarda después de cada acción.</div>
+    <div class="row wrap" style="margin-top:12px">
+      <button class="btn btn-sm" onclick="pauseResumeWorkoutExecution('${ds}')">${execution.status==="paused"?"Reanudar sesión":"Pausar sesión"}</button>
+      <button class="btn btn-sm" onclick="openFinishWorkout('${ds}',true)">Terminar parcialmente</button>
+      <button class="btn btn-sm" onclick="discardWorkoutExecution('${ds}')">Descartar</button>
+    </div>
+  </div>
+  ${execution.status==="paused"?'<div class="alert violet">La sesión está pausada. Reanúdala para continuar con temporizadores y registro.</div>':progress.remaining?renderActiveWorkoutStep(ds,execution):'<div class="alert violet">Todos los bloques están registrados. Revisa el cierre antes de guardar la sesión.</div>'}
+  ${progress.remaining===0?`<button class="btn btn-accent" style="width:100%;min-height:50px" onclick="openFinishWorkout('${ds}',false)">Finalizar y guardar sesión</button>`:""}`;
+}
+
 /* ---------- ENTRENO: detalle del entrenamiento del día ---------- */
 function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
   const training=trainingPrefs();
   const location=training.locations[parseYmd(ds).getDay()];
+  const prescription=workoutPrescription(ds);
+  const execution=normalizedWorkoutExecution(ds);
+  const restDay=prescription.sessionType==="rest"&&!trainingSafetyHold();
+  const contentIssues=workoutContentIssues(ds);
   const safetyNotice=trainingSafetyHold()
     ? `<div class="alert"><b>Entrenamiento pausado por seguridad.</b><br>No inicies esta rutina hasta recibir orientación de un profesional. Nutrición, historial y exportación siguen disponibles.</div>`
     : `<div class="alert violet"><b>Señales para detenerte:</b><br>Dolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.</div>`;
@@ -2454,18 +2952,23 @@ function renderWorkout(){
   </div>
   ${section("wk.entreno","Entrenamiento",`<div class="workout">
     <div class="meal-head">
-      <button class="chk ${st.workoutDone?'on':''}" onclick="toggleWorkout()" ${trainingSafetyHold()?"disabled":""}>${st.workoutDone?'✓':''}</button>
       <div>
         <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}</div>
         <div class="detail">${esc(ew.workout.detail)}</div>
+        ${workoutStatusHtml(ds,execution)}
       </div>
     </div>
     <div class="meal-actions">
-      <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()?"disabled":""}>Cambiar entrenamiento</button>
-      ${ew.overridden?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
+      ${contentIssues.length?'<div class="alert">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción antes de iniciarla.</div>':""}
+      ${!execution&&!st.workoutDone&&!restDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>`:""}
+      ${!execution&&st.workoutDone?'<span class="muted small">Completado con el registro anterior; las series no estaban disponibles.</span>':""}
+      ${restDay?'<span class="muted small">Descanso planificado: no cuenta como sesión incompleta.</span>':""}
+      <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()||execution||st.workoutDone?"disabled":""}>Cambiar entrenamiento</button>
+      ${ew.overridden&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
     </div>
   </div>`)}
-  ${exerciseArray(ew.workout.exerciseIds).length?section("wk.ejercicios","Ejercicios guiados",workoutExercisesHtml(ew.workout),`${exerciseArray(ew.workout.exerciseIds).length}`):""}
+  ${execution?renderWorkoutExecution(ds,execution):""}
+  ${!execution&&exerciseArray(ew.workout.exerciseIds).length?section("wk.ejercicios","Vista previa de ejercicios",workoutExercisesHtml(ew.workout),`${exerciseArray(ew.workout.exerciseIds).length}`):""}
   ${daySummary(ds)}
   `;
 }
@@ -2538,14 +3041,15 @@ function extraCard(ds,e,i){
 /* ---------- Fase 8: resumen del día ---------- */
 function daySummary(ds){
   const day=buildDay(ds); const st=dayState(ds); const {t,target,doneMeals,totMeals}=dayTotals(ds);
-  const wOk=st.workoutDone?1:0;
+  const workoutOutcome=workoutOutcomeForState(st);
+  const workoutSummary=workoutOutcome==="completed"?"✓":workoutOutcome==="partial"?"Parcial":workoutOutcome==="in_progress"?"En curso":workoutOutcome==="paused"?"Pausado":"—";
   const w=day.week; const daysLeft=Math.round((parseYmd(END)-parseYmd(ds))/86400000);
   return section("wk.resumen","Resumen",`
   <div class="summary">
     <div class="scard"><div class="n">${Math.round(target.kcal?t.kcal/target.kcal*100:0)}%</div><div class="l">kcal de la meta</div></div>
     <div class="scard"><div class="n">${Math.round(target.p?t.p/target.p*100:0)}%</div><div class="l">proteína de la meta</div></div>
     <div class="scard"><div class="n">${doneMeals}/${totMeals}</div><div class="l">comidas cumplidas</div></div>
-    <div class="scard"><div class="n">${wOk?'✓':'—'}</div><div class="l">entrenamiento</div></div>
+    <div class="scard"><div class="n">${workoutSummary}</div><div class="l">entrenamiento</div></div>
   </div>
   <div class="muted small center" style="margin-top:10px">${w?(w.num?("Semana "+w.num+" de "+PLAN_DURATION_WEEKS):"Semana de arranque"):""} · faltan ${daysLeft} días para el final</div>`);
 }
@@ -2556,10 +3060,13 @@ function toggleMeal(ds,id){const ms=mealState(ds,id);ms.done=!ms.done;commitDay(
 function toggleExtra(ds,i){const d=dayState(ds);d.extras[i].done=!d.extras[i].done;commitDay(ds);render();}
 function toggleWorkout(){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado hasta una evaluación profesional");return;}
-  const d=dayState(current);d.workoutDone=!d.workoutDone;commitDay(current);render();
+  setView("entreno");
 }
 function openWorkoutPicker(ds){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  const execution=normalizedWorkoutExecution(ds);
+  if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
+  if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
   const ew=effectiveWorkout(ds);
   const prefs=trainingPrefs();
   const options=workoutOptions(ds);
@@ -2577,6 +3084,9 @@ function openWorkoutPicker(ds){
 }
 function setWorkout(ds,id){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  const execution=normalizedWorkoutExecution(ds);
+  if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
+  if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
   const d=dayState(ds);if(id&&id!==plannedWorkoutId(ds))d.workoutOverride=id;else delete d.workoutOverride;commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");
 }
 function delExtra(ds,i){const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);render();}
@@ -2616,13 +3126,15 @@ function progressJourney(){
 }
 // Tarjetas de estadísticas (kg, entrenos, racha)
 function progressStats(){
-  const entrenos=Object.values(S.days).filter(d=>d&&d.workoutDone).length;
+  const outcomes=Object.values(S.days).map(day=>workoutOutcomeForState(day||{}));
+  const entrenos=outcomes.filter(outcome=>outcome==="completed").length;
+  const parciales=outcomes.filter(outcome=>outcome==="partial").length;
   const ws=Object.keys(WEIGHT_RANGES).map(n=>wkg(n)).filter(v=>v!=null);
   const lost=ws.length>=2?(ws[0]-ws[ws.length-1]):0;
   const lostTxt=lost>0?"-"+lost.toFixed(1):(lost<0?"+"+(-lost).toFixed(1):"0");
   return `<div class="summary" style="grid-template-columns:1fr 1fr 1fr">
     <div class="scard"><div class="n" style="color:var(--good)">${lostTxt}</div><div class="l">kg</div></div>
-    <div class="scard"><div class="n">${entrenos}</div><div class="l">entrenos</div></div>
+    <div class="scard"><div class="n">${entrenos}</div><div class="l">completos${parciales?` · ${parciales} parciales`:""}</div></div>
     <div class="scard"><div class="n" style="color:var(--terra-300)">🔥 ${streak()}</div><div class="l">días racha</div></div>
   </div>`;
 }
@@ -3586,7 +4098,7 @@ function profileName(){
 // ¿hubo actividad ese día? (alguna comida/extra hecha o entreno)
 function dayActive(ds){
   const st=S.days[ds]; if(!st)return false;
-  if(st.workoutDone)return true;
+  if(workoutHasRecordedActivity(st))return true;
   if(st.meals&&Object.values(st.meals).some(m=>m&&m.done))return true;
   if(st.extras&&st.extras.some(e=>e&&e.done))return true;
   return false;
@@ -4021,7 +4533,7 @@ function commitDay(ds){
   pushDay(ds);
 }
 // Trae el día desde la DB y re-renderiza si seguimos viéndolo.
-function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view==="nutricion")&&current===ds)render();});}
+function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view==="nutricion"||view==="entreno")&&current===ds)render();});}
 
 /* ---- Registro de peso + % grasa en la DB (tabla weight_log) ---- */
 // kg es NOT NULL: sin peso no hay fila (el % grasa acompaña al peso).
@@ -4542,6 +5054,7 @@ async function boot(){
   if(session)await onAuth(); else render();
 }
 registerServiceWorker();
+setInterval(workoutTimerTick,1000);
 // Captura el evento de instalación (Android/Chrome) y oculta la sugerencia si ya se instaló.
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;updateInstallPrompt();});
 window.addEventListener("appinstalled",()=>{UI.installDismissed=true;uiSave();removeInstallPrompt();});

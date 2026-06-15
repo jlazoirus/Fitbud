@@ -13,12 +13,13 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 - **Revisión cada 4 semanas** para actualizar peso, objetivo, macros o preferencias sin perder el progreso.
 - **Cierre de ciclo** con recap de logros, foto de progreso personal de cuerpo entero y elección del siguiente desafío antes de recalcular el próximo bloque.
 - **Tipos de día**: PESAS, BAJO, REFEED y DIET BREAK, cada uno con su meta de kcal y macros.
-- **Marcar** comidas y entrenamiento como completados (se guarda en `localStorage`).
+- **Registrar** comidas y ejecutar entrenamientos; Supabase es la fuente de verdad y `localStorage` mantiene una caché recuperable.
 - **Reemplazar** comidas (otra opción del plan o una personalizada) y **agregar** extras.
 - **Navegación** día anterior/siguiente y vista de semana completa.
 - **Registro de peso** semanal con gráfico de evolución, indicador de semana y resumen del día.
 - **Plan deportivo configurable**: elige 4 o 10 semanas, Running, Cycling o Natación y combínalo siempre con fuerza en gimnasio o con peso corporal.
 - **Ejercicios guiados**: cada rutina enlaza un catálogo propio con instrucciones, respiración, errores comunes, señales de seguridad y demostraciones SVG animadas que se pueden pausar.
+- **Reproductor de entrenamiento**: calentamiento, series o intervalos, carga/repeticiones/RPE, descansos temporizados, sustituciones y cierre completo o parcial recuperable al reabrir la PWA.
 - **Instalable como PWA** con manifest, íconos y cache offline del shell de la app.
 
 ## Plan de entrenamiento
@@ -33,6 +34,8 @@ Cada usuario configura en **Perfil**:
 El reparto se adapta a la disponibilidad real y coloca las sesiones deportivas en los días compatibles con piscina o exterior. Natación valida que existan suficientes días con piscina. El bloque de 4 semanas usa una progresión compacta y el de 10 semanas incluye descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
 
 Todas las sesiones publicadas usan IDs del catálogo de ejercicios, no nombres libres. La vista **Entreno** muestra la demostración y las instrucciones de cada movimiento; `prefers-reduced-motion` deja la ilustración estática. Los administradores pueden buscar, filtrar, crear, editar o archivar ejercicios desde **Perfil → Ejercicios** y revisar que cada registro tenga fuente, licencia y media.
+
+Al iniciar una sesión, Fitbros la ordena en calentamiento, bloque principal y vuelta a la calma. En fuerza registra cada serie con repeticiones, carga o asistencia y RPE; los descansos tienen temporizador y una sustitución conserva la dosis del movimiento. Running, cycling y natación se presentan como bloques con objetivo, intensidad, recuperación y timer. Pausar, cerrar o recargar conserva el avance en el estado diario sincronizado con Supabase. El cierre solicita dificultad y señales anormales antes de marcar el resultado como completo o parcial.
 
 ## Configuración inicial y macros
 
@@ -122,6 +125,7 @@ El catálogo base se mantiene en [`exercise-catalog.js`](exercise-catalog.js). D
 ```bash
 node scripts/generate-exercise-sql.mjs
 node scripts/validate-exercises.mjs
+node scripts/validate-workout-player.mjs
 ```
 
 ## Uso local
