@@ -18,6 +18,7 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 - **Navegación** día anterior/siguiente y vista de semana completa.
 - **Registro de peso** semanal con gráfico de evolución, indicador de semana y resumen del día.
 - **Plan deportivo configurable**: elige 4 o 10 semanas, Running, Cycling o Natación y combínalo siempre con fuerza en gimnasio o con peso corporal.
+- **Plan de entrenamiento personalizado**: prepara, revisa y activa 4 o 10 semanas completas usando solo días, lugares, recursos y ejercicios compatibles; permite cambiar una semana o sesión sin rehacer el resto.
 - **Ejercicios guiados**: cada rutina enlaza un catálogo propio con instrucciones, respiración, errores comunes, señales de seguridad y demostraciones SVG animadas que se pueden pausar.
 - **Reproductor de entrenamiento**: calentamiento, series o intervalos, carga/repeticiones/RPE, descansos temporizados, sustituciones y cierre completo o parcial recuperable al reabrir la PWA.
 - **Consumo controlado del coach**: cada acción reserva una unidad server-side; al alcanzar el límite reutiliza opciones compatibles o una alternativa determinista sin mostrar contadores.
@@ -32,7 +33,7 @@ Cada usuario configura en **Perfil**:
 - entre **3 y 6 días exactos** y el lugar disponible cada día;
 - minutos por sesión, equipo, experiencia, prioridad, horario y movimientos a evitar.
 
-El reparto se adapta a la disponibilidad real y coloca las sesiones deportivas en los días compatibles con piscina o exterior. Natación valida que existan suficientes días con piscina. El bloque de 4 semanas usa una progresión compacta y el de 10 semanas incluye descarga en la semana 6 y consolidación en la semana 10. Cada entrenamiento diario todavía se puede reemplazar manualmente.
+El reparto se adapta a la disponibilidad real y coloca las sesiones deportivas en los días compatibles con piscina o exterior. Natación valida que existan suficientes días con piscina. Desde **Entreno → Preparar mi plan**, Fitbros construye las 4 o 10 semanas, valida ejercicios, dosis, tiempo y limitaciones, y muestra el borrador antes de activarlo. El bloque corto consolida en la semana 4; el largo descarga en la semana 6 y consolida en la semana 10. Una semana o sesión puede prepararse otra vez sin reemplazar el resto.
 
 Todas las sesiones publicadas usan IDs del catálogo de ejercicios, no nombres libres. La vista **Entreno** muestra la demostración y las instrucciones de cada movimiento; `prefers-reduced-motion` deja la ilustración estática. Los administradores pueden buscar, filtrar, crear, editar o archivar ejercicios desde **Perfil → Ejercicios** y revisar que cada registro tenga fuente, licencia y media.
 
@@ -128,6 +129,8 @@ El catálogo base se mantiene en [`exercise-catalog.js`](exercise-catalog.js). D
 node scripts/generate-exercise-sql.mjs
 node scripts/validate-exercises.mjs
 node scripts/validate-workout-player.mjs
+node scripts/validate-training-plan.mjs
+node scripts/test-training-plan-api.mjs
 node scripts/validate-coach-quota.mjs
 node scripts/test-coach-quota.mjs
 ```

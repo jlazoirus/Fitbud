@@ -215,8 +215,92 @@ function collectExerciseIds(value, output) {
   }
 }
 
+function trainingPhaseRanges(phase) {
+  return {
+    base: { sets: [2, 4], rpe: [5, 7] },
+    progression: { sets: [3, 5], rpe: [6, 8] },
+    deload: { sets: [1, 3], rpe: [4, 6] },
+    build: { sets: [3, 5], rpe: [6, 9] },
+    consolidation: { sets: [2, 4], rpe: [5, 7] },
+  }[phase] || null;
+}
+
+function validateTrainingPlanWeek(data, validation) {
+  const expected = Array.isArray(validation.expectedSessions) ? validation.expectedSessions : [];
+  const sessions = data && Array.isArray(data.sessions) ? data.sessions : [];
+  const phase = String(validation.expectedPhase || "");
+  const ranges = trainingPhaseRanges(phase);
+  const allowed = new Set(Array.isArray(validation.allowedExerciseIds) ? validation.allowedExerciseIds.map(String) : []);
+  const expectedByDate = new Map(expected.map((item) => [String(item.date || ""), item]));
+  const seen = new Set();
+  if (!ranges || Number(data && data.week) !== Number(validation.expectedWeek)) return false;
+  if (String(data && data.phase || "") !== phase || sessions.length !== expected.length) return false;
+  if (containsRestriction(JSON.stringify(data), validation)) return false;
+  for (const session of sessions) {
+    const date = String(session && session.date || "");
+    const spec = expectedByDate.get(date);
+    if (!spec || seen.has(date)) return false;
+    seen.add(date);
+    const type = String(session.type || "");
+    const role = String(session.role || "");
+    const location = String(session.location || "");
+    const duration = Number(session.duration_minutes);
+    if (type !== spec.type || role !== spec.role || location !== spec.location) return false;
+    if (Number(session.weekday) !== Number(spec.weekday)) return false;
+    if (!["strength", "running", "cycling", "swimming"].includes(type)) return false;
+    if (!String(session.name || "").trim() || !String(session.objective || "").trim() || !String(session.intensity || "").trim()) return false;
+    if (!Number.isFinite(duration) || duration < 20 || duration > Number(validation.sessionMinutes || 60)) return false;
+    const exercises = Array.isArray(session.exercises) ? session.exercises : [];
+    const blocks = Array.isArray(session.blocks) ? session.blocks : [];
+    if (type === "strength") {
+      if (exercises.length < 2 || exercises.length > 8 || blocks.length) return false;
+    } else if (exercises.length !== 1 || blocks.length < 3
+      || String(blocks[0] && blocks[0].phase) !== "warmup"
+      || String(blocks[blocks.length - 1] && blocks[blocks.length - 1].phase) !== "cooldown") {
+      return false;
+    }
+    for (const exercise of exercises) {
+      const id = String(exercise && (exercise.exercise_id || exercise.exerciseId) || "");
+      const sets = Number(exercise && exercise.sets);
+      const rest = Number(exercise && (exercise.rest_seconds != null ? exercise.rest_seconds : exercise.restSeconds));
+      const rpe = Number(exercise && (exercise.target_rpe != null ? exercise.target_rpe : exercise.targetRpe));
+      const rir = Number(exercise && (exercise.target_rir != null ? exercise.target_rir : exercise.targetRir));
+      if (!id || (allowed.size && !allowed.has(id)) || !String(exercise && exercise.reps || "").trim()) return false;
+      if (!Number.isInteger(sets) || sets < ranges.sets[0] || sets > ranges.sets[1]) return false;
+      if (!Number.isFinite(rest) || rest < 20 || rest > 300) return false;
+      if (!Number.isFinite(rpe) || rpe < ranges.rpe[0] || rpe > ranges.rpe[1]) return false;
+      if (!Number.isFinite(rir) || rir < 0 || rir > 5) return false;
+    }
+    for (const block of blocks) {
+      const blockPhase = String(block && block.phase || "");
+      const seconds = Number(block && (block.duration_seconds != null ? block.duration_seconds : block.durationSeconds));
+      if (!["warmup", "main", "recovery", "cooldown"].includes(blockPhase)) return false;
+      if (!String(block && block.label || "").trim() || !String(block && block.target || "").trim()
+        || !String(block && block.intensity || "").trim()) return false;
+      if (!Number.isFinite(seconds) || seconds < 15 || seconds > 7200) return false;
+    }
+    if (type === "strength") {
+      const estimatedSeconds = exercises.reduce((sum, exercise) => {
+        const sets = Number(exercise && exercise.sets) || 0;
+        const rest = Number(exercise && (exercise.rest_seconds != null ? exercise.rest_seconds : exercise.restSeconds)) || 0;
+        return sum + sets * (rest + 45);
+      }, 600);
+      if (estimatedSeconds > duration * 60 * 1.25) return false;
+    } else {
+      const blockSeconds = blocks.reduce((sum, block) =>
+        sum + (Number(block && (block.duration_seconds != null ? block.duration_seconds : block.durationSeconds)) || 0), 0);
+      if (blockSeconds > duration * 60 * 1.1 || blockSeconds < duration * 60 * 0.45) return false;
+    }
+  }
+  if (seen.size !== expected.length) return false;
+  return true;
+}
+
 function validateTraining(data, validation) {
   if (!data || typeof data !== "object") return false;
+  if (validation && validation.schema === "training_plan_week_v1") {
+    return validateTrainingPlanWeek(data, validation);
+  }
   const allowed = new Set(Array.isArray(validation.allowedExerciseIds) ? validation.allowedExerciseIds.map(String) : []);
   const ids = [];
   collectExerciseIds(data, ids);

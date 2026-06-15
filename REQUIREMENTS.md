@@ -93,7 +93,7 @@ Estado funcional auditado el 14 de junio de 2026:
 - Preferencias de entrenamiento: running, cycling o natacion combinados con gimnasio o peso corporal; 3 a 6 dias exactos por semana y lugar por dia.
 - Claude puede estimar y sugerir comidas, revisar macros y generar un dia o una semana de dieta.
 - Racha actual basada en cualquier actividad registrada; no distingue cumplimiento nutricional, entrenamiento ni descanso planificado.
-- Entrenamientos actuales enlazan un catalogo propio de 40 ejercicios y cuentan con reproductor recuperable por bloques, series, cargas, RPE y temporizadores.
+- Entrenamientos actuales enlazan un catalogo propio de 40 ejercicios, cuentan con reproductor recuperable y permiten preparar, revisar y activar planes personalizados completos de 4 o 10 semanas.
 - No existe todavia facturacion, entitlement de suscripcion, paywall, recordatorios por correo, check-in semanal adaptativo ni un centro conversacional de coach.
 - La fuente de verdad personal es Supabase y `localStorage` actua como cache, pero la sincronizacion sigue siendo last-write-wins sin cola offline.
 
@@ -107,7 +107,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Onboarding | Perfil v3 implementado: macros, zona horaria, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | Falta usar el numero variable de comidas al construir el plan nutricional (REQ-18) |
 | Home diario | Muestra macros, dieta, entrenamiento y racha | Falta priorizacion inteligente, estado del dia, proxima accion y contingencias |
 | Nutricion | Recetas, macros, checks, reemplazos y generacion IA diaria/semanal | Falta plan por numero de comidas, opciones equivalentes, lista de compras, contexto de presupuesto/tiempo y versionado |
-| Entrenamiento | Plan combinado, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta generar y adaptar planes completos de 4/10 semanas (REQ-17) |
+| Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20) |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
 | Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Falta comparar tendencias, hitos y explicar que cambio en el plan |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
@@ -160,7 +160,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 ### Fase B - Inteligencia y adaptacion
 
-17. REQ-17 - Generador IA de planes de entrenamiento.
+17. REQ-17 - Generador IA de planes de entrenamiento. **Implementado**.
 18. REQ-18 - Generador IA de planes nutricionales flexibles.
 19. REQ-19 - Reemplazos y modo contingencia.
 20. REQ-20 - Check-in semanal y ajuste adaptativo.
@@ -200,7 +200,7 @@ No se necesitan los 33 REQ para vender la primera suscripcion. **MVP de lanzamie
 - REQ-32 (cuota+reutilizacion) para controlar costo antes de abrir el grifo.
 - REQ-14 (consentimiento/privacidad minimos) + REQ-33 (landing) + REQ-25/REQ-26 (paywall y checkout).
 
-**Diferibles tras el primer cobro** (mejoran, no bloquean): REQ-13 (versionado completo), REQ-17 (generador de entrenamiento full), REQ-19 (contingencias), REQ-20 (check-in adaptativo), REQ-21 (coach conversacional), REQ-27 (analitica), REQ-28 (offline), REQ-29 (modularizacion), REQ-30 (e2e). Se recomienda igual REQ-27 minimo y REQ-30 smoke antes de escalar trafico.
+**Diferibles tras el primer cobro** (mejoran, no bloquean): REQ-13 (versionado completo), REQ-19 (contingencias), REQ-20 (check-in adaptativo), REQ-21 (coach conversacional), REQ-27 (analitica), REQ-28 (offline), REQ-29 (modularizacion), REQ-30 (e2e). Se recomienda igual REQ-27 minimo y REQ-30 smoke antes de escalar trafico.
 
 **Decision de producto pendiente (define la conversion):** cuando se entrega el primer valor. Recomendado: registro → onboarding → **un primer plan/dia gratis** (trial de valor) → paywall para seguir generando/adaptando. Confirmar antes de construir REQ-25/REQ-33.
 
@@ -640,7 +640,7 @@ Permitir que cada usuario elija entre un bloque corto de 4 semanas y un proceso 
 - Editar la duración en cualquier momento desde Perfil.
 - Ajustar fecha final, calendario y semanas de peso del ciclo.
 - La progresión por semanas es del **entrenamiento** (consolidación/descarga), no de la nutrición: tras quitar el plan estático (commit `9e3fa4e`) ya no existen tipos de día ni refeeds; los macros son uniformes todos los días y las comidas se arman por usuario.
-- Periodización de entrenamiento: consolidación en la semana 4 (plan corto) y descarga en la semana 6 + consolidación en la semana 10 (plan largo). Esto debe quedar a cargo del generador de entrenamiento (REQ-17); mientras tanto el código de ciclos conserva el andamiaje sin efecto nutricional.
+- Periodización de entrenamiento: consolidación en la semana 4 (plan corto) y descarga en la semana 6 + consolidación en la semana 10 (plan largo), aplicada por el generador de entrenamiento de REQ-17.
 - Conservar los registros existentes al acortar o ampliar el ciclo.
 - Mostrar la duración correcta en Home, Progreso, onboarding y recap.
 
@@ -918,7 +918,9 @@ Convertir la tarjeta de entrenamiento en una experiencia guiada que indique exac
 
 ## REQ-17 - Generador IA de planes de entrenamiento
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementacion prepara el plan por semanas bajo una sola accion idempotente, valida fechas, lugares, duracion, fase, dosis y ejercicios contra el catalogo activo, y usa una alternativa determinista compatible si el servicio no responde. El usuario revisa las 4 o 10 semanas, puede preparar otra semana o sesion sin rehacer el resto y activa el borrador versionado solo despues de confirmar. La nueva version empieza en la primera fecha sin entrenamiento registrado; el reproductor consume las dosis e intervalos del plan activo y conserva el historial anterior.
 
 ### Objetivo
 

@@ -21,6 +21,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
 - **Biblioteca de ejercicios:** `exercise-catalog.js` aporta 40 ejercicios propios y el mapeo por ID de todas las rutinas actuales. Supabase (`exercises`) pasa a ser la fuente compartida después de aplicar la migración; el catálogo empaquetado es el fallback.
 - **Reproductor de entrenamiento:** `workout-player.js` construye prescripciones deterministas para fuerza y cardio, normaliza el estado recuperable y calcula progreso, duración y temporizadores. La UI guarda series, cargas, RPE, sustituciones, bloques y cierre en `day_log.state.workoutExecution`.
+- **Planes de entrenamiento personalizados:** `training-plan.js` valida semanas completas contra disponibilidad, fase, tiempo, catálogo y limitaciones. El cliente prepara 4 o 10 semanas por partes, guarda un borrador en `plan_versions` y solo lo activa después de confirmación; si el servicio falla usa la plantilla determinista validada.
 
 > **Macros del día (resuelto):** la vista HOY toma los macros de cada comida desde la **base de datos** (calculados por ingredientes), no de valores fijos. `mealValue()` resuelve con esta prioridad: **1)** override manual → **2)** macros de la DB por `dishName` → **3)** fallback a `SLOTS`. Las metas guardadas por el usuario son la fuente directa para Home, Nutrición y generación con IA; `DAY_TARGET` solo se usa como fallback para perfiles que todavía no tienen metas calculadas.
 
@@ -34,9 +35,10 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `api/admin.js` | Función serverless **admin**: usuarios, cuenta QA y políticas de consumo. Permite límites por acción, activación, diagnóstico nuevo/reutilizado, cortesía y reinicio diario. Usa `SUPABASE_SERVICE_ROLE_KEY` solo en servidor. |
 | `api/privacy.js` | Exporta perfil, progreso, planes, consentimientos, consumo/opciones del coach y fotos descritas; o elimina fotos + cuenta Auth tras confirmar `BORRAR <email>`. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v22`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v23`. |
 | `exercise-catalog.js` | Catálogo local propio de 40 ejercicios y mapeo de cada variante de rutina a IDs estables. También alimenta la generación reproducible del SQL. |
 | `workout-player.js` | Dominio sin dependencias para prescribir fuerza/cardio, recuperar ejecuciones y calcular temporizadores, progreso y resultados. |
+| `training-plan.js` | Contrato sin dependencias para normalizar semanas, rechazar días/ejercicios/dosis incompatibles y convertir sesiones activadas al reproductor. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. El layout respeta `safe-area-inset-*` para no quedar bajo la barra de estado ni el indicador de inicio de iOS. |
 | `supabase/schema.sql` | Esquema completo de la DB (todas las tablas, vista `dish_macros`, RLS). Para instalación nueva. |
 | `supabase/seed.sql` | Datos precargados: 55 ingredientes, 43 platos con receta, 4 dietas, 28 almuerzos asignados. Correr después de schema. |
@@ -49,6 +51,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `supabase/coach_quota.sql` | Migración idempotente de políticas, overrides, reservas, partes, pool privado e impresiones. Las tablas no tienen acceso para usuarios normales; las RPC se conceden solo a service role. Ejecutar después de `privacy.sql`; no se aplica automáticamente. |
 | `scripts/generate-exercise-sql.mjs`, `scripts/validate-exercises.mjs` | Regeneran el seed SQL desde el catálogo y validan completitud, media propia y referencias de todas las rutinas. |
 | `scripts/validate-workout-player.mjs` | Valida prescripciones de fuerza/cardio, dosis, temporizadores y recuperación del estado del reproductor. |
+| `scripts/validate-training-plan.mjs`, `scripts/test-training-plan-api.mjs` | Validan planes de 4/10 semanas, integración con el reproductor y rechazo server-side de respuestas incompatibles. |
 | `scripts/validate-coach-quota.mjs`, `scripts/test-coach-quota.mjs` | Validan contratos de esquema/cliente y prueban con mocks idempotencia, reutilización, devolución y administración sin llamadas pagadas. |
 | `PRIVACY.md` | Política operativa preliminar: edad, consentimiento, aptitud, retención, exportación y borrado. Requiere revisión legal antes del lanzamiento comercial. |
 | `plan-10-semanas-recomposicion.md` | Plan original (fuente de verdad de menús, días, entrenos, metas). |
@@ -59,7 +62,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Capa de datos:** calendario dinámico por perfil (`planStartDate`/`planEndDate`/`planCycleNumber`/`planDurationWeeks`), menús, generadores de entrenamiento, `DAY_TARGET` (fallback sin perfil), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales exactas).
 - **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → logística de comidas → preferencias, permiso esencial, fotos opcionales y evaluación de seguridad. `migrateProfilePrefs()` normaliza el esquema v3 y guarda `timeZone`; `hasCompleteOnboarding()` no bloquea perfiles heredados y `profileReviewDue()` solicita revisión cada 28 días.
 - **Cierre de sesión:** `signOutUser()` limpia la UI y el cache del usuario de inmediato, solicita a Supabase un cierre local y elimina la sesión persistida como fallback si la red no responde.
-- **Entrenamiento:** cada perfil elige disciplina, fuerza, 3-6 días exactos, lugar por día, minutos, equipo, experiencia, prioridad y limitaciones. `workoutSchedule()` asigna fuerza/deporte; `effectiveWorkout(ds)` conserva overrides y devuelve `safety_hold` si la evaluación tiene una señal de alerta. `workoutPrescription()` convierte la sesión en calentamiento, bloques principales y vuelta a la calma; `renderWorkout()` muestra el reproductor y el ejercicio activo desde el catálogo.
+- **Entrenamiento:** cada perfil elige disciplina, fuerza, 3-6 días exactos, lugar por día, minutos, equipo, experiencia, prioridad y limitaciones. `openTrainingPlanGenerator()` prepara semanas validables y `activateTrainingPlanDraft()` inicia la nueva versión en la primera fecha sin entrenamiento registrado. `effectiveWorkout(ds)` resuelve la sesión del snapshot activo, conserva overrides y devuelve `safety_hold` ante una señal de alerta. `workoutPrescription()` convierte la dosis o intervalos activados en pasos recuperables.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
 - **Estado/persistencia** (~335): `S` (objeto raíz, cacheado en localStorage), `dayState(ds)` (campos: `meals{id:{done,ovr}}`, `extras[]`, `workoutDone`, `workoutOverride`, `workoutExecution`), `mealState`, `mealValue` (resuelve macros: override manual → DB por `dishName` → fallback plan), `dayTotals(ds)` (suma solo comidas marcadas `done`). `workoutExecution` conserva pasos, series, timer, duración, sustituciones y resultado `completed|partial`.
 - **Sincronización con la DB:** `commitDay(ds)`=`save()`+`pushDay(ds)` (upsert a `day_log` con `plan_version_id`); `pullDay(ds)`/`syncDay(ds)` bajan el día; `pushWeight`/`pullWeights`/`syncWeights` para `weight_log`; `pullPlanVersions()`/`ensurePlanVersion()` mantienen el snapshot prescrito. Se llama `commitDay` en cada mutación del día (toggles, reemplazo, editor, sugerencia IA, cambio de entreno) y `syncDay`/`syncWeights` al arrancar, navegar y conectar.
@@ -86,7 +89,7 @@ Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
 - `diet_dishes(id, diet_id, dish_id, weekday, slot)` — qué plato cada día.
 - `day_log(log_date pk, state jsonb, plan_version_id, updated_at)` — consumo del día (comidas/extras/entreno/override) como documento JSON.
 - `weight_log(user_id, cycle_start, week, kg, bf_pct)` — peso y grasa semanal separados por ciclo.
-- `plan_versions(user_id, cycle_number, version_number, version_key, source, status, valid_from, valid_to, snapshot_hash, snapshot, reason, prompt, model)` — snapshots del plan prescrito por usuario y ciclo.
+- `plan_versions(user_id, cycle_number, version_number, version_key, source, status, valid_from, valid_to, snapshot_hash, snapshot, reason, prompt, model)` — snapshots del plan prescrito por usuario y ciclo; `snapshot.trainingPlan` guarda semanas, sesiones, dosis, validación y versión del contrato.
 - `plan_cycles(user_id, cycle_number, start_date, end_date, challenge, summary, photo_path)` — recap e historial.
 - `user_consents(user_id, consent_type, policy_version, status, timestamps)` — aceptación/retiro por propósito y versión.
 - `safety_screenings(user_id, screening_version, responses, has_red_flags, cleared_for_training)` — aptitud versionada.
@@ -132,6 +135,7 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Consumo diario en la DB** — `day_log` + `commitDay`/`pullDay`/`syncDay`. Sincroniza entre dispositivos; localStorage es caché.
 - **Peso en la DB** — `weight_log` + `pushWeight`/`pullWeights`/`syncWeights`. Nada del usuario vive solo en el navegador.
 - **Plan deportivo configurable** — `primarySport` + `strengthMode` + `trainDays` en `profiles.prefs`; reparto con `workoutSchedule(days)` y sesiones progresivas con `workoutOptions(ds)`.
+- **Generador de entrenamiento** — crea y valida 4/10 semanas con ejercicios del catálogo, progresión/descarga, revisión por semana o sesión, fallback determinista y activación confirmada sin reescribir entrenamientos registrados.
 - **Cambiar el entrenamiento del día** — `effectiveWorkout` + `workoutOverride` (sincroniza vía `day_log`).
 - **Biblioteca guiada de ejercicios** — 40 registros propios cubren gimnasio, peso corporal, running, cycling y natación; todas las rutinas usan IDs, la UI permite pausar animaciones y el admin valida fuente/licencia antes de publicar.
 - **Reproductor guiado** — sesiones ordenadas con calentamiento, series o intervalos, descansos, carga/repeticiones/RPE, sustituciones y cierre de seguridad. Pausar o cerrar la PWA conserva el avance en `day_log`.

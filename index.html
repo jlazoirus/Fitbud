@@ -390,6 +390,8 @@
 <script src="exercise-catalog.js"></script>
 <!-- Dominio del reproductor guiado; sin dependencias y validable en Node. -->
 <script src="workout-player.js"></script>
+<!-- Contrato y validación de planes de entrenamiento personalizados. -->
+<script src="training-plan.js"></script>
 <!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -727,6 +729,7 @@ function trainingPrefs(){
 const LOCAL_EXERCISES=Array.isArray(window.FITBUD_EXERCISES)?window.FITBUD_EXERCISES:[];
 const WORKOUT_EXERCISE_IDS=window.FITBUD_WORKOUT_EXERCISES||{};
 const WORKOUT_PLAYER=window.FITBUD_WORKOUT_PLAYER;
+const TRAINING_PLAN=window.FITBUD_TRAINING_PLAN;
 function workoutSchedule(days,dayIds,priority,locations,primary){
   const selected=normalizedTrainingDays(dayIds,days);
   const sessions=baseWorkoutTemplate(selected.length,priority);
@@ -741,7 +744,22 @@ function workoutSchedule(days,dayIds,priority,locations,primary){
   });
   return assigned;
 }
+function generatedTrainingPlanForDate(ds){
+  const version=planVersionForDate(ds);
+  const plan=version&&version.snapshot&&version.snapshot.trainingPlan;
+  return plan&&Array.isArray(plan.weeks)?plan:null;
+}
+function generatedWorkoutForDate(ds){
+  const plan=generatedTrainingPlanForDate(ds);
+  const session=TRAINING_PLAN&&plan?TRAINING_PLAN.sessionForDate(plan,ds):null;
+  const prefs=planPrefsForDate(ds);
+  return session?TRAINING_PLAN.workoutFromSession(session,prefs.strengthMode):null;
+}
 function plannedWorkoutId(ds,prefs){
+  if(!prefs){
+    const generated=generatedWorkoutForDate(ds);
+    if(generated)return generated.id;
+  }
   const training=trainingPrefsFromPrefs(prefs||planPrefsForDate(ds));
   const wd=parseYmd(ds).getDay();
   return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary)[wd]||"descanso";
@@ -909,19 +927,27 @@ function workoutOptions(ds,prefs){
     {id:"descanso",kind:"Descanso",name:"Descanso total",detail:"Movilidad suave y caminata opcional. Prioriza sueño y recuperación.",exerciseIds:[]},
   ];
 }
-function workoutById(ds,id,prefs){return workoutOptions(ds,prefs).find(o=>o.id===id)||null;}
+function workoutById(ds,id,prefs){
+  if(!prefs){
+    const generated=generatedWorkoutForDate(ds);
+    if(generated&&generated.id===id)return generated;
+  }
+  return workoutOptions(ds,prefs).find(o=>o.id===id)||null;
+}
 function effectiveWorkout(ds,prefs){
   if(trainingSafetyHold()&&ds>=todayStr()){
     const hold=safetyHoldWorkout();
     return {id:hold.id,workout:hold,plannedId:hold.id,planned:hold,overridden:false};
   }
   const resolvedPrefs=prefs||planPrefsForDate(ds);
-  const plannedId=plannedWorkoutId(ds,resolvedPrefs);
+  const generated=!prefs?generatedWorkoutForDate(ds):null;
+  const planned=generated||workoutById(ds,plannedWorkoutId(ds,resolvedPrefs),resolvedPrefs);
+  const plannedId=planned&&planned.id?planned.id:"descanso";
   const st=S.days[ds];
   const ovrId=st&&st.workoutOverride;
   const valid=ovrId&&workoutById(ds,ovrId,resolvedPrefs);
   const id=valid?ovrId:plannedId;
-  return {id,workout:workoutById(ds,id,resolvedPrefs),plannedId,planned:workoutById(ds,plannedId,resolvedPrefs),overridden:!!(valid&&ovrId!==plannedId)};
+  return {id,workout:valid||planned,plannedId,planned,overridden:!!(valid&&ovrId!==plannedId)};
 }
 
 // metas y macros por slot según tipo de día
@@ -1028,6 +1054,11 @@ function hashText(text){
   }
   return ("00000000"+(h>>>0).toString(16)).slice(-8);
 }
+function stableJson(value){
+  if(Array.isArray(value))return `[${value.map(stableJson).join(",")}]`;
+  if(value&&typeof value==="object")return `{${Object.keys(value).sort().map(key=>`${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
 function planCalendarForPrefs(prefs){
   const p=migrateProfilePrefs(prefs||{});
   const duration=resolvedPlanDuration(p);
@@ -1109,6 +1140,7 @@ function planSnapshotDigest(prefs,meta){
     targets:effectiveDayTarget(normalized),
     training,
     slots:mealSlotsForPrefs(normalized).map(s=>({id:s.id,label:s.slot,time:s.time})),
+    trainingPlan:meta&&Object.prototype.hasOwnProperty.call(meta,"trainingPlan")?meta.trainingPlan:null,
     origin:{
       source:(meta&&meta.source)||"manual",
       reason:(meta&&meta.reason)||"",
@@ -1116,12 +1148,15 @@ function planSnapshotDigest(prefs,meta){
       model:(meta&&meta.model)||null,
     },
   };
-  return {payload,digest:hashText(JSON.stringify(payload))};
+  return {payload,digest:hashText(stableJson(payload))};
 }
 function planVersionForDate(ds){
   if(!validYmd(ds)||!Array.isArray(PLAN_VERSIONS)||!PLAN_VERSIONS.length)return null;
+  const storedId=S&&S.days&&S.days[ds]&&S.days[ds].planVersionId;
+  const stored=storedId&&PLAN_VERSIONS.find(version=>String(version.id)===String(storedId));
+  if(stored)return stored;
   const matches=PLAN_VERSIONS.filter(v=>validYmd(v.valid_from)&&ds>=v.valid_from&&(!validYmd(v.valid_to)||ds<=v.valid_to));
-  const pool=matches.length?matches:PLAN_VERSIONS.filter(v=>v.status==="active");
+  const pool=matches;
   if(!pool.length)return null;
   const rank=status=>status==="active"?3:status==="draft"?2:status==="completed"?1:0;
   return pool.slice().sort((a,b)=>
@@ -1174,7 +1209,7 @@ function weekOf(ds,prefs){
 function buildDay(ds,prefsOverride){
   const ctx=planContextForDate(ds,prefsOverride);
   const meals=mealSlotsForPrefs(ctx.prefs).map(s=>({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
-  return {ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(ctx.prefs),meals,workout:effectiveWorkout(ds,ctx.prefs).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
+  return {ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(ctx.prefs),meals,workout:effectiveWorkout(ds,prefsOverride||null).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
 }
 
 /* ---------- ESTADO / PERSISTENCIA (localStorage) ---------- */
@@ -2936,9 +2971,14 @@ function renderWorkoutExecution(ds,execution){
 }
 
 /* ---------- ENTRENO: detalle del entrenamiento del día ---------- */
+function activeGeneratedTrainingVersion(){
+  const active=planVersionActiveForCycle(cycleNumber());
+  return active&&active.snapshot&&active.snapshot.trainingPlan?active:null;
+}
 function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
   const training=trainingPrefs();
+  const generatedVersion=activeGeneratedTrainingVersion();
   const location=training.locations[parseYmd(ds).getDay()];
   const prescription=workoutPrescription(ds);
   const execution=normalizedWorkoutExecution(ds);
@@ -2955,8 +2995,12 @@ function renderWorkout(){
       <div>
         <div class="muted small">Plan combinado · ${training.days} días/semana · ${PLAN_DURATION_WEEKS} semanas${location?` · ${TRAINING_LOCATION_LABELS[location]}`:""}</div>
         <div style="font-weight:700;margin-top:3px">${SPORT_LABELS[training.primary]} + ${STRENGTH_LABELS[training.strength]}</div>
+        ${generatedVersion?`<div class="muted small" style="margin-top:4px">Plan personalizado activo desde ${prettyDate(generatedVersion.valid_from)} · ${esc(generatedVersion.reason||"ajustado a tu perfil")}</div>`:""}
       </div>
-      <button class="btn btn-sm" onclick="setView('perfil')">Configurar</button>
+      <div class="row wrap">
+        <button class="btn btn-sm" onclick="openTrainingPlanGenerator()" ${trainingSafetyHold()?"disabled":""}>${generatedVersion?"Preparar otra versión":"Preparar mi plan"}</button>
+        <button class="btn btn-sm" onclick="setView('perfil')">Configurar</button>
+      </div>
     </div>
   </div>
   ${section("wk.entreno","Entrenamiento",`<div class="workout">
@@ -3738,6 +3782,7 @@ function coachCompatibilityContext(action){
       repeatPreference:p.repeatPreference,
     },
     training:{
+      primarySport:p.primarySport,strengthMode:p.strengthMode,durationWeeks:resolvedPlanDuration(p),
       days:p.trainingDays,locations:p.trainingLocations,equipment:p.equipment,
       experience:p.trainingExperience,priority:p.trainingPriority,
       injuries:p.injuries,limitations:p.limitations,avoidMovements:p.avoidMovements,
@@ -3880,6 +3925,326 @@ function validMealSuggestions(value){
     &&[option.kcal,option.proteina_g,option.carbohidratos_g,option.grasa_g].every(n=>Number.isFinite(Number(n)))
     &&!coachHardRestrictions().some(term=>String(option.nombre||"").toLowerCase().includes(term))
   ));
+}
+
+function activeTrainingCatalog(){
+  const source=DB.loaded&&Array.isArray(DB.exercises)&&DB.exercises.length?DB.exercises:LOCAL_EXERCISES;
+  return source.filter(exercise=>exercise&&exercise.active!==false&&exercise.slug);
+}
+function trainingEquipmentSupports(requirement,prefs){
+  const selected=new Set(prefs.equipment||[]);
+  const support={
+    barbell:["barbell"],rack:["barbell"],bench:["dumbbells","barbell","machines"],
+    cable:["machines"],leg_press:["machines"],leg_curl:["machines"],
+    dumbbells:["dumbbells"],dumbbells_or_cable:["dumbbells","machines"],
+    barbell_or_dumbbells:["barbell","dumbbells"],resistance_band:["bands"],
+    pullup_bar:["pullup"],bench_or_assistance:["machines","bodyweight"],
+    bench_or_chair:["bodyweight","dumbbells"],step_or_bench:["bodyweight","dumbbells"],
+    sliders_or_towel:["bodyweight"],bicycle:["bike","trainer"],pool:["pool_gear"],
+  };
+  const options=support[requirement]||[];
+  return !options.length||options.some(option=>selected.has(option));
+}
+function exerciseConflictsWithProfile(exercise,prefs){
+  const blocked=String([prefs.injuries,prefs.limitations,prefs.avoidMovements].filter(Boolean).join(" ")).toLowerCase();
+  if(!blocked)return false;
+  const words=new Set(blocked.split(/[^a-záéíóúñ]+/i).filter(word=>word.length>=5&&!["evitar","dolor","lesion","lesión","movimiento"].includes(word)));
+  if(!words.size)return false;
+  const safety=[
+    exercise.name,exercise.movement_pattern,
+    ...exerciseArray(exercise.aliases),...exerciseArray(exercise.contraindications),
+    ...exerciseArray(exercise.safety_signals),
+  ].join(" ").toLowerCase();
+  return [...words].some(word=>safety.includes(word));
+}
+function allowedExercisesForSession(spec,prefs,catalog){
+  const strength=spec.type==="strength";
+  const cardioRoleIds=!strength&&WORKOUT_EXERCISE_IDS[prefs.primarySport]
+    ?new Set(WORKOUT_EXERCISE_IDS[prefs.primarySport][spec.role]||[]):null;
+  return catalog.filter(exercise=>{
+    if(exerciseConflictsWithProfile(exercise,prefs))return false;
+    const places=exerciseArray(exercise.places);
+    if(places.length&&!places.includes(spec.location))return false;
+    if(strength){
+      const disciplines=prefs.strengthMode==="bodyweight"
+        ?new Set(["bodyweight","strength"])
+        :new Set(["gym","strength","bodyweight"]);
+      if(!disciplines.has(exercise.discipline))return false;
+      return exerciseArray(exercise.equipment).every(item=>trainingEquipmentSupports(item,prefs));
+    }
+    return exercise.discipline===prefs.primarySport&&(!cardioRoleIds||cardioRoleIds.has(exercise.slug));
+  });
+}
+function trainingExpectedWeeks(prefs){
+  const p=migrateProfilePrefs(prefs||((profile&&profile.prefs)||{}));
+  const training=trainingPrefsFromPrefs(p);
+  const calendar=planCalendarForPrefs(p);
+  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary);
+  const strengthRoles=new Set(["fullA","fullB","torsoA","torsoB","piernaA","piernaB"]);
+  const catalog=activeTrainingCatalog();
+  return calendar.weeks.map((week,index)=>{
+    const sessions=[];
+    for(let offset=0;offset<7;offset++){
+      const date=addDays(week.start,offset);
+      const weekday=parseYmd(date).getDay();
+      if(!training.dayIds.includes(weekday))continue;
+      const role=schedule[weekday];
+      const type=strengthRoles.has(role)?"strength":training.primary;
+      const spec={date,weekday,location:training.locations[weekday],role,type};
+      spec.allowedExerciseIds=allowedExercisesForSession(spec,p,catalog).map(exercise=>exercise.slug);
+      sessions.push(spec);
+    }
+    return {week:index+1,phase:TRAINING_PLAN.phaseForWeek(index+1,training.duration),sessions};
+  });
+}
+function trainingBlockedTerms(prefs){
+  return String(prefs.avoidMovements||"").split(/[,;]/).map(term=>term.trim().toLowerCase()).filter(Boolean);
+}
+function trainingPlanValidationConfig(expected,prefs){
+  const allowed=[...new Set(expected.sessions.flatMap(session=>session.allowedExerciseIds||[]))];
+  return {
+    schema:"training_plan_week_v1",
+    expectedWeek:expected.week,
+    expectedPhase:expected.phase,
+    expectedSessions:expected.sessions.map(({date,weekday,location,role,type})=>({date,weekday,location,role,type})),
+    sessionMinutes:prefs.sessionMinutes,
+    allowedExerciseIds:allowed,
+    hardRestrictions:trainingBlockedTerms(prefs),
+  };
+}
+function trainingPhaseDose(phase){
+  return {
+    base:{sets:3,rpe:6,rir:3},
+    progression:{sets:4,rpe:7,rir:2},
+    deload:{sets:2,rpe:5,rir:4},
+    build:{sets:4,rpe:8,rir:1},
+    consolidation:{sets:3,rpe:6,rir:3},
+  }[phase]||{sets:3,rpe:6,rir:3};
+}
+function deterministicTrainingWeekPayload(expected,prefs){
+  const dose=trainingPhaseDose(expected.phase);
+  const sessions=expected.sessions.map(spec=>{
+    const workout=workoutById(spec.date,spec.role,prefs);
+    const exerciseIds=exerciseArray(workout&&workout.exerciseIds).filter(id=>(spec.allowedExerciseIds||[]).includes(id));
+    const exercises=exerciseIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
+    const prescription=WORKOUT_PLAYER.buildPrescription({
+      workout,
+      exercises,
+      context:{week:expected.week,durationWeeks:resolvedPlanDuration(prefs),sessionMinutes:prefs.sessionMinutes},
+    });
+    const strength=spec.type==="strength";
+    const prescribed=strength
+      ?prescription.steps.filter(step=>step.type==="strength").map(step=>({
+        exercise_id:step.exerciseSlug,sets:step.prescribedSets,reps:step.reps,
+        rest_seconds:step.restSeconds,target_rpe:step.targetRpe,target_rir:step.targetRir,tempo:step.tempo,
+      }))
+      :[{
+        exercise_id:exerciseIds[0],sets:dose.sets,reps:"Sesión completa",
+        rest_seconds:60,target_rpe:dose.rpe,target_rir:dose.rir,tempo:"Ritmo controlado",
+      }];
+    const blocks=strength?[]:prescription.steps.map(step=>({
+      phase:step.phase,label:step.label,target:step.target,intensity:step.intensity,duration_seconds:step.durationSeconds,
+    }));
+    return {
+      date:spec.date,weekday:spec.weekday,location:spec.location,role:spec.role,type:spec.type,
+      name:workout.name,objective:prescription.objective,duration_minutes:Math.min(prefs.sessionMinutes,prescription.estimatedMinutes),
+      intensity:strength?`RPE ${dose.rpe}`:(spec.role==="calidad"?"RPE 7":spec.role==="tecnica"?"RPE 5":"RPE 3-5"),
+      exercises:prescribed,blocks,
+    };
+  });
+  return {
+    week:expected.week,
+    phase:expected.phase,
+    reason:"Semana construida con el catálogo verificado, la disponibilidad y la progresión del ciclo.",
+    sessions,
+  };
+}
+function trainingWeekPrompt(expected,prefs){
+  const catalog=activeTrainingCatalog();
+  const allowedIds=new Set(expected.sessions.flatMap(session=>session.allowedExerciseIds||[]));
+  const allowed=catalog.filter(exercise=>allowedIds.has(exercise.slug)).map(exercise=>({
+    exercise_id:exercise.slug,name:exercise.name,discipline:exercise.discipline,
+    movement_pattern:exercise.movement_pattern,equipment:exerciseArray(exercise.equipment),places:exerciseArray(exercise.places),
+  }));
+  const context={
+    week:expected.week,phase:expected.phase,duration_weeks:resolvedPlanDuration(prefs),
+    session_minutes:prefs.sessionMinutes,experience:prefs.trainingExperience,priority:prefs.trainingPriority,
+    primary_sport:prefs.primarySport,strength_mode:prefs.strengthMode,equipment:prefs.equipment,
+    injuries:prefs.injuries||null,limitations:prefs.limitations||null,avoid_movements:prefs.avoidMovements||null,
+    expected_sessions:expected.sessions.map(({date,weekday,location,role,type,allowedExerciseIds})=>
+      ({date,weekday,location,role,type,allowed_exercise_ids:allowedExerciseIds})),
+    allowed_catalog:allowed,
+  };
+  return `Prepara SOLO la semana ${expected.week} de un plan de ${resolvedPlanDuration(prefs)} semanas.
+Respeta exactamente fechas, lugares, roles, duración disponible y ejercicios permitidos del JSON.
+La fase obligatoria es "${expected.phase}". Usa progresión prudente para la experiencia indicada.
+En fuerza incluye 2-8 ejercicios con series, repeticiones, descanso, RPE, RIR y tempo.
+En deporte incluye un ejercicio del catálogo y bloques ordenados de calentamiento, trabajo, recuperaciones si aplican y vuelta a la calma.
+No inventes ejercicios ni cambies los días disponibles. Responde SOLO JSON válido:
+{"week":${expected.week},"phase":"${expected.phase}","reason":"breve","sessions":[{"date":"YYYY-MM-DD","weekday":1,"location":"gym","role":"fullA","type":"strength","name":"...","objective":"...","duration_minutes":60,"intensity":"RPE 6","exercises":[{"exercise_id":"back-squat","sets":3,"reps":"8-10","rest_seconds":120,"target_rpe":6,"target_rir":3,"tempo":"3-1-1"}],"blocks":[]}]}
+Contexto estructurado: ${JSON.stringify(context)}`;
+}
+async function generateTrainingWeek(expected,prefs,request){
+  const fallbackRaw=deterministicTrainingWeekPayload(expected,prefs);
+  const validation=trainingPlanValidationConfig(expected,prefs);
+  if(request.fallbackOnly){
+    const normalized=TRAINING_PLAN.normalizeWeek(fallbackRaw,{...validation,durationWeeks:resolvedPlanDuration(prefs),sessions:expected.sessions,blockedTerms:trainingBlockedTerms(prefs)});
+    return {...normalized,fallback:true};
+  }
+  const fallback=JSON.stringify(fallbackRaw);
+  const quota=coachQuota(request.action,request.requestId,request.partKey,fallback,validation,`training-week-${expected.week}-${expected.sessions.map(s=>s.date).join(":")}`);
+  const txt=await callClaude(trainingWeekPrompt(expected,prefs),2048,quota);
+  const parsed=parseJSON(txt);
+  return TRAINING_PLAN.normalizeWeek(parsed,{
+    ...validation,durationWeeks:resolvedPlanDuration(prefs),sessions:expected.sessions,blockedTerms:trainingBlockedTerms(prefs),
+  });
+}
+function trainingPlanPromptMetadata(prefs,expectedWeeks){
+  return JSON.stringify({
+    version:"training-plan-v1",durationWeeks:resolvedPlanDuration(prefs),
+    primarySport:prefs.primarySport,strengthMode:prefs.strengthMode,
+    trainingDays:prefs.trainingDays,sessionMinutes:prefs.sessionMinutes,
+    experience:prefs.trainingExperience,priority:prefs.trainingPriority,
+    catalogHash:coachCompatibilityContext("training_plan").catalog.exercises,
+    weeks:expectedWeeks.map(week=>({week:week.week,phase:week.phase,dates:week.sessions.map(session=>session.date)})),
+  });
+}
+async function persistTrainingDraft(plan,prefs,expectedWeeks,warnings){
+  const check=TRAINING_PLAN.validatePlan(plan,{durationWeeks:resolvedPlanDuration(prefs)});
+  if(!check.ok)throw new Error(check.issues[0]||"El plan completo no pasó las validaciones.");
+  const prompt=trainingPlanPromptMetadata(prefs,expectedWeeks);
+  const draft=await createTrainingPlanDraft(plan,prompt);
+  window._trainingDraft={plan,versionId:draft.id,validFrom:draft.valid_from,prefs,expectedWeeks,warnings:warnings||[],prompt};
+  return draft;
+}
+function trainingPhaseLabel(phase){
+  return {base:"Base",progression:"Progresión",deload:"Descarga",build:"Bloque fuerte",consolidation:"Consolidación"}[phase]||phase;
+}
+function trainingDraftReviewHtml(){
+  const draft=window._trainingDraft;
+  if(!draft)return '<div class="alert">El borrador ya no está disponible.</div>';
+  const weeks=draft.plan.weeks.map((week,index)=>`<details class="dash" ${index===0?"open":""}>
+    <summary><b>Semana ${week.week} · ${trainingPhaseLabel(week.phase)}</b> <span class="muted small">${week.sessions.length} sesiones</span></summary>
+    <div class="muted small" style="margin:8px 0">${esc(week.reason||"Semana validada según tu perfil.")}</div>
+    ${week.sessions.map(session=>`<div class="opt" style="cursor:default">
+      <b>${esc(prettyDate(session.date))} · ${esc(session.name)}</b>
+      <div class="o-meta">${esc(TRAINING_LOCATION_LABELS[session.location]||session.location)} · ${session.durationMinutes} min · ${esc(session.intensity)}</div>
+      <div class="muted small" style="margin-top:4px">${esc(session.objective)} · ${session.exercises.map(item=>esc((exerciseBySlug(item.exerciseId,true)||{}).name||item.exerciseId)).join(" · ")}</div>
+      <button class="btn btn-sm" style="margin-top:8px" onclick="regenerateTrainingDraftSession('${session.date}')">Otra sesión</button>
+    </div>`).join("")}
+    <button class="btn btn-sm" onclick="regenerateTrainingDraftWeek(${index})">Preparar otra semana ${week.week}</button>
+  </details>`).join("");
+  const warnings=draft.warnings&&draft.warnings.length
+    ?`<div class="ai-box">Se usó la alternativa validada en: ${draft.warnings.map(esc).join(", ")}.</div>`:"";
+  return `<div class="ai-box"><b>Plan listo para revisar.</b><br>${esc(draft.plan.reason)} Empieza ${prettyDate(draft.validFrom||START)} y no cambia sesiones ya registradas.</div>
+    ${warnings}${weeks}
+    <div class="row wrap" style="margin-top:12px">
+      <button class="btn btn-accent" onclick="applyTrainingPlanDraft()">Activar plan</button>
+      <button class="btn" onclick="closeModal()">Mantener plan actual</button>
+    </div>`;
+}
+async function openTrainingPlanGenerator(){
+  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  if(!hasRequiredConsents()||!hasCurrentScreening()){toast("Revisa privacidad y seguridad antes de preparar tu plan");return;}
+  const actionKey="training_plan";
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const expectedWeeks=trainingExpectedWeeks(prefs);
+  const missing=expectedWeeks.flatMap(week=>week.sessions.filter(session=>!session.allowedExerciseIds.length));
+  if(missing.length){endCoachAction(actionKey);toast("Faltan ejercicios compatibles con tus lugares o recursos");return;}
+  modal(`<h3>Preparar mi plan de entrenamiento</h3><div id="trainingPlanOut"><div class="ai-box">Estamos preparando ${expectedWeeks.length} semanas según tus días, recursos y experiencia…</div></div>`);
+  const weeks=[];const warnings=[];let fallbackOnly=!aiAvailable();
+  try{
+    for(let index=0;index<expectedWeeks.length;index++){
+      const expected=expectedWeeks[index];
+      const out=$("#trainingPlanOut");
+      if(out)out.innerHTML=`<div class="ai-box">Preparando semana ${index+1} de ${expectedWeeks.length}<br><span class="muted small">${trainingPhaseLabel(expected.phase)} · ${expected.sessions.length} sesiones</span></div>`;
+      let result;
+      try{
+        result=await generateTrainingWeek(expected,prefs,{
+          action:"training_plan",requestId,partKey:`week-${expected.week}`,fallbackOnly,
+        });
+        if(!result.ok)throw new Error(result.issues[0]||"La semana no pasó las validaciones.");
+      }catch(error){
+        fallbackOnly=true;
+        result=await generateTrainingWeek(expected,prefs,{fallbackOnly:true});
+        warnings.push(`semana ${expected.week}`);
+      }
+      weeks.push(result.week);
+    }
+    const plan={
+      version:TRAINING_PLAN.VERSION,
+      durationWeeks:resolvedPlanDuration(prefs),
+      startDate:START,endDate:END,
+      reason:"Combina tu disciplina principal con fuerza, respeta tus días exactos y ajusta la carga por fase.",
+      createdAt:new Date().toISOString(),
+      validation:{schema:"training_plan_week_v1",status:"passed",catalogHash:coachCompatibilityContext("training_plan").catalog.exercises},
+      weeks,
+    };
+    await persistTrainingDraft(plan,prefs,expectedWeeks,warnings);
+    $("#trainingPlanOut").innerHTML=trainingDraftReviewHtml();
+  }catch(error){
+    const out=$("#trainingPlanOut");if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(error))}</div>`;
+  }finally{endCoachAction(actionKey);}
+}
+async function regenerateTrainingDraftWeek(index){
+  const draft=window._trainingDraft;if(!draft)return;
+  const expected=draft.expectedWeeks[index];if(!expected)return;
+  const actionKey=`training_plan_week_${expected.week}`;
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
+  const out=$("#trainingPlanOut");if(out)out.innerHTML=`<div class="ai-box">Preparando otra opción para la semana ${expected.week}…</div>`;
+  try{
+    let result;
+    try{
+      result=await generateTrainingWeek(expected,draft.prefs,{action:"training_plan",requestId,partKey:`week-${expected.week}`,fallbackOnly:!aiAvailable()});
+      if(!result.ok)throw new Error(result.issues[0]);
+    }catch(error){
+      result=await generateTrainingWeek(expected,draft.prefs,{fallbackOnly:true});
+    }
+    const plan={...draft.plan,weeks:draft.plan.weeks.map((week,i)=>i===index?result.week:week),createdAt:new Date().toISOString()};
+    await persistTrainingDraft(plan,draft.prefs,draft.expectedWeeks,result.fallback?[`semana ${expected.week}`]:[]);
+    $("#trainingPlanOut").innerHTML=trainingDraftReviewHtml();
+  }catch(error){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(error))}</div>`;}
+  finally{endCoachAction(actionKey);}
+}
+async function regenerateTrainingDraftSession(date){
+  const draft=window._trainingDraft;if(!draft)return;
+  const weekIndex=draft.expectedWeeks.findIndex(week=>week.sessions.some(session=>session.date===date));
+  if(weekIndex<0)return;
+  const expectedWeek=draft.expectedWeeks[weekIndex];
+  const expected={...expectedWeek,sessions:expectedWeek.sessions.filter(session=>session.date===date)};
+  const actionKey=`training_replacement_${date}`;
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
+  const out=$("#trainingPlanOut");if(out)out.innerHTML=`<div class="ai-box">Preparando otra sesión para ${prettyDate(date)}…</div>`;
+  try{
+    let result;
+    try{
+      result=await generateTrainingWeek(expected,draft.prefs,{action:"training_replacement",requestId,partKey:`session-${date}`,fallbackOnly:!aiAvailable()});
+      if(!result.ok)throw new Error(result.issues[0]);
+    }catch(error){
+      result=await generateTrainingWeek(expected,draft.prefs,{fallbackOnly:true});
+    }
+    const replacement=result.week.sessions[0];
+    const weeks=draft.plan.weeks.map((week,index)=>index===weekIndex
+      ?{...week,sessions:week.sessions.map(session=>session.date===date?replacement:session)}
+      :week);
+    const plan={...draft.plan,weeks,createdAt:new Date().toISOString()};
+    await persistTrainingDraft(plan,draft.prefs,draft.expectedWeeks,result.fallback?[prettyDate(date)]:[]);
+    $("#trainingPlanOut").innerHTML=trainingDraftReviewHtml();
+  }catch(error){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(error))}</div>`;}
+  finally{endCoachAction(actionKey);}
+}
+async function applyTrainingPlanDraft(){
+  const draft=window._trainingDraft;if(!draft)return;
+  const button=document.querySelector("#trainingPlanOut .btn-accent");if(button)button.disabled=true;
+  try{
+    const active=await activateTrainingPlanDraft(draft.versionId);
+    window._trainingDraft=null;closeModal();render();
+    toast(`Plan activo desde ${prettyDate(active.valid_from)}`);
+  }catch(error){
+    if(button)button.disabled=false;
+    const out=$("#trainingPlanOut");if(out)out.insertAdjacentHTML("afterbegin",`<div class="ai-box">⚠️ ${esc(coachErrorMessage(error))}</div>`);
+  }
 }
 
 // IA 1 — estimar comida (texto)
@@ -4585,8 +4950,13 @@ async function ensurePlanVersion(meta){
   const validFrom=validYmd(meta&&meta.validFrom)?meta.validFrom:(validYmd(prefs.planStartDate)?prefs.planStartDate:todayStr());
   const validTo=validYmd(meta&&meta.validTo)?meta.validTo:(validYmd(prefs.planEndDate)?prefs.planEndDate:null);
   const status=(meta&&meta.status)||"active";
-  const snapshot=planSnapshotDigest(prefs,meta||{});
   const current=planVersionForDate(validFrom)||planVersionActiveForCycle(cycleNo);
+  const explicitTrainingPlan=!!(meta&&Object.prototype.hasOwnProperty.call(meta,"trainingPlan"));
+  if(current&&current.status==="active"&&!explicitTrainingPlan&&current.snapshot&&current.snapshot.prefs
+    &&stableJson(current.snapshot.prefs)===stableJson(planSnapshotFields(prefs))){
+    return current;
+  }
+  const snapshot=planSnapshotDigest(prefs,meta||{});
   if(planVersionSnapshotMatches(current,snapshot.digest)&&current.status==="active"){
     return current;
   }
@@ -4597,7 +4967,7 @@ async function ensurePlanVersion(meta){
     try{
       const sup=await supa.from("plan_versions").update({
         status:"superseded",
-        valid_to:validFrom,
+        valid_to:validYmd(current.valid_from)&&validFrom>current.valid_from?addDays(validFrom,-1):validFrom,
         superseded_at:now,
         updated_at:now,
       }).eq("id",current.id).eq("user_id",uid()).eq("status","active");
@@ -4637,6 +5007,107 @@ async function ensurePlanVersion(meta){
     }
     throw e;
   }
+}
+
+function trainingPlanActivationDate(){
+  let ds=todayStr()<START?START:todayStr()>END?END:todayStr();
+  while(ds<=END&&workoutHasRecordedActivity(S.days[ds]||{}))ds=addDays(ds,1);
+  return ds<=END?ds:null;
+}
+
+async function createTrainingPlanDraft(plan,prompt){
+  if(!supa||!uid())throw new Error("Inicia sesión para guardar el borrador.");
+  if(!TRAINING_PLAN)throw new Error("El contrato de entrenamiento no está disponible.");
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const validFrom=trainingPlanActivationDate();
+  if(!validFrom)throw new Error("Este ciclo ya no tiene fechas futuras disponibles.");
+  if(!PLAN_VERSIONS_LOADED)await pullPlanVersions();
+  const meta={
+    source:"ia",
+    reason:plan.reason||"Plan personalizado según disponibilidad, experiencia y recursos",
+    prompt,
+    model:effectiveSettings().model||DEFAULT_MODEL,
+    trainingPlan:plan,
+  };
+  const snapshot=planSnapshotDigest(prefs,meta);
+  const cycleNo=cycleNumber();
+  const versionKey=`${cycleNo}:${validFrom}:training:${snapshot.digest}`;
+  const existing=PLAN_VERSIONS.find(row=>row.version_key===versionKey);
+  if(existing)return existing;
+  const now=new Date().toISOString();
+  const row={
+    user_id:uid(),
+    cycle_number:cycleNo,
+    version_number:planVersionVersionNumber(cycleNo),
+    version_key:versionKey,
+    source:"ia",
+    status:"draft",
+    valid_from:validFrom,
+    valid_to:END,
+    reason:meta.reason,
+    prompt,
+    model:meta.model,
+    snapshot_hash:snapshot.digest,
+    snapshot:snapshot.payload,
+    activated_at:null,
+    superseded_at:null,
+    updated_at:now,
+  };
+  const result=await supa.from("plan_versions").insert(row).select("id,user_id,cycle_number,version_number,version_key,source,status,valid_from,valid_to,reason,prompt,model,snapshot_hash,snapshot,activated_at,superseded_at,created_at,updated_at").single();
+  if(result.error)throw new Error("No se pudo guardar el borrador. Aplica supabase/plan_cycles.sql.");
+  await pullPlanVersions();
+  return PLAN_VERSIONS.find(version=>String(version.id)===String(result.data.id))||result.data;
+}
+
+async function activateTrainingPlanDraft(versionId){
+  if(!supa||!uid())throw new Error("Inicia sesión para activar el plan.");
+  if(!PLAN_VERSIONS_LOADED)await pullPlanVersions();
+  const draft=PLAN_VERSIONS.find(row=>String(row.id)===String(versionId)&&row.status==="draft");
+  if(!draft||!draft.snapshot||!draft.snapshot.trainingPlan)throw new Error("El borrador ya no está disponible.");
+  const validFrom=draft.valid_from;
+  const currentActive=planVersionActiveForCycle(draft.cycle_number);
+  const now=new Date().toISOString();
+  try{
+    if(currentActive&&String(currentActive.id)!==String(draft.id)){
+      const closed=await supa.from("plan_versions").update({
+        status:"superseded",
+        valid_to:validYmd(currentActive.valid_from)&&validFrom>currentActive.valid_from?addDays(validFrom,-1):validFrom,
+        superseded_at:now,
+        updated_at:now,
+      }).eq("id",currentActive.id).eq("user_id",uid()).eq("status","active");
+      if(closed.error)throw closed.error;
+    }
+    const activated=await supa.from("plan_versions").update({
+      status:"active",
+      activated_at:now,
+      superseded_at:null,
+      updated_at:now,
+    }).eq("id",draft.id).eq("user_id",uid()).eq("status","draft").select("id").single();
+    if(activated.error)throw activated.error;
+  }catch(error){
+    if(currentActive){
+      await supa.from("plan_versions").update({
+        status:"active",
+        valid_to:currentActive.valid_to||END,
+        superseded_at:null,
+        updated_at:new Date().toISOString(),
+      }).eq("id",currentActive.id).eq("user_id",uid()).eq("status","superseded");
+    }
+    throw new Error("No se pudo activar el plan sin reemplazar la versión vigente.");
+  }
+  await pullPlanVersions();
+  const active=PLAN_VERSIONS.find(row=>String(row.id)===String(draft.id))||draft;
+  const updates=[];
+  Object.keys(S.days||{}).filter(ds=>ds>=validFrom&&ds<=END).forEach(ds=>{
+    const state=dayState(ds);
+    if(workoutHasRecordedActivity(state))return;
+    delete state.workoutOverride;
+    state.planVersionId=active.id;
+    updates.push(pushDay(ds));
+  });
+  save();
+  if(updates.length)await Promise.all(updates);
+  return active;
 }
 
 async function backfillDayVersions(){

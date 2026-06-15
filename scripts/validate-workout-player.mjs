@@ -63,4 +63,27 @@ const restored=player.normalizeExecution(JSON.parse(JSON.stringify(execution)),s
 assert.equal(restored.steps[1].sets[0].done,true);
 assert.equal(restored.workoutId,strengthWorkout.id);
 
-console.log("Reproductor validado: fuerza, cardio, temporizador y recuperación persistente.");
+const customWorkout={
+  id:"generated-2026-06-16-fullA",
+  kind:"Gimnasio",
+  name:"Fuerza personalizada",
+  generatedPrescription:{
+    objective:"Practicar técnica con carga controlada",
+    durationMinutes:50,
+    exercises:[
+      {exerciseId:"back-squat",sets:2,reps:"6-8",restSeconds:150,targetRpe:5,targetRir:4,tempo:"3-1-1"},
+      {exerciseId:"bench-press",sets:2,reps:"8",restSeconds:120,targetRpe:6,targetRir:3,tempo:"2-1-1"},
+    ],
+    blocks:[],
+  },
+};
+const custom=player.buildPrescription({
+  workout:customWorkout,
+  exercises:["back-squat","bench-press"].map(slug=>catalog.find(item=>item.slug===slug)),
+  context:{week:1,durationWeeks:10,sessionMinutes:60},
+});
+assert.deepEqual(custom.steps.filter(step=>step.type==="strength").map(step=>step.prescribedSets),[2,2]);
+assert.equal(custom.steps[1].restSeconds,150);
+assert.equal(custom.objective,"Practicar técnica con carga controlada");
+
+console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporizador y recuperación persistente.");

@@ -141,6 +141,56 @@
     steps.push(timedStep("cooldown","cooldown",labels.cooldown,cooldownTarget,"RPE 1-2",cooldownSeconds));
     return steps;
   }
+  function generatedStrengthSteps(workout,exercises,context){
+    const custom=workout.generatedPrescription||{};
+    const bySlug=new Map(exercises.map(exercise=>[exercise.slug,exercise]));
+    const warmupMinutes=clamp(Math.round(number(custom.durationMinutes||context.sessionMinutes,60)*.12),5,10);
+    const cooldownMinutes=clamp(Math.round(number(custom.durationMinutes||context.sessionMinutes,60)*.08),4,8);
+    const steps=[timedStep(
+      "warmup","warmup","Calentamiento",
+      "Movilidad dinámica y series de aproximación de los primeros movimientos","RPE 2-3",warmupMinutes*60
+    )];
+    (custom.exercises||[]).forEach((dose,index)=>{
+      const exercise=bySlug.get(dose.exerciseId)||{};
+      steps.push({
+        id:`exercise-${index+1}`,
+        type:"strength",
+        phase:"main",
+        label:exercise.name||dose.exerciseId,
+        exerciseSlug:dose.exerciseId,
+        originalExerciseSlug:dose.exerciseId,
+        phaseLabel:"Plan personalizado",
+        prescribedSets:clamp(dose.sets,1,5),
+        reps:String(dose.reps||"8-12"),
+        defaultReps:Math.max(1,Math.round(number(String(dose.reps||"").match(/\d+/)?.[0],10))),
+        restSeconds:clamp(dose.restSeconds,20,300),
+        tempo:String(dose.tempo||"Controlado"),
+        targetRpe:clamp(dose.targetRpe,3,9),
+        targetRir:clamp(dose.targetRir,0,5),
+        unit:/\bseg|segundo|s\b/i.test(String(dose.reps||""))?"seg":"reps",
+        suggestedLoad:exercise.discipline==="bodyweight"
+          ?`Peso corporal o asistencia que deje ${clamp(dose.targetRir,0,5)} repeticiones en reserva`
+          :`Carga controlable para RPE ${clamp(dose.targetRpe,3,9)}`,
+      });
+    });
+    steps.push(timedStep(
+      "cooldown","cooldown","Vuelta a la calma",
+      "Respiración tranquila y movilidad suave de las zonas trabajadas","RPE 1-2",cooldownMinutes*60
+    ));
+    return steps;
+  }
+  function generatedCardioSteps(workout){
+    const blocks=workout.generatedPrescription&&Array.isArray(workout.generatedPrescription.blocks)
+      ?workout.generatedPrescription.blocks:[];
+    return blocks.map((block,index)=>timedStep(
+      `generated-${index+1}`,
+      block.phase,
+      block.label,
+      block.target,
+      block.intensity,
+      block.durationSeconds
+    ));
+  }
   function buildPrescription(input){
     const workout=input&&input.workout||{};
     const exercises=Array.isArray(input&&input.exercises)?input.exercises:[];
@@ -159,6 +209,19 @@
       };
     }
     if(STRENGTH_KINDS.has(kind)){
+      if(workout.generatedPrescription&&Array.isArray(workout.generatedPrescription.exercises)){
+        return {
+          version:VERSION,
+          workoutId:workout.id,
+          name:workout.name,
+          kind,
+          sessionType:"strength",
+          objective:workout.generatedPrescription.objective||"Completar la sesión con técnica estable",
+          estimatedMinutes:clamp(workout.generatedPrescription.durationMinutes||context.sessionMinutes,20,180),
+          phaseLabel:"Plan personalizado",
+          steps:generatedStrengthSteps(workout,exercises,context),
+        };
+      }
       const phase=phaseSettings(context.week,context.durationWeeks);
       const warmupMinutes=clamp(Math.round(number(context.sessionMinutes,60)*.12),5,10);
       const cooldownMinutes=clamp(Math.round(number(context.sessionMinutes,60)*.08),4,8);
@@ -195,12 +258,14 @@
       };
     }
     if(CARDIO_KINDS.has(kind)){
-      const steps=cardioSpecs(
-        workout.sport||String(kind).toLowerCase(),
-        workout.id,
-        workout.phaseIndex,
-        context.sessionMinutes
-      );
+      const steps=workout.generatedPrescription&&Array.isArray(workout.generatedPrescription.blocks)
+        ?generatedCardioSteps(workout)
+        :cardioSpecs(
+          workout.sport||String(kind).toLowerCase(),
+          workout.id,
+          workout.phaseIndex,
+          context.sessionMinutes
+        );
       const seconds=steps.reduce((sum,step)=>sum+number(step.durationSeconds,0),0);
       return {
         version:VERSION,
@@ -208,7 +273,9 @@
         name:workout.name,
         kind,
         sessionType:"cardio",
-        objective:workout.id==="calidad"
+        objective:workout.generatedPrescription&&workout.generatedPrescription.objective
+          ?workout.generatedPrescription.objective
+          :workout.id==="calidad"
           ?"Sostener la intensidad indicada sin perder técnica"
           :workout.id==="tecnica"
             ?"Mejorar eficiencia y control antes que velocidad"
