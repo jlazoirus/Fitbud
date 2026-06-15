@@ -29,7 +29,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `config.js` | Fallback de config en runtime (`window.FITBUD_CONFIG`). **Vacío en el repo**; producción usa Vercel. |
 | `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. **Exige sesión:** valida el JWT de Supabase (Bearer → `/auth/v1/user`) antes de llamar a Anthropic; sin token válido responde 401 (falla cerrado). |
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
-| `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios paginados, bloquear/desbloquear en Auth + `profiles.active`, cambiar contraseña y enviar reset. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida admin activo, impide auto-desactivación y conserva al último admin. |
+| `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios paginados, bloquear/desbloquear en Auth + `profiles.active`, cambiar contraseña, enviar reset y preparar una cuenta QA reiniciable. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida admin activo, impide auto-desactivación y conserva al último admin. |
 | `api/privacy.js` | Exporta un JSON legible del usuario autenticado o elimina fotos + cuenta Auth tras confirmar `BORRAR <email>`. Usa service role solo en servidor y protege al último admin. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
 | `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v17`. |
@@ -139,7 +139,7 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 - **Login obligatorio.** Sin sesión se ve `renderAuth()` (login/registro). En dev local sin credenciales, esa pantalla pide conectar Supabase (URL + publishable key → `S.settings`). En producción las da `/api/config`.
 - **Estado:** `session` (Supabase Auth) y `profile` (fila de `profiles`: `is_admin` + `prefs`). `authReady` gatea el render (splash mientras resuelve). `onAuth()` carga perfil + datos al entrar; `setupAuthListener()` reacciona a login/logout/refresh.
 - **Datos por usuario:** `day_log`/`weight_log`/`plan_versions` llevan `user_id`; `pushDay/pullDay/pushWeight/pullWeights` lo incluyen y RLS lo fuerza. `pullAllDays()` baja todo el historial al entrar (racha/stats). Al login se limpia la caché local (`S.days`/`S.weights`) y manda la DB.
-- **Roles:** `isAdmin()` = `profile.is_admin`; `isActive()` controla acceso a la app. El primer admin se promueve por SQL (`update profiles set is_admin=true where email='...'`). Después, Perfil → Usuarios permite activar/desactivar y gestionar contraseñas.
+- **Roles:** `isAdmin()` = `profile.is_admin`; `isActive()` controla acceso a la app. El primer admin se promueve por SQL (`update profiles set is_admin=true where email='...'`). Después, Perfil → Usuarios permite activar/desactivar, gestionar contraseñas y crear/reiniciar una cuenta QA marcada con `user_metadata.fitbros_test_user`.
 - **Catálogo compartido:** ingredientes/platos/dietas se leen para cualquier autenticado; escritura solo admin (RLS con `is_admin()`).
 
 ### Navegación (nueva IA por rol)

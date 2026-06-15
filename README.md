@@ -73,9 +73,12 @@ Los administradores tienen una vista **Perfil → Usuarios** con búsqueda y fil
 - activar o desactivar cuentas;
 - asignar una nueva contraseña;
 - enviar un correo de recuperación;
+- crear o reiniciar una cuenta QA conservando sus credenciales pero eliminando perfil, progreso, planes, consentimientos y fotos para repetir el onboarding completo;
 - consultar fecha de alta y último acceso.
 
 Desactivar una cuenta actualiza `profiles.active` y bloquea al usuario en Supabase Auth. También queda protegido por RLS y no puede escribir ni usar Claude. El servidor impide que un administrador se desactive a sí mismo o desactive al último administrador activo.
+
+La herramienta **Preparar usuario QA** solo reinicia cuentas creadas por ella y marcadas internamente como prueba. Si el correo pertenece a una cuenta normal o administradora, la operación se rechaza. El administrador puede elegir **Reiniciar e ingresar** para salir de su sesión y abrir inmediatamente el onboarding con la cuenta limpia.
 
 Para habilitar esta función en una instalación existente, ejecuta [`supabase/admin.sql`](supabase/admin.sql) en el SQL Editor. La migración también evita que un usuario pueda elevarse a administrador o cambiar su propio estado mediante una llamada directa a REST.
 

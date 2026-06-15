@@ -3898,6 +3898,15 @@ async function renderAdminUsers(){
       <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
       <button class="btn btn-sm" onclick="renderAdminUsers()">Actualizar</button>
     </div>
+    <div class="dash" style="margin-bottom:14px">
+      <div class="row between wrap" style="gap:10px">
+        <div style="flex:1;min-width:210px">
+          <b>Usuario de prueba reiniciable</b>
+          <div class="muted small" style="margin-top:5px">Conserva el mismo acceso, pero vuelve a onboarding sin perfil, progreso, planes, consentimientos ni fotos.</div>
+        </div>
+        <button class="btn btn-accent" onclick="openAdminTestUser()">Preparar usuario QA</button>
+      </div>
+    </div>
     <div id="adminList" class="muted small">Cargando usuarios…</div>`;
   try{
     const out=await adminApi("list");
@@ -3932,7 +3941,7 @@ function adminUsersHtml(users){
     const me=u.id===uid();
     return `<div class="meal">
       <div class="meal-head"><div>
-        <div class="name">${esc(u.email||u.id)} ${u.is_admin?'<span class="pill" style="background:var(--accent-dim);color:var(--purple-200)">admin</span>':''}${u.active?'':' <span class="pill" style="background:var(--bad);color:#fff">inactivo</span>'}${me?' <span class="pill">tú</span>':''}</div>
+        <div class="name">${esc(u.email||u.id)} ${u.is_test_user?'<span class="pill" style="background:var(--terra-dim);color:var(--terra-200)">prueba</span>':''}${u.is_admin?'<span class="pill" style="background:var(--accent-dim);color:var(--purple-200)">admin</span>':''}${u.active?'':' <span class="pill" style="background:var(--bad);color:#fff">inactivo</span>'}${me?' <span class="pill">tú</span>':''}</div>
         <div class="nums muted">creado ${prettyDateTime(u.created_at)} · último acceso ${u.last_sign_in_at?prettyDateTime(u.last_sign_in_at):"nunca"}</div>
       </div></div>
       <div class="meal-actions">
@@ -3942,6 +3951,52 @@ function adminUsersHtml(users){
       </div>
     </div>`;
   }).join("");
+}
+function openAdminTestUser(){
+  modal(`<h3>Preparar usuario de prueba</h3>
+    <p class="muted small">Si la cuenta ya existe, se borrará toda su actividad y volverá a entrar como usuario nuevo. Por seguridad, una cuenta normal nunca puede convertirse en cuenta de prueba.</p>
+    <div class="field"><label>Correo de prueba</label><input id="adminTestEmail" type="email" autocomplete="off" value="qa-flow@fitbros.app"></div>
+    <div class="field"><label>Contraseña</label><input id="adminTestPwd" type="password" autocomplete="new-password" minlength="8" placeholder="Mínimo 8 caracteres"></div>
+    <div class="field"><label>Confirmar contraseña</label><input id="adminTestPwdConfirm" type="password" autocomplete="new-password" minlength="8"></div>
+    <div class="row wrap" style="margin-top:12px">
+      <button id="adminTestPrepareBtn" class="btn" style="flex:1" onclick="prepareAdminTestUser(false)">Solo reiniciar</button>
+      <button id="adminTestEnterBtn" class="btn btn-accent" style="flex:1" onclick="prepareAdminTestUser(true)">Reiniciar e ingresar</button>
+    </div>
+    <div id="adminTestOut" class="muted small" style="margin-top:10px"></div>`);
+}
+async function prepareAdminTestUser(enterAfter){
+  const email=$("#adminTestEmail").value.trim().toLowerCase();
+  const password=$("#adminTestPwd").value;
+  const confirmPassword=$("#adminTestPwdConfirm").value;
+  const out=$("#adminTestOut");
+  if(!email||!email.includes("@")){out.textContent="Escribe un correo válido.";return;}
+  if(password.length<8){out.textContent="Usa una contraseña de al menos 8 caracteres.";return;}
+  if(password!==confirmPassword){out.textContent="Las contraseñas no coinciden.";return;}
+  if(!confirm(`¿Reiniciar ${email} como usuario nuevo? Se borrarán todos sus datos de prueba.`))return;
+  const buttons=[$("#adminTestPrepareBtn"),$("#adminTestEnterBtn")].filter(Boolean);
+  buttons.forEach(button=>button.disabled=true);
+  out.textContent="Preparando cuenta…";
+  try{
+    const result=await adminApi("prepareTestUser",{email,password});
+    if(!enterAfter){
+      out.innerHTML=`<b>Cuenta ${result.created?"creada":"reiniciada"}.</b><br>Ya puede entrar con el correo y contraseña indicados y comenzará desde onboarding.`;
+      buttons.forEach(button=>button.disabled=false);
+      return;
+    }
+    closeModal();
+    await signOutUser();
+    const signed=await signIn(email,password);
+    if(signed.error)throw signed.error;
+    const sessionResult=await supa.auth.getSession();
+    session=(sessionResult.data&&sessionResult.data.session)||null;
+    if(!session)throw new Error("La cuenta se preparó, pero no se pudo iniciar sesión automáticamente.");
+    await onAuth();
+    toast("Usuario de prueba listo");
+  }catch(e){
+    if(enterAfter)toast(e.message);
+    else if(out)out.textContent="⚠️ "+e.message;
+    buttons.forEach(button=>button.disabled=false);
+  }
 }
 async function adminToggleActive(id,active){
   const user=adminUsersCache.find(u=>u.id===id);

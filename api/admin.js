@@ -2,6 +2,7 @@
 // SUPABASE_SERVICE_ROLE_KEY vive exclusivamente en el servidor.
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BAN_DURATION = "876000h"; // 100 años; "none" levanta el bloqueo.
 
 function env() {
@@ -73,6 +74,22 @@ async function updateAuthUser(id, attributes, e) {
   return data;
 }
 
+async function createAuthUser(email, password, e) {
+  const response = await fetch(e.url + "/auth/v1/admin/users", {
+    method: "POST",
+    headers: serviceHeaders(e, { "content-type": "application/json" }),
+    body: JSON.stringify({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { fitbros_test_user: true },
+    }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo crear el usuario de prueba."));
+  return data && data.user ? data.user : data;
+}
+
 async function upsertProfileStatus(user, active, e) {
   const response = await fetch(e.url + "/rest/v1/profiles?on_conflict=id", {
     method: "POST",
@@ -85,6 +102,88 @@ async function upsertProfileStatus(user, active, e) {
   const data = await responseJson(response);
   if (!response.ok) throw new Error(apiError(data, "No se pudo actualizar profiles.active."));
   return data;
+}
+
+async function resetTestProfile(user, e) {
+  const response = await fetch(e.url + "/rest/v1/profiles?on_conflict=id", {
+    method: "POST",
+    headers: serviceHeaders(e, {
+      "content-type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation",
+    }),
+    body: JSON.stringify({
+      id: user.id,
+      email: user.email || "",
+      is_admin: false,
+      active: true,
+      prefs: {},
+      updated_at: new Date().toISOString(),
+    }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo reiniciar el perfil de prueba."));
+}
+
+async function deleteUserRows(table, userId, e) {
+  const response = await fetch(
+    e.url + "/rest/v1/" + table + "?user_id=eq." + encodeURIComponent(userId),
+    {
+      method: "DELETE",
+      headers: serviceHeaders(e, { Prefer: "return=minimal" }),
+    }
+  );
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo limpiar " + table + "."));
+}
+
+async function listStorageLevel(e, prefix) {
+  const response = await fetch(e.url + "/storage/v1/object/list/progress-photos", {
+    method: "POST",
+    headers: serviceHeaders(e, { "content-type": "application/json" }),
+    body: JSON.stringify({ prefix, limit: 1000, offset: 0, sortBy: { column: "name", order: "asc" } }),
+  });
+  const data = await responseJson(response);
+  if (response.status === 404) return [];
+  if (!response.ok) throw new Error(apiError(data, "No se pudieron listar las fotos de progreso personal."));
+  return Array.isArray(data) ? data : [];
+}
+
+async function deleteTestPhotos(userId, e) {
+  const files = [];
+  const queue = [userId];
+  while (queue.length) {
+    const prefix = queue.shift();
+    const items = await listStorageLevel(e, prefix);
+    for (const item of items) {
+      if (!item || !item.name) continue;
+      const path = prefix + "/" + item.name;
+      if (item.metadata) files.push(path);
+      else if (queue.length < 1000) queue.push(path);
+    }
+  }
+  if (!files.length) return;
+  const response = await fetch(e.url + "/storage/v1/object/progress-photos", {
+    method: "DELETE",
+    headers: serviceHeaders(e, { "content-type": "application/json" }),
+    body: JSON.stringify({ prefixes: files }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudieron borrar las fotos de progreso personal."));
+}
+
+async function resetTestUserData(user, e) {
+  await deleteTestPhotos(user.id, e);
+  for (const table of [
+    "day_log",
+    "weight_log",
+    "plan_cycles",
+    "plan_versions",
+    "user_consents",
+    "safety_screenings",
+  ]) {
+    await deleteUserRows(table, user.id, e);
+  }
+  await resetTestProfile(user, e);
 }
 
 async function activeAdminCount(e) {
@@ -137,8 +236,15 @@ async function listUsers(e) {
       last_sign_in_at: user.last_sign_in_at || null,
       is_admin: !!profile.is_admin,
       active: profile.active !== false && !isCurrentlyBanned(user),
+      is_test_user: !!(user.user_metadata && user.user_metadata.fitbros_test_user === true),
     };
   }).sort((a, b) => (a.email || "").localeCompare(b.email || ""));
+}
+
+async function authUserByEmail(email, e) {
+  const target = email.toLowerCase();
+  const users = await listAuthUsers(e);
+  return users.find((user) => String(user.email || "").toLowerCase() === target) || null;
 }
 
 function safeRedirect(req, candidate) {
@@ -242,6 +348,48 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (body.action === "prepareTestUser") {
+      const email = String(body.email || "").trim().toLowerCase();
+      const password = String(body.password || "");
+      if (!EMAIL_RE.test(email) || email.length > 254 || password.length < 8 || password.length > 128) {
+        res.status(400).json({ error: "Correo válido y contraseña de 8 a 128 caracteres requeridos." });
+        return;
+      }
+      let targetUser = await authUserByEmail(email, e);
+      let created = false;
+      if (targetUser) {
+        if (targetUser.id === caller) {
+          res.status(400).json({ error: "No puedes convertir tu cuenta administradora en usuario de prueba." });
+          return;
+        }
+        if (!(targetUser.user_metadata && targetUser.user_metadata.fitbros_test_user === true)) {
+          res.status(409).json({ error: "Ese correo ya pertenece a una cuenta normal y no puede reiniciarse como prueba." });
+          return;
+        }
+        const targetProfile = await profileById(targetUser.id, e);
+        if (targetProfile && targetProfile.is_admin) {
+          res.status(409).json({ error: "Una cuenta administradora no puede reiniciarse como prueba." });
+          return;
+        }
+      } else {
+        targetUser = await createAuthUser(email, password, e);
+        created = true;
+      }
+      await updateAuthUser(targetUser.id, {
+        password,
+        email_confirm: true,
+        ban_duration: "none",
+        user_metadata: Object.assign({}, targetUser.user_metadata || {}, { fitbros_test_user: true }),
+      }, e);
+      await resetTestUserData({ id: targetUser.id, email }, e);
+      res.status(200).json({
+        ok: true,
+        created,
+        user: { id: targetUser.id, email, is_test_user: true },
+      });
+      return;
+    }
+
     if (body.action === "resetPassword") {
       const userId = String(body.userId || "");
       if (!UUID_RE.test(userId)) {
@@ -273,6 +421,6 @@ export default async function handler(req, res) {
 
     res.status(400).json({ error: "Acción desconocida." });
   } catch (error) {
-    res.status(500).json({ error: String((error && error.message) || error) });
+    res.status(Number(error && error.status) || 500).json({ error: String((error && error.message) || error) });
   }
 }

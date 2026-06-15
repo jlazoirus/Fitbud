@@ -463,6 +463,7 @@ Agregar una vista de administrador para activar/desactivar usuarios y cambiar co
   - estado activo/inactivo;
   - activar/desactivar;
   - cambiar contrasena o generar reset;
+  - crear o reiniciar una cuenta QA que conserve el acceso y vuelva al onboarding sin datos;
   - ver fecha de creacion/ultimo acceso si esta disponible.
 - Usuarios desactivados no pueden escribir ni usar IA.
 - Desactivar también bloquea el inicio de sesión en Supabase Auth.
@@ -476,6 +477,8 @@ Agregar una vista de administrador para activar/desactivar usuarios y cambiar co
 - Usuario no admin no puede llamar endpoints admin.
 - Admin puede activar/desactivar usuarios.
 - Admin puede cambiar contrasena o iniciar flujo de reset de forma controlada.
+- Admin puede reiniciar una cuenta marcada como QA y entrar con ella como usuario nuevo.
+- Una cuenta normal o administradora no puede borrarse accidentalmente mediante la herramienta QA.
 - Commit y push propios.
 
 ### Verificacion sugerida
