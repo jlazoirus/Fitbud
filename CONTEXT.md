@@ -11,8 +11,8 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 
 ## 2. Stack y arquitectura
 - **Frontend:** un único `index.html` (HTML+CSS+JS inline). Mobile-first. Sin dependencias salvo `supabase-js` por CDN (jsDelivr).
-- **Persistencia:** la **fuente de verdad es Supabase**; `localStorage` (clave `fitbud_v1`) es solo **caché offline** que la espeja. Ningún dato del usuario vive solo en el navegador (el progreso diario va a `day_log` y el peso a `weight_log`). Lo único local-de-dispositivo son los overrides de credenciales en Ajustes (en producción vienen de Vercel).
-- **Base de datos:** Supabase (PostgreSQL) — catálogo de alimentos (ingredientes/platos/dietas), consumo diario (`day_log`) y peso (`weight_log`).
+- **Persistencia:** la **fuente de verdad es Supabase**; `localStorage` (clave `fitbud_v1`) es solo **caché offline** que la espeja. Ningún dato del usuario vive solo en el navegador (el progreso diario va a `day_log`, el peso a `weight_log` y el plan prescrito a `plan_versions`). Lo único local-de-dispositivo son los overrides de credenciales en Ajustes (en producción vienen de Vercel).
+- **Base de datos:** Supabase (PostgreSQL) — catálogo de alimentos (ingredientes/platos/dietas), consumo diario (`day_log`), plan versionado (`plan_versions`) y peso (`weight_log`).
 - **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador. El proxy exige sesión: el cliente manda el token de Supabase en `Authorization: Bearer` y el server lo valida (401 si falta/!válido). Funciones: estimar comida, sugerir, revisar macros y **generar un día completo** (`aiGenerateDay` → `validateGeneratedDay` valida huevo/restricciones/macros/repetición antes de dejar aplicar; se guarda como override por día en `day_log`).
 - **Lenguaje de producto:** usuarios normales ven "tu coach", "preparar" y "otra opción"; no ven proveedor, modelo, prompts, tokens ni detalles de configuración. Los errores se neutralizan y el texto dinámico se filtra antes de mostrarlo. Los administradores conservan el diagnóstico técnico en Ajustes.
 - **Perfil flexible:** `profiles.prefs` usa `profileSchemaVersion: 2`. Incluye 2-6 comidas, horarios, ventana alimentaria, logística, alergias/gustos separados, días y lugar por sesión, equipo, experiencia, prioridad y limitaciones. Los perfiles antiguos reciben defaults y se persisten al iniciar sesión sin repetir onboarding.
@@ -37,7 +37,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `supabase/day_log.sql` | Migración incremental: tabla `day_log` (consumo diario). *(Superado por auth.sql, que la recrea por usuario.)* |
 | `supabase/weight_log.sql` | Migración incremental: tabla `weight_log` (peso). *(Superado por auth.sql.)* |
 | `supabase/auth.sql` | **Multiusuario:** `profiles` (rol admin + prefs), `day_log`/`weight_log` por `user_id`, RLS por usuario y escritura de catálogo solo admin. Correr después de schema/seed. |
-| `supabase/plan_cycles.sql` | Migración idempotente para ciclos sucesivos: `plan_cycles`, pesos separados por `cycle_start` y bucket privado `progress-photos` con RLS. La duración se infiere de las fechas y se configura en `profiles.prefs.planDurationWeeks`. |
+| `supabase/plan_cycles.sql` | Migración idempotente para ciclos sucesivos: `plan_versions`, `plan_cycles`, `day_log.plan_version_id`, pesos separados por `cycle_start` y bucket privado `progress-photos` con RLS. La duración se infiere de las fechas y se configura en `profiles.prefs.planDurationWeeks`. |
 | `plan-10-semanas-recomposicion.md` | Plan original (fuente de verdad de menús, días, entrenos, metas). |
 | `BUILD_PLAN.md`, `PROGRESS.md`, `REQUIREMENTS.md`, `README.md` | Docs del proyecto. |
 
@@ -49,7 +49,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Entrenamiento:** cada perfil elige disciplina, fuerza, 3-6 días exactos, lugar por día, minutos, equipo, experiencia, prioridad y limitaciones. `workoutSchedule()` asigna fuerza/deporte a esos días y prioriza piscina/exterior cuando corresponde; `effectiveWorkout(ds)` conserva overrides diarios.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
 - **Estado/persistencia** (~335): `S` (objeto raíz, cacheado en localStorage), `dayState(ds)` (campos: `meals{id:{done,ovr}}`, `extras[]`, `workoutDone`, `workoutOverride`), `mealState`, `mealValue` (resuelve macros: override manual → DB por `dishName` → fallback plan), `dayTotals(ds)` (suma solo comidas marcadas `done`).
-- **Sincronización con la DB:** `commitDay(ds)`=`save()`+`pushDay(ds)` (upsert a `day_log`); `pullDay(ds)`/`syncDay(ds)` bajan el día; `pushWeight`/`pullWeights`/`syncWeights` para `weight_log`. Se llama `commitDay` en cada mutación del día (toggles, reemplazo, editor, sugerencia IA, cambio de entreno) y `syncDay`/`syncWeights` al arrancar, navegar y conectar.
+- **Sincronización con la DB:** `commitDay(ds)`=`save()`+`pushDay(ds)` (upsert a `day_log` con `plan_version_id`); `pullDay(ds)`/`syncDay(ds)` bajan el día; `pushWeight`/`pullWeights`/`syncWeights` para `weight_log`; `pullPlanVersions()`/`ensurePlanVersion()` mantienen el snapshot prescrito. Se llama `commitDay` en cada mutación del día (toggles, reemplazo, editor, sugerencia IA, cambio de entreno) y `syncDay`/`syncWeights` al arrancar, navegar y conectar.
 - **Navegación:** `current` (fecha YYYY-MM-DD), `view` (`day|week|foods|weight|settings`), `render()` (dispatcher), `renderTabs()`, `setView()`.
 - **Vistas:** `renderDay()` (HOY: dashboard kcal/macros + comidas + extras + entreno + resumen), `renderWeek()`, `renderFoods()` (sub-tabs `platos|ingredientes|dietas`), `renderWeight()` (tabla + gráfico SVG), `renderSettings()`.
 - **Comidas:** `mealCard`, `extraCard`, `toggleMeal/Extra/Workout`, `openReplace`/`applyReplace`, `openEditor`/`editorSheet`/`saveEditor` (comidas personalizadas / editar valores).
@@ -71,12 +71,13 @@ Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
 - `dish_ingredients(id, dish_id, ingredient_id, grams)` — receta (líneas).
 - `diets(id, code, name, description)` — A/B/C/D.
 - `diet_dishes(id, diet_id, dish_id, weekday, slot)` — qué plato cada día.
-- `day_log(log_date pk, state jsonb, updated_at)` — consumo del día (comidas/extras/entreno/override) como documento JSON.
+- `day_log(log_date pk, state jsonb, plan_version_id, updated_at)` — consumo del día (comidas/extras/entreno/override) como documento JSON.
 - `weight_log(user_id, cycle_start, week, kg, bf_pct)` — peso y grasa semanal separados por ciclo.
+- `plan_versions(user_id, cycle_number, version_number, version_key, source, status, valid_from, valid_to, snapshot_hash, snapshot, reason, prompt, model)` — snapshots del plan prescrito por usuario y ciclo.
 - `plan_cycles(user_id, cycle_number, start_date, end_date, challenge, summary, photo_path)` — recap e historial.
 - Storage privado `progress-photos/<user_id>/cycle-N/...` — fotos de progreso con URLs firmadas.
 - Vista `dish_macros` — macros calculados por plato (suma de ingredientes), `security_invoker`.
-- **RLS (con `auth.sql` + `admin.sql`):** escritura anónima eliminada. `day_log`/`weight_log` solo permiten escritura propia a usuarios activos; catálogo solo a admins activos. El trigger `protect_profile_system_fields` impide que un usuario cambie sus propios campos `is_admin` o `active`; la API admin usa service role.
+- **RLS (con `auth.sql` + `admin.sql`):** escritura anónima eliminada. `day_log`/`weight_log`/`plan_versions` solo permiten escritura propia a usuarios activos; catálogo solo a admins activos. El trigger `protect_profile_system_fields` impide que un usuario cambie sus propios campos `is_admin` o `active`; la API admin usa service role.
 - **Cálculo de macros:** `macros = Σ ingrediente(por_100g) × gramos/100`. En la app se hace en cliente (`macrosFromLines`).
 - **Re-seed:** `seed.sql` hace `truncate ... restart identity cascade` (es re-ejecutable).
 
@@ -108,6 +109,7 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 
 ### Ya hecho ✅
 - **Macros del día desde la DB** — vía `dishName` + `mealValue()`; el almuerzo se lee de `diet_dishes` (`dietLunchDish()`), así reasignar/renombrar el plato en Supabase se refleja. Fallback al plan.
+- **Versionado del plan** — `plan_versions` guarda snapshots activos y previos; `day_log.plan_version_id` preserva qué plan vio cada día y `pullPlanVersions()`/`ensurePlanVersion()` migran el historial.
 - **Consumo diario en la DB** — `day_log` + `commitDay`/`pullDay`/`syncDay`. Sincroniza entre dispositivos; localStorage es caché.
 - **Peso en la DB** — `weight_log` + `pushWeight`/`pullWeights`/`syncWeights`. Nada del usuario vive solo en el navegador.
 - **Plan deportivo configurable** — `primarySport` + `strengthMode` + `trainDays` en `profiles.prefs`; reparto con `workoutSchedule(days)` y sesiones progresivas con `workoutOptions(ds)`.
@@ -129,7 +131,7 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 
 - **Login obligatorio.** Sin sesión se ve `renderAuth()` (login/registro). En dev local sin credenciales, esa pantalla pide conectar Supabase (URL + publishable key → `S.settings`). En producción las da `/api/config`.
 - **Estado:** `session` (Supabase Auth) y `profile` (fila de `profiles`: `is_admin` + `prefs`). `authReady` gatea el render (splash mientras resuelve). `onAuth()` carga perfil + datos al entrar; `setupAuthListener()` reacciona a login/logout/refresh.
-- **Datos por usuario:** `day_log`/`weight_log` llevan `user_id`; `pushDay/pullDay/pushWeight/pullWeights` lo incluyen y RLS lo fuerza. `pullAllDays()` baja todo el historial al entrar (racha/stats). Al login se limpia la caché local (`S.days`/`S.weights`) y manda la DB.
+- **Datos por usuario:** `day_log`/`weight_log`/`plan_versions` llevan `user_id`; `pushDay/pullDay/pushWeight/pullWeights` lo incluyen y RLS lo fuerza. `pullAllDays()` baja todo el historial al entrar (racha/stats). Al login se limpia la caché local (`S.days`/`S.weights`) y manda la DB.
 - **Roles:** `isAdmin()` = `profile.is_admin`; `isActive()` controla acceso a la app. El primer admin se promueve por SQL (`update profiles set is_admin=true where email='...'`). Después, Perfil → Usuarios permite activar/desactivar y gestionar contraseñas.
 - **Catálogo compartido:** ingredientes/platos/dietas se leen para cualquier autenticado; escritura solo admin (RLS con `is_admin()`).
 

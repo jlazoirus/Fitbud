@@ -3,6 +3,8 @@
 -- Idempotente. Ejecuta después de supabase/auth.sql.
 -- ============================================================
 
+alter table day_log add column if not exists plan_version_id bigint;
+
 -- Separa la semana 1..10 de cada ciclo sin perder los registros existentes.
 alter table weight_log add column if not exists cycle_start date;
 update weight_log set cycle_start = '2026-06-13' where cycle_start is null;
@@ -10,6 +12,50 @@ alter table weight_log alter column cycle_start set not null;
 alter table weight_log alter column cycle_start set default '2026-06-13';
 alter table weight_log drop constraint if exists weight_log_pkey;
 alter table weight_log add primary key (user_id, cycle_start, week);
+
+create table if not exists plan_versions (
+  id             bigint generated always as identity primary key,
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  cycle_number   int not null check (cycle_number > 0),
+  version_number  int not null check (version_number > 0),
+  version_key    text not null,
+  source         text not null default 'manual' check (source in ('onboarding','ia','checkin','manual','new_cycle','migration')),
+  status         text not null default 'draft' check (status in ('draft','active','superseded','completed')),
+  valid_from     date not null,
+  valid_to       date,
+  reason         text,
+  prompt         text,
+  model          text,
+  snapshot_hash  text not null default '',
+  snapshot       jsonb not null default '{}'::jsonb,
+  activated_at   timestamptz,
+  superseded_at  timestamptz,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  unique (user_id, version_key),
+  unique (user_id, cycle_number, version_number)
+);
+
+create unique index if not exists plan_versions_one_active_idx
+  on plan_versions (user_id, cycle_number)
+  where status = 'active';
+create index if not exists plan_versions_user_valid_idx
+  on plan_versions (user_id, valid_from desc, valid_to desc, created_at desc);
+
+alter table plan_versions enable row level security;
+
+drop policy if exists "read own plan_versions" on plan_versions;
+drop policy if exists "write own plan_versions" on plan_versions;
+create policy "read own plan_versions" on plan_versions
+  for select using (user_id = auth.uid());
+create policy "write own plan_versions" on plan_versions
+  for all using (user_id = auth.uid() and is_active())
+  with check (user_id = auth.uid() and is_active());
+
+alter table day_log drop constraint if exists day_log_plan_version_id_fkey;
+alter table day_log add constraint day_log_plan_version_id_fkey
+  foreign key (plan_version_id) references plan_versions(id) on delete set null;
+create index if not exists day_log_plan_version_idx on day_log (user_id, plan_version_id);
 
 create table if not exists plan_cycles (
   id             bigint generated always as identity primary key,

@@ -431,6 +431,9 @@ let REFEED_DATES=new Set(DEFAULT_REFEED_DATES);
 let WEEKS=DEFAULT_WEEKS.map(w=>({...w}));
 let WEIGHT_RANGES={...DEFAULT_WEIGHT_RANGES};
 let PLAN_DURATION_WEEKS=10;
+let PLAN_VERSIONS=[];
+let PLAN_VERSIONS_LOADED=false;
+let PLAN_VERSIONS_ERROR=null;
 
 
 const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
@@ -591,15 +594,27 @@ function migrateProfilePrefs(source){
   prefs.trainNote=[prefs.injuries,prefs.limitations,prefs.avoidMovements].filter(Boolean).join(". ");
   return prefs;
 }
-function trainingPrefs(){
-  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
+function trainingPrefsFromPrefs(source){
+  const p=migrateProfilePrefs(source||{});
   return {
-    primary:p.primarySport,strength:p.strengthMode,days:p.trainingDays.length,
-    dayIds:p.trainingDays,locations:p.trainingLocations,sessionMinutes:p.sessionMinutes,
-    equipment:p.equipment,experience:p.trainingExperience,priority:p.trainingPriority,
-    preferredTime:p.preferredTrainingTime,injuries:p.injuries,
-    limitations:p.limitations,avoidMovements:p.avoidMovements,
+    primary:p.primarySport,
+    strength:p.strengthMode,
+    days:p.trainingDays.length,
+    dayIds:[...(p.trainingDays||[])],
+    locations:{...(p.trainingLocations||{})},
+    sessionMinutes:p.sessionMinutes,
+    equipment:[...(p.equipment||[])],
+    experience:p.trainingExperience,
+    priority:p.trainingPriority,
+    preferredTime:p.preferredTrainingTime,
+    injuries:p.injuries,
+    limitations:p.limitations,
+    avoidMovements:p.avoidMovements,
+    duration:resolvedPlanDuration(p),
   };
+}
+function trainingPrefs(){
+  return trainingPrefsFromPrefs((profile&&profile.prefs)||{});
 }
 function workoutSchedule(days,dayIds,priority,locations,primary){
   const selected=normalizedTrainingDays(dayIds,days);
@@ -615,10 +630,10 @@ function workoutSchedule(days,dayIds,priority,locations,primary){
   });
   return assigned;
 }
-function plannedWorkoutId(ds){
-  const prefs=trainingPrefs();
+function plannedWorkoutId(ds,prefs){
+  const training=trainingPrefsFromPrefs(prefs||planPrefsForDate(ds));
   const wd=parseYmd(ds).getDay();
-  return workoutSchedule(prefs.days,prefs.dayIds,prefs.priority,prefs.locations,prefs.primary)[wd]||"descanso";
+  return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary)[wd]||"descanso";
 }
 function trainingPlanSummary(days,primary,priority){
   priority=priority||inferredTrainingPriority((profile&&profile.prefs)||{});
@@ -638,13 +653,15 @@ function trainingPlanSummary(days,primary,priority){
   };
   return `${split[days]||split[6]} de ${SPORT_LABELS[primary]||SPORT_LABELS.running}.`;
 }
-function trainingWeek(ds){
-  const w=weekOf(ds);
+function trainingWeek(ds,prefs){
+  const w=weekOf(ds,prefs);
   return w&&w.num?w.num:1;
 }
-function strengthProgression(ds){
-  const n=trainingWeek(ds);
-  if(PLAN_DURATION_WEEKS===4){
+function strengthProgression(ds,prefs){
+  const ctx=prefs?migrateProfilePrefs(prefs):planPrefsForDate(ds);
+  const n=trainingWeek(ds,ctx);
+  const duration=resolvedPlanDuration(ctx);
+  if(duration===4){
     if(n===1)return "Base: 3 series por ejercicio, deja 3 repeticiones en reserva.";
     if(n<=3)return "Progresión: sube carga o repeticiones con buena técnica y deja 1-2 repeticiones en reserva.";
     return "Consolidación: reduce el volumen, conserva intensidad y registra tus mejores series técnicas.";
@@ -655,9 +672,11 @@ function strengthProgression(ds){
   if(n<=9)return "Bloque fuerte: 4 series principales, deja 1-2 repeticiones en reserva.";
   return "Consolidación: 2-3 series, sin llegar al fallo y priorizando técnica.";
 }
-function sportSessions(primary,ds){
-  const n=trainingWeek(ds);
-  const phase=PLAN_DURATION_WEEKS===4
+function sportSessions(primary,ds,prefs){
+  const ctx=prefs?migrateProfilePrefs(prefs):planPrefsForDate(ds);
+  const n=trainingWeek(ds,ctx);
+  const duration=resolvedPlanDuration(ctx);
+  const phase=duration===4
     ? (n===1?0:n<=3?1:4)
     : (n<=2?0:n<=5?1:n===6?2:n<=9?3:4);
   const plans={
@@ -732,8 +751,8 @@ function sportSessions(primary,ds){
     technique:{id:"tecnica",kind:p.kind,name:p.techniqueName,detail:p.technique},
   };
 }
-function strengthSessions(mode,ds){
-  const progress=strengthProgression(ds);
+function strengthSessions(mode,ds,prefs){
+  const progress=strengthProgression(ds,prefs);
   const gym={
     fullA:{id:"fullA",kind:"Gimnasio",name:"Gimnasio · Full body A",detail:"Sentadilla 6-10 · Press banca 6-10 · Remo 8-12 · Peso muerto rumano 8-12 · Core. "+progress},
     fullB:{id:"fullB",kind:"Gimnasio",name:"Gimnasio · Full body B",detail:"Hip thrust 8-12 · Press inclinado 8-12 · Jalón o dominadas 8-12 · Búlgaras 10/lado · Core. "+progress},
@@ -752,10 +771,10 @@ function strengthSessions(mode,ds){
   };
   return mode==="bodyweight"?bodyweight:gym;
 }
-function workoutOptions(ds){
-  const prefs=trainingPrefs();
-  const strength=strengthSessions(prefs.strength,ds);
-  const sport=sportSessions(prefs.primary,ds);
+function workoutOptions(ds,prefs){
+  const training=trainingPrefsFromPrefs(prefs||planPrefsForDate(ds));
+  const strength=strengthSessions(training.strength,ds,prefs||planPrefsForDate(ds));
+  const sport=sportSessions(training.primary,ds,prefs||planPrefsForDate(ds));
   return [
     strength.fullA,strength.fullB,
     strength.torsoA,strength.piernaA,strength.torsoB,strength.piernaB,
@@ -763,14 +782,15 @@ function workoutOptions(ds){
     {id:"descanso",kind:"Descanso",name:"Descanso total",detail:"Movilidad suave y caminata opcional. Prioriza sueño y recuperación."},
   ];
 }
-function workoutById(ds,id){return workoutOptions(ds).find(o=>o.id===id)||null;}
-function effectiveWorkout(ds){
-  const plannedId=plannedWorkoutId(ds);
+function workoutById(ds,id,prefs){return workoutOptions(ds,prefs).find(o=>o.id===id)||null;}
+function effectiveWorkout(ds,prefs){
+  const resolvedPrefs=prefs||planPrefsForDate(ds);
+  const plannedId=plannedWorkoutId(ds,resolvedPrefs);
   const st=S.days[ds];
   const ovrId=st&&st.workoutOverride;
-  const valid=ovrId&&workoutById(ds,ovrId);
+  const valid=ovrId&&workoutById(ds,ovrId,resolvedPrefs);
   const id=valid?ovrId:plannedId;
-  return {id,workout:workoutById(ds,id),plannedId,planned:workoutById(ds,plannedId),overridden:!!(valid&&ovrId!==plannedId)};
+  return {id,workout:workoutById(ds,id,resolvedPrefs),plannedId,planned:workoutById(ds,plannedId,resolvedPrefs),overridden:!!(valid&&ovrId!==plannedId)};
 }
 
 // metas y macros por slot según tipo de día
@@ -801,13 +821,17 @@ function calculateMacroTargets(input){
 }
 function profileMacroTargets(){
   const p=(profile&&profile.prefs)||{};
+  return profileMacroTargetsFromPrefs(p);
+}
+function profileMacroTargetsFromPrefs(source){
+  const p=migrateProfilePrefs(source||{});
   const target={kcal:+p.calorieTarget,p:+p.proteinTarget,c:+p.carbTarget,f:+p.fatTarget};
   return Object.values(target).every(v=>Number.isFinite(v)&&v>0)?target:null;
 }
 // Meta del día = las metas personales del usuario (onboarding), iguales todos
 // los días. Sin plan estático: si aún no hay onboarding, un objetivo neutro.
-function effectiveDayTarget(){
-  return profileMacroTargets()||{kcal:2000,p:150,c:200,f:65};
+function effectiveDayTarget(source){
+  return profileMacroTargetsFromPrefs(source||((profile&&profile.prefs)||{}))||{kcal:2000,p:150,c:200,f:65};
 }
 // Estructura única de comidas para cualquier día (sin tipos de día / menús fijos).
 const BASE_SLOTS=[
@@ -853,6 +877,128 @@ function buildWeightRanges(prefs){
   }
   return ranges;
 }
+function hashText(text){
+  let h=2166136261;
+  for(let i=0;i<text.length;i++){
+    h^=text.charCodeAt(i);
+    h=Math.imul(h,16777619);
+  }
+  return ("00000000"+(h>>>0).toString(16)).slice(-8);
+}
+function planCalendarForPrefs(prefs){
+  const p=migrateProfilePrefs(prefs||{});
+  const duration=resolvedPlanDuration(p);
+  const startDate=validYmd(p.planStartDate)?p.planStartDate:START;
+  const weeks=buildCycleWeeks(startDate,duration);
+  const refeedDates=new Set([2,4,8,10].filter(n=>n<=duration).map(n=>weekdayInWeek(weeks[n-1],6)));
+  return {startDate,endDate:planEndFor(startDate,duration),durationWeeks:duration,weeks,refeedDates};
+}
+function planSnapshotFields(prefs){
+  const p=migrateProfilePrefs(prefs||{});
+  return {
+    profileSchemaVersion:p.profileSchemaVersion,
+    name:p.name||"",
+    sex:p.sex||"",
+    age:p.age||"",
+    heightCm:p.heightCm||"",
+    weightKg:p.weightKg||"",
+    bodyFatPct:p.bodyFatPct==null?"":p.bodyFatPct,
+    activityLevel:p.activityLevel,
+    goal:p.goal,
+    calorieTarget:p.calorieTarget||"",
+    proteinTarget:p.proteinTarget||"",
+    carbTarget:p.carbTarget||"",
+    fatTarget:p.fatTarget||"",
+    maintenanceCalories:p.maintenanceCalories||"",
+    macroMethod:p.macroMethod||"",
+    challenge:p.challenge||"",
+    primarySport:p.primarySport,
+    strengthMode:p.strengthMode,
+    trainType:p.trainType||p.primarySport,
+    trainDays:p.trainDays,
+    trainingDays:[...(p.trainingDays||[])],
+    trainingLocations:{...(p.trainingLocations||{})},
+    sessionMinutes:p.sessionMinutes,
+    equipment:[...(p.equipment||[])],
+    trainingExperience:p.trainingExperience,
+    trainingPriority:p.trainingPriority,
+    preferredTrainingTime:p.preferredTrainingTime,
+    injuries:p.injuries||"",
+    limitations:p.limitations||"",
+    avoidMovements:p.avoidMovements||"",
+    diet:[...(p.diet||[])],
+    mealCount:p.mealCount,
+    mealTimes:[...(p.mealTimes||[])],
+    eatingWindowStart:p.eatingWindowStart||"",
+    eatingWindowEnd:p.eatingWindowEnd||"",
+    mainMealIndex:p.mainMealIndex,
+    cookingMinutes:p.cookingMinutes,
+    foodBudget:p.foodBudget,
+    repeatPreference:p.repeatPreference,
+    preferredCuisines:[...(p.preferredCuisines||[])],
+    preferredPreparations:[...(p.preferredPreparations||[])],
+    preferredIngredients:p.preferredIngredients||"",
+    foodNotes:p.foodNotes||"",
+    allergies:p.allergies||"",
+    dislikedIngredients:p.dislikedIngredients||"",
+    planCycleNumber:p.planCycleNumber||1,
+    planStartDate:p.planStartDate||"",
+    planEndDate:p.planEndDate||"",
+    planDurationWeeks:p.planDurationWeeks||10,
+    cycleStartWeight:p.cycleStartWeight||"",
+    cycleStartBodyFat:p.cycleStartBodyFat==null?"":p.cycleStartBodyFat,
+  };
+}
+function planSnapshotDigest(prefs,meta){
+  const normalized=migrateProfilePrefs(prefs||{});
+  const calendar=planCalendarForPrefs(normalized);
+  const training=trainingPrefsFromPrefs(normalized);
+  const payload={
+    prefs:planSnapshotFields(normalized),
+    calendar:{
+      startDate:calendar.startDate,
+      endDate:calendar.endDate,
+      durationWeeks:calendar.durationWeeks,
+      weeks:calendar.weeks.map(w=>({label:w.label,start:w.start,end:w.end,menu:w.menu,num:w.num,dietBreak:w.dietBreak})),
+      refeedDates:[...calendar.refeedDates],
+    },
+    targets:effectiveDayTarget(normalized),
+    training,
+    slots:BASE_SLOTS.slice(0,normalized.mealCount).map((slot,index)=>({id:slot.id,label:slot.slot,time:normalized.mealTimes[index]||null})),
+    origin:{
+      source:(meta&&meta.source)||"manual",
+      reason:(meta&&meta.reason)||"",
+      prompt:(meta&&meta.prompt)||null,
+      model:(meta&&meta.model)||null,
+    },
+  };
+  return {payload,digest:hashText(JSON.stringify(payload))};
+}
+function planVersionForDate(ds){
+  if(!validYmd(ds)||!Array.isArray(PLAN_VERSIONS)||!PLAN_VERSIONS.length)return null;
+  const matches=PLAN_VERSIONS.filter(v=>validYmd(v.valid_from)&&ds>=v.valid_from&&(!validYmd(v.valid_to)||ds<=v.valid_to));
+  const pool=matches.length?matches:PLAN_VERSIONS.filter(v=>v.status==="active");
+  if(!pool.length)return null;
+  const rank=status=>status==="active"?3:status==="draft"?2:status==="completed"?1:0;
+  return pool.slice().sort((a,b)=>
+    (b.valid_from||"").localeCompare(a.valid_from||"")||
+    rank(b.status)-rank(a.status)||
+    (Number(b.version_number)||0)-(Number(a.version_number)||0)||
+    (b.updated_at||b.created_at||"").localeCompare(a.updated_at||a.created_at||"")
+  )[0]||null;
+}
+function planPrefsForDate(ds){
+  const version=planVersionForDate(ds);
+  const source=version&&version.snapshot&&version.snapshot.prefs?version.snapshot.prefs:((profile&&profile.prefs)||{});
+  return migrateProfilePrefs(source);
+}
+function planContextForDate(ds,prefsOverride){
+  const prefs=prefsOverride?migrateProfilePrefs(prefsOverride):planPrefsForDate(ds);
+  const calendar=planCalendarForPrefs(prefs);
+  const week=calendar.weeks.find(w=>ds>=w.start&&ds<=w.end)||null;
+  return {prefs,calendar,week,version:prefsOverride?null:planVersionForDate(ds)};
+}
+
 function refreshPlanCalendar(){
   const p=(profile&&profile.prefs)||{};
   if(validYmd(p.planStartDate)){
@@ -871,13 +1017,20 @@ function refreshPlanCalendar(){
   }
 }
 
-function weekOf(ds){for(const w of WEEKS){if(ds>=w.start&&ds<=w.end)return w;}return null;}
+function weekOf(ds,prefs){
+  if(prefs){
+    const calendar=planCalendarForPrefs(prefs);
+    return calendar.weeks.find(w=>ds>=w.start&&ds<=w.end)||null;
+  }
+  for(const w of WEEKS){if(ds>=w.start&&ds<=w.end)return w;}
+  return null;
+}
 // Construye el día: slots genéricos vacíos que se llenan con la IA (o ediciones
 // del usuario). Sin plan estático, sin menús ni tipos de día.
-function buildDay(ds){
-  const w=weekOf(ds);
+function buildDay(ds,prefsOverride){
+  const ctx=planContextForDate(ds,prefsOverride);
   const meals=BASE_SLOTS.map(s=>({id:s.id,slot:s.slot,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
-  return {ds,wd:parseYmd(ds).getDay(),type:null,week:w,target:effectiveDayTarget(),meals,workout:effectiveWorkout(ds).workout};
+  return {ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(ctx.prefs),meals,workout:effectiveWorkout(ds,ctx.prefs).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
 }
 
 /* ---------- ESTADO / PERSISTENCIA (localStorage) ---------- */
@@ -1549,7 +1702,13 @@ async function saveOnboarding(){
     onboardingPending:false,pendingChallenge:null,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
   };
-  const result=await saveProfilePrefs(prefs);
+  const result=await saveProfilePrefs(prefs,{
+    source:newCycle?"new_cycle":"onboarding",
+    reason:newCycle?"Nuevo ciclo tras el recap":"Onboarding inicial",
+    validFrom:planStartDate,
+    validTo:planEndDate,
+    cycleNumber:planCycleNumber,
+  });
   if(result&&result.error){toast("No se pudo guardar: "+result.error.message);return;}
   if(newCycle||firstCycle){
     S.days={};S.weights={};save();
@@ -1573,7 +1732,13 @@ function maybePromptProfileReview(){
 }
 async function keepCurrentProfile(){
   const prefs={...((profile&&profile.prefs)||{}),onboardingReviewedAt:new Date().toISOString()};
-  const result=await saveProfilePrefs(prefs);
+  const result=await saveProfilePrefs(prefs,{
+    source:"manual",
+    reason:calendarChanged?"Ajuste manual del plan":"Preferencias guardadas",
+    validFrom:todayStr(),
+    validTo:planEndDate,
+    cycleNumber:prefs.planCycleNumber,
+  });
   if(result&&result.error){toast("No se pudo guardar: "+result.error.message);return;}
   closeModal();toast(`Te preguntaremos de nuevo en ${PROFILE_REVIEW_DAYS} días`);
 }
@@ -1828,7 +1993,7 @@ function renderHoy(){
 /* ---------- NUTRICIÓN: detalle de comidas + coach ---------- */
 function renderNutrition(){
   const ds=current; const st=dayState(ds); const day=buildDay(ds);
-  const w=weekOf(ds)||WEEKS[0]; const hasPlan=weekHasGeneratedPlan(w);
+  const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||WEEKS[0]; const hasPlan=weekHasGeneratedPlan(w);
   const mealsHtml=day.meals.map(b=>mealCard(ds,b)).join("");
   const extrasHtml=st.extras.map((e,i)=>extraCard(ds,e,i)).join("");
   const weekCta=aiAvailable()?(hasPlan
@@ -2068,7 +2233,8 @@ function bodyComposition(){
 }
 // Lista de días de la semana actual (con navegación), reutiliza goDay
 function weekSection(){
-  const w=weekOf(current)||WEEKS[0];
+  const currentPrefs=planPrefsForDate(current);
+  const w=weekOf(current,currentPrefs)||weekOf(current)||WEEKS[0];
   let days=[];let d=w.start;while(d<=w.end){days.push(d);d=addDays(d,1);}
   const rows=days.map(ds=>{
     const{t,target,doneMeals,totMeals}=dayTotals(ds);
@@ -2081,14 +2247,23 @@ function weekSection(){
     </div>`;
   }).join("");
   return `<div class="row between" style="margin-bottom:10px">
-      <button class="btn btn-sm" onclick="weekNav(-1)" ${w.num<=0?'disabled style=opacity:.3':''}>‹</button>
+      <button class="btn btn-sm" onclick="weekNav(-1)" ${w.num<=1?'disabled style=opacity:.3':''}>‹</button>
       <span class="muted small">${w.label==="Arranque"?"Arranque":"Semana "+w.num}</span>
-      <button class="btn btn-sm" onclick="weekNav(1)" ${w.num>=PLAN_DURATION_WEEKS?'disabled style=opacity:.3':''}>›</button>
+      <button class="btn btn-sm" onclick="weekNav(1)" ${w.num>=resolvedPlanDuration(currentPrefs)?'disabled style=opacity:.3':''}>›</button>
     </div>
     ${rows}`;
 }
 function goDay(ds){current=ds;view="nutricion";render();window.scrollTo(0,0);syncDay(current);}
-function weekNav(n){const w=weekOf(current)||WEEKS[0];const i=WEEKS.indexOf(w)+n;if(i>=0&&i<WEEKS.length){current=WEEKS[i].start;render();window.scrollTo(0,0);}}
+function weekNav(n){
+  const prefs=planPrefsForDate(current);
+  const calendar=planCalendarForPrefs(prefs);
+  const w=weekOf(current,prefs)||weekOf(current)||calendar.weeks[0];
+  const i=calendar.weeks.findIndex(week=>week.start===w.start&&week.end===w.end);
+  if(i>=0){
+    const next=calendar.weeks[i+n];
+    if(next){current=next.start;render();window.scrollTo(0,0);}
+  }
+}
 
 /* ---------- PERFIL: preferencias (mixto) + cuenta + admin ---------- */
 function renderProfile(){
@@ -2644,7 +2819,7 @@ function weekDays(w){const days=[];let d=w.start;while(d<=w.end){if(d>=START&&d<
 function weekHasGeneratedPlan(w){return weekDays(w).some(ds=>{const st=S.days&&S.days[ds];return st&&st.meals&&Object.values(st.meals).some(m=>m&&m.ovr&&m.ovr.gen);});}
 async function aiGenerateWeek(){
   if(coachUnavailable())return;
-  const w=weekOf(current)||WEEKS[0]; const days=weekDays(w);
+  const w=weekOf(current,planPrefsForDate(current))||weekOf(current)||WEEKS[0]; const days=weekDays(w);
   if(!days.length){toast("Esta semana está fuera del plan");return;}
   const label=w.num?("Semana "+w.num):"Semana de arranque";
   modal(`<h3>📅 Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida…</div></div>`);
@@ -2937,16 +3112,33 @@ async function loadProfile(){
   }
   refreshPlanCalendar();
 }
-async function saveProfilePrefs(prefs){
+async function saveProfilePrefs(prefs,meta){
   if(!supa||!uid())return{error:{message:"Sin sesión"}};
   if(!isActive())return{error:{message:"Cuenta desactivada"}};
+  const normalized=migrateProfilePrefs(prefs||{});
   const result=await supa.from("profiles").upsert({
     id:uid(),
     email:(session&&session.user&&session.user.email)||"",
-    prefs,
+    prefs:normalized,
     updated_at:new Date().toISOString(),
   },{onConflict:"id"});
-  if(!result.error){profile.prefs=prefs;refreshPlanCalendar();}
+  if(!result.error){
+    profile.prefs=normalized;
+    refreshPlanCalendar();
+    try{
+      const version=await ensurePlanVersion({
+        prefs:normalized,
+        source:(meta&&meta.source)||"manual",
+        reason:(meta&&meta.reason)||"",
+        validFrom:validYmd(meta&&meta.validFrom)?meta.validFrom:todayStr(),
+        validTo:validYmd(meta&&meta.validTo)?meta.validTo:null,
+        cycleNumber:(meta&&meta.cycleNumber)!=null?meta.cycleNumber:normalized.planCycleNumber,
+      });
+      if(version)await backfillDayVersions();
+    }catch(e){
+      if(!String((e&&e.message)||e).match(/plan_versions|relation|column|constraint/i))console.warn("No se pudo sincronizar la versión del plan tras guardar el perfil.",e);
+    }
+  }
   return result;
 }
 async function signIn(email,pwd){
@@ -2965,6 +3157,7 @@ function clearSignedOutState(){
   refreshPlanCalendar();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;
   cycleHistory=[];recapPhotoFile=null;recapChallenge="";
+  PLAN_VERSIONS=[];PLAN_VERSIONS_LOADED=false;PLAN_VERSIONS_ERROR=null;
   if(recapPhotoUrl)URL.revokeObjectURL(recapPhotoUrl);
   recapPhotoUrl="";
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
@@ -3013,12 +3206,24 @@ async function onAuth(){
       return;
     }
     if(supa&&!DB.loaded)await dbLoad();
-    await Promise.all([pullAllDays(),pullWeights(),pullCycleHistory()]);
     const prefs=(profile&&profile.prefs)||{};
     onboardingActive=!!prefs.onboardingPending||!hasCompleteOnboarding(prefs);
     onboardingDraft=onboardingActive?onboardingDefaults():null;
     if(onboardingDraft&&prefs.pendingChallenge)applyChallengeDefaults(onboardingDraft,prefs.pendingChallenge);
-    if(!onboardingActive)await upsertActiveCycle();
+    await Promise.all([pullPlanVersions(),pullCycleHistory()]);
+    if(!onboardingActive){
+      const version=await ensurePlanVersion({
+        prefs,
+        source:prefs.planCycleNumber&&Number(prefs.planCycleNumber)>1?"migration":"migration",
+        reason:"Versión activa cargada al iniciar sesión",
+        validFrom:validYmd(prefs.planStartDate)?prefs.planStartDate:START,
+        validTo:validYmd(prefs.planEndDate)?prefs.planEndDate:END,
+        cycleNumber:prefs.planCycleNumber,
+      });
+      if(version)await backfillDayVersions();
+      await upsertActiveCycle();
+    }
+    await Promise.all([pullAllDays(),pullWeights()]);
     onboardingStep=1;reviewPromptShown=false;
     view="hoy";current=clampDate(todayStr());
     render();
@@ -3103,18 +3308,153 @@ async function pullCycleHistory(){
   }catch(e){cycleHistory=[];return false;}
 }
 
+async function pullPlanVersions(){
+  PLAN_VERSIONS=[];
+  if(!supa||!uid())return false;
+  try{
+    const result=await supa.from("plan_versions").select("id,user_id,cycle_number,version_number,version_key,source,status,valid_from,valid_to,reason,prompt,model,snapshot_hash,snapshot,activated_at,superseded_at,created_at,updated_at").eq("user_id",uid()).order("cycle_number",{ascending:false}).order("version_number",{ascending:false});
+    if(result.error)throw result.error;
+    PLAN_VERSIONS=Array.isArray(result.data)?result.data:[];
+    PLAN_VERSIONS_LOADED=true;
+    PLAN_VERSIONS_ERROR=null;
+    return true;
+  }catch(e){
+    PLAN_VERSIONS=[];
+    PLAN_VERSIONS_LOADED=false;
+    PLAN_VERSIONS_ERROR=(e&&e.message)||String(e);
+    return false;
+  }
+}
+
+function planVersionVersionNumber(cycleNo){
+  return PLAN_VERSIONS.reduce((max,row)=>{
+    if(Number(row.cycle_number)===Number(cycleNo))return Math.max(max,Number(row.version_number)||0);
+    return max;
+  },0)+1;
+}
+
+function planVersionActiveForCycle(cycleNo){
+  return PLAN_VERSIONS.find(row=>Number(row.cycle_number)===Number(cycleNo)&&row.status==="active")||null;
+}
+
+function planVersionSnapshotMatches(row,digest){
+  return !!row&&String(row.snapshot_hash||"")===String(digest||"");
+}
+
+function resolvePlanVersionIdForDate(ds){
+  const row=planVersionForDate(ds);
+  return row&&row.id?row.id:null;
+}
+
+async function ensurePlanVersion(meta){
+  if(!supa||!uid())return null;
+  if(!PLAN_VERSIONS_LOADED)await pullPlanVersions();
+  const prefs=migrateProfilePrefs((meta&&meta.prefs)||(meta&&meta.profilePrefs)||(profile&&profile.prefs)||{});
+  const cycleNo=Math.max(1,Number.parseInt((meta&&meta.cycleNumber)!=null?meta.cycleNumber:prefs.planCycleNumber,10)||cycleNumber());
+  const validFrom=validYmd(meta&&meta.validFrom)?meta.validFrom:(validYmd(prefs.planStartDate)?prefs.planStartDate:todayStr());
+  const validTo=validYmd(meta&&meta.validTo)?meta.validTo:(validYmd(prefs.planEndDate)?prefs.planEndDate:null);
+  const status=(meta&&meta.status)||"active";
+  const snapshot=planSnapshotDigest(prefs,meta||{});
+  const current=planVersionForDate(validFrom)||planVersionActiveForCycle(cycleNo);
+  if(planVersionSnapshotMatches(current,snapshot.digest)&&current.status==="active"){
+    return current;
+  }
+  const now=new Date().toISOString();
+  const versionKey=`${cycleNo}:${validFrom}:${snapshot.digest}`;
+  const nextVersionNumber=planVersionVersionNumber(cycleNo);
+  if(current&&current.status==="active"&&current.version_key!==versionKey){
+    try{
+      const sup=await supa.from("plan_versions").update({
+        status:"superseded",
+        valid_to:validFrom,
+        superseded_at:now,
+        updated_at:now,
+      }).eq("id",current.id).eq("user_id",uid()).eq("status","active");
+      if(sup.error)throw sup.error;
+    }catch(e){
+      if(!String((e&&e.message)||e).match(/plan_versions|relation|column|constraint/i))console.warn("No se pudo cerrar la versión anterior del plan.",e);
+    }
+  }
+  try{
+    const row={
+      user_id:uid(),
+      cycle_number:cycleNo,
+      version_number:nextVersionNumber,
+      version_key:versionKey,
+      source:(meta&&meta.source)||"manual",
+      status,
+      valid_from:validFrom,
+      valid_to:validTo,
+      reason:(meta&&meta.reason)||null,
+      prompt:(meta&&meta.prompt)||null,
+      model:(meta&&meta.model)||null,
+      snapshot_hash:snapshot.digest,
+      snapshot:snapshot.payload,
+      activated_at:status==="active"?now:null,
+      superseded_at:status==="superseded"?now:null,
+      updated_at:now,
+    };
+    const result=await supa.from("plan_versions").upsert(row,{onConflict:"user_id,version_key"}).select("id,user_id,cycle_number,version_number,version_key,source,status,valid_from,valid_to,reason,prompt,model,snapshot_hash,snapshot,activated_at,superseded_at,created_at,updated_at").maybeSingle();
+    if(result.error)throw result.error;
+    await pullPlanVersions();
+    return planVersionForDate(validFrom)||result.data||null;
+  }catch(e){
+    if(String((e&&e.message)||e).match(/plan_versions|relation|column|constraint/i)){
+      PLAN_VERSIONS_ERROR=(e&&e.message)||String(e);
+      console.warn("No se pudo registrar la versión del plan; se mantiene la compatibilidad local.",e);
+      return null;
+    }
+    throw e;
+  }
+}
+
+async function backfillDayVersions(){
+  if(!supa||!uid()||!PLAN_VERSIONS_LOADED)return false;
+  try{
+    const result=await supa.from("day_log").select("log_date,plan_version_id").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
+    if(result.error)throw result.error;
+    const rows=Array.isArray(result.data)?result.data:[];
+    const updates=rows.filter(row=>!row.plan_version_id).map(row=>{
+      const planVersionId=resolvePlanVersionIdForDate(row.log_date);
+      if(!planVersionId)return null;
+      return supa.from("day_log").update({plan_version_id:planVersionId,updated_at:new Date().toISOString()}).eq("user_id",uid()).eq("log_date",row.log_date);
+    }).filter(Boolean);
+    if(updates.length)await Promise.all(updates);
+    return true;
+  }catch(e){
+    if(!String((e&&e.message)||e).match(/plan_version_id|plan_versions|relation|column/i))console.warn("No se pudo reconciliar la versión del plan en el historial diario.",e);
+    return false;
+  }
+}
+
 /* ---- Registro de consumo en la DB (tabla day_log) ---- */
 // Sube el estado del día (comidas marcadas, extras, entreno) a Supabase.
 async function pushDay(ds){
   if(!supa||!ds||!uid())return;
-  try{ await supa.from("day_log").upsert({user_id:uid(),log_date:ds,state:S.days[ds]||{},updated_at:new Date().toISOString()},{onConflict:"user_id,log_date"}); }catch(e){}
+  const state={...(S.days[ds]||{})};
+  const planVersionId=state.planVersionId||resolvePlanVersionIdForDate(ds);
+  if(planVersionId)state.planVersionId=planVersionId;
+  try{
+    const result=await supa.from("day_log").upsert({user_id:uid(),log_date:ds,state,plan_version_id:planVersionId||null,updated_at:new Date().toISOString()},{onConflict:"user_id,log_date"});
+    if(result.error&&String((result.error&&result.error.message)||result.error).match(/plan_version_id|column/i)){
+      await supa.from("day_log").upsert({user_id:uid(),log_date:ds,state,updated_at:new Date().toISOString()},{onConflict:"user_id,log_date"});
+    }
+  }catch(e){}
 }
 // Baja el estado de un día desde Supabase (última versión sincronizada).
 async function pullDay(ds){
   if(!supa||!ds||!uid())return false;
   try{
-    const r=await supa.from("day_log").select("state").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
-    if(!r.error&&r.data&&r.data.state&&typeof r.data.state==="object"){S.days[ds]=r.data.state;save();return true;}
+    let r=await supa.from("day_log").select("state,plan_version_id").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
+    if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("state").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
+    if(!r.error&&r.data&&r.data.state&&typeof r.data.state==="object"){
+      const state={...r.data.state};
+      const planVersionId=r.data.plan_version_id||state.planVersionId||resolvePlanVersionIdForDate(ds)||null;
+      if(planVersionId&&!state.planVersionId)state.planVersionId=planVersionId;
+      S.days[ds]=state;save();
+      if(!r.data.plan_version_id&&planVersionId)backfillDayVersions();
+      return true;
+    }
   }catch(e){}
   return false;
 }
@@ -3122,12 +3462,30 @@ async function pullDay(ds){
 async function pullAllDays(){
   if(!supa||!uid())return;
   try{
-    const r=await supa.from("day_log").select("log_date,state").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
-    if(!r.error&&Array.isArray(r.data)){r.data.forEach(row=>{if(row.state&&typeof row.state==="object")S.days[row.log_date]=row.state;});save();}
+    let r=await supa.from("day_log").select("log_date,state,plan_version_id").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
+    if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("log_date,state").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
+    if(!r.error&&Array.isArray(r.data)){
+      r.data.forEach(row=>{
+        if(row.state&&typeof row.state==="object"){
+          const state={...row.state};
+          const planVersionId=row.plan_version_id||state.planVersionId||resolvePlanVersionIdForDate(row.log_date)||null;
+          if(planVersionId&&!state.planVersionId)state.planVersionId=planVersionId;
+          S.days[row.log_date]=state;
+        }
+      });
+      save();
+      await backfillDayVersions();
+    }
   }catch(e){}
 }
 // Guarda local + sube a la DB (usar tras cualquier cambio del día).
-function commitDay(ds){save();pushDay(ds);}
+function commitDay(ds){
+  const st=dayState(ds);
+  const planVersionId=st.planVersionId||resolvePlanVersionIdForDate(ds);
+  if(planVersionId)st.planVersionId=planVersionId;
+  save();
+  pushDay(ds);
+}
 // Trae el día desde la DB y re-renderiza si seguimos viéndolo.
 function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view==="nutricion")&&current===ds)render();});}
 

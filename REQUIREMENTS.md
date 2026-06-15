@@ -152,7 +152,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 0. REQ-31 - Tecnologia invisible (lenguaje). **Implementado**: copy operativo de coach y diagnostico tecnico solo para administradores.
 12. REQ-12 - Perfil flexible de alimentacion y entrenamiento.
-13. REQ-13 - Modelo de planes versionados.
+13. REQ-13 - Modelo de planes versionados. **Implementado**.
 14. REQ-14 - Seguridad, consentimiento y privacidad.
 15. REQ-15 - Biblioteca de ejercicios y demostraciones animadas.
 16. REQ-16 - Reproductor de entrenamiento para principiantes.
@@ -702,7 +702,7 @@ Recoger la disponibilidad y preferencias suficientes para que el coach pueda pro
 
 ## REQ-13 - Modelo de planes versionados
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Objetivo
 
@@ -741,6 +741,12 @@ Separar el plan prescrito de lo que el usuario ejecuto para poder generar, adapt
 - RLS aisla todos los planes por usuario.
 - La migracion es idempotente y documentada.
 - Commit y push propios.
+
+### Resultado
+
+- Se creo `plan_versions` como snapshot persistente del plan prescrito.
+- `day_log` guarda `plan_version_id` para conservar la ejecucion historica.
+- El cliente crea, activa y backfillea versiones sin perder el historial existente.
 
 ### Verificacion sugerida
 

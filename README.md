@@ -97,11 +97,11 @@ Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se
 ### Preparar la base
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
-2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql) y [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql). El último crea el historial de ciclos, separa los pesos por ciclo y configura el bucket privado `progress-photos`.
+2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql) y [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql). El último crea el historial de ciclos, el modelo versionado de planes, separa los pesos por ciclo y configura el bucket privado `progress-photos`.
 3. En **Project Settings → API Keys**, copia la **Project URL** (o el Project ID) y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
 4. Ponlos como variables de entorno en Vercel (ver despliegue). Para desarrollo local, también puedes guardarlos desde **Ajustes → Base de datos**.
 
-> Para una instalación existente que ya usa `auth.sql`, basta ejecutar [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql). Es idempotente y conserva los pesos existentes asignándolos al ciclo inicial.
+> Para una instalación existente que ya usa `auth.sql`, basta ejecutar [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql). Es idempotente y conserva los pesos existentes asignándolos al ciclo inicial y crea la tabla de versiones de plan si aún no existe.
 
 ## Uso local
 

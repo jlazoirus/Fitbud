@@ -64,6 +64,7 @@ create table day_log (
   user_id     uuid not null references auth.users(id) on delete cascade,
   log_date    date not null,
   state       jsonb not null default '{}'::jsonb,
+  plan_version_id bigint,
   updated_at  timestamptz not null default now(),
   primary key (user_id, log_date)
 );
