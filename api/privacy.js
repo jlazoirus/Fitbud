@@ -84,7 +84,7 @@ async function listPhotos(e, userId) {
 
 async function exportUser(user, e) {
   const userFilter = { user_id: "eq." + user.id };
-  const [profiles, days, weights, versions, cycles, consents, screenings, photos] = await Promise.all([
+  const [profiles, days, weights, versions, cycles, consents, screenings, coachUsage, coachOptions, photos] = await Promise.all([
     restRows(e, "profiles", { id: "eq." + user.id }, "*"),
     restRows(e, "day_log", userFilter, "*"),
     restRows(e, "weight_log", userFilter, "*"),
@@ -92,6 +92,8 @@ async function exportUser(user, e) {
     restRows(e, "plan_cycles", userFilter, "*"),
     restRows(e, "user_consents", userFilter, "*"),
     restRows(e, "safety_screenings", userFilter, "*"),
+    restRows(e, "coach_usage", userFilter, "*"),
+    restRows(e, "coach_option_pool", userFilter, "*"),
     listPhotos(e, user.id),
   ]);
   return {
@@ -110,6 +112,8 @@ async function exportUser(user, e) {
     plan_cycles: cycles,
     consents,
     safety_screenings: screenings,
+    coach_usage: coachUsage,
+    coach_options: coachOptions,
     progress_photos: photos.map((photo) => ({
       path: photo.path || null,
       created_at: photo.created_at || null,

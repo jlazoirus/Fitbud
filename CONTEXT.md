@@ -13,9 +13,9 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Frontend:** un único `index.html` (HTML+CSS+JS inline). Mobile-first. Sin dependencias salvo `supabase-js` por CDN (jsDelivr).
 - **Persistencia:** la **fuente de verdad es Supabase**; `localStorage` (clave `fitbud_v1`) es solo **caché offline** que la espeja. Ningún dato del usuario vive solo en el navegador (el progreso diario va a `day_log`, el peso a `weight_log` y el plan prescrito a `plan_versions`). Lo único local-de-dispositivo son los overrides de credenciales en Ajustes (en producción vienen de Vercel).
 - **Base de datos:** Supabase (PostgreSQL) — catálogo de alimentos (ingredientes/platos/dietas), consumo diario (`day_log`), plan versionado (`plan_versions`) y peso (`weight_log`).
-- **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador. El proxy exige sesión: el cliente manda el token de Supabase en `Authorization: Bearer` y el server lo valida (401 si falta/!válido). Funciones: estimar comida, sugerir, revisar macros y **generar un día completo** (`aiGenerateDay` → `validateGeneratedDay` valida huevo/restricciones/macros/repetición antes de dejar aplicar; se guarda como override por día en `day_log`).
+- **IA:** Claude vía **proxy serverless** en Vercel (`/api/claude`). La API key nunca llega al navegador. El proxy exige sesión, privacidad vigente y una reserva idempotente por acción; valida la salida antes de guardarla. Dieta diaria/semanal, opciones, estimación y revisión tienen políticas separadas. Al alcanzar el límite reutiliza el pool privado compatible o una alternativa determinista sin llamar al proveedor.
 - **Lenguaje de producto:** usuarios normales ven "tu coach", "preparar" y "otra opción"; no ven proveedor, modelo, prompts, tokens ni detalles de configuración. Los errores se neutralizan y el texto dinámico se filtra antes de mostrarlo. Los administradores conservan el diagnóstico técnico en Ajustes.
-- **Perfil flexible:** `profiles.prefs` usa `profileSchemaVersion: 2`. Incluye 2-6 comidas, horarios, ventana alimentaria, logística, alergias/gustos separados, días y lugar por sesión, equipo, experiencia, prioridad y limitaciones. Los perfiles antiguos reciben defaults y se persisten al iniciar sesión sin repetir onboarding.
+- **Perfil flexible:** `profiles.prefs` usa `profileSchemaVersion: 3`. Incluye zona horaria, 2-6 comidas, horarios, ventana alimentaria, logística, alergias/gustos separados, días y lugar por sesión, equipo, experiencia, prioridad y limitaciones. Los perfiles antiguos reciben defaults y se persisten al iniciar sesión sin repetir onboarding.
 - **Privacidad y seguridad:** `user_consents` y `safety_screenings` guardan aceptación y aptitud por versión. Edad mínima 18 años. La interfaz presenta un solo permiso esencial para personalizar el plan y un segundo permiso opcional para fotos; no solicita correo o marketing. Sin el permiso vigente no se crea/adapta el plan ni se llama al coach; una señal de alerta reemplaza la rutina por una pausa segura.
 - **Hosting:** Vercel (estático + funciones en `api/`). No hay build.
 - **PWA:** `manifest.webmanifest` + `service-worker.js` + íconos en `assets/`.
@@ -29,12 +29,12 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 |---|---|
 | `index.html` | **Toda la app** (~1160 líneas): datos, estado, render, vistas, IA, voz, DB, sync. |
 | `config.js` | Fallback de config en runtime (`window.FITBUD_CONFIG`). **Vacío en el repo**; producción usa Vercel. |
-| `api/claude.js` | Función serverless: proxy a Anthropic. Usa `ANTHROPIC_API_KEY` (env). Whitelist de modelo, clamp de tokens. **Exige sesión:** valida el JWT de Supabase (Bearer → `/auth/v1/user`) antes de llamar a Anthropic; sin token válido responde 401 (falla cerrado). |
+| `api/claude.js` | Proxy serverless: valida sesión/privacidad, reserva cuota mediante RPC con service role, agrupa partes idempotentes, valida JSON, guarda resultados válidos y selecciona pool/plantilla al agotar el límite antes de decidir si llama a Anthropic. |
 | `api/config.js` | Función serverless: devuelve config pública (URL+publishable key de Supabase, modelo, `proxy:bool`). NO devuelve la key de Claude. |
-| `api/admin.js` | Función serverless **admin** (REQ-07): listar usuarios paginados, bloquear/desbloquear en Auth + `profiles.active`, cambiar contraseña, enviar reset y preparar una cuenta QA reiniciable. Usa `SUPABASE_SERVICE_ROLE_KEY` (solo servidor); valida admin activo, impide auto-desactivación y conserva al último admin. |
-| `api/privacy.js` | Exporta un JSON legible del usuario autenticado o elimina fotos + cuenta Auth tras confirmar `BORRAR <email>`. Usa service role solo en servidor y protege al último admin. |
+| `api/admin.js` | Función serverless **admin**: usuarios, cuenta QA y políticas de consumo. Permite límites por acción, activación, diagnóstico nuevo/reutilizado, cortesía y reinicio diario. Usa `SUPABASE_SERVICE_ROLE_KEY` solo en servidor. |
+| `api/privacy.js` | Exporta perfil, progreso, planes, consentimientos, consumo/opciones del coach y fotos descritas; o elimina fotos + cuenta Auth tras confirmar `BORRAR <email>`. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v21`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v22`. |
 | `exercise-catalog.js` | Catálogo local propio de 40 ejercicios y mapeo de cada variante de rutina a IDs estables. También alimenta la generación reproducible del SQL. |
 | `workout-player.js` | Dominio sin dependencias para prescribir fuerza/cardio, recuperar ejecuciones y calcular temporizadores, progreso y resultados. |
 | `manifest.webmanifest`, `assets/icon-192.png`, `assets/icon-512.png` | PWA instalable. El layout respeta `safe-area-inset-*` para no quedar bajo la barra de estado ni el indicador de inicio de iOS. |
@@ -46,8 +46,10 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `supabase/plan_cycles.sql` | Migración idempotente para ciclos sucesivos: `plan_versions`, `plan_cycles`, `day_log.plan_version_id`, pesos separados por `cycle_start` y bucket privado `progress-photos` con RLS. La duración se infiere de las fechas y se configura en `profiles.prefs.planDurationWeeks`. |
 | `supabase/privacy.sql` | Migración idempotente de `user_consents` y `safety_screenings`, ambas aisladas por usuario con RLS. Ejecutar después de `plan_cycles.sql`. |
 | `supabase/exercises.sql` | Migración idempotente de la biblioteca de ejercicios, fuente/licencia, media procedimental, RLS y seed de las rutinas actuales. Ejecutar después de `auth.sql`; no se aplica automáticamente. |
+| `supabase/coach_quota.sql` | Migración idempotente de políticas, overrides, reservas, partes, pool privado e impresiones. Las tablas no tienen acceso para usuarios normales; las RPC se conceden solo a service role. Ejecutar después de `privacy.sql`; no se aplica automáticamente. |
 | `scripts/generate-exercise-sql.mjs`, `scripts/validate-exercises.mjs` | Regeneran el seed SQL desde el catálogo y validan completitud, media propia y referencias de todas las rutinas. |
 | `scripts/validate-workout-player.mjs` | Valida prescripciones de fuerza/cardio, dosis, temporizadores y recuperación del estado del reproductor. |
+| `scripts/validate-coach-quota.mjs`, `scripts/test-coach-quota.mjs` | Validan contratos de esquema/cliente y prueban con mocks idempotencia, reutilización, devolución y administración sin llamadas pagadas. |
 | `PRIVACY.md` | Política operativa preliminar: edad, consentimiento, aptitud, retención, exportación y borrado. Requiere revisión legal antes del lanzamiento comercial. |
 | `plan-10-semanas-recomposicion.md` | Plan original (fuente de verdad de menús, días, entrenos, metas). |
 | `BUILD_PLAN.md`, `PROGRESS.md`, `REQUIREMENTS.md`, `README.md` | Docs del proyecto. |
@@ -55,7 +57,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 ## 4. Estructura interna de index.html (con líneas aprox.)
 - **Config runtime** (~151): `CONFIG` (de `config.js`), `REMOTE` (de `/api/config`), `effectiveSettings()` (prioridad: override local en Ajustes → REMOTE/Vercel → config.js), `aiAvailable()`, `settingSource()`.
 - **Capa de datos:** calendario dinámico por perfil (`planStartDate`/`planEndDate`/`planCycleNumber`/`planDurationWeeks`), menús, generadores de entrenamiento, `DAY_TARGET` (fallback sin perfil), `calculateMacroTargets()` y `effectiveDayTarget()` (metas personales exactas).
-- **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → logística de comidas → preferencias, permiso esencial, fotos opcionales y evaluación de seguridad. `migrateProfilePrefs()` normaliza el esquema v2; `hasCompleteOnboarding()` no bloquea perfiles heredados y `profileReviewDue()` solicita revisión cada 28 días.
+- **Onboarding:** `renderOnboarding()` guía datos corporales → macros → entrenamiento → logística de comidas → preferencias, permiso esencial, fotos opcionales y evaluación de seguridad. `migrateProfilePrefs()` normaliza el esquema v3 y guarda `timeZone`; `hasCompleteOnboarding()` no bloquea perfiles heredados y `profileReviewDue()` solicita revisión cada 28 días.
 - **Cierre de sesión:** `signOutUser()` limpia la UI y el cache del usuario de inmediato, solicita a Supabase un cierre local y elimina la sesión persistida como fallback si la red no responde.
 - **Entrenamiento:** cada perfil elige disciplina, fuerza, 3-6 días exactos, lugar por día, minutos, equipo, experiencia, prioridad y limitaciones. `workoutSchedule()` asigna fuerza/deporte; `effectiveWorkout(ds)` conserva overrides y devuelve `safety_hold` si la evaluación tiene una señal de alerta. `workoutPrescription()` convierte la sesión en calentamiento, bloques principales y vuelta a la calma; `renderWorkout()` muestra el reproductor y el ejercicio activo desde el catálogo.
 - **Lógica de calendario:** `weekOf(ds)`, `dayType(ds)` → PESAS/BAJO/REFEED/DIETBREAK, `buildDay(ds)` arma el día (comidas+entreno); el almuerzo se resuelve desde la DB (`dietLunchDish`) con fallback al plan.
@@ -64,7 +66,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 - **Navegación:** `current` (fecha YYYY-MM-DD), `view` (`day|week|foods|weight|settings`), `render()` (dispatcher), `renderTabs()`, `setView()`.
 - **Vistas:** `renderDay()` (HOY: dashboard kcal/macros + comidas + extras + entreno + resumen), `renderWeek()`, `renderFoods()` (sub-tabs `platos|ingredientes|dietas`), `renderWeight()` (tabla + gráfico SVG), `renderSettings()`.
 - **Comidas:** `mealCard`, `extraCard`, `toggleMeal/Extra/Workout`, `openReplace`/`applyReplace`, `openEditor`/`editorSheet`/`saveEditor` (comidas personalizadas / editar valores).
-- **IA (Claude)** (~619): `callClaude(userText,maxTokens)` → si hay key local llama directo a Anthropic; si no, usa `/api/claude`. `parseJSON()` (limpia ```json). `aiEstimate()` (IA1 estimar comida), `aiSuggest()` (IA2 sugerir), `aiReview()` (IA3 revisar macros). System prompt vegetariano sin huevo.
+- **IA (Claude)**: `callClaude(userText,maxTokens,quota)` manda acción, `requestId`, parte, contexto compatible, fallback y reglas de validación. `aiGenerateWeek()` comparte un solo ID para sus siete partes; dobles clicks y reintentos reutilizan la misma solicitud. La vía directa con key local queda como herramienta de desarrollo.
 - **Voz** (~695): `toggleMic()`/`stopMic()` con Web Speech API (`es-PE`, fallback `es-ES`), alimenta el campo del editor.
 - **Supabase / Catálogos**: `DB` cachea alimentos y ejercicios; `dbLoad()` usa `exercises` cuando existe y degrada al catálogo local si la migración está pendiente. Alimentos conserva sus editores y `renderExerciseAdmin()` añade filtros, validación, CRUD y archivado solo para admin.
 - **Init** (final): `supaInit(); registerServiceWorker(); render(); ensureDB(); syncDay(current); syncWeights();` y de nuevo tras `loadRemoteConfig().then(...)` (por si las credenciales llegan de Vercel).
@@ -89,9 +91,12 @@ Proyecto ref: `wtqnvtixvfapdbzcegdw` (URL en env de Vercel). Tablas:
 - `user_consents(user_id, consent_type, policy_version, status, timestamps)` — aceptación/retiro por propósito y versión.
 - `safety_screenings(user_id, screening_version, responses, has_red_flags, cleared_for_training)` — aptitud versionada.
 - `exercises(slug, aliases, discipline, level, equipment, places, muscles, movement_pattern, instructions, safety, media, source, license, active)` — biblioteca compartida de movimientos y sesiones deportivas.
+- `coach_quota_policies(action, entitlement_code, daily_limit, enabled)` y `coach_quota_overrides(user_id, action, ...)` — política general/producto y cortesía.
+- `coach_usage(user_id, action, request_id, quota_date, timezone, status, origin, provider_calls, tokens, result_id)` — auditoría y reserva idempotente.
+- `coach_generation_parts`, `coach_option_pool`, `coach_option_impressions` — partes de una acción, opciones privadas compatibles e historial para selección menos reciente.
 - Storage privado `progress-photos/<user_id>/cycle-N/...` — fotos de progreso con URLs firmadas.
 - Vista `dish_macros` — macros calculados por plato (suma de ingredientes), `security_invoker`.
-- **RLS (con `auth.sql` + `plan_cycles.sql` + `privacy.sql` + `exercises.sql`):** escritura anónima eliminada. Datos, planes, consentimientos y evaluaciones solo permiten acceso propio; catálogos solo permiten escritura a admins activos. Las APIs admin/privacidad usan service role exclusivamente en servidor.
+- **RLS:** escritura anónima eliminada. Datos, planes, consentimientos y evaluaciones solo permiten acceso propio; catálogos solo permiten escritura a admins activos. Cuotas, pool e impresiones revocan acceso a `anon`/`authenticated` y solo se operan con RPC/service role tras verificar sesión.
 - **Cálculo de macros:** `macros = Σ ingrediente(por_100g) × gramos/100`. En la app se hace en cliente (`macrosFromLines`).
 - **Re-seed:** `seed.sql` hace `truncate ... restart identity cascade` (es re-ejecutable).
 
@@ -106,7 +111,7 @@ Prioridad en `effectiveSettings()`: **override local (Ajustes, localStorage)** �
 | `ANTHROPIC_API_KEY` | proxy `/api/claude` | **Sí** (solo servidor) |
 | `SUPABASE_URL` | `https://<ref>.supabase.co` | No |
 | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | No |
-| `SUPABASE_SERVICE_ROLE_KEY` | funciones admin y privacidad (`/api/admin`, `/api/privacy`) | **Sí** (solo servidor) |
+| `SUPABASE_SERVICE_ROLE_KEY` | cuotas del coach, administración y privacidad | **Sí** (solo servidor) |
 | `ANTHROPIC_MODEL` (opcional) | modelo por defecto | No |
 
 Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (default), `claude-sonnet-4-6`.
@@ -131,8 +136,9 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Biblioteca guiada de ejercicios** — 40 registros propios cubren gimnasio, peso corporal, running, cycling y natación; todas las rutinas usan IDs, la UI permite pausar animaciones y el admin valida fuente/licencia antes de publicar.
 - **Reproductor guiado** — sesiones ordenadas con calentamiento, series o intervalos, descansos, carga/repeticiones/RPE, sustituciones y cierre de seguridad. Pausar o cerrar la PWA conserva el avance en `day_log`.
 - **Onboarding y revisión periódica** — calcula macros, reúne objetivo y preferencias, se activa al primer login y vuelve a preguntar cada 28 días.
-- **Perfil flexible v2** — estructura logística de comidas, restricciones duras/blandas y disponibilidad deportiva; migra perfiles existentes y alimenta al coach como JSON.
+- **Perfil flexible v3** — estructura logística de comidas, restricciones duras/blandas, zona horaria y disponibilidad deportiva; migra perfiles existentes y alimenta al coach como JSON.
 - **Privacidad y seguridad** — consentimientos versionados, gate para cuentas existentes, pausa de entrenamiento por alertas, guardrails server-side, exportación y borrado.
+- **Cuotas y reutilización** — políticas por acción, ventana diaria por zona horaria, reserva atómica, semana agrupada, pool privado, fallback determinista y panel administrativo sin contadores en la experiencia normal.
 
 ### Pendiente / ideas
 - **Porciones especiales de REFEED/DIETBREAK:** el almuerzo refeed usa el plato estándar de la DB, sin la doble porción de carbo que indica el plan.
@@ -141,7 +147,7 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Editor de dietas** (hoy `foodsDiets` es solo lectura): asignar/editar `diet_dishes` desde la app.
 - **Buscar/filtrar** ingredientes y platos; sugerencias por macros restantes.
 - **Conflictos de sync:** hoy last-write-wins, sin cola offline (cambios hechos sin red se pueden perder si otro dispositivo escribe).
-- **Mejorar la IA:** que sugiera usando platos reales de la DB; cachear respuestas.
+- **Mejorar la IA:** que sugiera usando platos reales de la DB con recálculo estricto por ingredientes.
 
 ## 11b. Multiusuario, auth y roles (nuevo)
 La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migración: `supabase/auth.sql`.
@@ -159,7 +165,7 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 - **Entreno** (`renderWorkout`): nav de día + prescripción + reproductor recuperable + ejercicio activo con demostración/instrucciones + series o intervalos + cierre completo/parcial + resumen.
 - **Progreso** (`renderProgress`): stats (kg/entrenos/racha) + gráfico+tabla de peso + sección Semana (reusa `goDay`/`weekNav`).
 - **Perfil** (`renderProfile`): edita macros, logística alimentaria, restricciones, disponibilidad, lugares y recursos → `profiles.prefs`; cuenta + cerrar sesión; Administración solo admin.
-- **Coach personalizado:** `buildSysPrompt()` serializa el perfil v2 como JSON estructurado para separar restricciones obligatorias, gustos y recursos.
+- **Coach personalizado:** `buildSysPrompt()` serializa el perfil v3 como JSON estructurado para separar restricciones obligatorias, gustos, recursos y zona horaria.
 
 ## 11. Convenciones / gotchas
 - **Sin build, sin frameworks.** Todo en `index.html`; las funciones se llaman vía `onclick` inline. Mantener ese estilo (vanilla, español en UI/labels).

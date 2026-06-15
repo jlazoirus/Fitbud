@@ -103,10 +103,20 @@ global.fetch = async (url, options = {}) => {
   if (value.includes("/rest/v1/safety_screenings")) {
     return response(200, [{ age_confirmed: true, has_red_flags: false, cleared_for_training: true }]);
   }
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) {
+    return response(200, [{ usage_id: 1, mode: "fresh", usage_status: "reserved", effective_limit: 4, quota_day: "2026-06-15", policy_enabled: true }]);
+  }
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) {
+    return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  }
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) {
+    return response(200, [{ stored_result_id: 9 }]);
+  }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) return response(200, false);
   if (value.includes("api.anthropic.com")) {
     providerCalls += 1;
     providerSystem = JSON.parse(options.body).system;
-    return response(200, { content: [{ text: "{}" }] });
+    return response(200, { content: [{ text: '{"evaluacion":"Bien","sugerencia":"Continua"}' }], usage: { input_tokens: 10, output_tokens: 5 } });
   }
   throw new Error("Ruta no simulada: " + value);
 };
@@ -114,7 +124,18 @@ res = capture();
 await claudeHandler({
   method: "POST",
   headers: { authorization: "Bearer token" },
-  body: { userText: "Prepara una opcion", system: "Contexto del perfil" },
+  body: {
+    userText: "Prepara una opcion",
+    system: "Contexto del perfil",
+    quota: {
+      action: "macro_review",
+      requestId: "22222222-2222-4222-8222-222222222222",
+      partKey: "review",
+      contextKey: "ctx-privacy-test",
+      fallbackText: '{"evaluacion":"Bien","sugerencia":"Continua"}',
+      validation: {},
+    },
+  },
 }, res);
 assert(res.statusCode === 200, "El coach debe aceptar privacidad vigente.");
 assert(providerCalls === 1, "Debe realizar una sola llamada autorizada.");

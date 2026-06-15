@@ -104,7 +104,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Flujo | Estado actual | Brecha principal |
 |---|---|---|
 | Registro y acceso | Login, registro, reset y admin disponibles | Falta relacionar acceso con suscripcion y ofrecer una muestra clara antes del pago |
-| Onboarding | Perfil v2 implementado: macros, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | Falta usar el numero variable de comidas al construir el plan nutricional (REQ-18) |
+| Onboarding | Perfil v3 implementado: macros, zona horaria, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | Falta usar el numero variable de comidas al construir el plan nutricional (REQ-18) |
 | Home diario | Muestra macros, dieta, entrenamiento y racha | Falta priorizacion inteligente, estado del dia, proxima accion y contingencias |
 | Nutricion | Recetas, macros, checks, reemplazos y generacion IA diaria/semanal | Falta plan por numero de comidas, opciones equivalentes, lista de compras, contexto de presupuesto/tiempo y versionado |
 | Entrenamiento | Plan combinado, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta generar y adaptar planes completos de 4/10 semanas (REQ-17) |
@@ -117,7 +117,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Seguridad y privacidad | Auth, RLS y fotos de progreso personal protegidas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
 | Operacion | Admin de usuarios, alimentos y ejercicios con fuente/licencia | Faltan prompts/versiones, soporte, metricas de IA y costos |
 | Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
-| Consumo de generacion | No hay limite; los generadores de REQ-08 son ilimitados | Cuota diaria server-side y reutilizacion controlada de opciones (REQ-32) |
+| Consumo de generacion | Cuota diaria server-side, reserva idempotente y pool privado implementados | Integrar entitlement de REQ-25 y costo por accion de REQ-27 |
 | PWA y sincronizacion | Instalable, cache y safe areas de iPhone | Falta cola offline, conflictos, recuperacion ante fallos y pruebas end-to-end de journeys |
 
 ## Journey objetivo
@@ -156,7 +156,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 14. REQ-14 - Seguridad, consentimiento y privacidad.
 15. REQ-15 - Biblioteca de ejercicios y demostraciones animadas.
 16. REQ-16 - Reproductor de entrenamiento para principiantes. **Implementado**.
-32. REQ-32 - Cuotas diarias y reutilizacion de opciones. Implementar antes de ampliar REQ-17/REQ-18 y retrofitear a REQ-08.
+32. REQ-32 - Cuotas diarias y reutilizacion de opciones. **Implementado** antes de ampliar REQ-17/REQ-18 y retrofiteado a REQ-08.
 
 ### Fase B - Inteligencia y adaptacion
 
@@ -659,7 +659,7 @@ Permitir que cada usuario elija entre un bloque corto de 4 semanas y un proceso 
 
 **Estado: implementado.**
 
-La implementacion amplía onboarding y Perfil a cinco pasos, guarda preferencias estructuradas en `profiles.prefs` con `profileSchemaVersion: 2`, migra perfiles heredados con defaults sin reabrir onboarding y adapta el calendario de entrenamiento a los dias/lugares seleccionados. El contexto del coach recibe el perfil como JSON estructurado y las alergias se validan como restricciones duras, separadas de ingredientes no preferidos.
+La implementacion amplía onboarding y Perfil a cinco pasos, guarda preferencias estructuradas en `profiles.prefs` (evolucionadas a `profileSchemaVersion: 3` por REQ-32 para persistir zona horaria), migra perfiles heredados con defaults sin reabrir onboarding y adapta el calendario de entrenamiento a los dias/lugares seleccionados. El contexto del coach recibe el perfil como JSON estructurado y las alergias se validan como restricciones duras, separadas de ingredientes no preferidos.
 
 ### Objetivo
 
@@ -1669,7 +1669,9 @@ Que ningun usuario no administrador vea en la UI operativa la palabra IA, el pro
 
 ## REQ-32 - Cuotas diarias y reutilizacion de opciones
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementación agrega una reserva atómica por acción y día en Supabase, usando la zona horaria persistida del perfil y un `request_id` idempotente. Una semana completa comparte una sola reserva aunque prepare hasta siete días. Las respuestas válidas se guardan en un pool privado por usuario y contexto compatible; al alcanzar el límite, el servidor elige primero opciones no vistas, luego la menos reciente y finalmente una alternativa determinista, sin llamar otra vez al proveedor. Los fallos previos a una opción válida devuelven la reserva. Administración permite editar políticas, desactivar acciones, distinguir resultados nuevos/reutilizados, otorgar cortesía y reiniciar el consumo del día. Las políticas para planes y reemplazos de entrenamiento quedan disponibles para REQ-17/REQ-19.
 
 ### Objetivo
 

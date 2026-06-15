@@ -77,7 +77,7 @@ await handler({
 }, res);
 assert(res.statusCode === 200 && res.body.created === true, "Debe crear la cuenta QA si no existe.");
 assert(requests.some((item) => item.url.endsWith("/auth/v1/admin/users") && item.method === "POST"), "Debe crear el usuario en Auth.");
-assert(requests.filter((item) => item.method === "DELETE" && item.url.includes("/rest/v1/")).length === 6, "Debe limpiar las seis tablas personales.");
+assert(requests.filter((item) => item.method === "DELETE" && item.url.includes("/rest/v1/")).length === 9, "Debe limpiar progreso, privacidad y datos de consumo del coach.");
 assert(requests.some((item) => item.url.includes("/rest/v1/profiles?on_conflict=id") && item.method === "POST"), "Debe reiniciar el perfil.");
 
 requests = [];

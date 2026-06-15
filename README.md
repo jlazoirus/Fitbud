@@ -12,7 +12,7 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 - **Privacidad y seguridad versionadas**: edad mínima de 18 años, un permiso esencial y fotos opcionales, evaluación de aptitud, exportación y borrado de cuenta.
 - **Revisión cada 4 semanas** para actualizar peso, objetivo, macros o preferencias sin perder el progreso.
 - **Cierre de ciclo** con recap de logros, foto de progreso personal de cuerpo entero y elección del siguiente desafío antes de recalcular el próximo bloque.
-- **Tipos de día**: PESAS, BAJO, REFEED y DIET BREAK, cada uno con su meta de kcal y macros.
+- **Metas personales uniformes** para todos los días, calculadas en onboarding y editables desde Perfil.
 - **Registrar** comidas y ejecutar entrenamientos; Supabase es la fuente de verdad y `localStorage` mantiene una caché recuperable.
 - **Reemplazar** comidas (otra opción del plan o una personalizada) y **agregar** extras.
 - **Navegación** día anterior/siguiente y vista de semana completa.
@@ -20,6 +20,7 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 - **Plan deportivo configurable**: elige 4 o 10 semanas, Running, Cycling o Natación y combínalo siempre con fuerza en gimnasio o con peso corporal.
 - **Ejercicios guiados**: cada rutina enlaza un catálogo propio con instrucciones, respiración, errores comunes, señales de seguridad y demostraciones SVG animadas que se pueden pausar.
 - **Reproductor de entrenamiento**: calentamiento, series o intervalos, carga/repeticiones/RPE, descansos temporizados, sustituciones y cierre completo o parcial recuperable al reabrir la PWA.
+- **Consumo controlado del coach**: cada acción reserva una unidad server-side; al alcanzar el límite reutiliza opciones compatibles o una alternativa determinista sin mostrar contadores.
 - **Instalable como PWA** con manifest, íconos y cache offline del shell de la app.
 
 ## Plan de entrenamiento
@@ -47,7 +48,7 @@ Después del primer inicio de sesión, Fitbud guía al usuario por cinco pasos:
 4. Número y horario de comidas, ventana alimentaria, tiempo de cocina y presupuesto.
 5. Patrón de alimentación, alergias, privacidad, consentimientos y evaluación básica de seguridad.
 
-El cálculo usa Katch-McArdle cuando se proporciona el porcentaje de grasa corporal y Mifflin-St Jeor en caso contrario. El perfil queda guardado por usuario en `profiles.prefs` con `profileSchemaVersion: 2`; las cuentas existentes reciben defaults compatibles sin repetir el onboarding. Los consentimientos y la evaluación viven en tablas versionadas independientes. Cada 28 días la app pregunta si se desea revisar la configuración; también puede abrirse manualmente desde **Perfil → Recalcular objetivos y preferencias**.
+El cálculo usa Katch-McArdle cuando se proporciona el porcentaje de grasa corporal y Mifflin-St Jeor en caso contrario. El perfil queda guardado por usuario en `profiles.prefs` con `profileSchemaVersion: 3`, incluida su zona horaria para ventanas diarias; las cuentas existentes reciben defaults compatibles sin repetir el onboarding. Los consentimientos y la evaluación viven en tablas versionadas independientes. Cada 28 días la app pregunta si se desea revisar la configuración; también puede abrirse manualmente desde **Perfil → Recalcular objetivos y preferencias**.
 
 Al terminar la duración elegida, Fitbud resume entrenamientos, adherencia, cambio de peso, grasa corporal y mejor racha. El usuario puede guardar una foto de progreso personal de cuerpo entero y elegir entre mantener, continuar, mejorar rendimiento o ganar fuerza. Esa elección vuelve a abrir el onboarding y crea un ciclo nuevo de 4 o 10 semanas con fechas, macros y reparto deportivo recalculados.
 
@@ -61,7 +62,7 @@ La app resuelve sus credenciales en este orden de prioridad:
 
 Las funciones serverless ([`api/`](api/)) son el corazón de la seguridad:
 
-- **`/api/claude`** — proxy a la API de Anthropic. La API key vive **solo** en el servidor (variable `ANTHROPIC_API_KEY` en Vercel); nunca llega al navegador ni a GitHub.
+- **`/api/claude`** — proxy a la API de Anthropic. Valida la respuesta, reserva cuota atómicamente, guarda opciones compatibles y reutiliza el pool privado sin una llamada externa cuando corresponde. La API key vive **solo** en el servidor.
 - **`/api/config`** — devuelve al navegador solo datos públicos (URL + publishable key de Supabase, modelo). **No** devuelve la key de Claude.
 - **`/api/admin`** — lista, activa/desactiva y cambia contraseñas. Exige un administrador activo y usa `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor.
 - **`/api/privacy`** — exporta los datos del usuario autenticado y borra cuenta, datos y fotos tras una confirmación estricta. Usa `SUPABASE_SERVICE_ROLE_KEY` solo en el servidor.
@@ -81,6 +82,7 @@ Los administradores tienen una vista **Perfil → Usuarios** con búsqueda y fil
 - enviar un correo de recuperación;
 - crear o reiniciar una cuenta QA conservando sus credenciales pero eliminando perfil, progreso, planes, consentimientos y fotos para repetir el onboarding completo;
 - consultar fecha de alta y último acceso.
+- configurar límites por acción, desactivar una función costosa, comparar respuestas nuevas/reutilizadas y otorgar o reiniciar cortesía por usuario.
 
 Desactivar una cuenta actualiza `profiles.active` y bloquea al usuario en Supabase Auth. También queda protegido por RLS y no puede escribir ni usar Claude. El servidor impide que un administrador se desactive a sí mismo o desactive al último administrador activo.
 
@@ -114,11 +116,11 @@ Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se
 ### Preparar la base
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
-2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql), [`supabase/privacy.sql`](supabase/privacy.sql) y [`supabase/exercises.sql`](supabase/exercises.sql). Las migraciones finales crean planes, privacidad y la biblioteca compartida de ejercicios con RLS.
+2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql), [`supabase/privacy.sql`](supabase/privacy.sql), [`supabase/exercises.sql`](supabase/exercises.sql) y [`supabase/coach_quota.sql`](supabase/coach_quota.sql). Las migraciones finales crean planes, privacidad, la biblioteca compartida y el control de consumo con RLS.
 3. En **Project Settings → API Keys**, copia la **Project URL** (o el Project ID) y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
 4. Ponlos como variables de entorno en Vercel (ver despliegue). Para desarrollo local, también puedes guardarlos desde **Ajustes → Base de datos**.
 
-> Para una instalación existente, ejecuta las migraciones idempotentes pendientes en orden: [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) si aún no se aplicó, después [`supabase/privacy.sql`](supabase/privacy.sql) y finalmente [`supabase/exercises.sql`](supabase/exercises.sql). No se ejecutan automáticamente en producción.
+> Para una instalación existente, ejecuta las migraciones idempotentes pendientes en orden: [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) si aún no se aplicó, después [`supabase/privacy.sql`](supabase/privacy.sql), [`supabase/exercises.sql`](supabase/exercises.sql) y finalmente [`supabase/coach_quota.sql`](supabase/coach_quota.sql). No se ejecutan automáticamente en producción.
 
 El catálogo base se mantiene en [`exercise-catalog.js`](exercise-catalog.js). Después de editarlo, regenera la migración y valida referencias con:
 
@@ -126,6 +128,8 @@ El catálogo base se mantiene en [`exercise-catalog.js`](exercise-catalog.js). D
 node scripts/generate-exercise-sql.mjs
 node scripts/validate-exercises.mjs
 node scripts/validate-workout-player.mjs
+node scripts/validate-coach-quota.mjs
+node scripts/test-coach-quota.mjs
 ```
 
 ## Uso local
@@ -152,7 +156,7 @@ No hay build: archivos estáticos en la raíz + funciones serverless en [`api/`]
    | `ANTHROPIC_API_KEY` | tu key `sk-ant-...` de Claude | **Sí** (solo servidor) |
    | `SUPABASE_URL` | `https://xxxxx.supabase.co` | No (pública) |
    | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | No (pública) |
-   | `SUPABASE_SERVICE_ROLE_KEY` | service role para `/api/admin` y `/api/privacy` | **Sí (solo servidor)** |
+   | `SUPABASE_SERVICE_ROLE_KEY` | service role para cuotas, `/api/admin` y `/api/privacy` | **Sí (solo servidor)** |
    | `ANTHROPIC_MODEL` *(opcional)* | `claude-haiku-4-5-20251001` | No |
 
 4. **Deploy**. Cada `git push` redepliega solo.

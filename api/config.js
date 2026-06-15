@@ -11,8 +11,8 @@ export default function handler(req, res) {
     },
     anthropic: {
       model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
-      // true si el servidor tiene la key => la app usará el proxy /api/claude
-      proxy: !!process.env.ANTHROPIC_API_KEY,
+      // El proxy solo se anuncia cuando puede aplicar cuota server-side.
+      proxy: !!process.env.ANTHROPIC_API_KEY && !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     },
   });
 }

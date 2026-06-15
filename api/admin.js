@@ -4,6 +4,15 @@
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BAN_DURATION = "876000h"; // 100 años; "none" levanta el bloqueo.
+const COACH_ACTIONS = new Set([
+  "diet_day",
+  "diet_week",
+  "meal_option",
+  "meal_estimate",
+  "macro_review",
+  "training_plan",
+  "training_replacement",
+]);
 
 function env() {
   return {
@@ -174,6 +183,9 @@ async function deleteTestPhotos(userId, e) {
 async function resetTestUserData(user, e) {
   await deleteTestPhotos(user.id, e);
   for (const table of [
+    "coach_usage",
+    "coach_option_pool",
+    "coach_quota_overrides",
     "day_log",
     "weight_log",
     "plan_cycles",
@@ -184,6 +196,146 @@ async function resetTestUserData(user, e) {
     await deleteUserRows(table, user.id, e);
   }
   await resetTestProfile(user, e);
+}
+
+async function restRequest(e, path, options) {
+  const response = await fetch(e.url + "/rest/v1/" + path, Object.assign(
+    { headers: serviceHeaders(e) },
+    options || {}
+  ));
+  const data = await responseJson(response);
+  if (!response.ok) {
+    const error = new Error(apiError(data, "No se pudo consultar " + path.split("?")[0] + "."));
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+async function quotaOverview(e) {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [policies, overrides, usage] = await Promise.all([
+    restRequest(e, "coach_quota_policies?select=action,entitlement_code,daily_limit,enabled,updated_at&order=action.asc"),
+    restRequest(e, "coach_quota_overrides?select=user_id,action,entitlement_code,daily_limit,bonus_units,enabled,expires_at,updated_at&order=updated_at.desc&limit=500"),
+    restRequest(
+      e,
+      "coach_usage?select=user_id,action,status,origin,error_code,created_at&created_at=gte."
+        + encodeURIComponent(since)
+        + "&order=created_at.desc&limit=2000"
+    ),
+  ]);
+  const summary = {};
+  const byUser = {};
+  (Array.isArray(usage) ? usage : []).forEach((row) => {
+    const action = row.action || "unknown";
+    if (!summary[action]) summary[action] = { fresh: 0, reused: 0, refunded: 0, errors: 0 };
+    if (row.status === "refunded") summary[action].refunded += 1;
+    else if (row.origin === "fresh") summary[action].fresh += 1;
+    else summary[action].reused += 1;
+    if (row.error_code) summary[action].errors += 1;
+    const key = row.user_id + ":" + action;
+    byUser[key] = (byUser[key] || 0) + 1;
+  });
+  const topConsumers = Object.entries(byUser)
+    .map(([key, requests]) => {
+      const split = key.lastIndexOf(":");
+      return { user_id: key.slice(0, split), action: key.slice(split + 1), requests };
+    })
+    .sort((a, b) => b.requests - a.requests)
+    .slice(0, 10);
+  return {
+    policies: Array.isArray(policies) ? policies : [],
+    overrides: Array.isArray(overrides) ? overrides : [],
+    summary,
+    topConsumers,
+    windowDays: 7,
+  };
+}
+
+async function setQuotaPolicy(body, caller, e) {
+  const action = String(body.quotaAction || "");
+  const dailyLimit = Number.parseInt(body.dailyLimit, 10);
+  if (!COACH_ACTIONS.has(action) || !Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 1000) {
+    const error = new Error("Acción y límite diario entre 0 y 1000 requeridos.");
+    error.status = 400;
+    throw error;
+  }
+  const response = await fetch(e.url + "/rest/v1/coach_quota_policies?on_conflict=action,entitlement_code", {
+    method: "POST",
+    headers: serviceHeaders(e, {
+      "content-type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation",
+    }),
+    body: JSON.stringify({
+      action,
+      entitlement_code: String(body.entitlementCode || "default").slice(0, 80),
+      daily_limit: dailyLimit,
+      enabled: body.enabled !== false,
+      updated_by: caller,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo actualizar la política."));
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function setQuotaOverride(body, caller, e) {
+  const userId = String(body.userId || "");
+  const action = String(body.quotaAction || "");
+  const dailyLimit = body.dailyLimit === "" || body.dailyLimit == null ? null : Number.parseInt(body.dailyLimit, 10);
+  const bonusUnits = Number.parseInt(body.bonusUnits, 10) || 0;
+  if (!UUID_RE.test(userId) || !COACH_ACTIONS.has(action)
+    || (dailyLimit != null && (!Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 1000))
+    || bonusUnits < 0 || bonusUnits > 1000) {
+    const error = new Error("Usuario, acción y valores de cortesía válidos requeridos.");
+    error.status = 400;
+    throw error;
+  }
+  if (!await profileById(userId, e)) {
+    const error = new Error("Usuario no encontrado.");
+    error.status = 404;
+    throw error;
+  }
+  const response = await fetch(e.url + "/rest/v1/coach_quota_overrides?on_conflict=user_id,action", {
+    method: "POST",
+    headers: serviceHeaders(e, {
+      "content-type": "application/json",
+      Prefer: "resolution=merge-duplicates,return=representation",
+    }),
+    body: JSON.stringify({
+      user_id: userId,
+      action,
+      entitlement_code: body.entitlementCode ? String(body.entitlementCode).slice(0, 80) : null,
+      daily_limit: dailyLimit,
+      bonus_units: bonusUnits,
+      enabled: typeof body.enabled === "boolean" ? body.enabled : null,
+      expires_at: body.expiresAt || null,
+      updated_by: caller,
+      updated_at: new Date().toISOString(),
+    }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo guardar la cortesía."));
+  return Array.isArray(data) ? data[0] : data;
+}
+
+async function resetQuota(body, e) {
+  const userId = String(body.userId || "");
+  const action = String(body.quotaAction || "");
+  if (!UUID_RE.test(userId) || !COACH_ACTIONS.has(action)) {
+    const error = new Error("Usuario y acción válidos requeridos.");
+    error.status = 400;
+    throw error;
+  }
+  const response = await fetch(e.url + "/rest/v1/rpc/admin_reset_coach_quota", {
+    method: "POST",
+    headers: serviceHeaders(e, { "content-type": "application/json" }),
+    body: JSON.stringify({ p_user_id: userId, p_action: action }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo reiniciar la cuota."));
+  return Number(data) || 0;
 }
 
 async function activeAdminCount(e) {
@@ -416,6 +568,26 @@ export default async function handler(req, res) {
         return;
       }
       res.status(200).json({ ok: true });
+      return;
+    }
+
+    if (body.action === "quotaOverview") {
+      res.status(200).json(await quotaOverview(e));
+      return;
+    }
+
+    if (body.action === "setQuotaPolicy") {
+      res.status(200).json({ ok: true, policy: await setQuotaPolicy(body, caller, e) });
+      return;
+    }
+
+    if (body.action === "setQuotaOverride") {
+      res.status(200).json({ ok: true, override: await setQuotaOverride(body, caller, e) });
+      return;
+    }
+
+    if (body.action === "resetQuota") {
+      res.status(200).json({ ok: true, reset: await resetQuota(body, e) });
       return;
     }
 

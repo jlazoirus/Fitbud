@@ -528,7 +528,7 @@ let PLAN_VERSIONS_ERROR=null;
 
 const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
 const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
-const PROFILE_SCHEMA_VERSION=2;
+const PROFILE_SCHEMA_VERSION=3;
 const CONSENT_POLICY_VERSION="2026-06-15-v2";
 const SAFETY_SCREENING_VERSION="2026-06-15";
 const MINIMUM_AGE=18;
@@ -595,6 +595,13 @@ function defaultMealTimes(count){
   return (presets[count]||presets[4]).slice();
 }
 function validTime(value){return typeof value==="string"&&/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);}
+function detectedTimeZone(){
+  try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"UTC";}catch(e){return"UTC";}
+}
+function validTimeZone(value){
+  if(typeof value!=="string"||!value.trim())return false;
+  try{Intl.DateTimeFormat("en-US",{timeZone:value}).format();return true;}catch(e){return false;}
+}
 function normalizedMealTimes(value,count){
   const fallback=defaultMealTimes(count);
   const source=Array.isArray(value)?value:[];
@@ -659,6 +666,7 @@ function migrateProfilePrefs(source){
   const equipmentDefault=strength==="bodyweight"?["bodyweight"]:["dumbbells","barbell","machines"];
   const prefs={...p,
     profileSchemaVersion:PROFILE_SCHEMA_VERSION,
+    timeZone:validTimeZone(p.timeZone)?p.timeZone:detectedTimeZone(),
     primarySport:primary,
     strengthMode:strength,
     trainType:primary,
@@ -956,7 +964,7 @@ function profileMacroTargetsFromPrefs(source){
 function effectiveDayTarget(source){
   return profileMacroTargetsFromPrefs(source||((profile&&profile.prefs)||{}))||{kcal:2000,p:150,c:200,f:65};
 }
-// Estructura de comidas del día según cuántas come el usuario (2-6, perfil v2).
+// Estructura de comidas del día según cuántas come el usuario (2-6, perfil v3).
 // Conserva los ids históricos (desayuno/almuerzo/cena/snack) para no perder los
 // datos ya guardados en day_log; los ids nuevos solo aparecen con 5-6 comidas.
 const MEAL_SLOT_TEMPLATES={
@@ -1032,6 +1040,7 @@ function planSnapshotFields(prefs){
   const p=migrateProfilePrefs(prefs||{});
   return {
     profileSchemaVersion:p.profileSchemaVersion,
+    timeZone:p.timeZone,
     name:p.name||"",
     sex:p.sex||"",
     age:p.age||"",
@@ -3659,6 +3668,7 @@ function buildSysPrompt(){
   const base=`Da estimaciones realistas de porciones reales, con kcal y macros. Habla como el coach del usuario y no menciones tecnología, proveedores, modelos, prompts ni tokens. No diagnostiques, no prescribas tratamientos, no cambies medicación y no sustituyas a un profesional de salud. ${safety}`;
   const context={
     schema_version:p.profileSchemaVersion,
+    time_zone:p.timeZone,
     body:{weight_kg:+p.weightKg||null,body_fat_pct:+p.bodyFatPct||null},
     nutrition:{
       diet:(p.diet||[]).map(d=>DIET_LABELS[d]||d),
@@ -3695,7 +3705,84 @@ function buildSysPrompt(){
   };
   return `Perfil estructurado del usuario (JSON): ${JSON.stringify(context)}. ${base} Las restricciones duras son obligatorias; los ingredientes no preferidos son preferencias blandas. Respeta siempre el perfil y no inventes recursos que el usuario no tiene.`;
 }
-async function callClaude(userText,maxTokens){
+function coachRequestId(){
+  if(window.crypto&&typeof window.crypto.randomUUID==="function")return window.crypto.randomUUID();
+  const bytes=new Uint8Array(16);
+  if(window.crypto&&window.crypto.getRandomValues)window.crypto.getRandomValues(bytes);
+  else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);
+  bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+  const hex=Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+}
+const coachActionsInFlight=new Set();
+function beginCoachAction(key){
+  if(coachActionsInFlight.has(key)){toast("Esta acción ya está en proceso");return null;}
+  coachActionsInFlight.add(key);return coachRequestId();
+}
+function endCoachAction(key){coachActionsInFlight.delete(key);}
+function coachHardRestrictions(){
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const terms=String(p.allergies||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean);
+  if(Array.isArray(p.diet)&&(p.diet.includes("sin_huevo")||p.diet.includes("vegano")))terms.push("huevo","clara de huevo","yema");
+  return [...new Set(terms.map(x=>x.toLowerCase()))];
+}
+function coachCompatibilityContext(action){
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const target=effectiveDayTarget(p);
+  return {
+    version:1,action,
+    timeZone:p.timeZone,
+    nutrition:{
+      target,mealCount:p.mealCount,mealTimes:p.mealTimes,diet:p.diet||[],
+      allergies:p.allergies||"",cookingMinutes:p.cookingMinutes,foodBudget:p.foodBudget,
+      repeatPreference:p.repeatPreference,
+    },
+    training:{
+      days:p.trainingDays,locations:p.trainingLocations,equipment:p.equipment,
+      experience:p.trainingExperience,priority:p.trainingPriority,
+      injuries:p.injuries,limitations:p.limitations,avoidMovements:p.avoidMovements,
+    },
+    catalog:{
+      dishes:hashText((DB.dishes||[]).map(d=>d.id+":"+d.name).join("|")),
+      exercises:hashText((DB.exercises||[]).map(e=>e.slug+":"+(e.active!==false)).join("|")),
+    },
+  };
+}
+function coachQuota(action,requestId,partKey,fallbackText,validation,scope){
+  const context={...coachCompatibilityContext(action),scope:scope||null};
+  const serialized=JSON.stringify(context);
+  return {
+    action,requestId,partKey,
+    contextKey:"ctx-"+hashText(serialized)+"-"+hashText(serialized.split("").reverse().join("")),
+    fallbackText:String(fallbackText||""),
+    validation:validation||{},
+  };
+}
+async function coachProxyFetch(payload){
+  let lastError=null;
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const res=await fetch("/api/claude",{
+        method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+session.access_token},
+        body:JSON.stringify(payload)
+      });
+      const data=await res.json().catch(()=>({}));
+      if(res.status===409&&attempt===0){await new Promise(resolve=>setTimeout(resolve,350));continue;}
+      if(res.status===404)throw new Error("El proxy /api/claude no está disponible. Despliega en Vercel o usa una configuración local de desarrollo.");
+      if(!res.ok)throw new Error(data.error||("Error "+res.status));
+      return data;
+    }catch(e){
+      lastError=e;
+      if(attempt===0&&/fetch|network|conexi|proceso/i.test(String(e&&e.message||e))){
+        await new Promise(resolve=>setTimeout(resolve,250));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastError||new Error("No se pudo contactar al coach.");
+}
+async function callClaude(userText,maxTokens,quota){
   if(!isActive())throw new Error("Tu cuenta está desactivada.");
   if(!hasRequiredConsents()||!hasCurrentScreening())throw new Error("Revisa privacidad y seguridad antes de usar tu coach.");
   const cfg=effectiveSettings();
@@ -3715,13 +3802,10 @@ async function callClaude(userText,maxTokens){
   //    El proxy exige sesión: enviamos el token de Supabase (Bearer) para que valide.
   const token=session&&session.access_token;
   if(!token)throw new Error("Inicia sesión para usar tu coach.");
-  const res=await fetch("/api/claude",{
-    method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+token},
-    body:JSON.stringify({userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL})
+  if(!quota||!quota.action||!quota.requestId)throw new Error("La acción del coach no tiene una reserva válida.");
+  const data=await coachProxyFetch({
+    userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL,quota
   });
-  if(res.status===404)throw new Error("El proxy /api/claude no está disponible. Despliega en Vercel (con ANTHROPIC_API_KEY) o pon una API key local en Ajustes.");
-  const data=await res.json().catch(()=>({}));
-  if(!res.ok)throw new Error(data.error||("Error "+res.status));
   return data.text||"";
 }
 function parseJSON(txt){
@@ -3730,32 +3814,110 @@ function parseJSON(txt){
   if(a>=0&&b>=0)t=t.slice(a,b+1);
   return JSON.parse(t);
 }
+function compatibleIngredient(candidates,fallback){
+  const restricted=coachHardRestrictions();
+  return candidates.find(name=>!restricted.some(term=>name.toLowerCase().includes(term)))||fallback;
+}
+function splitDailyTarget(total,count,index){
+  const base=Math.floor(Number(total||0)/count);
+  return index===count-1?Math.round(Number(total||0)-base*(count-1)):base;
+}
+function deterministicDayPayload(ds){
+  const day=buildDay(ds),target=effectiveDayTarget(),count=day.meals.length;
+  const proteinName=compatibleIngredient(
+    ["Proteína vegetal en polvo","Seitán","Tofu firme","Lentejas cocidas"],
+    "Fuente de proteína compatible"
+  );
+  const carbName=compatibleIngredient(["Arroz cocido","Quinua cocida","Papa","Avena"],"Fuente de carbohidratos compatible");
+  const fatName=compatibleIngredient(["Aceite de oliva","Palta","Chía"],"Fuente de grasas compatible");
+  const comidas=day.meals.map((meal,index)=>{
+    const p=splitDailyTarget(target.p,count,index);
+    const c=splitDailyTarget(target.c,count,index);
+    const f=splitDailyTarget(target.f,count,index);
+    return {
+      slot_id:meal.id,
+      nombre:`${meal.slot} práctica ajustada a tus metas`,
+      ingredientes:[
+        {nombre:proteinName,gramos:Math.max(10,Math.round(p/0.8))},
+        {nombre:carbName,gramos:Math.max(10,Math.round(c/0.28))},
+        {nombre:fatName,gramos:Math.max(3,Math.round(f))},
+        {nombre:"Verduras variadas compatibles",gramos:100},
+      ],
+      kcal:splitDailyTarget(target.kcal,count,index),
+      proteina_g:p,carbohidratos_g:c,grasa_g:f,
+    };
+  });
+  return {explicacion:"Alternativa práctica construida con tus metas y restricciones vigentes.",comidas};
+}
+function deterministicSuggestionPayload(remK,remP){
+  const budget=Math.max(100,Number(remK)||0);
+  const protein=Math.max(10,Math.min(Number(remP)||10,Math.round(budget/8)));
+  const names=["Bowl práctico compatible","Plato rápido compatible","Opción simple para completar el día"];
+  return {opciones:names.map((nombre,index)=>{
+    const factor=[.9,.72,.55][index];
+    const kcal=Math.max(80,Math.round(budget*factor));
+    const p=Math.max(10,Math.round(protein*factor));
+    const f=Math.max(4,Math.round(kcal*.25/9));
+    const c=Math.max(5,Math.round((kcal-p*4-f*9)/4));
+    return {nombre,kcal,proteina_g:p,carbohidratos_g:c,grasa_g:f};
+  })};
+}
+function dietQuotaValidation(ds){
+  const day=buildDay(ds);
+  return {
+    expectedMeals:day.meals.length,
+    slots:day.meals.map(meal=>meal.id),
+    target:effectiveDayTarget(),
+    hardRestrictions:coachHardRestrictions(),
+  };
+}
+function mealOptionValidation(remK){
+  return {hardRestrictions:coachHardRestrictions(),maxKcal:Math.max(100,Number(remK)||0)};
+}
+function validMealSuggestions(value){
+  return !!(value&&Array.isArray(value.opciones)&&value.opciones.length&&value.opciones.every(option=>
+    String(option&&option.nombre||"").trim()
+    &&[option.kcal,option.proteina_g,option.carbohidratos_g,option.grasa_g].every(n=>Number.isFinite(Number(n)))
+    &&!coachHardRestrictions().some(term=>String(option.nombre||"").toLowerCase().includes(term))
+  ));
+}
 
 // IA 1 — estimar comida (texto)
 async function aiEstimate(){
   const name=$("#f_name").value.trim();
   if(!name){toast("Escribe o dicta la comida primero");return;}
+  const actionKey="meal_estimate";
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const out=$("#aiOut");out.innerHTML=`<div class="ai-box">Estimando…</div>`;
   try{
-    const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". Responde SOLO JSON: {"kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve"}`,400);
+    const fallback=JSON.stringify({kcal:500,proteina_g:25,carbohidratos_g:55,grasa_g:20,nota:"Estimación de referencia. Ajusta la porción si conoces la receta."});
+    const quota=coachQuota("meal_estimate",requestId,"estimate",fallback,{},hashText(name.toLowerCase()));
+    const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". Responde SOLO JSON: {"kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve"}`,400,quota);
     const j=parseJSON(txt);
     $("#f_kcal").value=Math.round(j.kcal);$("#f_p").value=Math.round(j.proteina_g);$("#f_c").value=Math.round(j.carbohidratos_g);$("#f_f").value=Math.round(j.grasa_g);
     out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}</div>`;
   }catch(e){out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
+  finally{endCoachAction(actionKey);}
 }
 
 // IA 2 — sugerir comidas
 async function aiSuggest(){
   if(coachUnavailable())return;
+  const actionKey="meal_option";
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const{t,target}=dayTotals(current);const day=buildDay(current);
   const remK=Math.max(0,target.kcal-t.kcal),remP=Math.max(0,target.p-t.p);
   modal(`<h3>✨ Otra opción de comida</h3><div id="aiOut"><div class="ai-box">Buscando opciones…</div></div>`);
   try{
-    const txt=await callClaude(`Me quedan ${remK} kcal y ${remP} g de proteína para la meta del día. Sugiere 2-3 comidas que respeten el perfil estructurado, sus restricciones y recursos. Responde SOLO JSON: {"opciones":[{"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n}]}`,600);
+    const fallback=JSON.stringify(deterministicSuggestionPayload(remK,remP));
+    const quota=coachQuota("meal_option",requestId,"options",fallback,mealOptionValidation(remK),`${Math.round(remK/50)*50}:${Math.round(remP/10)*10}`);
+    const txt=await callClaude(`Me quedan ${remK} kcal y ${remP} g de proteína para la meta del día. Sugiere 2-3 comidas que respeten el perfil estructurado, sus restricciones y recursos. Responde SOLO JSON: {"opciones":[{"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n}]}`,600,quota);
     const j=parseJSON(txt);
+    if(!validMealSuggestions(j))throw new Error("Las opciones no son compatibles con el perfil.");
     const html=j.opciones.map((o,i)=>`<button class="opt" onclick='addSuggestion(${JSON.stringify(JSON.stringify(o))})'>${esc(coachCopy(o.nombre))}<div class="o-meta">${Math.round(o.kcal)} kcal · P ${Math.round(o.proteina_g)} · C ${Math.round(o.carbohidratos_g)} · G ${Math.round(o.grasa_g)} g · toca para agregar</div></button>`).join("");
     $("#aiOut").innerHTML=html;
   }catch(e){$("#aiOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
+  finally{endCoachAction(actionKey);}
 }
 function addSuggestion(s){const o=JSON.parse(s);const d=dayState(current);d.extras.push({name:coachCopy(o.nombre),kcal:Math.round(o.kcal),p:Math.round(o.proteina_g),c:Math.round(o.carbohidratos_g),f:Math.round(o.grasa_g),done:true});commitDay(current);closeModal();render();toast("Comida agregada");}
 
@@ -3814,7 +3976,7 @@ function validateGeneratedDay(j,day,target){
   return{ok:issues.length===0,issues,warns,comidas,totals:{kcal:Math.round(tot.kcal),p:Math.round(tot.p),c:Math.round(tot.c),f:Math.round(tot.f)},explicacion:coachCopy((j.explicacion||j.explicación||"").trim())};
 }
 // Núcleo reutilizable: genera UN día a la medida de los macros del usuario y lo valida.
-async function generateOneDay(ds){
+async function generateOneDay(ds,coachRequest){
   const day=buildDay(ds); const target=effectiveDayTarget();
   const slots=day.meals.map(m=>`${m.id} (${m.slot}${m.time?", ~"+m.time:""})`).join(", ");
   const dishList=DB.loaded?DB.dishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
@@ -3827,27 +3989,40 @@ Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}.
 Cada comida debe llevar ingredientes reales con gramos y macros que sumen cerca de la meta del día.
 Responde SOLO JSON válido, sin texto extra:
 {"explicacion":"breve","comidas":[{"slot_id":"desayuno","nombre":"...","ingredientes":[{"nombre":"Avena","gramos":50}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
-  const txt=await callClaude(prompt,1400);
+  const fallback=JSON.stringify(deterministicDayPayload(ds));
+  const quota=coachQuota(
+    coachRequest.action,
+    coachRequest.requestId,
+    coachRequest.partKey,
+    fallback,
+    dietQuotaValidation(ds)
+  );
+  const txt=await callClaude(prompt,1400,quota);
   const j=parseJSON(txt);
   return {res:validateGeneratedDay(j,day,target),day,target};
 }
 async function aiGenerateDay(){
   if(coachUnavailable())return;
+  const actionKey="diet_day";
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const ds=current; const day=buildDay(ds);
   modal(`<h3>🍽️ Preparar mi día</h3><div id="genOut"><div class="ai-box">Estamos preparando tu día a la medida de tus metas…</div></div>`);
   try{
-    const {res,target}=await generateOneDay(ds);
+    const {res,target}=await generateOneDay(ds,{action:"diet_day",requestId,partKey:"day"});
     window._genDay={ds,comidas:res.comidas};
     $("#genOut").innerHTML=genReviewHtml(res,target);
   }catch(e){$("#genOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
+  finally{endCoachAction(actionKey);}
 }
 // --- Plan semanal personalizado (se guarda como overrides por día, por usuario) ---
 function weekDays(w){const days=[];let d=w.start;while(d<=w.end){if(d>=START&&d<=END)days.push(d);d=addDays(d,1);}return days;}
 function weekHasGeneratedPlan(w){return weekDays(w).some(ds=>{const st=S.days&&S.days[ds];return st&&st.meals&&Object.values(st.meals).some(m=>m&&m.ovr&&m.ovr.gen);});}
 async function aiGenerateWeek(){
   if(coachUnavailable())return;
+  const actionKey="diet_week";
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const w=weekOf(current,planPrefsForDate(current))||weekOf(current)||WEEKS[0]; const days=weekDays(w);
-  if(!days.length){toast("Esta semana está fuera del plan");return;}
+  if(!days.length){endCoachAction(actionKey);toast("Esta semana está fuera del plan");return;}
   const label=w.num?("Semana "+w.num):"Semana de arranque";
   modal(`<h3>📅 Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida…</div></div>`);
   let okN=0; const problems=[];
@@ -3855,7 +4030,7 @@ async function aiGenerateWeek(){
     const ds=days[i];
     const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Preparando ${label}: día ${i+1} de ${days.length}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
     try{
-      const {res}=await generateOneDay(ds);
+      const {res}=await generateOneDay(ds,{action:"diet_week",requestId,partKey:"day-"+(i+1)});
       if(res.ok){applyDayComidas(ds,res.comidas);okN++;}
       else problems.push(prettyDate(ds)+": "+(res.issues[0]||"no válido"));
     }catch(e){problems.push(prettyDate(ds)+": "+coachErrorMessage(e));}
@@ -3868,6 +4043,7 @@ async function aiGenerateWeek(){
       <button class="btn btn-accent" onclick="closeModal()">Listo</button>
       <button class="btn" onclick="aiGenerateWeek()">Preparar otra semana</button>
     </div>`;
+  endCoachAction(actionKey);
 }
 function genReviewHtml(res,target){
   const t=res.totals||{kcal:0,p:0,c:0,f:0};
@@ -3904,14 +4080,23 @@ function applyGeneratedDay(){
 // IA 3 — revisar mis macros
 async function aiReview(){
   if(coachUnavailable())return;
+  const actionKey="macro_review";
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const{t,target}=dayTotals(current);const day=buildDay(current);
   const now=new Date();const hora=now.getHours()+":"+String(now.getMinutes()).padStart(2,"0");
   modal(`<h3>🔍 Revisión de macros</h3><div id="aiOut"><div class="ai-box">Analizando…</div></div>`);
   try{
-    const txt=await callClaude(`Son las ${hora}. Llevo consumido: ${t.kcal} kcal, ${t.p} g proteína, ${t.c} g carbos, ${t.f} g grasa. Metas del día: ${target.kcal} kcal, ${target.p} P, ${target.c} C, ${target.f} G. Evalúa brevemente cómo voy y da UNA sugerencia concreta que respete el perfil estructurado. Responde SOLO JSON: {"evaluacion":"...","sugerencia":"..."}`,400);
+    const missing=Math.max(0,target.kcal-t.kcal);
+    const fallback=JSON.stringify({
+      evaluacion:t.kcal>=target.kcal*.85?"Estás cerca de completar la meta del día.":"Todavía queda margen para completar tu meta del día.",
+      sugerencia:missing>0?`Prioriza una comida compatible de aproximadamente ${Math.round(missing)} kcal.`:"Mantén el cierre del día simple y registra lo que realmente consumas.",
+    });
+    const quota=coachQuota("macro_review",requestId,"review",fallback,{},`${Math.round(t.kcal/50)*50}:${Math.round(t.p/10)*10}`);
+    const txt=await callClaude(`Son las ${hora}. Llevo consumido: ${t.kcal} kcal, ${t.p} g proteína, ${t.c} g carbos, ${t.f} g grasa. Metas del día: ${target.kcal} kcal, ${target.p} P, ${target.c} C, ${target.f} G. Evalúa brevemente cómo voy y da UNA sugerencia concreta que respete el perfil estructurado. Responde SOLO JSON: {"evaluacion":"...","sugerencia":"..."}`,400,quota);
     const j=parseJSON(txt);
     $("#aiOut").innerHTML=`<div class="ai-box"><b>Evaluación:</b> ${esc(coachCopy(j.evaluacion))}\n\n<b>Sugerencia:</b> ${esc(coachCopy(j.sugerencia))}</div>`;
   }catch(e){$("#aiOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
+  finally{endCoachAction(actionKey);}
 }
 
 /* ============================================================
@@ -4569,6 +4754,12 @@ function dishMacros(dishId){return macrosFromLines(DB.dishIng.filter(x=>x.dish_i
    Usa /api/admin (service role en el servidor). El cliente solo manda su JWT.
    ============================================================ */
 let adminUsersCache=[];
+let adminQuotaCache={policies:[],overrides:[],summary:{},topConsumers:[]};
+const ADMIN_COACH_ACTION_LABELS={
+  diet_day:"Dieta · día",diet_week:"Dieta · semana",meal_option:"Opción de comida",
+  meal_estimate:"Estimar comida",macro_review:"Revisar macros",
+  training_plan:"Plan de entrenamiento",training_replacement:"Reemplazo de entrenamiento",
+};
 function prettyDateTime(iso){try{const d=new Date(iso);if(isNaN(d))return "—";return d.getDate()+" "+MON[d.getMonth()]+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}catch(e){return "—";}}
 async function adminApi(action,payload){
   const token=session&&session.access_token;
@@ -4594,7 +4785,8 @@ async function renderAdminUsers(){
         <button class="btn btn-accent" onclick="openAdminTestUser()">Preparar usuario QA</button>
       </div>
     </div>
-    <div id="adminList" class="muted small">Cargando usuarios…</div>`;
+    <div id="adminList" class="muted small">Cargando usuarios…</div>
+    <div id="adminQuotaPanel" class="dash" style="margin-top:16px"><div class="muted small">Cargando políticas y consumo…</div></div>`;
   try{
     const out=await adminApi("list");
     adminUsersCache=out.users||[];
@@ -4615,6 +4807,7 @@ async function renderAdminUsers(){
   }catch(e){
     const list=$("#adminList");if(list)list.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}<div class="muted small" style="margin-top:8px">Requiere SUPABASE_SERVICE_ROLE_KEY en Vercel y la migración supabase/admin.sql aplicada.</div></div>`;
   }
+  await loadAdminQuotaOverview();
 }
 function filterAdminUsers(){
   const search=($("#adminSearch")&&$("#adminSearch").value||"").trim().toLowerCase();
@@ -4635,9 +4828,92 @@ function adminUsersHtml(users){
         <button class="btn btn-sm" ${me?'disabled style="opacity:.4"':''} onclick="adminToggleActive('${u.id}',${u.active?'false':'true'})">${u.active?'Desactivar':'Activar'}</button>
         <button class="btn btn-sm" onclick="adminSetPassword('${u.id}')">Cambiar contraseña</button>
         <button class="btn btn-sm" onclick="adminResetLink('${u.id}')">Enviar reset</button>
+        <button class="btn btn-sm" onclick="openAdminUserQuota('${u.id}')">Consumo</button>
       </div>
     </div>`;
   }).join("");
+}
+async function loadAdminQuotaOverview(){
+  const panel=$("#adminQuotaPanel");if(!panel)return;
+  try{
+    adminQuotaCache=await adminApi("quotaOverview");
+    const policies=adminQuotaCache.policies||[],summary=adminQuotaCache.summary||{};
+    const rows=policies.map(policy=>{
+      const stats=summary[policy.action]||{fresh:0,reused:0,refunded:0,errors:0};
+      return `<div class="meal">
+        <div class="meal-head"><div style="flex:1">
+          <div class="name">${esc(ADMIN_COACH_ACTION_LABELS[policy.action]||policy.action)}</div>
+          <div class="nums muted">7 días: ${stats.fresh} nuevas · ${stats.reused} reutilizadas · ${stats.refunded} devueltas · ${stats.errors} con error</div>
+        </div></div>
+        <div class="meal-actions" style="align-items:center">
+          <label class="muted small">Límite <input id="quota_limit_${policy.action}" type="number" min="0" max="1000" value="${policy.daily_limit}" style="width:74px"></label>
+          <label class="chip-check"><input id="quota_enabled_${policy.action}" type="checkbox" ${policy.enabled?"checked":""}><span>Activa</span></label>
+          <button class="btn btn-sm" onclick="saveAdminQuotaPolicy('${policy.action}')">Guardar</button>
+        </div>
+      </div>`;
+    }).join("");
+    const top=(adminQuotaCache.topConsumers||[]).slice(0,5).map(item=>{
+      const user=adminUsersCache.find(row=>row.id===item.user_id);
+      return `${esc((user&&user.email)||item.user_id)} · ${esc(ADMIN_COACH_ACTION_LABELS[item.action]||item.action)}: ${item.requests}`;
+    }).join("<br>");
+    panel.innerHTML=`<div class="row between wrap" style="margin-bottom:10px">
+        <div><b>Consumo del coach</b><div class="muted small">Políticas server-side y origen de respuestas; visible solo para administradores.</div></div>
+        <button class="btn btn-sm" onclick="loadAdminQuotaOverview()">Actualizar</button>
+      </div>
+      ${rows||'<div class="muted small">No hay políticas configuradas.</div>'}
+      ${top?`<div class="ai-box" style="margin-top:12px"><b>Mayor actividad reciente</b><br>${top}</div>`:""}`;
+  }catch(e){
+    panel.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}<div class="muted small" style="margin-top:6px">Ejecuta supabase/coach_quota.sql para habilitar políticas, reutilización y auditoría.</div></div>`;
+  }
+}
+async function saveAdminQuotaPolicy(action){
+  const limit=$("#quota_limit_"+action),enabled=$("#quota_enabled_"+action);
+  if(!limit||!enabled)return;
+  try{
+    await adminApi("setQuotaPolicy",{quotaAction:action,dailyLimit:+limit.value,enabled:enabled.checked});
+    toast("Política actualizada");await loadAdminQuotaOverview();
+  }catch(e){toast(e.message);}
+}
+function openAdminUserQuota(id){
+  const user=adminUsersCache.find(row=>row.id===id)||{id,email:id};
+  const policies=adminQuotaCache.policies||[];
+  if(!policies.length){toast("Carga primero las políticas de consumo");return;}
+  const options=policies.map(policy=>`<option value="${policy.action}">${esc(ADMIN_COACH_ACTION_LABELS[policy.action]||policy.action)}</option>`).join("");
+  modal(`<h3>Consumo y cortesía</h3>
+    <p class="muted small">${esc(user.email||user.id)}. El límite vacío hereda la política general; las unidades extra se suman solo a esta cuenta.</p>
+    <div class="field"><label>Acción</label><select id="adminQuotaAction">${options}</select></div>
+    <div class="field"><label>Límite diario personalizado (opcional)</label><input id="adminQuotaLimit" type="number" min="0" max="1000" placeholder="Heredar"></div>
+    <div class="field"><label>Unidades extra de cortesía</label><input id="adminQuotaBonus" type="number" min="0" max="1000" value="0"></div>
+    <div class="field"><label>Disponibilidad</label><select id="adminQuotaEnabled"><option value="">Heredar política</option><option value="true">Activa</option><option value="false">Desactivada</option></select></div>
+    <div class="row wrap">
+      <button class="btn btn-accent" onclick="saveAdminUserQuota('${user.id}')">Guardar cortesía</button>
+      <button class="btn" onclick="resetAdminUserQuota('${user.id}')">Reiniciar consumo de hoy</button>
+    </div>
+    <div id="adminQuotaOut" class="muted small" style="margin-top:8px"></div>`);
+}
+async function saveAdminUserQuota(userId){
+  const out=$("#adminQuotaOut"),enabledValue=$("#adminQuotaEnabled").value;
+  if(out)out.textContent="Guardando…";
+  try{
+    await adminApi("setQuotaOverride",{
+      userId,quotaAction:$("#adminQuotaAction").value,
+      dailyLimit:$("#adminQuotaLimit").value,
+      bonusUnits:+$("#adminQuotaBonus").value||0,
+      enabled:enabledValue===""?null:enabledValue==="true",
+    });
+    if(out)out.textContent="Cortesía guardada.";
+    await loadAdminQuotaOverview();
+  }catch(e){if(out)out.textContent="⚠️ "+e.message;}
+}
+async function resetAdminUserQuota(userId){
+  const action=$("#adminQuotaAction").value,out=$("#adminQuotaOut");
+  if(!confirm("¿Devolver el consumo fresco de hoy para esta acción? El historial se conservará."))return;
+  if(out)out.textContent="Reiniciando…";
+  try{
+    const result=await adminApi("resetQuota",{userId,quotaAction:action});
+    if(out)out.textContent=`Consumo reiniciado (${result.reset||0} reservas devueltas).`;
+    await loadAdminQuotaOverview();
+  }catch(e){if(out)out.textContent="⚠️ "+e.message;}
 }
 function openAdminTestUser(){
   modal(`<h3>Preparar usuario de prueba</h3>

@@ -28,7 +28,7 @@ Antes de habilitar entrenamiento se pregunta por dolor de pecho, mareo o desmayo
 
 Los datos personales se aislan por usuario mediante RLS. Las fotos se guardan en un bucket privado bajo la carpeta del usuario y se muestran mediante URLs firmadas de una hora. Las claves privilegiadas solo existen en funciones server-side.
 
-La exportacion genera un JSON legible con perfil, progreso, planes, ciclos, consentimientos y evaluaciones. Las fotos se enumeran como metadatos privados; no se publican enlaces permanentes.
+La exportacion genera un JSON legible con perfil, progreso, planes, ciclos, consentimientos, evaluaciones, historial de uso del coach y opciones personales guardadas. Las fotos se enumeran como metadatos privados; no se publican enlaces permanentes.
 
 ## Retencion y borrado
 
@@ -40,4 +40,4 @@ La exportacion genera un JSON legible con perfil, progreso, planes, ciclos, cons
 
 ## Procesamiento automatizado
 
-El coach usa procesamiento automatizado para proponer opciones. Las restricciones duras se validan antes de guardar, los cambios del plan requieren confirmacion y las respuestas no deben diagnosticar ni recomendar entrenar ante senales de alerta.
+El coach usa procesamiento automatizado para proponer opciones. Cada accion se registra con un identificador idempotente y puede reutilizar una opcion privada compatible para controlar costos. Las restricciones duras se validan antes de guardar, los cambios del plan requieren confirmacion y las respuestas no deben diagnosticar ni recomendar entrenar ante senales de alerta.
