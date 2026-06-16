@@ -584,6 +584,8 @@
 <script src="workout-player.js"></script>
 <!-- Contrato y validación de planes de entrenamiento personalizados. -->
 <script src="training-plan.js"></script>
+<!-- Contratos de dominio: validadores sin DOM para perfil, macros, día, entitlement, sync y coach. -->
+<script src="domain-contracts.js"></script>
 <!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -946,6 +948,7 @@ const LOCAL_EXERCISES=Array.isArray(window.FITBUD_EXERCISES)?window.FITBUD_EXERC
 const WORKOUT_EXERCISE_IDS=window.FITBUD_WORKOUT_EXERCISES||{};
 const WORKOUT_PLAYER=window.FITBUD_WORKOUT_PLAYER;
 const TRAINING_PLAN=window.FITBUD_TRAINING_PLAN;
+const DOMAIN_CONTRACTS=window.FITBUD_DOMAIN_CONTRACTS||{};
 function workoutSchedule(days,dayIds,priority,locations,primary){
   const selected=normalizedTrainingDays(dayIds,days);
   const sessions=baseWorkoutTemplate(selected.length,priority);
@@ -1449,8 +1452,13 @@ function enqueueMutation(entity,entityKey,payload){
   if(!uid())return;
   const q=_getSyncQ();
   const i=q.findIndex(x=>x.uid===uid()&&x.entity===entity&&x.entityKey===entityKey&&x.status==="pending");
-  if(i!==-1){q[i].payload=payload;q[i].ts=new Date().toISOString();}
-  else q.push({id:Math.random().toString(36).slice(2),uid:uid(),entity,entityKey,payload,ts:new Date().toISOString(),retries:0,status:"pending"});
+  const newEntry={id:Math.random().toString(36).slice(2),uid:uid(),entity,entityKey,payload,ts:new Date().toISOString(),retries:0,status:"pending"};
+  if(DOMAIN_CONTRACTS.validateSyncEntry){
+    const v=DOMAIN_CONTRACTS.validateSyncEntry(newEntry);
+    if(!v.ok)console.warn("[domain] syncEntry inválido:",v.errors);
+  }
+  if(i!==-1){q[i].payload=payload;q[i].ts=newEntry.ts;}
+  else q.push(newEntry);
   _setSyncQ(q);_updateSyncBadge();
 }
 // Elimina una mutación de la cola al confirmar que el servidor la recibió.
@@ -1534,7 +1542,12 @@ async function loadEntitlement(){
       entitlementChecked=true;return; // 401/403: autenticado pero sin acceso
     }
     const data=await r.json().catch(()=>({}));
-    entitlement=(data&&data.entitlement)||null;
+    const rawEnt=(data&&data.entitlement)||null;
+    if(rawEnt&&DOMAIN_CONTRACTS.validateEntitlement){
+      const v=DOMAIN_CONTRACTS.validateEntitlement(rawEnt);
+      if(!v.ok)console.warn("[domain] entitlement inválido:",v.errors);
+    }
+    entitlement=rawEnt;
     entitlementExpired=(data&&data.expired)||null;
     entitlementChecked=true;
   }catch(_){} // error de red → permisivo (no bloquear)
@@ -6756,6 +6769,10 @@ function commitDay(ds){
   const st=dayState(ds);
   const planVersionId=st.planVersionId||resolvePlanVersionIdForDate(ds);
   if(planVersionId)st.planVersionId=planVersionId;
+  if(DOMAIN_CONTRACTS.validateDayLogState){
+    const v=DOMAIN_CONTRACTS.validateDayLogState(st);
+    if(!v.ok)console.warn("[domain] dayLog state inválido en",ds,":",v.errors);
+  }
   save();
   pushDay(ds);
 }

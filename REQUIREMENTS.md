@@ -182,7 +182,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 
 27. REQ-27 - Analitica de producto, IA y costos.
 28. REQ-28 - Sincronizacion offline y resolucion de conflictos.
-29. REQ-29 - Modularizacion incremental y contratos de dominio.
+29. REQ-29 - Modularizacion incremental y contratos de dominio. **Implementado**.
 30. REQ-30 - Pruebas end-to-end, accesibilidad y release gates.
 
 ### Fase F - Activacion, retencion y pulido (auditoria heuristica + directiva de producto, jun 2026)
@@ -1550,7 +1550,8 @@ Evitar perdida de registros cuando la PWA se usa sin red o desde varios disposit
 
 ## REQ-29 - Modularizacion incremental y contratos de dominio
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`domain-contracts.js` exporta seis validadores puramente funcionales (sin DOM) para los dominios de perfil, macros, estado de día, entitlement, cola de sync y solicitud al coach. Cada validador devuelve `{ok, errors[]}`. Los contratos se usan como advertencias no bloqueantes en `commitDay` (día), `enqueueMutation` (sync) y `loadEntitlement` (entitlement) — los tres puntos de frontera donde datos externos o del usuario llegan al sistema. `scripts/validate-contracts.mjs` prueba los seis validadores en Node.js sin DOM. Service worker v34 añade `domain-contracts.js` al shell.
 
 ### Objetivo
 
