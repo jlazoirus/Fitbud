@@ -1787,7 +1787,8 @@ Controlar el costo diario de generar dietas y rutinas y seguir ofreciendo altern
 
 ## REQ-33 - Landing publica y funnel de adquisicion
 
-**Estado: pendiente.**
+**Estado: implementado.**
+La implementación renderiza la landing dentro de `index.html` via `renderLanding()`: visible para cualquier visitante no autenticado antes de mostrar el formulario de login. Incluye hero con gradiente de marca, mockup de demo de la app, grid de features, pasos de cómo funciona, precios desde `PRICING_CONFIG` (stub desacoplado listo para conectar con REQ-25), FAQ con acordeón y CTA final. Open Graph/Twitter Card en `<head>`. El botón "← Conoce Fitbros" en el formulario de auth devuelve a la landing. Ningún texto menciona IA, proveedor, modelo ni cuota (REQ-31). Service worker v29.
 
 ### Objetivo
 
