@@ -552,6 +552,21 @@
 
   /* Footer de la landing */
   .l-footer{border-top:1px solid var(--border);padding:18px 0 6px;text-align:center}
+  /* ---- Paywall (REQ-25) ---- */
+  .paywall-expired{background:var(--surf3);border:1px solid var(--bad);color:var(--bad);padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:14px;line-height:1.4}
+  .paywall-msg{font-size:14px;color:var(--muted);line-height:1.5;margin-bottom:16px}
+  .paywall-plans{display:flex;flex-direction:column;gap:12px}
+  .paywall-plan{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px}
+  .paywall-plan-hi{border-color:var(--accent);background:linear-gradient(160deg,var(--accent-dim),var(--surf1))}
+  .paywall-badge{font-size:10px;color:var(--purple-200);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:4px}
+  .paywall-plan-name{font-family:var(--font-display);font-size:16px;font-weight:800;margin-bottom:4px}
+  .paywall-plan-price{font-family:var(--font-display);font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
+  .paywall-cur{font-size:13px;vertical-align:top;margin-top:3px;display:inline-block}
+  .paywall-period{font-size:12px;color:var(--muted);font-family:var(--font-body);font-weight:400}
+  .paywall-plan-desc{font-size:12px;color:var(--muted);margin:6px 0 10px;line-height:1.4}
+  .paywall-features{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:4px}
+  .paywall-features li{font-size:12px;color:var(--txt);display:flex;gap:6px;align-items:flex-start}
+  .paywall-features li:before{content:'✓';color:var(--good);font-weight:700;flex:0 0 auto}
   .l-footer-legal{font-size:11px;color:var(--muted2);line-height:1.7}
   .l-footer-legal a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--border)}
 </style>
@@ -579,49 +594,24 @@
    macros en vivo, IA (Claude API), voz y extras.
    ============================================================ */
 
-/* ---------- CATÁLOGO DE PLANES (stub — REQ-25 lo reemplazará con catalog server-side) ---------- */
-const PRICING_CONFIG = {
-  currency: "USD",
-  plans: [
-    {
-      id: "monthly",
-      name: "Plan mensual",
-      price: 14,
-      period: "mes",
-      duration_days: 30,
-      renewal: "mensual",
-      highlight: false,
-      description: "Acceso completo. Sin permanencia. Cancela cuando quieras.",
-      features: [
-        "Plan de nutrición personalizado",
-        "Rutinas de entrenamiento guiadas",
-        "Seguimiento de progreso",
-        "Adaptaciones y contingencias",
-        "Rachas e hitos de constancia",
-        "Recordatorios opcionales",
-      ],
-    },
-    {
-      id: "quarterly",
-      name: "Paquete 3 meses",
-      price: 36,
-      period: "3 meses",
-      duration_days: 90,
-      renewal: "cada 3 meses",
-      highlight: true,
-      badge: "Mejor valor",
-      description: "Ahorra un 15 % respecto al plan mensual. Ideal para un ciclo completo.",
-      features: [
-        "Todo lo del plan mensual",
-        "Ahorro del 15 %",
-        "Acceso a ciclos de 10 semanas",
-        "Recap detallado al cerrar ciclo",
-        "Fotos de progreso privadas",
-        "Prioridad en nuevas funciones",
-      ],
-    },
-  ],
-};
+/* ---------- CATÁLOGO DE PLANES (REQ-25: cargado desde /api/catalog) ---------- */
+let catalogPlans=null; // null=no cargado; []=sin planes; [...]= planes activos
+async function loadCatalog(){
+  try{
+    const r=await fetch("/api/catalog");
+    if(r.ok){const data=await r.json();if(data&&Array.isArray(data.plans)&&data.plans.length){catalogPlans=data.plans;return;}}
+  }catch(_){}
+  // Fallback inline para cuando /api/catalog no existe aún (local dev, GitHub Pages)
+  catalogPlans=[
+    {id:"monthly",name:"Plan mensual",price_usd:14,duration_days:30,auto_renew:false,active:true,badge:null,
+     description:"Acceso completo. Sin permanencia. Cancela cuando quieras.",
+     features:["Plan de nutrición personalizado","Rutinas de entrenamiento guiadas","Seguimiento de progreso","Adaptaciones y contingencias","Rachas e hitos de constancia","Recordatorios opcionales"]},
+    {id:"quarterly",name:"Paquete 3 meses",price_usd:36,duration_days:90,auto_renew:false,active:true,badge:"Mejor valor",
+     description:"Ahorra un 15 % respecto al plan mensual. Ideal para un ciclo completo.",
+     features:["Todo lo del plan mensual","Ahorro del 15 %","Acceso a ciclos de 10 semanas","Recap detallado al cerrar ciclo","Fotos de progreso privadas","Prioridad en nuevas funciones"]},
+  ];
+}
+function activeCatalogPlans(){return(catalogPlans||[]).filter(p=>p.active!==false);}
 
 /* ---------- CONFIGURACIÓN RUNTIME (config.js + overrides locales) ---------- */
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
@@ -661,18 +651,22 @@ function effectiveSettings(){
 }
 // IA disponible si hay key local/config (llamada directa) o el proxy de Vercel
 function aiAvailable(){return !!effectiveSettings().apiKey||!!(REMOTE.anthropic&&REMOTE.anthropic.proxy);}
-function coachUnavailable(){
-  if(aiAvailable())return false;
-  if(typeof isAdmin==="function"&&isAdmin()){
-    toast("Configura el servicio del coach en Ajustes");
-    setView("settings");
-  }else{
-    toast("Tu coach no está disponible en este momento. Intenta más tarde.");
+function coachUnavailable(context){
+  if(!aiAvailable()){
+    if(typeof isAdmin==="function"&&isAdmin()){
+      toast("Configura el servicio del coach en Ajustes");
+      setView("settings");
+    }else{
+      toast("Tu coach no está disponible en este momento. Intenta más tarde.");
+    }
+    return true;
   }
-  return true;
+  if(!hasEntitlement()){showPaywall(context||"ai");return true;}
+  return false;
 }
 function coachErrorMessage(error){
   const message=String(error&&error.message||"").trim();
+  if(error&&error.paywall)return "Activa tu plan para continuar.";
   if(typeof isAdmin==="function"&&isAdmin())return message||"No se pudo completar la acción.";
   if(/desactivad/i.test(message))return "Tu cuenta está desactivada.";
   if(/sesi[oó]n/i.test(message))return "Vuelve a iniciar sesión para continuar con tu coach.";
@@ -1433,6 +1427,32 @@ let S=load();
 function load(){try{const o=JSON.parse(localStorage.getItem(KEY));return o&&typeof o==="object"?o:{};}catch(e){return{};}}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));}
 if(!S.days)S.days={}; if(!S.weights)S.weights={}; if(!S.settings)S.settings={};
+/* --- entitlement (REQ-25) ------------------------------------------------- */
+let entitlement=null;        // {plan_id,status,starts_at,expires_at,origin} o null
+let entitlementExpired=null; // último vencido para mostrar en UI
+let entitlementChecked=false;// true cuando /api/entitlement respondió con éxito
+async function loadEntitlement(){
+  if(!session)return;
+  const token=session&&session.access_token;if(!token)return;
+  try{
+    const r=await fetch("/api/entitlement",{headers:{Authorization:"Bearer "+token}});
+    if(!r.ok){
+      // 404=endpoint no existe aún; >=500=config faltante → no bloquear (permisivo)
+      if(r.status===404||r.status>=500)return;
+      entitlementChecked=true;return; // 401/403: autenticado pero sin acceso
+    }
+    const data=await r.json().catch(()=>({}));
+    entitlement=(data&&data.entitlement)||null;
+    entitlementExpired=(data&&data.expired)||null;
+    entitlementChecked=true;
+  }catch(_){} // error de red → permisivo (no bloquear)
+}
+function hasEntitlement(){
+  if(profile&&profile.is_admin)return true;           // admin siempre pasa
+  if(effectiveSettings&&effectiveSettings().apiKey)return true; // dev con key local
+  if(!entitlementChecked)return true;                 // setup pendiente → permisivo
+  return entitlement!==null;
+}
 function dayState(ds){if(!S.days[ds])S.days[ds]={meals:{},extras:[],workoutDone:false};const d=S.days[ds];if(!d.meals)d.meals={};if(!d.extras)d.extras=[];return d;}
 function mealState(ds,id){const d=dayState(ds);if(!d.meals[id])d.meals[id]={done:false};return d.meals[id];}
 // valor efectivo de una comida (con override si existe)
@@ -3761,6 +3781,7 @@ async function sendCoachMessage(userText){
     toast("Revisa privacidad y seguridad antes de usar tu coach");
     return;
   }
+  if(aiAvailable()&&!hasEntitlement()){showPaywall("ai");return;} // REQ-25
   const msgs=loadCoachChat();
   const userMsg={id:coachRequestId(),role:"user",text:userText.trim(),ts:Date.now()};
   msgs.push(userMsg);
@@ -4024,6 +4045,9 @@ function renderProfile(){
   </div>
 
   <button class="btn btn-accent" style="width:100%" onclick="saveProfile()">Guardar preferencias</button>
+
+  <div class="section-h">Mi suscripción</div>
+  <div class="dash">${subscriptionStatusHtml()}</div>
 
   <div class="section-h">Privacidad y seguridad</div>
   <div class="dash">
@@ -4322,15 +4346,79 @@ function toggleFaq(el){
   el.closest(".l-faq-item").classList.toggle("open");
 }
 
+/* ---- Paywall y estado de suscripción (REQ-25) ---- */
+function showPaywall(context){
+  const plans=activeCatalogPlans();
+  const expired=entitlementExpired;
+  const msg=context==="training"
+    ?"Para acceder a tu plan de entrenamiento personalizado, activa tu suscripción."
+    :context==="nutrition"
+    ?"Para generar y adaptar tu nutrición personalizada, activa tu suscripción."
+    :"Activa tu suscripción para acceder a todas las funciones de tu coach.";
+  const expiredBanner=expired
+    ?`<div class="paywall-expired">Tu plan venció el ${prettyDateTime(expired.expires_at).split(" ").slice(0,2).join(" ")}. Tu historial, progreso y exportación siguen disponibles.</div>`:"";
+  const plansHtml=plans.map(p=>{
+    const features=(p.features||[]).map(f=>`<li>${esc(f)}</li>`).join("");
+    const badge=p.badge?`<div class="paywall-badge">${esc(p.badge)}</div>`:"";
+    const isHi=!!(p.badge||(p.duration_days>31));
+    return`<div class="paywall-plan${isHi?" paywall-plan-hi":""}">
+      ${badge}
+      <div class="paywall-plan-name">${esc(p.name)}</div>
+      <div class="paywall-plan-price"><span class="paywall-cur">USD</span> ${p.price_usd} <span class="paywall-period">/ ${p.duration_days<=31?"mes":"3 meses"}</span></div>
+      <div class="paywall-plan-desc">${esc(p.description||"")}</div>
+      <ul class="paywall-features">${features}</ul>
+      <button class="btn btn-accent" style="width:100%;min-height:44px" onclick="activatePlanFromPaywall('${esc(p.id)}')">Activar plan</button>
+    </div>`;
+  }).join("");
+  modal(`<h3>Activa tu plan</h3>
+    <div class="paywall-msg">${expiredBanner}${esc(msg)}</div>
+    <div class="paywall-plans">${plansHtml}</div>
+    <div class="muted small" style="text-align:center;margin-top:12px">Tu progreso, historial y preferencias se conservan con cualquier plan.</div>`);
+}
+function activatePlanFromPaywall(planId){
+  // REQ-26 implementará el checkout; por ahora informa al usuario
+  closeModal();
+  toast("La activación de planes estará disponible próximamente. Contacta al administrador para acceso anticipado.");
+}
+function subscriptionStatusHtml(){
+  if(entitlement){
+    const expTs=new Date(entitlement.expires_at).getTime();
+    const daysLeft=Math.max(0,Math.ceil((expTs-Date.now())/86400000));
+    const origin=entitlement.status==="courtesy"||(entitlement.origin||"").includes("courtesy")?"Acceso de cortesía":
+      entitlement.origin==="checkout"?"Suscripción activa":"Plan activo";
+    const planName=entitlement.plan_id==="quarterly"?"Paquete 3 meses":"Plan mensual";
+    return`<div class="row between" style="margin-bottom:8px">
+      <span><b>${esc(planName)}</b> <span class="muted small">(${esc(origin)})</span></span>
+      <span class="badge b-PESAS">Activo</span>
+    </div>
+    <div class="muted small">Válido hasta ${prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ")}${daysLeft<=7?` · <b style="color:var(--bad)">${daysLeft} días restantes</b>`:""}</div>`;
+  }
+  if(entitlementExpired){
+    const expDate=prettyDateTime(entitlementExpired.expires_at).split(" ").slice(0,2).join(" ");
+    return`<div class="row between" style="margin-bottom:8px">
+      <span><b>Plan vencido</b></span><span class="badge b-Libre">Inactivo</span>
+    </div>
+    <div class="muted small" style="margin-bottom:12px">Venció el ${esc(expDate)}. Tu historial y exportación siguen disponibles.</div>
+    <button class="btn btn-accent" style="width:100%" onclick="showPaywall('profile')">Ver planes disponibles</button>`;
+  }
+  if(!entitlementChecked){
+    return'<div class="muted small">Verificando estado de tu plan…</div>';
+  }
+  return`<div class="muted small" style="margin-bottom:12px">Sin plan activo. Activa tu suscripción para acceder a tu coach, nutrición personalizada y rutinas de entrenamiento.</div>
+    <button class="btn btn-accent" style="width:100%" onclick="showPaywall('profile')">Ver planes disponibles</button>`;
+}
+
 function landingPricingHtml(){
-  return PRICING_CONFIG.plans.map(p=>{
-    const items=p.features.map(f=>`<div class="l-plan-item">${esc(f)}</div>`).join("");
+  const plans=activeCatalogPlans();
+  return plans.map(p=>{
+    const items=(p.features||[]).map(f=>`<div class="l-plan-item">${esc(f)}</div>`).join("");
     const badge=p.badge?`<div class="l-plan-badge">${esc(p.badge)}</div>`:"";
-    return `<div class="l-plan${p.highlight?" highlight":""}">
+    const isHi=!!(p.badge||(p.duration_days>31));
+    return`<div class="l-plan${isHi?" highlight":""}">
       ${badge}
       <div class="l-plan-name">${esc(p.name)}</div>
-      <div class="l-plan-price"><span class="l-plan-cur">${esc(p.currency||PRICING_CONFIG.currency||"USD")}</span>${p.price} <span class="l-plan-period">/ ${esc(p.period)}</span></div>
-      <div class="l-plan-desc">${esc(p.description)}</div>
+      <div class="l-plan-price"><span class="l-plan-cur">USD</span>${p.price_usd} <span class="l-plan-period">/ ${p.duration_days<=31?"mes":"3 meses"}</span></div>
+      <div class="l-plan-desc">${esc(p.description||"")}</div>
       <div class="l-plan-items">${items}</div>
       <button class="btn btn-accent" style="width:100%;min-height:44px;border-radius:12px;font-size:14px" onclick="showAuthFromLanding('up')">Empezar ahora</button>
     </div>`;
@@ -4899,6 +4987,7 @@ async function coachProxyFetch(payload){
       });
       const data=await res.json().catch(()=>({}));
       if(res.status===409&&attempt===0){await new Promise(resolve=>setTimeout(resolve,350));continue;}
+      if(res.status===402){const err=new Error(data.error||"Activa tu plan para usar esta función.");err.paywall=true;err.expired=!!(data&&data.expired);throw err;}
       if(res.status===404)throw new Error("El proxy /api/claude no está disponible. Despliega en Vercel o usa una configuración local de desarrollo.");
       if(!res.ok)throw new Error(data.error||("Error "+res.status));
       return data;
@@ -5261,6 +5350,7 @@ function trainingDraftReviewHtml(){
 async function openTrainingPlanGenerator(){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
   if(!hasRequiredConsents()||!hasCurrentScreening()){toast("Revisa privacidad y seguridad antes de preparar tu plan");return;}
+  if(aiAvailable()&&!hasEntitlement()){showPaywall("training");return;} // REQ-25
   const actionKey="training_plan";
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
@@ -6050,6 +6140,7 @@ async function signUp(email,pwd){
 let _signOutBusy=false;
 function clearSignedOutState(){
   session=null;profile=null;view="hoy";
+  entitlement=null;entitlementExpired=null;entitlementChecked=false;
   refreshPlanCalendar();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;
   cycleHistory=[];recapPhotoFile=null;recapChallenge="";
@@ -6098,6 +6189,8 @@ async function onAuth(){
   try{
     await loadProfile();
     await loadPrivacyState();
+    entitlement=null;entitlementExpired=null;entitlementChecked=false;
+    loadEntitlement(); // no-await: no debe bloquear el arranque (REQ-25)
     S.days={};S.weights={};save();   // descarta caché de otra sesión; la DB manda
     if(!isActive()){
       onboardingActive=false;onboardingDraft=null;view="hoy";render();
@@ -6615,9 +6708,44 @@ function adminUsersHtml(users){
         <button class="btn btn-sm" onclick="adminSetPassword('${u.id}')">Cambiar contraseña</button>
         <button class="btn btn-sm" onclick="adminResetLink('${u.id}')">Enviar reset</button>
         <button class="btn btn-sm" onclick="openAdminUserQuota('${u.id}')">Consumo</button>
+        <button class="btn btn-sm" onclick="openAdminCourtesy('${u.id}')">Cortesía</button>
       </div>
     </div>`;
   }).join("");
+}
+async function openAdminCourtesy(userId){
+  const plans=activeCatalogPlans();
+  const options=plans.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} (${p.duration_days} días)</option>`).join("");
+  modal(`<h3>Acceso de cortesía</h3>
+    <div class="muted small" style="margin-bottom:14px">Otorga acceso temporal sin cobro. El entitlement queda auditado con tu usuario.</div>
+    <div class="field"><label>Plan</label><select id="courtesyPlan">${options}</select></div>
+    <div class="field"><label>Días de acceso</label><input id="courtesyDays" type="number" inputmode="numeric" min="1" max="365" value="30"></div>
+    <div class="field" style="margin-bottom:0"><label>Nota interna (opcional)</label><input id="courtesyNotes" placeholder="Ej. beta tester, promo especial"></div>
+    <div class="row wrap" style="margin-top:14px">
+      <button class="btn btn-accent" onclick="grantCourtesy('${userId}',this)">Otorgar acceso</button>
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+    </div>`);
+}
+async function grantCourtesy(userId,btn){
+  if(btn){btn.disabled=true;btn.textContent="Otorgando…";}
+  const planId=($("#courtesyPlan")&&$("#courtesyPlan").value)||"monthly";
+  const days=Math.max(1,Math.min(365,+($("#courtesyDays")&&$("#courtesyDays").value)||30));
+  const notes=($("#courtesyNotes")&&$("#courtesyNotes").value.trim())||"";
+  const token=session&&session.access_token;
+  if(!token){toast("Sesión requerida");if(btn){btn.disabled=false;btn.textContent="Otorgar acceso";}return;}
+  try{
+    const r=await fetch("/api/entitlement",{
+      method:"POST",
+      headers:{"content-type":"application/json","Authorization":"Bearer "+token},
+      body:JSON.stringify({action:"grant",userId,planId,days,notes})
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data.error||"No se pudo otorgar el acceso.");
+    closeModal();toast("Acceso de cortesía otorgado por "+days+" días");
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent="Otorgar acceso";}
+    toast(String(e.message||e));
+  }
 }
 async function loadAdminQuotaOverview(){
   const panel=$("#adminQuotaPanel");if(!panel)return;
@@ -7421,6 +7549,7 @@ async function boot(){
   // en vez del login. Si ya hay override local, no hace falta esperar.
   const hasLocalCreds=!!(S.settings&&S.settings.supaUrl&&S.settings.supaKey);
   if(!hasLocalCreds)await loadRemoteConfig();
+  loadCatalog(); // no-await: catálogo de planes en paralelo (REQ-25)
   supaInit();
   setupAuthListener();
   await refreshAuth();         // resuelve sesión (authReady=true)

@@ -1339,7 +1339,8 @@ Enviar un recordatorio util al final del dia solo cuando el usuario lo autorizo 
 
 ## REQ-25 - Oferta, entitlement y paywall
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Catálogo server-side en `subscription_plans` (Supabase); dos planes con precio, duración, renovación y características. Entitlements en `user_entitlements` con estados active/expired/courtesy/revoked, origen y auditoría de quién los concede. `api/catalog.js` sirve los planes públicamente con fallback inline. `api/entitlement.js` devuelve el entitlement activo (GET) y permite al admin otorgar/revocar acceso de cortesía (POST). `api/claude.js` verifica `user_entitlements` antes de cualquier generación: retorna 402 con `paywall:true` si no hay plan activo; admins y dev-mode (key local) siempre pasan. Cliente: `loadCatalog()` y `loadEntitlement()` se llaman en boot/onAuth de forma no bloqueante; `hasEntitlement()` es permisivo hasta confirmar la tabla existe; `coachUnavailable(context)`, `openTrainingPlanGenerator()` y `sendCoachMessage()` muestran el paywall modal contextual antes de intentar cualquier llamada; `subscriptionStatusHtml()` en Perfil muestra vigencia, tipo y días restantes; admin tiene botón "Cortesía" por usuario. Precios y planes no están hardcodeados en index.html.
 
 ### Objetivo
 

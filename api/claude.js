@@ -122,6 +122,28 @@ async function verifyPrivacyAccess(auth) {
   }
 }
 
+async function verifyEntitlement(auth, e) {
+  if (auth.profile.is_admin) return { ok: true };
+  try {
+    const now = new Date().toISOString();
+    const r = await fetch(
+      e.url + "/rest/v1/user_entitlements?user_id=eq." + auth.user.id
+        + "&status=in.(active,courtesy)&expires_at=gt." + now + "&limit=1&select=id,status",
+      { headers: serviceHeaders(e) }
+    );
+    if (!r.ok) {
+      // Tabla inexistente (setup pendiente) → no bloquear
+      if (r.status === 404) return { ok: true };
+      return { ok: false, expired: true };
+    }
+    const rows = await r.json().catch(() => []);
+    if (Array.isArray(rows) && rows.length) return { ok: true };
+    return { ok: false, expired: true };
+  } catch (_) {
+    return { ok: true }; // error de red → no bloquear
+  }
+}
+
 function bodyObject(req) {
   if (typeof req.body === "string") return JSON.parse(req.body || "{}");
   return req.body && typeof req.body === "object" ? req.body : {};
@@ -425,6 +447,16 @@ export default async function handler(req, res) {
       error: privacy.setup
         ? "La proteccion de privacidad todavia no esta configurada."
         : "Revisa y acepta la privacidad y seguridad vigentes antes de usar tu coach.",
+    });
+    return;
+  }
+
+  const entitlement = await verifyEntitlement(auth, e);
+  if (!entitlement.ok) {
+    res.status(402).json({
+      error: "Activa tu plan para continuar usando tu coach.",
+      paywall: true,
+      expired: !!entitlement.expired,
     });
     return;
   }
