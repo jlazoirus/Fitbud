@@ -4375,23 +4375,69 @@ function showPaywall(context){
     <div class="paywall-plans">${plansHtml}</div>
     <div class="muted small" style="text-align:center;margin-top:12px">Tu progreso, historial y preferencias se conservan con cualquier plan.</div>`);
 }
-function activatePlanFromPaywall(planId){
-  // REQ-26 implementará el checkout; por ahora informa al usuario
-  closeModal();
-  toast("La activación de planes estará disponible próximamente. Contacta al administrador para acceso anticipado.");
+async function activatePlanFromPaywall(planId){
+  if(!session){toast("Sesión no disponible. Recarga la página.");return;}
+  const btn=event&&event.target instanceof HTMLButtonElement?event.target:null;
+  if(btn){btn.disabled=true;btn.textContent="Redirigiendo…";}
+  try{
+    const r=await fetch("/api/checkout",{
+      method:"POST",
+      headers:{"content-type":"application/json","Authorization":"Bearer "+session.access_token},
+      body:JSON.stringify({planId}),
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||!data.url){
+      if(btn){btn.disabled=false;btn.textContent="Activar plan";}
+      toast(r.status===404?"El checkout no está disponible en este entorno.":(data.error||"No se pudo iniciar el pago. Intenta de nuevo."));
+      return;
+    }
+    window.location.href=data.url;
+  }catch(_){
+    if(btn){btn.disabled=false;btn.textContent="Activar plan";}
+    toast("Error de red. Verifica tu conexión e intenta de nuevo.");
+  }
+}
+function checkCheckoutReturn(){
+  const params=new URLSearchParams(location.search);
+  const status=params.get("checkout");
+  if(!status)return;
+  if(history&&history.replaceState)history.replaceState({},document.title,location.pathname);
+  if(status==="success"){
+    loadEntitlement().then(()=>render());
+    modal(`<h3>¡Pago recibido!</h3>
+      <p style="margin:12px 0">Tu plan se está activando. En unos momentos tendrás acceso completo a tu coach.</p>
+      <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Continuar</button>`);
+  }else if(status==="cancel"){
+    toast("El pago fue cancelado. Puedes activar tu plan cuando quieras desde Perfil.");
+  }
+}
+async function restorePurchase(btn){
+  if(btn){btn.disabled=true;btn.textContent="Verificando…";}
+  await loadEntitlement();
+  if(entitlement){
+    render();
+    toast("Plan restaurado correctamente.");
+  }else{
+    if(btn){btn.disabled=false;btn.textContent="Restaurar compra";}
+    toast("No encontramos un pago reciente. Si pagaste hace poco, espera unos minutos e intenta de nuevo.");
+  }
 }
 function subscriptionStatusHtml(){
   if(entitlement){
     const expTs=new Date(entitlement.expires_at).getTime();
     const daysLeft=Math.max(0,Math.ceil((expTs-Date.now())/86400000));
+    const isCheckout=entitlement.origin==="checkout";
     const origin=entitlement.status==="courtesy"||(entitlement.origin||"").includes("courtesy")?"Acceso de cortesía":
-      entitlement.origin==="checkout"?"Suscripción activa":"Plan activo";
+      isCheckout?"Suscripción activa":"Plan activo";
     const planName=entitlement.plan_id==="quarterly"?"Paquete 3 meses":"Plan mensual";
+    const renewBtn=isCheckout&&daysLeft<=14
+      ?`<button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="showPaywall('profile')">Renovar plan</button>`:"";
     return`<div class="row between" style="margin-bottom:8px">
       <span><b>${esc(planName)}</b> <span class="muted small">(${esc(origin)})</span></span>
       <span class="badge b-PESAS">Activo</span>
     </div>
-    <div class="muted small">Válido hasta ${prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ")}${daysLeft<=7?` · <b style="color:var(--bad)">${daysLeft} días restantes</b>`:""}</div>`;
+    <div class="muted small">Válido hasta ${prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ")}${daysLeft<=7?` · <b style="color:var(--bad)">${daysLeft} días restantes</b>`:""}</div>
+    ${renewBtn}`;
   }
   if(entitlementExpired){
     const expDate=prettyDateTime(entitlementExpired.expires_at).split(" ").slice(0,2).join(" ");
@@ -4399,13 +4445,14 @@ function subscriptionStatusHtml(){
       <span><b>Plan vencido</b></span><span class="badge b-Libre">Inactivo</span>
     </div>
     <div class="muted small" style="margin-bottom:12px">Venció el ${esc(expDate)}. Tu historial y exportación siguen disponibles.</div>
-    <button class="btn btn-accent" style="width:100%" onclick="showPaywall('profile')">Ver planes disponibles</button>`;
+    <button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="showPaywall('profile')">Ver planes disponibles</button>`;
   }
   if(!entitlementChecked){
     return'<div class="muted small">Verificando estado de tu plan…</div>';
   }
   return`<div class="muted small" style="margin-bottom:12px">Sin plan activo. Activa tu suscripción para acceder a tu coach, nutrición personalizada y rutinas de entrenamiento.</div>
-    <button class="btn btn-accent" style="width:100%" onclick="showPaywall('profile')">Ver planes disponibles</button>`;
+    <button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="showPaywall('profile')">Ver planes disponibles</button>
+    <button class="btn" style="width:100%;font-size:13px;margin-top:4px" onclick="restorePurchase(this)">Restaurar compra</button>`;
 }
 
 function landingPricingHtml(){
@@ -6219,6 +6266,7 @@ async function onAuth(){
     onboardingStep=1;reviewPromptShown=false;
     view="hoy";current=clampDate(todayStr());
     render();
+    checkCheckoutReturn(); // REQ-26: manejar retorno de Stripe checkout
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
   }finally{_authBusy=false;}
 }

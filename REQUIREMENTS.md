@@ -113,7 +113,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
 | Recordatorios | No existe | Falta el canal por correo (REQ-24) y el canal push de recordatorios de racha con permiso del dispositivo (REQ-38); ambos exigen programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
-| Suscripcion | No existe | Falta oferta de 1/3 meses, checkout, webhooks, entitlement, renovacion, cancelacion y expiracion |
+| Suscripcion | Checkout Stripe (REQ-26): sesión alojada, webhooks firmados, entitlement activado por webhook. | Falta conciliación y panel de historial de pagos (REQ-27) |
 | Seguridad y privacidad | Auth, RLS y fotos de progreso personal protegidas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
 | Operacion | Admin de usuarios, alimentos y ejercicios con fuente/licencia | Faltan prompts/versiones, soporte, metricas de IA y costos |
 | Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
@@ -1387,7 +1387,8 @@ Definir que obtiene el usuario con el paquete de 1 mes o 3 meses y aplicar esos 
 
 ## REQ-26 - Checkout y ciclo de facturacion
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Stripe como proveedor (checkout alojado, modo `payment` por ser paquetes sin auto-renovación). `api/checkout.js` crea sesión Stripe vía fetch nativo, requiere sesión autenticada y retorna URL de redirección. `api/webhook.js` verifica firma HMAC-SHA256 con Node `crypto` (bodyParser desactivado), activa entitlement en `checkout.session.completed` y lo revoca en `charge.refunded`; idempotente por `billing_events.stripe_event_id UNIQUE`. `billing_events` audita todos los eventos; sin acceso para usuarios (solo service_role). Cliente: `activatePlanFromPaywall()` llama `/api/checkout` y redirige a Stripe; `checkCheckoutReturn()` maneja `?checkout=success|cancel` al volver y recarga el entitlement; `subscriptionStatusHtml()` agrega "Renovar plan" (≤14 días restantes, solo checkout) y "Restaurar compra" (sin plan activo). `restorePurchase()` vuelve a llamar `loadEntitlement()` para recuperar plans con webhook tardío. Datos de tarjeta nunca salen de Stripe; `metadata.user_id` relaciona eventos con el usuario sin exponer secretos. Nuevas vars Vercel: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_QUARTERLY`. Migración: `supabase/billing.sql`.
 
 ### Objetivo
 

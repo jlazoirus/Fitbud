@@ -46,6 +46,7 @@ Los siguientes scripts son **seguros de re-ejecutar** (idempotentes): no borran 
 7. coach_quota.sql
 8. notifications.sql
 9. entitlements.sql
+10. billing.sql
 ```
 
 ---
@@ -242,6 +243,28 @@ alter table weight_log add column if not exists bf_pct numeric;
 
 ---
 
+---
+
+### 10. `supabase/billing.sql`
+
+**REQ:** REQ-26 (checkout y ciclo de facturación)
+
+**Qué hace:**
+- Crea la tabla `billing_events` (auditoría de webhooks de Stripe: stripe_event_id, event_type, user_id, plan_id, entitlement_id, status, payload, error).
+- `stripe_event_id` es `UNIQUE` para garantizar idempotencia: un webhook duplicado de Stripe no crea dos entitlements.
+- RLS habilitado sin políticas → solo `service_role` puede operar la tabla (el webhook en `api/webhook.js` usa service role).
+
+**Por qué es necesario:** `api/webhook.js` escribe en `billing_events` para auditoría y comprueba duplicados antes de crear entitlements. Sin esta tabla, el webhook falla con error de relación inexistente.
+
+**Prerequisito:** `entitlements.sql` ya aplicado (FK hacia `user_entitlements`).
+
+```sql
+-- Ver contenido completo en: supabase/billing.sql
+-- (~25 líneas)
+```
+
+---
+
 ## Resumen de orden y dependencias
 
 ```
@@ -260,6 +283,8 @@ schema.sql ──► seed.sql (re-correr)
                │         │                   └──► coach_quota.sql   (paso 7)
                │         │                               │
                │         │                               └──► entitlements.sql (paso 9)
+               │         │                                           │
+               │         │                                           └──► billing.sql (paso 10)
                │         │
                │         └──► exercises.sql    (paso 6)
                │
