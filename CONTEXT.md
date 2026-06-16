@@ -64,6 +64,12 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `scripts/validate-workout-player.mjs` | Valida prescripciones de fuerza/cardio, dosis, temporizadores y recuperación del estado del reproductor. |
 | `scripts/validate-training-plan.mjs`, `scripts/test-training-plan-api.mjs` | Validan planes de 4/10 semanas, integración con el reproductor y rechazo server-side de respuestas incompatibles. |
 | `scripts/validate-coach-quota.mjs`, `scripts/test-coach-quota.mjs` | Validan contratos de esquema/cliente y prueban con mocks idempotencia, reutilización, devolución y administración sin llamadas pagadas. |
+| `scripts/release-gate.mjs` | **Release gate (REQ-30):** orquesta 18 checks locales (sintaxis JS, dominio, SQL, secrets, HTML/a11y) en ~1 s. Sale con código 1 si alguno falla. Correr antes de cada push. `--warn-only` para no bloquear. |
+| `scripts/audit-secrets.mjs` | Escanea todos los archivos rastreados por git contra patrones de credenciales reales (Claude, Stripe, Supabase JWT, Resend). Allowlist para nombres de variables de entorno y comentarios de ejemplo. |
+| `scripts/audit-html.mjs` | Verifica sintaxis del JS embebido (`node --check` sobre tmp file), tags PWA, `env(safe-area-inset-*)`, `prefers-reduced-motion`, `alt` en imágenes, `aria-label` en selects de entrenamiento y lenguaje prohibido (REQ-31) en atributos de UI. Presupuesto de tamaño: warn >600 KB, fail >1 000 KB. |
+| `scripts/validate-migrations.mjs` | Verifica idempotencia, RLS en tablas de usuario, `ADD COLUMN IF NOT EXISTS`, `DROP IF EXISTS` y secrets hardcodeados en todos los archivos `supabase/*.sql`. |
+| `scripts/smoke-test.mjs` | Prueba 8 endpoints de producción con fetch nativo (sin deps). Uso: `node scripts/smoke-test.mjs [--url URL] [--dry]`. |
+| `ROLLBACK.md` | Procedimiento de rollback para Vercel, Supabase, service worker y Git. |
 | `PRIVACY.md` | Política operativa preliminar: edad, consentimiento, aptitud, retención, exportación y borrado. Requiere revisión legal antes del lanzamiento comercial. |
 | `plan-10-semanas-recomposicion.md` | Plan original (fuente de verdad de menús, días, entrenos, metas). |
 | `BUILD_PLAN.md`, `PROGRESS.md`, `REQUIREMENTS.md`, `README.md` | Docs del proyecto. |

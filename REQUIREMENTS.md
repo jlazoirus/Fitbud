@@ -183,7 +183,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 27. REQ-27 - Analitica de producto, IA y costos.
 28. REQ-28 - Sincronizacion offline y resolucion de conflictos.
 29. REQ-29 - Modularizacion incremental y contratos de dominio. **Implementado**.
-30. REQ-30 - Pruebas end-to-end, accesibilidad y release gates.
+30. REQ-30 - Pruebas end-to-end, accesibilidad y release gates. **Implementado**.
 
 ### Fase F - Activacion, retencion y pulido (auditoria heuristica + directiva de producto, jun 2026)
 
@@ -1594,7 +1594,8 @@ Reducir el riesgo de seguir agregando coach, pagos y notificaciones dentro de un
 
 ## REQ-30 - Pruebas end-to-end, accesibilidad y release gates
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`scripts/release-gate.mjs` orquesta 18 checks locales (sintaxis JS, dominio, SQL, secrets, HTML/a11y) en 0.8 s y sale con código 1 si alguno falla. `scripts/audit-secrets.mjs` escanea todos los archivos rastreados por git contra patrones de credenciales reales (Claude, Stripe, Supabase JWT, Resend). `scripts/audit-html.mjs` verifica sintaxis del JS embebido (node --check sobre tmp file), tags PWA (viewport-fit, apple-mobile-web-app-*, manifest, SW), safe-area-inset, prefers-reduced-motion, alt en imágenes, aria-label en selects y lenguaje prohibido (REQ-31) en atributos de UI. `scripts/validate-migrations.mjs` verifica idempotencia (IF NOT EXISTS en incrementales; DROP+CREATE en scripts de instalación fresca), RLS en tablas de usuario (buscado en todos los archivos SQL del repo), ADD COLUMN sin IF NOT EXISTS, DROP sin IF EXISTS y secrets hardcodeados. `scripts/smoke-test.mjs` prueba 8 endpoints de producción con fetch nativo: /, /api/config, /api/catalog, /api/claude sin auth, /api/checkout sin auth, /api/admin sin auth, /api/analytics sin auth, manifest y SW. `ROLLBACK.md` documenta el procedimiento de rollback para Vercel, Supabase, SW y Git.
 
 ### Objetivo
 
