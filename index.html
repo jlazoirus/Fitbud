@@ -569,6 +569,12 @@
   .paywall-features li:before{content:'✓';color:var(--good);font-weight:700;flex:0 0 auto}
   .l-footer-legal{font-size:11px;color:var(--muted2);line-height:1.7}
   .l-footer-legal a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--border)}
+  /* Cola offline y badge de sincronización (REQ-28) */
+  .sync-badge{position:fixed;bottom:calc(70px + var(--safe-bottom));right:12px;z-index:150;font-size:10px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent;transition:opacity .2s;cursor:default;pointer-events:none}
+  .sync-badge.offline{background:rgba(220,60,60,.14);border-color:rgba(220,60,60,.35);color:#f87171}
+  .sync-badge.pending{background:rgba(180,140,30,.14);border-color:rgba(180,140,30,.35);color:#e8c95a}
+  .sync-badge.synced{background:rgba(60,180,80,.14);border-color:rgba(60,180,80,.35);color:#4ade80}
+  .sync-badge.attention{background:rgba(220,110,30,.14);border-color:rgba(220,110,30,.35);color:#f0a050;pointer-events:auto;cursor:pointer}
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
 <script src="config.js"></script>
@@ -585,6 +591,7 @@
 <div id="app"></div>
 <div class="tabs" id="tabs"></div>
 <div class="toast" id="toast"></div>
+<div class="sync-badge" id="sync-badge" hidden></div>
 
 <script>
 "use strict";
@@ -1427,6 +1434,91 @@ let S=load();
 function load(){try{const o=JSON.parse(localStorage.getItem(KEY));return o&&typeof o==="object"?o:{};}catch(e){return{};}}
 function save(){localStorage.setItem(KEY,JSON.stringify(S));}
 if(!S.days)S.days={}; if(!S.weights)S.weights={}; if(!S.settings)S.settings={};
+
+/* ================================================================
+   REQ-28 — Cola offline y resolución de conflictos
+   Cada mutación se guarda en localStorage bajo SYNC_QUEUE_KEY con
+   {id, uid, entity, entityKey, payload, ts, retries, status}.
+   drainSyncQueue() la procesa al recuperar red o al iniciar sesión.
+   ================================================================ */
+const SYNC_QUEUE_KEY="fitbud_syncq_v1";
+function _getSyncQ(){try{return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)||"[]");}catch(e){return[];}}
+function _setSyncQ(q){try{localStorage.setItem(SYNC_QUEUE_KEY,JSON.stringify(q));}catch(e){}}
+// Agrega o actualiza una mutación pendiente en la cola (deduplica por entidad+clave).
+function enqueueMutation(entity,entityKey,payload){
+  if(!uid())return;
+  const q=_getSyncQ();
+  const i=q.findIndex(x=>x.uid===uid()&&x.entity===entity&&x.entityKey===entityKey&&x.status==="pending");
+  if(i!==-1){q[i].payload=payload;q[i].ts=new Date().toISOString();}
+  else q.push({id:Math.random().toString(36).slice(2),uid:uid(),entity,entityKey,payload,ts:new Date().toISOString(),retries:0,status:"pending"});
+  _setSyncQ(q);_updateSyncBadge();
+}
+// Elimina una mutación de la cola al confirmar que el servidor la recibió.
+function _dequeueMutation(entity,entityKey){
+  _setSyncQ(_getSyncQ().filter(x=>!(x.uid===uid()&&x.entity===entity&&x.entityKey===entityKey)));
+  _updateSyncBadge();
+}
+// Descarta toda la cola del usuario al cerrar sesión (aislamiento entre usuarios en el dispositivo).
+function clearSyncQueueForUser(userId){
+  _setSyncQ(_getSyncQ().filter(x=>x.uid!==userId));
+  _updateSyncBadge();
+}
+// True si el día tiene mutaciones de day_log en estado pendiente.
+function _hasPendingDay(ds){
+  return _getSyncQ().some(x=>x.uid===uid()&&x.entity==="day_log"&&x.entityKey===ds&&x.status==="pending");
+}
+// Actualiza el badge de sincronización en la UI (sin reescribir el DOM de tabs/app).
+function _updateSyncBadge(){
+  const el=document.getElementById("sync-badge");if(!el)return;
+  if(!session){el.hidden=true;return;}
+  const q=_getSyncQ().filter(x=>x.uid===uid());
+  const pending=q.filter(x=>x.status==="pending").length;
+  const failed=q.filter(x=>x.status==="failed").length;
+  if(!navigator.onLine){
+    el.textContent="Sin red";el.className="sync-badge offline";el.hidden=false;el.onclick=null;
+  }else if(failed>0){
+    el.textContent="⚠ Atención";el.className="sync-badge attention";el.hidden=false;
+    el.onclick=()=>toast("Cambios sin sincronizar ("+failed+"): vuelve a conectarte para reintentarlo.");
+  }else if(pending>0){
+    el.textContent="↑ "+pending;el.className="sync-badge pending";el.hidden=false;el.onclick=null;
+  }else{
+    el.textContent="✓";el.className="sync-badge synced";el.hidden=false;el.onclick=null;
+    setTimeout(()=>{if(el&&el.className.includes("synced"))el.hidden=true;},2000);
+  }
+}
+// Procesa la cola: reintenta cada mutación pendiente en orden. Máximo 3 intentos por ítem.
+let _drainBusy=false;
+async function drainSyncQueue(){
+  if(_drainBusy||!supa||!uid()||!navigator.onLine)return;
+  _drainBusy=true;
+  try{
+    const q=_getSyncQ();
+    const pending=q.filter(x=>x.uid===uid()&&x.status==="pending");
+    for(const item of pending){
+      try{
+        if(!session||!session.access_token){await refreshAuth();if(!session)break;}
+        if(item.entity==="day_log"){
+          let r=await supa.from("day_log").upsert(item.payload,{onConflict:"user_id,log_date"});
+          if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i)){
+            const{plan_version_id:_,...compat}=item.payload;
+            r=await supa.from("day_log").upsert(compat,{onConflict:"user_id,log_date"});
+          }
+          if(r.error)throw r.error;
+        }else if(item.entity==="weight_log"){
+          const p=item.payload;
+          const r=await supa.from("weight_log").upsert(p,{onConflict:"user_id,cycle_start,week"});
+          if(r.error&&cycleNumber()===1){
+            await supa.from("weight_log").upsert({user_id:p.user_id,week:p.week,kg:p.kg,bf_pct:p.bf_pct,updated_at:p.updated_at},{onConflict:"user_id,week"});
+          }else if(r.error)throw r.error;
+        }
+        _dequeueMutation(item.entity,item.entityKey);
+      }catch(e){
+        const q2=_getSyncQ();const i2=q2.findIndex(x=>x.id===item.id);
+        if(i2!==-1){q2[i2].retries=(q2[i2].retries||0)+1;if(q2[i2].retries>=3)q2[i2].status="failed";_setSyncQ(q2);}
+      }
+    }
+  }finally{_drainBusy=false;_updateSyncBadge();}
+}
 /* --- entitlement (REQ-25) ------------------------------------------------- */
 let entitlement=null;        // {plan_id,status,starts_at,expires_at,origin} o null
 let entitlementExpired=null; // último vencido para mostrar en UI
@@ -6194,6 +6286,7 @@ async function signUp(email,pwd){
 }
 let _signOutBusy=false;
 function clearSignedOutState(){
+  const prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
   session=null;profile=null;view="hoy";
   entitlement=null;entitlementExpired=null;entitlementChecked=false;
   refreshPlanCalendar();
@@ -6204,6 +6297,7 @@ function clearSignedOutState(){
   if(recapPhotoUrl)URL.revokeObjectURL(recapPhotoUrl);
   recapPhotoUrl="";
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
+  if(prevUid)clearSyncQueueForUser(prevUid); // aislar cola: no exponer datos al próximo usuario
   authReady=true;
   const overlay=$("#overlay");if(overlay)overlay.remove();
   render();
@@ -6222,6 +6316,8 @@ async function signOutUser(button){
   if(_signOutBusy)return;
   _signOutBusy=true;
   if(button){button.disabled=true;button.textContent="Cerrando sesión…";}
+  // Intentar vaciar cola antes de limpiar la sesión (máx 5 s)
+  await Promise.race([drainSyncQueue(),new Promise(r=>setTimeout(r,5000))]);
   const client=supa;
   clearSignedOutState();
   try{
@@ -6271,6 +6367,7 @@ async function onAuth(){
       await upsertActiveCycle();
     }
     await Promise.all([pullAllDays(),pullWeights()]);
+    drainSyncQueue(); // vaciar cola offline pendiente al reconectar (no-await)
     onboardingStep=1;reviewPromptShown=false;
     view="hoy";current=clampDate(todayStr());
     render();
@@ -6602,16 +6699,22 @@ async function pushDay(ds){
   const state={...(S.days[ds]||{})};
   const planVersionId=state.planVersionId||resolvePlanVersionIdForDate(ds);
   if(planVersionId)state.planVersionId=planVersionId;
+  const payload={user_id:uid(),log_date:ds,state,plan_version_id:planVersionId||null,updated_at:new Date().toISOString()};
+  if(!navigator.onLine){enqueueMutation("day_log",ds,payload);return;}
   try{
-    const result=await supa.from("day_log").upsert({user_id:uid(),log_date:ds,state,plan_version_id:planVersionId||null,updated_at:new Date().toISOString()},{onConflict:"user_id,log_date"});
+    const result=await supa.from("day_log").upsert(payload,{onConflict:"user_id,log_date"});
     if(result.error&&String((result.error&&result.error.message)||result.error).match(/plan_version_id|column/i)){
-      await supa.from("day_log").upsert({user_id:uid(),log_date:ds,state,updated_at:new Date().toISOString()},{onConflict:"user_id,log_date"});
-    }
-  }catch(e){}
+      const{plan_version_id:_,...compat}=payload;
+      await supa.from("day_log").upsert(compat,{onConflict:"user_id,log_date"});
+    }else if(result.error)throw result.error;
+    _dequeueMutation("day_log",ds);
+  }catch(e){enqueueMutation("day_log",ds,payload);}
 }
-// Baja el estado de un día desde Supabase (última versión sincronizada).
+// Baja el estado de un día desde Supabase. Si hay mutaciones pendientes en la cola,
+// el estado local es la autoridad y no se sobreescribe con el estado del servidor.
 async function pullDay(ds){
   if(!supa||!ds||!uid())return false;
+  if(_hasPendingDay(ds))return true; // estado local autoridad mientras pendiente
   try{
     let r=await supa.from("day_log").select("state,plan_version_id").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
     if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("state").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
@@ -6626,7 +6729,8 @@ async function pullDay(ds){
   }catch(e){}
   return false;
 }
-// Baja TODOS los días del usuario (para racha y estadísticas correctas al entrar).
+// Baja TODOS los días del usuario. Días con mutaciones pendientes en la cola se omiten
+// para preservar los cambios offline hechos en este dispositivo.
 async function pullAllDays(){
   if(!supa||!uid())return;
   try{
@@ -6634,6 +6738,7 @@ async function pullAllDays(){
     if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("log_date,state").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
     if(!r.error&&Array.isArray(r.data)){
       r.data.forEach(row=>{
+        if(_hasPendingDay(row.log_date))return; // preservar cambios offline pendientes
         if(row.state&&typeof row.state==="object"){
           const state={...row.state};
           const planVersionId=row.plan_version_id||state.planVersionId||resolvePlanVersionIdForDate(row.log_date)||null;
@@ -6659,17 +6764,21 @@ function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view===
 
 /* ---- Registro de peso + % grasa en la DB (tabla weight_log) ---- */
 // kg es NOT NULL: sin peso no hay fila (el % grasa acompaña al peso).
+// Las inserciones de peso se encolan cuando no hay red; las eliminaciones son last-write-wins.
 async function pushWeight(week,kg,bf){
   if(!supa||!uid())return;
+  const payload={user_id:uid(),cycle_start:START,week,kg:(kg==null?null:kg),bf_pct:(bf==null?null:bf),updated_at:new Date().toISOString()};
+  if(!navigator.onLine){if(kg!=null)enqueueMutation("weight_log","w"+week,payload);return;}
   try{
     const result=kg==null
       ?await supa.from("weight_log").delete().eq("user_id",uid()).eq("cycle_start",START).eq("week",week)
-      :await supa.from("weight_log").upsert({user_id:uid(),cycle_start:START,week:week,kg:kg,bf_pct:(bf==null?null:bf),updated_at:new Date().toISOString()},{onConflict:"user_id,cycle_start,week"});
+      :await supa.from("weight_log").upsert(payload,{onConflict:"user_id,cycle_start,week"});
     if(result.error&&cycleNumber()===1){
       if(kg==null)await supa.from("weight_log").delete().eq("user_id",uid()).eq("week",week);
-      else await supa.from("weight_log").upsert({user_id:uid(),week:week,kg:kg,bf_pct:(bf==null?null:bf),updated_at:new Date().toISOString()},{onConflict:"user_id,week"});
-    }
-  }catch(e){}
+      else await supa.from("weight_log").upsert({user_id:uid(),week,kg,bf_pct:(bf==null?null:bf),updated_at:payload.updated_at},{onConflict:"user_id,week"});
+    }else if(result.error)throw result.error;
+    _dequeueMutation("weight_log","w"+week);
+  }catch(e){if(kg!=null)enqueueMutation("weight_log","w"+week,payload);}
 }
 async function pullWeights(){
   if(!supa||!uid())return false;
@@ -7680,8 +7789,13 @@ setInterval(workoutTimerTick,1000);
 // Captura el evento de instalación (Android/Chrome) y oculta la sugerencia si ya se instaló.
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstallPrompt=e;updateInstallPrompt();});
 window.addEventListener("appinstalled",()=>{UI.installDismissed=true;uiSave();removeInstallPrompt();});
+// Cola offline: drenar al recuperar red; actualizar badge al perderla (REQ-28).
+window.addEventListener("online",()=>{_updateSyncBadge();if(supa&&session)drainSyncQueue();});
+window.addEventListener("offline",()=>_updateSyncBadge());
 render();                      // splash mientras resolvemos la sesión
 boot();                        // carga config (Vercel) → conecta Supabase → resuelve sesión
+// Inicializar badge de sincronización (vive fuera de #app para sobrevivir render()).
+_updateSyncBadge();
 </script>
 </body>
 </html>

@@ -1500,7 +1500,8 @@ Medir si la experiencia crea valor, donde se abandona y cuanto cuesta operar la 
 
 ## REQ-28 - Sincronizacion offline y resolucion de conflictos
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Cola `fitbud_syncq_v1` en localStorage: cada mutación de `day_log` y `weight_log` se almacena con `{id, uid, entity, entityKey, payload, ts, retries, status}`. `pushDay` y `pushWeight` encolan al perder red o ante error de red; `drainSyncQueue()` procesa la cola al recuperar red, al iniciar sesión y al cerrar sesión (con timeout de 5 s). `pullDay` y `pullAllDays` saltan días con mutaciones pendientes para no sobreescribir cambios offline. La cola se aísla por usuario en `clearSyncQueueForUser()` al detectar cierre de sesión. Badge `#sync-badge` muestra: "Sin red" (offline), "↑ N" (pendientes), "✓" (sincronizado, desaparece a los 2 s), "⚠ Atención" (fallido tras 3 reintentos, clicable). El drenado incluye manejo de sesión expirada con `refreshAuth()`. `drainSyncQueue` es idempotente porque `pushDay`/`pushWeight` usan upsert con clave de conflicto. Sin migraciones SQL (la cola vive en localStorage). Service worker v33.
 
 ### Objetivo
 
