@@ -1441,7 +1441,8 @@ Vender y mantener los paquetes de 1 y 3 meses con un flujo de pago confiable y a
 
 ## REQ-27 - Analitica de producto, IA y costos
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`product_events` registra eventos de embudo anonimizados (sin datos de salud, alergias ni prompts) con filtro de propiedades en servidor y cliente. `feature_flags` versiona prompts y flags. `coach_usage` extiende con `latency_ms`, `estimated_cost_usd` (calculado en `api/claude.js` desde precios por modelo), `prompt_version` y `outcome`. `complete_fresh_coach_part` y `fail_coach_generation_part` actualizados con nuevos parametros opcionales (backward compatible). Vistas admin `v_activation_funnel` y `v_ai_cost_summary`. `api/analytics.js`: POST registra eventos del cliente, GET devuelve metricas agregadas solo a admin. `index.html`: `trackEvent()` con allowlist de 15 claves seguras; 8 puntos instrumentados (session_start, onboarding_complete, paywall_shown, checkout_start, checkout_complete, diet_week_applied, training_plan_applied, coach_message_sent); vista "Analitica" en la seccion admin de Perfil. Migracion: `supabase/analytics.sql`.
 
 ### Objetivo
 

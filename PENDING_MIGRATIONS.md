@@ -47,6 +47,7 @@ Los siguientes scripts son **seguros de re-ejecutar** (idempotentes): no borran 
 8. notifications.sql
 9. entitlements.sql
 10. billing.sql
+11. analytics.sql
 ```
 
 ---
@@ -265,6 +266,30 @@ alter table weight_log add column if not exists bf_pct numeric;
 
 ---
 
+### 11. `supabase/analytics.sql`
+
+**REQ:** REQ-27 (analítica de producto, IA y costos)
+
+**Qué hace:**
+- Crea la tabla `product_events` (eventos de embudo anonimizados: session_start, onboarding_complete, paywall_shown, checkout, etc.). RLS: usuarios insertan/leen los propios; service_role accede a todo para vistas admin.
+- Crea la tabla `feature_flags` (versionado de prompts y flags de experimentos). Lectura pública; escritura solo admin.
+- Extiende `coach_usage` con: `latency_ms INTEGER`, `estimated_cost_usd NUMERIC(10,6)`, `prompt_version TEXT`, `outcome TEXT`.
+- Reemplaza `complete_fresh_coach_part` y `fail_coach_generation_part` con versiones que aceptan los nuevos campos como parámetros opcionales con DEFAULT (backward compatible con llamadas existentes).
+- Crea vistas admin `v_activation_funnel` (embudo 90d por evento y usuarios únicos) y `v_ai_cost_summary` (costo, latencia y tasa de error por acción 30d).
+
+**Por qué es necesario:** `api/analytics.js` inserta en `product_events` y consulta `v_activation_funnel`/`v_ai_cost_summary`. `api/claude.js` pasa `p_latency_ms`, `p_estimated_cost` y `p_prompt_version` a los RPCs actualizados para registrar métricas de costo en `coach_usage`. Sin este script, los eventos de producto se descartan (404) y los RPCs del coach fallan porque la firma antigua fue reemplazada.
+
+**Prerequisito:** `coach_quota.sql` ya aplicado (las funciones reemplazadas viven en ese script).
+
+**Nota:** El DROP de las funciones antiguas es necesario porque PostgreSQL trata firmas distintas como funciones diferentes. El script DROP + CREATE es idempotente si se ejecuta varias veces porque `CREATE OR REPLACE` recrea la versión nueva.
+
+```sql
+-- Ver contenido completo en: supabase/analytics.sql
+-- (~200 líneas; incluye tablas, extensión de coach_usage, funciones y vistas)
+```
+
+---
+
 ## Resumen de orden y dependencias
 
 ```
@@ -282,9 +307,11 @@ schema.sql ──► seed.sql (re-correr)
                │         │                   │
                │         │                   └──► coach_quota.sql   (paso 7)
                │         │                               │
-               │         │                               └──► entitlements.sql (paso 9)
-               │         │                                           │
-               │         │                                           └──► billing.sql (paso 10)
+               │         │                               ├──► entitlements.sql (paso 9)
+               │         │                               │           │
+               │         │                               │           └──► billing.sql (paso 10)
+               │         │                               │
+               │         │                               └──► analytics.sql (paso 11)
                │         │
                │         └──► exercises.sql    (paso 6)
                │

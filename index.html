@@ -2396,6 +2396,7 @@ async function saveOnboarding(){
   }
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
   view="hoy";current=clampDate(todayStr());
+  trackEvent(firstCycle||newCycle?"onboarding_complete":"onboarding_review",{cycle:planCycleNumber,duration_weeks:duration,source:newCycle?"new_cycle":firstCycle?"first":"review"});
   if(firstCycle||newCycle)await prepareFirstCycleDay(current);
   render();window.scrollTo(0,0);toast(firstCycle||newCycle?"Tu primer día está listo":"Tu plan quedó actualizado");
 }
@@ -2478,6 +2479,7 @@ function render(){
   if(isAdmin()&&view==="exercises")return renderExerciseAdmin();
   if(isAdmin()&&view==="settings")return renderSettings();
   if(isAdmin()&&view==="admin")return renderAdminUsers();
+  if(isAdmin()&&view==="analytics")return renderAnalytics();
   renderHoy();
 }
 function renderSplash(){$("#app").innerHTML=`<div class="splash"><div class="muted">Cargando…</div></div>`;}
@@ -3777,6 +3779,7 @@ function parseCoachReply(raw){
 // Envía un mensaje al coach y actualiza la vista.
 async function sendCoachMessage(userText){
   if(!userText||!userText.trim())return;
+  trackEvent("coach_message_sent",{});
   if(!isActive()||!hasRequiredConsents()||!hasCurrentScreening()){
     toast("Revisa privacidad y seguridad antes de usar tu coach");
     return;
@@ -4099,6 +4102,7 @@ function renderProfile(){
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('foods')">🥗 Alimentos (catálogo)</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('exercises')">🏋️ Ejercicios (catálogo)</button>
+    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('analytics')">📊 Analítica</button>
     <button class="btn" style="width:100%" onclick="setView('settings')">⚙️ Ajustes técnicos</button>
   </div>`:""}
 
@@ -4348,6 +4352,7 @@ function toggleFaq(el){
 
 /* ---- Paywall y estado de suscripción (REQ-25) ---- */
 function showPaywall(context){
+  trackEvent("paywall_shown",{context:context||"generic"});
   const plans=activeCatalogPlans();
   const expired=entitlementExpired;
   const msg=context==="training"
@@ -4377,6 +4382,7 @@ function showPaywall(context){
 }
 async function activatePlanFromPaywall(planId){
   if(!session){toast("Sesión no disponible. Recarga la página.");return;}
+  trackEvent("checkout_start",{});
   const btn=event&&event.target instanceof HTMLButtonElement?event.target:null;
   if(btn){btn.disabled=true;btn.textContent="Redirigiendo…";}
   try{
@@ -4403,6 +4409,7 @@ function checkCheckoutReturn(){
   if(!status)return;
   if(history&&history.replaceState)history.replaceState({},document.title,location.pathname);
   if(status==="success"){
+    trackEvent("checkout_complete",{});
     loadEntitlement().then(()=>render());
     modal(`<h3>¡Pago recibido!</h3>
       <p style="margin:12px 0">Tu plan se está activando. En unos momentos tendrás acceso completo a tu coach.</p>
@@ -5726,6 +5733,7 @@ function genWeekReviewHtml(){
 function applyWeekPlan(){
   const draft=window._genWeek;if(!draft||!draft.daysData.length){closeModal();return;}
   draft.daysData.forEach(d=>applyDayComidas(d.ds,d.comidas));
+  trackEvent("diet_week_applied",{count:draft.daysData.length});
   window._genWeek=null;closeModal();render();toast(`${draft.daysData.length} días aplicados a tu plan`);
 }
 async function regenerateDayInWeekDraft(index){
@@ -6267,6 +6275,7 @@ async function onAuth(){
     view="hoy";current=clampDate(todayStr());
     render();
     checkCheckoutReturn(); // REQ-26: manejar retorno de Stripe checkout
+    trackEvent("session_start",{});
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
   }finally{_authBusy=false;}
 }
@@ -6553,6 +6562,7 @@ async function activateTrainingPlanDraft(versionId){
   }
   await pullPlanVersions();
   const active=PLAN_VERSIONS.find(row=>String(row.id)===String(draft.id))||draft;
+  try{const p_=(profile&&profile.prefs)||{};trackEvent("training_plan_applied",{duration_weeks:p_.planDurationWeeks||10,sport:p_.primarySport||"gym"});}catch(_){}
   const updates=[];
   Object.keys(S.days||{}).filter(ds=>ds>=validFrom&&ds<=END).forEach(ds=>{
     const state=dayState(ds);
@@ -7602,6 +7612,68 @@ async function boot(){
   setupAuthListener();
   await refreshAuth();         // resuelve sesión (authReady=true)
   if(session)await onAuth(); else render();
+}
+/* ---- Analitica de producto (REQ-27) ---- */
+// Solo claves seguras sin datos de salud, identidad ni prompts.
+const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","action"]);
+let _analyticsSessionId=null;
+function analyticsSessionId(){if(!_analyticsSessionId)_analyticsSessionId=Math.random().toString(36).slice(2)+Date.now().toString(36);return _analyticsSessionId;}
+function filterEventProps(props){
+  const out={};
+  for(const[k,v]of Object.entries(props||{})){
+    if(ANALYTICS_SAFE_PROPS.has(k)&&(typeof v==="string"||typeof v==="number"||typeof v==="boolean"))out[k]=v;
+  }
+  return out;
+}
+function trackEvent(type,props){
+  if(!session)return;
+  try{
+    const safe=filterEventProps(props||{});
+    fetch("/api/analytics",{
+      method:"POST",
+      headers:{"content-type":"application/json","Authorization":"Bearer "+session.access_token},
+      body:JSON.stringify({event_type:type,properties:safe,session_id:analyticsSessionId()}),
+    }).catch(()=>{});
+  }catch(_){}
+}
+async function renderAnalytics(){
+  if(!isAdmin()){setView("hoy");return;}
+  $("#app").innerHTML=`${screenHeader("Analítica","Producto, IA y costos","perfil")}<div class="dash muted small">Cargando métricas…</div>`;
+  try{
+    const r=await fetch("/api/analytics",{headers:{Authorization:"Bearer "+session.access_token}});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+      $("#app").innerHTML=`${screenHeader("Analítica","Producto, IA y costos","perfil")}<div class="ai-box">⚠️ ${esc(data.error||"Error al cargar analítica")}</div>`;
+      return;
+    }
+    const{funnel=[],ai_costs=[],summary={}}=data;
+    const funnelRows=funnel.map(row=>`<tr><td style="padding:7px 12px">${esc(row.event_type)}</td><td style="padding:7px 12px;text-align:right">${row.unique_users_7d||0}</td><td style="padding:7px 12px;text-align:right">${row.unique_users||0}</td><td style="padding:7px 12px;text-align:right">${row.total_events||0}</td></tr>`).join("");
+    const aiRows=ai_costs.map(row=>`<tr><td style="padding:7px 12px">${esc(row.action)}</td><td style="padding:7px 12px;text-align:right">${row.total_calls||0}</td><td style="padding:7px 12px;text-align:right">${row.error_rate_pct||0}%</td><td style="padding:7px 12px;text-align:right">$${row.total_cost_usd||0}</td><td style="padding:7px 12px;text-align:right">${row.avg_latency_sec||"—"}s</td><td style="padding:7px 12px;text-align:right">$${row.cost_per_user_usd||0}</td></tr>`).join("");
+    $("#app").innerHTML=`${screenHeader("Analítica","Producto, IA y costos","perfil")}
+      <div class="dash">
+        <b>Resumen — últimos 30 días</b>
+        <div class="row wrap" style="margin-top:10px;gap:16px">
+          <div style="text-align:center"><div style="font-size:1.5em;font-weight:700">${summary.active_users_7d||0}</div><div class="muted small">usuarios activos 7d</div></div>
+          <div style="text-align:center"><div style="font-size:1.5em;font-weight:700">${summary.active_users_30d||0}</div><div class="muted small">usuarios activos 30d</div></div>
+          <div style="text-align:center"><div style="font-size:1.5em;font-weight:700">$${summary.total_cost_30d||0}</div><div class="muted small">costo IA 30d USD</div></div>
+        </div>
+      </div>
+      ${funnelRows?`<div class="section-h">Embudo de activación (90 días)</div>
+        <div class="dash" style="padding:0;overflow:auto">
+          <table style="width:100%;font-size:13px;border-collapse:collapse">
+            <thead><tr style="border-bottom:1px solid var(--surf3)"><th style="padding:8px 12px;text-align:left">Evento</th><th style="padding:8px 12px;text-align:right">7d</th><th style="padding:8px 12px;text-align:right">90d únicos</th><th style="padding:8px 12px;text-align:right">Total</th></tr></thead>
+            <tbody>${funnelRows}</tbody>
+          </table></div>`:""}
+      ${aiRows?`<div class="section-h">Costo IA por acción (30 días)</div>
+        <div class="dash" style="padding:0;overflow:auto">
+          <table style="width:100%;font-size:13px;border-collapse:collapse">
+            <thead><tr style="border-bottom:1px solid var(--surf3)"><th style="padding:8px 12px;text-align:left">Acción</th><th style="padding:8px 12px;text-align:right">Llamadas</th><th style="padding:8px 12px;text-align:right">Errores</th><th style="padding:8px 12px;text-align:right">Costo USD</th><th style="padding:8px 12px;text-align:right">Latencia</th><th style="padding:8px 12px;text-align:right">$/usuario</th></tr></thead>
+            <tbody>${aiRows}</tbody>
+          </table></div>`:""}
+      ${!funnelRows&&!aiRows?`<div class="dash muted small">Sin datos todavía. Completa el onboarding y usa el coach para ver métricas aquí.</div>`:""}`;
+  }catch(error){
+    $("#app").innerHTML=`${screenHeader("Analítica","Producto, IA y costos","perfil")}<div class="ai-box">⚠️ ${esc(coachErrorMessage(error))}</div>`;
+  }
 }
 registerServiceWorker();
 setInterval(workoutTimerTick,1000);

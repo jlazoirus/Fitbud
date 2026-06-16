@@ -2,6 +2,12 @@
 // La credencial del proveedor y la service role viven exclusivamente aqui.
 const ALLOWED_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"];
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
+const PROMPT_VERSION = "v1";
+// Costo estimado por token en USD (precios de agosto 2025).
+const MODEL_COSTS = {
+  "claude-haiku-4-5-20251001": { input: 0.0000008, output: 0.000004 },
+  "claude-sonnet-4-6":         { input: 0.000003,  output: 0.000015 },
+};
 const CONSENT_POLICY_VERSION = "2026-06-15-v2";
 const SAFETY_SCREENING_VERSION = "2026-06-15";
 const REQUIRED_CONSENTS = ["body_progress", "automated_coach"];
@@ -353,6 +359,11 @@ function firstRow(data) {
   return Array.isArray(data) ? data[0] : data;
 }
 
+function estimateCostUsd(model, inputTokens, outputTokens) {
+  const costs = MODEL_COSTS[model] || MODEL_COSTS[DEFAULT_MODEL];
+  return Math.round((costs.input * (inputTokens || 0) + costs.output * (outputTokens || 0)) * 1e6) / 1e6;
+}
+
 async function claimPart(e, usageId, partKey) {
   return firstRow(await rpc(e, "claim_coach_generation_part", {
     p_usage_id: usageId,
@@ -378,6 +389,7 @@ async function failPart(e, usageId, partKey, code, metrics) {
       p_provider_called: !!metrics,
       p_input_tokens: Number(metrics && metrics.inputTokens) || 0,
       p_output_tokens: Number(metrics && metrics.outputTokens) || 0,
+      p_latency_ms: Number(metrics && metrics.latencyMs) || null,
     });
   } catch (_) {
     // El error original es mas importante que un fallo al registrar la devolucion.
@@ -398,6 +410,7 @@ async function providerResponse(e, body, privacy) {
     ? " La evaluacion del usuario tiene una senal de alerta: no propongas rutinas ni progresiones de ejercicio; limita la respuesta a detener actividad y buscar evaluacion profesional."
     : "";
   const clientSystem = typeof body.system === "string" ? body.system : "";
+  const callStart = Date.now();
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -412,6 +425,7 @@ async function providerResponse(e, body, privacy) {
       messages: [{ role: "user", content: String(body.userText || "") }],
     }),
   });
+  const latencyMs = Date.now() - callStart;
   const data = await responseJson(response);
   if (!response.ok) {
     const error = new Error(apiError(data, "Error " + response.status));
@@ -423,6 +437,7 @@ async function providerResponse(e, body, privacy) {
     inputTokens: Number(data.usage && data.usage.input_tokens) || 0,
     outputTokens: Number(data.usage && data.usage.output_tokens) || 0,
     model,
+    latencyMs,
   };
 }
 
@@ -577,9 +592,13 @@ export default async function handler(req, res) {
       p_metadata: {
         model: generated.model,
         validation_version: 1,
+        prompt_version: PROMPT_VERSION,
       },
       p_input_tokens: generated.inputTokens,
       p_output_tokens: generated.outputTokens,
+      p_latency_ms: generated.latencyMs || null,
+      p_estimated_cost: estimateCostUsd(generated.model, generated.inputTokens, generated.outputTokens),
+      p_prompt_version: PROMPT_VERSION,
     }));
     const response = { text: generated.text };
     if (auth.profile.is_admin) {
