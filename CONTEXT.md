@@ -37,7 +37,7 @@ PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) q
 | `api/admin.js` | Función serverless **admin**: usuarios, cuenta QA y políticas de consumo. Permite límites por acción, activación, diagnóstico nuevo/reutilizado, cortesía y reinicio diario. Usa `SUPABASE_SERVICE_ROLE_KEY` solo en servidor. |
 | `api/privacy.js` | Exporta perfil, progreso, planes, consentimientos, consumo/opciones del coach y fotos descritas; o elimina fotos + cuenta Auth tras confirmar `BORRAR <email>`. |
 | `vercel.json` | Deploy estático sin build (`framework:null`, `outputDirectory:"."`). |
-| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v23`. |
+| `service-worker.js` | Cache PWA. `index.html`/`config.js` network-first; `/api/*` network-only; assets cache-first; CDN stale-while-revalidate. Caché `fitbud-pwa-v25`. |
 | `exercise-catalog.js` | Catálogo local propio de 40 ejercicios y mapeo de cada variante de rutina a IDs estables. También alimenta la generación reproducible del SQL. |
 | `workout-player.js` | Dominio sin dependencias para prescribir fuerza/cardio, recuperar ejecuciones y calcular temporizadores, progreso y resultados. |
 | `training-plan.js` | Contrato sin dependencias para normalizar semanas, rechazar días/ejercicios/dosis incompatibles y convertir sesiones activadas al reproductor. |
@@ -146,6 +146,7 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Privacidad y seguridad** — consentimientos versionados, gate para cuentas existentes, pausa de entrenamiento por alertas, guardrails server-side, exportación y borrado.
 - **Cuotas y reutilización** — políticas por acción, ventana diaria por zona horaria, reserva atómica, semana agrupada, pool privado, fallback determinista y panel administrativo sin contadores en la experiencia normal.
 - **Contingencias (REQ-19)** — reemplazos con motivo, delta de macros, alcance (hoy/semana) y log; acciones rápidas de entrenamiento (tiempo/lugar/equipo/sesión perdida); reversión al plan original; resumen de adaptaciones en el día.
+- **Coach conversacional (REQ-21)** — tab "Coach" con historial por ciclo/usuario, sugerencias predefinidas (5 preguntas del plan), contexto enriquecido, clasificación de respuesta (educativo/propuesta/aplicado/fallback), confirmación antes de aplicar acciones, resumen automático al superar 30 mensajes y lenguaje 100% invisible (sin IA/proveedor). Estado en `localStorage` por `fitbud_chat_v1_<uid>_c<cycle>`.
 
 ### Pendiente / ideas
 - **Porciones especiales de REFEED/DIETBREAK:** el almuerzo refeed usa el plato estándar de la DB, sin la doble porción de carbo que indica el plan.

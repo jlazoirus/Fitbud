@@ -1138,7 +1138,8 @@ Usar el progreso y la experiencia del usuario para proponer ajustes pequenos cad
 
 ## REQ-21 - Centro conversacional del coach
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Tab "Coach" con conversación por ciclo, contexto enriquecido (macros, entreno, check-ins, adaptaciones), sugerencias predefinidas, confirmación antes de aplicar cambios de datos, fallback claro y resumen automático al superar 30 mensajes.
 
 ### Objetivo
 
