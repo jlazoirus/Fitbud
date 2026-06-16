@@ -3618,7 +3618,7 @@ function setWorkout(ds,id){
   if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
   const d=dayState(ds);if(id&&id!==plannedWorkoutId(ds))d.workoutOverride=id;else delete d.workoutOverride;commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");
 }
-function delExtra(ds,i){const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);render();}
+function delExtra(ds,i){if(!confirm("¿Eliminar esta comida extra?"))return;const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);render();}
 
 /* ---------- PROGRESO: stats + peso + semana ---------- */
 function renderProgress(){
@@ -4870,12 +4870,38 @@ async function finishPasswordRecovery(){
 /* ============================================================
    Fase 4: REEMPLAZO + COMIDAS PERSONALIZADAS  (modales)
    ============================================================ */
-function modal(html){
-  let o=$("#overlay");
-  if(!o){o=document.createElement("div");o.id="overlay";o.className="overlay";o.addEventListener("click",e=>{if(e.target===o)closeModal();});document.body.appendChild(o);}
-  o.innerHTML=`<div class="sheet"><div class="closebar"><button onclick="closeModal()">✕</button></div>${html}</div>`;
+let _modalTrigger=null;
+function _modalKeyHandler(e){
+  if(e.key==="Escape"){closeModal();return;}
+  if(e.key==="Tab"){
+    const sheet=document.querySelector("#overlay .sheet");if(!sheet)return;
+    const sel='button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex="0"]';
+    const focusable=Array.from(sheet.querySelectorAll(sel)).filter(el=>el.offsetParent!==null);
+    if(focusable.length<2)return;
+    const first=focusable[0],last=focusable[focusable.length-1];
+    if(e.shiftKey){if(document.activeElement===first){last.focus();e.preventDefault();}}
+    else{if(document.activeElement===last){first.focus();e.preventDefault();}}
+  }
 }
-function closeModal(){const o=$("#overlay");if(o)o.remove();stopMic();}
+function modal(html){
+  const existing=$("#overlay");
+  if(!existing)_modalTrigger=document.activeElement;
+  let o=existing;
+  if(!o){o=document.createElement("div");o.id="overlay";o.className="overlay";o.addEventListener("click",e=>{if(e.target===o)closeModal();});document.body.appendChild(o);}
+  o.innerHTML=`<div class="sheet" role="dialog" aria-modal="true"><div class="closebar"><button onclick="closeModal()" aria-label="Cerrar">✕</button></div>${html}</div>`;
+  const sheet=o.querySelector(".sheet");
+  const h3=sheet&&sheet.querySelector("h3");
+  if(h3){h3.id="sheet-title";sheet.setAttribute("aria-labelledby","sheet-title");}
+  document.removeEventListener("keydown",_modalKeyHandler);
+  document.addEventListener("keydown",_modalKeyHandler);
+  setTimeout(()=>{const btn=sheet&&sheet.querySelector(".closebar button");if(btn)btn.focus();},0);
+}
+function closeModal(){
+  document.removeEventListener("keydown",_modalKeyHandler);
+  const o=$("#overlay");if(o)o.remove();stopMic();
+  if(_modalTrigger&&typeof _modalTrigger.focus==="function")try{_modalTrigger.focus();}catch(_){}
+  _modalTrigger=null;
+}
 
 function openReplace(ds,id,reason){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);
@@ -6370,7 +6396,7 @@ function clearSignedOutState(){
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
   if(prevUid)clearSyncQueueForUser(prevUid); // aislar cola: no exponer datos al próximo usuario
   authReady=true;
-  const overlay=$("#overlay");if(overlay)overlay.remove();
+  closeModal();
   render();
 }
 function clearStoredAuthSession(client){
@@ -7682,8 +7708,8 @@ function submitWeeklyCheckin(){
       :"Recomendación: tu cuerpo responde bien. Añade carga progresiva en tus series principales."}</div>`:"";
 
   const el=document.querySelector(".sheet");
-  if(el)el.innerHTML=`<div class="closebar"><button onclick="closeModal()">✕</button></div>
-    <h3>Ajuste · Semana ${due.num+1}</h3>
+  if(el)el.innerHTML=`<div class="closebar"><button onclick="closeModal()" aria-label="Cerrar">✕</button></div>
+    <h3 id="sheet-title">Ajuste · Semana ${due.num+1}</h3>
     <p class="muted small">${esc(proposal.reason)}</p>
     ${safeNote}${keepBlock}${calorieBlock}${intensityNote}
     <div class="muted small" style="margin-top:12px">Ajuste máximo: ±${CHECKIN_MAX_KCAL_ADJUST} kcal/día. Aplica desde mañana y no modifica días ya registrados.</div>

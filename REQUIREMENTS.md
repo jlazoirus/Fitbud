@@ -1952,7 +1952,8 @@ Eliminar la redundancia entre "Reemplazar" y "Adaptar" en la tarjeta de comida y
 
 ## REQ-37 - Accesibilidad de modales y confirmacion de acciones destructivas
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`modal()` ahora asigna `role="dialog"` y `aria-modal="true"` al sheet, conecta `aria-labelledby` al primer `<h3>` (id `sheet-title`), añade `aria-label="Cerrar"` al botón ✕, guarda el elemento disparador y lo restaura al cerrar, y registra un handler de teclado (`_modalKeyHandler`) que cierra con Esc y atrapa el foco con Tab/Shift-Tab dentro del sheet. `delExtra()` pide confirmación antes de eliminar una comida extra, consistente con las otras acciones destructivas. El bloque de actualización directa del sheet en el check-in semanal también incluye `aria-label` en su botón de cierre e `id="sheet-title"` en su h3. La remoción directa del overlay en `signOutUser()` fue reemplazada por `closeModal()` para limpiar el listener de teclado al cerrar sesión. Sin SQL nuevo.
 
 ### Objetivo
 
