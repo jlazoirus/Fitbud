@@ -1191,7 +1191,8 @@ Dar al usuario un punto unico para pedir ayuda contextual y convertir respuestas
 
 ## REQ-22 - Home como agenda diaria del coach
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Home muestra una tarjeta de acción prioritaria determinista (sin llamada IA), progreso nutricional con anillo de kcal y macros, accesos rápidos a Nutrición/Entreno/Coach, banner de check-in cuando hay uno pendiente y mensajes diferenciados para descanso, día completado, plan terminado y evaluación de seguridad.
 
 ### Objetivo
 

@@ -395,6 +395,19 @@
   .ci-dpos{color:var(--good);font-family:var(--font-mono);font-size:12px}
   .ci-dneg{color:var(--warn);font-family:var(--font-mono);font-size:12px}
 
+  /* Home agenda diaria (REQ-22) */
+  .prio-card{border-radius:var(--r-lg);padding:18px;margin-bottom:14px}
+  .prio-eyebrow{font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:6px}
+  .prio-name{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:-.02em;margin:0 0 5px;line-height:1.2}
+  .prio-detail{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.4}
+  .prio-reason{font-size:11px;color:var(--muted);margin-top:10px}
+  .home-quick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+  .hq-btn{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 8px;text-align:center;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:5px}
+  .hq-btn:active{transform:scale(.96)}
+  .hq-icon{font-size:20px;line-height:1}
+  .hq-label{font-size:11px;font-weight:600;color:var(--txt)}
+  .hq-sub{font-size:10px;color:var(--muted)}
+
   /* Coach conversacional (REQ-21) */
   .coach-wrap{display:flex;flex-direction:column;height:calc(100dvh - 120px);padding-bottom:0}
   .coach-msgs{flex:1;overflow-y:auto;padding:12px 14px 8px;display:flex;flex-direction:column;gap:10px}
@@ -2435,18 +2448,113 @@ function heroDash(ds){
   </div>`;
 }
 
-/* ---------- HOME (Hoy): dieta de hoy + racha + entreno ---------- */
+/* ---------- HOME: acción prioritaria del día sin llamada IA (REQ-22) ---------- */
+function nextDailyAction(ds){
+  const st=dayState(ds);
+  const day=buildDay(ds);
+  const ew=effectiveWorkout(ds);
+  const execution=normalizedWorkoutExecution(ds);
+  const workoutOutcome=workoutOutcomeForState(st);
+  const restDay=ew.workout&&ew.workout.id==="descanso";
+  const safetyHold=trainingSafetyHold();
+  const {doneMeals,totMeals,t,target}=dayTotals(ds);
+  const pendingMeals=day.meals.filter(m=>!mealState(ds,m.id).done);
+  const workoutPending=!restDay&&!safetyHold&&!st.workoutDone&&workoutOutcome==="pending";
+
+  // 1. Sesión iniciada o pausada → continuar
+  if(execution&&(workoutOutcome==="in_progress"||workoutOutcome==="paused")){
+    const prog=WORKOUT_PLAYER.progress(execution);
+    return{type:"workout_resume",
+      eyebrow:"Sesión en curso",
+      title:esc(ew.workout.name),
+      detail:`${prog.completed} de ${prog.total} bloques completados`,
+      cta:`<button class="btn btn-accent" style="width:100%;min-height:44px" onclick="setView('entreno')">Continuar sesión</button>`,
+      reason:""};
+  }
+
+  // 2. Evaluación de seguridad pendiente con sesión de entrenamiento programada
+  if(safetyHold&&workoutPending){
+    return{type:"safety",
+      eyebrow:"Entrenamiento en pausa",
+      title:"Revisión de seguridad pendiente",
+      detail:"Completa la evaluación en Perfil antes de retomar.",
+      cta:`<button class="btn btn-accent" style="width:100%;min-height:44px" onclick="setView('perfil')">Completar evaluación</button>`,
+      reason:""};
+  }
+
+  // 3. Comida pendiente
+  if(pendingMeals.length>0){
+    const nextMeal=pendingMeals[0];
+    const ms=mealState(ds,nextMeal.id);
+    const v=mealValue(nextMeal,ms);
+    const kcalRem=Math.max(0,Math.round(target.kcal-t.kcal));
+    const mealLabel=v.name?esc(v.name):esc(nextMeal.slot);
+    const mealDetail=[
+      nextMeal.slot+(nextMeal.time?" · ~"+nextMeal.time:""),
+      v.kcal?v.kcal+" kcal":"",
+      kcalRem>0&&doneMeals>0?kcalRem+" kcal restantes del día":""
+    ].filter(Boolean).join(" · ");
+    const trainBtn=workoutPending&&pendingMeals.length===1
+      ?`<button class="btn btn-sm" onclick="setView('entreno')">Ver entreno</button>`:"";
+    const reason=workoutPending&&pendingMeals.length===1
+      ?`Después: ${esc(ew.workout.name)}`
+      :pendingMeals.length>1?`${pendingMeals.length-1} comida${pendingMeals.length>2?"s":""} más en el día`
+      :"Última comida del día";
+    return{type:"meal",
+      eyebrow:"Próxima comida",
+      title:mealLabel,
+      detail:mealDetail,
+      cta:`<div class="row" style="gap:8px"><button class="btn btn-accent" style="flex:1;min-height:44px" onclick="toggleMeal('${ds}','${nextMeal.id}')">✓ Registrar</button><button class="btn btn-sm" onclick="setView('nutricion')">Ver detalle</button>${trainBtn}</div>`,
+      reason};
+  }
+
+  // 4. Solo queda el entrenamiento
+  if(workoutPending){
+    return{type:"workout",
+      eyebrow:"Entrenamiento de hoy",
+      title:esc(ew.workout.name),
+      detail:esc(ew.workout.detail||""),
+      cta:`<div class="row" style="gap:8px"><button class="btn btn-accent" style="flex:1;min-height:44px" onclick="setView('entreno')">Iniciar sesión</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Adaptar</button></div>`,
+      reason:"Comidas del día registradas"};
+  }
+
+  // 5. Descanso planificado
+  if(restDay){
+    return{type:"rest",
+      eyebrow:"Descanso planificado",
+      title:"Día de recuperación",
+      detail:esc(ew.workout.detail||"Movilidad suave y caminata opcional."),
+      cta:`<button class="btn" style="width:100%;min-height:44px" onclick="setView('progreso')">Ver mi progreso</button>`,
+      reason:"El descanso es parte del plan"};
+  }
+
+  // 6. Día completado
+  const wkLabel=workoutOutcome==="completed"?"completado":workoutOutcome==="partial"?"parcial":"—";
+  return{type:"complete",
+    eyebrow:"Día completado",
+    title:"¡Buen trabajo hoy!",
+    detail:`${doneMeals}/${totMeals} comidas · entrenamiento ${wkLabel}`,
+    cta:`<button class="btn" style="width:100%;min-height:44px" onclick="setView('progreso')">Ver mi progreso</button>`,
+    reason:""};
+}
+
+/* ---------- HOME (Hoy): agenda diaria del coach ---------- */
 function renderHoy(){
   const today=todayStr();
-  current=clampDate(today);              // Home siempre muestra hoy (acotado al plan)
+  current=clampDate(today);
   const planEnded=today>END, planNotStarted=today<START;
-  const ds=current; const day=buildDay(ds); const st=dayState(ds);
+  const ds=current; const st=dayState(ds);
   const {doneMeals,totMeals}=dayTotals(ds);
   const name=profileName(); const stk=streak(); const ew=effectiveWorkout(ds);
-  const workoutExecution=normalizedWorkoutExecution(ds);
   const workoutOutcome=workoutOutcomeForState(st);
-  const workoutProgress=workoutExecution?WORKOUT_PLAYER.progress(workoutExecution):null;
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
+  const action=nextDailyAction(ds);
+  const checkinDue=weeklyCheckinDue();
+  const prioStyle=
+    action.type==="complete"?"background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border:1px solid rgba(16,185,129,.28)":
+    action.type==="rest"?"background:var(--surf2);border:1px solid var(--border)":
+    action.type==="meal"?"background:linear-gradient(160deg,rgba(200,100,60,.16),var(--surf1));border:1px solid var(--terra-dim)":
+    "background:linear-gradient(160deg,var(--accent-dim),var(--surf1));border:1px solid var(--border-acc)";
   $("#app").innerHTML=`
   <header class="shead">
     <div>
@@ -2458,32 +2566,34 @@ function renderHoy(){
       <div class="avatar">${esc((name[0]||"F").toUpperCase())}</div>
     </div>
   </header>
-  ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}. Mostrando el primer día.</div>`:""}
-  ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
-  ${dayAlert(day)}
+  ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
+  ${trainingSafetyHold()&&action.type!=="safety"?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
+  ${checkinDue?weeklyCheckinBanner():""}
+  <div class="prio-card" style="${prioStyle}">
+    <div class="prio-eyebrow">${action.eyebrow}</div>
+    <div class="prio-name">${action.title}</div>
+    ${action.detail?`<div class="prio-detail">${action.detail}</div>`:""}
+    ${action.cta}
+    ${action.reason?`<div class="prio-reason">${action.reason}</div>`:""}
+  </div>
   ${heroDash(ds)}
-
-  <div class="section-h">Dieta de hoy</div>
-  <div class="card-link" onclick="setView('nutricion')">
-    <div style="flex:1;min-width:0">
-      <div class="cl-title">${doneMeals}/${totMeals} comidas registradas</div>
-      <div class="muted small" style="margin-top:3px">${esc(day.meals.map(m=>m.slot).join(" · "))}</div>
+  <div class="home-quick">
+    <div class="hq-btn" onclick="setView('nutricion')">
+      <div class="hq-icon">🍽️</div>
+      <div class="hq-label">Nutrición</div>
+      <div class="hq-sub">${doneMeals}/${totMeals} comidas</div>
     </div>
-    ${chevron()}
-  </div>
-
-  <div class="section-h">Entrenamiento de hoy</div>
-  <div class="workout card-link" onclick="setView('entreno')">
-    <div class="meal-head" style="flex:1;min-width:0">
-      <div>
-        <div class="name" style="font-weight:600">${esc(ew.workout.name)}</div>
-        <div class="detail">${workoutProgress&&["in_progress","paused"].includes(workoutOutcome)?`${workoutProgress.completed}/${workoutProgress.total} bloques registrados · `:""}${esc(ew.workout.detail)}</div>
-        ${workoutStatusHtml(ds,workoutExecution)}
-      </div>
+    <div class="hq-btn" onclick="setView('entreno')">
+      <div class="hq-icon">🏋️</div>
+      <div class="hq-label">Entreno</div>
+      <div class="hq-sub">${workoutStatusLabel(workoutOutcome)}</div>
     </div>
-    ${chevron()}
-  </div>
-  `;
+    <div class="hq-btn" onclick="setView('coach')">
+      <div class="hq-icon">💬</div>
+      <div class="hq-label">Coach</div>
+      <div class="hq-sub">Consultar</div>
+    </div>
+  </div>`;
 }
 
 /* ---------- NUTRICIÓN: detalle de comidas + coach ---------- */

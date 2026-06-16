@@ -168,7 +168,7 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 
 ### Navegación (nueva IA por rol)
 - Tabs de usuario: **Hoy · Nutrición · Entreno · Progreso · Perfil** (`renderTabs`, 5 fijos).
-- **Hoy** (`renderHoy`): saludo + racha (`streak()`) + hero (anillo kcal + macros) + tarjeta "dieta de hoy" (→Nutrición) + "entreno de hoy" (→Entreno). Siempre muestra el día actual.
+- **Hoy** (`renderHoy`): agenda diaria del coach (REQ-22). Saludo + racha + banner de check-in si hay uno pendiente + tarjeta de acción prioritaria (`nextDailyAction`) + hero de kcal/macros (`heroDash`) + grid de accesos rápidos (Nutrición/Entreno/Coach). `nextDailyAction(ds)` calcula la prioridad de forma determinista (sin IA): sesión en curso → evaluación de seguridad → comida pendiente → entrenamiento pendiente → descanso → día completo. La tarjeta primaria tiene un botón de CTA en un toque; completar la acción llama `render()` y actualiza la prioridad sin recargar. Siempre muestra el día actual (`clampDate(todayStr())`).
 - **Nutrición** (`renderNutrition`): nav de día + hero + comidas del plan + extras + IA.
 - **Entreno** (`renderWorkout`): nav de día + prescripción + reproductor recuperable + ejercicio activo con demostración/instrucciones + series o intervalos + cierre completo/parcial + resumen.
 - **Progreso** (`renderProgress`): stats (kg/entrenos/racha) + gráfico+tabla de peso + sección Semana (reusa `goDay`/`weekNav`).
