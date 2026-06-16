@@ -1916,7 +1916,8 @@ Reducir la friccion de activacion: pedir en el alta solo lo imprescindible para 
 
 ## REQ-36 - Unificar acciones de comida (cambiar/adaptar)
 
-**Estado: pendiente.**
+**Estado: implementado.**
+La tarjeta de comida ahora expone un único botón primario "Cambiar" que abre una hoja con motivo opcional (Sin cocina / Comer fuera / Sin ingrediente) y a continuación la lista de platos con delta de kcal visible y selector de alcance (Solo hoy / Esta semana). "Ver receta" y "Editar valores" se unificaron en el botón secundario "···" que abre un modal con la receta completa y la opción de editar. "Volver al plan" aparece ante cualquier override (antes solo con motivo). `contingencyLog` sigue registrando tipo, motivo, plato elegido y prescripción previa. Sin SQL nuevo.
 
 ### Objetivo
 

@@ -3536,11 +3536,9 @@ function mealCard(ds,b){
       </div>
     </div>
     <div class="meal-actions">
-      ${r?`<button class="btn btn-sm" onclick="toggleRecipe(this)">Ver receta</button>`:""}
-      <button class="btn btn-sm" onclick="openReplace('${ds}','${b.id}')">Reemplazar</button>
-      <button class="btn btn-sm" onclick="openEditor('meal','${ds}','${b.id}')">Editar valores</button>
-      ${!ms.done?`<button class="btn btn-sm" onclick="openMealContingency('${ds}','${b.id}')">Adaptar</button>`:""}
-      ${ms.ovr&&ms.ovr.contingencyReason?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
+      <button class="btn btn-sm" onclick="openChangeMeal('${ds}','${b.id}')">Cambiar</button>
+      ${ms.ovr?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
+      <button class="btn btn-sm" onclick="openMealMore('${ds}','${b.id}')">···</button>
     </div>
     ${recipeHtml}
   </div>`;
@@ -4940,6 +4938,74 @@ function openMealContingency(ds,id){
     <button class="opt" onclick="openReplace('${ds}','${id}','eat_out')">🍽️ Voy a comer fuera<div class="o-meta">Busca el equivalente más cercano</div></button>
     <button class="opt" onclick="openReplace('${ds}','${id}','missing_ingredient')">🛒 No conseguí un ingrediente<div class="o-meta">Elige otro plato compatible con tus metas</div></button>
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+}
+/* ---- Cambiar comida: accion unificada (REQ-36) ---- */
+function openChangeMeal(ds,id){
+  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
+  const ms=mealState(ds,id);const cv=mealValue(base,ms);
+  const options=(DB.loaded?DB.dishes.filter(d=>(d.slot||"")===id):[]).map(d=>({name:d.name,dishName:d.name}));
+  window._changeMeal={ds,id,options,reason:null};
+  const optsHtml=_buildChangeMealOpts(cv);
+  modal(`<h3>Cambiar — ${esc(base.slot)}</h3>
+    <p class="muted small" id="chg-hint">Elige un plato compatible con tus metas.${cv.kcal?` Actual: ${cv.kcal} kcal.`:""}</p>
+    <div style="margin:8px 0 4px">
+      <span class="muted small">Motivo (opcional):</span>
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px">
+        <button class="btn btn-sm" id="chg-no_cook" onclick="toggleMotivoChip('no_cook')">🍱 Sin cocina</button>
+        <button class="btn btn-sm" id="chg-eat_out" onclick="toggleMotivoChip('eat_out')">🍽️ Comer fuera</button>
+        <button class="btn btn-sm" id="chg-missing_ingredient" onclick="toggleMotivoChip('missing_ingredient')">🛒 Sin ingrediente</button>
+      </div>
+    </div>
+    <div class="row" style="margin:8px 0 4px;gap:8px">
+      <label class="muted small"><input type="radio" name="chgScope" value="day" checked> Solo hoy</label>
+      <label class="muted small"><input type="radio" name="chgScope" value="week"> Esta semana</label>
+    </div>
+    <div id="chg-opts">${optsHtml}</div>
+    <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="openEditor('meal','${ds}','${id}')">✎ Personalizada / editar valores</button>`);
+}
+function _buildChangeMealOpts(cv){
+  const{ds:mDs,id,options}=window._changeMeal;const day=buildDay(mDs);const base=day.meals.find(m=>m.id===id);
+  const ms=mealState(mDs,id);const cur=cv||mealValue(base,ms);
+  return options.map((o,i)=>{
+    const d=o.dishName?dishByName(o.dishName):null;const m=d?dishMacros(d.id):null;
+    const dk=m&&cur.kcal?m.kcal-cur.kcal:null;
+    const dkStr=dk!=null?` <span class="muted">(${dk>0?"+":""}${dk} kcal)</span>`:"";
+    const meta=m?`${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g${dkStr}`:"";
+    return `<button class="opt" onclick="applyChangeMeal(${i})">${esc(o.name)}<div class="o-meta">${meta}</div></button>`;
+  }).join("")||'<p class="muted small">No hay platos en la base para este espacio.</p>';
+}
+function toggleMotivoChip(reason){
+  const cm=window._changeMeal;if(!cm)return;
+  cm.reason=cm.reason===reason?null:reason;
+  const hints={no_cook:"Opciones sin cocina.",eat_out:"El equivalente más cercano para comer afuera.",missing_ingredient:"Otro plato compatible con tus metas."};
+  const day=buildDay(cm.ds);const base=day.meals.find(m=>m.id===cm.id);
+  const ms=mealState(cm.ds,cm.id);const cv=mealValue(base,ms);
+  const hint=document.getElementById('chg-hint');
+  if(hint)hint.textContent=(hints[cm.reason]||"Elige un plato compatible con tus metas.")+(cv.kcal?` Actual: ${cv.kcal} kcal.`:"");
+  ['no_cook','eat_out','missing_ingredient'].forEach(r=>{
+    const b=document.getElementById('chg-'+r);if(!b)return;
+    b.style.outline=cm.reason===r?'2px solid var(--accent)':'';
+    b.style.opacity=(cm.reason&&cm.reason!==r)?'0.5':'1';
+  });
+}
+function applyChangeMeal(i){
+  const{ds,id,options,reason}=window._changeMeal;const o=options[i];
+  const ms=mealState(ds,id);const prev=ms.ovr?ms.ovr.name:null;
+  ms.ovr={name:o.name,dishName:o.dishName||null};
+  if(reason)ms.ovr.contingencyReason=reason;
+  addContingencyEntry(ds,{type:"meal_replace",id,reason:reason||null,chosen:o.name,prev});
+  const scope=(document.querySelector("input[name='chgScope']:checked")||{}).value||"day";
+  if(scope==="week")propagateMealOverride(ds,id,{...ms.ovr});
+  commitDay(ds);closeModal();render();toast("Comida actualizada");
+}
+function openMealMore(ds,id){
+  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
+  const ms=mealState(ds,id);const r=mealRecipe(base,ms);
+  const recHtml=r?`<div class="recipe open" style="margin:6px 0 10px">${r.lines.map(l=>`<div class="r-row"><span>${esc(l.name)}</span><span class="g">${l.grams} g</span></div>`).join("")}<div class="r-foot">${r.lines.length} ingredientes · ${r.generated?"opción de tu coach":"macros calculados desde la receta"}</div></div>`:"";
+  modal(`<h3>${esc(base.slot)}</h3>
+    ${recHtml}
+    <button class="opt" onclick="closeModal();openEditor('meal','${ds}','${id}')">✎ Editar valores / comida personalizada</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cerrar</button>`);
 }
 /* ---- Contingencia: entrenamiento ---- */
 function openWorkoutContingency(ds,reason){
