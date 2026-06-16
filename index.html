@@ -2099,6 +2099,38 @@ function updateOnboardingActivity(value){
   const out=$("#obActivityDescription"),activity=ACTIVITY_LEVELS[value];
   if(out&&activity)out.textContent=activity.description;
 }
+// REQ-34: prepara el primer día del ciclo tras el onboarding, sin texto técnico (REQ-31).
+// Idempotente: si prefs.cycleFirstDayPreparedAt ya está, no vuelve a dispararse.
+// Intenta generación; cae a plantilla determinista ante cualquier fallo.
+async function prepareFirstCycleDay(ds){
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  if(prefs.cycleFirstDayPreparedAt)return;
+  const actionKey="first_day_prep";
+  if(coachActionsInFlight.has(actionKey))return;
+  $("#tabs").innerHTML="";
+  $("#app").innerHTML=`<main class="onboarding">
+    <div class="onboarding-brand">FITBROS · TU PLAN</div>
+    <h1>Preparando tu primer día</h1>
+    <p class="onboarding-copy">Estamos armando tu plan a la medida de tus metas. Solo un momento…</p>
+  </main>`;
+  let comidas=null;
+  coachActionsInFlight.add(actionKey);
+  try{
+    if(aiAvailable()&&isActive()&&hasRequiredConsents()&&hasCurrentScreening()){
+      const requestId=coachRequestId();
+      try{
+        const {res}=await generateOneDay(ds,{action:"diet_day",requestId,partKey:"first-day"});
+        if(res&&res.ok&&Array.isArray(res.comidas)&&res.comidas.length)comidas=res.comidas;
+      }catch(e){}
+    }
+    if(!comidas){const det=deterministicDayPayload(ds);comidas=det.comidas||[];}
+    if(comidas.length)applyDayComidas(ds,comidas);
+    const nowStr=new Date().toISOString();
+    if(profile&&profile.prefs)profile.prefs.cycleFirstDayPreparedAt=nowStr;
+    const markedPrefs={...migrateProfilePrefs((profile&&profile.prefs)||{}),cycleFirstDayPreparedAt:nowStr};
+    try{await saveProfilePrefs(markedPrefs,{source:"system",reason:"Primer día del ciclo preparado"});}catch(e){}
+  }finally{coachActionsInFlight.delete(actionKey);}
+}
 async function saveOnboarding(){
   readOnboardingStep();
   const error=validateOnboardingStep();
@@ -2152,6 +2184,7 @@ async function saveOnboarding(){
     cycleStartWeight:d.weightKg,cycleStartBodyFat:d.bodyFatPct===""?null:d.bodyFatPct,
     onboardingPending:false,pendingChallenge:null,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
+    ...(firstCycle||newCycle?{cycleFirstDayPreparedAt:null}:{}),
   };
   const result=await saveProfilePrefs(prefs,{
     source:newCycle?"new_cycle":"onboarding",
@@ -2169,7 +2202,9 @@ async function saveOnboarding(){
     await pullCycleHistory();
   }
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
-  view="hoy";current=clampDate(todayStr());render();window.scrollTo(0,0);toast("Tu plan quedó actualizado");
+  view="hoy";current=clampDate(todayStr());
+  if(firstCycle||newCycle)await prepareFirstCycleDay(current);
+  render();window.scrollTo(0,0);toast(firstCycle||newCycle?"Tu primer día está listo":"Tu plan quedó actualizado");
 }
 function maybePromptProfileReview(){
   if(reviewPromptShown||onboardingActive||!session)return;

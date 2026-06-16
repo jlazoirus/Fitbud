@@ -1824,7 +1824,8 @@ Crear la superficie publica que hoy no existe (la primera pantalla es el login) 
 
 ## REQ-34 - Primer plan al terminar el onboarding (primer valor inmediato)
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`prepareFirstCycleDay(ds)` se dispara desde `saveOnboarding()` solo cuando `firstCycle||newCycle`. Pantalla de transición → generación (o plantilla determinista ante fallo) → `applyDayComidas` → marca `cycleFirstDayPreparedAt` en prefs. Idempotente por flag; no se re-dispara en renders ni recargas posteriores. Sin vocabulario técnico en UI (REQ-31). Service worker v26.
 
 ### Objetivo
 
