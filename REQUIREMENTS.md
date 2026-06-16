@@ -1288,7 +1288,8 @@ Transformar la racha actual en un sistema motivacional justo que mida constancia
 
 ## REQ-24 - Recordatorios de inactividad por correo
 
-**Estado: pendiente futuro.**
+**Estado: implementado.**
+Infraestructura completa; activación final requiere configurar en Vercel: RESEND_API_KEY, NOTIFY_FROM_EMAIL (dominio verificado en resend.com), NOTIFY_APP_URL y CRON_SECRET.
 
 ### Objetivo
 
