@@ -408,6 +408,24 @@
   .hq-label{font-size:11px;font-weight:600;color:var(--txt)}
   .hq-sub{font-size:10px;color:var(--muted)}
 
+  /* Rachas e hitos (REQ-23) */
+  .streak-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+  .streak-card{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px;text-align:center}
+  .streak-card.main{grid-column:1 / -1;background:linear-gradient(160deg,var(--accent-dim),var(--surf1));border-color:var(--border-acc)}
+  .streak-n{font-family:var(--font-display);font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1}
+  .streak-card.main .streak-n{font-size:38px}
+  .streak-lbl{font-size:11px;color:var(--muted);margin-top:4px}
+  .streak-best{font-size:10px;color:var(--muted2);margin-top:2px;font-family:var(--font-mono)}
+  .week-consist{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-bottom:10px}
+  .week-consist-bar{height:6px;background:var(--surf3);border-radius:999px;overflow:hidden;margin:7px 0 4px}
+  .week-consist-bar > i{display:block;height:100%;border-radius:999px;background:var(--terra-400);transition:width .5s}
+  .milestones{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .milestone{display:flex;align-items:center;gap:10px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:9px 12px;font-size:13px}
+  .milestone .ms-ic{font-size:18px;flex:0 0 auto}
+  .milestone .ms-lbl{font-weight:600}
+  .milestone .ms-date{font-size:11px;color:var(--muted);margin-top:2px}
+  .streak-recovery{background:var(--warn-dim);border:1px solid rgba(245,158,11,.32);border-radius:var(--r-md);padding:10px 12px;font-size:13px;color:#fcd34d;margin-bottom:10px}
+
   /* Coach conversacional (REQ-21) */
   .coach-wrap{display:flex;flex-direction:column;height:calc(100dvh - 120px);padding-bottom:0}
   .coach-msgs{flex:1;overflow-y:auto;padding:12px 14px 8px;display:flex;flex-direction:column;gap:10px}
@@ -1356,11 +1374,13 @@ function cycleSummary(){
     const mealStates=st.meals||{};
     const dayMeals=day.meals.reduce((n,m)=>n+(mealStates[m.id]&&mealStates[m.id].done?1:0),0);
     const workoutOutcome=workoutOutcomeForState(st);
-    const dayActive=dayMeals>0||workoutHasRecordedActivity(st)||(Array.isArray(st.extras)&&st.extras.some(x=>x&&x.done));
+    const dayAny=dayMeals>0||workoutHasRecordedActivity(st)||(Array.isArray(st.extras)&&st.extras.some(x=>x&&x.done));
+    const dayCombined=combinedDayDone(ds);
     plannedMeals+=day.meals.length;doneMeals+=dayMeals;
     if(workoutOutcome==="completed")workouts++;
     if(workoutOutcome==="partial")partialWorkouts++;
-    if(dayActive){activeDays++;currentStreak++;bestStreak=Math.max(bestStreak,currentStreak);}else currentStreak=0;
+    if(dayAny)activeDays++;
+    if(dayCombined){currentStreak++;bestStreak=Math.max(bestStreak,currentStreak);}else currentStreak=0;
     ds=addDays(ds,1);
   }
   const weighted=Object.keys(WEIGHT_RANGES).map(Number).filter(n=>wkg(n)!=null).sort((a,b)=>a-b);
@@ -2546,6 +2566,7 @@ function renderHoy(){
   const ds=current; const st=dayState(ds);
   const {doneMeals,totMeals}=dayTotals(ds);
   const name=profileName(); const stk=streak(); const ew=effectiveWorkout(ds);
+  checkAndSaveMilestones();
   const workoutOutcome=workoutOutcomeForState(st);
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
   const action=nextDailyAction(ds);
@@ -3347,6 +3368,7 @@ function renderProgress(){
   $("#app").innerHTML=`${screenHeader("Progreso","Tu evolución","progreso")}
     ${weeklyCheckinBanner()}
     ${progressStats()}
+    ${section("pr.rachas","Rachas e hitos",renderStreakSection())}
     ${section("pr.ciclos","Tus ciclos",progressJourney(),`${cycleNumber()}`)}
     ${section("pr.peso","Peso corporal",
       weightChart()+bodyComposition()+
@@ -3384,11 +3406,64 @@ function progressStats(){
   const ws=Object.keys(WEIGHT_RANGES).map(n=>wkg(n)).filter(v=>v!=null);
   const lost=ws.length>=2?(ws[0]-ws[ws.length-1]):0;
   const lostTxt=lost>0?"-"+lost.toFixed(1):(lost<0?"+"+(-lost).toFixed(1):"0");
+  const stk=streak();
   return `<div class="summary" style="grid-template-columns:1fr 1fr 1fr">
     <div class="scard"><div class="n" style="color:var(--good)">${lostTxt}</div><div class="l">kg</div></div>
     <div class="scard"><div class="n">${entrenos}</div><div class="l">completos${parciales?` · ${parciales} parciales`:""}</div></div>
-    <div class="scard"><div class="n" style="color:var(--terra-300)">🔥 ${streak()}</div><div class="l">días racha</div></div>
+    <div class="scard"><div class="n" style="color:var(--terra-300)">🔥 ${stk}</div><div class="l">días racha</div></div>
   </div>`;
+}
+
+// Sección de rachas e hitos (REQ-23)
+function renderStreakSection(){
+  const s=streakStats();
+  const stk=s.combCur;
+  const MILESTONE_ICONS={3:"🌱",7:"⭐",14:"🔥",30:"🏆"};
+  const MILESTONE_LABELS={3:"3 días",7:"1 semana",14:"2 semanas",30:"1 mes"};
+  // Recuperación: si la mejor racha supera la actual y el actual es 0 (racha rota ayer o antes)
+  const broken=s.combBest>0&&stk===0;
+  const recoveryHtml=broken
+    ?`<div class="streak-recovery">Tu mejor racha fue de <b>${s.combBest} día${s.combBest>1?"s":""}</b>. Retoma hoy: el progreso que hiciste no desaparece.</div>`:"";
+  // Consistencia semanal
+  const weekPct=s.weekPlanned>0?Math.round(s.weekDone/s.weekPlanned*100):null;
+  const weekHtml=s.weekPlanned>0?`
+  <div class="week-consist">
+    <div class="row between"><span style="font-size:13px;font-weight:600">Consistencia esta semana</span><span class="muted small">${s.weekDone}/${s.weekPlanned} sesiones</span></div>
+    <div class="week-consist-bar"><i style="width:${weekPct}%"></i></div>
+    <div class="muted small">${weekPct===100?"Semana perfecta de entrenamiento":weekPct>=50?"Más de la mitad de las sesiones completadas":"Quedan sesiones por completar esta semana"}</div>
+  </div>`:"";
+  // Hitos alcanzados (del ciclo actual)
+  const milestones=getStreakMilestones().filter(m=>m.cycle===cycleNumber()).sort((a,b)=>b.level-a.level);
+  const milestonesHtml=milestones.length?`<div class="milestones">${milestones.map(m=>`
+    <div class="milestone">
+      <div class="ms-ic">${MILESTONE_ICONS[m.level]||"🏅"}</div>
+      <div><div class="ms-lbl">${MILESTONE_LABELS[m.level]||m.level+" días"} de racha</div><div class="ms-date">${prettyDate(m.date)}</div></div>
+    </div>`).join("")}</div>`:"";
+  // Próximo hito
+  const nextLevel=STREAK_MILESTONE_LEVELS.find(l=>l>stk);
+  const nextHint=nextLevel&&stk>0?`<div class="muted small" style="margin-top:8px;text-align:center">${nextLevel-stk} día${nextLevel-stk>1?"s":""} más para el hito de ${MILESTONE_LABELS[nextLevel]||nextLevel+" días"}</div>`:"";
+  return `
+  ${recoveryHtml}
+  <div class="streak-grid">
+    <div class="streak-card main">
+      <div class="streak-n">${stk>0?"🔥 "+stk:"—"}</div>
+      <div class="streak-lbl">Racha actual (combinada)</div>
+      <div class="streak-best">Mejor: ${s.combBest} día${s.combBest!==1?"s":""}</div>
+    </div>
+    <div class="streak-card">
+      <div class="streak-n" style="font-size:20px">${s.nutCur}</div>
+      <div class="streak-lbl">Nutrición</div>
+      <div class="streak-best">Mejor: ${s.nutBest}</div>
+    </div>
+    <div class="streak-card">
+      <div class="streak-n" style="font-size:20px">${s.trainCur}</div>
+      <div class="streak-lbl">Entrenamiento</div>
+      <div class="streak-best">Mejor: ${s.trainBest}</div>
+    </div>
+  </div>
+  ${weekHtml}
+  ${nextHint}
+  ${milestonesHtml}`;
 }
 function weightRows(){
   return Object.keys(WEIGHT_RANGES).map(n=>{
@@ -5328,6 +5403,7 @@ function profileName(){
   return email.split("@")[0]||"Fitbro";
 }
 // ¿hubo actividad ese día? (alguna comida/extra hecha o entreno)
+// Actividad mínima en un día (cualquier comida, entreno o extra marcado).
 function dayActive(ds){
   const st=S.days[ds]; if(!st)return false;
   if(workoutHasRecordedActivity(st))return true;
@@ -5335,11 +5411,104 @@ function dayActive(ds){
   if(st.extras&&st.extras.some(e=>e&&e.done))return true;
   return false;
 }
-// Racha: días consecutivos con actividad terminando hoy (o ayer si hoy aún nada).
+
+/* ---------- REQ-23: sistema de rachas justo ---------- */
+
+// Nutrición cumplida: ≥50 % de las comidas planificadas marcadas.
+function nutritionDayDone(ds){
+  const day=buildDay(ds);
+  if(!day.meals.length)return false;
+  const done=day.meals.filter(m=>mealState(ds,m.id).done).length;
+  return done>=Math.ceil(day.meals.length/2);
+}
+
+// Resultado de entrenamiento del día.
+function trainingDayResult(ds){
+  const ew=effectiveWorkout(ds);
+  const isRest=ew.workout&&ew.workout.id==="descanso";
+  if(isRest)return "rest";
+  const st=S.days[ds]||{};
+  const done=workoutHasRecordedActivity(st)||!!st.workoutDone;
+  return done?"done":"missed";
+}
+
+// Día con cumplimiento combinado (nutrición + entrenamiento o descanso planificado).
+function combinedDayDone(ds){
+  if(ds<START||ds>todayStr())return false;
+  const trainRes=trainingDayResult(ds);
+  return nutritionDayDone(ds)&&(trainRes==="done"||trainRes==="rest");
+}
+
+// Métricas completas de rachas: pase hacia adelante desde START hasta hoy.
+function streakStats(){
+  const today=todayStr();
+  let ds=START;
+  let nutCur=0,nutBest=0,trainCur=0,trainBest=0,combCur=0,combBest=0;
+  while(ds<=today&&ds<=END){
+    const nutDone=nutritionDayDone(ds);
+    const trainRes=trainingDayResult(ds);
+    if(nutDone){nutCur++;if(nutCur>nutBest)nutBest=nutCur;}else nutCur=0;
+    if(trainRes==="done"){trainCur++;if(trainCur>trainBest)trainBest=trainCur;}
+    else if(trainRes!=="rest")trainCur=0;
+    const combOk=nutDone&&(trainRes==="done"||trainRes==="rest");
+    if(combOk){combCur++;if(combCur>combBest)combBest=combCur;}else combCur=0;
+    ds=addDays(ds,1);
+  }
+  // Consistencia de la semana actual (sesiones de entrenamiento)
+  const prefs=planPrefsForDate(today);
+  const week=weekOf(today,prefs)||weekOf(today);
+  let weekPlanned=0,weekDone=0;
+  if(week){
+    let d=week.start;
+    while(d<=week.end&&d<=today){
+      const res=trainingDayResult(d);
+      if(res!=="rest"){weekPlanned++;if(res==="done")weekDone++;}
+      d=addDays(d,1);
+    }
+  }
+  return{nutCur,nutBest,trainCur,trainBest,combCur,combBest,weekPlanned,weekDone};
+}
+
+const STREAK_MILESTONE_LEVELS=[3,7,14,30];
+
+function getStreakMilestones(){
+  return Array.isArray(profile&&profile.prefs&&profile.prefs.streakMilestones)
+    ?profile.prefs.streakMilestones:[];
+}
+
+// Guarda hito de racha si no existe ya para (type, level, cycle).
+async function saveStreakMilestone(type,level){
+  if(!profile||!profile.prefs)return;
+  const key=`${type}-${level}-c${cycleNumber()}`;
+  const existing=getStreakMilestones();
+  if(existing.some(m=>m.key===key))return;
+  const milestone={key,type,level,cycle:cycleNumber(),date:todayStr()};
+  const updated=[...existing,milestone];
+  if(!profile.prefs.streakMilestones)profile.prefs.streakMilestones=[];
+  profile.prefs.streakMilestones=updated;
+  try{await saveProfilePrefs(profile.prefs);}catch(e){/* best-effort */}
+}
+
+// Detecta y guarda hitos nuevos; muestra toast la primera vez.
+function checkAndSaveMilestones(){
+  if(!profile||!session||!isActive())return;
+  const stk=streak();
+  STREAK_MILESTONE_LEVELS.forEach(level=>{
+    if(stk>=level){
+      const key=`combined-${level}-c${cycleNumber()}`;
+      if(!getStreakMilestones().some(m=>m.key===key)){
+        saveStreakMilestone("combined",level);
+        toast(`🔥 ¡${level} días de racha! Sigue así.`);
+      }
+    }
+  });
+}
+
+// Racha combinada: días consecutivos cumplidos hasta hoy (ventana de 1 día).
 function streak(){
   let n=0,ds=todayStr();
-  if(!dayActive(ds))ds=addDays(ds,-1);
-  while(dayActive(ds)){n++;ds=addDays(ds,-1);}
+  if(!combinedDayDone(ds))ds=addDays(ds,-1);
+  while(ds>=START&&combinedDayDone(ds)){n++;ds=addDays(ds,-1);}
   return n;
 }
 

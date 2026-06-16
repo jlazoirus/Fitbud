@@ -1241,7 +1241,8 @@ Hacer que Home responda rapidamente "que debo hacer ahora" y conecte nutricion, 
 
 ## REQ-23 - Rachas, consistencia e hitos
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Streak combinada (nutrición ≥50% comidas + entrenamiento hecho o descanso planificado), rachas separadas de nutrición y entrenamiento, consistencia semanal, hitos idempotentes 3/7/14/30 días guardados en prefs, mensajes de recuperación y sección "Rachas e hitos" en Progreso. Home usa la racha combinada.
 
 ### Objetivo
 
