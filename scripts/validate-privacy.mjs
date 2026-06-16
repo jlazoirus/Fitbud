@@ -23,7 +23,7 @@ const required = {
     "deleteMyAccount",
     "trainingSafetyHold",
     'id="ob_consent_core"',
-    'id="ob_consent_photos"',
+    'id="pf_consent_photos"',
     'id="pg_consent_core"',
     'id="pg_consent_photos"',
     "No vendemos tus datos ni los usamos para publicidad",

@@ -2051,7 +2051,7 @@ function startOnboarding(){
   window.scrollTo(0,0);
 }
 function onboardingSteps(){
-  return `<div class="steps" aria-label="Paso ${onboardingStep} de 5">${[1,2,3,4,5].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
+  return `<div class="steps" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
 }
 function onboardingButtons(last){
   return `<div class="onboarding-actions">
@@ -2138,6 +2138,24 @@ function validateTrainingProfile(d){
   if(!Array.isArray(d.equipment)||!d.equipment.length)return "Selecciona al menos un recurso o equipo disponible";
   return "";
 }
+function validateTrainingProfileCore(d){
+  if(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validPlanDuration(d.planDurationWeeks))return "Completa la base de tu plan de entrenamiento";
+  if(!validTrainingDays((d.trainingDays||[]).length))return `Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días exactos para entrenar`;
+  if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))return "Elige el lugar de entrenamiento para cada día disponible";
+  if(d.primarySport==="swimming"){
+    const priority=TRAINING_PRIORITY_LABELS[d.trainingPriority]?d.trainingPriority:"composition";
+    const poolDays=d.trainingDays.filter(day=>d.trainingLocations[day]==="pool").length;
+    const swimSessions=baseWorkoutTemplate(d.trainingDays.length,priority).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
+    if(poolDays<swimSessions)return `Con natación necesitas piscina ${swimSessions} ${swimSessions===1?"día":"días"} por semana`;
+  }
+  if(!Number.isFinite(d.sessionMinutes)||d.sessionMinutes<20||d.sessionMinutes>180)return "Los minutos por sesión deben estar entre 20 y 180";
+  if(!TRAINING_EXPERIENCE_LABELS[d.trainingExperience])return "Selecciona tu nivel de experiencia";
+  return "";
+}
+function needsProfileTuning(prefs){
+  const p=prefs||{};
+  return !!(p.onboardingEssentialOnly && !p.profileRefinedAt);
+}
 function validateFoodSchedule(d){
   if(!Number.isInteger(d.mealCount)||d.mealCount<2||d.mealCount>6)return "Elige entre 2 y 6 comidas al día";
   if(!Array.isArray(d.mealTimes)||d.mealTimes.length!==d.mealCount||d.mealTimes.some(time=>!validTime(time)))return "Completa un horario aproximado para cada comida";
@@ -2204,7 +2222,7 @@ function renderOnboarding(){
       </div>${onboardingButtons(false)}`;
   }else if(onboardingStep===3){
     body=`<h1>Arma tu semana de entrenamiento</h1>
-      <p class="onboarding-copy">Elige los días y recursos que realmente tienes. Recomendamos al menos tres sesiones para combinar tu disciplina con fuerza y recuperación.</p>
+      <p class="onboarding-copy">Elige los días y recursos que realmente tienes. Recomendamos al menos tres sesiones para combinar tu disciplina y fuerza. Podrás afinar prioridad, equipo y lesiones desde tu Perfil.</p>
       <div class="dash">
         <div class="onboarding-grid">
           <div class="field" style="margin-top:0"><label>Disciplina principal</label><select id="ob_sport" onchange="updateOnboardingTrainingSummary()">
@@ -2216,73 +2234,36 @@ function renderOnboarding(){
           <div class="field"><label>Duración del plan</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
             ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
           </select></div>
-          <div class="field"><label>Prioridad</label><select id="ob_priority" onchange="updateOnboardingTrainingSummary()">
-            ${Object.entries(TRAINING_PRIORITY_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.trainingPriority,v)}>${l}</option>`).join("")}
-          </select></div>
           <div class="field"><label>Experiencia</label><select id="ob_experience">
             ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.trainingExperience,v)}>${l}</option>`).join("")}
           </select></div>
           <div class="field"><label>Minutos por sesión</label><input id="ob_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${d.sessionMinutes}"></div>
-          <div class="field"><label>Horario preferido</label><select id="ob_time">
-            ${Object.entries(TRAINING_TIME_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.preferredTrainingTime,v)}>${l}</option>`).join("")}
-          </select></div>
         </div>
         <label class="muted small">Días disponibles y lugar real</label>
         ${trainingAvailabilityHtml("ob",d)}
         <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority)}</div>
-        <div class="field"><label>Equipo disponible</label><div class="chips">${checkChips("ob_equipment",EQUIPMENT_LABELS,d.equipment)}</div></div>
-        <div class="field"><label>Lesiones actuales (opcional)</label><input id="ob_injuries" value="${esc(d.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
-        <div class="field"><label>Limitaciones relevantes (opcional)</label><input id="ob_limitations" value="${esc(d.limitations)}" placeholder="Ej. no puedo correr más de 20 minutos"></div>
-        <div class="field" style="margin-bottom:0"><label>Movimientos a evitar (opcional)</label><input id="ob_avoid_movements" value="${esc(d.avoidMovements)}" placeholder="Ej. saltos, press sobre la cabeza"></div>
       </div>${onboardingButtons(false)}`;
-  }else if(onboardingStep===4){
-    body=`<h1>Organiza tus comidas alrededor de tu día</h1>
-      <p class="onboarding-copy">Define una estructura realista. Más adelante tu plan podrá repartir porciones y horarios sin asumir cuatro comidas para todos.</p>
+  }else{
+    const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]];
+    body=`<h1>Casi listo — tus preferencias y seguridad</h1>
+      <p class="onboarding-copy">Solo lo imprescindible para calcular tus comidas. Después podrás afinar cocinas, horarios y presupuesto desde tu Perfil.</p>
       <div class="dash">
         <div class="onboarding-grid">
           <div class="field" style="margin-top:0"><label>Comidas al día</label><select id="ob_meal_count" onchange="updateOnboardingMealCount(this.value)">
             ${[2,3,4,5,6].map(value=>`<option value="${value}" ${d.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
           </select></div>
-          <div class="field" style="margin-top:0"><label>Comida principal</label><select id="ob_main_meal">
-            ${Array.from({length:d.mealCount},(_,index)=>`<option value="${index+1}" ${d.mainMealIndex===index+1?"selected":""}>Comida ${index+1}</option>`).join("")}
-          </select></div>
-          <div class="field"><label>Inicio de ventana</label><input id="ob_window_start" type="time" value="${d.eatingWindowStart}"></div>
-          <div class="field"><label>Fin de ventana</label><input id="ob_window_end" type="time" value="${d.eatingWindowEnd}"></div>
         </div>
-        <label class="muted small">Horarios aproximados</label>
-        ${mealTimesHtml("ob",d)}
-        <div class="onboarding-grid">
-          <div class="field"><label>Minutos para cocinar</label><input id="ob_cooking" type="number" inputmode="numeric" min="5" max="180" step="5" value="${d.cookingMinutes}"></div>
-          <div class="field"><label>Presupuesto</label><select id="ob_budget">
-            ${Object.entries(FOOD_BUDGET_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.foodBudget,v)}>${l}</option>`).join("")}
-          </select></div>
-          <div class="field"><label>Repetición aceptable</label><select id="ob_repeat">
-            ${Object.entries(REPEAT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.repeatPreference,v)}>${l}</option>`).join("")}
-          </select></div>
-        </div>
-      </div>${onboardingButtons(false)}`;
-  }else{
-    const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]];
-    body=`<h1>Ajusta tus preferencias alimenticias</h1>
-      <p class="onboarding-copy">Separamos alergias y restricciones duras de los gustos. Tu coach nunca debe tratar una alergia como una simple preferencia.</p>
-      <div class="dash">
         <label class="muted small">Patrón de alimentación y restricciones generales</label>
-        <div class="chips" style="margin:10px 0 16px">
+        <div class="chips" style="margin:9px 0 4px">
           ${dietOptions.map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}
         </div>
-        <div class="field"><label>Cocinas preferidas</label><div class="chips">${checkChips("ob_cuisine",CUISINE_LABELS,d.preferredCuisines)}</div></div>
-        <div class="field"><label>Preparaciones preferidas</label><div class="chips">${checkChips("ob_preparation",PREPARATION_LABELS,d.preferredPreparations)}</div></div>
-        <div class="field"><label>Ingredientes que disfrutas</label><input id="ob_preferred_ingredients" value="${esc(d.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
-        <div class="field"><label>Otras preferencias (opcional)</label><textarea id="ob_food_notes" rows="2" placeholder="Ej. prefiero desayunos salados">${esc(d.foodNotes)}</textarea></div>
-        <div class="field"><label>Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se validan como exclusiones obligatorias.</div></div>
-        <div class="field"><label>Ingredientes que no te gustan</label><input id="ob_disliked" value="${esc(d.dislikedIngredients)}" placeholder="tofu, aceitunas..."><div class="field-note">Son preferencias blandas: se evitan cuando existe una alternativa viable.</div></div>
-        <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Comidas:</b> ${d.mealCount} entre ${d.eatingWindowStart} y ${d.eatingWindowEnd}<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainingDays.length} días · ${SPORT_LABELS[d.primarySport]} + ${STRENGTH_LABELS[d.strengthMode]}</div>
+        <div class="field"><label>Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
+        <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainingDays.length} días · ${SPORT_LABELS[d.primarySport]||""} + ${STRENGTH_LABELS[d.strengthMode]||""}</div>
       </div>
       <div class="section-h" style="margin-left:0">Privacidad y seguridad</div>
       <div class="dash">
         <div class="alert violet"><b>Tus datos trabajan para ti.</b><br>No los vendemos ni los usamos para publicidad. Solo los procesamos para adaptar tu plan y ayudarte a revisar tu progreso.</div>
-        <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="ob_consent_core" ${d.consentCore?"checked":""}><span>Acepto que Fitbros use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
-        <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="ob_consent_photos" ${d.consentPhotos?"checked":""}><span>Opcional: guardar fotos de progreso personal para comparar mi avance.</span></label>
+        <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="ob_consent_core" ${d.consentCore?"checked":""}><span>Acepto que Fitbros use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
         <div class="muted small" style="margin-bottom:8px"><b>Antes de entrenar:</b> responde estas preguntas para evitar recomendaciones que podrían no ser adecuadas para ti.</div>
         ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("ob_safety_"+key,d.safetyResponses[key])}</div>`).join("")}
         <div class="alert"><b>Fitbros es bienestar, no atención médica.</b><br>Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
@@ -2305,19 +2286,25 @@ function readOnboardingStep(){
     d.goal=$("#ob_goal").value;d.calorieTarget=+$("#ob_kcal").value;d.proteinTarget=+$("#ob_protein").value;
     d.carbTarget=+$("#ob_carbs").value;d.fatTarget=+$("#ob_fat").value;
   }else if(onboardingStep===3){
-    readTrainingFields("ob",d);
-  }else if(onboardingStep===4){
-    readFoodScheduleFields("ob",d);
+    d.primarySport=$("#ob_sport").value;
+    d.strengthMode=$("#ob_strength").value;
+    d.planDurationWeeks=+$("#ob_duration").value;
+    d.trainingExperience=$("#ob_experience").value;
+    d.sessionMinutes=+$("#ob_minutes").value;
+    d.trainingDays=WEEKDAY_OPTIONS.filter(day=>{const el=$("#ob_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
+    d.trainDays=d.trainingDays.length;
+    d.trainingLocations={};
+    d.trainingDays.forEach(day=>{d.trainingLocations[day]=$("#ob_location_"+day).value;});
+    // Rellenar campos diferidos con defaults válidos
+    if(!TRAINING_PRIORITY_LABELS[d.trainingPriority])d.trainingPriority=inferredTrainingPriority(d);
+    if(!TRAINING_TIME_LABELS[d.preferredTrainingTime])d.preferredTrainingTime="flexible";
+    if(!d.equipment||!d.equipment.length)d.equipment=d.strengthMode==="bodyweight"?["bodyweight"]:["dumbbells","barbell","machines"];
   }else{
-    d.diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>$("#ob_diet_"+v).checked);
-    d.preferredCuisines=checkedValues("ob_cuisine",CUISINE_LABELS);
-    d.preferredPreparations=checkedValues("ob_preparation",PREPARATION_LABELS);
-    d.preferredIngredients=$("#ob_preferred_ingredients").value.trim();
-    d.foodNotes=$("#ob_food_notes").value.trim();
+    // Nuevo paso 4 combinado: comidas esenciales + restricciones + privacidad
+    d.mealCount=Math.min(6,Math.max(2,+$("#ob_meal_count").value||d.mealCount));
+    d.diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#ob_diet_"+v);return el&&el.checked;});
     d.allergies=$("#ob_allergies").value.trim();
-    d.dislikedIngredients=$("#ob_disliked").value.trim();
     d.consentCore=$("#ob_consent_core").checked;
-    d.consentPhotos=$("#ob_consent_photos").checked;
     d.safetyResponses=Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,$("#ob_safety_"+key).value]));
   }
 }
@@ -2332,9 +2319,8 @@ function validateOnboardingStep(){
     if(d.bodyFatPct!==""&&(d.bodyFatPct<3||d.bodyFatPct>60))return "El porcentaje de grasa debe estar entre 3% y 60%";
   }
   if(onboardingStep===2&&[d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].some(v=>!Number.isFinite(v)||v<=0))return "Completa las cuatro metas de nutrición";
-  if(onboardingStep===3)return validateTrainingProfile(d);
-  if(onboardingStep===4)return validateFoodSchedule(d);
-  if(onboardingStep===5){
+  if(onboardingStep===3)return validateTrainingProfileCore(d);
+  if(onboardingStep===4){
     const foodError=validateFoodPreferences(d);
     if(foodError)return foodError;
     if(d.age<MINIMUM_AGE)return `Debes tener al menos ${MINIMUM_AGE} años`;
@@ -2354,7 +2340,7 @@ function onboardingNext(){
   const error=validateOnboardingStep();
   if(error){toast(error);return;}
   if(onboardingStep===1)applyCalculatedMacros();
-  onboardingStep=Math.min(5,onboardingStep+1);
+  onboardingStep=Math.min(4,onboardingStep+1);
   renderOnboarding();window.scrollTo(0,0);
 }
 function onboardingBack(){readOnboardingStep();onboardingStep=Math.max(1,onboardingStep-1);renderOnboarding();window.scrollTo(0,0);}
@@ -2381,12 +2367,13 @@ function updateOnboardingMealCount(value){
     const input=$("#ob_meal_time_"+index);
     return input&&validTime(input.value)?input.value:onboardingDraft.mealTimes[index];
   });
-  onboardingDraft.eatingWindowStart=$("#ob_window_start").value;
-  onboardingDraft.eatingWindowEnd=$("#ob_window_end").value;
-  onboardingDraft.mainMealIndex=+$("#ob_main_meal").value;
-  onboardingDraft.cookingMinutes=+$("#ob_cooking").value;
-  onboardingDraft.foodBudget=$("#ob_budget").value;
-  onboardingDraft.repeatPreference=$("#ob_repeat").value;
+  const ws=$("#ob_window_start"),we=$("#ob_window_end"),mm=$("#ob_main_meal"),ck=$("#ob_cooking"),bg=$("#ob_budget"),rp=$("#ob_repeat");
+  if(ws)onboardingDraft.eatingWindowStart=ws.value;
+  if(we)onboardingDraft.eatingWindowEnd=we.value;
+  if(mm)onboardingDraft.mainMealIndex=+mm.value;
+  if(ck)onboardingDraft.cookingMinutes=+ck.value;
+  if(bg)onboardingDraft.foodBudget=bg.value;
+  if(rp)onboardingDraft.repeatPreference=rp.value;
   const count=Math.min(6,Math.max(2,+value||4));
   onboardingDraft.mealCount=count;
   onboardingDraft.mealTimes=defaultMealTimes(count);
@@ -2483,6 +2470,7 @@ async function saveOnboarding(){
     onboardingPending:false,pendingChallenge:null,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
     ...(firstCycle||newCycle?{cycleFirstDayPreparedAt:null}:{}),
+    ...(firstCycle||newCycle?{onboardingEssentialOnly:true,profileRefinedAt:null}:{}),
   };
   const result=await saveProfilePrefs(prefs,{
     source:newCycle?"new_cycle":"onboarding",
@@ -2859,6 +2847,7 @@ function renderHoy(){
   </header>
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()&&action.type!=="safety"?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
+  ${needsProfileTuning((profile&&profile.prefs)||{})?`<div class="alert" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px" onclick="setView('perfil')"><span><b>Afina tu plan</b> · Agrega tus preferencias de cocina, horarios y equipo para mejores propuestas.</span><span style="opacity:.6;white-space:nowrap">→ Perfil</span></div>`:""}
   ${checkinDue?weeklyCheckinBanner():""}
   <div class="prio-card" style="${prioStyle}">
     <div class="prio-eyebrow">${action.eyebrow}</div>
@@ -4067,6 +4056,8 @@ function renderProfile(){
   const duration=resolvedPlanDuration(p);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
 
+  ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas. Guarda cuando estés listo.</span></div>`:""}
+
   <div class="dash">
     <div class="field" style="margin:0"><label>Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
   </div>
@@ -4292,6 +4283,7 @@ async function saveProfile(){
   };
   prefs.avoid=[prefs.allergies,prefs.dislikedIngredients].filter(Boolean).join(", ");
   prefs.trainNote=[prefs.injuries,prefs.limitations,prefs.avoidMovements].filter(Boolean).join(". ");
+  if(prefs.onboardingEssentialOnly&&!prefs.profileRefinedAt)prefs.profileRefinedAt=new Date().toISOString();
   const result=await saveProfilePrefs(prefs);
   if(result&&result.error){toast("Error: "+result.error.message);return;}
   if(calendarChanged){await upsertActiveCycle();await pullCycleHistory();}

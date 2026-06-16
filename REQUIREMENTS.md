@@ -1876,7 +1876,8 @@ Que el usuario vea un dia real (comidas con macros + sesion o descanso) inmediat
 
 ## REQ-35 - Onboarding minimo viable con divulgacion progresiva
 
-**Estado: pendiente.**
+**Estado: implementado.**
+El onboarding pasa de 5 pasos densos a 4 pasos ligeros. Paso 3 (entrenamiento) conserva disciplina, fuerza, duración, experiencia, minutos y días/lugar; difiere prioridad, horario, equipo, lesiones y limitaciones. Nuevo paso 4 combinado pide solo número de comidas, patrón de alimentación, alergias, consentimiento core y screening de seguridad; difiere ventana alimentaria, horarios exactos, cocinas, preparaciones, presupuesto, repetición y fotos. Los campos diferidos tienen defaults válidos desde `migrateProfilePrefs` y se siguen enviando al coach como JSON estructurado. `saveOnboarding()` marca `onboardingEssentialOnly:true` en prefs para ciclos nuevos; `saveProfile()` setea `profileRefinedAt` al guardar desde Perfil. `needsProfileTuning()` detecta el estado y muestra un banner "Afina tu plan" en Home y Perfil. `validate-privacy.mjs` actualizado: el consentimiento de fotos se comprueba en `pf_consent_photos` (Perfil) en lugar de `ob_consent_photos`. Service worker v35.
 
 ### Objetivo
 
