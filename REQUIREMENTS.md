@@ -111,7 +111,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
 | Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Falta comparar tendencias, hitos y explicar que cambio en el plan |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
-| Recordatorios | No existe | Falta programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
+| Recordatorios | No existe | Falta el canal por correo (REQ-24) y el canal push de recordatorios de racha con permiso del dispositivo (REQ-38); ambos exigen programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
 | Suscripcion | No existe | Falta oferta de 1/3 meses, checkout, webhooks, entitlement, renovacion, cancelacion y expiracion |
 | Seguridad y privacidad | Auth, RLS y fotos de progreso personal protegidas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
@@ -184,6 +184,16 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 28. REQ-28 - Sincronizacion offline y resolucion de conflictos.
 29. REQ-29 - Modularizacion incremental y contratos de dominio.
 30. REQ-30 - Pruebas end-to-end, accesibilidad y release gates.
+
+### Fase F - Activacion, retencion y pulido (auditoria heuristica + directiva de producto, jun 2026)
+
+Hallazgos de una evaluacion heuristica de los flujos reales (REQ-34..37) mas una directiva de producto de notificaciones push (REQ-38). No estaban capturados en REQ-12..33. Prioridad de producto: la activacion (REQ-34/REQ-35) deberia preceder a la monetizacion (REQ-25/REQ-26/REQ-33), porque dirigir trafico pago a un primer dia vacio rompe la promesa central. **REQ-34 ya esta priorizado como siguiente en `agent-loop.json`.**
+
+34. REQ-34 - Primer plan al terminar el onboarding (primer valor inmediato). **Priorizado como siguiente · alta prioridad, bajo esfuerzo.**
+35. REQ-35 - Onboarding minimo viable con divulgacion progresiva.
+36. REQ-36 - Unificar acciones de comida (cambiar/adaptar).
+37. REQ-37 - Accesibilidad de modales y confirmacion de acciones destructivas.
+38. REQ-38 - Notificaciones push y recordatorios de racha (retencion; comparte infraestructura con REQ-24 y depende de REQ-23). Bloqueado en una decision de proveedor/transport y secretos antes de implementar el envio.
 
 REQ-08 debe esperar a REQ-01/REQ-02 y preferiblemente a REQ-05/REQ-06, porque necesita recetas confiables, contexto por usuario y control de acceso a IA.
 
@@ -1808,6 +1818,213 @@ Crear la superficie publica que hoy no existe (la primera pantalla es el login) 
 - Recorrer visita → registro → onboarding como usuario nuevo.
 - Revisar que no haya terminos prohibidos en el HTML publico.
 - Probar Open Graph y rendimiento en movil.
+
+---
+
+## REQ-34 - Primer plan al terminar el onboarding (primer valor inmediato)
+
+**Estado: pendiente.**
+
+### Objetivo
+
+Que el usuario vea un dia real (comidas con macros + sesion o descanso) inmediatamente despues de terminar el onboarding, en lugar de slots vacios (`Sin asignar`), cumpliendo la promesa central "siempre tengo una opcion viable para comer y entrenar hoy". Hoy el alta termina y aterriza en un dia vacio; el usuario debe descubrir solo los botones de generacion en otra pestana.
+
+### Dependencias
+
+- Requiere REQ-13, REQ-17, REQ-18 y REQ-32 (todos implementados).
+- Coordinar con la "Decision de producto pendiente" del trial y con REQ-25 cuando exista entitlement: no asumir generacion ilimitada.
+
+### Alcance
+
+- Al cerrar el onboarding inicial (y opcionalmente al iniciar un ciclo nuevo desde el recap), preparar el primer dia con las metas recien calculadas.
+- Patron recomendado: una transicion clara ("Estamos preparando tu primer dia") con un unico disparo controlado; no encadenar multiples llamadas sin control.
+- Respetar REQ-32: una sola reserva idempotente, devolucion de cuota ante fallo tecnico y fallback determinista.
+- Si la generacion falla, mostrar el dia con la plantilla determinista para que nunca quede vacio.
+- Marcar en `profiles.prefs` que el primer dia del ciclo ya se preparo: no re-disparar en cada apertura ni en cada render.
+- Home y Nutricion deben reflejar el dia ya preparado.
+- Ningun texto operativo menciona IA, proveedor, modelo ni cuota (REQ-31).
+
+### Criterios de aceptacion
+
+- Tras completar el onboarding, el primer dia tiene comidas con macros y una sesion (o descanso) asignada sin pasos manuales adicionales.
+- La preparacion consume como maximo una unidad de cuota y es idempotente ante reintentos o doble montaje.
+- Un fallo del servicio deja un dia valido mediante plantilla, nunca vacio.
+- No se dispara mas de una vez por ciclo.
+- Respeta alergias, restricciones y metas del perfil recien guardado.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Onboarding nuevo con servicio mockeado correcto y en fallo; confirmar dia valido en ambos casos.
+- Probar idempotencia (recargar/remontar durante la preparacion).
+- Perfil con alergia dura: confirmar que el primer dia la respeta.
+- Confirmar que no se vuelve a generar al reabrir la app.
+
+---
+
+## REQ-35 - Onboarding minimo viable con divulgacion progresiva
+
+**Estado: pendiente.**
+
+### Objetivo
+
+Reducir la friccion de activacion: pedir en el alta solo lo imprescindible para calcular metas y armar el primer dia, y diferir el resto a Perfil con un nudge posterior, sin perder el perfil flexible de REQ-12. Hoy el onboarding son 5 pasos densos (el paso 3 tiene ~13 campos; el 5 mezcla dieta, cocinas, preparaciones, alergias, dos consentimientos y el cuestionario de seguridad) antes de ver cualquier valor.
+
+### Dependencias
+
+- Requiere REQ-12 (perfil v3, implementado). Se coordina con REQ-34 (primer valor) y, si aplica, con REQ-33 (funnel).
+
+### Alcance
+
+- Separar los campos del perfil en "esenciales" (datos corporales, objetivo, dias y lugar de entreno, numero de comidas, alergias, consentimiento esencial y screening de seguridad) y "afinables" (cocinas, preparaciones, presupuesto, horario preferido, ventana alimentaria, ingredientes preferidos, notas, movimientos a evitar).
+- El alta solicita solo esenciales con valores por defecto sensatos; los afinables quedan con default y un nudge posterior ("Afina tu plan") accesible desde Home/Perfil.
+- No degradar el contexto del coach: los afinables se siguen guardando (con default) y enviando como JSON estructurado.
+- Conservar la migracion de perfiles existentes y `profileSchemaVersion` sin reabrir onboarding.
+- Mantener obligatorias en el alta las validaciones duras: edad minima, alergias y screening de seguridad.
+- Sin overflow en 375x812 y 390x844.
+
+### Criterios de aceptacion
+
+- Un usuario nuevo completa el alta con notablemente menos campos y llega antes al primer valor.
+- Los campos diferidos tienen default valido y pueden completarse despues sin volver a hacer onboarding.
+- Edad minima, alergias y screening siguen siendo obligatorios en el alta.
+- El coach sigue recibiendo el perfil completo (con defaults) como datos estructurados.
+- Editar una preferencia diferida no borra progreso ni planes.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Alta nueva: confirmar menos pasos y que el plan se puede generar.
+- Completar afinables luego desde Perfil y verificar persistencia.
+- Perfil heredado: confirmar migracion sin reabrir onboarding.
+- Revisar el prompt del coach con datos completos.
+
+---
+
+## REQ-36 - Unificar acciones de comida (cambiar/adaptar)
+
+**Estado: pendiente.**
+
+### Objetivo
+
+Eliminar la redundancia entre "Reemplazar" y "Adaptar" en la tarjeta de comida y reducir la carga de decision a dos acciones claras. Hoy cada comida ofrece hasta cinco botones (Ver receta, Reemplazar, Editar valores, Adaptar, Volver al plan) donde "Reemplazar" y "Adaptar" terminan en el mismo flujo de reemplazo (`openReplace`), con o sin motivo.
+
+### Dependencias
+
+- Requiere REQ-19 (contingencias, implementado).
+
+### Alcance
+
+- Consolidar "Reemplazar" y "Adaptar" en una sola accion ("Cambiar") que abra una hoja con motivo opcional (no puedo cocinar / como fuera / sin ingrediente) y luego las opciones con delta de macros y alcance (solo hoy / esta semana). El motivo deja de ser un paso separado obligatorio.
+- Degradar "Editar valores" y "Ver receta" a acciones secundarias (p. ej. menu overflow) sin perder funcionalidad.
+- Conservar el registro en `contingencyLog` (motivo, opcion elegida, prescripcion previa) y el boton "Volver al plan".
+- Mantener consistencia de verbo con Entreno ("Adaptar"/"Cambiar").
+
+### Criterios de aceptacion
+
+- La tarjeta de comida no muestra dos botones distintos que lleven al mismo flujo de reemplazo.
+- Cambiar una comida sigue registrando motivo (cuando se indica), alcance y delta, y se puede revertir.
+- No se pierde ninguna funcionalidad existente (editar valores, ver receta, comida personalizada).
+- Sin overflow de botones en movil.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Cambiar una comida con y sin motivo; alcance hoy vs semana; revertir al plan.
+- Editar valores y ver receta desde la accion secundaria.
+- Revisar 375x812 sin overflow.
+
+---
+
+## REQ-37 - Accesibilidad de modales y confirmacion de acciones destructivas
+
+**Estado: pendiente.**
+
+### Objetivo
+
+Cerrar brechas de teclado y foco en los modales (`.sheet`) y unificar la confirmacion de acciones destructivas. Hoy los modales solo cierran con la X o clic fuera (sin Esc ni atrapado de foco) y algunas acciones destructivas no piden confirmacion (p. ej. eliminar comida extra), a diferencia de otras que si lo hacen.
+
+### Dependencias
+
+- Ninguna tecnica.
+
+### Alcance
+
+- Modales: atrapar el foco mientras estan abiertos, cerrar con Esc, devolver el foco al elemento disparador al cerrar y marcar `role="dialog"`/`aria-modal="true"` con un titulo asociado.
+- Confirmar las acciones destructivas que hoy no confirman (al menos eliminar comida extra), de forma consistente con las que ya lo hacen.
+- No introducir regresiones en los flujos que abren/cierran modales (editor, reemplazo, contingencias, check-in, generadores).
+
+### Criterios de aceptacion
+
+- Con teclado, el foco no escapa del modal abierto y Esc lo cierra.
+- Al cerrar un modal, el foco vuelve a un punto razonable.
+- Borrar una comida extra pide confirmacion.
+- Lectores de pantalla anuncian el modal como dialogo.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Navegacion por teclado en editor, reemplazo y check-in; probar Esc y foco de retorno.
+- Borrar una comida extra y confirmar el paso de confirmacion.
+- Revision rapida con un lector de pantalla o el arbol de accesibilidad.
+
+---
+
+## REQ-38 - Notificaciones push y recordatorios de racha
+
+**Estado: pendiente.**
+
+### Objetivo
+
+Enviar recordatorios push al dispositivo (estilo Duolingo) para que el usuario no pierda su racha, solo con permiso explicito del dispositivo y consentimiento, y solo cuando hay algo pendiente. El recordatorio refuerza la constancia sin castigar descansos planificados.
+
+### Dependencias
+
+- Requiere REQ-14 (consentimiento; hoy no se pide permiso de notificaciones, se introduce aqui un consentimiento contextual).
+- Requiere REQ-23 (definicion justa de racha: un descanso planificado no la rompe; el recordatorio solo aplica cuando la racha esta realmente en riesgo).
+- Comparte infraestructura con REQ-24 (scheduler por zona horaria, deduplicacion idempotente, "enviar solo si hay acciones pendientes", baja en un paso). REQ-24 ya anticipa "preparar la arquitectura para otros canales sin implementar push todavia": este es ese canal.
+- Debe consultar entitlement cuando exista REQ-25.
+
+### Decision previa bloqueante (proveedor/transport)
+
+- Definir y documentar el transporte antes de cargar nada: **Web Push estandar con VAPID** (sin costo de proveedor, la clave privada vive solo en el servidor) frente a un **proveedor** (FCM/OneSignal). La eleccion condiciona claves, esquema de suscripciones y el job de envio.
+- Contemplar iOS: el web push solo funciona en la **PWA instalada** (iOS 16.4+); en Safari no instalado no hay push. La UX debe explicarlo y, en su caso, invitar a instalar primero.
+- Requiere secretos (clave privada VAPID o credenciales del proveedor). No crear cuentas, compras ni secretos automaticamente: si faltan, bloquear con un reporte.
+
+### Alcance
+
+- **Flujo de permiso del dispositivo:**
+  - Solicitar `Notification.requestPermission()` SOLO tras un gesto explicito del usuario y despues de explicar el valor ("Activa los recordatorios para no perder tu racha"). Nunca al cargar la app.
+  - Manejar los tres estados: `default` (no preguntado), `granted`, `denied`. Si esta `denied`, no volver a forzar el prompt; explicar como reactivarlo desde los ajustes del dispositivo.
+  - Registrar la `PushSubscription` y guardarla por usuario (tabla con RLS), ligada a un consentimiento de recordatorios revocable.
+- **Service worker:** anadir handlers `push` (mostrar la notificacion) y `notificationclick` (abrir el dia correcto en la PWA). Hoy el SW solo cachea; no debe romperse el cache existente.
+- **Scheduler server-side** (Vercel Cron o `pg_cron`) que por usuario y zona horaria determine si la racha esta en riesgo (dia por terminar, con racha activa y sin actividad registrada) y envie como maximo un push por dia con clave idempotente.
+- **Preferencias:** opt-in, hora limite, dias habilitados y tipo (racha / nutricion / entreno), reutilizando o compartiendo el modelo de REQ-24.
+- No enviar a usuarios sin permiso del dispositivo, sin consentimiento, inactivos o sin acciones pendientes; completar la actividad antes del envio cancela el recordatorio.
+- No incluir datos corporales ni sensibles en el titulo o cuerpo de la notificacion.
+- Lenguaje invisible (REQ-31): la notificacion habla de "tu coach"/"tu racha", nunca de tecnologia, proveedor ni modelos.
+- La clave privada VAPID o las credenciales del proveedor viven solo en el servidor; nunca en el cliente ni en el repo.
+
+### Criterios de aceptacion
+
+- El permiso del dispositivo solo se solicita tras un gesto y una explicacion; un `denied` no se vuelve a forzar.
+- Sin permiso del dispositivo y consentimiento vigente no se envia ningun push.
+- Un usuario con la racha en riesgo recibe como maximo un recordatorio por dia; reintentos del job no duplican.
+- La notificacion abre el dia correcto despues de autenticarse.
+- Completar la actividad pendiente antes del envio cancela el recordatorio.
+- La zona horaria del usuario decide cuando termina el dia.
+- Ninguna notificacion expone datos sensibles ni vocabulario tecnico.
+- No hay secretos en el cliente ni en el repo.
+- Un descanso planificado no genera un recordatorio de "racha en riesgo".
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Probar el permiso: `default`→`granted`, `default`→`denied` y la guia de reactivacion.
+- Probar en PWA instalada (incluido iOS 16.4+ en modo standalone) y en navegador de escritorio.
+- Ejecutar el job en `dry-run` con usuarios en distintas zonas horarias; simular entrega, reintento y deduplicacion.
+- Confirmar que sin actividad pendiente o con descanso planificado no se envia.
+- Verificar que el service worker maneja `push`/`notificationclick` sin romper el cache.
 
 ---
 
