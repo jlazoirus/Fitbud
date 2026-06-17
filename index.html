@@ -752,6 +752,8 @@ const PROFILE_SCHEMA_VERSION=3;
 const CONSENT_POLICY_VERSION="2026-06-15-v2";
 const SAFETY_SCREENING_VERSION="2026-06-15";
 const MINIMUM_AGE=18;
+// Clave pública VAPID para Web Push (REQ-38). No es secreta; la privada vive solo en el servidor.
+const VAPID_PUBLIC_KEY="BG6yyBKh5oUpZSu2OzOoxpn3THiWvZ3S8t528rEDRxn9-MKMz2UR16QkvoiYTHTgyXqDRGZiJOzgEh8tnqMp0_E";
 const REQUIRED_CONSENTS=["body_progress","automated_coach"];
 const SAFETY_QUESTIONS=[
   ["chest_pain","¿Tienes dolor de pecho durante la actividad o en reposo?"],
@@ -4190,6 +4192,11 @@ function renderProfile(){
     <button id="notifSaveBtn" class="btn btn-accent" style="width:100%;margin-top:14px" onclick="saveNotifPrefs()">Guardar recordatorios</button>
   </div>
 
+  <div class="section-h">Avisos del dispositivo</div>
+  <div class="dash">
+    <div id="pushSection"><!-- se completa desde renderPushSection() --></div>
+  </div>
+
   ${isAdmin()?`<div class="section-h">Administración</div>
   <div class="dash">
     <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, alimentos, ejercicios y la configuración técnica.</div>
@@ -4205,9 +4212,11 @@ function renderProfile(){
     <div class="row between"><span class="muted small">${esc(email)}</span><span class="badge ${isAdmin()?'b-PESAS':'b-Libre'}">${isAdmin()?'Admin':'Usuario'}</span></div>
     <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="signOutUser(this)">Cerrar sesión</button>
   </div>`;
-  // Cargar preferencias de recordatorios y poblar el formulario
+  // Cargar preferencias de recordatorios y poblar el formulario + sección push
   if(supa&&uid()){
-    loadNotifPrefs().then(populateNotifPrefsForm);
+    loadNotifPrefs().then(()=>{populateNotifPrefsForm();renderPushSection();});
+  }else{
+    renderPushSection();
   }
 }
 function updateTrainingSummary(){
@@ -4341,7 +4350,7 @@ async function exportPersonalData(button){
   finally{if(button){button.disabled=false;button.textContent="Exportar mis datos";}}
 }
 /* ============================================================
-   RECORDATORIOS POR CORREO (REQ-24)
+   RECORDATORIOS POR CORREO (REQ-24) Y PUSH DE RACHA (REQ-38)
    ============================================================ */
 const NOTIF_HOURS=[17,18,19,20,21,22,23];
 const NOTIF_HOUR_DEFAULT=20;
@@ -4405,6 +4414,105 @@ async function saveNotifPrefs(){
   if(error){toast("No se pudieron guardar los recordatorios");return;}
   notifPrefsCache={...notifPrefsCache,...row};
   toast("Recordatorios guardados");
+}
+
+/* ── Web Push / avisos del dispositivo (REQ-38) ─────────────────────────── */
+
+function urlBase64ToUint8Array(base64String){
+  const padding="=".repeat((4-base64String.length%4)%4);
+  const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+  const raw=atob(base64);
+  return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+
+function renderPushSection(){
+  const el=document.getElementById("pushSection");
+  if(!el)return;
+  if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window)){
+    el.innerHTML='<p class="muted small">Las notificaciones del dispositivo no están disponibles en este navegador. Instala la app (Añadir a pantalla de inicio) para habilitarlas.</p>';
+    return;
+  }
+  const perm=Notification.permission;
+  const pushEnabled=!!(notifPrefsCache&&notifPrefsCache.push_opt_in);
+  const note='<p class="muted small" style="margin-bottom:10px">Recibe un aviso en este dispositivo antes de que termine el día para no perder tu racha. Usa la misma hora y días configurados arriba. Solo funciona con la app instalada (iOS 16.4+ y Android).</p>';
+  if(perm==="denied"){
+    el.innerHTML=note+`<div class="alert violet"><b>Avisos bloqueados.</b> Para reactivarlos ve a la configuración de tu navegador y permite las notificaciones para esta app.<br><span class="muted small">iOS: Safari → Configuración del sitio web → Notificaciones. Android: ajustes del navegador → Notificaciones.</span></div>`;
+    return;
+  }
+  if(perm==="default"){
+    el.innerHTML=note+`<button class="btn btn-accent" style="width:100%" onclick="requestPushPermission(this)">Activar avisos del dispositivo</button>`;
+    return;
+  }
+  // permission === "granted"
+  el.innerHTML=note+`<label class="chip-check" style="display:flex;margin-bottom:6px"><input type="checkbox" id="push_opt_in" ${pushEnabled?"checked":""} onchange="savePushOptIn(this)"><span>Aviso de racha en este dispositivo</span></label><p class="muted small">El aviso se envía una sola vez al día si tienes actividad pendiente.</p>`;
+}
+
+async function requestPushPermission(btn){
+  if(btn){btn.disabled=true;btn.textContent="Solicitando permiso…";}
+  try{
+    const perm=await Notification.requestPermission();
+    if(perm==="granted"){
+      await subscribePush();
+      renderPushSection();
+      toast("Avisos del dispositivo activados");
+    }else{
+      renderPushSection();
+    }
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent="Activar avisos del dispositivo";}
+    toast("No se pudo activar el aviso del dispositivo");
+  }
+}
+
+async function subscribePush(){
+  if(!("serviceWorker" in navigator)||!("PushManager" in window))return;
+  const reg=await navigator.serviceWorker.ready;
+  const sub=await reg.pushManager.subscribe({
+    userVisibleOnly:true,
+    applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
+  const subJson=sub.toJSON();
+  const token=session&&session.access_token;
+  if(!token)return;
+  const r=await fetch("/api/push-subscribe",{
+    method:"POST",
+    headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},
+    body:JSON.stringify(subJson),
+  });
+  if(!r.ok)throw new Error("No se pudo guardar la suscripción");
+  await _savePushOptInDb(true);
+}
+
+async function savePushOptIn(checkbox){
+  const enabled=checkbox.checked;
+  if(!enabled){
+    try{
+      if("serviceWorker" in navigator){
+        const reg=await navigator.serviceWorker.ready;
+        const sub=await reg.pushManager.getSubscription();
+        if(sub)await sub.unsubscribe();
+      }
+      const token=session&&session.access_token;
+      if(token){
+        await fetch("/api/push-subscribe",{method:"DELETE",headers:{Authorization:"Bearer "+token}});
+      }
+    }catch(_){}
+  }
+  await _savePushOptInDb(enabled);
+}
+
+async function _savePushOptInDb(enabled){
+  if(!supa||!uid())return;
+  const tz=(Intl&&Intl.DateTimeFormat?Intl.DateTimeFormat().resolvedOptions().timeZone:null)||
+    (profile&&profile.prefs&&profile.prefs.timeZone)||"UTC";
+  const row={user_id:uid(),push_opt_in:enabled,timezone:tz,updated_at:new Date().toISOString()};
+  const{error}=await supa.from("notification_preferences").upsert(row,{onConflict:"user_id"});
+  if(!error){
+    notifPrefsCache={...notifPrefsCache,...row};
+    toast(enabled?"Avisos del dispositivo activados":"Avisos del dispositivo desactivados");
+  }else{
+    toast("No se pudo guardar la preferencia");
+  }
 }
 
 function openDeleteAccount(){
@@ -7796,7 +7904,9 @@ function registerServiceWorker(){
   const secure=location.protocol==="https:"||host==="localhost"||host==="127.0.0.1"||host==="::1";
   if(!secure)return;
   window.addEventListener("load",()=>{
-    navigator.serviceWorker.register("./service-worker.js").catch(e=>console.warn("No se pudo registrar el service worker",e));
+    navigator.serviceWorker.register("./service-worker.js")
+      .then(reg=>{window._swRegistration=reg;})
+      .catch(e=>console.warn("No se pudo registrar el service worker",e));
   });
 }
 // Carga la base de datos si hay conexión, para que los macros del día salgan de la DB.

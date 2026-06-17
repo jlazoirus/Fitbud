@@ -1,4 +1,7 @@
-// Recordatorios de inactividad por correo (REQ-24)
+// Recordatorios por correo (REQ-24) y push de racha (REQ-38)
+// Excepción a allowNewRuntimeDependency: se usa `web-push` para firmar notificaciones
+// VAPID sin depender de un proveedor externo de pago. Autorizado explícitamente
+// para REQ-38; el resto del proyecto sigue sin dependencias runtime nuevas.
 // Vercel cron job (GET /api/notify) + baja de un solo clic (GET /api/notify?unsubscribe=TOKEN)
 //
 // Variables de entorno requeridas en Vercel (además de las ya existentes):
@@ -9,7 +12,30 @@
 //
 // vercel.json define: { "crons": [{ "path": "/api/notify", "schedule": "0 * * * *" }] }
 // Vercel envía Authorization: Bearer CRON_SECRET en cada invocación automática del cron.
-// Lenguaje REQ-31: todos los textos del correo hablan de "tu plan"/"tu racha"; sin mención de IA.
+// Lenguaje REQ-31: todos los textos hablan de "tu plan"/"tu racha"; sin mención de IA.
+//
+// Push VAPID (REQ-38) — variables de entorno adicionales requeridas en Vercel:
+//   VAPID_PRIVATE_KEY   — clave privada VAPID (solo servidor; nunca en cliente/repo)
+//   VAPID_SUBJECT       — ej: mailto:j.lazo.ir@gmail.com
+//   VAPID_PUBLIC_KEY    — clave pública (el cliente usa el literal; esta var es opcional)
+
+import webpush from "web-push";
+
+const VAPID_PUBLIC_KEY =
+  process.env.VAPID_PUBLIC_KEY ||
+  "BG6yyBKh5oUpZSu2OzOoxpn3THiWvZ3S8t528rEDRxn9-MKMz2UR16QkvoiYTHTgyXqDRGZiJOzgEh8tnqMp0_E";
+
+let vapidReady = false;
+try {
+  if (process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT,
+      VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+    vapidReady = true;
+  }
+} catch (_) {}
 
 function env() {
   return {
@@ -282,6 +308,119 @@ async function runJob(e, dryRun) {
         }
         results.errors++;
         results.log.push({ user: user_id, type: notifType, date: dateStr, action: "error", error: err.message });
+      }
+    }
+  }
+
+  // ── Push de racha (REQ-38) ──────────────────────────────────────────────────
+  if (vapidReady) {
+    results.push = { sent: 0, skipped: 0, errors: 0 };
+
+    const pushPrefs = await supaGet(e,
+      "/rest/v1/notification_preferences?push_opt_in=eq.true" +
+      "&select=user_id,timezone,notify_hour,enabled_days"
+    ).catch(() => []);
+
+    for (const pref of pushPrefs) {
+      const { user_id, timezone, notify_hour, enabled_days } = pref;
+      const tz = safeTimezone(timezone || "UTC");
+      const nowHour = currentHourInTz(tz);
+      const nowDow  = dayOfWeekInTz(tz);
+      const dateStr = todayInTz(tz);
+
+      if (nowHour !== (notify_hour ?? 20)) continue;
+      const days = Array.isArray(enabled_days) ? enabled_days.map(Number) : [0,1,2,3,4,5,6];
+      if (!days.includes(nowDow)) continue;
+
+      // Verificar usuario activo
+      const profileRows = await supaGet(e,
+        `/rest/v1/profiles?id=eq.${user_id}&select=active`
+      ).catch(() => []);
+      if (!profileRows.length || profileRows[0].active === false) continue;
+
+      // Actividad pendiente
+      const pending = await checkPending(user_id, dateStr, e)
+        .catch(() => ({ nutrition: false, training: false }));
+      if (!pending.nutrition && !pending.training) continue;
+
+      // Idempotencia
+      const key = `${user_id}:push_streak:${dateStr}`;
+      const existing = await supaGet(e,
+        `/rest/v1/notification_log?idempotency_key=eq.${encodeURIComponent(key)}&select=id,status`
+      ).catch(() => []);
+      if (existing.length && existing[0].status === "sent") {
+        results.push.skipped++;
+        results.log.push({ user: user_id, type: "push_streak", date: dateStr, action: "already_sent" });
+        continue;
+      }
+
+      // Obtener suscripciones del usuario
+      const subs = await supaGet(e,
+        `/rest/v1/push_subscriptions?user_id=eq.${user_id}&select=endpoint,keys_p256dh,keys_auth`
+      ).catch(() => []);
+      if (!subs.length) continue;
+
+      // Registrar intento
+      let logId = existing.length ? existing[0].id : null;
+      if (!logId && !dryRun) {
+        const ins = await supaPost(e, "/rest/v1/notification_log", {
+          user_id,
+          notification_type: "push_streak",
+          reference_date: dateStr,
+          idempotency_key: key,
+          status: "pending",
+          attempted_at: new Date().toISOString(),
+        }, { Prefer: "return=representation" }).catch(() => null);
+        logId = ins && ins[0] && ins[0].id;
+      }
+
+      if (dryRun) {
+        results.push.skipped++;
+        results.log.push({ user: user_id, type: "push_streak", date: dateStr, action: "dry_run" });
+        continue;
+      }
+
+      // Enviar push a todas las suscripciones del usuario
+      const payload = JSON.stringify({
+        title: "Tu racha te espera",
+        body: "Tienes actividad pendiente. Unos minutos bastan para mantener tu racha.",
+        tag: "fitbros-streak",
+        url: `/?date=${dateStr}`,
+      });
+
+      let sendOk = false;
+      for (const sub of subs) {
+        try {
+          await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.keys_p256dh, auth: sub.keys_auth } },
+            payload
+          );
+          sendOk = true;
+        } catch (err) {
+          if (err.statusCode === 410) {
+            // Suscripción caducada: eliminarla
+            await fetch(
+              `${e.url}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`,
+              { method: "DELETE", headers: mutateHeaders(e) }
+            ).catch(() => null);
+          }
+          results.log.push({ user: user_id, type: "push_streak", date: dateStr, action: "push_error", error: err.message });
+        }
+      }
+
+      if (logId) {
+        await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
+          sendOk
+            ? { status: "sent",  delivered_at: new Date().toISOString() }
+            : { status: "error", error_message: "Ninguna suscripción entregada" }
+        ).catch(() => null);
+      }
+
+      if (sendOk) {
+        results.push.sent++;
+        results.log.push({ user: user_id, type: "push_streak", date: dateStr, action: "push_sent" });
+      } else {
+        results.push.errors++;
       }
     }
   }

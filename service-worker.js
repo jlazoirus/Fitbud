@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v36";
+const CACHE_NAME = "fitbud-pwa-v37";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -76,6 +76,41 @@ async function networkFirst(request, fallbackUrl) {
     return (await caches.match(request)) || (fallbackUrl ? caches.match(fallbackUrl) : Promise.reject(error));
   }
 }
+
+// ── Web Push handlers (REQ-38) ────────────────────────────────────────────────
+
+self.addEventListener("push", event => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (_) {}
+  const title = data.title || "Fitbros";
+  const body  = data.body  || "Tienes actividad pendiente.";
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: "./assets/icon-192.png",
+      badge: "./assets/icon-192.png",
+      tag: data.tag || "fitbros-reminder",
+      data: { url: data.url || "/" },
+      requireInteraction: false,
+    })
+  );
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
+      for (const client of list) {
+        if ("focus" in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
 
 async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_NAME);

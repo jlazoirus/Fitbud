@@ -48,6 +48,7 @@ Los siguientes scripts son **seguros de re-ejecutar** (idempotentes): no borran 
 9. entitlements.sql
 10. billing.sql
 11. analytics.sql
+12. push_subscriptions.sql
 ```
 
 ---
@@ -316,6 +317,33 @@ schema.sql ──► seed.sql (re-correr)
                │         └──► exercises.sql    (paso 6)
                │
                └──► notifications.sql          (paso 8, independiente)
+                         │
+                         └──► push_subscriptions.sql (paso 12)
+```
+
+---
+
+### 12. `supabase/push_subscriptions.sql`
+
+**REQ:** REQ-38 (notificaciones push y recordatorios de racha)
+
+**Qué hace:**
+- Crea la tabla `push_subscriptions` (`user_id`, `endpoint`, `keys_p256dh`, `keys_auth`, `user_agent`, `created_at`). Restricción `UNIQUE(user_id, endpoint)` para deduplicar suscripciones desde el mismo dispositivo. RLS: cada usuario gestiona las propias; el cron usa service role.
+- Agrega la columna `push_opt_in BOOLEAN NOT NULL DEFAULT false` a `notification_preferences` (`ADD COLUMN IF NOT EXISTS`, idempotente).
+- Extiende el CHECK de `notification_log.notification_type` para aceptar el valor `push_streak` (idempotente mediante `DO $$ BEGIN … EXCEPTION WHEN OTHERS THEN NULL END $$`).
+
+**Por qué es necesario:** `api/push-subscribe.js` escribe las suscripciones, `api/notify.js` las lee para enviar notificaciones VAPID, y `notification_log` necesita el tipo `push_streak` para la deduplicación diaria.
+
+**Prerequisito:** `notifications.sql` ya aplicado (las tablas `notification_preferences` y `notification_log` deben existir).
+
+> ⚠️ **Variables de entorno que el usuario debe configurar en Vercel antes de que el cron de push funcione en producción:**
+> - `VAPID_PRIVATE_KEY` — clave privada VAPID generada con `npx web-push generate-vapid-keys`
+> - `VAPID_SUBJECT` — será `mailto:j.lazo.ir@gmail.com`
+> - `VAPID_PUBLIC_KEY` — mismo valor que el literal embebido en el frontend (opcional; el frontend usa el literal directamente)
+
+```sql
+-- Ver contenido completo en: supabase/push_subscriptions.sql
+-- (~50 líneas; incluye tabla, ALTER TABLE, extensión de CHECK y RLS)
 ```
 
 ---
