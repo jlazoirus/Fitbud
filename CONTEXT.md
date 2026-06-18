@@ -180,7 +180,7 @@ Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (de
 - **Porciones especiales de REFEED/DIETBREAK:** el almuerzo refeed usa el plato estándar de la DB, sin la doble porción de carbo que indica el plan.
 - **¿El cambio de entreno ajusta el tipo de día/metas?** Hoy cambiar pesas↔correr no cambia el tipo de día (sigue por el día de semana). Decidir si debería.
 - ~~**Auth de Supabase**~~ ✅ Hecho — multiusuario con login; RLS por usuario y escritura de catálogo solo admin (ver §11b).
-- **Editor de dietas** (hoy `foodsDiets` es solo lectura): asignar/editar `diet_dishes` desde la app.
+- **Editor de dietas** (REQ-39 pendiente): `foodsDiets()` hoy es solo lectura; falta asignar/editar `diet_dishes` desde la app sin tocar SQL manual.
 - **Buscar/filtrar** ingredientes y platos; sugerencias por macros restantes.
 - **Conflictos de sync:** cola offline implementada (REQ-28). Los cambios hechos sin red se encolan y se reenvían al reconectar con upsert idempotente. El estado local tiene prioridad sobre el servidor mientras haya pendientes en la cola. Dos dispositivos editando el mismo día: el que drena último gana (last-write-wins a nivel de upsert), pero ninguno pierde sus cambios offline silenciosamente.
 - **Mejorar la IA:** que sugiera usando platos reales de la DB con recálculo estricto por ingredientes.

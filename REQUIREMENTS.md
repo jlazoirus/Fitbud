@@ -195,6 +195,10 @@ Hallazgos de una evaluacion heuristica de los flujos reales (REQ-34..37) mas una
 37. REQ-37 - Accesibilidad de modales y confirmacion de acciones destructivas.
 38. REQ-38 - Notificaciones push y recordatorios de racha (retencion; comparte infraestructura con REQ-24 y depende de REQ-23). Bloqueado en una decision de proveedor/transport y secretos antes de implementar el envio.
 
+### Fase G - Operacion del catalogo nutricional (auditoria jun 2026)
+
+39. REQ-39 - Editor administrativo de dietas y asignaciones. Descubierto al auditar el journey Administracion -> Alimentos -> Dietas: el backend permite escribir `diets`/`diet_dishes` como admin, pero la app solo muestra esas asignaciones.
+
 REQ-08 debe esperar a REQ-01/REQ-02 y preferiblemente a REQ-05/REQ-06, porque necesita recetas confiables, contexto por usuario y control de acceso a IA.
 
 Los requerimientos REQ-12 a REQ-33 son el backlog recomendado para completar la vision comercial. Las dependencias de cada uno mandan sobre el orden numerico cuando exista una razon tecnica.
@@ -2041,6 +2045,64 @@ Enviar recordatorios push al dispositivo (estilo Duolingo) para que el usuario n
 - Ejecutar el job en `dry-run` con usuarios en distintas zonas horarias; simular entrega, reintento y deduplicacion.
 - Confirmar que sin actividad pendiente o con descanso planificado no se envia.
 - Verificar que el service worker maneja `push`/`notificationclick` sin romper el cache.
+
+---
+
+## REQ-39 - Editor administrativo de dietas y asignaciones
+
+**Estado: pendiente (auditoria 2026-06-18 del journey Administracion -> Alimentos -> Dietas).**
+
+### Evidencia
+
+- `index.html` carga `diets` y `diet_dishes` en `dbLoad()` y `foodsDiets()` solo renderiza filas; no existe accion para crear, editar, reasignar o eliminar asignaciones de menu.
+- `supabase/auth.sql` ya da escritura admin sobre `ingredients`, `dishes`, `dish_ingredients`, `diets` y `diet_dishes`, por lo que la brecha es de producto/UI, no de permisos.
+- `README.md` documenta que desde la app se pueden crear y editar ingredientes y platos, pero no dietas. `CONTEXT.md` tambien lista "Editor de dietas" como pendiente.
+
+### Objetivo
+
+Permitir que un administrador mantenga los menus nutricionales desde la app sin tocar SQL manual, conservando macros calculados desde recetas y sin reescribir historial personal.
+
+### Dependencias
+
+- Requiere REQ-01 y REQ-02 para recetas/macros confiables.
+- Requiere REQ-07 para rol admin y RLS de escritura sobre catalogo.
+- Debe respetar REQ-31: usuarios normales no ven lenguaje tecnico ni controles administrativos.
+
+### Alcance
+
+- En Perfil -> Alimentos -> Dietas, agregar controles admin para:
+  - crear y editar `diets` (`code`, `name`, `description`);
+  - agregar, cambiar y eliminar filas de `diet_dishes`;
+  - elegir dia de semana, slot y plato desde el catalogo existente;
+  - mostrar resumen de kcal/proteina promedio y avisos por dia/slot.
+- Validar antes de guardar:
+  - plato existente y activo en el catalogo;
+  - slot compatible con el plato o confirmacion explicita si se reutiliza fuera de su slot;
+  - ausencia de duplicados para la misma dieta, dia y slot;
+  - dieta con codigo y nombre no vacios.
+- Mantener el comportamiento historico:
+  - no modificar `day_log`, `plan_versions` ni registros ya ejecutados;
+  - las nuevas asignaciones solo afectan catalogo/fallback y futuras consultas de `dietLunchDish()`;
+  - conservar RLS: solo admins activos escriben, usuarios normales solo leen lo necesario para su plan.
+- Si se agrega una restriccion SQL, debe ser idempotente y documentarse como migracion pendiente manual.
+
+### Criterios de aceptacion
+
+- Un admin puede crear una dieta y asignar/cambiar/quitar un plato por dia/slot desde la UI.
+- Al recargar, `dbLoad()` muestra las asignaciones guardadas y los macros calculados coinciden con la receta del plato.
+- El sistema bloquea o advierte duplicados e incompatibilidades de slot antes de guardar.
+- Un usuario no administrador no ve controles de edicion ni puede mutar `diets`/`diet_dishes`.
+- Editar el catalogo no cambia dias completados ni snapshots de planes activos ya guardados.
+- La vista funciona sin overflow en 375x812.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Como admin: crear una dieta de prueba, asignar almuerzos de lunes a domingo, recargar y comprobar persistencia.
+- Cambiar una asignacion usada por `dietLunchDish()` y verificar que un dia futuro sin override toma el nuevo plato.
+- Intentar duplicar dieta/dia/slot y confirmar bloqueo o advertencia.
+- Probar usuario normal: sin acceso a la vista/admin y sin mutacion directa permitida por RLS.
+- Ejecutar `git diff --check` y el release gate local.
 
 ---
 
