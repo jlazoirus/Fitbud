@@ -7489,16 +7489,125 @@ function foodsIngredients(){
 }
 function foodsDiets(){
   const dayNames=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
-  let html="";
+  const admin=isAdmin();
+  let html=admin?`<button class="btn btn-accent" style="width:100%;margin-bottom:10px" onclick="editDiet(null)">＋ Nueva dieta</button>`:"";
+  if(!DB.diets.length)return html||'<div class="muted small">Sin dietas.</div>';
   DB.diets.forEach(dt=>{
-    const items=DB.dietDishes.filter(x=>x.diet_id===dt.id).sort((a,b)=>(((a.weekday+6)%7)-((b.weekday+6)%7)));
+    const items=DB.dietDishes.filter(x=>x.diet_id===dt.id).sort((a,b)=>{
+      const wa=a.weekday===null||a.weekday===undefined?7:(a.weekday+6)%7;
+      const wb=b.weekday===null||b.weekday===undefined?7:(b.weekday+6)%7;
+      return wa-wb||(a.slot||"").localeCompare(b.slot||"");
+    });
+    const seen=new Set(),dupes=new Set();
+    items.forEach(it=>{const k=(it.weekday===null||it.weekday===undefined?"-":it.weekday)+":"+it.slot;if(seen.has(k))dupes.add(k);seen.add(k);});
     let sum={kcal:0,p:0},n=0;
-    const rows=items.map(it=>{const dish=DB.dishes.find(x=>x.id===it.dish_id);if(!dish)return"";const m=dishMacros(dish.id);sum.kcal+=m.kcal;sum.p+=m.p;n++;
-      return `<div class="wk-day"><div class="wk-left"><div class="d">${dayNames[it.weekday]} <span class="muted small">${esc(it.slot||"")}</span></div><div class="m">${esc(dish.name)}</div></div><div class="center"><div style="font-weight:600">${m.kcal}</div><div class="muted small">P${m.p}</div></div></div>`;
+    const rows=items.map(it=>{
+      const dish=DB.dishes.find(x=>x.id===it.dish_id);
+      const m=dish?dishMacros(dish.id):{kcal:0,p:0};
+      if(dish){sum.kcal+=m.kcal;sum.p+=m.p;n++;}
+      const slotWarn=dish&&dish.slot&&it.slot&&dish.slot!==it.slot;
+      const wkKey=(it.weekday===null||it.weekday===undefined?"-":it.weekday)+":"+it.slot;
+      const isDupe=dupes.has(wkKey);
+      const dayLabel=it.weekday===null||it.weekday===undefined?"Cualquier día":dayNames[it.weekday];
+      return `<div class="wk-day"${admin?` style="cursor:pointer" onclick="editDietDish(${dt.id},${it.id})"`:''}>
+        <div class="wk-left">
+          <div class="d">${dayLabel} <span class="muted small">${esc(it.slot||"")}</span>${slotWarn?' <span class="pill" style="background:var(--terra-dim);color:var(--terra-200)">slot</span>':''}${isDupe?' <span class="pill" style="background:var(--bad);color:#fff">dup</span>':''}</div>
+          <div class="m">${dish?esc(dish.name):'<span class="muted">Plato eliminado</span>'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="center"><div style="font-weight:600">${m.kcal||""}</div><div class="muted small">${m.p?"P"+m.p:""}</div></div>
+          ${admin?`<button class="btn btn-sm" style="color:var(--terra-300);flex-shrink:0" onclick="event.stopPropagation();deleteDietDish(${it.id})">✕</button>`:''}
+        </div>
+      </div>`;
     }).join("");
-    html+=`<div class="section-h">${esc(dt.name)}</div><div class="muted small" style="margin:-4px 2px 8px">${esc(dt.description||"")}${n?` · almuerzo promedio ${Math.round(sum.kcal/n)} kcal / P ${Math.round(sum.p/n)} g`:""}</div>${rows}`;
+    const avgInfo=n?` · promedio ${Math.round(sum.kcal/n)} kcal / P ${Math.round(sum.p/n)} g`:"";
+    html+=
+      `<div class="row between" style="align-items:center;margin-top:12px">`+
+        `<div class="section-h" style="margin:0">${esc(dt.name)}</div>`+
+        (admin?`<button class="btn btn-sm" onclick="editDiet(${dt.id})">Editar</button>`:'')+
+      `</div>`+
+      `<div class="muted small" style="margin:2px 2px 8px">${esc(dt.description||"")}${avgInfo}</div>`+
+      rows+
+      (admin?`<button class="btn btn-sm" style="width:100%;margin:6px 0 12px" onclick="editDietDish(${dt.id},null)">＋ Agregar asignación</button>`:"");
   });
   return html||'<div class="muted small">Sin dietas.</div>';
+}
+/* ── editor de dieta ─────────────────────────────────────────── */
+function editDiet(id){
+  const dt=id?DB.diets.find(d=>d.id===id):{code:"",name:"",description:""};
+  window._diet={id};
+  modal(`<h3>${id?"Editar":"Nueva"} dieta</h3>`+
+    `<div class="field"><label>Código</label><input id="dtt_code" value="${esc(dt.code||"")}" placeholder="A, B, REFEED…" maxlength="20"></div>`+
+    `<div class="field"><label>Nombre</label><input id="dtt_name" value="${esc(dt.name||"")}" placeholder="Menú A — Criollo"></div>`+
+    `<div class="field"><label>Descripción</label><input id="dtt_desc" value="${esc(dt.description||"")}" placeholder="Semanas 1, 5, 10"></div>`+
+    `<button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="saveDiet()">Guardar</button>`+
+    (id?`<button class="btn" style="width:100%;margin-top:8px" onclick="deleteDiet(${id})">Eliminar dieta</button>`:""));
+}
+async function saveDiet(){
+  const code=$("#dtt_code").value.trim();
+  const name=$("#dtt_name").value.trim();
+  const description=$("#dtt_desc").value.trim()||null;
+  if(!code){toast("El código es obligatorio");return;}
+  if(!name){toast("El nombre es obligatorio");return;}
+  const id=window._diet.id;
+  const row={code,name,description};
+  const res=id?await supa.from("diets").update(row).eq("id",id):await supa.from("diets").insert(row);
+  if(res.error){toast("Error: "+res.error.message);return;}
+  closeModal();await dbLoad();render();toast("Dieta guardada");
+}
+async function deleteDiet(id){
+  if(!confirm("¿Eliminar dieta y todas sus asignaciones?"))return;
+  const res=await supa.from("diets").delete().eq("id",id);
+  if(res.error){toast("No se pudo: "+res.error.message);return;}
+  closeModal();await dbLoad();render();toast("Eliminada");
+}
+/* ── editor de asignación de plato en dieta ─────────────────── */
+function editDietDish(dietId,id){
+  if(!DB.dishes.length){toast("Agrega platos primero");return;}
+  const it=id?DB.dietDishes.find(x=>x.id===id):{diet_id:dietId,dish_id:DB.dishes[0].id,weekday:1,slot:"almuerzo"};
+  const dietName=(DB.diets.find(d=>d.id===dietId)||{}).name||"";
+  window._dietDish={id,dietId};
+  const dayOpts=[["Dom",0],["Lun",1],["Mar",2],["Mié",3],["Jue",4],["Vie",5],["Sáb",6]]
+    .map(([n,v])=>`<option value="${v}" ${v===it.weekday?"selected":""}>${n}</option>`).join("");
+  const noDay=`<option value="" ${it.weekday===null||it.weekday===undefined?"selected":""}>Cualquier día</option>`;
+  const slots=["desayuno","almuerzo","batido","cena","snack"];
+  const dishOpts=DB.dishes.map(d=>`<option value="${d.id}" ${d.id===it.dish_id?"selected":""}>${esc(d.name)} · ${esc(d.slot||"?")}</option>`).join("");
+  modal(`<h3>${id?"Editar":"Nueva"} asignación</h3>`+
+    `<div class="muted small" style="margin-bottom:12px">${esc(dietName)}</div>`+
+    `<div class="field"><label>Día</label><select id="dd_day">${dayOpts}${noDay}</select></div>`+
+    `<div class="field"><label>Slot</label><select id="dd_slot">${slots.map(s=>`<option ${s===(it.slot||"almuerzo")?"selected":""}>${s}</option>`).join("")}</select></div>`+
+    `<div class="field"><label>Plato</label><select id="dd_dish">${dishOpts}</select></div>`+
+    `<button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="saveDietDish()">Guardar</button>`+
+    (id?`<button class="btn" style="width:100%;margin-top:8px" onclick="deleteDietDish(${id})">Quitar asignación</button>`:""));
+}
+async function saveDietDish(){
+  const dietId=window._dietDish.dietId;
+  const id=window._dietDish.id;
+  const dayRaw=$("#dd_day").value;
+  const weekday=dayRaw===""?null:+dayRaw;
+  const slot=$("#dd_slot").value;
+  const dish_id=+$("#dd_dish").value;
+  if(!dish_id){toast("Selecciona un plato");return;}
+  const dup=DB.dietDishes.find(x=>x.diet_id===dietId&&x.weekday===weekday&&x.slot===slot&&(!id||x.id!==id));
+  if(dup){
+    const dupDish=DB.dishes.find(d=>d.id===dup.dish_id);
+    if(!confirm(`Ya existe "${dupDish?dupDish.name:"otro plato"}" en ese día/slot. ¿Reemplazar?`))return;
+    const del=await supa.from("diet_dishes").delete().eq("id",dup.id);
+    if(del.error){toast("Error al reemplazar: "+del.error.message);return;}
+  }
+  const dish=DB.dishes.find(d=>d.id===dish_id);
+  if(dish&&dish.slot&&dish.slot!==slot&&!confirm(`"${dish.name}" es un plato de ${dish.slot} pero se asignará al slot ${slot}. ¿Continuar?`))return;
+  const row={diet_id:dietId,dish_id,weekday,slot};
+  const res=id?await supa.from("diet_dishes").update(row).eq("id",id):await supa.from("diet_dishes").insert(row);
+  if(res.error){toast("Error: "+res.error.message);return;}
+  closeModal();await dbLoad();render();toast("Asignación guardada");
+}
+async function deleteDietDish(id){
+  if(!confirm("¿Quitar esta asignación de la dieta?"))return;
+  const res=await supa.from("diet_dishes").delete().eq("id",id);
+  if(res.error){toast("No se pudo: "+res.error.message);return;}
+  if(typeof closeModal==="function")closeModal();
+  await dbLoad();render();toast("Quitada");
 }
 
 /* ---- editor de ingrediente ---- */

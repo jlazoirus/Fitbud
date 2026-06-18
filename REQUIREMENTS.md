@@ -2050,7 +2050,7 @@ Enviar recordatorios push al dispositivo (estilo Duolingo) para que el usuario n
 
 ## REQ-39 - Editor administrativo de dietas y asignaciones
 
-**Estado: pendiente (auditoria 2026-06-18 del journey Administracion -> Alimentos -> Dietas).**
+**Estado: implementado (2026-06-18).**
 
 ### Evidencia
 
