@@ -29,6 +29,8 @@ FASE 1 · VALIDAR  →  FASE 2 · DECIDIR  →  FASE 3 · ADQUIRIR  →  FASE 4 
 
 4. **`03-Redes-Sociales.md`** — Voz de marca, plataformas (IG + TikTok), pilares de contenido y calendario. Lo único que puedes empezar *ya* en paralelo: construir audiencia "en público" mientras validas.
 
+5. **`04-Naming.md`** — Ejercicio de nombre: crítica a "Fitbros"/"Fitbud", criterios, candidatos, shortlist (Compa, Kúmplo, Garra, Faro) y cómo validar el nombre con tus amigos. Hallazgo clave: "Fitbros" excluye a ~la mitad del mercado por el sesgo de "bros".
+
 ---
 
 ## Qué hacer esta semana (Fase 1, semana 1)
