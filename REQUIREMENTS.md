@@ -2106,6 +2106,166 @@ Permitir que un administrador mantenga los menus nutricionales desde la app sin 
 
 ---
 
+## REQ-40 - Home Hoy: agenda determinista del dia (sin IA)
+
+**Estado: pendiente (Fase 1 del rediseno "Home agentico", definido 2026-06-18 tras review heuristico de PM).**
+
+### Contexto y decision de producto
+
+Se evaluo convertir la app en "IA agentic first" con la conversacion como entry point. El review heuristico concluyo que la columna vertebral real no es el chat (caro, alto esfuerzo, pagina en blanco) sino la **agenda determinista** "que sigue ahora", que hoy ya calcula `nextDailyAction()` sin gastar tokens. Esta fase entrega y mide ese nucleo de forma aislada, antes de tocar IA o navegacion. Es la pieza de mayor valor a costo cero.
+
+### Evidencia
+
+- `renderHoy()` (en `index.html`) muestra una sola "prio-card" con la accion prioritaria del dia y tres botones de atajo (`home-quick`). Solo expone un item a la vez aunque queden comida **y** entreno pendientes.
+- `nextDailyAction(ds)` ya deriva de forma determinista el estado del dia (comida pendiente, entreno pendiente, descanso, completado) reutilizando `buildDay()`, `effectiveWorkout()`, `dayTotals()`, `normalizedWorkoutExecution()` y `workoutOutcomeForState()`. No hace llamadas al proveedor.
+- No existen estados de diseno para: dia 0 sin plan generado, dia totalmente completado (cierre celebratorio) ni operacion sin conexion.
+
+### Objetivo
+
+Que al abrir "Hoy" el usuario vea, sin una sola llamada IA, **todo lo que le toca hoy** (proxima comida y entreno pendiente) con acciones directas, mas un cierre claro cuando termina y un arranque claro cuando aun no tiene plan. Metrica norte: adherencia (porcentaje de comidas registradas y entrenos completados por semana). Guardarrail: costo IA por usuario activo no debe subir con esta fase (debe ser cero).
+
+### Dependencias
+
+- No requiere migracion ni decisiones manuales: es 100% cliente y determinista. Puede ejecutarse antes que las fases de IA.
+- Reutiliza REQ-22 (`nextDailyAction`) y REQ-27 (`trackEvent`) ya presentes.
+
+### Alcance
+
+- Reemplazar la "prio-card" unica por un bloque "Lo que sigue hoy" que liste, en orden, los items pendientes del dia calculados por `nextDailyAction()` y `buildDay()`:
+  - proxima comida no registrada, con kcal/proteina del plato y boton "Registrar" que llama a `toggleMeal()` directo;
+  - entreno pendiente (solo si no se entreno y no es descanso), con boton "Iniciar" (ir a `entreno`) y "Adaptar" (`openWorkoutContingency()`);
+  - sello "Tu agenda" o equivalente; nunca lenguaje de IA (REQ-31).
+- Conservar el strip de macros (`heroDash`) siempre visible arriba.
+- Disenar los tres estados huerfanos:
+  - **Dia 0 / sin plan:** mensaje de bienvenida + CTA unico para generar/afinar el plan (a Perfil u onboarding), sin agenda vacia confusa.
+  - **Dia completado:** estado de cierre con racha, comidas/entreno del dia y atajo a Progreso (reusar caso `type:"complete"`).
+  - **Sin conexion / datos no cargados:** la agenda sigue mostrandose desde cache local; degradar sin pantallas en blanco ni errores tecnicos.
+- Conservar el rotulo de pestana "Hoy" (no renombrar): evitar costo de re-aprendizaje. **No** promover el chat ni cambiar la navegacion en esta fase.
+- Mantener 375x812 sin overflow y minimo 44px de area tactil en los botones.
+- Instrumentar un evento de adherencia determinista (allowlist REQ-27) al registrar comida o iniciar entreno desde el home, para poder medir la fase de forma aislada. Sin datos de salud en el evento.
+
+### Criterios de aceptacion
+
+- Con comida y entreno pendientes, el home muestra **ambos** items con sus acciones, no solo uno.
+- Registrar una comida o iniciar el entreno desde el home no dispara ninguna llamada a `/api/claude` (verificable en red).
+- Dia 0 muestra bienvenida y CTA de plan; dia completado muestra cierre; sin conexion muestra la agenda desde cache.
+- Ningun texto del home menciona IA, modelos, tokens ni cuotas.
+- La vista no presenta overflow en 375x812.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Simular dia con 2 comidas y entreno pendientes: confirmar dos items y acciones.
+- Registrar comida desde el home con el panel de red abierto: cero llamadas al proveedor.
+- Forzar `DB.error`/offline y confirmar que la agenda persiste desde cache.
+- Revisar estados dia-0 (perfil sin plan) y dia-completado.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-41 - Coach ejecutor con guardrales de confianza
+
+**Estado: pendiente (Fase 2 del rediseno "Home agentico", definido 2026-06-18; depende de REQ-40 entregado y medido).**
+
+### Contexto y decision de producto
+
+El coach actual solo sabe ejecutar una accion (`marcar_descanso`); todo lo demas es texto. El salto agentico es que el coach **haga** cosas (registrar comida, cambiar plato, adaptar entreno, registrar peso). El review marco esto como el riesgo numero uno: un coach que ejecuta puede romper el plan o violar restricciones del usuario (p. ej. proponer un plato con huevo a un vegetariano sin huevo) y destruir la confianza en un solo toque. Por eso la regla dura: el modelo solo **propone intencion**; un validador determinista decide si la accion es legal **antes** de ofrecer el boton "Aplicar".
+
+### Evidencia
+
+- `sendCoachMessage()` arma el prompt con un unico tipo de accion (`marcar_descanso`); `parseCoachReply()` acepta `accion.tipo`/`accion.descripcion` libres; `applyCoachAction()` solo implementa `marcar_descanso`.
+- `domain-contracts.js` ya expone validadores puros (`validateDayLogState`, `validateMacroTargets`, `validateCoachRequest`, etc.) reutilizables como compuerta.
+- `profiles.prefs` guarda alergias/gustos; los platos tienen `slot`; existe logica de compatibilidad de slot y override por dia (REQ-36).
+
+### Objetivo
+
+Permitir que el coach proponga y, tras confirmacion, ejecute un conjunto acotado de acciones, garantizando que **ninguna** accion que viole restricciones del usuario (alergias, slot, metas, plan activo, historial ya ejecutado) llegue siquiera a ofrecerse. La IA sigue siendo opt-in y con techo de costo por usuario.
+
+### Dependencias
+
+- Requiere REQ-40 entregado (el home determinista es la base sobre la que actua el coach).
+- Requiere REQ-25/26 (entitlement + cuota) ya activos en produccion: la ejecucion es una mutacion sensible y debe comprobar sesion, usuario activo y entitlement en servidor.
+- Requiere que las migraciones manuales de entitlement esten aplicadas.
+
+### Alcance
+
+- Definir una compuerta unica `canApplyCoachAction(action)` (cliente + validacion server-side en el endpoint que persista) que, para cada tipo de accion, valide de forma determinista contra: alergias/gustos de `profiles.prefs`, compatibilidad de slot, metas de macros, plan activo y dias ya completados. Aplicarla tambien a `marcar_descanso`.
+- Ampliar el vocabulario de acciones de forma controlada, cada una enrutada a la funcion determinista existente y nunca reescribiendo dias completados:
+  - `registrar_comida` -> `toggleMeal()`;
+  - `cambiar_plato` -> flujo de contingencia/override de REQ-36, solo con platos validos y del slot correcto;
+  - `adaptar_entreno` -> `openWorkoutContingency()` (20 min / en casa / sin equipo / sesion perdida);
+  - `registrar_peso` -> registro de peso existente.
+- Mantener el patron `propuesta -> confirmar -> aplicar`: el usuario siempre confirma; las acciones rechazadas por la compuerta no muestran boton "Aplicar" sino una explicacion neutral.
+- Schema de salida estricto, validacion, timeout, manejo de error y **techo de uso por usuario** reutilizando `coach_quota` (REQ-32). Sin texto de IA/tokens para usuarios normales (REQ-31).
+- Si se requiere persistir auditoria de acciones, usar SQL idempotente documentado como migracion manual; preferir reutilizar tablas existentes.
+
+### Criterios de aceptacion
+
+- Una accion que viola una restriccion (p. ej. plato con ingrediente alergeno o de slot incompatible) **no** ofrece boton "Aplicar"; muestra explicacion neutral.
+- Aplicar una accion valida produce exactamente el mismo resultado que hacerlo manualmente por la UI determinista, y nunca modifica un dia ya completado.
+- La ejecucion comprueba sesion, usuario activo y entitlement en servidor; un usuario sin entitlement no puede mutar via coach.
+- Se respeta el techo de costo por usuario; al superarlo, fallback determinista sin llamar al proveedor.
+- Ningun texto operativo menciona IA, modelos, tokens ni cuotas.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Proponer un cambio de plato con alergeno del usuario y confirmar que se bloquea antes de ofrecer "Aplicar".
+- Aplicar `registrar_comida` y comparar el estado resultante con `toggleMeal()` manual.
+- Intentar accion sobre un dia completado y confirmar que no lo reescribe.
+- Forzar limite de cuota y confirmar fallback determinista.
+- Revisar que la mutacion falla sin entitlement (usuario de prueba).
+
+---
+
+## REQ-42 - Home agentico: conversacion como entry point
+
+**Estado: pendiente (Fase 3 del rediseno "Home agentico", definido 2026-06-18; depende de REQ-40 y REQ-41 entregados y medidos).**
+
+### Contexto y decision de producto
+
+Solo despues de validar que la agenda determinista (REQ-40) mueve la adherencia y que el ejecutor (REQ-41) es seguro, se promueve la conversacion a superficie principal. El review advirtio no mezclar este cambio de navegacion con las fases anteriores para poder atribuir el impacto, y conservar la degradacion: sin IA o sin conexion, el home colapsa exactamente a la agenda determinista de REQ-40.
+
+### Evidencia
+
+- La pestana "Coach" es la 5.a de 6 (`renderTabs()`), con el mismo peso visual que el resto: la conversacion esta enterrada.
+- `buildCoachContextText()` ya alimenta al coach con macros, entreno, semana y check-ins: el contexto para un home conversacional ya existe.
+- `renderHoy()` (post REQ-40) y `renderCoach()` comparten datos pero viven en pantallas separadas.
+
+### Objetivo
+
+Hacer de la conversacion el eje de la pantalla de inicio, con la agenda determinista y los macros siempre encima, los chips aterrizados en el estado actual y el input de coach a mano, sin subir el costo base (cargar el home sigue costando cero tokens; la IA solo se activa al tocar un chip o escribir).
+
+### Dependencias
+
+- Requiere REQ-40 (agenda determinista) y REQ-41 (ejecutor con guardrails) entregados y con metrica de adherencia validada.
+
+### Alcance
+
+- Fusionar la pantalla de inicio y el coach en un `renderCoachHome()` que muestre, en orden: cabecera + racha, strip de macros (`heroDash`), bloque "Lo que sigue hoy" (REQ-40), separador "O preguntale a tu coach", chips contextuales derivados del estado e input persistente.
+- Reducir la navegacion de 6 a 5 pestanas integrando el coach en el inicio; conservar Nutricion, Entreno, Progreso, Perfil como superficies de detalle. Conservar un rotulo de inicio reconocible (no introducir lenguaje de IA).
+- Generar los chips de sugerencia desde el estado real (kcal restantes, comida pendiente, sesion perdida) de forma determinista; tocar un chip o escribir es el unico punto que gasta tokens.
+- Degradacion: sin IA disponible o sin conexion, ocultar input/chips y mostrar solo la agenda determinista de REQ-40, sin errores tecnicos.
+- Mantener 375x812 sin overflow, area tactil minima 44px y accesibilidad de foco del input.
+
+### Criterios de aceptacion
+
+- El inicio muestra macros + agenda determinista + acceso a conversacion en una sola pantalla, y cargarlo no dispara ninguna llamada a `/api/claude`.
+- La navegacion baja a 5 pestanas sin perder acceso a Nutricion/Entreno/Progreso/Perfil.
+- Los chips reflejan el estado actual del dia y solo gastan tokens al activarse.
+- Sin IA o sin conexion, el inicio degrada a la agenda determinista sin romperse.
+- Ningun texto operativo para usuarios normales menciona IA, modelos, tokens ni cuotas.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Cargar el inicio con el panel de red abierto: cero llamadas al proveedor hasta tocar un chip o enviar texto.
+- Confirmar 5 pestanas y que cada superficie de detalle sigue accesible.
+- Desactivar IA/forzar offline y confirmar degradacion a la agenda determinista.
+- Revisar overflow en 375x812 y foco del input.
+
+---
+
 ## Notas de implementacion para agentes
 
 - No guardar secrets en Git.
