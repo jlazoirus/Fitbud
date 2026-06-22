@@ -13,7 +13,8 @@ create table if not exists coach_quota_policies (
     'meal_estimate',
     'macro_review',
     'training_plan',
-    'training_replacement'
+    'training_replacement',
+    'coach_conversation'
   )),
   entitlement_code  text not null default 'default',
   daily_limit       int not null check (daily_limit >= 0),
@@ -32,7 +33,8 @@ values
   ('meal_estimate', 'default', 8),
   ('macro_review', 'default', 4),
   ('training_plan', 'default', 1),
-  ('training_replacement', 'default', 3)
+  ('training_replacement', 'default', 3),
+  ('coach_conversation', 'default', 20)
 on conflict (action, entitlement_code) do nothing;
 
 create table if not exists coach_quota_overrides (
@@ -44,7 +46,8 @@ create table if not exists coach_quota_overrides (
     'meal_estimate',
     'macro_review',
     'training_plan',
-    'training_replacement'
+    'training_replacement',
+    'coach_conversation'
   )),
   entitlement_code   text,
   daily_limit        int check (daily_limit is null or daily_limit >= 0),
