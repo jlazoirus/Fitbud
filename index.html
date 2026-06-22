@@ -6486,7 +6486,8 @@ async function signIn(email,pwd){
 }
 async function signUp(email,pwd){
   if(!supa)return{error:{message:"Conecta Supabase primero"}};
-  const r=await supa.auth.signUp({email,password:pwd});
+  const emailRedirectTo=location.origin+location.pathname;
+  const r=await supa.auth.signUp({email,password:pwd,options:{emailRedirectTo}});
   return r;
 }
 let _signOutBusy=false;
