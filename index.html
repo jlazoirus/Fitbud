@@ -411,6 +411,38 @@
   .prio-name{font-family:var(--font-display);font-size:20px;font-weight:800;letter-spacing:-.02em;margin:0 0 5px;line-height:1.2}
   .prio-detail{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.4}
   .prio-reason{font-size:11px;color:var(--muted);margin-top:10px}
+  .agenda-card{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;margin:14px 0}
+  .agenda-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+  .agenda-kicker{font-size:11px;color:var(--terra-300);text-transform:uppercase;font-weight:800;margin-bottom:4px}
+  .agenda-title{font-family:var(--font-display);font-size:21px;font-weight:800;margin:0;line-height:1.18}
+  .agenda-sub{font-size:12px;color:var(--muted);line-height:1.35;margin-top:4px}
+  .agenda-count{background:var(--surf2);border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:11px;font-weight:700;padding:5px 8px;white-space:nowrap}
+  .agenda-note{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-md);color:var(--muted);font-size:12px;line-height:1.35;padding:10px 12px;margin:8px 0 10px}
+  .agenda-list{display:flex;flex-direction:column}
+  .agenda-item{display:grid;grid-template-columns:38px 1fr;gap:12px;padding:13px 0;border-top:1px solid var(--border)}
+  .agenda-item:first-child{border-top:0;padding-top:4px}
+  .agenda-icon{width:38px;height:38px;border-radius:var(--r-md);display:grid;place-items:center;background:var(--surf2);border:1px solid var(--border);font-size:18px;line-height:1}
+  .agenda-item.meal .agenda-icon{background:rgba(200,100,60,.12);border-color:var(--terra-dim)}
+  .agenda-item.workout .agenda-icon,.agenda-item.resume .agenda-icon{background:var(--accent-dim);border-color:var(--border-acc)}
+  .agenda-item.done .agenda-icon{background:rgba(16,185,129,.10);border-color:rgba(16,185,129,.28)}
+  .agenda-label{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase;margin-bottom:2px}
+  .agenda-name{font-size:15px;font-weight:800;color:var(--txt);line-height:1.25}
+  .agenda-meta{font-size:12px;color:var(--muted);line-height:1.38;margin-top:3px}
+  .agenda-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .agenda-actions .btn{min-height:44px;flex:1 1 128px}
+  .agenda-state{background:linear-gradient(160deg,var(--accent-dim),var(--surf1));border-color:var(--border-acc)}
+  .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
+  .agenda-state.setup{background:linear-gradient(160deg,rgba(200,100,60,.13),var(--surf1));border-color:var(--terra-dim)}
+  .agenda-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .agenda-summary div{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
+  .agenda-summary b{display:block;font-family:var(--font-display);font-size:19px;line-height:1}
+  .agenda-summary span{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+  @media(max-width:380px){
+    .agenda-head{flex-direction:column}
+    .agenda-count{align-self:flex-start}
+    .agenda-actions .btn{flex-basis:100%}
+    .agenda-summary{grid-template-columns:1fr}
+  }
   .home-quick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
   .hq-btn{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 8px;text-align:center;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:5px}
   .hq-btn:active{transform:scale(.96)}
@@ -2818,6 +2850,203 @@ function nextDailyAction(ds){
     reason:""};
 }
 
+function homeDayHasPreparedMeals(ds,day){
+  return day.meals.some(m=>{
+    const ms=mealState(ds,m.id);
+    const v=mealValue(m,ms);
+    return !!((ms&&ms.ovr&&(ms.ovr.gen||ms.ovr.name||ms.ovr.dishName))||v.name||v.kcal||v.p||v.c||v.f);
+  });
+}
+function homeCacheNoticeHtml(){
+  if(typeof navigator!=="undefined"&&!navigator.onLine){
+    return `<div class="agenda-note">Sin red: mostramos la agenda guardada en este dispositivo.</div>`;
+  }
+  if(DB.error){
+    return `<div class="agenda-note">Mostrando tu agenda guardada mientras se actualizan los catálogos.</div>`;
+  }
+  if(supa&&!DB.loaded){
+    return `<div class="agenda-note">Actualizando catálogos; la agenda usa tus datos guardados.</div>`;
+  }
+  return "";
+}
+function homeTrackAction(ds,action,props){
+  const payload={source:"home",action,day_of_week:parseYmd(ds).getDay(),...(props||{})};
+  trackEvent("home_agenda_action",payload);
+}
+function homeRegisterMeal(ds,id){
+  const meal=buildDay(ds).meals.find(m=>m.id===id);
+  homeTrackAction(ds,"meal_register",{slot:meal?meal.id:id});
+  toggleMeal(ds,id);
+}
+function homeOpenWorkout(ds,action){
+  homeTrackAction(ds,action||"workout_start");
+  current=ds;
+  setView("entreno");
+}
+function homeAdaptWorkout(ds){
+  homeTrackAction(ds,"workout_adapt");
+  openWorkoutContingency(ds,"tiempo");
+}
+function homePrepareDay(ds){
+  homeTrackAction(ds,"prepare_day");
+  current=ds;
+  if(!hasCompleteOnboarding((profile&&profile.prefs)||{})){startOnboarding();return;}
+  if(aiAvailable()){aiGenerateDay();return;}
+  setView("perfil");
+  toast("Revisa tu perfil para preparar este día.");
+}
+function homeAgendaData(ds){
+  const st=dayState(ds);
+  const day=buildDay(ds);
+  const ew=effectiveWorkout(ds);
+  const execution=normalizedWorkoutExecution(ds);
+  const workoutOutcome=workoutOutcomeForState(st);
+  const restDay=ew.workout&&ew.workout.id==="descanso";
+  const safetyHold=trainingSafetyHold();
+  const hasPreparedMeals=homeDayHasPreparedMeals(ds,day);
+  const pendingMeals=hasPreparedMeals?day.meals.filter(m=>!mealState(ds,m.id).done):[];
+  const workoutPending=!restDay&&!safetyHold&&!st.workoutDone&&workoutOutcome==="pending";
+  const safetyPending=!restDay&&safetyHold&&workoutOutcome==="pending";
+  const {doneMeals,totMeals}=dayTotals(ds);
+  const items=[];
+
+  if(!hasPreparedMeals){
+    return {state:"setup",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
+  }
+
+  if(execution&&(workoutOutcome==="in_progress"||workoutOutcome==="paused")){
+    const prog=WORKOUT_PLAYER.progress(execution);
+    items.push({
+      kind:"resume",
+      icon:"▶",
+      label:"Sesión en curso",
+      title:ew.workout&&ew.workout.name?ew.workout.name:"Entrenamiento",
+      meta:`${prog.completed} de ${prog.total} bloques completados`,
+      actions:`<button class="btn btn-accent" onclick="homeOpenWorkout('${ds}','workout_resume')">Continuar</button>`
+    });
+  }
+
+  if(safetyPending){
+    items.push({
+      kind:"workout",
+      icon:"!",
+      label:"Entrenamiento en pausa",
+      title:"Revisión de seguridad pendiente",
+      meta:"Completa la evaluación antes de retomar.",
+      actions:`<button class="btn btn-accent" onclick="setView('perfil')">Completar evaluación</button>`
+    });
+  }
+
+  if(pendingMeals.length){
+    const meal=pendingMeals[0];
+    const ms=mealState(ds,meal.id);
+    const v=mealValue(meal,ms);
+    const remaining=pendingMeals.length-1;
+    const title=v.name||meal.slot;
+    const meta=[
+      meal.slot+(meal.time?" · ~"+meal.time:""),
+      v.kcal?`${Math.round(v.kcal)} kcal`:"",
+      v.p?`P ${Math.round(v.p)} g`:"",
+      remaining?`${remaining} comida${remaining>1?"s":""} más`:""
+    ].filter(Boolean).join(" · ");
+    items.push({
+      kind:"meal",
+      icon:"●",
+      label:"Próxima comida",
+      title,
+      meta,
+      actions:`<button class="btn btn-accent" onclick="homeRegisterMeal('${ds}','${meal.id}')">Registrar</button><button class="btn" onclick="setView('nutricion')">Ver detalle</button>`
+    });
+  }
+
+  if(workoutPending){
+    items.push({
+      kind:"workout",
+      icon:"◉",
+      label:"Entrenamiento pendiente",
+      title:ew.workout&&ew.workout.name?ew.workout.name:"Sesión de hoy",
+      meta:ew.workout&&ew.workout.detail?ew.workout.detail:"Sigue la sesión guiada de hoy.",
+      actions:`<button class="btn btn-accent" onclick="homeOpenWorkout('${ds}','workout_start')">Iniciar</button><button class="btn" onclick="homeAdaptWorkout('${ds}')">Adaptar</button>`
+    });
+  }else if(restDay&&pendingMeals.length){
+    items.push({
+      kind:"rest",
+      icon:"○",
+      label:"Entreno",
+      title:"Descanso planificado",
+      meta:ew.workout&&ew.workout.detail?ew.workout.detail:"El descanso también cuenta dentro del plan.",
+      actions:""
+    });
+  }
+
+  if(!items.length){
+    return {state:"done",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
+  }
+  return {state:"agenda",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
+}
+function homeAgendaItemHtml(item){
+  return `<div class="agenda-item ${esc(item.kind)}">
+    <div class="agenda-icon">${esc(item.icon)}</div>
+    <div>
+      <div class="agenda-label">${esc(item.label)}</div>
+      <div class="agenda-name">${esc(item.title)}</div>
+      ${item.meta?`<div class="agenda-meta">${esc(item.meta)}</div>`:""}
+      ${item.actions?`<div class="agenda-actions">${item.actions}</div>`:""}
+    </div>
+  </div>`;
+}
+function homeAgendaHtml(ds){
+  const data=homeAgendaData(ds);
+  const note=homeCacheNoticeHtml();
+  if(data.state==="setup"){
+    const cta=aiAvailable()?"Preparar mi día":"Revisar mi perfil";
+    return `<section class="agenda-card agenda-state setup">
+      <div class="agenda-head">
+        <div>
+          <div class="agenda-kicker">Tu agenda</div>
+          <h3 class="agenda-title">Aún falta preparar este día</h3>
+          <div class="agenda-sub">Completa o actualiza tu plan para llenar comidas y entrenamiento antes de registrar actividad.</div>
+        </div>
+      </div>
+      ${note}
+      <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">${cta}</button></div>
+    </section>`;
+  }
+  if(data.state==="done"){
+    const workoutLabel=data.ew.workout&&data.ew.workout.id==="descanso"
+      ?"descanso planificado"
+      :workoutStatusLabel(data.workoutOutcome).toLowerCase();
+    return `<section class="agenda-card agenda-state done">
+      <div class="agenda-head">
+        <div>
+          <div class="agenda-kicker">Día cerrado</div>
+          <h3 class="agenda-title">Todo lo importante de hoy está cubierto</h3>
+          <div class="agenda-sub">Puedes revisar progreso o dejar notas adicionales desde las vistas de detalle.</div>
+        </div>
+        <span class="agenda-count">Racha ${streak()}</span>
+      </div>
+      ${note}
+      <div class="agenda-summary">
+        <div><b>${data.doneMeals}/${data.totMeals}</b><span>comidas registradas</span></div>
+        <div><b>${esc(workoutLabel)}</b><span>entrenamiento</span></div>
+      </div>
+      <div class="agenda-actions"><button class="btn" onclick="setView('progreso')">Ver progreso</button></div>
+    </section>`;
+  }
+  return `<section class="agenda-card">
+    <div class="agenda-head">
+      <div>
+        <div class="agenda-kicker">Tu agenda</div>
+        <h3 class="agenda-title">Lo que sigue hoy</h3>
+        <div class="agenda-sub">Ordenado con tu plan, lo registrado y el estado del entrenamiento.</div>
+      </div>
+      <span class="agenda-count">${data.items.length} pendiente${data.items.length===1?"":"s"}</span>
+    </div>
+    ${note}
+    <div class="agenda-list">${data.items.map(homeAgendaItemHtml).join("")}</div>
+  </section>`;
+}
+
 /* ---------- HOME (Hoy): agenda diaria del coach ---------- */
 function renderHoy(){
   const today=todayStr();
@@ -2829,13 +3058,7 @@ function renderHoy(){
   checkAndSaveMilestones();
   const workoutOutcome=workoutOutcomeForState(st);
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
-  const action=nextDailyAction(ds);
   const checkinDue=weeklyCheckinDue();
-  const prioStyle=
-    action.type==="complete"?"background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border:1px solid rgba(16,185,129,.28)":
-    action.type==="rest"?"background:var(--surf2);border:1px solid var(--border)":
-    action.type==="meal"?"background:linear-gradient(160deg,rgba(200,100,60,.16),var(--surf1));border:1px solid var(--terra-dim)":
-    "background:linear-gradient(160deg,var(--accent-dim),var(--surf1));border:1px solid var(--border-acc)";
   $("#app").innerHTML=`
   <header class="shead">
     <div>
@@ -2848,17 +3071,11 @@ function renderHoy(){
     </div>
   </header>
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
-  ${trainingSafetyHold()&&action.type!=="safety"?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
+  ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
   ${needsProfileTuning((profile&&profile.prefs)||{})?`<div class="alert" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px" onclick="setView('perfil')"><span><b>Afina tu plan</b> · Agrega tus preferencias de cocina, horarios y equipo para mejores propuestas.</span><span style="opacity:.6;white-space:nowrap">→ Perfil</span></div>`:""}
   ${checkinDue?weeklyCheckinBanner():""}
-  <div class="prio-card" style="${prioStyle}">
-    <div class="prio-eyebrow">${action.eyebrow}</div>
-    <div class="prio-name">${action.title}</div>
-    ${action.detail?`<div class="prio-detail">${action.detail}</div>`:""}
-    ${action.cta}
-    ${action.reason?`<div class="prio-reason">${action.reason}</div>`:""}
-  </div>
   ${heroDash(ds)}
+  ${homeAgendaHtml(ds)}
   <div class="home-quick">
     <div class="hq-btn" onclick="setView('nutricion')">
       <div class="hq-icon">🍽️</div>

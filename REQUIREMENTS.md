@@ -2108,7 +2108,9 @@ Permitir que un administrador mantenga los menus nutricionales desde la app sin 
 
 ## REQ-40 - Home Hoy: agenda determinista del dia (sin IA)
 
-**Estado: pendiente (Fase 1 del rediseno "Home agentico", definido 2026-06-18 tras review heuristico de PM).**
+**Estado: implementado.**
+
+La implementación reemplaza la tarjeta prioritaria única de `renderHoy()` por un bloque "Lo que sigue hoy" debajo del strip de macros. La agenda se calcula en cliente desde `buildDay()`, `dayTotals()`, `effectiveWorkout()`, `normalizedWorkoutExecution()` y el estado local: muestra la próxima comida pendiente y el entrenamiento pendiente con acciones directas, conserva descanso planificado sin sugerir entrenar, y añade estados explícitos para día sin comidas preparadas, día cerrado y operación con datos guardados/offline. Los clicks de "Registrar", "Iniciar", "Adaptar" y "Preparar mi día" instrumentan `home_agenda_action` con propiedades seguras (`source`, `action`, `slot`, `day_of_week`) y no disparan llamadas al proveedor salvo el CTA explícito de preparar día. Service worker v38.
 
 ### Contexto y decision de producto
 

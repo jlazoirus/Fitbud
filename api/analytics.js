@@ -14,6 +14,7 @@ const ALLOWED_EVENT_TYPES = new Set([
   "diet_week_applied",
   "meal_done",
   "workout_done",
+  "home_agenda_action",
   "training_plan_applied",
   "contingency_meal",
   "contingency_workout",
