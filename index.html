@@ -486,6 +486,7 @@
   .chat-type.aplicado{background:rgba(34,197,94,.15);color:#4ade80}
   .chat-type.fallback{background:var(--surf3);color:var(--muted)}
   .coach-action-bar{margin-top:8px;display:flex;gap:8px}
+  .coach-action-note{margin-top:8px;padding:9px 10px;border-radius:var(--r-sm);background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.24);color:#fcd34d;font-size:12px;line-height:1.4}
   .coach-chips{display:flex;flex-wrap:wrap;gap:7px;padding:10px 14px 4px}
   .coach-chip{background:var(--surf1);border:1px solid var(--border-acc);border-radius:999px;padding:7px 13px;font-size:13px;color:var(--accent-text,#c4b5fd);cursor:pointer;transition:.15s;text-align:left}
   .coach-chip:active{transform:scale(.97)}
@@ -4016,6 +4017,27 @@ const COACH_SUGGESTIONS=[
   "Adapta el día de hoy por falta de tiempo",
   "¿Por qué cambió mi plan esta semana?",
 ];
+const COACH_ACTION_TYPES=new Set(["marcar_descanso","registrar_comida","cambiar_plato","adaptar_entreno","registrar_peso"]);
+const COACH_ACTION_ALIASES={
+  descanso:"marcar_descanso",marcar_descanso:"marcar_descanso",descanso_activo:"marcar_descanso",
+  registrar_comida:"registrar_comida",marcar_comida:"registrar_comida",comida_hecha:"registrar_comida",
+  cambiar_plato:"cambiar_plato",cambiar_comida:"cambiar_plato",reemplazar_comida:"cambiar_plato",
+  adaptar_entreno:"adaptar_entreno",adaptar_entrenamiento:"adaptar_entreno",contingencia_entreno:"adaptar_entreno",
+  registrar_peso:"registrar_peso",guardar_peso:"registrar_peso",peso:"registrar_peso",
+};
+const COACH_WORKOUT_REASON_ALIASES={
+  tiempo:"tiempo",solo_20_min:"tiempo",poco_tiempo:"tiempo",falta_de_tiempo:"tiempo",
+  casa:"casa",en_casa:"casa",
+  equipo:"equipo",sin_equipo:"equipo",sin_acceso_al_equipo:"equipo",
+  sesion_perdida:"sesion_perdida",perdi_la_sesion:"sesion_perdida",me_perdi_la_sesion:"sesion_perdida",
+};
+const COACH_ACTION_LABELS={
+  marcar_descanso:"Convertir en descanso",
+  registrar_comida:"Registrar comida",
+  cambiar_plato:"Cambiar plato",
+  adaptar_entreno:"Adaptar entrenamiento",
+  registrar_peso:"Registrar peso",
+};
 
 function coachChatKey(){
   return "fitbud_chat_v1_"+(session&&session.user&&session.user.id||"anon")+"_c"+cycleNumber();
@@ -4055,6 +4077,7 @@ function buildCoachContextText(){
     week:{num:weekNum,done:weekDone,planned:weekPlanned},
     recent_checkins:checkins,
     today_adaptations:contingencies,
+    executable_actions:coachActionContext(today),
     cycle:cycleNumber(),
     plan_source:snap?snap.source:null,
     plan_version:snap?snap.version_number:null,
@@ -4070,6 +4093,182 @@ function coachHistoryText(msgs){
   }).join("\n");
 }
 
+function coachKey(value){
+  return String(value||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
+}
+function coachSplitTerms(value){
+  return String(value||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean);
+}
+function coachFoodBlockTerms(includeSoft){
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const terms=coachHardRestrictions();
+  if(includeSoft!==false)terms.push(...coachSplitTerms(p.dislikedIngredients));
+  if(Array.isArray(p.diet)&&p.diet.includes("sin_lacteos"))terms.push("leche","lácteo","lacteo","queso","yogur","yogurt");
+  if(Array.isArray(p.diet)&&p.diet.includes("sin_gluten"))terms.push("gluten","trigo");
+  return [...new Set(terms.map(t=>String(t||"").trim()).filter(Boolean))];
+}
+function coachTextHasTerms(value,terms){
+  const hay=coachKey(value);
+  return (terms||[]).find(term=>term&&hay.includes(coachKey(term)))||"";
+}
+function coachDishText(dish){
+  if(!dish)return "";
+  const lines=DB.dishIng.filter(x=>x.dish_id===dish.id)
+    .map(l=>{const ing=ingById(+l.ingredient_id);return ing?ing.name:"";})
+    .filter(Boolean);
+  return [dish.name,dish.notes||"",...lines].join(" ");
+}
+function coachDishBlockedByProfile(dish){
+  const term=coachTextHasTerms(coachDishText(dish),coachFoodBlockTerms(true));
+  return term?{blocked:true,term}:{blocked:false,term:""};
+}
+function coachActionCurrentWeek(ds){
+  const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||(WEEKS&&WEEKS[0]);
+  return w&&w.num?Number(w.num):1;
+}
+function coachActionDayClosed(ds){
+  try{return homeAgendaData(ds).state==="done";}catch(_){return false;}
+}
+function coachActionContext(ds){
+  const day=buildDay(ds);
+  const st=dayState(ds);
+  const ew=effectiveWorkout(ds);
+  const mealOptions={};
+  if(DB.loaded){
+    day.meals.forEach(meal=>{
+      mealOptions[meal.id]=DB.dishes
+        .filter(d=>(d.slot||"")===meal.id&&!coachDishBlockedByProfile(d).blocked)
+        .slice(0,8)
+        .map(d=>{const m=dishMacros(d.id);return{name:d.name,kcal:m.kcal,p:m.p,c:m.c,f:m.f};});
+    });
+  }
+  return {
+    schema:"coach_actions_v1",
+    allowed_actions:[...COACH_ACTION_TYPES],
+    scope:"solo_hoy",
+    today:ds,
+    day_closed:coachActionDayClosed(ds),
+    meals:day.meals.map(meal=>{
+      const ms=mealState(ds,meal.id);const v=mealValue(meal,ms);
+      return {slot:meal.id,label:meal.slot,name:v.name||meal.name||"",done:!!ms.done,kcal:v.kcal||0,options:mealOptions[meal.id]||[]};
+    }),
+    workout:{planned:ew&&ew.workout?ew.workout.name:null,done:!!st.workoutDone,has_execution:!!st.workoutExecution,can_adapt:!trainingSafetyHold()&&!st.workoutDone&&!st.workoutExecution},
+    weight_week:coachActionCurrentWeek(ds),
+  };
+}
+function normalizeCoachAction(raw){
+  if(!raw||typeof raw!=="object"||Array.isArray(raw))return null;
+  const rawTipo=coachKey(raw.tipo||raw.type||raw.action||"");
+  const tipo=COACH_ACTION_ALIASES[rawTipo]||rawTipo;
+  if(!COACH_ACTION_TYPES.has(tipo))return null;
+  const action={tipo,descripcion:coachCopy(raw.descripcion||raw.description||COACH_ACTION_LABELS[tipo]||"Aplicar")};
+  const ds=String(raw.ds||raw.fecha||raw.date||"").trim();
+  if(ds)action.ds=ds;
+  if(tipo==="registrar_comida"||tipo==="cambiar_plato"){
+    const slot=raw.slot||raw.meal_id||raw.comida||raw.meal||raw.id;
+    if(slot!=null)action.slot=String(slot).trim();
+  }
+  if(tipo==="cambiar_plato"){
+    const dishName=raw.dishName||raw.dish_name||raw.plato||raw.nombre_plato||raw.dish||raw.nombre;
+    if(dishName!=null)action.dishName=coachCopy(String(dishName).trim());
+  }
+  if(tipo==="adaptar_entreno"){
+    const reasonKey=coachKey(raw.reason||raw.motivo||raw.option||raw.opcion||"");
+    action.reason=COACH_WORKOUT_REASON_ALIASES[reasonKey]||reasonKey;
+  }
+  if(tipo==="registrar_peso"){
+    const kg=raw.kg!=null?raw.kg:(raw.peso!=null?raw.peso:raw.weight_kg);
+    const bf=raw.bf_pct!=null?raw.bf_pct:(raw.grasa_pct!=null?raw.grasa_pct:raw.body_fat_pct);
+    action.kg=Number(kg);
+    if(bf!=null&&bf!=="")action.bf_pct=Number(bf);
+  }
+  if(DOMAIN_CONTRACTS.validateCoachAction){
+    const v=DOMAIN_CONTRACTS.validateCoachAction(action);
+    if(!v.ok)return null;
+  }
+  return action;
+}
+function coachFindMeal(ds,action){
+  const key=coachKey(action&&action.slot);
+  if(!key)return null;
+  return buildDay(ds).meals.find(m=>[m.id,m.slot,m.name].some(v=>coachKey(v)===key))||null;
+}
+function coachFindDish(action){
+  const raw=String(action&&action.dishName||"").trim();
+  if(!raw||!DB.loaded)return null;
+  const key=coachKey(raw);
+  return DB.dishes.find(d=>String(d.id)===raw||coachKey(d.name)===key)||null;
+}
+function coachApplicationEntitlement(){
+  if(profile&&profile.is_admin)return {ok:true};
+  if(effectiveSettings&&effectiveSettings().apiKey)return {ok:true};
+  if(!entitlementChecked)return {ok:false,reason:"Espera a que se valide tu plan antes de aplicar esta acción."};
+  return entitlement?{ok:true}:{ok:false,reason:"Activa tu plan para aplicar acciones del coach."};
+}
+function canApplyCoachAction(raw){
+  const action=normalizeCoachAction(raw);
+  if(!action)return {ok:false,reason:"La propuesta no tiene una acción segura para aplicar."};
+  if(!session&&!effectiveSettings().apiKey)return {ok:false,action,reason:"Vuelve a iniciar sesión para aplicar esta acción."};
+  if(!isActive())return {ok:false,action,reason:"Tu cuenta no está activa."};
+  if(!hasRequiredConsents()||!hasCurrentScreening())return {ok:false,action,reason:"Revisa privacidad y seguridad antes de aplicar acciones."};
+  const ent=coachApplicationEntitlement();
+  if(!ent.ok)return {ok:false,action,reason:ent.reason};
+
+  const today=todayStr();
+  const ds=action.ds||today;
+  const mutatesDay=action.tipo!=="registrar_peso";
+  if(mutatesDay&&ds!==today)return {ok:false,action,reason:"El coach solo puede aplicar cambios sobre el día de hoy."};
+  if(mutatesDay&&!inRange(ds))return {ok:false,action,reason:"El día está fuera del ciclo activo."};
+  if(mutatesDay&&!hasCompleteOnboarding((profile&&profile.prefs)||{}))return {ok:false,action,reason:"Completa tu perfil antes de aplicar cambios."};
+  if(mutatesDay&&coachActionDayClosed(ds))return {ok:false,action,reason:"El día ya está cerrado; no lo modifico desde el coach."};
+
+  if(action.tipo==="marcar_descanso"){
+    const st=dayState(ds);const ew=effectiveWorkout(ds);
+    if(ew.workout&&ew.workout.id==="descanso")return {ok:false,action,reason:"Hoy ya es un descanso planificado."};
+    if(st.workoutDone||workoutHasRecordedActivity(st))return {ok:false,action,reason:"La sesión ya tiene registro; no la reescribo."};
+    return {ok:true,action,ds};
+  }
+  if(action.tipo==="registrar_comida"){
+    const meal=coachFindMeal(ds,action);
+    if(!meal)return {ok:false,action,reason:"No encontré esa comida en el día de hoy."};
+    const ms=mealState(ds,meal.id);const v=mealValue(meal,ms);
+    if(ms.done)return {ok:false,action,reason:"Esa comida ya está registrada."};
+    if(!homeDayHasPreparedMeals(ds,buildDay(ds))||!(v.name||v.kcal))return {ok:false,action,reason:"Primero prepara una comida válida para ese espacio."};
+    return {ok:true,action,ds,meal};
+  }
+  if(action.tipo==="cambiar_plato"){
+    const meal=coachFindMeal(ds,action);
+    if(!meal)return {ok:false,action,reason:"No encontré ese espacio de comida en el día de hoy."};
+    if(mealState(ds,meal.id).done)return {ok:false,action,reason:"La comida ya está registrada; no cambio su historial."};
+    if(!DB.loaded)return {ok:false,action,reason:"Actualiza el catálogo antes de cambiar platos desde el coach."};
+    const dish=coachFindDish(action);
+    if(!dish)return {ok:false,action,reason:"El plato propuesto no existe en el catálogo."};
+    if((dish.slot||"")!==meal.id)return {ok:false,action,reason:"El plato propuesto no corresponde a ese espacio de comida."};
+    const blocked=coachDishBlockedByProfile(dish);
+    if(blocked.blocked)return {ok:false,action,reason:"El plato propuesto choca con una restricción o preferencia del perfil."};
+    const macros=dishMacros(dish.id);
+    if(!macros||!(macros.kcal>0))return {ok:false,action,reason:"El plato no tiene macros calculables desde receta."};
+    if(macros.kcal>buildDay(ds).target.kcal)return {ok:false,action,reason:"El plato excede la meta diaria completa."};
+    return {ok:true,action,ds,meal,dish,macros};
+  }
+  if(action.tipo==="adaptar_entreno"){
+    const st=dayState(ds);const ew=effectiveWorkout(ds);
+    if(trainingSafetyHold())return {ok:false,action,reason:"El entrenamiento está pausado por seguridad."};
+    if(ew.workout&&ew.workout.id==="descanso")return {ok:false,action,reason:"Hoy ya es descanso planificado."};
+    if(st.workoutDone||normalizedWorkoutExecution(ds))return {ok:false,action,reason:"La sesión ya tiene registro; no la reescribo."};
+    return {ok:true,action,ds};
+  }
+  if(action.tipo==="registrar_peso"){
+    return {ok:true,action,ds:today,week:coachActionCurrentWeek(today)};
+  }
+  return {ok:false,action,reason:"Esta acción no está disponible."};
+}
+function coachActionButtonText(decision){
+  const a=decision.action||{};
+  if(a.tipo==="cambiar_plato"&&decision.dish)return "Aplicar: "+COACH_ACTION_LABELS[a.tipo];
+  return "Aplicar: "+(COACH_ACTION_LABELS[a.tipo]||a.descripcion||"acción");
+}
+
 // Parsea la respuesta JSON del coach; si falla devuelve texto libre como educativo.
 function parseCoachReply(raw){
   const cleaned=raw.trim().replace(/^```json?\s*/i,"").replace(/```\s*$/,"").trim();
@@ -4079,8 +4278,8 @@ function parseCoachReply(raw){
       const j=JSON.parse(cleaned.slice(a,b+1));
       if(j&&j.respuesta){
         const type=["educativo","propuesta"].includes(j.type)?j.type:"educativo";
-        const accion=(type==="propuesta"&&j.accion&&j.accion.tipo&&j.accion.descripcion)?j.accion:null;
-        return{type,text:String(j.respuesta),accion};
+        const accion=type==="propuesta"?normalizeCoachAction(j.accion):null;
+        return{type:accion?"propuesta":"educativo",text:String(j.respuesta),accion};
       }
     }catch(e){}
   }
@@ -4116,11 +4315,12 @@ async function sendCoachMessage(userText){
     const history=msgs.filter(m=>m.role!=="summary").slice(-20).filter(m=>m.id!==userMsg.id);
     const historyText=history.length?"\n\n[Historial reciente]\n"+coachHistoryText(history):"";
     const contextText=buildCoachContextText();
+    const actionContext=coachActionContext(todayStr());
     const quota=coachQuota("coach_conversation",rid,"msg-"+userMsg.id,
       "Tu coach no puede responder ahora. Revisa la sección de Nutrición o Entrenamiento.",
-      {type:"string"},null);
+      {schema:"coach_conversation_v2",allowedActionTypes:actionContext.allowed_actions,hardRestrictions:coachFoodBlockTerms(true)},null);
 
-    const prompt=`[Contexto actual del usuario]\n${contextText}${historyText}\n\n[Nueva pregunta]\n${userText.trim()}\n\nResponde EXCLUSIVAMENTE con JSON válido:\n{"type":"educativo","respuesta":"texto de respuesta"}\nO si propones marcar el entrenamiento de hoy como descanso activo, puedes usar:\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"marcar_descanso","descripcion":"descripción del cambio"}}\nNo uses markdown fuera del JSON. Usa lenguaje de coach, no menciones IA ni tecnología.`;
+    const prompt=`[Contexto actual del usuario]\n${contextText}${historyText}\n\n[Nueva pregunta]\n${userText.trim()}\n\nResponde EXCLUSIVAMENTE con JSON válido:\n{"type":"educativo","respuesta":"texto de respuesta"}\n\nSi conviene proponer una acción, usa solo una de estas formas y solo para el día ${actionContext.today}:\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"marcar_descanso","descripcion":"Convertir hoy en descanso"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"registrar_comida","slot":"desayuno","descripcion":"Registrar desayuno"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"cambiar_plato","slot":"almuerzo","dishName":"Nombre exacto del plato del catálogo","descripcion":"Cambiar almuerzo"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"adaptar_entreno","reason":"tiempo","descripcion":"Adaptar entrenamiento"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"registrar_peso","kg":82.4,"bf_pct":19,"descripcion":"Registrar peso"}}\nPara adaptar entreno, reason debe ser: tiempo, casa, equipo o sesion_perdida. Para cambiar plato usa un dishName exacto listado en executable_actions.meals[].options y del mismo slot. Si la acción violaría restricciones, cambiaría un día cerrado, requiere un dato que no tienes o no aparece en el contexto, responde educativo sin accion. No uses markdown fuera del JSON. Usa lenguaje de coach, no menciones tecnología.`;
 
     const raw=await callClaude(prompt,600,quota);
     const reply=parseCoachReply(coachCopy(raw));
@@ -4147,21 +4347,58 @@ async function sendCoachMessage(userText){
 }
 
 // Aplica la acción propuesta por el coach tras confirmación del usuario.
-function applyCoachAction(msgId,tipo,descripcion){
+function applyCoachAction(msgId){
   const msgs=loadCoachChat();
   const msg=msgs.find(m=>m.id===msgId);
   if(!msg||msg._applied)return;
-  if(tipo==="marcar_descanso"){
-    const ds=todayStr();
+  const decision=canApplyCoachAction(msg.accion);
+  if(!decision.ok){
+    msg._blocked=decision.reason;
+    saveCoachChat(msgs);
+    renderCoach();
+    toast(decision.reason);
+    return;
+  }
+  const a=decision.action;
+  const ds=decision.ds||todayStr();
+  if(a.tipo==="marcar_descanso"){
     const st=dayState(ds);
-    st.workoutDone=true;
+    const prev=st.workoutOverride||plannedWorkoutId(ds);
+    st.workoutOverride="descanso";
+    addContingencyEntry(ds,{type:"coach_workout_rest",reason:"coach_action",prev});
     commitDay(ds);
+    toast("Día marcado como descanso planificado");
+  }else if(a.tipo==="registrar_comida"){
+    const ms=mealState(ds,decision.meal.id);
+    ms.done=true;
+    commitDay(ds);
+    toast("Comida registrada");
+  }else if(a.tipo==="cambiar_plato"){
+    const ms=mealState(ds,decision.meal.id);
+    const prev=ms.ovr?ms.ovr.name:null;
+    ms.ovr={name:decision.dish.name,dishName:decision.dish.name};
+    addContingencyEntry(ds,{type:"coach_meal_change",id:decision.meal.id,reason:"coach_action",chosen:decision.dish.name,prev});
+    commitDay(ds);
+    toast("Comida actualizada");
+  }else if(a.tipo==="adaptar_entreno"){
     msg._applied=true;
     msg.type="aplicado";
     saveCoachChat(msgs);
     renderCoach();
-    toast("Entrenamiento marcado como descanso activo");
+    if(a.reason==="sesion_perdida")openMissedSession(ds);
+    else openWorkoutContingency(ds,a.reason);
+    toast("Elige la adaptación");
+    return;
+  }else if(a.tipo==="registrar_peso"){
+    const patch={kg:a.kg};
+    if(a.bf_pct!=null)patch.bf=a.bf_pct;
+    setWeightEntry(decision.week,patch);
+    toast("Peso registrado");
   }
+  msg._applied=true;
+  msg.type="aplicado";
+  saveCoachChat(msgs);
+  renderCoach();
 }
 
 function scrollCoachToBottom(){
@@ -4185,11 +4422,15 @@ function renderCoachMessage(m){
   const typeCls=m.type||"educativo";
   let actionBar="";
   if(m.accion&&m.type==="propuesta"&&!m._applied){
-    const safeTipo=esc(m.accion.tipo); const safeDesc=esc(m.accion.descripcion); const safeMsgId=esc(m.id);
-    actionBar=`<div class="coach-action-bar">
-      <button class="btn btn-accent btn-sm" onclick="applyCoachAction('${safeMsgId}','${safeTipo}','${safeDesc}')">Aplicar: ${safeDesc}</button>
-      <button class="btn btn-sm" onclick="dismissCoachAction('${safeMsgId}')">Ignorar</button>
-    </div>`;
+    const safeMsgId=esc(m.id);
+    const decision=canApplyCoachAction(m.accion);
+    actionBar=decision.ok
+      ?`<div class="coach-action-bar">
+        <button class="btn btn-accent btn-sm" onclick="applyCoachAction('${safeMsgId}')">${esc(coachActionButtonText(decision))}</button>
+        <button class="btn btn-sm" onclick="dismissCoachAction('${safeMsgId}')">Ignorar</button>
+      </div>`
+      :`<div class="coach-action-note">${esc(m._blocked||decision.reason)}</div>
+        <div class="coach-action-bar"><button class="btn btn-sm" onclick="dismissCoachAction('${safeMsgId}')">Entendido</button></div>`;
   }
   return `<div class="coach-msg coach">
     <div class="chat-bubble">${esc(m.text)}</div>

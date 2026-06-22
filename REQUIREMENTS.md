@@ -2167,7 +2167,9 @@ Que al abrir "Hoy" el usuario vea, sin una sola llamada IA, **todo lo que le toc
 
 ## REQ-41 - Coach ejecutor con guardrales de confianza
 
-**Estado: pendiente (Fase 2 del rediseno "Home agentico", definido 2026-06-18; depende de REQ-40 entregado y medido).**
+**Estado: implementado.**
+
+La implementacion mantiene el chat como propuesta confirmada y agrega una compuerta unica `canApplyCoachAction(action)` antes de mostrar o ejecutar botones del coach. El vocabulario queda acotado a `marcar_descanso`, `registrar_comida`, `cambiar_plato`, `adaptar_entreno` y `registrar_peso`; `parseCoachReply()` normaliza el schema, `/api/claude` rechaza respuestas conversacionales con acciones fuera de vocabulario, y `domain-contracts.js` valida la forma de cada accion en pruebas Node. Una accion bloqueada muestra una explicacion neutral y no ofrece "Aplicar". Las acciones validas reutilizan las rutas deterministas existentes: comidas se registran sin toggle inverso, cambios de plato exigen catalogo real, slot compatible, receta con macros y restricciones/gustos del perfil; entreno abre o aplica las contingencias existentes sin reescribir sesiones registradas; descanso usa `workoutOverride="descanso"` con log; peso escribe en `weight_log` del ciclo actual. La reserva, sesion, usuario activo, privacidad, entitlement y cuota siguen verificandose en `/api/claude` antes de devolver propuestas. Sin SQL nuevo. Service worker v39.
 
 ### Contexto y decision de producto
 

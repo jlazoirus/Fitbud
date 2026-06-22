@@ -11,8 +11,11 @@
   const VALID_ENTITLEMENT_STATUSES=new Set(["active","expired","courtesy","revoked"]);
   const VALID_SYNC_ENTITIES=new Set(["day_log","weight_log"]);
   const VALID_SYNC_STATUSES=new Set(["pending","failed"]);
+  const VALID_COACH_ACTION_TYPES=new Set(["marcar_descanso","registrar_comida","cambiar_plato","adaptar_entreno","registrar_peso"]);
+  const VALID_COACH_WORKOUT_REASONS=new Set(["tiempo","casa","equipo","sesion_perdida"]);
   const TIME_RE=/^(?:[01]\d|2[0-3]):[0-5]\d$/;
   const ISO_RE=/^\d{4}-\d{2}-\d{2}T/;
+  const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
   const VALID_WEEKDAYS=new Set([0,1,2,3,4,5,6]);
 
   function ok(errors){return{ok:errors.length===0,errors};}
@@ -111,6 +114,35 @@
     return ok(errors);
   }
 
+  // Acción ejecutable propuesta por el coach conversacional.
+  // La UI vuelve a validarla contra el estado real antes de mostrar/aplicar.
+  function validateCoachAction(action){
+    const errors=[];
+    if(!action||typeof action!=="object"||Array.isArray(action))return ok(["La acción del coach debe ser un objeto."]);
+    const tipo=String(action.tipo||"").trim();
+    if(!VALID_COACH_ACTION_TYPES.has(tipo))errors.push("tipo de acción no permitido.");
+    if(action.descripcion!==undefined&&typeof action.descripcion!=="string")errors.push("descripcion debe ser string.");
+    if(action.ds!==undefined&&!DATE_RE.test(String(action.ds)))errors.push("ds debe ser YYYY-MM-DD.");
+    if(tipo==="registrar_comida"||tipo==="cambiar_plato"){
+      if(typeof action.slot!=="string"||!action.slot.trim())errors.push("slot requerido para acciones de comida.");
+    }
+    if(tipo==="cambiar_plato"){
+      if(typeof action.dishName!=="string"||!action.dishName.trim())errors.push("dishName requerido para cambiar plato.");
+    }
+    if(tipo==="adaptar_entreno"){
+      if(!VALID_COACH_WORKOUT_REASONS.has(String(action.reason||"")))errors.push("reason de entrenamiento no permitido.");
+    }
+    if(tipo==="registrar_peso"){
+      const kg=Number(action.kg);
+      if(!Number.isFinite(kg)||kg<30||kg>300)errors.push("kg fuera de rango (30-300).");
+      if(action.bf_pct!==undefined&&action.bf_pct!==null&&action.bf_pct!==""){
+        const bf=Number(action.bf_pct);
+        if(!Number.isFinite(bf)||bf<3||bf>70)errors.push("bf_pct fuera de rango (3-70).");
+      }
+    }
+    return ok(errors);
+  }
+
   root.FITBUD_DOMAIN_CONTRACTS={
     validateProfilePrefs,
     validateMacroTargets,
@@ -118,5 +150,6 @@
     validateEntitlement,
     validateSyncEntry,
     validateCoachRequest,
+    validateCoachAction,
   };
 })(typeof window!=="undefined"?window:globalThis);

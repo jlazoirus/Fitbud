@@ -21,8 +21,17 @@ const ALLOWED_ACTIONS = new Set([
   "training_replacement",
   "coach_conversation",
 ]);
+const ALLOWED_COACH_ACTION_TYPES = new Set([
+  "marcar_descanso",
+  "registrar_comida",
+  "cambiar_plato",
+  "adaptar_entreno",
+  "registrar_peso",
+]);
+const ALLOWED_COACH_WORKOUT_REASONS = new Set(["tiempo", "casa", "equipo", "sesion_perdida"]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_KEY_RE = /^[a-zA-Z0-9._:-]{1,160}$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const SERVER_GUARDRAILS = [
   "Actua solo como coach de bienestar y educacion general.",
   "No diagnostiques enfermedades, no prescribas tratamientos y no sustituyas a un profesional de salud.",
@@ -338,6 +347,31 @@ function validateTraining(data, validation) {
   return !containsRestriction(text, validation);
 }
 
+function validateCoachConversationAction(action, validation) {
+  if (!action) return true;
+  if (typeof action !== "object" || Array.isArray(action)) return false;
+  const tipo = String(action.tipo || "").trim();
+  const allowed = Array.isArray(validation.allowedActionTypes) && validation.allowedActionTypes.length
+    ? new Set(validation.allowedActionTypes.map(String))
+    : ALLOWED_COACH_ACTION_TYPES;
+  if (!ALLOWED_COACH_ACTION_TYPES.has(tipo) || !allowed.has(tipo)) return false;
+  if (action.descripcion !== undefined && typeof action.descripcion !== "string") return false;
+  if (action.ds !== undefined && !DATE_RE.test(String(action.ds))) return false;
+  if ((tipo === "registrar_comida" || tipo === "cambiar_plato")
+    && (typeof action.slot !== "string" || !action.slot.trim())) return false;
+  if (tipo === "cambiar_plato" && (typeof action.dishName !== "string" || !action.dishName.trim())) return false;
+  if (tipo === "adaptar_entreno" && !ALLOWED_COACH_WORKOUT_REASONS.has(String(action.reason || ""))) return false;
+  if (tipo === "registrar_peso") {
+    const kg = Number(action.kg);
+    if (!Number.isFinite(kg) || kg < 30 || kg > 300) return false;
+    if (action.bf_pct !== undefined && action.bf_pct !== null && action.bf_pct !== "") {
+      const bf = Number(action.bf_pct);
+      if (!Number.isFinite(bf) || bf < 3 || bf > 70) return false;
+    }
+  }
+  return !containsRestriction(JSON.stringify(action), validation);
+}
+
 function validateCoachOutput(action, text, validation) {
   if (action === "coach_conversation") {
     // La respuesta puede venir como JSON estructurado {type,respuesta,accion?}
@@ -346,11 +380,12 @@ function validateCoachOutput(action, text, validation) {
     if (!trimmed) return false;
     try {
       const data = parseJsonText(text);
-      if (data && typeof data.respuesta === "string" && data.respuesta.trim()) return true;
+      if (!data || typeof data.respuesta !== "string" || !data.respuesta.trim()) return false;
+      return validateCoachConversationAction(data.accion, validation || {});
     } catch (_) {
       // No es JSON: se acepta como texto plano de coach.
+      return true;
     }
-    return true;
   }
   let data;
   try {

@@ -3,7 +3,7 @@ import "../domain-contracts.js";
 
 const contracts=globalThis.FITBUD_DOMAIN_CONTRACTS;
 assert.ok(contracts,"El módulo de contratos debe estar disponible");
-const{validateProfilePrefs,validateMacroTargets,validateDayLogState,validateEntitlement,validateSyncEntry,validateCoachRequest}=contracts;
+const{validateProfilePrefs,validateMacroTargets,validateDayLogState,validateEntitlement,validateSyncEntry,validateCoachRequest,validateCoachAction}=contracts;
 
 // ── validateMacroTargets ──────────────────────────────────────────────────────
 let r=validateMacroTargets({kcal:2000,p:180,c:170,f:62});
@@ -141,4 +141,29 @@ assert.ok(!r.ok,"maxTokens>16000 debe fallar");
 r=validateCoachRequest({action:"suggest",requestId:"r1",maxTokens:500,context:"texto"});
 assert.ok(!r.ok,"context no-objeto debe fallar");
 
-console.log("Contratos de dominio validados: macros, perfil, día, entitlement, cola offline y coach.");
+// ── validateCoachAction ──────────────────────────────────────────────────────
+r=validateCoachAction({tipo:"registrar_comida",slot:"almuerzo",descripcion:"Registrar almuerzo"});
+assert.ok(r.ok,"Acción registrar_comida válida debe pasar: "+r.errors.join(", "));
+
+r=validateCoachAction({tipo:"cambiar_plato",slot:"cena",dishName:"Bowl de tofu"});
+assert.ok(r.ok,"Acción cambiar_plato válida debe pasar: "+r.errors.join(", "));
+
+r=validateCoachAction({tipo:"adaptar_entreno",reason:"tiempo"});
+assert.ok(r.ok,"Acción adaptar_entreno válida debe pasar: "+r.errors.join(", "));
+
+r=validateCoachAction({tipo:"registrar_peso",kg:82.4,bf_pct:19});
+assert.ok(r.ok,"Acción registrar_peso válida debe pasar: "+r.errors.join(", "));
+
+r=validateCoachAction({tipo:"borrar_plan"});
+assert.ok(!r.ok,"Acción fuera de vocabulario debe fallar");
+
+r=validateCoachAction({tipo:"cambiar_plato",slot:"almuerzo"});
+assert.ok(!r.ok,"cambiar_plato sin dishName debe fallar");
+
+r=validateCoachAction({tipo:"adaptar_entreno",reason:"dolor"});
+assert.ok(!r.ok,"reason de entrenamiento no permitido debe fallar");
+
+r=validateCoachAction({tipo:"registrar_peso",kg:8});
+assert.ok(!r.ok,"peso fuera de rango debe fallar");
+
+console.log("Contratos de dominio validados: macros, perfil, día, entitlement, cola offline, coach y acciones del coach.");
