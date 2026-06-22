@@ -410,6 +410,35 @@ async function failPart(e, usageId, partKey, code, metrics) {
   }
 }
 
+function isMissingCoachConversationQuota(error) {
+  const message = String(error && error.message || "");
+  const code = String(error && error.code || "");
+  return /unknown_quota_action|coach_conversation|coach_quota_(?:policies|overrides).*check|check constraint/i.test(message + " " + code);
+}
+
+async function reserveCoachAction(e, auth, quota) {
+  try {
+    return firstRow(await rpc(e, "reserve_coach_action", {
+      p_user_id: auth.user.id,
+      p_action: quota.action,
+      p_request_id: quota.requestId,
+    }));
+  } catch (error) {
+    if (quota.action !== "coach_conversation" || !isMissingCoachConversationQuota(error)) {
+      throw error;
+    }
+    // Compatibilidad con bases donde coach_quota.sql se aplico antes de
+    // existir la accion de conversacion. La validacion sigue usando
+    // coach_conversation; solo la reserva cae temporalmente en una cuota
+    // existente hasta ejecutar supabase/coach_conversation_patch.sql.
+    return firstRow(await rpc(e, "reserve_coach_action", {
+      p_user_id: auth.user.id,
+      p_action: "macro_review",
+      p_request_id: quota.requestId,
+    }));
+  }
+}
+
 async function providerResponse(e, body, privacy) {
   if (!e.providerKey) {
     const error = new Error("El servicio del coach no esta configurado.");
@@ -503,11 +532,7 @@ export default async function handler(req, res) {
 
   let reservation;
   try {
-    reservation = firstRow(await rpc(e, "reserve_coach_action", {
-      p_user_id: auth.user.id,
-      p_action: quota.action,
-      p_request_id: quota.requestId,
-    }));
+    reservation = await reserveCoachAction(e, auth, quota);
   } catch (error) {
     const setup = error.status === 404 || /reserve_coach_action|schema cache|function/i.test(error.message);
     res.status(setup ? 503 : 500).json({
