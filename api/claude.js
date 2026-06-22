@@ -339,6 +339,19 @@ function validateTraining(data, validation) {
 }
 
 function validateCoachOutput(action, text, validation) {
+  if (action === "coach_conversation") {
+    // La respuesta puede venir como JSON estructurado {type,respuesta,accion?}
+    // o como texto plano (p. ej. el fallback al agotar la cuota). Ambos validos.
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return false;
+    try {
+      const data = parseJsonText(text);
+      if (data && typeof data.respuesta === "string" && data.respuesta.trim()) return true;
+    } catch (_) {
+      // No es JSON: se acepta como texto plano de coach.
+    }
+    return true;
+  }
   let data;
   try {
     data = parseJsonText(text);
