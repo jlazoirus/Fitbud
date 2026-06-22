@@ -6,7 +6,6 @@
 -- ============================================================
 
 -- 1. Actualizar CHECK constraint en coach_quota_policies
--- (busca la restricción actual por su definición y la reemplaza)
 do $$ declare v text; begin
   select conname into v from pg_constraint
   where conrelid = 'coach_quota_policies'::regclass
@@ -15,15 +14,20 @@ do $$ declare v text; begin
   if v is not null then
     execute 'alter table coach_quota_policies drop constraint ' || quote_ident(v);
   end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'coach_quota_policies'::regclass
+      and conname = 'coach_quota_policies_action_check'
+  ) then
+    alter table coach_quota_policies
+      add constraint coach_quota_policies_action_check
+      check (action in (
+        'diet_day','diet_week','meal_option','meal_estimate',
+        'macro_review','training_plan','training_replacement',
+        'coach_conversation'
+      ));
+  end if;
 end $$;
-
-alter table coach_quota_policies
-  add constraint if not exists coach_quota_policies_action_check
-  check (action in (
-    'diet_day','diet_week','meal_option','meal_estimate',
-    'macro_review','training_plan','training_replacement',
-    'coach_conversation'
-  ));
 
 -- 2. Actualizar CHECK constraint en coach_quota_overrides
 do $$ declare v text; begin
@@ -34,15 +38,20 @@ do $$ declare v text; begin
   if v is not null then
     execute 'alter table coach_quota_overrides drop constraint ' || quote_ident(v);
   end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'coach_quota_overrides'::regclass
+      and conname = 'coach_quota_overrides_action_check'
+  ) then
+    alter table coach_quota_overrides
+      add constraint coach_quota_overrides_action_check
+      check (action in (
+        'diet_day','diet_week','meal_option','meal_estimate',
+        'macro_review','training_plan','training_replacement',
+        'coach_conversation'
+      ));
+  end if;
 end $$;
-
-alter table coach_quota_overrides
-  add constraint if not exists coach_quota_overrides_action_check
-  check (action in (
-    'diet_day','diet_week','meal_option','meal_estimate',
-    'macro_review','training_plan','training_replacement',
-    'coach_conversation'
-  ));
 
 -- 3. Insertar política de cuota para coach_conversation
 insert into coach_quota_policies (action, entitlement_code, daily_limit)
