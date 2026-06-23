@@ -119,7 +119,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
 | Consumo de generacion | Cuota diaria server-side, reserva idempotente y pool privado implementados | Integrar entitlement de REQ-25 y costo por accion de REQ-27 |
 | PWA y sincronizacion | Instalable, cache y safe areas de iPhone | Falta cola offline, conflictos, recuperacion ante fallos y pruebas end-to-end de journeys |
-| Feedback de carga | Botones con `disabled + textContent` en operaciones cortas | Operaciones largas (generación de plan, coach, día nutricional) carecen de indicador visible durante la espera — pantalla congelada sin feedback (REQ-47). |
+| Feedback de carga | Botones con `disabled + textContent` en operaciones cortas + spinner/loading-row CSS puro en generación de plan, coach y día nutricional (REQ-47) | — |
 
 ## Journey objetivo
 
@@ -2533,7 +2533,7 @@ Ocultar "Repetición aceptable" y la ventana de inicio/fin del flujo estándar (
 
 ## REQ-47 - Indicadores de carga (spinners) en generacion de plan, coach y nutricion diaria
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Evidencia
 

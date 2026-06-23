@@ -510,6 +510,12 @@
   .coach-empty{text-align:center;padding:24px 16px 10px;color:var(--muted)}
   .coach-empty .ce-icon{font-size:36px;margin-bottom:8px}
 
+  /* Spinner / loading-row (REQ-47) */
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spinner{width:18px;height:18px;border:2px solid var(--border-2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+  .loading-row{display:flex;align-items:center;gap:10px;padding:14px 0;color:var(--muted);font-size:14px}
+  @media(prefers-reduced-motion:reduce){.spinner{animation:none;opacity:.6}}
+
   /* ── Landing pública (REQ-33) ─────────────────────────────────────────── */
   .landing{max-width:560px;margin:0 auto;padding:0 16px calc(40px + var(--safe-bottom)) 16px;overflow-x:hidden}
   .landing-nav{display:flex;justify-content:space-between;align-items:center;padding:max(18px,calc(12px + var(--safe-top))) 0 20px}
@@ -3173,7 +3179,7 @@ function renderHoy(){
   const canUse=hasAI&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
   const msgs=loadCoachChat();
   const msgsHtml=msgs.map(renderCoachMessage).join("");
-  const typingHtml=`<div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="coach-typing"><span></span><span></span><span></span></div></div></div>`;
+  const typingHtml=`<div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="loading-row" style="padding:6px 2px"><div class="spinner"></div><span>Tu coach está pensando…</span></div></div></div>`;
   const chips=canUse?buildContextualChips(ds):[];
   const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${JSON.stringify(s)})">${esc(s)}</button>`).join("")}</div>`:"";
   const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted2)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
@@ -6265,13 +6271,13 @@ async function openTrainingPlanGenerator(){
   const expectedWeeks=trainingExpectedWeeks(prefs);
   const missing=expectedWeeks.flatMap(week=>week.sessions.filter(session=>!session.allowedExerciseIds.length));
   if(missing.length){endCoachAction(actionKey);toast("Faltan ejercicios compatibles con tus lugares o recursos");return;}
-  modal(`<h3>Preparar mi plan de entrenamiento</h3><div id="trainingPlanOut"><div class="ai-box">Estamos preparando ${expectedWeeks.length} semanas según tus días, recursos y experiencia…</div></div>`);
+  modal(`<h3>Preparar mi plan de entrenamiento</h3><div id="trainingPlanOut"><div class="loading-row"><div class="spinner"></div><span>Preparando tu plan…</span></div></div>`);
   const weeks=[];const warnings=[];let fallbackOnly=!aiAvailable();
   try{
     for(let index=0;index<expectedWeeks.length;index++){
       const expected=expectedWeeks[index];
       const out=$("#trainingPlanOut");
-      if(out)out.innerHTML=`<div class="ai-box">Preparando semana ${index+1} de ${expectedWeeks.length}<br><span class="muted small">${trainingPhaseLabel(expected.phase)} · ${expected.sessions.length} sesiones</span></div>`;
+      if(out)out.innerHTML=`<div class="loading-row"><div class="spinner"></div><span>Preparando semana ${index+1} de ${expectedWeeks.length}…</span></div>`;
       let result;
       try{
         result=await generateTrainingWeek(expected,prefs,{
@@ -6489,7 +6495,7 @@ async function aiGenerateDay(){
   const actionKey="diet_day";
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const ds=current; const day=buildDay(ds);
-  modal(`<h3>🍽️ Preparar mi día</h3><div id="genOut"><div class="ai-box">Estamos preparando tu día a la medida de tus metas…</div></div>`);
+  modal(`<h3>🍽️ Preparar mi día</h3><div id="genOut"><div class="loading-row"><div class="spinner"></div><span>Preparando tus comidas de hoy…</span></div></div>`);
   try{
     const {res,target}=await generateOneDay(ds,{action:"diet_day",requestId,partKey:"day"});
     window._genDay={ds,comidas:res.comidas};
