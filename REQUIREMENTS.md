@@ -2715,3 +2715,117 @@ No aplica verificación técnica automatizada. La verificación es documental:
 - Confirmar que `PRIVACY.md` tiene una anotación de revisión con nombre y fecha del profesional que aprobó el contenido.
 - Confirmar que los contratos DPA con los cuatro proveedores están archivados y referenciados.
 - Confirmar que el flujo de registro muestra explícitamente la restricción de edad mínima antes de crear la cuenta.
+
+---
+
+## REQ-50 - Cupones de acceso gratuito (28 días) sin Stripe
+
+**Estado: pendiente.**
+
+### Evidencia
+
+- `supabase/entitlements.sql`: tabla `user_entitlements` con `origin check (origin in ('checkout','admin_courtesy','admin_grant'))`. Hay que agregar `'coupon'` a esa restricción mediante una migración SQL (`supabase/coupon_codes.sql`).
+- `api/entitlement.js:GET` (línea ~51): consulta `status in (active,courtesy) and expires_at > now()` — un entitlement con `status='active'` y `origin='coupon'` sería detectado sin cambios en el endpoint.
+- `index.html:5202-5204` (`subscriptionStatusHtml()`): ya distingue `origin === 'checkout'` → "Suscripción activa", `origin.includes('courtesy')` → "Acceso de cortesía", y cualquier otro → "Plan activo". Un entitlement `origin='coupon'` caería en el tercer caso; el alcance especifica mostrar "Acceso gratuito" para este origen, lo que requiere un cambio mínimo de una línea en esa función.
+- `api/entitlement.js:POST` (línea ~79): ya existe un endpoint admin que otorga/revoca acceso de cortesía. La generación de cupones es distinta (códigos predistribuidos que el usuario canjea solo) y requiere un endpoint nuevo separado.
+- `api/webhook.js`: crea entitlements con `origin: 'checkout'` y `payment_ref` del `payment_intent` de Stripe. El flujo de cupones no toca este archivo.
+- `api/checkout.js`: redirige a Stripe. No se modifica.
+
+### Objetivo
+
+Permitir que Jona (admin del producto) genere manualmente códigos de cupón alfanuméricos y los distribuya a quien quiera (influencers, casos de soporte, partners). El usuario canjea el código dentro de la app — sin tarjeta ni Stripe — y se le activa un entitlement gratuito de 28 días a partir del momento del canje. Al vencer, el paywall contextual de REQ-25 aparece exactamente igual que con cualquier plan vencido.
+
+### Dependencias
+
+- **REQ-25** (entitlements y paywall): el entitlement de cupón se detecta con la misma consulta `status=active AND expires_at > now()` que REQ-25 ya ejecuta. El paywall al vencer funciona sin cambios.
+- **REQ-26** (billing/checkout): completamente aditivo. No se modifica `api/checkout.js`, `api/webhook.js` ni `billing_events`. Los cupones no generan eventos de Stripe ni filas en `billing_events`.
+- **REQ-31** (sin lenguaje técnico en UI): los textos del usuario no mencionan tokens, códigos internos ni términos técnicos.
+- No requiere cambios en `api/entitlement.js:GET` ni en `showPaywall()`.
+
+### Alcance
+
+#### 1 — Migración SQL (`supabase/coupon_codes.sql`)
+
+Crear tabla `redemption_codes` con las columnas:
+
+| columna | tipo | descripción |
+|---|---|---|
+| `code` | `text primary key` | Código alfanumérico en mayúsculas (ej. `FIT-X7K2-9A`). Unique por definición (PK). |
+| `plan_id` | `text references subscription_plans(id)` | Plan que se otorga al canjear (default `'monthly'`). |
+| `duration_days` | `int not null default 28` | Días de acceso a partir del canje. |
+| `created_by` | `uuid references auth.users` | Admin que generó el código. |
+| `created_at` | `timestamptz not null default now()` | |
+| `valid_until` | `timestamptz` | Opcional: fecha hasta la que Jona acepta canjear este código. Nulo = sin expiración del código. |
+| `redeemed_by` | `uuid references auth.users` | Nulo hasta que se canjea. |
+| `redeemed_at` | `timestamptz` | Nulo hasta que se canjea. |
+| `entitlement_id` | `uuid references user_entitlements` | Nulo hasta que se canjea; enlaza con el entitlement creado. |
+
+**Decisión: códigos de un solo uso.** Un código solo puede ser canjeado una vez (`redeemed_by IS NOT NULL` bloquea un segundo canje). Razón: evita el abuso de distribución masiva (p. ej., alguien publica el código en redes) y mantiene la lógica de canje atómica y simple — un solo `UPDATE ... WHERE redeemed_by IS NULL` como check de disponibilidad antes del INSERT del entitlement.
+
+También en `coupon_codes.sql`: `ALTER TABLE user_entitlements DROP CONSTRAINT user_entitlements_origin_check; ALTER TABLE user_entitlements ADD CONSTRAINT user_entitlements_origin_check CHECK (origin IN ('checkout','admin_courtesy','admin_grant','coupon'));`
+
+RLS: `redemption_codes` habilitada pero sin política SELECT para usuarios (solo `service_role` puede leer). No se expone al cliente ningún listado de códigos.
+
+#### 2 — Endpoint `/api/coupon.js`
+
+Maneja dos acciones en un único archivo serverless para mantener la convención del proyecto (`api/checkout.js`, `api/entitlement.js`, etc.):
+
+**`POST /api/coupon` — action `'generate'` (solo admin)**
+
+- Verifica sesión y `is_admin === true` con el mismo patrón de `verifyUser()` de `api/entitlement.js`.
+- Genera un código aleatorio de 8 caracteres alfanuméricos (A-Z 0-9, excluyendo 0/O/I/1 para evitar confusiones visuales), formateado como `XXX-XXXX` (ej. `FIT-X7K2` o similar). Formato exacto: decisión de implementación, documentar en el código.
+- Acepta parámetros opcionales: `planId` (default `'monthly'`), `durationDays` (default `28`), `validUntil` (ISO string, nulo si no se pasa).
+- Inserta la fila en `redemption_codes` usando `service_role`.
+- Devuelve `{ code, plan_id, duration_days, valid_until, created_at }`.
+- Sin panel de admin adicional: Jona llama al endpoint directamente (ej. con `curl` o un script) o se puede invocar desde la consola del navegador con su token de admin.
+
+**`POST /api/coupon` — action `'redeem'` (cualquier usuario autenticado)**
+
+- Verifica sesión del usuario.
+- Valida el `code` (existe, `redeemed_by IS NULL`, y si tiene `valid_until` este no pasó).
+- Verifica que el usuario no tenga ya un entitlement activo (evita acumulación).
+- En una operación atómica:
+  1. Calcula `expires_at = now() + duration_days * 86400 s`.
+  2. Crea fila en `user_entitlements`: `status='active'`, `origin='coupon'`, `payment_ref=null`, `notes='Cupón {code}'`, `granted_by=null`.
+  3. Actualiza `redemption_codes`: `redeemed_by=user.id`, `redeemed_at=now()`, `entitlement_id=<id_recién_creado>`.
+- Respuestas de error claras al usuario: `"Código no válido."` (no existe), `"Este código ya fue utilizado."` (ya canjeado), `"El código ha expirado."` (pasó `valid_until`), `"Ya tienes un plan activo."`.
+- Devuelve `{ entitlement: { plan_id, expires_at, origin } }` en éxito.
+
+#### 3 — UI en Perfil (`index.html`)
+
+- En `subscriptionStatusHtml()` (línea 5203): añadir rama para `origin === 'coupon'` → muestra etiqueta "Acceso gratuito" (en lugar de "Plan activo"). Cambio de una línea.
+- En la sección de suscripción de Perfil (línea 4703), dentro del bloque de estado `!entitlement && entitlementChecked` (es decir, sin plan activo), agregar debajo de los botones existentes un bloque colapsable "¿Tienes un código de acceso?" con:
+  - Un campo `<input type="text" placeholder="Ej. FIT-X7K2">` y botón "Canjear".
+  - Al pulsar, llama a `POST /api/coupon` con `{ action: 'redeem', code }` usando el token del usuario.
+  - En éxito: muestra confirmación "¡Código canjeado! Acceso gratuito activo por 28 días." y llama a `loadEntitlement().then(() => render())` para actualizar el estado sin recargar.
+  - En error: muestra el mensaje devuelto por el endpoint (ya son mensajes de usuario, no técnicos).
+- El bloque de canje solo se renderiza cuando `!entitlement && entitlementChecked` (sin plan activo). Usuarios con plan activo no ven el campo.
+- Sin overflow en 375×812.
+
+#### 4 — Flujo al vencer
+
+Ningún cambio requerido. Cuando `expires_at` pasa, `api/entitlement.js:GET` deja de devolver el entitlement como activo, `entitlementExpired` se puebla, y el paywall de REQ-25 aparece con el botón "Ver planes disponibles" — idéntico al flujo de un plan pagado vencido.
+
+### Criterios de aceptacion
+
+- Jona puede llamar a `POST /api/coupon` con `{ action: 'generate' }` usando su token de admin y recibe un código. El mismo endpoint devuelve 403 si el token no es de admin.
+- Un usuario sin plan activo puede ingresar el código en Perfil y recibe confirmación de activación. La sección de suscripción actualiza inmediatamente mostrando "Acceso gratuito" y la fecha de expiración (+28 días desde el canje).
+- El mismo código no puede canjearse dos veces: el segundo intento devuelve "Este código ya fue utilizado."
+- Un código con `valid_until` pasado devuelve "El código ha expirado."
+- Un usuario con entitlement activo ve 400 "Ya tienes un plan activo." e intenta no crear un segundo entitlement.
+- Al cumplirse los 28 días, `api/entitlement.js:GET` devuelve `entitlement: null` y el paywall de REQ-25 aparece exactamente igual que para un plan pagado vencido.
+- El flujo de pago real con Stripe (REQ-26) no sufre regresión: `api/checkout.js` y `api/webhook.js` funcionan sin cambios.
+- `subscriptionStatusHtml()` muestra "Acceso gratuito" (no "Plan activo") para entitlements con `origin === 'coupon'`.
+- `redemption_codes` no es accesible directamente desde el cliente (sin política RLS SELECT para `authenticated`).
+- Ningún texto de UI menciona tokens, códigos internos, `service_role` ni lenguaje técnico (REQ-31).
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Con token de admin: `curl -X POST /api/coupon -H "Authorization: Bearer $TOKEN" -d '{"action":"generate"}'` y verificar respuesta con código.
+- Con token de usuario regular: canjear el código en Perfil → confirmar que aparece "Acceso gratuito" con la fecha correcta y que `user_entitlements` tiene la fila con `origin='coupon'`.
+- Intentar canjear el mismo código con otro usuario → confirmar error "Este código ya fue utilizado."
+- Verificar en `redemption_codes` que la fila tiene `redeemed_by` y `entitlement_id` correctos.
+- Cambiar manualmente `expires_at` del entitlement a una fecha pasada en Supabase → recargar la app → confirmar que aparece el paywall.
+- Sin sesión: `POST /api/coupon` con `action='redeem'` devuelve 401.
+- `git diff --check` y release gate local.
