@@ -109,7 +109,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Nutricion | Recetas, macros, checks, reemplazos, generacion IA diaria/semanal con borrador+lista de compras y regeneracion por comida | Falta contingencia nutricional y reemplazos equivalentes (REQ-19) |
 | Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20) |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
-| Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico de peso con valores hardcodeados del primer usuario para todos los demás (REQ-43) |
+| Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico de peso personalizado por usuario implementado (REQ-43) |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
 | Recordatorios | No existe | Falta el canal por correo (REQ-24) y el canal push de recordatorios de racha con permiso del dispositivo (REQ-38); ambos exigen programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
@@ -2273,7 +2273,9 @@ Hacer de la conversacion el eje de la pantalla de inicio, con la agenda determin
 
 ## REQ-43 - Gráfico de peso personalizado por usuario
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+La implementación reemplaza los valores fijos `74/82` y la etiqueta `meta ~74.5` de `weightChart()` por un eje Y calculado desde los pesos reales del usuario con padding dinámico. La línea de referencia ahora muestra `Inicio` con el peso inicial del ciclo: prioriza el peso registrado en semana 1, luego `cycleStartWeight` y finalmente `weightKg` del perfil. Si no hay registros de peso, el gráfico mantiene el estado vacío sin línea de referencia. La superposición de porcentaje de grasa conserva su eje independiente. Service worker v41.
 
 ### Evidencia
 

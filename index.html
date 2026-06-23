@@ -6619,14 +6619,32 @@ function setBodyFat(n,v){setWeightEntry(n,{bf:v});}
 function composition(n){const kg=wkg(n),bf=wbf(n);if(kg==null||bf==null)return null;const fat=kg*bf/100;return{kg,bf,fat,lean:kg-fat};}
 // Última semana (mayor índice) con datos de peso.
 function lastWeighedWeek(){const ks=Object.keys(WEIGHT_RANGES).map(Number).filter(n=>wkg(n)!=null);return ks.length?Math.max(...ks):null;}
+function positiveWeight(value){const n=Number(value);return Number.isFinite(n)&&n>0?n:null;}
+function startWeightReference(){
+  const loggedWeekOne=positiveWeight(wkg(1));
+  if(loggedWeekOne!=null)return loggedWeekOne;
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  return positiveWeight(prefs.cycleStartWeight)||positiveWeight(prefs.weightKg);
+}
+function weightAxisDomain(points,reference){
+  const values=points.map(p=>p.y).filter(v=>Number.isFinite(v));
+  if(reference!=null)values.push(reference);
+  const min=Math.min(...values),max=Math.max(...values);
+  const spread=Math.max(0,max-min);
+  const padKg=Math.max(2,spread*.05);
+  return {minY:min-padKg,maxY:max+padKg};
+}
 function weightChart(){
   const pts=Object.keys(WEIGHT_RANGES).map(n=>({x:+n,y:wkg(n)})).filter(p=>p.y!=null);
   if(pts.length<1)return `<div class="chart muted small center">Ingresa tu peso semanal para ver el gráfico de evolución.</div>`;
   const W=520,H=160,pad=28;const span=Math.max(1,PLAN_DURATION_WEEKS-1);const xs=p=>pad+(p.x-1)/span*(W-pad*2);
-  const allY=pts.map(p=>p.y).concat([74,82]);const minY=Math.min(...allY)-0.5,maxY=Math.max(...allY)+0.5;
+  const startRef=startWeightReference();
+  const {minY,maxY}=weightAxisDomain(pts,startRef);
   const ys=y=>H-pad-(y-minY)/(maxY-minY)*(H-pad*2);
   const line=pts.map((p,i)=>(i?"L":"M")+xs(p).toFixed(1)+" "+ys(p.y).toFixed(1)).join(" ");
   const dots=pts.map(p=>`<circle cx="${xs(p).toFixed(1)}" cy="${ys(p.y).toFixed(1)}" r="3.5" fill="var(--accent)"/>`).join("");
+  const startLayer=startRef!=null?`<line x1="${pad}" y1="${ys(startRef)}" x2="${W-pad}" y2="${ys(startRef)}" stroke="var(--line)" stroke-dasharray="3 3"/>
+    <text x="${W-pad}" y="${Math.max(12,ys(startRef)-4)}" fill="var(--muted)" font-size="10" text-anchor="end">Inicio ${startRef.toFixed(1)} kg</text>`:"";
   // Overlay de % grasa corporal (eje propio, en terracota) si hay datos.
   const bfpts=Object.keys(WEIGHT_RANGES).map(n=>({x:+n,y:wbf(n)})).filter(p=>p.y!=null);
   let bfLayer="";
@@ -6639,9 +6657,7 @@ function weightChart(){
       <text x="${pad}" y="12" fill="var(--terra-300)" font-size="10">% grasa</text>`;
   }
   return `<div class="chart"><svg viewBox="0 0 ${W} ${H}" width="100%">
-    <line x1="${pad}" y1="${ys(82)}" x2="${W-pad}" y2="${ys(82)}" stroke="var(--line)" stroke-dasharray="3 3"/>
-    <line x1="${pad}" y1="${ys(74.5)}" x2="${W-pad}" y2="${ys(74.5)}" stroke="var(--good)" stroke-dasharray="3 3"/>
-    <text x="${W-pad}" y="${ys(74.5)-4}" fill="var(--good)" font-size="10" text-anchor="end">meta ~74.5</text>
+    ${startLayer}
     <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>${dots}
     ${bfLayer}
   </svg></div>`;
