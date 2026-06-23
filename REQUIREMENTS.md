@@ -109,7 +109,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Nutricion | Recetas, macros, checks, reemplazos, generacion IA diaria/semanal con borrador+lista de compras y regeneracion por comida | Falta contingencia nutricional y reemplazos equivalentes (REQ-19) |
 | Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20) |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
-| Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico de peso personalizado por usuario implementado (REQ-43) |
+| Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico personalizado implementado (REQ-43). Falta adherencia nutricional del ciclo en curso en las estadísticas de Progreso y contexto de pesos en las tarjetas de ciclos completados (REQ-44). |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
 | Recordatorios | No existe | Falta el canal por correo (REQ-24) y el canal push de recordatorios de racha con permiso del dispositivo (REQ-38); ambos exigen programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
@@ -194,6 +194,10 @@ Hallazgos de una evaluacion heuristica de los flujos reales (REQ-34..37) mas una
 36. REQ-36 - Unificar acciones de comida (cambiar/adaptar).
 37. REQ-37 - Accesibilidad de modales y confirmacion de acciones destructivas.
 38. REQ-38 - Notificaciones push y recordatorios de racha (retencion; comparte infraestructura con REQ-24 y depende de REQ-23). Bloqueado en una decision de proveedor/transport y secretos antes de implementar el envio.
+
+### Fase H - Cierre del ciclo de feedback de Progreso (auditoria jun 2026)
+
+44. REQ-44 - Adherencia nutricional y contexto de peso en Progreso.
 
 ### Fase G - Operacion del catalogo nutricional (auditoria jun 2026)
 
@@ -2316,6 +2320,58 @@ Que el gráfico de peso en Progreso refleje el rango real del usuario en lugar d
 - Probar con un usuario cuyo rango de peso esté fuera de 74-82 (p. ej. 90-100 kg) y confirmar que el gráfico no comprime la curva en el extremo inferior del eje.
 - Confirmar que la referencia muestra el peso de inicio, no "74.5".
 - Probar sin datos registrados: sin línea de referencia, sin errores.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-44 - Adherencia nutricional y contexto de peso en Progreso
+
+**Estado: pendiente.**
+
+### Evidencia
+
+- `progressStats()` en `index.html` muestra tres métricas: cambio de peso (delta del ciclo), entrenamientos completados (número absoluto) y racha actual. No muestra el porcentaje de adherencia nutricional del ciclo en curso.
+- `getCycleSummary()` ya calcula `mealAdherence` (porcentaje de comidas planificadas efectivamente registradas), pero ese valor solo se muestra en el recap al cerrar el ciclo. Durante el ciclo el usuario no puede ver cuánto ha cumplido su plan de comidas en conjunto.
+- La racha mide consistencia *consecutiva*, no adherencia acumulada: un usuario con 94 % de adherencia en el ciclo que falla un día ve "0 días de racha", sin poder saber que su adherencia global sigue siendo muy alta.
+- Las tarjetas de ciclos completados en `progressJourney()` muestran `s.weightChange` (p. ej. `-2.5 kg`) pero no `s.startWeight` ni `s.endWeight`, que sí están guardados en `plan_cycles.summary` y que dan contexto imprescindible: bajar 2.5 kg desde 90 kg es diferente que desde 65 kg.
+
+### Objetivo
+
+Cerrar el ciclo de feedback de Progreso: mostrar al usuario, durante el ciclo activo, el porcentaje de adherencia nutricional acumulada, y en los ciclos completados el peso inicial y final junto al delta, sin necesidad de llamadas adicionales al servidor (todos los datos ya están disponibles en `getCycleSummary()` y `plan_cycles.summary`).
+
+### Dependencias
+
+- Ninguna técnica. Cambio 100% en cliente (`progressStats()` y `progressJourney()` dentro de `index.html`). No requiere migración SQL.
+- Complementa REQ-43 (gráfico personalizado) dentro del mismo journey de Progreso.
+
+### Alcance
+
+- En `progressStats()`, añadir una cuarta tarjeta con la adherencia nutricional del ciclo en curso:
+  - Llamar a `getCycleSummary()` (ya existe) para obtener `mealAdherence`.
+  - Mostrar como `XX %` con la etiqueta "comidas del plan".
+  - Si `plannedMeals` es 0 (ciclo sin comidas planificadas todavía), omitir la tarjeta o mostrar `—`.
+  - Ajustar el grid de `summary` de `1fr 1fr 1fr` a `repeat(4,1fr)` o `repeat(2,1fr) repeat(2,1fr)` para que quepan cuatro en móvil sin overflow.
+- En `progressJourney()`, dentro de cada tarjeta de ciclo completado, añadir inicio y fin de peso junto al delta existente:
+  - Usar `s.startWeight` y `s.endWeight` ya almacenados en `plan_cycles.summary`.
+  - Formato sugerido: `${s.startWeight} → ${s.endWeight} kg (${recapDelta(s.weightChange," kg")})`.
+  - Si `s.startWeight` o `s.endWeight` son nulos, conservar solo el delta actual.
+- Ningún texto nuevo menciona IA, proveedor, modelo ni cuota (REQ-31).
+- Sin overflow en 375x812.
+
+### Criterios de aceptacion
+
+- La sección "Progreso" muestra el porcentaje de comidas planificadas registradas durante el ciclo activo, sin necesidad de cerrar el ciclo para verlo.
+- Una racha de 0 días no impide ver una adherencia acumulada alta (p. ej. 85 %).
+- Las tarjetas de ciclos completados muestran peso de inicio y fin junto al delta; si falta alguno, se muestra solo lo disponible sin errores.
+- El layout no presenta overflow en 375x812 con las cuatro tarjetas visibles.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Simular un ciclo con 10 días registrados y 2 fallidos; confirmar que la adherencia muestra ~83 % aunque la racha sea 0.
+- Probar sin ningún día registrado; confirmar que la tarjeta de adherencia muestra `—` o se omite sin errores.
+- Simular un ciclo completado con `startWeight=90`, `endWeight=87.5`; confirmar que la tarjeta muestra "90 → 87.5 kg (-2.5 kg)".
+- Revisar layout en 375x812 con las cuatro tarjetas.
 - `git diff --check` y release gate local.
 
 ---
