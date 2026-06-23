@@ -106,8 +106,8 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Registro y acceso | Login, registro, reset y admin disponibles | Falta relacionar acceso con suscripcion y ofrecer una muestra clara antes del pago |
 | Onboarding | Perfil v3 implementado: macros, zona horaria, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | - |
 | Home diario | Muestra macros, dieta, entrenamiento y racha | Falta priorizacion inteligente, estado del dia, proxima accion y contingencias |
-| Nutricion | Recetas, macros, checks, reemplazos, generacion IA diaria/semanal con borrador+lista de compras y regeneracion por comida | Falta contingencia nutricional y reemplazos equivalentes (REQ-19) |
-| Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20) |
+| Nutricion | Recetas, macros, checks, reemplazos, generacion IA diaria/semanal con borrador+lista de compras y regeneracion por comida | Falta contingencia nutricional y reemplazos equivalentes (REQ-19). Campos de ventana de alimentación y repetición aceptable visibles en onboarding y perfil sin contexto suficiente para un usuario normal (REQ-46). |
+| Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20). Solo running/cycling/natación; usuarios de gimnasio sin cardio estructurado quedan sin opción (REQ-45). |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
 | Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico personalizado (REQ-43) y adherencia nutricional + contexto de peso en ciclos (REQ-44) implementados. Falta contingencia y adaptación semanal. |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
@@ -119,6 +119,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
 | Consumo de generacion | Cuota diaria server-side, reserva idempotente y pool privado implementados | Integrar entitlement de REQ-25 y costo por accion de REQ-27 |
 | PWA y sincronizacion | Instalable, cache y safe areas de iPhone | Falta cola offline, conflictos, recuperacion ante fallos y pruebas end-to-end de journeys |
+| Feedback de carga | Botones con `disabled + textContent` en operaciones cortas | Operaciones largas (generación de plan, coach, día nutricional) carecen de indicador visible durante la espera — pantalla congelada sin feedback (REQ-47). |
 
 ## Journey objetivo
 
@@ -197,7 +198,14 @@ Hallazgos de una evaluacion heuristica de los flujos reales (REQ-34..37) mas una
 
 ### Fase H - Cierre del ciclo de feedback de Progreso (auditoria jun 2026)
 
+43. REQ-43 - Gráfico de peso personalizado por usuario.
 44. REQ-44 - Adherencia nutricional y contexto de peso en Progreso.
+
+### Fase I - Pulido de UX y alcance de perfil (directiva de producto, jun 2026)
+
+45. REQ-45 - Disciplina "Otra actividad" y limpieza de naming en perfil y onboarding.
+46. REQ-46 - Simplificar configuración de nutrición (ocultar ventana y repetición en flujo estándar).
+47. REQ-47 - Indicadores de carga (spinners) en generación de plan, coach y nutrición diaria.
 
 ### Fase G - Operacion del catalogo nutricional (auditoria jun 2026)
 
@@ -2390,3 +2398,170 @@ Cerrar el ciclo de feedback de Progreso: mostrar al usuario, durante el ciclo ac
 - Toda mutacion sensible debe comprobar autenticacion, usuario activo y entitlement en servidor.
 - Toda UI nueva debe probarse como PWA movil y respetar safe areas.
 - Todo cambio SQL debe ser idempotente o incluir una ruta explicita de migracion y rollback.
+
+---
+
+## REQ-45 - Disciplina "Otra actividad" y limpieza de naming
+
+**Estado: pendiente.**
+
+### Evidencia
+
+- `VALID_SPORTS = new Set(["running","cycling","swimming"])` en `domain-contracts.js:7` bloquea cualquier valor distinto; el mensaje de error usa "deporte" (`domain-contracts.js:45`).
+- `SPORT_LABELS = {running:"Running",cycling:"Cycling",swimming:"Natación"}` en `index.html:786` — sin opción para otros perfiles.
+- `ob_sport` (onboarding, `index.html:2267-2268`) y `pf_sport` (perfil, `index.html:4570-4571`) generan sus `<option>` iterando `Object.entries(SPORT_LABELS)` — no hay ningún "Otra" en el set.
+- `sportSessions(primary, ds, prefs)` en `index.html:1062-1145` — cuando `primary` no está en `plans`, cae en silencio a `plans.running`, generando sesiones de running incorrectas para quien eligiera cualquier opción diferente.
+- La validación de piscina (`index.html:2170,2184`) solo aplica para `primarySport==="swimming"` — no afecta a `"other"`.
+- La UI ya usa la etiqueta "Disciplina principal" (`index.html:2267,4570`) en lugar de "deporte principal"; el naming correcto ya está parcialmente en producción; solo falta alinearlo en el contrato y añadir la opción faltante.
+
+### Objetivo
+
+Añadir `"other"` como disciplina válida con la etiqueta "Otra actividad" y comportamiento bien definido (solo sesiones de fuerza, sin cardio estructurado), y limpiar el naming en `domain-contracts.js` para que use "disciplina" en lugar de "deporte".
+
+### Dependencias
+
+- Ninguna técnica. Cambio 100% en cliente (`index.html` y `domain-contracts.js`). No requiere migración SQL.
+
+### Alcance
+
+- `domain-contracts.js`: añadir `"other"` a `VALID_SPORTS`. Actualizar el mensaje de error de la línea 45 de "primarySport debe ser running, cycling o swimming" a "La disciplina principal debe ser running, cycling, swimming u other".
+- `index.html`: añadir `other:"Otra actividad"` a `SPORT_LABELS` (línea 786).
+- `sportSessions()` (línea 1062): para `primary==="other"`, retornar un objeto con las tres sesiones vacías (`{quality:{id:"calidad",kind:"Otra",name:"",detail:"",exerciseIds:[]}, endurance:{...}, technique:{...}}`). El template de plan las descartará al comprobar que no hay `detail`, resultando en un plan con solo sesiones de fuerza.
+- `trainingPlanSummary()` (líneas 1028-1041): para `primary==="other"`, retornar un texto apropiado, por ejemplo: `"Solo fuerza y actividad física libre — sin plan de cardio estructurado."`.
+- Onboarding (línea 2268) y perfil (línea 4571): añadir al final del select `<option value="other">Otra actividad</option>`. Como ambos generan las opciones iterando `SPORT_LABELS`, basta con añadir la clave al objeto.
+- El fallback de la línea 2394 (`||"tu disciplina"`) ya queda cubierto por `SPORT_LABELS["other"]`.
+- No modificar la validación de piscina ni las sesiones de natación.
+- No tocar la lógica de entrenos de fuerza: `strengthSessions()` no depende de `primarySport`.
+- `generateWorkout()` / filtrado de ejercicios por disciplina (líneas 5971-5984): `WORKOUT_EXERCISE_IDS["other"]` será `undefined`, lo que ya hace que el filtro no aplique — sin cambios requeridos.
+- Ningún texto nuevo menciona IA, proveedor, modelo ni cuota (REQ-31).
+- Probar en 375×812 sin overflow.
+
+### Criterios de aceptacion
+
+- Un usuario puede completar el onboarding con `primarySport="other"` sin error de validación en `domain-contracts.js`.
+- Con `primarySport="other"`, el plan semanal contiene solo sesiones de fuerza; no aparece ninguna sesión de "Running · calidad", "Cycling · fondo" ni "Natación · técnica".
+- El summary box en onboarding y perfil muestra texto coherente para "Otra actividad" (sin mencionar running/cycling/natación).
+- No hay regresión para los tres deportes existentes (running, cycling, swimming).
+- El select en onboarding y perfil muestra "Otra actividad" al final de la lista.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Crear perfil con `primarySport="other"`, navegar a Entrenamiento y confirmar que el plan no contiene sesiones de cardio estructurado.
+- Confirmar que el select muestra "Otra actividad" en onboarding y en Perfil.
+- Con cada uno de los tres deportes originales, verificar que sus sesiones de cardio se siguen generando correctamente.
+- Ejecutar `domain-contracts.js` en Node con `primarySport="other"` y confirmar que no arroja error.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-46 - Simplificar configuracion de nutricion (ocultar ventana y repeticion en flujo estandar)
+
+**Estado: pendiente.**
+
+### Evidencia
+
+- `eatingWindowStart` / `eatingWindowEnd` se muestran en perfil como "Inicio de ventana" / "Fin de ventana" (`index.html:4544-4545`) y se leen en onboarding como `ob_window_start` / `ob_window_end` (`index.html:2409-2411`).
+- `repeatPreference` se muestra en perfil como "Repetición aceptable" (`index.html:4554-4555`) con valores poco intuitivos: "Poca repetición", "Repetir 2-3 veces", "Priorizar practicidad" (`REPEAT_LABELS`, `index.html:821`). Se lee en onboarding como `ob_repeat` (`index.html:2415`).
+- Los tres valores se envían al prompt de IA de nutrición: `eating_window.start/end` (`index.html:5702`) y `repetition` (`index.html:5706`). La lógica de generación los consume y debe seguir recibiéndolos.
+- Los defaults ya existen y son sensatos: `repeatPreference: "moderate"` (`index.html:950`); ventana: primera/última hora de las comidas según `defaultMealTimes(mealCount)` (`index.html:945-946`).
+- La validación `validateOnboardingNutStep()` (aprox. `index.html:2201-2208`) comprueba coherencia de la ventana; si los campos no están en el DOM, la lectura retorna `""`, lo que puede romper la validación — hay que condicionar esa rama.
+- No existe ningún patrón `<details>/<summary>` ni sección colapsable en el código actual.
+
+### Objetivo
+
+Ocultar "Repetición aceptable" y la ventana de inicio/fin del flujo estándar (onboarding y perfil), usando defaults sensatos, exponiendo los controles solo bajo un bloque "Configuración avanzada" opcional en el perfil. No romper la lógica que consume esos valores.
+
+### Dependencias
+
+- Ninguna técnica. Cambio 100% en cliente (`index.html`). No requiere migración SQL.
+- No depende de REQ-45 ni REQ-47.
+
+### Alcance
+
+- **Onboarding**: eliminar del HTML del paso de nutrición los tres inputs (`ob_window_start`, `ob_window_end`, `ob_repeat`). En `readOnboardingNutStep()`, mantener la lectura con fallback: `ws?.value || ""` y `rp?.value || "moderate"`. En `validateOnboardingNutStep()`, omitir las validaciones de ventana si `$('#ob_window_start')` es `null` (el paso ya no existe en el DOM).
+- **Perfil** (sección nutrición, aprox. `index.html:4540-4560`): envolver los tres campos en `<details class="adv-settings"><summary>Configuración avanzada</summary>…</details>`, cerrado por defecto. Añadir CSS mínimo: `.adv-settings summary { cursor:pointer; color:var(--muted); font-size:13px; margin:8px 0; }`.
+- **Defaults aplicados cuando los campos no están visibles**: `eatingWindowStart` = `defaultMealTimes(mealCount)[0]`; `eatingWindowEnd` = `defaultMealTimes(mealCount).slice(-1)[0]`; `repeatPreference` = `"moderate"`. Estos defaults ya existen en `planPrefsForDate()`; no duplicar lógica, solo asegurarse de que los valores llegan con ese fallback cuando los campos no están en el DOM.
+- No tocar `planPrefsForDate()`, `buildMealPlanContext()` ni el prompt de IA — los valores siguen fluyendo.
+- Usuarios con valores guardados distintos del default ven esos valores pre-llenados cuando expanden "Configuración avanzada" en perfil (la lectura de `p.repeatPreference`, `p.eatingWindowStart`, `p.eatingWindowEnd` no cambia).
+- Ningún texto nuevo menciona IA, proveedor, modelo ni cuota (REQ-31).
+- Probar en 375×812 sin overflow, bloque colapsado y expandido.
+
+### Criterios de aceptacion
+
+- En onboarding, el paso de nutrición no muestra los tres campos; el flujo se completa sin errores de validación de ventana.
+- En perfil, los tres campos están dentro de `<details>` cerrado por defecto.
+- Un usuario que expande "Configuración avanzada" puede cambiar y guardar los valores; la generación de nutrición los usa correctamente.
+- Usuarios con valores previamente guardados distintos del default ven sus valores al expandir el bloque.
+- No hay regresión en la generación de planes nutricionales: `eating_window` y `repetition` siempre llegan al prompt con valores válidos (default o configurados).
+- Sin overflow en 375×812.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Completar onboarding sin ver los tres campos; confirmar que el plan nutricional se genera sin error.
+- Abrir Perfil → nutrición; confirmar que "Configuración avanzada" está colapsada.
+- Expandir, cambiar `repeatPreference` a "high", guardar y confirmar que `buildMealPlanContext()` retorna `repetition:"high"`.
+- Probar con un usuario que ya tenga `eatingWindowStart` guardado distinto del default: confirmar que aparece al expandir.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-47 - Indicadores de carga (spinners) en generacion de plan, coach y nutricion diaria
+
+**Estado: pendiente.**
+
+### Evidencia
+
+- Patrón existente de feedback en botones: `button.disabled=true` + `button.textContent="Guardando…"` en ~10 lugares (`index.html:1821,2067,4793,4865,4905,4983,5044,5079,6994`). Solo cubre operaciones de guardado rápido (<3 s); no hay feedback durante esperas largas.
+- No existe ninguna clase CSS `spinner`, `loading` ni `skeleton` en el código.
+- Operaciones con mayor fricción identificadas (sin feedback hoy):
+  1. **Generación de plan de entrenamiento** (`openTrainingPlanGenerator()`, `index.html:6249`): solo hace `button.disabled=true` sin texto ni indicador visual durante la llamada a Claude (puede tardar 10-20 s).
+  2. **Respuesta del coach** (`sendCoachMessage()`, aprox. `index.html:700-710`): el área de respuesta queda vacía/congelada mientras se espera; `toast()` solo aparece en error.
+  3. **Generación de día nutricional** (botón de generación IA de día): el botón "Aplicar al día" se deshabilita tras recibir respuesta (`index.html:6440`) pero no hay indicador durante la generación.
+- `<div class="toast" id="toast">` (`index.html:632`) es la única pieza de feedback transient existente; no sirve para esperas largas.
+
+### Objetivo
+
+Añadir un indicador de carga inline (spinner CSS puro + texto de estado) para las tres operaciones con mayor fricción que carecen de feedback hoy, sin afectar las operaciones que ya tienen su patrón `textContent` propio.
+
+### Dependencias
+
+- Ninguna técnica. Cambio 100% en cliente (`index.html`). No requiere migración SQL.
+- No depende de REQ-45 ni REQ-46.
+
+### Alcance
+
+- **CSS** (bloque de estilos de `index.html`): añadir:
+  ```css
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .spinner{width:18px;height:18px;border:2px solid var(--border-2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+  .loading-row{display:flex;align-items:center;gap:10px;padding:14px 0;color:var(--muted);font-size:14px}
+  @media(prefers-reduced-motion:reduce){.spinner{animation:none;opacity:.6}}
+  ```
+- **Generación de plan de entrenamiento** (`openTrainingPlanGenerator()`, `index.html:6249`): antes de llamar al API, inyectar `<div class="loading-row"><div class="spinner"></div><span>Preparando tu plan…</span></div>` en `#trainingPlanOut`. Al completar (éxito o error), `innerHTML` del contenedor se reemplaza con el resultado, eliminando el loading-row automáticamente.
+- **Respuesta del coach** (`sendCoachMessage()` o equivalente, aprox. `index.html:700-710`): al enviar el mensaje, añadir un loading-row al final del hilo de mensajes del coach. Al recibir respuesta, reemplazar ese nodo con el mensaje del coach.
+- **Generación de día nutricional** (la función que llama al API de generación y actualiza el contenedor del día): al iniciar, inyectar loading-row con texto "Preparando tus comidas de hoy…" en el contenedor del día nutricional. Al completar, reemplazar con el plan.
+- No tocar los botones que ya usan el patrón `disabled + textContent` — ese patrón es suficiente para operaciones cortas.
+- El loading-row debe eliminarse completo al completar la operación, sin dejar nodos huérfanos.
+- Ningún texto nuevo menciona IA, proveedor, modelo ni cuota (REQ-31): los textos de estado son "Preparando…", "Tu coach está listo…" — sin mencionar Claude, tokens ni modelos.
+- Probar en 375×812 sin overflow.
+
+### Criterios de aceptacion
+
+- Al disparar la generación de plan de entrenamiento, el usuario ve el spinner y el texto "Preparando tu plan…" en lugar de una pantalla congelada.
+- Al enviar un mensaje al coach, el usuario ve el spinner y "Tu coach está pensando…" hasta recibir respuesta.
+- Al regenerar el día nutricional con IA, el usuario ve "Preparando tus comidas de hoy…" con spinner.
+- Con `prefers-reduced-motion: reduce` activo, el spinner no rota pero el texto de estado sigue visible.
+- Tras recibir respuesta, el spinner/loading-row desaparece completamente; el contenido final es el único elemento visible.
+- No hay regresión en el texto del coach ni en el plan de entrenamiento generado.
+- Sin overflow en 375×812.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Throttling de red a Slow 3G en DevTools; disparar generación de plan y confirmar spinner visible durante la espera.
+- Idem para el coach y la generación de día nutricional.
+- Verificar con `prefers-reduced-motion` activo (DevTools → Rendering → Emulate) que no hay animación pero sí texto.
+- Confirmar que el spinner desaparece por completo tras recibir respuesta (sin nodos `loading-row` huérfanos en el DOM).
+- `git diff --check` y release gate local.
