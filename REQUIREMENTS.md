@@ -2481,7 +2481,7 @@ Cuando `primary === "strength_only"`, mostrar **una sola vez** un aviso informat
 
 ## REQ-46 - Simplificar configuracion de nutricion (ocultar ventana y repeticion en flujo estandar)
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Evidencia
 
