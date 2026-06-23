@@ -31,6 +31,8 @@ FASE 1 · VALIDAR  →  FASE 2 · DECIDIR  →  FASE 3 · ADQUIRIR  →  FASE 4 
 
 5. **`04-Naming.md`** — Ejercicio de nombre: crítica a "Fitbros"/"Fitbud", criterios, candidatos, shortlist (Compa, Kúmplo, Garra, Faro) y cómo validar el nombre con tus amigos. Hallazgo clave: "Fitbros" excluye a ~la mitad del mercado por el sesgo de "bros".
 
+6. **`05-Auditoria-Deploy-UX-UI-2026-06-23.md`** — Resultado del intento de deploy forzado en Vercel y auditoría heurística UX/UI con capturas. Hallazgos clave: cron horario bloquea deploy en Hobby, checkout devuelve `503` antes de auth si Stripe no está configurado, primer día puede quedar vacío, Perfil es demasiado denso y Progreso necesita mejores targets táctiles/accesibilidad.
+
 ---
 
 ## Qué hacer esta semana (Fase 1, semana 1)

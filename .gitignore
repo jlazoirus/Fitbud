@@ -8,6 +8,9 @@
 node_modules/
 .vercel/
 
+# Archivos de auditoría y capturas locales
+assets/ux-audit-*/
+
 # Nunca subir secretos
 .env
 .env.local

@@ -1601,6 +1601,10 @@ async function drainSyncQueue(){
 let entitlement=null;        // {plan_id,status,starts_at,expires_at,origin} o null
 let entitlementExpired=null; // último vencido para mostrar en UI
 let entitlementChecked=false;// true cuando /api/entitlement respondió con éxito
+let billingHistory=[];       // proyección segura de billing_events para el usuario actual
+let billingHistoryChecked=false;
+let billingHistoryLoading=false;
+let billingHistoryError="";
 async function loadEntitlement(){
   if(!session)return;
   const token=session&&session.access_token;if(!token)return;
@@ -1621,6 +1625,27 @@ async function loadEntitlement(){
     entitlementExpired=(data&&data.expired)||null;
     entitlementChecked=true;
   }catch(_){} // error de red → permisivo (no bloquear)
+}
+async function loadBillingHistory(){
+  if(!session)return;
+  const token=session&&session.access_token;if(!token)return;
+  billingHistoryLoading=true;
+  billingHistoryError="";
+  renderBillingHistoryBox();
+  try{
+    const r=await fetch("/api/billing-history",{headers:{Authorization:"Bearer "+token}});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error("No pudimos cargar tu historial ahora.");
+    billingHistory=Array.isArray(data.history)?data.history:[];
+    billingHistoryChecked=true;
+  }catch(e){
+    billingHistory=[];
+    billingHistoryChecked=true;
+    billingHistoryError=String((e&&e.message)||e||"No pudimos cargar tu historial ahora.");
+  }finally{
+    billingHistoryLoading=false;
+    renderBillingHistoryBox();
+  }
 }
 function hasEntitlement(){
   if(profile&&profile.is_admin)return true;           // admin siempre pasa
@@ -4766,6 +4791,7 @@ function renderProfile(){
     <div class="row between"><span class="muted small">${esc(email)}</span><span class="badge ${isAdmin()?'b-PESAS':'b-Libre'}">${isAdmin()?'Admin':'Usuario'}</span></div>
     <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="signOutUser(this)">Cerrar sesión</button>
   </div>`;
+  ensureBillingHistory();
   // Cargar preferencias de recordatorios y poblar el formulario + sección push
   if(supa&&uid()){
     loadNotifPrefs().then(()=>{populateNotifPrefsForm();renderPushSection();});
@@ -5195,6 +5221,86 @@ async function restorePurchase(btn){
     toast("No encontramos un pago reciente. Si pagaste hace poco, espera unos minutos e intenta de nuevo.");
   }
 }
+function planDisplayName(planId){
+  const plan=(catalogPlans||[]).find(p=>String(p.id)===String(planId));
+  if(plan&&plan.name)return plan.name;
+  if(planId==="quarterly")return "Paquete 3 meses";
+  if(planId==="monthly")return "Plan mensual";
+  return "Plan";
+}
+function billingEventLabel(eventType,status){
+  if(status==="failed")return "No completado";
+  if(eventType==="checkout.session.completed")return "Pago recibido";
+  if(eventType==="charge.refunded")return "Reembolso registrado";
+  if(eventType==="charge.dispute.created")return "Revisión de pago";
+  if(eventType==="payment_intent.payment_failed")return "Pago no completado";
+  if(eventType==="checkout.session.expired")return "Pago cancelado";
+  return "Movimiento registrado";
+}
+function billingStatusLabel(status){
+  if(status==="processed")return "Completado";
+  if(status==="failed")return "Revisar";
+  return "Registrado";
+}
+function billingAmountText(item){
+  const cents=Number(item&&item.amount_cents);
+  if(!Number.isFinite(cents))return "";
+  const currency=String((item&&item.currency)||"USD").toUpperCase();
+  try{
+    return new Intl.NumberFormat("es-PE",{style:"currency",currency}).format(cents/100);
+  }catch(_){
+    return currency+" "+(cents/100).toFixed(2);
+  }
+}
+function billingHistoryHtml(){
+  if(billingHistoryLoading&&!billingHistoryChecked){
+    return`<div class="loading-row"><div class="spinner"></div><span>Cargando historial…</span></div>`;
+  }
+  if(billingHistoryError){
+    return`<div class="muted small" style="margin-top:8px">${esc(billingHistoryError)}</div>
+      <button class="btn btn-sm" style="margin-top:10px;min-height:44px" onclick="refreshBillingHistory(this)">Reintentar</button>`;
+  }
+  if(!billingHistoryChecked){
+    return`<div class="muted small" style="margin-top:8px">Cargando historial…</div>`;
+  }
+  if(!billingHistory.length){
+    return`<div class="muted small" style="margin-top:8px">No hay pagos registrados en tu cuenta.</div>`;
+  }
+  return billingHistory.map(item=>{
+    const amount=billingAmountText(item);
+    const planName=item.plan_id?planDisplayName(item.plan_id):"";
+    const meta=[planName,amount,billingStatusLabel(item.status)].filter(Boolean).map(esc).join(" · ");
+    return`<div class="meal" style="margin-top:10px">
+      <div class="meal-head"><div>
+        <div class="name">${esc(billingEventLabel(item.event_type,item.status))}</div>
+        <div class="nums muted">${esc(prettyDateTime(item.created_at))}${meta?` · ${meta}`:""}</div>
+      </div></div>
+    </div>`;
+  }).join("");
+}
+function billingHistorySectionHtml(){
+  return`<div style="border-top:1px solid var(--border);margin-top:16px;padding-top:14px">
+    <div class="row between wrap" style="gap:8px">
+      <b>Historial de pagos</b>
+      <button class="btn btn-sm" style="min-height:44px" onclick="refreshBillingHistory(this)">Actualizar</button>
+    </div>
+    <div id="billingHistoryBox">${billingHistoryHtml()}</div>
+  </div>`;
+}
+function renderBillingHistoryBox(){
+  const box=$("#billingHistoryBox");
+  if(box)box.innerHTML=billingHistoryHtml();
+}
+function ensureBillingHistory(){
+  renderBillingHistoryBox();
+  if(session&&!billingHistoryChecked&&!billingHistoryLoading)loadBillingHistory();
+}
+async function refreshBillingHistory(btn){
+  if(btn){btn.disabled=true;btn.textContent="Actualizando…";}
+  billingHistoryChecked=false;
+  await loadBillingHistory();
+  if(btn){btn.disabled=false;btn.textContent="Actualizar";}
+}
 function subscriptionStatusHtml(){
   if(entitlement){
     const expTs=new Date(entitlement.expires_at).getTime();
@@ -5210,7 +5316,8 @@ function subscriptionStatusHtml(){
       <span class="badge b-PESAS">Activo</span>
     </div>
     <div class="muted small">Válido hasta ${prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ")}${daysLeft<=7?` · <b style="color:var(--bad)">${daysLeft} días restantes</b>`:""}</div>
-    ${renewBtn}`;
+    ${renewBtn}
+    ${billingHistorySectionHtml()}`;
   }
   if(entitlementExpired){
     const expDate=prettyDateTime(entitlementExpired.expires_at).split(" ").slice(0,2).join(" ");
@@ -5218,14 +5325,17 @@ function subscriptionStatusHtml(){
       <span><b>Plan vencido</b></span><span class="badge b-Libre">Inactivo</span>
     </div>
     <div class="muted small" style="margin-bottom:12px">Venció el ${esc(expDate)}. Tu historial y exportación siguen disponibles.</div>
-    <button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="showPaywall('profile')">Ver planes disponibles</button>`;
+    <button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="showPaywall('profile')">Ver planes disponibles</button>
+    ${billingHistorySectionHtml()}`;
   }
   if(!entitlementChecked){
-    return'<div class="muted small">Verificando estado de tu plan…</div>';
+    return`<div class="muted small">Verificando estado de tu plan…</div>
+    ${billingHistorySectionHtml()}`;
   }
   return`<div class="muted small" style="margin-bottom:12px">Sin plan activo. Activa tu suscripción para acceder a tu coach, nutrición personalizada y rutinas de entrenamiento.</div>
     <button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="showPaywall('profile')">Ver planes disponibles</button>
-    <button class="btn" style="width:100%;font-size:13px;margin-top:4px" onclick="restorePurchase(this)">Restaurar compra</button>`;
+    <button class="btn" style="width:100%;font-size:13px;margin-top:4px" onclick="restorePurchase(this)">Restaurar compra</button>
+    ${billingHistorySectionHtml()}`;
 }
 
 function landingPricingHtml(){
@@ -7074,6 +7184,7 @@ function clearSignedOutState(){
   const prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
   session=null;profile=null;view="hoy";
   entitlement=null;entitlementExpired=null;entitlementChecked=false;
+  billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
   refreshPlanCalendar();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;
   cycleHistory=[];recapPhotoFile=null;recapChallenge="";
@@ -7126,6 +7237,7 @@ async function onAuth(){
     await loadProfile();
     await loadPrivacyState();
     entitlement=null;entitlementExpired=null;entitlementChecked=false;
+    billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
     loadEntitlement(); // no-await: no debe bloquear el arranque (REQ-25)
     S.days={};S.weights={};save();   // descarta caché de otra sesión; la DB manda
     if(!isActive()){

@@ -1,0 +1,1016 @@
+[
+  {
+    "name": "01-landing-mobile",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "Fitbros\nIniciar sesión\nEmpezar\nTU COACH PERSONAL\nSiempre tienes una opción viable para comer y entrenar hoy\n\nFitbros arma tu plan de nutrición y entrenamiento a partir de tu cuerpo, tus horarios y tus recursos reales — y lo ajusta cada semana según cómo te sientes.\n\nCrear mi cuenta gratis\nYa tengo cuenta\nSin tarjeta de crédito para empezar · Cancela cuando quieras\nHOY · MARTES\n1 640 kcal\nde 1 900 kcal\nAvena con proteína y arándanos\n38P · 52C · 9G\n✓\nArroz con lentejas y vegetales\n42P · 68C · 10G\n✓\nBatido de proteína + plátano\n35P · 40C · 5G\nFuerza — Tren superior\n5 ejercicios · ~55 min\n▶\nQUÉ OBTIENES\n🥗\nNutrición adaptada a ti\nTu plan de comidas se arma con tus metas, número de comidas, tiempo para cocinar, preferencias y restricciones. Sin menús genéricos.\n🏋️\nEntrenamiento guiado\nRutinas de 4 o 10 semanas con instrucciones paso a paso, demostraciones y alternativas si no tienes el equip",
+      "viewport": 390,
+      "scrollHeight": 3334,
+      "bodyWidth": 390,
+      "overflow": [],
+      "smallTargets": [
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Iniciar sesión",
+          "width": 108,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm btn-accent",
+          "text": "Empezar",
+          "width": 91,
+          "height": 30
+        },
+        {
+          "tag": "A",
+          "cls": "",
+          "text": "Iniciar sesión",
+          "width": 67,
+          "height": 15
+        }
+      ],
+      "unlabeled": [],
+      "buttons": [
+        "Iniciar sesión",
+        "Empezar",
+        "Crear mi cuenta gratis",
+        "Ya tengo cuenta",
+        "¿Necesito experiencia en nutrición o entrenamiento?\n+",
+        "¿El plan sirve si soy vegetariano o tengo alergias?\n+",
+        "¿Puedo entrenar en casa sin equipo?\n+",
+        "¿Qué pasa si me pierdo un día?\n+",
+        "¿Mis datos son privados?\n+",
+        "Crear mi cuenta gratis"
+      ]
+    }
+  },
+  {
+    "name": "02-auth-local-mobile",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "← Conoce Fitbros\nFitbros\nConecta tu proyecto Supabase para continuar.\nProject URL o ID\nPublishable key\nConectar",
+      "viewport": 390,
+      "scrollHeight": 844,
+      "bodyWidth": 390,
+      "overflow": [],
+      "smallTargets": [
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "← Conoce Fitbros",
+          "width": 125,
+          "height": 30
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-accent",
+          "text": "Conectar",
+          "width": 324,
+          "height": 35
+        }
+      ],
+      "unlabeled": [],
+      "buttons": [
+        "← Conoce Fitbros",
+        "Conectar"
+      ]
+    }
+  },
+  {
+    "name": "03-onboarding-step1-mobile",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "FITBROS · TU PLAN\nPrimero, conozcamos tu punto de partida\n\nEstos datos se usan para estimar tu gasto energético. El porcentaje de grasa es opcional, pero mejora el cálculo si lo conoces.\n\nNombre\nSexo para la fórmula\nSelecciona\nMasculino\nFemenino\nEdad\nEstatura (cm)\nPeso actual (kg)\nGrasa corporal % (opcional)\nNivel de actividad habitual\nLigera\nModerada\nAlta\nVida activa además de los entrenamientos\nContinuar",
+      "viewport": 390,
+      "scrollHeight": 916,
+      "bodyWidth": 390,
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "buttons": [
+        "Continuar"
+      ]
+    }
+  },
+  {
+    "name": "04-home-mobile",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "Martes, 23 jun\nHola, Usuario UX\nU\nAfina tu plan · Agrega tus preferencias de cocina, horarios y equipo para mejores propuestas.\n→ Perfil\n2200\nkcal restantes\nProteína\n0/160 g\nCarbos\n0/230 g\nGrasa\n0/70 g\n0 / 2200 kcal · 0/4 comidas\n2200 restantes\nTU AGENDA\nAún falta preparar este día\nCompleta o actualiza tu plan para llenar comidas y entrenamiento antes de registrar actividad.\nRevisar mi perfil\nHoy\nNutrición\nEntreno\nProgreso\nPerfil",
+      "viewport": 390,
+      "scrollHeight": 844,
+      "bodyWidth": 390,
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "buttons": [
+        "Revisar mi perfil",
+        "Hoy",
+        "Nutrición",
+        "Entreno",
+        "Progreso",
+        "Perfil"
+      ]
+    }
+  },
+  {
+    "name": "05-nutricion-mobile",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "‹\nMartes, 23 Jun · Hoy\nSemana 1\n›\nMACROS DEL DÍA\n2200\nkcal restantes\nProteína\n0/160 g\nCarbos\n0/230 g\nGrasa\n0/70 g\n0 / 2200 kcal · 0/4 comidas\n2200 restantes\n🍽️ Preparar este día\n✨ Ver otra opción de comida\n🔍 Revisar mis macros\nPrepara tu día o semana con tu coach, o agrega comidas; los macros se calculan por ingredientes.\nCOMIDAS DEL DÍA4\nDESAYUNO\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nCambiar\n···\nALMUERZO\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nCambiar\n···\nSNACK\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nCambiar\n···\nCENA\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nCambiar\n···\nCOMIDAS EXTRA\nNinguna todavía.\n＋ Agregar comida / snack\nHoy\nNutrición\nEntreno\nProgreso\nPerfil",
+      "viewport": 390,
+      "scrollHeight": 1415,
+      "bodyWidth": 390,
+      "overflow": [],
+      "smallTargets": [
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "MACROS DEL DÍA",
+          "width": 362,
+          "height": 34
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "🍽️ Preparar este día",
+          "width": 152,
+          "height": 37
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "✨ Ver otra opción de comida",
+          "width": 210,
+          "height": 37
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "🔍 Revisar mis macros",
+          "width": 166,
+          "height": 37
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "COMIDAS DEL DÍA4",
+          "width": 362,
+          "height": 34
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "chk ",
+          "text": "",
+          "width": 32,
+          "height": 32
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Cambiar",
+          "width": 80,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "···",
+          "width": 37,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "chk ",
+          "text": "",
+          "width": 32,
+          "height": 32
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Cambiar",
+          "width": 80,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "···",
+          "width": 37,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "chk ",
+          "text": "",
+          "width": 32,
+          "height": 32
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Cambiar",
+          "width": 80,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "···",
+          "width": 37,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "chk ",
+          "text": "",
+          "width": 32,
+          "height": 32
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Cambiar",
+          "width": 80,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "···",
+          "width": 37,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "COMIDAS EXTRA",
+          "width": 362,
+          "height": 34
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn",
+          "text": "＋ Agregar comida / snack",
+          "width": 362,
+          "height": 40
+        }
+      ],
+      "unlabeled": [],
+      "buttons": [
+        "‹",
+        "›",
+        "MACROS DEL DÍA",
+        "🍽️ Preparar este día",
+        "✨ Ver otra opción de comida",
+        "🔍 Revisar mis macros",
+        "COMIDAS DEL DÍA4",
+        "",
+        "Cambiar",
+        "···",
+        "",
+        "Cambiar",
+        "···",
+        "",
+        "Cambiar",
+        "···",
+        "",
+        "Cambiar",
+        "···",
+        "COMIDAS EXTRA",
+        "＋ Agregar comida / snack",
+        "Hoy",
+        "Nutrición",
+        "Entreno",
+        "Progreso",
+        "Perfil"
+      ]
+    }
+  },
+  {
+    "name": "05-entreno-mobile",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "‹\nMartes, 23 Jun · Hoy\nSemana 1\n›\nSeñales para detenerte:\nDolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.\nPlan combinado · 3 días/semana · 10 semanas\nRunning + Gimnasio\nPreparar mi plan\nConfigurar\nENTRENAMIENTO\nDescanso total\nMovilidad suave y caminata opcional. Prioriza sueño y recuperación.\nPendiente\nDescanso planificado: no cuenta como sesión incompleta.\nCambiar entrenamiento\nRESUMEN\n0%\nkcal de la meta\n0%\nproteína de la meta\n0/4\ncomidas cumplidas\n—\nentrenamiento\nSemana 1 de 10 · faltan 61 días para el final\nHoy\nNutrición\nEntreno\nProgreso\nPerfil",
+      "viewport": 390,
+      "scrollHeight": 844,
+      "bodyWidth": 390,
+      "overflow": [],
+      "smallTargets": [
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Preparar mi plan",
+          "width": 129,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Configurar",
+          "width": 93,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "ENTRENAMIENTO",
+          "width": 362,
+          "height": 34
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Cambiar entrenamiento",
+          "width": 174,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "RESUMEN",
+          "width": 362,
+          "height": 34
+        }
+      ],
+      "unlabeled": [],
+      "buttons": [
+        "‹",
+        "›",
+        "Preparar mi plan",
+        "Configurar",
+        "ENTRENAMIENTO",
+        "Cambiar entrenamiento",
+        "RESUMEN",
+        "Hoy",
+        "Nutrición",
+        "Entreno",
+        "Progreso",
+        "Perfil"
+      ]
+    }
+  },
+  {
+    "name": "05-progreso-mobile",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "Tu evolución\nProgreso\n0\nkg\n0\ncompletos\n🔥 0\ndías racha\n0%\ncomidas del plan\nRACHAS E HITOS\n—\nRacha actual (combinada)\nMejor: 0 días\n0\nNutrición\nMejor: 0\n0\nEntrenamiento\nMejor: 0\nTUS CICLOS1\nCiclo 1 en curso\nSábado, 13 jun → Domingo, 23 ago\nCuando termines este ciclo de 10 semanas, aquí quedarán el recap y tus fotos de progreso personal.\nPESO CORPORAL\nIngresa tu peso semanal para ver el gráfico de evolución.\nSEM\tRANGO KG\tPESO KG\t% GRASA\nS1\t81.0–81.4\t\t\nS2\t80.2–80.6\t\t\nS3\t79.3–79.8\t\t\nS4\t78.4–79.0\t\t\nS5\t77.5–78.2\t\t\nS6\t78.0–78.8\t\t\nS7\t77.0–77.8\t\t\nS8\t76.1–77.0\t\t\nS9\t75.2–76.2\t\t\nS10\t74.3–75.4\t\t\nSEMANA\n‹\nSemana 1\n›\nMartes, 23 Jun \n0/4 comidas · 0/2200 kcal\n0%\nproteína\nMiércoles, 24 Jun \n0/4 comidas · 0/2200 kcal\n0%\nproteína\nJueves, 25 Jun \n0/4 comidas · 0/2200 kcal\n0%\nproteína\nViernes, 26 Jun \n0/4 comidas · 0/2200 kcal\n0%\nproteína\nSábado, 27 Jun \n0/4 comidas · 0/2200 kcal\n0%\nproteína\nDomingo, 28 Jun ",
+      "viewport": 390,
+      "scrollHeight": 2012,
+      "bodyWidth": 390,
+      "overflow": [],
+      "smallTargets": [
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "RACHAS E HITOS",
+          "width": 362,
+          "height": 34
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "TUS CICLOS1",
+          "width": 362,
+          "height": 34
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "PESO CORPORAL",
+          "width": 362,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "",
+          "width": 72,
+          "height": 34
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "csec-h",
+          "text": "SEMANA",
+          "width": 362,
+          "height": 34
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "‹",
+          "width": 32,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "›",
+          "width": 32,
+          "height": 33
+        }
+      ],
+      "unlabeled": [
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "kg"
+        },
+        {
+          "tag": "INPUT",
+          "id": "",
+          "type": "number",
+          "placeholder": "%"
+        }
+      ],
+      "buttons": [
+        "RACHAS E HITOS",
+        "TUS CICLOS1",
+        "PESO CORPORAL",
+        "SEMANA",
+        "‹",
+        "›",
+        "Hoy",
+        "Nutrición",
+        "Entreno",
+        "Progreso",
+        "Perfil"
+      ]
+    }
+  },
+  {
+    "name": "05-perfil-mobile",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "ux@example.com\nPerfil\nAfina tu plan — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas. Guarda cuando estés listo.\nNombre\nOBJETIVO Y MACROS\n2200\nkcal diarias\n160 g\nproteína\n230 g\ncarbohidratos\n70 g\ngrasas\n82 kg · pérdida de grasa\nRecalcular objetivos y preferencias\nPREFERENCIAS ALIMENTICIAS\nPatrón de alimentación y restricciones generales\nVegetariano\nVegano\nSin huevo\nSin lácteos\nSin gluten\nOmnívoro\nComidas al día\n2 comidas\n3 comidas\n4 comidas\n5 comidas\n6 comidas\nComida principal\nComida 1\nComida 2\nComida 3\nComida 4\nHorarios aproximados\nComida 1\nComida 2\nComida 3\nComida 4\nMinutos para cocinar\nPresupuesto\nAjustado\nModerado\nFlexible\nConfiguración avanzada\nCocinas preferidas\nPeruana\nMediterránea\nAsiática\nMexicana\nItaliana\nLatinoamericana\nPreparaciones preferidas\nRápidas\nCocinar por tandas\nSin cocinar\nUna sola oll",
+      "viewport": 390,
+      "scrollHeight": 5436,
+      "bodyWidth": 390,
+      "overflow": [],
+      "smallTargets": [
+        {
+          "tag": "BUTTON",
+          "cls": "btn",
+          "text": "Recalcular objetivos y preferencias",
+          "width": 324,
+          "height": 38
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "yes",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "no",
+          "width": 15,
+          "height": 15
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 17,
+          "height": 17
+        },
+        {
+          "tag": "SELECT",
+          "cls": "",
+          "text": "Gimnasio\nCasa\nExterior\nPiscina",
+          "width": 158,
+          "height": 39
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 17,
+          "height": 17
+        },
+        {
+          "tag": "SELECT",
+          "cls": "",
+          "text": "Gimnasio\nCasa\nExterior\nPiscina",
+          "width": 158,
+          "height": 39
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 17,
+          "height": 17
+        },
+        {
+          "tag": "SELECT",
+          "cls": "",
+          "text": "Gimnasio\nCasa\nExterior\nPiscina",
+          "width": 158,
+          "height": 39
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 17,
+          "height": 17
+        },
+        {
+          "tag": "SELECT",
+          "cls": "",
+          "text": "Gimnasio\nCasa\nExterior\nPiscina",
+          "width": 158,
+          "height": 39
+        },
+        {
+          "tag": "INPUT",
+          "cls": "",
+          "text": "on",
+          "width": 17,
+          "height": 17
+        }
+      ],
+      "unlabeled": [
+        {
+          "tag": "INPUT",
+          "id": "pf_window_start",
+          "type": "time",
+          "placeholder": ""
+        },
+        {
+          "tag": "INPUT",
+          "id": "pf_window_end",
+          "type": "time",
+          "placeholder": ""
+        },
+        {
+          "tag": "SELECT",
+          "id": "pf_repeat",
+          "type": "select-one",
+          "placeholder": ""
+        }
+      ],
+      "buttons": [
+        "Recalcular objetivos y preferencias",
+        "Guardar preferencias",
+        "Actualizar",
+        "Reintentar",
+        "Guardar permiso de fotos",
+        "Revisar privacidad y seguridad",
+        "Leer aviso de privacidad",
+        "Exportar mis datos",
+        "Borrar mi cuenta y datos",
+        "Guardar recordatorios",
+        "Activar avisos del dispositivo",
+        "Cerrar sesión",
+        "Hoy",
+        "Nutrición",
+        "Entreno",
+        "Progreso",
+        "Perfil"
+      ]
+    }
+  },
+  {
+    "name": "10-landing-desktop",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "Fitbros\nIniciar sesión\nEmpezar\nTU COACH PERSONAL\nSiempre tienes una opción viable para comer y entrenar hoy\n\nFitbros arma tu plan de nutrición y entrenamiento a partir de tu cuerpo, tus horarios y tus recursos reales — y lo ajusta cada semana según cómo te sientes.\n\nCrear mi cuenta gratis\nYa tengo cuenta\nSin tarjeta de crédito para empezar · Cancela cuando quieras\nHOY · MARTES\n1 640 kcal\nde 1 900 kcal\nAvena con proteína y arándanos\n38P · 52C · 9G\n✓\nArroz con lentejas y vegetales\n42P · 68C · 10G\n✓\nBatido de proteína + plátano\n35P · 40C · 5G\nFuerza — Tren superior\n5 ejercicios · ~55 min\n▶\nQUÉ OBTIENES\n🥗\nNutrición adaptada a ti\nTu plan de comidas se arma con tus metas, número de comidas, tiempo para cocinar, preferencias y restricciones. Sin menús genéricos.\n🏋️\nEntrenamiento guiado\nRutinas de 4 o 10 semanas con instrucciones paso a paso, demostraciones y alternativas si no tienes el equip",
+      "viewport": 1280,
+      "scrollHeight": 3042,
+      "bodyWidth": 1280,
+      "overflow": [],
+      "smallTargets": [
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm",
+          "text": "Iniciar sesión",
+          "width": 108,
+          "height": 33
+        },
+        {
+          "tag": "BUTTON",
+          "cls": "btn btn-sm btn-accent",
+          "text": "Empezar",
+          "width": 91,
+          "height": 30
+        },
+        {
+          "tag": "A",
+          "cls": "",
+          "text": "Iniciar sesión",
+          "width": 67,
+          "height": 15
+        }
+      ],
+      "unlabeled": [],
+      "buttons": [
+        "Iniciar sesión",
+        "Empezar",
+        "Crear mi cuenta gratis",
+        "Ya tengo cuenta",
+        "¿Necesito experiencia en nutrición o entrenamiento?\n+",
+        "¿El plan sirve si soy vegetariano o tengo alergias?\n+",
+        "¿Puedo entrenar en casa sin equipo?\n+",
+        "¿Qué pasa si me pierdo un día?\n+",
+        "¿Mis datos son privados?\n+",
+        "Crear mi cuenta gratis"
+      ]
+    }
+  },
+  {
+    "name": "11-home-desktop",
+    "metrics": {
+      "title": "Fitbros — Tu cuerpo, tu sistema",
+      "appTextStart": "Martes, 23 jun\nHola, Usuario UX\nU\nAfina tu plan · Agrega tus preferencias de cocina, horarios y equipo para mejores propuestas.\n→ Perfil\n2200\nkcal restantes\nProteína\n0/160 g\nCarbos\n0/230 g\nGrasa\n0/70 g\n0 / 2200 kcal · 0/4 comidas\n2200 restantes\nTU AGENDA\nAún falta preparar este día\nCompleta o actualiza tu plan para llenar comidas y entrenamiento antes de registrar actividad.\nRevisar mi perfil\nHoy\nNutrición\nEntreno\nProgreso\nPerfil",
+      "viewport": 1280,
+      "scrollHeight": 900,
+      "bodyWidth": 1280,
+      "overflow": [],
+      "smallTargets": [],
+      "unlabeled": [],
+      "buttons": [
+        "Revisar mi perfil",
+        "Hoy",
+        "Nutrición",
+        "Entreno",
+        "Progreso",
+        "Perfil"
+      ]
+    }
+  }
+]
