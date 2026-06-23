@@ -41,7 +41,8 @@
     "REQ-42",
     "REQ-45",
     "REQ-46",
-    "REQ-47"
+    "REQ-47",
+    "REQ-48"
   ],
   "limits": {
     "requirementsPerRun": 1,

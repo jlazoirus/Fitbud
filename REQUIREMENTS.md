@@ -113,7 +113,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
 | Recordatorios | No existe | Falta el canal por correo (REQ-24) y el canal push de recordatorios de racha con permiso del dispositivo (REQ-38); ambos exigen programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
-| Suscripcion | Checkout Stripe (REQ-26): sesión alojada, webhooks firmados, entitlement activado por webhook. | Falta conciliación y panel de historial de pagos (REQ-27) |
+| Suscripcion | Checkout Stripe (REQ-26): sesión alojada, webhooks firmados, entitlement activado por webhook. | Falta conciliación de pagos (REQ-27). Historial de pagos visible para el usuario formalizado como REQ-48. Checklist de revisión legal pre-lanzamiento formalizado como REQ-49 (requiere acción humana). |
 | Seguridad y privacidad | Auth, RLS y fotos de progreso personal protegidas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
 | Operacion | Admin de usuarios, alimentos y ejercicios con fuente/licencia | Faltan prompts/versiones, soporte, metricas de IA y costos |
 | Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
@@ -206,6 +206,11 @@ Hallazgos de una evaluacion heuristica de los flujos reales (REQ-34..37) mas una
 45. REQ-45 - Selector de disciplina en dos pasos: cardio opcional, aviso cardiovascular y cardio ligero genérico.
 46. REQ-46 - Simplificar configuración de nutrición (ocultar ventana y repetición en flujo estándar).
 47. REQ-47 - Indicadores de carga (spinners) en generación de plan, coach y nutrición diaria.
+
+### Fase J - Facturacion del usuario y cumplimiento legal pre-lanzamiento (jun 2026)
+
+48. REQ-48 - Panel de historial de pagos para el usuario. Depende de REQ-26 (webhooks activos).
+49. REQ-49 - Checklist de revision legal antes del lanzamiento comercial. **No implementable por el agente; requiere accion humana. No agregar a `agent-loop.json`.**
 
 ### Fase G - Operacion del catalogo nutricional (auditoria jun 2026)
 
@@ -2589,3 +2594,124 @@ Añadir un indicador de carga inline (spinner CSS puro + texto de estado) para l
 - Verificar con `prefers-reduced-motion` activo (DevTools → Rendering → Emulate) que no hay animación pero sí texto.
 - Confirmar que el spinner desaparece por completo tras recibir respuesta (sin nodos `loading-row` huérfanos en el DOM).
 - `git diff --check` y release gate local.
+
+---
+
+## REQ-48 - Panel de historial de pagos para el usuario
+
+**Estado: pendiente.**
+
+### Evidencia
+
+- `subscriptionStatusHtml()` en `index.html:5198` muestra únicamente el estado vigente (plan activo/vencido/cortesía/sin plan), la fecha de vencimiento y un botón de renovación o de restaurar compra. No existe ninguna vista de transacciones pasadas.
+- `billing_events` (`supabase/billing.sql`): tabla con campos `user_id`, `event_type`, `plan_id`, `status`, `payload` (jsonb con el evento Stripe completo, que incluye `amount`, `currency` y `created`), `created_at`. Índice en `(user_id)` y en `(event_type, created_at desc)`.
+- RLS de `billing_events`: la tabla tiene `enable row level security` pero sin ninguna política declarada — el comentario explícito del archivo lo confirma (`billing.sql:18-19`: `-- Sin políticas RLS = solo service_role puede operar esta tabla`). No existe política `SELECT` para usuarios autenticados.
+- `user_entitlements` (`supabase/entitlements.sql`): tiene la política `entitlement_select_own` que permite al usuario leer sus propias filas. Contiene `plan_id`, `status`, `starts_at`, `expires_at`, `origin` (`checkout`/`admin_courtesy`/`admin_grant`) y `payment_ref`. Un usuario con acceso de cortesía (`origin = 'admin_courtesy'`) no tiene ningún evento en `billing_events`.
+- No existe ningún endpoint `api/billing-history.js` ni equivalente; `index.html` no consulta `billing_events` en ningún lugar.
+
+### Objetivo
+
+Que el usuario pueda ver en Perfil un listado de sus eventos de pago pasados — fecha, plan, monto si está disponible en el evento de Stripe, estado — ordenados de más reciente a más antiguo, con un mensaje claro cuando no hay historial (usuarios con cortesía o admin). No se exponen datos de otros usuarios ni el `payload` completo de Stripe.
+
+### Dependencias
+
+- Requiere REQ-26 (checkout y webhooks activos que pueblan `billing_events`).
+- Requiere REQ-25 (entitlements) para leer `user_entitlements` como fuente complementaria de plan y fechas.
+- Respetar REQ-31: ningún texto de la UI menciona Stripe, webhooks, eventos ni lenguaje técnico.
+
+### Alcance
+
+- Crear un endpoint de solo lectura `api/billing-history.js` que:
+  - Verifique la sesión del usuario con el JWT de Supabase (`Authorization: Bearer …`).
+  - Consulte `billing_events` filtrando estrictamente por `user_id = auth.uid()` usando `service_role` (dado que RLS no tiene política SELECT para usuarios; mismo patrón que `api/checkout.js`).
+  - Proyecte solo los campos seguros: `event_type`, `plan_id`, `status`, `created_at`, y si existen en `payload`: `payload->>'amount'` y `payload->>'currency'` (monto en centavos de Stripe, convertido a display en el cliente).
+  - Ordene por `created_at DESC`. Límite de 24 eventos.
+  - No devuelva `stripe_event_id`, `error`, `entitlement_id` ni el `payload` completo.
+- En la sección de suscripción de Perfil (`index.html:4703`), añadir debajo de `subscriptionStatusHtml()` una sección "Historial de pagos" que:
+  - Llame al endpoint al cargar Perfil (junto a `loadEntitlement()`).
+  - Muestre una lista con: fecha formateada, nombre del plan legible (`plan_id` → label), monto si disponible, estado del evento.
+  - Si la lista está vacía (usuario de cortesía, admin o sin pagos), muestre "No hay pagos registrados en tu cuenta."
+  - Solo se renderiza si hay sesión activa; no expone datos de otros usuarios.
+- Alternativa descartada: ajustar RLS de `billing_events` con una política SELECT y leer directo desde el cliente. Descartada porque `billing_events` contiene el `payload` Stripe completo y exponerlo al cliente amplía la superficie de ataque; el patrón de `service_role` en un endpoint autenticado ya existe en el proyecto.
+- Sin columnas SQL nuevas; usar solo lo que ya existe en `billing_events` y `user_entitlements`.
+- Probar en 375×812 sin overflow.
+
+### Criterios de aceptacion
+
+- Un usuario con al menos un evento en `billing_events` ve en Perfil → sección de suscripción su historial con fecha, plan, monto (si disponible) y estado, ordenado de más reciente a más antiguo.
+- Un usuario con acceso de cortesía o sin ningún evento ve "No hay pagos registrados en tu cuenta."
+- El endpoint devuelve 401 si la petición no incluye un JWT válido.
+- El endpoint nunca devuelve eventos de otro usuario; la consulta filtra estrictamente por el `uid` del JWT.
+- El `payload` completo de Stripe, `stripe_event_id` y `error` no se incluyen en la respuesta al cliente.
+- Ningún texto de la UI menciona Stripe, webhooks, tokens ni lenguaje técnico (REQ-31).
+- Sin overflow en 375×812.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Con usuario de prueba con al menos un evento en `billing_events`: cargar Perfil y confirmar que aparece el historial.
+- Con usuario de cortesía o admin: confirmar mensaje "No hay pagos registrados en tu cuenta."
+- Sin sesión: confirmar que `api/billing-history.js` devuelve 401.
+- Inspeccionar la respuesta JSON del endpoint y confirmar ausencia de `stripe_event_id`, `payload` completo y `error`.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-49 - Checklist de revision legal antes del lanzamiento comercial
+
+**Estado: pendiente. Requiere accion humana; no implementable por el agente autonomo.**
+
+### Contexto y condicion de parada
+
+Este requerimiento no produce código. Documenta los puntos de `PRIVACY.md` que exigen validación legal profesional antes de que Fitbros pueda lanzarse comercialmente. Si el agente autónomo (`agent-loop.json`) encontrara este REQ en cola, debe detenerse inmediatamente con la condición `legal_or_medical_decision_required` (ya declarada en `agent-loop.json:stopConditions`) y reportar los puntos pendientes sin intentar redactar texto legal ni tomar decisión alguna. Este REQ no debe agregarse nunca a la cola de `agent-loop.json`.
+
+### Evidencia
+
+- `PRIVACY.md:4`: `**Estado legal:** texto preliminar. Requiere revision profesional antes de un lanzamiento comercial.` — el documento completo de privacidad es una versión operativa preliminar, sin revisión profesional.
+- `PRIVACY.md:10`: `La edad minima operativa es **18 anos**. No se habilitan cuentas de menores hasta definir el tratamiento legal y los consentimientos correspondientes.` — la restricción existe en el texto pero el tratamiento legal para menores no está definido.
+- `PRIVACY.md:38`: `Los respaldos gestionados por proveedores deben configurarse para expirar en un maximo operativo de 30 dias. Este plazo y los contratos de los proveedores deben verificarse legalmente antes del lanzamiento comercial.` — el plazo de retención de backups y los contratos con proveedores (Supabase, Vercel, Anthropic, Stripe) no están verificados legalmente.
+
+### Objetivo
+
+Formalizar como requerimiento de producto los tres puntos de `PRIVACY.md` que requieren revisión legal externa, de modo que queden registrados en el backlog y no se omitan al preparar el lanzamiento comercial.
+
+### Dependencias
+
+- **Condicion de parada del agente**: `legal_or_medical_decision_required` (definida en `agent-loop.json:stopConditions`). El agente autonomo nunca intenta ejecutar este REQ.
+- Debe completarse antes del primer cobro real (ver "Frontera de MVP para el primer cobro").
+- Se coordina con REQ-14 (consentimiento y privacidad).
+
+### Alcance — checklist de revision
+
+Los tres puntos a revisar, tomados directamente de `PRIVACY.md`:
+
+1. **Revision del documento completo de PRIVACY.md por un profesional legal** (`PRIVACY.md:4`).
+   - El texto actual es preliminar y no ha sido revisado por un abogado.
+   - Verificar que el lenguaje cumple la normativa aplicable (LGPD, GDPR si hay usuarios de la UE, leyes de privacidad del país de operación).
+   - Confirmar que los propósitos declarados de tratamiento de datos (personalización de planes, fotos de progreso privadas) son suficientes, están correctamente limitados y son coherentes con lo que el código realmente hace.
+
+2. **Tratamiento legal para menores de edad** (`PRIVACY.md:10`).
+   - Hoy la app bloquea cuentas de menores. Verificar que esa restricción está adecuadamente comunicada en el flujo de registro (campo de fecha de nacimiento o confirmación explícita de mayoría de edad).
+   - Si en el futuro se quiere bajar la edad mínima, definir previamente: consentimiento parental, datos a recopilar o excluir, y obligaciones legales por jurisdicción. Hasta entonces, documentar que la restricción de 18 años es intencional y no una omisión.
+
+3. **Retencion de backups y contratos de procesamiento de datos con proveedores** (`PRIVACY.md:38`).
+   - Verificar que el plazo operativo de 30 días para expiración de backups es configurable en Supabase y Vercel, y que coincide con las políticas reales de cada proveedor.
+   - Revisar y archivar los contratos de procesamiento de datos (DPA) con Supabase, Vercel, Anthropic y Stripe; confirmar que permiten el uso previsto y definen sus propias obligaciones de retención y borrado compatibles con los compromisos de `PRIVACY.md`.
+
+### Criterios de aceptacion
+
+Los criterios de aceptación de este REQ son **acciones humanas**, no código:
+
+- Un profesional legal revisó el documento completo de `PRIVACY.md` y emitió un dictamen o aprobó explícitamente su contenido para el mercado objetivo.
+- El equipo confirmó por escrito que la restricción de edad mínima de 18 años está adecuadamente implementada y comunicada en el flujo de registro, y que el tratamiento legal de menores está documentado como fuera de alcance hasta nueva decisión.
+- El equipo verificó con Supabase, Vercel, Anthropic y Stripe que el plazo de retención de 30 días para backups es configurable en cada proveedor, y que los contratos DPA están firmados o aceptados formalmente.
+- La condición de cierre es una confirmación humana registrada en el repositorio (p. ej., una anotación en `PRIVACY.md` con "Revisado por: [nombre/fecha]" o un commit firmado por el responsable de producto o legal), no una verificación automatizada.
+- El agente autónomo no completa ni intenta completar este REQ.
+
+### Verificacion sugerida
+
+No aplica verificación técnica automatizada. La verificación es documental:
+
+- Confirmar que `PRIVACY.md` tiene una anotación de revisión con nombre y fecha del profesional que aprobó el contenido.
+- Confirmar que los contratos DPA con los cuatro proveedores están archivados y referenciados.
+- Confirmar que el flujo de registro muestra explícitamente la restricción de edad mínima antes de crear la cuenta.
