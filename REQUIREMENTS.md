@@ -2224,7 +2224,8 @@ Permitir que el coach proponga y, tras confirmacion, ejecute un conjunto acotado
 
 ## REQ-42 - Home agentico: conversacion como entry point
 
-**Estado: pendiente (Fase 3 del rediseno "Home agentico", definido 2026-06-18; depende de REQ-40 y REQ-41 entregados y medidos).**
+**Estado: implementado.**
+Coach integrado en Home: tabs 6→5, renderHoy() fusionado con chips contextuales e input del coach; degradacion limpia sin IA.
 
 ### Contexto y decision de producto
 

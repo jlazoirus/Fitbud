@@ -488,9 +488,12 @@
   .chat-type.fallback{background:var(--surf3);color:var(--muted)}
   .coach-action-bar{margin-top:8px;display:flex;gap:8px}
   .coach-action-note{margin-top:8px;padding:9px 10px;border-radius:var(--r-sm);background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.24);color:#fcd34d;font-size:12px;line-height:1.4}
-  .coach-chips{display:flex;flex-wrap:wrap;gap:7px;padding:10px 14px 4px}
+  .coach-chips{display:flex;flex-wrap:wrap;gap:7px;padding:0 0 10px}
   .coach-chip{background:var(--surf1);border:1px solid var(--border-acc);border-radius:999px;padding:7px 13px;font-size:13px;color:var(--accent-text,#c4b5fd);cursor:pointer;transition:.15s;text-align:left}
   .coach-chip:active{transform:scale(.97)}
+  .coach-home-sep{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+  .coach-home-sep::before,.coach-home-sep::after{content:"";flex:1;height:1px;background:var(--border)}
+  .coach-msgs-home{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
   .coach-input-row{display:flex;gap:8px;padding:10px 14px 12px;background:var(--bg);border-top:1px solid var(--border);flex-shrink:0}
   .coach-input-row textarea{flex:1;resize:none;background:var(--surf1);border:1px solid var(--border-2);border-radius:var(--r-md);color:var(--txt);padding:10px 12px;font-size:14px;font-family:inherit;min-height:42px;max-height:120px;line-height:1.4}
   .coach-input-row textarea:focus{outline:none;border-color:var(--accent)}
@@ -2602,7 +2605,6 @@ function render(){
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
   if(view==="progreso")return renderProgress();
-  if(view==="coach")return renderCoach();
   if(view==="perfil")return renderProfile();
   if(isAdmin()&&view==="foods")return renderFoods();
   if(isAdmin()&&view==="exercises")return renderExerciseAdmin();
@@ -2704,11 +2706,12 @@ function section(key,title,contentHtml,sub){
   </div>`;
 }
 function renderTabs(){
-  const tabs=[["hoy","Hoy"],["nutricion","Nutrición"],["entreno","Entreno"],["progreso","Progreso"],["coach","Coach"],["perfil","Perfil"]];
+  const tabs=[["hoy","Hoy"],["nutricion","Nutrición"],["entreno","Entreno"],["progreso","Progreso"],["perfil","Perfil"]];
   $("#tabs").innerHTML=tabs.map(([v,l])=>`<button class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
 }
 function setView(v){
   if((v==="foods"||v==="exercises"||v==="settings"||v==="admin")&&!isAdmin())v="perfil";
+  if(v==="coach")v="hoy";
   view=v;
   if(v==="hoy")current=clampDate(todayStr());
   if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}
@@ -3049,18 +3052,65 @@ function homeAgendaHtml(ds){
   </section>`;
 }
 
-/* ---------- HOME (Hoy): agenda diaria del coach ---------- */
+/* ---------- HOME (Hoy + Coach integrado): REQ-42 ---------- */
+function buildContextualChips(ds){
+  const day=buildDay(ds);
+  const st=dayState(ds);
+  const {t,target,doneMeals,totMeals}=dayTotals(ds);
+  const pendingMeals=day.meals.filter(m=>!mealState(ds,m.id).done);
+  const ew=effectiveWorkout(ds);
+  const restDay=ew.workout&&ew.workout.id==="descanso";
+  const workoutOutcome=workoutOutcomeForState(st);
+  const workoutPending=!restDay&&!st.workoutDone&&workoutOutcome==="pending";
+  const kcalRem=Math.max(0,Math.round(target.kcal-t.kcal));
+  const chips=[];
+  if(pendingMeals.length>0){
+    chips.push(`¿Qué como para ${esc(pendingMeals[0].slot)}? Me quedan ${kcalRem} kcal`);
+  }
+  if(workoutPending){
+    chips.push("¿Cómo hago el entrenamiento de hoy?");
+    chips.push("Adapta el entreno de hoy por falta de tiempo");
+  }
+  if(!workoutPending&&workoutOutcome==="missed"){
+    chips.push("Perdí la sesión de hoy — ¿qué hago?");
+  }
+  if(doneMeals===totMeals&&totMeals>0){
+    chips.push("¿Cómo estoy avanzando en la semana?");
+  }
+  const fallbacks=COACH_SUGGESTIONS.filter(s=>!chips.includes(s));
+  while(chips.length<2&&fallbacks.length)chips.push(fallbacks.shift());
+  return chips.slice(0,4);
+}
 function renderHoy(){
   const today=todayStr();
   current=clampDate(today);
   const planEnded=today>END, planNotStarted=today<START;
-  const ds=current; const st=dayState(ds);
-  const {doneMeals,totMeals}=dayTotals(ds);
-  const name=profileName(); const stk=streak(); const ew=effectiveWorkout(ds);
+  const ds=current;
+  const name=profileName(); const stk=streak();
   checkAndSaveMilestones();
-  const workoutOutcome=workoutOutcomeForState(st);
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
   const checkinDue=weeklyCheckinDue();
+  const hasAI=aiAvailable();
+  const canUse=hasAI&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
+  const msgs=loadCoachChat();
+  const msgsHtml=msgs.map(renderCoachMessage).join("");
+  const typingHtml=`<div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="coach-typing"><span></span><span></span><span></span></div></div></div>`;
+  const chips=canUse?buildContextualChips(ds):[];
+  const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${JSON.stringify(s)})">${esc(s)}</button>`).join("")}</div>`:"";
+  const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted2)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
+  const coachSection=canUse?`
+    <div class="coach-home-sep">O pregúntale a tu coach</div>
+    ${chipsHtml}
+    ${clearBtn}
+    <div class="coach-msgs-home" id="coachMsgs">${msgsHtml}${typingHtml}</div>
+    <div class="coach-input-row" style="margin:0 -14px;border-radius:0">
+      <textarea id="coachInput" placeholder="Escribe tu pregunta…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();coachSendFromInput();}"
+        oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+      <button onclick="coachSendFromInput()" title="Enviar">➤</button>
+    </div>`
+    :hasAI?`<div class="coach-home-sep">Tu coach</div><div class="ai-box" style="margin:0 0 12px">⚠️ ${!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`
+    :"";
   $("#app").innerHTML=`
   <header class="shead">
     <div>
@@ -3078,24 +3128,9 @@ function renderHoy(){
   ${checkinDue?weeklyCheckinBanner():""}
   ${heroDash(ds)}
   ${homeAgendaHtml(ds)}
-  <div class="home-quick">
-    <div class="hq-btn" onclick="setView('nutricion')">
-      <div class="hq-icon">🍽️</div>
-      <div class="hq-label">Nutrición</div>
-      <div class="hq-sub">${doneMeals}/${totMeals} comidas</div>
-    </div>
-    <div class="hq-btn" onclick="setView('entreno')">
-      <div class="hq-icon">🏋️</div>
-      <div class="hq-label">Entreno</div>
-      <div class="hq-sub">${workoutStatusLabel(workoutOutcome)}</div>
-    </div>
-    <div class="hq-btn" onclick="setView('coach')">
-      <div class="hq-icon">💬</div>
-      <div class="hq-label">Coach</div>
-      <div class="hq-sub">Consultar</div>
-    </div>
-  </div>`;
+  ${coachSection}`;
 }
+function renderCoach(){renderHoy();}
 
 /* ---------- NUTRICIÓN: detalle de comidas + coach ---------- */
 function renderNutrition(){
@@ -4051,7 +4086,7 @@ function saveCoachChat(msgs){
 }
 function clearCoachChat(){
   try{localStorage.removeItem(coachChatKey());}catch(e){}
-  renderCoach();
+  render();
 }
 
 // Arma contexto extra del día actual para el coach conversacional.
@@ -4403,7 +4438,11 @@ function applyCoachAction(msgId){
 }
 
 function scrollCoachToBottom(){
-  requestAnimationFrame(()=>{const el=document.getElementById("coachMsgs");if(el)el.scrollTop=el.scrollHeight;});
+  requestAnimationFrame(()=>{
+    const el=document.getElementById("coachMsgs");
+    if(el)el.scrollTop=el.scrollHeight;
+    window.scrollTo(0,document.body.scrollHeight);
+  });
 }
 
 function renderCoachMessage(m){
@@ -4455,54 +4494,7 @@ function coachSendFromInput(){
   sendCoachMessage(txt);
 }
 
-function renderCoach(){
-  const msgs=loadCoachChat();
-  const hasAI=aiAvailable();
-  const canUse=hasAI&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
-  const isEmpty=msgs.length===0;
-
-  const msgsHtml=msgs.map(renderCoachMessage).join("");
-  const typingHtml=`<div id="coachTyping" class="coach-msg coach" style="display:none">
-    <div class="chat-bubble"><div class="coach-typing"><span></span><span></span><span></span></div></div>
-  </div>`;
-
-  const chips=isEmpty&&canUse?`<div class="coach-chips">${COACH_SUGGESTIONS.map((s,i)=>`<button class="coach-chip" onclick="sendCoachMessage(${JSON.stringify(s)})">${esc(s)}</button>`).join("")}</div>`:"";
-
-  const emptyNote=isEmpty?`<div class="coach-empty"><div class="ce-icon">💬</div><div style="font-size:15px;font-weight:600;margin-bottom:4px">Tu coach personal</div><div class="muted small">Pregunta sobre tu plan, los ejercicios de hoy o cómo adaptarte a tu día.</div></div>`:"";
-
-  const unavailableNote=!canUse?`<div class="ai-box" style="margin:12px 14px 0">⚠️ ${!hasAI?"Conecta el servicio del coach en Ajustes.":!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`:"";
-
-  const clearBtn=msgs.length>0?`<button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted2)" onclick="clearCoachChat()">Limpiar conversación</button>`:"";
-
-  $("#app").innerHTML=`
-  <div class="coach-wrap">
-    <header class="shead">
-      <div>
-        <div class="shead-sub">Ciclo ${cycleNumber()}</div>
-        <h2>Tu coach</h2>
-      </div>
-      ${clearBtn}
-    </header>
-    ${unavailableNote}
-    <div class="coach-msgs" id="coachMsgs">
-      ${emptyNote}
-      ${chips}
-      ${msgsHtml}
-      ${typingHtml}
-    </div>
-    <div class="coach-input-row">
-      <textarea id="coachInput" placeholder="Escribe tu pregunta…" rows="1"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();coachSendFromInput();}"
-        oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"
-        ${!canUse?"disabled":""}></textarea>
-      <button onclick="coachSendFromInput()" ${!canUse?"disabled":""} title="Enviar">➤</button>
-    </div>
-  </div>`;
-
-  scrollCoachToBottom();
-  // Auto-focus solo en desktop para no abrir teclado en móvil
-  if(!isMobileDevice()){const ta=document.getElementById("coachInput");if(ta)ta.focus();}
-}
+// renderCoach() is now an alias — coach is integrated in renderHoy() (REQ-42)
 
 /* ---------- PERFIL: preferencias (mixto) + cuenta + admin ---------- */
 function renderProfile(){
