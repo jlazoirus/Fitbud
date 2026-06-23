@@ -469,7 +469,8 @@
   .streak-recovery{background:var(--warn-dim);border:1px solid rgba(245,158,11,.32);border-radius:var(--r-md);padding:10px 12px;font-size:13px;color:#fcd34d;margin-bottom:10px}
 
   /* Coach conversacional (REQ-21) */
-  .coach-wrap{display:flex;flex-direction:column;height:calc(100dvh - 120px);padding-bottom:0}
+  .coach-wrap{display:flex;flex-direction:column;height:calc(100dvh - 102px - var(--safe-top) - var(--safe-bottom));padding-bottom:0}
+  .coach-wrap>.shead,.coach-wrap>.ai-box{flex:0 0 auto}
   .coach-msgs{flex:1;overflow-y:auto;padding:12px 14px 8px;display:flex;flex-direction:column;gap:10px}
   .coach-msg{display:flex;flex-direction:column;max-width:88%}
   .coach-msg.user{align-self:flex-end;align-items:flex-end}
@@ -4474,15 +4475,15 @@ function renderCoach(){
   const clearBtn=msgs.length>0?`<button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted2)" onclick="clearCoachChat()">Limpiar conversación</button>`:"";
 
   $("#app").innerHTML=`
-  <header class="shead">
-    <div>
-      <div class="shead-sub">Ciclo ${cycleNumber()}</div>
-      <h2>Tu coach</h2>
-    </div>
-    ${clearBtn}
-  </header>
-  ${unavailableNote}
   <div class="coach-wrap">
+    <header class="shead">
+      <div>
+        <div class="shead-sub">Ciclo ${cycleNumber()}</div>
+        <h2>Tu coach</h2>
+      </div>
+      ${clearBtn}
+    </header>
+    ${unavailableNote}
     <div class="coach-msgs" id="coachMsgs">
       ${emptyNote}
       ${chips}
