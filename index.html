@@ -783,7 +783,7 @@ let PLAN_VERSIONS_LOADED=false;
 let PLAN_VERSIONS_ERROR=null;
 
 
-const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación"};
+const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación",other:"Otro deporte cardio",strength_only:"Solo fuerza"};
 const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
 const PROFILE_SCHEMA_VERSION=3;
 const CONSENT_POLICY_VERSION="2026-06-15-v2";
@@ -1022,7 +1022,11 @@ function plannedWorkoutId(ds,prefs){
   const wd=parseYmd(ds).getDay();
   return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary)[wd]||"descanso";
 }
-function trainingPlanSummary(days,primary,priority){
+function trainingPlanSummary(days,primary,priority,lightCardio){
+  if(primary==="other")return "Deporte cardio libre + fuerza — sin plan estructurado para tu deporte.";
+  if(primary==="strength_only")return lightCardio
+    ?"Fuerza + cardio ligero (actividad aeróbica libre)."
+    :"Solo fuerza — sin deporte cardio estructurado.";
   priority=priority||inferredTrainingPriority((profile&&profile.prefs)||{});
   if(priority==="strength"){
     const strengthSplit={3:"2 sesiones de fuerza + 1 sesión aeróbica",4:"3 sesiones de fuerza + 1 sesión aeróbica",5:"4 sesiones de fuerza + 1 sesión aeróbica",6:"4 sesiones de fuerza + 2 sesiones aeróbicas"};
@@ -1131,6 +1135,24 @@ function sportSessions(primary,ds,prefs){
       technique:"1200-1800 m suaves con ejercicios de agarre, alineación, respiración y virajes.",
     },
   };
+  if(primary==="other"||primary==="strength_only"){
+    const sportKind=SPORT_LABELS[primary]||"";
+    const empty={kind:sportKind,name:"",detail:"",exerciseIds:[],sport:primary,phaseIndex:phase};
+    const sessions={
+      quality:{id:"calidad",...empty},
+      endurance:{id:"facil",...empty},
+      technique:{id:"tecnica",...empty},
+    };
+    if(primary==="strength_only"&&ctx.lightCardioEnabled){
+      sessions.endurance={
+        id:"facil",kind:sportKind,
+        name:"Cardio ligero (actividad aeróbica libre)",
+        detail:"30-45 min de actividad aeróbica de intensidad moderada a tu elección (caminata rápida, bicicleta suave, baile libre, etc.).",
+        exerciseIds:[],sport:"strength_only",phaseIndex:phase,
+      };
+    }
+    return sessions;
+  }
   const p=plans[primary]||plans.running;
   const sessions={
     quality:{id:"calidad",kind:p.kind,name:p.qualityName,detail:p.quality[phase]},
@@ -1183,7 +1205,7 @@ function workoutOptions(ds,prefs){
     strength.torsoA,strength.piernaA,strength.torsoB,strength.piernaB,
     sport.quality,sport.endurance,sport.technique,
     {id:"descanso",kind:"Descanso",name:"Descanso total",detail:"Movilidad suave y caminata opcional. Prioriza sueño y recuperación.",exerciseIds:[]},
-  ];
+  ].filter(o=>o.name);
 }
 function workoutById(ds,id,prefs){
   if(!prefs){
@@ -2132,7 +2154,8 @@ function safetySelect(id,value){
   </select>`;
 }
 function readTrainingFields(prefix,d){
-  d.primarySport=$("#"+prefix+"_sport").value;
+  const _noCardio=$("#"+prefix+"_has_cardio_no");
+  d.primarySport=(_noCardio&&_noCardio.checked)?"strength_only":($("#"+prefix+"_sport")?$("#"+prefix+"_sport").value:"running");
   d.strengthMode=$("#"+prefix+"_strength").value;
   d.planDurationWeeks=+$("#"+prefix+"_duration").value;
   d.trainingPriority=$("#"+prefix+"_priority").value;
@@ -2264,9 +2287,19 @@ function renderOnboarding(){
       <p class="onboarding-copy">Elige los días y recursos que realmente tienes. Recomendamos al menos tres sesiones para combinar tu disciplina y fuerza. Podrás afinar prioridad, equipo y lesiones desde tu Perfil.</p>
       <div class="dash">
         <div class="onboarding-grid">
-          <div class="field" style="margin-top:0"><label>Disciplina principal</label><select id="ob_sport" onchange="updateOnboardingTrainingSummary()">
-            ${Object.entries(SPORT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.primarySport,v)}>${l}</option>`).join("")}
-          </select></div>
+          <div class="field" style="margin-top:0">
+            <label>¿Tienes un deporte cardio como actividad principal?</label>
+            <div class="chips" style="margin:6px 0">
+              <label class="chip-check"><input type="radio" name="ob_has_cardio" id="ob_has_cardio_yes" value="yes" onchange="updateObSportSelector()" ${d.primarySport!=="strength_only"?"checked":""}><span>Sí</span></label>
+              <label class="chip-check"><input type="radio" name="ob_has_cardio" id="ob_has_cardio_no" value="no" onchange="updateObSportSelector()" ${d.primarySport==="strength_only"?"checked":""}><span>No, solo entreno fuerza</span></label>
+            </div>
+            <div id="ob_sport_wrap" ${d.primarySport==="strength_only"?'style="display:none"':''}>
+              <label class="muted small">Deporte cardio</label>
+              <select id="ob_sport" onchange="updateOnboardingTrainingSummary()">
+                ${[["running","Running"],["cycling","Cycling"],["swimming","Natación"],["other","Otro deporte cardio"]].map(([v,l])=>`<option value="${v}" ${sel(d.primarySport==="strength_only"?"running":d.primarySport,v)}>${l}</option>`).join("")}
+              </select>
+            </div>
+          </div>
           <div class="field" style="margin-top:0"><label>Trabajo de fuerza</label><select id="ob_strength" onchange="updateOnboardingTrainingSummary()">
             ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.strengthMode,v)}>${l}</option>`).join("")}
           </select></div>
@@ -2280,7 +2313,7 @@ function renderOnboarding(){
         </div>
         <label class="muted small">Días disponibles y lugar real</label>
         ${trainingAvailabilityHtml("ob",d)}
-        <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority)}</div>
+        <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled)}</div>
       </div>${onboardingButtons(false)}`;
   }else{
     const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]];
@@ -2325,7 +2358,8 @@ function readOnboardingStep(){
     d.goal=$("#ob_goal").value;d.calorieTarget=+$("#ob_kcal").value;d.proteinTarget=+$("#ob_protein").value;
     d.carbTarget=+$("#ob_carbs").value;d.fatTarget=+$("#ob_fat").value;
   }else if(onboardingStep===3){
-    d.primarySport=$("#ob_sport").value;
+    const _obNoCardio=$("#ob_has_cardio_no");
+    d.primarySport=(_obNoCardio&&_obNoCardio.checked)?"strength_only":($("#ob_sport")?$("#ob_sport").value:"running");
     d.strengthMode=$("#ob_strength").value;
     d.planDurationWeeks=+$("#ob_duration").value;
     d.trainingExperience=$("#ob_experience").value;
@@ -2379,21 +2413,33 @@ function onboardingNext(){
   const error=validateOnboardingStep();
   if(error){toast(error);return;}
   if(onboardingStep===1)applyCalculatedMacros();
+  const prevStep=onboardingStep;
   onboardingStep=Math.min(4,onboardingStep+1);
   renderOnboarding();window.scrollTo(0,0);
+  if(prevStep===3&&onboardingDraft&&onboardingDraft.primarySport==="strength_only"){
+    showCardioNudge("onboarding");
+  }
 }
 function onboardingBack(){readOnboardingStep();onboardingStep=Math.max(1,onboardingStep-1);renderOnboarding();window.scrollTo(0,0);}
 function onboardingGoalChanged(goal){onboardingDraft.goal=goal;applyCalculatedMacros();renderOnboarding();}
 function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();renderOnboarding();toast("Metas recalculadas");}
 function updateOnboardingTrainingSummary(){
-  const out=$("#obTrainingSummary"),sport=$("#ob_sport"),duration=$("#ob_duration"),priority=$("#ob_priority");
-  if(!out||!sport||!duration||!priority)return;
+  const out=$("#obTrainingSummary"),duration=$("#ob_duration");
+  if(!out||!duration)return;
+  const _obNoCardio=$("#ob_has_cardio_no");
+  const sportValue=(_obNoCardio&&_obNoCardio.checked)?"strength_only":($("#ob_sport")?$("#ob_sport").value:"running");
   const dayIds=WEEKDAY_OPTIONS.filter(day=>{const el=$("#ob_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
   const labels=dayIds.map(day=>WEEKDAY_OPTIONS.find(option=>option.value===day).short).join(", ");
+  const lc=onboardingDraft&&onboardingDraft.lightCardioEnabled;
   const impact=dayIds.length<MIN_TRAINING_DAYS
-    ?`Elige al menos ${MIN_TRAINING_DAYS} días para combinar fuerza y ${SPORT_LABELS[sport.value]||"tu disciplina"}.`
-    :trainingPlanSummary(dayIds.length,sport.value,priority.value);
+    ?`Elige al menos ${MIN_TRAINING_DAYS} días para tu plan de entrenamiento.`
+    :trainingPlanSummary(dayIds.length,sportValue,undefined,lc);
   out.innerHTML=`<b>${duration.value} semanas · ${dayIds.length} días${labels?" ("+labels+")":""}.</b> ${impact}`;
+}
+function updateObSportSelector(){
+  const no=$("#ob_has_cardio_no"),wrap=$("#ob_sport_wrap");
+  if(wrap)wrap.style.display=(no&&no.checked)?"none":"";
+  updateOnboardingTrainingSummary();
 }
 function toggleTrainingDay(prefix,day){
   const checkbox=$("#"+prefix+"_day_"+day),location=$("#"+prefix+"_location_"+day);
@@ -2491,6 +2537,7 @@ async function saveOnboarding(){
     maintenanceCalories:d.maintenanceCalories,macroMethod:d.macroMethod,
     challenge:d.challenge||previous.pendingChallenge||previous.challenge||(d.goal==="mantenimiento"?"maintain":d.goal==="volumen"?"strength":"continue"),
     primarySport:d.primarySport,strengthMode:d.strengthMode,trainType:d.primarySport,
+    lightCardioEnabled:!!d.lightCardioEnabled,
     trainDays:d.trainingDays.length,trainingDays:d.trainingDays,trainingLocations:d.trainingLocations,
     sessionMinutes:d.sessionMinutes,equipment:d.equipment,trainingExperience:d.trainingExperience,
     trainingPriority:d.trainingPriority,preferredTrainingTime:d.preferredTrainingTime,
@@ -2686,6 +2733,35 @@ async function installApp(){
   if(!dp){dismissInstall();return;}
   try{ dp.prompt(); await dp.userChoice; }catch(e){}
   UI.installDismissed=true; uiSave(); removeInstallPrompt();   // no volver a sugerir tras el intento
+}
+/* ---- Aviso cardiovascular para usuarios "solo fuerza" (una vez, dismissable) ---- */
+let _cardioNudgeCtx=null;
+function showCardioNudge(ctx){
+  if(UI.cardioNudgeDismissed)return;
+  _cardioNudgeCtx=ctx;
+  modal(`<h3>Actividad aeróbica y salud cardiovascular</h3>
+    <p class="muted small">Las guías de salud pública (como las de la OMS) recomiendan al menos 150 minutos por semana de actividad aeróbica de intensidad moderada para mantener una buena salud cardiovascular. El entrenamiento de fuerza es una base excelente; combinarlo con actividad aeróbica regular puede ampliar sus beneficios. Esta es información general — consulta a un profesional de salud para orientación personalizada.</p>
+    <label class="chip-check" style="display:flex;margin:14px 0">
+      <input type="checkbox" id="nudge_light_cardio">
+      <span>Agregar cardio ligero a mi plan (actividad aeróbica de tu elección)</span>
+    </label>
+    <button class="btn btn-accent" style="width:100%;margin-top:4px" onclick="dismissCardioNudge()">Continuar</button>`);
+}
+function dismissCardioNudge(){
+  const enabled=!!(document.getElementById("nudge_light_cardio")&&document.getElementById("nudge_light_cardio").checked);
+  UI.cardioNudgeDismissed=true;uiSave();
+  if(_cardioNudgeCtx==="onboarding"&&onboardingDraft){
+    onboardingDraft.lightCardioEnabled=enabled;
+  }else if(_cardioNudgeCtx==="profile"&&enabled){
+    saveCardioLightEnabled(true);
+  }
+  closeModal();
+}
+async function saveCardioLightEnabled(enabled){
+  if(!profile||!profile.prefs)return;
+  const prefs={...profile.prefs,lightCardioEnabled:enabled};
+  const result=await saveProfilePrefs(prefs);
+  if(!result||!result.error)render();
 }
 function isCollapsed(key){return !!(UI.collapsed&&UI.collapsed[key]);}
 function toggleSection(key,btn){
@@ -4567,9 +4643,19 @@ function renderProfile(){
   <div class="dash">
     <div class="muted small" style="margin-bottom:10px">El plan usa tus días y lugares reales. Cambiar disponibilidad ajusta las próximas sesiones sin borrar lo que ya registraste.</div>
     <div class="onboarding-grid">
-      <div class="field"><label>Disciplina principal</label><select id="pf_sport" onchange="updateTrainingSummary()">
-        ${Object.entries(SPORT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.primarySport,v)}>${l}</option>`).join("")}
-      </select></div>
+      <div class="field">
+        <label>¿Tienes un deporte cardio como actividad principal?</label>
+        <div class="chips" style="margin:6px 0">
+          <label class="chip-check"><input type="radio" name="pf_has_cardio" id="pf_has_cardio_yes" value="yes" onchange="updatePfSportSelector()" ${p.primarySport!=="strength_only"?"checked":""}><span>Sí</span></label>
+          <label class="chip-check"><input type="radio" name="pf_has_cardio" id="pf_has_cardio_no" value="no" onchange="updatePfSportSelector()" ${p.primarySport==="strength_only"?"checked":""}><span>No, solo entreno fuerza</span></label>
+        </div>
+        <div id="pf_sport_wrap" ${p.primarySport==="strength_only"?'style="display:none"':''}>
+          <label class="muted small">Deporte cardio</label>
+          <select id="pf_sport" onchange="updateTrainingSummary()">
+            ${[["running","Running"],["cycling","Cycling"],["swimming","Natación"],["other","Otro deporte cardio"]].map(([v,l])=>`<option value="${v}" ${sel(p.primarySport==="strength_only"?"running":p.primarySport,v)}>${l}</option>`).join("")}
+          </select>
+        </div>
+      </div>
       <div class="field"><label>Trabajo de fuerza</label><select id="pf_strength" onchange="updateTrainingSummary()">
         ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.strengthMode,v)}>${l}</option>`).join("")}
       </select></div>
@@ -4590,7 +4676,7 @@ function renderProfile(){
     <div class="field"><label>Duración del plan</label><select id="pf_duration" onchange="updateTrainingSummary()">
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">Al cambiarla se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
-    <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority)}</div>
+    <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled)}</div>
     <div class="field"><label>Equipo disponible</label><div class="chips">${checkChips("pf_equipment",EQUIPMENT_LABELS,p.equipment)}</div></div>
     <div class="field"><label>Lesiones actuales (opcional)</label><input id="pf_injuries" value="${esc(p.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
     <div class="field"><label>Limitaciones relevantes (opcional)</label><input id="pf_limitations" value="${esc(p.limitations)}" placeholder="Ej. no puedo correr más de 20 minutos"></div>
@@ -4672,16 +4758,25 @@ function renderProfile(){
   }else{
     renderPushSection();
   }
+  if(p.primarySport==="strength_only")showCardioNudge("profile");
 }
 function updateTrainingSummary(){
-  const sport=$("#pf_sport"),duration=$("#pf_duration"),priority=$("#pf_priority"),out=$("#trainingSummary");
-  if(!out||!sport||!duration||!priority)return;
+  const duration=$("#pf_duration"),priority=$("#pf_priority"),out=$("#trainingSummary");
+  if(!out||!duration||!priority)return;
+  const _pfNoCardio=$("#pf_has_cardio_no");
+  const sportValue=(_pfNoCardio&&_pfNoCardio.checked)?"strength_only":($("#pf_sport")?$("#pf_sport").value:"running");
   const dayIds=WEEKDAY_OPTIONS.filter(day=>{const el=$("#pf_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
   const labels=dayIds.map(day=>WEEKDAY_OPTIONS.find(option=>option.value===day).short).join(", ");
+  const lc=migrateProfilePrefs((profile&&profile.prefs)||{}).lightCardioEnabled;
   const impact=dayIds.length<MIN_TRAINING_DAYS
     ?`Elige al menos ${MIN_TRAINING_DAYS} días para sostener un plan combinado.`
-    :trainingPlanSummary(dayIds.length,sport.value,priority.value);
+    :trainingPlanSummary(dayIds.length,sportValue,priority.value,lc);
   out.innerHTML=`<b>${duration.value} semanas · ${dayIds.length} días${labels?" ("+labels+")":""}.</b> ${impact}`;
+}
+function updatePfSportSelector(){
+  const no=$("#pf_has_cardio_no"),wrap=$("#pf_sport_wrap");
+  if(wrap)wrap.style.display=(no&&no.checked)?"none":"";
+  updateTrainingSummary();
 }
 function updateProfileMealCount(value){
   const count=Math.min(6,Math.max(2,+value||4));

@@ -2403,7 +2403,7 @@ Cerrar el ciclo de feedback de Progreso: mostrar al usuario, durante el ciclo ac
 
 ## REQ-45 - Selector de disciplina en dos pasos: cardio opcional, aviso cardiovascular y cardio ligero genérico
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Evidencia
 

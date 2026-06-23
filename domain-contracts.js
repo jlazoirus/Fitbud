@@ -4,7 +4,7 @@
 (function(root){
   "use strict";
 
-  const VALID_SPORTS=new Set(["running","cycling","swimming"]);
+  const VALID_SPORTS=new Set(["running","cycling","swimming","other","strength_only"]);
   const VALID_STRENGTH=new Set(["gym","bodyweight"]);
   const VALID_EXPERIENCES=new Set(["beginner","intermediate","advanced"]);
   const VALID_PRIORITIES=new Set(["composition","performance","strength","health"]);
@@ -42,7 +42,7 @@
   function validateProfilePrefs(prefs){
     const errors=[];
     if(!prefs||typeof prefs!=="object")return ok(["El perfil debe ser un objeto."]);
-    if(!VALID_SPORTS.has(prefs.primarySport))errors.push("primarySport debe ser running, cycling o swimming.");
+    if(!VALID_SPORTS.has(prefs.primarySport))errors.push("primarySport debe ser una disciplina válida (running, cycling, swimming, other, strength_only).");
     if(!VALID_STRENGTH.has(prefs.strengthMode))errors.push("strengthMode debe ser gym o bodyweight.");
     const days=Array.isArray(prefs.trainingDays)?prefs.trainingDays:[];
     if(days.length<1||days.length>6)errors.push("trainingDays debe tener entre 1 y 6 elementos.");
