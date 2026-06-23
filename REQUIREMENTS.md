@@ -109,7 +109,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Nutricion | Recetas, macros, checks, reemplazos, generacion IA diaria/semanal con borrador+lista de compras y regeneracion por comida | Falta contingencia nutricional y reemplazos equivalentes (REQ-19) |
 | Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20) |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
-| Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Falta comparar tendencias, hitos y explicar que cambio en el plan |
+| Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico de peso con valores hardcodeados del primer usuario para todos los demás (REQ-43) |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
 | Recordatorios | No existe | Falta el canal por correo (REQ-24) y el canal push de recordatorios de racha con permiso del dispositivo (REQ-38); ambos exigen programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
@@ -2268,6 +2268,53 @@ Hacer de la conversacion el eje de la pantalla de inicio, con la agenda determin
 - Confirmar 5 pestanas y que cada superficie de detalle sigue accesible.
 - Desactivar IA/forzar offline y confirmar degradacion a la agenda determinista.
 - Revisar overflow en 375x812 y foco del input.
+
+---
+
+## REQ-43 - Gráfico de peso personalizado por usuario
+
+**Estado: pendiente.**
+
+### Evidencia
+
+- `weightChart()` en `index.html` (líneas ~6626 y ~6643-6644) tiene dos valores hardcodeados del primer usuario:
+  - `const allY=pts.map(p=>p.y).concat([74,82])` fuerza el eje Y a incluir el rango 74-82 kg, distorsionando el gráfico para cualquier usuario con peso fuera de ese rango.
+  - Las líneas de referencia SVG codifican `ys(82)` y `ys(74.5)` con la etiqueta `meta ~74.5`.
+- Para un usuario con rango de peso 90-100 kg, el eje Y queda comprimido y la referencia "meta ~74.5" es irrelevante y puede ser confusa.
+- Ningún REQ existente aborda la personalización de los valores de referencia del gráfico de peso.
+
+### Objetivo
+
+Que el gráfico de peso en Progreso refleje el rango real del usuario en lugar de los valores del primer usuario, y muestre una referencia significativa (peso de inicio del ciclo) en lugar de un valor hardcodeado.
+
+### Dependencias
+
+- Ninguna técnica. Cambio 100% en cliente (`weightChart()` dentro de `index.html`). No requiere migración SQL.
+
+### Alcance
+
+- Eliminar `concat([74,82])` del cálculo del eje Y. Usar solo los valores reales de peso registrado, más un padding dinámico (p. ej. ±2 kg o ±5 % del rango real).
+- Reemplazar las dos líneas de referencia hardcodeadas (`ys(82)` y `ys(74.5)`) por:
+  - Una línea de "Inicio" en el peso del usuario al arrancar el ciclo: en primer lugar el primer peso registrado en `weight_log` para este ciclo (`wkg(1)`); si no hay datos, usar `profile.prefs.weightKg` del perfil.
+  - Eliminar la referencia `ys(82)` o convertirla en un margen visual sin etiqueta.
+- Si no hay ningún punto de referencia disponible (`wkg(1)` nulo y `prefs.weightKg` ausente), omitir la línea de referencia.
+- Conservar la superposición del porcentaje de grasa corporal con su eje independiente.
+- Ningún texto nuevo menciona IA, proveedor, modelo ni cuota (REQ-31).
+
+### Criterios de aceptacion
+
+- Un usuario con rango de peso 90-100 kg ve el gráfico con eje Y centrado en ese rango, sin distorsión por valores de 74-82.
+- La referencia mostrada corresponde al peso de inicio del ciclo del usuario activo, no un valor fijo de otro usuario.
+- Si no hay datos de inicio, no se muestra ninguna referencia, y el gráfico sigue siendo útil.
+- No hay regresión en el gráfico de usuarios con datos de grasa corporal.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Probar con un usuario cuyo rango de peso esté fuera de 74-82 (p. ej. 90-100 kg) y confirmar que el gráfico no comprime la curva en el extremo inferior del eje.
+- Confirmar que la referencia muestra el peso de inicio, no "74.5".
+- Probar sin datos registrados: sin línea de referencia, sin errores.
+- `git diff --check` y release gate local.
 
 ---
 
