@@ -109,7 +109,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Nutricion | Recetas, macros, checks, reemplazos, generacion IA diaria/semanal con borrador+lista de compras y regeneracion por comida | Falta contingencia nutricional y reemplazos equivalentes (REQ-19) |
 | Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20) |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
-| Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico personalizado implementado (REQ-43). Falta adherencia nutricional del ciclo en curso en las estadísticas de Progreso y contexto de pesos en las tarjetas de ciclos completados (REQ-44). |
+| Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico personalizado (REQ-43) y adherencia nutricional + contexto de peso en ciclos (REQ-44) implementados. Falta contingencia y adaptación semanal. |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
 | Recordatorios | No existe | Falta el canal por correo (REQ-24) y el canal push de recordatorios de racha con permiso del dispositivo (REQ-38); ambos exigen programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
@@ -2326,7 +2326,7 @@ Que el gráfico de peso en Progreso refleje el rango real del usuario en lugar d
 
 ## REQ-44 - Adherencia nutricional y contexto de peso en Progreso
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Evidencia
 

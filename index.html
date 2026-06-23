@@ -3905,13 +3905,13 @@ function progressJourney(){
       <div class="summary" style="margin-top:12px">
         <div class="scard"><div class="n">${s.workouts||0}</div><div class="l">entrenamientos</div></div>
         <div class="scard"><div class="n">${s.mealAdherence||0}%</div><div class="l">adherencia</div></div>
-        <div class="scard"><div class="n">${recapDelta(s.weightChange," kg")}</div><div class="l">cambio de peso</div></div>
+        <div class="scard"><div class="n">${recapDelta(s.weightChange," kg")}</div><div class="l">${s.startWeight!=null&&s.endWeight!=null?`${s.startWeight} → ${s.endWeight} kg`:`cambio de peso`}</div></div>
         <div class="scard"><div class="n">${s.bestStreak||0}</div><div class="l">mejor racha</div></div>
       </div>
     </div>`;
   }).join("");
 }
-// Tarjetas de estadísticas (kg, entrenos, racha)
+// Tarjetas de estadísticas (kg, entrenos, racha, adherencia nutricional)
 function progressStats(){
   const outcomes=Object.values(S.days).map(day=>workoutOutcomeForState(day||{}));
   const entrenos=outcomes.filter(outcome=>outcome==="completed").length;
@@ -3920,10 +3920,13 @@ function progressStats(){
   const lost=ws.length>=2?(ws[0]-ws[ws.length-1]):0;
   const lostTxt=lost>0?"-"+lost.toFixed(1):(lost<0?"+"+(-lost).toFixed(1):"0");
   const stk=streak();
-  return `<div class="summary" style="grid-template-columns:1fr 1fr 1fr">
+  const cs=cycleSummary();
+  const adherenceTxt=cs.plannedMeals>0?`${cs.mealAdherence}%`:`—`;
+  return `<div class="summary" style="grid-template-columns:repeat(2,1fr)">
     <div class="scard"><div class="n" style="color:var(--good)">${lostTxt}</div><div class="l">kg</div></div>
     <div class="scard"><div class="n">${entrenos}</div><div class="l">completos${parciales?` · ${parciales} parciales`:""}</div></div>
     <div class="scard"><div class="n" style="color:var(--terra-300)">🔥 ${stk}</div><div class="l">días racha</div></div>
+    <div class="scard"><div class="n">${adherenceTxt}</div><div class="l">comidas del plan</div></div>
   </div>`;
 }
 
