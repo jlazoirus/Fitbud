@@ -107,7 +107,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Onboarding | Perfil v3 implementado: macros, zona horaria, 2-6 comidas, horarios, logistica alimentaria, dias/lugares, recursos, experiencia y limitaciones | - |
 | Home diario | Muestra macros, dieta, entrenamiento y racha | Falta priorizacion inteligente, estado del dia, proxima accion y contingencias |
 | Nutricion | Recetas, macros, checks, reemplazos, generacion IA diaria/semanal con borrador+lista de compras y regeneracion por comida | Falta contingencia nutricional y reemplazos equivalentes (REQ-19). Campos de ventana de alimentación y repetición aceptable visibles en onboarding y perfil sin contexto suficiente para un usuario normal (REQ-46). |
-| Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20). Solo running/cycling/natación; usuarios de gimnasio sin cardio estructurado quedan sin opción (REQ-45). |
+| Entrenamiento | Planes personalizados de 4/10 semanas, biblioteca guiada y reproductor recuperable con series, intervalos, temporizadores y sustituciones | Falta el modo contingencia y la adaptación semanal (REQ-19/REQ-20). Solo running/cycling/natación; el selector no diferencia entre usuarios de otro deporte cardio libre y usuarios sin cardio estructurado (REQ-45). |
 | Adaptacion | Revision manual cada 4 semanas y nuevo ciclo | Falta check-in semanal y ajustes graduales segun adherencia, hambre, energia, recuperacion y rendimiento |
 | Progreso | Peso, grasa, entrenos, adherencia, racha, recap y fotos | Gráfico personalizado (REQ-43) y adherencia nutricional + contexto de peso en ciclos (REQ-44) implementados. Falta contingencia y adaptación semanal. |
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
@@ -203,7 +203,7 @@ Hallazgos de una evaluacion heuristica de los flujos reales (REQ-34..37) mas una
 
 ### Fase I - Pulido de UX y alcance de perfil (directiva de producto, jun 2026)
 
-45. REQ-45 - Disciplina "Otra actividad" y limpieza de naming en perfil y onboarding.
+45. REQ-45 - Selector de disciplina en dos pasos: cardio opcional, aviso cardiovascular y cardio ligero genérico.
 46. REQ-46 - Simplificar configuración de nutrición (ocultar ventana y repetición en flujo estándar).
 47. REQ-47 - Indicadores de carga (spinners) en generación de plan, coach y nutrición diaria.
 
@@ -2401,56 +2401,80 @@ Cerrar el ciclo de feedback de Progreso: mostrar al usuario, durante el ciclo ac
 
 ---
 
-## REQ-45 - Disciplina "Otra actividad" y limpieza de naming
+## REQ-45 - Selector de disciplina en dos pasos: cardio opcional, aviso cardiovascular y cardio ligero genérico
 
 **Estado: pendiente.**
 
 ### Evidencia
 
-- `VALID_SPORTS = new Set(["running","cycling","swimming"])` en `domain-contracts.js:7` bloquea cualquier valor distinto; el mensaje de error usa "deporte" (`domain-contracts.js:45`).
-- `SPORT_LABELS = {running:"Running",cycling:"Cycling",swimming:"Natación"}` en `index.html:786` — sin opción para otros perfiles.
-- `ob_sport` (onboarding, `index.html:2267-2268`) y `pf_sport` (perfil, `index.html:4570-4571`) generan sus `<option>` iterando `Object.entries(SPORT_LABELS)` — no hay ningún "Otra" en el set.
-- `sportSessions(primary, ds, prefs)` en `index.html:1062-1145` — cuando `primary` no está en `plans`, cae en silencio a `plans.running`, generando sesiones de running incorrectas para quien eligiera cualquier opción diferente.
-- La validación de piscina (`index.html:2170,2184`) solo aplica para `primarySport==="swimming"` — no afecta a `"other"`.
-- La UI ya usa la etiqueta "Disciplina principal" (`index.html:2267,4570`) en lugar de "deporte principal"; el naming correcto ya está parcialmente en producción; solo falta alinearlo en el contrato y añadir la opción faltante.
+- `VALID_SPORTS = new Set(["running","cycling","swimming"])` en `domain-contracts.js:7` trata el cardio como obligatorio; el mensaje de error usa "deporte" en lugar de "disciplina" (`domain-contracts.js:45`).
+- `SPORT_LABELS = {running:"Running",cycling:"Cycling",swimming:"Natación"}` en `index.html:786` — sin camino para quien no hace ningún deporte cardio.
+- `ob_sport` (onboarding, `index.html:2267-2268`) y `pf_sport` (perfil, `index.html:4570-4571`) presentan el selector como si el cardio fuera universal, sin preguntar primero si el usuario lo practica.
+- `sportSessions()` en `index.html:1062-1145` — cuando `primary` no está en `plans`, cae silenciosamente a `plans.running`, generando sesiones de running para perfiles que no corren.
+- El diseño original mezclaba dos casos distintos bajo una sola opción "Otra actividad": (a) usuario que hace un deporte cardio no listado (tenis, box, hiking…) y (b) usuario sin ningún deporte cardio estructurado. El nombre "disciplina principal" no es correcto para el caso (b) porque no se está eligiendo una disciplina, se está indicando que no hay ninguna.
 
 ### Objetivo
 
-Añadir `"other"` como disciplina válida con la etiqueta "Otra actividad" y comportamiento bien definido (solo sesiones de fuerza, sin cardio estructurado), y limpiar el naming en `domain-contracts.js` para que use "disciplina" en lugar de "deporte".
+Separar la selección de deporte en dos pasos explícitos: primero preguntar si el usuario practica algún deporte cardio, y solo entonces mostrar el selector de deporte. Para quien no hace cardio, reemplazar el selector por un camino limpio ("solo fuerza") con un aviso informativo único sobre actividad cardiovascular y la opción de incorporar sesiones de cardio ligero genérico al plan.
 
 ### Dependencias
 
-- Ninguna técnica. Cambio 100% en cliente (`index.html` y `domain-contracts.js`). No requiere migración SQL.
+- Ninguna técnica. Cambio 100 % en cliente (`index.html` y `domain-contracts.js`). No requiere migración SQL.
 
 ### Alcance
 
-- `domain-contracts.js`: añadir `"other"` a `VALID_SPORTS`. Actualizar el mensaje de error de la línea 45 de "primarySport debe ser running, cycling o swimming" a "La disciplina principal debe ser running, cycling, swimming u other".
-- `index.html`: añadir `other:"Otra actividad"` a `SPORT_LABELS` (línea 786).
-- `sportSessions()` (línea 1062): para `primary==="other"`, retornar un objeto con las tres sesiones vacías (`{quality:{id:"calidad",kind:"Otra",name:"",detail:"",exerciseIds:[]}, endurance:{...}, technique:{...}}`). El template de plan las descartará al comprobar que no hay `detail`, resultando en un plan con solo sesiones de fuerza.
-- `trainingPlanSummary()` (líneas 1028-1041): para `primary==="other"`, retornar un texto apropiado, por ejemplo: `"Solo fuerza y actividad física libre — sin plan de cardio estructurado."`.
-- Onboarding (línea 2268) y perfil (línea 4571): añadir al final del select `<option value="other">Otra actividad</option>`. Como ambos generan las opciones iterando `SPORT_LABELS`, basta con añadir la clave al objeto.
-- El fallback de la línea 2394 (`||"tu disciplina"`) ya queda cubierto por `SPORT_LABELS["other"]`.
+#### Paso 1 — bifurcación en el selector de deporte
+
+El selector de deporte actual (onboarding paso 3, línea 2267-2268; perfil, línea 4570-4571) se reemplaza por dos controles en secuencia:
+
+1. Una pregunta binaria: "¿Tienes un deporte cardio como actividad principal?" con dos opciones de radio o botones: **"Sí"** y **"No, solo entreno fuerza"**.
+2. Si el usuario elige **"Sí"**, se despliega el select existente con las opciones: Running / Ciclismo / Natación / **Otro deporte cardio no listado** (valor `"other"`). El comportamiento de los tres deportes existentes no cambia. Para `"other"`, el plan genera solo sesiones de fuerza (sin cardio estructurado), tal como se describía en el diseño original de este REQ.
+3. Si el usuario elige **"No, solo entreno fuerza"**, no se muestra ningún select de deporte. El campo `primarySport` se guarda con el valor `"strength_only"`.
+
+`domain-contracts.js`: añadir `"other"` y `"strength_only"` a `VALID_SPORTS`. Actualizar el mensaje de error de `domain-contracts.js:45` para listar los valores válidos actualizados y reemplazar "deporte" por "disciplina".
+
+`SPORT_LABELS` en `index.html:786`: añadir `other: "Otro deporte cardio"` (etiqueta visible en resumen/summary cuando el usuario eligió "Sí" + other). `"strength_only"` no necesita etiqueta en `SPORT_LABELS` porque su texto de resumen se genera por separado.
+
+#### Paso 2 — comportamiento del plan para cada valor
+
+- `primary === "running"` / `"cycling"` / `"swimming"`: sin cambios.
+- `primary === "other"`: `sportSessions()` retorna sesiones de cardio vacías (sin `detail`), que el template descarta — el plan contiene solo fuerza. `trainingPlanSummary()` devuelve texto apropiado, p. ej.: `"Deporte cardio libre + fuerza — sin plan estructurado para tu deporte."`.
+- `primary === "strength_only"`: `sportSessions()` retorna sesiones vacías idénticas al caso `"other"`. Si el usuario activó el toggle de cardio ligero (`prefs.lightCardioEnabled === true`), `sportSessions()` puede añadir una sesión genérica por semana etiquetada como "Cardio ligero (actividad aeróbica libre)" sin serie de ejercicios específicos de ningún deporte, únicamente duración e indicación de intensidad baja. `trainingPlanSummary()` devuelve texto apropiado, p. ej.: `"Solo fuerza — sin deporte cardio estructurado."` o, si tiene cardio ligero: `"Fuerza + cardio ligero (actividad aeróbica libre)."`.
+
+#### Paso 3 — aviso informativo de salud cardiovascular
+
+Cuando `primary === "strength_only"`, mostrar **una sola vez** un aviso informativo breve y no bloqueante (tipo banner o modal ligero) que:
+
+- Informa de forma general sobre los beneficios de la actividad aeróbica moderada con referencia a la recomendación de salud pública (p. ej., ~150 min/semana de actividad aeróbica moderada según la OMS), sin dar consejo médico personalizado.
+- Incluye un toggle o checkbox opcional: **"Agregar cardio ligero a mi plan"**. Si el usuario lo activa, escribe `prefs.lightCardioEnabled = true` en el perfil (campo persistido en Supabase junto al resto de prefs).
+- Si el usuario cierra el aviso o elige no activar el toggle, el aviso **no debe volver a aparecer nunca**. La decisión se persiste en el objeto `UI` del localStorage (p. ej., `UI.cardioNudgeDismissed = true; uiSave()`), siguiendo el mismo patrón que `UI.installDismissed`.
+- El aviso se muestra en el flujo de onboarding inmediatamente después de que el usuario selecciona "No, solo entreno fuerza" y avanza al paso siguiente, o bien al entrar a la pantalla de Perfil si el usuario cambia la opción ahí. En ambos casos solo se muestra si `!UI.cardioNudgeDismissed`.
+- Ningún texto del aviso menciona IA, proveedor, modelo ni cuota (REQ-31). El lenguaje es informativo, no prescriptivo.
+
+#### Restricciones de alcance
+
 - No modificar la validación de piscina ni las sesiones de natación.
-- No tocar la lógica de entrenos de fuerza: `strengthSessions()` no depende de `primarySport`.
-- `generateWorkout()` / filtrado de ejercicios por disciplina (líneas 5971-5984): `WORKOUT_EXERCISE_IDS["other"]` será `undefined`, lo que ya hace que el filtro no aplique — sin cambios requeridos.
-- Ningún texto nuevo menciona IA, proveedor, modelo ni cuota (REQ-31).
-- Probar en 375×812 sin overflow.
+- `strengthSessions()` no depende de `primarySport` — sin cambios.
+- `generateWorkout()` / filtrado por disciplina (líneas 5971-5984): `WORKOUT_EXERCISE_IDS["other"]` y `WORKOUT_EXERCISE_IDS["strength_only"]` serán `undefined`, el filtro ya no aplica — sin cambios requeridos.
+- Probar en 375×812 sin overflow en la bifurcación y en el aviso.
 
 ### Criterios de aceptacion
 
-- Un usuario puede completar el onboarding con `primarySport="other"` sin error de validación en `domain-contracts.js`.
-- Con `primarySport="other"`, el plan semanal contiene solo sesiones de fuerza; no aparece ninguna sesión de "Running · calidad", "Cycling · fondo" ni "Natación · técnica".
-- El summary box en onboarding y perfil muestra texto coherente para "Otra actividad" (sin mencionar running/cycling/natación).
-- No hay regresión para los tres deportes existentes (running, cycling, swimming).
-- El select en onboarding y perfil muestra "Otra actividad" al final de la lista.
+- (a) Un usuario que selecciona "No, solo entreno fuerza" puede completar el onboarding sin error de validación en `domain-contracts.js`, y su plan semanal no contiene ninguna sesión de "Running · calidad", "Cycling · fondo", "Natación · técnica" ni ningún otro cardio estructurado de deporte específico.
+- (b) El aviso de cardio aparece exactamente una vez para `primary === "strength_only"`. Tras cerrarlo (sin activar el toggle), `UI.cardioNudgeDismissed` queda en `true` y el aviso no reaparece al recargar la app, volver al onboarding ni al perfil.
+- (c) Si el usuario activa el toggle antes de cerrar el aviso, `prefs.lightCardioEnabled` queda en `true`, se persiste en Supabase, y el plan generado incluye sesiones genéricas de cardio ligero sin mencionar ningún deporte específico.
+- (d) Un usuario que selecciona "Sí" + "Otro deporte cardio" (`primary === "other"`) recibe un plan con solo sesiones de fuerza (sin cardio estructurado) y sin que aparezca el aviso cardiovascular.
+- (e) Los tres deportes existentes (running, cycling, swimming) no sufren regresión: sus sesiones de cardio se siguen generando correctamente.
+- (f) El summary box en onboarding y perfil muestra texto coherente para `"other"` y `"strength_only"` (sin mencionar running/cycling/natación cuando no corresponde).
 - Commit y push propios.
 
 ### Verificacion sugerida
 
-- Crear perfil con `primarySport="other"`, navegar a Entrenamiento y confirmar que el plan no contiene sesiones de cardio estructurado.
-- Confirmar que el select muestra "Otra actividad" en onboarding y en Perfil.
+- Completar onboarding con "No, solo entreno fuerza", verificar que el plan no tiene sesiones de cardio estructurado y que el aviso aparece; cerrarlo y confirmar que no reaparece en una recarga.
+- Repetir el flujo activando el toggle: confirmar que `prefs.lightCardioEnabled === true` en Supabase y que el plan contiene sesiones de cardio ligero genéricas.
+- Completar onboarding con "Sí" + "Otro deporte cardio": confirmar plan solo-fuerza sin aviso cardiovascular.
 - Con cada uno de los tres deportes originales, verificar que sus sesiones de cardio se siguen generando correctamente.
-- Ejecutar `domain-contracts.js` en Node con `primarySport="other"` y confirmar que no arroja error.
+- Ejecutar `domain-contracts.js` en Node con `primarySport="strength_only"` y `primarySport="other"` y confirmar que no arroja error.
 - `git diff --check` y release gate local.
 
 ---
