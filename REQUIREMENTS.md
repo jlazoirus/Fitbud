@@ -2599,7 +2599,8 @@ Añadir un indicador de carga inline (spinner CSS puro + texto de estado) para l
 
 ## REQ-48 - Panel de historial de pagos para el usuario
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Endpoint `api/billing-history.js` autenticado: verifica sesión activa, lee `billing_events` con `service_role` filtrando por `auth.uid()` y devuelve solo `event_type`, `plan_id`, `status`, `created_at`, `amount_cents` y `currency`. No expone `payload`, `stripe_event_id`, `error` ni eventos de otros usuarios. Perfil → "Mi suscripción" ahora muestra "Historial de pagos" debajo del estado del plan, con fecha, plan, monto si existe, estado legible y vacío "No hay pagos registrados en tu cuenta." para cortesías/admin/sin pagos. Test local `scripts/test-billing-history-api.mjs`. Service worker v42.
 
 ### Evidencia
 
@@ -2718,7 +2719,7 @@ No aplica verificación técnica automatizada. La verificación es documental:
 
 ---
 
-## REQ-50 - Cupones de acceso gratuito (28 días) sin Stripe
+## REQ-50 - Cupones de acceso gratuito (duración configurable) sin Stripe
 
 **Estado: pendiente.**
 
@@ -2733,7 +2734,7 @@ No aplica verificación técnica automatizada. La verificación es documental:
 
 ### Objetivo
 
-Permitir que Jona (admin del producto) genere manualmente códigos de cupón alfanuméricos y los distribuya a quien quiera (influencers, casos de soporte, partners). El usuario canjea el código dentro de la app — sin tarjeta ni Stripe — y se le activa un entitlement gratuito de 28 días a partir del momento del canje. Al vencer, el paywall contextual de REQ-25 aparece exactamente igual que con cualquier plan vencido.
+Permitir que Jona (admin del producto) genere manualmente códigos de cupón alfanuméricos y los distribuya a quien quiera (influencers, casos de soporte, partners). Al generar cada código se puede configurar la duración de acceso que otorga (default 28 días), de modo que distintos códigos pueden dar 7, 14, 28, 60 días u otra cantidad. El usuario canjea el código dentro de la app — sin tarjeta ni Stripe — y se le activa un entitlement gratuito por la duración configurada en ese código, a partir del momento del canje. Al vencer, el paywall contextual de REQ-25 aparece exactamente igual que con cualquier plan vencido.
 
 ### Dependencias
 
@@ -2752,7 +2753,7 @@ Crear tabla `redemption_codes` con las columnas:
 |---|---|---|
 | `code` | `text primary key` | Código alfanumérico en mayúsculas (ej. `FIT-X7K2-9A`). Unique por definición (PK). |
 | `plan_id` | `text references subscription_plans(id)` | Plan que se otorga al canjear (default `'monthly'`). |
-| `duration_days` | `int not null default 28` | Días de acceso a partir del canje. |
+| `duration_days` | `int not null default 28` | Días de acceso que otorga este código al canjearse. Configurable por código; default 28 si no se especifica al generarlo. **Concepto distinto de `valid_until`**: `duration_days` es cuánto dura el plan gratuito una vez canjeado; `valid_until` es hasta cuándo el código puede canjearse (caducidad del código en sí). Son independientes y ambos opcionales desde el punto de vista del admin. |
 | `created_by` | `uuid references auth.users` | Admin que generó el código. |
 | `created_at` | `timestamptz not null default now()` | |
 | `valid_until` | `timestamptz` | Opcional: fecha hasta la que Jona acepta canjear este código. Nulo = sin expiración del código. |
@@ -2774,7 +2775,10 @@ Maneja dos acciones en un único archivo serverless para mantener la convención
 
 - Verifica sesión y `is_admin === true` con el mismo patrón de `verifyUser()` de `api/entitlement.js`.
 - Genera un código aleatorio de 8 caracteres alfanuméricos (A-Z 0-9, excluyendo 0/O/I/1 para evitar confusiones visuales), formateado como `XXX-XXXX` (ej. `FIT-X7K2` o similar). Formato exacto: decisión de implementación, documentar en el código.
-- Acepta parámetros opcionales: `planId` (default `'monthly'`), `durationDays` (default `28`), `validUntil` (ISO string, nulo si no se pasa).
+- Acepta parámetros opcionales e independientes entre sí:
+  - `durationDays` (entero, default `28`): días de acceso gratuito que otorgará el código al canjearse. Puede ser 7, 14, 28, 60, etc. **No tiene relación con `validUntil`.**
+  - `validUntil` (ISO string, sin default → nulo): fecha límite hasta la que el código puede canjearse. Nulo significa que el código no caduca. **No afecta la duración del plan**, solo cuándo el código deja de ser canjeable.
+  - `planId` (default `'monthly'`).
 - Inserta la fila en `redemption_codes` usando `service_role`.
 - Devuelve `{ code, plan_id, duration_days, valid_until, created_at }`.
 - Sin panel de admin adicional: Jona llama al endpoint directamente (ej. con `curl` o un script) o se puede invocar desde la consola del navegador con su token de admin.
@@ -2797,7 +2801,7 @@ Maneja dos acciones en un único archivo serverless para mantener la convención
 - En la sección de suscripción de Perfil (línea 4703), dentro del bloque de estado `!entitlement && entitlementChecked` (es decir, sin plan activo), agregar debajo de los botones existentes un bloque colapsable "¿Tienes un código de acceso?" con:
   - Un campo `<input type="text" placeholder="Ej. FIT-X7K2">` y botón "Canjear".
   - Al pulsar, llama a `POST /api/coupon` con `{ action: 'redeem', code }` usando el token del usuario.
-  - En éxito: muestra confirmación "¡Código canjeado! Acceso gratuito activo por 28 días." y llama a `loadEntitlement().then(() => render())` para actualizar el estado sin recargar.
+  - En éxito: muestra confirmación "¡Código canjeado! Acceso gratuito activo por {N} días." (donde N proviene del campo `duration_days` devuelto por el endpoint en el objeto `entitlement` — no hardcodeado) y llama a `loadEntitlement().then(() => render())` para actualizar el estado sin recargar.
   - En error: muestra el mensaje devuelto por el endpoint (ya son mensajes de usuario, no técnicos).
 - El bloque de canje solo se renderiza cuando `!entitlement && entitlementChecked` (sin plan activo). Usuarios con plan activo no ven el campo.
 - Sin overflow en 375×812.
@@ -2808,12 +2812,14 @@ Ningún cambio requerido. Cuando `expires_at` pasa, `api/entitlement.js:GET` dej
 
 ### Criterios de aceptacion
 
-- Jona puede llamar a `POST /api/coupon` con `{ action: 'generate' }` usando su token de admin y recibe un código. El mismo endpoint devuelve 403 si el token no es de admin.
-- Un usuario sin plan activo puede ingresar el código en Perfil y recibe confirmación de activación. La sección de suscripción actualiza inmediatamente mostrando "Acceso gratuito" y la fecha de expiración (+28 días desde el canje).
+- Jona puede llamar a `POST /api/coupon` con `{ action: 'generate' }` usando su token de admin y recibe un código con `duration_days: 28` por defecto. El mismo endpoint devuelve 403 si el token no es de admin.
+- Jona puede generar un código con duración distinta (ej. `{ action: 'generate', durationDays: 7 }`) y al canjearse el entitlement expira en `now() + 7 días`, no 28. `durationDays` y `validUntil` son independientes y pueden combinarse libremente.
+- Un usuario sin plan activo puede ingresar el código en Perfil y recibe confirmación de activación. La sección de suscripción actualiza inmediatamente mostrando "Acceso gratuito" y la fecha de expiración (calculada como `now() + duration_days` configurado en ese código).
+- El mensaje de éxito en UI muestra la duración real del código canjeado (no "28 días" hardcodeado).
 - El mismo código no puede canjearse dos veces: el segundo intento devuelve "Este código ya fue utilizado."
-- Un código con `valid_until` pasado devuelve "El código ha expirado."
+- Un código con `valid_until` pasado devuelve "El código ha expirado." (la caducidad del código no altera la duración del plan que hubiera otorgado).
 - Un usuario con entitlement activo ve 400 "Ya tienes un plan activo." e intenta no crear un segundo entitlement.
-- Al cumplirse los 28 días, `api/entitlement.js:GET` devuelve `entitlement: null` y el paywall de REQ-25 aparece exactamente igual que para un plan pagado vencido.
+- Al vencer el entitlement (`expires_at < now()`), `api/entitlement.js:GET` devuelve `entitlement: null` y el paywall de REQ-25 aparece exactamente igual que para un plan pagado vencido.
 - El flujo de pago real con Stripe (REQ-26) no sufre regresión: `api/checkout.js` y `api/webhook.js` funcionan sin cambios.
 - `subscriptionStatusHtml()` muestra "Acceso gratuito" (no "Plan activo") para entitlements con `origin === 'coupon'`.
 - `redemption_codes` no es accesible directamente desde el cliente (sin política RLS SELECT para `authenticated`).
@@ -2822,7 +2828,9 @@ Ningún cambio requerido. Cuando `expires_at` pasa, `api/entitlement.js:GET` dej
 
 ### Verificacion sugerida
 
-- Con token de admin: `curl -X POST /api/coupon -H "Authorization: Bearer $TOKEN" -d '{"action":"generate"}'` y verificar respuesta con código.
+- Con token de admin: `curl -X POST /api/coupon -H "Authorization: Bearer $TOKEN" -d '{"action":"generate"}'` → respuesta con `duration_days: 28` (default).
+- Con duración personalizada: `curl ... -d '{"action":"generate","durationDays":7}'` → respuesta con `duration_days: 7`; al canjearlo, el entitlement expira en 7 días.
+- Con caducidad de código: `curl ... -d '{"action":"generate","durationDays":14,"validUntil":"2026-07-31T00:00:00Z"}'` → código que otorga 14 días de acceso pero solo puede canjearse antes del 31/07/2026 (los dos parámetros son independientes).
 - Con token de usuario regular: canjear el código en Perfil → confirmar que aparece "Acceso gratuito" con la fecha correcta y que `user_entitlements` tiene la fila con `origin='coupon'`.
 - Intentar canjear el mismo código con otro usuario → confirmar error "Este código ya fue utilizado."
 - Verificar en `redemption_codes` que la fila tiene `redeemed_by` y `entitlement_id` correctos.
