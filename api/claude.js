@@ -222,9 +222,10 @@ function validateDietDay(data, validation) {
     kcal += Number(meal.kcal);
     protein += Number(meal.proteina_g);
   }
-  const target = validation.target && typeof validation.target === "object" ? validation.target : {};
-  if (Number(target.kcal) > 0 && Math.abs(kcal - Number(target.kcal)) > Number(target.kcal) * 0.15) return false;
-  if (Number(target.p) > 0 && protein < Number(target.p) * 0.85) return false;
+  // La tolerancia de macros (kcal ±15%, proteína ≥85%) se valida en el cliente
+  // con mejor UX: muestra el plan con advertencias y deja elegir al usuario.
+  // Aquí solo validamos estructura para evitar rechazar respuestas válidas.
+  void kcal; void protein;
   return true;
 }
 
