@@ -68,6 +68,7 @@ Las funciones serverless ([`api/`](api/)) son el corazón de la seguridad:
 - **`/api/config`** — devuelve al navegador solo datos públicos (URL + publishable key de Supabase, modelo). **No** devuelve la key de Claude.
 - **`/api/admin`** — lista, activa/desactiva y cambia contraseñas. Exige un administrador activo y usa `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor.
 - **`/api/privacy`** — exporta los datos del usuario autenticado y borra cuenta, datos y fotos tras una confirmación estricta. Usa `SUPABASE_SERVICE_ROLE_KEY` solo en el servidor.
+- **`/api/coupon`** — genera códigos de acceso gratuito para administradores y permite canjearlos sin pasar por Stripe.
 
 ## Privacidad y seguridad
 
@@ -118,11 +119,11 @@ Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se
 ### Preparar la base
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
-2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql), [`supabase/privacy.sql`](supabase/privacy.sql), [`supabase/exercises.sql`](supabase/exercises.sql) y [`supabase/coach_quota.sql`](supabase/coach_quota.sql). Las migraciones finales crean planes, privacidad, la biblioteca compartida y el control de consumo con RLS.
+2. En el **SQL Editor**, ejecuta en orden [`supabase/schema.sql`](supabase/schema.sql), [`supabase/seed.sql`](supabase/seed.sql), [`supabase/auth.sql`](supabase/auth.sql), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql), [`supabase/privacy.sql`](supabase/privacy.sql), [`supabase/exercises.sql`](supabase/exercises.sql), [`supabase/coach_quota.sql`](supabase/coach_quota.sql), [`supabase/entitlements.sql`](supabase/entitlements.sql), [`supabase/billing.sql`](supabase/billing.sql), [`supabase/coupon_codes.sql`](supabase/coupon_codes.sql) y [`supabase/analytics.sql`](supabase/analytics.sql). Las migraciones finales crean planes, privacidad, la biblioteca compartida, control de consumo, facturación, cupones y métricas con RLS.
 3. En **Project Settings → API Keys**, copia la **Project URL** (o el Project ID) y la **Publishable key** (`sb_publishable_...`). Es la que reemplaza a la antigua `anon public` (ahora *legacy*); se usa igual y entra como rol `anon`.
 4. Ponlos como variables de entorno en Vercel (ver despliegue). Para desarrollo local, también puedes guardarlos desde **Ajustes → Base de datos**.
 
-> Para una instalación existente, ejecuta las migraciones idempotentes pendientes en orden: [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) si aún no se aplicó, después [`supabase/privacy.sql`](supabase/privacy.sql), [`supabase/exercises.sql`](supabase/exercises.sql) y finalmente [`supabase/coach_quota.sql`](supabase/coach_quota.sql). No se ejecutan automáticamente en producción.
+> Para una instalación existente, ejecuta las migraciones idempotentes pendientes en orden: [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) si aún no se aplicó, después [`supabase/privacy.sql`](supabase/privacy.sql), [`supabase/exercises.sql`](supabase/exercises.sql), [`supabase/coach_quota.sql`](supabase/coach_quota.sql), [`supabase/entitlements.sql`](supabase/entitlements.sql), [`supabase/billing.sql`](supabase/billing.sql), [`supabase/coupon_codes.sql`](supabase/coupon_codes.sql) y [`supabase/analytics.sql`](supabase/analytics.sql). No se ejecutan automáticamente en producción.
 
 El catálogo base se mantiene en [`exercise-catalog.js`](exercise-catalog.js). Después de editarlo, regenera la migración y valida referencias con:
 

@@ -22,7 +22,7 @@ const TABLES_REQUIRING_RLS = [
   "coach_usage", "coach_option_pool", "coach_option_impressions",
   "coach_generation_parts", "coach_quota_policies", "coach_quota_overrides",
   "notification_preferences", "notification_log",
-  "billing_events", "user_entitlements", "product_events",
+  "billing_events", "user_entitlements", "redemption_codes", "product_events",
 ];
 
 // Orden esperado de dependencias entre archivos

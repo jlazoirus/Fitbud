@@ -113,7 +113,7 @@ Cada agente debe volver a leer el commit real que exista en `HEAD` antes de empe
 | Motivacion | Racha simple visible | Falta definir rachas justas, descansos, metas semanales, hitos y recuperacion de constancia |
 | Recordatorios | No existe | Falta el canal por correo (REQ-24) y el canal push de recordatorios de racha con permiso del dispositivo (REQ-38); ambos exigen programacion por zona horaria, consentimiento, deduplicacion y envio solo si hay acciones pendientes |
 | Adquisicion | No existe superficie publica; la primera pantalla es el login | Falta landing/funnel que explique la oferta antes del registro y conecte con el paywall (REQ-33) |
-| Suscripcion | Checkout Stripe (REQ-26): sesión alojada, webhooks firmados, entitlement activado por webhook. | Falta conciliación de pagos (REQ-27). Historial de pagos visible para el usuario formalizado como REQ-48. Checklist de revisión legal pre-lanzamiento formalizado como REQ-49 (requiere acción humana). |
+| Suscripcion | Checkout Stripe (REQ-26): sesión alojada, webhooks firmados, entitlement activado por webhook. Historial de pagos visible (REQ-48) y cupones gratuitos de un solo uso con duración configurable (REQ-50). | Checklist de revisión legal pre-lanzamiento formalizado como REQ-49 (requiere acción humana). |
 | Seguridad y privacidad | Auth, RLS y fotos de progreso personal protegidas | Faltan consentimiento de salud/fotos/correos, exportacion, borrado, retencion y guardrails de entrenamiento |
 | Operacion | Admin de usuarios, alimentos y ejercicios con fuente/licencia | Faltan prompts/versiones, soporte, metricas de IA y costos |
 | Lenguaje (Principio 9) | Implementado: la UI operativa habla de coach, plan y opciones; los detalles técnicos quedan en administración | Mantener el barrido como gate de nuevas superficies |
@@ -211,6 +211,7 @@ Hallazgos de una evaluacion heuristica de los flujos reales (REQ-34..37) mas una
 
 48. REQ-48 - Panel de historial de pagos para el usuario. Depende de REQ-26 (webhooks activos).
 49. REQ-49 - Checklist de revision legal antes del lanzamiento comercial. **No implementable por el agente; requiere accion humana. No agregar a `agent-loop.json`.**
+50. REQ-50 - Cupones de acceso gratuito (duración configurable) sin Stripe. **Implementado**.
 
 ### Fase G - Operacion del catalogo nutricional (auditoria jun 2026)
 
@@ -2721,7 +2722,8 @@ No aplica verificación técnica automatizada. La verificación es documental:
 
 ## REQ-50 - Cupones de acceso gratuito (duración configurable) sin Stripe
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Migración `supabase/coupon_codes.sql`: tabla privada `redemption_codes`, constraint de `user_entitlements.origin` extendido con `coupon` y función transaccional `redeem_redemption_code()` para canjear un código de un solo uso creando el entitlement y marcándolo como usado en la misma operación. Endpoint `api/coupon.js`: `generate` solo admin con duración configurable y caducidad opcional del código; `redeem` para usuarios autenticados sin plan activo. Perfil muestra "¿Tienes un código de acceso?" cuando no hay plan activo, canjea sin Stripe, actualiza el estado inmediatamente y etiqueta el entitlement como "Acceso gratuito". Service worker v43. Prueba local `scripts/test-coupon-api.mjs`.
 
 ### Evidencia
 

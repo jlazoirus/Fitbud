@@ -5221,6 +5221,47 @@ async function restorePurchase(btn){
     toast("No encontramos un pago reciente. Si pagaste hace poco, espera unos minutos e intenta de nuevo.");
   }
 }
+function couponRedeemSectionHtml(){
+  return`<details class="adv-settings" style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px">
+    <summary>¿Tienes un código de acceso?</summary>
+    <div class="field" style="margin-top:10px"><label>Código de acceso</label><input id="couponCode" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="Ej. FIT-X7K2-9ABQ"></div>
+    <button class="btn" style="width:100%;min-height:44px" onclick="redeemCoupon(this)">Canjear</button>
+  </details>`;
+}
+function couponDurationText(ent){
+  const days=Number(ent&&ent.duration_days);
+  if(Number.isFinite(days)&&days>0)return days+" días";
+  const start=new Date(ent&&ent.starts_at).getTime();
+  const exp=new Date(ent&&ent.expires_at).getTime();
+  if(Number.isFinite(start)&&Number.isFinite(exp)&&exp>start){
+    return Math.ceil((exp-start)/86400000)+" días";
+  }
+  return "tu periodo de acceso";
+}
+async function redeemCoupon(btn){
+  const token=session&&session.access_token;
+  const input=$("#couponCode");
+  const code=(input&&input.value||"").trim();
+  if(!token){toast("Sesión requerida.");return;}
+  if(!code){toast("Ingresa tu código de acceso.");if(input)input.focus();return;}
+  if(btn){btn.disabled=true;btn.textContent="Canjeando…";}
+  try{
+    const r=await fetch("/api/coupon",{
+      method:"POST",
+      headers:{"content-type":"application/json","Authorization":"Bearer "+token},
+      body:JSON.stringify({action:"redeem",code})
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(data.error||"No pudimos canjear el código.");
+    const duration=couponDurationText(data.entitlement);
+    await loadEntitlement();
+    render();
+    toast("¡Código canjeado! Acceso gratuito activo por "+duration+".");
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent="Canjear";}
+    toast(String(e.message||e));
+  }
+}
 function planDisplayName(planId){
   const plan=(catalogPlans||[]).find(p=>String(p.id)===String(planId));
   if(plan&&plan.name)return plan.name;
@@ -5307,8 +5348,9 @@ function subscriptionStatusHtml(){
     const daysLeft=Math.max(0,Math.ceil((expTs-Date.now())/86400000));
     const isCheckout=entitlement.origin==="checkout";
     const origin=entitlement.status==="courtesy"||(entitlement.origin||"").includes("courtesy")?"Acceso de cortesía":
+      entitlement.origin==="coupon"?"Acceso gratuito":
       isCheckout?"Suscripción activa":"Plan activo";
-    const planName=entitlement.plan_id==="quarterly"?"Paquete 3 meses":"Plan mensual";
+    const planName=planDisplayName(entitlement.plan_id);
     const renewBtn=isCheckout&&daysLeft<=14
       ?`<button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="showPaywall('profile')">Renovar plan</button>`:"";
     return`<div class="row between" style="margin-bottom:8px">
@@ -5326,6 +5368,7 @@ function subscriptionStatusHtml(){
     </div>
     <div class="muted small" style="margin-bottom:12px">Venció el ${esc(expDate)}. Tu historial y exportación siguen disponibles.</div>
     <button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="showPaywall('profile')">Ver planes disponibles</button>
+    ${couponRedeemSectionHtml()}
     ${billingHistorySectionHtml()}`;
   }
   if(!entitlementChecked){
@@ -5335,6 +5378,7 @@ function subscriptionStatusHtml(){
   return`<div class="muted small" style="margin-bottom:12px">Sin plan activo. Activa tu suscripción para acceder a tu coach, nutrición personalizada y rutinas de entrenamiento.</div>
     <button class="btn btn-accent" style="width:100%;margin-bottom:8px" onclick="showPaywall('profile')">Ver planes disponibles</button>
     <button class="btn" style="width:100%;font-size:13px;margin-top:4px" onclick="restorePurchase(this)">Restaurar compra</button>
+    ${couponRedeemSectionHtml()}
     ${billingHistorySectionHtml()}`;
 }
 
