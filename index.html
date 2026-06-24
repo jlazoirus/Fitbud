@@ -2354,30 +2354,38 @@ function renderOnboarding(){
           <div class="field"><label>Duración del plan</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
             ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
           </select></div>
-          <div class="field"><label>Experiencia</label><select id="ob_experience">
-            ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.trainingExperience,v)}>${l}</option>`).join("")}
-          </select></div>
-          <div class="field"><label>Minutos por sesión</label><input id="ob_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${d.sessionMinutes}"></div>
         </div>
         <label class="muted small">Días disponibles y lugar real</label>
         ${trainingAvailabilityHtml("ob",d)}
         <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled)}</div>
+        <details class="adv-settings">
+          <summary>Opciones avanzadas (opcional)</summary>
+          <div class="onboarding-grid" style="margin-top:8px">
+            <div class="field"><label>Experiencia</label><select id="ob_experience">
+              ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.trainingExperience,v)}>${l}</option>`).join("")}
+            </select></div>
+            <div class="field"><label>Minutos por sesión</label><input id="ob_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${d.sessionMinutes}"></div>
+          </div>
+        </details>
       </div>${onboardingButtons(false)}`;
   }else{
     const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]];
     body=`<h1>Casi listo — tus preferencias y seguridad</h1>
       <p class="onboarding-copy">Solo lo imprescindible para calcular tus comidas. Después podrás afinar cocinas, horarios y presupuesto desde tu Perfil.</p>
       <div class="dash">
-        <div class="onboarding-grid">
-          <div class="field" style="margin-top:0"><label>Comidas al día</label><select id="ob_meal_count" onchange="updateOnboardingMealCount(this.value)">
-            ${[2,3,4,5,6].map(value=>`<option value="${value}" ${d.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
-          </select></div>
-        </div>
         <label class="muted small">Patrón de alimentación y restricciones generales</label>
         <div class="chips" style="margin:9px 0 4px">
           ${dietOptions.map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}
         </div>
         <div class="field"><label>Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
+        <details class="adv-settings">
+          <summary>Ajustar número de comidas (opcional)</summary>
+          <div class="onboarding-grid" style="margin-top:8px">
+            <div class="field"><label>Comidas al día</label><select id="ob_meal_count" onchange="updateOnboardingMealCount(this.value)">
+              ${[2,3,4,5,6].map(value=>`<option value="${value}" ${d.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
+            </select></div>
+          </div>
+        </details>
         <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainingDays.length} días · ${SPORT_LABELS[d.primarySport]||""} + ${STRENGTH_LABELS[d.strengthMode]||""}</div>
       </div>
       <div class="section-h" style="margin-left:0">Privacidad y seguridad</div>
@@ -2410,8 +2418,8 @@ function readOnboardingStep(){
     d.primarySport=(_obNoCardio&&_obNoCardio.checked)?"strength_only":($("#ob_sport")?$("#ob_sport").value:"running");
     d.strengthMode=$("#ob_strength").value;
     d.planDurationWeeks=+$("#ob_duration").value;
-    d.trainingExperience=$("#ob_experience").value;
-    d.sessionMinutes=+$("#ob_minutes").value;
+    const _obExp=$("#ob_experience");if(_obExp)d.trainingExperience=_obExp.value;
+    const _obMin=$("#ob_minutes");if(_obMin)d.sessionMinutes=+_obMin.value;
     d.trainingDays=WEEKDAY_OPTIONS.filter(day=>{const el=$("#ob_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
     d.trainDays=d.trainingDays.length;
     d.trainingLocations={};
@@ -2421,8 +2429,8 @@ function readOnboardingStep(){
     if(!TRAINING_TIME_LABELS[d.preferredTrainingTime])d.preferredTrainingTime="flexible";
     if(!d.equipment||!d.equipment.length)d.equipment=d.strengthMode==="bodyweight"?["bodyweight"]:["dumbbells","barbell","machines"];
   }else{
-    // Nuevo paso 4 combinado: comidas esenciales + restricciones + privacidad
-    d.mealCount=Math.min(6,Math.max(2,+$("#ob_meal_count").value||d.mealCount));
+    // Nuevo paso 4 combinado: restricciones + privacidad; comidas en sección opcional
+    const _obMc=$("#ob_meal_count");if(_obMc)d.mealCount=Math.min(6,Math.max(2,+_obMc.value||d.mealCount));
     d.diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#ob_diet_"+v);return el&&el.checked;});
     d.allergies=$("#ob_allergies").value.trim();
     d.consentCore=$("#ob_consent_core").checked;

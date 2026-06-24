@@ -3015,7 +3015,8 @@ Reducir la densidad percibida de Perfil dividiendolo en secciones con navegacion
 
 ## REQ-55 - Onboarding esencial y opciones avanzadas colapsadas por defecto
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Experiencia y minutos (paso 3) + número de comidas (paso 4) agrupados en `<details class="adv-settings">` colapsados por defecto; lecturas de DOM guardadas con null-check; defaults de migrateProfilePrefs aseguran plan válido sin abrir avanzado.
 
 > Origen: auditoria UX + principio de "menos pasos". Demasiadas decisiones avanzadas durante onboarding y en Perfil.
 
