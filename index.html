@@ -86,6 +86,13 @@
   .btn:active{transform:scale(.97)}
   .btn-accent{background:var(--accent);color:#fff;font-weight:700;font-family:var(--font-display);border:none;box-shadow:0 6px 22px var(--accent-glow)}
   .btn-sm{padding:7px 13px;font-size:13px}
+  /* Touch targets accesibles en pantallas táctiles (auditoría UX 23 jun 2026): mínimo 44px */
+  @media(pointer:coarse){
+    .btn-sm{min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+    .chip-check{min-height:44px}
+    .csec-h{min-height:44px}
+    table input[type="number"],table input[type="text"]{min-height:44px}
+  }
   .row{display:flex;gap:8px;align-items:center}
   .between{justify-content:space-between}
   .wrap{flex-wrap:wrap}
@@ -2817,7 +2824,7 @@ function section(key,title,contentHtml,sub){
 }
 function renderTabs(){
   const tabs=[["hoy","Hoy"],["nutricion","Nutrición"],["entreno","Entreno"],["progreso","Progreso"],["perfil","Perfil"]];
-  $("#tabs").innerHTML=tabs.map(([v,l])=>`<button class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
+  $("#tabs").innerHTML=tabs.map(([v,l])=>`<button data-tab="${v}" class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
 }
 function setView(v){
   if((v==="foods"||v==="exercises"||v==="settings"||v==="admin")&&!isAdmin())v="perfil";
@@ -3007,6 +3014,18 @@ function homePrepareDay(ds){
   current=ds;
   if(!hasCompleteOnboarding((profile&&profile.prefs)||{})){startOnboarding();return;}
   if(aiAvailable()){aiGenerateDay();return;}
+  // Sin coach disponible: arma un día determinista al instante en lugar de
+  // mandar al usuario a Perfil (evita un callejón sin salida en la activación).
+  try{
+    const det=deterministicDayPayload(ds);
+    if(det&&Array.isArray(det.comidas)&&det.comidas.length){
+      applyDayComidas(ds,det.comidas);
+      homeTrackAction(ds,"prepare_day_deterministic");
+      render();window.scrollTo(0,0);
+      toast("Listo: preparamos un día práctico con tus metas.");
+      return;
+    }
+  }catch(e){}
   setView("perfil");
   toast("Revisa tu perfil para preparar este día.");
 }
@@ -3114,7 +3133,7 @@ function homeAgendaHtml(ds){
   const data=homeAgendaData(ds);
   const note=homeCacheNoticeHtml();
   if(data.state==="setup"){
-    const cta=aiAvailable()?"Preparar mi día":"Revisar mi perfil";
+    const cta="Preparar mi día";
     return `<section class="agenda-card agenda-state setup">
       <div class="agenda-head">
         <div>
@@ -3229,6 +3248,7 @@ function renderHoy(){
     </div>
     <div class="row" style="gap:9px">
       ${stk>0?`<span class="badge b-BAJO">🔥 ${stk}</span>`:""}
+      <button class="btn btn-sm" title="Ver guía rápida" aria-label="Ver guía rápida" onclick="startFitbrosTour(true)" style="min-width:40px;min-height:40px;padding:0;font-weight:700">?</button>
       <div class="avatar">${esc((name[0]||"F").toUpperCase())}</div>
     </div>
   </header>
@@ -3239,6 +3259,7 @@ function renderHoy(){
   ${heroDash(ds)}
   ${homeAgendaHtml(ds)}
   ${coachSection}`;
+  maybeStartFitbrosTour();
 }
 function renderCoach(){renderHoy();}
 
@@ -4095,8 +4116,8 @@ function weightRows(){
   return Object.keys(WEIGHT_RANGES).map(n=>{
     const kg=wkg(n), bf=wbf(n);
     return `<tr><td>S${n}</td><td class="muted">${WEIGHT_RANGES[n].replace(/ .*/,'')}</td>
-      <td><input type="number" step="0.1" inputmode="decimal" value="${kg!=null?kg:""}" onchange="setWeight(${n},this.value)" placeholder="kg"></td>
-      <td><input type="number" step="0.1" inputmode="decimal" value="${bf!=null?bf:""}" onchange="setBodyFat(${n},this.value)" placeholder="%"></td></tr>`;
+      <td><input type="number" step="0.1" inputmode="decimal" value="${kg!=null?kg:""}" onchange="setWeight(${n},this.value)" placeholder="kg" aria-label="Peso de la semana ${n} en kilogramos"></td>
+      <td><input type="number" step="0.1" inputmode="decimal" value="${bf!=null?bf:""}" onchange="setBodyFat(${n},this.value)" placeholder="%" aria-label="Grasa corporal de la semana ${n} en porcentaje"></td></tr>`;
   }).join("");
 }
 // Resumen de composición corporal: masa grasa/magra de la última semana + cambios.
@@ -8839,6 +8860,120 @@ async function renderAnalytics(){
   }catch(error){
     $("#app").innerHTML=`${screenHeader("Analítica","Producto, IA y costos","perfil")}<div class="ai-box">⚠️ ${esc(coachErrorMessage(error))}</div>`;
   }
+}
+/* ===================================================================
+   GUIDED TOUR CONTEXTUAL — prototipo (auditoría UX 23 jun 2026)
+   Coachmarks ligeros, sin dependencias. Se dispara una sola vez tras el
+   onboarding, es saltable, recuerda su estado en localStorage, respeta
+   prefers-reduced-motion y se puede repetir desde el botón "?" de Hoy.
+   =================================================================== */
+const FITBROS_TOUR_KEY="fitbros_tour_v1";
+let _tour=null;
+function tourSeen(){try{return localStorage.getItem(FITBROS_TOUR_KEY);}catch(e){return null;}}
+function tourMarkSeen(v){try{localStorage.setItem(FITBROS_TOUR_KEY,v||"done");}catch(e){}}
+function tourSteps(){
+  return [
+    {sel:".agenda-card",title:"Tu día, en un solo lugar",body:"Aquí ves lo único que toca hacer ahora: la próxima comida o tu entrenamiento. Si falta el plan, el botón lo prepara al instante.",placement:"bottom"},
+    {sel:'[data-tab="nutricion"]',title:"Nutrición",body:"Tus comidas del día con calorías y macros. Registra, reemplaza por otra opción o agrega un extra.",placement:"top"},
+    {sel:'[data-tab="entreno"]',title:"Entreno",body:"Tu sesión guiada paso a paso: calentamiento, series e intervalos con temporizador y demostraciones.",placement:"top"},
+    {sel:'[data-tab="progreso"]',title:"Progreso",body:"Registra tu peso semanal y mira tu evolución, racha y adherencia.",placement:"top"},
+    {sel:'[data-tab="perfil"]',title:"Perfil",body:"Ajusta metas, comidas, entrenamiento y privacidad. Cada 4 semanas te proponemos revisar.",placement:"top"}
+  ];
+}
+function tourEnsureStyle(){
+  if(document.getElementById("tourStyle"))return;
+  const s=document.createElement("style");s.id="tourStyle";
+  s.textContent=`
+  .tour-spot{position:fixed;z-index:9998;border-radius:14px;box-shadow:0 0 0 9999px rgba(8,6,20,.74);pointer-events:none;transition:all .25s cubic-bezier(.4,0,.2,1)}
+  .tour-tip{position:fixed;z-index:9999;max-width:300px;width:calc(100vw - 32px);background:var(--surf2,#1a1730);color:var(--txt,#fff);border:1px solid var(--border-2,#332b52);border-radius:16px;padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+  .tour-tip h4{margin:0 0 6px;font-family:var(--font-display,inherit);font-size:16px;letter-spacing:-.02em}
+  .tour-tip p{margin:0 0 14px;font-size:13px;line-height:1.5;color:var(--muted,#a9a3c4)}
+  .tour-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .tour-dots{font-size:12px;color:var(--muted2,#7b769a)}
+  .tour-actions{display:flex;gap:8px}
+  .tour-btn{min-height:40px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid var(--border-2,#332b52);background:var(--surf3,#221d3a);color:var(--txt,#fff);cursor:pointer}
+  .tour-btn.primary{background:var(--accent,#7c5cff);border-color:transparent;color:#fff}
+  .tour-skip{background:none;border:none;color:var(--muted2,#7b769a);font-size:12px;cursor:pointer;min-height:40px;padding:0 4px}
+  @media(prefers-reduced-motion:reduce){.tour-spot{transition:none}}`;
+  document.head.appendChild(s);
+}
+function maybeStartFitbrosTour(){
+  if(_tour||tourSeen())return;
+  if(!session||onboardingActive||view!=="hoy")return;
+  if(!hasCompleteOnboarding((profile&&profile.prefs)||{}))return;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>startFitbrosTour(false)));
+}
+function startFitbrosTour(manual){
+  if(_tour)tourCleanup();
+  if(view!=="hoy"){setView("hoy");}
+  const steps=tourSteps().filter(s=>document.querySelector(s.sel));
+  if(!steps.length){if(manual)toast("Abre la pestaña Hoy para ver la guía.");return;}
+  tourEnsureStyle();
+  const spot=document.createElement("div");spot.className="tour-spot";
+  const tip=document.createElement("div");tip.className="tour-tip";
+  tip.setAttribute("role","dialog");tip.setAttribute("aria-live","polite");tip.setAttribute("aria-modal","true");
+  document.body.appendChild(spot);document.body.appendChild(tip);
+  _tour={i:0,steps,spot,tip,manual:!!manual};
+  window.addEventListener("resize",tourRender);
+  window.addEventListener("scroll",tourRender,true);
+  window.addEventListener("keydown",tourKey,true);
+  if(typeof trackEvent==="function")try{trackEvent("tour_start",{manual:!!manual,steps:steps.length});}catch(e){}
+  tourRender();
+}
+function tourKey(e){
+  if(!_tour)return;
+  if(e.key==="Escape"){e.preventDefault();tourFinish("skipped");}
+  else if(e.key==="ArrowRight"||e.key==="Enter"){e.preventDefault();tourNext();}
+  else if(e.key==="ArrowLeft"){e.preventDefault();tourPrev();}
+}
+function tourNext(){if(!_tour)return;if(_tour.i>=_tour.steps.length-1){tourFinish("done");}else{_tour.i++;tourRender();}}
+function tourPrev(){if(!_tour||_tour.i===0)return;_tour.i--;tourRender();}
+function tourRender(){
+  if(!_tour)return;
+  const step=_tour.steps[_tour.i];
+  const el=document.querySelector(step.sel);
+  if(!el){tourNext();return;}
+  const r=el.getBoundingClientRect();
+  const pad=8,vw=window.innerWidth,vh=window.innerHeight;
+  const sx=Math.max(8,r.left-pad),sy=Math.max(8,r.top-pad);
+  const sw=Math.min(vw-16,r.width+pad*2),sh=r.height+pad*2;
+  Object.assign(_tour.spot.style,{left:sx+"px",top:sy+"px",width:sw+"px",height:sh+"px"});
+  const last=_tour.i===_tour.steps.length-1,first=_tour.i===0;
+  _tour.tip.innerHTML=`
+    <h4>${esc(step.title)}</h4>
+    <p>${esc(step.body)}</p>
+    <div class="tour-row">
+      <button class="tour-skip" onclick="tourFinish('skipped')">${last?"Cerrar":"Saltar"}</button>
+      <div class="tour-row" style="gap:8px">
+        <span class="tour-dots">${_tour.i+1}/${_tour.steps.length}</span>
+        <div class="tour-actions">
+          ${first?"":`<button class="tour-btn" onclick="tourPrev()">Atrás</button>`}
+          <button class="tour-btn primary" onclick="tourNext()">${last?"¡Entendido!":"Siguiente"}</button>
+        </div>
+      </div>
+    </div>`;
+  const tr=_tour.tip.getBoundingClientRect();
+  const placeTop=step.placement==="top";
+  let top=placeTop?(r.top-tr.height-14):(r.bottom+14);
+  if(top<8)top=r.bottom+14;
+  if(top+tr.height>vh-8)top=Math.max(8,r.top-tr.height-14);
+  let left=Math.min(Math.max(8,r.left+r.width/2-tr.width/2),vw-tr.width-8);
+  Object.assign(_tour.tip.style,{top:top+"px",left:left+"px"});
+}
+function tourCleanup(){
+  if(!_tour)return;
+  window.removeEventListener("resize",tourRender);
+  window.removeEventListener("scroll",tourRender,true);
+  window.removeEventListener("keydown",tourKey,true);
+  if(_tour.spot)_tour.spot.remove();
+  if(_tour.tip)_tour.tip.remove();
+  _tour=null;
+}
+function tourFinish(reason){
+  if(!_tour)return;
+  if(typeof trackEvent==="function")try{trackEvent("tour_finish",{reason,step:_tour.i+1});}catch(e){}
+  tourCleanup();
+  tourMarkSeen(reason||"done");
 }
 registerServiceWorker();
 setInterval(workoutTimerTick,1000);
