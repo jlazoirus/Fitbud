@@ -2839,3 +2839,370 @@ Ningún cambio requerido. Cuando `expires_at` pasa, `api/entitlement.js:GET` dej
 - Cambiar manualmente `expires_at` del entitlement a una fecha pasada en Supabase → recargar la app → confirmar que aparece el paywall.
 - Sin sesión: `POST /api/coupon` con `action='redeem'` devuelve 401.
 - `git diff --check` y release gate local.
+
+---
+
+## REQ-51 - Activacion: primer dia siempre ejecutable y CTA de Home directo
+
+**Estado: implementado.**
+
+> Origen: pase de UX desde Cowork (auditoria del 23 jun 2026 + plan `estrategia/06-Plan-UX-Guided-Tour-y-Simplificacion-2026-06-24.md`). Hallazgo P0 de la auditoria: Home podia quedar en "Aun falta preparar este dia" sin salida cuando el coach no estaba disponible.
+
+### Evidencia
+
+- `prepareFirstCycleDay()` ya arma un dia determinista tras el onboarding con fallback a `deterministicDayPayload()` (`index.html:~2509-2537`), pero solo cubre el primer dia del ciclo.
+- `homePrepareDay()` caia a `setView("perfil")` + toast cuando `!aiAvailable()`, dejando el dia vacio sin accion util (callejon sin salida en activacion).
+- `homeAgendaHtml()` mostraba el CTA "Revisar mi perfil" en estado `setup` cuando no habia IA, reforzando la sensacion de "complete datos pero no recibi plan".
+- `deterministicDayPayload()` (`index.html:~6125`) y `applyDayComidas()` (`index.html:~6708`) ya existian y son sincronos.
+
+### Objetivo
+
+Que el usuario siempre pueda obtener un dia ejecutable desde Home con una sola accion, aun sin coach IA, sin ser desviado a Perfil.
+
+### Implementado
+
+- `homePrepareDay()` (`index.html:3015-3032`): sin IA disponible, arma un dia con `deterministicDayPayload()`, lo aplica con `applyDayComidas()`, re-renderiza y muestra toast de confirmacion; solo cae a Perfil si el fallback no produce comidas. Emite `home_agenda_action` con `prepare_day_deterministic` (`index.html:3023`).
+- CTA del estado `setup` siempre dice "Preparar mi dia" (`index.html:3136`).
+
+### Dependencias
+
+- Ninguna. Cambio 100% cliente en `index.html`. Sin migracion SQL. Respeta REQ-31 (sin vocabulario tecnico).
+
+### Criterios de aceptacion
+
+- Tras onboarding, Home nunca queda en estado vacio sin accion que lo resuelva en un toque.
+- Con IA desactivada, "Preparar mi dia" llena el dia al instante y re-renderiza; el usuario puede registrar comidas sin pasar por Perfil.
+- Ningun texto menciona IA, proveedor ni cuota.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Con `aiAvailable()` falso, completar onboarding y tocar "Preparar mi dia" en Home; confirmar dia lleno y toast.
+- `node scripts/audit-html.mjs`, `validate-contracts.mjs` (ejecutados, PASS).
+
+---
+
+## REQ-52 - Accesibilidad tactil: touch targets de 44px y labels en Progreso
+
+**Estado: implementado.**
+
+> Origen: auditoria UX 23 jun 2026 — 30 targets <44px en Perfil, 26 en Progreso, 19 en Nutricion; 20 inputs sin etiqueta programatica en Progreso.
+
+### Evidencia
+
+- `.btn-sm` (`index.html:88`), `.chip-check` y controles de tabla quedaban por debajo de 44px en movil.
+- Inputs de peso/grasa en `weightRows()` (`index.html:4118-4120`) comunicaban "kg"/"%" solo por placeholder, sin `aria-label` por semana.
+
+### Objetivo
+
+Elevar el area tactil minima a 44px en pantallas tactiles y dar etiqueta programatica a los inputs de Progreso, sin alterar el layout en desktop.
+
+### Implementado
+
+- Bloque CSS `@media(pointer:coarse)` (`index.html:89-96`): `min-height:44px` para `.btn-sm`, `.chip-check`, `.csec-h` e inputs numericos/texto de tabla.
+- `aria-label` por semana en los inputs de peso ("Peso de la semana N en kilogramos") y grasa ("Grasa corporal de la semana N en porcentaje") (`index.html:4119-4120`).
+
+### Dependencias
+
+- Ninguna. Cambio 100% cliente. No depende de REQ-56 (que migrara la tabla a tarjetas y reutilizara estas labels).
+
+### Criterios de aceptacion
+
+- En dispositivos `pointer:coarse`, los controles citados miden >=44px.
+- Lectores de pantalla anuncian semana y metrica en cada input de Progreso.
+- Sin regresion visual en desktop.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Emular dispositivo tactil (375x812) y medir alturas de `.btn-sm`/chips/inputs.
+- Inspeccionar `aria-label` en los inputs de la tabla de peso.
+
+---
+
+## REQ-53 - Guided tour contextual ligero (prototipo)
+
+**Estado: implementado (prototipo, sin dependencias externas).**
+
+> Origen: pedido de producto ("guided tour") + decision del plan: tour contextual corto en vez de tour lineal pesado. Las librerias externas (Shepherd/intro.js) se descartaron por mantener la app estatica sin build step.
+
+### Evidencia
+
+- No existia ningun mecanismo de tour, coachmarks ni tooltips de primer uso en el repo.
+- `renderTabs()` no exponia selectores estables para apuntar a las pestanas.
+
+### Objetivo
+
+Orientar al usuario nuevo con coachmarks contextuales una sola vez tras el onboarding, sin bloquear ni retrasar el primer valor, y permitir repetirlo a demanda.
+
+### Implementado
+
+- Modulo vanilla autocontenido (`index.html:8869-8975`): `FITBROS_TOUR_KEY`, `tourSteps()`, `maybeStartFitbrosTour()`, `startFitbrosTour()`, `tourNext/Prev/Render/Cleanup/Finish`, `tourKey`.
+- 5 pasos: tarjeta de agenda del dia + pestanas Nutricion, Entreno, Progreso, Perfil.
+- Disparo unico tras onboarding via `maybeStartFitbrosTour()` al final de `renderHoy()` (`index.html:3262`); estado en `localStorage` (`fitbros_tour_v1`).
+- Saltable (boton Saltar / Esc), navegable (Siguiente/Atras, flechas), repetible desde el boton "?" del header de Home (`index.html:3251`, `startFitbrosTour(true)`).
+- Selectores estables via `data-tab` agregado en `renderTabs()` (`index.html:2827`).
+- Respeta `prefers-reduced-motion`; spotlight + tooltip posicionados con `getBoundingClientRect`; emite `tour_start`/`tour_finish` para analitica; CSS inyectado bajo demanda (`tourEnsureStyle`).
+
+### Dependencias
+
+- Ninguna runtime. No agrega dependencias (cumple `allowNewRuntimeDependency:false`). Persistencia por dispositivo; si se quiere "visto" por cuenta, mover el flag a `profiles.prefs` (mejora futura).
+
+### Criterios de aceptacion
+
+- El tour aparece una sola vez tras completar el onboarding y no reaparece salvo reinicio manual del flag o boton "?".
+- Es saltable y navegable por teclado; no atrapa al usuario.
+- No rompe re-render: el overlay vive fuera de `#app` y recalcula posiciones en `resize`/`scroll`.
+- No menciona IA ni vocabulario tecnico.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Servir local, completar onboarding y confirmar disparo unico; repetir con el boton "?".
+- Reiniciar con `localStorage.removeItem('fitbros_tour_v1')`.
+- Pruebas de control de flujo (jsdom): auto-disparo, avance/retroceso, persistencia done/skipped, no-reaparicion, replay manual — 9/9 OK.
+
+### Mejoras futuras (no en este alcance)
+
+- Empty states que ensenan (REQ-57) y tooltips just-in-time la primera vez que se abre Entreno o el reproductor.
+
+---
+
+## REQ-54 - Perfil en secciones con navegacion local y guardado por seccion
+
+**Estado: pendiente.**
+
+> Origen: auditoria UX 23 jun 2026 — Perfil mide ~5.436px de alto en movil y mezcla macros, alimentacion, entrenamiento, suscripcion, privacidad, recordatorios, push y cuenta en una sola pantalla con guardado al final.
+
+### Evidencia
+
+- `renderProfile()` concentra todas las secciones en un solo scroll.
+- Ya existen los helpers `section()` y `toggleSection()` (`index.html:~2809-2818`) y el estado `UI.collapsed` con `uiSave()`.
+- El guardado consolida todo al final (mayor miedo a perder cambios).
+
+### Objetivo
+
+Reducir la densidad percibida de Perfil dividiendolo en secciones con navegacion local y guardado por seccion (o un boton sticky "Guardar cambios" que aparezca solo cuando hay modificaciones).
+
+### Dependencias
+
+- Cliente (`index.html`). Cuidado con `saveProfilePrefs()` y los esquemas versionados (`profileSchemaVersion`). No depende de REQ-55 pero se complementan.
+
+### Alcance
+
+- Agrupar Perfil en: Objetivo, Comidas, Entrenamiento, Privacidad, Cuenta.
+- Navegacion local (chips o tabs internos) que ancla/scrollea a cada seccion.
+- Guardado por seccion o boton sticky condicionado a "hay cambios sin guardar".
+- Reusar `section()`/`toggleSection()`; no duplicar logica de lectura/escritura de prefs.
+- Mantener compatibilidad: usuarios con datos previos ven sus valores sin migracion.
+- Sin overflow en 375x812; sin vocabulario tecnico (REQ-31).
+
+### Criterios de aceptacion
+
+- Perfil presenta secciones navegables; el usuario llega a una seccion sin recorrer toda la pantalla.
+- Guardar una seccion no exige tocar el resto; el indicador de "cambios sin guardar" es claro.
+- Sin regresion en `saveProfilePrefs()` ni en los consentimientos/evaluacion versionados.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Editar solo "Objetivo" y guardar; confirmar persistencia y que el resto no se altera.
+- Medir alto de Perfil en movil (debe bajar sustancialmente respecto a ~5.436px).
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-55 - Onboarding esencial y opciones avanzadas colapsadas por defecto
+
+**Estado: pendiente.**
+
+> Origen: auditoria UX + principio de "menos pasos". Demasiadas decisiones avanzadas durante onboarding y en Perfil.
+
+### Evidencia
+
+- Existen `onboardingEssentialOnly` y `needsProfileTuning()` y un alert "Afina tu plan" en Home (`index.html:~3237`).
+- El onboarding pide preferencias de cocina, preparaciones, equipo detallado, lesiones y recordatorios en el flujo principal.
+
+### Objetivo
+
+Pedir en onboarding solo lo esencial para generar el primer plan y mover lo avanzado a un bloque opcional colapsado, dejando "afinar el plan" como mejora posterior, nunca como prerrequisito percibido.
+
+### Dependencias
+
+- Cliente (`index.html`). Se apoya en `onboardingEssentialOnly` ya existente. Complementa REQ-54.
+
+### Alcance
+
+- Revisar pasos 3 y 4 del onboarding: dejar visibles solo los campos imprescindibles; agrupar el resto bajo "Configuracion avanzada (opcional)" colapsada.
+- Asegurar defaults sensatos cuando los campos avanzados no se completan (sin romper generacion ni validaciones; condicionar lecturas a la existencia del campo en el DOM, patron de REQ-46).
+- El mensaje "Afina tu plan" comunica mejora opcional, no trabajo bloqueante.
+- Sin vocabulario tecnico (REQ-31).
+
+### Criterios de aceptacion
+
+- El onboarding se completa con el minimo de campos y genera un primer plan valido.
+- Las opciones avanzadas existen pero no abruman el flujo principal.
+- Sin regresion en validaciones de onboarding ni en la generacion de planes.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Completar onboarding sin tocar avanzado; confirmar plan valido.
+- Expandir avanzado, guardar valores y confirmar que se usan.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-56 - Progreso: tabla de peso a tarjetas full-width en movil
+
+**Estado: pendiente.**
+
+> Origen: auditoria UX — 26 targets <44px y tabla densa en Progreso movil.
+
+### Evidencia
+
+- `weightRows()` (`index.html:4117-4121`) renderiza una tabla con inputs estrechos; los `aria-label` por semana ya quedaron listos en REQ-52.
+
+### Objetivo
+
+Convertir la tabla de peso en filas tipo tarjeta full-width en movil, con inputs comodos o steppers, manteniendo la tabla en desktop si conviene.
+
+### Dependencias
+
+- Cliente (`index.html`). Reutiliza los `aria-label` de REQ-52. No depende de REQ-54.
+
+### Alcance
+
+- En movil, cada semana es una tarjeta con peso y grasa en inputs full-width (o steppers), area tactil >=44px.
+- Conservar `setWeight()`/`setBodyFat()` y los `aria-label` existentes.
+- Mantener el grafico de evolucion (REQ-43) sin regresion.
+- Sin overflow en 375x812.
+
+### Criterios de aceptacion
+
+- En movil, registrar peso/grasa es comodo y accesible; no hay inputs minusculos.
+- Sin regresion en persistencia ni en el grafico.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Registrar peso en 375x812; medir area tactil.
+- Confirmar que el grafico y el resumen siguen correctos.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-57 - Empty states que ensenan en Nutricion, Entreno y Progreso
+
+**Estado: pendiente.**
+
+> Origen: plan de UX — donde hoy se lee "Sin asignar" o "Aun falta...", el vacio no ensena ni ofrece accion.
+
+### Evidencia
+
+- Nutricion muestra comidas "Sin asignar"; Progreso/Entreno pueden mostrar vacios sin guia.
+- El patron `agenda-state setup` de Home (con CTA directo) es un buen modelo a replicar (`index.html:~3116-3128`).
+
+### Objetivo
+
+Que cada pantalla sin datos explique brevemente que es la seccion y ofrezca la accion que la llena, en vez de un texto muerto.
+
+### Dependencias
+
+- Cliente (`index.html`). Se apoya en el patron de Home y en REQ-51 (dia preparable en un toque).
+
+### Alcance
+
+- Definir empty states con: titulo claro, 1 linea de que aporta la seccion, y CTA que resuelve (preparar, registrar, ir al paso correspondiente).
+- Aplicar en Nutricion, Entreno y Progreso.
+- Sin vocabulario tecnico (REQ-31).
+
+### Criterios de aceptacion
+
+- Ninguna pantalla principal muestra un vacio sin accion.
+- Cada empty state lleva a la accion correcta en un toque.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Forzar estados vacios y confirmar copy + CTA en cada vista.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-58 - Landing: breakpoint desktop propio y product proof en el primer viewport
+
+**Estado: pendiente.**
+
+> Origen: auditoria UX P2 — la landing es persuasiva pero larga; en desktop hereda el contenedor movil centrado y el mockup aparece tarde.
+
+### Evidencia
+
+- Landing movil ~3.334px de alto; el primer viewport es casi todo headline + copy + CTA; el mockup llega despues.
+- En desktop se mantiene una columna movil centrada con mucho espacio vacio.
+
+### Objetivo
+
+Acelerar la conviccion: acercar el product proof (mockup / "que recibire hoy") al primer viewport en movil y dar a la landing un layout propio en desktop, sin alterar la app autenticada (que sigue mobile-first).
+
+### Dependencias
+
+- Cliente (`index.html`, `renderLanding()`). No toca la app autenticada.
+
+### Alcance
+
+- Movil: subir parte del mockup/prueba de producto al primer viewport o reducir la altura del hero.
+- Desktop: breakpoint propio (dos columnas o composicion mas ancha) solo para la landing publica.
+- Sin overflow horizontal; sin regresion en los CTAs de registro (`showAuthFromLanding`).
+
+### Criterios de aceptacion
+
+- En movil, hay prueba de producto visible sin scroll largo.
+- En desktop, la landing no se ve como una columna movil perdida en el centro.
+- La app autenticada permanece en ancho movil.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- Revisar landing en 375x812 y en >=1280px.
+- Confirmar CTAs de registro intactos.
+- `git diff --check` y release gate local.
+
+---
+
+## REQ-59 - Fix de contrato: validar autenticacion antes de la config de Stripe en checkout
+
+**Estado: pendiente.**
+
+> Origen: smoke test de produccion (auditoria 23 jun 2026): `POST /api/checkout` sin sesion devuelve 503 en vez de 401/403.
+
+### Evidencia
+
+- En `api/checkout.js`, si `STRIPE_SECRET_KEY` no esta configurada, el endpoint responde 503 antes de llamar a `verifyUser`, por lo que una peticion sin auth recibe 503 en lugar del 401/403 esperado por el smoke test.
+
+### Objetivo
+
+Ordenar la validacion del endpoint: primero metodo, luego sesion, luego configuracion de pasarela; sin cambiar el comportamiento del flujo de pago valido.
+
+### Dependencias
+
+- Servidor (`api/checkout.js`). Sin migracion. No consumir Stripe real (mockear). No depende de otros REQ.
+
+### Alcance
+
+- Reordenar: validar metodo HTTP -> validar sesion (`verifyUser`) -> validar config de Stripe.
+- Peticion sin auth devuelve 401/403; con auth pero sin config devuelve 503 (o el codigo correcto) recien entonces.
+- Sin regresion en el checkout valido (REQ-26) ni en el webhook.
+
+### Criterios de aceptacion
+
+- `POST /api/checkout` sin sesion devuelve 401/403 (no 503).
+- El smoke test `scripts/smoke-test.mjs` pasa 9/9.
+- Sin regresion en `api/webhook.js`.
+- Commit y push propios.
+
+### Verificacion sugerida
+
+- `node scripts/smoke-test.mjs --url <deploy>` -> 9/9.
+- Probar sin auth (espera 401/403) y con auth + sin config (espera 503).
+- `git diff --check` y release gate local.
