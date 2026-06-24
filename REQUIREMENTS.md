@@ -213,6 +213,10 @@ Hallazgos de una evaluacion heuristica de los flujos reales (REQ-34..37) mas una
 49. REQ-49 - Checklist de revision legal antes del lanzamiento comercial. **No implementable por el agente; requiere accion humana. No agregar a `agent-loop.json`.**
 50. REQ-50 - Cupones de acceso gratuito (duración configurable) sin Stripe. **Implementado**.
 
+### Fase K - Configuracion externa y pendientes de infraestructura (jun 2026)
+
+60. REQ-60 - Corregir Site URL / Redirect URLs de Supabase (recuperar contrasena apunta a localhost). **No implementable por el agente; requiere accion manual en dashboard de Supabase. No agregar a `agent-loop.json`.**
+
 ### Fase G - Operacion del catalogo nutricional (auditoria jun 2026)
 
 39. REQ-39 - Editor administrativo de dietas y asignaciones. Descubierto al auditar el journey Administracion -> Alimentos -> Dietas: el backend permite escribir `diets`/`diet_dishes` como admin, pero la app solo muestra esas asignaciones.
@@ -3134,7 +3138,8 @@ Que cada pantalla sin datos explique brevemente que es la seccion y ofrezca la a
 
 ## REQ-58 - Landing: breakpoint desktop propio y product proof en el primer viewport
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Landing pública desacoplada del ancho móvil global de `#app` mediante `landing-host`, hero con texto + mockup en el primer bloque y breakpoint desktop propio (dos columnas, grids anchos para features/planes/pasos). En móvil el mockup aparece dentro del primer viewport sin scroll largo; en desktop la landing usa hasta 1120px sin afectar la app autenticada. Service worker v48.
 
 > Origen: auditoria UX P2 — la landing es persuasiva pero larga; en desktop hereda el contenedor movil centrado y el mockup aparece tarde.
 
@@ -3208,3 +3213,59 @@ Ordenar la validacion del endpoint: primero metodo, luego sesion, luego configur
 - `node scripts/smoke-test.mjs --url <deploy>` -> 9/9.
 - Probar sin auth (espera 401/403) y con auth + sin config (espera 503).
 - `git diff --check` y release gate local.
+
+---
+
+## REQ-60 - Corregir Site URL / Redirect URLs de Supabase (recuperar contrasena apunta a localhost)
+
+**Estado: pendiente. Requiere accion manual en el dashboard de Supabase; no implementable por el agente autonomo.**
+
+### Diagnostico
+
+El codigo de la app ya esta correcto y no requiere ningun cambio:
+
+- `index.html` (~linea 5769, flujo de autoservicio): arma el `redirectTo` con `window.location.origin` dinamicamente antes de llamar a `supabase.auth.resetPasswordForEmail()`.
+- `index.html` (~linea 8122, panel admin): mismo patron; el `redirectTo` se construye con `location.origin` antes de llamar al endpoint de reset.
+- `api/admin.js`: valida el `redirectTo` con `safeRedirect()` antes de pasarlo a la API de Supabase, rechazando dominios no autorizados.
+
+La causa raiz es de **configuracion externa**: en el dashboard de Supabase (Authentication → URL Configuration), el campo "Site URL" del proyecto apunta a `http://localhost:xxxx` y/o la URL de produccion no esta en la allowlist de "Redirect URLs". Cuando Supabase recibe un `resetPasswordForEmail` con un `redirectTo`, lo valida contra esa allowlist. Si el dominio no esta en la lista, Supabase ignora el `redirectTo` y cae al Site URL configurado (localhost), por lo que el correo de recuperacion llega con un link que apunta a localhost en vez de a produccion.
+
+### Objetivo
+
+Que los correos de recuperacion de contrasena — y cualquier otro flujo de Supabase Auth que use redirect (confirmacion de email, invitaciones, magic links) — apunten siempre al dominio de produccion real (`https://fitbud-green.vercel.app`), no a localhost.
+
+### Dependencias
+
+- Acceso al dashboard de Supabase del proyecto como propietario o administrador (Jona).
+- No depende de ningun otro REQ de codigo; es un cambio de configuracion puro.
+- **Condicion de parada del agente**: el agente autonomo nunca intenta ejecutar este REQ. Si lo encontrara en cola (cosa que no debe ocurrir), debe detenerse con `external_dashboard_action_required`.
+
+### Alcance — accion requerida
+
+Cambio manual en el dashboard de Supabase, seccion **Authentication → URL Configuration**:
+
+1. **Site URL**: cambiar a `https://fitbud-green.vercel.app`.
+2. **Redirect URLs** (allowlist): agregar `https://fitbud-green.vercel.app/**`.
+3. Opcional pero recomendado: agregar tambien `http://localhost:*` o `http://localhost:3000/**` para poder seguir probando el flujo en local sin afectar produccion (Supabase acepta multiples entradas).
+
+No se requiere ningun cambio de codigo, migracion SQL ni nuevo commit de app.
+
+### Por que no es automatizable por el agente
+
+Esta configuracion vive en el dashboard de cuenta de Supabase (un proveedor externo), no en el repositorio. No existe una API publica de administracion de proyectos Supabase que el agente pueda llamar desde el repo con los secretos actuales. Requiere que el dueno del proyecto entre con su cuenta al dashboard y realice el cambio de forma manual. El agente no tiene acceso ni debe tenerlo a credenciales de administracion de la plataforma.
+
+### Criterios de aceptacion
+
+Los criterios de aceptacion son **acciones humanas y verificacion manual**, no codigo:
+
+- El campo "Site URL" en Authentication → URL Configuration del proyecto Supabase es `https://fitbud-green.vercel.app`.
+- La allowlist de "Redirect URLs" incluye `https://fitbud-green.vercel.app/**`.
+- Tras el cambio, al solicitar un reset de contrasena real desde el formulario de produccion, el correo recibido contiene un link a `https://fitbud-green.vercel.app/...` y no a `localhost`.
+- El agente autonomo no completa ni intenta completar este REQ.
+
+### Verificacion sugerida
+
+1. Entrar a `https://fitbud-green.vercel.app`, usar "Olvidé mi contraseña" con un correo real.
+2. Revisar el correo recibido y confirmar que el link de reset apunta a `https://fitbud-green.vercel.app/...`.
+3. Hacer clic en el link y confirmar que la app carga correctamente el formulario de nueva contrasena en produccion.
+4. Opcional: verificar tambien el flujo desde el panel admin (enviar reset a un usuario de prueba y confirmar el dominio del link recibido).
