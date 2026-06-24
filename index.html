@@ -312,6 +312,20 @@
   table.wt th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
   table.wt td{font-family:var(--font-mono)}
   table.wt input{width:72px;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:7px;text-align:center;font-size:14px;font-family:var(--font-mono)}
+  @media(max-width:480px){
+    table.wt thead{display:none}
+    table.wt,table.wt tbody{display:block;width:100%}
+    table.wt tr{display:grid;grid-template-columns:auto 1fr 1fr;grid-template-areas:"week range range" ". peso grasa";background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);margin-bottom:10px;padding:10px 12px;gap:4px 8px}
+    table.wt td{border-bottom:none;padding:0;text-align:left;font-family:var(--font-body)}
+    table.wt td:nth-child(1){grid-area:week;font-family:var(--font-display);font-weight:700;font-size:14px;align-self:center}
+    table.wt td:nth-child(2){grid-area:range;font-size:12px;color:var(--muted);align-self:center}
+    table.wt td:nth-child(3){grid-area:peso}
+    table.wt td:nth-child(4){grid-area:grasa}
+    table.wt td:nth-child(3)::before,table.wt td:nth-child(4)::before{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+    table.wt td:nth-child(3)::before{content:"Peso kg"}
+    table.wt td:nth-child(4)::before{content:"% grasa"}
+    table.wt input{width:100%;min-height:44px;font-size:16px;border-radius:var(--r-md);padding:0 8px;box-sizing:border-box}
+  }
   .chart{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px;margin:14px 0}
 
   .summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}

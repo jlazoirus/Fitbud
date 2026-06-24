@@ -3057,7 +3057,7 @@ Pedir en onboarding solo lo esencial para generar el primer plan y mover lo avan
 
 ## REQ-56 - Progreso: tabla de peso a tarjetas full-width en movil
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 > Origen: auditoria UX — 26 targets <44px y tabla densa en Progreso movil.
 
