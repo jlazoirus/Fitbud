@@ -3096,7 +3096,7 @@ Convertir la tabla de peso en filas tipo tarjeta full-width en movil, con inputs
 
 ## REQ-57 - Empty states que ensenan en Nutricion, Entreno y Progreso
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 > Origen: plan de UX — donde hoy se lee "Sin asignar" o "Aun falta...", el vacio no ensena ni ofrece accion.
 

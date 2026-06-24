@@ -3296,6 +3296,7 @@ function renderCoach(){renderHoy();}
 function renderNutrition(){
   const ds=current; const st=dayState(ds); const day=buildDay(ds);
   const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||WEEKS[0]; const hasPlan=weekHasGeneratedPlan(w);
+  const prepared=homeDayHasPreparedMeals(ds,day);
   const mealsHtml=day.meals.map(b=>mealCard(ds,b)).join("");
   const extrasHtml=st.extras.map((e,i)=>extraCard(ds,e,i)).join("");
   const weekCta=aiAvailable()?(hasPlan
@@ -3310,8 +3311,17 @@ function renderNutrition(){
     <button class="btn btn-sm" onclick="aiReview()">🔍 Revisar mis macros</button>
   </div>
   <div class="muted small">${dbStatusNote()}</div>`;
+  const emptyNutHtml=!prepared?`<section class="agenda-card agenda-state setup">
+    <div class="agenda-head"><div>
+      <div class="agenda-kicker">Nutrición</div>
+      <h3 class="agenda-title">Prepara tus comidas de hoy</h3>
+      <div class="agenda-sub">Aquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Un día preparado llena los slots automáticamente.</div>
+    </div></div>
+    <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
+  </section>`:"";
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
+  ${emptyNutHtml}
   ${weekCta}
   ${section("nut.macros","Macros del día",heroDash(ds)+aiRow)}
   ${section("nut.plan","Comidas del día",mealsHtml,`${day.meals.length}`)}
@@ -3877,9 +3887,21 @@ function renderWorkout(){
   const safetyNotice=trainingSafetyHold()
     ? `<div class="alert"><b>Entrenamiento pausado por seguridad.</b><br>No inicies esta rutina hasta recibir orientación de un profesional. Nutrición, historial y exportación siguen disponibles.</div>`
     : `<div class="alert violet"><b>Señales para detenerte:</b><br>Dolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.</div>`;
+  const emptyWkHtml=(!generatedVersion&&!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold())?`<section class="agenda-card agenda-state setup">
+    <div class="agenda-head"><div>
+      <div class="agenda-kicker">Entreno</div>
+      <h3 class="agenda-title">Guía tu sesión de hoy</h3>
+      <div class="agenda-sub">Aquí sigues cada serie y descanso, registras cargas y cierras la sesión. Un plan personalizado adapta los ejercicios a tus días y lugar.</div>
+    </div></div>
+    <div class="agenda-actions">
+      <button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>
+      <button class="btn" onclick="openTrainingPlanGenerator()">Preparar mi plan</button>
+    </div>
+  </section>`:"";
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
   ${safetyNotice}
+  ${emptyWkHtml}
   <div class="dash" style="padding:12px 14px">
     <div class="row between">
       <div>
@@ -4044,7 +4066,15 @@ function renderProgress(){
     ${section("pr.rachas","Rachas e hitos",renderStreakSection())}
     ${section("pr.ciclos","Tus ciclos",progressJourney(),`${cycleNumber()}`)}
     ${section("pr.peso","Peso corporal",
-      weightChart()+bodyComposition()+
+      (lastWeighedWeek()===null?`<section class="agenda-card agenda-state setup" style="margin:0 0 14px">
+        <div class="agenda-head"><div>
+          <div class="agenda-kicker">Progreso</div>
+          <h3 class="agenda-title">Registra tu peso de la semana</h3>
+          <div class="agenda-sub">Ver tu peso semana a semana revela si el plan funciona — sin adivinar. Completa el campo de la semana actual para activar el gráfico.</div>
+        </div></div>
+        <div class="agenda-actions"><button class="btn btn-accent" onclick="scrollToWeightInput()">Ingresar mi peso</button></div>
+      </section>`:"")
+      +weightChart()+bodyComposition()+
       `<table class="wt"><thead><tr><th>Sem</th><th>Rango kg</th><th>Peso kg</th><th>% grasa</th></tr></thead><tbody>${weightRows()}</tbody></table>`)}
     ${section("pr.semana","Semana",weekSection()+weeklyCheckinHistory())}`;
 }
@@ -6955,6 +6985,7 @@ function setWeightEntry(n,patch){
 }
 function setWeight(n,v){setWeightEntry(n,{kg:v});}
 function setBodyFat(n,v){setWeightEntry(n,{bf:v});}
+function scrollToWeightInput(){const el=document.querySelector('.wt input');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.focus();}}
 // Composición corporal derivada para una semana con peso y % grasa.
 function composition(n){const kg=wkg(n),bf=wbf(n);if(kg==null||bf==null)return null;const fat=kg*bf/100;return{kg,bf,fat,lean:kg-fat};}
 // Última semana (mayor índice) con datos de peso.
