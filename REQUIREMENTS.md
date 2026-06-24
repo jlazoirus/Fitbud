@@ -2970,7 +2970,8 @@ Orientar al usuario nuevo con coachmarks contextuales una sola vez tras el onboa
 
 ## REQ-54 - Perfil en secciones con navegacion local y guardado por seccion
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Navegacion local por chips (Objetivo / Comidas / Entreno / Privacidad / Cuenta) con anchors y scrollIntoView; boton flotante "Guardar cambios" condicionado a cambios sin guardar (dirty tracking via delegacion oninput/onchange en pfEditableBody); boton estatico eliminado; profileClearDirty() en saveProfile(); cache SW v45.
 
 > Origen: auditoria UX 23 jun 2026 — Perfil mide ~5.436px de alto en movil y mezcla macros, alimentacion, entrenamiento, suscripcion, privacidad, recordatorios, push y cuenta en una sola pantalla con guardado al final.
 

@@ -628,6 +628,13 @@
   .sync-badge.pending{background:rgba(180,140,30,.14);border-color:rgba(180,140,30,.35);color:#e8c95a}
   .sync-badge.synced{background:rgba(60,180,80,.14);border-color:rgba(60,180,80,.35);color:#4ade80}
   .sync-badge.attention{background:rgba(220,110,30,.14);border-color:rgba(220,110,30,.35);color:#f0a050;pointer-events:auto;cursor:pointer}
+  /* Perfil: navegación local y guardado flotante (REQ-54) */
+  .pf-nav{display:flex;overflow-x:auto;gap:6px;padding:0 0 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .pf-nav::-webkit-scrollbar{display:none}
+  .pf-nav button{flex:0 0 auto;background:var(--surf2);border:1px solid var(--border-2);border-radius:999px;color:var(--muted);font-size:13px;font-weight:600;padding:8px 16px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;white-space:nowrap}
+  .pf-nav button:active{background:var(--terra-400,#b44c2c);border-color:var(--terra-400,#b44c2c);color:#fff}
+  .pf-save-float{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:0;right:0;padding:0 16px;z-index:49;pointer-events:none}
+  .pf-save-float button{width:100%;max-width:528px;margin:0 auto;display:block;background:var(--accent);color:#fff;border:none;border-radius:var(--r-lg);padding:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.55);pointer-events:auto;font-family:var(--font-display)}
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
 <script src="config.js"></script>
@@ -4631,6 +4638,19 @@ function coachSendFromInput(){
 // renderCoach() is now an alias — coach is integrated in renderHoy() (REQ-42)
 
 /* ---------- PERFIL: preferencias (mixto) + cuenta + admin ---------- */
+function profileMarkDirty(){
+  if(view!=="perfil")return;
+  const el=document.getElementById("profileSaveFloat");
+  if(el)el.style.display="";
+}
+function profileClearDirty(){
+  const el=document.getElementById("profileSaveFloat");
+  if(el)el.style.display="none";
+}
+function pfScrollTo(id){
+  const el=document.getElementById(id);
+  if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+}
 function renderProfile(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const macros=profileMacroTargets();
@@ -4641,13 +4661,22 @@ function renderProfile(){
   const duration=resolvedPlanDuration(p);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
 
-  ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas. Guarda cuando estés listo.</span></div>`:""}
+  <div class="pf-nav" role="navigation" aria-label="Secciones del perfil">
+    <button onclick="pfScrollTo('pfSecObjetivo')">Objetivo</button>
+    <button onclick="pfScrollTo('pfSecComidas')">Comidas</button>
+    <button onclick="pfScrollTo('pfSecEntreno')">Entreno</button>
+    <button onclick="pfScrollTo('pfSecPrivacidad')">Privacidad</button>
+    <button onclick="pfScrollTo('pfSecCuenta')">Cuenta</button>
+  </div>
 
-  <div class="dash">
+  ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas.</span></div>`:""}
+
+  <div id="pfEditableBody" oninput="profileMarkDirty()" onchange="profileMarkDirty()">
+  <div id="pfSecObjetivo" class="dash">
     <div class="field" style="margin:0"><label>Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
   </div>
 
-  <div class="section-h">Objetivo y macros</div>
+  <div class="section-h">Objetivo y metas</div>
   <div class="dash">
     ${macros?`<div class="macro-preview" style="margin-top:0">
       <div class="scard"><div class="n">${macros.kcal}</div><div class="l">kcal diarias</div></div>
@@ -4659,7 +4688,7 @@ function renderProfile(){
     <button class="btn" style="width:100%" onclick="startOnboarding()">Recalcular objetivos y preferencias</button>
   </div>
 
-  <div class="section-h">Preferencias alimenticias</div>
+  <div id="pfSecComidas" class="section-h">Comidas</div>
   <div class="dash">
     <label class="muted small">Patrón de alimentación y restricciones generales</label>
     <div class="chips" style="margin:9px 0 4px">
@@ -4699,7 +4728,7 @@ function renderProfile(){
     <div class="field" style="margin-bottom:0"><label>Ingredientes que no te gustan</label><input id="pf_disliked" value="${esc(p.dislikedIngredients)}" placeholder="tofu, aceitunas…"><div class="field-note">Se evitan cuando existe una alternativa viable.</div></div>
   </div>
 
-  <div class="section-h">Preferencias de entrenamiento</div>
+  <div id="pfSecEntreno" class="section-h">Entrenamiento</div>
   <div class="dash">
     <div class="muted small" style="margin-bottom:10px">El plan usa tus días y lugares reales. Cambiar disponibilidad ajusta las próximas sesiones sin borrar lo que ya registraste.</div>
     <div class="onboarding-grid">
@@ -4743,9 +4772,9 @@ function renderProfile(){
     <div class="field" style="margin-bottom:0"><label>Movimientos a evitar (opcional)</label><input id="pf_avoid_movements" value="${esc(p.avoidMovements)}" placeholder="Ej. saltos, press sobre la cabeza"></div>
   </div>
 
-  <button class="btn btn-accent" style="width:100%" onclick="saveProfile()">Guardar preferencias</button>
+  </div>
 
-  <div class="section-h">Mi suscripción</div>
+  <div id="pfSecPrivacidad" class="section-h">Mi suscripción</div>
   <div class="dash">${subscriptionStatusHtml()}</div>
 
   <div class="section-h">Privacidad y seguridad</div>
@@ -4807,11 +4836,12 @@ function renderProfile(){
     <button class="btn" style="width:100%" onclick="setView('settings')">⚙️ Ajustes técnicos</button>
   </div>`:""}
 
-  <div class="section-h">Cuenta</div>
+  <div id="pfSecCuenta" class="section-h">Cuenta</div>
   <div class="dash">
     <div class="row between"><span class="muted small">${esc(email)}</span><span class="badge ${isAdmin()?'b-PESAS':'b-Libre'}">${isAdmin()?'Admin':'Usuario'}</span></div>
     <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="signOutUser(this)">Cerrar sesión</button>
-  </div>`;
+  </div>
+  <div id="profileSaveFloat" class="pf-save-float" style="display:none"><button onclick="saveProfile()">Guardar cambios</button></div>`;
   ensureBillingHistory();
   // Cargar preferencias de recordatorios y poblar el formulario + sección push
   if(supa&&uid()){
@@ -4905,6 +4935,7 @@ async function saveProfile(){
   if(result&&result.error){toast("Error: "+result.error.message);return;}
   if(calendarChanged){await upsertActiveCycle();await pullCycleHistory();}
   current=clampDate(current);
+  profileClearDirty();
   render();
   toast(durationChanged?`Plan ajustado a ${planDurationWeeks} semanas`:"Preferencias guardadas");
 }
