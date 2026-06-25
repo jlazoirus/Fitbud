@@ -39,14 +39,14 @@ export default async function handler(req, res) {
     return;
   }
   const e = env();
-  if (!e.stripeKey) {
-    res.status(503).json({ error: "Pasarela de pago no configurada. Contacta al administrador." });
-    return;
-  }
-
   const user = await verifyUser(req, e);
   if (!user) {
     res.status(401).json({ error: "Sesión requerida." });
+    return;
+  }
+
+  if (!e.stripeKey) {
+    res.status(503).json({ error: "Pasarela de pago no configurada. Contacta al administrador." });
     return;
   }
 

@@ -3179,7 +3179,8 @@ Acelerar la conviccion: acercar el product proof (mockup / "que recibire hoy") a
 
 ## REQ-59 - Fix de contrato: validar autenticacion antes de la config de Stripe en checkout
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`api/checkout.js` valida ahora el método y la sesión antes de revisar `STRIPE_SECRET_KEY`, de modo que una petición sin sesión devuelve 401 aunque la pasarela no esté configurada. Una sesión válida sin configuración de Stripe conserva el 503 operativo. Se agregó `scripts/test-checkout-api.mjs` para cubrir el contrato con mocks sin llamar a Stripe.
 
 > Origen: smoke test de produccion (auditoria 23 jun 2026): `POST /api/checkout` sin sesion devuelve 503 en vez de 401/403.
 
