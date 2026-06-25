@@ -41,10 +41,11 @@ const user = {
   id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
   email: "user@example.com",
 };
-const handler = await importHandler("api/billing-history.js");
+const handler = await importHandler("api/entitlement.js");
 
+// Sin sesión debe rechazar con 401
 let res = capture();
-await handler({ method: "GET", headers: {} }, res);
+await handler({ method: "GET", query: { action: "billing-history" }, headers: {} }, res);
 assert(res.statusCode === 401, "Debe exigir sesión para consultar historial.");
 
 let requests = [];
@@ -79,7 +80,7 @@ global.fetch = async (url, options = {}) => {
 };
 
 res = capture();
-await handler({ method: "GET", headers: { authorization: "Bearer user-token" } }, res);
+await handler({ method: "GET", query: { action: "billing-history" }, headers: { authorization: "Bearer user-token" } }, res);
 assert(res.statusCode === 200, "Debe responder 200 con sesión válida.");
 assert(Array.isArray(res.body.history) && res.body.history.length === 1, "Debe devolver historial proyectado.");
 const item = res.body.history[0];
@@ -92,4 +93,4 @@ assert(!("stripe_event_id" in item), "No debe devolver ID externo.");
 assert(!("error" in item), "No debe devolver errores internos.");
 assert(requests.some(item => item.url.includes("/rest/v1/billing_events?")), "Debe consultar billing_events.");
 
-console.log("API billing-history: autenticación, filtro y proyección segura verificados con mocks.");
+console.log("API billing-history (vía entitlement): autenticación, filtro y proyección segura verificados con mocks.");

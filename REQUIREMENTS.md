@@ -3298,3 +3298,36 @@ El commit anterior `6a2776c` había eliminado la comprobación de rango de macro
 - `node scripts/release-gate.mjs` pasa 18/18 tras el commit.
 - Usuarios con `sin_huevo`, `vegano` o alergias pueden generar su día sin recibir el error 422.
 - La validación server-side sigue rechazando respuestas que violen restricciones (comportamiento correcto, mantenido).
+
+
+---
+
+## REQ-62 - Fix infra: consolidar billing-history y coupon dentro de entitlement para cumplir límite de Vercel Hobby
+
+**Estado: implementado.**
+
+### Contexto
+
+Vercel plan Hobby (gratuito) impone un máximo de **12 Serverless Functions** por deployment. El repo había llegado a 13 archivos en `api/*.js`, bloqueando el build con:
+
+> "No more than 12 Serverless Functions can be added to a Deployment on the Hobby plan."
+
+**Regla permanente:** cualquier futuro endpoint nuevo debe evaluarse contra este límite. Si ya hay 11 funciones, un archivo nuevo haría fallar el build — debe consolidarse dentro de un endpoint existente o reemplazar uno.
+
+### Cambios (commit único en main)
+
+- **`api/entitlement.js`**: absorbe la lógica completa de `billing-history.js` y `coupon.js`.
+  - `GET /api/entitlement?action=billing-history` → historial de pagos (antes `GET /api/billing-history`)
+  - `POST /api/entitlement { action:"generate", ... }` → generar código de canje (antes `POST /api/coupon`)
+  - `POST /api/entitlement { action:"redeem", ... }` → canjear código (antes `POST /api/coupon`)
+  - `GET /api/entitlement`, `POST { action:"grant" }`, `POST { action:"revoke" }` → comportamiento existente sin cambios
+- **`api/billing-history.js`**: eliminado.
+- **`api/coupon.js`**: eliminado.
+- **`index.html`**: dos llamadas `fetch` actualizadas al endpoint consolidado.
+- **`scripts/test-billing-history-api.mjs`** y **`scripts/test-coupon-api.mjs`**: adaptados para importar desde `api/entitlement.js`; misma cobertura.
+
+### Verificacion
+
+- `ls api/*.js | wc -l` → **11** (bajo el límite de 12).
+- `node scripts/test-billing-history-api.mjs` pasa.
+- `node scripts/test-coupon-api.mjs` pasa.

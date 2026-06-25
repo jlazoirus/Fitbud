@@ -1692,7 +1692,7 @@ async function loadBillingHistory(){
   billingHistoryError="";
   renderBillingHistoryBox();
   try{
-    const r=await fetch("/api/billing-history",{headers:{Authorization:"Bearer "+token}});
+    const r=await fetch("/api/entitlement?action=billing-history",{headers:{Authorization:"Bearer "+token}});
     const data=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error("No pudimos cargar tu historial ahora.");
     billingHistory=Array.isArray(data.history)?data.history:[];
@@ -5382,7 +5382,7 @@ async function redeemCoupon(btn){
   if(!code){toast("Ingresa tu código de acceso.");if(input)input.focus();return;}
   if(btn){btn.disabled=true;btn.textContent="Canjeando…";}
   try{
-    const r=await fetch("/api/coupon",{
+    const r=await fetch("/api/entitlement",{
       method:"POST",
       headers:{"content-type":"application/json","Authorization":"Bearer "+token},
       body:JSON.stringify({action:"redeem",code})

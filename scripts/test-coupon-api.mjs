@@ -45,8 +45,9 @@ const admin = {
   id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
   email: "admin@example.com",
 };
-const handler = await importHandler("api/coupon.js");
+const handler = await importHandler("api/entitlement.js");
 
+// Sin sesión debe rechazar con 401
 let res = capture();
 await handler({ method: "POST", headers: {}, body: { action: "redeem", code: "FIT-TEST-1234" } }, res);
 assert(res.statusCode === 401, "Debe exigir sesión para generar o canjear códigos.");
@@ -101,6 +102,7 @@ global.fetch = async (url, options = {}) => {
   throw new Error("Ruta no simulada: " + value);
 };
 
+// Usuario regular no puede generar
 res = capture();
 await handler({
   method: "POST",
@@ -109,6 +111,7 @@ await handler({
 }, res);
 assert(res.statusCode === 403, "Un usuario regular no debe generar códigos.");
 
+// Admin puede generar
 currentUser = admin;
 currentProfile = { active: true, is_admin: true };
 res = capture();
@@ -122,6 +125,7 @@ assert(res.body.duration_days === 7, "Debe conservar duración configurable.");
 assert(res.body.valid_until === "2026-07-31T00:00:00.000Z", "Debe normalizar validUntil ISO.");
 assert(requests.some(item => item.url.endsWith("/rest/v1/redemption_codes")), "Debe insertar redemption_codes.");
 
+// Usuario autenticado puede canjear
 currentUser = user;
 currentProfile = { active: true, is_admin: false };
 res = capture();
@@ -134,4 +138,4 @@ assert(res.statusCode === 200, "Usuario autenticado debe canjear un código vál
 assert(res.body.entitlement.origin === "coupon", "El entitlement debe tener origen coupon.");
 assert(res.body.entitlement.duration_days === 7, "Debe devolver la duración real del código.");
 
-console.log("API coupon: generación admin, bloqueo no-admin y canje seguro verificados con mocks.");
+console.log("API coupon (vía entitlement): generación admin, bloqueo no-admin y canje seguro verificados con mocks.");
