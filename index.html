@@ -6758,10 +6758,10 @@ async function generateOneDay(ds,coachRequest){
   const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
   const slots=day.meals.map((m,i)=>`${m.id} (${m.slot}${m.time?", ~"+m.time:""}${i===mainMealIdx?" [comida principal]":""})`).join(", ");
   const hardRes=coachHardRestrictions();
-  // Solo excluir de la referencia los platos con restricciones DURAS (alergias, sin_huevo/vegano).
-  // Preferencias suaves (sin_lacteos, sin_gluten, dislikedIngredients) no se filtran aquí para
-  // no dejar la lista tan corta que la IA genere días calóricamente insuficientes (REQ-64).
-  const compatDishes=DB.loaded?DB.dishes.filter(d=>!coachTextHasTerms(coachDishText(d),hardRes)):[];
+  // Excluir de la referencia los platos incompatibles con el perfil (duras + suaves: sin_lacteos,
+  // sin_gluten, dislikedIngredients). validateGeneratedDay no valida las suaves, así que el filtro
+  // de la lista de referencia es la única barrera para no sugerirlas. REQ-61.
+  const compatDishes=DB.loaded?DB.dishes.filter(d=>!coachDishBlockedByProfile(d).blocked):[];
   const dishList=compatDishes.length?compatDishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
   const recent=recentMealNames(ds,5);
   const lp=(profile&&profile.prefs&&profile.prefs.learnedPatterns)||null;

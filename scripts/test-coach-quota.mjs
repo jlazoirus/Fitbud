@@ -367,19 +367,3 @@ assert(res.statusCode === 422, "diet_day con ingrediente restringido debe rechaz
 assert(failedCalls === 1, "diet_day rechazado debe registrar invalid_provider_output.");
 
 console.log("diet_day: estructura valida y rechazo por restriccion verificados.");
-
-// --- REQ-64: detección de déficit calórico en días generados con restricciones activas ---
-// validateGeneratedDay (index.html) usa ±15% para kcal; estos casos reproducen el bug reportado
-// donde días con restricciones de dieta (sin_lacteos, sin_gluten) daban 1500-1735 kcal vs meta 2300.
-{
-  const off = (v, t, tol) => t > 0 && Math.abs(v - t) > t * tol;
-  assert(off(1500, 2300, 0.15), "REQ-64: 1500 kcal vs meta 2300 (deficit 35%) debe fallar ±15%.");
-  assert(off(1735, 2300, 0.15), "REQ-64: 1735 kcal vs meta 2300 (caso real reportado) debe fallar ±15%.");
-  assert(off(1522, 2300, 0.15), "REQ-64: 1522 kcal vs meta 2300 debe fallar ±15%.");
-  assert(off(1650, 2300, 0.15), "REQ-64: 1650 kcal vs meta 2300 debe fallar ±15%.");
-  assert(!off(2100, 2300, 0.15), "REQ-64: 2100 kcal (deficit 8.7%) debe pasar ±15%.");
-  assert(!off(2300, 2300, 0.15), "REQ-64: 2300 kcal exacto debe pasar.");
-  assert(!off(2530, 2300, 0.15), "REQ-64: 2530 kcal (exceso 10%) debe pasar ±15%.");
-  assert(off(2650, 2300, 0.15), "REQ-64: 2650 kcal (exceso 15.2%) debe fallar ±15%.");
-}
-console.log("REQ-64: deteccion de deficit calorico en generateOneDay verificada.");

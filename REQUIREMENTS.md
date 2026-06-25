@@ -3387,7 +3387,7 @@ Detectar automáticamente cuándo el usuario tiene buena adherencia nutricional 
 5. Generar un día con "Preparar mi día": el prompt enviado debe incluir la línea de ingredientes aprendidos (verificable habilitando apiKey local y revisando la petición en DevTools).
 6. Confirmar que en el panel de Perfil no aparece ningún elemento nuevo de UI relacionado con patrones o aprendizaje.
 
-## REQ-64 - Fix: "Preparar mi semana" genera días con déficit calórico grave cuando el perfil tiene preferencias de dieta
+## REQ-64 - Fix: "Preparar mi semana" genera días con déficit calórico porque la IA no escalaba porciones a la meta
 
 **Estado: implementado.**
 
@@ -3395,26 +3395,33 @@ Detectar automáticamente cuándo el usuario tiene buena adherencia nutricional 
 
 Al usar "Preparar mi semana", los 7 días fallaban `validateGeneratedDay` con calorías entre 25%–35% por debajo de la meta. Ejemplo: meta 2300 kcal/día, días generados 1500–1735 kcal.
 
-### Causa raíz
+### Causa raíz (verificada contra producción)
 
-`generateOneDay()` (commit `a2fdf49`, REQ-61) filtró `dishList` con `coachDishBlockedByProfile()`, que internamente llama a `coachFoodBlockTerms(true)`. Esta función incluye no solo restricciones **duras** (alergias, sin_huevo/vegano) sino también preferencias **suaves**: `dislikedIngredients`, y los flags de dieta `sin_lacteos` (→ leche, queso, yogur) y `sin_gluten` (→ trigo). Con múltiples preferencias activas, la mayoría de platos calórico-densos quedaban filtrados. La IA anclaba a los pocos platos restantes (generalmente bajos en calorías) y no alcanzaba la meta.
+El prompt de `generateOneDay()` decía "Cada comida debe llevar ingredientes reales con gramos y macros que sumen **cerca de** la meta del día" — instrucción demasiado vaga. La IA anclaba a los macros de porción por defecto de los platos de referencia (~300 kcal c/u), elegía un plato por slot y no escalaba gramajes, sumando ~1500–1735 kcal contra una meta de 2300.
 
-Problema secundario: el prompt decía "sumen **cerca de** la meta del día", demasiado vago para que la IA lo interprete como obligatorio.
+**Hipótesis descartadas con datos** (consulta SQL a `profiles` y `dishes` en producción):
+- *No era el filtrado de platos.* El perfil que reportó el bug (`kcal_target=2300`) tiene `diet=["vegetariano","sin_huevo"]`, sin `allergies` ni `dislikedIngredients` ni `sin_lacteos`/`sin_gluten`. Para ese perfil `coachFoodBlockTerms(true)` == `coachHardRestrictions()` == `["huevo","clara de huevo","yema"]`: el filtro suave no recortaba nada extra. Quedaban ~40 de 43 platos en la lista.
+- *No era el catálogo.* De 43 platos, 29 superan 500 kcal y 16 son densos y libres de lácteos/gluten/huevo. Densidad calórica de sobra.
+
+> Nota histórica: el commit anterior `e0fbd51` atribuyó el bug al filtro suave y relajó `compatDishes` a solo restricciones duras. Esa relajación no ayudaba (no-op para este perfil) y además debilitaba el honrar `sin_lacteos`/`sin_gluten` —que `validateGeneratedDay` no valida— en planes de futuros usuarios. Este REQ revierte esa parte y deja solo el fix de prompt, que es el que ataca la causa real.
 
 ### Fix (`index.html`)
 
-1. **Filtro más preciso en `compatDishes`**: en lugar de `coachDishBlockedByProfile()` (que aplica bloqueos suaves), usa `coachTextHasTerms(coachDishText(d), hardRes)` donde `hardRes = coachHardRestrictions()`. Así solo se excluyen de la referencia los platos con ingredientes realmente prohibidos (alergias, sin_huevo/vegano). Los platos con preferencias suaves (sin_lacteos, sin_gluten) siguen apareciendo como referencia para dar a la IA suficientes opciones calóricas.
-2. **Prompt reforzado**: cambia "Platos disponibles (reutilízalos cuando encajen)" por "Referencia de platos compatibles (úsalos como inspiración; ajusta gramajes o crea platos distintos si hace falta para alcanzar la meta)". La línea de instrucción pasa de "cerca de la meta" a "OBLIGATORIO: el total del día debe ser `${target.kcal}` kcal ±10% y proteína ≥`${Math.round(target.p*0.85)}` g."
+**Prompt reforzado** en `generateOneDay()`: "Platos disponibles (reutilízalos cuando encajen)" → "Referencia de platos compatibles (úsalos como inspiración; ajusta gramajes o crea platos distintos si hace falta para alcanzar la meta)", y la línea de meta pasa de "cerca de la meta" a "OBLIGATORIO: el total del día debe ser `${target.kcal}` kcal ±10% y proteína ≥`${Math.round(target.p*0.85)}` g. ... ajusta porciones libremente para cumplir la meta."
 
-El fix de REQ-61 (las restricciones duras no aparecen en el plan) se mantiene: `hardResLine` sigue diciendo PROHIBIDO, y `validateGeneratedDay` sigue rechazando platos con ingredientes vetados.
+El filtrado de `compatDishes` se mantiene en `coachDishBlockedByProfile()` (duras + suaves), igual que REQ-61, para no sugerir platos con ingredientes que el usuario marcó evitar. `hardResLine` sigue diciendo PROHIBIDO y `validateGeneratedDay` sigue rechazando ingredientes vetados.
 
-### Test (`scripts/test-coach-quota.mjs`)
+### Tests
 
-Nuevos asertos al final del archivo que verifican la lógica de tolerancia ±15% de `validateGeneratedDay` con los casos reales del bug (1500, 1735, 1522, 1650 kcal vs 2300 fallan; 2100, 2300, 2530 pasan; 2650 falla por exceso).
+El test de REQ-61 en `scripts/test-coach-quota.mjs` (diet_day válido → 200, con ingrediente restringido → 422) se mantiene como guarda de regresión del filtrado duro. No se añade test de calorías: el fix es puramente de prompt (string) y `validateGeneratedDay` vive en `index.html` (browser), fuera del alcance del harness de tests `.mjs` de Node; un aserto sobre la aritmética de tolerancia no ejercitaría código real.
+
+### Pendiente conocido (fuera de alcance, candidato a REQ nuevo)
+
+`vegetariano` no se filtra en ningún lado (solo `vegano` dispara restricciones en `coachHardRestrictions`/`coachFoodBlockTerms`). Un usuario vegetariano puede recibir platos con carne/pescado como referencia, y `validateGeneratedDay` tampoco lo valida. No afecta a las calorías (la carne sube kcal), pero es un hueco de cumplimiento de dieta.
 
 ### Criterios de aceptación
 
 - `node scripts/test-coach-quota.mjs` pasa sin errores.
 - `node scripts/release-gate.mjs` pasa 18/18.
-- "Preparar mi semana" genera días dentro de ±15% de la meta calórica aunque el perfil tenga `sin_lacteos`, `sin_gluten` u otras preferencias de dieta activas.
-- Platos con restricciones duras (alergias, sin_huevo, vegano) siguen sin aparecer en los planes generados.
+- "Preparar mi semana" genera días dentro de ±15% de la meta calórica (la IA escala porciones para alcanzarla).
+- Platos con restricciones (duras y suaves) siguen sin sugerirse en la lista de referencia.
