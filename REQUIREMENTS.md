@@ -3331,3 +3331,57 @@ Vercel plan Hobby (gratuito) impone un máximo de **12 Serverless Functions** po
 - `ls api/*.js | wc -l` → **11** (bajo el límite de 12).
 - `node scripts/test-billing-history-api.mjs` pasa.
 - `node scripts/test-coupon-api.mjs` pasa.
+
+---
+
+## REQ-63 - Aprendizaje silencioso de patrones de alimentación del usuario
+
+**Estado: implementado.**
+
+### Objetivo
+
+Detectar automáticamente cuándo el usuario tiene buena adherencia nutricional reciente y usar los ingredientes y platos que realmente comió (marcados `done:true`) como contexto adicional para la IA al generar días, sin notificar al usuario ni modificar sus preferencias editables.
+
+### Decisiones de producto (tomadas por el dueño del producto, no modificar)
+
+- **Opción A — silencioso**: el sistema aprende internamente; sin toast, sin card, sin mensaje al usuario. No modifica `profile.prefs.preferredIngredients` (campo editable). Persiste en `profile.prefs.learnedPatterns`, campo nuevo no visible en la UI de Perfil.
+- **Tolerancia 5-de-7**: se activa si al menos 5 de los últimos 7 días calendario (ventana deslizante hacia atrás desde hoy, no racha estricta consecutiva) cumplen `nutritionDayDone()=true`.
+
+### Decisión técnica (tomada por el agente, documentada aquí)
+
+**Frecuencia de recálculo**: `maybeUpdateLearnedPatterns()` recalcula como máximo una vez por día, comparando `learnedPatterns.detectedAt` con `todayStr()`. Esto evita una escritura a Supabase en cada login o render mientras el usuario siga en el mismo día. Si la condición deja de cumplirse al día siguiente (el usuario falla más días), los patrones quedan en caché hasta que se vuelvan a calcular con la condición cumplida. El tiempo de staleness máximo es 24h — aceptable para una sugerencia de IA soft (no es una restricción dura).
+
+### Dependencias
+
+- `nutritionDayDone(ds)` — función existente, sin cambios.
+- `S.days` — estado en memoria cargado por `pullAllDays()`.
+- `profile.prefs` — campo JSONB en tabla `profiles` de Supabase.
+
+### Alcance
+
+**`index.html`**:
+- `recentNutritionAdherence(ds)` — nueva función; devuelve `true` si ≥5 de los últimos 7 días cumplen `nutritionDayDone`.
+- `extractLearnedPatterns(ds, windowDays=14)` — nueva función; escanea `S.days` buscando comidas `done:true` con `ovr` presente; devuelve `{topIngredients:[...8], topMealNames:[...5], detectedAt, windowDays}`.
+- `maybeUpdateLearnedPatterns()` — nueva función async; comprueba condición y persiste en `profile.prefs.learnedPatterns` via `supa.from("profiles").update(...)` directo (sin `saveProfilePrefs` para no disparar `ensurePlanVersion`/`backfillDayVersions`). Llamada sin `await` desde `onAuth()` tras `pullAllDays()`.
+- `generateOneDay()` — añade línea al prompt: "El usuario suele disfrutar ingredientes como: X, Y, Z. Incorpóralos cuando encajen con las metas." Solo si `learnedPatterns.topIngredients` no está vacío.
+- `buildSysPrompt()` — añade campo `learned_patterns` al bloque `nutrition` del contexto estructurado JSON que recibe la IA (coach conversacional incluido).
+
+**`scripts/test-learned-patterns.mjs`** — tests unitarios de `recentNutritionAdherence` (7/7, 5/7, 4/7, 0/7, 3 días con datos, 6/7, umbral 50 % de slots) y de `extractLearnedPatterns` (ingredientes frecuentes, sin done/sin ovr, top 8 ingredientes, top 5 platos, campo `name` vs `nombre`).
+
+### Criterios de aceptación
+
+- `node scripts/test-learned-patterns.mjs` pasa sin errores.
+- `node scripts/release-gate.mjs` pasa 18/18 tras commit.
+- No hay ningún toast, card ni cambio visible en la UI de Perfil cuando se actualiza `learnedPatterns`.
+- `profile.prefs.preferredIngredients` no es modificado por este flujo.
+- Si el usuario tiene adherencia ≥5/7, la próxima vez que la IA genere un día el prompt incluye la línea de ingredientes aprendidos.
+- `buildSysPrompt()` incluye `learned_patterns` en el JSON de contexto enviado al coach conversacional.
+
+### Verificación sugerida
+
+1. `node scripts/test-learned-patterns.mjs` → "todos los tests pasaron".
+2. Marcar ≥5 días de los últimos 7 como completados (≥50 % de comidas por día).
+3. Recargar la app (o hacer login), esperar que `maybeUpdateLearnedPatterns` termine (async background).
+4. Inspeccionar `profile.prefs.learnedPatterns` en Supabase: debe tener `{topIngredients:[...], topMealNames:[...], detectedAt:"YYYY-MM-DD", windowDays:14}`.
+5. Generar un día con "Preparar mi día": el prompt enviado debe incluir la línea de ingredientes aprendidos (verificable habilitando apiKey local y revisando la petición en DevTools).
+6. Confirmar que en el panel de Perfil no aparece ningún elemento nuevo de UI relacionado con patrones o aprendizaje.

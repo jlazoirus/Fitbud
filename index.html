@@ -6109,6 +6109,7 @@ function buildSysPrompt(){
       notes:p.foodNotes||null,
       hard_restrictions:p.allergies||null,
       disliked_ingredients:p.dislikedIngredients||null,
+      learned_patterns:p.learnedPatterns||null,
     },
     training:{
       primary_sport:p.primarySport,
@@ -6760,6 +6761,8 @@ async function generateOneDay(ds,coachRequest){
   const compatDishes=DB.loaded?DB.dishes.filter(d=>!coachDishBlockedByProfile(d).blocked):[];
   const dishList=compatDishes.length?compatDishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
   const recent=recentMealNames(ds,5);
+  const lp=(profile&&profile.prefs&&profile.prefs.learnedPatterns)||null;
+  const learnedLine=lp&&lp.topIngredients&&lp.topIngredients.length?`\nEl usuario suele disfrutar ingredientes como: ${lp.topIngredients.join(", ")}. Incorpóralos cuando encajen con las metas.`:"";
   const cookCtx=`Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
   const hardResLine=hardRes.length?`\nPROHIBIDO incluir en cualquier comida o ingrediente: ${hardRes.join(", ")}.`:"";
   const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
@@ -6767,7 +6770,7 @@ Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carb
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
 ${cookCtx}${hardResLine}
 Platos disponibles (reutilízalos cuando encajen; puedes crear variantes coherentes): ${dishList}.
-Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}.
+Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}${learnedLine}.
 Cada comida debe llevar ingredientes reales con gramos y macros que sumen cerca de la meta del día.
 Responde SOLO JSON válido, sin texto extra:
 {"explicacion":"breve","comidas":[{"slot_id":"desayuno","nombre":"...","ingredientes":[{"nombre":"Avena","gramos":50}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
@@ -7201,6 +7204,61 @@ function nutritionDayDone(ds){
   return done>=Math.ceil(day.meals.length/2);
 }
 
+/* ---------- REQ-63: adherencia reciente y aprendizaje silencioso de patrones ---------- */
+
+// True si ≥5 de los últimos 7 días calendario (ventana deslizante hacia atrás desde ds) cumplen nutritionDayDone.
+function recentNutritionAdherence(ds){
+  let count=0;
+  for(let i=0;i<7;i++){const d=addDays(ds,-i);if(d>=START&&nutritionDayDone(d))count++;}
+  return count>=5;
+}
+
+// Escanea los últimos windowDays días y devuelve los ingredientes y nombres de plato más frecuentes
+// entre comidas marcadas done:true con override de IA (ovr presente).
+function extractLearnedPatterns(ds,windowDays){
+  windowDays=windowDays||14;
+  const ingFreq={},mealFreq={};
+  for(let i=0;i<windowDays;i++){
+    const d=addDays(ds,-i);
+    if(d<START)break;
+    const st=S.days&&S.days[d];if(!st||!st.meals)continue;
+    const day=buildDay(d);
+    day.meals.forEach(b=>{
+      const ms=st.meals&&st.meals[b.id];
+      if(!ms||!ms.done)return;
+      const o=ms.ovr;
+      if(!o)return;
+      if(o.name){const k=o.name.trim();if(k)mealFreq[k]=(mealFreq[k]||0)+1;}
+      if(Array.isArray(o.ingredientes)){
+        o.ingredientes.forEach(x=>{
+          const k=(x.nombre||x.name||"").trim();
+          if(k)ingFreq[k]=(ingFreq[k]||0)+1;
+        });
+      }
+    });
+  }
+  const topIngredients=Object.entries(ingFreq).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k])=>k);
+  const topMealNames=Object.entries(mealFreq).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([k])=>k);
+  return{topIngredients,topMealNames,detectedAt:ds,windowDays};
+}
+
+// Comprueba la condición 5-de-7 y, si se cumple, persiste los patrones aprendidos en profile.prefs.learnedPatterns.
+// Sin notificación al usuario. Decisión técnica: recalcula como máximo una vez por día (detectedAt===todayStr()).
+async function maybeUpdateLearnedPatterns(){
+  if(!supa||!profile||!session||!isActive())return;
+  const ds=todayStr();
+  if(!recentNutritionAdherence(ds))return;
+  const existing=profile.prefs&&profile.prefs.learnedPatterns;
+  if(existing&&existing.detectedAt===ds)return;
+  const patterns=extractLearnedPatterns(ds,14);
+  if(!patterns.topIngredients.length&&!patterns.topMealNames.length)return;
+  if(!profile.prefs)profile.prefs={};
+  profile.prefs.learnedPatterns=patterns;
+  try{
+    await supa.from("profiles").update({prefs:profile.prefs,updated_at:new Date().toISOString()}).eq("id",uid());
+  }catch(e){/* best-effort */}
+}
+
 // Resultado de entrenamiento del día.
 function trainingDayResult(ds){
   const ew=effectiveWorkout(ds);
@@ -7448,6 +7506,7 @@ async function onAuth(){
       await upsertActiveCycle();
     }
     await Promise.all([pullAllDays(),pullWeights()]);
+    maybeUpdateLearnedPatterns(); // REQ-63: best-effort, sin await, sin notificación al usuario
     drainSyncQueue(); // vaciar cola offline pendiente al reconectar (no-await)
     onboardingStep=1;reviewPromptShown=false;
     view="hoy";current=clampDate(todayStr());
