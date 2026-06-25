@@ -3269,3 +3269,32 @@ Los criterios de aceptacion son **acciones humanas y verificacion manual**, no c
 2. Revisar el correo recibido y confirmar que el link de reset apunta a `https://fitbud-green.vercel.app/...`.
 3. Hacer clic en el link y confirmar que la app carga correctamente el formulario de nueva contrasena en produccion.
 4. Opcional: verificar tambien el flujo desde el panel admin (enviar reset a un usuario de prueba y confirmar el dominio del link recibido).
+
+---
+
+## REQ-61 - Fix: "Preparar mi día" rechaza respuestas válidas cuando el perfil tiene restricciones de dieta
+
+**Estado: implementado.**
+
+### Causa raíz
+
+`generateOneDay()` construía `dishList` con **todos** los platos del catálogo, sin filtrar por las restricciones duras del perfil (`sin_huevo`, `vegano`, alergias). La IA veía platos con huevo u otros ingredientes restringidos en la lista de "Platos disponibles" y en algunos casos los incluía en el plan generado. La validación server-side en `validateDietDay` (`api/claude.js`) corría `containsRestriction` y rechazaba esas respuestas con 422 "La opcion preparada no paso las validaciones."
+
+El commit anterior `6a2776c` había eliminado la comprobación de rango de macros (kcal ±15%, proteína ≥85%) pero no esta causa: el fallo por restricciones de ingredientes persistía para usuarios con `sin_huevo`, `vegano` o alergias configuradas.
+
+### Cambios (commit único en main)
+
+- **`index.html`** — `generateOneDay()`:
+  - Filtra `dishList` con `coachDishBlockedByProfile` antes de enviarlo al prompt; la IA solo ve platos compatibles con el perfil.
+  - Añade línea `PROHIBIDO incluir en cualquier comida o ingrediente: <términos>` al prompt cuando hay restricciones duras, reforzando la instrucción ya presente en el system prompt.
+
+- **`scripts/test-coach-quota.mjs`**:
+  - Test `diet_day` con respuesta válida (4 comidas, slots correctos, sin restricciones) → espera 200 y `complete_fresh_coach_part` llamado.
+  - Test `diet_day` con ingrediente restringido (`huevo` con `hardRestrictions: ["huevo"]`) → espera 422 y `fail_coach_generation_part` llamado.
+
+### Criterios de aceptacion
+
+- `node scripts/test-coach-quota.mjs` pasa incluyendo los nuevos casos de `diet_day`.
+- `node scripts/release-gate.mjs` pasa 18/18 tras el commit.
+- Usuarios con `sin_huevo`, `vegano` o alergias pueden generar su día sin recibir el error 422.
+- La validación server-side sigue rechazando respuestas que violen restricciones (comportamiento correcto, mantenido).

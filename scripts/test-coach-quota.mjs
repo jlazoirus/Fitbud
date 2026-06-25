@@ -298,3 +298,72 @@ await adminHandler({
 assert(res.statusCode === 200 && res.body.reset === 2, "El admin debe reiniciar consumo sin borrar auditoría.");
 
 console.log("Cuotas del coach: idempotencia, reutilizacion, devolucion y administracion verificadas con mocks.");
+
+// --- diet_day: estructura valida debe pasar validateDietDay ---
+const validDietDayText = JSON.stringify({
+  explicacion: "Plan equilibrado.",
+  comidas: [
+    { slot_id: "desayuno", nombre: "Avena proteica", ingredientes: [{ nombre: "Avena", gramos: 80 }, { nombre: "Leche desnatada", gramos: 200 }], kcal: 350, proteina_g: 18, carbohidratos_g: 55, grasa_g: 5 },
+    { slot_id: "almuerzo", nombre: "Pollo con arroz", ingredientes: [{ nombre: "Pechuga de pollo", gramos: 150 }, { nombre: "Arroz cocido", gramos: 200 }], kcal: 520, proteina_g: 45, carbohidratos_g: 70, grasa_g: 8 },
+    { slot_id: "snack", nombre: "Yogur con fruta", ingredientes: [{ nombre: "Yogur natural", gramos: 150 }, { nombre: "Arandanos", gramos: 80 }], kcal: 180, proteina_g: 12, carbohidratos_g: 25, grasa_g: 3 },
+    { slot_id: "cena", nombre: "Salmon al horno", ingredientes: [{ nombre: "Salmon", gramos: 180 }, { nombre: "Espinacas", gramos: 150 }], kcal: 380, proteina_g: 38, carbohidratos_g: 5, grasa_g: 20 },
+  ],
+});
+
+const dietDayQuota = {
+  action: "diet_day",
+  requestId: "55555555-5555-4555-8555-555555555555",
+  partKey: "day",
+  contextKey: "ctx-diet-day-test",
+  fallbackText: validDietDayText,
+  validation: { expectedMeals: 4, slots: ["desayuno", "almuerzo", "snack", "cena"], hardRestrictions: [] },
+};
+
+completedCalls = 0; failedCalls = 0; providerCalls = 0;
+global.fetch = async (url, options = {}) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) return response(200, [{ usage_id: 20, mode: "fresh", usage_status: "reserved", effective_limit: 3, quota_day: "2026-06-25", policy_enabled: true }]);
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) { completedCalls += 1; return response(200, [{ stored_result_id: 88 }]); }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) { providerCalls += 1; return response(200, { content: [{ text: validDietDayText }], usage: { input_tokens: 200, output_tokens: 300 } }); }
+  throw new Error("Ruta diet_day no simulada: " + value);
+};
+res = capture();
+await handler({ method: "POST", headers: { authorization: "Bearer token" }, body: { userText: "Genera mi dia", system: "Contexto", quota: dietDayQuota } }, res);
+assert(res.statusCode === 200, "diet_day valido debe completarse con 200.");
+assert(completedCalls === 1 && failedCalls === 0, "diet_day valido debe guardar sin registrar fallo.");
+
+// --- diet_day: ingrediente restringido debe rechazar con 422 ---
+const restrictedDietDayText = JSON.stringify({
+  explicacion: "Plan con proteina.",
+  comidas: [
+    { slot_id: "desayuno", nombre: "Tortilla de huevo", ingredientes: [{ nombre: "Huevo", gramos: 100 }, { nombre: "Tomate", gramos: 80 }], kcal: 220, proteina_g: 14, carbohidratos_g: 5, grasa_g: 15 },
+    { slot_id: "almuerzo", nombre: "Pollo con arroz", ingredientes: [{ nombre: "Pollo", gramos: 150 }, { nombre: "Arroz", gramos: 200 }], kcal: 500, proteina_g: 42, carbohidratos_g: 68, grasa_g: 7 },
+    { slot_id: "snack", nombre: "Batido de proteina", ingredientes: [{ nombre: "Proteina en polvo", gramos: 30 }, { nombre: "Agua", gramos: 300 }], kcal: 120, proteina_g: 24, carbohidratos_g: 3, grasa_g: 1 },
+    { slot_id: "cena", nombre: "Atun con ensalada", ingredientes: [{ nombre: "Atun en lata", gramos: 150 }, { nombre: "Lechuga", gramos: 100 }], kcal: 250, proteina_g: 35, carbohidratos_g: 5, grasa_g: 8 },
+  ],
+});
+
+failedCalls = 0; providerCalls = 0;
+global.fetch = async (url, options = {}) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) return response(200, [{ usage_id: 21, mode: "fresh", usage_status: "reserved", effective_limit: 3, quota_day: "2026-06-25", policy_enabled: true }]);
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) { providerCalls += 1; return response(200, { content: [{ text: restrictedDietDayText }], usage: { input_tokens: 200, output_tokens: 300 } }); }
+  throw new Error("Ruta diet_day restringido no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST", headers: { authorization: "Bearer token" },
+  body: { userText: "Genera mi dia", system: "Contexto", quota: { ...dietDayQuota, requestId: "66666666-6666-4666-8666-666666666666", validation: { ...dietDayQuota.validation, hardRestrictions: ["huevo"] } } },
+}, res);
+assert(res.statusCode === 422, "diet_day con ingrediente restringido debe rechazar con 422.");
+assert(failedCalls === 1, "diet_day rechazado debe registrar invalid_provider_output.");
+
+console.log("diet_day: estructura valida y rechazo por restriccion verificados.");

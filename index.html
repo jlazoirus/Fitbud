@@ -6756,13 +6756,16 @@ async function generateOneDay(ds,coachRequest){
   const mainMealIdx=Math.min(Math.max(1,prefs.mainMealIndex||2),day.meals.length)-1;
   const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
   const slots=day.meals.map((m,i)=>`${m.id} (${m.slot}${m.time?", ~"+m.time:""}${i===mainMealIdx?" [comida principal]":""})`).join(", ");
-  const dishList=DB.loaded?DB.dishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
+  const hardRes=coachHardRestrictions();
+  const compatDishes=DB.loaded?DB.dishes.filter(d=>!coachDishBlockedByProfile(d).blocked):[];
+  const dishList=compatDishes.length?compatDishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
   const recent=recentMealNames(ds,5);
   const cookCtx=`Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
+  const hardResLine=hardRes.length?`\nPROHIBIDO incluir en cualquier comida o ingrediente: ${hardRes.join(", ")}.`:"";
   const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
 Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carbohidratos, ${target.f} g grasa.
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
-${cookCtx}
+${cookCtx}${hardResLine}
 Platos disponibles (reutilízalos cuando encajen; puedes crear variantes coherentes): ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}.
 Cada comida debe llevar ingredientes reales con gramos y macros que sumen cerca de la meta del día.
