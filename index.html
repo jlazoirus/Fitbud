@@ -6146,7 +6146,13 @@ function endCoachAction(key){coachActionsInFlight.delete(key);}
 function coachHardRestrictions(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const terms=String(p.allergies||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean);
-  if(Array.isArray(p.diet)&&(p.diet.includes("sin_huevo")||p.diet.includes("vegano")))terms.push("huevo","clara de huevo","yema");
+  const diet=Array.isArray(p.diet)?p.diet:[];
+  if(diet.includes("sin_huevo")||diet.includes("vegano"))terms.push("huevo","clara de huevo","yema");
+  // Vegano: además del huevo, excluir lácteos de origen animal. REQ-65. Términos elegidos para
+  // NO bloquear "leche vegetal"/"leche de coco" (aptas) ni "mantequilla de maní" (el matcher es
+  // substring, sin límites de palabra; ver nota en REQUIREMENTS REQ-65). La carne/pescado se
+  // dirige por prompt (no por término) porque "pollo" colisionaría con "repollo".
+  if(diet.includes("vegano"))terms.push("queso","yogur","yogurt","parmesano","leche evaporada","lácteo","lacteo");
   return [...new Set(terms.map(x=>x.toLowerCase()))];
 }
 function coachCompatibilityContext(action){
@@ -6768,10 +6774,13 @@ async function generateOneDay(ds,coachRequest){
   const learnedLine=lp&&lp.topIngredients&&lp.topIngredients.length?`\nEl usuario suele disfrutar ingredientes como: ${lp.topIngredients.join(", ")}. Incorpóralos cuando encajen con las metas.`:"";
   const cookCtx=`Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
   const hardResLine=hardRes.length?`\nPROHIBIDO incluir en cualquier comida o ingrediente: ${hardRes.join(", ")}.`:"";
+  // Carne/pescado se instruye por prompt (no por término) para no colisionar con substrings como "repollo". REQ-65.
+  const dietList=Array.isArray(prefs.diet)?prefs.diet:[];
+  const vegLine=dietList.includes("vegano")?`\nPatrón VEGANO: no incluyas carne, aves, pescado, mariscos, lácteos, huevo ni miel; usa solo ingredientes de origen vegetal.`:dietList.includes("vegetariano")?`\nPatrón VEGETARIANO: no incluyas carne, aves, pescado ni mariscos.`:"";
   const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
 Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carbohidratos, ${target.f} g grasa.
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
-${cookCtx}${hardResLine}
+${cookCtx}${hardResLine}${vegLine}
 Referencia de platos compatibles (úsalos como inspiración; ajusta gramajes o crea platos distintos si hace falta para alcanzar la meta): ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}${learnedLine}.
 OBLIGATORIO: el total del día debe ser ${target.kcal} kcal ±10% y proteína ≥${Math.round(target.p*0.85)} g. Cada comida lleva ingredientes reales con gramos; ajusta porciones libremente para cumplir la meta.

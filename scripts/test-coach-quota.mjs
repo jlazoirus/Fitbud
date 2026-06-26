@@ -367,3 +367,69 @@ assert(res.statusCode === 422, "diet_day con ingrediente restringido debe rechaz
 assert(failedCalls === 1, "diet_day rechazado debe registrar invalid_provider_output.");
 
 console.log("diet_day: estructura valida y rechazo por restriccion verificados.");
+
+// --- REQ-65: perfil vegano debe rechazar un día con lácteo ---
+// coachHardRestrictions() añade términos de lácteo cuando diet incluye "vegano"; el servidor los
+// recibe en validation.hardRestrictions y debe devolver 422 si un plato los contiene. "Leche
+// vegetal" NO debe disparar (no se incluye el término "leche" a secas).
+const veganViolationText = JSON.stringify({
+  explicacion: "Plan vegano con un desliz de lácteo.",
+  comidas: [
+    { slot_id: "desayuno", nombre: "Avena con leche vegetal", ingredientes: [{ nombre: "Avena", gramos: 80 }, { nombre: "Leche vegetal", gramos: 200 }], kcal: 350, proteina_g: 14, carbohidratos_g: 55, grasa_g: 6 },
+    { slot_id: "almuerzo", nombre: "Bowl de tofu y arroz", ingredientes: [{ nombre: "Tofu firme", gramos: 200 }, { nombre: "Arroz cocido", gramos: 220 }], kcal: 560, proteina_g: 32, carbohidratos_g: 78, grasa_g: 12 },
+    { slot_id: "snack", nombre: "Hummus con verduras", ingredientes: [{ nombre: "Hummus", gramos: 120 }, { nombre: "Pimiento", gramos: 100 }], kcal: 230, proteina_g: 9, carbohidratos_g: 22, grasa_g: 11 },
+    { slot_id: "cena", nombre: "Ensalada con queso fresco", ingredientes: [{ nombre: "Queso fresco", gramos: 100 }, { nombre: "Lechuga", gramos: 100 }], kcal: 250, proteina_g: 18, carbohidratos_g: 6, grasa_g: 16 },
+  ],
+});
+
+failedCalls = 0; providerCalls = 0;
+global.fetch = async (url, options = {}) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) return response(200, [{ usage_id: 22, mode: "fresh", usage_status: "reserved", effective_limit: 3, quota_day: "2026-06-25", policy_enabled: true }]);
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) { providerCalls += 1; return response(200, { content: [{ text: veganViolationText }], usage: { input_tokens: 200, output_tokens: 300 } }); }
+  throw new Error("Ruta diet_day vegano no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST", headers: { authorization: "Bearer token" },
+  body: { userText: "Genera mi dia", system: "Contexto", quota: { ...dietDayQuota, requestId: "77777777-7777-4777-8777-777777777777", validation: { ...dietDayQuota.validation, hardRestrictions: ["queso", "yogur", "yogurt", "parmesano", "leche evaporada", "lácteo", "lacteo"] } } },
+}, res);
+assert(res.statusCode === 422, "REQ-65: diet_day vegano con queso fresco debe rechazar con 422.");
+assert(failedCalls === 1, "REQ-65: el rechazo vegano debe registrar invalid_provider_output.");
+
+// El mismo set de términos NO debe rechazar un día 100% vegetal (control: leche vegetal sí permitida).
+const veganCleanText = JSON.stringify({
+  explicacion: "Plan vegano correcto.",
+  comidas: [
+    { slot_id: "desayuno", nombre: "Avena con leche vegetal", ingredientes: [{ nombre: "Avena", gramos: 80 }, { nombre: "Leche vegetal", gramos: 200 }], kcal: 350, proteina_g: 14, carbohidratos_g: 55, grasa_g: 6 },
+    { slot_id: "almuerzo", nombre: "Bowl de tofu y arroz", ingredientes: [{ nombre: "Tofu firme", gramos: 200 }, { nombre: "Arroz cocido", gramos: 220 }], kcal: 560, proteina_g: 32, carbohidratos_g: 78, grasa_g: 12 },
+    { slot_id: "snack", nombre: "Hummus con verduras", ingredientes: [{ nombre: "Hummus", gramos: 120 }, { nombre: "Pimiento", gramos: 100 }], kcal: 230, proteina_g: 9, carbohidratos_g: 22, grasa_g: 11 },
+    { slot_id: "cena", nombre: "Tempeh salteado con quinua", ingredientes: [{ nombre: "Tempeh", gramos: 150 }, { nombre: "Quinua cocida", gramos: 180 }], kcal: 420, proteina_g: 28, carbohidratos_g: 40, grasa_g: 16 },
+  ],
+});
+
+completedCalls = 0; failedCalls = 0; providerCalls = 0;
+global.fetch = async (url, options = {}) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) return response(200, [{ usage_id: 23, mode: "fresh", usage_status: "reserved", effective_limit: 3, quota_day: "2026-06-25", policy_enabled: true }]);
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) { completedCalls += 1; return response(200, [{ stored_result_id: 99 }]); }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) { providerCalls += 1; return response(200, { content: [{ text: veganCleanText }], usage: { input_tokens: 200, output_tokens: 300 } }); }
+  throw new Error("Ruta diet_day vegano limpio no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST", headers: { authorization: "Bearer token" },
+  body: { userText: "Genera mi dia", system: "Contexto", quota: { ...dietDayQuota, requestId: "88888888-8888-4888-8888-888888888888", validation: { ...dietDayQuota.validation, hardRestrictions: ["queso", "yogur", "yogurt", "parmesano", "leche evaporada", "lácteo", "lacteo"] } } },
+}, res);
+assert(res.statusCode === 200, "REQ-65: día vegano sin lácteos (con leche vegetal) debe pasar.");
+assert(completedCalls === 1 && failedCalls === 0, "REQ-65: 'leche vegetal' no debe disparar el término de lácteo.");
+
+console.log("REQ-65: enforcement de lacteos para vegano (rechazo + control de leche vegetal) verificado.");

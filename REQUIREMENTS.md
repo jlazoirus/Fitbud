@@ -3425,3 +3425,39 @@ El test de REQ-61 en `scripts/test-coach-quota.mjs` (diet_day válido → 200, c
 - `node scripts/release-gate.mjs` pasa 18/18.
 - "Preparar mi semana" genera días dentro de ±15% de la meta calórica (la IA escala porciones para alcanzarla).
 - Platos con restricciones (duras y suaves) siguen sin sugerirse en la lista de referencia.
+
+## REQ-65 - Fix: los patrones vegano/vegetariano no excluían productos de origen animal
+
+**Estado: implementado.**
+
+### Problema (descubierto al verificar REQ-64)
+
+Las dietas `vegano` y `vegetariano` no filtraban carne/pescado, y `vegano` tampoco filtraba lácteos. `coachHardRestrictions()` solo añadía términos de huevo para `sin_huevo`/`vegano`. El hueco **activo** era vegano: el catálogo tiene varios platos densos con lácteo (`Queso fresco`, `Yogur griego`, `Parmesano`, `Leche evaporada`), así que un usuario vegano recibía esos platos en la lista de referencia, en las opciones del coach y podían pasar la validación del servidor. El hueco de `vegetariano` (carne/pescado) estaba **latente**: el catálogo es 100% vegetariano (el seed lo declara: "Vegetariano sin huevo"), así que hoy no hay carne que filtrar, pero la IA podría inventarla.
+
+### Decisión técnica (alcance y por qué)
+
+El matcher de restricciones (cliente `coachTextHasTerms` y servidor `containsRestriction`) usa **substring sin límites de palabra** (`haystack.includes(term)`). Esto impide añadir términos de carne comunes con seguridad: `"pollo"` colisionaría con `"repollo"` (col, usada en varios platos veganos), y `"res"` con `"fresco"`/`"fresa"`. Por eso:
+
+- **Lácteos de vegano → términos duros** en `coachHardRestrictions()`: `queso, yogur, yogurt, parmesano, leche evaporada, lácteo, lacteo`. Estos no colisionan en el catálogo y deliberadamente **no** incluyen `"leche"` a secas (bloquearía `Leche vegetal`/`Leche de coco`, aptas) ni `"mantequilla"` (bloquearía `Mantequilla de maní`). Al ser duros fluyen a los tres caminos: filtro de la lista de referencia (`coachFoodBlockTerms`), línea `PROHIBIDO` del prompt (`hardResLine`) y validación del servidor (`dietQuotaValidation` → 422).
+- **Carne/pescado → instrucción de prompt** (`vegLine`), no término, para evitar la colisión `pollo`/`repollo`. Cubre `vegetariano` ("no carne, aves, pescado ni mariscos") y `vegano` (además lácteos/huevo/miel). No hay enforcement por término para carne; es aceptable porque el catálogo no tiene carne y la IA recibe la instrucción explícita.
+
+### Alcance (`index.html`)
+
+- `coachHardRestrictions()`: añade los términos de lácteo cuando `diet` incluye `vegano`.
+- `generateOneDay()`: nueva `vegLine` insertada en el prompt tras `hardResLine`.
+
+### Test (`scripts/test-coach-quota.mjs`)
+
+Dos casos nuevos que ejercitan el enforcement real del servidor con el set de términos vegano: (1) un día con `Queso fresco` → **422**; (2) control: un día 100% vegetal con `Leche vegetal` → **200** (confirma que no hay falso positivo por el término de lácteo).
+
+### Pendiente conocido (fuera de alcance)
+
+El enforcement por término de carne/pescado requiere que el matcher soporte límites de palabra (hoy es substring puro). Si en el futuro se agregan platos con carne al catálogo, conviene primero mejorar `coachTextHasTerms`/`containsRestriction` a comparación por palabra y entonces añadir términos cárnicos. Igualmente, `miel` para vegano no está como término duro (solo en prompt).
+
+### Criterios de aceptación
+
+- `node scripts/test-coach-quota.mjs` pasa sin errores.
+- `node scripts/release-gate.mjs` pasa 18/18.
+- Un perfil vegano no recibe platos con lácteo en la lista de referencia ni en opciones del coach, y un plan con lácteo se rechaza (422).
+- `Leche vegetal`/`Leche de coco` siguen permitidas para veganos.
+- Los planes de vegetariano/vegano incluyen en el prompt la instrucción de excluir carne y pescado.
