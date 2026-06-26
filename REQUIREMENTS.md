@@ -3496,3 +3496,69 @@ Tres casos nuevos contra el enforcement real del servidor: (1) perfil vegetarian
 - `node scripts/release-gate.mjs` pasa 18/18.
 - Un perfil omnívoro ve platos con carne/pescado en la lista de referencia; uno vegetariano/vegano no, y un plan con carne se rechaza (422).
 - `Repollo` (y otros ingredientes vegetales) no se bloquean por colisión de substring.
+
+## REQ-67 - Splits progresivos de entrenamiento (Full Body → Upper/Lower → Push/Pull/Legs)
+
+### Objetivo
+
+Implementar splits de entrenamiento adaptados al nivel de experiencia del usuario (`trainingExperience`): principiantes usan Full Body, intermedios Upper/Lower y avanzados Push/Pull/Legs por defecto — sin que el usuario tenga que elegir nada (excepto usuarios avanzados, que pueden cambiar el split manualmente). El nivel asciende automáticamente en función del RPE reportado en las sesiones; nunca baja.
+
+### Contexto
+
+- `trainingExperience` (`beginner`/`intermediate`/`advanced`) ya existía en el onboarding y se pasaba al prompt de Claude, pero no afectaba qué split se asignaba.
+- El catálogo de ejercicios ya tenía todos los ejercicios con `level='beginner'`; no había ejercicios de nivel intermedio/avanzado ni filtrado por nivel en las sesiones.
+- Los roles `pushA`/`pullA`/`legsA` (PPL) no existían en `FITBUD_WORKOUT_EXERCISES`.
+- El RPE por serie en `day_log.state.workoutExecution` ya se capturaba — faltaba la lógica que lo analizara para subir el nivel.
+
+### Alcance
+
+1. **Nivel inicial**: se declara en el onboarding como antes (sin cambios en esa UI).
+
+2. **Splits por nivel** — asignados automáticamente, sin opción de elegir para principiante/intermedio:
+   - `beginner` → Full Body (`fullA`/`fullB`).
+   - `intermediate` → Upper/Lower (`torsoA`/`piernaA`/`torsoB`/`piernaB`).
+   - `advanced` → Push/Pull/Legs (`pushA`/`pullA`/`legsA`/`pushB`/`pullB`/`legsB`) por defecto; puede elegir otro split en Perfil (campo `workoutSplit`).
+
+3. **Roles PPL nuevos en el catálogo** (`FITBUD_WORKOUT_EXERCISES`):
+   - `pushA`, `pullA`, `legsA`, `pushB`, `pullB`, `legsB` para `gym` y `bodyweight`.
+
+4. **Ejercicios nuevos con nivel intermedio/avanzado** en `exercise-catalog.js` y `supabase/exercises.sql`:
+   - *Intermedios*: lateral-raise, cable-fly, face-pull, hammer-curl, diamond-push-up, pull-up, decline-push-up.
+   - *Avanzados*: weighted-pull-up, front-squat, archer-push-up, nordic-hamstring-curl.
+
+5. **Filtro de nivel en `allowedExercisesForSession`**: principiante solo ve ejercicios `beginner`; intermedio ve `beginner`+`intermediate`; avanzado ve todos.
+
+6. **Progresión automática de nivel** (`checkAutoLevelProgression`):
+   - Se ejecuta al abrir el generador de plan de entrenamiento.
+   - Analiza `S.days` (historial local de `workoutExecution` en `day_log`).
+   - **Umbral recomendado (decisión técnica — el dueño de producto no fijó valores exactos)**:
+     - `beginner → intermediate`: en las últimas **3 semanas**, al menos **3 sesiones de fuerza** con RPE registrado, ≥ **6 series** totales con RPE, y ≥ **75 %** de esas series con RPE ≤ 6. *Justificación: RPE ≤ 6 implica ≥ 4 RIR (muy poco estímulo); 3 semanas / 3 sesiones / 75% garantizan consistencia sin pedir demasiado datos.*
+     - `intermediate → advanced`: en las últimas **4 semanas**, al menos **4 sesiones de fuerza**, ≥ **8 series** con RPE, y ≥ **75 %** con RPE ≤ 7. *Justificación: umbral ligeramente más alto (RPE ≤ 7 = ≥ 3 RIR) y mayor ventana para asegurar que el usuario ha superado el nivel intermedio de forma sostenida.*
+   - El nivel **solo sube**, nunca baja — aunque el usuario deje de entrenar mucho tiempo. Confirmado por el dueño de producto.
+   - Si el nivel sube, se guarda vía `saveProfilePrefs` y se notifica al usuario con un toast.
+
+7. **Selector de split en Perfil** visible solo para `advanced`:
+   - Campo `pf_split` con opciones: Full Body (`fullbody`), Superior/Inferior (`upperlower`), Push/Pull/Piernas (`ppl`).
+   - Se guarda en `profile.prefs.workoutSplit`; se ignora si el nivel no es `advanced`.
+   - Por defecto (vacío) = PPL.
+
+### Criterios de aceptación
+
+- Un `beginner` recibe siempre `fullA`/`fullB`, sin importar priority ni número de días.
+- Un `intermediate` recibe siempre `torsoA`/`piernaA`/`torsoB`/`piernaB` (Upper/Lower).
+- Un `advanced` recibe PPL por defecto; puede cambiar el split a Full Body o Upper/Lower desde Perfil.
+- El selector de split NO aparece en el Perfil para `beginner` ni `intermediate`.
+- `allowedExercisesForSession` excluye ejercicios `intermediate` y `advanced` para usuarios `beginner`.
+- `checkAutoLevelProgression` sube a `intermediate` cuando se cumple el umbral de RPE ≤ 6 definido; no baja si las semanas siguientes tienen RPE alto.
+- `release-gate.mjs` y `validate-splits.mjs` pasan en verde.
+
+### Verificación sugerida
+
+```
+node scripts/validate-splits.mjs
+node scripts/release-gate.mjs
+```
+
+### Acción manual pendiente (Supabase)
+
+Ejecutar el bloque de INSERT adicional de `supabase/exercises.sql` para que los ejercicios `intermediate`/`advanced` nuevos aparezcan en la tabla `exercises` de producción.

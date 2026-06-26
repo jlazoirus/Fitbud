@@ -179,10 +179,23 @@
     ["shoulder-tap-plank","Plancha con toque de hombro",["toques de hombro"],"bodyweight","core",[],["home","gym"],["core","hombros"],"Plancha alta sin toques","Toques más lentos",["front-plank","dead-bug"]],
     ["step-up","Subida al banco",["step ups"],"bodyweight","lunge",["step_or_bench"],["home","outdoor","gym"],["cuádriceps","glúteos"],"Escalón bajo con apoyo","Escalón más alto o con carga",["walking-lunge","bulgarian-split-squat"]],
     ["slider-leg-curl","Curl femoral deslizante",["curl deslizante"],"bodyweight","hinge",["sliders_or_towel"],["home","gym"],["isquiotibiales","glúteos"],"Deslizar una pierna por vez","Curl completo con cadera elevada",["leg-curl","glute-bridge"]],
+    // intermediate
+    ["lateral-raise","Elevación lateral",["elevaciones laterales"],"gym","isolation",["dumbbells"],["gym"],["hombros"],"Elevación con poco rango","Elevación con pausa arriba",["overhead-press"],"intermediate"],
+    ["cable-fly","Apertura en polea",["cruces en polea"],"gym","push",["cable"],["gym"],["pecho","hombros"],"Apertura con rango corto","Apertura con pausa al centro",["bench-press","incline-dumbbell-press"],"intermediate"],
+    ["face-pull","Face pull",["jalón a la cara"],"gym","pull",["cable"],["gym"],["hombros posteriores","trapecios"],"Face pull con poco peso","Face pull con rotación externa",["seated-cable-row"],"intermediate"],
+    ["hammer-curl","Curl martillo",["curl neutro"],"gym","isolation",["dumbbells"],["gym"],["bíceps","antebrazo"],"Curl martillo ligero","Curl inclinado","[\"biceps-curl\"]","intermediate"],
+    ["diamond-push-up","Flexión diamante",["flexión tríceps"],"bodyweight","push",[],["home","gym"],["tríceps","pecho"],"Flexión diamante con rodillas","Flexión diamante con pausa",["push-up","assisted-dip"],"intermediate"],
+    ["pull-up","Dominada",["dominadas","chin-up"],"bodyweight","pull",["pullup_bar"],["gym","outdoor"],["espalda","bíceps"],"Dominada asistida con banda","Dominada con lastre",["assisted-pull-up","lat-pulldown"],"intermediate"],
+    ["decline-push-up","Flexión con pies elevados",["flexión declinada"],"bodyweight","push",["bench_or_chair"],["home","gym"],["pecho","tríceps"],"Flexión con pies a media altura","Flexión con lastre en espalda",["push-up","bench-press"],"intermediate"],
+    // advanced
+    ["weighted-pull-up","Dominada con lastre",["dominada lastrada"],"gym","pull",["pullup_bar","weight_belt"],["gym"],["espalda","bíceps"],"Dominada sin lastre","Dominada con lastre máximo",["pull-up","lat-pulldown"],"advanced"],
+    ["front-squat","Sentadilla frontal",["front squat"],"gym","squat",["barbell","rack"],["gym"],["cuádriceps","core"],"Sentadilla goblet","Sentadilla frontal con pausa",["back-squat","tempo-squat"],"advanced"],
+    ["archer-push-up","Flexión arquero",["flexión lateral"],"bodyweight","push",[],["home","gym"],["pecho","tríceps"],"Flexión arquero con apoyo","Flexión con un brazo asistida",["diamond-push-up","push-up"],"advanced"],
+    ["nordic-hamstring-curl","Curl nórdico",["nordico","nordic curl"],"bodyweight","hinge",["bench_or_anchor"],["gym","home"],["isquiotibiales"],"Curl nórdico parcial","Curl nórdico completo con pausa",["slider-leg-curl","romanian-deadlift"],"advanced"],
   ].map(row=>exercise({
     slug:row[0],name:row[1],aliases:row[2],discipline:row[3],pattern:row[4],
     equipment:row[5],places:row[6],muscles:row[7],regression:row[8],
-    progression:row[9],substitutes:row[10],
+    progression:row[9],substitutes:row[10],level:row[11]||"beginner",
   }));
 
   const endurance=[
@@ -212,6 +225,12 @@
       piernaA:["back-squat","romanian-deadlift","walking-lunge","standing-calf-raise"],
       torsoB:["incline-dumbbell-press","seated-cable-row","assisted-dip","biceps-curl","triceps-pushdown"],
       piernaB:["leg-press","barbell-hip-thrust","bulgarian-split-squat","leg-curl"],
+      pushA:["bench-press","overhead-press","incline-dumbbell-press","lateral-raise","triceps-pushdown","cable-fly"],
+      pullA:["lat-pulldown","seated-cable-row","face-pull","biceps-curl","hammer-curl"],
+      legsA:["back-squat","romanian-deadlift","leg-press","leg-curl","standing-calf-raise"],
+      pushB:["incline-dumbbell-press","bench-press","lateral-raise","assisted-dip","cable-fly"],
+      pullB:["seated-cable-row","lat-pulldown","hammer-curl","biceps-curl","face-pull"],
+      legsB:["barbell-hip-thrust","bulgarian-split-squat","leg-press","leg-curl","standing-calf-raise"],
     },
     bodyweight:{
       fullA:["tempo-squat","push-up","band-row","glute-bridge","front-plank"],
@@ -220,6 +239,12 @@
       piernaA:["tempo-squat","walking-lunge","single-leg-glute-bridge","standing-calf-raise"],
       torsoB:["incline-push-up","band-row","assisted-dip","shoulder-tap-plank"],
       piernaB:["bulgarian-split-squat","single-leg-rdl","step-up","slider-leg-curl","dead-bug"],
+      pushA:["push-up","pike-push-up","diamond-push-up","assisted-dip"],
+      pullA:["pull-up","band-row","assisted-pull-up"],
+      legsA:["tempo-squat","bulgarian-split-squat","single-leg-rdl","standing-calf-raise"],
+      pushB:["decline-push-up","push-up","pike-push-up","assisted-dip"],
+      pullB:["pull-up","band-row","assisted-pull-up"],
+      legsB:["walking-lunge","glute-bridge","slider-leg-curl","step-up"],
     },
     running:{calidad:["run-intervals"],facil:["run-easy"],tecnica:["run-drills"]},
     cycling:{calidad:["cycle-intervals"],facil:["cycle-endurance"],tecnica:["cycle-cadence"]},

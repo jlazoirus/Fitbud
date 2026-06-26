@@ -8,6 +8,7 @@
   const VALID_STRENGTH=new Set(["gym","bodyweight"]);
   const VALID_EXPERIENCES=new Set(["beginner","intermediate","advanced"]);
   const VALID_PRIORITIES=new Set(["composition","performance","strength","health"]);
+  const VALID_SPLITS=new Set(["fullbody","upperlower","ppl"]);
   const VALID_ENTITLEMENT_STATUSES=new Set(["active","expired","courtesy","revoked"]);
   const VALID_SYNC_ENTITIES=new Set(["day_log","weight_log"]);
   const VALID_SYNC_STATUSES=new Set(["pending","failed"]);
@@ -58,6 +59,7 @@
     if(prefs.eatingWindowEnd&&!TIME_RE.test(prefs.eatingWindowEnd))errors.push("eatingWindowEnd inválido.");
     if(!VALID_EXPERIENCES.has(prefs.trainingExperience))errors.push("trainingExperience debe ser beginner, intermediate o advanced.");
     if(prefs.trainingPriority&&!VALID_PRIORITIES.has(prefs.trainingPriority))errors.push("trainingPriority inválido.");
+    if(prefs.workoutSplit&&(!VALID_SPLITS.has(prefs.workoutSplit)||prefs.trainingExperience!=="advanced"))errors.push("workoutSplit solo es válido para usuarios advanced y debe ser fullbody, upperlower o ppl.");
     if(!Array.isArray(prefs.equipment))errors.push("equipment debe ser un array.");
     const age=Number(prefs.age);
     if(Number.isFinite(age)&&age<18)errors.push("Edad mínima 18 años.");
@@ -151,5 +153,6 @@
     validateSyncEntry,
     validateCoachRequest,
     validateCoachAction,
+    VALID_SPLITS,
   };
 })(typeof window!=="undefined"?window:globalThis);

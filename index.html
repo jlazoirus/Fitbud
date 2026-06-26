@@ -880,6 +880,7 @@ const WEEKDAY_OPTIONS=[
 const TRAINING_LOCATION_LABELS={gym:"Gimnasio",home:"Casa",outdoor:"Exterior",pool:"Piscina"};
 const TRAINING_PRIORITY_LABELS={composition:"Composición corporal",performance:"Rendimiento",strength:"Fuerza",health:"Salud general"};
 const TRAINING_EXPERIENCE_LABELS={beginner:"Principiante",intermediate:"Intermedio",advanced:"Avanzado"};
+const WORKOUT_SPLIT_LABELS={fullbody:"Cuerpo completo",upperlower:"Superior / Inferior",ppl:"Push / Pull / Piernas"};
 const TRAINING_TIME_LABELS={morning:"Mañana",midday:"Mediodía",afternoon:"Tarde",evening:"Noche",flexible:"Flexible"};
 const EQUIPMENT_LABELS={
   bodyweight:"Peso corporal",bands:"Bandas",dumbbells:"Mancuernas",barbell:"Barra y discos",
@@ -940,34 +941,48 @@ function inferredTrainingPriority(p){
   if(p.challenge==="strength")return "strength";
   return p.goal==="mantenimiento"?"health":"composition";
 }
-function baseWorkoutTemplate(days,priority){
-  const base={
-    3:["fullA","calidad","facil"],
-    4:["fullA","calidad","fullB","facil"],
-    5:["torsoA","piernaA","calidad","fullB","facil"],
-    6:["torsoA","piernaA","calidad","torsoB","piernaB","facil"],
-  };
-  const strength={
-    3:["fullA","fullB","facil"],
-    4:["torsoA","piernaA","fullB","facil"],
-    5:["torsoA","piernaA","torsoB","piernaB","facil"],
-    6:base[6],
-  };
-  const performance={
-    3:base[3],
-    4:["fullA","tecnica","calidad","facil"],
-    5:["fullA","tecnica","calidad","fullB","facil"],
-    6:["fullA","tecnica","calidad","fullB","tecnica","facil"],
-  };
-  const templates=priority==="strength"?strength:priority==="performance"?performance:base;
-  return (templates[days]||templates[3]).slice();
+function effectiveWorkoutSplit(experience,workoutSplit){
+  if(experience==="advanced"){
+    if(workoutSplit==="fullbody")return "fullbody";
+    if(workoutSplit==="upperlower")return "upperlower";
+    return "ppl";
+  }
+  if(experience==="intermediate")return "upperlower";
+  return "fullbody";
 }
-function defaultTrainingLocations(primary,strength,dayIds,priority){
-  const sessions=baseWorkoutTemplate(dayIds.length,priority);
-  const strengthIds=new Set(["fullA","fullB","torsoA","torsoB","piernaA","piernaB"]);
+function _fullBodyTemplate(days,priority){
+  const base={3:["fullA","calidad","facil"],4:["fullA","calidad","fullB","facil"],5:["fullA","calidad","fullA","fullB","facil"],6:["fullA","calidad","fullB","facil","fullA","calidad"]};
+  const strength={3:["fullA","fullB","facil"],4:["fullA","fullB","fullA","facil"],5:["fullA","fullB","fullA","fullB","facil"],6:["fullA","fullB","fullA","fullB","fullA","facil"]};
+  const performance={3:["fullA","calidad","facil"],4:["fullA","tecnica","calidad","facil"],5:["fullA","tecnica","calidad","fullB","facil"],6:["fullA","tecnica","calidad","fullB","tecnica","facil"]};
+  const t=priority==="strength"?strength:priority==="performance"?performance:base;
+  return (t[days]||t[3]).slice();
+}
+function _upperLowerTemplate(days,priority){
+  const base={3:["torsoA","piernaA","facil"],4:["torsoA","piernaA","torsoB","facil"],5:["torsoA","piernaA","calidad","torsoB","piernaB"],6:["torsoA","piernaA","calidad","torsoB","piernaB","facil"]};
+  const strength={3:["torsoA","piernaA","torsoB"],4:["torsoA","piernaA","torsoB","piernaB"],5:["torsoA","piernaA","torsoB","piernaB","facil"],6:["torsoA","piernaA","torsoB","piernaB","torsoA","facil"]};
+  const performance={3:["torsoA","calidad","piernaA"],4:["torsoA","piernaA","tecnica","calidad"],5:["torsoA","piernaA","tecnica","calidad","torsoB"],6:["torsoA","piernaA","tecnica","calidad","torsoB","piernaB"]};
+  const t=priority==="strength"?strength:priority==="performance"?performance:base;
+  return (t[days]||t[3]).slice();
+}
+function _pplTemplate(days,priority){
+  const base={3:["pushA","pullA","legsA"],4:["pushA","pullA","legsA","calidad"],5:["pushA","pullA","legsA","pushB","calidad"],6:["pushA","pullA","legsA","pushB","pullB","legsB"]};
+  const strength={3:["pushA","pullA","legsA"],4:["pushA","pullA","legsA","pushB"],5:["pushA","pullA","legsA","pushB","pullB"],6:["pushA","pullA","legsA","pushB","pullB","legsB"]};
+  const performance={3:["pushA","calidad","legsA"],4:["pushA","pullA","calidad","facil"],5:["pushA","pullA","legsA","tecnica","calidad"],6:["pushA","pullA","legsA","tecnica","calidad","facil"]};
+  const t=priority==="strength"?strength:priority==="performance"?performance:base;
+  return (t[days]||t[3]).slice();
+}
+function baseWorkoutTemplate(days,priority,experience,workoutSplit){
+  const split=effectiveWorkoutSplit(experience,workoutSplit);
+  if(split==="ppl")return _pplTemplate(days,priority);
+  if(split==="upperlower")return _upperLowerTemplate(days,priority);
+  return _fullBodyTemplate(days,priority);
+}
+const STRENGTH_SESSION_IDS=new Set(["fullA","fullB","torsoA","torsoB","piernaA","piernaB","pushA","pullA","legsA","pushB","pullB","legsB"]);
+function defaultTrainingLocations(primary,strength,dayIds,priority,experience,workoutSplit){
+  const sessions=baseWorkoutTemplate(dayIds.length,priority,experience,workoutSplit);
   return Object.fromEntries(dayIds.map((day,index)=>{
     const session=sessions[index];
-    const location=strengthIds.has(session)?(strength==="bodyweight"?"home":"gym"):(primary==="swimming"?"pool":"outdoor");
+    const location=STRENGTH_SESSION_IDS.has(session)?(strength==="bodyweight"?"home":"gym"):(primary==="swimming"?"pool":"outdoor");
     return [day,location];
   }));
 }
@@ -979,7 +994,9 @@ function migrateProfilePrefs(source){
   const legacyCount=validTrainingDays(p.trainDays)?+p.trainDays:3;
   const trainingDays=normalizedTrainingDays(p.trainingDays,legacyCount);
   const trainingPriority=inferredTrainingPriority(p);
-  const locationDefaults=defaultTrainingLocations(primary,strength,trainingDays,trainingPriority);
+  const trainingExperienceNorm=TRAINING_EXPERIENCE_LABELS[p.trainingExperience]?p.trainingExperience:"beginner";
+  const workoutSplitNorm=(trainingExperienceNorm==="advanced"&&WORKOUT_SPLIT_LABELS[p.workoutSplit])?p.workoutSplit:undefined;
+  const locationDefaults=defaultTrainingLocations(primary,strength,trainingDays,trainingPriority,trainingExperienceNorm,workoutSplitNorm);
   const trainingLocations={...locationDefaults};
   if(p.trainingLocations&&typeof p.trainingLocations==="object"){
     trainingDays.forEach(day=>{
@@ -1002,7 +1019,8 @@ function migrateProfilePrefs(source){
     trainingLocations,
     sessionMinutes:Math.min(180,Math.max(20,Number.parseInt(p.sessionMinutes,10)||60)),
     equipment:normalizedList(p.equipment,Object.keys(EQUIPMENT_LABELS)),
-    trainingExperience:TRAINING_EXPERIENCE_LABELS[p.trainingExperience]?p.trainingExperience:"beginner",
+    trainingExperience:trainingExperienceNorm,
+    workoutSplit:workoutSplitNorm,
     trainingPriority,
     preferredTrainingTime:TRAINING_TIME_LABELS[p.preferredTrainingTime]?p.preferredTrainingTime:"flexible",
     injuries:String(p.injuries||"").trim(),
@@ -1040,6 +1058,8 @@ function trainingPrefsFromPrefs(source){
     sessionMinutes:p.sessionMinutes,
     equipment:[...(p.equipment||[])],
     experience:p.trainingExperience,
+    workoutSplit:p.workoutSplit,
+    split:effectiveWorkoutSplit(p.trainingExperience,p.workoutSplit),
     priority:p.trainingPriority,
     preferredTime:p.preferredTrainingTime,
     injuries:p.injuries,
@@ -1056,9 +1076,9 @@ const WORKOUT_EXERCISE_IDS=window.FITBUD_WORKOUT_EXERCISES||{};
 const WORKOUT_PLAYER=window.FITBUD_WORKOUT_PLAYER;
 const TRAINING_PLAN=window.FITBUD_TRAINING_PLAN;
 const DOMAIN_CONTRACTS=window.FITBUD_DOMAIN_CONTRACTS||{};
-function workoutSchedule(days,dayIds,priority,locations,primary){
+function workoutSchedule(days,dayIds,priority,locations,primary,experience,workoutSplit){
   const selected=normalizedTrainingDays(dayIds,days);
-  const sessions=baseWorkoutTemplate(selected.length,priority);
+  const sessions=baseWorkoutTemplate(selected.length,priority,experience,workoutSplit);
   const sportIds=new Set(["calidad","facil","tecnica"]);
   const remaining=sessions.slice();
   const assigned={};
@@ -1088,7 +1108,7 @@ function plannedWorkoutId(ds,prefs){
   }
   const training=trainingPrefsFromPrefs(prefs||planPrefsForDate(ds));
   const wd=parseYmd(ds).getDay();
-  return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary)[wd]||"descanso";
+  return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit)[wd]||"descanso";
 }
 function trainingPlanSummary(days,primary,priority,lightCardio){
   if(primary==="other")return "Deporte cardio libre + fuerza — sin plan estructurado para tu deporte.";
@@ -1246,6 +1266,12 @@ function strengthSessions(mode,ds,prefs){
     piernaA:{id:"piernaA",kind:"Gimnasio",name:"Gimnasio · Pierna A",detail:"Sentadilla 6-10 · Peso muerto rumano 8-12 · Zancadas 10/lado · Gemelos 12-15. "+progress},
     torsoB:{id:"torsoB",kind:"Gimnasio",name:"Gimnasio · Torso B",detail:"Press inclinado 8-12 · Remo sentado 8-12 · Fondos o flexiones 8-15 · Curl y tríceps 10-15. "+progress},
     piernaB:{id:"piernaB",kind:"Gimnasio",name:"Gimnasio · Pierna B",detail:"Prensa 8-12 · Hip thrust 8-12 · Búlgaras 10/lado · Femoral 10-15. "+progress},
+    pushA:{id:"pushA",kind:"Gimnasio",name:"Gimnasio · Push A",detail:"Press banca · Press militar · Press inclinado · Elevaciones laterales · Polea tríceps. "+progress},
+    pullA:{id:"pullA",kind:"Gimnasio",name:"Gimnasio · Pull A",detail:"Jalón al pecho · Remo en polea · Face pull · Curl bíceps · Curl martillo. "+progress},
+    legsA:{id:"legsA",kind:"Gimnasio",name:"Gimnasio · Legs A",detail:"Sentadilla · Peso muerto rumano · Prensa · Curl femoral · Gemelos. "+progress},
+    pushB:{id:"pushB",kind:"Gimnasio",name:"Gimnasio · Push B",detail:"Press inclinado · Press banca agarre cerrado · Elevaciones laterales · Fondos · Apertura en polea. "+progress},
+    pullB:{id:"pullB",kind:"Gimnasio",name:"Gimnasio · Pull B",detail:"Remo sentado · Jalón · Curl martillo · Curl bíceps · Face pull. "+progress},
+    legsB:{id:"legsB",kind:"Gimnasio",name:"Gimnasio · Legs B",detail:"Hip thrust · Búlgaras · Prensa · Curl femoral · Gemelos. "+progress},
   };
   const bodyweight={
     fullA:{id:"fullA",kind:"Peso corporal",name:"Peso corporal · Full body A",detail:"Sentadilla tempo · Flexiones · Remo invertido o con banda · Puente de glúteo · Plancha. "+progress},
@@ -1254,6 +1280,12 @@ function strengthSessions(mode,ds,prefs){
     piernaA:{id:"piernaA",kind:"Peso corporal",name:"Peso corporal · Pierna A",detail:"Sentadilla tempo · Zancadas · Puente de glúteo a una pierna · Gemelos. "+progress},
     torsoB:{id:"torsoB",kind:"Peso corporal",name:"Peso corporal · Superior B",detail:"Flexiones inclinadas/declinadas · Remo con banda · Fondos asistidos · Plancha con toque de hombro. "+progress},
     piernaB:{id:"piernaB",kind:"Peso corporal",name:"Peso corporal · Pierna B",detail:"Búlgaras · Peso muerto a una pierna · Step-ups · Curl femoral deslizante · Core. "+progress},
+    pushA:{id:"pushA",kind:"Peso corporal",name:"Peso corporal · Push A",detail:"Flexiones · Pike push-ups · Flexión diamante · Fondos asistidos. "+progress},
+    pullA:{id:"pullA",kind:"Peso corporal",name:"Peso corporal · Pull A",detail:"Dominadas · Remo con banda · Dominadas asistidas. "+progress},
+    legsA:{id:"legsA",kind:"Peso corporal",name:"Peso corporal · Legs A",detail:"Sentadilla tempo · Búlgaras · Peso muerto a una pierna · Gemelos. "+progress},
+    pushB:{id:"pushB",kind:"Peso corporal",name:"Peso corporal · Push B",detail:"Flexión declinada · Flexiones · Pike push-ups · Fondos asistidos. "+progress},
+    pullB:{id:"pullB",kind:"Peso corporal",name:"Peso corporal · Pull B",detail:"Dominadas · Remo con banda · Dominadas asistidas. "+progress},
+    legsB:{id:"legsB",kind:"Peso corporal",name:"Peso corporal · Legs B",detail:"Zancadas · Puente de glúteo · Curl femoral deslizante · Step-ups. "+progress},
   };
   const sessions=mode==="bodyweight"?bodyweight:gym;
   const ids=WORKOUT_EXERCISE_IDS[mode==="bodyweight"?"bodyweight":"gym"]||{};
@@ -1271,6 +1303,7 @@ function workoutOptions(ds,prefs){
   return [
     strength.fullA,strength.fullB,
     strength.torsoA,strength.piernaA,strength.torsoB,strength.piernaB,
+    strength.pushA,strength.pullA,strength.legsA,strength.pushB,strength.pullB,strength.legsB,
     sport.quality,sport.endurance,sport.technique,
     {id:"descanso",kind:"Descanso",name:"Descanso total",detail:"Movilidad suave y caminata opcional. Prioriza sueño y recuperación.",exerciseIds:[]},
   ].filter(o=>o.name);
@@ -1927,7 +1960,7 @@ function applyChallengeDefaults(d,challenge){
     d.trainingPriority=challenge;
     if((d.trainingDays||[]).length<4)d.trainingDays=defaultTrainingDays(4);
     d.trainDays=d.trainingDays.length;
-    d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority);
+    d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority,d.trainingExperience,d.workoutSplit);
   }
 }
 async function startNextChallenge(){
@@ -2253,6 +2286,7 @@ function readTrainingFields(prefix,d){
   d.planDurationWeeks=+$("#"+prefix+"_duration").value;
   d.trainingPriority=$("#"+prefix+"_priority").value;
   d.trainingExperience=$("#"+prefix+"_experience").value;
+  const _splitEl=$("#"+prefix+"_split");d.workoutSplit=_splitEl?_splitEl.value||undefined:d.workoutSplit;
   d.sessionMinutes=+$("#"+prefix+"_minutes").value;
   d.preferredTrainingTime=$("#"+prefix+"_time").value;
   d.trainingDays=WEEKDAY_OPTIONS.filter(day=>{const el=$("#"+prefix+"_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
@@ -2285,7 +2319,7 @@ function validateTrainingProfile(d){
   if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))return "Elige el lugar de entrenamiento para cada día disponible";
   if(d.primarySport==="swimming"){
     const poolDays=d.trainingDays.filter(day=>d.trainingLocations[day]==="pool").length;
-    const swimSessions=baseWorkoutTemplate(d.trainingDays.length,d.trainingPriority).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
+    const swimSessions=baseWorkoutTemplate(d.trainingDays.length,d.trainingPriority,d.trainingExperience,d.workoutSplit).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
     if(poolDays<swimSessions)return `Con esta prioridad necesitas acceso a piscina ${swimSessions} ${swimSessions===1?"día":"días"} por semana`;
   }
   if(!Number.isFinite(d.sessionMinutes)||d.sessionMinutes<20||d.sessionMinutes>180)return "Los minutos por sesión deben estar entre 20 y 180";
@@ -2300,7 +2334,7 @@ function validateTrainingProfileCore(d){
   if(d.primarySport==="swimming"){
     const priority=TRAINING_PRIORITY_LABELS[d.trainingPriority]?d.trainingPriority:"composition";
     const poolDays=d.trainingDays.filter(day=>d.trainingLocations[day]==="pool").length;
-    const swimSessions=baseWorkoutTemplate(d.trainingDays.length,priority).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
+    const swimSessions=baseWorkoutTemplate(d.trainingDays.length,priority,d.trainingExperience,d.workoutSplit).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
     if(poolDays<swimSessions)return `Con natación necesitas piscina ${swimSessions} ${swimSessions===1?"día":"días"} por semana`;
   }
   if(!Number.isFinite(d.sessionMinutes)||d.sessionMinutes<20||d.sessionMinutes>180)return "Los minutos por sesión deben estar entre 20 y 180";
@@ -4851,9 +4885,17 @@ function renderProfile(){
       <div class="field"><label>Prioridad</label><select id="pf_priority" onchange="updateTrainingSummary()">
         ${Object.entries(TRAINING_PRIORITY_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.trainingPriority,v)}>${l}</option>`).join("")}
       </select></div>
-      <div class="field"><label>Experiencia</label><select id="pf_experience">
+      <div class="field"><label>Experiencia</label><select id="pf_experience" onchange="updatePfSplitVisibility()">
         ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.trainingExperience,v)}>${l}</option>`).join("")}
       </select></div>
+      <div class="field" id="pf_split_wrap" ${p.trainingExperience!=="advanced"?'style="display:none"':''}>
+        <label>Split de fuerza</label>
+        <select id="pf_split">
+          <option value="" ${!p.workoutSplit?"selected":""}>Push / Pull / Piernas (por defecto)</option>
+          ${Object.entries(WORKOUT_SPLIT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.workoutSplit,v)}>${l}</option>`).join("")}
+        </select>
+        <div class="field-note">Solo aplica cuando tu nivel es Avanzado.</div>
+      </div>
       <div class="field"><label>Minutos por sesión</label><input id="pf_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${p.sessionMinutes}"></div>
       <div class="field"><label>Horario preferido</label><select id="pf_time">
         ${Object.entries(TRAINING_TIME_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.preferredTrainingTime,v)}>${l}</option>`).join("")}
@@ -4969,6 +5011,10 @@ function updatePfSportSelector(){
   if(wrap)wrap.style.display=(no&&no.checked)?"none":"";
   updateTrainingSummary();
 }
+function updatePfSplitVisibility(){
+  const exp=$("#pf_experience"),wrap=$("#pf_split_wrap");
+  if(wrap)wrap.style.display=(exp&&exp.value==="advanced")?"":"none";
+}
 function updateProfileMealCount(value){
   const count=Math.min(6,Math.max(2,+value||4));
   const d={mealCount:count,mealTimes:defaultMealTimes(count)};
@@ -5018,6 +5064,7 @@ async function saveProfile(){
     sessionMinutes:draft.sessionMinutes,
     equipment:draft.equipment,
     trainingExperience:draft.trainingExperience,
+    workoutSplit:draft.trainingExperience==="advanced"?(draft.workoutSplit||undefined):undefined,
     trainingPriority:draft.trainingPriority,
     preferredTrainingTime:draft.preferredTrainingTime,
     injuries:draft.injuries,
@@ -6391,15 +6438,22 @@ function exerciseConflictsWithProfile(exercise,prefs){
   ].join(" ").toLowerCase();
   return [...words].some(word=>safety.includes(word));
 }
+function allowedLevelsForExperience(experience){
+  if(experience==="advanced")return null; // null = all levels
+  if(experience==="intermediate")return new Set(["beginner","intermediate"]);
+  return new Set(["beginner"]);
+}
 function allowedExercisesForSession(spec,prefs,catalog){
   const strength=spec.type==="strength";
   const cardioRoleIds=!strength&&WORKOUT_EXERCISE_IDS[prefs.primarySport]
     ?new Set(WORKOUT_EXERCISE_IDS[prefs.primarySport][spec.role]||[]):null;
+  const allowedLevels=allowedLevelsForExperience(prefs.trainingExperience);
   return catalog.filter(exercise=>{
     if(exerciseConflictsWithProfile(exercise,prefs))return false;
     const places=exerciseArray(exercise.places);
     if(places.length&&!places.includes(spec.location))return false;
     if(strength){
+      if(allowedLevels&&!allowedLevels.has(exercise.level||"beginner"))return false;
       const disciplines=prefs.strengthMode==="bodyweight"
         ?new Set(["bodyweight","strength"])
         :new Set(["gym","strength","bodyweight"]);
@@ -6413,8 +6467,8 @@ function trainingExpectedWeeks(prefs){
   const p=migrateProfilePrefs(prefs||((profile&&profile.prefs)||{}));
   const training=trainingPrefsFromPrefs(p);
   const calendar=planCalendarForPrefs(p);
-  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary);
-  const strengthRoles=new Set(["fullA","fullB","torsoA","torsoB","piernaA","piernaB"]);
+  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit);
+  const strengthRoles=STRENGTH_SESSION_IDS;
   const catalog=activeTrainingCatalog();
   return calendar.weeks.map((week,index)=>{
     const sessions=[];
@@ -6581,6 +6635,7 @@ async function openTrainingPlanGenerator(){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
   if(!hasRequiredConsents()||!hasCurrentScreening()){toast("Revisa privacidad y seguridad antes de preparar tu plan");return;}
   if(aiAvailable()&&!hasEntitlement()){showPaywall("training");return;} // REQ-25
+  await checkAutoLevelProgression(); // REQ-67: subir nivel si RPE lo justifica
   const actionKey="training_plan";
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
@@ -7440,6 +7495,45 @@ async function saveProfilePrefs(prefs,meta){
     }
   }
   return result;
+}
+// Progresión automática de nivel (solo sube, nunca baja).
+// Umbral: beginner→intermediate si ≥75% sets con RPE≤6 en ≥3 sesiones (últimas 3 semanas, ≥6 sets con RPE);
+//         intermediate→advanced si ≥75% sets con RPE≤7 en ≥4 sesiones (últimas 4 semanas, ≥8 sets con RPE).
+async function checkAutoLevelProgression(){
+  if(!profile||!profile.prefs)return;
+  const currentExp=profile.prefs.trainingExperience;
+  if(currentExp==="advanced")return;
+  const weeksWindow=currentExp==="intermediate"?4:3;
+  const minSessions=currentExp==="intermediate"?4:3;
+  const minSets=currentExp==="intermediate"?8:6;
+  const rpeThreshold=currentExp==="intermediate"?7:6;
+  const cutoff=addDays(todayStr(),-weeksWindow*7);
+  const days=Object.keys(S.days||{}).filter(ds=>ds>=cutoff&&ds<=todayStr()).sort();
+  const sessions=[];
+  for(const ds of days){
+    const execution=S.days[ds]&&S.days[ds].workoutExecution;
+    if(!execution||!Array.isArray(execution.steps))continue;
+    const sets=[];
+    for(const step of execution.steps){
+      if(step.type!=="strength"||!Array.isArray(step.sets))continue;
+      for(const set of step.sets){
+        if(set&&set.done&&set.rpe!=null&&Number.isFinite(Number(set.rpe))){
+          sets.push(Number(set.rpe));
+        }
+      }
+    }
+    if(sets.length>=2)sessions.push(sets);
+  }
+  if(sessions.length<minSessions)return;
+  const allSets=sessions.flat();
+  if(allSets.length<minSets)return;
+  const pctLow=allSets.filter(r=>r<=rpeThreshold).length/allSets.length;
+  if(pctLow<0.75)return;
+  const nextExp=currentExp==="beginner"?"intermediate":"advanced";
+  const prefs={...profile.prefs,trainingExperience:nextExp,workoutSplit:undefined};
+  const result=await saveProfilePrefs(prefs,{source:"auto_level",reason:`RPE sostenido ≤${rpeThreshold} en ${sessions.length} sesiones`});
+  if(!result||result.error)return;
+  toast(`Nivel actualizado a ${TRAINING_EXPERIENCE_LABELS[nextExp]} 🎉`);
 }
 async function signIn(email,pwd){
   if(!supa)return{error:{message:"Conecta Supabase primero"}};

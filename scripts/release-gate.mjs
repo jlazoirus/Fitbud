@@ -74,6 +74,7 @@ run("validate-workout-player.mjs", "node scripts/validate-workout-player.mjs");
 run("validate-training-plan.mjs", "node scripts/validate-training-plan.mjs");
 run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
+run("validate-splits.mjs", "node scripts/validate-splits.mjs");
 
 // ── Validadores de SQL y datos ───────────────────────────────────────────────
 console.log("\n[ SQL y datos ]");
