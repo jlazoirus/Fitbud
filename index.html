@@ -4368,9 +4368,25 @@ function coachFoodBlockTerms(includeSoft){
   if(Array.isArray(p.diet)&&p.diet.includes("sin_gluten"))terms.push("gluten","trigo");
   return [...new Set(terms.map(t=>String(t||"").trim()).filter(Boolean))];
 }
+// Coincidencia por palabra (no substring): tokeniza con coachKey y compara término vs tokens.
+// El último token del término admite prefijo (plurales: "pollo"→"pollos"), los previos exactos.
+// Evita colisiones como "pollo"⊂"repollo" o "res"⊂"fresco" al añadir términos cárnicos. REQ-66.
+function coachTermInTokens(tokens,term){
+  const tt=coachKey(term).split("_").filter(Boolean);
+  if(!tt.length)return false;
+  for(let i=0;i+tt.length<=tokens.length;i++){
+    let ok=true;
+    for(let j=0;j<tt.length;j++){
+      const tok=tokens[i+j];
+      if(j===tt.length-1?!tok.startsWith(tt[j]):tok!==tt[j]){ok=false;break;}
+    }
+    if(ok)return true;
+  }
+  return false;
+}
 function coachTextHasTerms(value,terms){
-  const hay=coachKey(value);
-  return (terms||[]).find(term=>term&&hay.includes(coachKey(term)))||"";
+  const tokens=coachKey(value).split("_").filter(Boolean);
+  return (terms||[]).find(term=>term&&coachTermInTokens(tokens,term))||"";
 }
 function coachDishText(dish){
   if(!dish)return "";
@@ -6153,6 +6169,9 @@ function coachHardRestrictions(){
   // substring, sin límites de palabra; ver nota en REQUIREMENTS REQ-65). La carne/pescado se
   // dirige por prompt (no por término) porque "pollo" colisionaría con "repollo".
   if(diet.includes("vegano"))terms.push("queso","yogur","yogurt","parmesano","leche evaporada","lácteo","lacteo");
+  // Vegetariano/vegano: excluir carne, aves y pescado. Ya seguro con el matcher por palabra (REQ-66):
+  // "pollo" no colisiona con "repollo" ni "res" con "fresco".
+  if(diet.includes("vegetariano")||diet.includes("vegano"))terms.push("carne","pollo","pavo","cerdo","ternera","res","jamón","chorizo","tocino","pescado","atún","salmón","trucha","merluza","gamba","langostino","camarón","marisco","calamar","pulpo","anchoa","sardina");
   return [...new Set(terms.map(x=>x.toLowerCase()))];
 }
 function coachCompatibilityContext(action){

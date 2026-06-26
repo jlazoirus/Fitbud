@@ -3461,3 +3461,38 @@ El enforcement por término de carne/pescado requiere que el matcher soporte lí
 - Un perfil vegano no recibe platos con lácteo en la lista de referencia ni en opciones del coach, y un plan con lácteo se rechaza (422).
 - `Leche vegetal`/`Leche de coco` siguen permitidas para veganos.
 - Los planes de vegetariano/vegano incluyen en el prompt la instrucción de excluir carne y pescado.
+
+## REQ-66 - Soporte real de dietas omnívoras: catálogo con carne/pescado + matcher por palabra
+
+**Estado: implementado.**
+
+### Problema
+
+La app ofrecía `omnívoro` como patrón de alimentación, pero el catálogo era 100% vegetariano (sin un solo ingrediente de carne, ave o pescado). Un usuario omnívoro recibía, de facto, planes vegetarianos. Cerrarlo requería (a) contenido animal en el catálogo y (b) poder filtrar ese contenido para perfiles vegetarianos/veganos — lo que REQ-65 dejó pendiente porque el matcher de restricciones era substring puro y `"pollo"` colisionaba con `"repollo"`.
+
+### Fix
+
+**1. Matcher por palabra (`index.html` y `api/claude.js`).** `coachTextHasTerms` (cliente) y `containsRestriction` (servidor) pasan de `includes()` substring a comparación por token: se tokeniza el texto (minúsculas, sin acentos, separando por no-alfanumérico) y un término coincide si sus tokens aparecen consecutivos, admitiendo prefijo solo en el último token (plurales: `pollo`→`pollos`). Así `"pollo"` ya no matchea `"repollo"` ni `"res"` matchea `"fresco"`. Ambas implementaciones son equivalentes en semántica (los tests del servidor cubren el caso `repollo`).
+
+**2. Términos de carne/pescado (`coachHardRestrictions`).** Para `vegetariano`/`vegano` se añaden términos duros: `carne, pollo, pavo, cerdo, ternera, res, jamón, chorizo, tocino, pescado, atún, salmón, trucha, merluza, gamba, langostino, camarón, marisco, calamar, pulpo, anchoa, sardina`. Al ser duros fluyen al filtro de la lista de referencia, a la línea `PROHIBIDO` del prompt y a la validación del servidor (422). Verificado que ninguno colisiona (como prefijo de palabra) con el catálogo vegetariano existente.
+
+**3. Contenido omnívoro (`supabase/seed.sql`).** Nuevos ingredientes (categoría `Proteína animal`, macros por 100 g): Pechuga de pollo, Pavo molido magro, Carne de res magra, Huevo entero, Atún en agua, Salmón. Nuevos platos: Huevos revueltos + avena (desayuno), Pollo a la plancha + arroz + brócoli y Bowl de atún + arroz + palta (almuerzo), Carne de res salteada + papa + verduras y Salmón al horno + quinua + verduras (cena). El encabezado del seed deja de decir "Vegetariano sin huevo".
+
+### Tests (`scripts/test-coach-quota.mjs`)
+
+Tres casos nuevos contra el enforcement real del servidor: (1) perfil vegetariano + día con pechuga de pollo → **422**; (2) omnívoro (sin restricciones) + el mismo día → **200**; (3) **regresión**: día vegetariano que usa `Repollo` con `"pollo"` entre las restricciones → **200** (prueba que el matcher es por palabra). `supabase/validate.mjs` sigue en verde (61 ingredientes, 48 platos).
+
+### Acción manual pendiente (no la hace el agente)
+
+⚠️ El seed cambia el **repo**, no la base de producción. Para que el contenido omnívoro aparezca en producción hay que re-ejecutar `supabase/seed.sql` en Supabase. **Cuidado: el seed hace `truncate ... restart identity cascade` de `ingredients/dishes/dish_ingredients/diets/diet_dishes`** — borra y recarga el catálogo (no toca perfiles, day_log ni datos de usuario, pero reinicia los ids de platos). Hacerlo en una ventana sin tráfico.
+
+### Pendiente conocido (fuera de alcance)
+
+`miel` no es término duro para vegano (solo va por prompt). Las dietas `pescetariano`/`flexitariano` no existen como opción. Si se amplía el catálogo con más cortes/pescados, basta añadir términos (el matcher ya los soporta con seguridad).
+
+### Criterios de aceptación
+
+- `node scripts/test-coach-quota.mjs` y `node scripts/validate.mjs` pasan.
+- `node scripts/release-gate.mjs` pasa 18/18.
+- Un perfil omnívoro ve platos con carne/pescado en la lista de referencia; uno vegetariano/vegano no, y un plan con carne se rechaza (422).
+- `Repollo` (y otros ingredientes vegetales) no se bloquean por colisión de substring.

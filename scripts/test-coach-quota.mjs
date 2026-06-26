@@ -433,3 +433,92 @@ assert(res.statusCode === 200, "REQ-65: día vegano sin lácteos (con leche vege
 assert(completedCalls === 1 && failedCalls === 0, "REQ-65: 'leche vegetal' no debe disparar el término de lácteo.");
 
 console.log("REQ-65: enforcement de lacteos para vegano (rechazo + control de leche vegetal) verificado.");
+
+// --- REQ-66: carne/pescado para vegetariano/vegano + regresión de matcher por palabra ---
+// Términos cárnicos que coachHardRestrictions() añade para vegetariano/vegano.
+const MEAT_TERMS = ["carne", "pollo", "pavo", "cerdo", "ternera", "res", "jamón", "chorizo", "tocino", "pescado", "atún", "salmón", "trucha", "merluza", "gamba", "langostino", "camarón", "marisco", "calamar", "pulpo", "anchoa", "sardina"];
+
+const chickenDayText = JSON.stringify({
+  explicacion: "Día omnívoro con pollo.",
+  comidas: [
+    { slot_id: "desayuno", nombre: "Avena con fruta", ingredientes: [{ nombre: "Avena", gramos: 80 }, { nombre: "Plátano", gramos: 100 }], kcal: 350, proteina_g: 12, carbohidratos_g: 60, grasa_g: 6 },
+    { slot_id: "almuerzo", nombre: "Pollo a la plancha + arroz", ingredientes: [{ nombre: "Pechuga de pollo", gramos: 180 }, { nombre: "Arroz cocido", gramos: 200 }], kcal: 560, proteina_g: 60, carbohidratos_g: 55, grasa_g: 10 },
+    { slot_id: "snack", nombre: "Hummus con verduras", ingredientes: [{ nombre: "Hummus", gramos: 100 }, { nombre: "Pimiento", gramos: 100 }], kcal: 200, proteina_g: 8, carbohidratos_g: 20, grasa_g: 10 },
+    { slot_id: "cena", nombre: "Tofu salteado", ingredientes: [{ nombre: "Tofu firme", gramos: 200 }, { nombre: "Verduras mixtas", gramos: 150 }], kcal: 300, proteina_g: 22, carbohidratos_g: 12, grasa_g: 16 },
+  ],
+});
+
+// 1) Vegetariano: el día con pollo debe rechazarse (422).
+failedCalls = 0; providerCalls = 0;
+global.fetch = async (url) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) return response(200, [{ usage_id: 30, mode: "fresh", usage_status: "reserved", effective_limit: 3, quota_day: "2026-06-25", policy_enabled: true }]);
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) { providerCalls += 1; return response(200, { content: [{ text: chickenDayText }], usage: { input_tokens: 200, output_tokens: 300 } }); }
+  throw new Error("Ruta diet_day vegetariano/pollo no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST", headers: { authorization: "Bearer token" },
+  body: { userText: "Genera mi dia", system: "Contexto", quota: { ...dietDayQuota, requestId: "a1a1a1a1-aaaa-4aaa-8aaa-a11111111111", validation: { ...dietDayQuota.validation, hardRestrictions: MEAT_TERMS } } },
+}, res);
+assert(res.statusCode === 422, "REQ-66: vegetariano con pechuga de pollo debe rechazar con 422.");
+assert(failedCalls === 1, "REQ-66: el rechazo de carne debe registrar invalid_provider_output.");
+
+// 2) Omnívoro (sin restricciones de carne): el mismo día con pollo debe pasar (200).
+completedCalls = 0; failedCalls = 0; providerCalls = 0;
+global.fetch = async (url) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) return response(200, [{ usage_id: 31, mode: "fresh", usage_status: "reserved", effective_limit: 3, quota_day: "2026-06-25", policy_enabled: true }]);
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) { completedCalls += 1; return response(200, [{ stored_result_id: 100 }]); }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) { providerCalls += 1; return response(200, { content: [{ text: chickenDayText }], usage: { input_tokens: 200, output_tokens: 300 } }); }
+  throw new Error("Ruta diet_day omnivoro no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST", headers: { authorization: "Bearer token" },
+  body: { userText: "Genera mi dia", system: "Contexto", quota: { ...dietDayQuota, requestId: "b2b2b2b2-bbbb-4bbb-8bbb-b22222222222", validation: { ...dietDayQuota.validation, hardRestrictions: [] } } },
+}, res);
+assert(res.statusCode === 200, "REQ-66: omnívoro con pollo debe pasar (200).");
+assert(completedCalls === 1 && failedCalls === 0, "REQ-66: el día omnívoro debe completarse sin fallo.");
+
+// 3) Regresión del matcher: un día vegetariano con "Repollo" NO debe rechazarse aunque "pollo"
+//    esté entre las restricciones (prueba que el matcher es por palabra, no substring).
+const cabbageDayText = JSON.stringify({
+  explicacion: "Día vegetariano con repollo.",
+  comidas: [
+    { slot_id: "desayuno", nombre: "Avena con fruta", ingredientes: [{ nombre: "Avena", gramos: 80 }, { nombre: "Plátano", gramos: 100 }], kcal: 350, proteina_g: 12, carbohidratos_g: 60, grasa_g: 6 },
+    { slot_id: "almuerzo", nombre: "Tacos de frijol con repollo", ingredientes: [{ nombre: "Frijoles negros cocidos", gramos: 200 }, { nombre: "Repollo", gramos: 100 }, { nombre: "Tortilla de maíz", gramos: 75 }], kcal: 480, proteina_g: 20, carbohidratos_g: 70, grasa_g: 8 },
+    { slot_id: "snack", nombre: "Queso fresco con tomate", ingredientes: [{ nombre: "Queso fresco", gramos: 80 }, { nombre: "Tomate", gramos: 100 }], kcal: 180, proteina_g: 14, carbohidratos_g: 6, grasa_g: 11 },
+    { slot_id: "cena", nombre: "Tofu salteado", ingredientes: [{ nombre: "Tofu firme", gramos: 200 }, { nombre: "Verduras mixtas", gramos: 150 }], kcal: 300, proteina_g: 22, carbohidratos_g: 12, grasa_g: 16 },
+  ],
+});
+
+completedCalls = 0; failedCalls = 0; providerCalls = 0;
+global.fetch = async (url) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) return response(200, [{ usage_id: 32, mode: "fresh", usage_status: "reserved", effective_limit: 3, quota_day: "2026-06-25", policy_enabled: true }]);
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) { completedCalls += 1; return response(200, [{ stored_result_id: 101 }]); }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) { providerCalls += 1; return response(200, { content: [{ text: cabbageDayText }], usage: { input_tokens: 200, output_tokens: 300 } }); }
+  throw new Error("Ruta diet_day repollo no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST", headers: { authorization: "Bearer token" },
+  body: { userText: "Genera mi dia", system: "Contexto", quota: { ...dietDayQuota, requestId: "c3c3c3c3-cccc-4ccc-8ccc-c33333333333", validation: { ...dietDayQuota.validation, hardRestrictions: MEAT_TERMS } } },
+}, res);
+assert(res.statusCode === 200, "REQ-66: 'repollo' no debe activar el término 'pollo' (matcher por palabra).");
+assert(completedCalls === 1 && failedCalls === 0, "REQ-66: el día con repollo debe completarse sin fallo.");
+
+console.log("REQ-66: carne para vegetariano rechazada, omnivoro permitido y regresion repollo/pollo verificadas.");

@@ -1,7 +1,7 @@
 -- ============================================================
 -- Fitbud — datos precargados (ejecuta DESPUÉS de schema.sql)
 -- Valores nutricionales por 100 g (aproximados, editables).
--- Vegetariano sin huevo. Re-ejecutable: hace truncate primero.
+-- Base vegetariana + opciones omnívoras (carne/aves/pescado/huevo). Re-ejecutable: hace truncate primero.
 -- ============================================================
 truncate diet_dishes, diets, dish_ingredients, dishes, ingredients restart identity cascade;
 
@@ -61,7 +61,14 @@ insert into ingredients (name, category, kcal, protein_g, carbs_g, fat_g) values
 ('Verduras mixtas','Verdura',25,1.5,4,0.3),
 ('Alga nori','Verdura',35,6,5,0.3),
 ('Miel','Otros',304,0.3,82,0),
-('Mermelada','Otros',250,0.5,65,0);
+('Mermelada','Otros',250,0.5,65,0),
+-- Proteínas animales (opciones omnívoras)
+('Pechuga de pollo','Proteína animal',165,31,0,3.6),
+('Pavo molido magro','Proteína animal',150,27,0,4),
+('Carne de res magra','Proteína animal',137,21,0,5),
+('Huevo entero','Proteína animal',143,13,1,9.5),
+('Atún en agua','Proteína animal',116,26,0,1),
+('Salmón','Proteína animal',208,20,0,13);
 
 -- ---------- PLATOS ----------
 insert into dishes (name, slot, menu) values
@@ -115,7 +122,13 @@ insert into dishes (name, slot, menu) values
 ('Fajitas de tofu + tortillas','almuerzo','D'),
 ('Quesadillas de frijol, queso y champiñones','almuerzo','D'),
 ('Enchiladas de frijol + cottage','almuerzo','D'),
-('Sopa azteca + tofu + palta','almuerzo','D');
+('Sopa azteca + tofu + palta','almuerzo','D'),
+-- Omnívoros (carne / aves / pescado / huevo)
+('Huevos revueltos + avena','desayuno',null),
+('Pollo a la plancha + arroz + brócoli','almuerzo',null),
+('Bowl de atún + arroz + palta','almuerzo',null),
+('Carne de res salteada + papa + verduras','cena',null),
+('Salmón al horno + quinua + verduras','cena',null);
 
 -- ---------- RECETAS (dish_ingredients) ----------
 insert into dish_ingredients (dish_id, ingredient_id, grams)
@@ -171,7 +184,13 @@ from (values
   ('Fajitas de tofu + tortillas','Tofu firme',250),('Fajitas de tofu + tortillas','Pimiento',100),('Fajitas de tofu + tortillas','Cebolla',50),('Fajitas de tofu + tortillas','Tortilla integral de trigo',75),
   ('Quesadillas de frijol, queso y champiñones','Tortilla integral de trigo',80),('Quesadillas de frijol, queso y champiñones','Frijoles negros cocidos',150),('Quesadillas de frijol, queso y champiñones','Queso fresco',80),('Quesadillas de frijol, queso y champiñones','Champiñones',80),
   ('Enchiladas de frijol + cottage','Frijoles negros cocidos',200),('Enchiladas de frijol + cottage','Tortilla de maíz',75),('Enchiladas de frijol + cottage','Queso cottage',100),('Enchiladas de frijol + cottage','Tomate',50),('Enchiladas de frijol + cottage','Aceite de oliva',10),
-  ('Sopa azteca + tofu + palta','Tofu firme',200),('Sopa azteca + tofu + palta','Tortilla de maíz',90),('Sopa azteca + tofu + palta','Palta',40),('Sopa azteca + tofu + palta','Verduras mixtas',150)
+  ('Sopa azteca + tofu + palta','Tofu firme',200),('Sopa azteca + tofu + palta','Tortilla de maíz',90),('Sopa azteca + tofu + palta','Palta',40),('Sopa azteca + tofu + palta','Verduras mixtas',150),
+  -- Omnívoros
+  ('Huevos revueltos + avena','Huevo entero',150),('Huevos revueltos + avena','Avena',60),('Huevos revueltos + avena','Leche vegetal',150),
+  ('Pollo a la plancha + arroz + brócoli','Pechuga de pollo',180),('Pollo a la plancha + arroz + brócoli','Arroz cocido',200),('Pollo a la plancha + arroz + brócoli','Brócoli',150),('Pollo a la plancha + arroz + brócoli','Aceite de oliva',8),
+  ('Bowl de atún + arroz + palta','Atún en agua',150),('Bowl de atún + arroz + palta','Arroz cocido',200),('Bowl de atún + arroz + palta','Palta',60),
+  ('Carne de res salteada + papa + verduras','Carne de res magra',160),('Carne de res salteada + papa + verduras','Papa',220),('Carne de res salteada + papa + verduras','Verduras mixtas',150),('Carne de res salteada + papa + verduras','Aceite de oliva',8),
+  ('Salmón al horno + quinua + verduras','Salmón',160),('Salmón al horno + quinua + verduras','Quinua cocida',180),('Salmón al horno + quinua + verduras','Verduras mixtas',150),('Salmón al horno + quinua + verduras','Aceite de oliva',5)
 ) as v(dish_name, ing_name, grams)
 join dishes d      on d.name = v.dish_name
 join ingredients i on i.name = v.ing_name;

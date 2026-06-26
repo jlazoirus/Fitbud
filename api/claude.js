@@ -198,9 +198,28 @@ function restrictedTerms(validation) {
   return terms.map((term) => String(term || "").trim().toLowerCase()).filter(Boolean);
 }
 
+// Tokeniza igual que coachKey del cliente: minúsculas, sin acentos, separa por no-alfanumérico.
+function restrictionTokens(value) {
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/[^a-z0-9]+/).filter(Boolean);
+}
+// Coincidencia por palabra (no substring): el último token del término admite prefijo (plurales).
+// Evita falsos positivos como "pollo"⊂"repollo" o "res"⊂"fresco" al filtrar carne. REQ-66.
+function termMatchesTokens(tokens, term) {
+  const tt = restrictionTokens(term);
+  if (!tt.length) return false;
+  for (let i = 0; i + tt.length <= tokens.length; i++) {
+    let ok = true;
+    for (let j = 0; j < tt.length; j++) {
+      const tok = tokens[i + j];
+      if (j === tt.length - 1 ? !tok.startsWith(tt[j]) : tok !== tt[j]) { ok = false; break; }
+    }
+    if (ok) return true;
+  }
+  return false;
+}
 function containsRestriction(value, validation) {
-  const haystack = String(value || "").toLowerCase();
-  return restrictedTerms(validation).some((term) => haystack.includes(term));
+  const tokens = restrictionTokens(value);
+  return restrictedTerms(validation).some((term) => termMatchesTokens(tokens, term));
 }
 
 function validateDietDay(data, validation) {
