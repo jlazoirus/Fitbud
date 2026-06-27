@@ -4054,3 +4054,45 @@ Se evaluó agregar variantes de "doble porción de proteína" al seed.sql. Se de
 
 - Servir en local, configurar perfil con meta 2300 kcal / 180 g proteína, ejecutar "Preparar mi día" y verificar que el día generado pasa validación (sin el error "kcal fuera de ±15%" ni "Proteína por debajo del 85%").
 - Repetir con meta normal (2000 kcal / 100 g proteína) y verificar que sigue funcionando igual.
+
+## REQ-76 - Catálogo: shakes de proteína como opción de alta proteína por porción
+
+### Contexto
+
+Complemento de REQ-75. El prompt reforzado de `generateOneDay` instruye a la IA a combinar fuentes de proteína y subir gramajes, pero el catálogo de platos no tenía una opción simple de "shake de proteína" que la IA pudiera usar para tapar déficits rápidamente. Los batidos existentes (`Batido peri-entreno día pesas/bajo`) son específicos de entrenamiento y van en slot `batido` (que no existe en los templates de comidas estándar).
+
+### Solución
+
+Agregar 2 variantes de shake de proteína al seed, en slot `snack` (aparece en configuraciones de 4+ comidas), usando ingredientes que ya existen en el catálogo.
+
+| Plato | Ingredientes | kcal | P | C | F |
+|---|---|---|---|---|---|
+| Shake de proteína con agua | 35g proteína en polvo | 131 | 28 | 3 | 2 |
+| Shake de proteína con yogur griego | 30g proteína en polvo + 200g yogur griego 0% | 233 | 44 | 10 | 2 |
+
+El primero es un tapahuecos mínimo (131 kcal, 28g P); el segundo es una bomba de proteína (233 kcal, 44g P) que permite a la IA cerrar déficits grandes de proteína sin excederse en calorías.
+
+### Impacto
+
+- **No requiere migración SQL**: el seed es re-ejecutable (`truncate` + inserts).
+- **No requiere cambios en index.html**: `generateOneDay` ya itera `DB.dishes` dinámicamente y los incluye en el prompt con sus macros.
+- **No afecta el plan fijo**: los shakes no están en `PLAN_SLOTS` del validador.
+- **Afecta a todos los usuarios**: al re-ejecutar el seed, los 2 platos nuevos aparecen para todos. Es intencional — son opciones universalmente útiles.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `supabase/seed.sql` | 2 dishes nuevos + 3 filas de `dish_ingredients` |
+
+### Criterios de aceptación
+
+- `node supabase/validate.mjs` pasa (50 platos, 50 recetas, 0 errores).
+- Los macros calculados del shake con agua son ~131 kcal / 28g P.
+- Los macros calculados del shake con yogur son ~233 kcal / 44g P.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Re-ejecutar `seed.sql` en Supabase (o entorno local) y verificar que los 2 platos aparecen en la tabla `dishes`.
+- Servir en local, abrir "Preparar mi día" con meta alta de proteína y verificar que el prompt enviado a la IA incluye los shakes en la lista de referencia.

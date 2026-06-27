@@ -91,6 +91,9 @@ insert into dishes (name, slot, menu) values
 ('Snack refeed: pan + mermelada + proteína','snack',null),
 ('Snack diet break: pan con palta','snack',null),
 ('Snack extra: fruta + yogur','snack',null),
+-- Shakes de proteína (REQ-76: opciones de alta proteína para tapar déficit)
+('Shake de proteína con agua','snack',null),
+('Shake de proteína con yogur griego','snack',null),
 -- Menú A (Criollo)
 ('Saltado de tofu firme + arroz','almuerzo','A'),
 ('Lentejas guisadas + quinua + ensalada','almuerzo','A'),
@@ -153,6 +156,9 @@ from (values
   ('Snack refeed: pan + mermelada + proteína','Pan de molde',80),('Snack refeed: pan + mermelada + proteína','Mermelada',30),('Snack refeed: pan + mermelada + proteína','Proteína en polvo',30),
   ('Snack diet break: pan con palta','Pan de molde',100),('Snack diet break: pan con palta','Palta',40),('Snack diet break: pan con palta','Proteína en polvo',25),
   ('Snack extra: fruta + yogur','Yogur griego natural 0%',100),('Snack extra: fruta + yogur','Fruta pequeña (manzana)',120),('Snack extra: fruta + yogur','Granola sin azúcar',20),
+  -- Shakes de proteína (REQ-76)
+  ('Shake de proteína con agua','Proteína en polvo',35),
+  ('Shake de proteína con yogur griego','Proteína en polvo',30),('Shake de proteína con yogur griego','Yogur griego natural 0%',200),
   -- Menú A
   ('Saltado de tofu firme + arroz','Tofu firme',250),('Saltado de tofu firme + arroz','Arroz cocido',200),('Saltado de tofu firme + arroz','Cebolla',50),('Saltado de tofu firme + arroz','Tomate',50),('Saltado de tofu firme + arroz','Aceite de oliva',8),
   ('Lentejas guisadas + quinua + ensalada','Lentejas cocidas',350),('Lentejas guisadas + quinua + ensalada','Quinua cocida',120),('Lentejas guisadas + quinua + ensalada','Verduras mixtas',100),('Lentejas guisadas + quinua + ensalada','Aceite de oliva',5),
