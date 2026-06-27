@@ -6492,6 +6492,10 @@ function trainingPlanValidationConfig(expected,prefs){
   const allowed=[...new Set(expected.sessions.flatMap(session=>session.allowedExerciseIds||[]))];
   return {
     schema:"training_plan_week_v1",
+    // REQ-68: training-plan.js#normalizeWeek lee `config.week` (no `expectedWeek`) para
+    // calcular la semana y la fase esperadas. Sin esta clave, normalizeWeek asumía
+    // siempre semana 1 y el plan completo quedaba mal numerado a partir de la semana 2.
+    week:expected.week,
     expectedWeek:expected.week,
     expectedPhase:expected.phase,
     expectedSessions:expected.sessions.map(({date,weekday,location,role,type})=>({date,weekday,location,role,type})),

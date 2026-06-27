@@ -72,6 +72,7 @@ run("validate-contracts.mjs", "node scripts/validate-contracts.mjs");
 run("validate-exercises.mjs", "node scripts/validate-exercises.mjs");
 run("validate-workout-player.mjs", "node scripts/validate-workout-player.mjs");
 run("validate-training-plan.mjs", "node scripts/validate-training-plan.mjs");
+run("validate-training-plan-wiring.mjs", "node scripts/validate-training-plan-wiring.mjs");
 run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
 run("validate-splits.mjs", "node scripts/validate-splits.mjs");

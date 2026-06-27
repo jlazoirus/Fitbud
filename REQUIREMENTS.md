@@ -3562,3 +3562,33 @@ node scripts/release-gate.mjs
 ### Acción manual pendiente (Supabase)
 
 Ejecutar el bloque de INSERT adicional de `supabase/exercises.sql` para que los ejercicios `intermediate`/`advanced` nuevos aparezcan en la tabla `exercises` de producción.
+
+## REQ-68 - Fix: "Preparar mi plan de entrenamiento" rechazaba el plan con "La semana 2 está fuera de orden."
+
+**Estado: implementado.**
+
+### Problema
+
+Al generar "Preparar mi plan de entrenamiento" aparecía un modal de error: "La semana 2 está fuera de orden." El mensaje proviene de `training-plan.js#validatePlan`, que exige `plan.weeks[index].week === index+1` para cada semana.
+
+### Causa raíz (verificada contra código, no es una regresión de REQ-67)
+
+`trainingPlanValidationConfig()` en `index.html` construye el objeto `validation` que se pasa con spread a `TRAINING_PLAN.normalizeWeek(parsed, {...validation, ...})` —tanto en el camino con IA como en el determinista (`fallbackOnly`), en `generateTrainingWeek()`—. Esa función nombraba la semana solicitada como `expectedWeek:expected.week`. Pero `training-plan.js#normalizeWeek` lee `config.week` (línea: `const expectedWeek=Math.max(1,integer(config&&config.week,1));`), no `config.expectedWeek`. Como esa clave nunca existía en `validation`, `config.week` era siempre `undefined` y `normalizeWeek` caía al fallback `1` **en cada semana**, devolviendo `week.week=1` sin importar cuál semana se estuviera generando. Al ensamblarse `plan.weeks` en `openTrainingPlanGenerator()`, la semana en el índice 1 (la segunda) llegaba con `week.week=1`, y `validatePlan` lo detectaba como "fuera de orden" (`1 !== 2`). Por la misma razón, `normalizeWeek` también calculaba internamente la fase de progresión (`expectedPhase`) a partir de esa semana mal calculada, así que el plan completo —más allá de la primera semana— quedaba con datos de semana 1 disfrazados de semana N; ese segundo síntoma quedaba enmascarado porque el primer `issue` ("fuera de orden") ya hacía fallar la validación antes de notarlo.
+
+Esto **no es una regresión de REQ-67** (commit `b3b1d25`, mismo día): ese commit no modificó `training-plan.js`, ni `trainingPlanValidationConfig`, ni el bucle de `openTrainingPlanGenerator`/`generateTrainingWeek` que ensambla `plan.weeks`. `git log --follow -- training-plan.js` muestra que ese archivo solo se tocó una vez, en `0d19a23` (REQ-17, generador IA de planes de entrenamiento), commit donde se introdujo `trainingPlanValidationConfig` con la clave `expectedWeek` desde el primer día. El bug es preexistente desde REQ-17 y simplemente no había sido detectado hasta ahora.
+
+Por qué el release gate nunca lo capturó: `scripts/validate-training-plan.mjs` prueba `training-plan.js` de forma aislada pasando manualmente un config con la clave correcta (`week:` en vez de `expectedWeek:`), por lo que nunca ejercitó el wiring real de `index.html`. La discrepancia de nombre de propiedad entre productor (`index.html`) y consumidor (`training-plan.js`) quedó invisible para los tests existentes.
+
+### Fix (`index.html`)
+
+Una línea en `trainingPlanValidationConfig()`: se agrega `week:expected.week` (se conserva `expectedWeek` por compatibilidad, ya que se usa como metadata en `coachQuota`). Con esto `normalizeWeek` recibe la semana correcta en cada iteración y calcula la fase de progresión real para esa semana.
+
+### Tests
+
+`scripts/validate-training-plan-wiring.mjs` (nuevo, integrado en `release-gate.mjs`): extrae la función real `trainingPlanValidationConfig` (y su dependencia `trainingBlockedTerms`) del código fuente de `index.html` por parseo de llaves balanceadas —mismo patrón que usan otros `validate-*.mjs` que auditan `index.html` sin DOM— y reproduce el flujo real de `generateTrainingWeek` → `normalizeWeek` → `validatePlan` para planes de 4 y 10 semanas, confirmando `plan.weeks[index].week === index+1` para todas las semanas. Se verificó manualmente que el test falla con el mensaje original ("La semana no coincide con la solicitada.") al revertir el fix sobre una copia del archivo, y pasa limpio con el fix aplicado.
+
+### Criterios de aceptación
+
+- `node scripts/validate-training-plan-wiring.mjs` pasa sin errores.
+- `node scripts/release-gate.mjs` pasa con el mismo conteo de checks en verde que antes de este fix, más el nuevo validador.
+- "Preparar mi plan de entrenamiento" genera planes de 4 y 10 semanas sin el error "La semana N está fuera de orden." en ningún índice.
