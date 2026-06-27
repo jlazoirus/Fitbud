@@ -3592,3 +3592,50 @@ Una línea en `trainingPlanValidationConfig()`: se agrega `week:expected.week` (
 - `node scripts/validate-training-plan-wiring.mjs` pasa sin errores.
 - `node scripts/release-gate.mjs` pasa con el mismo conteo de checks en verde que antes de este fix, más el nuevo validador.
 - "Preparar mi plan de entrenamiento" genera planes de 4 y 10 semanas sin el error "La semana N está fuera de orden." en ningún índice.
+
+## REQ-69 - Fix: editar macros en el perfil no actualizaba el objetivo del día en Nutrición
+
+**Estado: implementado.**
+
+### Problema
+
+Al editar macros en la pantalla "Define tu objetivo y tus macros" (Perfil → Recalcular objetivos), los cambios se guardaban en `profile.prefs` pero el tab Nutrición seguía mostrando los objetivos del plan anterior. Caso concreto reportado: proteína editada a 180 g, mostrada como 141 g en "Macros del día". Las calorías sí coincidían (ambas 2300) porque el snapshot del plan también tenía ese valor, lo que hacía el bug menos obvio.
+
+### Causa raíz
+
+`buildDay(ds)` construye el objeto de día con `target: effectiveDayTarget(ctx.prefs)`, donde `ctx.prefs` viene de `planContextForDate(ds)` → `planPrefsForDate(ds)`. Esa función, cuando existe una versión de plan activa para la fecha, devuelve `version.snapshot.prefs` (los prefs congelados al momento de generar el plan) en lugar de `profile.prefs` (los prefs actuales del usuario):
+
+```js
+function planPrefsForDate(ds){
+  const version=planVersionForDate(ds);
+  const source=version&&version.snapshot&&version.snapshot.prefs
+    ?version.snapshot.prefs          // ← snapshot congelado
+    :((profile&&profile.prefs)||{}); // ← prefs actuales (solo si no hay plan)
+  return migrateProfilePrefs(source);
+}
+```
+
+Al pasar esos snapshot-prefs a `effectiveDayTarget(ctx.prefs)`, el objetivo del día se calculaba desde los valores congelados del snapshot (proteína: 141 g calculada automáticamente cuando se generó el plan), ignorando que el usuario luego había cambiado manualmente su proteína objetivo a 180 g.
+
+El snapshot tiene sentido para estructura del plan (entrenamientos, horarios de comida), pero los macros objetivo deben reflejar siempre lo que el usuario guardó más recientemente en su perfil.
+
+### Fix (`index.html`, línea ~1593)
+
+En `buildDay()`, se quita el argumento `ctx.prefs` de la llamada a `effectiveDayTarget`:
+
+```diff
+- return {ds,...,target:effectiveDayTarget(ctx.prefs),...};
++ return {ds,...,target:effectiveDayTarget(),...};
+```
+
+Sin argumento, `effectiveDayTarget` cae al fallback `(profile&&profile.prefs)||{}` — siempre los valores actuales. El snapshot sigue siendo usado para todo lo demás (estructura de comidas, workout plan).
+
+### Tests
+
+`scripts/validate-macro-target-wiring.mjs` (nuevo, integrado en `release-gate.mjs`): extrae `buildDay` del fuente real de `index.html` y verifica estructuralmente que no contiene `effectiveDayTarget(ctx.prefs)` y sí contiene `effectiveDayTarget()`.
+
+### Criterios de aceptación
+
+- `node scripts/validate-macro-target-wiring.mjs` pasa sin errores.
+- `node scripts/release-gate.mjs` pasa con todos los checks en verde tras el commit.
+- En el tab Nutrición, "Macros del día" muestra el objetivo de proteína que el usuario guardó en su perfil, no el calculado automáticamente al generar el plan.

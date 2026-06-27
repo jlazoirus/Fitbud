@@ -1590,7 +1590,7 @@ function weekOf(ds,prefs){
 function buildDay(ds,prefsOverride){
   const ctx=planContextForDate(ds,prefsOverride);
   const meals=mealSlotsForPrefs(ctx.prefs).map(s=>({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
-  return {ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(ctx.prefs),meals,workout:effectiveWorkout(ds,prefsOverride||null).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
+  return {ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(),meals,workout:effectiveWorkout(ds,prefsOverride||null).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
 }
 
 /* ---------- ESTADO / PERSISTENCIA (localStorage) ---------- */
