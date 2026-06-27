@@ -3925,3 +3925,71 @@ node scripts/test-sync-conflicts.mjs
 node scripts/validate-contracts.mjs
 node scripts/audit-html.mjs
 ```
+
+## REQ-74 - Aviso de privacidad y términos accesibles antes del registro
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey de **adquisición** (loop auditor, `AUDIT_AGENT.md`). Se recorrió la landing pública y la pantalla de registro estando deslogueado.
+
+### Problema
+
+Un visitante puede crear cuenta y empezar a entregar datos sensibles (peso, % de grasa, fotos corporales, preferencias de salud) sin poder leer en ningún momento un aviso de privacidad ni términos de servicio:
+
+- El footer de la landing solo contiene `© 2026 Fitbros · Iniciar sesión` (`index.html:6008`). No hay enlace a privacidad ni a términos.
+- La nav y el hero de la landing tampoco lo enlazan.
+- La pantalla de registro (`renderAuth`, `index.html:6016`) no muestra aviso, enlace ni casilla de consentimiento antes de crear la cuenta.
+- El gate de privacidad (`renderPrivacyGate` / `openPrivacyNotice`) solo aparece **después** de autenticarse, dentro de la app.
+
+Esto contradice el principio de producto 7 ("Privacidad por defecto") y la propia FAQ de la landing, que promete: *"Tu progreso, fotos, conversaciones y datos corporales son privados… Puedes exportar o solicitar el borrado de tu cuenta y todos tus datos en cualquier momento"* (`index.html:5994`), sin dar al visitante forma de verificar esa promesa antes de registrarse.
+
+### Causa raíz
+
+La función que muestra el aviso ya existe y **no depende de sesión** — es un `modal()` plano:
+
+```js
+function openPrivacyNotice(){            // index.html:2455
+  modal(`<h3>Privacidad sencilla</h3> ... `);
+}
+```
+
+Pero solo está cableada desde pantallas autenticadas: el centro de privacidad (`index.html:2433`) y Perfil (`index.html:2708`). Ni `renderLanding()` (footer en `index.html:6008`) ni `renderAuth()` (`index.html:6016`) la invocan. No existe, además, una ruta pública estática a `PRIVACY.md`.
+
+### Objetivo
+
+Que cualquier visitante pueda leer el aviso de privacidad (y los términos) **antes** de crear una cuenta, desde la landing y desde la pantalla de registro, sin necesidad de loguearse.
+
+### Alcance
+
+1. Añadir al footer de la landing (`index.html:6008`) enlaces "Privacidad" y "Términos" que abran el aviso correspondiente (reutilizar `openPrivacyNotice()` para privacidad).
+2. Añadir en la pantalla de registro (`renderAuth`) una línea bajo el botón de crear cuenta del tipo "Al crear tu cuenta aceptas nuestros Términos y el Aviso de privacidad", con ambos enlaces abriendo el modal correspondiente sin requerir sesión.
+3. Si no existe aún un texto de Términos, crear un `openTermsNotice()` mínimo equivalente a `openPrivacyNotice()`, con el mismo marcado de "texto preliminar pendiente de revisión profesional" que ya usa el aviso (`index.html:2460`).
+4. Verificar que ambos modales funcionan estando deslogueado (no dependen de `session`, `uid()` ni `privacyReady`).
+
+### Fuera de alcance
+
+- No redactar la versión legal definitiva (sigue siendo "texto preliminar pendiente de revisión profesional"; es decisión humana/legal, no del agente).
+- No añadir casilla de consentimiento bloqueante en el registro: el gate de consentimiento post-login (`renderPrivacyGate`) sigue siendo la captura formal de consentimiento. Aquí solo se trata de **acceso** al aviso antes de registrarse.
+- No crear una ruta/archivo HTML estático nuevo si basta con el modal in-app.
+
+### Riesgos
+
+- `openPrivacyNotice()` usa `modal()`, `closeModal()` y `CONSENT_POLICY_VERSION`; confirmar que están definidos en el scope global cuando se renderiza la landing (lo están, ya se usan en otros puntos sin sesión).
+- No romper el layout del footer ni el de la pantalla de registro en móvil.
+- Mantener REQ-31: el aviso no debe mencionar IA, modelos ni proveedores.
+
+### Criterios de aceptación
+
+- Estando deslogueado, el footer de la landing muestra enlaces "Privacidad" y "Términos" que abren su modal.
+- La pantalla de registro enlaza ambos avisos antes de crear cuenta.
+- Ambos modales abren sin error con `session` nula (probado en local sin login).
+- `node scripts/release-gate.mjs` pasa.
+- No se introduce vocabulario técnico prohibido por REQ-31 en los textos públicos.
+
+### Verificación sugerida
+
+- Servir en local (`python3 -m http.server 8923`), abrir la landing sin sesión y comprobar los enlaces del footer.
+- Pulsar "Crear mi cuenta gratis" y confirmar que la pantalla de registro enlaza privacidad y términos.
+- Abrir cada modal y verificar que cierra con "Entendido" y que no aparece error en consola.
