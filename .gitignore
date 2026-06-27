@@ -1,5 +1,6 @@
-# Claude Code local
-.claude/
+# Claude Code local (versionar solo los subagentes del repo; lo demás es local)
+.claude/*
+!.claude/agents/
 
 # OS
 .DS_Store
