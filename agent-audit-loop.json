@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "name": "fitbros-autonomous-qa-auditor",
+  "repository": "/Users/jonathan/Fitbud",
+  "branch": "main",
+  "requirementFile": "REQUIREMENTS.md",
+  "subagent": ".claude/agents/qa-auditor.md",
+  "runbook": "AUDIT_AGENT.md",
+  "contextFiles": [
+    "CONTEXT.md",
+    "README.md"
+  ],
+  "journeys": [
+    "adquisicion",
+    "onboarding",
+    "home",
+    "nutricion",
+    "entrenamiento",
+    "progreso",
+    "retencion",
+    "sync",
+    "auth-roles",
+    "facturacion",
+    "administracion",
+    "pwa"
+  ],
+  "limits": {
+    "newRequirementsPerRun": 1,
+    "commitsPerRun": 1,
+    "pushesPerRun": 1,
+    "maxPushAttempts": 2,
+    "runsPerDay": 1,
+    "maxWallClockMinutes": 60,
+    "lockStaleMinutes": 180,
+    "paidExternalCallsPerRun": 0,
+    "mayModifyAppCode": false
+  },
+  "policy": {
+    "onlyWritableFile": "REQUIREMENTS.md",
+    "requireEvidence": true,
+    "avoidDuplicateRequirements": true,
+    "skipRunWhenNoMaterialGap": true,
+    "rotateJourneysForCoverage": true
+  },
+  "stopConditions": [
+    "dirty_worktree",
+    "branch_mismatch",
+    "remote_ahead_or_diverged",
+    "another_agent_active",
+    "app_code_modification_attempted",
+    "no_material_gap_found",
+    "time_budget_exhausted"
+  ]
+}

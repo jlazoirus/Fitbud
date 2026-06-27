@@ -3639,3 +3639,289 @@ Sin argumento, `effectiveDayTarget` cae al fallback `(profile&&profile.prefs)||{
 - `node scripts/validate-macro-target-wiring.mjs` pasa sin errores.
 - `node scripts/release-gate.mjs` pasa con todos los checks en verde tras el commit.
 - En el tab Nutrición, "Macros del día" muestra el objetivo de proteína que el usuario guardó en su perfil, no el calculado automáticamente al generar el plan.
+
+## REQ-70 - Validación de negocio y beta controlada
+
+**Estado: bloqueado por ejecución humana. Requiere entrevistas, usuarios reales y decisión de producto; no implementable por el agente autónomo.**
+
+### Origen
+
+Punto 6 del status general: el producto está construido, desplegado y técnicamente verde, pero aún falta validar con uso real si el problema duele, si el primer valor se entiende, si hay retención y si existe disposición de pago. La fuente estratégica es `estrategia/01-Plan-de-Validacion.md`.
+
+### Objetivo
+
+Convertir Fitbros de "producto implementado" a "producto validado o invalidado con evidencia", antes de invertir en adquisición, checkout comercial definitivo o nuevas features grandes.
+
+La decisión final debe ser una de tres:
+
+- **GO**: hay señal suficiente para activar cobro y adquisición.
+- **ITERAR**: el problema existe, pero activación/retención/fricción requieren ajustes.
+- **PIVOT**: el problema, segmento o promesa no sostienen uso/pago.
+
+### Alcance humano obligatorio
+
+1. **Dogfooding Cliente 0**
+   - Usar Fitbros como única herramienta durante al menos 4 semanas.
+   - Registrar diariamente fricción, momento de valor, adherencia y casos donde el plan se rompió.
+   - Hacer una revisión semanal con top 3 fricciones y top 3 momentos de valor.
+
+2. **Entrevistas de problema**
+   - Reclutar 10-15 personas, mínimo 5 por segmento A y 5 por segmento B.
+   - Entrevistar antes de mostrar el producto.
+   - Registrar si el dolor aparece espontáneamente, si hubo intentos fallidos recientes y si ya gastan tiempo o dinero en resolverlo.
+
+3. **Prueba de activación observada**
+   - Pedir a cada persona crear cuenta, completar onboarding, llegar al primer día útil, registrar una comida y resolver una contingencia.
+   - Medir time-to-first-value y puntos de bloqueo sin ayuda.
+
+4. **Beta de uso real**
+   - Dar acceso 1-2 semanas.
+   - Medir activación, adherencia, D7/D14, uso del coach, generación/adaptación y costo IA.
+   - Separar resultados por segmento A/B.
+
+5. **Encuesta de valor y disposición a pagar**
+   - Sean Ellis: porcentaje "muy decepcionado" si Fitbros desaparece.
+   - Test de precio con compromiso real: pago simbólico, lista founder, método de pago o intención fuerte con monto concreto.
+   - Identificar método preferido: tarjeta, Yape/Plin, Mercado Pago u otro.
+
+### Alcance implementable por el agente
+
+El agente sí puede preparar soporte para la validación, pero no reemplazarla:
+
+- Crear plantillas de entrevista, encuesta y diario en `estrategia/`.
+- Crear un tablero estático o script de métricas que lea `product_events`, `day_log` y `billing_events`.
+- Agregar eventos faltantes si se detecta que una métrica crítica no está instrumentada.
+- Sintetizar resultados pegados por el usuario y producir recomendación GO/ITERAR/PIVOT.
+
+### Fuera de alcance
+
+- No inventar resultados de entrevistas o beta.
+- No activar adquisición paga antes de una decisión GO.
+- No cambiar precio, packaging o cabeza de playa solo por intuición.
+- No marcar este REQ como implementado por crear documentos; solo se cierra con evidencia real.
+
+### Métricas mínimas
+
+| Métrica | Umbral de señal positiva |
+|---|---|
+| H1 Problema | >=60% describe el dolor sin sugerirlo |
+| Activación | >=70% completa onboarding y llega al primer día útil sin ayuda |
+| Time-to-first-value | <10 min en prueba observada |
+| Retención beta | D7 >=40%, D14 >=25% |
+| Sean Ellis | >=40% "muy decepcionado" |
+| Disposición a pagar | >=30% da un paso de compromiso real |
+| Costo IA | No se dispara por usuario activo |
+
+### Criterios de aceptación
+
+- Existe una tabla de participantes con segmento, estado y resultado.
+- Hay notas o grabaciones resumidas de al menos 10 entrevistas.
+- Hay resultados separados para Segmento A y Segmento B.
+- Hay medición de activación, adherencia, retención D7/D14 y costo IA.
+- Hay decisión escrita GO/ITERAR/PIVOT con evidencia.
+- Se actualiza `estrategia/01-Plan-de-Validacion.md` o se crea un informe de cierre de beta con aprendizajes y próximos RQs.
+
+## REQ-71 - Sincronizar documentación operativa con el estado real del código
+
+**Estado: pendiente.**
+
+### Origen
+
+Punto 8 del status general: existe drift documental. El código consolidó endpoints y cambió decisiones operativas, pero algunos documentos siguen describiendo superficies antiguas o estados ya resueltos.
+
+Ejemplos detectados:
+
+- `README.md` todavía menciona `/api/coupon`, pero REQ-62 consolidó cupones dentro de `/api/entitlement`.
+- `CONTEXT.md` todavía lista `api/billing-history.js` y `api/coupon.js`, aunque esos archivos fueron eliminados.
+- Algunos documentos de negocio siguen diciendo "checkout pendiente de activar" sin distinguir entre infraestructura implementada y configuración externa pendiente.
+- `api/notify.js` comenta cron horario, mientras `vercel.json` usa cron diario por restricción de Vercel Hobby.
+- `PROGRESS.md` representa solo las fases iniciales y ya no comunica el estado real del producto.
+
+### Objetivo
+
+Que cualquier persona o agente que retome el proyecto lea documentación consistente con el código actual, sin perseguir endpoints inexistentes ni asumir pendientes ya resueltos.
+
+### Alcance
+
+1. **Actualizar mapa de archivos**
+   - `CONTEXT.md` debe listar solo archivos existentes.
+   - Reemplazar `api/billing-history.js` y `api/coupon.js` por las acciones consolidadas de `api/entitlement.js`.
+   - Ajustar el conteo de release gate si el documento menciona valores antiguos.
+
+2. **Actualizar README**
+   - Reemplazar `/api/coupon` por `/api/entitlement` con acciones `generate`/`redeem`.
+   - Documentar que billing history se consulta con `GET /api/entitlement?action=billing-history`.
+   - Aclarar que Stripe checkout está implementado en código pero requiere configuración externa para cobro real.
+
+3. **Actualizar documentos de negocio/estrategia**
+   - Separar "implementado en código" de "activado comercialmente".
+   - Marcar landing/paywall/checkout como infraestructura lista, con validación y configuración comercial pendientes.
+   - Actualizar referencias antiguas a "no existe landing" si ya quedaron superadas.
+
+4. **Actualizar cron y notificaciones**
+   - Alinear `api/notify.js`, `CONTEXT.md` y `vercel.json`.
+   - Documentar explícitamente la limitación actual: cron diario en Hobby; granularidad horaria requiere plan Pro o scheduler externo.
+
+5. **Agregar guardrail liviano**
+   - Extender `scripts/audit-html.mjs` o crear un script pequeño de docs audit que falle si reaparecen referencias a endpoints eliminados (`/api/coupon`, `/api/billing-history`) o afirmaciones obvias ya falsas.
+   - Integrarlo en `scripts/release-gate.mjs` si el costo es bajo.
+
+### Fuera de alcance
+
+- No reescribir todos los documentos estratégicos desde cero.
+- No cambiar código funcional salvo que la auditoría detecte una contradicción real.
+- No borrar historia útil de decisiones; si una sección antigua se conserva, marcarla como histórica.
+
+### Criterios de aceptación
+
+- `rg -n "api/coupon|api/billing-history|billing-history.js|coupon.js" README.md CONTEXT.md NEGOCIO.md estrategia REQUIREMENTS.md` no devuelve referencias vigentes incorrectas; solo referencias históricas explícitamente marcadas como "antes" o REQ-62.
+- `README.md` y `CONTEXT.md` describen correctamente `api/entitlement.js`.
+- Los docs distinguen checkout implementado vs Stripe configurado/activado.
+- La documentación del cron coincide con `vercel.json`.
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-72 - Modularización incremental de index.html sin cambio funcional
+
+**Estado: pendiente.**
+
+### Origen
+
+Punto 9 del status general: `index.html` concentra la mayoría de la app (~9k líneas). Está validado y funciona, pero el tamaño aumenta el riesgo de regresiones, dificulta revisión y vuelve lentas las futuras mejoras.
+
+### Objetivo
+
+Reducir la complejidad operativa de `index.html` mediante módulos incrementales, sin cambiar comportamiento visible ni introducir framework/build step.
+
+La regla de oro es: **extraer primero dominio puro y servicios aislados; dejar el render acoplado al DOM para fases posteriores.**
+
+### Alcance fase 1
+
+1. **Inventario de responsabilidades**
+   - Crear un mapa breve de secciones actuales de `index.html`: config, estado, planes, nutrición, entrenamiento, coach, perfil, admin, sync, analytics, tour.
+   - Identificar funciones puras ya testeables y funciones DOM-heavy que no deben tocarse todavía.
+
+2. **Extraer módulo de nutrición/coach puro**
+   - Candidatos: normalización de restricciones, matcher por palabra, validación de platos generados, cálculo de deltas de macros, learned patterns.
+   - El módulo debe funcionar en navegador y Node sin dependencias externas.
+   - Exportar vía ESM y exponer fallback global solo si la carga desde `index.html` lo necesita.
+
+3. **Extraer módulo de sync puro**
+   - Candidatos: forma de entradas de cola, clasificación de estados, merge policy básica, sanitización de payload.
+   - Mantener acceso a `localStorage` en `index.html` salvo que se cree un wrapper muy pequeño.
+
+4. **Actualizar pruebas**
+   - Migrar validadores basados en parsing de `index.html` hacia imports directos cuando aplique.
+   - Conservar los validadores de wiring para asegurar que `index.html` usa el módulo extraído.
+
+5. **Mantener compatibilidad**
+   - Sin build step.
+   - Sin framework.
+   - Sin nuevas dependencias runtime.
+   - Sin cambiar nombres públicos usados por HTML inline antes de adaptar los handlers.
+
+### Fuera de alcance
+
+- No convertir toda la app a SPA con bundler.
+- No reescribir la UI.
+- No mover todo el coach, entrenamiento o perfil en un solo commit.
+- No cambiar contrato de Supabase ni API.
+
+### Riesgos
+
+- Los handlers inline (`onclick`) dependen de funciones globales.
+- El service worker puede cachear versiones mezcladas si no se sube `CACHE`.
+- Los validadores actuales parsean `index.html`; mover funciones exige actualizarlos.
+
+### Criterios de aceptación
+
+- `index.html` reduce al menos 500 líneas o se extrae un bloque funcional claro con pruebas directas.
+- La app sigue cargando sin build desde `python3 -m http.server 8923`.
+- `node scripts/release-gate.mjs` pasa.
+- Los módulos extraídos tienen tests o validadores dedicados.
+- No cambia ninguna tabla Supabase ni endpoint público.
+- Si se toca UI, se verifica manualmente Home, Nutrición, Entreno y Perfil en local.
+
+## REQ-73 - Resolución explícita de conflictos de sincronización offline
+
+**Estado: implementado.**
+
+### Origen
+
+Punto 10 del status general: la cola offline ya evita perder cambios locales, pero cuando dos dispositivos editan el mismo día o peso, el último `upsert` gana. Eso es aceptable como MVP técnico, pero no es resolución de conflictos real.
+
+### Objetivo
+
+Detectar y resolver conflictos entre estado local pendiente y estado remoto modificado por otro dispositivo, sin sobrescribir silenciosamente actividad relevante del usuario.
+
+### Alcance
+
+1. **Versionado mínimo de registros sincronizados**
+   - Agregar a payloads locales metadata `updatedAt`, `clientId` y `baseRemoteUpdatedAt` cuando se encola una mutación.
+   - Reutilizar columnas existentes si `updated_at` ya existe; si falta en alguna tabla, proponer migración idempotente.
+
+2. **Detección de conflicto**
+   - Antes de drenar una mutación pendiente, leer el registro remoto actual.
+   - Si el remoto cambió después de `baseRemoteUpdatedAt` y no fue el mismo `clientId`, marcar conflicto en la cola en vez de hacer `upsert` ciego.
+   - Mantener last-write-wins solo para cambios claramente no conflictivos.
+
+3. **Merge automático seguro**
+   - Para `day_log.state.meals`: combinar checks `done` por comida cuando no editan el mismo slot con valores distintos.
+   - Para `extras`: preservar extras con IDs distintos; si dos extras tienen el mismo ID y distinto contenido, marcar conflicto.
+   - Para `workoutExecution`: no mergear series contradictorias; marcar conflicto si ambos dispositivos cambiaron la ejecución.
+   - Para `weight_log`: si peso/grasa difieren para la misma semana, marcar conflicto.
+
+4. **UI de resolución**
+   - Badge de sync debe mostrar estado "conflicto" o "revisar".
+   - Modal simple: "Conservar este dispositivo", "Usar versión guardada" o "Combinar seguro" cuando exista merge automático.
+   - Mostrar fecha/dispositivo de cada versión cuando esté disponible.
+
+5. **Auditoría local**
+   - Registrar resolución en `day_log.state.syncResolutionLog` o metadata local equivalente.
+   - No enviar datos de salud a analytics.
+
+### Implementado
+
+**Motor puro (`sync-conflicts.js`).** Nuevo módulo sin DOM ni dependencias que expone `normalizeDayStateForSync`, `remoteChangedSince`, `mergeDayLogStates` y `mergeWeightPayload`. La app lo carga antes del cliente Supabase y el service worker lo incluye en el shell (`fitbud-pwa-v49`). El módulo se valida en Node con `scripts/test-sync-conflicts.mjs`.
+
+**Metadata local de sync.** La cola `fitbud_syncq_v1` conserva `clientId`, `baseRemoteUpdatedAt` y `basePayload` al encolar. La metadata `fitbud_sync_meta_v1` recuerda la última versión remota vista por usuario, entidad y clave. Los pulls de `day_log`/`weight_log` ahora leen `updated_at` y actualizan esa base; `pullDay`, `pullAllDays` y `pullWeights` no pisan registros con estado `pending`, `failed` o `conflict`.
+
+**Detección antes del upsert.** `drainSyncQueue()` lee la fila remota antes de guardar una mutación pendiente. Si `updated_at` remoto avanzó respecto de `baseRemoteUpdatedAt`, intenta resolver con el motor puro. Si el payload remoto ya coincide con el local, elimina la mutación; si el merge es seguro, guarda el payload combinado; si hay conflicto, marca la entrada como `status:"conflict"` y conserva el remoto dentro de `item.conflict.remotePayload`.
+
+**Merge seguro.** En `day_log.state`, las comidas distintas se combinan por id de slot, los extras se preservan por `_syncId` interno y `syncResolutionLog` se une sin duplicar entradas. Si ambos lados cambiaron `workoutExecution` u otro campo incompatible de forma distinta, queda conflicto. En `weight_log`, peso local y grasa remota pueden combinarse si no cambian el mismo campo; dos valores distintos para `kg` o `bf_pct` generan conflicto.
+
+**UI de resolución.** El badge `#sync-badge` agrega estado `conflict` con texto "Revisar". El modal `openSyncConflicts()` muestra cada conflicto y permite: "Conservar este dispositivo", "Usar versión guardada" o "Combinar seguro" cuando exista payload seguro. Elegir la versión local reintenta como mutación pendiente con la nueva base remota; elegir la remota aplica el payload remoto y elimina la mutación. Los conflictos sobreviven reload porque quedan en localStorage y están aislados por `uid`.
+
+**Contratos y PWA.** `domain-contracts.js` acepta `status:"conflict"` y valida metadata opcional de cola. `service-worker.js` sube a `fitbud-pwa-v49` e incluye `sync-conflicts.js`.
+
+### Fuera de alcance
+
+- No construir CRDT completo.
+- No resolver edición colaborativa en tiempo real.
+- No sincronizar conversaciones del coach si siguen siendo localStorage por ciclo.
+- No cambiar modelo de autenticación.
+
+### Criterios de aceptación
+
+- Dos dispositivos editando comidas distintas del mismo día pueden combinarse sin pérdida.
+- Dos dispositivos editando el mismo peso semanal con valores distintos generan conflicto visible.
+- Una ejecución de entrenamiento modificada en dos dispositivos no se sobrescribe silenciosamente.
+- El badge de sync diferencia pendiente, sincronizado, error y conflicto.
+- Cerrar sesión no transfiere conflictos a otro usuario.
+- Los conflictos sobreviven reload hasta que el usuario elige resolución.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Test unitario o script Node para el merge de `day_log`.
+- Test unitario o script Node para conflicto de `weight_log`.
+- Prueba manual con dos navegadores/perfiles locales simulando cambios offline y reconexión.
+
+### Verificación ejecutada
+
+```
+node --check sync-conflicts.js
+node --check domain-contracts.js
+node scripts/test-sync-conflicts.mjs
+node scripts/validate-contracts.mjs
+node scripts/audit-html.mjs
+```

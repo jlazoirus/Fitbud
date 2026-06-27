@@ -673,6 +673,7 @@
   .sync-badge.pending{background:rgba(180,140,30,.14);border-color:rgba(180,140,30,.35);color:#e8c95a}
   .sync-badge.synced{background:rgba(60,180,80,.14);border-color:rgba(60,180,80,.35);color:#4ade80}
   .sync-badge.attention{background:rgba(220,110,30,.14);border-color:rgba(220,110,30,.35);color:#f0a050;pointer-events:auto;cursor:pointer}
+  .sync-badge.conflict{background:rgba(210,70,110,.16);border-color:rgba(210,70,110,.42);color:#fb7185;pointer-events:auto;cursor:pointer}
   /* Perfil: navegación local y guardado flotante (REQ-54) */
   .pf-nav{display:flex;overflow-x:auto;gap:6px;padding:0 0 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .pf-nav::-webkit-scrollbar{display:none}
@@ -691,6 +692,8 @@
 <script src="training-plan.js"></script>
 <!-- Contratos de dominio: validadores sin DOM para perfil, macros, día, entitlement, sync y coach. -->
 <script src="domain-contracts.js"></script>
+<!-- Motor puro de resolución de conflictos offline. -->
+<script src="sync-conflicts.js"></script>
 <!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -1607,19 +1610,75 @@ if(!S.days)S.days={}; if(!S.weights)S.weights={}; if(!S.settings)S.settings={};
    drainSyncQueue() la procesa al recuperar red o al iniciar sesión.
    ================================================================ */
 const SYNC_QUEUE_KEY="fitbud_syncq_v1";
+const SYNC_META_KEY="fitbud_sync_meta_v1";
+const SYNC_CLIENT_KEY="fitbud_sync_client_v1";
+const SYNC_ENGINE=window.FITBUD_SYNC_CONFLICTS||{};
 function _getSyncQ(){try{return JSON.parse(localStorage.getItem(SYNC_QUEUE_KEY)||"[]");}catch(e){return[];}}
 function _setSyncQ(q){try{localStorage.setItem(SYNC_QUEUE_KEY,JSON.stringify(q));}catch(e){}}
+function _getSyncMeta(){try{return JSON.parse(localStorage.getItem(SYNC_META_KEY)||"{}");}catch(e){return{};}}
+function _setSyncMeta(m){try{localStorage.setItem(SYNC_META_KEY,JSON.stringify(m));}catch(e){}}
+function syncClientId(){
+  try{
+    let id=localStorage.getItem(SYNC_CLIENT_KEY);
+    if(!id){id="c_"+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem(SYNC_CLIENT_KEY,id);}
+    return id;
+  }catch(e){return"c_session";}
+}
+function _syncMetaKey(entity,entityKey,userId){return[String(userId||uid()||""),entity,entityKey].join("|");}
+function _syncBaseFor(entity,entityKey){
+  const meta=_getSyncMeta()[_syncMetaKey(entity,entityKey)];
+  return meta&&typeof meta==="object"?meta:{updatedAt:null,payload:null};
+}
+function _rememberRemoteVersion(entity,entityKey,updatedAt,payload){
+  if(!uid())return;
+  const meta=_getSyncMeta();
+  meta[_syncMetaKey(entity,entityKey)]={updatedAt:updatedAt||null,payload:payload||null,seenAt:new Date().toISOString()};
+  _setSyncMeta(meta);
+}
+function _syncExtraId(index,item){
+  const raw=JSON.stringify({i:index,name:item&&item.name,kcal:item&&item.kcal,p:item&&item.p,c:item&&item.c,f:item&&item.f,done:item&&item.done});
+  let h=0;for(let i=0;i<raw.length;i++)h=((h<<5)-h+raw.charCodeAt(i))|0;
+  return "x_"+index+"_"+Math.abs(h).toString(36);
+}
+function prepareDayStateForSync(state){
+  if(!SYNC_ENGINE.normalizeDayStateForSync)return state;
+  const normalized=SYNC_ENGINE.normalizeDayStateForSync(state||{},(index,item)=>_syncExtraId(index,item));
+  Object.keys(state||{}).forEach(k=>delete state[k]);
+  Object.assign(state,normalized);
+  return state;
+}
+function appendSyncResolutionLogToPayload(payload,kind,details){
+  if(!payload||payload.entity==="weight_log")return payload;
+  const p={...payload,state:{...((payload&&payload.state)||{})}};
+  const log=Array.isArray(p.state.syncResolutionLog)?p.state.syncResolutionLog.slice(-20):[];
+  log.push(Object.assign({type:kind,at:new Date().toISOString(),clientId:syncClientId()},details||{}));
+  p.state.syncResolutionLog=log;
+  return p;
+}
 // Agrega o actualiza una mutación pendiente en la cola (deduplica por entidad+clave).
 function enqueueMutation(entity,entityKey,payload){
   if(!uid())return;
   const q=_getSyncQ();
   const i=q.findIndex(x=>x.uid===uid()&&x.entity===entity&&x.entityKey===entityKey&&x.status==="pending");
-  const newEntry={id:Math.random().toString(36).slice(2),uid:uid(),entity,entityKey,payload,ts:new Date().toISOString(),retries:0,status:"pending"};
+  const base=_syncBaseFor(entity,entityKey);
+  const newEntry={
+    id:Math.random().toString(36).slice(2),
+    uid:uid(),
+    entity,
+    entityKey,
+    payload,
+    ts:new Date().toISOString(),
+    retries:0,
+    status:"pending",
+    clientId:syncClientId(),
+    baseRemoteUpdatedAt:base.updatedAt||null,
+    basePayload:base.payload||null,
+  };
   if(DOMAIN_CONTRACTS.validateSyncEntry){
     const v=DOMAIN_CONTRACTS.validateSyncEntry(newEntry);
     if(!v.ok)console.warn("[domain] syncEntry inválido:",v.errors);
   }
-  if(i!==-1){q[i].payload=payload;q[i].ts=newEntry.ts;}
+  if(i!==-1){q[i].payload=payload;q[i].ts=newEntry.ts;q[i].clientId=q[i].clientId||newEntry.clientId;}
   else q.push(newEntry);
   _setSyncQ(q);_updateSyncBadge();
 }
@@ -1633,19 +1692,48 @@ function clearSyncQueueForUser(userId){
   _setSyncQ(_getSyncQ().filter(x=>x.uid!==userId));
   _updateSyncBadge();
 }
-// True si el día tiene mutaciones de day_log en estado pendiente.
+// True si el día tiene mutaciones de day_log pendientes, fallidas o en conflicto.
 function _hasPendingDay(ds){
-  return _getSyncQ().some(x=>x.uid===uid()&&x.entity==="day_log"&&x.entityKey===ds&&x.status==="pending");
+  return _getSyncQ().some(x=>x.uid===uid()&&x.entity==="day_log"&&x.entityKey===ds&&["pending","failed","conflict"].includes(x.status));
+}
+function _hasPendingWeight(week){
+  return _getSyncQ().some(x=>x.uid===uid()&&x.entity==="weight_log"&&x.entityKey==="w"+week&&["pending","failed","conflict"].includes(x.status));
+}
+function _markSyncConflict(item,remotePayload,conflicts){
+  const q=_getSyncQ();const i=q.findIndex(x=>x.id===item.id);
+  if(i===-1)return;
+  q[i].status="conflict";
+  q[i].retries=0;
+  q[i].conflict={
+    detectedAt:new Date().toISOString(),
+    remoteUpdatedAt:remotePayload&&remotePayload.updated_at||null,
+    remotePayload,
+    conflicts:Array.isArray(conflicts)?conflicts.map(String):["cambio remoto"],
+  };
+  _setSyncQ(q);_updateSyncBadge();
+}
+function _resetConflictAsPending(id,payload,basePayload,baseRemoteUpdatedAt){
+  const q=_getSyncQ();const i=q.findIndex(x=>x.id===id&&x.uid===uid());
+  if(i===-1)return false;
+  q[i].status="pending";q[i].retries=0;q[i].payload=payload||q[i].payload;
+  q[i].basePayload=basePayload||q[i].basePayload||null;
+  q[i].baseRemoteUpdatedAt=baseRemoteUpdatedAt||q[i].baseRemoteUpdatedAt||null;
+  q[i].ts=new Date().toISOString();
+  _setSyncQ(q);_updateSyncBadge();return true;
 }
 // Actualiza el badge de sincronización en la UI (sin reescribir el DOM de tabs/app).
 function _updateSyncBadge(){
   const el=document.getElementById("sync-badge");if(!el)return;
   if(!session){el.hidden=true;return;}
   const q=_getSyncQ().filter(x=>x.uid===uid());
+  const conflicts=q.filter(x=>x.status==="conflict").length;
   const pending=q.filter(x=>x.status==="pending").length;
   const failed=q.filter(x=>x.status==="failed").length;
   if(!navigator.onLine){
     el.textContent="Sin red";el.className="sync-badge offline";el.hidden=false;el.onclick=null;
+  }else if(conflicts>0){
+    el.textContent="Revisar";el.className="sync-badge conflict";el.hidden=false;
+    el.onclick=()=>openSyncConflicts();
   }else if(failed>0){
     el.textContent="⚠ Atención";el.className="sync-badge attention";el.hidden=false;
     el.onclick=()=>toast("Cambios sin sincronizar ("+failed+"): vuelve a conectarte para reintentarlo.");
@@ -1655,6 +1743,51 @@ function _updateSyncBadge(){
     el.textContent="✓";el.className="sync-badge synced";el.hidden=false;el.onclick=null;
     setTimeout(()=>{if(el&&el.className.includes("synced"))el.hidden=true;},2000);
   }
+}
+async function _fetchRemoteSyncPayload(item){
+  if(item.entity==="day_log"){
+    let r=await supa.from("day_log").select("state,plan_version_id,updated_at").eq("user_id",uid()).eq("log_date",item.entityKey).maybeSingle();
+    if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("state,updated_at").eq("user_id",uid()).eq("log_date",item.entityKey).maybeSingle();
+    if(r.error)throw r.error;
+    if(!r.data)return null;
+    return {user_id:uid(),log_date:item.entityKey,state:r.data.state||{},plan_version_id:r.data.plan_version_id||null,updated_at:r.data.updated_at||null};
+  }
+  if(item.entity==="weight_log"){
+    const week=Number(String(item.entityKey).replace(/^w/,""));
+    let r=await supa.from("weight_log").select("week,kg,bf_pct,updated_at,cycle_start").eq("user_id",uid()).eq("cycle_start",START).eq("week",week).maybeSingle();
+    if(r.error&&cycleNumber()===1)r=await supa.from("weight_log").select("week,kg,bf_pct,updated_at").eq("user_id",uid()).eq("week",week).maybeSingle();
+    if(r.error)throw r.error;
+    if(!r.data)return null;
+    return {user_id:uid(),cycle_start:r.data.cycle_start||START,week:r.data.week,kg:r.data.kg,bf_pct:r.data.bf_pct,updated_at:r.data.updated_at||null};
+  }
+  return null;
+}
+function _payloadSameEnough(entity,a,b){
+  if(!a||!b||!SYNC_ENGINE.same)return false;
+  if(entity==="day_log")return SYNC_ENGINE.same((a.state||{}),(b.state||{}));
+  if(entity==="weight_log")return SYNC_ENGINE.same({kg:a.kg==null?null:Number(a.kg),bf_pct:a.bf_pct==null?null:Number(a.bf_pct)},{kg:b.kg==null?null:Number(b.kg),bf_pct:b.bf_pct==null?null:Number(b.bf_pct)});
+  return false;
+}
+function _resolveQueuedConflictPayload(item,remotePayload){
+  if(!remotePayload||!SYNC_ENGINE.remoteChangedSince||!SYNC_ENGINE.remoteChangedSince(item.baseRemoteUpdatedAt,remotePayload.updated_at))return {ok:true,payload:item.payload,remotePayload};
+  if(_payloadSameEnough(item.entity,item.payload,remotePayload))return {ok:true,payload:item.payload,remotePayload,dequeueOnly:true};
+  if(item.entity==="day_log"&&SYNC_ENGINE.mergeDayLogStates){
+    const merged=SYNC_ENGINE.mergeDayLogStates(item.basePayload&&item.basePayload.state,item.payload&&item.payload.state,remotePayload.state);
+    if(merged.ok){
+      const payload={...item.payload,state:merged.merged,updated_at:new Date().toISOString()};
+      return {ok:true,payload:appendSyncResolutionLogToPayload(payload,"auto_merge",{remoteUpdatedAt:remotePayload.updated_at}),remotePayload};
+    }
+    return {ok:false,remotePayload,conflicts:merged.conflicts};
+  }
+  if(item.entity==="weight_log"&&SYNC_ENGINE.mergeWeightPayload){
+    const merged=SYNC_ENGINE.mergeWeightPayload(item.basePayload,item.payload,remotePayload);
+    if(merged.ok){
+      const payload={...item.payload,...merged.merged,updated_at:new Date().toISOString()};
+      return {ok:true,payload,remotePayload};
+    }
+    return {ok:false,remotePayload,conflicts:merged.conflicts};
+  }
+  return {ok:false,remotePayload,conflicts:["cambio remoto"]};
 }
 // Procesa la cola: reintenta cada mutación pendiente en orden. Máximo 3 intentos por ítem.
 let _drainBusy=false;
@@ -1667,20 +1800,33 @@ async function drainSyncQueue(){
     for(const item of pending){
       try{
         if(!session||!session.access_token){await refreshAuth();if(!session)break;}
+        const remotePayload=await _fetchRemoteSyncPayload(item);
+        const resolved=_resolveQueuedConflictPayload(item,remotePayload);
+        if(!resolved.ok){_markSyncConflict(item,remotePayload,resolved.conflicts);continue;}
+        if(resolved.dequeueOnly){
+          _rememberRemoteVersion(item.entity,item.entityKey,remotePayload&&remotePayload.updated_at,item.payload);
+          _dequeueMutation(item.entity,item.entityKey);
+          continue;
+        }
+        const payload=resolved.payload||item.payload;
         if(item.entity==="day_log"){
-          let r=await supa.from("day_log").upsert(item.payload,{onConflict:"user_id,log_date"});
+          let r=await supa.from("day_log").upsert(payload,{onConflict:"user_id,log_date"});
           if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i)){
-            const{plan_version_id:_,...compat}=item.payload;
+            const{plan_version_id:_,...compat}=payload;
             r=await supa.from("day_log").upsert(compat,{onConflict:"user_id,log_date"});
           }
           if(r.error)throw r.error;
+          if(payload&&payload.state)S.days[item.entityKey]=payload.state;
         }else if(item.entity==="weight_log"){
-          const p=item.payload;
+          const p=payload;
           const r=await supa.from("weight_log").upsert(p,{onConflict:"user_id,cycle_start,week"});
           if(r.error&&cycleNumber()===1){
             await supa.from("weight_log").upsert({user_id:p.user_id,week:p.week,kg:p.kg,bf_pct:p.bf_pct,updated_at:p.updated_at},{onConflict:"user_id,week"});
           }else if(r.error)throw r.error;
+          S.weights[p.week]={kg:Number(p.kg),bf:(p.bf_pct==null?null:Number(p.bf_pct))};
         }
+        _rememberRemoteVersion(item.entity,item.entityKey,payload.updated_at||new Date().toISOString(),payload);
+        save();
         _dequeueMutation(item.entity,item.entityKey);
       }catch(e){
         const q2=_getSyncQ();const i2=q2.findIndex(x=>x.id===item.id);
@@ -1688,6 +1834,91 @@ async function drainSyncQueue(){
       }
     }
   }finally{_drainBusy=false;_updateSyncBadge();}
+}
+
+function _syncConflictLabel(item){
+  if(item.entity==="day_log")return "Día "+prettyDate(item.entityKey);
+  if(item.entity==="weight_log")return "Peso · semana "+String(item.entityKey).replace(/^w/,"");
+  return "Cambio pendiente";
+}
+function _syncConflictDetail(item){
+  const fields=(item.conflict&&Array.isArray(item.conflict.conflicts))?item.conflict.conflicts:[];
+  if(item.entity==="day_log"){
+    if(fields.some(f=>String(f).startsWith("meals.")))return "Hay cambios distintos en comidas del mismo día.";
+    if(fields.some(f=>String(f).startsWith("extras.")))return "Hay cambios distintos en comidas extra.";
+    if(fields.some(f=>String(f).includes("workout")))return "La sesión fue modificada en dos lugares.";
+    return "El día fue actualizado en otro dispositivo.";
+  }
+  if(item.entity==="weight_log")return "El peso o porcentaje de grasa cambió en otro dispositivo.";
+  return "Hay cambios guardados en otro dispositivo.";
+}
+function openSyncConflicts(){
+  const items=_getSyncQ().filter(x=>x.uid===uid()&&x.status==="conflict");
+  if(!items.length){toast("No hay conflictos pendientes");_updateSyncBadge();return;}
+  const rows=items.map(item=>{
+    const hasMerge=!!(item.conflict&&item.conflict.autoMergedPayload);
+    return `<div class="dash" style="margin-bottom:10px">
+      <b>${esc(_syncConflictLabel(item))}</b>
+      <p class="muted small" style="margin:6px 0 10px">${esc(_syncConflictDetail(item))}</p>
+      <div class="row wrap" style="gap:8px">
+        <button class="btn btn-sm" onclick="resolveSyncConflict('${esc(item.id)}','local')">Conservar este dispositivo</button>
+        <button class="btn btn-sm" onclick="resolveSyncConflict('${esc(item.id)}','remote')">Usar versión guardada</button>
+        ${hasMerge?`<button class="btn btn-sm btn-accent" onclick="resolveSyncConflict('${esc(item.id)}','merge')">Combinar seguro</button>`:""}
+      </div>
+    </div>`;
+  }).join("");
+  modal(`<h3>Revisar sincronización</h3>
+    <p class="muted small">Encontramos cambios hechos en otro dispositivo antes de guardar lo pendiente de este. Elige qué versión conservar.</p>
+    ${rows}
+    <button class="btn" style="width:100%;margin-top:4px" onclick="closeModal()">Cerrar</button>`);
+}
+function _applyRemoteSyncPayload(item,remotePayload){
+  if(!remotePayload)return;
+  if(item.entity==="day_log"){
+    const state={...(remotePayload.state||{})};
+    prepareDayStateForSync(state);
+    S.days[item.entityKey]=state;
+    _rememberRemoteVersion("day_log",item.entityKey,remotePayload.updated_at,remotePayload);
+  }else if(item.entity==="weight_log"){
+    const week=Number(String(item.entityKey).replace(/^w/,""));
+    if(remotePayload.kg!=null)S.weights[week]={kg:Number(remotePayload.kg),bf:(remotePayload.bf_pct==null?null:Number(remotePayload.bf_pct))};
+    _rememberRemoteVersion("weight_log",item.entityKey,remotePayload.updated_at,remotePayload);
+  }
+  save();
+}
+function _refreshAfterSyncResolution(item){
+  if(item.entity==="day_log"&&(view==="hoy"||view==="nutricion"||view==="entreno")&&current===item.entityKey)render();
+  else if(item.entity==="weight_log"&&view==="progreso")renderProgress();
+}
+function resolveSyncConflict(id,action){
+  const item=_getSyncQ().find(x=>x.id===id&&x.uid===uid()&&x.status==="conflict");
+  if(!item){toast("Ese conflicto ya fue resuelto");openSyncConflicts();return;}
+  const remote=item.conflict&&item.conflict.remotePayload;
+  if(action==="remote"){
+    _applyRemoteSyncPayload(item,remote);
+    _dequeueMutation(item.entity,item.entityKey);
+    closeModal();_refreshAfterSyncResolution(item);toast("Versión guardada aplicada");
+    return;
+  }
+  if(action==="merge"&&item.conflict&&item.conflict.autoMergedPayload){
+    const payload=item.conflict.autoMergedPayload;
+    _resetConflictAsPending(item.id,payload,remote,item.conflict.remoteUpdatedAt);
+    closeModal();toast("Combinación lista para guardar");drainSyncQueue();return;
+  }
+  if(action==="local"){
+    let payload={...item.payload,updated_at:new Date().toISOString()};
+    if(item.entity==="day_log"){
+      payload=appendSyncResolutionLogToPayload(payload,"manual_local",{remoteUpdatedAt:item.conflict&&item.conflict.remoteUpdatedAt});
+      if(payload.state)S.days[item.entityKey]=payload.state;
+    }else if(item.entity==="weight_log"){
+      const week=Number(String(item.entityKey).replace(/^w/,""));
+      if(payload.kg!=null)S.weights[week]={kg:Number(payload.kg),bf:(payload.bf_pct==null?null:Number(payload.bf_pct))};
+    }
+    save();
+    _resetConflictAsPending(item.id,payload,remote,item.conflict&&item.conflict.remoteUpdatedAt);
+    closeModal();_refreshAfterSyncResolution(item);toast("Cambio listo para guardar");drainSyncQueue();return;
+  }
+  toast("Elige una opción válida");
 }
 /* --- entitlement (REQ-25) ------------------------------------------------- */
 let entitlement=null;        // {plan_id,status,starts_at,expires_at,origin} o null
@@ -7966,6 +8197,7 @@ async function backfillDayVersions(){
 async function pushDay(ds){
   if(!supa||!ds||!uid())return;
   const state={...(S.days[ds]||{})};
+  prepareDayStateForSync(state);
   const planVersionId=state.planVersionId||resolvePlanVersionIdForDate(ds);
   if(planVersionId)state.planVersionId=planVersionId;
   const payload={user_id:uid(),log_date:ds,state,plan_version_id:planVersionId||null,updated_at:new Date().toISOString()};
@@ -7976,6 +8208,8 @@ async function pushDay(ds){
       const{plan_version_id:_,...compat}=payload;
       await supa.from("day_log").upsert(compat,{onConflict:"user_id,log_date"});
     }else if(result.error)throw result.error;
+    S.days[ds]=state;save();
+    _rememberRemoteVersion("day_log",ds,payload.updated_at,payload);
     _dequeueMutation("day_log",ds);
   }catch(e){enqueueMutation("day_log",ds,payload);}
 }
@@ -7985,13 +8219,15 @@ async function pullDay(ds){
   if(!supa||!ds||!uid())return false;
   if(_hasPendingDay(ds))return true; // estado local autoridad mientras pendiente
   try{
-    let r=await supa.from("day_log").select("state,plan_version_id").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
-    if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("state").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
+    let r=await supa.from("day_log").select("state,plan_version_id,updated_at").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
+    if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("state,updated_at").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
     if(!r.error&&r.data&&r.data.state&&typeof r.data.state==="object"){
       const state={...r.data.state};
+      prepareDayStateForSync(state);
       const planVersionId=r.data.plan_version_id||state.planVersionId||resolvePlanVersionIdForDate(ds)||null;
       if(planVersionId&&!state.planVersionId)state.planVersionId=planVersionId;
       S.days[ds]=state;save();
+      _rememberRemoteVersion("day_log",ds,r.data.updated_at,{user_id:uid(),log_date:ds,state,plan_version_id:planVersionId,updated_at:r.data.updated_at});
       if(!r.data.plan_version_id&&planVersionId)backfillDayVersions();
       return true;
     }
@@ -8003,16 +8239,18 @@ async function pullDay(ds){
 async function pullAllDays(){
   if(!supa||!uid())return;
   try{
-    let r=await supa.from("day_log").select("log_date,state,plan_version_id").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
-    if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("log_date,state").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
+    let r=await supa.from("day_log").select("log_date,state,plan_version_id,updated_at").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
+    if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("log_date,state,updated_at").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
     if(!r.error&&Array.isArray(r.data)){
       r.data.forEach(row=>{
         if(_hasPendingDay(row.log_date))return; // preservar cambios offline pendientes
         if(row.state&&typeof row.state==="object"){
           const state={...row.state};
+          prepareDayStateForSync(state);
           const planVersionId=row.plan_version_id||state.planVersionId||resolvePlanVersionIdForDate(row.log_date)||null;
           if(planVersionId&&!state.planVersionId)state.planVersionId=planVersionId;
           S.days[row.log_date]=state;
+          _rememberRemoteVersion("day_log",row.log_date,row.updated_at,{user_id:uid(),log_date:row.log_date,state,plan_version_id:planVersionId,updated_at:row.updated_at});
         }
       });
       save();
@@ -8023,6 +8261,7 @@ async function pullAllDays(){
 // Guarda local + sube a la DB (usar tras cualquier cambio del día).
 function commitDay(ds){
   const st=dayState(ds);
+  prepareDayStateForSync(st);
   const planVersionId=st.planVersionId||resolvePlanVersionIdForDate(ds);
   if(planVersionId)st.planVersionId=planVersionId;
   if(DOMAIN_CONTRACTS.validateDayLogState){
@@ -8050,15 +8289,27 @@ async function pushWeight(week,kg,bf){
       if(kg==null)await supa.from("weight_log").delete().eq("user_id",uid()).eq("week",week);
       else await supa.from("weight_log").upsert({user_id:uid(),week,kg,bf_pct:(bf==null?null:bf),updated_at:payload.updated_at},{onConflict:"user_id,week"});
     }else if(result.error)throw result.error;
+    if(kg!=null)_rememberRemoteVersion("weight_log","w"+week,payload.updated_at,payload);
     _dequeueMutation("weight_log","w"+week);
   }catch(e){if(kg!=null)enqueueMutation("weight_log","w"+week,payload);}
 }
 async function pullWeights(){
   if(!supa||!uid())return false;
   try{
-    let r=await supa.from("weight_log").select("week,kg,bf_pct").eq("user_id",uid()).eq("cycle_start",START);
-    if(r.error&&cycleNumber()===1)r=await supa.from("weight_log").select("week,kg,bf_pct").eq("user_id",uid());
-    if(!r.error&&Array.isArray(r.data)){const w={};r.data.forEach(x=>{w[x.week]={kg:Number(x.kg),bf:(x.bf_pct==null?null:Number(x.bf_pct))};});S.weights=w;save();return true;}
+    let r=await supa.from("weight_log").select("week,kg,bf_pct,updated_at,cycle_start").eq("user_id",uid()).eq("cycle_start",START);
+    if(r.error&&cycleNumber()===1)r=await supa.from("weight_log").select("week,kg,bf_pct,updated_at").eq("user_id",uid());
+    if(!r.error&&Array.isArray(r.data)){
+      const w={...(S.weights||{})};
+      const remoteWeeks=new Set();
+      r.data.forEach(x=>{
+        remoteWeeks.add(String(x.week));
+        if(_hasPendingWeight(x.week))return;
+        w[x.week]={kg:Number(x.kg),bf:(x.bf_pct==null?null:Number(x.bf_pct))};
+        _rememberRemoteVersion("weight_log","w"+x.week,x.updated_at,{user_id:uid(),cycle_start:x.cycle_start||START,week:x.week,kg:x.kg,bf_pct:x.bf_pct,updated_at:x.updated_at});
+      });
+      Object.keys(w).forEach(week=>{if(!remoteWeeks.has(String(week))&&!_hasPendingWeight(week))delete w[week];});
+      S.weights=w;save();return true;
+    }
   }catch(e){}
   return false;
 }

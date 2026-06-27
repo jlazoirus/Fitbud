@@ -60,7 +60,7 @@ if (modifiedLines.length) {
 
 // ── Sintaxis de módulos JS ────────────────────────────────────────────────────
 console.log("\n[ Sintaxis de módulos JS ]");
-for (const file of ["domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js"]) {
+for (const file of ["domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
   if (existsSync(join(ROOT, file))) {
     run(`node --check ${file}`, `node --check "${join(ROOT, file)}"`);
   }
@@ -77,6 +77,7 @@ run("validate-macro-target-wiring.mjs", "node scripts/validate-macro-target-wiri
 run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
 run("validate-splits.mjs", "node scripts/validate-splits.mjs");
+run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
 
 // ── Validadores de SQL y datos ───────────────────────────────────────────────
 console.log("\n[ SQL y datos ]");

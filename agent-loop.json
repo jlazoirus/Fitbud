@@ -67,10 +67,11 @@
     "allowNewRuntimeDependency": false
   },
   "continuousImprovement": {
-    "auditWhenQueueIsComplete": true,
+    "auditWhenQueueIsComplete": false,
     "includeUnlistedPendingRequirements": true,
     "newRequirementsPerAudit": 1,
-    "requireEvidence": true
+    "requireEvidence": true,
+    "auditOwnedBy": "agent-audit-loop.json"
   },
   "stopConditions": [
     "dirty_worktree",

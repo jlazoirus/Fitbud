@@ -106,6 +106,9 @@ const validEntry={
   ts:"2026-06-16T10:00:00.000Z",
   retries:0,
   status:"pending",
+  clientId:"client-001",
+  baseRemoteUpdatedAt:"2026-06-16T09:55:00.000Z",
+  basePayload:{user_id:"user-uuid-001",log_date:"2026-06-16",state:{}},
 };
 r=validateSyncEntry(validEntry);
 assert.ok(r.ok,"Entrada de cola válida debe pasar: "+r.errors.join(", "));
@@ -124,6 +127,9 @@ assert.ok(!r.ok,"Payload null debe fallar");
 
 r=validateSyncEntry({...validEntry,status:"done"});
 assert.ok(!r.ok,"Status no reconocido debe fallar");
+
+r=validateSyncEntry({...validEntry,status:"conflict",conflict:{conflicts:["meals.almuerzo"]}});
+assert.ok(r.ok,"Estado conflict con metadata debe pasar: "+r.errors.join(", "));
 
 // ── validateCoachRequest ──────────────────────────────────────────────────────
 r=validateCoachRequest({action:"suggest_meal",requestId:"req-abc-001",maxTokens:1024,context:{user_id:"uid"}});

@@ -11,7 +11,7 @@
   const VALID_SPLITS=new Set(["fullbody","upperlower","ppl"]);
   const VALID_ENTITLEMENT_STATUSES=new Set(["active","expired","courtesy","revoked"]);
   const VALID_SYNC_ENTITIES=new Set(["day_log","weight_log"]);
-  const VALID_SYNC_STATUSES=new Set(["pending","failed"]);
+  const VALID_SYNC_STATUSES=new Set(["pending","failed","conflict"]);
   const VALID_COACH_ACTION_TYPES=new Set(["marcar_descanso","registrar_comida","cambiar_plato","adaptar_entreno","registrar_peso"]);
   const VALID_COACH_WORKOUT_REASONS=new Set(["tiempo","casa","equipo","sesion_perdida"]);
   const TIME_RE=/^(?:[01]\d|2[0-3]):[0-5]\d$/;
@@ -100,7 +100,11 @@
     if(!entry.payload||typeof entry.payload!=="object"||Array.isArray(entry.payload))errors.push("payload debe ser un objeto plano.");
     if(!entry.ts||!ISO_RE.test(entry.ts))errors.push("ts debe ser ISO 8601.");
     if(!Number.isInteger(entry.retries)||entry.retries<0)errors.push("retries debe ser entero >= 0.");
-    if(!VALID_SYNC_STATUSES.has(entry.status))errors.push("status debe ser pending o failed.");
+    if(!VALID_SYNC_STATUSES.has(entry.status))errors.push("status debe ser pending, failed o conflict.");
+    if(entry.clientId!==undefined&&typeof entry.clientId!=="string")errors.push("clientId debe ser string cuando existe.");
+    if(entry.baseRemoteUpdatedAt!==undefined&&entry.baseRemoteUpdatedAt!==null&&!ISO_RE.test(entry.baseRemoteUpdatedAt))errors.push("baseRemoteUpdatedAt debe ser ISO 8601 o null.");
+    if(entry.basePayload!==undefined&&entry.basePayload!==null&&(typeof entry.basePayload!=="object"||Array.isArray(entry.basePayload)))errors.push("basePayload debe ser objeto o null.");
+    if(entry.conflict!==undefined&&entry.conflict!==null&&(typeof entry.conflict!=="object"||Array.isArray(entry.conflict)))errors.push("conflict debe ser objeto o null.");
     return ok(errors);
   }
 
