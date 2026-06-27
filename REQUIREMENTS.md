@@ -3993,3 +3993,64 @@ Que cualquier visitante pueda leer el aviso de privacidad (y los términos) **an
 - Servir en local (`python3 -m http.server 8923`), abrir la landing sin sesión y comprobar los enlaces del footer.
 - Pulsar "Crear mi cuenta gratis" y confirmar que la pantalla de registro enlaza privacidad y términos.
 - Abrir cada modal y verificar que cierra con "Entendido" y que no aparece error en consola.
+
+## REQ-75 - Fix: prompt de generateOneDay no alcanzaba metas altas de proteína
+
+### Problema
+
+Con metas de macros de proteína alta (ej. 2300 kcal / 180 g proteína — 31% de kcal de proteína), la IA generaba días muy por debajo de la meta (ej. 1640 kcal, 88 g proteína). `validateGeneratedDay` rechazaba correctamente el resultado, pero el usuario quedaba sin plan.
+
+No es un bug de caché ni de snapshot (a diferencia de REQ-69): el `contextKey` en el sistema de quota ya incluye el target de macros. El problema era puramente de prompt engineering.
+
+### Causa raíz (verificada contra código)
+
+1. **La línea OBLIGATORIO no daba peso igualitario a proteína**: mencionaba "kcal ±10% y proteína ≥X g" como cláusula subordinada. La IA priorizaba calorías sobre proteína.
+2. **Sin instrucciones tácticas para metas altas**: el catálogo es mayormente vegetariano (tofu 16g/100g, legumbres 8-9g/100g). Para 180 g/día la IA necesita combinar múltiples fuentes de proteína por comida y usar porciones generosas, pero nada en el prompt lo instruía.
+3. **Token limit fijo**: 1400 tokens para todas las metas. Un día con stacking de proteína necesita describir más ingredientes por comida.
+
+### Solución
+
+**Archivo: `index.html`, función `generateOneDay` (~línea 7089).**
+
+1. **Detección de meta alta**: calcula `protPct = target.p * 4 / target.kcal * 100`. Si `protPct > 25%`, activa el bloque `highProt`.
+2. **Bloque condicional `highProtLine`** (se inyecta solo cuando aplica):
+   - Piso mínimo de proteína por comida: `≥ Math.round(protPerMeal * 0.7)` g.
+   - Instrucción explícita de combinar 2+ fuentes de proteína por comida.
+   - Lista de los ingredientes más proteicos del catálogo con su rendimiento (g prot/100g).
+   - Permiso explícito de subir gramajes para alcanzar la meta.
+3. **Línea OBLIGATORIO reforzada**: ahora enumera calorías y proteína como dos metas igualmente obligatorias ("AMBAS metas", "TAN importante como las calorías") e instruye a sumar y verificar totales antes de responder.
+4. **Token limit escalado**: 1800 tokens cuando `highProt`, 1400 cuando no. No afecta quota/costos significativamente (es un ~28% de aumento en el techo, no en el uso real).
+
+### Decisión: no agregar platos al seed
+
+Se evaluó agregar variantes de "doble porción de proteína" al seed.sql. Se descartó porque:
+- El prompt ya instruye a ajustar gramajes libremente y crear platos distintos.
+- Agregar platos al seed requiere también recetas (`dish_ingredients`) y afecta a todos los usuarios.
+- La solución de prompt es menos invasiva y más flexible: aplica proporcionalmente según la meta de cada usuario.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | Bloque `highProtLine` condicional + línea OBLIGATORIO reforzada + token limit escalado |
+| `scripts/validate-high-protein-prompt.mjs` | Validador estructural nuevo (7 asserts + 4 casos simulados) |
+| `scripts/release-gate.mjs` | Agrega `validate-high-protein-prompt.mjs` al gate |
+
+### Invariantes que se mantienen
+
+- `validateGeneratedDay` no cambia: sigue validando kcal ±15% y proteína ≥85%.
+- El `contextKey` del sistema de quota sigue incluyendo los targets (cambia cuando cambia la meta).
+- Platos incompatibles siguen filtrados por `coachDishBlockedByProfile` (REQ-61).
+- Restricciones duras (`hardResLine`, dietas, alergias) no se alteran.
+
+### Criterios de aceptación
+
+- Con meta 2300 kcal / 180 g proteína, el prompt generado incluye "META DE PROTEÍNA ALTA", "2+ fuentes de proteína", piso mínimo por comida, y usa 1800 tokens.
+- Con meta 2000 kcal / 100 g proteína (20%), el prompt no incluye el bloque extra y usa 1400 tokens.
+- `node scripts/validate-high-protein-prompt.mjs` pasa (4 casos: 2300/180p, 2000/150p, 2400/200p, 2000/100p).
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Servir en local, configurar perfil con meta 2300 kcal / 180 g proteína, ejecutar "Preparar mi día" y verificar que el día generado pasa validación (sin el error "kcal fuera de ±15%" ni "Proteína por debajo del 85%").
+- Repetir con meta normal (2000 kcal / 100 g proteína) y verificar que sigue funcionando igual.

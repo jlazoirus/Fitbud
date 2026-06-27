@@ -7086,15 +7086,28 @@ async function generateOneDay(ds,coachRequest){
   // Carne/pescado se instruye por prompt (no por término) para no colisionar con substrings como "repollo". REQ-65.
   const dietList=Array.isArray(prefs.diet)?prefs.diet:[];
   const vegLine=dietList.includes("vegano")?`\nPatrón VEGANO: no incluyas carne, aves, pescado, mariscos, lácteos, huevo ni miel; usa solo ingredientes de origen vegetal.`:dietList.includes("vegetariano")?`\nPatrón VEGETARIANO: no incluyas carne, aves, pescado ni mariscos.`:"";
+  const protPct=target.kcal>0?Math.round(target.p*4/target.kcal*100):0;
+  const highProt=protPct>25;
+  const mealCount=day.meals.length||4;
+  const protPerMeal=Math.round(target.p/mealCount);
+  const highProtLine=highProt?`\nMETA DE PROTEÍNA ALTA (${target.p} g = ${protPct}% de kcal). Estrategia OBLIGATORIA:
+- Cada comida debe aportar ≥${Math.round(protPerMeal*0.7)} g de proteína (piso mínimo).
+- Combina 2+ fuentes de proteína por comida (ej. tofu + legumbre, proteína en polvo + yogur griego, pollo + queso).
+- Usa porciones generosas de los ingredientes más proteicos del catálogo: proteína en polvo (80g prot/100g), seitán (24g), soya texturizada (52g seca), tempeh (20g), pechuga de pollo (31g), atún (26g), yogur griego 0% (10g), queso cottage (11g).
+- Puedes subir gramajes (ej. 300g de tofu en vez de 200g, 60g de proteína en polvo en vez de 30g) para alcanzar la meta. NO sacrifiques proteína por variedad.`:"";
   const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
 Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carbohidratos, ${target.f} g grasa.
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
-${cookCtx}${hardResLine}${vegLine}
+${cookCtx}${hardResLine}${vegLine}${highProtLine}
 Referencia de platos compatibles (úsalos como inspiración; ajusta gramajes o crea platos distintos si hace falta para alcanzar la meta): ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}${learnedLine}.
-OBLIGATORIO: el total del día debe ser ${target.kcal} kcal ±10% y proteína ≥${Math.round(target.p*0.85)} g. Cada comida lleva ingredientes reales con gramos; ajusta porciones libremente para cumplir la meta.
+OBLIGATORIO — el día DEBE cumplir AMBAS metas:
+1. Calorías: ${target.kcal} kcal ±10%.
+2. Proteína: ≥${Math.round(target.p*0.85)} g (meta ${target.p} g). Alcanzar la proteína es TAN importante como las calorías.
+Cada comida lleva ingredientes reales con gramos; ajusta porciones libremente para cumplir ambas metas. Suma y verifica los totales antes de responder.
 Responde SOLO JSON válido, sin texto extra:
 {"explicacion":"breve","comidas":[{"slot_id":"desayuno","nombre":"...","ingredientes":[{"nombre":"Avena","gramos":50}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
+  const maxTok=highProt?1800:1400;
   const fallback=JSON.stringify(deterministicDayPayload(ds));
   const quota=coachQuota(
     coachRequest.action,
@@ -7103,7 +7116,7 @@ Responde SOLO JSON válido, sin texto extra:
     fallback,
     dietQuotaValidation(ds)
   );
-  const txt=await callClaude(prompt,1400,quota);
+  const txt=await callClaude(prompt,maxTok,quota);
   const j=parseJSON(txt);
   return {res:validateGeneratedDay(j,day,target),day,target};
 }
