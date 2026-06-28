@@ -74,6 +74,15 @@ function parseRequirements(markdown) {
     const body = markdown.slice(start, end);
     const statusMatch = body.match(/^\*\*Estado:\s*(.+?)\*\*/m);
     const status = statusMatch ? statusMatch[1].trim() : "sin estado";
+    const nonAutomatable = [
+      /no implementable por el agente/i,
+      /requiere accion humana/i,
+      /requiere acción humana/i,
+      /requiere accion manual/i,
+      /requiere acción manual/i,
+      /condicion de parada del agente/i,
+      /condición de parada del agente/i,
+    ].some((pattern) => pattern.test(status) || pattern.test(body));
     result.set(match[1], {
       id: match[1],
       title: match[2].trim(),
@@ -81,6 +90,7 @@ function parseRequirements(markdown) {
       implemented: /\bimplementado\b/i.test(status),
       blocked: /\bbloqueado\b/i.test(status),
       pending: /\bpendiente\b/i.test(status),
+      nonAutomatable,
     });
   });
 
@@ -111,7 +121,21 @@ function selfTest() {
     throw new Error("Requirement queue priority is invalid");
   }
 
+  const manualSample = [
+    "## REQ-49 - Legal",
+    "",
+    "**Estado: pendiente. Requiere accion humana; no implementable por el agente autonomo.**",
+  ].join("\n");
+  const manualReq = parseRequirements(manualSample).get("REQ-49");
+  if (!manualReq || !manualReq.pending || !manualReq.nonAutomatable) {
+    throw new Error(`Manual requirement parse failed: ${JSON.stringify(manualReq)}`);
+  }
+
   return { action: "self_test_passed", parser: true, queue: true };
+}
+
+function canAutoImplement(requirement) {
+  return requirement.pending && !requirement.nonAutomatable;
 }
 
 function selectNext() {
@@ -150,6 +174,9 @@ function selectNext() {
       if (!requirement.pending) {
         return { action: "stop", reason: "unknown_requirement_status", requirement };
       }
+      if (requirement.nonAutomatable) {
+        return { action: "stop", reason: "requirement_requires_manual_action", requirement };
+      }
       return {
         action: "implement",
         requirement,
@@ -167,7 +194,7 @@ function selectNext() {
 
     for (const requirement of discovered) {
       if (requirement.blocked) return { action: "stop", reason: "requirement_blocked", requirement };
-      if (requirement.pending) {
+      if (canAutoImplement(requirement)) {
         return {
           action: "implement",
           requirement,

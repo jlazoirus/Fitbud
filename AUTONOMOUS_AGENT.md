@@ -187,7 +187,7 @@ El selector libera automaticamente el lock cuando el preflight devuelve `stop`. 
 
 Cuando todos los elementos de `queue` esten implementados:
 
-1. Ejecutar primero cualquier REQ pendiente descubierto en `REQUIREMENTS.md` aunque todavia no figure en la cola inicial.
+1. Ejecutar primero cualquier REQ pendiente descubierto en `REQUIREMENTS.md` aunque todavia no figure en la cola inicial, salvo que el propio REQ declare accion humana, accion manual externa o que no es implementable por el agente autonomo.
 2. Si no quedan pendientes, auditar un solo journey: adquisicion, onboarding, Home, nutricion, entrenamiento, progreso, retencion, facturacion, administracion o PWA.
 3. Revisar codigo, pruebas, errores y requerimientos antes de proponer algo.
 4. Si existe una brecha material no duplicada, agregar como maximo un REQ atomico con objetivo, dependencias, alcance, aceptacion y verificacion.
