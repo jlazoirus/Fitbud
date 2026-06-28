@@ -4096,3 +4096,71 @@ El primero es un tapahuecos mínimo (131 kcal, 28g P); el segundo es una bomba d
 
 - Re-ejecutar `seed.sql` en Supabase (o entorno local) y verificar que los 2 platos aparecen en la tabla `dishes`.
 - Servir en local, abrir "Preparar mi día" con meta alta de proteína y verificar que el prompt enviado a la IA incluye los shakes en la lista de referencia.
+
+## REQ-77 - Fix: las metas calculadas en onboarding incumplen "kcal = suma de macros" para usuarios de alto peso en déficit
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **onboarding** (commit previo leído: `bd82606` — REQ-76 shakes de proteína). Se reconstruyó el cálculo de metas de `calculateMacroTargets()` que dispara el paso 1→2 (`applyCalculatedMacros`, `index.html:2771`) y se contrastó contra el criterio de aceptación ya declarado en REQ-09: *"Las calorías coinciden con la suma de macros base"* (`REQUIREMENTS.md:616`). Para personas con peso corporal alto, objetivo déficit y BMR deprimido (estatura baja / edad alta / actividad ligera), la igualdad se rompe.
+
+### Problema
+
+El objetivo de calorías que se guarda y muestra no coincide con la suma calórica de las metas de macros que se guardan junto a él. Reproducción concreta (todos dentro de los rangos que valida `validateOnboardingStep`, `index.html:2752-2758`):
+
+- Mujer 140 kg / 160 cm / 60 años, actividad ligera, objetivo **déficit**:
+  - `calorieTarget = 2230`
+  - macros: **P 280 g · C 50 g · F 112 g** → 280·4 + 50·4 + 112·9 = **2328 kcal**
+  - **Discrepancia: +98 kcal** entre el objetivo de calorías y la suma de sus propios macros.
+
+Como `calorieTarget`, `proteinTarget`, `carbTarget` y `fatTarget` se guardan de forma independiente y ambos afloran por separado en Hoy y Nutrición (`profileMacroTargetsFromPrefs`, `index.html:1367-1371`), el usuario recibe un objetivo internamente contradictorio: el anillo de kcal dice 2230 pero seguir los macros prescritos implica 2328 kcal/día, lo que anula ~100 kcal del déficit pretendido. Casos de control (80 kg/175/30 déficit, 110-120 kg en déficit) sí cuadran, por lo que el bug es silencioso y solo afecta al extremo de peso alto — demografía central de una app centrada en déficit.
+
+### Causa raíz
+
+`calculateMacroTargets()` (`index.html:1345-1361`) deriva los carbohidratos como el residuo calórico pero lo recorta con un piso sin re-balancear las calorías:
+
+```js
+const kcal=Math.round(maintenance*goalFactor/10)*10;     // 1356
+const proteinRate=input.goal==="deficit"?2:1.8;
+const p=Math.round((hasBf?Math.max(leanKg*2.2,kg*1.6):kg*proteinRate)); // 1358
+const f=Math.round(Math.max(45,kg*.8));                  // 1359
+const c=Math.max(50,Math.round((kcal-p*4-f*9)/4));       // 1360
+```
+
+- La proteína se ancla a **peso corporal total** (`kg*2` en déficit), no a masa magra ni a peso objetivo, así que para 140 kg da 280 g — fisiológicamente excesivo.
+- La grasa tiene piso `Math.max(45, kg*0.8)`.
+- Cuando `p*4 + f*9` se acerca o supera a `kcal`, el residuo de carbohidratos cae por debajo de 50 y el `Math.max(50, …)` lo fija en 50 **sin ajustar `kcal`**, dejando `kcal < p*4 + c*4 + f*9`.
+
+### Objetivo
+
+Que las metas que el onboarding calcula y guarda sean siempre internamente consistentes: la suma calórica de proteína + carbohidratos + grasa debe igualar (dentro de redondeo) el objetivo de calorías mostrado, para cualquier combinación válida de peso/estatura/edad/actividad/objetivo, cumpliendo el criterio ya prometido en REQ-09.
+
+### Alcance
+
+1. En `calculateMacroTargets` (`index.html:1345`), garantizar la invariante `kcal ≈ p*4 + c*4 + f*9`: cuando el residuo de carbohidratos toque el piso, reconciliar reduciendo grasa hasta su propio piso y/o ajustando `kcal` (o proteína) de forma documentada, en lugar de dejar metas que no suman.
+2. Acotar la proteína para que no escale sin límite con el peso corporal total en personas de peso alto (p. ej. basarla en masa magra cuando no hay %grasa, o aplicar un techo razonable), evitando objetivos de 280 g.
+3. Añadir un validador de dominio (estilo `scripts/validate-macro-target-wiring.mjs`) que recorra un barrido de perfiles válidos y falle si `|kcal − (p*4+c*4+f*9)| > 10`.
+
+### Fuera de alcance
+
+- Rediseñar la fórmula de BMR/mantenimiento (Mifflin/Katch-McArdle se conservan).
+- Cambiar la generación de comidas con IA (REQ-75/76) ni el objetivo del día en Nutrición.
+- Tocar el flujo de pasos, validaciones de rango o la UI del onboarding más allá de mostrar metas consistentes.
+
+### Riesgos
+
+- Reajustar proteína/grasa puede cambiar metas ya calculadas para usuarios existentes; debe afectar solo el cálculo, no reescribir prefs guardadas sin que el usuario recalcule.
+- El re-balanceo no debe romper los casos de control que hoy ya cuadran (80/110/120 kg).
+
+### Criterios de aceptación
+
+- Para el caso 140 kg / 160 cm / 60 años / ligera / déficit, `calorieTarget` y la suma de macros difieren en ≤ 10 kcal.
+- Un barrido de perfiles válidos (peso 35-250, estatura 130-230, edad MIN-90, todas las actividades y objetivos, con y sin %grasa) no produce ninguna meta donde `|kcal − suma de macros| > 10`.
+- La proteína calculada para un usuario de 140 kg en déficit queda en un rango fisiológico documentado (no 280 g por anclarse al peso total).
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Reproducir en local (`python3 -m http.server 8923`): abrir onboarding, ingresar 140 kg / 160 cm / 60 años / actividad ligera, objetivo déficit, avanzar al paso 2 y comprobar que kcal mostrado = P·4 + C·4 + F·9.
+- Script de barrido sobre `calculateMacroTargets` que verifique la invariante en todo el dominio válido.
