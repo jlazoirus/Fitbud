@@ -3782,7 +3782,8 @@ Que cualquier persona o agente que retome el proyecto lea documentación consist
 
 ## REQ-72 - Modularización incremental de index.html sin cambio funcional
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Fase 1 completa: creado `js/nutrition-pure.js` (377 líneas, patrón IIFE idéntico a `domain-contracts.js`) con 59 símbolos extraídos. `index.html` redujo 249 líneas (9563→9314). Sin build step, sin dependencias nuevas. Tests directos en `scripts/test-nutrition-pure.mjs`.
 
 ### Origen
 
