@@ -8513,7 +8513,7 @@ function editExercise(slug){
       <div class="field"><label>Disciplina</label><select id="ex_discipline">${["gym","bodyweight","strength","running","cycling","swimming"].map(value=>`<option value="${value}" ${ex.discipline===value?"selected":""}>${value}</option>`).join("")}</select></div>
       <div class="field"><label>Nivel</label><select id="ex_level">${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([value,label])=>`<option value="${value}" ${ex.level===value?"selected":""}>${label}</option>`).join("")}</select></div>
       <div class="field"><label>Patrón</label><input id="ex_pattern" value="${esc(ex.movement_pattern)}"></div>
-      <div class="field"><label>Demostración</label><select id="ex_media_key">${mediaKeys.map(value=>`<option value="${value}" ${ex.media_key===value?"selected":""}>${value}</option>`).join("")}</select></div>
+      <div class="field"><label>SVG fallback (patrón)</label><select id="ex_media_key">${mediaKeys.map(value=>`<option value="${value}" ${ex.media_key===value?"selected":""}>${value}</option>`).join("")}</select></div>
     </div>
     <div class="field"><label>Aliases (comas)</label><input id="ex_aliases" value="${exerciseFieldValue(ex,"aliases")}"></div>
     <div class="field"><label>Equipo (comas)</label><input id="ex_equipment" value="${exerciseFieldValue(ex,"equipment")}"></div>
@@ -8528,8 +8528,15 @@ function editExercise(slug){
     <div class="field"><label>Progresión</label><input id="ex_progression" value="${esc(ex.progression)}"></div>
     <div class="field"><label>Sustitutos por ID (comas)</label><input id="ex_substitutes" value="${exerciseFieldValue(ex,"substitute_slugs")}"></div>
     <div class="field"><label>Contraindicaciones/limitaciones (una por línea)</label><textarea id="ex_contraindications" rows="3">${exerciseFieldValue(ex,"contraindications","\n")}</textarea></div>
+    <div class="field"><label>Tipo de media</label><select id="ex_media_type">${["inline_svg","image_sequence","image","video","gif"].map(v=>`<option value="${v}" ${(ex.media_type||"inline_svg")===v?"selected":""}>${v}</option>`).join("")}</select></div>
+    <div class="field"><label>Fotogramas o clip — una URL por línea, la 1ª es el inicio (debe estar en Storage)</label><textarea id="ex_frames" rows="2" placeholder="https://…/storage/v1/object/public/exercise-media/slug/0.jpg">${exerciseFieldValue(ex,"frames","\n")}</textarea></div>
+    <div class="field"><label>Imagen estática (poster)</label><input id="ex_poster" value="${esc(ex.poster_url||"")}" placeholder="URL en Storage (opcional)"></div>
+    <div class="field"><label>Clip principal (media_url, opcional)</label><input id="ex_media_url" value="${esc(ex.media_url||"")}" placeholder="URL de video/gif en Storage (opcional)"></div>
+    <div class="row" style="margin-bottom:8px"><button class="btn btn-sm" type="button" onclick="previewExerciseMedia()">Previsualizar media</button></div>
+    <div id="ex_media_preview" class="exercise-demo" style="border-radius:var(--r-md);border:1px solid var(--border);margin-bottom:12px"></div>
     <div class="onboarding-grid">
       <div class="field"><label>Fuente</label><input id="ex_source" value="${esc(ex.source_name)}"></div>
+      <div class="field"><label>URL fuente</label><input id="ex_source_url" value="${esc(ex.source_url||"")}"></div>
       <div class="field"><label>Licencia</label><input id="ex_license" value="${esc(ex.license_name)}"></div>
       <div class="field"><label>Atribución</label><input id="ex_attribution" value="${esc(ex.attribution||"")}"></div>
     </div>
@@ -8558,16 +8565,30 @@ function readExerciseEditor(){
     progression:$("#ex_progression").value.trim(),
     substitute_slugs:exerciseTextList($("#ex_substitutes").value),
     contraindications:exerciseTextList($("#ex_contraindications").value),
-    media_type:"inline_svg",
+    media_type:$("#ex_media_type").value,
     media_key:mediaKey,
     static_key:mediaKey,
+    media_url:$("#ex_media_url").value.trim()||null,
+    poster_url:$("#ex_poster").value.trim()||null,
+    frames:exerciseTextList($("#ex_frames").value),
     source_name:$("#ex_source").value.trim(),
-    source_url:"",
+    source_url:$("#ex_source_url").value.trim()||null,
     license_name:$("#ex_license").value.trim(),
     attribution:$("#ex_attribution").value.trim()||null,
     active:$("#ex_active").checked,
     updated_at:new Date().toISOString(),
   };
+}
+function previewExerciseMedia(){
+  const ex={
+    name:$("#ex_name").value||"ejercicio",
+    media_type:$("#ex_media_type").value,
+    media_url:$("#ex_media_url").value.trim(),
+    poster_url:$("#ex_poster").value.trim(),
+    frames:exerciseTextList($("#ex_frames").value),
+  };
+  const box=$("#ex_media_preview");
+  if(box)box.innerHTML=exerciseMediaHtml(ex);
 }
 async function saveExercise(){
   const row=readExerciseEditor();

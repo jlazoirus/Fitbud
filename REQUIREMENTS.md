@@ -845,7 +845,9 @@ Establecer los limites de un coach de bienestar antes de ampliar recomendaciones
 
 **Estado: implementado.**
 
-La implementacion adopta produccion propia Fitbros: 40 ejercicios cubren todas las rutinas actuales de gimnasio, peso corporal, running, cycling y natacion. Cada sesion usa IDs estables del catalogo; Entreno muestra instrucciones, respiracion, errores, senales de seguridad, regresion/progresion y una demostracion SVG animada que puede pausarse y queda estatica con movimiento reducido. `supabase/exercises.sql` crea la fuente compartida con RLS y CRUD admin; `exercise-catalog.js` mantiene un respaldo local generado desde el mismo contenido hasta aplicar la migracion.
+La implementacion usa IDs estables del catalogo en todas las rutinas; Entreno muestra instrucciones, respiracion, errores, senales de seguridad y regresion/progresion. La demostracion visual sigue una cadena de degradacion (`exerciseMediaHtml`): clip de video/gif → imagen estatica → secuencia de 2 fotos → SVG procedimental → solo texto, con pausa/reproduccion y respeto de `prefers-reduced-motion`. Un modo "Ver tecnica" (`openExerciseGuide`) amplia la demostracion con las instrucciones completas. `supabase/exercises.sql` crea la fuente compartida con RLS y CRUD admin (incluida gestion de media: tipo, fotogramas, poster, fuente/licencia, con previsualizacion); `exercise-catalog.js` mantiene un respaldo local con el SVG procedimental como fallback garantizado.
+
+**Actualizacion (2026-06-29) — decision build vs buy revisada.** El SVG procedimental original era generico por patron de movimiento (no por ejercicio), por lo que no ensenaba la tecnica real. Se reabrio la decision y se eligio **licenciar Free Exercise DB** (`yuhonas/free-exercise-db`, dominio publico / Unlicense): se espejan las fotos a Supabase Storage (bucket `exercise-media` publico, sin hotlinks) y se pueblan `media_url/poster_url/frames`. Resultado: 42 ejercicios de fuerza con fotos reales de inicio/fin; los 9 de cardio (running/cycling/natacion) conservan el SVG porque la fuente es solo de fuerza. Pipeline: `scripts/free-exercise-db-map.mjs` (mapeo slug→id) + `scripts/ingest-exercise-media.mjs` (`--check`/`--upload`/`--apply`) + `supabase/exercise-media.sql`. El service worker cachea `/storage/v1/object/` para uso offline. El SVG sigue como fallback para cualquier ejercicio sin foto.
 
 ### Objetivo
 
@@ -857,8 +859,9 @@ Crear una fuente de verdad de ejercicios que permita explicar cada movimiento a 
 
 ### Decision previa bloqueante (build vs buy)
 
-- **Decision resuelta:** producir demostraciones SVG procedimentales propias, alojadas en la app y registradas como contenido de Fitbros. No se usan hotlinks, APIs pagadas ni media de terceros.
-- Conseguir cientos de demostraciones animadas con licencia es un sub-proyecto de contenido y legal por si solo. Antes de codificar este REQ hay que decidir y documentar la fuente: **licenciar** una libreria de ejercicios (p. ej. proveedores con API/licencia comercial), **grabar/producir** propio, o **generar**. La eleccion condiciona costo, esquema de `fuente/licencia` y tiempos. No empezar la carga de media sin esta decision.
+- **Decision vigente (2026-06-29):** **licenciar** Free Exercise DB (dominio publico / Unlicense) y espejar la media a Supabase Storage. El SVG procedimental propio queda como fallback, no como demostracion principal. Se mantiene la regla: no hotlinks ni media sin fuente/licencia registrada.
+- **Decision anterior (superada):** producir demostraciones SVG procedimentales propias como unica fuente. Se descarto porque el SVG es generico por patron de movimiento y no ensena la tecnica real de cada ejercicio.
+- Conseguir cientos de demostraciones animadas con licencia es un sub-proyecto de contenido y legal por si solo. Las opciones evaluadas fueron: **licenciar** una libreria (elegida: Free Exercise DB, gratis/dominio publico; alternativa premium: pack comercial de GIF/video), **grabar/producir** propio, o **generar** (SVG). Pendiente futuro: cubrir cardio y mejoras de calidad (video) reusan el mismo pipeline.
 
 ### Alcance
 
