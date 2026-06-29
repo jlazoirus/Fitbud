@@ -69,6 +69,7 @@ Las funciones serverless ([`api/`](api/)) son el corazón de la seguridad:
 - **`/api/admin`** — lista, activa/desactiva y cambia contraseñas. Exige un administrador activo y usa `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor.
 - **`/api/privacy`** — exporta los datos del usuario autenticado y borra cuenta, datos y fotos tras una confirmación estricta. Usa `SUPABASE_SERVICE_ROLE_KEY` solo en el servidor.
 - **`/api/entitlement`** — además de gestionar entitlements activos y cortesías admin, expone dos acciones consolidadas (REQ-62): `GET ?action=billing-history` devuelve el historial de pagos del usuario autenticado (solo campos seguros, sin IDs externos); `POST action:'generate'` (solo admin) crea códigos de acceso gratuito de un solo uso; `POST action:'redeem'` activa un entitlement `origin='coupon'` sin pasar por Stripe.
+- **`/api/beta-recruitment`** — captura postulaciones públicas para entrevistas/beta de REQ-70. Recalcula segmento/prioridad en servidor, deduplica por WhatsApp normalizado y guarda en `beta_recruitment_submissions` con service role. Requiere aplicar `supabase/beta_recruitment.sql` manualmente en Supabase.
 
 ## Privacidad y seguridad
 
@@ -161,7 +162,7 @@ No hay build: archivos estáticos en la raíz + funciones serverless en [`api/`]
    | `ANTHROPIC_API_KEY` | tu key `sk-ant-...` de Claude | **Sí** (solo servidor) |
    | `SUPABASE_URL` | `https://xxxxx.supabase.co` | No (pública) |
    | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | No (pública) |
-   | `SUPABASE_SERVICE_ROLE_KEY` | service role para cuotas, `/api/admin` y `/api/privacy` | **Sí (solo servidor)** |
+   | `SUPABASE_SERVICE_ROLE_KEY` | service role para cuotas, `/api/admin`, `/api/privacy` y reclutamiento beta | **Sí (solo servidor)** |
    | `ANTHROPIC_MODEL` *(opcional)* | `claude-haiku-4-5-20251001` | No |
 
 4. **Deploy**. Cada `git push` redepliega solo.

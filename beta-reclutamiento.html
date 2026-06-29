@@ -313,6 +313,10 @@
       color:#5d554e;
       font-size:13px;
     }
+    .notice.error{
+      background:#f8e6df;
+      color:#7a2e1f;
+    }
     .footer{
       margin:24px 0 10px;
       color:var(--muted);
@@ -371,6 +375,10 @@
         </div>
 
         <form id="recruitForm">
+          <div style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+            <label for="website">Sitio web</label>
+            <input id="website" name="website" tabindex="-1" autocomplete="off">
+          </div>
           <fieldset>
             <legend>Datos de contacto</legend>
             <div class="grid">
@@ -379,8 +387,8 @@
                 <input id="name" name="name" autocomplete="name" required>
               </div>
               <div>
-                <label for="contact">WhatsApp</label>
-                <input id="contact" name="contact" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+51 999 999 999">
+                <label for="whatsapp">WhatsApp</label>
+                <input id="whatsapp" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+51 999 999 999">
               </div>
               <div>
                 <label for="age">Edad</label>
@@ -509,7 +517,7 @@
           <div class="notice">No compartas diagnosticos ni informacion medica sensible en este formulario. Si tienes una condicion de salud, consulta con un profesional antes de empezar cualquier plan de entrenamiento o alimentacion.</div>
 
           <div class="actions">
-            <button type="submit">Ver mi resultado</button>
+            <button type="submit" id="submitBtn">Enviar postulación</button>
             <button type="reset" class="secondary">Limpiar</button>
           </div>
 
@@ -526,12 +534,7 @@
             </div>
             <div class="result-body">
               <p id="nextStep"></p>
-              <label for="summary">Resumen para enviar</label>
-              <textarea id="summary" class="summary" readonly></textarea>
-              <div class="actions">
-                <button type="button" id="copyBtn" class="secondary">Copiar resumen</button>
-                <a id="whatsappBtn" class="button" href="#" target="_blank" rel="noopener">Enviar por WhatsApp</a>
-              </div>
+              <div id="submissionMeta" class="notice"></div>
             </div>
           </section>
         </form>
@@ -551,9 +554,7 @@
   <script>
     const form = document.getElementById("recruitForm");
     const result = document.getElementById("result");
-    const summaryEl = document.getElementById("summary");
-    const copyBtn = document.getElementById("copyBtn");
-    const whatsappBtn = document.getElementById("whatsappBtn");
+    const submitBtn = document.getElementById("submitBtn");
     const painOptions = document.getElementById("painOptions");
 
     painOptions.addEventListener("change", () => {
@@ -563,25 +564,27 @@
 
     form.addEventListener("reset", () => {
       result.style.display = "none";
-      whatsappBtn.href = "#";
     });
 
-    form.addEventListener("submit", (event) => {
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const data = readForm();
-      const score = scoreCandidate(data);
-      const summary = buildSummary(data, score);
-      renderResult(data, score, summary);
-    });
-
-    copyBtn.addEventListener("click", async () => {
+      setSubmitting(true);
       try {
-        await navigator.clipboard.writeText(summaryEl.value);
-        copyBtn.textContent = "Copiado";
-        setTimeout(() => { copyBtn.textContent = "Copiar resumen"; }, 1600);
-      } catch (err) {
-        summaryEl.focus();
-        summaryEl.select();
+        const data = readForm();
+        const response = await fetch("/api/beta-recruitment", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(data)
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || "No se pudo guardar la postulación.");
+        }
+        renderResult(payload.submission);
+      } catch (error) {
+        renderError(String((error && error.message) || error));
+      } finally {
+        setSubmitting(false);
       }
     });
 
@@ -589,7 +592,7 @@
       const fd = new FormData(form);
       return {
         name: clean(fd.get("name")),
-        contact: clean(fd.get("contact")),
+        whatsapp: clean(fd.get("whatsapp")),
         age: clean(fd.get("age")),
         city: clean(fd.get("city")),
         stage: clean(fd.get("stage")),
@@ -600,133 +603,49 @@
         story: clean(fd.get("story")),
         investment: clean(fd.get("investment")),
         availability: clean(fd.get("availability")),
-        health: clean(fd.get("health"))
+        health: clean(fd.get("health")),
+        website: clean(fd.get("website")),
+        source: clean(new URLSearchParams(location.search).get("source") || "beta-reclutamiento")
       };
     }
 
-    function scoreCandidate(data){
-      let a = 0;
-      let b = 0;
-      let priorityPoints = 0;
-
-      if (data.stage === "consistent") a += 2;
-      if (data.stage === "advanced") a += 3;
-      if (data.stage === "beginner") b += 3;
-      if (data.stage === "returning") b += 2;
-
-      if (data.tools.includes("App de tracking")) a += 2;
-      if (data.tools.includes("Excel o notas")) a += 2;
-      if (data.tools.includes("Coach o nutricionista")) a += 1;
-      if (data.tools.includes("Nada sostenido")) b += 2;
-      if (data.tools.includes("YouTube o redes")) b += 1;
-
-      data.pains.forEach((pain) => {
-        const input = [...document.querySelectorAll('input[name="pains"]')].find((node) => node.value === pain);
-        const type = input ? input.dataset.type : "";
-        if (type === "a") a += 2;
-        if (type === "b") b += 2;
-        if (type === "both") { a += 1; b += 1; }
-      });
-
-      if (data.recentAttempt === "yes") priorityPoints += 2;
-      if (data.story.length >= 60) priorityPoints += 2;
-      if (data.pains.length >= 2) priorityPoints += 1;
-      if (data.availability === "interview_beta") priorityPoints += 2;
-      if (data.availability === "interview") priorityPoints += 1;
-      if (["time","app","coach"].includes(data.investment)) priorityPoints += 1;
-      if (data.health === "caution") priorityPoints -= 1;
-      if (data.age === "Menos de 18") priorityPoints -= 4;
-      if (data.availability === "later") priorityPoints -= 2;
-
-      const segment = a === b ? "Exploratorio" : (a > b ? "A - Comprometido autonomo" : "B - Principiante guiado");
-      let priority = "Baja";
-      if (priorityPoints >= 6) priority = "Alta";
-      else if (priorityPoints >= 3) priority = "Media";
-      const betaEligible = data.age !== "Menos de 18" && data.health === "clear" && data.availability === "interview_beta";
-
-      return { a, b, priorityPoints, segment, priority, betaEligible };
-    }
-
-    function renderResult(data, score, summary){
-      document.getElementById("resultTitle").textContent = score.betaEligible ? "Buen candidato para entrevista y beta" : "Buen candidato para entrevista";
-      document.getElementById("resultSubtitle").textContent = "Copia el resumen y envialo para coordinar el siguiente paso.";
-      document.getElementById("segmentPill").textContent = score.segment;
-      document.getElementById("priorityPill").textContent = "Prioridad " + score.priority;
-      document.getElementById("priorityPill").className = "pill " + (score.priority === "Alta" ? "ok" : score.priority === "Media" ? "warn" : "");
-      document.getElementById("nextStep").textContent = nextStepText(score, data);
-      summaryEl.value = summary;
-
-      const phone = new URLSearchParams(location.search).get("whatsapp");
-      if (phone) {
-        whatsappBtn.href = "https://wa.me/" + encodeURIComponent(phone.replace(/\D/g, "")) + "?text=" + encodeURIComponent(summary);
-        whatsappBtn.style.display = "";
-      } else {
-        whatsappBtn.href = "https://wa.me/?text=" + encodeURIComponent(summary);
-        whatsappBtn.style.display = "";
-      }
-
+    function renderResult(submission){
+      document.getElementById("resultTitle").textContent = "Postulación registrada";
+      document.getElementById("resultSubtitle").textContent = "Gracias. Ya quedó guardada para revisión.";
+      document.getElementById("segmentPill").textContent = submission.segment || "Segmento pendiente";
+      document.getElementById("priorityPill").textContent = "Prioridad " + (submission.priority || "pendiente");
+      document.getElementById("priorityPill").className = "pill " + (submission.priority === "Alta" ? "ok" : submission.priority === "Media" ? "warn" : "");
+      document.getElementById("nextStep").textContent = nextStepText(submission);
+      const code = submission.id ? "Código de postulación: #" + submission.id + "." : "Postulación guardada.";
+      document.getElementById("submissionMeta").className = "notice";
+      document.getElementById("submissionMeta").textContent = code + " Te escribiremos por WhatsApp si pasas a entrevista o beta.";
       result.style.display = "block";
       result.scrollIntoView({ behavior:"smooth", block:"start" });
     }
 
-    function nextStepText(score, data){
-      if (data.age === "Menos de 18") return "Gracias. Por seguridad, necesitamos participantes mayores de 18 para beta. Podrias servir para investigacion futura con autorizacion adecuada.";
-      if (data.health === "caution") return "Gracias. Tu caso puede servir para entrevista de problema, pero no deberias probar rutinas sin evaluacion profesional.";
-      if (score.priority === "Alta") return "Tu caso parece muy util para la validacion. Envia el resumen y te contactaremos para coordinar una entrevista.";
-      if (score.priority === "Media") return "Tu caso puede servir para una segunda ronda. Envia el resumen para quedar en lista.";
+    function renderError(message){
+      document.getElementById("resultTitle").textContent = "No pudimos guardar tu postulación";
+      document.getElementById("resultSubtitle").textContent = "Revisa los datos e intenta nuevamente.";
+      document.getElementById("segmentPill").textContent = "Sin guardar";
+      document.getElementById("priorityPill").textContent = "Pendiente";
+      document.getElementById("priorityPill").className = "pill";
+      document.getElementById("nextStep").textContent = message;
+      document.getElementById("submissionMeta").className = "notice error";
+      document.getElementById("submissionMeta").textContent = "Si el problema continúa, intenta de nuevo más tarde.";
+      result.style.display = "block";
+      result.scrollIntoView({ behavior:"smooth", block:"start" });
+    }
+
+    function nextStepText(submission){
+      if (submission.betaEligible) return "Tu caso puede calzar para entrevista y beta. Revisaremos las postulaciones y priorizaremos por ajuste al proceso.";
+      if (submission.priority === "Alta") return "Tu caso parece útil para entrevista de problema. Revisaremos las postulaciones y te contactaremos si pasas a la siguiente etapa.";
+      if (submission.priority === "Media") return "Tu caso quedó registrado para una posible segunda ronda.";
       return "Gracias. Puede que no seas prioridad para esta primera beta, pero tu respuesta ayuda a entender el mercado.";
     }
 
-    function buildSummary(data, score){
-      return [
-        "Hola, quiero participar en la validacion de Fitbros.",
-        "",
-        "Nombre: " + data.name,
-        "WhatsApp: " + data.contact,
-        "Edad: " + data.age,
-        "Ciudad: " + data.city,
-        "Segmento sugerido: " + score.segment,
-        "Prioridad sugerida: " + score.priority,
-        "Elegible para beta: " + (score.betaEligible ? "Si" : "No / revisar"),
-        "",
-        "Objetivo: " + data.goal,
-        "Momento actual: " + labelStage(data.stage),
-        "Intento reciente: " + (data.recentAttempt === "yes" ? "Si" : "No"),
-        "Herramientas: " + (data.tools.join(", ") || "No marco"),
-        "Fricciones: " + (data.pains.join(", ") || "No marco"),
-        "Inversion actual: " + labelInvestment(data.investment),
-        "Disponibilidad: " + labelAvailability(data.availability),
-        "Salud/ejercicio: " + (data.health === "clear" ? "Sin restriccion reportada" : "Requiere cautela"),
-        "",
-        "Ultima vez que paso:",
-        data.story
-      ].join("\n");
-    }
-
-    function labelStage(value){
-      return {
-        beginner:"Quiere empezar, no sabe por donde",
-        returning:"Esta retomando",
-        consistent:"Entrena/cuida comida con constancia",
-        advanced:"Dieta/entreno estructurado en serio"
-      }[value] || value;
-    }
-
-    function labelInvestment(value){
-      return {
-        none:"Nada por ahora",
-        time:"Tiempo buscando rutinas/recetas/videos",
-        app:"Pago o pago una app",
-        coach:"Pago o pago coach/nutricionista/gym"
-      }[value] || value;
-    }
-
-    function labelAvailability(value){
-      return {
-        interview_beta:"Entrevista y beta",
-        interview:"Solo entrevista",
-        later:"Interesado, pero no esta semana"
-      }[value] || value;
+    function setSubmitting(isSubmitting){
+      submitBtn.disabled = isSubmitting;
+      submitBtn.textContent = isSubmitting ? "Guardando..." : "Enviar postulación";
     }
 
     function clean(value){

@@ -40,13 +40,15 @@ Cuando este desplegado el repo, usa:
 https://fitbud-green.vercel.app/beta-reclutamiento.html
 ```
 
-Si quieres que el boton final abra WhatsApp directo a un numero especifico, comparte el link asi:
+Puedes agregar un origen simple para distinguir publicaciones/canales:
 
 ```text
-https://fitbud-green.vercel.app/beta-reclutamiento.html?whatsapp=51XXXXXXXXX
+https://fitbud-green.vercel.app/beta-reclutamiento.html?source=ig-amigo-julio
 ```
 
-El formulario no guarda datos en una base. Segmenta en el navegador y genera un resumen para que la persona lo envie por WhatsApp. Esto es intencional para arrancar rapido y evitar almacenar datos sensibles antes de tener un flujo formal de investigacion.
+El formulario guarda automaticamente la postulacion en Supabase via `POST /api/beta-recruitment`. El scoring se recalcula en servidor y se deduplica por WhatsApp normalizado, asi que la persona solo llena el formulario y espera contacto.
+
+Accion tecnica pendiente antes de usarlo en produccion: aplicar `supabase/beta_recruitment.sql` en Supabase. No se ejecuta automaticamente desde el repo.
 
 ## 3. Mensaje para tu amigo
 
@@ -170,7 +172,23 @@ El formulario publico pregunta:
 - Disponibilidad: filtra si puede hacer entrevista y beta.
 - Riesgo de salud: evita meter a beta de entrenamiento a personas que requieren evaluacion profesional.
 
-## 7. Scoring manual para seleccionar candidatos
+## 7. Scoring automatico y revision diaria
+
+El endpoint calcula:
+
+- Segmento sugerido: A, B o Exploratorio.
+- Prioridad: Alta, Media o Baja.
+- Elegibilidad beta: entrevista + beta posible, o solo entrevista/revisar.
+
+Para que el agente revise postulaciones y priorice a quienes debe contactar Jonathan:
+
+```bash
+node scripts/review-beta-recruitment.mjs --limit=20
+```
+
+El script lee `beta_recruitment_submissions` con `SUPABASE_SERVICE_ROLE_KEY`, lista primero candidatos `new`/`shortlisted`, y muestra WhatsApp, segmento, prioridad, fricciones y caso resumido.
+
+## 8. Criterios de seleccion
 
 Prioriza en este orden:
 
@@ -187,16 +205,16 @@ Busca minimo:
 - 5 candidatos B con prioridad alta o media.
 - Ideal: 2-3 candidatos que no conozcan directamente a Jonathan para reducir sesgo.
 
-## 8. Pipeline diario
+## 9. Pipeline diario
 
 1. Publicar story/post con el link.
-2. Revisar respuestas 2 veces al dia.
-3. Copiar los mejores candidatos a `estrategia/Participantes-Beta-REQ70.csv`.
-4. Escribir primero a prioridad alta.
+2. El formulario guarda postulaciones automaticamente.
+3. Ejecutar o revisar la salida diaria de `node scripts/review-beta-recruitment.mjs --limit=20`.
+4. Escribir primero a prioridad alta, manteniendo balance de minimo 5 A y 5 B.
 5. Agendar entrevista de problema antes de mostrar el producto.
 6. Despues de la entrevista, confirmar si pasa a prueba observada y beta.
 
-## 9. Mensaje para agendar entrevista
+## 10. Mensaje para agendar entrevista
 
 ```text
 Gracias por llenar el formulario. Creo que tu caso nos sirve mucho para la validacion.
@@ -209,7 +227,7 @@ Te quedan bien estas opciones?
 - [DIA/HORA 3]
 ```
 
-## 10. Que no hacer
+## 11. Que no hacer
 
 - No mostrar la app antes de la entrevista de problema.
 - No preguntar "pagarias por esto?" como pregunta principal.

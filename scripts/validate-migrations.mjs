@@ -23,6 +23,7 @@ const TABLES_REQUIRING_RLS = [
   "coach_generation_parts", "coach_quota_policies", "coach_quota_overrides",
   "notification_preferences", "notification_log",
   "billing_events", "user_entitlements", "redemption_codes", "product_events",
+  "beta_recruitment_submissions",
 ];
 
 // Orden esperado de dependencias entre archivos
@@ -38,6 +39,7 @@ const DEPENDENCY_ORDER = [
   "entitlements.sql", // 8 — entitlement
   "billing.sql",      // 9 — eventos Stripe
   "analytics.sql",    // 10 — analítica
+  "beta_recruitment.sql", // 11 — reclutamiento beta REQ-70
 ];
 
 // schema.sql y seed.sql son scripts de instalación fresca (DROP + CREATE), no incrementales.

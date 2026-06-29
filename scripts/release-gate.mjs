@@ -80,6 +80,7 @@ run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
 run("validate-splits.mjs", "node scripts/validate-splits.mjs");
 run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
+run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
 
 // ── Validadores de SQL y datos ───────────────────────────────────────────────
 console.log("\n[ SQL y datos ]");

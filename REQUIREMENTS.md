@@ -3313,7 +3313,7 @@ Vercel plan Hobby (gratuito) impone un máximo de **12 Serverless Functions** po
 
 > "No more than 12 Serverless Functions can be added to a Deployment on the Hobby plan."
 
-**Regla permanente:** cualquier futuro endpoint nuevo debe evaluarse contra este límite. Si ya hay 11 funciones, un archivo nuevo haría fallar el build — debe consolidarse dentro de un endpoint existente o reemplazar uno.
+**Regla permanente:** cualquier futuro endpoint nuevo debe evaluarse contra este límite. Si ya hay 12 funciones, un archivo nuevo haría fallar el build — debe consolidarse dentro de un endpoint existente o reemplazar uno.
 
 ### Cambios (commit único en main)
 
@@ -3329,7 +3329,7 @@ Vercel plan Hobby (gratuito) impone un máximo de **12 Serverless Functions** po
 
 ### Verificacion
 
-- `ls api/*.js | wc -l` → **11** (bajo el límite de 12).
+- En ese commit, `ls api/*.js | wc -l` → **11** (bajo el límite de 12). REQ-70 luego agrego `api/beta-recruitment.js`, dejando el total en **12**.
 - `node scripts/test-billing-history-api.mjs` pasa.
 - `node scripts/test-coupon-api.mjs` pasa.
 
@@ -3689,6 +3689,7 @@ La decisión final debe ser una de tres:
 El agente sí puede preparar soporte para la validación, pero no reemplazarla:
 
 - Crear plantillas de entrevista, encuesta y diario en `estrategia/`.
+- Automatizar captura y priorización de candidatos de reclutamiento sin cerrar el REQ: formulario público, endpoint server-side, tabla privada y script de revisión.
 - Crear un tablero estático o script de métricas que lea `product_events`, `day_log` y `billing_events`.
 - Agregar eventos faltantes si se detecta que una métrica crítica no está instrumentada.
 - Sintetizar resultados pegados por el usuario y producir recomendación GO/ITERAR/PIVOT.
