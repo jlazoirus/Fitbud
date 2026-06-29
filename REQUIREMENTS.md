@@ -3723,7 +3723,7 @@ El agente sí puede preparar soporte para la validación, pero no reemplazarla:
 
 ## REQ-71 - Sincronizar documentación operativa con el estado real del código
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Origen
 

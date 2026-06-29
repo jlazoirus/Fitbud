@@ -10,7 +10,8 @@
 //   NOTIFY_APP_URL       — URL pública de la app, ej: https://fitbud-green.vercel.app
 //   CRON_SECRET          — cadena aleatoria; Vercel la inyecta en Authorization al ejecutar cron
 //
-// vercel.json define: { "crons": [{ "path": "/api/notify", "schedule": "0 * * * *" }] }
+// vercel.json define: { "crons": [{ "path": "/api/notify", "schedule": "0 8 * * *" }] }
+// Limitación Vercel Hobby: mínimo un disparo diario; granularidad horaria requiere plan Pro.
 // Vercel envía Authorization: Bearer CRON_SECRET en cada invocación automática del cron.
 // Lenguaje REQ-31: todos los textos hablan de "tu plan"/"tu racha"; sin mención de IA.
 //

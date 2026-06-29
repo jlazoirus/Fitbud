@@ -68,7 +68,7 @@ Las funciones serverless ([`api/`](api/)) son el corazón de la seguridad:
 - **`/api/config`** — devuelve al navegador solo datos públicos (URL + publishable key de Supabase, modelo). **No** devuelve la key de Claude.
 - **`/api/admin`** — lista, activa/desactiva y cambia contraseñas. Exige un administrador activo y usa `SUPABASE_SERVICE_ROLE_KEY` únicamente en el servidor.
 - **`/api/privacy`** — exporta los datos del usuario autenticado y borra cuenta, datos y fotos tras una confirmación estricta. Usa `SUPABASE_SERVICE_ROLE_KEY` solo en el servidor.
-- **`/api/coupon`** — genera códigos de acceso gratuito para administradores y permite canjearlos sin pasar por Stripe.
+- **`/api/entitlement`** — además de gestionar entitlements activos y cortesías admin, expone dos acciones consolidadas (REQ-62): `GET ?action=billing-history` devuelve el historial de pagos del usuario autenticado (solo campos seguros, sin IDs externos); `POST action:'generate'` (solo admin) crea códigos de acceso gratuito de un solo uso; `POST action:'redeem'` activa un entitlement `origin='coupon'` sin pasar por Stripe.
 
 ## Privacidad y seguridad
 
