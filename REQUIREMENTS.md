@@ -3642,7 +3642,7 @@ Sin argumento, `effectiveDayTarget` cae al fallback `(profile&&profile.prefs)||{
 
 ## REQ-70 - Validación de negocio y beta controlada
 
-**Estado: bloqueado por ejecución humana. Requiere entrevistas, usuarios reales y decisión de producto; no implementable por el agente autónomo.**
+**Estado: pendiente. Requiere entrevistas, usuarios reales y decisión de producto; no implementable por el agente autónomo.**
 
 ### Origen
 
