@@ -4164,3 +4164,614 @@ Que las metas que el onboarding calcula y guarda sean siempre internamente consi
 
 - Reproducir en local (`python3 -m http.server 8923`): abrir onboarding, ingresar 140 kg / 160 cm / 60 años / actividad ligera, objetivo déficit, avanzar al paso 2 y comprobar que kcal mostrado = P·4 + C·4 + F·9.
 - Script de barrido sobre `calculateMacroTargets` que verifique la invariante en todo el dominio válido.
+
+## REQ-78 - Dominio nutricional puro y contratos estrictos
+
+**Estado: pendiente.**
+
+### Origen
+
+Análisis de arquitectura nutricional del 28 jun 2026 (`ANALISIS_ARQUITECTURA_NUTRICION_FITIA_v2.md`). El diagnóstico central es que Fitbros ya tiene catálogo, recetas y macros calculables, pero la autoridad nutricional real sigue dispersa entre prompts, overrides de `day_log` y validaciones parciales dentro de `index.html`. Antes de mover planes a un solver o a `plan_versions`, hace falta una base pura y testeable equivalente a lo que ya existe en entrenamiento con `training-plan.js` y `workout-player.js`.
+
+### Problema
+
+Las reglas nutricionales críticas no viven en un módulo de dominio único:
+
+- `calculateMacroTargets()` calcula metas pero la consistencia estricta se está abordando aparte en REQ-77.
+- `validateGeneratedDay()` valida respuestas generadas desde el script principal y mezcla reglas de slots, restricciones, tolerancias y forma del JSON.
+- El matcher por palabra ya existe para restricciones duras del coach (REQ-66), pero todavía quedan comparaciones free-text dispersas para alergias/gustos.
+- Los macros de recetas se calculan en varios lugares por convención, no por un contrato central que todas las rutas deban usar.
+- `domain-contracts.js#validateMacroTargets` todavía permite una diferencia amplia y no modela tolerancias por nivel: meta diaria, slot, plato, reemplazo.
+
+Esto hace que cada mejora nutricional termine agregando lógica nueva al script principal en vez de fortalecer una frontera determinista compartida.
+
+### Objetivo
+
+Crear un módulo puro de dominio nutricional que sea la autoridad local para targets, recetas, restricciones, slots y tolerancias, sin cambiar todavía la experiencia visible ni la persistencia. El módulo debe poder ejecutarse en navegador y en Node, y quedar cubierto por validadores integrados al release gate.
+
+### Dependencias
+
+- Debe ejecutarse después o junto con REQ-77, porque el contrato de targets estrictos depende de metas internamente consistentes.
+- Complementa REQ-72, pero este REQ es específico de nutrición y no persigue una modularización general de `index.html`.
+
+### Alcance
+
+1. Crear un módulo sin DOM ni dependencias runtime nuevas, por ejemplo `nutrition-domain.js`, cargable desde `index.html` y desde scripts Node.
+2. Mover o duplicar de forma controlada funciones puras existentes, manteniendo compatibilidad global mientras el HTML inline siga dependiendo de funciones globales:
+   - normalización de texto alimentario;
+   - tokenización por palabra para restricciones;
+   - cálculo de kcal derivadas por macros;
+   - cálculo de macros de receta desde ingredientes y gramos;
+   - validación de targets diarios;
+   - validación de target por slot;
+   - validación de plato/comida aplicable;
+   - definición de slots renderizables para 2-6 comidas.
+3. Definir tolerancias explícitas por nivel:
+   - target de usuario: `|kcal - (p*4+c*4+f*9)| <= 10` tras REQ-77;
+   - slot de comida: tolerancia flexible documentada;
+   - día completo: tolerancia estricta por suma de comidas;
+   - reemplazo: tolerancia dependiente de si se puede rebalancear el resto del día.
+4. Reemplazar comparaciones `includes()` dispersas de alergias/gustos por el matcher común cuando sea seguro hacerlo.
+5. Exponer el módulo como global solo si el script principal lo necesita, siguiendo el patrón de `DOMAIN_CONTRACTS`.
+6. Agregar script de validación, por ejemplo `scripts/validate-nutrition-domain.mjs`, con casos de:
+   - target consistente e inconsistente;
+   - ingredientes con kcal declaradas que no igualan exactamente `4/4/9`;
+   - restricción `pollo` que no bloquea `repollo`;
+   - alergia free-text con tokenización;
+   - slots válidos para 2, 4, 5 y 6 comidas.
+7. Integrar el validador al `scripts/release-gate.mjs`.
+8. Actualizar `CONTEXT.md` solo si se crea un archivo nuevo de dominio.
+
+### Fuera de alcance
+
+- No cambiar todavía cómo se genera un día o una semana.
+- No mover el plan nutricional a `plan_versions`.
+- No cambiar SQL ni catálogo.
+- No reescribir la UI de Nutrición.
+
+### Riesgos
+
+- Duplicar lógica puede crear divergencia si no se reemplazan los puntos de uso principales.
+- Endurecer validaciones como bloqueo en runtime podría romper flujos existentes; en este REQ las nuevas reglas deben empezar como contratos/test y warnings donde corresponda, salvo casos obvios de datos inválidos.
+- Las kcal declaradas por ingrediente no siempre coinciden con `P*4+C*4+F*9`; el módulo debe tratar kcal como dimensión independiente, no asumir equivalencia perfecta.
+
+### Criterios de aceptación
+
+- Existe un módulo nutricional puro, importable en Node y cargable por la app sin build step.
+- El módulo calcula macros de recetas desde ingredientes y gramos usando `ingredient.kcal` como fuente de kcal, no solo `4/4/9`.
+- El matcher común evita falsos positivos como `pollo` vs `repollo` y cubre restricciones free-text donde aplica.
+- Las tolerancias de target, slot, día y reemplazo están documentadas en código y cubiertas por tests.
+- `node scripts/validate-nutrition-domain.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `node scripts/validate-nutrition-domain.mjs`.
+- `node scripts/release-gate.mjs`.
+- Revisar manualmente que Home y Nutrición siguen cargando sin errores tras cargar el módulo nuevo.
+
+---
+
+## REQ-79 - Catálogo nutricional semántico, claves estables y cobertura de 2-6 comidas
+
+**Estado: pendiente.**
+
+### Origen
+
+El análisis nutricional detectó que la UI soporta 2-6 comidas, pero el catálogo actual no cubre todos los slots renderizables: `media_manana`, `merienda` y `recena` no tienen platos propios. También se detectó un riesgo de identidad: `supabase/seed.sql` hace `truncate ... restart identity cascade`, por lo que los IDs numéricos no son suficientes como identidad histórica para planes nutricionales futuros.
+
+### Problema
+
+El catálogo está modelado como platos con un `slot` literal único y con IDs autoincrementales. Eso bloquea tres necesidades nuevas:
+
+- Un mismo plato útil no puede declararse compatible con varios momentos del día sin duplicarlo.
+- Las restricciones dietarias dependen demasiado de nombres/ingredientes en texto, aunque parte del matcher ya se endureció en REQ-66.
+- Un snapshot histórico que guarde solo `dishId`/`ingredientId` puede perder auditabilidad si el catálogo se re-seedea y los IDs cambian.
+
+### Objetivo
+
+Convertir el catálogo nutricional en una base semántica para planificación determinista: platos con claves estables, slots compatibles múltiples, tags dietarios y metadata suficiente para filtrar y escalar porciones. La app debe poder cubrir todos los slots posibles para perfiles de 2-6 comidas sin depender de prompts.
+
+### Dependencias
+
+- Requiere REQ-78 para usar contratos comunes de slots/restricciones.
+- Debe preceder a cualquier REQ que guarde `nutritionPlan` histórico en `plan_versions`.
+
+### Alcance
+
+1. Crear migración SQL idempotente, por ejemplo `supabase/nutrition_catalog_semantics.sql`, que agregue de forma compatible:
+   - `ingredients.slug text`;
+   - `dishes.slug text`;
+   - `dishes.compatible_slots text[]`;
+   - `dishes.diet_tags text[]`;
+   - `dishes.prep_minutes integer`;
+   - `dishes.budget_tier text`;
+   - `dishes.needs_kitchen boolean`;
+   - `dishes.eat_out_ok boolean`;
+   - `dishes.protein_density text` o métrica derivable;
+   - `dish_ingredients.scalable boolean`;
+   - opcionalmente `dish_ingredients.min_g`, `max_g`, `step_g` para límites de porción por ingrediente.
+2. Backfillar `slug` con claves estables derivadas de nombres actuales y documentar que futuras recetas deben mantener slug estable.
+3. Backfillar `compatible_slots`:
+   - si no hay metadata específica, iniciar con `[slot]`;
+   - declarar explícitamente snacks, shakes y platos simples compatibles con `media_manana`, `merienda` y `recena` cuando nutricionalmente aplique.
+4. Añadir metadata dietaria mínima en seed/migración:
+   - `vegetariano`, `vegano` cuando aplique;
+   - flags/tags para lácteos, huevo, carne/pescado o alérgenos comunes si el esquema elegido lo soporta.
+5. Actualizar `dbLoad()` y el editor admin de alimentos/dietas para leer y conservar los campos nuevos sin romper instalaciones donde la migración aún no fue aplicada.
+6. Actualizar validadores del catálogo:
+   - todo plato tiene `slug` estable;
+   - todo slot que la UI puede renderizar tiene al menos N candidatos compatibles después de aplicar restricciones básicas;
+   - no hay `compatible_slots` fuera del vocabulario permitido;
+   - los slugs son únicos;
+   - no se rompe `supabase/validate.mjs`.
+7. Documentar en `CONTEXT.md` la acción manual pendiente: aplicar la migración en Supabase; no ejecutar migraciones de producción automáticamente.
+
+### Fuera de alcance
+
+- No cambiar todavía `buildDay()` para leer un plan activo.
+- No construir el solver de porciones.
+- No re-seedear producción automáticamente.
+- No eliminar el campo `dishes.slot`; debe quedar como compatibilidad o slot principal hasta completar la migración.
+
+### Riesgos
+
+- El seed reinicia IDs; cualquier cambio debe evitar que un plan futuro dependa solo de IDs numéricos.
+- Si se agregan constraints demasiado estrictos antes de backfill, se puede romper una base existente.
+- El editor admin puede perder campos nuevos si actualiza filas sin preservarlos.
+
+### Criterios de aceptación
+
+- La migración SQL es idempotente y no requiere ejecutar producción automáticamente.
+- Todos los ingredientes y platos del seed tienen `slug` estable y único.
+- Todos los slots renderizables por la app (`desayuno`, `media_manana`, `almuerzo`, `merienda`, `snack`, `cena`, `recena`) tienen candidatos compatibles en el catálogo.
+- `dbLoad()` funciona tanto con la migración aplicada como sin ella.
+- El editor admin no borra metadata semántica al editar platos existentes.
+- `node supabase/validate.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `node supabase/validate.mjs`.
+- Script nuevo o extendido: `node scripts/validate-nutrition-catalog.mjs`.
+- Probar en local un perfil de 6 comidas y confirmar que cada slot tiene candidatos compatibles sin depender de generación con coach.
+
+---
+
+## REQ-80 - Solver determinista de porciones para preparar un día nutricional
+
+**Estado: pendiente.**
+
+### Origen
+
+Los bugs REQ-64, REQ-75 y REQ-76 muestran el mismo patrón: el sistema le pide al modelo que ajuste gramos y macros, luego intenta corregir con prompt engineering o con más platos. El análisis recomienda mover esa aritmética a un solver determinista que trabaje sobre ingredientes, gramos y metadata del catálogo.
+
+### Problema
+
+`deterministicDayPayload()` existe como fallback, pero usa constantes y divisiones aproximadas. No calcula porciones desde la composición real de cada receta ni puede explicar cuándo un plato no alcanza las metas dentro de límites palatables. En cambio, el camino principal de `generateOneDay()` sigue dependiendo de una respuesta textual con macros declarados.
+
+### Objetivo
+
+Crear un solver determinista que, dado un perfil, target diario, slots del día y catálogo compatible, produzca un día nutricional completo con platos, ingredientes en gramos y macros recalculados. Debe funcionar sin llamadas externas y convertirse en el fallback principal de "Preparar mi día".
+
+### Dependencias
+
+- Requiere REQ-77 para targets consistentes.
+- Requiere REQ-78 para contratos de dominio nutricional.
+- Requiere idealmente REQ-79 para `compatible_slots` y límites de escalado; si REQ-79 no está aplicado en producción, debe degradar usando `slot` y defaults seguros.
+
+### Alcance
+
+1. Implementar en el módulo nutricional puro funciones como:
+   - `mealSlotTargets(dayTarget, prefs, workoutContext)`;
+   - `compatibleDishesForSlot(slot, prefs, catalog)`;
+   - `solveDishPortion(dish, mealTarget, options)`;
+   - `planDeterministicNutritionDay(ctx)`.
+2. El solver debe optimizar `kcal`, proteína, carbohidratos y grasa como dimensiones independientes:
+   - no asumir que cuadrar P/C/F cuadra kcal;
+   - recalcular kcal desde `ingredients.kcal`;
+   - devolver residual y score por dimensión.
+3. Definir límites:
+   - gramos mínimos, máximos y step por ingrediente cuando existan;
+   - defaults conservadores cuando no existan;
+   - topes palatables para evitar porciones absurdas.
+4. Manejar `no_solution` de forma explícita:
+   - plato incompatible;
+   - proteína insuficiente;
+   - kcal fuera de tolerancia;
+   - ingrediente sin macros;
+   - slot sin candidatos.
+5. Integrar el solver como fallback principal en:
+   - `homePrepareDay()` cuando no hay coach disponible;
+   - `prepareFirstCycleDay()` ante fallo del servicio;
+   - `deterministicDayPayload()` o reemplazo equivalente.
+6. Mantener la UI sin lenguaje técnico: si no hay solución perfecta, mostrar una opción viable y un mensaje neutral, no detalles del solver.
+7. Agregar tests:
+   - metas normales y altas de proteína;
+   - perfil vegano/vegetariano/omnívoro;
+   - 2, 4 y 6 comidas;
+   - slot sin candidatos devuelve `no_solution` medible;
+   - kcal se valida con `ingredients.kcal`.
+
+### Fuera de alcance
+
+- No guardar todavía el día en `plan_versions.snapshot.nutritionPlan`.
+- No reemplazar por completo la generación semanal con coach.
+- No crear recetas nuevas.
+- No ejecutar migraciones de producción.
+
+### Riesgos
+
+- El catálogo puede no tener suficientes platos para metas extremas; eso debe producir una causa medible, no una tolerancia escondida.
+- El solver puede elegir porciones matemáticamente correctas pero poco apetecibles; los límites de porción son parte crítica del alcance.
+- Cambiar el fallback puede alterar expectativas de usuarios sin coach; debe verificarse en Home y Nutrición móvil.
+
+### Criterios de aceptación
+
+- "Preparar mi día" puede llenar un día válido sin llamar a `/api/claude`.
+- El día generado contiene platos, ingredientes con gramos y macros calculados por el motor.
+- Para metas altas de proteína, el solver combina opciones compatibles o devuelve una causa `no_solution` sin dejar el día vacío.
+- Los totales del día quedan dentro de la tolerancia documentada.
+- No se muestran palabras prohibidas por REQ-31.
+- `node scripts/validate-nutrition-solver.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Servir local y desactivar disponibilidad del coach; usar "Preparar mi día" en Home.
+- Probar perfiles de 2, 4 y 6 comidas.
+- Revisar red: cero llamadas a `/api/claude` durante el fallback determinista.
+- `node scripts/validate-nutrition-solver.mjs`.
+
+---
+
+## REQ-81 - Planner semanal nutricional determinista y lista de compras derivada
+
+**Estado: pendiente.**
+
+### Origen
+
+Fitbros ya muestra borradores semanales y lista de compras cuando genera una semana, pero esa lista depende del resultado generado y no de un plan nutricional determinista estable. El análisis propone que la lista de compras sea una derivación del plan semanal estructurado, no un artefacto textual del coach.
+
+### Problema
+
+El usuario puede preparar una semana, pero la coherencia depende de respuestas externas y de overrides. Además, si luego se necesita operar sin coach o controlar costo, no existe un planner semanal determinista equivalente al generador de entrenamiento validado.
+
+### Objetivo
+
+Crear un planner semanal que use el solver diario para producir 7 días estructurados, controle repetición, respete restricciones y genere lista de compras agregada desde ingredientes y gramos aplicados.
+
+### Dependencias
+
+- Requiere REQ-80.
+- Aprovecha REQ-79 para variedad por slots y metadata.
+
+### Alcance
+
+1. Implementar funciones puras:
+   - `planNutritionWeek(ctx)`;
+   - `scoreWeeklyVariety(days, prefs)`;
+   - `buildShoppingListFromNutritionPlan(days)`.
+2. Generar exactamente 7 días desde fecha de inicio seleccionada.
+3. Controlar repetición:
+   - evitar repetir plato igual en días consecutivos si hay alternativa compatible;
+   - respetar `repeatPreference` cuando exista;
+   - permitir repetición pragmática si el catálogo no ofrece alternativas.
+4. Generar lista de compras por ingrediente:
+   - agrupar por `ingredientSlug` o fallback estable;
+   - sumar gramos;
+   - conservar nombre visible y categoría;
+   - redondear cantidades a unidades razonables cuando aplique.
+5. Integrar como fallback o modo determinista en el flujo actual de "Preparar mi semana", manteniendo revisión antes de aplicar.
+6. El borrador semanal debe mostrar:
+   - resumen de kcal/proteína promedio;
+   - advertencias de slots sin variedad;
+   - lista de compras derivada;
+   - botón para aplicar como hoy.
+7. Agregar tests de semana:
+   - suma diaria en tolerancia;
+   - lista de compras coincide con ingredientes de los 7 días;
+   - no duplica ingredientes por nombre distinto si comparten slug;
+   - respeta restricciones duras.
+
+### Fuera de alcance
+
+- No mover todavía el plan semanal activo a `plan_versions`.
+- No construir rebalanceo de reemplazos.
+- No crear panel nuevo de inventario o despensa.
+
+### Riesgos
+
+- El catálogo puede ser insuficiente para variedad real en 5-6 comidas; debe avisarse como limitación de catálogo, no fallar silenciosamente.
+- Si no existen slugs, la agregación de compras debe usar fallback seguro hasta REQ-79.
+
+### Criterios de aceptación
+
+- "Preparar mi semana" tiene una ruta determinista sin llamada externa cuando el coach no está disponible.
+- El borrador semanal contiene 7 días con comidas estructuradas y lista de compras derivada de ingredientes reales.
+- La lista de compras suma exactamente lo aplicado en los días del borrador, dentro de redondeos documentados.
+- Restricciones duras se respetan en todos los días.
+- `node scripts/validate-nutrition-week-planner.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Desactivar coach y preparar una semana.
+- Probar perfil vegetariano, vegano y omnívoro.
+- Comparar manualmente un ingrediente repetido en varios días contra su total en compras.
+- `node scripts/validate-nutrition-week-planner.mjs`.
+
+---
+
+## REQ-82 - Plan nutricional activo versionado en `plan_versions`
+
+**Estado: pendiente.**
+
+### Origen
+
+El análisis identificó la falla arquitectónica más importante: la prescripción nutricional vive como overrides de `day_log.state.meals`, mientras `day_log` debería representar ejecución. Fitbros ya tiene `plan_versions` para entrenamiento y snapshots de plan; nutrición debe usar el mismo patrón.
+
+### Problema
+
+Actualmente:
+
+- `buildDay(ds)` puede construir slots vacíos.
+- `applyDayComidas()` guarda comidas generadas como overrides en `day_log`.
+- `day_log` mezcla prescripción, cambios y ejecución.
+- Auditar qué plan vio el usuario en una fecha futura o pasada depende de reconstruir estado mutable y overrides.
+
+Esto debilita historial inmutable, sync, reemplazos y compras.
+
+### Objetivo
+
+Guardar el plan nutricional prescrito como entidad de primera clase dentro de `plan_versions.snapshot.nutritionPlan`, con snapshots materializados y auditables. `day_log` debe quedar para registrar lo ejecutado, cambios aplicados, extras y estado offline, no como fuente principal de prescripción.
+
+### Dependencias
+
+- Requiere REQ-79 antes de guardar referencias estables.
+- Requiere REQ-80 o REQ-81 para producir planes estructurados.
+- Debe respetar REQ-13: versiones futuras no reescriben historial.
+
+### Alcance
+
+1. Definir schema de `nutritionPlan` dentro de `plan_versions.snapshot`:
+   - `version`;
+   - `catalogVersion` o fecha de catálogo si existe;
+   - `days[]`;
+   - `day.date`;
+   - `day.target`;
+   - `day.meals[]`;
+   - `meal.id` estable dentro del plan;
+   - `meal.slot`;
+   - `meal.dishSlug`, `dishName` y opcional `dishId` operativo;
+   - `meal.ingredients[]` con `ingredientSlug`, `name`, `grams`, macros por línea opcionales;
+   - `meal.macros` calculados al activar;
+   - `shoppingList`.
+2. Guardar snapshots materializados: aunque el catálogo cambie después, el snapshot conserva nombre, gramos y macros usados en ese momento.
+3. Adaptar `buildDay(ds)` para leer primero la prescripción de `nutritionPlan` activa para la fecha:
+   - si existe, renderiza comidas desde snapshot;
+   - si no existe, usa el fallback actual.
+4. Adaptar `mealValue()` para resolver:
+   - ejecución/override de `day_log` cuando exista;
+   - prescripción de `nutritionPlan`;
+   - catálogo DB/fallback solo como compatibilidad.
+5. Adaptar `applyDayComidas()` y flujos de aplicar semana:
+   - crear o actualizar borrador de `plan_versions` con `nutritionPlan`;
+   - activar solo después de confirmación;
+   - no escribir prescripción como override del día salvo compatibilidad temporal necesaria.
+6. Mantener `day_log.state.meals` para:
+   - `done`;
+   - replacement aplicado;
+   - edición manual real del día;
+   - notas/contingencias;
+   - estado de sync/conflicto.
+7. Migración/backfill:
+   - no intentar reconstruir todo el pasado;
+   - para perfiles sin `nutritionPlan`, seguir usando compatibilidad hasta que preparen día/semana;
+   - no borrar overrides existentes.
+8. Agregar validador de snapshot:
+   - every meal has slug/materialized name/macros;
+   - day targets sum within tolerance;
+   - shopping list matches days if present.
+
+### Fuera de alcance
+
+- No cambiar tablas SQL si `plan_versions.snapshot` JSONB es suficiente.
+- No reescribir historial existente.
+- No resolver reemplazos con rebalanceo; eso es REQ-83.
+
+### Riesgos
+
+- Mezclar snapshots nuevos con overrides antiguos puede duplicar comidas si no se define prioridad clara.
+- Los service workers viejos pueden servir una versión de `index.html` incompatible; subir `CACHE_NAME` si se toca el shell PWA.
+- El sync offline debe seguir considerando `day_log` como ejecución, no plan.
+
+### Criterios de aceptación
+
+- Un plan nutricional nuevo queda guardado en `plan_versions.snapshot.nutritionPlan`.
+- `buildDay()` renderiza comidas prescritas desde `nutritionPlan` sin depender de overrides en `day_log`.
+- Marcar una comida como hecha escribe ejecución en `day_log` sin modificar el snapshot prescrito.
+- Cambiar un plan futuro no reescribe días ya ejecutados.
+- Snapshots siguen auditables aunque cambie el catálogo, porque guardan slugs, nombres, gramos y macros materializados.
+- `node scripts/validate-nutrition-plan-snapshot.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Preparar una semana, activar, recargar y confirmar que `plan_versions.snapshot.nutritionPlan` contiene días y compras.
+- Marcar una comida, recargar y confirmar que el snapshot no cambia pero `day_log` sí.
+- Cambiar catálogo localmente y confirmar que el día histórico sigue mostrando lo materializado en el snapshot.
+
+---
+
+## REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras
+
+**Estado: pendiente.**
+
+### Origen
+
+REQ-36 unificó acciones de comida y REQ-19 agregó contingencias, pero el reemplazo actual sigue siendo principalmente una lista de platos con delta de kcal. El análisis nutricional propone el comportamiento tipo Fitia: cambiar una comida sin romper el día ni reescribir lo ya ejecutado.
+
+### Problema
+
+Hoy cambiar una comida:
+
+- muestra impacto, pero no siempre conserva coherencia de macros diarios;
+- no rebalancea el resto del día;
+- puede dejar déficit/exceso que el usuario debe resolver manualmente;
+- no usa todavía un solver de porciones ni una prescripción nutricional activa.
+
+### Objetivo
+
+Convertir "Cambiar" en un reemplazo equivalente: elegir alternativas compatibles, ajustar porciones y, cuando sea necesario, rebalancear comidas futuras no registradas para conservar los objetivos diarios. El usuario debe ver el impacto antes de confirmar.
+
+### Dependencias
+
+- Requiere REQ-80 para solver.
+- Requiere REQ-82 para distinguir prescripción de ejecución de forma robusta.
+
+### Alcance
+
+1. Implementar motor puro de reemplazo:
+   - `rankReplacementCandidates(meal, candidates, target, prefs)`;
+   - `solveReplacement(meal, candidate, dayPlan, dayLog)`;
+   - `rebalanceFutureMeals(dayPlan, changedMeal, dayLog)`.
+2. En el modal/hoja de "Cambiar":
+   - listar candidatos por cercanía a kcal/proteína y restricciones;
+   - mostrar delta de kcal, proteína, carbohidratos y grasa;
+   - indicar si requiere rebalancear otra comida futura;
+   - conservar motivo opcional y alcance.
+3. Rebalancear solo comidas del mismo día que:
+   - no estén marcadas como hechas;
+   - no tengan edición manual explícita;
+   - no pertenezcan a días completados.
+4. Si no se puede rebalancear:
+   - permitir aplicar con advertencia neutral si queda dentro de tolerancia aceptable;
+   - o bloquear si rompe restricciones/targets de forma severa.
+5. Guardar en `day_log.state.contingencyLog`:
+   - comida original;
+   - comida nueva;
+   - gramos/macros;
+   - comidas rebalanceadas;
+   - motivo;
+   - timestamp.
+6. Mantener "Volver al plan":
+   - revierte reemplazo y rebalanceos asociados cuando sea seguro;
+   - nunca borra registros ejecutados.
+7. Agregar tests:
+   - reemplazo dentro de tolerancia sin rebalanceo;
+   - reemplazo que rebalancea cena futura;
+   - comida ya registrada no se toca;
+   - día completado no se reescribe;
+   - restricciones duras bloquean candidato.
+
+### Fuera de alcance
+
+- No resolver rebalanceo semanal completo; este REQ opera por día.
+- No crear recetas nuevas.
+- No cambiar el flujo de entrenamiento.
+
+### Riesgos
+
+- Rebalancear silenciosamente puede erosionar confianza; cada cambio debe mostrarse antes de confirmar.
+- Revertir debe ser cuidadoso para no borrar acciones hechas después del reemplazo.
+- Los conflictos offline pueden involucrar cambios rebalanceados; el log debe ser claro.
+
+### Criterios de aceptación
+
+- Cambiar una comida propone alternativas compatibles rankeadas por cercanía a la meta.
+- Si el reemplazo desbalancea el día, el sistema propone ajustes en comidas futuras no registradas antes de aplicar.
+- Ninguna comida ya marcada como hecha se modifica por rebalanceo.
+- "Volver al plan" revierte el cambio sin borrar ejecución real.
+- El resumen del día muestra la adaptación y cualquier rebalanceo aplicado.
+- `node scripts/validate-nutrition-replacements.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Día con desayuno hecho y almuerzo pendiente: cambiar almuerzo y confirmar que desayuno no cambia.
+- Día con comida futura disponible: aplicar reemplazo alto en kcal y confirmar rebalanceo propuesto.
+- Forzar offline, aplicar cambio, reconectar y confirmar que sync mantiene log y estado.
+
+---
+
+## REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros
+
+**Estado: pendiente.**
+
+### Origen
+
+El análisis concluye que los parches de prompt no deben seguir siendo la forma principal de corregir aritmética nutricional. La IA debe aportar variedad, explicación y traducción de preferencias, pero el sistema debe mapear ingredientes, calcular macros, ajustar porciones y validar antes de aplicar.
+
+### Problema
+
+`generateOneDay()` y flujos similares todavía dependen de respuestas que declaran macros y gramos. Aunque hay validaciones, el modelo sigue siendo la fuente inicial de un cálculo que debería ser determinista. Esto genera fallos recurrentes con metas altas, restricciones, porciones y catálogo incompleto.
+
+### Objetivo
+
+Reubicar al coach nutricional como capa auxiliar: propone recetas o alternativas, pero Fitbros solo aplica resultados que el motor nutricional pueda normalizar, recalcular y validar. La experiencia visible sigue siendo la misma: "tu coach" prepara opciones; internamente, el motor decide si son aplicables.
+
+### Dependencias
+
+- Requiere REQ-78 y REQ-80.
+- Idealmente requiere REQ-79 para mapear recetas a slugs/metadata.
+- Debe respetar REQ-31, REQ-32 y REQ-25.
+
+### Alcance
+
+1. Cambiar el contrato de generación nutricional:
+   - el coach puede proponer nombre, slot, ingredientes y preparación;
+   - macros declarados por la respuesta son informativos o ignorados;
+   - el motor calcula macros reales desde ingredientes mapeados.
+2. Implementar normalización de ingredientes:
+   - match por `ingredientSlug` si existe;
+   - match por nombre normalizado;
+   - si el ingrediente no existe, marcar `needs_catalog_review` o usar sustituto aprobado;
+   - no aplicar recetas con ingredientes desconocidos como plan activo.
+3. Pasar toda propuesta por:
+   - restricciones duras;
+   - solver de porciones;
+   - tolerancias del día/slot;
+   - validación de ingredientes conocidos;
+   - entitlement/cuota existente.
+4. Mantener fallback determinista:
+   - si el coach falla o propone algo inválido, usar solver determinista;
+   - no dejar el día vacío.
+5. Guardar resultados válidos en un pool privado solo si son recalculables y compatibles con el perfil actual.
+6. Opcional en este REQ si el alcance alcanza: crear una cola/admin de "recetas candidatas" para que recetas nuevas se revisen antes de entrar al catálogo global.
+7. Actualizar tests de `api/claude.js`/quota:
+   - respuesta con macros falsos pero ingredientes conocidos se recalcula;
+   - ingrediente desconocido no se aplica;
+   - restricción dura bloquea;
+   - quota agotada usa fallback sin llamada externa.
+
+### Fuera de alcance
+
+- No crear automáticamente recetas globales sin revisión.
+- No ampliar catálogo masivo.
+- No mostrar detalles técnicos al usuario.
+- No consumir servicios pagados fuera de las llamadas ya controladas por cuota.
+
+### Riesgos
+
+- Mapear ingredientes por nombre puede producir falsos positivos; debe preferirse slug o selección de catálogo.
+- Rechazar demasiadas propuestas puede reducir variedad; el fallback determinista debe cubrir la experiencia.
+- Si se guarda pool privado, debe revalidarse ante cambios de perfil.
+
+### Criterios de aceptación
+
+- Ninguna comida generada por el coach se aplica usando macros declarados como autoridad.
+- Las macros visibles salen del motor sobre ingredientes conocidos y gramos finales.
+- Una propuesta con ingrediente desconocido queda bloqueada o marcada para revisión, sin aplicarse como plan activo.
+- Al fallar una propuesta, el usuario recibe una opción determinista válida.
+- Se mantiene el techo de cuota y el vocabulario invisible.
+- `node scripts/test-coach-quota.mjs` pasa.
+- `node scripts/validate-nutrition-coach-contract.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Mockear respuesta con macros inflados y confirmar que la app recalcula.
+- Mockear ingrediente inexistente y confirmar bloqueo/fallback.
+- Agotar cuota y confirmar que no hay llamada externa adicional.
+- Recorrer "Preparar mi día" y "Preparar mi semana" como usuario normal, sin textos técnicos.
