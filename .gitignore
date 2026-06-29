@@ -12,6 +12,9 @@ node_modules/
 # Archivos de auditoría y capturas locales
 assets/ux-audit-*/
 
+# Análisis y materiales locales (no versionar)
+ANALISIS_ARQUITECTURA_NUTRICION_FITIA*.md
+
 # Nunca subir secretos
 .env
 .env.local
