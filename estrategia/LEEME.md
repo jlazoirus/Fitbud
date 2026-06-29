@@ -33,7 +33,7 @@ FASE 1 · VALIDAR  →  FASE 2 · DECIDIR  →  FASE 3 · ADQUIRIR  →  FASE 4 
 
 6. **`05-Auditoria-Deploy-UX-UI-2026-06-23.md`** — Resultado del intento de deploy forzado en Vercel y auditoría heurística UX/UI con capturas. Hallazgos clave: cron horario bloquea deploy en Hobby, checkout devuelve `503` antes de auth si Stripe no está configurado, primer día puede quedar vacío, Perfil es demasiado denso y Progreso necesita mejores targets táctiles/accesibilidad.
 
-7. **`07-Kit-Reclutamiento-Beta-REQ70.md`** — Material listo para reclutar candidatos por redes: brief para un amigo con audiencia fitness, copies de stories/post/reel, respuestas por DM, formulario publico y scoring para separar Segmento A/B.
+7. **`07-Kit-Reclutamiento-Beta-REQ70.md`** — Material listo para reclutar candidatos por redes: brief para un amigo con audiencia fitness, copies de stories/post/reel, respuestas por WhatsApp, formulario publico y scoring para separar Segmento A/B.
 
 ---
 

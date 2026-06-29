@@ -379,8 +379,8 @@
                 <input id="name" name="name" autocomplete="name" required>
               </div>
               <div>
-                <label for="contact">Instagram, WhatsApp o correo</label>
-                <input id="contact" name="contact" autocomplete="email" required placeholder="@usuario o +51...">
+                <label for="contact">WhatsApp</label>
+                <input id="contact" name="contact" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+51 999 999 999">
               </div>
               <div>
                 <label for="age">Edad</label>
@@ -444,7 +444,7 @@
               <label class="option"><input type="checkbox" name="tools" value="App de tracking"><span>App de tracking<small>MyFitnessPal, Fitia, MacroFactor, Yazio u otra.</small></span></label>
               <label class="option"><input type="checkbox" name="tools" value="Excel o notas"><span>Excel, notas o calculadora propia</span></label>
               <label class="option"><input type="checkbox" name="tools" value="Coach o nutricionista"><span>Coach, entrenador o nutricionista</span></label>
-              <label class="option"><input type="checkbox" name="tools" value="YouTube o redes"><span>YouTube, TikTok, Instagram o rutinas sueltas</span></label>
+              <label class="option"><input type="checkbox" name="tools" value="YouTube o redes"><span>YouTube, TikTok, otras redes o rutinas sueltas</span></label>
               <label class="option"><input type="checkbox" name="tools" value="Nada sostenido"><span>Nada sostenido<small>He probado cosas, pero no mantuve un sistema.</small></span></label>
             </div>
           </fieldset>
@@ -682,7 +682,7 @@
         "Hola, quiero participar en la validacion de Fitbros.",
         "",
         "Nombre: " + data.name,
-        "Contacto: " + data.contact,
+        "WhatsApp: " + data.contact,
         "Edad: " + data.age,
         "Ciudad: " + data.city,
         "Segmento sugerido: " + score.segment,

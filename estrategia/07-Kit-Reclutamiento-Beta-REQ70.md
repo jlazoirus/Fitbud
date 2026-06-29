@@ -46,7 +46,7 @@ Si quieres que el boton final abra WhatsApp directo a un numero especifico, comp
 https://fitbud-green.vercel.app/beta-reclutamiento.html?whatsapp=51XXXXXXXXX
 ```
 
-El formulario no guarda datos en una base. Segmenta en el navegador y genera un resumen para que la persona lo envie por DM o WhatsApp. Esto es intencional para arrancar rapido y evitar almacenar datos sensibles antes de tener un flujo formal de investigacion.
+El formulario no guarda datos en una base. Segmenta en el navegador y genera un resumen para que la persona lo envie por WhatsApp. Esto es intencional para arrancar rapido y evitar almacenar datos sensibles antes de tener un flujo formal de investigacion.
 
 ## 3. Mensaje para tu amigo
 
@@ -126,7 +126,7 @@ CTA:
 Llena el formulario. Son 2 minutos. Si encajas, te escribimos para una entrevista corta y posible beta.
 ```
 
-## 5. Respuestas por DM
+## 5. Respuestas por WhatsApp
 
 ### Cuando alguien pregunta "de que trata"
 
@@ -159,7 +159,7 @@ Gracias por contarlo. Para la beta de entrenamiento necesitamos ser cuidadosos: 
 
 El formulario publico pregunta:
 
-- Nombre y contacto: para poder escribirle.
+- Nombre y WhatsApp: para poder escribirle.
 - Edad y pais/ciudad: contexto basico.
 - Estado actual: principiante, retomando, constante, avanzado.
 - Objetivo principal: bajar grasa, ganar musculo, salud/habitos, rendimiento.
@@ -176,7 +176,7 @@ Prioriza en este orden:
 
 | Prioridad | Candidato | Que hacer |
 |---|---|---|
-| Alta | Dolor concreto + intento reciente + disponibilidad + contacto claro | Agendar entrevista esta semana |
+| Alta | Dolor concreto + intento reciente + disponibilidad + WhatsApp claro | Agendar entrevista esta semana |
 | Media | Dolor probable, pero poca urgencia o disponibilidad limitada | Guardar para segunda ronda |
 | Baja | Curiosidad sin intento real, sin dolor especifico o sin disponibilidad | No perseguir ahora |
 | Solo entrevista | Tiene condicion/lesion que impide beta, pero puede aportar insight | Entrevistar sin darle tareas fisicas |
@@ -217,4 +217,3 @@ Te quedan bien estas opciones?
 - No prometer resultados fisicos.
 - No reclutar para adquisicion masiva todavia.
 - No mezclar A y B en el analisis final.
-
