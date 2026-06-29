@@ -189,11 +189,17 @@
   .exercise-card.inactive{opacity:.62}
   .exercise-demo{position:relative;background:linear-gradient(145deg,var(--surf3),var(--surf2));border-bottom:1px solid var(--border);min-height:164px;display:flex;align-items:center;justify-content:center}
   .exercise-demo svg{display:block;width:100%;height:164px;color:var(--purple-200)}
-  .exercise-demo .demo-floor{stroke:var(--border-2);stroke-width:3}
-  .exercise-demo .demo-athlete{transform-box:fill-box;transform-origin:center}
-  .exercise-demo .demo-body{stroke:currentColor;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;fill:none}
-  .exercise-demo .demo-head{fill:var(--terra-300)}
-  .exercise-demo .demo-prop{stroke:var(--muted2);stroke-width:5;fill:none}
+  .demo-media{display:block;width:100%;height:164px;object-fit:contain;background:var(--surf3)}
+  .demo-frames{position:relative;width:100%;height:164px}
+  .demo-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+  .demo-frame.demo-frame-1{opacity:0;animation:demoFrame 1.6s steps(1,end) infinite}
+  @keyframes demoFrame{0%,49.9%{opacity:0}50%,100%{opacity:1}}
+  .demo-expand{position:absolute;top:8px;right:8px;z-index:2;width:34px;height:34px;border-radius:999px;border:1px solid var(--border-2);background:rgba(7,7,15,.55);color:var(--txt);font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .demo-floor{stroke:var(--border-2);stroke-width:3}
+  .demo-athlete{transform-box:fill-box;transform-origin:center}
+  .demo-body{stroke:currentColor;stroke-width:7;stroke-linecap:round;stroke-linejoin:round;fill:none}
+  .demo-head{fill:var(--terra-300)}
+  .demo-prop{stroke:var(--muted2);stroke-width:5;fill:none}
   .demo-squat .demo-athlete{animation:demoSquat 2.2s ease-in-out infinite}
   .demo-hinge .demo-athlete{animation:demoHinge 2.2s ease-in-out infinite}
   .demo-push .demo-athlete{animation:demoPush 1.8s ease-in-out infinite}
@@ -206,7 +212,7 @@
   .demo-run .demo-athlete{animation:demoRun 1.2s ease-in-out infinite}
   .demo-cycle .demo-crank{transform-box:fill-box;transform-origin:center;animation:demoCycle .9s linear infinite}
   .demo-swim .demo-athlete{animation:demoSwim 2s ease-in-out infinite}
-  .exercise-card.paused .demo-athlete,.exercise-card.paused .demo-crank{animation-play-state:paused}
+  .exercise-card.paused .demo-athlete,.exercise-card.paused .demo-crank,.exercise-card.paused .demo-frame-1{animation-play-state:paused}
   @keyframes demoSquat{0%,100%{transform:translateY(0) scaleY(1)}50%{transform:translateY(22px) scaleY(.82)}}
   @keyframes demoHinge{0%,100%{transform:rotate(0)}50%{transform:rotate(28deg) translate(8px,10px)}}
   @keyframes demoPush{0%,100%{transform:translateY(-9px)}50%{transform:translateY(12px)}}
@@ -228,6 +234,9 @@
   .exercise-steps{margin:8px 0 0;padding-left:20px;color:var(--txt);font-size:13px;line-height:1.5}
   .exercise-safety{margin-top:10px;padding:10px;border-radius:var(--r-sm);background:rgba(220,80,80,.08);border:1px solid rgba(220,80,80,.2);font-size:12px;line-height:1.45}
   .exercise-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+  .guide-demo{position:relative;border-radius:var(--r-md);overflow:hidden;background:linear-gradient(145deg,var(--surf3),var(--surf2));border:1px solid var(--border);margin:2px 0 10px;min-height:220px;display:flex;align-items:center;justify-content:center}
+  .guide-demo svg,.guide-demo .demo-media,.guide-demo .demo-frames{height:240px}
+  .guide-demo svg{width:100%;color:var(--purple-200)}
   .exercise-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
   .exercise-filters input,.exercise-filters select{width:100%;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:10px;font:inherit}
   .player-overview{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center}
@@ -262,7 +271,8 @@
   .player-active-exercise{margin-top:12px}
   .player-active-exercise .exercise-card{border-color:var(--border-acc)}
   @media(prefers-reduced-motion:reduce){
-    .exercise-demo .demo-athlete,.exercise-demo .demo-crank{animation:none!important}
+    .demo-athlete,.demo-crank{animation:none!important}
+    .demo-frame.demo-frame-1{animation:none!important;opacity:0!important}
   }
 
   /* Tabs */
@@ -3451,10 +3461,60 @@ function exerciseDemoSvg(exercise){
   }
   return `<svg class="demo-${esc(key)}" viewBox="0 0 240 150" role="img" aria-label="Demostración animada de ${esc(exercise.name)}">${figure}</svg>`;
 }
+// Normaliza la media disponible de un ejercicio a una forma consistente (REQ-15).
+function exerciseMediaSources(exercise){
+  const mediaType=String(exercise&&exercise.media_type||"").toLowerCase();
+  const frames=exerciseArray(exercise&&exercise.frames).map(f=>String(f||"").trim()).filter(Boolean);
+  const url=String(exercise&&exercise.media_url||"").trim();
+  const poster=String(exercise&&exercise.poster_url||"").trim();
+  const isVideo=mediaType==="video"||/\.(mp4|webm|mov)(\?|#|$)/i.test(url);
+  const isGif=mediaType==="gif"||/\.gif(\?|#|$)/i.test(url);
+  const isImage=mediaType==="image"||/\.(png|jpe?g|webp|avif)(\?|#|$)/i.test(url);
+  return {mediaType,frames,url,poster,isVideo,isGif,isImage};
+}
+// Cadena de degradación: video/gif → imagen → secuencia de 2 fotos → SVG procedimental.
+function exerciseMediaHtml(exercise,opts){
+  const autoplay=!opts||opts.autoplay!==false;
+  const m=exerciseMediaSources(exercise);
+  const label=esc(`Demostración de ${exercise.name}`);
+  if(m.url&&m.isVideo){
+    return `<video class="demo-media" ${autoplay?"autoplay ":""}loop muted playsinline preload="metadata"${m.poster?` poster="${esc(m.poster)}"`:""} aria-label="${label}"><source src="${esc(m.url)}"></video>`;
+  }
+  if(m.url&&(m.isGif||m.isImage)){
+    return `<img class="demo-media" src="${esc(m.url)}" alt="${label}" loading="lazy">`;
+  }
+  if(m.frames.length>=2){
+    return `<div class="demo-frames">${m.frames.slice(0,2).map((src,i)=>`<img class="demo-frame demo-frame-${i}" src="${esc(src)}" alt="${label}" loading="lazy">`).join("")}</div>`;
+  }
+  if(m.poster||m.frames.length===1){
+    return `<img class="demo-media" src="${esc(m.poster||m.frames[0])}" alt="${label}" loading="lazy">`;
+  }
+  return exerciseDemoSvg(exercise);
+}
+// Modo "Ver técnica": demostración ampliada + instrucciones completas (REQ-16).
+function openExerciseGuide(slug){
+  const exercise=exerciseBySlug(slug,true);
+  if(!exercise){toast("No se encontró el ejercicio");return;}
+  const steps=exerciseArray(exercise.steps);
+  const errors=exerciseArray(exercise.common_errors);
+  const signals=exerciseArray(exercise.safety_signals);
+  const equipment=exerciseArray(exercise.equipment);
+  const muscles=exerciseArray(exercise.muscles);
+  modal(`<div class="guide-demo">${exerciseMediaHtml(exercise)}</div>
+    <h3>${esc(exercise.name)}</h3>
+    <div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(equipment.join(", "))}`:""}${muscles.length?` · ${esc(muscles.join(", "))}`:""}</div>
+    <div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
+    <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
+    <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
+    ${errors.length?`<div class="exercise-copy"><b>Errores comunes:</b> ${esc(errors.join(" · "))}</div>`:""}
+    <div class="exercise-copy"><b>Más fácil:</b> ${esc(exercise.regression)}<br><b>Más difícil:</b> ${esc(exercise.progression)}</div>
+    ${signals.length?`<div class="exercise-safety"><b>Detente si:</b> ${esc(signals.join(" · "))}</div>`:""}`);
+}
 function toggleExerciseMotion(button){
   const card=button.closest(".exercise-card");
   if(!card)return;
   const paused=card.classList.toggle("paused");
+  card.querySelectorAll("video").forEach(v=>{paused?v.pause():v.play().catch(()=>{});});
   button.textContent=paused?"Reproducir":"Pausar";
   button.setAttribute("aria-pressed",String(paused));
 }
@@ -3468,7 +3528,7 @@ function exerciseCard(exercise,admin){
   const pausedByDefault=reduced||admin;
   const issues=validateExerciseRecord(exercise);
   return `<article class="exercise-card ${pausedByDefault?"paused":""} ${exercise.active===false?"inactive":""}" data-exercise="${esc(exercise.slug)}">
-    <div class="exercise-demo">${exerciseDemoSvg(exercise)}</div>
+    <div class="exercise-demo">${exerciseMediaHtml(exercise,{autoplay:!pausedByDefault})}<button class="demo-expand" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Ver técnica de ${esc(exercise.name)} ampliada">⤢</button></div>
     <div class="exercise-body">
       <div class="exercise-title">
         <div><h3>${esc(exercise.name)}</h3><div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(equipment.join(", "))}`:""}</div></div>
@@ -3482,6 +3542,7 @@ function exerciseCard(exercise,admin){
       <div class="exercise-safety"><b>Detente si:</b> ${esc(signals.join(" · "))}</div>
       ${admin?`<div class="exercise-copy"><b>Músculos:</b> ${esc(muscles.join(", "))}<br><b>Fuente/licencia:</b> ${esc(exercise.source_name)} · ${esc(exercise.license_name)}${issues.length?`<br><b style="color:var(--bad)">Incompleto:</b> ${esc(issues.join(", "))}`:""}</div>`:""}
       <div class="exercise-actions">
+        <button class="btn btn-sm" onclick="openExerciseGuide('${esc(exercise.slug)}')">Ver técnica</button>
         ${reduced?'<button class="btn btn-sm" disabled>Movimiento reducido</button>':`<button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>`}
         ${admin&&DB.exerciseReady?`<button class="btn btn-sm" onclick="editExercise('${esc(exercise.slug)}')">Editar</button>`:""}
       </div>
@@ -8374,7 +8435,9 @@ function validateExerciseRecord(exercise){
   const requiredText=["slug","name","discipline","level","movement_pattern","start_position","breathing","regression","progression","media_key","static_key","source_name","license_name"];
   requiredText.forEach(key=>{if(!String(exercise&&exercise[key]||"").trim())issues.push(key);});
   ["steps","common_errors","safety_signals","contraindications"].forEach(key=>{if(!exerciseArray(exercise&&exercise[key]).length)issues.push(key);});
-  if(exercise&&exercise.source_url&&/^https?:\/\//i.test(exercise.source_url))issues.push("media externa");
+  // La media servida debe vivir en almacenamiento propio (Supabase Storage), no en hotlinks externos (REQ-15).
+  const mediaUrls=[exercise&&exercise.media_url,exercise&&exercise.poster_url].concat(exerciseArray(exercise&&exercise.frames)).map(u=>String(u||"").trim()).filter(Boolean);
+  if(mediaUrls.some(u=>/^https?:\/\//i.test(u)&&!u.includes("/storage/v1/object/")))issues.push("media externa (hotlink)");
   return issues;
 }
 function renderExerciseAdmin(){

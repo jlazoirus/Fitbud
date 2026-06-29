@@ -56,6 +56,12 @@ self.addEventListener("fetch", event => {
 
   if (url.hostname === "cdn.jsdelivr.net") {
     event.respondWith(staleWhileRevalidate(request));
+    return;
+  }
+
+  // Media de ejercicios alojada en Supabase Storage: cache-first para uso offline (REQ-15).
+  if (url.pathname.includes("/storage/v1/object/")) {
+    event.respondWith(cacheFirst(request));
   }
 });
 
