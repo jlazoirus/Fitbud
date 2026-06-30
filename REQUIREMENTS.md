@@ -57,7 +57,7 @@ Automatizable por el agente desarrollador:
 1. REQ-81 - Planner semanal nutricional determinista y lista de compras derivada.
 2. REQ-82 - Plan nutricional activo versionado en `plan_versions`.
 3. ~~REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.~~ (implementado)
-4. REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.
+4. ~~REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.~~ (implementado)
 
 Pendiente no automatizable por agentes:
 
@@ -945,7 +945,7 @@ Convertir "Cambiar" en un reemplazo equivalente: elegir alternativas compatibles
 
 ## REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros
 
-**Estado: pendiente.**
+**Estado: implementado.** `recalcCoachMealMacros(comida, catalog)` y `normalizeCoachIngredient` en `js/nutrition-domain.js` calculan macros reales desde el catálogo. `validateGeneratedDay` en `index.html` ignora macros declarados por el coach cuando el catálogo está disponible; marca ingredientes desconocidos con `needs_catalog_review`; mantiene fallback declarado cuando el catálogo no está cargado. 8 tests en `scripts/validate-nutrition-coach-contract.mjs`.
 
 ### Origen
 

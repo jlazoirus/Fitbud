@@ -7070,6 +7070,7 @@ function validateGeneratedDay(j,day,target){
   const noEgg=Array.isArray(prefs.diet)&&(prefs.diet.includes("sin_huevo")||prefs.diet.includes("vegano"));
   const recent=recentMealNames(day.ds,5).map(s=>s.toLowerCase());
   const knownIng=new Set((DB.ingredients||[]).map(i=>i.name.toLowerCase()));
+  const ndCoach=window.FITBUD_NUTRITION_DOMAIN;
   let tot={kcal:0,p:0,c:0,f:0}; const comidas=[];
   j.comidas.forEach((c,idx)=>{
     const slot_id=c.slot_id||c.slot||slotIds[idx]||("slot"+idx);
@@ -7078,16 +7079,26 @@ function validateGeneratedDay(j,day,target){
     if(!nombre)issues.push(`Comida ${idx+1} sin nombre.`);
     if(!ings.length)issues.push(`"${nombre||("Comida "+(idx+1))}" sin ingredientes.`);
     ings.forEach(g=>{if(!(g.gramos>0))issues.push(`"${nombre}": gramos inválidos en "${g.nombre}".`);});
-    const macro={kcal:+c.kcal||0,p:+c.proteina_g||+c.p||0,c:+c.carbohidratos_g||+c.c||0,f:+c.grasa_g||+c.f||0};
+    // REQ-84: macros declarados por el coach son informativos. El motor recalcula desde ingredientes del catálogo.
+    let macro;
+    if(ndCoach&&ndCoach.recalcCoachMealMacros&&DB.loaded){
+      const calc=ndCoach.recalcCoachMealMacros({ingredientes:ings},DB);
+      macro=calc.macros;
+      if(calc.unknownCount>0)warns.push(`"${nombre}": ingredientes no reconocidos (${calc.unknownNames.join(", ")}). Macros calculados desde ingredientes conocidos.`);
+    }else{
+      macro={kcal:+c.kcal||0,p:+c.proteina_g||+c.p||0,c:+c.carbohidratos_g||+c.c||0,f:+c.grasa_g||+c.f||0};
+    }
     tot.kcal+=macro.kcal;tot.p+=macro.p;tot.c+=macro.c;tot.f+=macro.f;
     // huevo / restricción
     const hay=(nombre+" "+ings.map(g=>g.nombre).join(" ")).toLowerCase();
     if(noEgg&&/\bhuevo|clara de huevo|yema\b/.test(hay))issues.push(`"${nombre}" contiene huevo (restricción del perfil).`);
     if(prefs.allergies){prefs.allergies.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(Boolean).forEach(a=>{if(hay.includes(a))issues.push(`"${nombre}" incluye "${a}" (restricción obligatoria).`);});}
     if(prefs.dislikedIngredients){prefs.dislikedIngredients.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(Boolean).forEach(a=>{if(hay.includes(a))warns.push(`"${nombre}" incluye "${a}", que marcaste como no preferido.`);});}
-    // ingredientes nuevos (no en la DB)
-    const nuevos=ings.filter(g=>g.nombre&&!knownIng.has(g.nombre.toLowerCase())).map(g=>g.nombre);
-    if(nuevos.length&&DB.loaded)warns.push(`"${nombre}": ingredientes nuevos (${nuevos.join(", ")}).`);
+    // ingredientes nuevos: solo cuando el catálogo no está disponible para recalcular
+    if(!(ndCoach&&ndCoach.recalcCoachMealMacros&&DB.loaded)){
+      const nuevos=ings.filter(g=>g.nombre&&!knownIng.has(g.nombre.toLowerCase())).map(g=>g.nombre);
+      if(nuevos.length&&DB.loaded)warns.push(`"${nombre}": ingredientes nuevos (${nuevos.join(", ")}).`);
+    }
     if(recent.includes(nombre.toLowerCase()))warns.push(`"${nombre}" se repite respecto a días recientes.`);
     comidas.push({slot_id,nombre,ingredientes:ings,kcal:Math.round(macro.kcal),proteina_g:Math.round(macro.p),carbohidratos_g:Math.round(macro.c),grasa_g:Math.round(macro.f)});
   });

@@ -586,6 +586,43 @@
     });
   }
 
+  // ── Normalización de ingredientes propuestos por el coach (REQ-84) ───────────
+  // Busca un ingrediente en el catálogo por slug o por nombre normalizado.
+  // Retorna {ingredient, matched}.
+  function normalizeCoachIngredient(ingName,ingSlug,maps){
+    if(ingSlug){const by=maps.bySlug.get(String(ingSlug).trim().toLowerCase());if(by)return{ingredient:by,matched:true};}
+    const key=solverKey(ingName);
+    if(key){const by=maps.byName.get(key);if(by)return{ingredient:by,matched:true};}
+    return{ingredient:null,matched:false};
+  }
+
+  // Recalcula macros de una comida usando el catálogo real (ignora macros declarados por el coach).
+  // comida: {ingredientes:[{nombre, gramos, ingredientSlug?}]}
+  // Retorna {macros, knownCount, unknownCount, unknownNames, ingredientesResolved}
+  function recalcCoachMealMacros(comida,catalog){
+    const maps=catalogMaps(catalog);
+    const ings=Array.isArray(comida&&comida.ingredientes)?comida.ingredientes:[];
+    const acc={kcal:0,p:0,c:0,f:0};
+    let knownCount=0,unknownCount=0;
+    const unknownNames=[];
+    const ingredientesResolved=ings.map(ing=>{
+      const ingName=String(ing.nombre||ing.name||"").trim();
+      const ingSlug=String(ing.ingredientSlug||ing.slug||"").trim();
+      const grams=num(ing.gramos!=null?ing.gramos:ing.grams);
+      const{ingredient,matched}=normalizeCoachIngredient(ingName,ingSlug,maps);
+      if(matched&&ingredient){
+        const m=macrosForIngredient(ingredient,grams);
+        addMacros(acc,m);
+        knownCount++;
+        return{nombre:ingName,gramos:grams,matched:true,ingredientSlug:slugFor(ingredient),...roundMacros(m)};
+      }
+      unknownCount++;
+      unknownNames.push(ingName);
+      return{nombre:ingName,gramos:grams,matched:false,needs_catalog_review:true};
+    });
+    return{macros:roundMacros(acc),knownCount,unknownCount,unknownNames,ingredientesResolved};
+  }
+
   // ── Lista de compras desde plan semanal estructurado ─────────────────────────
   // days: array de {comidas:[{ingredientes:[{ingredientSlug, nombre, gramos}]}]}
   // Agrupa por ingredientSlug (o slugFor como fallback) y suma gramos.
@@ -695,6 +732,7 @@
     rankReplacementCandidates,
     solveReplacement,
     rebalanceFutureMeals,
+    recalcCoachMealMacros,
     buildShoppingListFromNutritionPlan,
     scoreWeeklyVariety,
     planNutritionWeek,
