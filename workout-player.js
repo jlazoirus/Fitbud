@@ -209,7 +209,7 @@
       };
     }
     if(STRENGTH_KINDS.has(kind)){
-      if(workout.generatedPrescription&&Array.isArray(workout.generatedPrescription.exercises)){
+      if(workout.generatedPrescription&&Array.isArray(workout.generatedPrescription.exercises)&&workout.generatedPrescription.exercises.length>0){
         return {
           version:VERSION,
           workoutId:workout.id,

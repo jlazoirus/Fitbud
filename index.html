@@ -3722,7 +3722,14 @@ function workoutExercisesHtml(workout){
 /* ---------- Reproductor guiado de entrenamiento (REQ-16) ---------- */
 function workoutPrescription(ds){
   const ew=effectiveWorkout(ds);
-  const exercises=exerciseArray(ew.workout&&ew.workout.exerciseIds).map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
+  const workout=ew.workout;
+  let prescribedIds=exerciseArray(workout&&workout.exerciseIds);
+  // REQ-92: plan generado con exercises:[] → usar template estático del rol como respaldo
+  if(workout&&workout.generated&&!prescribedIds.length&&workout.role){
+    const template=workoutById(ds,workout.role,planPrefsForDate(ds));
+    if(template&&template.exerciseIds&&template.exerciseIds.length)prescribedIds=exerciseArray(template.exerciseIds);
+  }
+  const exercises=prescribedIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
   const prefs=trainingPrefsFromPrefs(planPrefsForDate(ds));
   return WORKOUT_PLAYER.buildPrescription({
     workout:ew.workout,
@@ -6784,7 +6791,13 @@ function deterministicTrainingWeekPayload(expected,prefs){
   const dose=trainingPhaseDose(expected.phase);
   const sessions=expected.sessions.map(spec=>{
     const workout=workoutById(spec.date,spec.role,prefs);
-    const exerciseIds=exerciseArray(workout&&workout.exerciseIds).filter(id=>(spec.allowedExerciseIds||[]).includes(id));
+    // REQ-92: filtrar ejercicios del template por los permitidos; si quedan < 2, suplementar
+    // desde spec.allowedExerciseIds para que el fallback nunca produzca exercises:[]
+    let exerciseIds=exerciseArray(workout&&workout.exerciseIds).filter(id=>(spec.allowedExerciseIds||[]).includes(id));
+    if(strength&&exerciseIds.length<2){
+      const extra=(spec.allowedExerciseIds||[]).filter(id=>!exerciseIds.includes(id));
+      exerciseIds=[...exerciseIds,...extra].slice(0,6);
+    }
     const exercises=exerciseIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
     const prescription=WORKOUT_PLAYER.buildPrescription({
       workout,

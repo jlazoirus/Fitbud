@@ -175,6 +175,7 @@
       name:session.name,
       detail:`${session.objective} · ${session.durationMinutes} min · ${session.intensity}`,
       sport:strength?null:session.type,
+      role:session.role,
       exerciseIds:session.exercises.map(item=>item.exerciseId),
       generated:true,
       generatedPrescription:{

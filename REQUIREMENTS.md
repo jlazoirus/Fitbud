@@ -1414,3 +1414,71 @@ El flujo manual "Agregar comida/snack" (`saveEditor`, línea 6434) y "Sugerir co
 - `dayTotals` no cuenta el snack como consumido hasta que el usuario lo marque.
 - `node scripts/validate-gap-snack-pending.mjs` pasa.
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-92 - Fix: sesión de entrenamiento generada mostraba solo Calentamiento + Vuelta a la calma sin bloques de ejercicios
+
+**Estado: implementado.** Fixes en `deterministicTrainingWeekPayload` (causa raíz), `workout-player.js`, `training-plan.js` y `workoutPrescription`.
+
+### Problema
+
+Al iniciar una sesión de gimnasio generada (ej. "Gimnasio - Pull A"), la sesión mostraba solo 2 bloques: **Bloque 1 de 2 (Calentamiento)** y **Bloque 2 de 2 (Vuelta a la calma)**, sin ningún bloque de ejercicios reales entre ellos.
+
+### Causa raíz
+
+En `deterministicTrainingWeekPayload` (el fallback determinístico que se usa cuando la IA falla o genera datos inválidos), los ejercicios del template estático se filtran por `spec.allowedExerciseIds`:
+
+```js
+const exerciseIds = exerciseArray(workout.exerciseIds).filter(id => spec.allowedExerciseIds.includes(id));
+```
+
+Los ejercicios del template Pull A de gimnasio son `["lat-pulldown","seated-cable-row","face-pull","biceps-curl","hammer-curl"]`, todos requieren cable (machines) o mancuernas. Si el usuario no tiene `machines` ni `dumbbells` en su equipamiento seleccionado (ej: solo barra y dominadas), **ninguno pasa el filtro** → `exerciseIds = []` → el fallback genera una sesión con `exercises: []`.
+
+Cuando el usuario inicia esa sesión, `WORKOUT_PLAYER.buildPrescription` detecta `generatedPrescription.exercises` como array vacío, entra al path "generado" (la condición original solo verificaba `Array.isArray` sin verificar longitud), y `generatedStrengthSteps` itera 0 veces → solo warmup + cooldown = **2 bloques**.
+
+La misma condición de guarda (`!session.allowedExerciseIds.length`) no protege este caso porque `allowedExerciseIds` del usuario incluye otros ejercicios (back-squat, pull-up, etc.), así que la generación del plan procede, pero los ejercicios del template nunca coinciden.
+
+### Solución (4 fixes)
+
+**Fix 1 — Causa raíz (`index.html` `deterministicTrainingWeekPayload`):** Si el filtro de template produce < 2 ejercicios, suplementar con ejercicios de `spec.allowedExerciseIds` hasta 6:
+
+```js
+let exerciseIds = exerciseArray(workout?.exerciseIds).filter(id => allowedExerciseIds.includes(id));
+if (strength && exerciseIds.length < 2) {
+  const extra = allowedExerciseIds.filter(id => !exerciseIds.includes(id));
+  exerciseIds = [...exerciseIds, ...extra].slice(0, 6);
+}
+```
+
+**Fix 2 — Defensivo (`workout-player.js` `buildPrescription`):** No entrar al path generado cuando `exercises` está vacío; agregar `&& exercises.length > 0`:
+
+```js
+if (workout.generatedPrescription && Array.isArray(workout.generatedPrescription.exercises) && workout.generatedPrescription.exercises.length > 0)
+```
+
+**Fix 3 — Data (`training-plan.js` `workoutFromSession`):** Incluir `role: session.role` en el workout generado para que el fallback de sesión pueda buscarlo.
+
+**Fix 4 — Fallback de sesión (`index.html` `workoutPrescription`):** Cuando el workout generado tiene `exerciseIds: []` (plan almacenado con bug), usar el template estático del rol como respaldo para que el usuario pueda iniciar la sesión sin regenerar el plan:
+
+```js
+if (workout.generated && !prescribedIds.length && workout.role) {
+  const template = workoutById(ds, workout.role, planPrefsForDate(ds));
+  if (template?.exerciseIds?.length) prescribedIds = exerciseArray(template.exerciseIds);
+}
+```
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `deterministicTrainingWeekPayload`: suplementar ejercicios cuando filtro < 2 |
+| `index.html` | `workoutPrescription`: fallback a template estático cuando `exerciseIds` vacío |
+| `workout-player.js` | `buildPrescription`: condición `exercises.length > 0` antes de path generado |
+| `training-plan.js` | `workoutFromSession`: expone `role: session.role` en el workout |
+
+### Criterios de aceptación
+
+- Una sesión Pull A de gimnasio generada muestra calentamiento + ejercicios reales + vuelta a la calma (≥ 3 bloques).
+- Para usuario con equipamiento limitado (sin machines/dumbbells), el fallback usa ejercicios alternativos de `allowedExerciseIds`.
+- Para planes ya almacenados con `exercises: []`, la sesión usa el template estático del rol (el usuario ve ejercicios aunque no sean los generados por IA).
+- No hay regresión en sesiones Pull A ya generadas correctamente con ejercicios.
+- `node scripts/release-gate.mjs` pasa.
