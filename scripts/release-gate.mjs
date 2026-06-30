@@ -81,6 +81,7 @@ run("validate-nutrition-catalog.mjs", "node scripts/validate-nutrition-catalog.m
 run("validate-nutrition-solver.mjs", "node scripts/validate-nutrition-solver.mjs");
 run("validate-nutrition-week-planner.mjs", "node scripts/validate-nutrition-week-planner.mjs");
 run("validate-nutrition-plan-snapshot.mjs", "node scripts/validate-nutrition-plan-snapshot.mjs");
+run("validate-nutrition-replacements.mjs", "node scripts/validate-nutrition-replacements.mjs");
 run("validate-high-protein-prompt.mjs", "node scripts/validate-high-protein-prompt.mjs");
 run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");

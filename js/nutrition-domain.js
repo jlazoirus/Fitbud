@@ -488,6 +488,104 @@
     };
   }
 
+  // ── Motor de reemplazos equivalentes (REQ-83) ────────────────────────────────
+
+  // Devuelve candidatos ordenados por cercanía al target de la comida actual.
+  // meal: {slot_id, kcal, proteina_g, carbohidratos_g, grasa_g}
+  // candidates: platos del catálogo ya filtrados por slot/dieta
+  // mealTarget: {kcal,p,c,f} objetivo del slot
+  // catalog: objeto {ingredients, dishes, dishIng}
+  function rankReplacementCandidates(meal,candidates,mealTarget,catalog){
+    const currentKcal=num(meal&&meal.kcal)||0;
+    const currentP=num(meal&&meal.proteina_g)||0;
+    const results=[];
+    (candidates||[]).slice(0,60).forEach(dish=>{
+      const solved=solveDishPortion(dish,mealTarget,{catalog});
+      if(!solved.ok)return;
+      const m=solved.macros;
+      const deltaKcal=m.kcal-currentKcal;
+      const proximity=Math.abs(deltaKcal)/Math.max(50,currentKcal);
+      results.push({
+        dish,
+        macros:m,
+        ingredients:solved.ingredients,
+        score:solved.score+proximity*0.5,
+        deltaKcal:Math.round(deltaKcal),
+        deltaP:Math.round(m.p-currentP),
+        deltaC:Math.round(m.c-(num(meal&&meal.carbohidratos_g)||0)),
+        deltaF:Math.round(m.f-(num(meal&&meal.grasa_g)||0)),
+      });
+    });
+    return results.sort((a,b)=>a.score-b.score);
+  }
+
+  // Evalúa si un reemplazo necesita rebalancear y qué comidas futuras son candidatas.
+  // dayMeals: array de comidas del día [{id, slot, kcal, ...}]
+  // dayLog: day_log.state con {meals:{[id]:{done, ovr}}}
+  // changedSlotId: slot que cambia
+  // deltaKcal: diferencia de kcal del nuevo plato vs. el original (puede ser negativa)
+  // Devuelve {rebalanceNeeded, futureMeals:[{id,slot}], warns}
+  function solveReplacement(changedSlotId,deltaKcal,dayMeals,dayLog){
+    const tol=NUTRITION_TOLERANCES.REPLACEMENT_KCAL_PCT;
+    const absRatio=Math.abs(num(deltaKcal))/Math.max(50,num(deltaKcal<0?deltaKcal*-1:1)+50);
+    // Rebalanceo si el cambio supera la tolerancia del slot
+    const rebalanceNeeded=Math.abs(num(deltaKcal))>50;
+    const mealIdx=(dayMeals||[]).findIndex(m=>m.id===changedSlotId);
+    const futureMeals=(dayMeals||[]).filter((m,i)=>{
+      if(mealIdx>=0&&i<=mealIdx)return false;
+      const ms=dayLog&&dayLog.meals&&dayLog.meals[m.id];
+      if(ms&&ms.done)return false;
+      // No rebalancear si tiene edición manual (ovr sin gen=true)
+      if(ms&&ms.ovr&&!ms.ovr.gen&&!ms.ovr.nutritionPlan)return false;
+      return true;
+    });
+    const warns=[];
+    if(rebalanceNeeded&&!futureMeals.length){
+      warns.push("No hay comidas futuras sin registrar para compensar. El total del día quedará ajustado.");
+    }
+    return{rebalanceNeeded,futureMeals,warns};
+  }
+
+  // Genera los ajustes de rebalanceo para comidas futuras redistribuyendo el delta.
+  // futureMeals: array de {id, slot, kcal, dishSlug} — ya filtrado por solveReplacement
+  // deltaKcal: kcal a compensar en las comidas futuras (negativo = absorber exceso)
+  // dayTarget: {kcal,p,c,f} objetivo del día
+  // prefs: preferencias del perfil
+  // catalog: catálogo completo
+  // Devuelve [{slot_id, slot, adjustKcal, newOvr?}]
+  function rebalanceFutureMeals(futureMeals,deltaKcal,dayTarget,prefs,catalog){
+    if(!futureMeals||!futureMeals.length)return[];
+    const adjustKcal=Math.round(-num(deltaKcal)/futureMeals.length);
+    const targets=mealSlotTargets(dayTarget,prefs,null);
+    return futureMeals.map(fm=>{
+      const slotTarget=targets.find(t=>t.id===fm.id);
+      if(!slotTarget)return{slot_id:fm.id,slot:fm.slot,adjustKcal,newOvr:null};
+      const adjTarget={
+        kcal:Math.max(100,slotTarget.target.kcal+adjustKcal),
+        p:Math.max(5,slotTarget.target.p),
+        c:Math.max(5,slotTarget.target.c),
+        f:Math.max(2,slotTarget.target.f),
+      };
+      // Si la comida futura tiene dishSlug (prescripción del nutritionPlan), re-solver la porción
+      let newOvr=null;
+      if(fm.dishSlug&&catalog){
+        const dish=(Array.isArray(catalog.dishes)?catalog.dishes:[]).find(d=>slugFor(d)===fm.dishSlug);
+        if(dish){
+          const solved=solveDishPortion(dish,adjTarget,{catalog});
+          if(solved.ok){
+            newOvr={
+              name:dish.name,dishName:dish.name,gen:true,nutritionPlan:true,
+              kcal:solved.macros.kcal,p:solved.macros.p,c:solved.macros.c,f:solved.macros.f,
+              ingredientes:solved.ingredients.map(({nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g})=>
+                ({nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g})),
+            };
+          }
+        }
+      }
+      return{slot_id:fm.id,slot:fm.slot,adjustKcal,newOvr};
+    });
+  }
+
   // ── Lista de compras desde plan semanal estructurado ─────────────────────────
   // days: array de {comidas:[{ingredientes:[{ingredientSlug, nombre, gramos}]}]}
   // Agrupa por ingredientSlug (o slugFor como fallback) y suma gramos.
@@ -594,6 +692,9 @@
     compatibleDishesForSlot,
     solveDishPortion,
     planDeterministicNutritionDay,
+    rankReplacementCandidates,
+    solveReplacement,
+    rebalanceFutureMeals,
     buildShoppingListFromNutritionPlan,
     scoreWeeklyVariety,
     planNutritionWeek,

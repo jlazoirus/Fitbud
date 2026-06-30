@@ -56,7 +56,7 @@ Automatizable por el agente desarrollador:
 
 1. REQ-81 - Planner semanal nutricional determinista y lista de compras derivada.
 2. REQ-82 - Plan nutricional activo versionado en `plan_versions`.
-3. REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.
+3. ~~REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.~~ (implementado)
 4. REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.
 
 Pendiente no automatizable por agentes:
@@ -854,7 +854,7 @@ Guardar el plan nutricional prescrito como entidad de primera clase dentro de `p
 
 ## REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras
 
-**Estado: pendiente.**
+**Estado: implementado.** Motor puro `rankReplacementCandidates`, `solveReplacement`, `rebalanceFutureMeals` en `js/nutrition-domain.js`; `openChangeMeal`/`applyChangeMeal`/`revertMeal` en `index.html` enriquecidos con ranking y rebalanceo; contingencyLog incluye comidas rebalanceadas; 9 tests en `scripts/validate-nutrition-replacements.mjs`.
 
 ### Origen
 

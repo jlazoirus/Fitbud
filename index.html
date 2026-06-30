@@ -6177,8 +6177,26 @@ function addContingencyEntry(ds,entry){
 }
 function revertMeal(ds,id){
   const ms=mealState(ds,id);const prev=ms.ovr?ms.ovr.name:null;
-  delete ms.ovr;addContingencyEntry(ds,{type:"meal_revert",id,prev});
-  commitDay(ds);render();toast("Comida restaurada al plan original");
+  delete ms.ovr;
+  // Deshacer rebalanceos asociados al último meal_replace de este slot (REQ-83)
+  const st=dayState(ds);
+  const log=st.contingencyLog||[];
+  const lastReplace=[...log].reverse().find(e=>e.type==="meal_replace"&&e.id===id);
+  const revertedSlots=[];
+  if(lastReplace&&Array.isArray(lastReplace.rebalanced)){
+    lastReplace.rebalanced.forEach(r=>{
+      if(!r.slot_id)return;
+      const fms=mealState(ds,r.slot_id);
+      // Solo revertir si la comida futura no fue marcada como hecha después del rebalanceo
+      if(fms&&!fms.done){
+        if(r.prevOvr)fms.ovr={...r.prevOvr};
+        else delete fms.ovr;
+        revertedSlots.push(r.slot_id);
+      }
+    });
+  }
+  addContingencyEntry(ds,{type:"meal_revert",id,prev,revertedSlots});
+  commitDay(ds);render();toast("Comida restaurada al plan"+(revertedSlots.length?` · ${revertedSlots.length} comida${revertedSlots.length>1?"s":""} restablecida${revertedSlots.length>1?"s":""}`:""));
 }
 function propagateMealOverride(ds,id,ovr){
   const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||(WEEKS&&WEEKS[0]);if(!w)return;
@@ -6201,7 +6219,26 @@ function openChangeMeal(ds,id){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
   const ms=mealState(ds,id);const cv=mealValue(base,ms);
   const options=(DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,id)):[]).map(d=>({name:d.name,dishName:d.name}));
-  window._changeMeal={ds,id,options,reason:null};
+  // Rankear candidatos con el motor de reemplazos (REQ-83)
+  const nd=window.FITBUD_NUTRITION_DOMAIN;
+  let ranked=null;
+  if(nd&&nd.rankReplacementCandidates&&DB.loaded){
+    const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+    const target=effectiveDayTarget();
+    const mealTargets=nd.mealSlotTargets?nd.mealSlotTargets(target,prefs,null):null;
+    const mealTarget=mealTargets&&mealTargets.find(t=>t.id===id);
+    const compatible=DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked);
+    if(mealTarget&&compatible.length){
+      const candidates=nd.rankReplacementCandidates(cv,compatible,mealTarget.target,DB);
+      // Anotar rebalanceo necesario en cada candidato
+      const st=dayState(ds);
+      ranked=candidates.slice(0,12).map(r=>{
+        const solv=nd.solveReplacement?nd.solveReplacement(id,r.deltaKcal,day.meals,st):null;
+        return{...r,rebalanceNeeded:solv&&solv.rebalanceNeeded,futureMeals:solv&&solv.futureMeals};
+      });
+    }
+  }
+  window._changeMeal={ds,id,options,reason:null,ranked};
   const optsHtml=_buildChangeMealOpts(cv);
   modal(`<h3>Cambiar — ${esc(base.slot)}</h3>
     <p class="muted small" id="chg-hint">Elige un plato compatible con tus metas.${cv.kcal?` Actual: ${cv.kcal} kcal.`:""}</p>
@@ -6221,8 +6258,22 @@ function openChangeMeal(ds,id){
     <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="openEditor('meal','${ds}','${id}')">✎ Personalizada / editar valores</button>`);
 }
 function _buildChangeMealOpts(cv){
-  const{ds:mDs,id,options}=window._changeMeal;const day=buildDay(mDs);const base=day.meals.find(m=>m.id===id);
+  const{ds:mDs,id,options,ranked}=window._changeMeal;
+  const day=buildDay(mDs);const base=day.meals.find(m=>m.id===id);
   const ms=mealState(mDs,id);const cur=cv||mealValue(base,ms);
+  // Usar candidatos rankeados cuando están disponibles (REQ-83)
+  if(ranked&&ranked.length){
+    const st=dayState(mDs);
+    return ranked.map((r,i)=>{
+      const dk=r.deltaKcal;
+      const dkStr=` <span class="muted">(${dk>0?"+":""}${dk} kcal)</span>`;
+      const dpStr=r.deltaP!==0?` P${r.deltaP>0?"+":""}${r.deltaP}`:"";
+      const rebalInfo=r.rebalanceNeeded&&r.futureMeals&&r.futureMeals.length
+        ?`<span class="muted small"> · ajusta ${r.futureMeals.length} comida${r.futureMeals.length>1?"s":""} futura${r.futureMeals.length>1?"s":""}</span>`:"";
+      const meta=`${r.macros.kcal} kcal${dkStr}${dpStr}${rebalInfo}`;
+      return `<button class="opt" onclick="applyChangeMeal(${i})">${esc(r.dish.name)}<div class="o-meta">${meta}</div></button>`;
+    }).join("")||'<p class="muted small">No hay platos compatibles en la base para este espacio.</p>';
+  }
   return options.map((o,i)=>{
     const d=o.dishName?dishByName(o.dishName):null;const m=d?dishMacros(d.id):null;
     const dk=m&&cur.kcal?m.kcal-cur.kcal:null;
@@ -6246,14 +6297,51 @@ function toggleMotivoChip(reason){
   });
 }
 function applyChangeMeal(i){
-  const{ds,id,options,reason}=window._changeMeal;const o=options[i];
-  const ms=mealState(ds,id);const prev=ms.ovr?ms.ovr.name:null;
-  ms.ovr={name:o.name,dishName:o.dishName||null};
-  if(reason)ms.ovr.contingencyReason=reason;
-  addContingencyEntry(ds,{type:"meal_replace",id,reason:reason||null,chosen:o.name,prev});
+  const{ds,id,options,reason,ranked}=window._changeMeal;
+  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);
+  const ms=mealState(ds,id);
+  const prevName=ms.ovr?ms.ovr.name:(base&&base.name)||null;
+  const prevKcal=mealValue(base||{},ms).kcal||0;
+  // Determinar comida nueva: usar candidato rankeado si existe, si no el listado simple
+  const ranked_item=ranked&&ranked[i];
+  const o=ranked_item?{name:ranked_item.dish.name,dishName:ranked_item.dish.name}:options[i];
+  if(!o)return;
+  const newOvr={name:o.name,dishName:o.dishName||null,gen:true};
+  if(reason)newOvr.contingencyReason=reason;
+  if(ranked_item&&ranked_item.macros){
+    newOvr.kcal=ranked_item.macros.kcal;
+    newOvr.p=ranked_item.macros.p;
+    newOvr.c=ranked_item.macros.c;
+    newOvr.f=ranked_item.macros.f;
+    if(ranked_item.ingredients&&ranked_item.ingredients.length){
+      newOvr.ingredientes=ranked_item.ingredients.map(({nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g})=>
+        ({nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g}));
+    }
+  }
+  ms.ovr=newOvr;
+  // Rebalanceo de comidas futuras (REQ-83)
+  const rebalanced=[];
+  const nd=window.FITBUD_NUTRITION_DOMAIN;
+  if(ranked_item&&ranked_item.rebalanceNeeded&&ranked_item.futureMeals&&ranked_item.futureMeals.length&&nd&&nd.rebalanceFutureMeals){
+    const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+    const target=effectiveDayTarget();
+    const adjustments=nd.rebalanceFutureMeals(ranked_item.futureMeals,ranked_item.deltaKcal,target,prefs,DB);
+    adjustments.forEach(adj=>{
+      const fms=mealState(ds,adj.slot_id);
+      const prevOvr=fms.ovr?{...fms.ovr}:null;
+      if(adj.newOvr){fms.ovr={...adj.newOvr};}
+      rebalanced.push({slot_id:adj.slot_id,slot:adj.slot,adjustKcal:adj.adjustKcal,prevOvr,applied:!!adj.newOvr});
+    });
+  }
+  addContingencyEntry(ds,{
+    type:"meal_replace",id,reason:reason||null,
+    prev:{name:prevName,kcal:prevKcal},
+    chosen:{name:o.name,kcal:ranked_item&&ranked_item.macros&&ranked_item.macros.kcal||null},
+    rebalanced,
+  });
   const scope=(document.querySelector("input[name='chgScope']:checked")||{}).value||"day";
   if(scope==="week")propagateMealOverride(ds,id,{...ms.ovr});
-  commitDay(ds);closeModal();render();toast("Comida actualizada");
+  commitDay(ds);closeModal();render();toast("Comida actualizada"+(rebalanced.length?` · ${rebalanced.length} ajustada${rebalanced.length>1?"s":""}`:""));
 }
 function openMealMore(ds,id){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
