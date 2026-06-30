@@ -53,9 +53,19 @@ const m = g.calculateMacroTargets({weightKg:80,heightCm:180,age:30,sex:"male",go
 assert.ok(m.kcal>1000 && m.kcal<4000, "kcal en rango razonable: "+m.kcal);
 assert.ok(m.p>50, "proteína razonable: "+m.p);
 assert.ok(m.method, "método calculado: "+m.method);
+// REQ-77: invariante kcal == p*4+c*4+f*9
+assert.equal(m.kcal, m.p*4+m.c*4+m.f*9, "REQ-77: kcal debe igualar la suma calórica de macros (caso 80 kg)");
 
 const mBf = g.calculateMacroTargets({weightKg:80,heightCm:180,age:30,sex:"male",goal:"deficit",activityLevel:"moderate",bodyFatPct:15});
 assert.equal(mBf.method, "Katch-McArdle", "con BF% usa Katch-McArdle");
+assert.equal(mBf.kcal, mBf.p*4+mBf.c*4+mBf.f*9, "REQ-77: invariante con BF%");
+
+// REQ-77: caso canónico — mujer 140 kg / 160 cm / 60 a / ligera / déficit
+const mHeavy = g.calculateMacroTargets({weightKg:140,heightCm:160,age:60,sex:"female",goal:"deficit",activityLevel:"light"});
+assert.ok(Math.abs(mHeavy.kcal - (mHeavy.p*4+mHeavy.c*4+mHeavy.f*9)) <= 10,
+  "REQ-77: caso 140 kg — |kcal - suma_macros| debe ser ≤ 10, got "+Math.abs(mHeavy.kcal-(mHeavy.p*4+mHeavy.c*4+mHeavy.f*9)));
+assert.ok(mHeavy.p <= 220,
+  "REQ-77: proteína para 140 kg sin BF% debe ser ≤ 220 g (era 280 g con bug), got "+mHeavy.p);
 
 // ── validTrainingDays ─────────────────────────────────────────────────────────
 assert.ok(g.validTrainingDays(3));

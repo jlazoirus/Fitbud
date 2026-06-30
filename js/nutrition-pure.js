@@ -255,11 +255,23 @@
       :10*kg+6.25*cm-5*age+(input.sex==="female"?-161:5);
     const maintenance=Math.round(bmr*activity.factor/10)*10;
     const goalFactor=input.goal==="volumen"?1.1:input.goal==="mantenimiento"?1:.85;
-    const kcal=Math.round(maintenance*goalFactor/10)*10;
+    const kcalTarget=Math.round(maintenance*goalFactor/10)*10;
     const proteinRate=input.goal==="deficit"?2:1.8;
-    const p=Math.round((hasBf?Math.max(leanKg*2.2,kg*1.6):kg*proteinRate));
-    const f=Math.round(Math.max(45,kg*.8));
-    const c=Math.max(50,Math.round((kcal-p*4-f*9)/4));
+    // Protein: when no BF% is given, use adjusted body weight (IBW + 40% of excess)
+    // for people significantly above IBW — avoids unrealistically high targets (e.g. 280 g for 140 kg).
+    // IBW via Devine formula (cm-based). Only kicks in when kg > IBW * 1.25.
+    const ibw=Math.max(30,input.sex==="female"?45.5+0.906*(cm-152.4):50+0.906*(cm-152.4));
+    const pRefKg=hasBf?null:(kg>ibw*1.25?ibw+0.4*(kg-ibw):kg);
+    const pRaw=hasBf?Math.max(leanKg*2.2,kg*1.6):(pRefKg||kg)*proteinRate;
+    const cFloor=50,fFloor=45;
+    const p=Math.round(pRaw);
+    // Cap fat so the carb floor always fits within the kcal budget (prevents p*4+f*9+cFloor*4 > kcalTarget).
+    const fMax=Math.max(fFloor,Math.floor((kcalTarget-p*4-cFloor*4)/9));
+    const fRaw=Math.round(Math.max(fFloor,kg*.8));
+    const f=Math.round(Math.max(fFloor,Math.min(fRaw,fMax)));
+    const c=Math.max(cFloor,Math.round((kcalTarget-p*4-f*9)/4));
+    // Return the exact macro-derived kcal so kcal === p*4+c*4+f*9 always holds.
+    const kcal=p*4+c*4+f*9;
     return {kcal,p,c,f,maintenance,bmr:Math.round(bmr),method:hasBf?"Katch-McArdle":"Mifflin-St Jeor"};
   }
 

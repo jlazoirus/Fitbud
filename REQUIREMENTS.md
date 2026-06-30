@@ -4104,7 +4104,7 @@ El primero es un tapahuecos mínimo (131 kcal, 28g P); el segundo es una bomba d
 
 ## REQ-77 - Fix: las metas calculadas en onboarding incumplen "kcal = suma de macros" para usuarios de alto peso en déficit
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Origen
 
