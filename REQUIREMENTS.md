@@ -4172,7 +4172,7 @@ Que las metas que el onboarding calcula y guarda sean siempre internamente consi
 
 ## REQ-78 - Dominio nutricional puro y contratos estrictos
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Origen
 
