@@ -1167,3 +1167,79 @@ Nueva función `weekPendingDays(allDays)` que filtra:
 - Si todos los días de la semana ya pasaron/están registrados, muestra toast y no genera nada.
 - `node scripts/validate-week-skip-past.mjs` pasa.
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-88 - Fix: contextKey de generación diaria no incluía la fecha, causando reuso cruzado entre días
+
+**Estado: implementado.** `generateOneDay` ahora pasa `ds` como `scope` a `coachQuota`, y `COACH_PROMPT_VERSION` sube a 3 para invalidar entradas de pool anteriores. 5 asserts en `scripts/validate-day-scope-in-context.mjs`.
+
+### Problema
+
+Al generar una semana completa ("Preparar mi semana"), todos los días recibían el mismo resultado de la IA en vez de planes individualizados. Ejemplo concreto: miércoles y viernes ambos mostraban exactamente 1798 kcal con las mismas comidas — evidencia de que un resultado cached se reutilizaba para todos los días.
+
+### Causa raíz (verificada contra código)
+
+`generateOneDay` llamaba a `coachQuota` con solo 5 argumentos, sin pasar el 6to parámetro `scope`:
+
+```js
+const quota=coachQuota(
+    coachRequest.action,
+    coachRequest.requestId,
+    coachRequest.partKey,
+    fallback,
+    dietQuotaValidation(ds)
+    // ← falta ds como scope
+);
+```
+
+En `coachQuota(action,requestId,partKey,fallbackText,validation,scope)`, cuando `scope` es `undefined`, se convierte en `scope||null` → `null`. El `contextKey` resultante (hash del JSON serializado del contexto) era **idéntico para todos los días** de la semana, porque la fecha no formaba parte del hash.
+
+El sistema de reuso (`select_reusable_coach_part` en Supabase) buscaba por `context_key` y encontraba el resultado del primer día generado, sirviéndolo para todos los demás.
+
+Comparación con `regenerateGenMeal` (que SÍ funcionaba bien):
+```js
+const quota=coachQuota("diet_day",requestId,"slot-"+slotId,fallback,validation,slotId+":"+draft.ds);
+//                                                                               ↑ scope incluye fecha
+```
+
+### Solución
+
+1. **`generateOneDay`**: Se agrega `ds` (la fecha del día, ej. `"2026-06-30"`) como 7mo argumento a `coachQuota`:
+```js
+const quota=coachQuota(
+    coachRequest.action,
+    coachRequest.requestId,
+    coachRequest.partKey,
+    fallback,
+    dietQuotaValidation(ds),
+    ds  // ← fecha como scope → contextKey único por día
+);
+```
+
+2. **`COACH_PROMPT_VERSION`**: Bump de 2 → 3. Esto invalida todas las entradas existentes en `coach_option_pool` que se generaron sin scope en el contextKey. Sin este bump, las entradas viejas (con scope=null) seguirían matcheando si alguien no hubiera regenerado aún.
+
+### Por qué este fix es definitivo
+
+El contextKey ahora incluye:
+- `version: COACH_PROMPT_VERSION` (3) — invalida resultados de prompts anteriores
+- `scope: ds` (ej. "2026-06-30") — hace cada día único
+- `nutrition.target` — metas del usuario
+- `catalog` hash — catálogo de platos disponible
+- `diet`, `mealCount`, etc. — preferencias
+
+Un resultado solo se puede reutilizar si: (a) es del mismo usuario, (b) mismo día, (c) misma versión de prompt, (d) mismas metas, (e) mismo catálogo, (f) mismas preferencias. Cualquier cambio en cualquiera de estos factores genera un contextKey diferente y fuerza una nueva llamada a la IA.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `generateOneDay` pasa `ds` como scope; `COACH_PROMPT_VERSION` = 3 |
+| `scripts/validate-day-scope-in-context.mjs` | Validador estructural (5 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Criterios de aceptación
+
+- Cada día de "Preparar mi semana" genera un resultado diferente (contextKey único por fecha).
+- `COACH_PROMPT_VERSION >= 3`.
+- Entradas antiguas del pool (version 2, scope null) no se reutilizan.
+- `node scripts/validate-day-scope-in-context.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.

@@ -6518,7 +6518,7 @@ function coachHardRestrictions(){
 }
 // REQ-86: bump COACH_PROMPT_VERSION cada vez que cambia la lógica del prompt
 // para invalidar resultados reutilizables generados con prompts anteriores.
-const COACH_PROMPT_VERSION=2;
+const COACH_PROMPT_VERSION=3;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -7166,7 +7166,8 @@ Responde SOLO JSON válido, sin texto extra:
     coachRequest.requestId,
     coachRequest.partKey,
     fallback,
-    dietQuotaValidation(ds)
+    dietQuotaValidation(ds),
+    ds
   );
   const txt=await callClaude(prompt,maxTok,quota);
   const j=parseJSON(txt);
