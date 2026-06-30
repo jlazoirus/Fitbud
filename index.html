@@ -6516,11 +6516,14 @@ function coachHardRestrictions(){
   if(diet.includes("vegetariano")||diet.includes("vegano"))terms.push("carne","pollo","pavo","cerdo","ternera","res","jamón","chorizo","tocino","pescado","atún","salmón","trucha","merluza","gamba","langostino","camarón","marisco","calamar","pulpo","anchoa","sardina");
   return [...new Set(terms.map(x=>x.toLowerCase()))];
 }
+// REQ-86: bump COACH_PROMPT_VERSION cada vez que cambia la lógica del prompt
+// para invalidar resultados reutilizables generados con prompts anteriores.
+const COACH_PROMPT_VERSION=2;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
   return {
-    version:1,action,
+    version:COACH_PROMPT_VERSION,action,
     timeZone:p.timeZone,
     nutrition:{
       target,mealCount:p.mealCount,mealTimes:p.mealTimes,diet:p.diet||[],
