@@ -54,11 +54,10 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 
 Automatizable por el agente desarrollador:
 
-1. REQ-80 - Solver determinista de porciones para preparar un dia nutricional.
-2. REQ-81 - Planner semanal nutricional determinista y lista de compras derivada.
-3. REQ-82 - Plan nutricional activo versionado en `plan_versions`.
-4. REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.
-5. REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.
+1. REQ-81 - Planner semanal nutricional determinista y lista de compras derivada.
+2. REQ-82 - Plan nutricional activo versionado en `plan_versions`.
+3. REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.
+4. REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.
 
 Pendiente no automatizable por agentes:
 
@@ -583,11 +582,11 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-79`).
 
 ## Requerimientos activos completos
 
-Los siguientes REQ siguen completos porque son el trabajo operativo pendiente para agentes.
+Los siguientes REQ conservan detalle completo porque son trabajo operativo reciente o pendiente para agentes.
 
 ## REQ-80 - Solver determinista de porciones para preparar un día nutricional
 
-**Estado: pendiente.**
+**Estado: implementado (2026-06-30).**
 
 ### Origen
 

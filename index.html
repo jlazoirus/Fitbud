@@ -2687,6 +2687,7 @@ async function prepareFirstCycleDay(ds){
         if(res&&res.ok&&Array.isArray(res.comidas)&&res.comidas.length)comidas=res.comidas;
       }catch(e){}
     }
+    if(!comidas&&supa&&!DB.loaded&&!DB.error){try{await dbLoad();}catch(e){}}
     if(!comidas){const det=deterministicDayPayload(ds);comidas=det.comidas||[];}
     if(comidas.length)applyDayComidas(ds,comidas);
     const nowStr=new Date().toISOString();
@@ -3163,7 +3164,7 @@ function homeAdaptWorkout(ds){
   homeTrackAction(ds,"workout_adapt");
   openWorkoutContingency(ds,"tiempo");
 }
-function homePrepareDay(ds){
+async function homePrepareDay(ds){
   homeTrackAction(ds,"prepare_day");
   current=ds;
   if(!hasCompleteOnboarding((profile&&profile.prefs)||{})){startOnboarding();return;}
@@ -3171,12 +3172,13 @@ function homePrepareDay(ds){
   // Sin coach disponible: arma un día determinista al instante en lugar de
   // mandar al usuario a Perfil (evita un callejón sin salida en la activación).
   try{
+    if(supa&&!DB.loaded&&!DB.error){toast("Actualizando tus opciones…");await dbLoad();}
     const det=deterministicDayPayload(ds);
     if(det&&Array.isArray(det.comidas)&&det.comidas.length){
       applyDayComidas(ds,det.comidas);
       homeTrackAction(ds,"prepare_day_deterministic");
       render();window.scrollTo(0,0);
-      toast("Listo: preparamos un día práctico con tus metas.");
+      toast(det.ok===false?"Listo: preparamos la opción más viable.":"Listo: preparamos un día práctico con tus metas.");
       return;
     }
   }catch(e){}
@@ -6398,54 +6400,23 @@ function parseJSON(txt){
   if(a>=0&&b>=0)t=t.slice(a,b+1);
   return JSON.parse(t);
 }
-function compatibleIngredient(candidates,fallback){
-  const restricted=coachHardRestrictions();
-  return candidates.find(name=>!restricted.some(term=>name.toLowerCase().includes(term)))||fallback;
-}
-function splitDailyTarget(total,count,index){
-  const base=Math.floor(Number(total||0)/count);
-  return index===count-1?Math.round(Number(total||0)-base*(count-1)):base;
-}
-// Distribución ponderada: la comida principal recibe el 30 % y el resto se distribuye uniformemente.
-function weightedMealSplit(total,count,index,mainIndex){
-  if(count<=1||!Number.isInteger(mainIndex)||mainIndex<0||mainIndex>=count)
-    return splitDailyTarget(total,count,index);
-  const main=Math.round(Number(total||0)*0.3);
-  const rest=Number(total||0)-main;
-  const otherCount=count-1;
-  if(index===mainIndex)return main;
-  const otherIndex=index<mainIndex?index:index-1;
-  const base=Math.floor(rest/otherCount);
-  return otherIndex===otherCount-1?Math.round(rest-base*(otherCount-1)):base;
-}
 function deterministicDayPayload(ds){
-  const day=buildDay(ds),target=effectiveDayTarget(),count=day.meals.length;
+  const day=buildDay(ds),target=effectiveDayTarget();
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const mainIndex=Math.min(Math.max(1,prefs.mainMealIndex||2),count)-1;
-  const proteinName=compatibleIngredient(
-    ["Proteína vegetal en polvo","Seitán","Tofu firme","Lentejas cocidas"],
-    "Fuente de proteína compatible"
-  );
-  const carbName=compatibleIngredient(["Arroz cocido","Quinua cocida","Papa","Avena"],"Fuente de carbohidratos compatible");
-  const fatName=compatibleIngredient(["Aceite de oliva","Palta","Chía"],"Fuente de grasas compatible");
-  const comidas=day.meals.map((meal,index)=>{
-    const p=weightedMealSplit(target.p,count,index,mainIndex);
-    const c=weightedMealSplit(target.c,count,index,mainIndex);
-    const f=weightedMealSplit(target.f,count,index,mainIndex);
-    return {
-      slot_id:meal.id,
-      nombre:`${meal.slot} práctica ajustada a tus metas`,
-      ingredientes:[
-        {nombre:proteinName,gramos:Math.max(10,Math.round(p/0.8))},
-        {nombre:carbName,gramos:Math.max(10,Math.round(c/0.28))},
-        {nombre:fatName,gramos:Math.max(3,Math.round(f))},
-        {nombre:"Verduras variadas compatibles",gramos:100},
-      ],
-      kcal:weightedMealSplit(target.kcal,count,index,mainIndex),
-      proteina_g:p,carbohidratos_g:c,grasa_g:f,
-    };
-  });
-  return {explicacion:"Alternativa práctica construida con tus metas y restricciones vigentes.",comidas};
+  const solver=window.FITBUD_NUTRITION_DOMAIN&&window.FITBUD_NUTRITION_DOMAIN.planDeterministicNutritionDay;
+  if(solver&&DB.loaded){
+    const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
+    const res=solver({date:ds,dayTarget:target,prefs,slots:day.meals,catalog:DB,workoutContext:{isTrainingDay}});
+    if(res&&Array.isArray(res.comidas))return res;
+  }
+  return {
+    ok:false,status:"no_solution",
+    no_solution:[{reason:DB.loaded?"catalog_without_viable_day":"catalog_unavailable"}],
+    totals:{kcal:0,p:0,c:0,f:0},target,
+    residual:{kcal:target.kcal,p:target.p,c:target.c,f:target.f},
+    explicacion:"Necesitamos actualizar tus opciones para preparar este día.",
+    comidas:[],
+  };
 }
 function deterministicSuggestionPayload(remK,remP){
   const budget=Math.max(100,Number(remK)||0);

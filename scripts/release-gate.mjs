@@ -60,7 +60,7 @@ if (modifiedLines.length) {
 
 // ── Sintaxis de módulos JS ────────────────────────────────────────────────────
 console.log("\n[ Sintaxis de módulos JS ]");
-for (const file of ["js/nutrition-pure.js", "domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
+for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
   if (existsSync(join(ROOT, file))) {
     run(`node --check ${file}`, `node --check "${join(ROOT, file)}"`);
   }
@@ -78,6 +78,7 @@ run("validate-macro-target-wiring.mjs", "node scripts/validate-macro-target-wiri
 run("validate-macro-targets-invariant.mjs", "node scripts/validate-macro-targets-invariant.mjs");
 run("validate-nutrition-domain.mjs", "node scripts/validate-nutrition-domain.mjs");
 run("validate-nutrition-catalog.mjs", "node scripts/validate-nutrition-catalog.mjs");
+run("validate-nutrition-solver.mjs", "node scripts/validate-nutrition-solver.mjs");
 run("validate-high-protein-prompt.mjs", "node scripts/validate-high-protein-prompt.mjs");
 run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
