@@ -19,6 +19,19 @@ El repositorio tiene **dos** agentes autónomos. Comparten el lock `.git/fitbros
 
 El auditor **NO modifica código de la app**: su único archivo escribible es `REQUIREMENTS.md`. Las reglas de comportamiento del auditor están en `.claude/agents/qa-auditor.md` — es un archivo de texto plano que cualquier agente debe **leer como spec**; el bloque YAML de cabecera (`name`, `tools`, `model`) es metadato para Claude Code y puede ignorarse cuando lo lee otra herramienta como Codex.
 
+## Memoria operativa entre corridas (continuidad, no fuente de verdad)
+
+Cada corrida autónoma arranca en frío: no hereda el historial conversacional de la anterior. Para preservar continuidad operativa entre corridas existe una **bitácora compartida fuera del repo**:
+
+`/Users/jonathan/.fitbros/agent-run-memory.md`
+
+Reglas para **cualquier** agente (Codex o Claude):
+
+- **Leer al inicio** (en el preflight) esa ruta **absoluta**. Codex además mantiene memoria per-automation en `/Users/jonathan/.codex/automations/<id>/memory.md`. Usa siempre rutas absolutas: **nunca** la variable `CODEX_HOME` ni rutas relativas para leer memoria, y **no** afirmes "no hay memoria previa" sin haber leído la ruta absoluta y confirmado que está ausente.
+- **Anexar al cierre** una entrada breve (timestamp ISO, loop, herramienta, acción del selector, lock, REQ, commit/push o bloqueo, acción manual pendiente, aprendizaje), **incluso en corridas detenidas** que no generan commit.
+- Vive **fuera del worktree** a propósito: así registra también las corridas detenidas sin ensuciar el worktree ni romper "un commit por corrida", y el **auditor puede anexarla sin violar** que su único archivo escribible del repo es `REQUIREMENTS.md` (la bitácora no es un archivo del repo). **No** la commitees ni la cuentes como cambio del repo.
+- **No es fuente de verdad.** Si contradice a Git/HEAD, `REQUIREMENTS.md`, `CONTEXT.md`, `docs/requirements-history.md`, `docs/architecture-reference.md` o el código real, la bitácora está equivocada. No decide estado de REQ, orden de la cola ni si el trabajo está hecho.
+
 ## Cómo ejecutar el loop DESARROLLADOR
 
 ```bash
