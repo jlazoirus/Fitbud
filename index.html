@@ -1344,6 +1344,94 @@ function planPrefsForDate(ds){
   const source=version&&version.snapshot&&version.snapshot.prefs?version.snapshot.prefs:((profile&&profile.prefs)||{});
   return migrateProfilePrefs(source);
 }
+// Devuelve el día prescrito del nutritionPlan activo para una fecha, o null.
+function activeNutritionPlanDay(ds){
+  if(!validYmd(ds)||!Array.isArray(PLAN_VERSIONS)||!PLAN_VERSIONS.length)return null;
+  const rank=s=>s==="active"?2:s==="draft"?1:0;
+  const matches=PLAN_VERSIONS.filter(v=>
+    v.snapshot&&v.snapshot.nutritionPlan&&
+    (v.status==="active"||v.status==="draft")&&
+    validYmd(v.valid_from)&&ds>=v.valid_from&&(!validYmd(v.valid_to)||ds<=v.valid_to)
+  );
+  if(!matches.length)return null;
+  const version=matches.sort((a,b)=>
+    rank(b.status)-rank(a.status)||
+    (b.valid_from||"").localeCompare(a.valid_from||"")||
+    (Number(b.version_number)||0)-(Number(a.version_number)||0)
+  )[0];
+  const np=version.snapshot.nutritionPlan;
+  return(np.days||[]).find(d=>d.date===ds)||null;
+}
+// Materializa daysData como snapshot nutritionPlan (slugs, nombres, gramos, macros en el momento).
+function buildNutritionPlanSnapshot(daysData,shoppingList){
+  const target=effectiveDayTarget();
+  return{
+    version:1,
+    catalogVersion:DB.loaded?(DB.dishIng&&DB.dishIng.length)||0:null,
+    createdAt:new Date().toISOString(),
+    days:(daysData||[]).map(d=>({
+      date:d.ds,
+      target,
+      meals:(d.comidas||[]).map(c=>({
+        id:c.slot_id,
+        slot:c.slot_id,
+        dishSlug:c.dishSlug||null,
+        dishName:c.nombre||"",
+        dishId:c.dishId||null,
+        ingredients:(c.ingredientes||[]).map(ing=>({
+          ingredientSlug:ing.ingredientSlug||null,
+          name:ing.nombre||"",
+          grams:ing.gramos||0,
+          kcal:ing.kcal||0,
+          protein_g:ing.proteina_g||0,
+          carbs_g:ing.carbohidratos_g||0,
+          fat_g:ing.grasa_g||0,
+        })),
+        macros:{kcal:c.kcal||0,p:c.proteina_g||0,c:c.carbohidratos_g||0,f:c.grasa_g||0},
+      })),
+    })),
+    shoppingList:shoppingList||[],
+  };
+}
+// Guarda un nutritionPlan como plan_versions activo. No-op silencioso si Supabase no está disponible.
+async function saveNutritionPlanVersion(draft){
+  if(!supa||!uid())return null;
+  if(!PLAN_VERSIONS_LOADED)await pullPlanVersions();
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const cycleNo=cycleNumber();
+  const dates=(draft.daysData||[]).map(d=>d.ds).filter(Boolean).sort();
+  if(!dates.length)return null;
+  const validFrom=dates[0],validTo=dates[dates.length-1];
+  const shopping=draft.shoppingList&&draft.shoppingList.length?draft.shoppingList:buildShoppingList(draft.daysData);
+  const nutritionPlan=buildNutritionPlanSnapshot(draft.daysData,shopping);
+  const digest=hashText(stableJson(nutritionPlan));
+  const versionKey=`${cycleNo}:${validFrom}:nutrition:${digest.slice(0,12)}`;
+  const existing=PLAN_VERSIONS.find(row=>row.version_key===versionKey&&row.status==="active");
+  if(existing)return existing;
+  const now=new Date().toISOString();
+  const row={
+    user_id:uid(),cycle_number:cycleNo,version_number:planVersionVersionNumber(cycleNo),
+    version_key:versionKey,source:"nutrition",status:"active",
+    valid_from:validFrom,valid_to:validTo,reason:"Plan nutricional preparado",
+    prompt:null,model:null,snapshot_hash:digest,
+    snapshot:{prefs:planSnapshotFields(prefs),nutritionPlan},
+    activated_at:now,superseded_at:null,updated_at:now,
+  };
+  try{
+    const result=await supa.from("plan_versions").upsert(row,{onConflict:"user_id,version_key"})
+      .select("id,user_id,cycle_number,version_number,version_key,source,status,valid_from,valid_to,reason,prompt,model,snapshot_hash,snapshot,activated_at,superseded_at,created_at,updated_at")
+      .maybeSingle();
+    if(result.error)throw result.error;
+    await pullPlanVersions();
+    return result.data;
+  }catch(e){
+    if(String((e&&e.message)||e).match(/plan_versions|relation|column|constraint/i)){
+      console.warn("No se pudo versionar el plan nutricional; compatibilidad local activa.",e);
+      return null;
+    }
+    throw e;
+  }
+}
 function planContextForDate(ds,prefsOverride){
   const prefs=prefsOverride?migrateProfilePrefs(prefsOverride):planPrefsForDate(ds);
   const calendar=planCalendarForPrefs(prefs);
@@ -1377,12 +1465,36 @@ function weekOf(ds,prefs){
   for(const w of WEEKS){if(ds>=w.start&&ds<=w.end)return w;}
   return null;
 }
-// Construye el día: slots genéricos vacíos que se llenan con la IA (o ediciones
-// del usuario). Sin plan estático, sin menús ni tipos de día.
+// Construye el día: lee primero la prescripción del nutritionPlan activo (REQ-82);
+// si no existe, devuelve slots vacíos compatibles con el flujo anterior.
 function buildDay(ds,prefsOverride){
   const ctx=planContextForDate(ds,prefsOverride);
-  const meals=mealSlotsForPrefs(ctx.prefs).map(s=>({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
-  return {ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(),meals,workout:effectiveWorkout(ds,prefsOverride||null).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
+  const nutritionDay=!prefsOverride?activeNutritionPlanDay(ds):null;
+  let meals;
+  if(nutritionDay&&Array.isArray(nutritionDay.meals)&&nutritionDay.meals.length){
+    const slotTimes=mealSlotsForPrefs(ctx.prefs);
+    meals=nutritionDay.meals.map(m=>{
+      const meta=slotTimes.find(s=>s.id===(m.slot||m.id))||{};
+      return{
+        id:m.slot||m.id,slot:m.slot||m.id,time:meta.time||null,
+        kcal:(m.macros&&m.macros.kcal)||0,
+        p:(m.macros&&m.macros.p)||0,
+        c:(m.macros&&m.macros.c)||0,
+        f:(m.macros&&m.macros.f)||0,
+        name:m.dishName||"",
+        dishName:m.dishName||null,
+        dishSlug:m.dishSlug||null,
+        ingredientes:(m.ingredients||[]).map(i=>({
+          nombre:i.name,gramos:i.grams,ingredientSlug:i.ingredientSlug||null,
+          kcal:i.kcal||0,proteina_g:i.protein_g||0,carbohidratos_g:i.carbs_g||0,grasa_g:i.fat_g||0,
+        })),
+        src:"nutritionPlan",
+      };
+    });
+  }else{
+    meals=mealSlotsForPrefs(ctx.prefs).map(s=>({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
+  }
+  return{ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(),meals,workout:effectiveWorkout(ds,prefsOverride||null).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
 }
 
 /* ---------- ESTADO / PERSISTENCIA (localStorage) ---------- */
@@ -1808,11 +1920,17 @@ function dishSlotMeta(dish){
 function mealValue(base,ms){
   const o=ms&&ms.ovr;
   const name=o&&o.name!=null?o.name:base.name;
+  // 1. Override manual del usuario (custom kcal o dishName explícito)
   if(o&&o.kcal!=null&&o.dishName==null){
     return{name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"custom"};
   }
   const dn=o&&o.dishName!=null?o.dishName:base.dishName;
   if(dn&&DB.loaded){const d=dishByName(dn);if(d){const m=dishMacros(d.id);return{name,kcal:m.kcal,p:m.p,c:m.c,f:m.f,src:"db"};}}
+  // 2. Prescripción del nutritionPlan (snapshot materializado, REQ-82)
+  if(base.src==="nutritionPlan"&&base.kcal>0){
+    return{name:base.name||name,kcal:base.kcal,p:base.p,c:base.c,f:base.f,src:"nutritionPlan"};
+  }
+  // 3. Fallback: plan/slot vacío
   return{name,kcal:base.kcal,p:base.p,c:base.c,f:base.f,src:"plan"};
 }
 
@@ -7087,8 +7205,14 @@ function genWeekReviewHtml(){
       <button class="btn" onclick="closeModal()">Descartar</button>
     </div>`;
 }
-function applyWeekPlan(){
+async function applyWeekPlan(){
   const draft=window._genWeek;if(!draft||!draft.daysData.length){closeModal();return;}
+  // Guardar prescripción en plan_versions (fuente de verdad a partir de REQ-82)
+  if(supa&&uid()){
+    try{await saveNutritionPlanVersion(draft);}
+    catch(e){console.warn("No se pudo versionar el plan nutricional.",e);}
+  }
+  // Compatibilidad: también escribe overrides para clientes sin DB conectada
   draft.daysData.forEach(d=>applyDayComidas(d.ds,d.comidas));
   trackEvent("diet_week_applied",{count:draft.daysData.length});
   window._genWeek=null;closeModal();render();toast(`${draft.daysData.length} días aplicados a tu plan`);

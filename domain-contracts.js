@@ -149,6 +149,75 @@
     return ok(errors);
   }
 
+  // ── Validador de snapshot nutritionPlan (plan_versions.snapshot.nutritionPlan) ──
+  // Verifica que el snapshot sea structuralmente completo y coherente.
+  // Puede usarse en el navegador y en scripts de prueba sin dependencias externas.
+  function validateNutritionPlanSnapshot(nutritionPlan){
+    const errors=[];
+    if(!nutritionPlan||typeof nutritionPlan!=="object")return ok(["nutritionPlan debe ser un objeto."]);
+    if(!Array.isArray(nutritionPlan.days)||!nutritionPlan.days.length)
+      errors.push("nutritionPlan.days debe ser un array no vacío.");
+    (nutritionPlan.days||[]).forEach((day,di)=>{
+      if(!day.date||!DATE_RE.test(String(day.date)))
+        errors.push(`día ${di}: date debe ser YYYY-MM-DD.`);
+      if(!day.target||typeof day.target!=="object")
+        errors.push(`día ${di}: target debe ser un objeto {kcal,p,c,f}.`);
+      if(!Array.isArray(day.meals)||!day.meals.length)
+        errors.push(`día ${di}: meals debe ser un array no vacío.`);
+      (day.meals||[]).forEach((m,mi)=>{
+        if(!m.slot&&!m.id)errors.push(`día ${di} comida ${mi}: slot/id requerido.`);
+        if(!m.dishName&&!m.dishSlug)errors.push(`día ${di} comida ${mi}: requiere dishName o dishSlug materializados.`);
+        const mac=m.macros;
+        if(!mac||typeof mac!=="object")errors.push(`día ${di} comida ${mi}: macros requeridos.`);
+        else{
+          ["kcal","p","c","f"].forEach(k=>{
+            if(!Number.isFinite(Number(mac[k]))||Number(mac[k])<0)
+              errors.push(`día ${di} comida ${mi}: macros.${k} inválido.`);
+          });
+        }
+        if(!Array.isArray(m.ingredients)||!m.ingredients.length)
+          errors.push(`día ${di} comida ${mi}: ingredients debe ser un array con al menos 1 elemento.`);
+        (m.ingredients||[]).forEach((ing,ii)=>{
+          if(!ing.name)errors.push(`día ${di} comida ${mi} ingrediente ${ii}: name requerido.`);
+          if(!(Number(ing.grams)>0))errors.push(`día ${di} comida ${mi} ingrediente ${ii}: grams debe ser > 0.`);
+        });
+      });
+      // Verificar que totales de comidas sumen dentro de ±15% del target.kcal
+      if(day.target&&Number.isFinite(Number(day.target.kcal))&&Number(day.target.kcal)>0){
+        const sumKcal=(day.meals||[]).reduce((s,m)=>s+Number((m.macros&&m.macros.kcal)||0),0);
+        const pct=Math.abs(sumKcal-Number(day.target.kcal))/Number(day.target.kcal);
+        if(pct>0.20)errors.push(`día ${di}: suma de kcal ${Math.round(sumKcal)} fuera de tolerancia 20% de meta ${day.target.kcal}.`);
+      }
+    });
+    // Verificar lista de compras si está presente
+    if(nutritionPlan.shoppingList!==undefined){
+      if(!Array.isArray(nutritionPlan.shoppingList))
+        errors.push("shoppingList debe ser un array si está presente.");
+      else{
+        // Construir suma manual de gramos por slug desde los días
+        const slugTotals=new Map();
+        (nutritionPlan.days||[]).forEach(day=>{
+          (day.meals||[]).forEach(m=>{
+            (m.ingredients||[]).forEach(ing=>{
+              const key=(ing.ingredientSlug||"").trim()||(ing.name||"").toLowerCase().replace(/[^a-z0-9]+/g,"-");
+              if(!key)return;
+              slugTotals.set(key,(slugTotals.get(key)||0)+Math.round(Number(ing.grams||0)));
+            });
+          });
+        });
+        nutritionPlan.shoppingList.forEach((item,si)=>{
+          if(!item.slug&&!item.nombre)errors.push(`shoppingList[${si}]: requiere slug o nombre.`);
+          if(!(Number(item.gramos)>0))errors.push(`shoppingList[${si}]: gramos debe ser > 0.`);
+        });
+        // Verificar que no haya duplicados por slug
+        const listSlugs=nutritionPlan.shoppingList.filter(i=>i.slug).map(i=>i.slug);
+        const unique=new Set(listSlugs);
+        if(unique.size!==listSlugs.length)errors.push("shoppingList contiene slugs duplicados.");
+      }
+    }
+    return ok(errors);
+  }
+
   root.FITBUD_DOMAIN_CONTRACTS={
     validateProfilePrefs,
     validateMacroTargets,
@@ -157,6 +226,7 @@
     validateSyncEntry,
     validateCoachRequest,
     validateCoachAction,
+    validateNutritionPlanSnapshot,
     VALID_SPLITS,
   };
 })(typeof window!=="undefined"?window:globalThis);

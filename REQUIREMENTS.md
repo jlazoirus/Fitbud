@@ -752,7 +752,8 @@ Crear un planner semanal que use el solver diario para producir 7 días estructu
 
 ## REQ-82 - Plan nutricional activo versionado en `plan_versions`
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`validateNutritionPlanSnapshot()` en `domain-contracts.js`. `buildNutritionPlanSnapshot()`, `saveNutritionPlanVersion()` y `activeNutritionPlanDay()` en `index.html`. `buildDay()` lee primero el nutritionPlan activo; `mealValue()` añade capa `nutritionPlan` entre override y fallback vacío. `applyWeekPlan()` guarda en `plan_versions` (con compatibilidad de override). Tests en `scripts/validate-nutrition-plan-snapshot.mjs`.
 
 ### Origen
 
