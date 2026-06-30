@@ -1373,3 +1373,44 @@ Igual que el anterior pero opera sobre `window._genWeek.daysData[dayIdx]`. Adem�
 - La lista de compras de la semana se actualiza al editar gramos.
 - `node scripts/validate-portion-editing.mjs` pasa.
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-91 - Fix: snack sugerido (REQ-89) aparecía como ya consumido al aplicar el día
+
+**Estado: implementado.** `applyGeneratedDay` pone `done:false` en extras generados. 3 asserts en `scripts/validate-gap-snack-pending.mjs`.
+
+### Problema
+
+Al aplicar un día generado que incluía un snack sugerido por REQ-89 para cerrar déficit, el snack aparecía con el checkbox marcado (✓ en morado) en la sección "Comidas extra", como si el usuario ya lo hubiera consumido. Las comidas regulares del plan (Desayuno, Almuerzo, Cena) aparecían correctamente sin marcar.
+
+### Causa raíz
+
+En `applyGeneratedDay`, los extras se creaban con `done:true` hardcodeado:
+
+```js
+st.extras.push({..., done:true, gen:true});
+```
+
+El flag `done:true` hace que `dayTotals` cuente sus macros como "ya consumidos" y que el checkbox aparezca marcado. Las comidas de slot (`applyDayComidas`) no tocan `done` — usan solo `ms.ovr`, dejando el flag en su estado inicial (`false`).
+
+### Solución
+
+Cambiar `done:true` → `done:false` en la línea de `applyGeneratedDay` que crea extras. El snack aparece como pendiente y el usuario lo marca cuando lo consume.
+
+El flujo manual "Agregar comida/snack" (`saveEditor`, línea 6434) y "Sugerir comida" (`addSuggestion`, línea 7048) mantienen `done:true` intencionalmente — en esos flujos el usuario está registrando algo que ya comió o va a comer de inmediato.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `applyGeneratedDay`: `done:true` → `done:false` en extras |
+| `scripts/validate-gap-snack-pending.mjs` | Validador (3 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Criterios de aceptación
+
+- El snack sugerido aparece sin marcar (pendiente) al aplicar el día.
+- El usuario lo marca manualmente cuando lo consume.
+- Las comidas de slot siguen apareciendo sin marcar (no regresión).
+- `dayTotals` no cuenta el snack como consumido hasta que el usuario lo marque.
+- `node scripts/validate-gap-snack-pending.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.

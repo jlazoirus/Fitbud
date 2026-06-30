@@ -7374,7 +7374,7 @@ function applyGeneratedDay(){
   if(extraComidas.length){
     const st=dayState(g.ds);
     extraComidas.forEach(c=>{
-      st.extras.push({name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,done:true,gen:true});
+      st.extras.push({name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,done:false,gen:true});
     });
     commitDay(g.ds);
   }
