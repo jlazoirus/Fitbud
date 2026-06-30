@@ -1116,3 +1116,54 @@ Al cambiar de `1` a `2`, el hash del `contextKey` cambia → todos los resultado
 - `coachCompatibilityContext` usa `version:COACH_PROMPT_VERSION`, no un literal.
 - `node scripts/validate-coach-prompt-version.mjs` pasa.
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-87 - Fix: "Preparar mi semana" sobrescribía días pasados y con datos registrados
+
+**Estado: implementado.** `weekPendingDays` filtra días anteriores a hoy y días con comidas consumidas (`doneMeals > 0`) antes de iterar. El progreso ("día X de Y") refleja solo los días pendientes. 4 asserts en `scripts/validate-week-skip-past.mjs`.
+
+### Problema
+
+Al usar "Preparar mi semana" (ej. semana 3, inicio 27 de junio), el sistema generaba los 7 días de la semana sin importar que los días 27 y 28 ya hubieran pasado y tuvieran comidas registradas manualmente por el usuario. El sistema intentaba sobrescribirlos con comidas generadas por IA.
+
+### Causa raíz (verificada contra código)
+
+`aiGenerateWeek` (línea ~7212) obtiene los días con `weekDays(w)` que devuelve **todos** los días de la semana (start..end). El bucle `for(let i=0;i<days.length;i++)` iteraba sobre todos sin ningún filtro de:
+- Fecha anterior a hoy
+- Días con comidas ya consumidas por el usuario (`dayTotals(ds).doneMeals > 0`)
+
+El mismo problema existía en el flujo determinista (`generateDeterministicWeek`) que recibía `days` sin filtrar.
+
+### Solución
+
+Nueva función `weekPendingDays(allDays)` que filtra:
+1. Días con fecha anterior a `todayStr()` → se saltan
+2. Días con `dayTotals(ds).doneMeals > 0` (comidas ya consumidas) → se saltan
+
+`aiGenerateWeek` ahora:
+- Llama `weekPendingDays(allDays)` para obtener solo días pendientes
+- Muestra cuántos días se saltaron en el modal de progreso ("5 días a tu medida (2 días ya registrados)")
+- El contador de progreso dice "día X de Y" donde Y = días pendientes, no los 7 totales
+- Si todos los días están registrados, muestra toast informativo y no genera nada
+- Pasa `days` filtrados a `generateDeterministicWeek`
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | Función `weekPendingDays`, filtrado en `aiGenerateWeek`, progreso ajustado |
+| `scripts/validate-week-skip-past.mjs` | Validador estructural (4 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Invariantes que se mantienen
+
+- "Preparar mi día" (flujo individual) no se ve afectado — el usuario puede regenerar el día de hoy explícitamente
+- La estructura del draft (`window._genWeek`) no cambia, solo contiene menos días
+- `applyWeekPlan` aplica solo los días que están en `daysData` (ya filtrados)
+
+### Criterios de aceptación
+
+- Si la semana tiene días pasados con comidas consumidas, "Preparar mi semana" solo genera los días pendientes (hoy en adelante, sin consumo).
+- El progreso muestra "día X de Y" donde Y = días pendientes.
+- Si todos los días de la semana ya pasaron/están registrados, muestra toast y no genera nada.
+- `node scripts/validate-week-skip-past.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.

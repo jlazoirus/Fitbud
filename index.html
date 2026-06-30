@@ -7209,10 +7209,23 @@ function generateDeterministicWeek(w,days){
     shoppingList:result.shoppingList,
   };
 }
+// REQ-87: filtra días pasados o con comidas ya consumidas antes de generar.
+function weekPendingDays(allDays){
+  const today=todayStr();
+  return allDays.filter(ds=>{
+    if(ds<today)return false;
+    const tot=dayTotals(ds);
+    if(tot.doneMeals>0)return false;
+    return true;
+  });
+}
 async function aiGenerateWeek(){
   const w=weekOf(current,planPrefsForDate(current))||weekOf(current)||WEEKS[0];
-  const days=weekDays(w);
-  if(!days.length){toast("Esta semana está fuera del plan");return;}
+  const allDays=weekDays(w);
+  if(!allDays.length){toast("Esta semana está fuera del plan");return;}
+  const days=weekPendingDays(allDays);
+  const skipped=allDays.length-days.length;
+  if(!days.length){toast(skipped?`Los ${allDays.length} días de esta semana ya están registrados.`:"Esta semana está fuera del plan");return;}
   // Fallback determinista cuando el coach no está disponible
   if(!aiAvailable()||!hasEntitlement()){
     const det=generateDeterministicWeek(w,days);
@@ -7224,12 +7237,13 @@ async function aiGenerateWeek(){
   const actionKey="diet_week";
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const label=w.num?("Semana "+w.num):"Semana de arranque";
-  modal(`<h3>Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida…</div></div>`);
+  const skipNote=skipped?` (${skipped} día${skipped>1?"s":""} ya registrado${skipped>1?"s":""})`:"";
+  modal(`<h3>Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida${skipNote}…</div></div>`);
   const daysData=[]; const problems=[];
   try{
     for(let i=0;i<days.length;i++){
       const ds=days[i];
-      const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Preparando ${label}: día ${i+1} de ${days.length}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
+      const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Preparando ${label}: día ${i+1} de ${days.length}${skipNote}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
       try{
         const {res}=await generateOneDay(ds,{action:"diet_week",requestId,partKey:"day-"+(i+1)});
         if(res.ok)daysData.push({ds,comidas:res.comidas});
