@@ -6963,14 +6963,43 @@ async function aiGenerateDay(){
 // --- Plan semanal personalizado (se guarda como overrides por día, por usuario) ---
 function weekDays(w){const days=[];let d=w.start;while(d<=w.end){if(d>=START&&d<=END)days.push(d);d=addDays(d,1);}return days;}
 function weekHasGeneratedPlan(w){return weekDays(w).some(ds=>{const st=S.days&&S.days[ds];return st&&st.meals&&Object.values(st.meals).some(m=>m&&m.ovr&&m.ovr.gen);});}
+// Modo determinista: genera semana con planNutritionWeek sin llamada externa.
+function generateDeterministicWeek(w,days){
+  const nd=window.FITBUD_NUTRITION_DOMAIN;
+  if(!nd||!nd.planNutritionWeek||!DB.loaded)return null;
+  const target=effectiveDayTarget();
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const result=nd.planNutritionWeek({prefs,dayTarget:target,catalog:DB,numDays:days.length});
+  if(!result||!result.days||!result.days.length)return null;
+  // Mapear días del plan a fechas reales de la semana
+  const daysData=days.map((ds,i)=>{
+    const planDay=result.days[i]||result.days[result.days.length-1];
+    return{ds,comidas:planDay.comidas||[]};
+  });
+  const label=w.num?("Semana "+w.num):"Semana de arranque";
+  return{
+    week:w,label,daysData,problems:[],
+    weekSummary:result.weekSummary,
+    variety:result.variety,
+    shoppingList:result.shoppingList,
+  };
+}
 async function aiGenerateWeek(){
-  if(coachUnavailable())return;
+  const w=weekOf(current,planPrefsForDate(current))||weekOf(current)||WEEKS[0];
+  const days=weekDays(w);
+  if(!days.length){toast("Esta semana está fuera del plan");return;}
+  // Fallback determinista cuando el coach no está disponible
+  if(!aiAvailable()||!hasEntitlement()){
+    const det=generateDeterministicWeek(w,days);
+    if(!det){toast("Actualiza tu catálogo de alimentos para preparar la semana sin conexión.");return;}
+    window._genWeek=det;
+    modal(`<h3>Preparar mi semana</h3><div id="genwOut">${genWeekReviewHtml()}</div>`);
+    return;
+  }
   const actionKey="diet_week";
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
-  const w=weekOf(current,planPrefsForDate(current))||weekOf(current)||WEEKS[0]; const days=weekDays(w);
-  if(!days.length){endCoachAction(actionKey);toast("Esta semana está fuera del plan");return;}
   const label=w.num?("Semana "+w.num):"Semana de arranque";
-  modal(`<h3>📅 Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida…</div></div>`);
+  modal(`<h3>Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida…</div></div>`);
   const daysData=[]; const problems=[];
   try{
     for(let i=0;i<days.length;i++){
@@ -7023,6 +7052,16 @@ function applyGeneratedDay(){
 // --- Revisión de semana: borrador → confirmar → aplicar ---
 function genWeekReviewHtml(){
   const draft=window._genWeek;if(!draft)return '<div class="ai-box">El borrador ya no está disponible.</div>';
+  // Resumen de kcal/proteína promedio (disponible en ruta determinista)
+  const ws=draft.weekSummary;
+  const summaryHtml=ws
+    ?`<div class="muted small" style="margin:6px 2px 10px">Promedio semanal: <b>${ws.avgKcal} kcal</b> · P ${ws.avgProt} g (meta ${ws.target&&ws.target.kcal||"—"} kcal / ${ws.target&&ws.target.p||"—"} g prot)</div>`
+    :"";
+  // Advertencias de variedad
+  const varWarns=(draft.variety&&draft.variety.warnings)||[];
+  const varietyHtml=varWarns.length
+    ?`<div class="ai-box" style="border-color:var(--warn,#f59e0b)">⚠️ ${varWarns.map(w=>esc(w.message)).join("<br>")}</div>`
+    :"";
   const days=draft.daysData.map((d,index)=>`<details class="dash" ${index===0?"open":""}>
     <summary><b>${esc(prettyDate(d.ds))}</b> <span class="muted small">${d.comidas.length} comidas</span></summary>
     ${d.comidas.map(c=>`<div class="opt" style="cursor:default;margin:6px 0">
@@ -7034,13 +7073,14 @@ function genWeekReviewHtml(){
   </details>`).join("");
   const problems=draft.problems&&draft.problems.length
     ?`<div class="ai-box">⚠️ No se pudieron preparar: ${draft.problems.map(esc).join(", ")}.</div>`:"";
-  const shopping=buildShoppingList(draft.daysData);
+  // Lista de compras: usar shoppingList con slugs cuando está disponible (ruta determinista)
+  const shopping=draft.shoppingList&&draft.shoppingList.length?draft.shoppingList:buildShoppingList(draft.daysData);
   const shopHtml=shopping.length
     ?`<details class="dash"><summary><b>Lista de compras</b> <span class="muted small">${shopping.length} ingredientes</span></summary>
       <div style="columns:2;gap:12px;margin-top:8px">${shopping.map(item=>`<div class="muted small">${esc(item.nombre)} <b>${item.gramos} g</b></div>`).join("")}</div>
     </details>`:"";
   return `<div class="ai-box"><b>${draft.daysData.length} días preparados.</b> Revisa cada día antes de aplicar; los cambios no se guardan hasta confirmar.</div>
-    ${problems}${days}${shopHtml}
+    ${summaryHtml}${varietyHtml}${problems}${days}${shopHtml}
     <div class="row wrap" style="margin-top:12px">
       <button class="btn btn-accent" onclick="applyWeekPlan()">Aplicar semana</button>
       <button class="btn" onclick="aiGenerateWeek()">Preparar otra semana</button>
@@ -7056,9 +7096,24 @@ function applyWeekPlan(){
 async function regenerateDayInWeekDraft(index){
   const draft=window._genWeek;if(!draft)return;
   const d=draft.daysData[index];if(!d)return;
+  const out=$("#genwOut");if(out)out.innerHTML=`<div class="ai-box">Preparando otro ${esc(prettyDate(d.ds))}…</div>`;
+  // Ruta determinista cuando el coach no está disponible
+  if(!aiAvailable()||!hasEntitlement()){
+    const nd=window.FITBUD_NUTRITION_DOMAIN;
+    if(nd&&nd.planDeterministicNutritionDay&&DB.loaded){
+      const target=effectiveDayTarget();
+      const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+      const res=nd.planDeterministicNutritionDay({prefs,dayTarget:target,catalog:DB});
+      draft.daysData[index]={ds:d.ds,comidas:res.comidas||[]};
+      // Recalcular shoppingList con slug-aggregation
+      const nd2=window.FITBUD_NUTRITION_DOMAIN;
+      if(nd2&&nd2.buildShoppingListFromNutritionPlan)draft.shoppingList=nd2.buildShoppingListFromNutritionPlan(draft.daysData);
+      if(out)out.innerHTML=genWeekReviewHtml();
+    }else{if(out)out.innerHTML=`<div class="ai-box">Actualiza tu catálogo para preparar alternativas.</div>`;}
+    return;
+  }
   const actionKey="diet_week_regen_"+index;
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
-  const out=$("#genwOut");if(out)out.innerHTML=`<div class="ai-box">Preparando otro ${esc(prettyDate(d.ds))}…</div>`;
   try{
     const {res}=await generateOneDay(d.ds,{action:"diet_week",requestId,partKey:"day-regen"});
     if(res.ok){

@@ -34,7 +34,8 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 - Catalogo Supabase: ingredientes, platos, recetas, dietas y vista `dish_macros`. `supabase/seed.sql` carga el catalogo base.
 - `js/nutrition-domain.js` valida macros, restricciones, slots y reemplazos. Usa kcal de ingredientes, no solo 4/4/9.
 - REQ-79 agrego metadata semantica con `supabase/nutrition_catalog_semantics.sql`: slugs estables, slots compatibles, tags dietarios y limites de escalado. Es migracion manual/idempotente; el cliente degrada si aun no esta aplicada.
-- REQ-80 agrego `planDeterministicNutritionDay()` en `js/nutrition-domain.js`: prepara un dia desde platos/ingredientes reales, respeta slots 2-6, restricciones y limites de porcion, y es el fallback principal cuando el coach no esta disponible. Pendiente activo: REQ-81..84 moveran semana, snapshots, reemplazos y contrato del coach sobre este motor.
+- REQ-80 agrego `planDeterministicNutritionDay()` en `js/nutrition-domain.js`: prepara un dia desde platos/ingredientes reales, respeta slots 2-6, restricciones y limites de porcion, y es el fallback principal cuando el coach no esta disponible.
+- REQ-81 agrego `planNutritionWeek(ctx)`, `scoreWeeklyVariety(days)` y `buildShoppingListFromNutritionPlan(days)` en `js/nutrition-domain.js`. `planNutritionWeek` llama `planDeterministicNutritionDay` para 7 dias pasando `prevDayUsed` para penalizar (no bloquear) repeticion consecutiva. `aiGenerateWeek()` en `index.html` usa ruta determinista cuando el coach no esta disponible; `genWeekReviewHtml()` muestra resumen kcal/prot promedio, advertencias de variedad y lista de compras agregada por slug. Pendiente activo: REQ-82..84 moveran snapshots versionados, reemplazos y contrato del coach sobre este motor.
 
 ## Entrenamiento
 

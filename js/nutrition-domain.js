@@ -423,6 +423,7 @@
         causes.push({slot:slot.id,reason:"slot_without_candidates"});
         return;
       }
+      const prevDayUsed=ctx&&ctx.prevDayUsed instanceof Set?ctx.prevDayUsed:new Set();
       let best=null;
       candidates.slice(0,48).forEach(dish=>{
         const solved=solveDishPortion(dish,slot.target,{catalog});
@@ -431,7 +432,8 @@
           return;
         }
         const reuse=used.has(slugFor(dish))?0.18:0;
-        const score=solved.score+reuse;
+        const yesterday=(!reuse&&prevDayUsed.size&&prevDayUsed.has(slugFor(dish)))?0.10:0;
+        const score=solved.score+reuse+yesterday;
         if(!best||score<best.rankScore)best={...solved,rankScore:score};
       });
       if(!best){
@@ -486,6 +488,95 @@
     };
   }
 
+  // ── Lista de compras desde plan semanal estructurado ─────────────────────────
+  // days: array de {comidas:[{ingredientes:[{ingredientSlug, nombre, gramos}]}]}
+  // Agrupa por ingredientSlug (o slugFor como fallback) y suma gramos.
+  function buildShoppingListFromNutritionPlan(days){
+    const totals=new Map();
+    (days||[]).forEach(day=>{
+      const comidas=Array.isArray(day.comidas)?day.comidas:((day.result&&day.result.comidas)||[]);
+      comidas.forEach(c=>{
+        (c.ingredientes||[]).forEach(ing=>{
+          const key=(ing.ingredientSlug||"").trim()||slugFor(ing);
+          if(!key)return;
+          const prev=totals.get(key)||{slug:key,nombre:ing.nombre||key,category:ing.category||"",gramos:0};
+          totals.set(key,{...prev,gramos:prev.gramos+Math.round(Number(ing.gramos||0))});
+        });
+      });
+    });
+    return[...totals.values()].sort((a,b)=>b.gramos-a.gramos);
+  }
+
+  // ── Puntuación de variedad semanal ───────────────────────────────────────────
+  // days: misma estructura que planNutritionWeek devuelve.
+  // Devuelve {score:0-1, warnings:[{slot, message, type}]}.
+  function scoreWeeklyVariety(days){
+    const slotSlugs={};
+    (days||[]).forEach(day=>{
+      const comidas=Array.isArray(day.comidas)?day.comidas:((day.result&&day.result.comidas)||[]);
+      comidas.forEach(c=>{
+        const slot=c.slot_id||c.slot;if(!slot)return;
+        if(!slotSlugs[slot])slotSlugs[slot]=[];
+        slotSlugs[slot].push(c.dishSlug||slugFor(c)||"");
+      });
+    });
+    const warnings=[];
+    let totalSlots=0,diverseSlots=0;
+    Object.entries(slotSlugs).forEach(([slot,slugs])=>{
+      totalSlots++;
+      const filled=slugs.filter(Boolean);
+      const unique=new Set(filled).size;
+      if(unique>1)diverseSlots++;
+      const consecutive=filled.filter((s,i)=>i>0&&s&&s===filled[i-1]).length;
+      if(consecutive>0){
+        warnings.push({slot,message:"El mismo plato se repite en días consecutivos ("+slot+")",type:"consecutive"});
+      } else if(unique===1&&filled.length>1){
+        warnings.push({slot,message:"Sin variedad en "+slot+": mismo plato todos los días",type:"no_variety"});
+      }
+    });
+    return{score:totalSlots>0?diverseSlots/totalSlots:1,warnings};
+  }
+
+  // ── Planner semanal determinista ─────────────────────────────────────────────
+  // ctx: {prefs, dayTarget, catalog, numDays?=7, workoutContext?}
+  // Usa planDeterministicNutritionDay para cada día, pasando prevDayUsed para
+  // penalizar (no bloquear) repetición de platos entre días consecutivos.
+  function planNutritionWeek(ctx){
+    const prefs=ctx&&ctx.prefs||{};
+    const dayTarget=ctx&&ctx.dayTarget||ctx&&ctx.target||{kcal:2000,p:150,c:200,f:65};
+    const catalog=ctx&&ctx.catalog||{};
+    const numDays=Math.min(Math.max(1,Number((ctx&&ctx.numDays)||7)),14);
+    const workoutContext=ctx&&ctx.workoutContext||null;
+    const days=[];
+    let prevDayUsed=new Set();
+    for(let i=0;i<numDays;i++){
+      const result=planDeterministicNutritionDay({prefs,dayTarget,catalog,workoutContext,prevDayUsed});
+      prevDayUsed=new Set((result.comidas||[]).map(c=>c.dishSlug||"").filter(Boolean));
+      days.push({
+        dayIndex:i,
+        comidas:result.comidas||[],
+        totals:result.totals,
+        target:result.target,
+        ok:result.ok,
+        warns:result.warns||[],
+        no_solution:result.no_solution||null,
+      });
+    }
+    const n=days.length||1;
+    const avgKcal=Math.round(days.reduce((s,d)=>s+(d.totals&&d.totals.kcal||0),0)/n);
+    const avgProt=Math.round(days.reduce((s,d)=>s+(d.totals&&d.totals.p||0),0)/n);
+    const variety=scoreWeeklyVariety(days);
+    const shoppingList=buildShoppingListFromNutritionPlan(days);
+    return{
+      ok:days.every(d=>d.ok),
+      days,
+      weekSummary:{avgKcal,avgProt,target:dayTarget},
+      variety,
+      shoppingList,
+      warns:variety.warnings,
+    };
+  }
+
   // ── Namespace ────────────────────────────────────────────────────────────────
   const FITBUD_NUTRITION_DOMAIN={
     MEAL_SLOT_VOCAB,
@@ -503,6 +594,9 @@
     compatibleDishesForSlot,
     solveDishPortion,
     planDeterministicNutritionDay,
+    buildShoppingListFromNutritionPlan,
+    scoreWeeklyVariety,
+    planNutritionWeek,
   };
   root.FITBUD_NUTRITION_DOMAIN=FITBUD_NUTRITION_DOMAIN;
   // Exponer selectos como globals para call-sites de index.html que lo necesiten.

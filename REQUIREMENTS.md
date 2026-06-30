@@ -673,7 +673,8 @@ Crear un solver determinista que, dado un perfil, target diario, slots del día 
 
 ## REQ-81 - Planner semanal nutricional determinista y lista de compras derivada
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Funciones puras `planNutritionWeek`, `scoreWeeklyVariety` y `buildShoppingListFromNutritionPlan` en `js/nutrition-domain.js`. Integradas en `aiGenerateWeek()` como ruta determinista cuando el coach no está disponible. `genWeekReviewHtml()` muestra resumen semanal, advertencias de variedad y lista de compras por slug. Tests en `scripts/validate-nutrition-week-planner.mjs`.
 
 ### Origen
 
