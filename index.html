@@ -3586,7 +3586,7 @@ function exerciseArray(value){
   return [];
 }
 function exerciseCatalog(includeInactive){
-  const source=DB.exerciseReady?DB.exercises:LOCAL_EXERCISES;
+  const source=(DB.exerciseReady&&Array.isArray(DB.exercises)&&DB.exercises.length)?DB.exercises:LOCAL_EXERCISES;
   return source.filter(ex=>includeInactive||ex.active!==false);
 }
 function exerciseBySlug(slug,includeInactive){

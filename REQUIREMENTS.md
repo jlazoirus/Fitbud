@@ -1482,3 +1482,54 @@ if (workout.generated && !prescribedIds.length && workout.role) {
 - Para planes ya almacenados con `exercises: []`, la sesión usa el template estático del rol (el usuario ve ejercicios aunque no sean los generados por IA).
 - No hay regresión en sesiones Pull A ya generadas correctamente con ejercicios.
 - `node scripts/release-gate.mjs` pasa.
+
+---
+
+## REQ-93 - Fix: exerciseCatalog devolvía catálogo vacío cuando tabla exercises de Supabase está vacía
+
+**Estado: implementado.** Fix en `exerciseCatalog` (`index.html`) para usar `LOCAL_EXERCISES` como fallback cuando `DB.exercises` está vacío, consistente con `activeTrainingCatalog`.
+
+### Descripción del bug
+
+Cuando la tabla `exercises` de Supabase existe pero está vacía (i.e. `exercises.sql` no se ejecutó o los seeds no se aplicaron), `dbLoad` almacenaba `DB.exercises = []` con `DB.exerciseReady = true`. Esto provocaba que `exerciseCatalog()` devolviera un array vacío, haciendo que `exerciseBySlug()` retornara `null` para todos los slugs.
+
+### Causa raíz
+
+`exerciseCatalog()` y `activeTrainingCatalog()` usaban condiciones de fallback inconsistentes:
+
+```js
+// exerciseCatalog — NO verificaba length: retornaba [] cuando DB.exercises=[]
+const source = DB.exerciseReady ? DB.exercises : LOCAL_EXERCISES;
+
+// activeTrainingCatalog — SÍ verificaba length: fallback correcto a LOCAL
+const source = DB.loaded && Array.isArray(DB.exercises) && DB.exercises.length
+  ? DB.exercises : LOCAL_EXERCISES;
+```
+
+Resultado: `allowedExerciseIds` se calculaba correctamente (vía `activeTrainingCatalog` con LOCAL), el plan se generaba, pero todos los `exerciseBySlug()` en `deterministicTrainingWeekPayload` y `workoutPrescription` retornaban `null` → `exercises = []` → 2 bloques solamente.
+
+### Fix (`index.html` `exerciseCatalog`)
+
+Alinear `exerciseCatalog` con la condición de fallback de `activeTrainingCatalog`:
+
+```js
+// Antes
+const source = DB.exerciseReady ? DB.exercises : LOCAL_EXERCISES;
+
+// Después (REQ-93)
+const source = (DB.exerciseReady && Array.isArray(DB.exercises) && DB.exercises.length)
+  ? DB.exercises : LOCAL_EXERCISES;
+```
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `exerciseCatalog`: fallback a `LOCAL_EXERCISES` cuando `DB.exercises` está vacío |
+
+### Criterios de aceptación
+
+- Con Supabase configurado pero tabla `exercises` vacía, `exerciseBySlug("lat-pulldown", true)` retorna el ejercicio de `LOCAL_EXERCISES`.
+- Con Supabase configurado y tabla `exercises` con datos, `exerciseBySlug` sigue usando los datos de Supabase (sin regresión).
+- Combinado con REQ-92, una sesión Pull A de gimnasio muestra ejercicios reales independientemente del estado de la tabla `exercises` en Supabase.
+- `node scripts/release-gate.mjs` pasa.
