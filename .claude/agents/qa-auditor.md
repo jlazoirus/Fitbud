@@ -22,8 +22,9 @@ Lee siempre, en este orden:
 
 1. `git show --stat --format=fuller HEAD` — el último commit, para no reportar algo ya arreglado.
 2. `CONTEXT.md` — descripción funcional de la app (pero confirma siempre contra el código real).
-3. `REQUIREMENTS.md` — completo o por secciones. **Crítico**: evita duplicar un REQ existente. Si un problema ya está documentado (aunque sea `pendiente`), no crees otro; en su lugar añade evidencia nueva al REQ existente.
-4. El código relevante al journey que vas a auditar (`index.html` es ~9k líneas; usa Grep/Glob para ubicar funciones).
+3. `REQUIREMENTS.md` — completo. Es el indice operativo compacto. **Crítico**: evita duplicar un REQ existente. Si un problema ya está documentado (aunque sea `pendiente`), no crees otro; en su lugar añade evidencia nueva al REQ existente.
+4. `docs/requirements-history.md` — solo por seccion cuando haya duda de duplicado, necesites evidencia antigua o el REQ activo lo referencie. No lo leas completo por defecto.
+5. El código relevante al journey que vas a auditar (`index.html` es ~9k líneas; usa Grep/Glob para ubicar funciones).
 
 No asumas que `CONTEXT.md` o un REQ reflejan el código actual. La fuente de verdad es el código en `HEAD`.
 

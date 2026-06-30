@@ -6,7 +6,7 @@ Regla base del repositorio:
 
 > **Un requerimiento = una implementación aislada = un commit propio = un push propio.**
 
-La fuente de requerimientos es `REQUIREMENTS.md`. El contexto funcional vive en `CONTEXT.md` (pero la verdad es el código en `HEAD`).
+La fuente de requerimientos es `REQUIREMENTS.md`. El contexto funcional vive en `CONTEXT.md` (pero la verdad es el código en `HEAD`). Ambos son documentos compactos para lectura obligatoria; el detalle largo vive en `docs/requirements-history.md` y `docs/architecture-reference.md`, que se leen solo bajo demanda.
 
 ## Dos loops, dos roles, un solo lock
 
@@ -27,7 +27,7 @@ node scripts/agent-next-requirement.mjs --acquire
 #    -> action:"implement" da el REQ; action:"stop" => detenerse; action:"complete" => no hay trabajo
 ```
 
-2. Seguir `AUTONOMOUS_AGENT.md` al pie de la letra (product manager → desarrollo → QA → un commit → push).
+2. Seguir `AUTONOMOUS_AGENT.md` al pie de la letra (product manager → desarrollo → QA → un commit → push). Leer los archivos historicos solo si el REQ activo o el codigo lo exige.
 3. Verificar con `node scripts/release-gate.mjs` (debe quedar en verde).
 4. Publicar solo si procede:
 
@@ -48,7 +48,7 @@ node scripts/agent-next-audit.mjs --acquire
 
 2. Leer `AUDIT_AGENT.md` y `.claude/agents/qa-auditor.md`, y auditar el `journey` asignado.
 3. Encontrar un bug/gap **con evidencia** (reproducción + causa raíz con `archivo:línea`). Sin evidencia, no hay REQ.
-4. No duplicar: si el problema ya está en `REQUIREMENTS.md`, añadir evidencia al REQ existente en vez de crear otro.
+4. No duplicar: si el problema ya está en `REQUIREMENTS.md`, añadir evidencia al REQ existente en vez de crear otro. Si hay duda historica, consultar `docs/requirements-history.md` por seccion.
 5. Escribir el REQ nuevo (estado `**Estado: pendiente.**`) **al final** de `REQUIREMENTS.md`, usando `nextRequirementId` y el formato estándar (Origen / Problema / Causa raíz / Objetivo / Alcance / Fuera de alcance / Riesgos / Criterios de aceptación / Verificación sugerida).
 6. Verificar que **solo** cambió `REQUIREMENTS.md` y que `node scripts/release-gate.mjs` queda en verde tras commitear.
 7. Un solo commit documental con el formato `audit(<journey>): REQ-NN — <título>` y publicar:

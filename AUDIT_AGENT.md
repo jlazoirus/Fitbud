@@ -5,7 +5,7 @@ Este runbook gobierna cada ejecución del **loop auditor** sobre Fitbros. Es el 
 - El **desarrollador** (`AUTONOMOUS_AGENT.md` + `agent-loop.json`) **vacía** la cola: implementa REQ, uno por corrida.
 - El **auditor** (este runbook + `agent-audit-loop.json`) **llena** la cola: recorre journeys, encuentra bugs y deuda, y los documenta como REQ nuevos.
 
-La configuración machine-readable vive en `agent-audit-loop.json`. Las reglas de comportamiento detalladas viven en el subagente `.claude/agents/qa-auditor.md`; este runbook solo añade la mecánica del loop (lock, preflight, commit, push).
+La configuración machine-readable vive en `agent-audit-loop.json`. Las reglas de comportamiento detalladas viven en el subagente `.claude/agents/qa-auditor.md`; este runbook solo añade la mecánica del loop (lock, preflight, commit, push). `REQUIREMENTS.md` y `CONTEXT.md` son compactos; los archivos largos bajo `docs/` se consultan solo por seccion cuando haya duda historica.
 
 ## Regla absoluta
 
@@ -33,7 +33,7 @@ Nunca implementar un REQ, nunca crear dos commits, nunca hacer dos pushes.
 2. Detenerse si devuelve `action: "stop"`. En particular `another_agent_active` significa que el desarrollador está corriendo: no auditar.
 3. Confirmar worktree limpio, rama `main`, y `HEAD == origin/main` (el selector ya lo valida).
 4. Tomar el `journey` y el `nextRequirementId` que devolvió el selector.
-5. Leer el contexto obligatorio que indica el subagente: último commit, `CONTEXT.md`, `REQUIREMENTS.md` y el código real del journey.
+5. Leer el contexto obligatorio que indica el subagente: último commit, `CONTEXT.md`, `REQUIREMENTS.md` y el código real del journey. Consultar `docs/requirements-history.md` solo para evitar duplicados o recuperar evidencia antigua.
 
 Liberar siempre el lock al terminar o bloquearse:
 

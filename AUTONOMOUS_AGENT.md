@@ -6,7 +6,7 @@ Este runbook gobierna cada ejecucion automatica sobre Fitbros. El agente combina
 2. **Desarrollador:** implementa el alcance completo usando los patrones existentes del repositorio.
 3. **QA y release:** prueba, documenta, crea un unico commit contextual y hace un unico push.
 
-La configuracion machine-readable vive en `agent-loop.json`. La fuente de requerimientos es `REQUIREMENTS.md`.
+La configuracion machine-readable vive en `agent-loop.json`. La fuente de requerimientos es `REQUIREMENTS.md`; el contexto operativo compacto vive en `CONTEXT.md`. El detalle historico esta en `docs/requirements-history.md` y `docs/architecture-reference.md` y se abre solo bajo demanda.
 
 ## Resultado de una ejecucion
 
@@ -40,7 +40,8 @@ Nunca implementar dos requerimientos, crear dos commits o hacer dos pushes en un
    - `REQUIREMENTS.md`;
    - `CONTEXT.md`;
    - los archivos de codigo, SQL y pruebas relacionados.
-5. No asumir que el requerimiento refleja el codigo actual. Un commit concurrente puede haberlo completado o cambiado.
+5. Abrir `docs/requirements-history.md` o `docs/architecture-reference.md` solo por seccion cuando el REQ activo lo referencie, haya duda de duplicado o falte contexto operativo.
+6. No asumir que el requerimiento refleja el codigo actual. Un commit concurrente puede haberlo completado o cambiado.
 
 Liberar siempre el lock al terminar o bloquearse:
 
@@ -113,6 +114,8 @@ En el mismo commit del requerimiento:
 
 - cambiar su estado a implementado en `REQUIREMENTS.md`;
 - actualizar `CONTEXT.md` si cambia arquitectura, datos o operacion;
+- actualizar `docs/requirements-history.md` solo si se compacta o archiva detalle historico deliberadamente;
+- actualizar `docs/architecture-reference.md` solo si cambia una referencia extendida que ya no conviene mantener en `CONTEXT.md`;
 - actualizar `README.md` solo cuando cambie instalacion o uso;
 - subir la version del cache si cambia el shell PWA;
 - documentar migraciones pendientes de aplicar manualmente.
@@ -202,4 +205,4 @@ Cuando todos los elementos de `queue` esten implementados:
 - Maximo dos intentos de implementacion.
 - Maximo 90 minutos.
 - Preferir pruebas locales, mocks y documentacion primaria.
-- No repetir analisis ya registrado en el commit anterior o `CONTEXT.md`.
+- No repetir analisis ya registrado en el commit anterior, `CONTEXT.md` o los archivos historicos bajo `docs/`.

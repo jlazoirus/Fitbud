@@ -1,7 +1,7 @@
 # Fitbros — Contexto de negocio y propuesta de valor
 
 > Documento **de negocio** (no técnico), pensado para Cowork y para trabajo de producto, marketing, growth y operaciones.
-> El contexto de ingeniería vive en `CONTEXT.md`; el backlog operativo en `REQUIREMENTS.md`; la privacidad en `PRIVACY.md`.
+> El contexto de ingeniería operativo vive en `CONTEXT.md`; el backlog operativo en `REQUIREMENTS.md`; la privacidad en `PRIVACY.md`. El detalle extendido está en `docs/architecture-reference.md` y `docs/requirements-history.md`.
 > Última actualización: 2026-06-18.
 
 ---

@@ -2,7 +2,7 @@
 
 > **Nota:** este documento cubre solo las fases iniciales de arranque (Fase 0–10).
 > El estado actual del producto y los requerimientos en curso están en [`REQUIREMENTS.md`](REQUIREMENTS.md).
-> La arquitectura detallada vive en [`CONTEXT.md`](CONTEXT.md).
+> La arquitectura operativa vive en [`CONTEXT.md`](CONTEXT.md); la referencia extendida está en [`docs/architecture-reference.md`](docs/architecture-reference.md).
 
 - [x] Fase 0 — Andamiaje y control de versiones
 - [x] Fase 1 — Capa de datos
