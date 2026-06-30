@@ -1308,3 +1308,68 @@ Cuando `res.ok === false`:
 - Si el gap es >700 kcal, no se muestra sugerencia.
 - `node scripts/validate-gap-snack.mjs` pasa.
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-90 - Feature: editar gramos/porciones de ingredientes en comidas generadas antes de aplicar
+
+**Estado: implementado.** Inputs numéricos inline en cada ingrediente de `genReviewHtml` y `genWeekReviewHtml`. `updateGenMealGrams` y `updateGenWeekMealGrams` recalculan macros vía `recalcCoachMealMacros` y re-validan. 7 asserts en `scripts/validate-portion-editing.mjs`.
+
+### Problema
+
+Cuando un día generado no llegaba a la meta de kcal/proteína, la única opción era descartar todo y regenerar, o agregar un snack automático (REQ-89). El usuario quiere poder ajustar los gramajes de los ingredientes existentes (ej. subir arroz de 80g a 120g, o pechuga de 100g a 150g) para cerrar el déficit él mismo, manteniendo las comidas que ya le gustan.
+
+### Investigación previa
+
+1. **No existía edición de gramos por ingrediente** — `editorSheet` (editor genérico) solo permite editar macros totales planos (kcal/P/C/G), no ingredientes individuales. El modal de revisión (`genReviewHtml`) mostraba los ingredientes como texto estático.
+
+2. **Patrón UI**: la app usa `<input type="number">` con `inputmode="numeric"` en todos los formularios (peso, edad, RPE, macros). No hay componente stepper. Los inputs se estilizan con las CSS vars del tema (`var(--surf3)`, `var(--border-2)`, `var(--txt)`).
+
+3. **Fórmula de macros**: `DB.ingredients` almacena macros por 100g (`kcal`, `protein_g`, `carbs_g`, `fat_g`). La fórmula es `macro = macro_per_100g × gramos / 100`. `recalcCoachMealMacros` (nutrition-domain.js) ya implementa esto: resuelve ingredientes por nombre, aplica la fórmula, y devuelve macros recalculados.
+
+4. **Dos flujos de revisión separados**: `genReviewHtml` sirve el día individual; `genWeekReviewHtml` sirve la semana. Ambos necesitan los inputs.
+
+5. **Guardado**: `applyDayComidas` graba `c.ingredientes` tal cual viene del draft. Al editar gramos en el draft antes de aplicar, los valores editados se persisten correctamente.
+
+### Solución
+
+#### Inputs inline en ingredientes
+
+En `genReviewHtml` y `genWeekReviewHtml`, cada ingrediente pasa de texto estático (`"Avena 50g"`) a un input editable:
+
+```html
+Avena <input type="number" min="5" step="5" value="50"
+  onchange="updateGenMealGrams(cIdx, gIdx, +this.value)">g
+```
+
+Estilo compacto (52px ancho, font 13px) con las CSS vars del tema para integrarse con el diseño oscuro.
+
+#### `updateGenMealGrams(mealIdx, ingIdx, grams)` — día individual
+
+1. Actualiza `window._genDay.comidas[mealIdx].ingredientes[ingIdx].gramos`
+2. Recalcula macros de la comida con `recalcCoachMealMacros` (match por nombre → fórmula per-100g × gramos)
+3. Actualiza `comida.kcal`, `.proteina_g`, `.carbohidratos_g`, `.grasa_g`
+4. Re-valida con `validateGeneratedDay` (que re-suma totales y checa ±15% kcal, ≥85% prot)
+5. Re-renderiza `genReviewHtml` → los macros por comida, totales del día, issues y botón "Aplicar" se actualizan
+
+#### `updateGenWeekMealGrams(dayIdx, mealIdx, ingIdx, grams)` — semana
+
+Igual que el anterior pero opera sobre `window._genWeek.daysData[dayIdx]`. Además recalcula la lista de compras con `buildShoppingListFromNutritionPlan`.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | Inputs inline en `genReviewHtml` y `genWeekReviewHtml`; funciones `updateGenMealGrams` y `updateGenWeekMealGrams` |
+| `scripts/validate-portion-editing.mjs` | Validador estructural (7 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Criterios de aceptación
+
+- Cada ingrediente en el modal de revisión muestra un input numérico editable para gramos.
+- Al cambiar gramos, los macros de la comida se recalculan desde `DB.ingredients` (per-100g × gramos).
+- Los totales del día se actualizan y la validación se re-ejecuta (±15% kcal, ≥85% prot).
+- Si los totales editados pasan la validación, "Aplicar al día" se habilita.
+- Funciona tanto en "Preparar mi día" como en "Preparar mi semana".
+- Al aplicar, los gramos editados se guardan (no los originales).
+- La lista de compras de la semana se actualiza al editar gramos.
+- `node scripts/validate-portion-editing.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.

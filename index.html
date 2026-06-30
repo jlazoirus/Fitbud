@@ -7294,10 +7294,11 @@ async function aiGenerateWeek(){
 }
 function genReviewHtml(res,target){
   const t=res.totals||{kcal:0,p:0,c:0,f:0};
-  const meals=(res.comidas||[]).map(c=>`<div class="opt" style="cursor:default">
+  const igStyle="width:52px;padding:2px 4px;text-align:right;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);font-size:13px";
+  const meals=(res.comidas||[]).map((c,cIdx)=>`<div class="opt" style="cursor:default">
     <b>${esc(c.nombre)}</b> <span class="muted small">(${c.slot_id})</span>
     <div class="o-meta">${c.kcal} kcal · P ${c.proteina_g} · C ${c.carbohidratos_g} · G ${c.grasa_g} g</div>
-    <div class="muted small" style="margin-top:4px">${c.ingredientes.map(g=>esc(g.nombre)+" "+g.gramos+"g").join(" · ")}</div>
+    <div class="muted small" style="margin-top:4px">${c.ingredientes.map((g,gIdx)=>`${esc(g.nombre)} <input type="number" inputmode="numeric" min="5" step="5" value="${g.gramos}" style="${igStyle}" onchange="updateGenMealGrams(${cIdx},${gIdx},+this.value)">g`).join(" · ")}</div>
     <div style="margin-top:6px"><button class="btn btn-sm" onclick="regenerateGenMeal('${c.slot_id}')">Otra opción</button></div>
   </div>`).join("");
   const issues=res.issues&&res.issues.length?`<div class="ai-box" style="border-color:var(--bad)">✗ No se puede aplicar:<br>${res.issues.map(esc).join("<br>")}</div>`:"";
@@ -7348,6 +7349,21 @@ function addGapSnackToDay(){
   const res=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
   const out=$("#genOut");if(out)out.innerHTML=genReviewHtml(res,target);
 }
+// REQ-90: editar gramos de ingredientes en el borrador del día y re-validar.
+function updateGenMealGrams(mealIdx,ingIdx,grams){
+  const draft=window._genDay;if(!draft)return;
+  const comida=draft.comidas[mealIdx];if(!comida)return;
+  const ing=comida.ingredientes[ingIdx];if(!ing)return;
+  ing.gramos=Math.max(1,Math.round(grams));
+  const ndCoach=window.FITBUD_NUTRITION_DOMAIN;
+  if(ndCoach&&ndCoach.recalcCoachMealMacros&&DB.loaded){
+    const calc=ndCoach.recalcCoachMealMacros({ingredientes:comida.ingredientes},DB);
+    comida.kcal=calc.macros.kcal;comida.proteina_g=calc.macros.p;comida.carbohidratos_g=calc.macros.c;comida.grasa_g=calc.macros.f;
+  }
+  const day=buildDay(draft.ds);const target=effectiveDayTarget();
+  const res=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
+  const out=$("#genOut");if(out)out.innerHTML=genReviewHtml(res,target);
+}
 function applyGeneratedDay(){
   const g=window._genDay; if(!g||!g.comidas){closeModal();return;}
   const day=buildDay(g.ds);
@@ -7377,12 +7393,13 @@ function genWeekReviewHtml(){
   const varietyHtml=varWarns.length
     ?`<div class="ai-box" style="border-color:var(--warn,#f59e0b)">⚠️ ${varWarns.map(w=>esc(w.message)).join("<br>")}</div>`
     :"";
+  const wkIgStyle="width:52px;padding:2px 4px;text-align:right;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);font-size:13px";
   const days=draft.daysData.map((d,index)=>`<details class="dash" ${index===0?"open":""}>
     <summary><b>${esc(prettyDate(d.ds))}</b> <span class="muted small">${d.comidas.length} comidas</span></summary>
-    ${d.comidas.map(c=>`<div class="opt" style="cursor:default;margin:6px 0">
+    ${d.comidas.map((c,mIdx)=>`<div class="opt" style="cursor:default;margin:6px 0">
       <b>${esc(c.nombre)}</b> <span class="muted small">(${c.slot_id})</span>
       <div class="o-meta">${c.kcal} kcal · P ${c.proteina_g} · C ${c.carbohidratos_g} · G ${c.grasa_g} g</div>
-      <div class="muted small" style="margin-top:4px">${c.ingredientes.map(g=>esc(g.nombre)+" "+g.gramos+"g").join(" · ")}</div>
+      <div class="muted small" style="margin-top:4px">${c.ingredientes.map((g,gIdx)=>`${esc(g.nombre)} <input type="number" inputmode="numeric" min="5" step="5" value="${g.gramos}" style="${wkIgStyle}" onchange="updateGenWeekMealGrams(${index},${mIdx},${gIdx},+this.value)">g`).join(" · ")}</div>
     </div>`).join("")}
     <button class="btn btn-sm" style="margin-top:6px" onclick="regenerateDayInWeekDraft(${index})">Preparar otro ${esc(prettyDate(d.ds).split(",")[0])}</button>
   </details>`).join("");
@@ -7401,6 +7418,21 @@ function genWeekReviewHtml(){
       <button class="btn" onclick="aiGenerateWeek()">Preparar otra semana</button>
       <button class="btn" onclick="closeModal()">Descartar</button>
     </div>`;
+}
+// REQ-90: editar gramos de ingredientes en el borrador de la semana y re-renderizar.
+function updateGenWeekMealGrams(dayIdx,mealIdx,ingIdx,grams){
+  const draft=window._genWeek;if(!draft)return;
+  const dayData=draft.daysData[dayIdx];if(!dayData)return;
+  const comida=dayData.comidas[mealIdx];if(!comida)return;
+  const ing=comida.ingredientes[ingIdx];if(!ing)return;
+  ing.gramos=Math.max(1,Math.round(grams));
+  const ndCoach=window.FITBUD_NUTRITION_DOMAIN;
+  if(ndCoach&&ndCoach.recalcCoachMealMacros&&DB.loaded){
+    const calc=ndCoach.recalcCoachMealMacros({ingredientes:comida.ingredientes},DB);
+    comida.kcal=calc.macros.kcal;comida.proteina_g=calc.macros.p;comida.carbohidratos_g=calc.macros.c;comida.grasa_g=calc.macros.f;
+  }
+  if(ndCoach&&ndCoach.buildShoppingListFromNutritionPlan)draft.shoppingList=ndCoach.buildShoppingListFromNutritionPlan(draft.daysData);
+  const out=$("#genwOut");if(out)out.innerHTML=genWeekReviewHtml();
 }
 async function applyWeekPlan(){
   const draft=window._genWeek;if(!draft||!draft.daysData.length){closeModal();return;}
