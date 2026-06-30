@@ -272,7 +272,6 @@
   .player-active-exercise .exercise-card{border-color:var(--border-acc)}
   @media(prefers-reduced-motion:reduce){
     .demo-athlete,.demo-crank{animation:none!important}
-    .demo-frame.demo-frame-1{animation:none!important;opacity:0!important}
   }
 
   /* Tabs */
@@ -3704,7 +3703,7 @@ function exerciseCard(exercise,admin){
       ${admin?`<div class="exercise-copy"><b>Músculos:</b> ${esc(muscles.join(", "))}<br><b>Fuente/licencia:</b> ${esc(exercise.source_name)} · ${esc(exercise.license_name)}${issues.length?`<br><b style="color:var(--bad)">Incompleto:</b> ${esc(issues.join(", "))}`:""}</div>`:""}
       <div class="exercise-actions">
         <button class="btn btn-sm" onclick="openExerciseGuide('${esc(exercise.slug)}')">Ver técnica</button>
-        ${reduced?'<button class="btn btn-sm" disabled>Movimiento reducido</button>':`<button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>`}
+        <button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>
         ${admin&&DB.exerciseReady?`<button class="btn btn-sm" onclick="editExercise('${esc(exercise.slug)}')">Editar</button>`:""}
       </div>
     </div>

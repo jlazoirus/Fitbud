@@ -1485,6 +1485,89 @@ if (workout.generated && !prescribedIds.length && workout.role) {
 
 ---
 
+## REQ-94 - Fix: demostración de ejercicio aparecía como imagen estática con "Reducir Movimiento" activo
+
+**Estado: implementado.** Dos cambios en `index.html`: (1) se eliminó `demo-frame-1` del bloque CSS `prefers-reduced-motion`, (2) se reemplazó el botón disabled "Movimiento reducido" por el botón habilitado "Reproducir/Pausar".
+
+### Descripción del bug
+
+En la pantalla de detalle de ejercicio (ej. Face Pull), la demostración aparecía como imagen estática sin movimiento en dispositivos con "Reducir Movimiento" activo (iOS: Configuración → Accesibilidad → Movimiento → Reducir Movimiento, o preferencia equivalente del sistema operativo que activa `prefers-reduced-motion: reduce` en el navegador).
+
+### Contexto del sistema de demos
+
+Los ejercicios de Supabase usan `media_type: "image_sequence"` con 2 fotogramas JPEG (posición inicio y posición final, provenientes de Free Exercise DB). La "animación" es CSS puro: `.demo-frame-1` alterna su `opacity` vía `@keyframes demoFrame` (`1.6s steps(1,end) infinite`), creando el efecto de flip entre los dos fotogramas.
+
+### Causa raíz (dos fallos compuestos)
+
+**Fallo 1 — CSS aplasta la animación con `!important`:**
+
+```css
+/* Antes — en @media(prefers-reduced-motion:reduce) */
+.demo-frame.demo-frame-1 { animation: none !important; opacity: 0 !important; }
+```
+
+`opacity:0!important` ocultaba `demo-frame-1` permanentemente bajo `prefers-reduced-motion`. Como la regla `.exercise-card.paused .demo-frame-1 { animation-play-state: paused }` ya maneja el estado "pausado" (animación detenida en `opacity: 0` al inicio del ciclo), esta regla era redundante y además dañina al bloquear que el usuario pudiera ver frame-1 incluso si activa la animación.
+
+**Fallo 2 — Botón de control deshabilitado:**
+
+```js
+// Antes
+${reduced ? '<button class="btn btn-sm" disabled>Movimiento reducido</button>' : `...Reproducir/Pausar...`}
+```
+
+Con `reduced === true`, el botón de play/pause se reemplazaba por un botón deshabilitado, impidiendo que el usuario activara manualmente la animación.
+
+### Fix (`index.html`)
+
+**CSS** — eliminar `demo-frame-1` del bloque `prefers-reduced-motion`:
+
+```css
+/* Antes */
+@media(prefers-reduced-motion:reduce){
+    .demo-athlete,.demo-crank{animation:none!important}
+    .demo-frame.demo-frame-1{animation:none!important;opacity:0!important}
+}
+
+/* Después (REQ-94) */
+@media(prefers-reduced-motion:reduce){
+    .demo-athlete,.demo-crank{animation:none!important}
+}
+```
+
+**JS** — siempre mostrar el botón habilitado:
+
+```js
+// Antes
+${reduced ? '<button class="btn btn-sm" disabled>Movimiento reducido</button>' : `<button ... >${pausedByDefault?"Reproducir":"Pausar"}</button>`}
+
+// Después (REQ-94)
+<button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>
+```
+
+### Comportamiento resultante
+
+- Con `prefers-reduced-motion: reduce` activo: la tarjeta arranca con clase `paused` → `demo-frame-1` tiene `animation-play-state: paused` → se ve solo frame-0 (posición inicial). El botón muestra **"Reproducir"** (habilitado).
+- Al pulsar "Reproducir": se elimina clase `paused` → `demoFrame` corre → flip entre frame-0 y frame-1 cada 0.8s. El botón cambia a **"Pausar"**.
+- Sin `prefers-reduced-motion`: comportamiento sin cambios (animación automática al cargar).
+- Las SVGs animadas (`.demo-athlete`, `.demo-crank`) siguen bloqueadas bajo `prefers-reduced-motion` correctamente.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | CSS: eliminar `demo-frame-1` de `@media(prefers-reduced-motion:reduce)` |
+| `index.html` | JS `exerciseCard`: siempre renderizar botón Reproducir/Pausar habilitado |
+
+### Criterios de aceptación
+
+- Con `prefers-reduced-motion: reduce` simulado, `exerciseCard` con `media_type: "image_sequence"` rinde HTML sin `disabled` y con texto "Reproducir".
+- La tarjeta tiene clase `paused` al renderizarse → `demo-frame-1.animationPlayState === "paused"`.
+- Al hacer click en "Reproducir", la clase `paused` se elimina → `demo-frame-1.animationPlayState === "running"`.
+- El bloque CSS `@media(prefers-reduced-motion:reduce)` ya no contiene regla para `.demo-frame-1`.
+- `node scripts/release-gate.mjs` pasa.
+
+---
+
 ## REQ-93 - Fix: exerciseCatalog devolvía catálogo vacío cuando tabla exercises de Supabase está vacía
 
 **Estado: implementado.** Fix en `exerciseCatalog` (`index.html`) para usar `LOCAL_EXERCISES` como fallback cuando `DB.exercises` está vacío, consistente con `activeTrainingCatalog`.
