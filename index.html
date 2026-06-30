@@ -2247,6 +2247,14 @@ function openPrivacyNotice(){
     <div class="alert">Texto preliminar pendiente de revisión profesional antes del lanzamiento comercial. Versión ${CONSENT_POLICY_VERSION}.</div>
     <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`);
 }
+function openTermsNotice(){
+  modal(`<h3>Términos de uso</h3>
+    <p class="muted small">Fitbros es una herramienta de seguimiento personal de nutrición y entrenamiento. El contenido generado es orientativo y no constituye consejo médico ni nutricional profesional.</p>
+    <p class="muted small">Al usar Fitbros aceptas no depender exclusivamente de la app para decisiones de salud. Consulta a un profesional si tienes condiciones médicas.</p>
+    <p class="muted small">Puedes cancelar tu cuenta en cualquier momento desde Perfil. La cancelación elimina tus datos personales conforme a nuestra política de privacidad.</p>
+    <div class="alert">Texto preliminar pendiente de revisión profesional antes del lanzamiento comercial. Versión ${CONSENT_POLICY_VERSION}.</div>
+    <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`);
+}
 function startOnboarding(){
   onboardingDraft=onboardingDefaults();
   onboardingActive=true;
@@ -5820,6 +5828,8 @@ function renderLanding(){
     <footer class="l-footer">
       <div class="l-footer-legal">
         © 2026 Fitbros · <a href="#" onclick="showAuthFromLanding('in');return false">Iniciar sesión</a>
+        · <a href="#" onclick="openPrivacyNotice();return false">Privacidad</a>
+        · <a href="#" onclick="openTermsNotice();return false">Términos</a>
       </div>
     </footer>
   </div>`;
@@ -5866,6 +5876,7 @@ function renderAuth(){
       <div class="field"><label>Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
       <div class="field"><label>Contraseña</label><input id="au_pwd" type="password" autocomplete="${mode==="in"?"current-password":"new-password"}" placeholder="••••••••"></div>
       <button class="btn btn-accent" style="width:100%" onclick="doAuth()">${mode==="in"?"Entrar":"Registrarme"}</button>
+      ${mode==="up"?`<p class="muted small center" style="margin-top:10px;font-size:12px;line-height:1.5">Al crear tu cuenta aceptas nuestros <a href="#" onclick="openTermsNotice();return false">Términos</a> y el <a href="#" onclick="openPrivacyNotice();return false">Aviso de privacidad</a>.</p>`:""}
       <div id="auOut" class="muted small" style="margin-top:10px"></div>
     </div>
     <div class="center" style="margin-top:14px">

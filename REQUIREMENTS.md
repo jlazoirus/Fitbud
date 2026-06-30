@@ -3933,7 +3933,7 @@ node scripts/audit-html.mjs
 
 ## REQ-74 - Aviso de privacidad y términos accesibles antes del registro
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Origen
 
