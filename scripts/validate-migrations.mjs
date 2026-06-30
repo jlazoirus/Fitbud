@@ -30,16 +30,17 @@ const TABLES_REQUIRING_RLS = [
 const DEPENDENCY_ORDER = [
   "schema.sql",       // 0 — base
   "seed.sql",         // 1 — datos
-  "auth.sql",         // 2 — multiusuario
-  "plan_cycles.sql",  // 3 — ciclos y fotos
-  "privacy.sql",      // 4 — consentimientos
-  "exercises.sql",    // 5 — catálogo de ejercicios
-  "coach_quota.sql",  // 6 — cuotas y pool
-  "notifications.sql",// 7 — recordatorios
-  "entitlements.sql", // 8 — entitlement
-  "billing.sql",      // 9 — eventos Stripe
-  "analytics.sql",    // 10 — analítica
-  "beta_recruitment.sql", // 11 — reclutamiento beta REQ-70
+  "nutrition_catalog_semantics.sql", // 2 — metadata nutricional REQ-79
+  "auth.sql",         // 3 — multiusuario
+  "plan_cycles.sql",  // 4 — ciclos y fotos
+  "privacy.sql",      // 5 — consentimientos
+  "exercises.sql",    // 6 — catálogo de ejercicios
+  "coach_quota.sql",  // 7 — cuotas y pool
+  "notifications.sql",// 8 — recordatorios
+  "entitlements.sql", // 9 — entitlement
+  "billing.sql",      // 10 — eventos Stripe
+  "analytics.sql",    // 11 — analítica
+  "beta_recruitment.sql", // 12 — reclutamiento beta REQ-70
 ];
 
 // schema.sql y seed.sql son scripts de instalación fresca (DROP + CREATE), no incrementales.

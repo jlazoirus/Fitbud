@@ -19,6 +19,7 @@ drop table if exists ingredients cascade;
 create table ingredients (
   id          bigint generated always as identity primary key,
   name        text not null unique,
+  slug        text,
   category    text,
   kcal        numeric not null default 0,   -- por 100 g
   protein_g   numeric not null default 0,   -- por 100 g
@@ -31,7 +32,15 @@ create table ingredients (
 create table dishes (
   id          bigint generated always as identity primary key,
   name        text not null unique,
+  slug        text,
   slot        text,            -- desayuno | almuerzo | batido | cena | snack
+  compatible_slots text[] not null default '{}',
+  diet_tags   text[] not null default '{}',
+  prep_minutes integer,
+  budget_tier text,
+  needs_kitchen boolean,
+  eat_out_ok boolean,
+  protein_density text,
   menu        text,            -- A | B | C | D | NULL (compartido)
   notes       text,
   created_at  timestamptz default now()
@@ -43,6 +52,10 @@ create table dish_ingredients (
   dish_id       bigint not null references dishes(id) on delete cascade,
   ingredient_id bigint not null references ingredients(id) on delete restrict,
   grams         numeric not null default 0,
+  scalable      boolean not null default true,
+  min_g         numeric,
+  max_g         numeric,
+  step_g        numeric,
   unique (dish_id, ingredient_id)
 );
 
@@ -80,6 +93,8 @@ create table weight_log (
 create index on dish_ingredients (dish_id);
 create index on dish_ingredients (ingredient_id);
 create index on diet_dishes (diet_id);
+create unique index ingredients_slug_unique_idx on ingredients(slug) where slug is not null;
+create unique index dishes_slug_unique_idx on dishes(slug) where slug is not null;
 
 -- ============================================================
 -- Vista de macros calculados por plato (suma de ingredientes)

@@ -77,6 +77,7 @@ run("validate-training-plan-wiring.mjs", "node scripts/validate-training-plan-wi
 run("validate-macro-target-wiring.mjs", "node scripts/validate-macro-target-wiring.mjs");
 run("validate-macro-targets-invariant.mjs", "node scripts/validate-macro-targets-invariant.mjs");
 run("validate-nutrition-domain.mjs", "node scripts/validate-nutrition-domain.mjs");
+run("validate-nutrition-catalog.mjs", "node scripts/validate-nutrition-catalog.mjs");
 run("validate-high-protein-prompt.mjs", "node scripts/validate-high-protein-prompt.mjs");
 run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");

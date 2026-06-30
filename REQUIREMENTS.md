@@ -4259,7 +4259,11 @@ Crear un módulo puro de dominio nutricional que sea la autoridad local para tar
 
 ## REQ-79 - Catálogo nutricional semántico, claves estables y cobertura de 2-6 comidas
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+Implementación: migración idempotente `supabase/nutrition_catalog_semantics.sql` con `slug` estable para ingredientes/platos, `compatible_slots`, `diet_tags`, metadata operativa de platos (`prep_minutes`, `budget_tier`, `needs_kitchen`, `eat_out_ok`, `protein_density`) y límites de escalado por ingrediente (`scalable`, `min_g`, `max_g`, `step_g`). `schema.sql` refleja las columnas para instalaciones frescas. El cliente lee esos campos cuando existen y degrada al `slot` clásico cuando producción aún no aplicó la migración; reemplazos, coach, regeneración de comida y editor de dietas usan `compatible_slots`. El editor de platos preserva/edita metadata solo si Supabase devuelve esas columnas. `scripts/validate-nutrition-catalog.mjs` valida slugs únicos, vocabulario, cobertura de `desayuno`, `media_manana`, `almuerzo`, `merienda`, `snack`, `cena`, `recena`, y shape de la migración; queda integrado en `release-gate`. `service-worker.js` sube a `fitbud-pwa-v51` e incluye `js/nutrition-domain.js` en el shell.
+
+Acción manual pendiente: aplicar `supabase/nutrition_catalog_semantics.sql` en Supabase. No se ejecutó ninguna migración de producción automáticamente.
 
 ### Origen
 

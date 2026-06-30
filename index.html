@@ -1770,6 +1770,37 @@ function mealState(ds,id){const d=dayState(ds);if(!d.meals[id])d.meals[id]={done
 // valor efectivo de una comida (con override si existe)
 function dishByName(name){return (DB.byName&&name)?DB.byName[name]:null;}
 function dishById(id){return DB.dishes.find(x=>x.id===id)||null;}
+const NUTRITION_CATALOG_SLOTS=["desayuno","media_manana","almuerzo","merienda","snack","cena","recena"];
+const NUTRITION_CATALOG_SLOT_OPTIONS=[...NUTRITION_CATALOG_SLOTS,"batido"];
+function catalogArray(v){
+  if(Array.isArray(v))return v.map(x=>String(x).trim()).filter(Boolean);
+  if(typeof v==="string")return v.split(/[,{},]/).map(x=>x.trim()).filter(Boolean);
+  return [];
+}
+function catalogSemanticsReady(){
+  return dishSemanticsReady()||ingredientSemanticsReady();
+}
+function ingredientSemanticsReady(){
+  return (DB.ingredients||[]).some(i=>Object.prototype.hasOwnProperty.call(i,"slug"));
+}
+function dishSemanticsReady(){
+  return (DB.dishes||[]).some(d=>Object.prototype.hasOwnProperty.call(d,"compatible_slots"))||
+    (DB.dishIng||[]).some(l=>Object.prototype.hasOwnProperty.call(l,"scalable"));
+}
+function catalogSlug(name){
+  return String(name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").replace(/-+/g,"-");
+}
+function dishCompatibleSlots(dish){
+  const slots=catalogArray(dish&&dish.compatible_slots);
+  const base=dish&&dish.slot?[dish.slot]:[];
+  return [...new Set((slots.length?slots:base).filter(Boolean))];
+}
+function dishSupportsSlot(dish,slot){return dishCompatibleSlots(dish).includes(slot);}
+function dishSlotMeta(dish){
+  const slots=dishCompatibleSlots(dish);
+  return slots.length?slots.join(", "):(dish&&dish.slot)||"?";
+}
 // Resuelve los macros de una comida:
 // 1) override manual con macros (editar valores / personalizada)
 // 2) macros calculados desde la base de datos por nombre de plato
@@ -4501,7 +4532,7 @@ function coachActionContext(ds){
   if(DB.loaded){
     day.meals.forEach(meal=>{
       mealOptions[meal.id]=DB.dishes
-        .filter(d=>(d.slot||"")===meal.id&&!coachDishBlockedByProfile(d).blocked)
+        .filter(d=>dishSupportsSlot(d,meal.id)&&!coachDishBlockedByProfile(d).blocked)
         .slice(0,8)
         .map(d=>{const m=dishMacros(d.id);return{name:d.name,kcal:m.kcal,p:m.p,c:m.c,f:m.f};});
     });
@@ -4607,7 +4638,7 @@ function canApplyCoachAction(raw){
     if(!DB.loaded)return {ok:false,action,reason:"Actualiza el catálogo antes de cambiar platos desde el coach."};
     const dish=coachFindDish(action);
     if(!dish)return {ok:false,action,reason:"El plato propuesto no existe en el catálogo."};
-    if((dish.slot||"")!==meal.id)return {ok:false,action,reason:"El plato propuesto no corresponde a ese espacio de comida."};
+    if(!dishSupportsSlot(dish,meal.id))return {ok:false,action,reason:"El plato propuesto no corresponde a ese espacio de comida."};
     const blocked=coachDishBlockedByProfile(dish);
     if(blocked.blocked)return {ok:false,action,reason:"El plato propuesto choca con una restricción o preferencia del perfil."};
     const macros=dishMacros(dish.id);
@@ -5986,8 +6017,8 @@ function closeModal(){
 function openReplace(ds,id,reason){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);
   const ms=mealState(ds,id);const currentVal=mealValue(base,ms);
-  // Opciones desde la base de datos, filtradas por el slot de la comida.
-  const options=(DB.loaded?DB.dishes.filter(d=>(d.slot||"")===id):[]).map(d=>({name:d.name,dishName:d.name}));
+  // Opciones desde la base de datos, filtradas por compatibilidad de slot.
+  const options=(DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,id)):[]).map(d=>({name:d.name,dishName:d.name}));
   const optsHtml=options.map((o,i)=>{
     const d=o.dishName?dishByName(o.dishName):null;const m=d?dishMacros(d.id):null;
     const deltaKcal=m&&currentVal.kcal?m.kcal-currentVal.kcal:null;
@@ -6049,7 +6080,7 @@ function openMealContingency(ds,id){
 function openChangeMeal(ds,id){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
   const ms=mealState(ds,id);const cv=mealValue(base,ms);
-  const options=(DB.loaded?DB.dishes.filter(d=>(d.slot||"")===id):[]).map(d=>({name:d.name,dishName:d.name}));
+  const options=(DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,id)):[]).map(d=>({name:d.name,dishName:d.name}));
   window._changeMeal={ds,id,options,reason:null};
   const optsHtml=_buildChangeMealOpts(cv);
   modal(`<h3>Cambiar — ${esc(base.slot)}</h3>
@@ -6902,7 +6933,7 @@ async function generateOneDay(ds,coachRequest){
   // sin_gluten, dislikedIngredients). validateGeneratedDay no valida las suaves, así que el filtro
   // de la lista de referencia es la única barrera para no sugerirlas. REQ-61.
   const compatDishes=DB.loaded?DB.dishes.filter(d=>!coachDishBlockedByProfile(d).blocked):[];
-  const dishList=compatDishes.length?compatDishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
+  const dishList=compatDishes.length?compatDishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${dishSlotMeta(d)}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
   const recent=recentMealNames(ds,5);
   const lp=(profile&&profile.prefs&&profile.prefs.learnedPatterns)||null;
   const learnedLine=lp&&lp.topIngredients&&lp.topIngredients.length?`\nEl usuario suele disfrutar ingredientes como: ${lp.topIngredients.join(", ")}. Incorpóralos cuando encajen con las metas.`:"";
@@ -7087,7 +7118,8 @@ async function regenerateGenMeal(slotId){
   const remC=Math.max(5,target.c-usedC);
   const remF=Math.max(2,target.f-usedF);
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const dishList=DB.loaded?DB.dishes.slice(0,40).map(d=>{const m=dishMacros(d.id);return `${d.name} [${d.slot}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(sin base de datos)";
+  const slotDishes=DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,slotId)):[];
+  const dishList=slotDishes.length?slotDishes.slice(0,40).map(d=>{const m=dishMacros(d.id);return `${d.name} [${dishSlotMeta(d)}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(sin platos compatibles en la base)";
   const out=$("#genOut");if(out)out.innerHTML=`<div class="ai-box">Buscando otra opción para ${esc(slot.slot)}…</div>`;
   try{
     const prompt=`Sugiere UNA comida diferente para el slot "${slot.slot}" (id: ${slotId}) del ${prettyDate(draft.ds)}.
@@ -8638,13 +8670,14 @@ function setFoodTab(t){foodTab=t;render();window.scrollTo(0,0);}
 
 function foodsDishes(){
   const bySlot={};DB.dishes.forEach(d=>{(bySlot[d.slot||"otros"]=bySlot[d.slot||"otros"]||[]).push(d);});
-  const order=["desayuno","almuerzo","batido","cena","snack","otros"];
+  const order=["desayuno","media_manana","almuerzo","merienda","batido","cena","snack","recena","otros"];
   let html=`<button class="btn btn-accent" style="width:100%;margin-bottom:10px" onclick="editDish(null)">＋ Nuevo plato</button>`;
   order.forEach(slot=>{if(!bySlot[slot])return;
     const inner=bySlot[slot].map(d=>{const m=dishMacros(d.id);
       return `<div class="meal"><div class="meal-head"><div>
         <div class="name">${esc(d.name)}${d.menu?` <span class="pill">Menú ${d.menu}</span>`:""}</div>
         <div class="nums"><b>${m.kcal}</b> kcal · P <b>${m.p}</b> · C <b>${m.c}</b> · G <b>${m.f}</b> g</div>
+        ${dishSemanticsReady()?`<div class="muted small">Compatible: ${esc(dishSlotMeta(d))}</div>`:""}
       </div></div><div class="meal-actions"><button class="btn btn-sm" onclick="editDish(${d.id})">Ver / editar receta</button></div></div>`;
     }).join("");
     html+=section("food.dish."+slot,slot,inner,`${bySlot[slot].length}`);
@@ -8746,8 +8779,8 @@ function editDietDish(dietId,id){
   const dayOpts=[["Dom",0],["Lun",1],["Mar",2],["Mié",3],["Jue",4],["Vie",5],["Sáb",6]]
     .map(([n,v])=>`<option value="${v}" ${v===it.weekday?"selected":""}>${n}</option>`).join("");
   const noDay=`<option value="" ${it.weekday===null||it.weekday===undefined?"selected":""}>Cualquier día</option>`;
-  const slots=["desayuno","almuerzo","batido","cena","snack"];
-  const dishOpts=DB.dishes.map(d=>`<option value="${d.id}" ${d.id===it.dish_id?"selected":""}>${esc(d.name)} · ${esc(d.slot||"?")}</option>`).join("");
+  const slots=NUTRITION_CATALOG_SLOT_OPTIONS;
+  const dishOpts=DB.dishes.map(d=>`<option value="${d.id}" ${d.id===it.dish_id?"selected":""}>${esc(d.name)} · ${esc(dishSlotMeta(d))}</option>`).join("");
   modal(`<h3>${id?"Editar":"Nueva"} asignación</h3>`+
     `<div class="muted small" style="margin-bottom:12px">${esc(dietName)}</div>`+
     `<div class="field"><label>Día</label><select id="dd_day">${dayOpts}${noDay}</select></div>`+
@@ -8772,7 +8805,7 @@ async function saveDietDish(){
     if(del.error){toast("Error al reemplazar: "+del.error.message);return;}
   }
   const dish=DB.dishes.find(d=>d.id===dish_id);
-  if(dish&&dish.slot&&dish.slot!==slot&&!confirm(`"${dish.name}" es un plato de ${dish.slot} pero se asignará al slot ${slot}. ¿Continuar?`))return;
+  if(dish&&!dishSupportsSlot(dish,slot)&&!confirm(`"${dish.name}" no está marcado como compatible con ${slot}. ¿Continuar?`))return;
   const row={diet_id:dietId,dish_id,weekday,slot};
   const res=id?await supa.from("diet_dishes").update(row).eq("id",id):await supa.from("diet_dishes").insert(row);
   if(res.error){toast("Error: "+res.error.message);return;}
@@ -8806,6 +8839,8 @@ async function saveIngredient(){
   const row={name:$("#ig_name").value.trim(),category:$("#ig_cat").value.trim()||null,kcal:+$("#ig_kcal").value||0,protein_g:+$("#ig_p").value||0,carbs_g:+$("#ig_c").value||0,fat_g:+$("#ig_f").value||0};
   if(!row.name){toast("Pon un nombre");return;}
   const id=window._ing.id;
+  const existing=id?ingById(id):null;
+  if(ingredientSemanticsReady())row.slug=(existing&&existing.slug)||catalogSlug(row.name);
   const res=id?await supa.from("ingredients").update(row).eq("id",id):await supa.from("ingredients").insert(row);
   if(res.error){toast("Error: "+res.error.message);return;}
   closeModal();await dbLoad();render();toast("Guardado");
@@ -8821,13 +8856,59 @@ async function deleteIngredient(id){
 function editDish(id){
   const dish=id?DB.dishes.find(d=>d.id===id):{name:"",slot:"almuerzo",menu:""};
   const lines=id?DB.dishIng.filter(x=>x.dish_id===id).map(l=>({ingredient_id:l.ingredient_id,grams:l.grams})):[];
-  window._dish={id,name:dish.name||"",slot:dish.slot||"almuerzo",menu:dish.menu||"",lines};
+  window._dish={
+    id,
+    name:dish.name||"",
+    slug:dish.slug||"",
+    slot:dish.slot||"almuerzo",
+    menu:dish.menu||"",
+    compatible_slots:dishCompatibleSlots(dish),
+    diet_tags:catalogArray(dish.diet_tags),
+    prep_minutes:dish.prep_minutes||"",
+    budget_tier:dish.budget_tier||"medium",
+    needs_kitchen:dish.needs_kitchen!==false,
+    eat_out_ok:!!dish.eat_out_ok,
+    protein_density:dish.protein_density||"",
+    lines
+  };
   dishModal();
 }
-function dishSync(){const n=document.getElementById("ds_name");if(n)window._dish.name=n.value;}
+function dishSync(){
+  const d=window._dish;
+  const n=document.getElementById("ds_name");if(n)d.name=n.value;
+  const slot=document.getElementById("ds_slot");if(slot)d.slot=slot.value;
+  const menu=document.getElementById("ds_menu");if(menu)d.menu=menu.value;
+  if(dishSemanticsReady()){
+    const checked=NUTRITION_CATALOG_SLOT_OPTIONS.filter(s=>{const el=document.getElementById("ds_compat_"+s);return el&&el.checked;});
+    if(checked.length)d.compatible_slots=checked;
+    const tags=document.getElementById("ds_tags");if(tags)d.diet_tags=tags.value.split(",").map(x=>x.trim()).filter(Boolean);
+    const prep=document.getElementById("ds_prep");if(prep)d.prep_minutes=prep.value;
+    const budget=document.getElementById("ds_budget");if(budget)d.budget_tier=budget.value;
+    const kitchen=document.getElementById("ds_kitchen");if(kitchen)d.needs_kitchen=kitchen.checked;
+    const eatOut=document.getElementById("ds_eat_out");if(eatOut)d.eat_out_ok=eatOut.checked;
+    const density=document.getElementById("ds_density");if(density)d.protein_density=density.value;
+  }
+}
 function dishModal(){
   const d=window._dish;const m=macrosFromLines(d.lines);
-  const slots=["desayuno","almuerzo","batido","cena","snack"];
+  const slots=NUTRITION_CATALOG_SLOT_OPTIONS;
+  const compat=d.compatible_slots&&d.compatible_slots.length?d.compatible_slots:[d.slot];
+  const semanticHtml=dishSemanticsReady()?`<details class="adv-settings" style="margin-top:10px">
+      <summary>Metadatos del catálogo</summary>
+      <div class="field"><label>Slots compatibles</label><div class="row wrap" style="gap:6px">
+        ${NUTRITION_CATALOG_SLOT_OPTIONS.map(s=>`<label class="chip-check"><input type="checkbox" id="ds_compat_${s}" ${compat.includes(s)?"checked":""}><span>${s}</span></label>`).join("")}
+      </div></div>
+      <div class="field"><label>Tags de dieta</label><input id="ds_tags" value="${esc((d.diet_tags||[]).join(", "))}" placeholder="vegetariano, vegano, omnivoro"></div>
+      <div class="grid2">
+        <div class="field"><label>Preparación (min)</label><input id="ds_prep" type="number" inputmode="numeric" value="${esc(d.prep_minutes||"")}"></div>
+        <div class="field"><label>Presupuesto</label><select id="ds_budget">${["low","medium","flexible"].map(x=>`<option value="${x}" ${x===d.budget_tier?"selected":""}>${x}</option>`).join("")}</select></div>
+      </div>
+      <div class="grid2">
+        <label class="chip-check"><input type="checkbox" id="ds_kitchen" ${d.needs_kitchen!==false?"checked":""}><span>Requiere cocina</span></label>
+        <label class="chip-check"><input type="checkbox" id="ds_eat_out" ${d.eat_out_ok?"checked":""}><span>Útil fuera de casa</span></label>
+      </div>
+      <div class="field"><label>Densidad de proteína</label><select id="ds_density"><option value="">—</option>${["low","medium","high","unknown"].map(x=>`<option value="${x}" ${x===d.protein_density?"selected":""}>${x}</option>`).join("")}</select></div>
+    </details>`:"";
   const linesHtml=d.lines.map((l,idx)=>`<div class="row" style="margin-bottom:6px">
     <select onchange="dishLineSet(${idx},'ingredient_id',this.value)" style="flex:1;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px">${DB.ingredients.map(i=>`<option value="${i.id}" ${i.id===+l.ingredient_id?"selected":""}>${esc(i.name)}</option>`).join("")}</select>
     <input type="number" inputmode="decimal" value="${l.grams}" onchange="dishLineSet(${idx},'grams',this.value)" style="width:64px;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px;text-align:center">
@@ -8840,6 +8921,7 @@ function dishModal(){
       <div class="field" style="flex:1"><label>Slot</label><select id="ds_slot" onchange="window._dish.slot=this.value">${slots.map(s=>`<option ${s===d.slot?"selected":""}>${s}</option>`).join("")}</select></div>
       <div class="field" style="flex:1"><label>Menú</label><select id="ds_menu" onchange="window._dish.menu=this.value"><option value="">—</option>${["A","B","C","D"].map(x=>`<option ${x===d.menu?"selected":""}>${x}</option>`).join("")}</select></div>
     </div>
+    ${semanticHtml}
     <div class="section-h" style="margin-left:0">Ingredientes (g)</div>
     ${linesHtml||'<div class="muted small">Sin ingredientes aún.</div>'}
     <button class="btn btn-sm" style="margin-top:6px" onclick="dishLineAdd()">＋ Agregar ingrediente</button>
@@ -8854,8 +8936,20 @@ async function saveDish(){
   const d=window._dish;dishSync();d.name=(d.name||"").trim();
   if(!d.name){toast("Pon un nombre al plato");return;}
   let dishId=d.id;
-  if(dishId){const r=await supa.from("dishes").update({name:d.name,slot:d.slot,menu:d.menu||null}).eq("id",dishId);if(r.error){toast("Error: "+r.error.message);return;}}
-  else{const r=await supa.from("dishes").insert({name:d.name,slot:d.slot,menu:d.menu||null}).select();if(r.error){toast("Error: "+r.error.message);return;}dishId=r.data[0].id;}
+  const dishRow={name:d.name,slot:d.slot,menu:d.menu||null};
+  if(dishSemanticsReady()){
+    const existing=dishId?DB.dishes.find(x=>x.id===dishId):null;
+    dishRow.slug=(existing&&existing.slug)||catalogSlug(d.name);
+    dishRow.compatible_slots=(d.compatible_slots&&d.compatible_slots.length)?d.compatible_slots:[d.slot];
+    dishRow.diet_tags=d.diet_tags||[];
+    dishRow.prep_minutes=d.prep_minutes===""||d.prep_minutes==null?null:+d.prep_minutes;
+    dishRow.budget_tier=d.budget_tier||null;
+    dishRow.needs_kitchen=!!d.needs_kitchen;
+    dishRow.eat_out_ok=!!d.eat_out_ok;
+    dishRow.protein_density=d.protein_density||null;
+  }
+  if(dishId){const r=await supa.from("dishes").update(dishRow).eq("id",dishId);if(r.error){toast("Error: "+r.error.message);return;}}
+  else{const r=await supa.from("dishes").insert(dishRow).select();if(r.error){toast("Error: "+r.error.message);return;}dishId=r.data[0].id;}
   await supa.from("dish_ingredients").delete().eq("dish_id",dishId);
   const rows=d.lines.filter(l=>l.ingredient_id&&l.grams).map(l=>({dish_id:dishId,ingredient_id:+l.ingredient_id,grams:+l.grams}));
   if(rows.length){const r=await supa.from("dish_ingredients").insert(rows);if(r.error){toast("Error en ingredientes: "+r.error.message);return;}}
