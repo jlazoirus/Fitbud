@@ -7116,6 +7116,41 @@ function validateGeneratedDay(j,day,target){
   if(off(tot.c,target.c,0.3))warns.push(`Carbohidratos ${Math.round(tot.c)} g lejos de la meta (${target.c} g).`);
   return{ok:issues.length===0,issues,warns,comidas,totals:{kcal:Math.round(tot.kcal),p:Math.round(tot.p),c:Math.round(tot.c),f:Math.round(tot.f)},explicacion:coachCopy((j.explicacion||j.explicación||"").trim())};
 }
+// REQ-89: busca un snack/shake del catálogo para cerrar un déficit de kcal/proteína.
+function findGapSnack(totals,target){
+  if(!DB.loaded||!DB.dishes||!DB.dishIng)return null;
+  const kcalGap=target.kcal-totals.kcal;
+  const protGap=target.p-totals.p;
+  if(kcalGap<80&&protGap<8)return null;
+  if(kcalGap>700)return null;
+  const snackSlots=new Set(["snack","batido","media_manana","merienda"]);
+  const candidates=DB.dishes.filter(d=>{
+    if(coachDishBlockedByProfile(d).blocked)return false;
+    const slots=dishCompatibleSlots(d);
+    return slots.some(s=>snackSlots.has(s));
+  });
+  if(!candidates.length)return null;
+  let best=null, bestScore=Infinity;
+  for(const d of candidates){
+    const m=dishMacros(d.id);
+    if(m.kcal<10)continue;
+    const protDominant=protGap*4>kcalGap;
+    const scale=protDominant&&m.p>0?Math.max(0.5,Math.min(2.5,protGap/m.p)):m.kcal>0?Math.max(0.5,Math.min(2.5,kcalGap/m.kcal)):1;
+    const sKcal=m.kcal*scale, sP=m.p*scale;
+    const newKcal=totals.kcal+sKcal, newP=totals.p+sP;
+    if(newKcal>target.kcal*1.15)continue;
+    const kcalOff=Math.abs(newKcal-target.kcal)/target.kcal;
+    const pOff=newP<target.p*0.85?target.p*0.85-newP:0;
+    const score=kcalOff*100+pOff*4+(protDominant&&m.p<5?200:0);
+    if(score<bestScore){bestScore=score;best={dish:d,scale,macros:m};}
+  }
+  if(!best)return null;
+  const {dish,scale,macros}=best;
+  const lines=DB.dishIng.filter(x=>x.dish_id===dish.id);
+  const ings=lines.map(l=>{const ing=ingById(+l.ingredient_id);return{nombre:ing?ing.name:"Ingrediente",gramos:Math.round((+l.grams)*scale)};}).filter(g=>g.gramos>0);
+  const sM={kcal:Math.round(macros.kcal*scale),p:Math.round(macros.p*scale),c:Math.round(macros.c*scale),f:Math.round(macros.f*scale)};
+  return{slot_id:"snack_extra",nombre:dish.name,ingredientes:ings,kcal:sM.kcal,proteina_g:sM.p,carbohidratos_g:sM.c,grasa_g:sM.f};
+}
 // Núcleo reutilizable: genera UN día a la medida de los macros del usuario y lo valida.
 async function generateOneDay(ds,coachRequest){
   const day=buildDay(ds); const target=effectiveDayTarget();
@@ -7267,10 +7302,29 @@ function genReviewHtml(res,target){
   </div>`).join("");
   const issues=res.issues&&res.issues.length?`<div class="ai-box" style="border-color:var(--bad)">✗ No se puede aplicar:<br>${res.issues.map(esc).join("<br>")}</div>`:"";
   const warns=res.warns&&res.warns.length?`<div class="ai-box">⚠️ ${res.warns.map(esc).join("<br>")}</div>`:"";
+  // REQ-89: sugerir snack para cerrar déficit
+  let snackHtml="";
+  if(!res.ok&&res.issues&&res.issues.length){
+    const deficitRe=/kcal del día .* fuera de|proteína .* por debajo/i;
+    const onlyDeficit=res.issues.every(i=>deficitRe.test(i));
+    const hasDeficit=t.kcal<target.kcal*0.85||t.p<target.p*0.85;
+    if(onlyDeficit&&hasDeficit){
+      const snack=findGapSnack(t,target);
+      if(snack){
+        window._genDayGapSnack=snack;
+        const sTotal={kcal:t.kcal+snack.kcal,p:t.p+snack.proteina_g};
+        snackHtml=`<div class="ai-box" style="border-color:var(--accent)">
+          💡 Agregar <b>${esc(snack.nombre)}</b> (${snack.kcal} kcal · P ${snack.proteina_g} g) completaría el día a ${sTotal.kcal} kcal / ${sTotal.p} g prot.
+          <div style="margin-top:4px" class="muted small">${snack.ingredientes.map(g=>esc(g.nombre)+" "+g.gramos+"g").join(" · ")}</div>
+          <div style="margin-top:8px"><button class="btn btn-sm btn-accent" onclick="addGapSnackToDay()">Agregar ${esc(snack.nombre)}</button></div>
+        </div>`;
+      }
+    }
+  }
   return `${res.explicacion?`<div class="ai-box">${esc(res.explicacion)}</div>`:""}
     <div class="muted small" style="margin:10px 2px 4px">Total del día: <b>${t.kcal}</b> kcal · P ${t.p} · C ${t.c} · G ${t.f} g <span class="muted">(meta ${target.kcal}/${target.p}/${target.c}/${target.f})</span></div>
     ${meals}
-    ${issues}${warns}
+    ${issues}${snackHtml}${warns}
     <div class="row wrap" style="margin-top:12px">
       ${res.ok?`<button class="btn btn-accent" onclick="applyGeneratedDay()">Aplicar al día</button>`:`<button class="btn" disabled style="opacity:.4">Aplicar al día</button>`}
       <button class="btn" onclick="closeModal()">Descartar</button>
@@ -7284,10 +7338,31 @@ function applyDayComidas(ds,comidas){
   });
   commitDay(ds);
 }
+// REQ-89: agrega el snack sugerido al borrador del día y re-valida.
+function addGapSnackToDay(){
+  const draft=window._genDay;const snack=window._genDayGapSnack;
+  if(!draft||!snack)return;
+  draft.comidas.push(snack);
+  window._genDayGapSnack=null;
+  const day=buildDay(draft.ds);const target=effectiveDayTarget();
+  const res=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
+  const out=$("#genOut");if(out)out.innerHTML=genReviewHtml(res,target);
+}
 function applyGeneratedDay(){
   const g=window._genDay; if(!g||!g.comidas){closeModal();return;}
-  applyDayComidas(g.ds,g.comidas);
-  window._genDay=null;closeModal();render();toast("Día aplicado a tu plan");
+  const day=buildDay(g.ds);
+  const slotIds=new Set(day.meals.map(m=>m.id));
+  const slotComidas=g.comidas.filter(c=>slotIds.has(c.slot_id));
+  const extraComidas=g.comidas.filter(c=>!slotIds.has(c.slot_id));
+  applyDayComidas(g.ds,slotComidas);
+  if(extraComidas.length){
+    const st=dayState(g.ds);
+    extraComidas.forEach(c=>{
+      st.extras.push({name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,done:true,gen:true});
+    });
+    commitDay(g.ds);
+  }
+  window._genDay=null;window._genDayGapSnack=null;closeModal();render();toast("Día aplicado a tu plan");
 }
 // --- Revisión de semana: borrador → confirmar → aplicar ---
 function genWeekReviewHtml(){

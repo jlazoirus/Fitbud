@@ -1243,3 +1243,68 @@ Un resultado solo se puede reutilizar si: (a) es del mismo usuario, (b) mismo d�
 - Entradas antiguas del pool (version 2, scope null) no se reutilizan.
 - `node scripts/validate-day-scope-in-context.mjs` pasa.
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-89 - Feature: sugerir snack del catálogo para cerrar déficit de kcal/proteína en día generado
+
+**Estado: implementado.** `findGapSnack` busca el mejor snack/shake del catálogo para completar el día. `genReviewHtml` muestra el botón de sugerencia. `addGapSnackToDay` agrega y re-valida. `applyGeneratedDay` separa extras. 6 asserts en `scripts/validate-gap-snack.mjs`.
+
+### Problema
+
+Cuando un día generado por IA no alcanzaba la meta de kcal o proteína (validación ±15% kcal, ≥85% proteína), el usuario solo podía descartar las 3-4 comidas completas y volver a generar. Esto era frustrante porque las comidas individuales podían estar bien — solo faltaba un poco para llegar a la meta.
+
+### Solución
+
+#### 1. `findGapSnack(totals, target)` (nueva función)
+
+Busca en el catálogo (`DB.dishes`) el mejor snack/shake para cerrar el hueco:
+
+- **Filtra candidatos**: solo platos con slots `snack`, `batido`, `media_manana`, `merienda`
+- **Respeta restricciones**: excluye platos bloqueados por `coachDishBlockedByProfile` (alergias, dieta vegana, etc.)
+- **Escala ingredientes**: ajusta gramos proporcionalmente (factor 0.5x–2.5x) para acercarse al hueco
+  - Si el déficit es dominantemente de proteína (`protGap*4 > kcalGap`), escala por proteína
+  - Si no, escala por kcal
+- **Scoring**: selecciona el candidato que minimice la desviación de macros al agregarlo
+- **Rechaza gaps irrazonables**: si faltan >700 kcal, no sugiere (el problema es estructural, no resoluble con un snack)
+- **Rechaza gaps triviales**: si faltan <80 kcal y <8g proteína, no sugiere
+
+Prioriza naturalmente los shakes de proteína (REQ-76) cuando el déficit es de proteína, porque tienen la mejor ratio proteína/kcal del catálogo.
+
+#### 2. `genReviewHtml` (modificada)
+
+Cuando `res.ok === false`:
+- Detecta si los issues son **solo** de déficit (kcal bajo o proteína baja, no errores estructurales como alergias o nombres ficticios)
+- Si `findGapSnack` encuentra un candidato, muestra un box con:
+  - Nombre del snack, macros, y el total proyectado
+  - Ingredientes con gramos
+  - Botón "Agregar [nombre del snack]"
+
+#### 3. `addGapSnackToDay()` (nueva función)
+
+- Agrega el snack sugerido a `window._genDay.comidas` con `slot_id: "snack_extra"`
+- Re-valida con `validateGeneratedDay` (el snack suma a los totales del día)
+- Re-renderiza el review — si ahora pasa la validación, "Aplicar al día" se habilita
+
+#### 4. `applyGeneratedDay()` (modificada)
+
+- Separa comidas que mapean a slots existentes del día de las extras (`snack_extra`)
+- Las comidas con slot existente se aplican vía `applyDayComidas` (overrides en meal slots)
+- Las extras se agregan a `dayState(ds).extras` con `done:true` — `dayTotals` ya las cuenta
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `findGapSnack`, `addGapSnackToDay`, mod `genReviewHtml`, mod `applyGeneratedDay` |
+| `scripts/validate-gap-snack.mjs` | Validador estructural (6 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Criterios de aceptación
+
+- Si un día generado falla solo por déficit de kcal/proteína y el gap es razonable (80–700 kcal), se muestra sugerencia de snack.
+- El snack sugerido respeta restricciones del perfil (alergias, dieta).
+- Al agregar el snack, se re-valida y si pasa, "Aplicar al día" se habilita.
+- Al aplicar, el snack se guarda en `extras` (no sobreescribe un slot de comida).
+- Si hay errores no-déficit (nombres ficticios, alergias), no se muestra sugerencia.
+- Si el gap es >700 kcal, no se muestra sugerencia.
+- `node scripts/validate-gap-snack.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
