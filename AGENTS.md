@@ -60,11 +60,12 @@ node scripts/agent-next-audit.mjs --acquire
 ```
 
 2. Leer `AUDIT_AGENT.md` y `.claude/agents/qa-auditor.md`, y auditar el `journey` asignado.
-3. Encontrar un bug/gap **con evidencia** (reproducción + causa raíz con `archivo:línea`). Sin evidencia, no hay REQ.
-4. No duplicar: si el problema ya está en `REQUIREMENTS.md`, añadir evidencia al REQ existente en vez de crear otro. Si hay duda historica, consultar `docs/requirements-history.md` por seccion.
-5. Escribir el REQ nuevo (estado `**Estado: pendiente.**`) **al final** de `REQUIREMENTS.md`, usando `nextRequirementId` y el formato estándar (Origen / Problema / Causa raíz / Objetivo / Alcance / Fuera de alcance / Riesgos / Criterios de aceptación / Verificación sugerida).
-6. Verificar que **solo** cambió `REQUIREMENTS.md` y que `node scripts/release-gate.mjs` queda en verde tras commitear.
-7. Un solo commit documental con el formato `audit(<journey>): REQ-NN — <título>` y publicar:
+3. **Verificación funcional obligatoria**: servir la app en local (`python3 -m http.server 8923` o preview de Claude Code) y recorrer el journey en un navegador real como usuario, verificando funcionalidad e interfaz. Flujos de IA con fixtures por defecto; presupuesto mínimo de llamadas pagadas (máx. 3/corrida) solo si el journey exige el flujo real.
+4. Encontrar un bug/gap **con evidencia** (reproducción + causa raíz con `archivo:línea` + evidencia funcional si es visible en UI). Sin evidencia, no hay REQ.
+5. No duplicar: si el problema ya está en `REQUIREMENTS.md`, añadir evidencia al REQ existente en vez de crear otro. Si hay duda historica, consultar `docs/requirements-history.md` por seccion.
+6. Escribir el REQ nuevo (estado `**Estado: pendiente.**`) **al final** de `REQUIREMENTS.md`, usando `nextRequirementId` y el formato estándar (Origen / Problema / Causa raíz / Objetivo / Alcance / Fuera de alcance / Riesgos / Criterios de aceptación / Verificación sugerida).
+7. Verificar que **solo** cambió `REQUIREMENTS.md` y que `node scripts/release-gate.mjs` queda en verde tras commitear.
+8. Un solo commit documental con el formato `audit(<journey>): REQ-NN — <título>` y publicar:
 
 ```bash
 node scripts/agent-next-audit.mjs --check-publish          # action:"ready_to_push"

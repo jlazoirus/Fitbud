@@ -1619,9 +1619,9 @@ const source = (DB.exerciseReady && Array.isArray(DB.exercises) && DB.exercises.
 
 ---
 
-## REQ-95 — Nav bar del footer no ancla al fondo en iOS
+## REQ-95 - Nav bar del footer no ancla al fondo en iOS
 
-**Estado:** Implementado
+**Estado: implementado.**
 
 ### Problema
 
@@ -1650,3 +1650,55 @@ Se agregaron helpers `scrollAppTop()` y `scrollAppBottom()` para reemplazar los 
 - El contenido de la vista Hoy (incluyendo la sección del coach) scrollea por encima del nav bar.
 - Las hojas modales (`.overlay`, `.sheet`), toasts y otros elementos `position:fixed` siguen funcionando correctamente.
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-96 - Crear suite E2E Playwright de journeys críticos e integrarla al release-gate
+
+**Estado: pendiente.**
+
+### Origen
+
+Decisión de producto (2026-07-01): el loop auditor ahora hace verificación funcional obligatoria en navegador por corrida, pero los commits diarios del desarrollador solo pasan por `release-gate.mjs` (sintaxis, validadores, SQL, seguridad) — nadie verifica automáticamente que un fix funcione *en pantalla* antes del push. Se necesita una capa de regresión E2E determinista.
+
+### Problema
+
+Un fix puede pasar el release-gate en verde y aun así romper un journey completo en la UI (ejemplos recientes: REQ-92 sesión Pull A solo mostraba calentamiento, REQ-95 nav bar desanclada en iOS). No existe ninguna prueba automatizada que abra la app en un navegador y recorra los flujos críticos.
+
+### Causa raíz
+
+No aplica un bug puntual: es una brecha de infraestructura de QA. El release-gate (`scripts/release-gate.mjs`) no incluye ningún check que ejecute la app renderizada.
+
+### Objetivo
+
+Que ningún commit pueda publicarse si rompe uno de los journeys críticos: la suite E2E recorre la app como usuario real y falla el gate si un flujo se rompe.
+
+### Alcance
+
+1. Añadir Playwright como dependencia de desarrollo (`@playwright/test`, navegador chromium) — patrón aprobado explícitamente para este REQ pese al invariante "sin dependencias nuevas"; es tooling de test, no dependencia runtime de la app.
+2. Crear `tests/e2e/` con specs para los journeys críticos: (a) onboarding/perfil y cálculo de macros mostrado, (b) ver objetivos del día en Nutrición y aplicar una comida, (c) iniciar y completar una sesión de entreno con el reproductor, (d) registrar peso en Progreso, (e) navegación entre tabs y estados vacíos sin errores de consola.
+3. Fixtures/mocks deterministas para toda llamada a IA y a Supabase (interceptar red con `page.route`); las pruebas corren 100% offline y sin llamadas pagadas.
+4. Helpers reutilizables (login/seed de estado local) exportados para que el loop auditor los reuse en su verificación funcional.
+5. Integrar la suite al `release-gate.mjs` como check bloqueante, con timeout razonable.
+
+### Fuera de alcance
+
+- No cambiar comportamiento de la app para hacerla "testeable" (si algo no se puede testear sin tocar la app, documentarlo como REQ aparte).
+- No testear Stripe real ni Supabase real.
+- No cubrir los 12 journeys en esta primera iteración: solo los 5 críticos listados.
+
+### Riesgos
+
+- Flakiness de E2E puede bloquear el loop desarrollador; mitigar con mocks deterministas, `retries: 1` y timeouts generosos.
+- El tamaño de `index.html` (~600 KB) puede hacer lentos los arranques; servir con el mismo `http.server` local.
+- Instalación de chromium requiere red la primera vez (`npx playwright install chromium`).
+
+### Criterios de aceptación
+
+- `npx playwright test` corre en local, offline, y pasa en verde sobre `HEAD`.
+- Romper deliberadamente un journey (p. ej. comentar el render del reproductor) hace fallar la suite.
+- Las pruebas no hacen ninguna llamada de red externa (IA, Supabase, Stripe) — todo interceptado.
+- `node scripts/release-gate.mjs` ejecuta la suite y queda en verde.
+
+### Verificación sugerida
+
+- `npx playwright test --reporter=list` y revisar que los 5 journeys pasan.
+- `node scripts/release-gate.mjs` incluye y pasa el check E2E.

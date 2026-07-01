@@ -32,11 +32,19 @@
     "runsPerDay": 1,
     "maxWallClockMinutes": 60,
     "lockStaleMinutes": 180,
-    "paidExternalCallsPerRun": 0,
+    "paidExternalCallsPerRun": 3,
     "mayModifyAppCode": false
+  },
+  "functionalAudit": {
+    "required": true,
+    "serveCommand": "python3 -m http.server 8923",
+    "baseUrl": "http://localhost:8923",
+    "evidenceKinds": ["ui-snapshot-o-screenshot", "console-errors", "network-failures", "pasos-de-reproduccion"]
   },
   "policy": {
     "onlyWritableFile": "REQUIREMENTS.md",
+    "functionalVerificationRequired": true,
+    "preferFixturesOverPaidCalls": true,
     "requireEvidence": true,
     "avoidDuplicateRequirements": true,
     "skipRunWhenNoMaterialGap": true,

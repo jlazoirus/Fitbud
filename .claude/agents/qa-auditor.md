@@ -62,6 +62,17 @@ python3 -m http.server 8923          # servir la app localmente para inspección
 
 Si un validador falla o el release-gate marca un check rojo que no sea por tu edición de `REQUIREMENTS.md`, eso es evidencia de bug — documéntalo.
 
+## Verificación funcional en navegador (obligatoria por corrida)
+
+Leer código no es suficiente: debes **ejecutar la app y recorrer el journey asignado como usuario real**, verificando que la funcionalidad y la interfaz estén correctas de punta a punta.
+
+1. **Servir la app**: `python3 -m http.server 8923` (o, dentro de Claude Code, `preview_start` con la config `fitbud` de `.claude/launch.json`).
+2. **Recorrer el journey en la UI**: navega las pantallas del journey, haz los clics y llena los formularios del flujo. Usa las herramientas de preview (`preview_snapshot`, `preview_click`, `preview_fill`, `preview_console_logs`, `preview_network`, `preview_screenshot`) o Playwright si la suite E2E (REQ-96) ya existe — reusa sus helpers de login/seed.
+3. **Qué verificar en pantalla**: que los números mostrados coincidan con lo calculado/guardado, que los estados vacíos no rompan la vista, que la navegación funcione, que no haya errores de consola ni requests fallidos, y que la UI respete los invariantes (REQ-31, privacidad).
+4. **Evidencia funcional**: todo hallazgo observable en UI debe incluir snapshot/screenshot, errores de consola o request fallido, y los pasos exactos de reproducción — además de la causa raíz `archivo:línea`. Un REQ de UI sin evidencia funcional es incompleto.
+5. **Flujos con IA**: por defecto usa fixtures/mocks deterministas. Tienes un presupuesto **mínimo** de llamadas pagadas (máx. 3 por corrida, `paidExternalCallsPerRun` en `agent-audit-loop.json`) reservado para cuando el journey exija validar el flujo de IA real de punta a punta. Nunca lo uses para otra cosa y reporta cuántas usaste.
+6. **Límite**: la interacción es local y de solo lectura respecto a producción — nunca mutes datos de cuentas reales de Supabase ni dispares pagos reales de Stripe. Si una parte del journey no se puede ejercitar en local, dilo en el REQ y márcala como verificada solo por lectura de código.
+
 ## Estándar de evidencia (obligatorio)
 
 Un REQ sin evidencia no sirve. Cada hallazgo debe incluir:
@@ -69,6 +80,7 @@ Un REQ sin evidencia no sirve. Cada hallazgo debe incluir:
 - **Reproducción concreta**: pasos o datos de entrada que disparan el bug.
 - **Causa raíz**: función y archivo (`index.html:~1593`), no solo el síntoma. Cita el código.
 - **Impacto**: a qué usuario afecta y por qué importa.
+- **Evidencia funcional** (si el bug es observable en UI): snapshot/screenshot, error de consola o request fallido capturado durante la verificación en navegador.
 
 Si no puedes confirmar la causa raíz, dilo explícitamente y marca el REQ como "requiere investigación" en lugar de inventar una.
 

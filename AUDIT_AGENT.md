@@ -57,6 +57,20 @@ Seguir al pie de la letra `.claude/agents/qa-auditor.md`:
 
 Si no existe brecha material demostrable en el journey, terminar sin crear trabajo artificial.
 
+## Fase de verificación funcional (obligatoria)
+
+La lectura de código NO basta: cada corrida debe **ejecutar la app y recorrer el journey asignado en un navegador real**, verificando que la funcionalidad y la interfaz se comportan como se espera. Configuración en `agent-audit-loop.json > functionalAudit`.
+
+1. Servir la app en local (sin mutar estado de producción):
+   ```bash
+   python3 -m http.server 8923
+   ```
+   Si el agente corre dentro de Claude Code, preferir las herramientas de preview (`preview_start` con la config `fitbud` de `.claude/launch.json`, `preview_snapshot`, `preview_click`, `preview_fill`, `preview_console_logs`, `preview_screenshot`). Si existe la suite E2E (REQ-96), reusar sus helpers de Playwright para llegar rápido a la pantalla del journey.
+2. Recorrer el journey **como usuario real**: navegar las pantallas, hacer los clics y llenar los formularios del flujo, y verificar que la UI renderiza el estado correcto (números, textos, estados vacíos, navegación).
+3. Capturar como evidencia: snapshot/screenshot de la pantalla con el problema, errores de consola, requests fallidos y los pasos exactos de reproducción. Esa evidencia funcional va en el REQ junto con la causa raíz `archivo:línea`.
+4. Flujos que dependen de IA: preferir fixtures/mocks deterministas. Solo si el journey exige validar el flujo real de punta a punta, usar el presupuesto mínimo de llamadas pagadas (máximo `paidExternalCallsPerRun` = 3 por corrida) y anotarlo en el reporte.
+5. Si el journey no se puede ejercitar en local (p. ej. requiere Stripe real), documentar qué parte quedó verificada solo por lectura de código y por qué.
+
 ## Escribir el REQ
 
 1. Usar el `nextRequirementId` del selector (= máximo existente + 1).
@@ -107,6 +121,6 @@ Reusar la política de "push rechazado" de `AUTONOMOUS_AGENT.md` (rebase una vez
 
 - Una ejecución por día (independiente del desarrollador).
 - A lo sumo `newRequirementsPerRun` REQ, un commit y un push por ejecución.
-- Cero llamadas pagadas externas.
+- **Mínimo de llamadas pagadas externas**: hasta `paidExternalCallsPerRun` (= 3) por corrida, solo cuando el journey exija validar un flujo de IA real de punta a punta. Por defecto usar fixtures/mocks (`preferFixturesOverPaidCalls`). Reportar cuántas se usaron.
 - Máximo 60 minutos.
-- Preferir lectura de código, validadores locales y prueba manual en `python3 -m http.server 8923`.
+- La verificación funcional en navegador es obligatoria (ver fase anterior); la lectura de código y los validadores la complementan, no la sustituyen.
