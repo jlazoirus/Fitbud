@@ -1616,3 +1616,37 @@ const source = (DB.exerciseReady && Array.isArray(DB.exercises) && DB.exercises.
 - Con Supabase configurado y tabla `exercises` con datos, `exerciseBySlug` sigue usando los datos de Supabase (sin regresión).
 - Combinado con REQ-92, una sesión Pull A de gimnasio muestra ejercicios reales independientemente del estado de la tabla `exercises` en Supabase.
 - `node scripts/release-gate.mjs` pasa.
+
+---
+
+## REQ-95 — Nav bar del footer no ancla al fondo en iOS
+
+**Estado:** Implementado
+
+### Problema
+
+En iOS, la barra de navegación inferior (`.tabs` con `position:fixed;bottom:0`) no se anclaba al fondo de la pantalla. En la vista principal aparecía en medio del contenido con la sección del coach visible debajo de ella. Causa probable: quirk de iOS Safari con `position:fixed` cuando el contenido desborda la altura del viewport.
+
+### Solución
+
+Cambio de arquitectura: de `position:fixed` para el nav bar a un layout flexbox en `body`.
+
+- `html/body`: `height:100dvh; display:flex; flex-direction:column; overflow:hidden`
+- `#app`: `flex:1; min-height:0; overflow-y:auto` (el contenido scrollea dentro del `#app`, no en el `window`)
+- `.tabs`: `flex-shrink:0` (queda anclado al fondo de body como hijo flex natural, sin `position:fixed`)
+- `padding-bottom` de `#app`: de `calc(88px + safe-bottom)` a `calc(20px + safe-bottom)` (ya no es necesario reservar espacio para el nav flotante)
+
+Se agregaron helpers `scrollAppTop()` y `scrollAppBottom()` para reemplazar los 14 llamados a `window.scrollTo()` que ya no funcionan cuando el scroll container es `#app` en vez de `window`.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | Layout flexbox en body/app/tabs + helpers scroll + sustitución de window.scrollTo |
+
+### Criterios de aceptación
+
+- La barra de navegación (Hoy/Nutrición/Entreno/Progreso/Perfil) siempre queda en el borde inferior de la pantalla.
+- El contenido de la vista Hoy (incluyendo la sección del coach) scrollea por encima del nav bar.
+- Las hojas modales (`.overlay`, `.sheet`), toasts y otros elementos `position:fixed` siguen funcionando correctamente.
+- `node scripts/release-gate.mjs` pasa.

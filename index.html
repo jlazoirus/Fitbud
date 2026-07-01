@@ -65,19 +65,21 @@
     --safe-left:env(safe-area-inset-left,0px);
   }
   *{box-sizing:border-box}
-  html{min-height:100%;background:var(--black)}
+  html{height:100%;background:var(--black)}
   body{
-    font-family:var(--font-body);background:var(--black);color:var(--txt);margin:0;padding:0;min-height:100vh;min-height:100dvh;overflow-x:hidden;
+    font-family:var(--font-body);background:var(--black);color:var(--txt);margin:0;padding:0;height:100vh;height:100dvh;overflow:hidden;
+    display:flex;flex-direction:column;
     -webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;
     background-image:radial-gradient(circle at 12% 8%,rgba(124,92,252,.10),transparent 42%),
                      radial-gradient(circle at 90% 96%,rgba(200,100,60,.07),transparent 46%);
     background-attachment:fixed;
   }
   #app{
-    width:100%;max-width:560px;min-height:100dvh;margin:0 auto;
+    flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+    width:100%;max-width:560px;margin:0 auto;
     padding:calc(14px + var(--safe-top))
             max(14px,var(--safe-right))
-            calc(88px + var(--safe-bottom))
+            calc(20px + var(--safe-bottom))
             max(14px,var(--safe-left));
   }
   #app.landing-host{max-width:none;padding:0}
@@ -276,7 +278,7 @@
 
   /* Tabs */
   .tabs{
-    position:fixed;bottom:0;left:0;right:0;width:100%;max-width:560px;margin:0 auto;
+    flex-shrink:0;width:100%;max-width:560px;margin:0 auto;
     background:rgba(7,7,15,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
     border-top:1px solid var(--border);display:flex;justify-content:space-between;
     padding:10px max(10px,var(--safe-right)) max(12px,var(--safe-bottom)) max(10px,var(--safe-left));
@@ -718,6 +720,8 @@
 
 <script>
 "use strict";
+function scrollAppTop(){const a=document.getElementById("app");if(a)a.scrollTop=0;else scrollAppTop();}
+function scrollAppBottom(){const a=document.getElementById("app");if(a)a.scrollTop=a.scrollHeight;else scrollAppBottom();}
 /* ============================================================
    Fitbros — tracker de nutrición y entrenamiento con IA (un solo archivo)
    Fases 1-8: datos, vista HOY, navegación, reemplazos,
@@ -2152,7 +2156,7 @@ async function startNextChallenge(){
     applyChallengeDefaults(onboardingDraft,recapChallenge);
     onboardingActive=true;onboardingStep=1;reviewPromptShown=true;
     recapPhotoFile=null;if(recapPhotoUrl)URL.revokeObjectURL(recapPhotoUrl);recapPhotoUrl="";
-    render();window.scrollTo(0,0);
+    render();scrollAppTop();
   }catch(e){
     if(btn){btn.disabled=false;btn.textContent="Reintentar";}
     if(out)out.textContent="No se pudo guardar: "+((e&&e.message)||String(e));
@@ -2386,7 +2390,7 @@ async function savePrivacyGate(){
     if(button){button.disabled=false;button.textContent="Aceptar y continuar";}
     toast(result.error.message);return;
   }
-  render();window.scrollTo(0,0);
+  render();scrollAppTop();
   toast(trainingSafetyHold()?"Entrenamiento pausado por seguridad":"Privacidad actualizada");
 }
 function openPrivacyNotice(){
@@ -2411,7 +2415,7 @@ function startOnboarding(){
   onboardingStep=1;
   closeModal();
   render();
-  window.scrollTo(0,0);
+  scrollAppTop();
 }
 function onboardingSteps(){
   return `<div class="steps" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
@@ -2726,12 +2730,12 @@ function onboardingNext(){
   if(onboardingStep===1)applyCalculatedMacros();
   const prevStep=onboardingStep;
   onboardingStep=Math.min(4,onboardingStep+1);
-  renderOnboarding();window.scrollTo(0,0);
+  renderOnboarding();scrollAppTop();
   if(prevStep===3&&onboardingDraft&&onboardingDraft.primarySport==="strength_only"){
     showCardioNudge("onboarding");
   }
 }
-function onboardingBack(){readOnboardingStep();onboardingStep=Math.max(1,onboardingStep-1);renderOnboarding();window.scrollTo(0,0);}
+function onboardingBack(){readOnboardingStep();onboardingStep=Math.max(1,onboardingStep-1);renderOnboarding();scrollAppTop();}
 function onboardingGoalChanged(goal){onboardingDraft.goal=goal;applyCalculatedMacros();renderOnboarding();}
 function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();renderOnboarding();toast("Metas recalculadas");}
 function updateOnboardingTrainingSummary(){
@@ -2889,7 +2893,7 @@ async function saveOnboarding(){
   view="hoy";current=clampDate(todayStr());
   trackEvent(firstCycle||newCycle?"onboarding_complete":"onboarding_review",{cycle:planCycleNumber,duration_weeks:duration,source:newCycle?"new_cycle":firstCycle?"first":"review"});
   if(firstCycle||newCycle)await prepareFirstCycleDay(current);
-  render();window.scrollTo(0,0);toast(firstCycle||newCycle?"Tu primer día está listo":"Tu plan quedó actualizado");
+  render();scrollAppTop();toast(firstCycle||newCycle?"Tu primer día está listo":"Tu plan quedó actualizado");
 }
 function maybePromptProfileReview(){
   if(reviewPromptShown||onboardingActive||!session)return;
@@ -3104,7 +3108,7 @@ function setView(v){
   view=v;
   if(v==="hoy")current=clampDate(todayStr());
   if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}
-  render();window.scrollTo(0,0);
+  render();scrollAppTop();
   if(v==="nutricion"||v==="hoy"||v==="entreno"||v==="coach")syncDay(current);
   if(v==="progreso")syncWeights();
 }
@@ -3294,7 +3298,7 @@ async function homePrepareDay(ds){
     if(det&&Array.isArray(det.comidas)&&det.comidas.length){
       applyDayComidas(ds,det.comidas);
       homeTrackAction(ds,"prepare_day_deterministic");
-      render();window.scrollTo(0,0);
+      render();scrollAppTop();
       toast(det.ok===false?"Listo: preparamos la opción más viable.":"Listo: preparamos un día práctico con tus metas.");
       return;
     }
@@ -4324,7 +4328,7 @@ function daySummary(ds){
 }
 
 /* ---------- acciones ---------- */
-function nav(n){const nd=addDays(current,n);if(inRange(nd)){current=nd;render();window.scrollTo(0,0);syncDay(current);}}
+function nav(n){const nd=addDays(current,n);if(inRange(nd)){current=nd;render();scrollAppTop();syncDay(current);}}
 function toggleMeal(ds,id){const ms=mealState(ds,id);ms.done=!ms.done;commitDay(ds);render();}
 function toggleExtra(ds,i){const d=dayState(ds);d.extras[i].done=!d.extras[i].done;commitDay(ds);render();}
 function toggleWorkout(){
@@ -4524,7 +4528,7 @@ function weekSection(){
     </div>
     ${rows}`;
 }
-function goDay(ds){current=ds;view="nutricion";render();window.scrollTo(0,0);syncDay(current);}
+function goDay(ds){current=ds;view="nutricion";render();scrollAppTop();syncDay(current);}
 function weekNav(n){
   const prefs=planPrefsForDate(current);
   const calendar=planCalendarForPrefs(prefs);
@@ -4532,7 +4536,7 @@ function weekNav(n){
   const i=calendar.weeks.findIndex(week=>week.start===w.start&&week.end===w.end);
   if(i>=0){
     const next=calendar.weeks[i+n];
-    if(next){current=next.start;render();window.scrollTo(0,0);}
+    if(next){current=next.start;render();scrollAppTop();}
   }
 }
 
@@ -4926,7 +4930,7 @@ function scrollCoachToBottom(){
   requestAnimationFrame(()=>{
     const el=document.getElementById("coachMsgs");
     if(el)el.scrollTop=el.scrollHeight;
-    window.scrollTo(0,document.body.scrollHeight);
+    scrollAppBottom();
   });
 }
 
@@ -5136,7 +5140,7 @@ function renderProfile(){
     <div class="alert ${trainingSafetyHold()?"":"violet"}"><b>${trainingSafetyHold()?"Entrenamiento pausado":"Evaluación de seguridad vigente"}</b><br>${trainingSafetyHold()?"Una respuesta requiere orientación profesional antes de retomar rutinas.":"Recuerda detenerte ante dolor, mareo, desmayo o falta de aire inusual."}</div>
     <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pf_consent_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Guardar fotos de progreso personal para comparar mi avance</span></label>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="saveOptionalConsents()">Guardar permiso de fotos</button>
-    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="renderPrivacyGate();window.scrollTo(0,0)">Revisar privacidad y seguridad</button>
+    <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="renderPrivacyGate();scrollAppTop()">Revisar privacidad y seguridad</button>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="exportPersonalData(this)">Exportar mis datos</button>
     <button class="btn privacy-control" style="width:100%;border-color:var(--bad);color:var(--bad)" onclick="openDeleteAccount()">Borrar mi cuenta y datos</button>
@@ -9061,7 +9065,7 @@ function renderFoods(){
     <div class="row wrap" style="margin-bottom:12px">${subtabs.map(([v,l])=>`<button class="btn btn-sm ${foodTab===v?'btn-accent':''}" onclick="setFoodTab('${v}')">${l}</button>`).join("")}</div>
     ${body}`;
 }
-function setFoodTab(t){foodTab=t;render();window.scrollTo(0,0);}
+function setFoodTab(t){foodTab=t;render();scrollAppTop();}
 
 function foodsDishes(){
   const bySlot={};DB.dishes.forEach(d=>{(bySlot[d.slot||"otros"]=bySlot[d.slot||"otros"]||[]).push(d);});
