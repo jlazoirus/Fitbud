@@ -65,7 +65,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 6. ~~REQ-98 - Fix banner de check-in: fechas rotas, duplicado, tono de arranque.~~ (implementado, P1)
 7. ~~REQ-100 - Nutrición sin duplicación: un CTA contextual y hero compacto.~~ (implementado, P1)
 8. ~~REQ-101 - Entreno sin CTAs duplicados.~~ (implementado, P1)
-9. REQ-102 - Progreso con estado cero guiado y peso en tarjetas. (P1)
+9. ~~REQ-102 - Progreso con estado cero guiado y peso en tarjetas.~~ (implementado, P1)
 10. REQ-103 - Onboarding sin jerga: macros como resumen. (P1)
 11. ~~REQ-99 - Perfil por secciones con guardado por sección.~~ (P1, el más grande; dividido el 2 jul en REQ-105..REQ-108, ver abajo)
 12. REQ-104 - Copy y paywall coherentes (depende de decisión REQ-26). (P2)
@@ -1910,7 +1910,8 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-101`).
 
 ## REQ-102 - UX: Progreso con estado cero guiado y tabla de peso en tarjetas mobile
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`progressIsEmpty()` detecta usuario sin peso, sin entrenos y sin racha. En ese estado, `renderProgress()` muestra primero la tarjeta "Registra tu peso de la semana" (con copy sobre qué se desbloquea) y arranca "Tus números" y "Rachas e hitos" colapsadas (`section()` acepta ahora un default de colapso vía `isCollapsed(key,def)`). `progressStats()` usa labels autoexplicativos ("Peso actual (kg)", "Entrenos completados", "Racha (días)", "Adherencia a comidas"); la primera tarjeta muestra el peso actual en vez de un delta críptico. `weightChart()` ya no duplica el mensaje de peso vacío. La tabla de peso a tarjetas full-width en mobile con inputs de 44px ya estaba resuelta por REQ-56.
 
 ### Origen
 
