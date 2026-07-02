@@ -4383,7 +4383,7 @@ function delExtra(ds,i){if(!confirm("¿Eliminar esta comida extra?"))return;cons
 /* ---------- PROGRESO: stats + peso + semana ---------- */
 function renderProgress(){
   $("#app").innerHTML=`${screenHeader("Progreso","Tu evolución","progreso")}
-    ${weeklyCheckinBanner()}
+    ${weeklyCheckinChip()}
     ${progressStats()}
     ${section("pr.rachas","Rachas e hitos",renderStreakSection())}
     ${section("pr.ciclos","Tus ciclos",progressJourney(),`${cycleNumber()}`)}
@@ -9464,20 +9464,36 @@ function weeklyCheckinDue(){
   if(!dueWeek)return null;
   const key=cycleNumber()+"-w"+dueNum;
   if(getWeeklyCheckins().find(c=>c.wk===key))return null;
-  return{key,num:dueNum,start:dueWeek.start,end:dueWeek.end};
+  const active=weekDays(dueWeek).some(dayActive);
+  return{key,num:dueNum,start:dueWeek.start,end:dueWeek.end,active};
+}
+
+// Rango de fechas compacto para el check-in ("23–29 jun" o "29 jun – 5 jul").
+function weeklyCheckinRangeLabel(startDs,endDs){
+  const s=parseYmd(startDs),e=parseYmd(endDs);
+  const sMon=MON[s.getMonth()],eMon=MON[e.getMonth()];
+  return sMon===eMon?`${s.getDate()}–${e.getDate()} ${sMon}`:`${s.getDate()} ${sMon} – ${e.getDate()} ${eMon}`;
 }
 
 function weeklyCheckinBanner(){
   const due=weeklyCheckinDue();if(!due)return"";
+  const body=due.active
+    ?"Revisa cómo fue tu semana y recibe ajustes a tu plan para la siguiente."
+    :"No registraste actividad esa semana. Aun así puedes ajustar tu plan para la que sigue.";
   return`<div class="ci-banner">
     <div class="section-h" style="margin:0 0 3px">Check-in · Semana ${due.num}</div>
-    <div style="font-size:15px;font-weight:600;font-family:var(--font-display)">${prettyDate(due.start).split(",")[0]} – ${prettyDate(due.end).split(",")[0]}</div>
-    <div class="muted small" style="margin:5px 0 12px">Revisa cómo fue tu semana y recibe ajustes a tu plan para la siguiente.</div>
+    <div style="font-size:15px;font-weight:600;font-family:var(--font-display)">${weeklyCheckinRangeLabel(due.start,due.end)}</div>
+    <div class="muted small" style="margin:5px 0 12px">${body}</div>
     <div class="row" style="gap:8px">
       <button class="btn btn-accent btn-sm" onclick="openWeeklyCheckin()">Iniciar check-in</button>
       <button class="btn btn-sm" onclick="skipWeeklyCheckin('${due.key}')">Omitir esta semana</button>
     </div>
   </div>`;
+}
+// Acceso discreto al check-in pendiente para vistas que no son Home (evita banner duplicado).
+function weeklyCheckinChip(){
+  const due=weeklyCheckinDue();if(!due)return"";
+  return`<button class="coach-chip" style="margin:0 0 14px" onclick="openWeeklyCheckin()">📋 Check-in semana ${due.num} pendiente · ${weeklyCheckinRangeLabel(due.start,due.end)}</button>`;
 }
 
 // Calcula sesiones planificadas/realizadas en la semana y peso previo.
@@ -9743,7 +9759,7 @@ function weeklyCheckinHistory(){
     return`<div class="wk-day" style="cursor:default">
       <div class="wk-left">
         <div class="d">Semana ${c.num}</div>
-        <div class="m">${prettyDate(c.start).split(",")[0]} – ${prettyDate(c.end).split(",")[0]}</div>
+        <div class="m">${weeklyCheckinRangeLabel(c.start,c.end)}</div>
       </div>
       ${status}
     </div>`;

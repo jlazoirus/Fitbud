@@ -1771,7 +1771,8 @@ Que la próxima acción del día sea lo primero que ve el usuario al abrir la ap
 
 ## REQ-98 - Fix UX: banner de check-in con fechas rotas, duplicado y sin tono de arranque
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`weeklyCheckinRangeLabel(startDs,endDs)` (nuevo, en `index.html`) reemplaza `prettyDate(...).split(",")[0]` (que descartaba la fecha y dejaba solo el nombre del día) por un rango compacto real ("13–19 jun" o "29 jun – 5 jul" si cruza de mes); se usa en `weeklyCheckinBanner()`, la nueva `weeklyCheckinChip()` y en `weeklyCheckinHistory()`, que tenía el mismo bug. `weeklyCheckinDue()` ahora calcula `active` con `weekDays(dueWeek).some(dayActive)`; `weeklyCheckinBanner()` usa ese flag para cambiar el copy a un tono no punitivo cuando la semana no tuvo actividad registrada ("No registraste actividad esa semana. Aun así puedes ajustar tu plan para la que sigue."), sin omitir el check-in automáticamente (se deja el botón "Omitir esta semana" como acción explícita del usuario, evitando tocar el conteo de check-ins de ciclos). `renderProgress()` ya no llama `weeklyCheckinBanner()` completo — usa `weeklyCheckinChip()`, un botón discreto estilo `.coach-chip` que abre `openWeeklyCheckin()` directamente, eliminando el banner duplicado entre Hoy y Progreso.
 
 ### Origen
 
