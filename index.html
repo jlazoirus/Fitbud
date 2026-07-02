@@ -4227,16 +4227,14 @@ function renderWorkout(){
   const safetyNotice=trainingSafetyHold()
     ? `<div class="alert"><b>Entrenamiento pausado por seguridad.</b><br>No inicies esta rutina hasta recibir orientación de un profesional. Nutrición, historial y exportación siguen disponibles.</div>`
     : `<div class="alert violet"><b>Señales para detenerte:</b><br>Dolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.</div>`;
-  const emptyWkHtml=(!generatedVersion&&!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold())?`<section class="agenda-card agenda-state setup">
+  // Tarjeta instructiva solo como empty state real: hoy no hay sesión ejecutable (rutina sin ejercicios válidos).
+  // Con sesión disponible, la única tarjeta es la de "wk.entreno" más abajo (REQ-101).
+  const emptyWkHtml=(contentIssues.length&&!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold())?`<section class="agenda-card agenda-state setup">
     <div class="agenda-head"><div>
       <div class="agenda-kicker">Entreno</div>
-      <h3 class="agenda-title">Guía tu sesión de hoy</h3>
-      <div class="agenda-sub">Aquí sigues cada serie y descanso, registras cargas y cierras la sesión. Un plan personalizado adapta los ejercicios a tus días y lugar.</div>
+      <h3 class="agenda-title">Tu sesión de hoy no está disponible</h3>
+      <div class="agenda-sub">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción abajo antes de iniciarla.</div>
     </div></div>
-    <div class="agenda-actions">
-      <button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>
-      <button class="btn" onclick="openTrainingPlanGenerator()">Preparar mi plan</button>
-    </div>
   </section>`:"";
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}

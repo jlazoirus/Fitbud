@@ -64,7 +64,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 5. ~~REQ-97 - Reordenar Home: agenda primero, hero compacto, un banner a la vez.~~ (implementado, P0)
 6. ~~REQ-98 - Fix banner de check-in: fechas rotas, duplicado, tono de arranque.~~ (implementado, P1)
 7. ~~REQ-100 - Nutrición sin duplicación: un CTA contextual y hero compacto.~~ (implementado, P1)
-8. REQ-101 - Entreno sin CTAs duplicados. (P1)
+8. ~~REQ-101 - Entreno sin CTAs duplicados.~~ (implementado, P1)
 9. REQ-102 - Progreso con estado cero guiado y peso en tarjetas. (P1)
 10. REQ-103 - Onboarding sin jerga: macros como resumen. (P1)
 11. ~~REQ-99 - Perfil por secciones con guardado por sección.~~ (P1, el más grande; dividido el 2 jul en REQ-105..REQ-108, ver abajo)
@@ -1903,42 +1903,10 @@ Que en Nutrición siempre quede claro cuál es LA acción siguiente, sin repetir
 
 ## REQ-101 - UX: Entreno sin CTAs duplicados — tarjeta instructiva solo como empty state
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`renderWorkout()`: `emptyWkHtml` ahora depende de `contentIssues.length`, no de ausencia de plan IA; se quitaron sus CTAs duplicados de "Iniciar sesión guiada"/"Preparar mi plan".
 
-### Origen
-
-Auditoría UI del 1 jul 2026 (hallazgo P1-7).
-
-### Problema
-
-En `renderWorkout()`, "Iniciar sesión guiada" aparece dos veces (tarjeta instructiva + tarjeta del workout) y "Preparar mi plan" otras dos. Cuatro botones para dos acciones; la tarjeta instructiva ocupa el primer lugar de forma permanente.
-
-### Objetivo
-
-Una sola tarjeta de sesión con una acción primaria clara; la explicación solo cuando no hay nada que ejecutar.
-
-### Alcance
-
-1. La tarjeta "Guía tu sesión de hoy" solo se muestra como empty state (sin plan/sesión disponible).
-2. Con sesión disponible: una sola tarjeta con "Iniciar sesión guiada" primario y "Cambiar/Adaptar hoy" secundarios.
-3. Conservar tal cual los chips de contingencia (Solo 20 min / En casa / Sin equipo / Me perdí la sesión).
-
-### Fuera de alcance
-
-- No tocar el reproductor (`workout-player.js`) ni la generación del plan de entrenamiento.
-
-### Riesgos
-
-- Estados intermedios (descanso, safety hold, ejecución en curso) deben conservar sus tarjetas actuales; revisar cada rama de `renderWorkout()`.
-
-### Criterios de aceptación
-
-- Cada acción aparece exactamente una vez en la vista.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Capturar Entreno en estados: sin plan, con sesión pendiente, día de descanso, safety hold, ejecución en curso.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-101`).
 
 ## REQ-102 - UX: Progreso con estado cero guiado y tabla de peso en tarjetas mobile
 
