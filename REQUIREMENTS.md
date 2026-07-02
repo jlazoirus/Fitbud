@@ -2226,3 +2226,44 @@ Que cada sección tenga una vía de guardado clara, visible solo cuando hay camb
 ### Verificación sugerida
 
 - Editar un campo de Entreno, navegar a Comidas sin guardar, confirmar aviso; guardar y confirmar que el cambio persiste; repetir sin guardar y confirmar que se avisó antes de perder el cambio.
+
+## REQ-109 - Fix Home: el badge "N pendientes" cuenta la fila de Descanso
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **home** (2 jul 2026), verificado en navegador (E2E): día de descanso con comidas pendientes.
+
+### Problema
+
+El badge muestra "2 pendientes" en un día de descanso, pero solo hay una acción real: la 2.ª fila ("Descanso planificado") es informativa, sin botón. Contar el descanso infla el número y contradice el texto "pendiente(s)".
+
+### Causa raíz
+
+`homeAgendaHtml` deriva el conteo de `data.items.length` (`index.html:3481`) sin excluir la fila de descanso que `homeAgendaData` inserta con `actions:""` (`index.html:3409`).
+
+### Objetivo
+
+Que el badge cuente solo acciones pendientes; una fila informativa no suma.
+
+### Alcance
+
+1. En `homeAgendaHtml`, contar `items.filter(i=>i.actions)`, no `items.length`; mantener visible la fila de descanso.
+
+### Fuera de alcance
+
+- No cambiar orden ni contenido de la agenda (REQ-97).
+
+### Riesgos
+
+- No romper el conteo cuando todas las filas son accionables.
+
+### Criterios de aceptación
+
+- Descanso con comidas pendientes: badge "1 pendiente"; entreno con comida+entreno pendientes: "2 pendientes".
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E: `completePrefs({trainingDays:[díasSinHoy]})`, preparar día, afirmar `.agenda-count`="1 pendiente".
