@@ -61,14 +61,18 @@ Automatizable por el agente desarrollador:
 
 Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`) — en orden de prioridad:
 
-5. REQ-97 - Reordenar Home: agenda primero, hero compacto, un banner a la vez. (P0)
-6. REQ-98 - Fix banner de check-in: fechas rotas, duplicado, tono de arranque. (P1)
+5. ~~REQ-97 - Reordenar Home: agenda primero, hero compacto, un banner a la vez.~~ (implementado, P0)
+6. ~~REQ-98 - Fix banner de check-in: fechas rotas, duplicado, tono de arranque.~~ (implementado, P1)
 7. REQ-100 - Nutrición sin duplicación: un CTA contextual y hero compacto. (P1)
 8. REQ-101 - Entreno sin CTAs duplicados. (P1)
 9. REQ-102 - Progreso con estado cero guiado y peso en tarjetas. (P1)
 10. REQ-103 - Onboarding sin jerga: macros como resumen. (P1)
-11. REQ-99 - Perfil por secciones con guardado por sección. (P1, el más grande)
+11. ~~REQ-99 - Perfil por secciones con guardado por sección.~~ (P1, el más grande; dividido el 2 jul en REQ-105..REQ-108, ver abajo)
 12. REQ-104 - Copy y paywall coherentes (depende de decisión REQ-26). (P2)
+13. REQ-105 - Perfil: acordeón real (una sección a la vez). (P1)
+14. REQ-106 - Perfil: aria-label en todos los inputs. (P1)
+15. REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta. (P1, depende de REQ-105)
+16. REQ-108 - Perfil: guardado por sección con aviso de cambios sin guardar. (P1, depende de REQ-105 — el de mayor riesgo, al final)
 
 Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall en "Preparar mi día" y fallback+reintento en errores del coach) ya quedaron implementados el 1 jul junto con mejoras de calidad del solver determinista (pre-rankeo calórico, variedad por `recentUsed` y desempate por fecha).
 
@@ -1813,7 +1817,8 @@ Que el check-in comunique fechas concretas, aparezca una sola vez y no exija rev
 
 ## REQ-99 - UX: Perfil por secciones reales con guardado por sección y labels accesibles
 
-**Estado: pendiente.**
+**Estado: implementado (dividido en REQ-105, REQ-106, REQ-107, REQ-108).**
+Marcado como el REQ más grande del backlog (~4.850 px, 91 elementos interactivos, guardado global + 2 guardados locales inconsistentes). Siguiendo el protocolo de la fase de product manager (dividir en vez de implementar a medias), se partió en cuatro requerimientos atómicos, cada uno completable en una ejecución: REQ-105 (acordeón real), REQ-106 (aria-label), REQ-107 (reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta) y REQ-108 (guardado por sección, el de mayor riesgo, al final y dependiente de REQ-105). No se tocó código de `index.html` en este commit.
 
 ### Origen
 
@@ -2056,3 +2061,167 @@ Que ninguna promesa visible contradiga el modelo de cobro real y que ningún bot
 ### Verificación sugerida
 
 - Sin `STRIPE_SECRET_KEY` en entorno local, abrir el paywall y verificar el estado degradado; grep de "Cancela cuando quieras" devuelve 0.
+
+## REQ-105 - UX: Perfil en acordeón real (una sección a la vez)
+
+**Estado: pendiente.**
+
+### Origen
+
+División de REQ-99 (2 jul 2026) por tamaño; auditoría UI del 1 jul 2026 (hallazgo P1-5).
+
+### Problema
+
+En `renderProfile()`, `.pf-nav` son chips que solo hacen `scrollIntoView`; las ocho secciones (Objetivo, Comidas, Entreno, Suscripción, Privacidad, Recordatorios, Avisos del dispositivo, Cuenta) están expandidas simultáneamente en una sola página de ~4.850 px.
+
+### Objetivo
+
+Que el usuario vea y navegue una sección a la vez, sin perder el modelo de guardado actual.
+
+### Alcance
+
+1. Reemplazar `.pf-nav` + `pfScrollTo` por un acordeón real (`<details>` o equivalente JS): cada sección colapsada por defecto; abrir una puede cerrar las demás.
+2. Conservar sin cambios `saveProfile()`, `profileMarkDirty`/`profileClearDirty`, `#profileSaveFloat`, `saveOptionalConsents()`, `saveNotifPrefs()`, `renderPushSection()` — este REQ es solo estructura/visual.
+3. Conservar los ids existentes (`pfSecObjetivo`, `pfSecComidas`, `pfSecEntreno`, `pfSecPrivacidad`, `pfSecCuenta`) para no romper referencias externas.
+4. Colapsar/ocultar con CSS (no desmontar del DOM) para no perder valores de inputs no guardados al cambiar de sección.
+
+### Fuera de alcance
+
+- Guardado por sección (REQ-108).
+- Reagrupar Suscripción/Recordatorios/Avisos del dispositivo bajo Cuenta (REQ-107).
+- `aria-label` (REQ-106).
+
+### Riesgos
+
+- Si el toggle desmonta/remonta el HTML de una sección (en vez de solo ocultar), se pierden valores no guardados al cambiar de sección; usar ocultamiento CSS, no re-render parcial.
+
+### Criterios de aceptación
+
+- Cada sección abierta individualmente mide ~1.500 px o menos de alto renderizado.
+- Editar un campo en una sección, abrir otra y volver conserva el valor editado (no se pierde por el toggle).
+- El botón flotante "Guardar cambios" sigue apareciendo y funcionando igual que hoy.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Medir `scrollHeight` de cada sección abierta individualmente; editar un campo, alternar entre dos secciones y confirmar que el valor persiste en el DOM antes de guardar.
+
+## REQ-106 - Accesibilidad: aria-label en todos los inputs de Perfil
+
+**Estado: pendiente.**
+
+### Origen
+
+División de REQ-99 (2 jul 2026) por tamaño; auditoría UI del 1 jul 2026 (hallazgo P1-5).
+
+### Problema
+
+Varios inputs/selects de `renderProfile()` y sus helpers (`mealTimesHtml`, `trainingAvailabilityHtml`, `checkChips`) dependen de un `<label>` visual sin asociación programática (`for`/`id`) o de un label genérico compartido (p. ej. horarios por día de la semana bajo un único label "Horarios aproximados") — un lector de pantalla no anuncia el propósito real del campo.
+
+### Objetivo
+
+Que cualquier input interactivo de Perfil tenga un nombre accesible correcto.
+
+### Alcance
+
+1. Auditar cada `<input>`/`<select>`/`<textarea>` dentro de `renderProfile()` y los helpers que usa (`mealTimesHtml`, `trainingAvailabilityHtml`, `checkChips`).
+2. Agregar `aria-label` donde el nombre accesible actual sea ambiguo o inexistente (los `label.chip-check` que envuelven el input ya son accesibles por asociación implícita — no agregar `aria-label` redundante ahí; enfocar en inputs de hora/número por día y campos con label compartido).
+3. No cambiar estructura visual, ids usados por JS, ni lógica de guardado.
+
+### Fuera de alcance
+
+- Orden de tabulación, foco programático, overhaul de accesibilidad fuera de Perfil.
+
+### Riesgos
+
+- Bajo: cambio aditivo de atributos; riesgo principal es duplicar anuncios si se agrega `aria-label` a un input que ya tiene nombre accesible claro por `<label for>`.
+
+### Criterios de aceptación
+
+- 0 inputs/selects/textareas visibles en Perfil sin nombre accesible (por `for`/`id`, `aria-label`, o `<label>` envolvente), verificado con un script de auditoría del DOM renderizado.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Script en `scripts/` (jsdom o parseo del HTML renderizado) que liste inputs de Perfil sin nombre accesible; debe reportar 0.
+
+## REQ-107 - UX: reagrupar Suscripción, Recordatorios y Avisos del dispositivo bajo Cuenta
+
+**Estado: pendiente.**
+
+### Origen
+
+División de REQ-99 (2 jul 2026) por tamaño; auditoría UI del 1 jul 2026 (hallazgo P1-5).
+
+### Problema
+
+"Mi suscripción", "Recordatorios" y "Avisos del dispositivo" son secciones sueltas entre Entreno y Cuenta, sin agrupación visual con la sección "Cuenta" a la que pertenecen conceptualmente.
+
+### Objetivo
+
+Que toda la información de cuenta (identidad, suscripción, notificaciones) viva en un solo lugar coherente.
+
+### Alcance
+
+1. Mover los bloques "Mi suscripción" (`subscriptionStatusHtml()`), "Recordatorios" y "Avisos del dispositivo" (`renderPushSection`) para que queden agrupados junto a `pfSecCuenta`, después de Privacidad.
+2. Implementar sobre la estructura vigente al momento de ejecutarse (acordeón de REQ-105 si ya está implementado; bloques secuenciales si no).
+3. No cambiar ids usados por `loadNotifPrefs`/`populateNotifPrefsForm`/`renderPushSection` (`#notif_*`, `#pushSection`) ni su lógica.
+
+### Fuera de alcance
+
+- Cambiar lógica o copy de guardado de recordatorios/push.
+
+### Riesgos
+
+- `renderPushSection()` y `loadNotifPrefs().then(...)` corren después de escribir `innerHTML`; confirmar que las referencias por `id` (`$("#pushSection")`, `$("#notif_*")`) se siguen resolviendo igual tras mover los bloques de contenedor padre (los ids son globales al documento, no deberían romperse).
+
+### Criterios de aceptación
+
+- Privacidad, Suscripción, Recordatorios y Avisos del dispositivo aparecen agrupados junto a "Cuenta", en ese orden.
+- Activar/guardar recordatorios y el estado de notificaciones push siguen funcionando igual que antes del cambio.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Inspeccionar el DOM renderizado y confirmar el nuevo orden de secciones; probar activar recordatorios y confirmar que `renderPushSection()` sigue pintando el estado de push correctamente.
+
+## REQ-108 - UX: guardado por sección en Perfil con aviso de cambios sin guardar
+
+**Estado: pendiente.**
+
+### Origen
+
+División de REQ-99 (2 jul 2026) por tamaño; auditoría UI del 1 jul 2026 (hallazgo P1-5). Depende de REQ-105 (estructura de acordeón).
+
+### Problema
+
+Todo Perfil comparte un único guardado global (`saveProfile()` + botón flotante), salvo Recordatorios y el permiso de fotos que tienen guardados propios independientes — modelo inconsistente con riesgo de pérdida silenciosa de cambios al navegar entre secciones.
+
+### Objetivo
+
+Que cada sección tenga una vía de guardado clara, visible solo cuando hay cambios pendientes, sin perder cambios de otras secciones.
+
+### Alcance
+
+1. Sobre la estructura de acordeón de REQ-105, mostrar el indicador de "cambios sin guardar" de forma consistente en las tres vías de guardado existentes (Objetivo+Comidas+Entreno vía `saveProfile()`; Privacidad/fotos vía `saveOptionalConsents()`; Recordatorios vía `saveNotifPrefs()`).
+2. Mantener a Objetivo+Comidas+Entreno bajo un único guardado (`saveProfile()`) porque `validateTrainingProfile`/`validateFoodSchedule`/`validateFoodPreferences` validan esos campos en conjunto — no partir esa validación cruzada en guardados independientes.
+3. Al cambiar de sección con cambios pendientes sin guardar, mostrar aviso (confirm o banner inline); no perder el valor en el DOM (la sección solo se oculta, no se destruye — ya garantizado por REQ-105).
+
+### Fuera de alcance
+
+- Cambiar `profileSchemaVersion` ni el esquema de `profiles.prefs`.
+- Separar la validación cruzada de Objetivo/Comidas/Entreno en guardados independientes.
+
+### Riesgos
+
+- Guardar solo una parte de Objetivo/Comidas/Entreno dejaría `profiles.prefs` en un estado que no pasa `validateTrainingProfile`/`validateFoodSchedule`/`validateFoodPreferences`; ese trío debe seguir viajando en un solo `saveProfilePrefs`.
+
+### Criterios de aceptación
+
+- Cambiar un campo y navegar a otra sección sin guardar muestra aviso, o el cambio permanece recuperable al volver (no se pierde en silencio).
+- Ningún guardado deja `profiles.prefs` en un estado que falle las validaciones existentes.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Editar un campo de Entreno, navegar a Comidas sin guardar, confirmar aviso; guardar y confirmar que el cambio persiste; repetir sin guardar y confirmar que se avisó antes de perder el cambio.
