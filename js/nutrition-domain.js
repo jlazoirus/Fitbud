@@ -405,6 +405,25 @@
     };
   }
 
+  // Hash determinista → [0,1). Usado como desempate de variedad por fecha:
+  // el mismo día siempre produce el mismo plan, pero días distintos rotan
+  // entre platos casi equivalentes en vez de repetir siempre el mismo ganador.
+  function seededJitter(seed){
+    let h=2166136261;
+    const s=String(seed||"");
+    for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
+    return ((h>>>0)%1000)/1000;
+  }
+
+  // kcal base de un plato con sus gramajes de receta (proxy barato para pre-rankear).
+  function dishBaseKcal(dish,catalog,maps){
+    const lines=dishLines(dish,catalog,maps);
+    if(!lines.length)return 0;
+    const missing=lines.find(line=>!line.ingredient||macroPer100(line.ingredient).kcal<=0);
+    if(missing)return 0;
+    return macrosFromSolvedLines(lines).kcal;
+  }
+
   function planDeterministicNutritionDay(ctx){
     const prefs=ctx&&ctx.prefs||{};
     const dayTarget=ctx&&ctx.dayTarget||ctx&&ctx.target||{kcal:2000,p:150,c:200,f:65};
@@ -416,6 +435,8 @@
       index,
     })).filter(slot=>slot.id);
     const catalog=ctx&&ctx.catalog||{};
+    const maps=catalogMaps(catalog);
+    const dateSeed=ctx&&ctx.date?String(ctx.date):"";
     const used=new Set(),comidas=[],diagnostics=[],causes=[];
     slots.forEach(slot=>{
       const candidates=compatibleDishesForSlot(slot.id,prefs,catalog);
@@ -424,16 +445,32 @@
         return;
       }
       const prevDayUsed=ctx&&ctx.prevDayUsed instanceof Set?ctx.prevDayUsed:new Set();
+      const recentUsed=ctx&&ctx.recentUsed instanceof Set?ctx.recentUsed:new Set();
+      // Pre-rankeo por cercanía calórica al slot: con catálogos grandes, los 48
+      // platos que reciben solver completo son los de tamaño más apropiado,
+      // no los primeros en orden arbitrario del catálogo.
+      const targetKcal=num(slot.target&&slot.target.kcal);
       let best=null;
-      candidates.slice(0,48).forEach(dish=>{
+      candidates
+        .map(dish=>({dish,baseKcal:dishBaseKcal(dish,catalog,maps)}))
+        .sort((a,b)=>{
+          const da=a.baseKcal>0?Math.abs(a.baseKcal-targetKcal):Infinity;
+          const db=b.baseKcal>0?Math.abs(b.baseKcal-targetKcal):Infinity;
+          return da-db;
+        })
+        .slice(0,48)
+        .forEach(({dish})=>{
         const solved=solveDishPortion(dish,slot.target,{catalog});
         if(!solved.ok){
           diagnostics.push({slot:slot.id,dish:dish.name,reason:solved.no_solution});
           return;
         }
-        const reuse=used.has(slugFor(dish))?0.18:0;
-        const yesterday=(!reuse&&prevDayUsed.size&&prevDayUsed.has(slugFor(dish)))?0.10:0;
-        const score=solved.score+reuse+yesterday;
+        const slug=slugFor(dish);
+        const reuse=used.has(slug)?0.18:0;
+        const yesterday=(!reuse&&prevDayUsed.size&&prevDayUsed.has(slug))?0.10:0;
+        const recent=(!reuse&&!yesterday&&recentUsed.size&&recentUsed.has(slug))?0.06:0;
+        const jitter=dateSeed?seededJitter(dateSeed+"|"+slot.id+"|"+slug)*0.03:0;
+        const score=solved.score+reuse+yesterday+recent+jitter;
         if(!best||score<best.rankScore)best={...solved,rankScore:score};
       });
       if(!best){
@@ -482,7 +519,7 @@
       },
       explicacion:noSolution
         ?"Preparamos la opción más viable con tu catálogo actual."
-        :"Alternativa práctica construida con tus metas y restricciones vigentes.",
+        :`Tu día quedó en ${totals.kcal} kcal con ${totals.p} g de proteína, dentro de tu meta y respetando tus restricciones.`,
       comidas,
       warns:validation.warns||[],
     };
@@ -684,9 +721,15 @@
     const workoutContext=ctx&&ctx.workoutContext||null;
     const days=[];
     let prevDayUsed=new Set();
+    const recentUsed=new Set();
+    const weekSeed=ctx&&ctx.startDate?String(ctx.startDate):"";
     for(let i=0;i<numDays;i++){
-      const result=planDeterministicNutritionDay({prefs,dayTarget,catalog,workoutContext,prevDayUsed});
+      const result=planDeterministicNutritionDay({
+        prefs,dayTarget,catalog,workoutContext,prevDayUsed,recentUsed,
+        date:weekSeed?weekSeed+"+"+i:"",
+      });
       prevDayUsed=new Set((result.comidas||[]).map(c=>c.dishSlug||"").filter(Boolean));
+      prevDayUsed.forEach(slug=>recentUsed.add(slug));
       days.push({
         dayIndex:i,
         comidas:result.comidas||[],

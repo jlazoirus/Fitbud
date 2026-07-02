@@ -117,4 +117,63 @@ const solved = d.solveDishPortion(kcalAuthorityCatalog.dishes[0], { kcal: 200, p
 assert.equal(solved.macros.kcal, 200, "kcal debe venir de ingredient.kcal, no de 4/4/9");
 assert.equal(solved.macros.p, 100, "proteína debe calcularse desde el ingrediente");
 
+// ── Calidad: determinismo por fecha, variedad y penalización de recientes ─────
+
+// Misma fecha → exactamente el mismo plan (determinismo estable).
+const seedCtx = {
+  dayTarget: normalTarget,
+  prefs: { mealCount: 4, mainMealIndex: 2, diet: ["omnivoro"] },
+  catalog,
+};
+const dayA1 = d.planDeterministicNutritionDay({ ...seedCtx, date: "2026-07-01" });
+const dayA2 = d.planDeterministicNutritionDay({ ...seedCtx, date: "2026-07-01" });
+assert.deepEqual(
+  dayA1.comidas.map(m => [m.slot_id, m.dishSlug, m.kcal]),
+  dayA2.comidas.map(m => [m.slot_id, m.dishSlug, m.kcal]),
+  "la misma fecha debe producir exactamente el mismo día");
+assertDay(dayA1, normalTarget, 4);
+
+// Fechas distintas → el día sigue siendo válido (el jitter solo desempata).
+const dayB = d.planDeterministicNutritionDay({ ...seedCtx, date: "2026-07-02" });
+assertDay(dayB, normalTarget, 4);
+
+// recentUsed penaliza platos usados en días recientes: si el ganador de un slot
+// se marca como reciente, un candidato casi equivalente debe tomar su lugar.
+const baseline = d.planDeterministicNutritionDay(seedCtx);
+const lunchWinner = baseline.comidas.find(m => m.slot_id === "almuerzo");
+assert.ok(lunchWinner && lunchWinner.dishSlug, "el almuerzo baseline debe tener dishSlug");
+const withRecent = d.planDeterministicNutritionDay({
+  ...seedCtx,
+  recentUsed: new Set([lunchWinner.dishSlug]),
+});
+assertDay(withRecent, normalTarget, 4);
+const lunchAlt = withRecent.comidas.find(m => m.slot_id === "almuerzo");
+assert.ok(lunchAlt, "el almuerzo con recentUsed debe existir");
+// El plato penalizado solo repite si no hay alternativa viable; con este
+// catálogo (2 candidatos omnívoros por slot de almuerzo) debe cambiar.
+assert.notEqual(lunchAlt.dishSlug, lunchWinner.dishSlug,
+  "recentUsed debe rotar el plato del almuerzo hacia una alternativa viable");
+
+// planNutritionWeek con startDate sigue produciendo semana válida y variada.
+const week = d.planNutritionWeek({
+  prefs: { mealCount: 4, mainMealIndex: 2, diet: ["omnivoro"] },
+  dayTarget: normalTarget,
+  catalog,
+  numDays: 7,
+  startDate: "2026-07-06",
+});
+assert.equal(week.days.length, 7, "semana de 7 días");
+assert.ok(week.days.every(day => day.comidas.length === 4), "cada día de la semana tiene 4 comidas");
+const weekStable = d.planNutritionWeek({
+  prefs: { mealCount: 4, mainMealIndex: 2, diet: ["omnivoro"] },
+  dayTarget: normalTarget,
+  catalog,
+  numDays: 7,
+  startDate: "2026-07-06",
+});
+assert.deepEqual(
+  week.days.map(day => day.comidas.map(m => m.dishSlug)),
+  weekStable.days.map(day => day.comidas.map(m => m.dishSlug)),
+  "la semana con el mismo startDate debe ser reproducible");
+
 console.log("validate-nutrition-solver: todos los checks pasaron.");

@@ -2950,15 +2950,16 @@ function screenHeader(title,sub,icon){
 
 let authReady=false;   // true cuando ya resolvimos la sesión de Supabase
 let passwordRecovery=false;
+let passwordRecoveryError="";
 function render(){
   updateInstallPrompt();
   $("#app").classList.toggle("landing-host", !!(authReady&&!session&&!window._showAuth));
   if(!authReady){$("#tabs").innerHTML="";return renderSplash();}
+  if(passwordRecovery){$("#tabs").innerHTML="";return renderPasswordRecovery();}
   if(!session){
     $("#tabs").innerHTML="";
     return window._showAuth ? renderAuth() : renderLanding();
   }
-  if(passwordRecovery){$("#tabs").innerHTML="";return renderPasswordRecovery();}
   if(profile&&!isActive()){ $("#tabs").innerHTML="";return renderInactive(); }
   if(!privacyReady){$("#tabs").innerHTML="";return renderSplash();}
   if(privacyError)return renderPrivacyUnavailable();
@@ -3289,9 +3290,15 @@ async function homePrepareDay(ds){
   homeTrackAction(ds,"prepare_day");
   current=ds;
   if(!hasCompleteOnboarding((profile&&profile.prefs)||{})){startOnboarding();return;}
-  if(aiAvailable()){aiGenerateDay();return;}
-  // Sin coach disponible: arma un día determinista al instante en lugar de
-  // mandar al usuario a Perfil (evita un callejón sin salida en la activación).
+  // Con coach disponible Y acceso vigente: el coach prepara el día.
+  // Sin acceso o sin coach: agenda determinista al instante — gratis, sin
+  // tokens y sin paywall (mismo patrón que aiGenerateWeek; NEGOCIO.md §9).
+  if(aiAvailable()&&hasEntitlement()){aiGenerateDay();return;}
+  const applied=await applyDeterministicDay(ds);
+  if(!applied)toast("No pudimos preparar tu día ahora. Revisa tu conexión e inténtalo otra vez.");
+}
+// Arma y aplica un día determinista desde el catálogo. Devuelve true si quedó aplicado.
+async function applyDeterministicDay(ds){
   try{
     if(supa&&!DB.loaded&&!DB.error){toast("Actualizando tus opciones…");await dbLoad();}
     const det=deterministicDayPayload(ds);
@@ -3299,12 +3306,17 @@ async function homePrepareDay(ds){
       applyDayComidas(ds,det.comidas);
       homeTrackAction(ds,"prepare_day_deterministic");
       render();scrollAppTop();
-      toast(det.ok===false?"Listo: preparamos la opción más viable.":"Listo: preparamos un día práctico con tus metas.");
-      return;
+      toast(det.ok===false?"Listo: preparamos la opción más viable para hoy.":"Tu día está listo con tus metas de hoy.");
+      return true;
     }
   }catch(e){}
-  setView("perfil");
-  toast("Revisa tu perfil para preparar este día.");
+  return false;
+}
+// Fallback desde el modal del coach: cierra y aplica el día determinista.
+async function deterministicFromModal(){
+  closeModal();
+  const applied=await applyDeterministicDay(current);
+  if(!applied)toast("No pudimos preparar tu día ahora. Inténtalo otra vez en unos minutos.");
 }
 function homeAgendaData(ds){
   const st=dayState(ds);
@@ -6049,6 +6061,28 @@ function renderAuth(){
   </div>`;
 }
 function toggleAuthMode(){window._authMode=(window._authMode==="up")?"in":"up";renderAuth();}
+function authRedirectUrl(mode){
+  const url=new URL(location.origin+location.pathname);
+  if(mode)url.searchParams.set("auth",mode);
+  return url.toString();
+}
+function authRedirectParams(){
+  const params=new URLSearchParams(location.search||"");
+  const hash=location.hash&&location.hash[0]==="#"?location.hash.slice(1):location.hash;
+  if(hash){
+    const hashParams=new URLSearchParams(hash);
+    hashParams.forEach((value,key)=>{if(!params.has(key))params.set(key,value);});
+  }
+  return params;
+}
+function isPasswordRecoveryRedirect(){
+  const params=authRedirectParams();
+  return params.get("auth")==="recovery"||params.get("type")==="recovery";
+}
+function passwordRecoveryRedirectError(){
+  const params=authRedirectParams();
+  return params.get("error_description")||params.get("error")||"";
+}
 function retryConnect(){
   loadRemoteConfig().then(()=>{supaInit();setupAuthListener();refreshAuth().then(()=>{session?onAuth():render();});});
 }
@@ -6078,11 +6112,23 @@ async function requestOwnPasswordReset(){
   const out=$("#auOut");
   if(!email){if(out)out.textContent="Escribe tu correo primero";return;}
   if(out)out.textContent="Enviando…";
-  const redirectTo=location.origin+location.pathname;
+  const redirectTo=authRedirectUrl("recovery");
   const result=await supa.auth.resetPasswordForEmail(email,{redirectTo});
   if(out)out.textContent=result.error?("⚠️ "+result.error.message):"Revisa tu correo para crear una nueva contraseña.";
 }
 function renderPasswordRecovery(){
+  if(!session){
+    const msg=passwordRecoveryError||"El enlace de recuperación ya expiró o no se pudo validar. Pide uno nuevo desde el inicio de sesión.";
+    $("#app").innerHTML=`<div class="auth">
+      <div class="auth-brand">Fitbros</div>
+      <div class="dash">
+        <h3>No pudimos abrir el enlace</h3>
+        <p class="muted small">${esc(msg)}</p>
+        <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="passwordRecovery=false;passwordRecoveryError='';window._showAuth=true;window._authMode='in';render()">Volver a iniciar sesión</button>
+      </div>
+    </div>`;
+    return;
+  }
   $("#app").innerHTML=`<div class="auth">
     <div class="auth-brand">Fitbros</div>
     <div class="muted small center" style="margin-bottom:20px">Define una nueva contraseña para tu cuenta.</div>
@@ -6103,6 +6149,7 @@ async function finishPasswordRecovery(){
   if(result.error){out.textContent="⚠️ "+result.error.message;return;}
   if(history&&history.replaceState)history.replaceState({},document.title,location.pathname);
   passwordRecovery=false;
+  passwordRecoveryError="";
   await signOutUser();
   window._authMode="in";
   toast("Contraseña actualizada. Inicia sesión nuevamente.");
@@ -6619,13 +6666,33 @@ function parseJSON(txt){
   if(a>=0&&b>=0)t=t.slice(a,b+1);
   return JSON.parse(t);
 }
+// Slugs de platos usados en los últimos `daysBack` días (para variedad del solver).
+function recentDishSlugs(ds,daysBack){
+  const used=new Set();
+  for(let i=1;i<=daysBack;i++){
+    const st=S.days[addDays(ds,-i)];
+    if(!st||!st.meals)continue;
+    Object.values(st.meals).forEach(m=>{
+      const o=m&&m.ovr;if(!o)return;
+      if(o.dishSlug){used.add(o.dishSlug);return;}
+      const dish=o.name?dishByName(o.name):null;
+      if(dish&&dish.slug)used.add(dish.slug);
+    });
+  }
+  return used;
+}
 function deterministicDayPayload(ds){
   const day=buildDay(ds),target=effectiveDayTarget();
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
   const solver=window.FITBUD_NUTRITION_DOMAIN&&window.FITBUD_NUTRITION_DOMAIN.planDeterministicNutritionDay;
   if(solver&&DB.loaded){
     const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
-    const res=solver({date:ds,dayTarget:target,prefs,slots:day.meals,catalog:DB,workoutContext:{isTrainingDay}});
+    const res=solver({
+      date:ds,dayTarget:target,prefs,slots:day.meals,catalog:DB,
+      workoutContext:{isTrainingDay},
+      prevDayUsed:recentDishSlugs(ds,1),
+      recentUsed:recentDishSlugs(ds,3),
+    });
     if(res&&Array.isArray(res.comidas))return res;
   }
   return {
@@ -7234,7 +7301,15 @@ async function aiGenerateDay(){
     const {res,target}=await generateOneDay(ds,{action:"diet_day",requestId,partKey:"day"});
     window._genDay={ds,comidas:res.comidas};
     $("#genOut").innerHTML=genReviewHtml(res,target);
-  }catch(e){$("#genOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
+  }catch(e){
+    // Nunca dejar al usuario en un callejón sin salida: siempre puede
+    // aplicar el día determinista o reintentar con su coach.
+    $("#genOut").innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>
+      <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-accent btn-sm" onclick="deterministicFromModal()">Usar una opción práctica ahora</button>
+        <button class="btn btn-sm" onclick="aiGenerateDay()">Reintentar</button>
+      </div>`;
+  }
   finally{endCoachAction(actionKey);}
 }
 // --- Plan semanal personalizado (se guarda como overrides por día, por usuario) ---
@@ -7246,7 +7321,7 @@ function generateDeterministicWeek(w,days){
   if(!nd||!nd.planNutritionWeek||!DB.loaded)return null;
   const target=effectiveDayTarget();
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const result=nd.planNutritionWeek({prefs,dayTarget:target,catalog:DB,numDays:days.length});
+  const result=nd.planNutritionWeek({prefs,dayTarget:target,catalog:DB,numDays:days.length,startDate:days[0]});
   if(!result||!result.days||!result.days.length)return null;
   // Mapear días del plan a fechas reales de la semana
   const daysData=days.map((ds,i)=>{
@@ -7351,7 +7426,7 @@ function genReviewHtml(res,target){
 function applyDayComidas(ds,comidas){
   (comidas||[]).forEach(c=>{
     const ms=mealState(ds,c.slot_id); if(!ms)return;
-    ms.ovr={name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,gen:true};
+    ms.ovr={name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,gen:true,...(c.dishSlug?{dishSlug:c.dishSlug}:{})};
   });
   commitDay(ds);
 }
@@ -8046,7 +8121,7 @@ async function signIn(email,pwd){
 }
 async function signUp(email,pwd){
   if(!supa)return{error:{message:"Conecta Supabase primero"}};
-  const emailRedirectTo=location.origin+location.pathname;
+  const emailRedirectTo=authRedirectUrl();
   const r=await supa.auth.signUp({email,password:pwd,options:{emailRedirectTo}});
   return r;
 }
@@ -8057,7 +8132,7 @@ function clearSignedOutState(){
   entitlement=null;entitlementExpired=null;entitlementChecked=false;
   billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
   refreshPlanCalendar();
-  onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;
+  onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;passwordRecoveryError="";
   cycleHistory=[];recapPhotoFile=null;recapChallenge="";
   PLAN_VERSIONS=[];PLAN_VERSIONS_LOADED=false;PLAN_VERSIONS_ERROR=null;
   privacyReady=false;privacyError="";consentRecords=[];safetyScreening=null;
@@ -8862,7 +8937,7 @@ async function adminResetLink(id){
   const user=adminUsersCache.find(u=>u.id===id);
   if(!user||!user.email){toast("Ese usuario no tiene correo");return;}
   if(!confirm("¿Enviar un enlace de recuperación a "+user.email+"?"))return;
-  try{await adminApi("resetPassword",{userId:id,redirectTo:location.origin+location.pathname});toast("Correo de recuperación enviado");}
+  try{await adminApi("resetPassword",{userId:id,redirectTo:authRedirectUrl("recovery")});toast("Correo de recuperación enviado");}
   catch(e){toast(e.message);}
 }
 
@@ -9694,9 +9769,12 @@ function setupAuthListener(){
   if(!supa||window._authSub)return;
   window._authSub=supa.auth.onAuthStateChange((event,sess)=>{
     session=sess||null;
-    if(event==="PASSWORD_RECOVERY"){passwordRecovery=true;authReady=true;render();}
+    if(event==="PASSWORD_RECOVERY"){passwordRecovery=true;passwordRecoveryError="";authReady=true;render();}
     else if(event==="SIGNED_OUT")clearSignedOutState();
-    else if(event==="SIGNED_IN"){if(!profile||profile.id!==uid())onAuth();}
+    else if(event==="SIGNED_IN"){
+      if(isPasswordRecoveryRedirect()){passwordRecovery=true;passwordRecoveryError="";authReady=true;render();return;}
+      if(!profile||profile.id!==uid())onAuth();
+    }
   });
 }
 async function boot(){
@@ -9706,9 +9784,17 @@ async function boot(){
   const hasLocalCreds=!!(S.settings&&S.settings.supaUrl&&S.settings.supaKey);
   if(!hasLocalCreds)await loadRemoteConfig();
   loadCatalog(); // no-await: catálogo de planes en paralelo (REQ-25)
+  const recoveryRedirect=isPasswordRecoveryRedirect();
   supaInit();
+  if(recoveryRedirect){passwordRecovery=true;passwordRecoveryError="";}
   setupAuthListener();
   await refreshAuth();         // resuelve sesión (authReady=true)
+  if(recoveryRedirect){
+    passwordRecovery=true;
+    passwordRecoveryError=session?"":(passwordRecoveryRedirectError()||"El enlace de recuperación ya expiró o no se pudo validar. Pide uno nuevo desde el inicio de sesión.");
+    render();
+    return;
+  }
   if(session)await onAuth(); else render();
 }
 /* ---- Analitica de producto (REQ-27) ---- */
