@@ -1727,7 +1727,8 @@ Que ningún commit pueda publicarse si rompe uno de los journeys críticos: la s
 
 ## REQ-97 - UX: reordenar Home — la agenda primero, hero compacto, un banner a la vez
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`renderHoy()` en `index.html` ahora ordena header → agenda → hero → banners → coach. `heroDash(ds,opts)` acepta `opts.compact` (solo Home lo usa) y colapsa a una línea ("kcal/meta kcal · comidas/total") mientras `doneMeals===0`; Nutrición sigue usando la versión completa sin pasar `opts`. Los banners de check-in y "Afina tu plan" comparten cola de prioridad (checkin > afinar plan, máximo uno); "Afina tu plan" es ahora un chip discreto (`.coach-chip`) en vez de un alert de ancho completo. `planEnded`/`planNotStarted`/`trainingSafetyHold` quedan fuera de esa cola por ser estados críticos/bloqueantes, no promocionales.
 
 ### Origen
 

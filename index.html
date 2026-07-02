@@ -3134,8 +3134,13 @@ function dayAlert(day){
   return "";
 }
 // Tarjeta hero: anillo de kcal + medidores de macros
-function heroDash(ds){
+function heroDash(ds,opts){
   const {t,target,doneMeals,totMeals}=dayTotals(ds);
+  if(opts&&opts.compact&&doneMeals===0){
+    return `<div class="dash" style="padding:12px 14px">
+      <span class="muted small"><b style="color:var(--txt)">${t.kcal}/${target.kcal} kcal</b> · ${doneMeals}/${totMeals} comidas</span>
+    </div>`;
+  }
   const isToday=ds===todayStr();
   const protColor=paceClass(t.p,target.p,isToday);
   const rem=target.kcal-t.kcal;
@@ -3541,12 +3546,11 @@ function renderHoy(){
       <div class="avatar">${esc((name[0]||"F").toUpperCase())}</div>
     </div>
   </header>
+  ${homeAgendaHtml(ds)}
+  ${heroDash(ds,{compact:true})}
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
-  ${needsProfileTuning((profile&&profile.prefs)||{})?`<div class="alert" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px" onclick="setView('perfil')"><span><b>Afina tu plan</b> · Agrega tus preferencias de cocina, horarios y equipo para mejores propuestas.</span><span style="opacity:.6;white-space:nowrap">→ Perfil</span></div>`:""}
-  ${checkinDue?weeklyCheckinBanner():""}
-  ${heroDash(ds)}
-  ${homeAgendaHtml(ds)}
+  ${checkinDue?weeklyCheckinBanner():needsProfileTuning((profile&&profile.prefs)||{})?`<button class="coach-chip" style="margin:0 0 12px" onclick="setView('perfil')" title="Agrega preferencias de cocina, horarios y equipo para mejores propuestas">✨ Afina tu plan</button>`:""}
   ${coachSection}`;
   maybeStartFitbrosTour();
 }
