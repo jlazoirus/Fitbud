@@ -108,6 +108,21 @@ run("validate-docs-index.mjs", "node scripts/validate-docs-index.mjs");
 run("audit-secrets.mjs", "node scripts/audit-secrets.mjs");
 run("audit-html.mjs", "node scripts/audit-html.mjs");
 
+// ── Suite E2E de journeys críticos (REQ-96) ──────────────────────────────────
+// Recorre la app real en Chromium headless con la red 100% mockeada
+// (tests/e2e/helpers.js): 0 llamadas externas, 0 dependencia de producción.
+console.log("\n[ E2E de journeys críticos (Playwright) ]");
+if (!existsSync(join(ROOT, "node_modules", "@playwright", "test"))) {
+  results.push({
+    label: "Suite E2E (npx playwright test)",
+    ok: false,
+    detail: "Falta @playwright/test. Corre: npm install && npx playwright install chromium",
+  });
+  console.error("  ✗ Suite E2E: falta @playwright/test — corre `npm install && npx playwright install chromium`");
+} else {
+  run("Suite E2E (npx playwright test)", "npx playwright test --reporter=list", { timeout: 300_000 });
+}
+
 // ── Resumen ──────────────────────────────────────────────────────────────────
 const passed = results.filter(r => r.ok).length;
 const failed = results.filter(r => !r.ok);

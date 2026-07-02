@@ -1,6 +1,13 @@
 {
   "type": "module",
+  "scripts": {
+    "test:e2e": "playwright test",
+    "release-gate": "node scripts/release-gate.mjs"
+  },
   "dependencies": {
     "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
   }
 }

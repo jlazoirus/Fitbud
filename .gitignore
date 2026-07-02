@@ -12,6 +12,10 @@ node_modules/
 # Archivos de auditoría y capturas locales
 assets/ux-audit-*/
 
+# Artefactos de la suite E2E (REQ-96)
+test-results/
+playwright-report/
+
 # Análisis y materiales locales (no versionar)
 ANALISIS_ARQUITECTURA_NUTRICION_FITIA*.md
 
