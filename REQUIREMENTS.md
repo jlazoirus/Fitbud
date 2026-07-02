@@ -63,7 +63,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 
 5. ~~REQ-97 - Reordenar Home: agenda primero, hero compacto, un banner a la vez.~~ (implementado, P0)
 6. ~~REQ-98 - Fix banner de check-in: fechas rotas, duplicado, tono de arranque.~~ (implementado, P1)
-7. REQ-100 - Nutrición sin duplicación: un CTA contextual y hero compacto. (P1)
+7. ~~REQ-100 - Nutrición sin duplicación: un CTA contextual y hero compacto.~~ (implementado, P1)
 8. REQ-101 - Entreno sin CTAs duplicados. (P1)
 9. REQ-102 - Progreso con estado cero guiado y peso en tarjetas. (P1)
 10. REQ-103 - Onboarding sin jerga: macros como resumen. (P1)
@@ -1862,7 +1862,8 @@ Que Perfil deje de abrumar: el usuario encuentra la sección que busca, guarda c
 
 ## REQ-100 - UX: Nutrición sin duplicación — un CTA contextual y hero compacto
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`renderNutrition()` en `index.html` ahora muestra un solo CTA prominente: la tarjeta "Prepara tus comidas de hoy" (llama `homePrepareDay(ds)`, ruta determinista sin paywall) cuando el día no está preparado; cuando ya está preparado, no hay CTA prominente. Las 3-4 acciones sueltas ("Preparar otra semana"/"Preparar semana", "Ver otra opción de comida", "Revisar mis macros", y "Volver a preparar este día" cuando ya hay plan) se movieron a un menú "Más opciones" (`openNutritionMoreMenu()`) abierto vía `modal()`, con iconos del set existente (`miniIcon()`, nuevo, reutiliza `TAB_ICONS`; se agregaron `more` y `refresh`) en vez de emojis. El hero de macros usa `heroDash(ds,{compact:"always"})` — se extendió `heroDash(ds,opts)` (REQ-97) para aceptar `opts.compact==="always"` y así no repetir nunca el bloque completo que Home puede mostrar. Fix de bug encontrado en el camino: el botón "Preparar este día" de Nutrición llamaba `aiGenerateDay()` directo, lo que mostraba el paywall a usuarios sin entitlement; ahora la regeneración pasa por `homePrepareDay()` como en Home, respetando la ruta determinista del 1 jul.
 
 ### Origen
 

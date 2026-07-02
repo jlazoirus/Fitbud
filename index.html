@@ -3004,9 +3004,13 @@ const TAB_ICONS={
   weight:'<path d="M12 3a2 2 0 0 0-2 2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2-2zM9 9h6"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
   chevron:'<path d="M9 6l6 6-6 6"/>',
+  more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  refresh:'<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
 };
 function tabIcon(name){return `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${TAB_ICONS[name]||""}</svg>`;}
 function chevron(){return `<svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${TAB_ICONS.chevron}</svg>`;}
+// Icono pequeño reutilizando el set existente (botones inline, sin emojis — REQ-100).
+function miniIcon(name,size){return `<svg width="${size||16}" height="${size||16}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">${TAB_ICONS[name]||""}</svg>`;}
 
 /* ---------- Secciones colapsables (REQ-04) ----------
    Estado por clave persistido en localStorage 'fitbud_ui', aparte de los
@@ -3136,6 +3140,12 @@ function dayAlert(day){
 // Tarjeta hero: anillo de kcal + medidores de macros
 function heroDash(ds,opts){
   const {t,target,doneMeals,totMeals}=dayTotals(ds);
+  if(opts&&opts.compact==="always"){
+    return `<div class="dash" style="padding:12px 14px">
+      <div class="muted small"><b style="color:var(--txt)">${t.kcal}</b>/${target.kcal} kcal · P ${t.p}/${target.p} · C ${t.c}/${target.c} · G ${t.f}/${target.f} g</div>
+      <div class="muted small" style="margin-top:4px">${doneMeals}/${totMeals} comidas</div>
+    </div>`;
+  }
   if(opts&&opts.compact&&doneMeals===0){
     return `<div class="dash" style="padding:12px 14px">
       <span class="muted small"><b style="color:var(--txt)">${t.kcal}/${target.kcal} kcal</b> · ${doneMeals}/${totMeals} comidas</span>
@@ -3559,22 +3569,10 @@ function renderCoach(){renderHoy();}
 /* ---------- NUTRICIÓN: detalle de comidas + coach ---------- */
 function renderNutrition(){
   const ds=current; const st=dayState(ds); const day=buildDay(ds);
-  const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||WEEKS[0]; const hasPlan=weekHasGeneratedPlan(w);
   const prepared=homeDayHasPreparedMeals(ds,day);
   const mealsHtml=day.meals.map(b=>mealCard(ds,b)).join("");
   const extrasHtml=st.extras.map((e,i)=>extraCard(ds,e,i)).join("");
-  const weekCta=aiAvailable()?(hasPlan
-    ? `<div class="row wrap" style="margin:0 0 12px"><button class="btn btn-sm" onclick="aiGenerateWeek()">🔄 Preparar otra semana</button></div>`
-    : `<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-        <span>🍽️ Arma tu semana a la medida de tus macros.</span>
-        <button class="btn btn-sm btn-accent" style="white-space:nowrap" onclick="aiGenerateWeek()">Preparar semana</button>
-      </div>`):"";
-  const aiRow=`<div class="row wrap" style="margin:12px 0 4px">
-    <button class="btn btn-sm" onclick="aiGenerateDay()">🍽️ Preparar este día</button>
-    <button class="btn btn-sm" onclick="aiSuggest()">✨ Ver otra opción de comida</button>
-    <button class="btn btn-sm" onclick="aiReview()">🔍 Revisar mis macros</button>
-  </div>
-  <div class="muted small">${dbStatusNote()}</div>`;
+  // Un solo CTA primario: día sin preparar → tarjeta de arranque; día preparado → nada prominente (REQ-100).
   const emptyNutHtml=!prepared?`<section class="agenda-card agenda-state setup">
     <div class="agenda-head"><div>
       <div class="agenda-kicker">Nutrición</div>
@@ -3583,17 +3581,37 @@ function renderNutrition(){
     </div></div>
     <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
   </section>`:"";
+  // Acciones secundarias (preparar semana, otra opción, revisar macros) van al menú "···" (REQ-100).
+  const moreBtn=`<div class="row" style="justify-content:flex-end;margin:0 0 6px">
+    <button class="btn btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
+  </div>`;
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
   ${emptyNutHtml}
-  ${weekCta}
-  ${section("nut.macros","Macros del día",heroDash(ds)+aiRow)}
+  ${moreBtn}
+  ${section("nut.macros","Macros del día",heroDash(ds,{compact:"always"})+`<div class="muted small">${dbStatusNote()}</div>`)}
   ${section("nut.plan","Comidas del día",mealsHtml,`${day.meals.length}`)}
   ${section("nut.extra","Comidas extra",
     (extrasHtml||'<div class="muted small" style="margin:0 2px 8px">Ninguna todavía.</div>')+
     '<button class="btn" style="width:100%" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
     st.extras.length?`${st.extras.length}`:"")}
   `;
+}
+// Menú de acciones secundarias de Nutrición: agrupa lo que antes eran 3-4 botones sin jerarquía (REQ-100).
+function openNutritionMoreMenu(){
+  const ds=current;
+  const day=buildDay(ds);
+  const prepared=homeDayHasPreparedMeals(ds,day);
+  const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||WEEKS[0];
+  const hasPlan=weekHasGeneratedPlan(w);
+  const item=(icon,label,onclick)=>`<button class="btn" style="width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start" onclick="closeModal();${onclick}">${miniIcon(icon)}<span>${label}</span></button>`;
+  const items=[
+    prepared?item("refresh","Volver a preparar este día","homePrepareDay(current)"):"",
+    item("refresh","Ver otra opción de comida","aiSuggest()"),
+    item("progreso","Revisar mis macros","aiReview()"),
+    item("week",hasPlan?"Preparar otra semana":"Preparar semana","aiGenerateWeek()"),
+  ].filter(Boolean).join("");
+  modal(`<h3>Más opciones</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">${items}</div>`);
 }
 
 /* ---------- Biblioteca de ejercicios (REQ-15) ---------- */
