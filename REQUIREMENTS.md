@@ -59,6 +59,19 @@ Automatizable por el agente desarrollador:
 3. ~~REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.~~ (implementado)
 4. ~~REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.~~ (implementado)
 
+Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`) — en orden de prioridad:
+
+5. REQ-97 - Reordenar Home: agenda primero, hero compacto, un banner a la vez. (P0)
+6. REQ-98 - Fix banner de check-in: fechas rotas, duplicado, tono de arranque. (P1)
+7. REQ-100 - Nutrición sin duplicación: un CTA contextual y hero compacto. (P1)
+8. REQ-101 - Entreno sin CTAs duplicados. (P1)
+9. REQ-102 - Progreso con estado cero guiado y peso en tarjetas. (P1)
+10. REQ-103 - Onboarding sin jerga: macros como resumen. (P1)
+11. REQ-99 - Perfil por secciones con guardado por sección. (P1, el más grande)
+12. REQ-104 - Copy y paywall coherentes (depende de decisión REQ-26). (P2)
+
+Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall en "Preparar mi día" y fallback+reintento en errores del coach) ya quedaron implementados el 1 jul junto con mejoras de calidad del solver determinista (pre-rankeo calórico, variedad por `recentUsed` y desempate por fecha).
+
 Pendiente no automatizable por agentes:
 
 - REQ-49 - Revision legal pre-lanzamiento.
@@ -1653,7 +1666,15 @@ Se agregaron helpers `scrollAppTop()` y `scrollAppBottom()` para reemplazar los 
 
 ## REQ-96 - Crear suite E2E Playwright de journeys críticos e integrarla al release-gate
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+### Solución (2026-07-02)
+
+Suite en `tests/e2e/` con `@playwright/test` (devDependency) + Chromium headless, corriendo la app real servida por `python3 -m http.server 8923` con **toda la red interceptada** (`tests/e2e/helpers.js`): Supabase (PostgREST stateful: lo upserteado se devuelve en GETs), `/api/*`, CDN de supabase-js vendorizado (`tests/e2e/vendor/`) y fuentes. El "coach" (`/api/claude`) se mockea leyendo metas y slots del propio prompt y construyendo comidas del catálogo fixture que cumplen las metas — 0 llamadas pagadas, 100 % offline y determinista.
+
+5 specs / 7 tests: `onboarding.spec.js` (onboarding completo, Mifflin-St Jeor verificado aparte, macros mostrados = guardados en el upsert de profiles), `nutricion.spec.js` (objetivos del día + preparar mi día + aplicar), `entreno.spec.js` (sesión guiada completa, adaptativa al nº de bloques, regresión REQ-92), `progreso.spec.js` (peso mostrado = guardado = sincronizado a weight_log), `navegacion.spec.js` (5 tabs + landing sin sesión + REQ-31, consola limpia en todos). Helpers exportados (`installMocks`, `seedLoggedInUser`, `completePrefs`) reutilizables por el loop auditor. Integrada a `release-gate.mjs` como check bloqueante con timeout de 5 min. Verificado: romper `completeWorkoutStep` hace fallar la suite.
+
+Comandos: `npm run test:e2e` o `npx playwright test`. Primera vez: `npm install && npx playwright install chromium`.
 
 ### Origen
 
@@ -1702,3 +1723,334 @@ Que ningún commit pueda publicarse si rompe uno de los journeys críticos: la s
 
 - `npx playwright test --reporter=list` y revisar que los 5 journeys pasan.
 - `node scripts/release-gate.mjs` incluye y pasa el check E2E.
+
+
+## REQ-97 - UX: reordenar Home — la agenda primero, hero compacto, un banner a la vez
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`, hallazgo P0-3).
+
+### Problema
+
+En `renderHoy()` el orden actual es: header → alert "Afina tu plan" → banner check-in → `heroDash` (~230 px) → agenda → coach. Para un usuario nuevo, "lo que te toca ahora" (el núcleo de la propuesta de valor) queda al borde o debajo del fold en móvil, detrás de dos avisos y un dashboard en cero.
+
+### Objetivo
+
+Que la próxima acción del día sea lo primero que ve el usuario al abrir la app, en cualquier estado de su cuenta.
+
+### Alcance
+
+1. Reordenar `renderHoy()`: header → agenda (próxima acción) → hero → banners → coach.
+2. Hero en modo compacto (una línea: "0/1900 kcal · 0/4 comidas") mientras el día no tenga registros; versión completa cuando hay actividad.
+3. Cola de prioridad de banners: mostrar máximo uno a la vez (check-in > afinar plan); "Afina tu plan" como chip discreto, no como primer elemento.
+
+### Fuera de alcance
+
+- No tocar la lógica de `homeAgendaData` ni el contenido de la agenda.
+- No rediseñar el chat del coach en Home.
+
+### Riesgos
+
+- El tour contextual ancla su primer coachmark a la agenda; verificar que los selectores (`data-tab`, contenedores) sigan válidos tras el reorden.
+- `heroDash` se reusa en Nutrición: el modo compacto debe ser opt-in para no alterar esa vista (o coordinarse con REQ-100).
+
+### Criterios de aceptación
+
+- Con viewport móvil (390×844), la tarjeta de agenda es visible completa en el primer viewport para un usuario nuevo.
+- Nunca se muestran dos banners apilados en Home.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Servir local, simular usuario nuevo (sin día preparado) y usuario con actividad; capturar Home en 390×844 y verificar orden y fold.
+- Forzar check-in pendiente + perfil sin afinar a la vez y verificar que solo se muestra un banner.
+
+## REQ-98 - Fix UX: banner de check-in con fechas rotas, duplicado y sin tono de arranque
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-4). Bug de copy verificado en producción.
+
+### Problema
+
+En `weeklyCheckinBanner()`, `prettyDate(due.start).split(",")[0]` produce "Martes – Lunes" (solo nombres de día, sin fechas). El banner aparece en Hoy y en Progreso a la vez, y se muestra aunque la semana a revisar no tenga ningún dato registrado ("Revisa cómo fue tu semana" sin nada que revisar).
+
+### Objetivo
+
+Que el check-in comunique fechas concretas, aparezca una sola vez y no exija revisar semanas vacías.
+
+### Alcance
+
+1. Copy con fechas reales: "Semana 1 · 23–29 jun".
+2. Banner completo solo en Hoy; en Progreso, acceso discreto (link/chip).
+3. Si la semana a revisar no tiene actividad registrada (`dayActive` en 0 días), cambiar el tono a arranque no punitivo u omitir automáticamente sin registro de "skip" culposo.
+
+### Fuera de alcance
+
+- No cambiar el flujo interno de `openWeeklyCheckin` ni sus ajustes propuestos.
+- No cambiar la lógica de `weeklyCheckinDue` salvo el caso "semana sin actividad".
+
+### Riesgos
+
+- `skipWeeklyCheckin` persiste claves por semana; la omisión automática no debe romper el conteo de check-ins de ciclos.
+
+### Criterios de aceptación
+
+- El banner muestra fechas concretas, no solo nombres de día.
+- No aparece duplicado en dos vistas a la vez.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Simular plan iniciado hace 8+ días sin actividad y verificar tono/omisión; con actividad, verificar fechas correctas en el banner.
+
+## REQ-99 - UX: Perfil por secciones reales con guardado por sección y labels accesibles
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-5); retoma los pendientes #6/#7 del plan del 24 jun.
+
+### Problema
+
+`renderProfile()` renderiza una sola página de ~4.850 px con 8 secciones, 91 elementos interactivos y 64 inputs sin label programático. Los chips de navegación solo hacen `scrollIntoView` y el guardado es un botón global al fondo más dos guardados locales inconsistentes — riesgo de perder cambios y parálisis de decisión.
+
+### Objetivo
+
+Que Perfil deje de abrumar: el usuario encuentra la sección que busca, guarda con confianza y ningún cambio se pierde en silencio.
+
+### Alcance
+
+1. Convertir los chips (Objetivo · Comidas · Entreno · Privacidad · Cuenta) en subvistas reales o acordeones colapsados por defecto (solo la sección activa abierta).
+2. Guardado sticky por sección, visible solo cuando hay cambios pendientes; cuidado con `saveProfilePrefs` y esquemas versionados.
+3. Agrupar Suscripción/Recordatorios/Avisos del dispositivo bajo Cuenta.
+4. `aria-label` en todos los inputs al migrar.
+
+### Fuera de alcance
+
+- No cambiar el esquema de `profiles.prefs` ni `profileSchemaVersion`.
+- No tocar los flujos de privacidad/consentimientos más allá de su ubicación visual.
+
+### Riesgos
+
+- El guardado por sección cambia el modelo actual "todo al final": riesgo de guardados parciales inconsistentes; definir qué campos viajan juntos.
+- Los flujos de push/recordatorios tienen guardados propios; unificar sin romper sus validaciones.
+
+### Criterios de aceptación
+
+- Ninguna sección de Perfil supera ~1.500 px de alto renderizado.
+- Cambiar un campo y salir de la sección sin guardar muestra aviso o autoguarda; no se pierden cambios en silencio.
+- 0 inputs visibles sin label programático en Perfil.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Medir `#app.scrollHeight` por sección; editar un campo, navegar a otra sección y verificar el aviso/autoguardado; auditar labels con querySelector.
+
+## REQ-100 - UX: Nutrición sin duplicación — un CTA contextual y hero compacto
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-6).
+
+### Problema
+
+`renderNutrition()` repite el `heroDash` completo de Home y ofrece 4 acciones sin jerarquía ("Preparar otra semana", "Preparar este día", "Ver otra opción de comida", "Revisar mis macros") con solapamiento semántico y emojis en botones.
+
+### Objetivo
+
+Que en Nutrición siempre quede claro cuál es LA acción siguiente, sin repetir información que Home ya muestra.
+
+### Alcance
+
+1. Un CTA primario contextual: día sin preparar → "Preparar este día"; día preparado → sin CTA prominente.
+2. Acciones restantes a menú "···" o dentro de cada comida.
+3. Hero de macros en versión compacta (no repetir el bloque completo de Home).
+4. Iconos del set existente en lugar de emojis en botones.
+
+### Fuera de alcance
+
+- No cambiar la lógica de generación (día/semana) ni los flujos de "Cambiar" comida.
+
+### Riesgos
+
+- Los CTAs actuales gatean por entitlement (coach); el CTA contextual debe respetar la ruta determinista sin paywall implementada el 1 jul.
+
+### Criterios de aceptación
+
+- Máximo un CTA primario visible en la parte superior de Nutrición.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Capturar Nutrición con día vacío y con día preparado; verificar jerarquía y ausencia del hero duplicado completo.
+
+## REQ-101 - UX: Entreno sin CTAs duplicados — tarjeta instructiva solo como empty state
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-7).
+
+### Problema
+
+En `renderWorkout()`, "Iniciar sesión guiada" aparece dos veces (tarjeta instructiva + tarjeta del workout) y "Preparar mi plan" otras dos. Cuatro botones para dos acciones; la tarjeta instructiva ocupa el primer lugar de forma permanente.
+
+### Objetivo
+
+Una sola tarjeta de sesión con una acción primaria clara; la explicación solo cuando no hay nada que ejecutar.
+
+### Alcance
+
+1. La tarjeta "Guía tu sesión de hoy" solo se muestra como empty state (sin plan/sesión disponible).
+2. Con sesión disponible: una sola tarjeta con "Iniciar sesión guiada" primario y "Cambiar/Adaptar hoy" secundarios.
+3. Conservar tal cual los chips de contingencia (Solo 20 min / En casa / Sin equipo / Me perdí la sesión).
+
+### Fuera de alcance
+
+- No tocar el reproductor (`workout-player.js`) ni la generación del plan de entrenamiento.
+
+### Riesgos
+
+- Estados intermedios (descanso, safety hold, ejecución en curso) deben conservar sus tarjetas actuales; revisar cada rama de `renderWorkout()`.
+
+### Criterios de aceptación
+
+- Cada acción aparece exactamente una vez en la vista.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Capturar Entreno en estados: sin plan, con sesión pendiente, día de descanso, safety hold, ejecución en curso.
+
+## REQ-102 - UX: Progreso con estado cero guiado y tabla de peso en tarjetas mobile
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-8); retoma el pendiente #8 del plan del 24 jun.
+
+### Problema
+
+Un usuario nuevo abre Progreso y ve 4 stat-cards en cero con labels crípticos ("completos", "kg"), rachas en cero y una tabla de peso con inputs pequeños. Los ceros en la fuente display parecen píldoras, no números. Hay un box redundante que repite lo que ya dice la tarjeta "Registra tu peso de la semana".
+
+### Objetivo
+
+Que Progreso sin datos invite a la primera acción en lugar de mostrar estadísticas vacías, y que registrar peso sea cómodo en móvil.
+
+### Alcance
+
+1. Con cero datos: colapsar stats/rachas y abrir con la tarjeta de registro de peso + qué se desbloquea al registrar.
+2. Labels autoexplicativos: "Peso actual", "Entrenos completados", "Racha", "Adherencia a comidas".
+3. `weightRows()`: tabla → tarjetas por semana full-width en mobile con inputs grandes o stepper (los aria-labels ya existen).
+4. Eliminar el box redundante "Ingresa tu peso semanal para ver el gráfico".
+
+### Fuera de alcance
+
+- No cambiar el modelo de datos de `weight_log` ni la lógica de rangos (`buildWeightRanges`).
+
+### Riesgos
+
+- `scrollToWeightInput()` asume la tabla `.wt input`; actualizar el selector al migrar a tarjetas.
+
+### Criterios de aceptación
+
+- Usuario sin datos ve primero una acción clara, no estadísticas en cero.
+- Inputs de peso con hit area ≥44 px en táctil.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Capturar Progreso sin datos y con 2 semanas de datos, en viewport móvil; probar registro de peso con teclado numérico.
+
+## REQ-103 - UX: onboarding sin jerga — macros como resumen y lugar de entrenamiento único por defecto
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-9).
+
+### Problema
+
+El paso 2 del onboarding expone 4 inputs crudos de macros más el texto "Fórmula: Katch-McArdle" (jerga técnica, contra el tono coach del principio 9). El paso 3 pide checkbox por día y lugar por día (7 selects): configuración avanzada a destiempo.
+
+### Objetivo
+
+Bajar el tiempo-a-plan del onboarding sin perder ningún dato esencial: el principiante no debería decidir macros ni logística por día para empezar.
+
+### Alcance
+
+1. Paso 2: resultado como resumen amable ("Tu referencia: 2.262 kcal · 137 g proteína") con "Ajustar valores" colapsado; la fórmula a un tooltip "¿cómo lo calculamos?".
+2. Paso 3: días + un solo lugar por defecto; "personalizar por día" colapsado.
+3. No perder ningún dato del esquema de prefs; solo cambia la presentación.
+
+### Fuera de alcance
+
+- No cambiar `calculateMacroTargets` ni las fórmulas.
+- No cambiar el número de pasos del onboarding.
+
+### Riesgos
+
+- `hasCompleteOnboarding()` y `migrateProfilePrefs()` esperan campos concretos; el colapsado no debe impedir setearlos con defaults válidos.
+
+### Criterios de aceptación
+
+- El onboarding no muestra nombres de fórmulas ni inputs de macros abiertos por defecto.
+- `hasCompleteOnboarding()` sigue cumpliéndose con el flujo nuevo.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Completar onboarding sin abrir ningún colapsable y verificar perfil válido con plan preparable; abrir "Ajustar valores" y verificar edición de macros.
+
+## REQ-104 - Copy y paywall coherentes: sin "cancela cuando quieras", paywall degradado sin checkout activo
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgos P2-10 y cadena P0-1 con REQ-26).
+
+### Problema
+
+(a) "Cancela cuando quieras" aparece 3 veces pero los planes son pago único sin renovación — no hay nada que cancelar. (b) Mientras el checkout de Stripe no esté activo (REQ-26), el paywall muestra botones de compra que terminan en error 503. (c) Empty state de Home con copy pasivo y largo.
+
+### Objetivo
+
+Que ninguna promesa visible contradiga el modelo de cobro real y que ningún botón lleve a un error por configuración faltante.
+
+### Alcance
+
+1. Reemplazar "Cancela cuando quieras" por "Sin renovación automática — pagas solo el período".
+2. `showPaywall`: si el checkout no está configurado, no mostrar botones de compra; mostrar mensaje "disponible pronto" + mantener la alternativa determinista.
+3. Empty state de Home: "Tu coach arma comidas y entreno para hoy en segundos."
+
+### Fuera de alcance
+
+- No activar el checkout de Stripe (eso es REQ-26).
+- No cambiar precios ni estructura de planes.
+
+### Riesgos
+
+- Detectar "checkout no configurado" desde el cliente requiere una señal del servidor (p. ej. respuesta de `/api/checkout` o flag en config); no exponer detalles técnicos al usuario (principio 9).
+
+### Criterios de aceptación
+
+- Ningún botón visible lleva a un endpoint que responde 503 por configuración faltante.
+- El copy de planes no promete cancelación de una renovación que no existe.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Sin `STRIPE_SECRET_KEY` en entorno local, abrir el paywall y verificar el estado degradado; grep de "Cancela cuando quieras" devuelve 0.
