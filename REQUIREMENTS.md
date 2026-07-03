@@ -1995,7 +1995,7 @@ Que el badge cuente solo acciones pendientes; una fila informativa no suma.
 
 ## REQ-110 - Fix UX: catch de aiGenerateWeek sin salida — sumar opción práctica y reintento
 
-**Estado: pendiente.**
+**Estado: implementado.** Catch externo de `aiGenerateWeek` (`index.html`) conserva `daysData`/`problems` parciales en `window._genWeek` y muestra "Usar una semana práctica ahora" (nueva función `deterministicWeekFromModal()`, completa solo los días faltantes con `generateDeterministicWeek` y re-renderiza `genWeekReviewHtml()`) y "Reintentar" (`aiGenerateWeek()`), mismo patrón de copy/clases que `deterministicFromModal`.
 
 ### Origen
 
