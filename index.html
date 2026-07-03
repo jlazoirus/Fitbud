@@ -5288,11 +5288,6 @@ function renderProfile(){
 
   </div>
 
-  <details id="pfSecSuscripcion" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Mi suscripción</summary>
-  <div class="pf-accordion-panel"><div class="dash">${subscriptionStatusHtml()}</div></div>
-  </details>
-
   <details id="pfSecPrivacidad" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
   <summary>Privacidad y seguridad</summary>
   <div class="pf-accordion-panel"><div class="dash">
@@ -5306,6 +5301,11 @@ function renderProfile(){
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="exportPersonalData(this)">Exportar mis datos</button>
     <button class="btn privacy-control" style="width:100%;border-color:var(--bad);color:var(--bad)" onclick="openDeleteAccount()">Borrar mi cuenta y datos</button>
   </div></div>
+  </details>
+
+  <details id="pfSecSuscripcion" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Mi suscripción</summary>
+  <div class="pf-accordion-panel"><div class="dash">${subscriptionStatusHtml()}</div></div>
   </details>
 
   <details id="pfSecRecordatorios" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">

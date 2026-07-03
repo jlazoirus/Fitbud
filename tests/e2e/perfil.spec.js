@@ -81,4 +81,34 @@ test.describe("Perfil", () => {
 
     expect(unnamed, `Inputs de Perfil sin nombre accesible: ${unnamed.join(", ")}`).toEqual([]);
   });
+
+  test("REQ-107: Privacidad, Suscripción, Recordatorios y Avisos quedan agrupados junto a Cuenta", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Perfil").click();
+
+    const ids = await page.locator("details.pf-accordion").evaluateAll((items) => items.map((el) => el.id));
+    expect(ids).toEqual([
+      "pfSecObjetivo", "pfSecComidas", "pfSecEntreno",
+      "pfSecPrivacidad", "pfSecSuscripcion", "pfSecRecordatorios", "pfSecAvisos",
+      "pfSecCuenta",
+    ]);
+
+    // Recordatorios: activar el opt-in sigue revelando las opciones (wiring de #notif_* intacto).
+    const recordatorios = page.locator("#pfSecRecordatorios");
+    await recordatorios.locator("> summary").click();
+    await page.check("#notif_opt_in");
+    await expect(page.locator("#notifOptions")).toBeVisible();
+
+    // Avisos del dispositivo: renderPushSection() sigue pintando el estado de push sin errores.
+    const avisos = page.locator("#pfSecAvisos");
+    await avisos.locator("> summary").click();
+    await expect(page.locator("#pushSection")).not.toBeEmpty();
+
+    expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
+  });
 });

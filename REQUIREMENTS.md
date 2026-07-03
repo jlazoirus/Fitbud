@@ -71,7 +71,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 12. ~~REQ-104 - Copy y paywall coherentes.~~ (implementado, P2)
 13. ~~REQ-105 - Perfil: acordeón real (una sección a la vez).~~ (implementado, P1)
 14. ~~REQ-106 - Perfil: aria-label en todos los inputs.~~ (implementado, P1)
-15. REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta. (P1, depende de REQ-105)
+15. ~~REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta.~~ (implementado, P1)
 16. REQ-108 - Perfil: guardado por sección con aviso de cambios sin guardar. (P1, depende de REQ-105 — el de mayor riesgo, al final)
 17. REQ-109 - Fix Home: badge "N pendientes" cuenta la fila de Descanso. (P2)
 18. REQ-110 - Fix: catch de aiGenerateWeek sin salida — opción práctica y reintento. (P1)
@@ -1864,7 +1864,9 @@ Que cualquier input interactivo de Perfil tenga un nombre accesible correcto.
 
 ## REQ-107 - UX: reagrupar Suscripción, Recordatorios y Avisos del dispositivo bajo Cuenta
 
-**Estado: pendiente.**
+**Estado: implementado.**
+En `renderProfile()` (`index.html`) se movió el bloque `<details id="pfSecSuscripcion">` para que quede inmediatamente después de `<details id="pfSecPrivacidad">` (antes iba antes de Privacidad). El nuevo orden de `<details class="pf-accordion">` es: Objetivo, Comidas, Entreno, Privacidad, Suscripción, Recordatorios, Avisos del dispositivo, [Administración si aplica], Cuenta — Recordatorios y Avisos ya seguían a Privacidad antes del cambio, así que mover solo Suscripción bastó para agrupar las cuatro secciones justo antes de Cuenta. No se tocaron ids (`#notif_*`, `#pushSection`), lógica de `loadNotifPrefs`/`populateNotifPrefsForm`/`renderPushSection`/`saveNotifPrefs`, ni el contenido de ninguna sección — cambio puramente de orden en el HTML generado.
+Prueba E2E nueva: `tests/e2e/perfil.spec.js` ("REQ-107: Privacidad, Suscripción, Recordatorios y Avisos quedan agrupados junto a Cuenta") verifica el orden exacto de ids de `details.pf-accordion`, confirma que activar el opt-in de Recordatorios sigue revelando `#notifOptions`, y que `#pushSection` sigue pintando contenido (wiring de `renderPushSection()` intacto) sin errores de consola.
 
 ### Origen
 
