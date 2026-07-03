@@ -146,7 +146,7 @@
   .ring-n{font-family:var(--font-display);font-weight:800;font-size:26px;line-height:1;letter-spacing:-.02em}
   .ring-l{font-size:11px;color:var(--muted);margin-top:3px}
   .hero-macros{flex:1;display:flex;flex-direction:column;gap:13px;min-width:0}
-  .mm-top{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+  .mm-top{display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 8px;font-size:12px;margin-bottom:5px}
   .mm-top .mm-lab{color:var(--txt);font-weight:500}
   .mm-top .mm-num{color:var(--muted2);font-family:var(--font-mono)}
   .kcal-line{margin-top:16px}
@@ -157,9 +157,16 @@
   .mini-macro-main b{font-family:var(--font-display);font-size:20px;color:var(--txt);letter-spacing:0}
   .mini-macro-pill{flex:0 0 auto;border:1px solid var(--border);border-radius:999px;padding:4px 8px;font-size:11px;color:var(--muted2);white-space:nowrap}
   .mini-macro-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:9px}
-  .mini-macro-label{display:flex;justify-content:space-between;gap:6px;font-size:10px;color:var(--muted2);margin-bottom:4px}
-  .mini-macro-label b{color:var(--txt);font-weight:700}
+  .mini-macro-grid>[role="button"]{cursor:pointer;border-radius:var(--r-sm,6px)}
+  .mini-macro-grid>[role="button"]:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+  .mini-macro-label{display:flex;flex-direction:column;align-items:flex-start;gap:2px;font-size:10px;color:var(--muted2);margin-bottom:4px}
+  .mini-macro-label span{white-space:nowrap}
+  .mini-macro-label b{color:var(--txt);font-weight:700;font-size:11px}
   .mini-macro-dash .bar{height:6px}
+  .mm[role="button"]{cursor:pointer}
+  .mm[role="button"]:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;border-radius:6px}
+  .ring[role="button"]{cursor:pointer}
+  .ring[role="button"]:focus-visible{outline:2px solid var(--accent2);outline-offset:3px;border-radius:999px}
 
   /* Screen header (eyebrow + título grande + chip de ícono) */
   .shead{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
@@ -3113,11 +3120,25 @@ function ring(pct,centerHtml,opt){
   </div>`;
 }
 // Medidor de macro (etiqueta + valor/meta + barra). fillClass: clase .fill-*
-function macroMeter(label,v,g,fillClass){
-  return `<div class="mm">
+// key (opcional): si se pasa, el medidor es tocable y abre la explicación del macro (ver MACRO_INFO).
+function macroMeter(label,v,g,fillClass,key){
+  const tapAttrs=key?` role="button" tabindex="0" aria-haspopup="dialog" onclick="showMacroInfo('${key}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMacroInfo('${key}')}"`:"";
+  return `<div class="mm"${tapAttrs}>
     <div class="mm-top"><span class="mm-lab">${label}</span><span class="mm-num">${v}/${g} g</span></div>
     <div class="bar"><i class="${fillClass}" style="width:${pctW(v,g)}%"></i></div>
   </div>`;
+}
+// Explicaciones cortas de cada macro, mostradas al tocar su medidor.
+const MACRO_INFO={
+  kcal:{label:"Calorías",text:"Las calorías representan la energía total de tu alimentación. El balance calórico determina si pierdes, mantienes o ganas peso."},
+  p:{label:"Proteínas",text:"Las proteínas son los bloques de construcción del músculo. Ayudan a reparar tejidos y mantener la masa muscular, especialmente importante en días de entrenamiento."},
+  c:{label:"Carbohidratos",text:"Los carbohidratos son tu fuente principal de energía. Son el combustible preferido del cerebro y los músculos durante el ejercicio."},
+  f:{label:"Grasas",text:"Las grasas son esenciales para la producción de hormonas, absorción de vitaminas y como fuente de energía sostenida. No hay que evitarlas — elegir las grasas correctas marca la diferencia."},
+};
+function showMacroInfo(key){
+  const info=MACRO_INFO[key];
+  if(!info)return;
+  modal(`<h3>${esc(info.label)}</h3><p class="muted small">${esc(info.text)}</p>`);
 }
 // Cabecera de pantalla (eyebrow + título Syne + chip de ícono a la derecha)
 function screenHeader(title,sub,icon){
@@ -3341,8 +3362,9 @@ function dayAlert(day){
   return "";
 }
 // Tarjeta hero: anillo de kcal + medidores de macros
-function miniMacroMeter(label,v,g,fillClass){
-  return `<div>
+function miniMacroMeter(label,v,g,fillClass,key){
+  const tapAttrs=key?` role="button" tabindex="0" aria-haspopup="dialog" onclick="showMacroInfo('${key}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showMacroInfo('${key}')}"`:"";
+  return `<div${tapAttrs}>
     <div class="mini-macro-label"><span>${label}</span><b>${v}/${g}g</b></div>
     <div class="bar"><i class="${fillClass}" style="width:${pctW(v,g)}%"></i></div>
   </div>`;
@@ -3362,9 +3384,9 @@ function miniMacroDash(ds){
     </div>
     <div class="bar"><i class="fill-kcal" style="width:${pctW(t.kcal,target.kcal)}%"></i></div>
     <div class="mini-macro-grid">
-      ${miniMacroMeter("P",t.p,target.p,protColor)}
-      ${miniMacroMeter("C",t.c,target.c,"fill-carb")}
-      ${miniMacroMeter("G",t.f,target.f,"fill-fat")}
+      ${miniMacroMeter("Proteínas",t.p,target.p,protColor,"p")}
+      ${miniMacroMeter("Carbohidratos",t.c,target.c,"fill-carb","c")}
+      ${miniMacroMeter("Grasas",t.f,target.f,"fill-fat","f")}
     </div>
   </div>`;
 }
@@ -3377,13 +3399,15 @@ function heroDash(ds,opts){
   const protColor=paceClass(t.p,target.p,isToday);
   const rem=target.kcal-t.kcal;
   const center=`<div class="ring-n">${rem>0?rem:0}</div><div class="ring-l">kcal restantes</div>`;
+  const kcalRing=ring(target.kcal?t.kcal/target.kcal:0,center,{size:128,stroke:12,color:"var(--accent2)"})
+    .replace('class="ring"','class="ring" role="button" tabindex="0" aria-haspopup="dialog" aria-label="Calorías, toca para más información" onclick="showMacroInfo(\'kcal\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();showMacroInfo(\'kcal\')}"');
   return `<div class="dash">
     <div class="hero">
-      ${ring(target.kcal?t.kcal/target.kcal:0,center,{size:128,stroke:12,color:"var(--accent2)"})}
+      ${kcalRing}
       <div class="hero-macros">
-        ${macroMeter("Proteína",t.p,target.p,protColor)}
-        ${macroMeter("Carbos",t.c,target.c,"fill-carb")}
-        ${macroMeter("Grasa",t.f,target.f,"fill-fat")}
+        ${macroMeter("Proteínas",t.p,target.p,protColor,"p")}
+        ${macroMeter("Carbohidratos",t.c,target.c,"fill-carb","c")}
+        ${macroMeter("Grasas",t.f,target.f,"fill-fat","f")}
       </div>
     </div>
     <div class="kcal-line">
