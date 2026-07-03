@@ -30,6 +30,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 
 - `api/claude.js` es proxy serverless: la key nunca llega al navegador. Exige sesion, privacidad vigente, entitlement y reserva idempotente por accion.
 - Las respuestas externas se validan antes de aplicar. Al agotar cuota se reutiliza pool privado compatible o fallback determinista.
+- REQ-117: usuarios sin plan pago tienen `coach_trials` server-side por 7 dias desde onboarding o primer uso premium; usa politicas `trial` en `coach_quota_policies`. Al agotar cambios incluidos, `/api/claude` corta con paywall comercial sin llamar al proveedor; usuarios pagos no quedan limitados por trial. Entrenamiento usa coach premium solo para semana 1 del trial y valida el resto sin llamada externa.
 - REQ-31 es invariante: UI normal no menciona IA, Claude, modelos, prompts, tokens ni cuotas internas. Usar copy de coach/plan/opciones.
 
 ## Nutricion

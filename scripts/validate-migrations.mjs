@@ -20,7 +20,7 @@ const TABLES_REQUIRING_RLS = [
   "day_log", "weight_log", "plan_versions", "plan_cycles",
   "user_consents", "safety_screenings", "profiles",
   "coach_usage", "coach_option_pool", "coach_option_impressions",
-  "coach_generation_parts", "coach_quota_policies", "coach_quota_overrides",
+  "coach_generation_parts", "coach_quota_policies", "coach_quota_overrides", "coach_trials",
   "notification_preferences", "notification_log",
   "billing_events", "user_entitlements", "redemption_codes", "product_events",
   "beta_recruitment_submissions",

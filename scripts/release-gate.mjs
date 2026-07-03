@@ -94,6 +94,7 @@ run("validate-gap-snack.mjs", "node scripts/validate-gap-snack.mjs");
 run("validate-portion-editing.mjs", "node scripts/validate-portion-editing.mjs");
 run("validate-gap-snack-pending.mjs", "node scripts/validate-gap-snack-pending.mjs");
 run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
+run("test-coach-quota.mjs", "node scripts/test-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
 run("validate-password-toggle.mjs", "node scripts/validate-password-toggle.mjs");
 run("validate-onboarding-copy.mjs", "node scripts/validate-onboarding-copy.mjs");

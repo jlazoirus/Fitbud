@@ -207,6 +207,99 @@ await handler({
 assert(res.statusCode === 503, "El error externo debe propagarse sin opcion falsa.");
 assert(failedCalls === 1, "Un fallo tecnico debe devolver la reserva.");
 
+const activeTrial = {
+  user_id: user.id,
+  starts_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+  expires_at: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString(),
+  status: "active",
+  started_reason: "onboarding_completed",
+  days_left: 6,
+};
+
+providerCalls = 0; completedCalls = 0; failedCalls = 0;
+global.fetch = async (url) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.includes("/rest/v1/user_entitlements")) return response(200, []);
+  if (value.endsWith("/rest/v1/rpc/get_or_create_coach_trial")) return response(200, [activeTrial]);
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) {
+    return response(200, [{ usage_id: 13, mode: "fresh", usage_status: "reserved", effective_limit: 2, quota_day: "2026-06-15", policy_enabled: true }]);
+  }
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) { completedCalls += 1; return response(200, [{ stored_result_id: 78 }]); }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) {
+    providerCalls += 1;
+    return response(200, { content: [{ text: optionText }], usage: { input_tokens: 100, output_tokens: 50 } });
+  }
+  throw new Error("Ruta trial fresco no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer token" },
+  body: { ...quotaBody, quota: { ...quotaBody.quota, requestId: "45454545-4545-4545-8545-454545454545" } },
+}, res);
+assert(res.statusCode === 200, "Trial activo debe permitir la primera accion premium.");
+assert(providerCalls === 1 && completedCalls === 1 && failedCalls === 0, "Trial fresco debe llamar proveedor y guardar una vez.");
+
+providerCalls = 0;
+global.fetch = async (url) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.includes("/rest/v1/user_entitlements")) return response(200, []);
+  if (value.endsWith("/rest/v1/rpc/get_or_create_coach_trial")) return response(200, [activeTrial]);
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) {
+    return response(200, [{ usage_id: 14, mode: "reuse", usage_status: "reused", effective_limit: 2, quota_day: "2026-06-15", policy_enabled: true }]);
+  }
+  if (value.includes("api.anthropic.com")) {
+    providerCalls += 1;
+    return response(500, {});
+  }
+  throw new Error("Ruta trial agotado no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer token" },
+  body: { ...quotaBody, quota: { ...quotaBody.quota, requestId: "56565656-5656-4656-8656-565656565656" } },
+}, res);
+assert(res.statusCode === 402 && res.body.trialLimit === true, "Trial agotado debe bloquear con mensaje comercial.");
+assert(providerCalls === 0, "Trial agotado no debe llamar al proveedor.");
+assert(!/IA|Claude|modelo|prompt|token|cuota/i.test(res.body.error || ""), "El mensaje de trial agotado no debe revelar terminos internos.");
+
+providerCalls = 0; completedCalls = 0; failedCalls = 0;
+global.fetch = async (url) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.includes("/rest/v1/user_entitlements")) return response(200, [{ id: "ent-1", status: "active", origin: "checkout" }]);
+  if (value.endsWith("/rest/v1/rpc/get_or_create_coach_trial")) throw new Error("El usuario pago no debe crear trial.");
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) {
+    return response(200, [{ usage_id: 15, mode: "fresh", usage_status: "reserved", effective_limit: 4, quota_day: "2026-06-15", policy_enabled: true }]);
+  }
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) { completedCalls += 1; return response(200, [{ stored_result_id: 79 }]); }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) {
+    providerCalls += 1;
+    return response(200, { content: [{ text: optionText }], usage: { input_tokens: 100, output_tokens: 50 } });
+  }
+  throw new Error("Ruta usuario pago no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer token" },
+  body: { ...quotaBody, quota: { ...quotaBody.quota, requestId: "67676767-6767-4767-8767-676767676767" } },
+}, res);
+assert(res.statusCode === 200, "Usuario pago debe seguir permitido sin limites de trial.");
+assert(providerCalls === 1 && completedCalls === 1 && failedCalls === 0, "Usuario pago debe completar la accion normalmente.");
+
+console.log("Trial premium: primera accion, bloqueo comercial y usuario pago verificados con mocks.");
+
 const adminHandler = await importHandler("api/admin.js");
 global.fetch = async (url, options = {}) => {
   const value = String(url);

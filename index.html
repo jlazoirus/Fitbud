@@ -834,6 +834,7 @@ function coachUnavailable(context){
 }
 function coachErrorMessage(error){
   const message=String(error&&error.message||"").trim();
+  if(error&&error.trialLimit)return message||"Estás en tu semana gratis. Ya usaste tus cambios incluidos; activa un plan para seguir personalizando.";
   if(error&&error.paywall)return "Activa tu plan para continuar.";
   if(typeof isAdmin==="function"&&isAdmin())return message||"No se pudo completar la acción.";
   if(/desactivad/i.test(message))return "Tu cuenta está desactivada.";
@@ -2023,6 +2024,7 @@ function resolveSyncConflict(id,action){
 /* --- entitlement (REQ-25) ------------------------------------------------- */
 let entitlement=null;        // {plan_id,status,starts_at,expires_at,origin} o null
 let entitlementExpired=null; // último vencido para mostrar en UI
+let premiumTrial=null;       // {status,starts_at,expires_at,days_left} o null
 let entitlementChecked=false;// true cuando /api/entitlement respondió con éxito
 let billingHistory=[];       // proyección segura de billing_events para el usuario actual
 let billingHistoryChecked=false;
@@ -2046,6 +2048,7 @@ async function loadEntitlement(){
     }
     entitlement=rawEnt;
     entitlementExpired=(data&&data.expired)||null;
+    premiumTrial=(data&&data.trial)||null;
     entitlementChecked=true;
   }catch(_){} // error de red → permisivo (no bloquear)
 }
@@ -2074,7 +2077,17 @@ function hasEntitlement(){
   if(profile&&profile.is_admin)return true;           // admin siempre pasa
   if(effectiveSettings&&effectiveSettings().apiKey)return true; // dev con key local
   if(!entitlementChecked)return true;                 // setup pendiente → permisivo
-  return entitlement!==null;
+  return entitlement!==null||hasActivePremiumTrial();
+}
+function hasActivePremiumTrial(){
+  if(!premiumTrial||premiumTrial.status!=="active")return false;
+  const exp=new Date(premiumTrial.expires_at).getTime();
+  return Number.isFinite(exp)&&exp>Date.now();
+}
+function premiumTrialDaysLeft(){
+  if(!hasActivePremiumTrial())return 0;
+  const exp=new Date(premiumTrial.expires_at).getTime();
+  return Math.max(1,Math.ceil((exp-Date.now())/86400000));
 }
 function dayState(ds){if(!S.days[ds])S.days[ds]={meals:{},extras:[],workoutDone:false};const d=S.days[ds];if(!d.meals)d.meals={};if(!d.extras)d.extras=[];return d;}
 function mealState(ds,id){const d=dayState(ds);if(!d.meals[id])d.meals[id]={done:false};return d.meals[id];}
@@ -5115,7 +5128,7 @@ function coachApplicationEntitlement(){
   if(profile&&profile.is_admin)return {ok:true};
   if(effectiveSettings&&effectiveSettings().apiKey)return {ok:true};
   if(!entitlementChecked)return {ok:false,reason:"Espera a que se valide tu plan antes de aplicar esta acción."};
-  return entitlement?{ok:true}:{ok:false,reason:"Activa tu plan para aplicar acciones del coach."};
+  return (entitlement||hasActivePremiumTrial())?{ok:true}:{ok:false,reason:"Activa tu plan para aplicar acciones del coach."};
 }
 function canApplyCoachAction(raw){
   const action=normalizeCoachAction(raw);
@@ -6047,7 +6060,9 @@ function showPaywall(context){
   trackEvent("paywall_shown",{context:context||"generic"});
   const plans=activeCatalogPlans();
   const expired=entitlementExpired;
-  const msg=context==="training"
+  const msg=context==="trial_limit"
+    ?"Estás en tu semana gratis y ya usaste tus cambios incluidos. Activa un plan para seguir personalizando tu nutrición y entrenamiento."
+    :context==="training"
     ?"Para acceder a tu plan de entrenamiento personalizado, activa tu suscripción."
     :context==="nutrition"
     ?"Para generar y adaptar tu nutrición personalizada, activa tu suscripción."
@@ -6265,6 +6280,19 @@ function subscriptionStatusHtml(){
     </div>
     <div class="muted small">Válido hasta ${prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ")}${daysLeft<=7?` · <b style="color:var(--bad)">${daysLeft} días restantes</b>`:""}</div>
     ${renewBtn}
+    ${billingHistorySectionHtml()}`;
+  }
+  if(hasActivePremiumTrial()){
+    const expDate=prettyDateTime(premiumTrial.expires_at).split(" ").slice(0,2).join(" ");
+    const daysLeft=premiumTrialDaysLeft();
+    return`<div class="row between" style="margin-bottom:8px">
+      <span><b>Semana gratis</b> <span class="muted small">(plan personalizado)</span></span>
+      <span class="badge b-PESAS">Activa</span>
+    </div>
+    <div class="muted small" style="margin-bottom:12px">Válida hasta ${esc(expDate)} · <b style="color:var(--accent)">${daysLeft} día${daysLeft===1?"":"s"} restante${daysLeft===1?"":"s"}</b></div>
+    <div class="ai-box">Tienes acceso a tu primera semana personalizada y cambios incluidos. Para seguir personalizando después, activa un plan.</div>
+    <button class="btn btn-accent" style="width:100%;margin:10px 0 8px" onclick="showPaywall('profile')">Ver planes disponibles</button>
+    ${couponRedeemSectionHtml()}
     ${billingHistorySectionHtml()}`;
   }
   if(entitlementExpired){
@@ -7243,7 +7271,11 @@ async function coachProxyFetch(payload){
       });
       const data=await res.json().catch(()=>({}));
       if(res.status===409&&attempt===0){await new Promise(resolve=>setTimeout(resolve,350));continue;}
-      if(res.status===402){const err=new Error(data.error||"Activa tu plan para usar esta función.");err.paywall=true;err.expired=!!(data&&data.expired);throw err;}
+      if(res.status===402){
+        const err=new Error(data.error||"Activa tu plan para usar esta función.");
+        err.paywall=true;err.expired=!!(data&&data.expired);err.trialLimit=!!(data&&data.trialLimit);err.trial=(data&&data.trial)||null;
+        throw err;
+      }
       if(res.status===404)throw new Error("El proxy /api/claude no está disponible. Despliega en Vercel o usa una configuración local de desarrollo.");
       if(!res.ok)throw new Error(data.error||("Error "+res.status));
       return data;
@@ -7587,7 +7619,8 @@ async function persistTrainingDraft(plan,prefs,expectedWeeks,warnings){
   if(!check.ok)throw new Error(check.issues[0]||"El plan completo no pasó las validaciones.");
   const prompt=trainingPlanPromptMetadata(prefs,expectedWeeks);
   const draft=await createTrainingPlanDraft(plan,prompt);
-  window._trainingDraft={plan,versionId:draft.id,validFrom:draft.valid_from,prefs,expectedWeeks,warnings:warnings||[],prompt};
+  const trialFirstWeekOnly=!!(window._trainingDraft&&window._trainingDraft.trialFirstWeekOnly);
+  window._trainingDraft={plan,versionId:draft.id,validFrom:draft.valid_from,prefs,expectedWeeks,warnings:warnings||[],prompt,trialFirstWeekOnly};
   return draft;
 }
 function trainingPhaseLabel(phase){
@@ -7603,9 +7636,13 @@ function trainingDraftReviewHtml(){
       <b>${esc(prettyDate(session.date))} · ${esc(session.name)}</b>
       <div class="o-meta">${esc(TRAINING_LOCATION_LABELS[session.location]||session.location)} · ${session.durationMinutes} min · ${esc(session.intensity)}</div>
       <div class="muted small" style="margin-top:4px">${esc(session.objective)} · ${session.exercises.map(item=>esc((exerciseBySlug(item.exerciseId,true)||{}).name||item.exerciseId)).join(" · ")}</div>
-      <button class="btn btn-sm" style="margin-top:8px" onclick="regenerateTrainingDraftSession('${session.date}')">Otra sesión</button>
+      ${draft.trialFirstWeekOnly&&index>0
+        ?`<div class="muted small" style="margin-top:8px">Activa un plan para personalizar esta semana.</div>`
+        :`<button class="btn btn-sm" style="margin-top:8px" onclick="regenerateTrainingDraftSession('${session.date}')">Otra sesión</button>`}
     </div>`).join("")}
-    <button class="btn btn-sm" onclick="regenerateTrainingDraftWeek(${index})">Preparar otra semana ${week.week}</button>
+    ${draft.trialFirstWeekOnly&&index>0
+      ?`<button class="btn btn-sm" onclick="showPaywall('trial_limit')">Personalizar semana ${week.week}</button>`
+      :`<button class="btn btn-sm" onclick="regenerateTrainingDraftWeek(${index})">Preparar otra semana ${week.week}</button>`}
   </details>`).join("");
   const warnings=draft.warnings&&draft.warnings.length
     ?`<div class="ai-box">Se usó la alternativa validada en: ${draft.warnings.map(esc).join(", ")}.</div>`:"";
@@ -7627,7 +7664,8 @@ async function openTrainingPlanGenerator(){
   const expectedWeeks=trainingExpectedWeeks(prefs);
   const missing=expectedWeeks.flatMap(week=>week.sessions.filter(session=>!session.allowedExerciseIds.length));
   if(missing.length){endCoachAction(actionKey);toast("Faltan ejercicios compatibles con tus lugares o recursos");return;}
-  modal(`<h3>Preparar mi plan de entrenamiento</h3><div id="trainingPlanOut"><div class="loading-row"><div class="spinner"></div><span>Preparando tu plan…</span></div></div>`);
+  const trialFirstWeekOnly=hasActivePremiumTrial()&&!entitlement;
+  modal(`<h3>Preparar mi plan de entrenamiento</h3><div id="trainingPlanOut"><div class="loading-row"><div class="spinner"></div><span>${trialFirstWeekOnly?"Preparando tu primera semana personalizada…":"Preparando tu plan…"}</span></div></div>`);
   const weeks=[];const warnings=[];let fallbackOnly=!aiAvailable();
   try{
     for(let index=0;index<expectedWeeks.length;index++){
@@ -7635,6 +7673,12 @@ async function openTrainingPlanGenerator(){
       const out=$("#trainingPlanOut");
       if(out)out.innerHTML=`<div class="loading-row"><div class="spinner"></div><span>Preparando semana ${index+1} de ${expectedWeeks.length}…</span></div>`;
       let result;
+      if(trialFirstWeekOnly&&index>0){
+        result=await generateTrainingWeek(expected,prefs,{fallbackOnly:true});
+        warnings.push(`semana ${expected.week}`);
+        weeks.push(result.week);
+        continue;
+      }
       try{
         result=await generateTrainingWeek(expected,prefs,{
           action:"training_plan",requestId,partKey:`week-${expected.week}`,fallbackOnly,
@@ -7657,6 +7701,7 @@ async function openTrainingPlanGenerator(){
       weeks,
     };
     await persistTrainingDraft(plan,prefs,expectedWeeks,warnings);
+    if(window._trainingDraft)window._trainingDraft.trialFirstWeekOnly=trialFirstWeekOnly;
     $("#trainingPlanOut").innerHTML=trainingDraftReviewHtml();
   }catch(error){
     const out=$("#trainingPlanOut");if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(error))}</div>`;
@@ -7664,6 +7709,7 @@ async function openTrainingPlanGenerator(){
 }
 async function regenerateTrainingDraftWeek(index){
   const draft=window._trainingDraft;if(!draft)return;
+  if(draft.trialFirstWeekOnly&&index>0){showPaywall("trial_limit");return;}
   const expected=draft.expectedWeeks[index];if(!expected)return;
   const actionKey=`training_plan_week_${expected.week}`;
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
@@ -7686,6 +7732,7 @@ async function regenerateTrainingDraftSession(date){
   const draft=window._trainingDraft;if(!draft)return;
   const weekIndex=draft.expectedWeeks.findIndex(week=>week.sessions.some(session=>session.date===date));
   if(weekIndex<0)return;
+  if(draft.trialFirstWeekOnly&&weekIndex>0){showPaywall("trial_limit");return;}
   const expectedWeek=draft.expectedWeeks[weekIndex];
   const expected={...expectedWeek,sessions:expectedWeek.sessions.filter(session=>session.date===date)};
   const actionKey=`training_replacement_${date}`;
@@ -8777,7 +8824,7 @@ let _signOutBusy=false;
 function clearSignedOutState(){
   const prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
   session=null;profile=null;view="hoy";
-  entitlement=null;entitlementExpired=null;entitlementChecked=false;
+  entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
   billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
   refreshPlanCalendar();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;passwordRecoveryError="";passwordRecoveryMode="recovery";
@@ -8830,9 +8877,9 @@ async function onAuth(){
   try{
     await loadProfile();
     await loadPrivacyState();
-    entitlement=null;entitlementExpired=null;entitlementChecked=false;
+    entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
     billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
-    loadEntitlement(); // no-await: no debe bloquear el arranque (REQ-25)
+    loadEntitlement().then(()=>{if(session)render();}); // no-await: no debe bloquear el arranque (REQ-25)
     S.days={};S.weights={};save();   // descarta caché de otra sesión; la DB manda
     if(!isActive()){
       onboardingActive=false;onboardingDraft=null;view="hoy";render();

@@ -37,7 +37,7 @@ async function verifyUser(req, e) {
     const user = await rj(r);
     if (!user || !user.id) return null;
     const pr = await fetch(
-      e.url + "/rest/v1/profiles?id=eq." + encodeURIComponent(user.id) + "&select=active,is_admin",
+      e.url + "/rest/v1/profiles?id=eq." + encodeURIComponent(user.id) + "&select=active,is_admin,prefs",
       { headers: { Authorization: "Bearer " + token, apikey: e.anon } }
     );
     if (!pr.ok) return null;
@@ -141,6 +141,58 @@ function entitlementOut(row) {
   };
 }
 
+function trialOut(row) {
+  if (!row) return null;
+  return {
+    status: String(row.status || ""),
+    starts_at: row.starts_at || null,
+    expires_at: row.expires_at || null,
+    days_left: Math.max(0, Number(row.days_left) || 0),
+  };
+}
+
+function trialStartedAt(auth) {
+  const raw = auth && auth.profile && auth.profile.prefs && auth.profile.prefs.onboardingCompletedAt;
+  const t = raw ? new Date(raw).getTime() : NaN;
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
+async function loadTrial(e, auth) {
+  const startedAt = trialStartedAt(auth);
+  try {
+    if (startedAt) {
+      const r = await fetch(e.url + "/rest/v1/rpc/get_or_create_coach_trial", {
+        method: "POST",
+        headers: svcHeaders(e, { "content-type": "application/json" }),
+        body: JSON.stringify({
+          p_user_id: auth.user.id,
+          p_onboarding_completed_at: startedAt,
+          p_started_reason: "onboarding_completed",
+        }),
+      });
+      const data = await rj(r);
+      if (r.ok) return trialOut(Array.isArray(data) ? data[0] : data);
+      if (r.status === 404) return null;
+    }
+    const r = await fetch(
+      e.url + "/rest/v1/coach_trials?user_id=eq." + encodeURIComponent(auth.user.id)
+        + "&select=status,starts_at,expires_at&limit=1",
+      { headers: svcHeaders(e) }
+    );
+    const rows = await rj(r);
+    if (!r.ok || !Array.isArray(rows) || !rows[0]) return null;
+    const exp = new Date(rows[0].expires_at).getTime();
+    const active = rows[0].status === "active" && Number.isFinite(exp) && exp > Date.now();
+    return trialOut({
+      ...rows[0],
+      status: active ? "active" : "expired",
+      days_left: active ? Math.ceil((exp - Date.now()) / 86400000) : 0,
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
 function couponError(data) {
   const msg = String((data && (data.message || data.error)) || "");
   const known = [
@@ -200,9 +252,10 @@ export default async function handler(req, res) {
       const ar = await fetch(activeUrl, { headers: svcHeaders(e) });
       const active = await rj(ar);
       if (ar.ok && Array.isArray(active) && active.length) {
-        res.status(200).json({ entitlement: active[0], expired: null, isAdmin: !!auth.profile.is_admin });
+        res.status(200).json({ entitlement: active[0], expired: null, trial: null, isAdmin: !!auth.profile.is_admin });
         return;
       }
+      const trial = await loadTrial(e, auth);
       const expUrl = e.url + "/rest/v1/user_entitlements?user_id=eq." + auth.user.id
         + "&status=in.(active,expired)&order=expires_at.desc&limit=1"
         + "&select=id,plan_id,status,starts_at,expires_at,origin";
@@ -211,6 +264,7 @@ export default async function handler(req, res) {
       res.status(200).json({
         entitlement: null,
         expired: er.ok && Array.isArray(expired) && expired.length ? expired[0] : null,
+        trial,
         isAdmin: !!auth.profile.is_admin,
       });
     } catch (err) {

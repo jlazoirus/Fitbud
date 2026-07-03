@@ -12,6 +12,7 @@ function assert(condition, message) {
 for (const table of [
   "coach_quota_policies",
   "coach_quota_overrides",
+  "coach_trials",
   "coach_usage",
   "coach_option_pool",
   "coach_generation_parts",
@@ -23,6 +24,7 @@ for (const table of [
 
 for (const fn of [
   "reserve_coach_action",
+  "get_or_create_coach_trial",
   "claim_coach_generation_part",
   "complete_fresh_coach_part",
   "fail_coach_generation_part",
@@ -38,6 +40,8 @@ assert(sql.includes("unique (user_id, action, request_id)"), "Falta idempotencia
 assert(sql.includes("origin = 'fresh'") && sql.includes("status in ('reserved','completed')"), "El conteo debe excluir reutilizaciones y devoluciones.");
 assert(sql.includes("prefs->>'timeZone'"), "La ventana diaria debe usar la zona horaria guardada.");
 assert(sql.includes("v_pool_count <= 1 or id is distinct from v_last_result"), "Debe evitar la repetición inmediata cuando hay alternativas.");
+assert(sql.includes("'trial', 1") && sql.includes("v_entitlement := 'trial'"), "El trial debe tener políticas server-side propias.");
+assert(sql.includes("expires_at > now()"), "El trial debe expirar server-side.");
 
 for (const action of [
   "diet_day",

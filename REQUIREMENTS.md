@@ -1513,7 +1513,7 @@ Ofrecer planes más seguros y sostenibles sin imponerlos: sugerencia suave desde
 
 ## REQ-117 - Trial premium: primera semana con plan personalizado y cuotas limitadas
 
-**Estado: pendiente.**
+**Estado: implementado.** Trial server-side en `coach_trials` (una fila por usuario, 7 días desde `onboardingCompletedAt` o primer uso premium), políticas `trial` en `coach_quota_policies`, y `reserve_coach_action` selecciona `entitlement_code='trial'` cuando aplica. `/api/claude` permite el trial sin plan pago, bloquea nuevas acciones costosas al agotar cambios incluidos con copy comercial sin términos internos y no llama al proveedor en ese caso; los usuarios con plan pago siguen por el camino premium normal. `/api/entitlement` expone `trial` para la UI, Perfil muestra "Semana gratis" y los gates del cliente aceptan trial activo. En entrenamiento, el trial usa coach premium solo para la semana 1 y completa semanas posteriores con alternativa validada sin llamada externa; personalizarlas abre conversión. Verificado con `scripts/test-coach-quota.mjs` (trial permitido, agotado bloqueado, pago permitido), `scripts/validate-coach-quota.mjs` y `scripts/validate-training-plan-wiring.mjs`.
 
 ### Origen
 

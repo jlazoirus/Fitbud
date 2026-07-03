@@ -12,6 +12,7 @@ const COACH_ACTIONS = new Set([
   "macro_review",
   "training_plan",
   "training_replacement",
+  "coach_conversation",
 ]);
 
 function env() {

@@ -128,4 +128,19 @@ for (const duration of [4, 10]) {
   });
 }
 
+const openGeneratorSrc = extractFunctionSource(html, "openTrainingPlanGenerator");
+assert.ok(
+  openGeneratorSrc.includes("trialFirstWeekOnly=hasActivePremiumTrial()&&!entitlement"),
+  "El generador debe detectar trial activo sin plan pago."
+);
+assert.ok(
+  openGeneratorSrc.includes("trialFirstWeekOnly&&index>0") && openGeneratorSrc.includes("fallbackOnly:true"),
+  "Durante trial, solo la primera semana debe usar generación premium; las posteriores van por alternativa validada."
+);
+const reviewHtmlSrc = extractFunctionSource(html, "trainingDraftReviewHtml");
+assert.ok(
+  reviewHtmlSrc.includes("draft.trialFirstWeekOnly&&index>0") && reviewHtmlSrc.includes("showPaywall('trial_limit')"),
+  "Las semanas posteriores del trial deben bloquear personalización premium con paywall comercial."
+);
+
 console.log("Wiring real de index.html → training-plan.js: numeración y fase de semanas validadas (4 y 10 semanas).");

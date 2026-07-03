@@ -140,24 +140,72 @@ async function verifyPrivacyAccess(auth) {
 
 async function verifyEntitlement(auth, e) {
   if (auth.profile.is_admin) return { ok: true };
+  const paid = await activePaidEntitlement(auth, e);
+  if (paid.ok) return paid;
+  const trial = await verifyTrialAccess(auth, e);
+  if (trial.ok) return trial;
+  return { ok: false, expired: true, trialExpired: !!trial.expired };
+}
+
+async function activePaidEntitlement(auth, e) {
   try {
     const now = new Date().toISOString();
     const r = await fetch(
       e.url + "/rest/v1/user_entitlements?user_id=eq." + auth.user.id
-        + "&status=in.(active,courtesy)&expires_at=gt." + now + "&limit=1&select=id,status",
+        + "&status=in.(active,courtesy)&expires_at=gt." + now + "&limit=1&select=id,status,origin",
       { headers: serviceHeaders(e) }
     );
     if (!r.ok) {
       // Tabla inexistente (setup pendiente) → no bloquear
-      if (r.status === 404) return { ok: true };
-      return { ok: false, expired: true };
+      if (r.status === 404) return { ok: true, access: "setup" };
+      return { ok: false };
     }
     const rows = await r.json().catch(() => []);
-    if (Array.isArray(rows) && rows.length) return { ok: true };
-    return { ok: false, expired: true };
+    if (Array.isArray(rows) && rows.length) return { ok: true, access: "paid" };
+    return { ok: false };
   } catch (_) {
-    return { ok: true }; // error de red → no bloquear
+    return { ok: true, access: "setup" }; // error de red → no bloquear
   }
+}
+
+function trialStartedAt(auth) {
+  const raw = auth && auth.profile && auth.profile.prefs && auth.profile.prefs.onboardingCompletedAt;
+  const t = raw ? new Date(raw).getTime() : NaN;
+  return Number.isFinite(t) ? new Date(t).toISOString() : null;
+}
+
+function trialOut(row) {
+  return {
+    status: String(row && row.status || ""),
+    starts_at: row && row.starts_at || null,
+    expires_at: row && row.expires_at || null,
+    days_left: Math.max(0, Number(row && row.days_left) || 0),
+  };
+}
+
+function trialActive(row) {
+  const expires = new Date(row && row.expires_at).getTime();
+  return row && row.status === "active" && Number.isFinite(expires) && expires > Date.now();
+}
+
+async function verifyTrialAccess(auth, e) {
+  try {
+    const startedAt = trialStartedAt(auth);
+    const row = firstRow(await rpc(e, "get_or_create_coach_trial", {
+      p_user_id: auth.user.id,
+      p_onboarding_completed_at: startedAt,
+      p_started_reason: startedAt ? "onboarding_completed" : "first_premium_action",
+    }));
+    if (trialActive(row)) return { ok: true, access: "trial", trial: trialOut(row) };
+    return { ok: false, expired: true, trial: trialOut(row) };
+  } catch (error) {
+    const setup = error.status === 404 || /get_or_create_coach_trial|schema cache|function/i.test(error.message || "");
+    return { ok: false, expired: !setup, setup };
+  }
+}
+
+function trialLimitMessage() {
+  return "Estás en tu semana gratis. Ya usaste tus cambios incluidos; activa un plan para seguir personalizando.";
 }
 
 function bodyObject(req) {
@@ -610,6 +658,15 @@ export default async function handler(req, res) {
   }
   if (reservation.mode === "refunded") {
     res.status(409).json({ error: "Esta solicitud ya fue devuelta. Intenta la accion nuevamente." });
+    return;
+  }
+  if (entitlement.access === "trial" && reservation.mode === "reuse") {
+    res.status(402).json({
+      error: trialLimitMessage(),
+      paywall: true,
+      trialLimit: true,
+      trial: entitlement.trial || null,
+    });
     return;
   }
 

@@ -37,6 +37,18 @@ values
   ('coach_conversation', 'default', 20)
 on conflict (action, entitlement_code) do nothing;
 
+insert into coach_quota_policies (action, entitlement_code, daily_limit)
+values
+  ('diet_day', 'trial', 1),
+  ('diet_week', 'trial', 1),
+  ('meal_option', 'trial', 2),
+  ('meal_estimate', 'trial', 3),
+  ('macro_review', 'trial', 1),
+  ('training_plan', 'trial', 1),
+  ('training_replacement', 'trial', 1),
+  ('coach_conversation', 'trial', 3)
+on conflict (action, entitlement_code) do nothing;
+
 create table if not exists coach_quota_overrides (
   user_id            uuid not null references auth.users(id) on delete cascade,
   action             text not null check (action in (
@@ -58,6 +70,16 @@ create table if not exists coach_quota_overrides (
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now(),
   primary key (user_id, action)
+);
+
+create table if not exists coach_trials (
+  user_id         uuid primary key references auth.users(id) on delete cascade,
+  starts_at       timestamptz not null,
+  expires_at      timestamptz not null,
+  status          text not null default 'active' check (status in ('active','expired')),
+  started_reason  text not null default 'first_premium_action' check (started_reason in ('onboarding_completed','first_premium_action')),
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
 );
 
 create table if not exists coach_usage (
@@ -143,6 +165,7 @@ create index if not exists coach_option_impressions_pick_idx
 
 alter table coach_quota_policies enable row level security;
 alter table coach_quota_overrides enable row level security;
+alter table coach_trials enable row level security;
 alter table coach_usage enable row level security;
 alter table coach_option_pool enable row level security;
 alter table coach_generation_parts enable row level security;
@@ -151,12 +174,14 @@ alter table coach_option_impressions enable row level security;
 -- Estas tablas son exclusivamente server-side. La service role omite RLS.
 revoke all on coach_quota_policies from anon, authenticated;
 revoke all on coach_quota_overrides from anon, authenticated;
+revoke all on coach_trials from anon, authenticated;
 revoke all on coach_usage from anon, authenticated;
 revoke all on coach_option_pool from anon, authenticated;
 revoke all on coach_generation_parts from anon, authenticated;
 revoke all on coach_option_impressions from anon, authenticated;
 grant all on coach_quota_policies to service_role;
 grant all on coach_quota_overrides to service_role;
+grant all on coach_trials to service_role;
 grant all on coach_usage to service_role;
 grant all on coach_option_pool to service_role;
 grant all on coach_generation_parts to service_role;
@@ -166,6 +191,69 @@ grant usage, select on sequence coach_usage_id_seq to service_role;
 grant usage, select on sequence coach_option_pool_id_seq to service_role;
 grant usage, select on sequence coach_generation_parts_id_seq to service_role;
 grant usage, select on sequence coach_option_impressions_id_seq to service_role;
+
+create or replace function get_or_create_coach_trial(
+  p_user_id uuid,
+  p_onboarding_completed_at timestamptz default null,
+  p_started_reason text default 'first_premium_action'
+)
+returns table (
+  user_id uuid,
+  starts_at timestamptz,
+  expires_at timestamptz,
+  status text,
+  started_reason text,
+  days_left int
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_profile record;
+  v_start timestamptz;
+  v_reason text;
+  v_trial coach_trials%rowtype;
+begin
+  select active into v_profile
+  from profiles
+  where id = p_user_id;
+
+  if not found or v_profile.active is false then
+    raise exception 'inactive_user';
+  end if;
+
+  v_start := coalesce(p_onboarding_completed_at, now());
+  if v_start > now() then
+    v_start := now();
+  end if;
+  v_reason := case
+    when p_started_reason in ('onboarding_completed','first_premium_action') then p_started_reason
+    else 'first_premium_action'
+  end;
+
+  insert into coach_trials (user_id, starts_at, expires_at, status, started_reason)
+  values (
+    p_user_id,
+    v_start,
+    v_start + interval '7 days',
+    case when v_start + interval '7 days' > now() then 'active' else 'expired' end,
+    v_reason
+  )
+  on conflict (user_id) do update set
+    status = case when coach_trials.expires_at > now() then 'active' else 'expired' end,
+    updated_at = now()
+  returning * into v_trial;
+
+  return query select
+    v_trial.user_id,
+    v_trial.starts_at,
+    v_trial.expires_at,
+    v_trial.status,
+    v_trial.started_reason,
+    greatest(0, ceil(extract(epoch from (v_trial.expires_at - now())) / 86400.0)::int);
+end;
+$$;
 
 create or replace function reserve_coach_action(
   p_user_id uuid,
@@ -189,6 +277,7 @@ declare
   v_profile record;
   v_override coach_quota_overrides%rowtype;
   v_policy coach_quota_policies%rowtype;
+  v_trial coach_trials%rowtype;
   v_timezone text := 'UTC';
   v_entitlement text := 'default';
   v_limit int := 0;
@@ -210,6 +299,16 @@ begin
     v_timezone := 'UTC';
   end if;
   v_quota_day := (now() at time zone v_timezone)::date;
+
+  select * into v_trial
+  from coach_trials
+  where user_id = p_user_id
+    and status = 'active'
+    and expires_at > now();
+
+  if found then
+    v_entitlement := 'trial';
+  end if;
 
   select * into v_override
   from coach_quota_overrides
@@ -634,8 +733,10 @@ revoke all on function complete_fresh_coach_part(bigint,text,text,text,jsonb,int
 revoke all on function fail_coach_generation_part(bigint,text,text,boolean,int,int) from public, anon, authenticated;
 revoke all on function select_reusable_coach_part(bigint,text,text,text,jsonb) from public, anon, authenticated;
 revoke all on function admin_reset_coach_quota(uuid,text) from public, anon, authenticated;
+revoke all on function get_or_create_coach_trial(uuid,timestamptz,text) from public, anon, authenticated;
 
 grant execute on function reserve_coach_action(uuid,text,uuid) to service_role;
+grant execute on function get_or_create_coach_trial(uuid,timestamptz,text) to service_role;
 grant execute on function claim_coach_generation_part(bigint,text) to service_role;
 grant execute on function complete_fresh_coach_part(bigint,text,text,text,jsonb,int,int) to service_role;
 grant execute on function fail_coach_generation_part(bigint,text,text,boolean,int,int) to service_role;
@@ -644,6 +745,8 @@ grant execute on function admin_reset_coach_quota(uuid,text) to service_role;
 
 comment on table coach_quota_policies is
   'Politicas configurables por accion y entitlement; nunca se exponen al usuario normal.';
+comment on table coach_trials is
+  'Estado server-side de la primera semana gratis; una fila por usuario, sin reinicio por navegador.';
 comment on table coach_usage is
   'Reserva idempotente por click intencional, con consumo fresco o reutilizado y ventana por zona horaria.';
 comment on table coach_option_pool is
