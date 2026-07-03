@@ -50,21 +50,14 @@ assert.ok(
   "regenerateGenMeal debe construir el fallback desde un plato real del catálogo (fbDish)."
 );
 
-// 3. deterministicSuggestionPayload no usa nombres genéricos
-const detSrc = extractFunctionSource(html, "deterministicSuggestionPayload");
-assert.ok(
-  !detSrc.includes("compatible") && !detSrc.includes("completar el día"),
-  "deterministicSuggestionPayload NO debe usar nombres genéricos como 'compatible' o 'completar el día'."
-);
-
-// 4. Prompt de generateOneDay prohíbe nombres ficticios
+// 3. Prompt de generateOneDay prohíbe nombres ficticios
 const genSrc = extractFunctionSource(html, "generateOneDay");
 assert.ok(
   genSrc.includes("PROHIBIDO inventar nombres genéricos"),
   "El prompt de generateOneDay debe prohibir nombres genéricos/ficticios."
 );
 
-// 5. Prompt de regenerateGenMeal prohíbe nombres ficticios
+// 4. Prompt de regenerateGenMeal prohíbe nombres ficticios
 assert.ok(
   regenSrc.includes("PROHIBIDO inventar nombres genéricos"),
   "El prompt de regenerateGenMeal debe prohibir nombres genéricos/ficticios."

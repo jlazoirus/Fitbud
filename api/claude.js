@@ -252,9 +252,15 @@ function validateMealOptions(data, validation) {
   const options = data && Array.isArray(data.opciones) ? data.opciones : [];
   if (!options.length || options.length > 5) return false;
   const maxKcal = Number(validation.maxKcal) || 0;
+  const allowedNames = new Set(
+    (Array.isArray(validation.allowedNames) ? validation.allowedNames : [])
+      .map((name) => String(name || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
   return options.every((option) => {
     const name = String((option && (option.nombre || option.name)) || "");
     return !!name
+      && (!allowedNames.size || allowedNames.has(name.trim().toLowerCase()))
       && !containsRestriction(name, validation)
       && [option.kcal, option.proteina_g, option.carbohidratos_g, option.grasa_g].every(finiteNumber)
       && (!maxKcal || Number(option.kcal) <= maxKcal * 1.15);

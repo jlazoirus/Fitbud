@@ -293,6 +293,7 @@
     border-top:1px solid var(--border);display:flex;justify-content:space-between;
     padding:10px max(10px,var(--safe-right)) max(12px,var(--safe-bottom)) max(10px,var(--safe-left));
     z-index:50;
+    transform:translateZ(0);-webkit-transform:translateZ(0);
   }
   .tabs:empty{display:none}
   .tabs button{flex:1;background:transparent;border:none;color:var(--muted);padding:2px 0;font-size:10px;font-weight:500;display:flex;flex-direction:column;align-items:center;gap:5px;border-radius:0;transition:.15s}
@@ -3035,6 +3036,7 @@ function screenHeader(title,sub,icon){
 let authReady=false;   // true cuando ya resolvimos la sesión de Supabase
 let passwordRecovery=false;
 let passwordRecoveryError="";
+let passwordRecoveryMode="recovery";
 function render(){
   updateInstallPrompt();
   $("#app").classList.toggle("landing-host", !!(authReady&&!session&&!window._showAuth));
@@ -3684,7 +3686,7 @@ function renderNutrition(){
     </div></div>
     <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
   </section>`:"";
-  // Acciones secundarias (preparar semana, otra opción, revisar macros) van al menú "···" (REQ-100).
+  // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
   const moreBtn=`<div class="row" style="justify-content:flex-end;margin:0 0 6px">
     <button class="btn btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
   </div>`;
@@ -3700,7 +3702,7 @@ function renderNutrition(){
     st.extras.length?`${st.extras.length}`:"")}
   `;
 }
-// Menú de acciones secundarias de Nutrición: agrupa lo que antes eran 3-4 botones sin jerarquía (REQ-100).
+// Menú de acciones secundarias de Nutrición: solo acciones globales, no reemplazos de comidas.
 function openNutritionMoreMenu(){
   const ds=current;
   const day=buildDay(ds);
@@ -6239,8 +6241,12 @@ function authRedirectParams(){
   return params;
 }
 function isPasswordRecoveryRedirect(){
+  return !!passwordRedirectMode();
+}
+function passwordRedirectMode(){
   const params=authRedirectParams();
-  return params.get("auth")==="recovery"||params.get("type")==="recovery";
+  const mode=params.get("auth")||params.get("type")||"";
+  return mode==="recovery"||mode==="invite"?mode:"";
 }
 function passwordRecoveryRedirectError(){
   const params=authRedirectParams();
@@ -6281,24 +6287,26 @@ async function requestOwnPasswordReset(){
 }
 function renderPasswordRecovery(){
   if(!session){
-    const msg=passwordRecoveryError||"El enlace de recuperación ya expiró o no se pudo validar. Pide uno nuevo desde el inicio de sesión.";
+    const invite=passwordRecoveryMode==="invite";
+    const msg=passwordRecoveryError||(invite?"El enlace de invitación ya expiró o no se pudo validar. Pide una nueva invitación.":"El enlace de recuperación ya expiró o no se pudo validar. Pide uno nuevo desde el inicio de sesión.");
     $("#app").innerHTML=`<div class="auth">
       <div class="auth-brand">Fitbros</div>
       <div class="dash">
         <h3>No pudimos abrir el enlace</h3>
         <p class="muted small">${esc(msg)}</p>
-        <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="passwordRecovery=false;passwordRecoveryError='';window._showAuth=true;window._authMode='in';render()">Volver a iniciar sesión</button>
+        <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="passwordRecovery=false;passwordRecoveryError='';passwordRecoveryMode='recovery';window._showAuth=true;window._authMode='in';render()">Volver a iniciar sesión</button>
       </div>
     </div>`;
     return;
   }
+  const invite=passwordRecoveryMode==="invite";
   $("#app").innerHTML=`<div class="auth">
     <div class="auth-brand">Fitbros</div>
-    <div class="muted small center" style="margin-bottom:20px">Define una nueva contraseña para tu cuenta.</div>
+    <div class="muted small center" style="margin-bottom:20px">${invite?"Crea tu contraseña para activar la cuenta.":"Define una nueva contraseña para tu cuenta."}</div>
     <div class="dash">
       <div class="field"><label>Nueva contraseña</label><input id="recovery_pwd" type="password" autocomplete="new-password" minlength="8"></div>
       <div class="field"><label>Confirmar contraseña</label><input id="recovery_confirm" type="password" autocomplete="new-password" minlength="8"></div>
-      <button class="btn btn-accent" style="width:100%" onclick="finishPasswordRecovery()">Actualizar contraseña</button>
+      <button class="btn btn-accent" style="width:100%" onclick="finishPasswordRecovery()">${invite?"Activar cuenta":"Actualizar contraseña"}</button>
       <div id="recoveryOut" class="muted small" style="margin-top:10px"></div>
     </div>
   </div>`;
@@ -6311,11 +6319,13 @@ async function finishPasswordRecovery(){
   const result=await supa.auth.updateUser({password:pwd});
   if(result.error){out.textContent="⚠️ "+result.error.message;return;}
   if(history&&history.replaceState)history.replaceState({},document.title,location.pathname);
+  const invite=passwordRecoveryMode==="invite";
   passwordRecovery=false;
   passwordRecoveryError="";
+  passwordRecoveryMode="recovery";
   await signOutUser();
   window._authMode="in";
-  toast("Contraseña actualizada. Inicia sesión nuevamente.");
+  toast(invite?"Cuenta activada. Inicia sesión nuevamente.":"Contraseña actualizada. Inicia sesión nuevamente.");
 }
 
 /* ============================================================
@@ -6435,13 +6445,53 @@ function openMealContingency(ds,id){
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cancelar</button>`);
 }
 /* ---- Cambiar comida: accion unificada (REQ-36) ---- */
-function openChangeMeal(ds,id){
-  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
+const MEAL_OPTION_REROLL_DAILY_LIMIT=4;
+const MEAL_OPTION_REROLL_KEY="fitbud_meal_option_rerolls_v1";
+function mealOptionRerollStore(){
+  try{return JSON.parse(localStorage.getItem(MEAL_OPTION_REROLL_KEY)||"{}")||{};}catch(_){return{};}
+}
+function saveMealOptionRerollStore(store){
+  try{localStorage.setItem(MEAL_OPTION_REROLL_KEY,JSON.stringify(store||{}));}catch(_){}
+}
+function mealOptionRerollBucket(){
+  return `${uid()||"local"}:${todayStr()}`;
+}
+function mealOptionRerollUsed(){
+  const store=mealOptionRerollStore();
+  return Math.max(0,Number(store[mealOptionRerollBucket()]||0));
+}
+function mealOptionRerollRemaining(){
+  return Math.max(0,MEAL_OPTION_REROLL_DAILY_LIMIT-mealOptionRerollUsed());
+}
+function consumeMealOptionReroll(){
+  const remaining=mealOptionRerollRemaining();
+  if(remaining<=0)return false;
+  const store=mealOptionRerollStore();
+  const bucket=mealOptionRerollBucket();
+  store[bucket]=mealOptionRerollUsed()+1;
+  saveMealOptionRerollStore(store);
+  return true;
+}
+function changeMealRerollMeta(){
+  return `Quedan ${mealOptionRerollRemaining()} de ${MEAL_OPTION_REROLL_DAILY_LIMIT} hoy`;
+}
+function changeMealRerollControlsHtml(){
+  const disabled=mealOptionRerollRemaining()<=0;
+  return `<div class="row between wrap" style="gap:8px;margin-top:8px">
+    <button id="chg-reroll" class="btn btn-sm" onclick="rerollChangeMealOptions()" ${disabled?"disabled":""}>Rehacer opciones</button>
+    <span id="chg-reroll-meta" class="muted small">${changeMealRerollMeta()}</span>
+  </div>`;
+}
+function updateChangeMealRerollControls(){
+  const button=$("#chg-reroll"),meta=$("#chg-reroll-meta");
+  if(button)button.disabled=mealOptionRerollRemaining()<=0;
+  if(meta)meta.textContent=changeMealRerollMeta();
+}
+function changeMealCandidatePool(ds,id,excludeSlugs,limit){
+  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return{ranked:null,options:[]};
   const ms=mealState(ds,id);const cv=mealValue(base,ms);
-  const options=(DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,id)):[]).map(d=>({name:d.name,dishName:d.name}));
-  // Rankear candidatos con el motor de reemplazos (REQ-83)
+  const excluded=excludeSlugs instanceof Set?excludeSlugs:new Set(excludeSlugs||[]);
   const nd=window.FITBUD_NUTRITION_DOMAIN;
-  let ranked=null;
   if(nd&&nd.rankReplacementCandidates&&DB.loaded){
     const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
     const target=effectiveDayTarget();
@@ -6450,15 +6500,43 @@ function openChangeMeal(ds,id){
     const compatible=DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked);
     if(mealTarget&&compatible.length){
       const candidates=nd.rankReplacementCandidates(cv,compatible,mealTarget.target,DB);
-      // Anotar rebalanceo necesario en cada candidato
+      const ordered=[
+        ...candidates.filter(r=>!excluded.has(r.dish.slug||r.dishSlug||coachKey(r.dish.name))),
+        ...candidates.filter(r=>excluded.has(r.dish.slug||r.dishSlug||coachKey(r.dish.name))),
+      ];
       const st=dayState(ds);
-      ranked=candidates.slice(0,12).map(r=>{
+      return{ranked:ordered.slice(0,limit||12).map(r=>{
         const solv=nd.solveReplacement?nd.solveReplacement(id,r.deltaKcal,day.meals,st):null;
         return{...r,rebalanceNeeded:solv&&solv.rebalanceNeeded,futureMeals:solv&&solv.futureMeals};
-      });
+      }),options:[]};
     }
   }
-  window._changeMeal={ds,id,options,reason:null,ranked};
+  const options=(DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked):[])
+    .sort((a,b)=>{
+      const as=excluded.has(a.slug||coachKey(a.name))?1:0;
+      const bs=excluded.has(b.slug||coachKey(b.name))?1:0;
+      return as-bs||a.name.localeCompare(b.name);
+    })
+    .slice(0,limit||12)
+    .map(d=>({name:d.name,dishName:d.name}));
+  return{ranked:null,options};
+}
+function changeMealCurrentSlugs(cm){
+  const slugs=new Set(cm&&cm.seenSlugs instanceof Set?cm.seenSlugs:[]);
+  (cm&&cm.ranked||[]).forEach(r=>{const slug=r&&r.dish&&(r.dish.slug||coachKey(r.dish.name));if(slug)slugs.add(slug);});
+  (cm&&cm.options||[]).forEach(o=>{const dish=o.dishName?dishByName(o.dishName):null;const slug=dish&&(dish.slug||coachKey(dish.name));if(slug)slugs.add(slug);});
+  return slugs;
+}
+function dishByCandidateName(name,candidates){
+  const exact=dishByName(name);if(exact)return exact;
+  const key=coachKey(name);
+  return (candidates||[]).find(d=>coachKey(d&&d.name)===key)||null;
+}
+function openChangeMeal(ds,id){
+  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
+  const ms=mealState(ds,id);const cv=mealValue(base,ms);
+  const pool=changeMealCandidatePool(ds,id,new Set(),12);
+  window._changeMeal={ds,id,options:pool.options,reason:null,ranked:pool.ranked,seenSlugs:new Set()};
   const optsHtml=_buildChangeMealOpts(cv);
   modal(`<h3>Cambiar — ${esc(base.slot)}</h3>
     <p class="muted small" id="chg-hint">Elige un plato compatible con tus metas.${cv.kcal?` Actual: ${cv.kcal} kcal.`:""}</p>
@@ -6475,6 +6553,7 @@ function openChangeMeal(ds,id){
       <label class="muted small"><input type="radio" name="chgScope" value="week"> Esta semana</label>
     </div>
     <div id="chg-opts">${optsHtml}</div>
+    ${changeMealRerollControlsHtml()}
     <button class="btn btn-accent" style="width:100%;margin-top:6px" onclick="openEditor('meal','${ds}','${id}')">✎ Personalizada / editar valores</button>`);
 }
 function _buildChangeMealOpts(cv){
@@ -6501,6 +6580,69 @@ function _buildChangeMealOpts(cv){
     const meta=m?`${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g${dkStr}`:"";
     return `<button class="opt" onclick="applyChangeMeal(${i})">${esc(o.name)}<div class="o-meta">${meta}</div></button>`;
   }).join("")||'<p class="muted small">No hay platos en la base para este espacio.</p>';
+}
+async function rerollChangeMealOptions(){
+  const cm=window._changeMeal;if(!cm)return;
+  if(mealOptionRerollRemaining()<=0){toast("Ya usaste tus cambios de opciones por hoy");updateChangeMealRerollControls();return;}
+  const button=$("#chg-reroll"),opts=$("#chg-opts");
+  if(button){button.disabled=true;button.textContent="Buscando…";}
+  if(opts)opts.insertAdjacentHTML("afterbegin",`<div class="ai-box" id="chg-reroll-loading">Preparando otras opciones…</div>`);
+  consumeMealOptionReroll();
+  try{
+    const seen=changeMealCurrentSlugs(cm);
+    cm.seenSlugs=seen;
+    const fallbackPool=changeMealCandidatePool(cm.ds,cm.id,seen,12);
+    const fallbackRanked=fallbackPool.ranked||[];
+    const fallbackOptions=fallbackRanked.length
+      ?fallbackRanked.slice(0,4).map(r=>({nombre:r.dish.name,kcal:r.macros.kcal,proteina_g:r.macros.p,carbohidratos_g:r.macros.c,grasa_g:r.macros.f}))
+      :(fallbackPool.options||[]).slice(0,4).map(o=>{const d=o.dishName?dishByName(o.dishName):null;const m=d?dishMacros(d.id):{kcal:0,p:0,c:0,f:0};return{nombre:o.name,kcal:m.kcal,proteina_g:m.p,carbohidratos_g:m.c,grasa_g:m.f};});
+    if(aiAvailable()&&hasEntitlement()&&fallbackOptions.length){
+      const requestId=coachRequestId();
+      const day=buildDay(cm.ds);const base=day.meals.find(m=>m.id===cm.id);
+      const ms=mealState(cm.ds,cm.id);const cur=mealValue(base,ms);
+      const candidates=(fallbackRanked.length?fallbackRanked.map(r=>r.dish):fallbackPool.options.map(o=>dishByName(o.dishName)).filter(Boolean));
+      const allowedNames=[...new Set(candidates.map(d=>d.name).filter(Boolean))];
+      const list=candidates.slice(0,40).map(d=>{const m=dishMacros(d.id);return `${d.name}: ${m.kcal} kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; ");
+      const fallback=JSON.stringify({opciones:fallbackOptions});
+      const maxKcal=Math.max(cur.kcal||0,...candidates.map(d=>dishMacros(d.id).kcal||0),100);
+      const validation=mealOptionValidation(maxKcal,{allowedNames});
+      const quota=coachQuota("meal_option",requestId,"change-"+cm.id,fallback,validation,`change:${cm.ds}:${cm.id}:${hashText([...seen].join("|"))}`);
+      const prompt=`Para reemplazar la comida "${base.slot}" del ${prettyDate(cm.ds)}, elige 4 platos distintos que respeten el perfil y se parezcan a los macros actuales (${cur.kcal||0} kcal, P ${cur.p||0}, C ${cur.c||0}, G ${cur.f||0}).
+Usa SOLO nombres exactos de esta lista de platos candidatos: ${list}.
+Evita repetir los platos ya mostrados. Responde SOLO JSON válido:
+{"opciones":[{"nombre":"Nombre exacto del plato","kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
+      try{
+        const txt=await callClaude(prompt,600,quota);
+        const parsed=parseJSON(txt);
+        const selected=(parsed&&Array.isArray(parsed.opciones)?parsed.opciones:[])
+          .map(o=>dishByCandidateName(o.dishName||o.nombre||o.name,candidates))
+          .filter(Boolean);
+        if(selected.length){
+          const selectedSlugs=new Set(selected.map(d=>d.slug||coachKey(d.name)));
+          const selectedPool=changeMealCandidatePool(cm.ds,cm.id,new Set([...seen].filter(slug=>!selectedSlugs.has(slug))),40);
+          if(selectedPool.ranked&&selectedPool.ranked.length){
+            const mapped=selected.map(d=>selectedPool.ranked.find(r=>String(r.dish.id)===String(d.id))).filter(Boolean);
+            if(mapped.length){cm.ranked=mapped;cm.options=[];}
+            else{cm.ranked=fallbackPool.ranked;cm.options=fallbackPool.options;}
+          }else{
+            cm.ranked=null;
+            cm.options=selected.map(d=>({name:d.name,dishName:d.name}));
+          }
+        }else{
+          cm.ranked=fallbackPool.ranked;cm.options=fallbackPool.options;
+        }
+      }catch(_){
+        cm.ranked=fallbackPool.ranked;cm.options=fallbackPool.options;
+      }
+    }else{
+      cm.ranked=fallbackPool.ranked;cm.options=fallbackPool.options;
+    }
+    const out=$("#chg-opts");if(out)out.innerHTML=_buildChangeMealOpts();
+  }finally{
+    const loading=$("#chg-reroll-loading");if(loading)loading.remove();
+    if(button)button.textContent="Rehacer opciones";
+    updateChangeMealRerollControls();
+  }
 }
 function toggleMotivoChip(reason){
   const cm=window._changeMeal;if(!cm)return;
@@ -6727,10 +6869,8 @@ function coachHardRestrictions(){
   const diet=Array.isArray(p.diet)?p.diet:[];
   if(diet.includes("sin_huevo")||diet.includes("vegano"))terms.push("huevo","clara de huevo","yema");
   // Vegano: además del huevo, excluir lácteos de origen animal. REQ-65. Términos elegidos para
-  // NO bloquear "leche vegetal"/"leche de coco" (aptas) ni "mantequilla de maní" (el matcher es
-  // substring, sin límites de palabra; ver nota en REQUIREMENTS REQ-65). La carne/pescado se
-  // dirige por prompt (no por término) porque "pollo" colisionaría con "repollo".
-  if(diet.includes("vegano"))terms.push("queso","yogur","yogurt","parmesano","leche evaporada","lácteo","lacteo");
+  // NO bloquear "leche vegetal"/"leche de coco" (aptas) ni "mantequilla de maní".
+  if(diet.includes("vegano"))terms.push("queso","yogur","yogurt","parmesano","leche evaporada","lácteo","lacteo","miel");
   // Vegetariano/vegano: excluir carne, aves y pescado. Ya seguro con el matcher por palabra (REQ-66):
   // "pollo" no colisiona con "repollo" ni "res" con "fresco".
   if(diet.includes("vegetariano")||diet.includes("vegano"))terms.push("carne","pollo","pavo","cerdo","ternera","res","jamón","chorizo","tocino","pescado","atún","salmón","trucha","merluza","gamba","langostino","camarón","marisco","calamar","pulpo","anchoa","sardina");
@@ -6738,7 +6878,7 @@ function coachHardRestrictions(){
 }
 // REQ-86: bump COACH_PROMPT_VERSION cada vez que cambia la lógica del prompt
 // para invalidar resultados reutilizables generados con prompts anteriores.
-const COACH_PROMPT_VERSION=3;
+const COACH_PROMPT_VERSION=4;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -6867,19 +7007,6 @@ function deterministicDayPayload(ds){
     comidas:[],
   };
 }
-function deterministicSuggestionPayload(remK,remP){
-  const budget=Math.max(100,Number(remK)||0);
-  const protein=Math.max(10,Math.min(Number(remP)||10,Math.round(budget/8)));
-  const names=["Bowl de quinua con tofu","Avena proteica con frutos","Ensalada de garbanzos y queso"];
-  return {opciones:names.map((nombre,index)=>{
-    const factor=[.9,.72,.55][index];
-    const kcal=Math.max(80,Math.round(budget*factor));
-    const p=Math.max(10,Math.round(protein*factor));
-    const f=Math.max(4,Math.round(kcal*.25/9));
-    const c=Math.max(5,Math.round((kcal-p*4-f*9)/4));
-    return {nombre,kcal,proteina_g:p,carbohidratos_g:c,grasa_g:f};
-  })};
-}
 // Agrega ingredientes de todos los días generados y devuelve la lista ordenada por gramos.
 function buildShoppingList(daysData){
   const totals=new Map();
@@ -6901,17 +7028,18 @@ function dietQuotaValidation(ds){
     expectedMeals:day.meals.length,
     slots:day.meals.map(meal=>meal.id),
     target:effectiveDayTarget(),
-    hardRestrictions:coachHardRestrictions(),
+    hardRestrictions:coachFoodBlockTerms(false),
   };
 }
-function mealOptionValidation(remK){
-  return {hardRestrictions:coachHardRestrictions(),maxKcal:Math.max(100,Number(remK)||0)};
+function mealOptionValidation(remK,extra){
+  return Object.assign({hardRestrictions:coachFoodBlockTerms(false),maxKcal:Math.max(100,Number(remK)||0)},extra||{});
 }
 function validMealSuggestions(value){
+  const hardTerms=coachFoodBlockTerms(false);
   return !!(value&&Array.isArray(value.opciones)&&value.opciones.length&&value.opciones.every(option=>
     String(option&&option.nombre||"").trim()
     &&[option.kcal,option.proteina_g,option.carbohidratos_g,option.grasa_g].every(n=>Number.isFinite(Number(n)))
-    &&!coachHardRestrictions().some(term=>String(option.nombre||"").toLowerCase().includes(term))
+    &&!coachTextHasTerms(String(option.nombre||""),hardTerms)
   ));
 }
 
@@ -7295,10 +7423,13 @@ function validateGeneratedDay(j,day,target){
   if(!j||!Array.isArray(j.comidas)||!j.comidas.length){return{ok:false,issues:["La respuesta no trae comidas."]};}
   const slotIds=day.meals.map(m=>m.id);
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const noEgg=Array.isArray(prefs.diet)&&(prefs.diet.includes("sin_huevo")||prefs.diet.includes("vegano"));
   const recent=recentMealNames(day.ds,5).map(s=>s.toLowerCase());
   const knownIng=new Set((DB.ingredients||[]).map(i=>i.name.toLowerCase()));
   const ndCoach=window.FITBUD_NUTRITION_DOMAIN;
+  const hardTerms=coachFoodBlockTerms(false);
+  const profileConflict=text=>ndCoach&&ndCoach.foodTextConflictForProfile
+    ?ndCoach.foodTextConflictForProfile(text,prefs,{includeSoft:false})
+    :coachTextHasTerms(text,hardTerms);
   let tot={kcal:0,p:0,c:0,f:0}; const comidas=[];
   j.comidas.forEach((c,idx)=>{
     const slot_id=c.slot_id||c.slot||slotIds[idx]||("slot"+idx);
@@ -7321,10 +7452,10 @@ function validateGeneratedDay(j,day,target){
       macro={kcal:+c.kcal||0,p:+c.proteina_g||+c.p||0,c:+c.carbohidratos_g||+c.c||0,f:+c.grasa_g||+c.f||0};
     }
     tot.kcal+=macro.kcal;tot.p+=macro.p;tot.c+=macro.c;tot.f+=macro.f;
-    // huevo / restricción
+    // Restricciones duras del perfil: patrón alimentario, alergias, sin lácteos y sin gluten.
     const hay=(nombre+" "+ings.map(g=>g.nombre).join(" ")).toLowerCase();
-    if(noEgg&&/\bhuevo|clara de huevo|yema\b/.test(hay))issues.push(`"${nombre}" contiene huevo (restricción del perfil).`);
-    if(prefs.allergies){prefs.allergies.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(Boolean).forEach(a=>{if(hay.includes(a))issues.push(`"${nombre}" incluye "${a}" (restricción obligatoria).`);});}
+    const conflict=profileConflict(hay);
+    if(conflict)issues.push(`"${nombre}" incluye "${conflict}" (restricción obligatoria).`);
     if(prefs.dislikedIngredients){prefs.dislikedIngredients.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(Boolean).forEach(a=>{if(hay.includes(a))warns.push(`"${nombre}" incluye "${a}", que marcaste como no preferido.`);});}
     // ingredientes nuevos: solo cuando el catálogo no está disponible para recalcular
     if(!(ndCoach&&ndCoach.recalcCoachMealMacros&&DB.loaded)){
@@ -7383,7 +7514,7 @@ async function generateOneDay(ds,coachRequest){
   const mainMealIdx=Math.min(Math.max(1,prefs.mainMealIndex||2),day.meals.length)-1;
   const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
   const slots=day.meals.map((m,i)=>`${m.id} (${m.slot}${m.time?", ~"+m.time:""}${i===mainMealIdx?" [comida principal]":""})`).join(", ");
-  const hardRes=coachHardRestrictions();
+  const hardRes=coachFoodBlockTerms(false);
   // Excluir de la referencia los platos incompatibles con el perfil (duras + suaves: sin_lacteos,
   // sin_gluten, dislikedIngredients). validateGeneratedDay no valida las suaves, así que el filtro
   // de la lista de referencia es la única barrera para no sugerirlas. REQ-61.
@@ -7718,6 +7849,11 @@ async function regenerateGenMeal(slotId){
   const draft=window._genDay;if(!draft)return;
   const actionKey="diet_meal_"+slotId;
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
+  if(!consumeMealOptionReroll()){
+    endCoachAction(actionKey);
+    toast("Ya usaste tus cambios de opciones por hoy");
+    return;
+  }
   const day=buildDay(draft.ds);const target=effectiveDayTarget();
   const slot=day.meals.find(m=>m.id===slotId);if(!slot){endCoachAction(actionKey);return;}
   const others=draft.comidas.filter(c=>c.slot_id!==slotId);
@@ -7745,7 +7881,8 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     const fbIngs=fbDish?DB.dishIng.filter(di=>di.dish_id===fbDish.id).map(di=>{const ing=(DB.ingredients||[]).find(i=>i.id===di.ingredient_id);return{nombre:ing?ing.name:"Ingrediente",gramos:di.grams};}):[];
     const fallbackMeal=fbDish?{slot_id:slotId,nombre:fbDish.name,ingredientes:fbIngs,kcal:fbDish.kcal,proteina_g:fbDish.p,carbohidratos_g:fbDish.c,grasa_g:fbDish.f}:{slot_id:slotId,nombre:`${slot.slot} rápido`,ingredientes:[],kcal:0,proteina_g:0,carbohidratos_g:0,grasa_g:0};
     const fallback=JSON.stringify({explicacion:"Opción del catálogo para el slot.",comidas:[fallbackMeal]});
-    const validation={expectedMeals:1,slots:[slotId],target:{kcal:remKcal,p:remP,c:remC,f:remF},hardRestrictions:coachHardRestrictions()};
+    const hardTerms=coachFoodBlockTerms(false);
+    const validation={expectedMeals:1,slots:[slotId],target:{kcal:remKcal,p:remP,c:remC,f:remF},hardRestrictions:hardTerms};
     const quota=coachQuota("diet_day",requestId,"slot-"+slotId,fallback,validation,slotId+":"+draft.ds);
     const txt=await callClaude(prompt,500,quota);
     const parsed=parseJSON(txt);
@@ -7754,7 +7891,7 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     const nombre=coachCopy(String(oneMeal.nombre).trim());
     const ings=Array.isArray(oneMeal.ingredientes)?oneMeal.ingredientes.map(x=>({nombre:coachCopy((x.nombre||"").trim()),gramos:+x.gramos})):[];
     const hay=(nombre+" "+ings.map(g=>g.nombre).join(" ")).toLowerCase();
-    if(coachHardRestrictions().some(term=>hay.includes(term)))throw new Error("La opción contiene una restricción del perfil.");
+    if(coachTextHasTerms(hay,hardTerms))throw new Error("La opción contiene una restricción del perfil.");
     const meal={slot_id:slotId,nombre,ingredientes:ings,kcal:Math.round(+oneMeal.kcal||remKcal),proteina_g:Math.round(+oneMeal.proteina_g||remP),carbohidratos_g:Math.round(+oneMeal.carbohidratos_g||remC),grasa_g:Math.round(+oneMeal.grasa_g||remF)};
     draft.comidas=draft.comidas.map(c=>c.slot_id===slotId?meal:c);
     const updatedRes=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
@@ -8274,7 +8411,7 @@ function clearSignedOutState(){
   entitlement=null;entitlementExpired=null;entitlementChecked=false;
   billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
   refreshPlanCalendar();
-  onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;passwordRecoveryError="";
+  onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;passwordRecoveryError="";passwordRecoveryMode="recovery";
   cycleHistory=[];recapPhotoFile=null;recapChallenge="";
   PLAN_VERSIONS=[];PLAN_VERSIONS_LOADED=false;PLAN_VERSIONS_ERROR=null;
   privacyReady=false;privacyError="";consentRecords=[];safetyScreening=null;
@@ -8833,6 +8970,13 @@ async function renderAdminUsers(){
       <button class="btn btn-sm" onclick="renderAdminUsers()">Actualizar</button>
     </div>
     <div class="dash" style="margin-bottom:14px">
+      <div class="row between wrap" style="gap:10px;margin-bottom:14px">
+        <div style="flex:1;min-width:210px">
+          <b>Invitar usuario</b>
+          <div class="muted small" style="margin-top:5px">Envía un correo para activar la cuenta y crear contraseña desde Fitbros.</div>
+        </div>
+        <button class="btn btn-accent" onclick="openAdminInviteUser()">Enviar invitación</button>
+      </div>
       <div class="row between wrap" style="gap:10px">
         <div style="flex:1;min-width:210px">
           <b>Usuario de prueba reiniciable</b>
@@ -9005,6 +9149,28 @@ async function resetAdminUserQuota(userId){
     if(out)out.textContent=`Consumo reiniciado (${result.reset||0} reservas devueltas).`;
     await loadAdminQuotaOverview();
   }catch(e){if(out)out.textContent="⚠️ "+e.message;}
+}
+function openAdminInviteUser(){
+  modal(`<h3>Invitar usuario</h3>
+    <p class="muted small">El correo permite activar la cuenta y crear contraseña. Si el correo ya existe, usa el reset de contraseña desde la lista.</p>
+    <div class="field"><label>Correo</label><input id="adminInviteEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
+    <button id="adminInviteBtn" class="btn btn-accent" style="width:100%" onclick="sendAdminInvite()">Enviar invitación</button>
+    <div id="adminInviteOut" class="muted small" style="margin-top:10px"></div>`);
+}
+async function sendAdminInvite(){
+  const email=($("#adminInviteEmail")&&$("#adminInviteEmail").value||"").trim().toLowerCase();
+  const out=$("#adminInviteOut"),btn=$("#adminInviteBtn");
+  if(!email||!email.includes("@")){if(out)out.textContent="Escribe un correo válido.";return;}
+  if(btn){btn.disabled=true;btn.textContent="Enviando…";}
+  try{
+    await adminApi("inviteUser",{email,redirectTo:authRedirectUrl("invite")});
+    closeModal();
+    toast("Invitación enviada");
+    renderAdminUsers();
+  }catch(e){
+    if(out)out.textContent="⚠️ "+e.message;
+    if(btn){btn.disabled=false;btn.textContent="Enviar invitación";}
+  }
 }
 function openAdminTestUser(){
   modal(`<h3>Preparar usuario de prueba</h3>
@@ -9927,10 +10093,11 @@ function setupAuthListener(){
   if(!supa||window._authSub)return;
   window._authSub=supa.auth.onAuthStateChange((event,sess)=>{
     session=sess||null;
-    if(event==="PASSWORD_RECOVERY"){passwordRecovery=true;passwordRecoveryError="";authReady=true;render();}
+    if(event==="PASSWORD_RECOVERY"){passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode="recovery";authReady=true;render();}
     else if(event==="SIGNED_OUT")clearSignedOutState();
     else if(event==="SIGNED_IN"){
-      if(isPasswordRecoveryRedirect()){passwordRecovery=true;passwordRecoveryError="";authReady=true;render();return;}
+      const redirectMode=passwordRedirectMode();
+      if(redirectMode){passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode=redirectMode;authReady=true;render();return;}
       if(!profile||profile.id!==uid())onAuth();
     }
   });
@@ -9942,14 +10109,16 @@ async function boot(){
   const hasLocalCreds=!!(S.settings&&S.settings.supaUrl&&S.settings.supaKey);
   if(!hasLocalCreds)await loadRemoteConfig();
   loadCatalog(); // no-await: catálogo de planes en paralelo (REQ-25)
-  const recoveryRedirect=isPasswordRecoveryRedirect();
+  const recoveryMode=passwordRedirectMode();
+  const recoveryRedirect=!!recoveryMode;
   supaInit();
-  if(recoveryRedirect){passwordRecovery=true;passwordRecoveryError="";}
+  if(recoveryRedirect){passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode=recoveryMode;}
   setupAuthListener();
   await refreshAuth();         // resuelve sesión (authReady=true)
   if(recoveryRedirect){
     passwordRecovery=true;
-    passwordRecoveryError=session?"":(passwordRecoveryRedirectError()||"El enlace de recuperación ya expiró o no se pudo validar. Pide uno nuevo desde el inicio de sesión.");
+    passwordRecoveryMode=recoveryMode;
+    passwordRecoveryError=session?"":(passwordRecoveryRedirectError()||(recoveryMode==="invite"?"El enlace de invitación ya expiró o no se pudo validar. Pide una nueva invitación.":"El enlace de recuperación ya expiró o no se pudo validar. Pide uno nuevo desde el inicio de sesión."));
     render();
     return;
   }

@@ -99,6 +99,24 @@ async function createAuthUser(email, password, e) {
   return data && data.user ? data.user : data;
 }
 
+async function inviteAuthUser(email, redirectTo, caller, e) {
+  const query = redirectTo ? "?redirect_to=" + encodeURIComponent(redirectTo) : "";
+  const response = await fetch(e.url + "/auth/v1/invite" + query, {
+    method: "POST",
+    headers: serviceHeaders(e, { "content-type": "application/json" }),
+    body: JSON.stringify({
+      email,
+      data: {
+        fitbros_invited: true,
+        invited_by: caller,
+      },
+    }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo enviar la invitación."));
+  return data && data.user ? data.user : data;
+}
+
 async function upsertProfileStatus(user, active, e) {
   const response = await fetch(e.url + "/rest/v1/profiles?on_conflict=id", {
     method: "POST",
@@ -538,6 +556,27 @@ export default async function handler(req, res) {
         ok: true,
         created,
         user: { id: targetUser.id, email, is_test_user: true },
+      });
+      return;
+    }
+
+    if (body.action === "inviteUser") {
+      const email = String(body.email || "").trim().toLowerCase();
+      if (!EMAIL_RE.test(email) || email.length > 254) {
+        res.status(400).json({ error: "Correo válido requerido." });
+        return;
+      }
+      const existing = await authUserByEmail(email, e);
+      if (existing) {
+        res.status(409).json({ error: "Ese correo ya tiene una cuenta. Usa el reset de contraseña si necesita recuperar acceso." });
+        return;
+      }
+      const redirectTo = safeRedirect(req, body.redirectTo);
+      const invited = await inviteAuthUser(email, redirectTo, caller, e);
+      if (invited && invited.id) await upsertProfileStatus({ id: invited.id, email }, true, e);
+      res.status(200).json({
+        ok: true,
+        user: invited && invited.id ? { id: invited.id, email } : { email },
       });
       return;
     }

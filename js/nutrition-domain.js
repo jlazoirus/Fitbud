@@ -226,13 +226,22 @@
       .filter(Boolean).join(" ");
   }
 
-  function solverRestrictionTerms(prefs){
+  function foodBlockTermsForProfile(prefs,includeSoft){
     const p=prefs||{},diet=Array.isArray(p.diet)?p.diet:[];
     const terms=allergyTermsForProfile(p);
     if(diet.includes("sin_lacteos"))terms.push("leche","lácteo","lacteo","queso","yogur","yogurt","parmesano","cottage");
     if(diet.includes("sin_gluten"))terms.push("gluten","trigo","pasta","fideos","pan","pita","tortilla integral");
     if(diet.includes("vegano"))terms.push("miel");
+    if(includeSoft===true)String(p.dislikedIngredients||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean).forEach(term=>terms.push(term));
     return [...new Set(terms.map(t=>String(t||"").trim()).filter(Boolean))];
+  }
+
+  function foodTextConflictForProfile(text,prefs,options){
+    return foodTextViolatesTerms(text,foodBlockTermsForProfile(prefs,(options&&options.includeSoft)===true));
+  }
+
+  function solverRestrictionTerms(prefs){
+    return foodBlockTermsForProfile(prefs,false);
   }
 
   function dishDietAllowed(dish,prefs,catalog,maps){
@@ -764,6 +773,8 @@
     mealSlotsForCount,
     allergyTermsForProfile,
     foodTextViolatesTerms,
+    foodBlockTermsForProfile,
+    foodTextConflictForProfile,
     validateTargetConsistency,
     validateDayTotals,
     validateSlotMacros,

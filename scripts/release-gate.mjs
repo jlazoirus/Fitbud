@@ -83,6 +83,8 @@ run("validate-nutrition-week-planner.mjs", "node scripts/validate-nutrition-week
 run("validate-nutrition-plan-snapshot.mjs", "node scripts/validate-nutrition-plan-snapshot.mjs");
 run("validate-nutrition-replacements.mjs", "node scripts/validate-nutrition-replacements.mjs");
 run("validate-nutrition-coach-contract.mjs", "node scripts/validate-nutrition-coach-contract.mjs");
+run("validate-first-day-preferences.mjs", "node scripts/validate-first-day-preferences.mjs");
+run("validate-meal-option-reroll.mjs", "node scripts/validate-meal-option-reroll.mjs");
 run("validate-high-protein-prompt.mjs", "node scripts/validate-high-protein-prompt.mjs");
 run("validate-placeholder-meals.mjs", "node scripts/validate-placeholder-meals.mjs");
 run("validate-coach-prompt-version.mjs", "node scripts/validate-coach-prompt-version.mjs");
@@ -95,6 +97,7 @@ run("validate-coach-quota.mjs", "node scripts/validate-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
 run("validate-splits.mjs", "node scripts/validate-splits.mjs");
 run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
+run("test-admin-api.mjs", "node scripts/test-admin-api.mjs");
 run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
 
 // ── Validadores de SQL y datos ───────────────────────────────────────────────

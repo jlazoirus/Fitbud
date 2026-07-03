@@ -79,6 +79,22 @@ assert.equal(d.foodTextViolatesTerms("tomate fresco", termsCarne), "",
 assert.ok(d.foodTextViolatesTerms("carne de res guisada", termsCarne) !== "",
   "carne de res debe bloquearse con dieta vegetariana");
 
+// ── Restricciones alimenticias completas para generación inicial ──────────────
+assert.ok(d.foodBlockTermsForProfile({ diet: ["vegano"] }).includes("miel"),
+  "vegano debe bloquear miel");
+assert.ok(d.foodTextConflictForProfile("pollo a la plancha", { diet: ["vegetariano"] }),
+  "vegetariano debe bloquear pollo");
+assert.equal(d.foodTextConflictForProfile("repollo al vapor", { diet: ["vegetariano"] }), "",
+  "vegetariano no debe bloquear repollo por falso positivo");
+assert.ok(d.foodTextConflictForProfile("yogur griego con fruta", { diet: ["sin_lacteos"] }),
+  "sin_lacteos debe bloquear yogur");
+assert.ok(d.foodTextConflictForProfile("pan integral con palta", { diet: ["sin_gluten"] }),
+  "sin_gluten debe bloquear pan/trigo");
+assert.equal(d.foodTextConflictForProfile("tofu salteado", { dislikedIngredients: "tofu" }), "",
+  "los ingredientes no preferidos no son restricción dura por defecto");
+assert.ok(d.foodTextConflictForProfile("tofu salteado", { dislikedIngredients: "tofu" }, { includeSoft: true }),
+  "includeSoft permite detectar ingredientes no preferidos");
+
 // ── validateTargetConsistency ─────────────────────────────────────────────────
 // Target consistente (post-REQ-77)
 const consistent = { kcal: 2300, p: 160, c: 271, f: 64 }; // 640+1084+576=2300
