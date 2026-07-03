@@ -73,7 +73,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 14. ~~REQ-106 - Perfil: aria-label en todos los inputs.~~ (implementado, P1)
 15. ~~REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta.~~ (implementado, P1)
 16. ~~REQ-108 - Perfil: guardado por sección con aviso de cambios sin guardar.~~ (implementado, P1)
-17. REQ-109 - Fix Home: badge "N pendientes" cuenta la fila de Descanso. (P2)
+17. ~~REQ-109 - Fix Home: badge "N pendientes" cuenta la fila de Descanso.~~ (implementado, P2)
 18. REQ-110 - Fix: catch de aiGenerateWeek sin salida — opción práctica y reintento. (P1)
 19. ~~REQ-111 - Fix API: /api/checkout valida Stripe antes que la sesión.~~ (implementado por REQ-59; entrada duplicada, no reabrir)
 20. REQ-112 - Accesibilidad: toasts aria-live y contraste de texto muted. (P2)
@@ -1950,7 +1950,7 @@ Que cada sección tenga una vía de guardado clara, visible solo cuando hay camb
 
 ## REQ-109 - Fix Home: el badge "N pendientes" cuenta la fila de Descanso
 
-**Estado: pendiente.**
+**Estado: implementado.**
 
 ### Origen
 
@@ -1988,6 +1988,10 @@ Que el badge cuente solo acciones pendientes; una fila informativa no suma.
 ### Verificación sugerida
 
 - E2E: `completePrefs({trainingDays:[díasSinHoy]})`, preparar día, afirmar `.agenda-count`="1 pendiente".
+
+### Implementación
+
+`homeAgendaData` ahora calcula `pendingCount=items.filter(i=>i.actions).length` (excluye la fila de descanso, que se inserta con `actions:""`) y lo devuelve junto con `items`. `homeAgendaHtml` usa `data.pendingCount` en vez de `data.items.length` para el badge; la fila de descanso se sigue renderizando igual (sin cambios en `homeAgendaItemHtml` ni en el orden/contenido de la agenda). `node scripts/release-gate.mjs`: 46/48 (los 2 bloqueantes — "Sin modificaciones no intencionadas" por el propio diff sin commitear y `validate-docs-index.mjs` por tamaño de este archivo — son preexistentes y no relacionados, mismo patrón que REQ-108).
 
 ## REQ-110 - Fix UX: catch de aiGenerateWeek sin salida — sumar opción práctica y reintento
 
