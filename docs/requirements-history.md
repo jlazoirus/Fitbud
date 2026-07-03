@@ -5128,3 +5128,940 @@ El flujo manual "Agregar comida/snack" (`saveEditor`, línea 6434) y "Sugerir co
 - `dayTotals` no cuenta el snack como consumido hasta que el usuario lo marque.
 - `node scripts/validate-gap-snack-pending.mjs` pasa.
 - `node scripts/release-gate.mjs` pasa.
+
+---
+
+# Archivo historico agregado el 2026-07-03
+
+## REQ-92 - Fix: sesión de entrenamiento generada mostraba solo Calentamiento + Vuelta a la calma sin bloques de ejercicios
+
+**Estado: implementado.** Fixes en `deterministicTrainingWeekPayload` (causa raíz), `workout-player.js`, `training-plan.js` y `workoutPrescription`.
+
+### Problema
+
+Al iniciar una sesión de gimnasio generada (ej. "Gimnasio - Pull A"), la sesión mostraba solo 2 bloques: **Bloque 1 de 2 (Calentamiento)** y **Bloque 2 de 2 (Vuelta a la calma)**, sin ningún bloque de ejercicios reales entre ellos.
+
+### Causa raíz
+
+En `deterministicTrainingWeekPayload` (el fallback determinístico que se usa cuando la IA falla o genera datos inválidos), los ejercicios del template estático se filtran por `spec.allowedExerciseIds`:
+
+```js
+const exerciseIds = exerciseArray(workout.exerciseIds).filter(id => spec.allowedExerciseIds.includes(id));
+```
+
+Los ejercicios del template Pull A de gimnasio son `["lat-pulldown","seated-cable-row","face-pull","biceps-curl","hammer-curl"]`, todos requieren cable (machines) o mancuernas. Si el usuario no tiene `machines` ni `dumbbells` en su equipamiento seleccionado (ej: solo barra y dominadas), **ninguno pasa el filtro** → `exerciseIds = []` → el fallback genera una sesión con `exercises: []`.
+
+Cuando el usuario inicia esa sesión, `WORKOUT_PLAYER.buildPrescription` detecta `generatedPrescription.exercises` como array vacío, entra al path "generado" (la condición original solo verificaba `Array.isArray` sin verificar longitud), y `generatedStrengthSteps` itera 0 veces → solo warmup + cooldown = **2 bloques**.
+
+La misma condición de guarda (`!session.allowedExerciseIds.length`) no protege este caso porque `allowedExerciseIds` del usuario incluye otros ejercicios (back-squat, pull-up, etc.), así que la generación del plan procede, pero los ejercicios del template nunca coinciden.
+
+### Solución (4 fixes)
+
+**Fix 1 — Causa raíz (`index.html` `deterministicTrainingWeekPayload`):** Si el filtro de template produce < 2 ejercicios, suplementar con ejercicios de `spec.allowedExerciseIds` hasta 6:
+
+```js
+let exerciseIds = exerciseArray(workout?.exerciseIds).filter(id => allowedExerciseIds.includes(id));
+if (strength && exerciseIds.length < 2) {
+  const extra = allowedExerciseIds.filter(id => !exerciseIds.includes(id));
+  exerciseIds = [...exerciseIds, ...extra].slice(0, 6);
+}
+```
+
+**Fix 2 — Defensivo (`workout-player.js` `buildPrescription`):** No entrar al path generado cuando `exercises` está vacío; agregar `&& exercises.length > 0`:
+
+```js
+if (workout.generatedPrescription && Array.isArray(workout.generatedPrescription.exercises) && workout.generatedPrescription.exercises.length > 0)
+```
+
+**Fix 3 — Data (`training-plan.js` `workoutFromSession`):** Incluir `role: session.role` en el workout generado para que el fallback de sesión pueda buscarlo.
+
+**Fix 4 — Fallback de sesión (`index.html` `workoutPrescription`):** Cuando el workout generado tiene `exerciseIds: []` (plan almacenado con bug), usar el template estático del rol como respaldo para que el usuario pueda iniciar la sesión sin regenerar el plan:
+
+```js
+if (workout.generated && !prescribedIds.length && workout.role) {
+  const template = workoutById(ds, workout.role, planPrefsForDate(ds));
+  if (template?.exerciseIds?.length) prescribedIds = exerciseArray(template.exerciseIds);
+}
+```
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `deterministicTrainingWeekPayload`: suplementar ejercicios cuando filtro < 2 |
+| `index.html` | `workoutPrescription`: fallback a template estático cuando `exerciseIds` vacío |
+| `workout-player.js` | `buildPrescription`: condición `exercises.length > 0` antes de path generado |
+| `training-plan.js` | `workoutFromSession`: expone `role: session.role` en el workout |
+
+### Criterios de aceptación
+
+- Una sesión Pull A de gimnasio generada muestra calentamiento + ejercicios reales + vuelta a la calma (≥ 3 bloques).
+- Para usuario con equipamiento limitado (sin machines/dumbbells), el fallback usa ejercicios alternativos de `allowedExerciseIds`.
+- Para planes ya almacenados con `exercises: []`, la sesión usa el template estático del rol (el usuario ve ejercicios aunque no sean los generados por IA).
+- No hay regresión en sesiones Pull A ya generadas correctamente con ejercicios.
+- `node scripts/release-gate.mjs` pasa.
+
+---
+
+---
+
+## REQ-94 - Fix: demostración de ejercicio aparecía como imagen estática con "Reducir Movimiento" activo
+
+**Estado: implementado.** Dos cambios en `index.html`: (1) se eliminó `demo-frame-1` del bloque CSS `prefers-reduced-motion`, (2) se reemplazó el botón disabled "Movimiento reducido" por el botón habilitado "Reproducir/Pausar".
+
+### Descripción del bug
+
+En la pantalla de detalle de ejercicio (ej. Face Pull), la demostración aparecía como imagen estática sin movimiento en dispositivos con "Reducir Movimiento" activo (iOS: Configuración → Accesibilidad → Movimiento → Reducir Movimiento, o preferencia equivalente del sistema operativo que activa `prefers-reduced-motion: reduce` en el navegador).
+
+### Contexto del sistema de demos
+
+Los ejercicios de Supabase usan `media_type: "image_sequence"` con 2 fotogramas JPEG (posición inicio y posición final, provenientes de Free Exercise DB). La "animación" es CSS puro: `.demo-frame-1` alterna su `opacity` vía `@keyframes demoFrame` (`1.6s steps(1,end) infinite`), creando el efecto de flip entre los dos fotogramas.
+
+### Causa raíz (dos fallos compuestos)
+
+**Fallo 1 — CSS aplasta la animación con `!important`:**
+
+```css
+/* Antes — en @media(prefers-reduced-motion:reduce) */
+.demo-frame.demo-frame-1 { animation: none !important; opacity: 0 !important; }
+```
+
+`opacity:0!important` ocultaba `demo-frame-1` permanentemente bajo `prefers-reduced-motion`. Como la regla `.exercise-card.paused .demo-frame-1 { animation-play-state: paused }` ya maneja el estado "pausado" (animación detenida en `opacity: 0` al inicio del ciclo), esta regla era redundante y además dañina al bloquear que el usuario pudiera ver frame-1 incluso si activa la animación.
+
+**Fallo 2 — Botón de control deshabilitado:**
+
+```js
+// Antes
+${reduced ? '<button class="btn btn-sm" disabled>Movimiento reducido</button>' : `...Reproducir/Pausar...`}
+```
+
+Con `reduced === true`, el botón de play/pause se reemplazaba por un botón deshabilitado, impidiendo que el usuario activara manualmente la animación.
+
+### Fix (`index.html`)
+
+**CSS** — eliminar `demo-frame-1` del bloque `prefers-reduced-motion`:
+
+```css
+/* Antes */
+@media(prefers-reduced-motion:reduce){
+    .demo-athlete,.demo-crank{animation:none!important}
+    .demo-frame.demo-frame-1{animation:none!important;opacity:0!important}
+}
+
+/* Después (REQ-94) */
+@media(prefers-reduced-motion:reduce){
+    .demo-athlete,.demo-crank{animation:none!important}
+}
+```
+
+**JS** — siempre mostrar el botón habilitado:
+
+```js
+// Antes
+${reduced ? '<button class="btn btn-sm" disabled>Movimiento reducido</button>' : `<button ... >${pausedByDefault?"Reproducir":"Pausar"}</button>`}
+
+// Después (REQ-94)
+<button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>
+```
+
+### Comportamiento resultante
+
+- Con `prefers-reduced-motion: reduce` activo: la tarjeta arranca con clase `paused` → `demo-frame-1` tiene `animation-play-state: paused` → se ve solo frame-0 (posición inicial). El botón muestra **"Reproducir"** (habilitado).
+- Al pulsar "Reproducir": se elimina clase `paused` → `demoFrame` corre → flip entre frame-0 y frame-1 cada 0.8s. El botón cambia a **"Pausar"**.
+- Sin `prefers-reduced-motion`: comportamiento sin cambios (animación automática al cargar).
+- Las SVGs animadas (`.demo-athlete`, `.demo-crank`) siguen bloqueadas bajo `prefers-reduced-motion` correctamente.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | CSS: eliminar `demo-frame-1` de `@media(prefers-reduced-motion:reduce)` |
+| `index.html` | JS `exerciseCard`: siempre renderizar botón Reproducir/Pausar habilitado |
+
+### Criterios de aceptación
+
+- Con `prefers-reduced-motion: reduce` simulado, `exerciseCard` con `media_type: "image_sequence"` rinde HTML sin `disabled` y con texto "Reproducir".
+- La tarjeta tiene clase `paused` al renderizarse → `demo-frame-1.animationPlayState === "paused"`.
+- Al hacer click en "Reproducir", la clase `paused` se elimina → `demo-frame-1.animationPlayState === "running"`.
+- El bloque CSS `@media(prefers-reduced-motion:reduce)` ya no contiene regla para `.demo-frame-1`.
+- `node scripts/release-gate.mjs` pasa.
+
+---
+
+---
+
+## REQ-93 - Fix: exerciseCatalog devolvía catálogo vacío cuando tabla exercises de Supabase está vacía
+
+**Estado: implementado.** Fix en `exerciseCatalog` (`index.html`) para usar `LOCAL_EXERCISES` como fallback cuando `DB.exercises` está vacío, consistente con `activeTrainingCatalog`.
+
+### Descripción del bug
+
+Cuando la tabla `exercises` de Supabase existe pero está vacía (i.e. `exercises.sql` no se ejecutó o los seeds no se aplicaron), `dbLoad` almacenaba `DB.exercises = []` con `DB.exerciseReady = true`. Esto provocaba que `exerciseCatalog()` devolviera un array vacío, haciendo que `exerciseBySlug()` retornara `null` para todos los slugs.
+
+### Causa raíz
+
+`exerciseCatalog()` y `activeTrainingCatalog()` usaban condiciones de fallback inconsistentes:
+
+```js
+// exerciseCatalog — NO verificaba length: retornaba [] cuando DB.exercises=[]
+const source = DB.exerciseReady ? DB.exercises : LOCAL_EXERCISES;
+
+// activeTrainingCatalog — SÍ verificaba length: fallback correcto a LOCAL
+const source = DB.loaded && Array.isArray(DB.exercises) && DB.exercises.length
+  ? DB.exercises : LOCAL_EXERCISES;
+```
+
+Resultado: `allowedExerciseIds` se calculaba correctamente (vía `activeTrainingCatalog` con LOCAL), el plan se generaba, pero todos los `exerciseBySlug()` en `deterministicTrainingWeekPayload` y `workoutPrescription` retornaban `null` → `exercises = []` → 2 bloques solamente.
+
+### Fix (`index.html` `exerciseCatalog`)
+
+Alinear `exerciseCatalog` con la condición de fallback de `activeTrainingCatalog`:
+
+```js
+// Antes
+const source = DB.exerciseReady ? DB.exercises : LOCAL_EXERCISES;
+
+// Después (REQ-93)
+const source = (DB.exerciseReady && Array.isArray(DB.exercises) && DB.exercises.length)
+  ? DB.exercises : LOCAL_EXERCISES;
+```
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `exerciseCatalog`: fallback a `LOCAL_EXERCISES` cuando `DB.exercises` está vacío |
+
+### Criterios de aceptación
+
+- Con Supabase configurado pero tabla `exercises` vacía, `exerciseBySlug("lat-pulldown", true)` retorna el ejercicio de `LOCAL_EXERCISES`.
+- Con Supabase configurado y tabla `exercises` con datos, `exerciseBySlug` sigue usando los datos de Supabase (sin regresión).
+- Combinado con REQ-92, una sesión Pull A de gimnasio muestra ejercicios reales independientemente del estado de la tabla `exercises` en Supabase.
+- `node scripts/release-gate.mjs` pasa.
+
+---
+
+---
+
+## REQ-95 - Nav bar del footer no ancla al fondo en iOS
+
+**Estado: implementado.**
+
+### Problema
+
+En iOS, la barra de navegación inferior (`.tabs` con `position:fixed;bottom:0`) no se anclaba al fondo de la pantalla. En la vista principal aparecía en medio del contenido con la sección del coach visible debajo de ella. Causa probable: quirk de iOS Safari con `position:fixed` cuando el contenido desborda la altura del viewport.
+
+### Solución
+
+Cambio de arquitectura: de `position:fixed` para el nav bar a un layout flexbox en `body`.
+
+- `html/body`: `height:100dvh; display:flex; flex-direction:column; overflow:hidden`
+- `#app`: `flex:1; min-height:0; overflow-y:auto` (el contenido scrollea dentro del `#app`, no en el `window`)
+- `.tabs`: `flex-shrink:0` (queda anclado al fondo de body como hijo flex natural, sin `position:fixed`)
+- `padding-bottom` de `#app`: de `calc(88px + safe-bottom)` a `calc(20px + safe-bottom)` (ya no es necesario reservar espacio para el nav flotante)
+
+Se agregaron helpers `scrollAppTop()` y `scrollAppBottom()` para reemplazar los 14 llamados a `window.scrollTo()` que ya no funcionan cuando el scroll container es `#app` en vez de `window`.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | Layout flexbox en body/app/tabs + helpers scroll + sustitución de window.scrollTo |
+
+### Criterios de aceptación
+
+- La barra de navegación (Hoy/Nutrición/Entreno/Progreso/Perfil) siempre queda en el borde inferior de la pantalla.
+- El contenido de la vista Hoy (incluyendo la sección del coach) scrollea por encima del nav bar.
+- Las hojas modales (`.overlay`, `.sheet`), toasts y otros elementos `position:fixed` siguen funcionando correctamente.
+- `node scripts/release-gate.mjs` pasa.
+
+---
+
+## REQ-96 - Crear suite E2E Playwright de journeys críticos e integrarla al release-gate
+
+**Estado: implementado.**
+
+### Solución (2026-07-02)
+
+Suite en `tests/e2e/` con `@playwright/test` (devDependency) + Chromium headless, corriendo la app real servida por `python3 -m http.server 8923` con **toda la red interceptada** (`tests/e2e/helpers.js`): Supabase (PostgREST stateful: lo upserteado se devuelve en GETs), `/api/*`, CDN de supabase-js vendorizado (`tests/e2e/vendor/`) y fuentes. El "coach" (`/api/claude`) se mockea leyendo metas y slots del propio prompt y construyendo comidas del catálogo fixture que cumplen las metas — 0 llamadas pagadas, 100 % offline y determinista.
+
+5 specs / 7 tests: `onboarding.spec.js` (onboarding completo, Mifflin-St Jeor verificado aparte, macros mostrados = guardados en el upsert de profiles), `nutricion.spec.js` (objetivos del día + preparar mi día + aplicar), `entreno.spec.js` (sesión guiada completa, adaptativa al nº de bloques, regresión REQ-92), `progreso.spec.js` (peso mostrado = guardado = sincronizado a weight_log), `navegacion.spec.js` (5 tabs + landing sin sesión + REQ-31, consola limpia en todos). Helpers exportados (`installMocks`, `seedLoggedInUser`, `completePrefs`) reutilizables por el loop auditor. Integrada a `release-gate.mjs` como check bloqueante con timeout de 5 min. Verificado: romper `completeWorkoutStep` hace fallar la suite.
+
+Comandos: `npm run test:e2e` o `npx playwright test`. Primera vez: `npm install && npx playwright install chromium`.
+
+### Origen
+
+Decisión de producto (2026-07-01): el loop auditor ahora hace verificación funcional obligatoria en navegador por corrida, pero los commits diarios del desarrollador solo pasan por `release-gate.mjs` (sintaxis, validadores, SQL, seguridad) — nadie verifica automáticamente que un fix funcione *en pantalla* antes del push. Se necesita una capa de regresión E2E determinista.
+
+### Problema
+
+Un fix puede pasar el release-gate en verde y aun así romper un journey completo en la UI (ejemplos recientes: REQ-92 sesión Pull A solo mostraba calentamiento, REQ-95 nav bar desanclada en iOS). No existe ninguna prueba automatizada que abra la app en un navegador y recorra los flujos críticos.
+
+### Causa raíz
+
+No aplica un bug puntual: es una brecha de infraestructura de QA. El release-gate (`scripts/release-gate.mjs`) no incluye ningún check que ejecute la app renderizada.
+
+### Objetivo
+
+Que ningún commit pueda publicarse si rompe uno de los journeys críticos: la suite E2E recorre la app como usuario real y falla el gate si un flujo se rompe.
+
+### Alcance
+
+1. Añadir Playwright como dependencia de desarrollo (`@playwright/test`, navegador chromium) — patrón aprobado explícitamente para este REQ pese al invariante "sin dependencias nuevas"; es tooling de test, no dependencia runtime de la app.
+2. Crear `tests/e2e/` con specs para los journeys críticos: (a) onboarding/perfil y cálculo de macros mostrado, (b) ver objetivos del día en Nutrición y aplicar una comida, (c) iniciar y completar una sesión de entreno con el reproductor, (d) registrar peso en Progreso, (e) navegación entre tabs y estados vacíos sin errores de consola.
+3. Fixtures/mocks deterministas para toda llamada a IA y a Supabase (interceptar red con `page.route`); las pruebas corren 100% offline y sin llamadas pagadas.
+4. Helpers reutilizables (login/seed de estado local) exportados para que el loop auditor los reuse en su verificación funcional.
+5. Integrar la suite al `release-gate.mjs` como check bloqueante, con timeout razonable.
+
+### Fuera de alcance
+
+- No cambiar comportamiento de la app para hacerla "testeable" (si algo no se puede testear sin tocar la app, documentarlo como REQ aparte).
+- No testear Stripe real ni Supabase real.
+- No cubrir los 12 journeys en esta primera iteración: solo los 5 críticos listados.
+
+### Riesgos
+
+- Flakiness de E2E puede bloquear el loop desarrollador; mitigar con mocks deterministas, `retries: 1` y timeouts generosos.
+- El tamaño de `index.html` (~600 KB) puede hacer lentos los arranques; servir con el mismo `http.server` local.
+- Instalación de chromium requiere red la primera vez (`npx playwright install chromium`).
+
+### Criterios de aceptación
+
+- `npx playwright test` corre en local, offline, y pasa en verde sobre `HEAD`.
+- Romper deliberadamente un journey (p. ej. comentar el render del reproductor) hace fallar la suite.
+- Las pruebas no hacen ninguna llamada de red externa (IA, Supabase, Stripe) — todo interceptado.
+- `node scripts/release-gate.mjs` ejecuta la suite y queda en verde.
+
+### Verificación sugerida
+
+- `npx playwright test --reporter=list` y revisar que los 5 journeys pasan.
+- `node scripts/release-gate.mjs` incluye y pasa el check E2E.
+
+---
+
+## REQ-97 - UX: reordenar Home — la agenda primero, hero compacto, un banner a la vez
+
+**Estado: implementado.**
+`renderHoy()` en `index.html` ahora ordena header → agenda → hero → banners → coach. `heroDash(ds,opts)` acepta `opts.compact` (solo Home lo usa) y colapsa a una línea ("kcal/meta kcal · comidas/total") mientras `doneMeals===0`; Nutrición sigue usando la versión completa sin pasar `opts`. Los banners de check-in y "Afina tu plan" comparten cola de prioridad (checkin > afinar plan, máximo uno); "Afina tu plan" es ahora un chip discreto (`.coach-chip`) en vez de un alert de ancho completo. `planEnded`/`planNotStarted`/`trainingSafetyHold` quedan fuera de esa cola por ser estados críticos/bloqueantes, no promocionales.
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`, hallazgo P0-3).
+
+### Problema
+
+En `renderHoy()` el orden actual es: header → alert "Afina tu plan" → banner check-in → `heroDash` (~230 px) → agenda → coach. Para un usuario nuevo, "lo que te toca ahora" (el núcleo de la propuesta de valor) queda al borde o debajo del fold en móvil, detrás de dos avisos y un dashboard en cero.
+
+### Objetivo
+
+Que la próxima acción del día sea lo primero que ve el usuario al abrir la app, en cualquier estado de su cuenta.
+
+### Alcance
+
+1. Reordenar `renderHoy()`: header → agenda (próxima acción) → hero → banners → coach.
+2. Hero en modo compacto (una línea: "0/1900 kcal · 0/4 comidas") mientras el día no tenga registros; versión completa cuando hay actividad.
+3. Cola de prioridad de banners: mostrar máximo uno a la vez (check-in > afinar plan); "Afina tu plan" como chip discreto, no como primer elemento.
+
+### Fuera de alcance
+
+- No tocar la lógica de `homeAgendaData` ni el contenido de la agenda.
+- No rediseñar el chat del coach en Home.
+
+### Riesgos
+
+- El tour contextual ancla su primer coachmark a la agenda; verificar que los selectores (`data-tab`, contenedores) sigan válidos tras el reorden.
+- `heroDash` se reusa en Nutrición: el modo compacto debe ser opt-in para no alterar esa vista (o coordinarse con REQ-100).
+
+### Criterios de aceptación
+
+- Con viewport móvil (390×844), la tarjeta de agenda es visible completa en el primer viewport para un usuario nuevo.
+- Nunca se muestran dos banners apilados en Home.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Servir local, simular usuario nuevo (sin día preparado) y usuario con actividad; capturar Home en 390×844 y verificar orden y fold.
+- Forzar check-in pendiente + perfil sin afinar a la vez y verificar que solo se muestra un banner.
+
+---
+
+## REQ-98 - Fix UX: banner de check-in con fechas rotas, duplicado y sin tono de arranque
+
+**Estado: implementado.**
+`weeklyCheckinRangeLabel(startDs,endDs)` (nuevo, en `index.html`) reemplaza `prettyDate(...).split(",")[0]` (que descartaba la fecha y dejaba solo el nombre del día) por un rango compacto real ("13–19 jun" o "29 jun – 5 jul" si cruza de mes); se usa en `weeklyCheckinBanner()`, la nueva `weeklyCheckinChip()` y en `weeklyCheckinHistory()`, que tenía el mismo bug. `weeklyCheckinDue()` ahora calcula `active` con `weekDays(dueWeek).some(dayActive)`; `weeklyCheckinBanner()` usa ese flag para cambiar el copy a un tono no punitivo cuando la semana no tuvo actividad registrada ("No registraste actividad esa semana. Aun así puedes ajustar tu plan para la que sigue."), sin omitir el check-in automáticamente (se deja el botón "Omitir esta semana" como acción explícita del usuario, evitando tocar el conteo de check-ins de ciclos). `renderProgress()` ya no llama `weeklyCheckinBanner()` completo — usa `weeklyCheckinChip()`, un botón discreto estilo `.coach-chip` que abre `openWeeklyCheckin()` directamente, eliminando el banner duplicado entre Hoy y Progreso.
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-4). Bug de copy verificado en producción.
+
+### Problema
+
+En `weeklyCheckinBanner()`, `prettyDate(due.start).split(",")[0]` produce "Martes – Lunes" (solo nombres de día, sin fechas). El banner aparece en Hoy y en Progreso a la vez, y se muestra aunque la semana a revisar no tenga ningún dato registrado ("Revisa cómo fue tu semana" sin nada que revisar).
+
+### Objetivo
+
+Que el check-in comunique fechas concretas, aparezca una sola vez y no exija revisar semanas vacías.
+
+### Alcance
+
+1. Copy con fechas reales: "Semana 1 · 23–29 jun".
+2. Banner completo solo en Hoy; en Progreso, acceso discreto (link/chip).
+3. Si la semana a revisar no tiene actividad registrada (`dayActive` en 0 días), cambiar el tono a arranque no punitivo u omitir automáticamente sin registro de "skip" culposo.
+
+### Fuera de alcance
+
+- No cambiar el flujo interno de `openWeeklyCheckin` ni sus ajustes propuestos.
+- No cambiar la lógica de `weeklyCheckinDue` salvo el caso "semana sin actividad".
+
+### Riesgos
+
+- `skipWeeklyCheckin` persiste claves por semana; la omisión automática no debe romper el conteo de check-ins de ciclos.
+
+### Criterios de aceptación
+
+- El banner muestra fechas concretas, no solo nombres de día.
+- No aparece duplicado en dos vistas a la vez.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Simular plan iniciado hace 8+ días sin actividad y verificar tono/omisión; con actividad, verificar fechas correctas en el banner.
+
+---
+
+## REQ-99 - UX: Perfil por secciones reales con guardado por sección y labels accesibles
+
+**Estado: implementado (dividido en REQ-105, REQ-106, REQ-107, REQ-108).**
+Marcado como el REQ más grande del backlog (~4.850 px, 91 elementos interactivos, guardado global + 2 guardados locales inconsistentes). Siguiendo el protocolo de la fase de product manager (dividir en vez de implementar a medias), se partió en cuatro requerimientos atómicos, cada uno completable en una ejecución: REQ-105 (acordeón real), REQ-106 (aria-label), REQ-107 (reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta) y REQ-108 (guardado por sección, el de mayor riesgo, al final y dependiente de REQ-105). No se tocó código de `index.html` en este commit.
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-5); retoma los pendientes #6/#7 del plan del 24 jun.
+
+### Problema
+
+`renderProfile()` renderiza una sola página de ~4.850 px con 8 secciones, 91 elementos interactivos y 64 inputs sin label programático. Los chips de navegación solo hacen `scrollIntoView` y el guardado es un botón global al fondo más dos guardados locales inconsistentes — riesgo de perder cambios y parálisis de decisión.
+
+### Objetivo
+
+Que Perfil deje de abrumar: el usuario encuentra la sección que busca, guarda con confianza y ningún cambio se pierde en silencio.
+
+### Alcance
+
+1. Convertir los chips (Objetivo · Comidas · Entreno · Privacidad · Cuenta) en subvistas reales o acordeones colapsados por defecto (solo la sección activa abierta).
+2. Guardado sticky por sección, visible solo cuando hay cambios pendientes; cuidado con `saveProfilePrefs` y esquemas versionados.
+3. Agrupar Suscripción/Recordatorios/Avisos del dispositivo bajo Cuenta.
+4. `aria-label` en todos los inputs al migrar.
+
+### Fuera de alcance
+
+- No cambiar el esquema de `profiles.prefs` ni `profileSchemaVersion`.
+- No tocar los flujos de privacidad/consentimientos más allá de su ubicación visual.
+
+### Riesgos
+
+- El guardado por sección cambia el modelo actual "todo al final": riesgo de guardados parciales inconsistentes; definir qué campos viajan juntos.
+- Los flujos de push/recordatorios tienen guardados propios; unificar sin romper sus validaciones.
+
+### Criterios de aceptación
+
+- Ninguna sección de Perfil supera ~1.500 px de alto renderizado.
+- Cambiar un campo y salir de la sección sin guardar muestra aviso o autoguarda; no se pierden cambios en silencio.
+- 0 inputs visibles sin label programático en Perfil.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Medir `#app.scrollHeight` por sección; editar un campo, navegar a otra sección y verificar el aviso/autoguardado; auditar labels con querySelector.
+
+---
+
+## REQ-100 - UX: Nutrición sin duplicación — un CTA contextual y hero compacto
+
+**Estado: implementado.**
+`renderNutrition()` en `index.html` ahora muestra un solo CTA prominente: la tarjeta "Prepara tus comidas de hoy" (llama `homePrepareDay(ds)`, ruta determinista sin paywall) cuando el día no está preparado; cuando ya está preparado, no hay CTA prominente. Las 3-4 acciones sueltas ("Preparar otra semana"/"Preparar semana", "Ver otra opción de comida", "Revisar mis macros", y "Volver a preparar este día" cuando ya hay plan) se movieron a un menú "Más opciones" (`openNutritionMoreMenu()`) abierto vía `modal()`, con iconos del set existente (`miniIcon()`, nuevo, reutiliza `TAB_ICONS`; se agregaron `more` y `refresh`) en vez de emojis. El hero de macros usa `heroDash(ds,{compact:"always"})` — se extendió `heroDash(ds,opts)` (REQ-97) para aceptar `opts.compact==="always"` y así no repetir nunca el bloque completo que Home puede mostrar. Fix de bug encontrado en el camino: el botón "Preparar este día" de Nutrición llamaba `aiGenerateDay()` directo, lo que mostraba el paywall a usuarios sin entitlement; ahora la regeneración pasa por `homePrepareDay()` como en Home, respetando la ruta determinista del 1 jul.
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-6).
+
+### Problema
+
+`renderNutrition()` repite el `heroDash` completo de Home y ofrece 4 acciones sin jerarquía ("Preparar otra semana", "Preparar este día", "Ver otra opción de comida", "Revisar mis macros") con solapamiento semántico y emojis en botones.
+
+### Objetivo
+
+Que en Nutrición siempre quede claro cuál es LA acción siguiente, sin repetir información que Home ya muestra.
+
+### Alcance
+
+1. Un CTA primario contextual: día sin preparar → "Preparar este día"; día preparado → sin CTA prominente.
+2. Acciones restantes a menú "···" o dentro de cada comida.
+3. Hero de macros en versión compacta (no repetir el bloque completo de Home).
+4. Iconos del set existente en lugar de emojis en botones.
+
+### Fuera de alcance
+
+- No cambiar la lógica de generación (día/semana) ni los flujos de "Cambiar" comida.
+
+### Riesgos
+
+- Los CTAs actuales gatean por entitlement (coach); el CTA contextual debe respetar la ruta determinista sin paywall implementada el 1 jul.
+
+### Criterios de aceptación
+
+- Máximo un CTA primario visible en la parte superior de Nutrición.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Capturar Nutrición con día vacío y con día preparado; verificar jerarquía y ausencia del hero duplicado completo.
+
+---
+
+## REQ-102 - UX: Progreso con estado cero guiado y tabla de peso en tarjetas mobile
+
+**Estado: implementado.**
+`progressIsEmpty()` detecta usuario sin peso, sin entrenos y sin racha. En ese estado, `renderProgress()` muestra primero la tarjeta "Registra tu peso de la semana" (con copy sobre qué se desbloquea) y arranca "Tus números" y "Rachas e hitos" colapsadas (`section()` acepta ahora un default de colapso vía `isCollapsed(key,def)`). `progressStats()` usa labels autoexplicativos ("Peso actual (kg)", "Entrenos completados", "Racha (días)", "Adherencia a comidas"); la primera tarjeta muestra el peso actual en vez de un delta críptico. `weightChart()` ya no duplica el mensaje de peso vacío. La tabla de peso a tarjetas full-width en mobile con inputs de 44px ya estaba resuelta por REQ-56.
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-8); retoma el pendiente #8 del plan del 24 jun.
+
+### Problema
+
+Un usuario nuevo abre Progreso y ve 4 stat-cards en cero con labels crípticos ("completos", "kg"), rachas en cero y una tabla de peso con inputs pequeños. Los ceros en la fuente display parecen píldoras, no números. Hay un box redundante que repite lo que ya dice la tarjeta "Registra tu peso de la semana".
+
+### Objetivo
+
+Que Progreso sin datos invite a la primera acción en lugar de mostrar estadísticas vacías, y que registrar peso sea cómodo en móvil.
+
+### Alcance
+
+1. Con cero datos: colapsar stats/rachas y abrir con la tarjeta de registro de peso + qué se desbloquea al registrar.
+2. Labels autoexplicativos: "Peso actual", "Entrenos completados", "Racha", "Adherencia a comidas".
+3. `weightRows()`: tabla → tarjetas por semana full-width en mobile con inputs grandes o stepper (los aria-labels ya existen).
+4. Eliminar el box redundante "Ingresa tu peso semanal para ver el gráfico".
+
+### Fuera de alcance
+
+- No cambiar el modelo de datos de `weight_log` ni la lógica de rangos (`buildWeightRanges`).
+
+### Riesgos
+
+- `scrollToWeightInput()` asume la tabla `.wt input`; actualizar el selector al migrar a tarjetas.
+
+### Criterios de aceptación
+
+- Usuario sin datos ve primero una acción clara, no estadísticas en cero.
+- Inputs de peso con hit area ≥44 px en táctil.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Capturar Progreso sin datos y con 2 semanas de datos, en viewport móvil; probar registro de peso con teclado numérico.
+
+---
+
+## REQ-103 - UX: onboarding sin jerga — macros como resumen y lugar de entrenamiento único por defecto
+
+**Estado: implementado.**
+Paso 2: macros bajo `<details>` "Ajustar valores"; arriba, resumen "Tu referencia: N kcal · N g proteína" y botón "¿Cómo lo calculamos?" con modal (antes texto fijo "Fórmula: ..."). Paso 3: checkboxes de día + un único select "Lugar de entrenamiento" aplicado a todos; personalización por día colapsada. `readOnboardingStep()` sigue completando `d.trainingLocations` por día, sin pérdida de datos. Perfil (prefix "pf") no cambió.
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P1-9).
+
+### Problema
+
+El paso 2 del onboarding expone 4 inputs crudos de macros más el texto "Fórmula: Katch-McArdle" (jerga técnica, contra el tono coach del principio 9). El paso 3 pide checkbox por día y lugar por día (7 selects): configuración avanzada a destiempo.
+
+### Objetivo
+
+Bajar el tiempo-a-plan del onboarding sin perder ningún dato esencial: el principiante no debería decidir macros ni logística por día para empezar.
+
+### Alcance
+
+1. Paso 2: resultado como resumen amable ("Tu referencia: 2.262 kcal · 137 g proteína") con "Ajustar valores" colapsado; la fórmula a un tooltip "¿cómo lo calculamos?".
+2. Paso 3: días + un solo lugar por defecto; "personalizar por día" colapsado.
+3. No perder ningún dato del esquema de prefs; solo cambia la presentación.
+
+### Fuera de alcance
+
+- No cambiar `calculateMacroTargets` ni las fórmulas.
+- No cambiar el número de pasos del onboarding.
+
+### Riesgos
+
+- `hasCompleteOnboarding()` y `migrateProfilePrefs()` esperan campos concretos; el colapsado no debe impedir setearlos con defaults válidos.
+
+### Criterios de aceptación
+
+- El onboarding no muestra nombres de fórmulas ni inputs de macros abiertos por defecto.
+- `hasCompleteOnboarding()` sigue cumpliéndose con el flujo nuevo.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Completar onboarding sin abrir ningún colapsable y verificar perfil válido con plan preparable; abrir "Ajustar valores" y verificar edición de macros.
+
+---
+
+## REQ-104 - Copy y paywall coherentes: sin "cancela cuando quieras", paywall degradado sin checkout activo
+
+**Estado: implementado.**
+Señal de checkout activo agregada a `/api/config` (`checkout.enabled`); `showPaywall` la usa para ocultar los botones de compra y mostrar "Disponible pronto" + canje de código cuando `STRIPE_SECRET_KEY` no está configurada.
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgos P2-10 y cadena P0-1 con REQ-26).
+
+### Problema
+
+(a) "Cancela cuando quieras" aparece 3 veces pero los planes son pago único sin renovación — no hay nada que cancelar. (b) Mientras el checkout de Stripe no esté activo (REQ-26), el paywall muestra botones de compra que terminan en error 503. (c) Empty state de Home con copy pasivo y largo.
+
+### Objetivo
+
+Que ninguna promesa visible contradiga el modelo de cobro real y que ningún botón lleve a un error por configuración faltante.
+
+### Alcance
+
+1. Reemplazar "Cancela cuando quieras" por "Sin renovación automática — pagas solo el período".
+2. `showPaywall`: si el checkout no está configurado, no mostrar botones de compra; mostrar mensaje "disponible pronto" + mantener la alternativa determinista.
+3. Empty state de Home: "Tu coach arma comidas y entreno para hoy en segundos."
+
+### Fuera de alcance
+
+- No activar el checkout de Stripe (eso es REQ-26).
+- No cambiar precios ni estructura de planes.
+
+### Riesgos
+
+- Detectar "checkout no configurado" desde el cliente requiere una señal del servidor (p. ej. respuesta de `/api/checkout` o flag en config); no exponer detalles técnicos al usuario (principio 9).
+
+### Criterios de aceptación
+
+- Ningún botón visible lleva a un endpoint que responde 503 por configuración faltante.
+- El copy de planes no promete cancelación de una renovación que no existe.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Sin `STRIPE_SECRET_KEY` en entorno local, abrir el paywall y verificar el estado degradado; grep de "Cancela cuando quieras" devuelve 0.
+
+---
+
+## REQ-105 - UX: Perfil en acordeón real (una sección a la vez)
+
+**Estado: implementado.**
+Perfil ya no usa `.pf-nav` ni `pfScrollTo`; `renderProfile()` renderiza secciones nativas `<details class="pf-accordion">` para Objetivo, Comidas, Entrenamiento, Mi suscripción, Privacidad, Recordatorios, Avisos del dispositivo, Administración y Cuenta. `profileAccordionToggle()` mantiene como máximo una sección abierta. Los campos permanecen montados en el DOM al cerrar secciones, `#pfEditableBody` sigue delegando cambios solo de Objetivo/Comidas/Entreno y el botón flotante `#profileSaveFloat` conserva el flujo de guardado global existente. Prueba E2E: `tests/e2e/perfil.spec.js`.
+
+### Origen
+
+División de REQ-99 (2 jul 2026) por tamaño; auditoría UI del 1 jul 2026 (hallazgo P1-5).
+
+### Problema
+
+En `renderProfile()`, `.pf-nav` son chips que solo hacen `scrollIntoView`; las ocho secciones (Objetivo, Comidas, Entreno, Suscripción, Privacidad, Recordatorios, Avisos del dispositivo, Cuenta) están expandidas simultáneamente en una sola página de ~4.850 px.
+
+### Objetivo
+
+Que el usuario vea y navegue una sección a la vez, sin perder el modelo de guardado actual.
+
+### Alcance
+
+1. Reemplazar `.pf-nav` + `pfScrollTo` por un acordeón real (`<details>` o equivalente JS): cada sección colapsada por defecto; abrir una puede cerrar las demás.
+2. Conservar sin cambios `saveProfile()`, `profileMarkDirty`/`profileClearDirty`, `#profileSaveFloat`, `saveOptionalConsents()`, `saveNotifPrefs()`, `renderPushSection()` — este REQ es solo estructura/visual.
+3. Conservar los ids existentes (`pfSecObjetivo`, `pfSecComidas`, `pfSecEntreno`, `pfSecPrivacidad`, `pfSecCuenta`) para no romper referencias externas.
+4. Colapsar/ocultar con CSS (no desmontar del DOM) para no perder valores de inputs no guardados al cambiar de sección.
+
+### Fuera de alcance
+
+- Guardado por sección (REQ-108).
+- Reagrupar Suscripción/Recordatorios/Avisos del dispositivo bajo Cuenta (REQ-107).
+- `aria-label` (REQ-106).
+
+### Riesgos
+
+- Si el toggle desmonta/remonta el HTML de una sección (en vez de solo ocultar), se pierden valores no guardados al cambiar de sección; usar ocultamiento CSS, no re-render parcial.
+
+### Criterios de aceptación
+
+- Cada sección abierta individualmente mide ~1.500 px o menos de alto renderizado.
+- Editar un campo en una sección, abrir otra y volver conserva el valor editado (no se pierde por el toggle).
+- El botón flotante "Guardar cambios" sigue apareciendo y funcionando igual que hoy.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Medir `scrollHeight` de cada sección abierta individualmente; editar un campo, alternar entre dos secciones y confirmar que el valor persiste en el DOM antes de guardar.
+
+---
+
+## REQ-106 - Accesibilidad: aria-label en todos los inputs de Perfil
+
+**Estado: implementado.**
+Auditados todos los `<input>`/`<select>`/`<textarea>` de `renderProfile()` y sus helpers (`mealTimesHtml`, `trainingAvailabilityHtml`, `checkChips`). La mayoría de los campos usaban un `<label>` visual sin `for`/`id`; en vez de agregar `aria-label` duplicando el texto ya visible, se asoció cada `<label>` con su control vía `for="<id>"` (23 campos en `index.html`: Nombre, Comidas al día, Comida principal, Minutos para cocinar, Presupuesto, Inicio/Fin de ventana, Repetición aceptable, Ingredientes que disfrutas, Otras preferencias, Alergias, Ingredientes que no te gustan, Deporte cardio, Trabajo de fuerza, Prioridad, Experiencia, Split de fuerza, Minutos por sesión, Horario preferido, Duración del plan, Lesiones, Limitaciones, Movimientos a evitar, Hora del recordatorio) y en `mealTimesHtml()` cada input de hora ("Comida N") ganó su `for` correspondiente. `trainingAvailabilityHtml()` ya tenía `aria-label="Lugar para {día}"` en los selects de lugar y checkboxes envueltos por `<label>` (de REQ-103); no requirió cambios. Los grupos de `checkChips` (chips de dieta, cocinas, preparaciones, equipo, días de recordatorio) y las etiquetas de sección ("Cocinas preferidas", "Días disponibles y lugar real", etc.) quedaron sin `for` a propósito: son rótulos de grupo, no de un único control, y cada checkbox ya es accesible por asociación implícita al estar envuelto en su propio `<label class="chip-check">`.
+Prueba E2E nueva: `tests/e2e/perfil.spec.js` ("REQ-106: todos los inputs/selects/textareas tienen nombre accesible") audita el DOM real renderizado de Perfil (sin abrir cada `<details>`, ya que REQ-105 mantiene los campos montados) y falla si algún control queda sin `aria-label`/`aria-labelledby`/`label[for]`/`label` envolvente; verificado que detecta una regresión (quitando un `for` a mano) antes de confirmar que el fix la deja en 0.
+
+### Origen
+
+División de REQ-99 (2 jul 2026) por tamaño; auditoría UI del 1 jul 2026 (hallazgo P1-5).
+
+### Problema
+
+Varios inputs/selects de `renderProfile()` y sus helpers (`mealTimesHtml`, `trainingAvailabilityHtml`, `checkChips`) dependen de un `<label>` visual sin asociación programática (`for`/`id`) o de un label genérico compartido (p. ej. horarios por día de la semana bajo un único label "Horarios aproximados") — un lector de pantalla no anuncia el propósito real del campo.
+
+### Objetivo
+
+Que cualquier input interactivo de Perfil tenga un nombre accesible correcto.
+
+### Alcance
+
+1. Auditar cada `<input>`/`<select>`/`<textarea>` dentro de `renderProfile()` y los helpers que usa (`mealTimesHtml`, `trainingAvailabilityHtml`, `checkChips`).
+2. Agregar `aria-label` donde el nombre accesible actual sea ambiguo o inexistente (los `label.chip-check` que envuelven el input ya son accesibles por asociación implícita — no agregar `aria-label` redundante ahí; enfocar en inputs de hora/número por día y campos con label compartido).
+3. No cambiar estructura visual, ids usados por JS, ni lógica de guardado.
+
+### Fuera de alcance
+
+- Orden de tabulación, foco programático, overhaul de accesibilidad fuera de Perfil.
+
+### Riesgos
+
+- Bajo: cambio aditivo de atributos; riesgo principal es duplicar anuncios si se agrega `aria-label` a un input que ya tiene nombre accesible claro por `<label for>`.
+
+### Criterios de aceptación
+
+- 0 inputs/selects/textareas visibles en Perfil sin nombre accesible (por `for`/`id`, `aria-label`, o `<label>` envolvente), verificado con un script de auditoría del DOM renderizado.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Script en `scripts/` (jsdom o parseo del HTML renderizado) que liste inputs de Perfil sin nombre accesible; debe reportar 0.
+
+---
+
+## REQ-107 - UX: reagrupar Suscripción, Recordatorios y Avisos del dispositivo bajo Cuenta
+
+**Estado: implementado.**
+En `renderProfile()` (`index.html`) se movió el bloque `<details id="pfSecSuscripcion">` para que quede inmediatamente después de `<details id="pfSecPrivacidad">` (antes iba antes de Privacidad). El nuevo orden de `<details class="pf-accordion">` es: Objetivo, Comidas, Entreno, Privacidad, Suscripción, Recordatorios, Avisos del dispositivo, [Administración si aplica], Cuenta — Recordatorios y Avisos ya seguían a Privacidad antes del cambio, así que mover solo Suscripción bastó para agrupar las cuatro secciones justo antes de Cuenta. No se tocaron ids (`#notif_*`, `#pushSection`), lógica de `loadNotifPrefs`/`populateNotifPrefsForm`/`renderPushSection`/`saveNotifPrefs`, ni el contenido de ninguna sección — cambio puramente de orden en el HTML generado.
+Prueba E2E nueva: `tests/e2e/perfil.spec.js` ("REQ-107: Privacidad, Suscripción, Recordatorios y Avisos quedan agrupados junto a Cuenta") verifica el orden exacto de ids de `details.pf-accordion`, confirma que activar el opt-in de Recordatorios sigue revelando `#notifOptions`, y que `#pushSection` sigue pintando contenido (wiring de `renderPushSection()` intacto) sin errores de consola.
+
+### Origen
+
+División de REQ-99 (2 jul 2026) por tamaño; auditoría UI del 1 jul 2026 (hallazgo P1-5).
+
+### Problema
+
+"Mi suscripción", "Recordatorios" y "Avisos del dispositivo" son secciones sueltas entre Entreno y Cuenta, sin agrupación visual con la sección "Cuenta" a la que pertenecen conceptualmente.
+
+### Objetivo
+
+Que toda la información de cuenta (identidad, suscripción, notificaciones) viva en un solo lugar coherente.
+
+### Alcance
+
+1. Mover los bloques "Mi suscripción" (`subscriptionStatusHtml()`), "Recordatorios" y "Avisos del dispositivo" (`renderPushSection`) para que queden agrupados junto a `pfSecCuenta`, después de Privacidad.
+2. Implementar sobre la estructura vigente al momento de ejecutarse (acordeón de REQ-105 si ya está implementado; bloques secuenciales si no).
+3. No cambiar ids usados por `loadNotifPrefs`/`populateNotifPrefsForm`/`renderPushSection` (`#notif_*`, `#pushSection`) ni su lógica.
+
+### Fuera de alcance
+
+- Cambiar lógica o copy de guardado de recordatorios/push.
+
+### Riesgos
+
+- `renderPushSection()` y `loadNotifPrefs().then(...)` corren después de escribir `innerHTML`; confirmar que las referencias por `id` (`$("#pushSection")`, `$("#notif_*")`) se siguen resolviendo igual tras mover los bloques de contenedor padre (los ids son globales al documento, no deberían romperse).
+
+### Criterios de aceptación
+
+- Privacidad, Suscripción, Recordatorios y Avisos del dispositivo aparecen agrupados junto a "Cuenta", en ese orden.
+- Activar/guardar recordatorios y el estado de notificaciones push siguen funcionando igual que antes del cambio.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Inspeccionar el DOM renderizado y confirmar el nuevo orden de secciones; probar activar recordatorios y confirmar que `renderPushSection()` sigue pintando el estado de push correctamente.
+
+---
+
+## REQ-108 - UX: guardado por sección en Perfil con aviso de cambios sin guardar
+
+**Estado: implementado.**
+En `index.html`, `profileAccordionGuard(ev,summaryEl)` se conectó al `onclick` de los 9 `<summary>` de nivel superior de Perfil (Objetivo, Comidas, Entreno, Privacidad, Suscripción, Recordatorios, Avisos, Administración, Cuenta). Antes de abrir una sección distinta, revisa si la sección actualmente abierta pertenece a un grupo con cambios sin guardar (`pfSectionGroup`/`pfGroupDirty`) y, si es así, hace `preventDefault()` y muestra `confirm(...)`; si el usuario cancela, la sección editada permanece abierta con el valor intacto (REQ-105 nunca desmonta los campos); si acepta, continúa la navegación. Se agregaron dos pares de dirty-tracking nuevos, independientes del flotante global existente (que ya cubre Objetivo+Comidas+Entreno vía `saveProfile()`, sin partir su validación cruzada — alcance fuera de este REQ): `pfPrivacyMarkDirty/pfPrivacyClearDirty` (wireado con `oninput`/`onchange` en el panel de Privacidad, limpiado en `saveOptionalConsents()`) y `pfNotifMarkDirty/pfNotifClearDirty` (wireado en el panel de Recordatorios, limpiado en `saveNotifPrefs()`). Cada uno pinta un indicador de texto "Cambios sin guardar" (`#pfPrivacyDirtyHint`, `#pfNotifDirtyHint`) junto a su propio botón de guardado, consistente con el patrón del botón flotante. `populateNotifPrefsForm()` sigue poblando por asignación directa de `.checked`/`.value`, que no dispara `input`/`change`, así que la carga inicial no marca la sección como sucia.
+Bug preexistente descubierto al escribir la prueba: `.toast` (`index.html`, notificación fija en la esquina inferior) no tenía `pointer-events:none`, así que aun invisible (`opacity:0`) bloqueaba clics reales sobre el botón flotante "Guardar cambios" cuando ambos se superponían cerca del borde inferior — se corrigió agregando `pointer-events:none` a la regla base `.toast` (no tiene contenido interactivo propio, así que no hay downside). Sin este fix, `tests/e2e/helpers.js`'s `completePrefs()` fixture tampoco encajaba con `validateFoodSchedule` (sin `eatingWindowStart`/`eatingWindowEnd` explícitos, el rango por defecto no encerraba `mealTimes[2]="20:00"`) — se agregaron esos dos campos al fixture compartido (no afecta otras specs, ninguna los usaba) para que `saveProfile()` sea verificable end-to-end.
+Prueba E2E nueva: `tests/e2e/perfil.spec.js` ("REQ-108: aviso de cambios sin guardar al cambiar de sección, por vía de guardado") cubre: editar Entreno y cancelar el aviso al intentar abrir Comidas (el valor permanece); reintentar y aceptar (navega, el valor persiste al volver); guardar con el botón flotante (limpia el indicador global); Privacidad y Recordatorios muestran/ocultan su propio indicador y confirman el POST correspondiente (`user_consents`, `notification_preferences`) vía el array `calls` de `installMocks`. Las pruebas REQ-105 y REQ-107 existentes se actualizaron para aceptar el `confirm()` que ahora aparece al navegar con cambios pendientes (comportamiento nuevo esperado, no una regresión). Suite completa (`npx playwright test`): 11/11 passing, sin ripple en otras specs por el cambio de fixture. `node scripts/release-gate.mjs`: 46/48 (los 2 bloqueantes son preexistentes y no relacionados — ver commit).
+
+### Origen
+
+División de REQ-99 (2 jul 2026) por tamaño; auditoría UI del 1 jul 2026 (hallazgo P1-5). Depende de REQ-105 (estructura de acordeón).
+
+### Problema
+
+Todo Perfil comparte un único guardado global (`saveProfile()` + botón flotante), salvo Recordatorios y el permiso de fotos que tienen guardados propios independientes — modelo inconsistente con riesgo de pérdida silenciosa de cambios al navegar entre secciones.
+
+### Objetivo
+
+Que cada sección tenga una vía de guardado clara, visible solo cuando hay cambios pendientes, sin perder cambios de otras secciones.
+
+### Alcance
+
+1. Sobre la estructura de acordeón de REQ-105, mostrar el indicador de "cambios sin guardar" de forma consistente en las tres vías de guardado existentes (Objetivo+Comidas+Entreno vía `saveProfile()`; Privacidad/fotos vía `saveOptionalConsents()`; Recordatorios vía `saveNotifPrefs()`).
+2. Mantener a Objetivo+Comidas+Entreno bajo un único guardado (`saveProfile()`) porque `validateTrainingProfile`/`validateFoodSchedule`/`validateFoodPreferences` validan esos campos en conjunto — no partir esa validación cruzada en guardados independientes.
+3. Al cambiar de sección con cambios pendientes sin guardar, mostrar aviso (confirm o banner inline); no perder el valor en el DOM (la sección solo se oculta, no se destruye — ya garantizado por REQ-105).
+
+### Fuera de alcance
+
+- Cambiar `profileSchemaVersion` ni el esquema de `profiles.prefs`.
+- Separar la validación cruzada de Objetivo/Comidas/Entreno en guardados independientes.
+
+### Riesgos
+
+- Guardar solo una parte de Objetivo/Comidas/Entreno dejaría `profiles.prefs` en un estado que no pasa `validateTrainingProfile`/`validateFoodSchedule`/`validateFoodPreferences`; ese trío debe seguir viajando en un solo `saveProfilePrefs`.
+
+### Criterios de aceptación
+
+- Cambiar un campo y navegar a otra sección sin guardar muestra aviso, o el cambio permanece recuperable al volver (no se pierde en silencio).
+- Ningún guardado deja `profiles.prefs` en un estado que falle las validaciones existentes.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Editar un campo de Entreno, navegar a Comidas sin guardar, confirmar aviso; guardar y confirmar que el cambio persiste; repetir sin guardar y confirmar que se avisó antes de perder el cambio.
+
+---
+
+## REQ-109 - Fix Home: el badge "N pendientes" cuenta la fila de Descanso
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría del journey **home** (2 jul 2026), verificado en navegador (E2E): día de descanso con comidas pendientes.
+
+### Problema
+
+El badge muestra "2 pendientes" en un día de descanso, pero solo hay una acción real: la 2.ª fila ("Descanso planificado") es informativa, sin botón. Contar el descanso infla el número y contradice el texto "pendiente(s)".
+
+### Causa raíz
+
+`homeAgendaHtml` deriva el conteo de `data.items.length` (`index.html:3481`) sin excluir la fila de descanso que `homeAgendaData` inserta con `actions:""` (`index.html:3409`).
+
+### Objetivo
+
+Que el badge cuente solo acciones pendientes; una fila informativa no suma.
+
+### Alcance
+
+1. En `homeAgendaHtml`, contar `items.filter(i=>i.actions)`, no `items.length`; mantener visible la fila de descanso.
+
+### Fuera de alcance
+
+- No cambiar orden ni contenido de la agenda (REQ-97).
+
+### Riesgos
+
+- No romper el conteo cuando todas las filas son accionables.
+
+### Criterios de aceptación
+
+- Descanso con comidas pendientes: badge "1 pendiente"; entreno con comida+entreno pendientes: "2 pendientes".
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E: `completePrefs({trainingDays:[díasSinHoy]})`, preparar día, afirmar `.agenda-count`="1 pendiente".
+
+### Implementación
+
+`homeAgendaData` ahora calcula `pendingCount=items.filter(i=>i.actions).length` (excluye la fila de descanso, que se inserta con `actions:""`) y lo devuelve junto con `items`. `homeAgendaHtml` usa `data.pendingCount` en vez de `data.items.length` para el badge; la fila de descanso se sigue renderizando igual (sin cambios en `homeAgendaItemHtml` ni en el orden/contenido de la agenda). `node scripts/release-gate.mjs`: 46/48 (los 2 bloqueantes — "Sin modificaciones no intencionadas" por el propio diff sin commitear y `validate-docs-index.mjs` por tamaño de este archivo — son preexistentes y no relacionados, mismo patrón que REQ-108).
+
+---
+
+## REQ-110 - Fix UX: catch de aiGenerateWeek sin salida — sumar opción práctica y reintento
+
+**Estado: implementado.** Catch externo de `aiGenerateWeek` (`index.html`) conserva `daysData`/`problems` parciales en `window._genWeek` y muestra "Usar una semana práctica ahora" (nueva función `deterministicWeekFromModal()`, completa solo los días faltantes con `generateDeterministicWeek` y re-renderiza `genWeekReviewHtml()`) y "Reintentar" (`aiGenerateWeek()`), mismo patrón de copy/clases que `deterministicFromModal`.
+
+### Origen
+
+Sesión del 1 jul 2026: el fix de P0-2 (auditoría `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`) se aplicó a `aiGenerateDay` pero no al flujo semanal.
+
+### Problema
+
+`aiGenerateWeek` ya entra por ruta determinista sin coach o sin entitlement, pero si el coach falla a mitad de la generación, el catch externo muestra solo `⚠️ <mensaje>` en el modal, sin reintento ni alternativa. Mismo callejón sin salida que tenía el día.
+
+### Objetivo
+
+Ningún fallo del coach durante "Preparar mi semana" deja al usuario sin salida accionable.
+
+### Alcance
+
+1. Catch externo de `aiGenerateWeek`: botones "Usar una semana práctica ahora" (aplica `generateDeterministicWeek` + `genWeekReviewHtml`) y "Reintentar".
+2. Conservar los días ya generados (`daysData` parcial) y completar solo los faltantes por ruta determinista.
+3. Reusar el patrón de `deterministicFromModal` (mismo copy y clases).
+
+### Fuera de alcance
+
+- Lógica de cuota y `beginCoachAction`/`endCoachAction`.
+- El flujo determinista semanal existente.
+
+### Riesgos
+
+- `window._genWeek` debe quedar consistente al mezclar días del coach con deterministas.
+
+### Criterios de aceptación
+
+- Con fallo del coach en el día N, el modal ofrece continuar determinista o reintentar; ninguna ruta termina en modal muerto.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Forzar error en `generateOneDay` en local y recorrer ambos botones; la semana aplicada respeta slots y restricciones.
+
+---
+
+## REQ-111 - Fix API: /api/checkout valida configuración de Stripe antes que la sesión (503 en vez de 401/403)
+
+**Estado: implementado.**
+Ya resuelto por REQ-59 (`fix(checkout): REQ-59 validar sesión antes de Stripe`, commit `a7409ea`): `api/checkout.js` valida método → `verifyUser` (401) → `stripeKey` (503) → resto del flujo, verificado leyendo el archivo línea por línea el 2 jul 2026. Esta entrada reapareció por re-derivar el backlog desde una auditoría vieja (23 jun) sin verificar contra el código actual; se deja como registro para no reabrirla.
+
+---
+
+## REQ-112 - Accesibilidad: toasts anunciados a lectores de pantalla y contraste de texto muted
+
+**Estado: implementado.** `#toast` (`index.html`) gana `role="status"` `aria-live="polite"` `aria-atomic="true"`; `toast()` solo hace `textContent`/`classList`, así que el anuncio no roba foco. `--muted` sube de `#8880aa` a `#9992b6` (≥4.5:1 sobre `--surf1`..`--surf4`, verificado por fórmula WCAG), lo que corrige de una sola vez todo el texto de cuerpo real que ya usaba ese token (p. ej. `.exercise-copy`, `.workout .detail`, `.onboarding-copy`, `.agenda-note`, `.prio-detail`, `.field-note`) sin tocar paleta ni tipografía. `--muted2` (`#52516e`, 1.9–2.6:1) se mantiene sin cambios para los usos decorativos o de cifra/etiqueta corta de una sola línea que excluye el alcance (`.mm-num`, `.mini-macro-*`, `.streak-best`, `.chat-meta`, `.agenda-label`, `.tour-dots`, `.ci-scale-lbl`, iconos SVG); se auditaron sus ~16 usos uno por uno y se migraron a `--muted` los 4 que sí son texto real legible: `.l-hero-note`, `.l-footer-legal` (antes con menos contraste que sus propios enlaces internos, que ya usaban `--muted`), el botón "Limpiar conversación" del coach y `.tour-skip` ("Saltar"/"Cerrar"). `node scripts/release-gate.mjs`: 46/48 (los 2 bloqueantes —"Sin modificaciones no intencionadas" por el propio diff sin commitear y `validate-docs-index.mjs` por tamaño de este archivo— son preexistentes y no relacionados, mismo patrón que REQ-108/REQ-109).
+
+### Origen
+
+Auditoría UI del 1 jul 2026 (hallazgo P2-11); complementa los aria-labels de Perfil (REQ-106). Alcance recortado el 2 jul 2026: el ítem de trap de foco en modales ya estaba resuelto por REQ-37 (`_modalKeyHandler` en `index.html`: Escape cierra, Tab queda atrapado en `.sheet`, el foco vuelve al disparador al cerrar) — verificado contra el código, no repetir.
+
+### Problema
+
+(a) Los toasts (`#toast`) no se anuncian a lectores de pantalla: no tienen `role`/`aria-live`. (b) `--muted` (`#8880aa`) da ~4.0:1 sobre `--surf4` y ~4.5:1 sobre `--surf3` (roza o incumple AA para texto de cuerpo); `--muted2` (`#52516e`) da 1.9–2.6:1 sobre todas las superficies del tema — muy por debajo de AA donde se usa como texto legible, no solo decorativo.
+
+### Objetivo
+
+Avisos y textos secundarios usables con lector de pantalla y legibles con baja visión, sin rediseñar la estética.
+
+### Alcance
+
+1. `#toast` con `role="status"` y `aria-live="polite"`.
+2. Auditar cada uso de `--muted`/`--muted2` como color de texto: subir el token o mover a `--txt`/un tono intermedio donde el contenido sea texto de cuerpo real (no decorativo tipo punto de estado o cifra secundaria de una sola línea corta).
+
+### Fuera de alcance
+
+- Foco atrapado en modales (ya resuelto por REQ-37). Aria-labels de inputs de Perfil (REQ-106). Paleta de marca y tipografías.
+
+### Riesgos
+
+- Subir el contraste de `--muted`/`--muted2` afecta toda la app: revisar jerarquía visual en las vistas principales para no aplanar la UI.
+
+### Criterios de aceptación
+
+- Un toast se anuncia con VoiceOver/NVDA sin robar el foco.
+- Texto de cuerpo que hoy usa `--muted`/`--muted2` cumple ≥4.5:1 contra su superficie real.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Recorrido con VoiceOver en Safari iOS; medir contraste de los tokens finales sobre `--surf1`..`--surf4`.

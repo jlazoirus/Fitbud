@@ -50,4 +50,37 @@ test.describe("Navegación", () => {
 
     expect(errors, `Errores de consola en la landing:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  test("REQ-113: el campo de contraseña permite mostrar y ocultar sin enviar", async ({ page, context }) => {
+    await installMocks(context);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+    await page.evaluate(() => {
+      window._showAuth = true;
+      window._authMode = "in";
+      render();
+    });
+
+    const password = page.locator("#au_pwd");
+    const toggle = page.locator('button[aria-controls="au_pwd"]');
+    await expect(password).toHaveAttribute("type", "password");
+    await expect(toggle).toHaveAttribute("aria-label", "Mostrar contraseña");
+
+    await password.fill("ClaveVisible123");
+    await toggle.click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue("ClaveVisible123");
+    await expect(toggle).toHaveAttribute("aria-label", "Ocultar contraseña");
+    await expect(toggle).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#auOut")).toBeEmpty();
+
+    await toggle.click();
+    await expect(password).toHaveAttribute("type", "password");
+    await expect(password).toHaveValue("ClaveVisible123");
+    await expect(toggle).toHaveAttribute("aria-label", "Mostrar contraseña");
+    await expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    expect(errors, `Errores de consola en toggle de contraseña:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
