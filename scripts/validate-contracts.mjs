@@ -36,6 +36,9 @@ const basePrefs={
 r=validateProfilePrefs(basePrefs);
 assert.ok(r.ok,"Perfil válido debe pasar: "+r.errors.join(", "));
 
+r=validateProfilePrefs({...basePrefs,primarySport:"walking",strengthMode:"none",equipment:[]});
+assert.ok(r.ok,"Perfil con caminata y fuerza pausada debe pasar: "+r.errors.join(", "));
+
 r=validateProfilePrefs({...basePrefs,primarySport:"tennis"});
 assert.ok(!r.ok,"primarySport inválido debe fallar");
 

@@ -54,12 +54,15 @@ test.describe("Onboarding", () => {
     expect(Math.abs(kcalFromMacros - kcalShown) / kcalShown).toBeLessThan(0.12);
     await page.getByRole("button", { name: "Continuar" }).click();
 
-    // Paso 3: semana de entrenamiento (solo fuerza, gym, 10 semanas, ≥3 días)
+    // Paso 3: semana de entrenamiento (caminata, sin fuerza por ahora, 10 semanas, ≥3 días)
     await expect(app).toContainText("Ciclo de seguimiento");
+    await expect(app).toContainText("¿Practicas alguna actividad física?");
+    await expect(page.locator("#ob_sport")).toContainText("Caminar");
+    await expect(page.locator("#ob_strength")).toContainText("No quiero fuerza por ahora");
     await expect(page.locator("#ob_duration")).toContainText("10 semanas · recomendado");
     await expect(app).toContainText("10 semanas es el proceso completo recomendado");
-    await page.check("#ob_has_cardio_no");
-    await page.selectOption("#ob_strength", "gym");
+    await page.selectOption("#ob_sport", "walking");
+    await page.selectOption("#ob_strength", "none");
     await page.selectOption("#ob_duration", "10");
     for (const d of [1, 3, 5]) {
       const cb = page.locator(`#ob_day_${d}`);
@@ -90,6 +93,9 @@ test.describe("Onboarding", () => {
     expect(Number(prefs.proteinTarget)).toBe(protShown);
     expect(Number(prefs.carbTarget)).toBe(carbShown);
     expect(Number(prefs.fatTarget)).toBe(fatShown);
+    expect(prefs.primarySport).toBe("walking");
+    expect(prefs.strengthMode).toBe("none");
+    expect(prefs.strengthPlace).toBe("none");
     expect(prefs.onboardingCompletedAt).toBeTruthy();
 
     // Consentimientos y screening quedaron registrados (privacidad por defecto)

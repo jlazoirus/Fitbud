@@ -49,6 +49,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 
 - `exercise-catalog.js` y `supabase/exercises.sql` cubren biblioteca, media y roles de rutina.
 - `training-plan.js` valida planes de 4/10 semanas; `workout-player.js` maneja ejecucion recuperable, series, cardio, temporizadores, RPE y sustituciones.
+- Onboarding/Perfil de entrenamiento (REQ-115): la UI pregunta actividad fisica principal (`walking/running/cycling/swimming/other/strength_only`) y donde entrenar fuerza (`strengthPlace: gym/home/outdoor/none`). `strengthMode:"none"` soporta semanas solo de actividad; caminata tiene ejercicios/roles `walking`; casa/aire libre muestran recursos (`bodyweight`, bandas, mancuernas, barra/discos, dominadas) sin duplicar lugar como decision principal.
 - Splits progresivos: beginner = Full Body, intermediate = Upper/Lower, advanced = Push/Pull/Legs por defecto con selector avanzado.
 
 ## Persistencia, sync y planes

@@ -1403,7 +1403,8 @@ Que el onboarding sea entendible para principiantes sin cambiar los valores inte
 
 ## REQ-115 - UX Onboarding: entrenamiento en dos decisiones claras sin duplicar lugar y fuerza
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Onboarding y Perfil usan dos decisiones visibles: actividad física principal (`walking`, `running`, `cycling`, `swimming`, `other`, `strength_only`) y dónde entrenar fuerza (`gym`, `home`, `outdoor`, `none`). `strengthPlace` conserva casa/aire libre/gimnasio/no fuerza y se mapea de forma compatible a `strengthMode`, `trainingLocations` y `equipment`. Caminata tiene catálogo/roles propios y `strengthMode:"none"` permite plan solo de actividad sin exigir equipo. Validador: `scripts/validate-training-onboarding-decisions.mjs`.
 
 ### Origen
 

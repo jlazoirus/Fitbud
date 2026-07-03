@@ -101,6 +101,15 @@
       contraindications:["dolor agudo al correr","señales cardiovasculares no evaluadas"],
       media_key:"run",
     },
+    walk:{
+      start_position:"Postura alta, mirada al frente y pasos cómodos.",
+      steps:["Empieza con paso suave para entrar en calor.","Mantén un ritmo estable y respiración controlada.","Baja el ritmo o detente ante cualquier señal de alerta."],
+      breathing:"Respira de forma rítmica y conserva un ritmo que te permita hablar.",
+      common_errors:["Caminar encorvado","Tensar hombros y manos","Ignorar dolor creciente"],
+      safety_signals:["Dolor de pecho, mareo o falta de aire inusual","Dolor articular que cambia la técnica"],
+      contraindications:["dolor agudo al caminar","señales cardiovasculares no evaluadas"],
+      media_key:"run",
+    },
     cycle:{
       start_position:"Bicicleta estable, sillín ajustado y manos relajadas.",
       steps:["Pedalea suave hasta encontrar una cadencia estable.","Completa los bloques sin balancear excesivamente el tronco.","Recupera con resistencia baja y termina con pedaleo fácil."],
@@ -199,6 +208,9 @@
   }));
 
   const endurance=[
+    ["walk-brisk","Caminata a paso activo","walking","walk","Caminar a ritmo cómodo con pausas breves","Aumentar tiempo a paso vivo sin perder respiración controlada",["walk-easy","walk-mobility"]],
+    ["walk-easy","Caminata aeróbica fácil","walking","walk","Caminata corta en terreno plano","Aumentar duración manteniendo conversación",["walk-brisk","walk-mobility"]],
+    ["walk-mobility","Caminata con movilidad","walking","walk","Caminata suave y movilidad articular","Sumar bloques de paso activo entre movilidad",["walk-easy"]],
     ["run-intervals","Intervalos de running","running","run","Series de carrera suave con más recuperación","Aumentar gradualmente la duración del bloque rápido",["run-easy","run-drills"]],
     ["run-easy","Running aeróbico fácil","running","run","Alternar caminar y correr","Aumentar tiempo manteniendo ritmo conversacional",["run-intervals","run-drills"]],
     ["run-drills","Técnica de carrera","running","run","Marcha técnica y progresivos cortos","Añadir repeticiones sin perder postura",["run-easy"]],
@@ -246,6 +258,7 @@
       pullB:["pull-up","band-row","assisted-pull-up"],
       legsB:["walking-lunge","glute-bridge","slider-leg-curl","step-up"],
     },
+    walking:{calidad:["walk-brisk"],facil:["walk-easy"],tecnica:["walk-mobility"]},
     running:{calidad:["run-intervals"],facil:["run-easy"],tecnica:["run-drills"]},
     cycling:{calidad:["cycle-intervals"],facil:["cycle-endurance"],tecnica:["cycle-cadence"]},
     swimming:{calidad:["swim-intervals"],facil:["swim-endurance"],tecnica:["swim-drills"]},

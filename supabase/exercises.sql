@@ -317,6 +317,30 @@ insert into exercises (
   'Fitbros Studio', '', 'Contenido propio Fitbros', 'Fitbros Studio', true
 ),
 (
+  'walk-brisk', 'Caminata a paso activo', '[]'::jsonb, 'walking', 'beginner',
+  '[]'::jsonb, '["outdoor"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'walk',
+  'Postura alta, mirada al frente y pasos cómodos.', '["Empieza con paso suave para entrar en calor.","Acelera solo hasta un ritmo que puedas sostener sin perder la respiración.","Vuelve a paso cómodo durante la recuperación y detente si aparece una señal de alerta."]'::jsonb, 'Respira de forma rítmica y conserva un ritmo que permita hablar en frases cortas.', '["Caminar encorvado","Aumentar demasiado el paso","Ignorar dolor creciente"]'::jsonb,
+  '["Dolor de pecho, mareo o falta de aire inusual","Dolor articular que cambia la técnica"]'::jsonb, 'Caminar a ritmo cómodo con pausas breves', 'Aumentar tiempo a paso vivo sin perder respiración controlada', '["walk-easy","walk-mobility"]'::jsonb,
+  '["dolor agudo al caminar","señales cardiovasculares no evaluadas"]'::jsonb, 'inline_svg', 'run', 'run',
+  'Fitbros Studio', '', 'Contenido propio Fitbros', 'Fitbros Studio', true
+),
+(
+  'walk-easy', 'Caminata aeróbica fácil', '[]'::jsonb, 'walking', 'beginner',
+  '[]'::jsonb, '["outdoor"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'walk',
+  'Postura alta, mirada al frente y pasos cómodos.', '["Empieza con paso suave para entrar en calor.","Mantén un ritmo conversacional y estable.","Termina con unos minutos tranquilos y registra cualquier molestia."]'::jsonb, 'Respira de forma rítmica y conserva un ritmo que permita hablar con comodidad.', '["Caminar encorvado","Tensar hombros y manos","Ignorar dolor creciente"]'::jsonb,
+  '["Dolor de pecho, mareo o falta de aire inusual","Dolor articular que cambia la técnica"]'::jsonb, 'Caminata corta en terreno plano', 'Aumentar duración manteniendo conversación', '["walk-brisk","walk-mobility"]'::jsonb,
+  '["dolor agudo al caminar","señales cardiovasculares no evaluadas"]'::jsonb, 'inline_svg', 'run', 'run',
+  'Fitbros Studio', '', 'Contenido propio Fitbros', 'Fitbros Studio', true
+),
+(
+  'walk-mobility', 'Caminata con movilidad', '[]'::jsonb, 'walking', 'beginner',
+  '[]'::jsonb, '["outdoor"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'walk',
+  'Postura alta, mirada al frente y pasos cómodos.', '["Camina suave hasta sentirte estable.","Alterna bloques cortos de paso cómodo con movilidad de tobillos, cadera y hombros.","Mantén movimientos controlados y sin dolor."]'::jsonb, 'Respira cómodo y baja el ritmo si necesitas recuperar el habla.', '["Forzar rangos de movilidad","Caminar mirando al suelo","Ignorar dolor creciente"]'::jsonb,
+  '["Dolor de pecho, mareo o falta de aire inusual","Dolor articular que cambia la técnica"]'::jsonb, 'Caminata suave y movilidad articular', 'Sumar bloques de paso activo entre movilidad', '["walk-easy"]'::jsonb,
+  '["dolor agudo al caminar","señales cardiovasculares no evaluadas"]'::jsonb, 'inline_svg', 'run', 'run',
+  'Fitbros Studio', '', 'Contenido propio Fitbros', 'Fitbros Studio', true
+),
+(
   'run-intervals', 'Intervalos de running', '[]'::jsonb, 'running', 'beginner',
   '[]'::jsonb, '["outdoor"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'run',
   'Postura alta, mirada al frente y pasos suaves bajo el cuerpo.', '["Comienza a ritmo fácil para estabilizar respiración y técnica.","Completa el bloque indicado manteniendo una zancada controlada.","Reduce el ritmo durante la recuperación y detente si aparece una señal de alerta."]'::jsonb, 'Usa una respiración rítmica y recupera el habla durante los tramos suaves.', '["Salir demasiado rápido","Alargar la zancada por delante del cuerpo","Ignorar dolor creciente"]'::jsonb,

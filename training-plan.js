@@ -2,7 +2,7 @@
   "use strict";
 
   const VERSION=1;
-  const SESSION_TYPES=new Set(["strength","running","cycling","swimming"]);
+  const SESSION_TYPES=new Set(["strength","walking","running","cycling","swimming"]);
   const BLOCK_PHASES=new Set(["warmup","main","recovery","cooldown"]);
 
   function number(value,fallback){
@@ -168,7 +168,7 @@
     const strength=session.type==="strength";
     const kind=strength
       ?(strengthMode==="bodyweight"?"Peso corporal":"Gimnasio")
-      :session.type==="swimming"?"Natación":session.type==="cycling"?"Cycling":"Running";
+      :session.type==="swimming"?"Natación":session.type==="cycling"?"Bicicleta":session.type==="walking"?"Caminata":"Correr";
     return {
       id:session.id,
       kind,

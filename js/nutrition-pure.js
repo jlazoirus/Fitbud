@@ -27,8 +27,8 @@
   const BASE_SLOTS=MEAL_SLOT_TEMPLATES[4].map(([id,slot])=>({id,slot}));
 
   // ── Constantes de perfil ────────────────────────────────────────────────────
-  const SPORT_LABELS={running:"Running",cycling:"Cycling",swimming:"Natación",other:"Otro deporte cardio",strength_only:"Solo fuerza"};
-  const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Peso corporal"};
+  const SPORT_LABELS={walking:"Caminar",running:"Correr",cycling:"Bicicleta",swimming:"Natación",other:"Otra actividad",strength_only:"Ninguna actividad"};
+  const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Casa o aire libre",none:"Sin fuerza por ahora"};
   const PROFILE_SCHEMA_VERSION=3;
   const PROFILE_REVIEW_DAYS=28;
   const PROFILE_REVIEW_MS=PROFILE_REVIEW_DAYS*24*60*60*1000;
@@ -234,11 +234,22 @@
     if(split==="upperlower")return _upperLowerTemplate(days,priority);
     return _fullBodyTemplate(days,priority);
   }
-  function defaultTrainingLocations(primary,strength,dayIds,priority,experience,workoutSplit){
-    const sessions=baseWorkoutTemplate(dayIds.length,priority,experience,workoutSplit);
+  function activityOnlyTemplate(days,primary){
+    const base={3:["facil","tecnica","facil"],4:["facil","tecnica","facil","calidad"],5:["facil","tecnica","facil","calidad","facil"],6:["facil","tecnica","facil","calidad","facil","tecnica"]};
+    const walking={3:["facil","facil","tecnica"],4:["facil","facil","tecnica","facil"],5:["facil","facil","tecnica","facil","calidad"],6:["facil","facil","tecnica","facil","calidad","facil"]};
+    const source=primary==="walking"?walking:base;
+    return (source[days]||source[3]).slice();
+  }
+  function trainingTemplateForModes(days,priority,experience,workoutSplit,strength,primary){
+    if(strength==="none")return activityOnlyTemplate(days,primary);
+    return baseWorkoutTemplate(days,priority,experience,workoutSplit);
+  }
+  function defaultTrainingLocations(primary,strength,dayIds,priority,experience,workoutSplit,strengthPlace){
+    const sessions=trainingTemplateForModes(dayIds.length,priority,experience,workoutSplit,strength,primary);
+    const bodyweightLocation=strengthPlace==="outdoor"?"outdoor":"home";
     return Object.fromEntries(dayIds.map((day,index)=>{
       const session=sessions[index];
-      const location=STRENGTH_SESSION_IDS.has(session)?(strength==="bodyweight"?"home":"gym"):(primary==="swimming"?"pool":"outdoor");
+      const location=STRENGTH_SESSION_IDS.has(session)?(strength==="bodyweight"?bodyweightLocation:"gym"):(primary==="swimming"?"pool":"outdoor");
       return [day,location];
     }));
   }
@@ -312,7 +323,7 @@
     defaultTrainingDays,normalizedTrainingDays,defaultMealTimes,validTime,
     detectedTimeZone,validTimeZone,normalizedMealTimes,
     // Entrenamiento
-    inferredTrainingPriority,effectiveWorkoutSplit,baseWorkoutTemplate,defaultTrainingLocations,
+    inferredTrainingPriority,effectiveWorkoutSplit,baseWorkoutTemplate,activityOnlyTemplate,trainingTemplateForModes,defaultTrainingLocations,
     _fullBodyTemplate,_upperLowerTemplate,_pplTemplate,
     // Macros
     calculateMacroTargets,
@@ -377,6 +388,8 @@
   root.inferredTrainingPriority=inferredTrainingPriority;
   root.effectiveWorkoutSplit=effectiveWorkoutSplit;
   root.baseWorkoutTemplate=baseWorkoutTemplate;
+  root.activityOnlyTemplate=activityOnlyTemplate;
+  root.trainingTemplateForModes=trainingTemplateForModes;
   root.defaultTrainingLocations=defaultTrainingLocations;
   root._fullBodyTemplate=_fullBodyTemplate;
   root._upperLowerTemplate=_upperLowerTemplate;

@@ -3,7 +3,7 @@
 
   const VERSION=1;
   const STRENGTH_KINDS=new Set(["Gimnasio","Peso corporal"]);
-  const CARDIO_KINDS=new Set(["Running","Cycling","Natación"]);
+  const CARDIO_KINDS=new Set(["Caminata","Correr","Running","Bicicleta","Cycling","Natación"]);
 
   function number(value,fallback){
     const parsed=Number(value);
@@ -70,6 +70,7 @@
   function cardioLabels(sport){
     if(sport==="swimming")return {warmup:"Entrada en calor",cooldown:"Vuelta a la calma",easy:"Nado aeróbico"};
     if(sport==="cycling")return {warmup:"Pedaleo de calentamiento",cooldown:"Pedaleo suave",easy:"Fondo aeróbico"};
+    if(sport==="walking")return {warmup:"Caminata suave",cooldown:"Caminata tranquila",easy:"Caminata aeróbica"};
     return {warmup:"Calentamiento",cooldown:"Enfriamiento",easy:"Carrera aeróbica"};
   }
   function cardioSpecs(sport,sessionId,phaseIndex,sessionMinutes){
@@ -98,6 +99,13 @@
           {rounds:4,target:"6 min a umbral controlado",seconds:360,recovery:180,rpe:8},
           {rounds:4,target:"20 s de aceleración",seconds:20,recovery:70,rpe:6},
         ],
+        walking:[
+          {rounds:6,target:"2 min a paso rápido",seconds:120,recovery:120,rpe:5},
+          {rounds:5,target:"3 min a paso vivo",seconds:180,recovery:120,rpe:6},
+          {rounds:4,target:"30 s de paso ágil",seconds:30,recovery:90,rpe:5},
+          {rounds:4,target:"4 min a paso sostenido",seconds:240,recovery:150,rpe:6},
+          {rounds:4,target:"1 min de paso activo",seconds:60,recovery:90,rpe:5},
+        ],
         swimming:[
           {rounds:8,target:"50 m",seconds:50,recovery:20,rpe:7},
           {rounds:6,target:"100 m",seconds:100,recovery:30,rpe:8},
@@ -121,6 +129,7 @@
       const targets={
         running:["Movilidad y técnica de carrera","6 progresivos de 15 s","Carrera suave con postura estable"],
         cycling:["Cadencia cómoda","6 bloques de cadencia alta","Pedaleo estable sin balanceo"],
+        walking:["Postura alta y brazos relajados","Cambios suaves de ritmo","Paso cómodo y respiración estable"],
         swimming:["Agarre y alineación","Respiración y virajes","Nado suave integrando la técnica"],
       };
       const names=targets[sport]||targets.running;
@@ -133,6 +142,7 @@
       const targets={
         running:["45-55 min a ritmo conversacional","55-70 min; últimos 10 min estables","40-45 min muy suaves","65-80 min sostenibles","40-50 min suaves"],
         cycling:["60-75 min en zona 2","75-105 min en zona 2","50-60 min muy fáciles","90-120 min con 3 bloques tempo","60-75 min fáciles"],
+        walking:["30-45 min a paso cómodo","40-55 min a paso conversacional","30-40 min muy suave","45-60 min sostenibles","35-45 min cómodos"],
         swimming:["1200-1600 m suaves","1600-2200 m aeróbicos","1000-1400 m muy suaves","2000-2600 m aeróbicos","1200-1600 m cómodos"],
       };
       steps.push(timedStep("endurance","main",labels.easy,(targets[sport]||targets.running)[phase],"RPE 3-5",mainSeconds));
