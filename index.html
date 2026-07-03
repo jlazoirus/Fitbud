@@ -3954,13 +3954,13 @@ function exerciseCard(exercise,admin){
         <div><h3>${esc(exercise.name)}</h3><div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(equipment.join(", "))}`:""}</div></div>
         ${exercise.active===false?'<span class="badge b-Libre">Archivado</span>':""}
       </div>
-      <div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
+      ${admin?`<div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
       <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
       <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
       <div class="exercise-copy"><b>Errores comunes:</b> ${esc(errors.join(" · "))}</div>
       <div class="exercise-copy"><b>Más fácil:</b> ${esc(exercise.regression)}<br><b>Más difícil:</b> ${esc(exercise.progression)}</div>
       <div class="exercise-safety"><b>Detente si:</b> ${esc(signals.join(" · "))}</div>
-      ${admin?`<div class="exercise-copy"><b>Músculos:</b> ${esc(muscles.join(", "))}<br><b>Fuente/licencia:</b> ${esc(exercise.source_name)} · ${esc(exercise.license_name)}${issues.length?`<br><b style="color:var(--bad)">Incompleto:</b> ${esc(issues.join(", "))}`:""}</div>`:""}
+      <div class="exercise-copy"><b>Músculos:</b> ${esc(muscles.join(", "))}<br><b>Fuente/licencia:</b> ${esc(exercise.source_name)} · ${esc(exercise.license_name)}${issues.length?`<br><b style="color:var(--bad)">Incompleto:</b> ${esc(issues.join(", "))}`:""}</div>`:""}
       <div class="exercise-actions">
         <button class="btn btn-sm" onclick="openExerciseGuide('${esc(exercise.slug)}')">Ver técnica</button>
         <button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>
