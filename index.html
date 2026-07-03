@@ -7713,8 +7713,37 @@ async function aiGenerateWeek(){
     window._genWeek={week:w,label,daysData,problems};
     const el=$("#genwOut");if(el)el.innerHTML=genWeekReviewHtml();
   }catch(e){
-    const el=$("#genwOut");if(el)el.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;
+    // Nunca dejar al usuario en un callejón sin salida: conservar los días ya
+    // generados y ofrecer completar el resto por ruta determinista, o reintentar.
+    window._genWeek={week:w,label,daysData,problems};
+    const el=$("#genwOut");
+    if(el)el.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>
+      <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-accent btn-sm" onclick="deterministicWeekFromModal()">Usar una semana práctica ahora</button>
+        <button class="btn btn-sm" onclick="aiGenerateWeek()">Reintentar</button>
+      </div>`;
   }finally{endCoachAction(actionKey);}
+}
+// Fallback desde el modal del coach: conserva los días ya generados y completa
+// los faltantes de la semana por ruta determinista.
+function deterministicWeekFromModal(){
+  const draft=window._genWeek;
+  if(!draft){toast("No pudimos preparar tu semana ahora. Inténtalo otra vez en unos minutos.");closeModal();return;}
+  const pending=weekPendingDays(weekDays(draft.week));
+  const doneIds=new Set(draft.daysData.map(d=>d.ds));
+  const missing=pending.filter(ds=>!doneIds.has(ds));
+  if(missing.length){
+    const det=generateDeterministicWeek(draft.week,missing);
+    if(det&&det.daysData&&det.daysData.length){
+      draft.daysData=draft.daysData.concat(det.daysData).sort((a,b)=>a.ds<b.ds?-1:a.ds>b.ds?1:0);
+      if(!draft.weekSummary&&det.weekSummary)draft.weekSummary=det.weekSummary;
+      if(!draft.variety&&det.variety)draft.variety=det.variety;
+      const nd=window.FITBUD_NUTRITION_DOMAIN;
+      draft.shoppingList=(nd&&nd.buildShoppingListFromNutritionPlan)?nd.buildShoppingListFromNutritionPlan(draft.daysData):buildShoppingList(draft.daysData);
+    }
+  }
+  if(!draft.daysData.length){toast("No pudimos preparar tu semana ahora. Inténtalo otra vez en unos minutos.");closeModal();return;}
+  const el=$("#genwOut");if(el)el.innerHTML=genWeekReviewHtml();
 }
 function genReviewHtml(res,target){
   const t=res.totals||{kcal:0,p:0,c:0,f:0};
