@@ -2513,7 +2513,7 @@ function openMacroFormulaInfo(){
 }
 function mealTimesHtml(prefix,d){
   return `<div class="onboarding-grid">${Array.from({length:d.mealCount},(_,index)=>`<div class="field">
-    <label>Comida ${index+1}</label><input id="${prefix}_meal_time_${index}" type="time" value="${d.mealTimes[index]||defaultMealTimes(d.mealCount)[index]}">
+    <label for="${prefix}_meal_time_${index}">Comida ${index+1}</label><input id="${prefix}_meal_time_${index}" type="time" value="${d.mealTimes[index]||defaultMealTimes(d.mealCount)[index]}">
   </div>`).join("")}</div>`;
 }
 function checkedValues(prefix,labels){
@@ -5171,7 +5171,7 @@ function renderProfile(){
     <summary>Objetivo</summary>
     <div class="pf-accordion-panel">
       <div class="dash">
-        <div class="field" style="margin:0"><label>Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
+        <div class="field" style="margin:0"><label for="pf_name">Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
       </div>
 
       <div class="dash">
@@ -5195,37 +5195,37 @@ function renderProfile(){
       ${[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]].map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="pf_diet_${v}" ${chk(v)}><span>${l}</span></label>`).join("")}
     </div>
     <div class="onboarding-grid">
-      <div class="field"><label>Comidas al día</label><select id="pf_meal_count" onchange="updateProfileMealCount(this.value)">
+      <div class="field"><label for="pf_meal_count">Comidas al día</label><select id="pf_meal_count" onchange="updateProfileMealCount(this.value)">
         ${[2,3,4,5,6].map(value=>`<option value="${value}" ${p.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
       </select></div>
-      <div class="field"><label>Comida principal</label><select id="pf_main_meal">
+      <div class="field"><label for="pf_main_meal">Comida principal</label><select id="pf_main_meal">
         ${Array.from({length:p.mealCount},(_,index)=>`<option value="${index+1}" ${p.mainMealIndex===index+1?"selected":""}>Comida ${index+1}</option>`).join("")}
       </select></div>
     </div>
     <label class="muted small">Horarios aproximados</label>
     <div id="pfMealTimes">${mealTimesHtml("pf",p)}</div>
     <div class="onboarding-grid">
-      <div class="field"><label>Minutos para cocinar</label><input id="pf_cooking" type="number" inputmode="numeric" min="5" max="180" step="5" value="${p.cookingMinutes}"></div>
-      <div class="field"><label>Presupuesto</label><select id="pf_budget">
+      <div class="field"><label for="pf_cooking">Minutos para cocinar</label><input id="pf_cooking" type="number" inputmode="numeric" min="5" max="180" step="5" value="${p.cookingMinutes}"></div>
+      <div class="field"><label for="pf_budget">Presupuesto</label><select id="pf_budget">
         ${Object.entries(FOOD_BUDGET_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.foodBudget,v)}>${l}</option>`).join("")}
       </select></div>
     </div>
     <details class="adv-settings">
       <summary>Configuración avanzada</summary>
       <div class="onboarding-grid">
-        <div class="field"><label>Inicio de ventana</label><input id="pf_window_start" type="time" value="${p.eatingWindowStart}"></div>
-        <div class="field"><label>Fin de ventana</label><input id="pf_window_end" type="time" value="${p.eatingWindowEnd}"></div>
-        <div class="field"><label>Repetición aceptable</label><select id="pf_repeat">
+        <div class="field"><label for="pf_window_start">Inicio de ventana</label><input id="pf_window_start" type="time" value="${p.eatingWindowStart}"></div>
+        <div class="field"><label for="pf_window_end">Fin de ventana</label><input id="pf_window_end" type="time" value="${p.eatingWindowEnd}"></div>
+        <div class="field"><label for="pf_repeat">Repetición aceptable</label><select id="pf_repeat">
           ${Object.entries(REPEAT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.repeatPreference,v)}>${l}</option>`).join("")}
         </select></div>
       </div>
     </details>
     <div class="field"><label>Cocinas preferidas</label><div class="chips">${checkChips("pf_cuisine",CUISINE_LABELS,p.preferredCuisines)}</div></div>
     <div class="field"><label>Preparaciones preferidas</label><div class="chips">${checkChips("pf_preparation",PREPARATION_LABELS,p.preferredPreparations)}</div></div>
-    <div class="field"><label>Ingredientes que disfrutas</label><input id="pf_preferred_ingredients" value="${esc(p.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
-    <div class="field"><label>Otras preferencias (opcional)</label><textarea id="pf_food_notes" rows="2" placeholder="Ej. prefiero desayunos salados">${esc(p.foodNotes)}</textarea></div>
-    <div class="field"><label>Alergias y restricciones duras</label><input id="pf_allergies" value="${esc(p.allergies)}" placeholder="maní, mariscos…"><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
-    <div class="field" style="margin-bottom:0"><label>Ingredientes que no te gustan</label><input id="pf_disliked" value="${esc(p.dislikedIngredients)}" placeholder="tofu, aceitunas…"><div class="field-note">Se evitan cuando existe una alternativa viable.</div></div>
+    <div class="field"><label for="pf_preferred_ingredients">Ingredientes que disfrutas</label><input id="pf_preferred_ingredients" value="${esc(p.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
+    <div class="field"><label for="pf_food_notes">Otras preferencias (opcional)</label><textarea id="pf_food_notes" rows="2" placeholder="Ej. prefiero desayunos salados">${esc(p.foodNotes)}</textarea></div>
+    <div class="field"><label for="pf_allergies">Alergias y restricciones duras</label><input id="pf_allergies" value="${esc(p.allergies)}" placeholder="maní, mariscos…"><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
+    <div class="field" style="margin-bottom:0"><label for="pf_disliked">Ingredientes que no te gustan</label><input id="pf_disliked" value="${esc(p.dislikedIngredients)}" placeholder="tofu, aceitunas…"><div class="field-note">Se evitan cuando existe una alternativa viable.</div></div>
   </div></div>
   </details>
 
@@ -5241,47 +5241,47 @@ function renderProfile(){
           <label class="chip-check"><input type="radio" name="pf_has_cardio" id="pf_has_cardio_no" value="no" onchange="updatePfSportSelector()" ${p.primarySport==="strength_only"?"checked":""}><span>No, solo entreno fuerza</span></label>
         </div>
         <div id="pf_sport_wrap" ${p.primarySport==="strength_only"?'style="display:none"':''}>
-          <label class="muted small">Deporte cardio</label>
+          <label class="muted small" for="pf_sport">Deporte cardio</label>
           <select id="pf_sport" onchange="updateTrainingSummary()">
             ${[["running","Running"],["cycling","Cycling"],["swimming","Natación"],["other","Otro deporte cardio"]].map(([v,l])=>`<option value="${v}" ${sel(p.primarySport==="strength_only"?"running":p.primarySport,v)}>${l}</option>`).join("")}
           </select>
         </div>
       </div>
-      <div class="field"><label>Trabajo de fuerza</label><select id="pf_strength" onchange="updateTrainingSummary()">
+      <div class="field"><label for="pf_strength">Trabajo de fuerza</label><select id="pf_strength" onchange="updateTrainingSummary()">
         ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.strengthMode,v)}>${l}</option>`).join("")}
       </select></div>
-      <div class="field"><label>Prioridad</label><select id="pf_priority" onchange="updateTrainingSummary()">
+      <div class="field"><label for="pf_priority">Prioridad</label><select id="pf_priority" onchange="updateTrainingSummary()">
         ${Object.entries(TRAINING_PRIORITY_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.trainingPriority,v)}>${l}</option>`).join("")}
       </select></div>
-      <div class="field"><label>Experiencia</label><select id="pf_experience" onchange="updatePfSplitVisibility()">
+      <div class="field"><label for="pf_experience">Experiencia</label><select id="pf_experience" onchange="updatePfSplitVisibility()">
         ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.trainingExperience,v)}>${l}</option>`).join("")}
       </select></div>
       <div class="field" id="pf_split_wrap" ${p.trainingExperience!=="advanced"?'style="display:none"':''}>
-        <label>Split de fuerza</label>
+        <label for="pf_split">Split de fuerza</label>
         <select id="pf_split">
           <option value="" ${!p.workoutSplit?"selected":""}>Push / Pull / Piernas (por defecto)</option>
           ${Object.entries(WORKOUT_SPLIT_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.workoutSplit,v)}>${l}</option>`).join("")}
         </select>
         <div class="field-note">Solo aplica cuando tu nivel es Avanzado.</div>
       </div>
-      <div class="field"><label>Minutos por sesión</label><input id="pf_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${p.sessionMinutes}"></div>
-      <div class="field"><label>Horario preferido</label><select id="pf_time">
+      <div class="field"><label for="pf_minutes">Minutos por sesión</label><input id="pf_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${p.sessionMinutes}"></div>
+      <div class="field"><label for="pf_time">Horario preferido</label><select id="pf_time">
         ${Object.entries(TRAINING_TIME_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.preferredTrainingTime,v)}>${l}</option>`).join("")}
       </select></div>
     </div>
     <label class="muted small">Días disponibles y lugar real</label>
     ${trainingAvailabilityHtml("pf",p)}
     <div class="field-note">Recomendamos entre 3 y 6 días para combinar fuerza, tu disciplina y al menos un día de descanso.</div>
-    <div class="field"><label>Duración del plan</label><select id="pf_duration" onchange="updateTrainingSummary()">
+    <div class="field"><label for="pf_duration">Duración del plan</label><select id="pf_duration" onchange="updateTrainingSummary()">
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">Al cambiarla se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
     <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled)}</div>
     <details class="adv-settings">
       <summary>Equipo y limitaciones</summary>
       <div class="field"><label>Equipo disponible</label><div class="chips">${checkChips("pf_equipment",EQUIPMENT_LABELS,p.equipment)}</div></div>
-      <div class="field"><label>Lesiones actuales (opcional)</label><input id="pf_injuries" value="${esc(p.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
-      <div class="field"><label>Limitaciones relevantes (opcional)</label><input id="pf_limitations" value="${esc(p.limitations)}" placeholder="Ej. no puedo correr más de 20 minutos"></div>
-      <div class="field" style="margin-bottom:0"><label>Movimientos a evitar (opcional)</label><input id="pf_avoid_movements" value="${esc(p.avoidMovements)}" placeholder="Ej. saltos, press sobre la cabeza"></div>
+      <div class="field"><label for="pf_injuries">Lesiones actuales (opcional)</label><input id="pf_injuries" value="${esc(p.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
+      <div class="field"><label for="pf_limitations">Limitaciones relevantes (opcional)</label><input id="pf_limitations" value="${esc(p.limitations)}" placeholder="Ej. no puedo correr más de 20 minutos"></div>
+      <div class="field" style="margin-bottom:0"><label for="pf_avoid_movements">Movimientos a evitar (opcional)</label><input id="pf_avoid_movements" value="${esc(p.avoidMovements)}" placeholder="Ej. saltos, press sobre la cabeza"></div>
     </details>
   </div></div>
   </details>
@@ -5318,7 +5318,7 @@ function renderProfile(){
     </label>
     <div id="notifOptions" style="display:none;margin-top:14px">
       <div class="field">
-        <label>Hora del recordatorio (en tu zona horaria)</label>
+        <label for="notif_hour">Hora del recordatorio (en tu zona horaria)</label>
         <select id="notif_hour">
           ${NOTIF_HOURS.map(h=>`<option value="${h}"${h===NOTIF_HOUR_DEFAULT?" selected":""}>${String(h).padStart(2,"0")}:00</option>`).join("")}
         </select>

@@ -70,7 +70,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 11. ~~REQ-99 - Perfil por secciones con guardado por sección.~~ (P1, el más grande; dividido el 2 jul en REQ-105..REQ-108, ver abajo)
 12. ~~REQ-104 - Copy y paywall coherentes.~~ (implementado, P2)
 13. ~~REQ-105 - Perfil: acordeón real (una sección a la vez).~~ (implementado, P1)
-14. REQ-106 - Perfil: aria-label en todos los inputs. (P1)
+14. ~~REQ-106 - Perfil: aria-label en todos los inputs.~~ (implementado, P1)
 15. REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta. (P1, depende de REQ-105)
 16. REQ-108 - Perfil: guardado por sección con aviso de cambios sin guardar. (P1, depende de REQ-105 — el de mayor riesgo, al final)
 17. REQ-109 - Fix Home: badge "N pendientes" cuenta la fila de Descanso. (P2)
@@ -1823,7 +1823,9 @@ Que el usuario vea y navegue una sección a la vez, sin perder el modelo de guar
 
 ## REQ-106 - Accesibilidad: aria-label en todos los inputs de Perfil
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Auditados todos los `<input>`/`<select>`/`<textarea>` de `renderProfile()` y sus helpers (`mealTimesHtml`, `trainingAvailabilityHtml`, `checkChips`). La mayoría de los campos usaban un `<label>` visual sin `for`/`id`; en vez de agregar `aria-label` duplicando el texto ya visible, se asoció cada `<label>` con su control vía `for="<id>"` (23 campos en `index.html`: Nombre, Comidas al día, Comida principal, Minutos para cocinar, Presupuesto, Inicio/Fin de ventana, Repetición aceptable, Ingredientes que disfrutas, Otras preferencias, Alergias, Ingredientes que no te gustan, Deporte cardio, Trabajo de fuerza, Prioridad, Experiencia, Split de fuerza, Minutos por sesión, Horario preferido, Duración del plan, Lesiones, Limitaciones, Movimientos a evitar, Hora del recordatorio) y en `mealTimesHtml()` cada input de hora ("Comida N") ganó su `for` correspondiente. `trainingAvailabilityHtml()` ya tenía `aria-label="Lugar para {día}"` en los selects de lugar y checkboxes envueltos por `<label>` (de REQ-103); no requirió cambios. Los grupos de `checkChips` (chips de dieta, cocinas, preparaciones, equipo, días de recordatorio) y las etiquetas de sección ("Cocinas preferidas", "Días disponibles y lugar real", etc.) quedaron sin `for` a propósito: son rótulos de grupo, no de un único control, y cada checkbox ya es accesible por asociación implícita al estar envuelto en su propio `<label class="chip-check">`.
+Prueba E2E nueva: `tests/e2e/perfil.spec.js` ("REQ-106: todos los inputs/selects/textareas tienen nombre accesible") audita el DOM real renderizado de Perfil (sin abrir cada `<details>`, ya que REQ-105 mantiene los campos montados) y falla si algún control queda sin `aria-label`/`aria-labelledby`/`label[for]`/`label` envolvente; verificado que detecta una regresión (quitando un `for` a mano) antes de confirmar que el fix la deja en 0.
 
 ### Origen
 

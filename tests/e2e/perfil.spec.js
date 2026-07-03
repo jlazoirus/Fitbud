@@ -53,4 +53,32 @@ test.describe("Perfil", () => {
 
     expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  test("REQ-106: todos los inputs/selects/textareas tienen nombre accesible", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Perfil").click();
+    // REQ-105: los campos quedan montados en el DOM aunque su sección esté
+    // colapsada, así que no hace falta abrir cada <details> para auditarlos.
+    await expect(page.locator("#pfSecCuenta")).toBeAttached();
+
+    const unnamed = await page.evaluate(() => {
+      const app = document.querySelector("#app");
+      const fields = Array.from(app.querySelectorAll("input, select, textarea"));
+      return fields
+        .filter((el) => el.type !== "hidden")
+        .filter((el) => {
+          if (el.getAttribute("aria-label") || el.getAttribute("aria-labelledby")) return false;
+          if (el.closest("label")) return false;
+          if (el.id && app.querySelector(`label[for="${el.id}"]`)) return false;
+          return true;
+        })
+        .map((el) => el.id || el.outerHTML.slice(0, 80));
+    });
+
+    expect(unnamed, `Inputs de Perfil sin nombre accesible: ${unnamed.join(", ")}`).toEqual([]);
+  });
 });
