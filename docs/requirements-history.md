@@ -4830,3 +4830,301 @@ Una sola tarjeta de sesión con una acción primaria clara; la explicación solo
 ### Verificación sugerida
 
 - Capturar Entreno en estados: sin plan, con sesión pendiente, día de descanso, safety hold, ejecución en curso.
+
+## REQ-87 - Fix: "Preparar mi semana" sobrescribía días pasados y con datos registrados
+
+**Estado: implementado.** `weekPendingDays` filtra días anteriores a hoy y días con comidas consumidas (`doneMeals > 0`) antes de iterar. El progreso ("día X de Y") refleja solo los días pendientes. 4 asserts en `scripts/validate-week-skip-past.mjs`.
+
+### Problema
+
+Al usar "Preparar mi semana" (ej. semana 3, inicio 27 de junio), el sistema generaba los 7 días de la semana sin importar que los días 27 y 28 ya hubieran pasado y tuvieran comidas registradas manualmente por el usuario. El sistema intentaba sobrescribirlos con comidas generadas por IA.
+
+### Causa raíz (verificada contra código)
+
+`aiGenerateWeek` (línea ~7212) obtiene los días con `weekDays(w)` que devuelve **todos** los días de la semana (start..end). El bucle `for(let i=0;i<days.length;i++)` iteraba sobre todos sin ningún filtro de:
+- Fecha anterior a hoy
+- Días con comidas ya consumidas por el usuario (`dayTotals(ds).doneMeals > 0`)
+
+El mismo problema existía en el flujo determinista (`generateDeterministicWeek`) que recibía `days` sin filtrar.
+
+### Solución
+
+Nueva función `weekPendingDays(allDays)` que filtra:
+1. Días con fecha anterior a `todayStr()` → se saltan
+2. Días con `dayTotals(ds).doneMeals > 0` (comidas ya consumidas) → se saltan
+
+`aiGenerateWeek` ahora:
+- Llama `weekPendingDays(allDays)` para obtener solo días pendientes
+- Muestra cuántos días se saltaron en el modal de progreso ("5 días a tu medida (2 días ya registrados)")
+- El contador de progreso dice "día X de Y" donde Y = días pendientes, no los 7 totales
+- Si todos los días están registrados, muestra toast informativo y no genera nada
+- Pasa `days` filtrados a `generateDeterministicWeek`
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | Función `weekPendingDays`, filtrado en `aiGenerateWeek`, progreso ajustado |
+| `scripts/validate-week-skip-past.mjs` | Validador estructural (4 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Invariantes que se mantienen
+
+- "Preparar mi día" (flujo individual) no se ve afectado — el usuario puede regenerar el día de hoy explícitamente
+- La estructura del draft (`window._genWeek`) no cambia, solo contiene menos días
+- `applyWeekPlan` aplica solo los días que están en `daysData` (ya filtrados)
+
+### Criterios de aceptación
+
+- Si la semana tiene días pasados con comidas consumidas, "Preparar mi semana" solo genera los días pendientes (hoy en adelante, sin consumo).
+- El progreso muestra "día X de Y" donde Y = días pendientes.
+- Si todos los días de la semana ya pasaron/están registrados, muestra toast y no genera nada.
+- `node scripts/validate-week-skip-past.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-88 - Fix: contextKey de generación diaria no incluía la fecha, causando reuso cruzado entre días
+
+**Estado: implementado.** `generateOneDay` ahora pasa `ds` como `scope` a `coachQuota`, y `COACH_PROMPT_VERSION` sube a 3 para invalidar entradas de pool anteriores. 5 asserts en `scripts/validate-day-scope-in-context.mjs`.
+
+### Problema
+
+Al generar una semana completa ("Preparar mi semana"), todos los días recibían el mismo resultado de la IA en vez de planes individualizados. Ejemplo concreto: miércoles y viernes ambos mostraban exactamente 1798 kcal con las mismas comidas — evidencia de que un resultado cached se reutilizaba para todos los días.
+
+### Causa raíz (verificada contra código)
+
+`generateOneDay` llamaba a `coachQuota` con solo 5 argumentos, sin pasar el 6to parámetro `scope`:
+
+```js
+const quota=coachQuota(
+    coachRequest.action,
+    coachRequest.requestId,
+    coachRequest.partKey,
+    fallback,
+    dietQuotaValidation(ds)
+    // ← falta ds como scope
+);
+```
+
+En `coachQuota(action,requestId,partKey,fallbackText,validation,scope)`, cuando `scope` es `undefined`, se convierte en `scope||null` → `null`. El `contextKey` resultante (hash del JSON serializado del contexto) era **idéntico para todos los días** de la semana, porque la fecha no formaba parte del hash.
+
+El sistema de reuso (`select_reusable_coach_part` en Supabase) buscaba por `context_key` y encontraba el resultado del primer día generado, sirviéndolo para todos los demás.
+
+Comparación con `regenerateGenMeal` (que SÍ funcionaba bien):
+```js
+const quota=coachQuota("diet_day",requestId,"slot-"+slotId,fallback,validation,slotId+":"+draft.ds);
+//                                                                               ↑ scope incluye fecha
+```
+
+### Solución
+
+1. **`generateOneDay`**: Se agrega `ds` (la fecha del día, ej. `"2026-06-30"`) como 7mo argumento a `coachQuota`:
+```js
+const quota=coachQuota(
+    coachRequest.action,
+    coachRequest.requestId,
+    coachRequest.partKey,
+    fallback,
+    dietQuotaValidation(ds),
+    ds  // ← fecha como scope → contextKey único por día
+);
+```
+
+2. **`COACH_PROMPT_VERSION`**: Bump de 2 → 3. Esto invalida todas las entradas existentes en `coach_option_pool` que se generaron sin scope en el contextKey. Sin este bump, las entradas viejas (con scope=null) seguirían matcheando si alguien no hubiera regenerado aún.
+
+### Por qué este fix es definitivo
+
+El contextKey ahora incluye:
+- `version: COACH_PROMPT_VERSION` (3) — invalida resultados de prompts anteriores
+- `scope: ds` (ej. "2026-06-30") — hace cada día único
+- `nutrition.target` — metas del usuario
+- `catalog` hash — catálogo de platos disponible
+- `diet`, `mealCount`, etc. — preferencias
+
+Un resultado solo se puede reutilizar si: (a) es del mismo usuario, (b) mismo día, (c) misma versión de prompt, (d) mismas metas, (e) mismo catálogo, (f) mismas preferencias. Cualquier cambio en cualquiera de estos factores genera un contextKey diferente y fuerza una nueva llamada a la IA.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `generateOneDay` pasa `ds` como scope; `COACH_PROMPT_VERSION` = 3 |
+| `scripts/validate-day-scope-in-context.mjs` | Validador estructural (5 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Criterios de aceptación
+
+- Cada día de "Preparar mi semana" genera un resultado diferente (contextKey único por fecha).
+- `COACH_PROMPT_VERSION >= 3`.
+- Entradas antiguas del pool (version 2, scope null) no se reutilizan.
+- `node scripts/validate-day-scope-in-context.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-89 - Feature: sugerir snack del catálogo para cerrar déficit de kcal/proteína en día generado
+
+**Estado: implementado.** `findGapSnack` busca el mejor snack/shake del catálogo para completar el día. `genReviewHtml` muestra el botón de sugerencia. `addGapSnackToDay` agrega y re-valida. `applyGeneratedDay` separa extras. 6 asserts en `scripts/validate-gap-snack.mjs`.
+
+### Problema
+
+Cuando un día generado por IA no alcanzaba la meta de kcal o proteína (validación ±15% kcal, ≥85% proteína), el usuario solo podía descartar las 3-4 comidas completas y volver a generar. Esto era frustrante porque las comidas individuales podían estar bien — solo faltaba un poco para llegar a la meta.
+
+### Solución
+
+#### 1. `findGapSnack(totals, target)` (nueva función)
+
+Busca en el catálogo (`DB.dishes`) el mejor snack/shake para cerrar el hueco:
+
+- **Filtra candidatos**: solo platos con slots `snack`, `batido`, `media_manana`, `merienda`
+- **Respeta restricciones**: excluye platos bloqueados por `coachDishBlockedByProfile` (alergias, dieta vegana, etc.)
+- **Escala ingredientes**: ajusta gramos proporcionalmente (factor 0.5x–2.5x) para acercarse al hueco
+  - Si el déficit es dominantemente de proteína (`protGap*4 > kcalGap`), escala por proteína
+  - Si no, escala por kcal
+- **Scoring**: selecciona el candidato que minimice la desviación de macros al agregarlo
+- **Rechaza gaps irrazonables**: si faltan >700 kcal, no sugiere (el problema es estructural, no resoluble con un snack)
+- **Rechaza gaps triviales**: si faltan <80 kcal y <8g proteína, no sugiere
+
+Prioriza naturalmente los shakes de proteína (REQ-76) cuando el déficit es de proteína, porque tienen la mejor ratio proteína/kcal del catálogo.
+
+#### 2. `genReviewHtml` (modificada)
+
+Cuando `res.ok === false`:
+- Detecta si los issues son **solo** de déficit (kcal bajo o proteína baja, no errores estructurales como alergias o nombres ficticios)
+- Si `findGapSnack` encuentra un candidato, muestra un box con:
+  - Nombre del snack, macros, y el total proyectado
+  - Ingredientes con gramos
+  - Botón "Agregar [nombre del snack]"
+
+#### 3. `addGapSnackToDay()` (nueva función)
+
+- Agrega el snack sugerido a `window._genDay.comidas` con `slot_id: "snack_extra"`
+- Re-valida con `validateGeneratedDay` (el snack suma a los totales del día)
+- Re-renderiza el review — si ahora pasa la validación, "Aplicar al día" se habilita
+
+#### 4. `applyGeneratedDay()` (modificada)
+
+- Separa comidas que mapean a slots existentes del día de las extras (`snack_extra`)
+- Las comidas con slot existente se aplican vía `applyDayComidas` (overrides en meal slots)
+- Las extras se agregan a `dayState(ds).extras` con `done:true` — `dayTotals` ya las cuenta
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `findGapSnack`, `addGapSnackToDay`, mod `genReviewHtml`, mod `applyGeneratedDay` |
+| `scripts/validate-gap-snack.mjs` | Validador estructural (6 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Criterios de aceptación
+
+- Si un día generado falla solo por déficit de kcal/proteína y el gap es razonable (80–700 kcal), se muestra sugerencia de snack.
+- El snack sugerido respeta restricciones del perfil (alergias, dieta).
+- Al agregar el snack, se re-valida y si pasa, "Aplicar al día" se habilita.
+- Al aplicar, el snack se guarda en `extras` (no sobreescribe un slot de comida).
+- Si hay errores no-déficit (nombres ficticios, alergias), no se muestra sugerencia.
+- Si el gap es >700 kcal, no se muestra sugerencia.
+- `node scripts/validate-gap-snack.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-90 - Feature: editar gramos/porciones de ingredientes en comidas generadas antes de aplicar
+
+**Estado: implementado.** Inputs numéricos inline en cada ingrediente de `genReviewHtml` y `genWeekReviewHtml`. `updateGenMealGrams` y `updateGenWeekMealGrams` recalculan macros vía `recalcCoachMealMacros` y re-validan. 7 asserts en `scripts/validate-portion-editing.mjs`.
+
+### Problema
+
+Cuando un día generado no llegaba a la meta de kcal/proteína, la única opción era descartar todo y regenerar, o agregar un snack automático (REQ-89). El usuario quiere poder ajustar los gramajes de los ingredientes existentes (ej. subir arroz de 80g a 120g, o pechuga de 100g a 150g) para cerrar el déficit él mismo, manteniendo las comidas que ya le gustan.
+
+### Investigación previa
+
+1. **No existía edición de gramos por ingrediente** — `editorSheet` (editor genérico) solo permite editar macros totales planos (kcal/P/C/G), no ingredientes individuales. El modal de revisión (`genReviewHtml`) mostraba los ingredientes como texto estático.
+
+2. **Patrón UI**: la app usa `<input type="number">` con `inputmode="numeric"` en todos los formularios (peso, edad, RPE, macros). No hay componente stepper. Los inputs se estilizan con las CSS vars del tema (`var(--surf3)`, `var(--border-2)`, `var(--txt)`).
+
+3. **Fórmula de macros**: `DB.ingredients` almacena macros por 100g (`kcal`, `protein_g`, `carbs_g`, `fat_g`). La fórmula es `macro = macro_per_100g × gramos / 100`. `recalcCoachMealMacros` (nutrition-domain.js) ya implementa esto: resuelve ingredientes por nombre, aplica la fórmula, y devuelve macros recalculados.
+
+4. **Dos flujos de revisión separados**: `genReviewHtml` sirve el día individual; `genWeekReviewHtml` sirve la semana. Ambos necesitan los inputs.
+
+5. **Guardado**: `applyDayComidas` graba `c.ingredientes` tal cual viene del draft. Al editar gramos en el draft antes de aplicar, los valores editados se persisten correctamente.
+
+### Solución
+
+#### Inputs inline en ingredientes
+
+En `genReviewHtml` y `genWeekReviewHtml`, cada ingrediente pasa de texto estático (`"Avena 50g"`) a un input editable:
+
+```html
+Avena <input type="number" min="5" step="5" value="50"
+  onchange="updateGenMealGrams(cIdx, gIdx, +this.value)">g
+```
+
+Estilo compacto (52px ancho, font 13px) con las CSS vars del tema para integrarse con el diseño oscuro.
+
+#### `updateGenMealGrams(mealIdx, ingIdx, grams)` — día individual
+
+1. Actualiza `window._genDay.comidas[mealIdx].ingredientes[ingIdx].gramos`
+2. Recalcula macros de la comida con `recalcCoachMealMacros` (match por nombre → fórmula per-100g × gramos)
+3. Actualiza `comida.kcal`, `.proteina_g`, `.carbohidratos_g`, `.grasa_g`
+4. Re-valida con `validateGeneratedDay` (que re-suma totales y checa ±15% kcal, ≥85% prot)
+5. Re-renderiza `genReviewHtml` → los macros por comida, totales del día, issues y botón "Aplicar" se actualizan
+
+#### `updateGenWeekMealGrams(dayIdx, mealIdx, ingIdx, grams)` — semana
+
+Igual que el anterior pero opera sobre `window._genWeek.daysData[dayIdx]`. Además recalcula la lista de compras con `buildShoppingListFromNutritionPlan`.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | Inputs inline en `genReviewHtml` y `genWeekReviewHtml`; funciones `updateGenMealGrams` y `updateGenWeekMealGrams` |
+| `scripts/validate-portion-editing.mjs` | Validador estructural (7 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Criterios de aceptación
+
+- Cada ingrediente en el modal de revisión muestra un input numérico editable para gramos.
+- Al cambiar gramos, los macros de la comida se recalculan desde `DB.ingredients` (per-100g × gramos).
+- Los totales del día se actualizan y la validación se re-ejecuta (±15% kcal, ≥85% prot).
+- Si los totales editados pasan la validación, "Aplicar al día" se habilita.
+- Funciona tanto en "Preparar mi día" como en "Preparar mi semana".
+- Al aplicar, los gramos editados se guardan (no los originales).
+- La lista de compras de la semana se actualiza al editar gramos.
+- `node scripts/validate-portion-editing.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-91 - Fix: snack sugerido (REQ-89) aparecía como ya consumido al aplicar el día
+
+**Estado: implementado.** `applyGeneratedDay` pone `done:false` en extras generados. 3 asserts en `scripts/validate-gap-snack-pending.mjs`.
+
+### Problema
+
+Al aplicar un día generado que incluía un snack sugerido por REQ-89 para cerrar déficit, el snack aparecía con el checkbox marcado (✓ en morado) en la sección "Comidas extra", como si el usuario ya lo hubiera consumido. Las comidas regulares del plan (Desayuno, Almuerzo, Cena) aparecían correctamente sin marcar.
+
+### Causa raíz
+
+En `applyGeneratedDay`, los extras se creaban con `done:true` hardcodeado:
+
+```js
+st.extras.push({..., done:true, gen:true});
+```
+
+El flag `done:true` hace que `dayTotals` cuente sus macros como "ya consumidos" y que el checkbox aparezca marcado. Las comidas de slot (`applyDayComidas`) no tocan `done` — usan solo `ms.ovr`, dejando el flag en su estado inicial (`false`).
+
+### Solución
+
+Cambiar `done:true` → `done:false` en la línea de `applyGeneratedDay` que crea extras. El snack aparece como pendiente y el usuario lo marca cuando lo consume.
+
+El flujo manual "Agregar comida/snack" (`saveEditor`, línea 6434) y "Sugerir comida" (`addSuggestion`, línea 7048) mantienen `done:true` intencionalmente — en esos flujos el usuario está registrando algo que ya comió o va a comer de inmediato.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `applyGeneratedDay`: `done:true` → `done:false` en extras |
+| `scripts/validate-gap-snack-pending.mjs` | Validador (3 asserts) |
+| `scripts/release-gate.mjs` | Agrega validador al gate |
+
+### Criterios de aceptación
+
+- El snack sugerido aparece sin marcar (pendiente) al aplicar el día.
+- El usuario lo marca manualmente cuando lo consume.
+- Las comidas de slot siguen apareciendo sin marcar (no regresión).
+- `dayTotals` no cuenta el snack como consumido hasta que el usuario lo marque.
+- `node scripts/validate-gap-snack-pending.mjs` pasa.
+- `node scripts/release-gate.mjs` pasa.
