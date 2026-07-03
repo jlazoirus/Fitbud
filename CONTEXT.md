@@ -20,7 +20,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 
 - Auth obligatorio con Supabase Auth. `profiles`, `day_log`, `weight_log` y `plan_versions` estan aislados por `user_id` y RLS.
 - `profiles.prefs` usa `profileSchemaVersion: 3`: zona horaria, 2-6 comidas, horarios/logistica, restricciones, disponibilidad, equipo, experiencia, prioridad y limitaciones.
-- Perfil (REQ-105) usa acordeon nativo: `renderProfile()` monta secciones `<details class="pf-accordion">` y `profileAccordionToggle()` deja una sola abierta; los campos no se desmontan y `#pfEditableBody` conserva el guardado global solo para Objetivo/Comidas/Entreno.
+- Perfil (REQ-105) usa acordeon nativo: `renderProfile()` monta secciones `<details class="pf-accordion">` y `profileAccordionToggle()` deja una sola abierta; los campos no se desmontan y `#pfEditableBody` conserva el guardado global solo para Objetivo/Comidas/Entreno. Orden (REQ-107): Objetivo, Comidas, Entreno, Privacidad, Suscripcion, Recordatorios, Avisos del dispositivo, [Administracion], Cuenta. REQ-108 agrego `profileAccordionGuard()` en el `onclick` de cada `<summary>`: si la seccion abierta tiene cambios sin guardar (`pfGroupDirty`, grupos "editable"/"privacy"/"notif") y se intenta abrir otra, hace `confirm()` antes de navegar; Privacidad y Recordatorios tienen su propio par mark/clearDirty (`pfPrivacyMarkDirty`/`pfNotifMarkDirty`) e indicador `#pfPrivacyDirtyHint`/`#pfNotifDirtyHint`, ademas del flotante global existente.
 - Consentimientos y safety screenings gatean plan/coach. Edad minima 18. Fotos y datos de salud son privados; nada sensible va a analytics.
 - Admin escribe catalogos y gestiona usuarios/cortesia; usuarios normales no ven diagnostico tecnico.
 

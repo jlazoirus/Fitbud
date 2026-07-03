@@ -3,7 +3,7 @@
 // global existente sigue apareciendo al editar preferencias.
 import { test, expect } from "@playwright/test";
 import {
-  installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges,
+  installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs,
 } from "./helpers.js";
 
 async function detailsOpen(locator) {
@@ -19,6 +19,9 @@ test.describe("Perfil", () => {
 
     await gotoApp(page);
     await page.locator("#tabs").getByText("Perfil").click();
+    // REQ-108: navegar con cambios sin guardar dispara un confirm(); esta
+    // prueba se enfoca en persistencia del DOM, así que lo acepta siempre.
+    page.on("dialog", (dialog) => dialog.accept());
 
     await expect(page.locator(".pf-nav")).toHaveCount(0);
     const sections = page.locator("details.pf-accordion");
@@ -90,6 +93,9 @@ test.describe("Perfil", () => {
 
     await gotoApp(page);
     await page.locator("#tabs").getByText("Perfil").click();
+    // REQ-108: activar el opt-in de recordatorios deja esa sección "dirty";
+    // aceptar el confirm() para poder navegar a Avisos en esta prueba.
+    page.on("dialog", (dialog) => dialog.accept());
 
     const ids = await page.locator("details.pf-accordion").evaluateAll((items) => items.map((el) => el.id));
     expect(ids).toEqual([
@@ -107,7 +113,73 @@ test.describe("Perfil", () => {
     // Avisos del dispositivo: renderPushSection() sigue pintando el estado de push sin errores.
     const avisos = page.locator("#pfSecAvisos");
     await avisos.locator("> summary").click();
+    expect(await detailsOpen(avisos)).toBe(true);
     await expect(page.locator("#pushSection")).not.toBeEmpty();
+
+    expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("REQ-108: aviso de cambios sin guardar al cambiar de sección, por vía de guardado", async ({ page, context }) => {
+    // diet:["omnivoro"] porque este test sí completa un saveProfile() real
+    // (validateFoodPreferences exige al menos un patrón de alimentación).
+    const { calls } = await installMocks(context, { prefs: completePrefs({ diet: ["omnivoro"] }) });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Perfil").click();
+
+    const entreno = page.locator("#pfSecEntreno");
+    const comidas = page.locator("#pfSecComidas");
+    const privacidad = page.locator("#pfSecPrivacidad");
+    const recordatorios = page.locator("#pfSecRecordatorios");
+
+    // 1) Editar Entreno, intentar navegar a Comidas sin guardar: se avisa y,
+    // si se cancela, la sección editada permanece abierta con el valor intacto.
+    await entreno.locator("> summary").click();
+    await page.fill("#pf_minutes", "45");
+    await expect(page.locator("#profileSaveFloat")).toBeVisible();
+
+    let dialogSeen = null;
+    page.once("dialog", (dialog) => { dialogSeen = dialog.message(); dialog.dismiss(); });
+    await comidas.locator("> summary").click();
+    expect(dialogSeen).toBeTruthy();
+    expect(await detailsOpen(entreno)).toBe(true);
+    expect(await detailsOpen(comidas)).toBe(false);
+    await expect(page.locator("#pf_minutes")).toHaveValue("45");
+
+    // 2) Reintentar y aceptar el aviso: se navega y el valor sigue ahí al volver.
+    page.once("dialog", (dialog) => dialog.accept());
+    await comidas.locator("> summary").click();
+    expect(await detailsOpen(comidas)).toBe(true);
+    await entreno.locator("> summary").click();
+    await expect(page.locator("#pf_minutes")).toHaveValue("45");
+
+    // 3) Guardar limpia el indicador global (saveProfile() vuelve a renderizar
+    // Perfil, así que las secciones quedan colapsadas de nuevo).
+    await page.click("#profileSaveFloat button");
+    await expect(page.locator("#profileSaveFloat")).toBeHidden();
+
+    // 4) Privacidad muestra su propio indicador "Cambios sin guardar" y lo
+    // limpia al guardar con su botón propio (no el flotante global).
+    await privacidad.locator("> summary").click();
+    // El fixture ya trae progress_photos aceptado (consentsFixture()); destildar
+    // es el cambio real que debe marcar la sección como "dirty".
+    await page.uncheck("#pf_consent_photos");
+    await expect(page.locator("#pfPrivacyDirtyHint")).toBeVisible();
+    await page.getByRole("button", { name: "Guardar permiso de fotos" }).click();
+    await expect
+      .poll(() => calls.filter((c) => c.table === "user_consents" && c.method === "POST").length)
+      .toBeGreaterThan(0);
+
+    // 5) Recordatorios: mismo patrón, con su propio botón e indicador.
+    await recordatorios.locator("> summary").click();
+    await page.check("#notif_opt_in");
+    await expect(page.locator("#pfNotifDirtyHint")).toBeVisible();
+    await page.click("#notifSaveBtn");
+    await expect(page.locator("#pfNotifDirtyHint")).toBeHidden();
+    expect(calls.filter((c) => c.table === "notification_preferences" && c.method === "POST").length).toBeGreaterThan(0);
 
     expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
   });

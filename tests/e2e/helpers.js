@@ -94,6 +94,9 @@ export function completePrefs(overrides = {}) {
     diet: [],
     mealCount: 3,
     mealTimes: ["08:00", "13:00", "20:00"],
+    // Debe encerrar mealTimes[0..n-1] o validateFoodSchedule rechaza el guardado.
+    eatingWindowStart: "07:00",
+    eatingWindowEnd: "21:00",
     mainMealIndex: 2,
     cookingMinutes: 30,
     foodBudget: "medium",

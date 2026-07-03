@@ -355,7 +355,7 @@
   .scard{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;text-align:center}
   .scard .n{font-family:var(--font-display);font-size:24px;font-weight:800;letter-spacing:-.02em}
   .scard .l{font-size:11px;color:var(--muted);margin-top:3px}
-  .toast{position:fixed;bottom:calc(82px + var(--safe-bottom));left:50%;transform:translateX(-50%);background:var(--surf3);border:1px solid var(--border-2);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;opacity:0;transition:opacity .2s;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast{position:fixed;bottom:calc(82px + var(--safe-bottom));left:50%;transform:translateX(-50%);background:var(--surf3);border:1px solid var(--border-2);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s;box-shadow:0 8px 24px rgba(0,0,0,.4)}
   .toast.show{opacity:1}
 
   /* Sugerencia "agregar a pantalla de inicio" (solo móvil) */
@@ -5142,6 +5142,61 @@ function profileClearDirty(){
   const el=document.getElementById("profileSaveFloat");
   if(el)el.style.display="none";
 }
+// REQ-108: cada vía de guardado independiente (Privacidad, Recordatorios) tiene
+// su propio indicador de "cambios sin guardar", además del flotante global que
+// ya cubre Objetivo+Comidas+Entreno (guardado único por validación cruzada).
+let pfPrivacyDirty=false, pfNotifDirty=false;
+function pfPrivacyMarkDirty(){
+  pfPrivacyDirty=true;
+  const el=document.getElementById("pfPrivacyDirtyHint");
+  if(el)el.style.display="";
+}
+function pfPrivacyClearDirty(){
+  pfPrivacyDirty=false;
+  const el=document.getElementById("pfPrivacyDirtyHint");
+  if(el)el.style.display="none";
+}
+function pfNotifMarkDirty(){
+  pfNotifDirty=true;
+  const el=document.getElementById("pfNotifDirtyHint");
+  if(el)el.style.display="";
+}
+function pfNotifClearDirty(){
+  pfNotifDirty=false;
+  const el=document.getElementById("pfNotifDirtyHint");
+  if(el)el.style.display="none";
+}
+function pfSectionGroup(id){
+  if(id==="pfSecObjetivo"||id==="pfSecComidas"||id==="pfSecEntreno")return "editable";
+  if(id==="pfSecPrivacidad")return "privacy";
+  if(id==="pfSecRecordatorios")return "notif";
+  return null;
+}
+function pfGroupDirty(group){
+  if(group==="editable"){const el=document.getElementById("profileSaveFloat");return !!(el&&el.style.display!=="none");}
+  if(group==="privacy")return pfPrivacyDirty;
+  if(group==="notif")return pfNotifDirty;
+  return false;
+}
+// Al abrir una sección distinta con cambios sin guardar en la que se cierra,
+// avisa antes de continuar. El valor no se pierde (REQ-105 no desmonta los
+// campos), pero el usuario debe saber que no quedó guardado.
+function profileAccordionGuard(ev,summaryEl){
+  const details=summaryEl&&summaryEl.closest("details.pf-accordion");
+  if(!details||details.open)return true;
+  const openSection=document.querySelector(".pf-accordion[open]");
+  if(openSection&&openSection!==details){
+    const group=pfSectionGroup(openSection.id);
+    if(group&&pfGroupDirty(group)){
+      ev.preventDefault();
+      if(confirm("Tienes cambios sin guardar en esta sección. Se conservan si vuelves, pero no se guardarán hasta que toques \"Guardar\". ¿Continuar de todas formas?")){
+        details.open=true;
+      }
+      return false;
+    }
+  }
+  return true;
+}
 let _profileAccordionSync=false;
 function profileAccordionToggle(el){
   if(!el||_profileAccordionSync)return;
@@ -5168,7 +5223,7 @@ function renderProfile(){
   <div class="pf-accordion-list">
   <div id="pfEditableBody" oninput="profileMarkDirty()" onchange="profileMarkDirty()">
   <details id="pfSecObjetivo" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-    <summary>Objetivo</summary>
+    <summary onclick="return profileAccordionGuard(event,this)">Objetivo</summary>
     <div class="pf-accordion-panel">
       <div class="dash">
         <div class="field" style="margin:0"><label for="pf_name">Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
@@ -5188,7 +5243,7 @@ function renderProfile(){
   </details>
 
   <details id="pfSecComidas" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Comidas</summary>
+  <summary onclick="return profileAccordionGuard(event,this)">Comidas</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <label class="muted small">Patrón de alimentación y restricciones generales</label>
     <div class="chips" style="margin:9px 0 4px">
@@ -5230,7 +5285,7 @@ function renderProfile(){
   </details>
 
   <details id="pfSecEntreno" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Entrenamiento</summary>
+  <summary onclick="return profileAccordionGuard(event,this)">Entrenamiento</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <div class="muted small" style="margin-bottom:10px">El plan usa tus días y lugares reales. Cambiar disponibilidad ajusta las próximas sesiones sin borrar lo que ya registraste.</div>
     <div class="onboarding-grid">
@@ -5289,12 +5344,13 @@ function renderProfile(){
   </div>
 
   <details id="pfSecPrivacidad" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Privacidad y seguridad</summary>
-  <div class="pf-accordion-panel"><div class="dash">
+  <summary onclick="return profileAccordionGuard(event,this)">Privacidad y seguridad</summary>
+  <div class="pf-accordion-panel"><div class="dash" oninput="pfPrivacyMarkDirty()" onchange="pfPrivacyMarkDirty()">
     <div class="row between" style="margin-bottom:10px"><span class="muted small">Aviso vigente</span><span class="badge b-Libre">${CONSENT_POLICY_VERSION}</span></div>
     <div class="alert violet"><b>Uso claro y limitado.</b><br>Tus datos se usan para personalizar tu plan y mostrar tu progreso. No los vendemos ni los usamos para publicidad.</div>
     <div class="alert ${trainingSafetyHold()?"":"violet"}"><b>${trainingSafetyHold()?"Entrenamiento pausado":"Evaluación de seguridad vigente"}</b><br>${trainingSafetyHold()?"Una respuesta requiere orientación profesional antes de retomar rutinas.":"Recuerda detenerte ante dolor, mareo, desmayo o falta de aire inusual."}</div>
     <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pf_consent_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Guardar fotos de progreso personal para comparar mi avance</span></label>
+    <div id="pfPrivacyDirtyHint" class="muted small" style="display:none;margin-bottom:6px">Cambios sin guardar</div>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="saveOptionalConsents()">Guardar permiso de fotos</button>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="renderPrivacyGate();scrollAppTop()">Revisar privacidad y seguridad</button>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
@@ -5304,13 +5360,13 @@ function renderProfile(){
   </details>
 
   <details id="pfSecSuscripcion" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Mi suscripción</summary>
+  <summary onclick="return profileAccordionGuard(event,this)">Mi suscripción</summary>
   <div class="pf-accordion-panel"><div class="dash">${subscriptionStatusHtml()}</div></div>
   </details>
 
   <details id="pfSecRecordatorios" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Recordatorios</summary>
-  <div class="pf-accordion-panel"><div class="dash">
+  <summary onclick="return profileAccordionGuard(event,this)">Recordatorios</summary>
+  <div class="pf-accordion-panel"><div class="dash" oninput="pfNotifMarkDirty()" onchange="pfNotifMarkDirty()">
     <div class="muted small" style="margin-bottom:12px">Recibe un aviso por correo si tienes actividad pendiente al final del día. Solo se envía cuando corresponde; nunca dos veces el mismo día.</div>
     <label class="chip-check" style="display:flex;margin-bottom:4px">
       <input type="checkbox" id="notif_opt_in" onchange="toggleNotifOptions()">
@@ -5337,19 +5393,20 @@ function renderProfile(){
         </div>
       </div>
     </div>
+    <div id="pfNotifDirtyHint" class="muted small" style="display:none;margin-top:14px">Cambios sin guardar</div>
     <button id="notifSaveBtn" class="btn btn-accent" style="width:100%;margin-top:14px" onclick="saveNotifPrefs()">Guardar recordatorios</button>
   </div></div>
   </details>
 
   <details id="pfSecAvisos" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Avisos del dispositivo</summary>
+  <summary onclick="return profileAccordionGuard(event,this)">Avisos del dispositivo</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <div id="pushSection"><!-- se completa desde renderPushSection() --></div>
   </div></div>
   </details>
 
   ${isAdmin()?`<details id="pfSecAdmin" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Administración</summary>
+  <summary onclick="return profileAccordionGuard(event,this)">Administración</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, alimentos, ejercicios y la configuración técnica.</div>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
@@ -5361,7 +5418,7 @@ function renderProfile(){
   </details>`:""}
 
   <details id="pfSecCuenta" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
-  <summary>Cuenta</summary>
+  <summary onclick="return profileAccordionGuard(event,this)">Cuenta</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <div class="row between"><span class="muted small">${esc(email)}</span><span class="badge ${isAdmin()?'b-PESAS':'b-Libre'}">${isAdmin()?'Admin':'Usuario'}</span></div>
     <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="signOutUser(this)">Cerrar sesión</button>
@@ -5494,6 +5551,7 @@ async function saveOptionalConsents(){
   if(result.error){toast(privacyApiMessage(result.error));return;}
   await loadPrivacyState();
   await pullCycleHistory();
+  pfPrivacyClearDirty();
   render();toast("Permisos actualizados");
 }
 async function privacyRequest(method,body){
@@ -5586,6 +5644,7 @@ async function saveNotifPrefs(){
   if(btn){btn.disabled=false;btn.textContent="Guardar recordatorios";}
   if(error){toast("No se pudieron guardar los recordatorios");return;}
   notifPrefsCache={...notifPrefsCache,...row};
+  pfNotifClearDirty();
   toast("Recordatorios guardados");
 }
 
