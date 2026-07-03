@@ -11,6 +11,23 @@ const USUARIO = { sexo: "male", edad: 30, estatura: 175, peso: 75, actividad: 1.
 const BMR = 10 * USUARIO.peso + 6.25 * USUARIO.estatura - 5 * USUARIO.edad + 5; // Mifflin hombre
 const TDEE = BMR * USUARIO.actividad;
 
+async function reachTrainingStep(page, age) {
+  await gotoApp(page);
+  const app = page.locator("#app");
+  await expect(app).toContainText(/punto de partida/i);
+  await page.fill("#ob_name", `Bro ${age}`);
+  await page.selectOption("#ob_sex", "male");
+  await page.fill("#ob_age", String(age));
+  await page.fill("#ob_height", String(USUARIO.estatura));
+  await page.fill("#ob_weight", String(USUARIO.peso));
+  await page.selectOption("#ob_activity", "moderate");
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.locator("#ob_goal")).toBeVisible();
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(page.locator("#ob_safety_mode")).toBeVisible();
+  return app;
+}
+
 test.describe("Onboarding", () => {
   test("usuario nuevo completa el onboarding y sus macros mostrados = guardados", async ({ page, context }) => {
     // Perfil SIN prefs → la app debe llevar al onboarding
@@ -104,4 +121,29 @@ test.describe("Onboarding", () => {
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  for (const scenario of [
+    { age: 20, text: "Construye técnica primero" },
+    { age: 52, text: "Empieza con bajo impacto" },
+    { age: 58, text: "Caminar también cuenta como plan" },
+  ]) {
+    test(`recomienda ritmo seguro para edad ${scenario.age}`, async ({ page, context }) => {
+      await installMocks(context, { tables: { profiles: { row: profileFixture({}) } } });
+      await seedLoggedInUser(page);
+      await autoDismissNudges(page);
+      const errors = collectConsoleErrors(page);
+
+      const app = await reachTrainingStep(page, scenario.age);
+      await expect(app).toContainText(scenario.text);
+      await expect(page.locator("#ob_safety_mode")).toContainText("Plan completo");
+      await page.selectOption("#ob_safety_mode", "full");
+      await expect(page.locator("#ob_safety_mode")).toHaveValue("full");
+      if (scenario.age >= 55) {
+        await expect(page.locator("#ob_sport")).toContainText("Caminar");
+        await expect(page.locator("#ob_strength")).toContainText("No quiero fuerza por ahora");
+      }
+
+      expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+    });
+  }
 });

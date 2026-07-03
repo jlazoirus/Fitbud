@@ -890,6 +890,11 @@ const SAFETY_QUESTIONS=[
   ["clinician_restriction","¿Un profesional te indicó limitar o evitar el ejercicio?"],
   ["acute_injury","¿Tienes una lesión aguda o dolor que empeora al moverte?"],
 ];
+const TRAINING_SAFETY_MODE_LABELS={
+  auto:"Según mi perfil (recomendado)",
+  gentle:"Suave / bajo impacto",
+  full:"Plan completo",
+};
 function migrateProfilePrefs(source){
   const p={...(source&&typeof source==="object"?source:{})};
   let primary=SPORT_LABELS[p.primarySport]?p.primarySport:"";
@@ -929,6 +934,7 @@ function migrateProfilePrefs(source){
     trainingExperience:trainingExperienceNorm,
     workoutSplit:workoutSplitNorm,
     trainingPriority,
+    trainingSafetyMode:normalizedTrainingSafetyMode(p.trainingSafetyMode),
     preferredTrainingTime:TRAINING_TIME_LABELS[p.preferredTrainingTime]?p.preferredTrainingTime:"flexible",
     injuries:String(p.injuries||"").trim(),
     limitations:String(p.limitations||p.trainNote||"").trim(),
@@ -957,8 +963,10 @@ function migrateProfilePrefs(source){
 }
 function trainingPrefsFromPrefs(source){
   const p=migrateProfilePrefs(source||{});
+  const primary=effectiveTrainingPrimarySport(p);
   return {
-    primary:p.primarySport,
+    primary,
+    selectedPrimary:p.primarySport,
     strength:p.strengthMode,
     strengthPlace:p.strengthPlace,
     days:p.trainingDays.length,
@@ -970,6 +978,8 @@ function trainingPrefsFromPrefs(source){
     workoutSplit:p.workoutSplit,
     split:effectiveWorkoutSplit(p.trainingExperience,p.workoutSplit),
     priority:p.trainingPriority,
+    safetyMode:p.trainingSafetyMode,
+    gentleMode:isGentleTrainingPlan(p),
     preferredTime:p.preferredTrainingTime,
     injuries:p.injuries,
     limitations:p.limitations,
@@ -1006,6 +1016,78 @@ const STRENGTH_RESOURCE_LABELS={
   barbell:"Barra y discos",
   pullup:"Barra de dominadas",
 };
+const GENTLE_BLOCKED_EXERCISE_SLUGS=new Set([
+  "pike-push-up","assisted-pull-up","pull-up","weighted-pull-up",
+  "decline-push-up","diamond-push-up","archer-push-up",
+  "bulgarian-split-squat","walking-lunge","single-leg-rdl",
+  "slider-leg-curl","nordic-hamstring-curl","shoulder-tap-plank",
+  "overhead-press",
+]);
+function normalizedTrainingSafetyMode(value){
+  return TRAINING_SAFETY_MODE_LABELS[value]?value:"auto";
+}
+function trainingHasDeclaredLimits(prefs){
+  const text=String([prefs&&prefs.injuries,prefs&&prefs.limitations,prefs&&prefs.avoidMovements].filter(Boolean).join(" ")).trim();
+  return text.length>0;
+}
+function trainingSafetyRecommendation(prefs){
+  const p=prefs||{};
+  const age=Number(p.age);
+  if(trainingHasDeclaredLimits(p)){
+    return {
+      active:true,
+      kind:"limits",
+      title:"Entrena con más margen",
+      body:"Por tus limitaciones declaradas, el modo suave prioriza caminatas, movilidad y ejercicios estables. Si la evaluación de seguridad marca una alerta, el entrenamiento seguirá pausado.",
+    };
+  }
+  if(Number.isFinite(age)&&age>=55){
+    return {
+      active:true,
+      kind:"age55",
+      title:"Caminar también cuenta como plan",
+      body:"Te recomendamos empezar con bajo impacto: caminatas o cardio ligero, movilidad y fuerza mínima opcional. Puedes elegir plan completo si te sientes listo y tu evaluación está en verde.",
+    };
+  }
+  if(Number.isFinite(age)&&age>=50){
+    return {
+      active:true,
+      kind:"age50",
+      title:"Empieza con bajo impacto",
+      body:"Te conviene iniciar con volumen moderado, fuerza ligera y progresión gradual. Puedes mantener el plan completo si prefieres una carga normal.",
+    };
+  }
+  if(Number.isFinite(age)&&age>=18&&age<=21){
+    return {
+      active:true,
+      kind:"young",
+      title:"Construye técnica primero",
+      body:"Te sugerimos empezar conservador, con técnica estable y progresión gradual. Puedes elegir plan completo si ya entrenas con constancia.",
+    };
+  }
+  return {active:false,kind:"standard",title:"",body:""};
+}
+function isGentleTrainingPlan(prefs){
+  const mode=normalizedTrainingSafetyMode(prefs&&prefs.trainingSafetyMode);
+  if(mode==="gentle")return true;
+  if(mode==="full")return false;
+  return trainingSafetyRecommendation(prefs).active;
+}
+function effectiveTrainingPrimarySport(prefs){
+  const primary=SPORT_LABELS[prefs&&prefs.primarySport]?prefs.primarySport:"running";
+  if(!isGentleTrainingPlan(prefs))return primary;
+  const mode=normalizedTrainingSafetyMode(prefs&&prefs.trainingSafetyMode);
+  const rec=trainingSafetyRecommendation(prefs);
+  const lowImpact=mode==="gentle"||["limits","age50","age55"].includes(rec.kind);
+  return lowImpact&&["running","other"].includes(primary)?"walking":primary;
+}
+function exerciseBlockedByGentleMode(exercise){
+  if(!exercise)return false;
+  const slug=String(exercise.slug||"");
+  if(GENTLE_BLOCKED_EXERCISE_SLUGS.has(slug))return true;
+  const hay=[exercise.name,exercise.movement_pattern,...exerciseArray(exercise.aliases)].join(" ").toLowerCase();
+  return /pike|dominad|inver|declinad|lastrad|n[oó]rdic|b[uú]lgara|arquero/.test(hay);
+}
 function normalizeStrengthPlace(value,strength,locations){
   if(["gym","home","outdoor","none"].includes(value))return value;
   if(strength==="none")return "none";
@@ -2318,6 +2400,7 @@ function onboardingDefaults(){
     equipment:p.equipment.slice(),
     trainingExperience:p.trainingExperience,
     trainingPriority:p.trainingPriority,
+    trainingSafetyMode:p.trainingSafetyMode,
     preferredTrainingTime:p.preferredTrainingTime,
     injuries:p.injuries,
     limitations:p.limitations,
@@ -2622,6 +2705,15 @@ function safetySelect(id,value){
     <option value="yes" ${value==="yes"?"selected":""}>Sí</option>
   </select>`;
 }
+function trainingSafetyModeHtml(prefix,d){
+  const mode=normalizedTrainingSafetyMode(d&&d.trainingSafetyMode);
+  const rec=trainingSafetyRecommendation(d||{});
+  const select=`<div class="field" style="grid-column:1 / -1"><label for="${prefix}_safety_mode">Ritmo del plan</label><select id="${prefix}_safety_mode" onchange="${prefix==="ob"?"updateOnboardingTrainingChoice()":"updateTrainingSummary()"}">
+    ${Object.entries(TRAINING_SAFETY_MODE_LABELS).map(([value,label])=>`<option value="${value}" ${mode===value?"selected":""}>${label}</option>`).join("")}
+  </select><div class="field-note">El modo recomendado baja intensidad y prioriza opciones estables; el plan completo queda disponible si tu evaluación de seguridad está en verde.</div></div>`;
+  if(!rec.active)return select;
+  return `${select}<div class="alert violet" style="grid-column:1 / -1"><b>${esc(rec.title)}</b><br>${esc(rec.body)}</div>`;
+}
 function readTrainingFields(prefix,d){
   const sportEl=$("#"+prefix+"_sport");
   const _noCardio=$("#"+prefix+"_has_cardio_no");
@@ -2631,6 +2723,8 @@ function readTrainingFields(prefix,d){
   d.strengthMode=strengthModeFromChoice(strengthChoice);
   d.planDurationWeeks=+$("#"+prefix+"_duration").value;
   d.trainingPriority=$("#"+prefix+"_priority").value;
+  const safetyModeEl=$("#"+prefix+"_safety_mode");
+  d.trainingSafetyMode=normalizedTrainingSafetyMode(safetyModeEl&&safetyModeEl.value);
   d.trainingExperience=$("#"+prefix+"_experience").value;
   const _splitEl=$("#"+prefix+"_split");d.workoutSplit=_splitEl?_splitEl.value||undefined:d.workoutSplit;
   d.sessionMinutes=+$("#"+prefix+"_minutes").value;
@@ -2791,6 +2885,7 @@ function renderOnboarding(){
           return `<label class="chip-check"><input type="checkbox" id="ob_day_${day.value}" ${checked?"checked":""} onchange="onboardingToggleDay()"><span>${day.label}</span></label>`;
         }).join("")}</div>
         <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled,d.strengthMode)}</div>
+        <div class="onboarding-grid training-choice-grid">${trainingSafetyModeHtml("ob",d)}</div>
         <details class="adv-settings">
           <summary>Ajustar lugar por día (opcional)</summary>
           <div id="obLocationList" style="margin-top:8px">${onboardingLocationRowsHtml(d.trainingDays||[],day=>TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]?d.trainingLocations[day]:(locationDefaults[day]||onboardingDefaultLocation(d)))}</div>
@@ -2855,6 +2950,7 @@ function readOnboardingStep(){
     d.strengthPlace=normalizeStrengthPlace($("#ob_strength")&&$("#ob_strength").value);
     d.strengthMode=strengthModeFromChoice(d.strengthPlace);
     d.planDurationWeeks=+$("#ob_duration").value;
+    const _obSafetyMode=$("#ob_safety_mode");if(_obSafetyMode)d.trainingSafetyMode=normalizedTrainingSafetyMode(_obSafetyMode.value);
     const _obExp=$("#ob_experience");if(_obExp)d.trainingExperience=_obExp.value;
     const _obMin=$("#ob_minutes");if(_obMin)d.sessionMinutes=+_obMin.value;
     d.trainingDays=onboardingSelectedDays();
@@ -3042,7 +3138,7 @@ async function saveOnboarding(){
     lightCardioEnabled:!!d.lightCardioEnabled,
     trainDays:d.trainingDays.length,trainingDays:d.trainingDays,trainingLocations:d.trainingLocations,
     sessionMinutes:d.sessionMinutes,equipment:d.equipment,trainingExperience:d.trainingExperience,
-    trainingPriority:d.trainingPriority,preferredTrainingTime:d.preferredTrainingTime,
+    trainingPriority:d.trainingPriority,trainingSafetyMode:d.trainingSafetyMode,preferredTrainingTime:d.preferredTrainingTime,
     injuries:d.injuries,limitations:d.limitations,avoidMovements:d.avoidMovements,
     trainPlace:d.strengthPlace==="outdoor"?"aire_libre":d.strengthPlace==="home"?"casa":"gym",
     trainNote:[d.injuries,d.limitations,d.avoidMovements].filter(Boolean).join(". "),
@@ -5470,6 +5566,7 @@ function renderProfile(){
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado. Al cambiarlo se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
     <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled,p.strengthMode)}</div>
+    <div class="onboarding-grid training-choice-grid">${trainingSafetyModeHtml("pf",p)}</div>
     <details class="adv-settings">
       <summary>Limitaciones</summary>
       <div class="field"><label for="pf_injuries">Lesiones actuales (opcional)</label><input id="pf_injuries" value="${esc(p.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
@@ -5667,6 +5764,7 @@ async function saveProfile(){
     trainingExperience:draft.trainingExperience,
     workoutSplit:draft.trainingExperience==="advanced"?(draft.workoutSplit||undefined):undefined,
     trainingPriority:draft.trainingPriority,
+    trainingSafetyMode:draft.trainingSafetyMode,
     preferredTrainingTime:draft.preferredTrainingTime,
     injuries:draft.injuries,
     limitations:draft.limitations,
@@ -7051,6 +7149,7 @@ function buildSysPrompt(){
     },
     training:{
       primary_sport:p.primarySport,
+      planned_primary_sport:effectiveTrainingPrimarySport(p),
       strength_mode:p.strengthMode,
       available_days:p.trainingDays,
       location_by_day:p.trainingLocations,
@@ -7058,6 +7157,8 @@ function buildSysPrompt(){
       equipment:p.equipment,
       experience:p.trainingExperience,
       priority:p.trainingPriority,
+      safety_mode:p.trainingSafetyMode,
+      gentle_mode:isGentleTrainingPlan(p),
       preferred_time:p.preferredTrainingTime,
       injuries:p.injuries||null,
       limitations:p.limitations||null,
@@ -7096,7 +7197,7 @@ function coachHardRestrictions(){
 }
 // REQ-86: bump COACH_PROMPT_VERSION cada vez que cambia la lógica del prompt
 // para invalidar resultados reutilizables generados con prompts anteriores.
-const COACH_PROMPT_VERSION=4;
+const COACH_PROMPT_VERSION=5;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -7109,9 +7210,11 @@ function coachCompatibilityContext(action){
       repeatPreference:p.repeatPreference,
     },
     training:{
-      primarySport:p.primarySport,strengthMode:p.strengthMode,durationWeeks:resolvedPlanDuration(p),
+      primarySport:p.primarySport,plannedPrimarySport:effectiveTrainingPrimarySport(p),
+      strengthMode:p.strengthMode,durationWeeks:resolvedPlanDuration(p),
       days:p.trainingDays,locations:p.trainingLocations,equipment:p.equipment,
       experience:p.trainingExperience,priority:p.trainingPriority,
+      trainingSafetyMode:p.trainingSafetyMode,gentleMode:isGentleTrainingPlan(p),
       injuries:p.injuries,limitations:p.limitations,avoidMovements:p.avoidMovements,
     },
     catalog:{
@@ -7303,6 +7406,7 @@ function allowedExercisesForSession(spec,prefs,catalog){
   const allowedLevels=allowedLevelsForExperience(prefs.trainingExperience);
   return catalog.filter(exercise=>{
     if(exerciseConflictsWithProfile(exercise,prefs))return false;
+    if(isGentleTrainingPlan(prefs)&&exerciseBlockedByGentleMode(exercise))return false;
     const places=exerciseArray(exercise.places);
     if(places.length&&!places.includes(spec.location))return false;
     if(strength){
@@ -7319,6 +7423,7 @@ function allowedExercisesForSession(spec,prefs,catalog){
 function trainingExpectedWeeks(prefs){
   const p=migrateProfilePrefs(prefs||((profile&&profile.prefs)||{}));
   const training=trainingPrefsFromPrefs(p);
+  const planPrefs={...p,primarySport:training.primary};
   const calendar=planCalendarForPrefs(p);
   const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength);
   const strengthRoles=STRENGTH_SESSION_IDS;
@@ -7332,7 +7437,7 @@ function trainingExpectedWeeks(prefs){
       const role=schedule[weekday];
       const type=strengthRoles.has(role)?"strength":training.primary;
       const spec={date,weekday,location:training.locations[weekday],role,type};
-      spec.allowedExerciseIds=allowedExercisesForSession(spec,p,catalog).map(exercise=>exercise.slug);
+      spec.allowedExerciseIds=allowedExercisesForSession(spec,planPrefs,catalog).map(exercise=>exercise.slug);
       sessions.push(spec);
     }
     return {week:index+1,phase:TRAINING_PLAN.phaseForWeek(index+1,training.duration),sessions};
@@ -7355,9 +7460,18 @@ function trainingPlanValidationConfig(expected,prefs){
     sessionMinutes:prefs.sessionMinutes,
     allowedExerciseIds:allowed,
     hardRestrictions:trainingBlockedTerms(prefs),
+    gentleMode:isGentleTrainingPlan(prefs),
   };
 }
-function trainingPhaseDose(phase){
+function trainingPhaseDose(phase,prefs){
+  const gentle=isGentleTrainingPlan(prefs||{});
+  if(gentle)return {
+    base:{sets:2,rpe:5,rir:4},
+    progression:{sets:3,rpe:6,rir:3},
+    deload:{sets:2,rpe:4,rir:4},
+    build:{sets:3,rpe:6,rir:3},
+    consolidation:{sets:2,rpe:5,rir:4},
+  }[phase]||{sets:2,rpe:5,rir:4};
   return {
     base:{sets:3,rpe:6,rir:3},
     progression:{sets:4,rpe:7,rir:2},
@@ -7367,9 +7481,11 @@ function trainingPhaseDose(phase){
   }[phase]||{sets:3,rpe:6,rir:3};
 }
 function deterministicTrainingWeekPayload(expected,prefs){
-  const dose=trainingPhaseDose(expected.phase);
+  const dose=trainingPhaseDose(expected.phase,prefs);
+  const planPrefs={...prefs,primarySport:effectiveTrainingPrimarySport(prefs)};
+  const gentle=isGentleTrainingPlan(prefs);
   const sessions=expected.sessions.map(spec=>{
-    const workout=workoutById(spec.date,spec.role,prefs);
+    const workout=workoutById(spec.date,spec.role,planPrefs);
     const strength=spec.type==="strength";
     // REQ-92: filtrar ejercicios del template por los permitidos; si quedan < 2, suplementar
     // desde spec.allowedExerciseIds para que el fallback nunca produzca exercises:[]
@@ -7399,7 +7515,7 @@ function deterministicTrainingWeekPayload(expected,prefs){
     return {
       date:spec.date,weekday:spec.weekday,location:spec.location,role:spec.role,type:spec.type,
       name:workout.name,objective:prescription.objective,duration_minutes:Math.min(prefs.sessionMinutes,prescription.estimatedMinutes),
-      intensity:strength?`RPE ${dose.rpe}`:(spec.role==="calidad"?"RPE 7":spec.role==="tecnica"?"RPE 5":"RPE 3-5"),
+      intensity:strength?`RPE ${dose.rpe}`:(gentle?(spec.role==="calidad"?"RPE 5":spec.role==="tecnica"?"RPE 3-4":"RPE 2-4"):(spec.role==="calidad"?"RPE 7":spec.role==="tecnica"?"RPE 5":"RPE 3-5")),
       exercises:prescribed,blocks,
     };
   });
@@ -7417,10 +7533,13 @@ function trainingWeekPrompt(expected,prefs){
     exercise_id:exercise.slug,name:exercise.name,discipline:exercise.discipline,
     movement_pattern:exercise.movement_pattern,equipment:exerciseArray(exercise.equipment),places:exerciseArray(exercise.places),
   }));
+  const gentle=isGentleTrainingPlan(prefs);
   const context={
     week:expected.week,phase:expected.phase,duration_weeks:resolvedPlanDuration(prefs),
     session_minutes:prefs.sessionMinutes,experience:prefs.trainingExperience,priority:prefs.trainingPriority,
-    primary_sport:prefs.primarySport,strength_mode:prefs.strengthMode,equipment:prefs.equipment,
+    primary_sport:prefs.primarySport,planned_primary_sport:effectiveTrainingPrimarySport(prefs),
+    strength_mode:prefs.strengthMode,equipment:prefs.equipment,
+    safety_mode:prefs.trainingSafetyMode,gentle_mode:gentle,
     injuries:prefs.injuries||null,limitations:prefs.limitations||null,avoid_movements:prefs.avoidMovements||null,
     expected_sessions:expected.sessions.map(({date,weekday,location,role,type,allowedExerciseIds})=>
       ({date,weekday,location,role,type,allowed_exercise_ids:allowedExerciseIds})),
@@ -7429,6 +7548,7 @@ function trainingWeekPrompt(expected,prefs){
   return `Prepara SOLO la semana ${expected.week} de un plan de ${resolvedPlanDuration(prefs)} semanas.
 Respeta exactamente fechas, lugares, roles, duración disponible y ejercicios permitidos del JSON.
 La fase obligatoria es "${expected.phase}". Usa progresión prudente para la experiencia indicada.
+${gentle?"Modo suave obligatorio: baja volumen e intensidad, prioriza ejercicios estables y no uses movimientos invertidos, dominadas ni pike push-ups.":""}
 En fuerza incluye 2-8 ejercicios con series, repeticiones, descanso, RPE, RIR y tempo.
 En deporte incluye un ejercicio del catálogo y bloques ordenados de calentamiento, trabajo, recuperaciones si aplican y vuelta a la calma.
 No inventes ejercicios ni cambies los días disponibles. Responde SOLO JSON válido:
@@ -7453,7 +7573,9 @@ async function generateTrainingWeek(expected,prefs,request){
 function trainingPlanPromptMetadata(prefs,expectedWeeks){
   return JSON.stringify({
     version:"training-plan-v1",durationWeeks:resolvedPlanDuration(prefs),
-    primarySport:prefs.primarySport,strengthMode:prefs.strengthMode,
+    primarySport:prefs.primarySport,plannedPrimarySport:effectiveTrainingPrimarySport(prefs),
+    strengthMode:prefs.strengthMode,trainingSafetyMode:prefs.trainingSafetyMode,
+    gentleMode:isGentleTrainingPlan(prefs),
     trainingDays:prefs.trainingDays,sessionMinutes:prefs.sessionMinutes,
     experience:prefs.trainingExperience,priority:prefs.trainingPriority,
     catalogHash:coachCompatibilityContext("training_plan").catalog.exercises,

@@ -33,7 +33,14 @@
     if(current<=9)return "build";
     return "consolidation";
   }
-  function phaseRanges(phase){
+  function phaseRanges(phase,gentleMode){
+    if(gentleMode)return {
+      base:{sets:[1,3],rpe:[3,6]},
+      progression:{sets:[2,3],rpe:[4,6]},
+      deload:{sets:[1,2],rpe:[3,5]},
+      build:{sets:[2,3],rpe:[4,6]},
+      consolidation:{sets:[1,3],rpe:[3,6]},
+    }[phase]||{sets:[1,3],rpe:[3,6]};
     return {
       base:{sets:[2,4],rpe:[5,7]},
       progression:{sets:[3,5],rpe:[6,8]},
@@ -92,7 +99,7 @@
 
     const expectedByDate=new Map(expected.map(item=>[item.date,item]));
     const seen=new Set();
-    const ranges=phaseRanges(expectedPhase);
+    const ranges=phaseRanges(expectedPhase,!!(config&&config.gentleMode));
     const sessions=rawSessions.map((rawSession,index)=>{
       const date=text(rawSession&&rawSession.date);
       const spec=expectedByDate.get(date);

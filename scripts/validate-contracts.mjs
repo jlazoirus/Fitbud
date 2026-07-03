@@ -30,6 +30,7 @@ const basePrefs={
   eatingWindowEnd:"20:00",
   trainingExperience:"beginner",
   trainingPriority:"health",
+  trainingSafetyMode:"auto",
   equipment:["dumbbells","barbell"],
   age:28,
 };
@@ -56,6 +57,12 @@ assert.ok(!r.ok,"sessionMinutes >180 debe fallar");
 
 r=validateProfilePrefs({...basePrefs,trainingExperience:"elite"});
 assert.ok(!r.ok,"trainingExperience inválido debe fallar");
+
+r=validateProfilePrefs({...basePrefs,trainingSafetyMode:"gentle"});
+assert.ok(r.ok,"trainingSafetyMode gentle debe pasar: "+r.errors.join(", "));
+
+r=validateProfilePrefs({...basePrefs,trainingSafetyMode:"medical"});
+assert.ok(!r.ok,"trainingSafetyMode inválido debe fallar");
 
 // ── validateDayLogState ───────────────────────────────────────────────────────
 r=validateDayLogState({meals:{},extras:[],workoutDone:false});

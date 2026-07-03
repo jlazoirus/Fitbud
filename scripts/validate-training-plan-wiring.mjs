@@ -38,12 +38,31 @@ function extractFunctionSource(src, name) {
   return src.slice(start, i);
 }
 
+function extractConstSource(src, name) {
+  const marker = `const ${name}=`;
+  const start = src.indexOf(marker);
+  assert.ok(start !== -1, `No se encontró const ${name}= en index.html`);
+  const end = src.indexOf(";\n", start);
+  assert.ok(end !== -1, `No se encontró el cierre de ${name}`);
+  return src.slice(start, end + 1);
+}
+
 // trainingPlanValidationConfig depende de trainingBlockedTerms; extraemos
 // ambas del fuente real y las evaluamos juntas en un sandbox aislado.
+const safetyLabelsSrc = extractConstSource(html, "TRAINING_SAFETY_MODE_LABELS");
+const trainingHasLimitsSrc = extractFunctionSource(html, "trainingHasDeclaredLimits");
+const safetyRecommendationSrc = extractFunctionSource(html, "trainingSafetyRecommendation");
+const normalizedSafetyModeSrc = extractFunctionSource(html, "normalizedTrainingSafetyMode");
+const gentleModeSrc = extractFunctionSource(html, "isGentleTrainingPlan");
 const blockedTermsSrc = extractFunctionSource(html, "trainingBlockedTerms");
 const validationConfigSrc = extractFunctionSource(html, "trainingPlanValidationConfig");
 
 const sandbox = new Function(`
+  ${safetyLabelsSrc}
+  ${trainingHasLimitsSrc}
+  ${safetyRecommendationSrc}
+  ${normalizedSafetyModeSrc}
+  ${gentleModeSrc}
   ${blockedTermsSrc}
   ${validationConfigSrc}
   return { trainingBlockedTerms, trainingPlanValidationConfig };

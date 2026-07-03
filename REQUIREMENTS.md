@@ -1460,7 +1460,8 @@ Que el flujo de entrenamiento sea autoexplicativo y capture la intención real s
 
 ## REQ-116 - Entrenamiento seguro: modo suave recomendado por edad o restricciones
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Onboarding y Perfil agregan `trainingSafetyMode` (`auto/gentle/full`) con recomendación visible por edad 18-21, 50+, 55+ o limitaciones declaradas. El modo recomendado baja volumen/intensidad, puede usar caminata como actividad efectiva de bajo impacto, filtra ejercicios complejos/invertidos/dominadas/pike push-ups antes de generar semanas y valida `gentleMode` en `training-plan.js`. Red flags del safety screening siguen pausando entrenamiento. Validador: `scripts/validate-training-safety-mode.mjs`.
 
 ### Origen
 

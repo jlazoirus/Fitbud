@@ -8,6 +8,7 @@
   const VALID_STRENGTH=new Set(["gym","bodyweight","none"]);
   const VALID_EXPERIENCES=new Set(["beginner","intermediate","advanced"]);
   const VALID_PRIORITIES=new Set(["composition","performance","strength","health"]);
+  const VALID_TRAINING_SAFETY_MODES=new Set(["auto","gentle","full"]);
   const VALID_SPLITS=new Set(["fullbody","upperlower","ppl"]);
   const VALID_ENTITLEMENT_STATUSES=new Set(["active","expired","courtesy","revoked"]);
   const VALID_SYNC_ENTITIES=new Set(["day_log","weight_log"]);
@@ -59,6 +60,7 @@
     if(prefs.eatingWindowEnd&&!TIME_RE.test(prefs.eatingWindowEnd))errors.push("eatingWindowEnd inválido.");
     if(!VALID_EXPERIENCES.has(prefs.trainingExperience))errors.push("trainingExperience debe ser beginner, intermediate o advanced.");
     if(prefs.trainingPriority&&!VALID_PRIORITIES.has(prefs.trainingPriority))errors.push("trainingPriority inválido.");
+    if(prefs.trainingSafetyMode&& !VALID_TRAINING_SAFETY_MODES.has(prefs.trainingSafetyMode))errors.push("trainingSafetyMode inválido.");
     if(prefs.workoutSplit&&(!VALID_SPLITS.has(prefs.workoutSplit)||prefs.trainingExperience!=="advanced"))errors.push("workoutSplit solo es válido para usuarios advanced y debe ser fullbody, upperlower o ppl.");
     if(!Array.isArray(prefs.equipment))errors.push("equipment debe ser un array.");
     const age=Number(prefs.age);
