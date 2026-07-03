@@ -2065,3 +2065,699 @@ Avisos y textos secundarios usables con lector de pantalla y legibles con baja v
 ### Verificación sugerida
 
 - Recorrido con VoiceOver en Safari iOS; medir contraste de los tokens finales sobre `--surf1`..`--surf4`.
+
+## REQ-113 - UX Auth: mostrar/ocultar contraseña en todos los campos de password
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): en el textbox de password debe haber un icono que permita ver lo escrito.
+
+### Problema
+
+Los campos `type="password"` de login, registro, recuperación/invitación y modales administrativos no ofrecen control de visibilidad. En móvil esto aumenta errores de tipeo y fricción de activación, especialmente en el primer registro.
+
+### Causa raíz
+
+`index.html` renderiza inputs de contraseña directamente (`au_pwd`, `recovery_pwd`, `recovery_confirm`, `adminTestPwd`, `adminTestPwdConfirm`, `adminPwd`, `adminPwdConfirm`, y campos técnicos locales) sin componente/helper compartido ni botón de toggle.
+
+### Objetivo
+
+Que cualquier usuario pueda alternar entre contraseña oculta y visible de forma accesible, sin afectar autocomplete ni validaciones.
+
+### Alcance
+
+1. Crear un helper visual reutilizable para campos password con botón iconográfico de ojo/ojo tachado.
+2. Aplicarlo a login/registro, recuperación/invitación, preparación de usuario QA y cambio de contraseña admin.
+3. Mantener `autocomplete`, `minlength`, ids y validaciones existentes.
+4. El botón debe tener `aria-label` dinámico ("Mostrar contraseña" / "Ocultar contraseña") y no enviar formularios ni mover foco innecesariamente.
+
+### Fuera de alcance
+
+- Cambiar políticas de contraseña, login social, passkeys o recuperación por correo.
+- Mostrar secretos técnicos permanentes; para llaves/API locales aplicar el mismo patrón solo si no debilita el masking actual.
+
+### Riesgos
+
+- Un toggle mal implementado puede romper `autocomplete` o leer valores incorrectos en `doAuth`, `finishPasswordRecovery` y flujos admin.
+
+### Criterios de aceptación
+
+- Cada input de contraseña visible para usuario/admin tiene un botón de mostrar/ocultar.
+- Alternar visibilidad conserva el valor escrito y no dispara acciones de submit.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E o prueba manual mobile: registro, login, recuperación y cambio admin de contraseña alternando dos veces antes de enviar.
+
+## REQ-114 - UX Onboarding: copy sin jerga en objetivo, grasa, ciclo y patrón de comida
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): "Mantener y recomponer", "Omnívoro", "% grasa" y "Duration" no son autoexplicativos para una persona normal.
+
+### Problema
+
+El onboarding todavía usa lenguaje técnico o poco cotidiano:
+
+- "Mantener peso y recomponer" no comunica claramente el objetivo.
+- "Omnívoro" no es como se identifica una persona que come de todo.
+- "% grasa" puede sentirse obligatorio o intimidante aunque sea opcional.
+- "Duración del plan" no explica que el usuario elige un ciclo de seguimiento, con 10 semanas como opción recomendada.
+
+### Causa raíz
+
+REQ-103 redujo jerga de macros y lugar, pero no cambió todos los labels de dominio ni sus ayudas contextuales. Las etiquetas visibles salen de `index.html` y de constantes compartidas en `js/nutrition-pure.js`.
+
+### Objetivo
+
+Que el onboarding sea entendible para principiantes sin cambiar los valores internos ni romper planes existentes.
+
+### Alcance
+
+1. Cambiar el copy visible de `mantenimiento` a una frase corta que conserve significado: mantener peso mientras mejora composición. Si no hay copy más corto y claro, usar "Mantener mi peso y mejorar mi cuerpo".
+2. Cambiar el label visible de `omnivoro` a "Como de todo"; conservar el valor interno `omnivoro`.
+3. Aclarar que el porcentaje de grasa corporal es opcional y se puede completar después, con tooltip o nota compacta según encaje en mobile.
+4. Cambiar "Duración del plan" por una decisión de ciclo: 4 semanas como ciclo corto para empezar, 10 semanas como proceso completo/recomendado por defecto.
+5. Replicar el copy consistente en Perfil donde aparezcan los mismos controles.
+
+### Fuera de alcance
+
+- Cambiar fórmulas de macros, `profileSchemaVersion`, valores guardados o historial.
+- Rediseñar el entrenamiento completo; eso queda en REQ-115 y REQ-116.
+
+### Riesgos
+
+- Cambiar labels sin conservar valores internos puede romper validaciones, tests y compatibilidad con perfiles existentes.
+
+### Criterios de aceptación
+
+- El onboarding no muestra "Omnívoro" ni "Mantener peso y recomponer" como labels principales.
+- El campo de grasa corporal queda claramente opcional.
+- 10 semanas sigue siendo el default.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Completar onboarding sin ingresar grasa corporal y confirmar que el perfil queda válido y el plan se puede preparar.
+
+## REQ-115 - UX Onboarding: entrenamiento en dos decisiones claras sin duplicar lugar y fuerza
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): "Deporte cardio" no se entiende; el lugar de entrenamiento se cruza con gimnasio/peso corporal; la persona debería elegir dónde entrenar fuerza y con qué equipamiento si entrena en casa o al aire libre.
+
+### Problema
+
+El onboarding mezcla tres conceptos en controles separados: deporte cardio, trabajo de fuerza y lugar por día. Eso obliga al usuario a reconciliar "Gimnasio/Peso corporal" con "Lugar de entrenamiento", generando duplicidad y decisiones raras en mobile.
+
+### Causa raíz
+
+El modelo actual mantiene `primarySport`, `strengthMode`, `trainingLocations` y `equipment`, pero la UI los presenta como selectores paralelos en vez de una secuencia de intención:
+
+1. actividad física/deporte que quiere practicar;
+2. si quiere fuerza;
+3. dónde y con qué recursos quiere hacer esa fuerza.
+
+### Objetivo
+
+Que el flujo de entrenamiento sea autoexplicativo y capture la intención real sin duplicar decisiones.
+
+### Alcance
+
+1. Reemplazar "¿Tienes un deporte cardio...?" y "Deporte cardio" por "¿Practicas alguna actividad física?" sin usar la palabra cardiovascular.
+2. Ofrecer opciones explícitas: caminar, correr, bicicleta, natación, otro, ninguna.
+3. Reemplazar "Trabajo de fuerza" por una pregunta única: dónde quiere entrenar fuerza: gimnasio, casa con peso corporal/equipo, aire libre con peso corporal/equipo, o "No quiero fuerza por ahora".
+4. Si elige casa o aire libre, preguntar si tiene o quiere considerar equipamiento; permitir seleccionar ninguno, bandas/elásticos, mancuernas, barra/discos y barra de dominadas.
+5. Mantener compatibilidad interna con `primarySport`, `strengthMode`, `trainingLocations` y `equipment` mediante mapeo/migración.
+6. Actualizar Perfil con el mismo modelo para editarlo después.
+
+### Fuera de alcance
+
+- Cambiar el contenido de rutinas suaves por edad/restricción (REQ-116).
+- Crear ejercicios nuevos si el catálogo actual cubre las combinaciones básicas.
+- Permitir menores de edad.
+
+### Riesgos
+
+- `validateTrainingProfile`, `defaultTrainingLocations`, `trainingExpectedWeeks` y el generador de entrenamiento dependen de valores existentes. El cambio debe ser de presentación/mapeo antes de tocar contratos.
+
+### Criterios de aceptación
+
+- El usuario puede elegir caminar como actividad principal.
+- El usuario puede elegir no hacer fuerza por ahora sin caer en validaciones contradictorias.
+- Casa/aire libre muestran recursos disponibles sin repetir "Lugar de entrenamiento" como decisión duplicada.
+- Perfiles antiguos siguen migrando a una selección válida.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E onboarding con: caminata + no fuerza; ninguna actividad + fuerza en casa sin equipo; running + fuerza en gimnasio.
+
+## REQ-116 - Entrenamiento seguro: modo suave recomendado por edad o restricciones
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026) + revisión de guías oficiales WHO/CDC/HHS: caminar cuenta como actividad aeróbica válida; en adultos mayores conviene ajustar intensidad, sumar balance/fuerza cuando sea apropiado y adaptar a condiciones reales.
+
+### Problema
+
+El flujo actual puede sugerir rutinas estándar a usuarios de 18-21, mayores de 50, mayores de 55 o personas con restricciones, sin una recomendación visible de bajar intensidad, priorizar caminatas/cardio ligero o evitar movimientos complejos.
+
+### Causa raíz
+
+La app tiene safety screening y nivel de experiencia, pero no traduce edad/restricciones a una recomendación de plan más suave que el usuario pueda aceptar o rechazar. Además, "solo caminatas/cardio ligero" no está modelado como opción válida y explícita para mayores.
+
+### Objetivo
+
+Ofrecer planes más seguros y sostenibles sin imponerlos: sugerencia suave desde 50, recomendación más fuerte desde 55, y libertad para elegir plan completo si el usuario lo decide y no hay red flags médicos.
+
+### Alcance
+
+1. Si edad 18-21: sugerir empezar conservador, con técnica y progresión gradual, sin bloquear plan completo.
+2. Si edad >=50: sugerir modo suave/bajo impacto o fuerza ligera.
+3. Si edad >=55: sugerir caminar/cardio ligero como plan válido, con opción de fuerza mínima o plan completo.
+4. Si hay restricciones/limitaciones declaradas: recomendar modo suave y excluir movimientos complejos o invertidos cuando aplique.
+5. El modo suave debe reducir intensidad/volumen, favorecer caminatas, movilidad, ejercicios estables y alternativas de bajo impacto.
+6. La UI debe explicar la sugerencia con tono de cuidado, no de incapacidad.
+7. Si el safety screening tiene red flags, mantener la pausa de seguridad vigente y no permitir saltarla.
+
+### Fuera de alcance
+
+- Diagnóstico médico, rehabilitación clínica o planes para menores de 18.
+- Reescribir todo el catálogo de ejercicios; usar sustituciones y filtros disponibles donde sea posible.
+
+### Riesgos
+
+- Mensajes sobre edad y salud deben evitar promesas médicas o tono discriminatorio.
+- Permitir "solo cardio" requiere revisar validaciones que hoy esperan fuerza/equipment.
+
+### Criterios de aceptación
+
+- Usuario de 50-54 ve sugerencia de plan suave, pero puede elegir plan completo.
+- Usuario de 55+ puede elegir caminatas/cardio ligero como plan válido.
+- Usuario con red flag médico sigue bloqueado por safety hold.
+- Rutinas suaves no incluyen ejercicios complejos como pike push-ups, dominadas o movimientos invertidos salvo que el usuario elija plan completo y tenga perfil compatible.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E con edades 20, 52 y 58; validar copy, opciones y plan resultante. Revisar manualmente un plan suave de 55+ en mobile.
+
+## REQ-117 - Trial premium: primera semana con plan personalizado y cuotas limitadas
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): antes del paywall debe generarse la primera semana gratis de dieta y entrenamiento con experiencia premium, limitando llamadas para controlar gasto y sin mencionar IA al usuario.
+
+### Problema
+
+La estrategia pide entregar valor antes del paywall, pero la experiencia premium real está ligada a entitlement. Un usuario nuevo debe probar el producto completo, pero sin abrir consumo ilimitado de coach.
+
+### Causa raíz
+
+El modelo actual distingue `hasEntitlement()` y cuotas de coach por acción, pero no existe un estado de trial premium de primera semana con límites propios, mensajes de conversión y expiración clara.
+
+### Objetivo
+
+Dar a cada usuario nuevo una primera semana personalizada gratis, con acceso premium limitado y mensajes comerciales claros cuando se agoten los cambios/rearmados.
+
+### Alcance
+
+1. Crear estado de trial por usuario: inicio, fin, uso y expiración; duración inicial 7 días desde completar onboarding o primer plan generado.
+2. Durante trial, permitir generar la primera semana de nutrición y entrenamiento con el coach premium.
+3. Limitar acciones costosas de trial: rearmar semana/día, "otra opción", cambios de plato y regeneraciones; los límites deben ser configurables en políticas server-side o constantes claras.
+4. Al agotar límites de trial, mostrar copy visible: está en su semana gratis, ya usó sus cambios incluidos, puede activar un plan para seguir personalizando.
+5. Respetar REQ-31: no usar "IA", modelos, tokens, cuotas internas ni proveedor en UI normal; usar "coach", "plan personalizado", "cambios incluidos".
+6. Mantener fallback determinista gratuito si el servicio premium falla.
+
+### Fuera de alcance
+
+- Activar Stripe o cambiar precios.
+- Implementar métodos de pago locales.
+- Cambiar la frontera premium completa más allá del trial.
+
+### Riesgos
+
+- El gasto puede crecer si los límites no se aplican server-side.
+- El trial no debe convertirse en entitlement indefinido ni poder reiniciarse con refresh/localStorage.
+
+### Criterios de aceptación
+
+- Usuario nuevo sin plan pago puede generar su primera semana personalizada dentro del trial.
+- Agotar límites de trial bloquea nuevas llamadas costosas con mensaje comercial no técnico.
+- Un usuario con plan pago no queda limitado por límites de trial.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Tests de `api/claude.js`/cuotas con usuario trial: primera acción permitida, límite agotado bloqueado, usuario pago permitido.
+
+## REQ-118 - Activación: generar automáticamente la primera semana al terminar onboarding
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): al terminar onboarding el usuario debe recibir automáticamente su primera semana completa, personalizada a sus gustos y objetivos.
+
+### Problema
+
+Hoy el onboarding termina y la preparación del día/semana depende de acciones posteriores. Para activación, el usuario debería salir del onboarding con "qué comer y entrenar esta semana" ya listo.
+
+### Causa raíz
+
+`saveOnboarding()` guarda preferencias y prepara estados iniciales, pero no orquesta una generación semanal premium automática de nutrición + entrenamiento ni una pantalla de progreso/revisión post-onboarding.
+
+### Objetivo
+
+Reducir time-to-first-value: registro -> onboarding -> primera semana personalizada lista, sin que el usuario tenga que buscar "Preparar semana".
+
+### Alcance
+
+1. Al guardar onboarding, iniciar generación de la primera semana de nutrición y entrenamiento usando el trial premium de REQ-117 cuando corresponda.
+2. Mostrar estado de progreso comprensible: preparando comidas, preparando entrenamiento, validando plan.
+3. Guardar nutrición en `plan_versions`/snapshot y entrenamiento como plan activo o borrador activado, sin reescribir historial.
+4. Si falla una parte, usar fallback determinista y avisar con opción de reintento sin dejar pantalla muerta.
+5. Al finalizar, llevar a Home con el anillo de macros, siguiente comida y sesión/descanso de hoy ya visibles.
+
+### Fuera de alcance
+
+- Rediseñar el paywall completo.
+- Regenerar semanas futuras después de la primera; eso sigue siendo acción premium normal.
+
+### Riesgos
+
+- Generar nutrición + entrenamiento puede tardar; la UX debe manejar espera, errores parciales y navegación.
+- No debe aplicar planes si falta consentimiento o safety screening vigente.
+
+### Criterios de aceptación
+
+- Un usuario nuevo completa onboarding y termina con primera semana aplicada o con fallback aplicado y reintento disponible.
+- La generación usa preferencias guardadas antes de llamar al coach.
+- Home no queda en estado "Aún falta preparar este día" después de onboarding exitoso.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E onboarding completo con mocks de coach exitoso y con fallo parcial; verificar Home y `plan_versions`.
+
+## REQ-119 - Onboarding nutricional: capturar gustos y disgustos antes del primer plan
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): la dieta debe generarse desde el primer momento en base a gustos, porque una dieta genérica da mala impresión.
+
+### Problema
+
+El onboarding esencial captura patrón de alimentación y alergias, pero no pregunta de forma directa por ingredientes favoritos, platos que le gustan ni comidas/ingredientes que no le gustan. El primer plan puede sentirse genérico aunque cumpla macros.
+
+### Causa raíz
+
+Las preferencias detalladas existen en Perfil (`preferredIngredients`, `preferredCuisines`, `dislikedIngredients`, notas), pero parte de esos campos quedó fuera del onboarding para simplificarlo.
+
+### Objetivo
+
+Capturar gustos mínimos de alto impacto antes de generar la primera semana, sin volver pesado el onboarding.
+
+### Alcance
+
+1. En onboarding, agregar campos breves: ingredientes favoritos, platos que le gustan, comidas o ingredientes que no le gustan.
+2. Guardar esos valores en prefs existentes si alcanzan, o extender prefs de forma compatible si hace falta.
+3. Usar esos gustos en la primera generación semanal automática (REQ-118), día, semana, reemplazos y "otra opción".
+4. Mantener alergias/restricciones duras separadas de disgustos/preferencias.
+5. Reflejar los mismos campos en Perfil como configuración editable.
+
+### Fuera de alcance
+
+- Crear catálogo nuevo de platos para cada gusto.
+- Hacer scoring avanzado de preferencias aprendidas; esto puede apoyarse en `learnedPatterns` existente.
+
+### Riesgos
+
+- Demasiados campos en onboarding pueden bajar conversión. Deben ser compactos y opcionales salvo restricciones duras.
+
+### Criterios de aceptación
+
+- El usuario puede completar onboarding con gustos vacíos, pero si los llena se guardan y se usan en el primer plan.
+- El prompt/contexto y fallback determinista reciben preferencias positivas y negativas.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Test con "me gusta pollo/arroz" y "no me gusta avena": confirmar que el primer plan prioriza compatibles y evita disgustos cuando hay alternativas.
+
+## REQ-120 - Nutrición: "No me gusta este plato" bloquea futuras sugerencias hasta editar Perfil
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): agregar una opción para decir que un plato no gusta y que no vuelva a sugerirse, salvo que el usuario lo cambie en Perfil.
+
+### Problema
+
+El usuario puede cambiar una comida, pero no hay una acción explícita para enseñar al sistema que un plato específico no debe volver a aparecer. Esto provoca repetición de platos rechazados y erosiona la confianza.
+
+### Causa raíz
+
+Las preferencias negativas son principalmente texto libre (`dislikedIngredients`) y patrones aprendidos. No existe una lista estructurada de platos bloqueados por slug/nombre ni un flujo de desbloqueo.
+
+### Objetivo
+
+Permitir bloquear platos de forma persistente, aplicable a todos los flujos de generación y editable desde Perfil avanzado.
+
+### Alcance
+
+1. En cada comida sugerida/aplicada, agregar acción "No me gusta este plato" o equivalente.
+2. Guardar el bloqueo como preferencia estructurada por `dishSlug` cuando exista y por nombre normalizado como fallback.
+3. Excluir platos bloqueados en generación de día, semana, reemplazos, "otra opción" y regenerar día.
+4. En Perfil avanzado, listar platos bloqueados y permitir quitarlos ("volver a sugerir").
+5. Si bloquear un plato deja muy pocos candidatos, mostrar mensaje útil y usar fallback compatible sin romper macros.
+
+### Fuera de alcance
+
+- Bloquear ingredientes completos desde esta acción; ingredientes se manejan en preferencias.
+- Analytics de platos rechazados agregada a nivel global.
+
+### Riesgos
+
+- Bloqueos excesivos pueden dejar sin candidatos en dietas restrictivas; el sistema debe degradar con feedback claro.
+
+### Criterios de aceptación
+
+- Un plato marcado como no gustado no aparece en nuevas generaciones para ese usuario.
+- El usuario puede desbloquearlo desde Perfil y vuelve a ser elegible.
+- Días ya ejecutados no cambian.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Generar día con un plato, marcarlo como no gustado, regenerar día/semana y confirmar que no reaparece.
+
+## REQ-121 - Nutrición: cambios de preferencias regeneran solo futuro y se respetan de inmediato
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): si las preferencias de comida se actualizan, al regenerar el día deben tomarse en cuenta y solo debe cambiar el futuro.
+
+### Problema
+
+Aunque parte de la generación usa prefs actuales, no hay garantía visible/contractual de que todo flujo de regeneración invalide contexto anterior y preserve días ya registrados.
+
+### Causa raíz
+
+La app combina `plan_versions`, `day_log`, overrides, cache de coach y generación determinista. Algunos context keys ya incluyen preferencias, pero el contrato debe ser explícito para preferencias nuevas como gustos, platos bloqueados y disgustos.
+
+### Objetivo
+
+Que editar preferencias alimente inmediatamente toda regeneración futura sin tocar lo ya ejecutado.
+
+### Alcance
+
+1. Incluir gustos, disgustos y platos bloqueados en context keys/cache de generación cuando aplique.
+2. Al regenerar día/semana, excluir días pasados y días con comidas ya registradas.
+3. Si una comida futura fue generada antes del cambio de preferencias, regenerarla debe usar prefs actuales.
+4. Mostrar copy de confirmación cuando el cambio solo afecte propuestas futuras.
+
+### Fuera de alcance
+
+- Reescribir historial de `day_log` ya ejecutado.
+- Migrar planes antiguos salvo cuando el usuario regenere futuro.
+
+### Riesgos
+
+- Invalidar demasiado puede elevar consumo de coach; usar límites de trial/premium y fallback determinista.
+
+### Criterios de aceptación
+
+- Cambiar "no me gusta avena" y regenerar mañana evita avena si hay alternativas.
+- Comidas hechas hoy o en días pasados no se modifican.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Test con plan versionado activo + día futuro regenerado tras editar preferencias; confirmar que snapshot futuro cambia y día pasado no.
+
+## REQ-122 - Fix Nutrición: dietas deben llegar a objetivos o completar con sugerencias aplicables
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): las dietas no están generando correctamente, no llegan al objetivo y no dejan avanzar; si falla varias veces debe sugerir comidas extra/snacks para llegar a macros.
+
+### Problema
+
+Cuando una dieta generada queda fuera de tolerancia, el usuario puede quedar bloqueado o recibir una opción que no cumple el objetivo. La app ya tiene snack de cierre para déficit en algunos casos, pero no hay garantía robusta para día/semana ni recuperación tras fallos repetidos.
+
+### Causa raíz
+
+Los caminos de coach, solver determinista, edición de gramos, gap snack y validación de macros no están completamente unificados como contrato de "plan aplicable". La proteína y calorías pueden fallar por catálogo, porciones o respuesta del coach.
+
+### Objetivo
+
+Toda dieta aplicada debe ser viable: cumplir objetivos dentro de tolerancia o incluir una sugerencia concreta aplicable que complete el día sin bloquear al usuario.
+
+### Alcance
+
+1. Revisar `validateGeneratedDay`, `findGapSnack`, `genReviewHtml`, `generateOneDay`, `planDeterministicNutritionDay` y flujo semanal.
+2. Si el plan no llega a kcal/proteína, sugerir snack/comida extra compatible y permitir agregarlo al borrador.
+3. Si dos intentos consecutivos no cumplen objetivo, activar ruta de completado determinista con comida extra compatible.
+4. Permitir aplicar con aviso solo si el usuario entiende qué falta y hay una acción para completarlo; no aplicar silenciosamente un día claramente insuficiente.
+5. Mantener restricciones duras como bloqueo absoluto.
+
+### Fuera de alcance
+
+- Cambiar metas calculadas de macros.
+- Crear platos nuevos en catálogo global sin revisión.
+
+### Riesgos
+
+- Forzar macros puede generar porciones poco realistas; el solver debe preferir opciones consumibles y explicar cuando necesita comida extra.
+
+### Criterios de aceptación
+
+- Metas altas de proteína reciben plan aplicable o snack/comida extra aplicable.
+- La semana no queda bloqueada por un día con déficit recuperable.
+- Restricciones duras siguen bloqueando platos incompatibles.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Tests con objetivos altos y catálogo limitado: el sistema completa kcal/proteína con snack o comida extra sin violar restricciones.
+
+## REQ-123 - Fix Nutrición: todos los botones "Otra opción" soportan reintentos repetidos con feedback
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): el botón de otra opción no funciona después del primer intento y no da feedback; revisar todos los botones "otra opción".
+
+### Problema
+
+Los flujos de alternativa de comida parecen funcionar una vez y fallar o quedar sin estado claro en el segundo intento. El usuario no sabe si se agotó límite, si falló el coach, si quedó el borrador anterior o si debe cerrar el modal.
+
+### Causa raíz
+
+Hay múltiples caminos: `regenerateGenMeal`, `regenerateDayInWeekDraft`, reemplazos de comida aplicada, "Rehacer opciones" y flujos de `meal_option`/cuota. No comparten un patrón uniforme de estado, fallback, límite diario y restauración.
+
+### Objetivo
+
+Que cualquier acción "Otra opción"/"Rehacer opciones" pueda repetirse dentro de su límite, tenga fallback y comunique claramente éxito, carga, límite agotado o error.
+
+### Alcance
+
+1. Auditar todos los botones visibles con copy "Otra opción", "Rehacer opciones", "Preparar otro..." y equivalentes.
+2. Unificar comportamiento: loading, consumo de límite, fallback determinista, volver al borrador y reintentar.
+3. Corregir el bug de segundo intento.
+4. Mostrar contador o mensaje claro cuando el límite de opciones del día/trial se agota.
+5. Mantener "Más opciones" sin duplicar reemplazos por comida.
+
+### Fuera de alcance
+
+- Cambiar límites de trial/premium definidos en REQ-117 salvo integrarlos.
+- Rediseñar el modal completo de revisión de semana.
+
+### Riesgos
+
+- Consumir cuota antes de validar puede penalizar fallos técnicos; la reserva/devolución debe seguir el patrón server-side existente.
+
+### Criterios de aceptación
+
+- Cada botón de alternativa funciona al menos dos veces seguidas o muestra límite agotado con feedback.
+- Ningún error deja modal muerto sin volver al borrador/reintentar.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E o script con mocks: día generado -> otra opción dos veces; semana -> preparar otro día dos veces; comida aplicada -> rehacer opciones dos veces.
+
+## REQ-124 - Home y Nutrición: anillo de macros primero y agenda/comidas debajo
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): el gráfico/anillo de macros es crítico y debe aparecer primero en Home y Nutrición; luego siguiente comida y sesión pendiente.
+
+### Problema
+
+REQ-97 priorizó la agenda antes del hero compacto. La nueva decisión de producto cambia la jerarquía: el usuario debe ver primero su avance de macros, porque es el centro de control del día.
+
+### Causa raíz
+
+`renderHoy()` actualmente renderiza agenda antes de `heroDash`; `renderNutrition()` muestra un botón de más opciones antes del bloque de macros. Además el estado "done" de Home no está diseñado alrededor del anillo + racha + pendientes restantes.
+
+### Objetivo
+
+Home y Nutrición deben abrir con el anillo/resumen de macros, más compacto si hace falta, y luego mostrar la siguiente acción del día.
+
+### Alcance
+
+1. En Home: ordenar como anillo/resumen de macros -> siguiente comida -> entrenamiento pendiente/sesión de hoy -> coach.
+2. Si ya completó entrenamiento, no mostrar tarjeta de sesión; si falta entrenar, mantenerla pendiente aunque ya completó comidas.
+3. Si completó todas las comidas y entrenamiento, mostrar anillo + racha/mensaje de día cubierto.
+4. En Nutrición: ordenar como anillo/resumen -> comidas del día -> comidas extra/reordenadas -> más opciones.
+5. Hacer el anillo más compacto si es necesario para mobile sin perder lectura.
+6. Revisar tour/coachmarks para que apunten al nuevo primer elemento.
+
+### Fuera de alcance
+
+- Cambiar cálculo de macros.
+- Rediseñar todo el dashboard de progreso.
+
+### Riesgos
+
+- Contradice el orden definido en REQ-97; documentar la nueva decisión en el mismo commit para evitar reversiones automáticas.
+
+### Criterios de aceptación
+
+- En Home mobile, el primer bloque útil es el anillo/resumen de macros.
+- Si falta entrenar, Home lo muestra como pendiente aunque las comidas estén completas.
+- En Nutrición, "Más opciones" no aparece antes del resumen y las comidas.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Capturas Playwright mobile de Home: día vacío/preparado, comidas completas con entreno pendiente, día completo.
+
+## REQ-125 - Nutrición: reordenar comidas y saltar comidas sin cambiar horarios históricos
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): el usuario debe reordenar comidas según cómo las consume durante el día; también debe poder saltarse una comida que ya no hará.
+
+### Problema
+
+Las comidas extra quedan al final y pueden perder visibilidad. Si el usuario agrega una comida que hará a media tarde, no puede subirla al lugar lógico. Tampoco hay acción explícita para marcar que no hará una comida planificada sin borrarla ni consumirla.
+
+### Causa raíz
+
+`renderNutrition()` separa comidas planificadas y extras por estructura fija; `day_log` no tiene un orden visual persistente ni estado "saltada" para slots de comida. El orden actual deriva de slots/arrays, no de intención diaria del usuario.
+
+### Objetivo
+
+Permitir ordenar visualmente el día de comidas en mobile y marcar comidas saltadas, preservando el historial y los horarios originales.
+
+### Alcance
+
+1. Permitir reordenar comidas planificadas y extras en la vista de Nutrición.
+2. Optimizar para mobile: drag and drop o control de agarre pequeño; si no queda claro/accesible, agregar botones subir/bajar discretos.
+3. El reordenamiento cambia solo el orden visual del día, no el slot, horario original, macros ni historial.
+4. Agregar acción "Saltar esta comida" para comidas planificadas no consumidas.
+5. Una comida saltada no cuenta como consumida; debe verse como saltada y permitir deshacer.
+6. Home debe usar el orden visual para decidir la siguiente comida pendiente cuando exista.
+
+### Fuera de alcance
+
+- Recalcular automáticamente macros al saltar una comida; eso puede quedar como sugerencia o acción posterior.
+- Cambiar el template global de horarios del usuario.
+
+### Riesgos
+
+- Drag and drop móvil puede ser frágil; los controles deben tener fallback accesible.
+- Saltar comida puede dejar macros bajos; coordinar copy con REQ-122.
+
+### Criterios de aceptación
+
+- Una comida extra puede moverse entre comidas planificadas y conserva su estado.
+- Una comida planificada puede marcarse como saltada y luego restaurarse.
+- El orden visual persiste al cambiar de tab o recargar.
+- Días pasados ya registrados no se reordenan automáticamente.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E mobile: agregar snack extra, moverlo arriba del almuerzo, saltar desayuno, verificar Home muestra la siguiente comida correcta.
+
+## REQ-126 - Admin: resetear futuro y regenerar nutrición/entrenamiento para cualquier usuario
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): como administrador debe poder borrar para otro usuario todo lo futuro generado y volver a generar dieta y ejercicio para al menos toda la semana; también reiniciar a cero y devolverlo al onboarding si hace falta.
+
+### Problema
+
+El admin puede listar usuarios, activar/desactivar, invitar, resetear usuario QA y administrar consumo, pero no puede corregir planes futuros de un usuario normal sin intervención manual en base de datos.
+
+### Causa raíz
+
+`api/admin.js` tiene acciones administrativas acotadas; no existe una acción segura para borrar prescripción futura (`plan_versions`/`day_log` futuros) ni para preparar un flujo de regeneración por usuario y fecha.
+
+### Objetivo
+
+Dar al administrador una herramienta segura para resetear o regenerar futuro de nutrición y/o entrenamiento de cualquier usuario, con fecha de inicio y preview antes de aplicar.
+
+### Alcance
+
+1. En panel admin, agregar acción por usuario: "Regenerar plan" o "Resetear futuro".
+2. Permitir seleccionar: nutrición, entrenamiento o ambos.
+3. Permitir fecha de inicio; default = hoy en zona horaria del usuario/admin si no se elige.
+4. Preview obligatorio antes de aplicar: qué días/versiones se archivarán/borrarán y qué se regenerará.
+5. Al aplicar, borrar/archivar solo futuro desde la fecha elegida; no tocar días pasados ni registros ejecutados.
+6. Permitir regenerar como mínimo 7 días.
+7. Agregar opción separada de "Reiniciar usuario": borrar datos personales/planes/progreso según política existente y marcar onboarding pendiente para que vuelva a empezar.
+8. Auditar acción con admin, usuario objetivo, fecha, alcance y resultado.
+
+### Fuera de alcance
+
+- Ejecutar migraciones de producción automáticamente.
+- Saltarse RLS desde cliente; operaciones sensibles deben pasar por API admin server-side.
+- Crear pagos, cupones o entitlements nuevos.
+
+### Riesgos
+
+- Alto riesgo de pérdida de datos si la acción toca historial; requerir confirmación explícita y preview.
+- Regenerar con coach para otro usuario puede consumir cuota/costo; usar políticas admin claras y fallback determinista si corresponde.
+
+### Criterios de aceptación
+
+- Admin puede seleccionar usuario normal, fecha y tipo de plan a resetear/regenerar.
+- El preview muestra impacto antes de aplicar.
+- Aplicar desde hoy no modifica días pasados ni comidas/entrenos ya registrados.
+- Reiniciar usuario lo devuelve a onboarding sin convertirlo necesariamente en usuario QA.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Tests de `api/admin.js` con mocks: preview, aplicar nutrición, aplicar entrenamiento, ambos, reinicio total, bloqueo a no-admin y protección de historial pasado.
