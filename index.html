@@ -685,11 +685,20 @@
   .sync-badge.synced{background:rgba(60,180,80,.14);border-color:rgba(60,180,80,.35);color:#4ade80}
   .sync-badge.attention{background:rgba(220,110,30,.14);border-color:rgba(220,110,30,.35);color:#f0a050;pointer-events:auto;cursor:pointer}
   .sync-badge.conflict{background:rgba(210,70,110,.16);border-color:rgba(210,70,110,.42);color:#fb7185;pointer-events:auto;cursor:pointer}
-  /* Perfil: navegación local y guardado flotante (REQ-54) */
-  .pf-nav{display:flex;overflow-x:auto;gap:6px;padding:0 0 12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-  .pf-nav::-webkit-scrollbar{display:none}
-  .pf-nav button{flex:0 0 auto;background:var(--surf2);border:1px solid var(--border-2);border-radius:999px;color:var(--muted);font-size:13px;font-weight:600;padding:8px 16px;cursor:pointer;transition:background .15s,color .15s,border-color .15s;white-space:nowrap}
-  .pf-nav button:active{background:var(--terra-400,#b44c2c);border-color:var(--terra-400,#b44c2c);color:#fff}
+  /* Perfil: acordeón local y guardado flotante (REQ-105) */
+  .pf-accordion-list{display:flex;flex-direction:column;gap:10px}
+  .pf-accordion{margin:0}
+  .pf-accordion>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--surf2);border:1px solid var(--border-2);border-radius:var(--r-md);color:var(--txt);font-family:var(--font-display);font-size:15px;font-weight:800;padding:14px 16px;cursor:pointer;list-style:none;min-height:48px}
+  .pf-accordion>summary::-webkit-details-marker{display:none}
+  .pf-accordion>summary:after{content:'+';font-family:var(--font-body);font-size:20px;font-weight:600;line-height:1;color:var(--muted)}
+  .pf-accordion[open]>summary{background:var(--accent-dim);border-color:var(--border-acc);margin-bottom:10px}
+  .pf-accordion[open]>summary:after{content:'-';color:var(--txt)}
+  .pf-accordion-panel{display:flex;flex-direction:column;gap:12px}
+  .pf-accordion-panel>.dash{margin:0}
+  .pf-accordion .field{margin:9px 0}
+  .pf-accordion .availability{gap:6px}
+  .pf-accordion .availability-day{grid-template-columns:minmax(106px,.9fr) minmax(126px,1.1fr);gap:8px;padding:8px 9px}
+  .pf-accordion .availability-day select{padding:8px;min-height:40px}
   .pf-save-float{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:0;right:0;padding:0 16px;z-index:49;pointer-events:none}
   .pf-save-float button{width:100%;max-width:528px;margin:0 auto;display:block;background:var(--accent);color:#fff;border:none;border-radius:var(--r-lg);padding:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.55);pointer-events:auto;font-family:var(--font-display)}
 </style>
@@ -5103,9 +5112,17 @@ function profileClearDirty(){
   const el=document.getElementById("profileSaveFloat");
   if(el)el.style.display="none";
 }
-function pfScrollTo(id){
-  const el=document.getElementById(id);
-  if(el)el.scrollIntoView({behavior:"smooth",block:"start"});
+let _profileAccordionSync=false;
+function profileAccordionToggle(el){
+  if(!el||_profileAccordionSync)return;
+  setTimeout(()=>{
+    if(!el.open||_profileAccordionSync)return;
+    _profileAccordionSync=true;
+    document.querySelectorAll(".pf-accordion[open]").forEach(section=>{
+      if(section!==el)section.open=false;
+    });
+    _profileAccordionSync=false;
+  },0);
 }
 function renderProfile(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
@@ -5116,36 +5133,33 @@ function renderProfile(){
   const email=(session&&session.user&&session.user.email)||"";
   const duration=resolvedPlanDuration(p);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
-
-  <div class="pf-nav" role="navigation" aria-label="Secciones del perfil">
-    <button onclick="pfScrollTo('pfSecObjetivo')">Objetivo</button>
-    <button onclick="pfScrollTo('pfSecComidas')">Comidas</button>
-    <button onclick="pfScrollTo('pfSecEntreno')">Entreno</button>
-    <button onclick="pfScrollTo('pfSecPrivacidad')">Privacidad</button>
-    <button onclick="pfScrollTo('pfSecCuenta')">Cuenta</button>
-  </div>
-
   ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas.</span></div>`:""}
 
+  <div class="pf-accordion-list">
   <div id="pfEditableBody" oninput="profileMarkDirty()" onchange="profileMarkDirty()">
-  <div id="pfSecObjetivo" class="dash">
-    <div class="field" style="margin:0"><label>Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
-  </div>
+  <details id="pfSecObjetivo" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+    <summary>Objetivo</summary>
+    <div class="pf-accordion-panel">
+      <div class="dash">
+        <div class="field" style="margin:0"><label>Nombre</label><input id="pf_name" value="${esc(p.name||"")}" placeholder="Tu nombre"></div>
+      </div>
 
-  <div class="section-h">Objetivo y metas</div>
-  <div class="dash">
-    ${macros?`<div class="macro-preview" style="margin-top:0">
-      <div class="scard"><div class="n">${macros.kcal}</div><div class="l">kcal diarias</div></div>
-      <div class="scard"><div class="n">${macros.p} g</div><div class="l">proteína</div></div>
-      <div class="scard"><div class="n">${macros.c} g</div><div class="l">carbohidratos</div></div>
-      <div class="scard"><div class="n">${macros.f} g</div><div class="l">grasas</div></div>
+      <div class="dash">
+        ${macros?`<div class="macro-preview" style="margin-top:0">
+          <div class="scard"><div class="n">${macros.kcal}</div><div class="l">kcal diarias</div></div>
+          <div class="scard"><div class="n">${macros.p} g</div><div class="l">proteína</div></div>
+          <div class="scard"><div class="n">${macros.c} g</div><div class="l">carbohidratos</div></div>
+          <div class="scard"><div class="n">${macros.f} g</div><div class="l">grasas</div></div>
+        </div>
+        <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${p.goal==="volumen"?"ganar masa":p.goal==="mantenimiento"?"mantenimiento y recomposición":"pérdida de grasa"}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
+        <button class="btn" style="width:100%" onclick="startOnboarding()">Recalcular objetivos y preferencias</button>
+      </div>
     </div>
-    <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${p.goal==="volumen"?"ganar masa":p.goal==="mantenimiento"?"mantenimiento y recomposición":"pérdida de grasa"}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
-    <button class="btn" style="width:100%" onclick="startOnboarding()">Recalcular objetivos y preferencias</button>
-  </div>
+  </details>
 
-  <div id="pfSecComidas" class="section-h">Comidas</div>
-  <div class="dash">
+  <details id="pfSecComidas" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Comidas</summary>
+  <div class="pf-accordion-panel"><div class="dash">
     <label class="muted small">Patrón de alimentación y restricciones generales</label>
     <div class="chips" style="margin:9px 0 4px">
       ${[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]].map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="pf_diet_${v}" ${chk(v)}><span>${l}</span></label>`).join("")}
@@ -5182,10 +5196,12 @@ function renderProfile(){
     <div class="field"><label>Otras preferencias (opcional)</label><textarea id="pf_food_notes" rows="2" placeholder="Ej. prefiero desayunos salados">${esc(p.foodNotes)}</textarea></div>
     <div class="field"><label>Alergias y restricciones duras</label><input id="pf_allergies" value="${esc(p.allergies)}" placeholder="maní, mariscos…"><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
     <div class="field" style="margin-bottom:0"><label>Ingredientes que no te gustan</label><input id="pf_disliked" value="${esc(p.dislikedIngredients)}" placeholder="tofu, aceitunas…"><div class="field-note">Se evitan cuando existe una alternativa viable.</div></div>
-  </div>
+  </div></div>
+  </details>
 
-  <div id="pfSecEntreno" class="section-h">Entrenamiento</div>
-  <div class="dash">
+  <details id="pfSecEntreno" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Entrenamiento</summary>
+  <div class="pf-accordion-panel"><div class="dash">
     <div class="muted small" style="margin-bottom:10px">El plan usa tus días y lugares reales. Cambiar disponibilidad ajusta las próximas sesiones sin borrar lo que ya registraste.</div>
     <div class="onboarding-grid">
       <div class="field">
@@ -5230,19 +5246,26 @@ function renderProfile(){
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">Al cambiarla se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
     <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled)}</div>
-    <div class="field"><label>Equipo disponible</label><div class="chips">${checkChips("pf_equipment",EQUIPMENT_LABELS,p.equipment)}</div></div>
-    <div class="field"><label>Lesiones actuales (opcional)</label><input id="pf_injuries" value="${esc(p.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
-    <div class="field"><label>Limitaciones relevantes (opcional)</label><input id="pf_limitations" value="${esc(p.limitations)}" placeholder="Ej. no puedo correr más de 20 minutos"></div>
-    <div class="field" style="margin-bottom:0"><label>Movimientos a evitar (opcional)</label><input id="pf_avoid_movements" value="${esc(p.avoidMovements)}" placeholder="Ej. saltos, press sobre la cabeza"></div>
-  </div>
+    <details class="adv-settings">
+      <summary>Equipo y limitaciones</summary>
+      <div class="field"><label>Equipo disponible</label><div class="chips">${checkChips("pf_equipment",EQUIPMENT_LABELS,p.equipment)}</div></div>
+      <div class="field"><label>Lesiones actuales (opcional)</label><input id="pf_injuries" value="${esc(p.injuries)}" placeholder="Ej. esguince de tobillo en recuperación"></div>
+      <div class="field"><label>Limitaciones relevantes (opcional)</label><input id="pf_limitations" value="${esc(p.limitations)}" placeholder="Ej. no puedo correr más de 20 minutos"></div>
+      <div class="field" style="margin-bottom:0"><label>Movimientos a evitar (opcional)</label><input id="pf_avoid_movements" value="${esc(p.avoidMovements)}" placeholder="Ej. saltos, press sobre la cabeza"></div>
+    </details>
+  </div></div>
+  </details>
 
   </div>
 
-  <div id="pfSecPrivacidad" class="section-h">Mi suscripción</div>
-  <div class="dash">${subscriptionStatusHtml()}</div>
+  <details id="pfSecSuscripcion" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Mi suscripción</summary>
+  <div class="pf-accordion-panel"><div class="dash">${subscriptionStatusHtml()}</div></div>
+  </details>
 
-  <div class="section-h">Privacidad y seguridad</div>
-  <div class="dash">
+  <details id="pfSecPrivacidad" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Privacidad y seguridad</summary>
+  <div class="pf-accordion-panel"><div class="dash">
     <div class="row between" style="margin-bottom:10px"><span class="muted small">Aviso vigente</span><span class="badge b-Libre">${CONSENT_POLICY_VERSION}</span></div>
     <div class="alert violet"><b>Uso claro y limitado.</b><br>Tus datos se usan para personalizar tu plan y mostrar tu progreso. No los vendemos ni los usamos para publicidad.</div>
     <div class="alert ${trainingSafetyHold()?"":"violet"}"><b>${trainingSafetyHold()?"Entrenamiento pausado":"Evaluación de seguridad vigente"}</b><br>${trainingSafetyHold()?"Una respuesta requiere orientación profesional antes de retomar rutinas.":"Recuerda detenerte ante dolor, mareo, desmayo o falta de aire inusual."}</div>
@@ -5252,10 +5275,12 @@ function renderProfile(){
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
     <button class="btn privacy-control" style="width:100%;margin-bottom:8px" onclick="exportPersonalData(this)">Exportar mis datos</button>
     <button class="btn privacy-control" style="width:100%;border-color:var(--bad);color:var(--bad)" onclick="openDeleteAccount()">Borrar mi cuenta y datos</button>
-  </div>
+  </div></div>
+  </details>
 
-  <div class="section-h">Recordatorios</div>
-  <div class="dash">
+  <details id="pfSecRecordatorios" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Recordatorios</summary>
+  <div class="pf-accordion-panel"><div class="dash">
     <div class="muted small" style="margin-bottom:12px">Recibe un aviso por correo si tienes actividad pendiente al final del día. Solo se envía cuando corresponde; nunca dos veces el mismo día.</div>
     <label class="chip-check" style="display:flex;margin-bottom:4px">
       <input type="checkbox" id="notif_opt_in" onchange="toggleNotifOptions()">
@@ -5283,27 +5308,35 @@ function renderProfile(){
       </div>
     </div>
     <button id="notifSaveBtn" class="btn btn-accent" style="width:100%;margin-top:14px" onclick="saveNotifPrefs()">Guardar recordatorios</button>
-  </div>
+  </div></div>
+  </details>
 
-  <div class="section-h">Avisos del dispositivo</div>
-  <div class="dash">
+  <details id="pfSecAvisos" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Avisos del dispositivo</summary>
+  <div class="pf-accordion-panel"><div class="dash">
     <div id="pushSection"><!-- se completa desde renderPushSection() --></div>
-  </div>
+  </div></div>
+  </details>
 
-  ${isAdmin()?`<div class="section-h">Administración</div>
-  <div class="dash">
+  ${isAdmin()?`<details id="pfSecAdmin" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Administración</summary>
+  <div class="pf-accordion-panel"><div class="dash">
     <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, alimentos, ejercicios y la configuración técnica.</div>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('foods')">🥗 Alimentos (catálogo)</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('exercises')">🏋️ Ejercicios (catálogo)</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('analytics')">📊 Analítica</button>
     <button class="btn" style="width:100%" onclick="setView('settings')">⚙️ Ajustes técnicos</button>
-  </div>`:""}
+  </div></div>
+  </details>`:""}
 
-  <div id="pfSecCuenta" class="section-h">Cuenta</div>
-  <div class="dash">
+  <details id="pfSecCuenta" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary>Cuenta</summary>
+  <div class="pf-accordion-panel"><div class="dash">
     <div class="row between"><span class="muted small">${esc(email)}</span><span class="badge ${isAdmin()?'b-PESAS':'b-Libre'}">${isAdmin()?'Admin':'Usuario'}</span></div>
     <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="signOutUser(this)">Cerrar sesión</button>
+  </div></div>
+  </details>
   </div>
   <div id="profileSaveFloat" class="pf-save-float" style="display:none"><button onclick="saveProfile()">Guardar cambios</button></div>`;
   ensureBillingHistory();

@@ -20,6 +20,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 
 - Auth obligatorio con Supabase Auth. `profiles`, `day_log`, `weight_log` y `plan_versions` estan aislados por `user_id` y RLS.
 - `profiles.prefs` usa `profileSchemaVersion: 3`: zona horaria, 2-6 comidas, horarios/logistica, restricciones, disponibilidad, equipo, experiencia, prioridad y limitaciones.
+- Perfil (REQ-105) usa acordeon nativo: `renderProfile()` monta secciones `<details class="pf-accordion">` y `profileAccordionToggle()` deja una sola abierta; los campos no se desmontan y `#pfEditableBody` conserva el guardado global solo para Objetivo/Comidas/Entreno.
 - Consentimientos y safety screenings gatean plan/coach. Edad minima 18. Fotos y datos de salud son privados; nada sensible va a analytics.
 - Admin escribe catalogos y gestiona usuarios/cortesia; usuarios normales no ven diagnostico tecnico.
 

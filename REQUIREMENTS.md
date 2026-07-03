@@ -69,7 +69,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 10. ~~REQ-103 - Onboarding sin jerga: macros como resumen.~~ (implementado, P1)
 11. ~~REQ-99 - Perfil por secciones con guardado por sección.~~ (P1, el más grande; dividido el 2 jul en REQ-105..REQ-108, ver abajo)
 12. ~~REQ-104 - Copy y paywall coherentes.~~ (implementado, P2)
-13. REQ-105 - Perfil: acordeón real (una sección a la vez). (P1)
+13. ~~REQ-105 - Perfil: acordeón real (una sección a la vez).~~ (implementado, P1)
 14. REQ-106 - Perfil: aria-label en todos los inputs. (P1)
 15. REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta. (P1, depende de REQ-105)
 16. REQ-108 - Perfil: guardado por sección con aviso de cambios sin guardar. (P1, depende de REQ-105 — el de mayor riesgo, al final)
@@ -1778,7 +1778,8 @@ Que ninguna promesa visible contradiga el modelo de cobro real y que ningún bot
 
 ## REQ-105 - UX: Perfil en acordeón real (una sección a la vez)
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Perfil ya no usa `.pf-nav` ni `pfScrollTo`; `renderProfile()` renderiza secciones nativas `<details class="pf-accordion">` para Objetivo, Comidas, Entrenamiento, Mi suscripción, Privacidad, Recordatorios, Avisos del dispositivo, Administración y Cuenta. `profileAccordionToggle()` mantiene como máximo una sección abierta. Los campos permanecen montados en el DOM al cerrar secciones, `#pfEditableBody` sigue delegando cambios solo de Objetivo/Comidas/Entreno y el botón flotante `#profileSaveFloat` conserva el flujo de guardado global existente. Prueba E2E: `tests/e2e/perfil.spec.js`.
 
 ### Origen
 
