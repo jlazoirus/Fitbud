@@ -50,7 +50,7 @@
     --good-dim:rgba(34,197,94,.14); --warn-dim:rgba(245,158,11,.14); --bad-dim:rgba(239,68,68,.14);
     /* Aliases compat. con la app */
     --bg:var(--black); --card:var(--surf1); --card2:var(--surf2); --line:var(--border);
-    --txt:#f0eeff; --muted:#8880aa; --muted2:#52516e;
+    --txt:#f0eeff; --muted:#9992b6; --muted2:#52516e;
     /* Tipos de día */
     --pesas:var(--purple-400); --bajo:var(--terra-400); --refeed:var(--warn); --dietbreak:var(--purple-300); --libre:#52516e;
     /* Tipografía */
@@ -575,7 +575,7 @@
   .l-hero-sub{font-size:15px;color:var(--muted);line-height:1.52;margin:0 0 22px;max-width:440px}
   .l-hero-ctas{display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px;margin:0}
   .l-hero-ctas .btn{min-height:48px;font-size:15px;border-radius:14px;justify-content:center;display:flex;align-items:center}
-  .l-hero-note{font-size:11px;color:var(--muted2);margin-top:12px;text-align:left}
+  .l-hero-note{font-size:11px;color:var(--muted);margin-top:12px;text-align:left}
 
   /* Mockup / demo placeholder */
   .l-mockup{border:1px solid var(--border-acc);border-radius:var(--r-lg);background:linear-gradient(160deg,var(--surf2),var(--surf1));padding:14px;margin:0 auto;max-width:320px;width:100%;min-width:0;box-shadow:0 20px 60px rgba(124,92,252,.18)}
@@ -687,7 +687,7 @@
   .paywall-features{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:4px}
   .paywall-features li{font-size:12px;color:var(--txt);display:flex;gap:6px;align-items:flex-start}
   .paywall-features li:before{content:'✓';color:var(--good);font-weight:700;flex:0 0 auto}
-  .l-footer-legal{font-size:11px;color:var(--muted2);line-height:1.7}
+  .l-footer-legal{font-size:11px;color:var(--muted);line-height:1.7}
   .l-footer-legal a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--border)}
   /* Cola offline y badge de sincronización (REQ-28) */
   .sync-badge{position:fixed;bottom:calc(70px + var(--safe-bottom));right:12px;z-index:150;font-size:10px;font-weight:600;padding:3px 8px;border-radius:999px;border:1px solid transparent;transition:opacity .2s;cursor:default;pointer-events:none}
@@ -735,7 +735,7 @@
 <body>
 <div id="app"></div>
 <div class="tabs" id="tabs"></div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div class="sync-badge" id="sync-badge" hidden></div>
 
 <script>
@@ -3636,7 +3636,7 @@ function renderHoy(){
   const typingHtml=`<div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="loading-row" style="padding:6px 2px"><div class="spinner"></div><span>Tu coach está pensando…</span></div></div></div>`;
   const chips=canUse?buildContextualChips(ds):[];
   const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${JSON.stringify(s)})">${esc(s)}</button>`).join("")}</div>`:"";
-  const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted2)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
+  const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
   const coachSection=canUse?`
     <div class="coach-home-sep">O pregúntale a tu coach</div>
     ${chipsHtml}
@@ -10307,7 +10307,7 @@ function tourEnsureStyle(){
   .tour-actions{display:flex;gap:8px}
   .tour-btn{min-height:40px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid var(--border-2,#332b52);background:var(--surf3,#221d3a);color:var(--txt,#fff);cursor:pointer}
   .tour-btn.primary{background:var(--accent,#7c5cff);border-color:transparent;color:#fff}
-  .tour-skip{background:none;border:none;color:var(--muted2,#7b769a);font-size:12px;cursor:pointer;min-height:40px;padding:0 4px}
+  .tour-skip{background:none;border:none;color:var(--muted,#9992b6);font-size:12px;cursor:pointer;min-height:40px;padding:0 4px}
   @media(prefers-reduced-motion:reduce){.tour-spot{transition:none}}`;
   document.head.appendChild(s);
 }
