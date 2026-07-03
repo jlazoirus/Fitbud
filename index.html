@@ -2444,6 +2444,51 @@ function trainingAvailabilityHtml(prefix,d){
     </div>`;
   }).join("")}</div>`;
 }
+// REQ-103: en onboarding, un solo lugar por defecto para todos los días; el detalle por día queda colapsado.
+function onboardingDefaultLocation(d){
+  const days=d.trainingDays||[];
+  const known=days.map(day=>d.trainingLocations&&d.trainingLocations[day]).find(value=>TRAINING_LOCATION_LABELS[value]);
+  return known||(d.primarySport==="swimming"?"pool":d.strengthMode==="bodyweight"?"home":"gym");
+}
+function onboardingSelectedDays(){
+  return WEEKDAY_OPTIONS.filter(day=>{const el=$("#ob_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
+}
+function onboardingLocationRowsHtml(days,locationFor){
+  if(!days.length)return '<p class="muted small">Elige al menos un día para personalizar el lugar.</p>';
+  return `<div class="availability">${days.map(day=>{
+    const label=WEEKDAY_OPTIONS.find(option=>option.value===day).label;
+    const location=locationFor(day);
+    return `<div class="availability-day">
+      <label>${label}</label>
+      <select id="ob_location_${day}" aria-label="Lugar para ${label}">
+        ${Object.entries(TRAINING_LOCATION_LABELS).map(([value,l])=>`<option value="${value}" ${location===value?"selected":""}>${l}</option>`).join("")}
+      </select>
+    </div>`;
+  }).join("")}</div>`;
+}
+function onboardingToggleDay(){
+  const days=onboardingSelectedDays();
+  const def=$("#ob_location_default");
+  const fallback=(def&&TRAINING_LOCATION_LABELS[def.value])?def.value:onboardingDefaultLocation(onboardingDraft);
+  const list=$("#obLocationList");
+  if(list)list.innerHTML=onboardingLocationRowsHtml(days,day=>{
+    const existing=$("#ob_location_"+day);
+    return (existing&&TRAINING_LOCATION_LABELS[existing.value])?existing.value:fallback;
+  });
+  updateOnboardingTrainingSummary();
+}
+function onboardingApplyDefaultLocation(value){
+  const days=onboardingSelectedDays();
+  const list=$("#obLocationList");
+  if(list)list.innerHTML=onboardingLocationRowsHtml(days,()=>value);
+}
+function openMacroFormulaInfo(){
+  const d=onboardingDraft||{};
+  modal(`<h3>¿Cómo lo calculamos?</h3>
+    <p class="muted small">Usamos tu peso, estatura, edad, sexo y nivel de actividad para estimar cuánta energía gastas al día (mantenimiento). Desde ahí ajustamos calorías y proteína según tu objetivo.</p>
+    <p class="muted small">Método: ${esc(d.macroMethod||"estimación energética")}.</p>
+    <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`);
+}
 function mealTimesHtml(prefix,d){
   return `<div class="onboarding-grid">${Array.from({length:d.mealCount},(_,index)=>`<div class="field">
     <label>Comida ${index+1}</label><input id="${prefix}_meal_time_${index}" type="time" value="${d.mealTimes[index]||defaultMealTimes(d.mealCount)[index]}">
@@ -2569,25 +2614,26 @@ function renderOnboarding(){
       </div>${onboardingButtons(false)}`;
   }else if(onboardingStep===2){
     body=`<h1>Define tu objetivo y tus macros</h1>
-      <p class="onboarding-copy">Calculamos una referencia inicial. Puedes ajustar cualquier valor antes de guardar.</p>
+      <p class="onboarding-copy">Calculamos una referencia inicial a partir de tus datos. Puedes ajustarla si quieres.</p>
       <div class="dash">
         <div class="field" style="margin-top:0"><label>Objetivo principal</label><select id="ob_goal" onchange="onboardingGoalChanged(this.value)">
           <option value="deficit" ${sel(d.goal,"deficit")}>Perder grasa</option>
           <option value="mantenimiento" ${sel(d.goal,"mantenimiento")}>Mantener peso y recomponer</option>
           <option value="volumen" ${sel(d.goal,"volumen")}>Ganar masa muscular</option>
         </select></div>
-        <div class="macro-preview">
-          <div class="scard"><div class="n">${d.calorieTarget||"—"}</div><div class="l">kcal / día</div></div>
-          <div class="scard"><div class="n">${d.maintenanceCalories||"—"}</div><div class="l">kcal mantenimiento</div></div>
+        <div class="ai-box"><b>Tu referencia: ${d.calorieTarget||"—"} kcal · ${d.proteinTarget||"—"} g proteína.</b> Ajustada a tu objetivo y tus datos personales.
+          <div style="margin-top:8px"><button type="button" class="btn btn-sm" onclick="openMacroFormulaInfo()">¿Cómo lo calculamos?</button></div>
         </div>
-        <div class="onboarding-grid">
-          <div class="field"><label>Calorías</label><input id="ob_kcal" type="number" inputmode="numeric" value="${d.calorieTarget}"></div>
-          <div class="field"><label>Proteína (g)</label><input id="ob_protein" type="number" inputmode="numeric" value="${d.proteinTarget}"></div>
-          <div class="field"><label>Carbohidratos (g)</label><input id="ob_carbs" type="number" inputmode="numeric" value="${d.carbTarget}"></div>
-          <div class="field"><label>Grasas (g)</label><input id="ob_fat" type="number" inputmode="numeric" value="${d.fatTarget}"></div>
-        </div>
-        <button class="btn btn-sm" onclick="recalculateOnboarding()">Recalcular valores</button>
-        <div class="review-meta">Fórmula: ${esc(d.macroMethod||"estimación energética")}</div>
+        <details class="adv-settings">
+          <summary>Ajustar valores (opcional)</summary>
+          <div class="onboarding-grid" style="margin-top:8px">
+            <div class="field"><label>Calorías</label><input id="ob_kcal" type="number" inputmode="numeric" value="${d.calorieTarget}"></div>
+            <div class="field"><label>Proteína (g)</label><input id="ob_protein" type="number" inputmode="numeric" value="${d.proteinTarget}"></div>
+            <div class="field"><label>Carbohidratos (g)</label><input id="ob_carbs" type="number" inputmode="numeric" value="${d.carbTarget}"></div>
+            <div class="field"><label>Grasas (g)</label><input id="ob_fat" type="number" inputmode="numeric" value="${d.fatTarget}"></div>
+          </div>
+          <button class="btn btn-sm" style="margin-top:8px" onclick="recalculateOnboarding()">Recalcular valores</button>
+        </details>
       </div>${onboardingButtons(false)}`;
   }else if(onboardingStep===3){
     body=`<h1>Arma tu semana de entrenamiento</h1>
@@ -2614,9 +2660,21 @@ function renderOnboarding(){
             ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
           </select></div>
         </div>
-        <label class="muted small">Días disponibles y lugar real</label>
-        ${trainingAvailabilityHtml("ob",d)}
+        <label class="muted small">Días disponibles</label>
+        <div class="chips" style="margin:6px 0 12px">${WEEKDAY_OPTIONS.map(day=>{
+          const checked=(d.trainingDays||[]).includes(day.value);
+          return `<label class="chip-check"><input type="checkbox" id="ob_day_${day.value}" ${checked?"checked":""} onchange="onboardingToggleDay()"><span>${day.label}</span></label>`;
+        }).join("")}</div>
+        <div class="field" style="margin-top:0"><label>Lugar de entrenamiento</label>
+          <select id="ob_location_default" onchange="onboardingApplyDefaultLocation(this.value)">
+            ${Object.entries(TRAINING_LOCATION_LABELS).map(([value,label])=>`<option value="${value}" ${onboardingDefaultLocation(d)===value?"selected":""}>${label}</option>`).join("")}
+          </select>
+        </div>
         <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled)}</div>
+        <details class="adv-settings">
+          <summary>Personalizar lugar por día (opcional)</summary>
+          <div id="obLocationList" style="margin-top:8px">${onboardingLocationRowsHtml(d.trainingDays||[],day=>TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]?d.trainingLocations[day]:onboardingDefaultLocation(d))}</div>
+        </details>
         <details class="adv-settings">
           <summary>Opciones avanzadas (opcional)</summary>
           <div class="onboarding-grid" style="margin-top:8px">
@@ -2679,10 +2737,15 @@ function readOnboardingStep(){
     d.planDurationWeeks=+$("#ob_duration").value;
     const _obExp=$("#ob_experience");if(_obExp)d.trainingExperience=_obExp.value;
     const _obMin=$("#ob_minutes");if(_obMin)d.sessionMinutes=+_obMin.value;
-    d.trainingDays=WEEKDAY_OPTIONS.filter(day=>{const el=$("#ob_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
+    d.trainingDays=onboardingSelectedDays();
     d.trainDays=d.trainingDays.length;
+    const _obLocDefault=$("#ob_location_default");
+    const _obFallbackLocation=(_obLocDefault&&TRAINING_LOCATION_LABELS[_obLocDefault.value])?_obLocDefault.value:onboardingDefaultLocation(d);
     d.trainingLocations={};
-    d.trainingDays.forEach(day=>{d.trainingLocations[day]=$("#ob_location_"+day).value;});
+    d.trainingDays.forEach(day=>{
+      const el=$("#ob_location_"+day);
+      d.trainingLocations[day]=(el&&TRAINING_LOCATION_LABELS[el.value])?el.value:_obFallbackLocation;
+    });
     // Rellenar campos diferidos con defaults válidos
     if(!TRAINING_PRIORITY_LABELS[d.trainingPriority])d.trainingPriority=inferredTrainingPriority(d);
     if(!TRAINING_TIME_LABELS[d.preferredTrainingTime])d.preferredTrainingTime="flexible";

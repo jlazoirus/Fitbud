@@ -66,7 +66,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 7. ~~REQ-100 - Nutrición sin duplicación: un CTA contextual y hero compacto.~~ (implementado, P1)
 8. ~~REQ-101 - Entreno sin CTAs duplicados.~~ (implementado, P1)
 9. ~~REQ-102 - Progreso con estado cero guiado y peso en tarjetas.~~ (implementado, P1)
-10. REQ-103 - Onboarding sin jerga: macros como resumen. (P1)
+10. ~~REQ-103 - Onboarding sin jerga: macros como resumen.~~ (implementado, P1)
 11. ~~REQ-99 - Perfil por secciones con guardado por sección.~~ (P1, el más grande; dividido el 2 jul en REQ-105..REQ-108, ver abajo)
 12. REQ-104 - Copy y paywall coherentes (depende de decisión REQ-26). (P2)
 13. REQ-105 - Perfil: acordeón real (una sección a la vez). (P1)
@@ -1952,7 +1952,8 @@ Que Progreso sin datos invite a la primera acción en lugar de mostrar estadíst
 
 ## REQ-103 - UX: onboarding sin jerga — macros como resumen y lugar de entrenamiento único por defecto
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Paso 2: macros bajo `<details>` "Ajustar valores"; arriba, resumen "Tu referencia: N kcal · N g proteína" y botón "¿Cómo lo calculamos?" con modal (antes texto fijo "Fórmula: ..."). Paso 3: checkboxes de día + un único select "Lugar de entrenamiento" aplicado a todos; personalización por día colapsada. `readOnboardingStep()` sigue completando `d.trainingLocations` por día, sin pérdida de datos. Perfil (prefix "pf") no cambió.
 
 ### Origen
 

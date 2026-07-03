@@ -32,8 +32,11 @@ test.describe("Onboarding", () => {
     await page.selectOption("#ob_activity", "moderate");
     await page.getByRole("button", { name: "Continuar" }).click();
 
-    // Paso 2: macros calculados. La app declara Mifflin-St Jeor: lo verificamos.
-    await expect(app).toContainText(/Mifflin-St Jeor/i);
+    // Paso 2: macros calculados. La fórmula (Mifflin-St Jeor) vive en el tooltip "¿Cómo lo calculamos?" (REQ-103).
+    await page.getByRole("button", { name: "¿Cómo lo calculamos?" }).click();
+    const formulaModal = page.locator("#overlay");
+    await expect(formulaModal).toContainText(/Mifflin-St Jeor/i);
+    await formulaModal.getByRole("button", { name: "Entendido" }).click();
     const kcalShown = Number(await page.inputValue("#ob_kcal"));
     const protShown = Number(await page.inputValue("#ob_protein"));
     const carbShown = Number(await page.inputValue("#ob_carbs"));
