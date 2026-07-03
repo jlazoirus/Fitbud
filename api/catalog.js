@@ -9,7 +9,7 @@ const FALLBACK_PLANS = [
     auto_renew: false,
     active: true,
     badge: null,
-    description: "Acceso completo. Sin permanencia. Cancela cuando quieras.",
+    description: "Acceso completo. Sin permanencia. Sin renovación automática — pagas solo el período.",
     features: [
       "Plan de nutrición personalizado",
       "Rutinas de entrenamiento guiadas",
@@ -18,7 +18,7 @@ const FALLBACK_PLANS = [
       "Rachas e hitos de constancia",
       "Recordatorios opcionales",
     ],
-    catalog_version: "2026-06-16",
+    catalog_version: "2026-07-03",
   },
   {
     id: "quarterly",
@@ -37,7 +37,7 @@ const FALLBACK_PLANS = [
       "Fotos de progreso privadas",
       "Prioridad en nuevas funciones",
     ],
-    catalog_version: "2026-06-16",
+    catalog_version: "2026-07-03",
   },
 ];
 

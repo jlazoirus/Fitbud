@@ -14,5 +14,10 @@ export default function handler(req, res) {
       // El proxy solo se anuncia cuando puede aplicar cuota server-side.
       proxy: !!process.env.ANTHROPIC_API_KEY && !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     },
+    checkout: {
+      // REQ-104: el cliente usa esto para ocultar botones de compra si el
+      // checkout no esta configurado, en vez de dejarlos fallar en /api/checkout.
+      enabled: !!process.env.STRIPE_SECRET_KEY,
+    },
   });
 }

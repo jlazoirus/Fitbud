@@ -738,7 +738,7 @@ async function loadCatalog(){
   // Fallback inline para cuando /api/catalog no existe aún (local dev, GitHub Pages)
   catalogPlans=[
     {id:"monthly",name:"Plan mensual",price_usd:14,duration_days:30,auto_renew:false,active:true,badge:null,
-     description:"Acceso completo. Sin permanencia. Cancela cuando quieras.",
+     description:"Acceso completo. Sin permanencia. Sin renovación automática — pagas solo el período.",
      features:["Plan de nutrición personalizado","Rutinas de entrenamiento guiadas","Seguimiento de progreso","Adaptaciones y contingencias","Rachas e hitos de constancia","Recordatorios opcionales"]},
     {id:"quarterly",name:"Paquete 3 meses",price_usd:36,duration_days:90,auto_renew:false,active:true,badge:"Mejor valor",
      description:"Ahorra un 15 % respecto al plan mensual. Ideal para un ciclo completo.",
@@ -767,13 +767,15 @@ const CONFIG = {
 // Config remota servida por /api/config (variables de entorno en Vercel).
 // Mantiene las credenciales fuera de GitHub. La API key de Claude NO viaja
 // aquí: vive solo en el servidor y se usa vía el proxy /api/claude.
-let REMOTE={supabase:{url:"",publishableKey:""},anthropic:{model:"",proxy:false}};
+let REMOTE={supabase:{url:"",publishableKey:""},anthropic:{model:"",proxy:false},checkout:{enabled:false}};
 async function loadRemoteConfig(){
   try{
     const r=await fetch("/api/config",{cache:"no-store"});
-    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{}};}
+    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{},checkout:j.checkout||{}};}
   }catch(e){/* sin funciones serverless (p.ej. GitHub Pages): se ignora */}
 }
+// REQ-104: checkout activo solo si el servidor confirma STRIPE_SECRET_KEY configurada.
+function checkoutAvailable(){return !!(REMOTE.checkout&&REMOTE.checkout.enabled);}
 function effectiveSettings(){
   const local=S.settings||{};
   return {
@@ -3506,7 +3508,7 @@ function homeAgendaHtml(ds){
         <div>
           <div class="agenda-kicker">Tu agenda</div>
           <h3 class="agenda-title">Aún falta preparar este día</h3>
-          <div class="agenda-sub">Completa o actualiza tu plan para llenar comidas y entrenamiento antes de registrar actividad.</div>
+          <div class="agenda-sub">Tu coach arma comidas y entreno para hoy en segundos.</div>
         </div>
       </div>
       ${note}
@@ -5673,22 +5675,28 @@ function showPaywall(context){
     :"Activa tu suscripción para acceder a todas las funciones de tu coach.";
   const expiredBanner=expired
     ?`<div class="paywall-expired">Tu plan venció el ${prettyDateTime(expired.expires_at).split(" ").slice(0,2).join(" ")}. Tu historial, progreso y exportación siguen disponibles.</div>`:"";
+  const checkoutOn=checkoutAvailable();
   const plansHtml=plans.map(p=>{
     const features=(p.features||[]).map(f=>`<li>${esc(f)}</li>`).join("");
     const badge=p.badge?`<div class="paywall-badge">${esc(p.badge)}</div>`:"";
     const isHi=!!(p.badge||(p.duration_days>31));
+    const cta=checkoutOn
+      ?`<button class="btn btn-accent" style="width:100%;min-height:44px" onclick="activatePlanFromPaywall('${esc(p.id)}')">Activar plan</button>`
+      :`<div class="muted small" style="text-align:center;margin-top:6px">Disponible pronto</div>`;
     return`<div class="paywall-plan${isHi?" paywall-plan-hi":""}">
       ${badge}
       <div class="paywall-plan-name">${esc(p.name)}</div>
       <div class="paywall-plan-price"><span class="paywall-cur">USD</span> ${p.price_usd} <span class="paywall-period">/ ${p.duration_days<=31?"mes":"3 meses"}</span></div>
       <div class="paywall-plan-desc">${esc(p.description||"")}</div>
       <ul class="paywall-features">${features}</ul>
-      <button class="btn btn-accent" style="width:100%;min-height:44px" onclick="activatePlanFromPaywall('${esc(p.id)}')">Activar plan</button>
+      ${cta}
     </div>`;
   }).join("");
+  const unavailableHtml=checkoutOn?"":`<div class="paywall-msg" style="margin-top:12px">La activación de planes de pago estará disponible pronto. Si ya tienes un código de acceso, puedes canjearlo aquí:</div>${couponRedeemSectionHtml()}`;
   modal(`<h3>Activa tu plan</h3>
     <div class="paywall-msg">${expiredBanner}${esc(msg)}</div>
     <div class="paywall-plans">${plansHtml}</div>
+    ${unavailableHtml}
     <div class="muted small" style="text-align:center;margin-top:12px">Tu progreso, historial y preferencias se conservan con cualquier plan.</div>`);
 }
 async function activatePlanFromPaywall(planId){
@@ -5941,7 +5949,7 @@ function renderLanding(){
           <button class="btn btn-accent" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
           <button class="btn" onclick="showAuthFromLanding('in')">Ya tengo cuenta</button>
         </div>
-        <div class="l-hero-note">Sin tarjeta de crédito para empezar · Cancela cuando quieras</div>
+        <div class="l-hero-note">Sin tarjeta de crédito para empezar · Sin renovación automática</div>
       </div>
       <div class="l-mockup" aria-hidden="true">
         <div class="l-mockup-day">Hoy · Martes</div>
@@ -6090,7 +6098,7 @@ function renderLanding(){
       <h2>Empieza hoy, sin excusas</h2>
       <p>Configura tu perfil en 5 minutos y tu primer plan estará listo antes de que termines.</p>
       <button class="btn btn-accent" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
-      <div class="muted small center" style="margin-top:8px">Cancela cuando quieras · Sin tarjeta para empezar</div>
+      <div class="muted small center" style="margin-top:8px">Sin renovación automática · Sin tarjeta para empezar</div>
     </div>
 
     <!-- Footer -->

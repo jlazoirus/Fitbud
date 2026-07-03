@@ -55,6 +55,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 ## Pagos, notificaciones y analytics
 
 - Landing publica, catalogo de planes, paywall, Stripe Checkout, webhooks, entitlements, cupones y billing history estan implementados. Cobro real depende de variables y configuracion externa.
+- REQ-104: `/api/config` expone `checkout.enabled` (`!!STRIPE_SECRET_KEY`); en el cliente, `checkoutAvailable()` lo lee de `REMOTE.checkout` y `showPaywall` oculta los botones "Activar plan" (muestra "Disponible pronto" + canje de codigo) cuando esta en false, para no ofrecer una compra que terminaria en 503. Tambien quito "Cancela cuando quieras" del copy (planes son pago unico sin renovacion); `supabase/entitlements.sql` actualizo la descripcion sembrada — pendiente re-ejecutar ese seed en produccion para que la tabla `subscription_plans` refleje el nuevo texto.
 - `api/notify.js` corre cron diario en Vercel Hobby, envia correo via Resend y push via `web-push` si hay consentimiento. Granularidad horaria requiere plan Pro o scheduler externo.
 - `api/analytics.js` registra eventos permitidos por allowlist; no enviar datos de salud, alergias, fotos, prompts ni contenido de conversaciones.
 

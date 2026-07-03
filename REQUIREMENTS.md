@@ -68,7 +68,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 9. ~~REQ-102 - Progreso con estado cero guiado y peso en tarjetas.~~ (implementado, P1)
 10. ~~REQ-103 - Onboarding sin jerga: macros como resumen.~~ (implementado, P1)
 11. ~~REQ-99 - Perfil por secciones con guardado por sección.~~ (P1, el más grande; dividido el 2 jul en REQ-105..REQ-108, ver abajo)
-12. REQ-104 - Copy y paywall coherentes (depende de decisión REQ-26). (P2)
+12. ~~REQ-104 - Copy y paywall coherentes.~~ (implementado, P2)
 13. REQ-105 - Perfil: acordeón real (una sección a la vez). (P1)
 14. REQ-106 - Perfil: aria-label en todos los inputs. (P1)
 15. REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta. (P1, depende de REQ-105)
@@ -1736,7 +1736,8 @@ Bajar el tiempo-a-plan del onboarding sin perder ningún dato esencial: el princ
 
 ## REQ-104 - Copy y paywall coherentes: sin "cancela cuando quieras", paywall degradado sin checkout activo
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Señal de checkout activo agregada a `/api/config` (`checkout.enabled`); `showPaywall` la usa para ocultar los botones de compra y mostrar "Disponible pronto" + canje de código cuando `STRIPE_SECRET_KEY` no está configurada.
 
 ### Origen
 

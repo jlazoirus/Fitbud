@@ -91,14 +91,14 @@ insert into subscription_plans
 values
   ('monthly',
    'Plan mensual', 14.00, 30, false, true, null,
-   'Acceso completo. Sin permanencia. Cancela cuando quieras.',
+   'Acceso completo. Sin permanencia. Sin renovación automática — pagas solo el período.',
    '["Plan de nutrición personalizado","Rutinas de entrenamiento guiadas","Seguimiento de progreso","Adaptaciones y contingencias","Rachas e hitos de constancia","Recordatorios opcionales"]'::jsonb,
-   '2026-06-16'),
+   '2026-07-03'),
   ('quarterly',
    'Paquete 3 meses', 36.00, 90, false, true, 'Mejor valor',
    'Ahorra un 15 % respecto al plan mensual. Ideal para un ciclo completo.',
    '["Todo lo del plan mensual","Ahorro del 15 %","Acceso a ciclos de 10 semanas","Recap detallado al cerrar ciclo","Fotos de progreso privadas","Prioridad en nuevas funciones"]'::jsonb,
-   '2026-06-16')
+   '2026-07-03')
 on conflict (id) do update set
   name            = excluded.name,
   price_usd       = excluded.price_usd,
