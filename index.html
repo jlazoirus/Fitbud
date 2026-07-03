@@ -4863,17 +4863,19 @@ const COACH_ACTION_LABELS={
   registrar_peso:"Registrar peso",
 };
 
+// REQ: historial del coach es por sesión (memoria JS, no localStorage) — se pierde al recargar la página.
+const coachChatMemory={};
 function coachChatKey(){
   return "fitbud_chat_v1_"+(session&&session.user&&session.user.id||"anon")+"_c"+cycleNumber();
 }
 function loadCoachChat(){
-  try{return JSON.parse(localStorage.getItem(coachChatKey()))||[];}catch(e){return [];}
+  return coachChatMemory[coachChatKey()]||[];
 }
 function saveCoachChat(msgs){
-  try{localStorage.setItem(coachChatKey(),JSON.stringify(msgs));}catch(e){}
+  coachChatMemory[coachChatKey()]=msgs;
 }
 function clearCoachChat(){
-  try{localStorage.removeItem(coachChatKey());}catch(e){}
+  delete coachChatMemory[coachChatKey()];
   render();
 }
 
