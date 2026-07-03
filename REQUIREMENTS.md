@@ -76,7 +76,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 17. ~~REQ-109 - Fix Home: badge "N pendientes" cuenta la fila de Descanso.~~ (implementado, P2)
 18. REQ-110 - Fix: catch de aiGenerateWeek sin salida — opción práctica y reintento. (P1)
 19. ~~REQ-111 - Fix API: /api/checkout valida Stripe antes que la sesión.~~ (implementado por REQ-59; entrada duplicada, no reabrir)
-20. REQ-112 - Accesibilidad: toasts aria-live y contraste de texto muted. (P2)
+20. ~~REQ-112 - Accesibilidad: toasts aria-live y contraste de texto muted.~~ (implementado, P2)
 
 Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall en "Preparar mi día" y fallback+reintento en errores del coach) ya quedaron implementados el 1 jul junto con mejoras de calidad del solver determinista (pre-rankeo calórico, variedad por `recentUsed` y desempate por fecha).
 
@@ -2040,7 +2040,7 @@ Ya resuelto por REQ-59 (`fix(checkout): REQ-59 validar sesión antes de Stripe`,
 
 ## REQ-112 - Accesibilidad: toasts anunciados a lectores de pantalla y contraste de texto muted
 
-**Estado: pendiente.**
+**Estado: implementado.** `#toast` (`index.html`) gana `role="status"` `aria-live="polite"` `aria-atomic="true"`; `toast()` solo hace `textContent`/`classList`, así que el anuncio no roba foco. `--muted` sube de `#8880aa` a `#9992b6` (≥4.5:1 sobre `--surf1`..`--surf4`, verificado por fórmula WCAG), lo que corrige de una sola vez todo el texto de cuerpo real que ya usaba ese token (p. ej. `.exercise-copy`, `.workout .detail`, `.onboarding-copy`, `.agenda-note`, `.prio-detail`, `.field-note`) sin tocar paleta ni tipografía. `--muted2` (`#52516e`, 1.9–2.6:1) se mantiene sin cambios para los usos decorativos o de cifra/etiqueta corta de una sola línea que excluye el alcance (`.mm-num`, `.mini-macro-*`, `.streak-best`, `.chat-meta`, `.agenda-label`, `.tour-dots`, `.ci-scale-lbl`, iconos SVG); se auditaron sus ~16 usos uno por uno y se migraron a `--muted` los 4 que sí son texto real legible: `.l-hero-note`, `.l-footer-legal` (antes con menos contraste que sus propios enlaces internos, que ya usaban `--muted`), el botón "Limpiar conversación" del coach y `.tour-skip` ("Saltar"/"Cerrar"). `node scripts/release-gate.mjs`: 46/48 (los 2 bloqueantes —"Sin modificaciones no intencionadas" por el propio diff sin commitear y `validate-docs-index.mjs` por tamaño de este archivo— son preexistentes y no relacionados, mismo patrón que REQ-108/REQ-109).
 
 ### Origen
 
