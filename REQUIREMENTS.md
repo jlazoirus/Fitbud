@@ -84,6 +84,7 @@ Pendiente no automatizable por agentes:
 
 - REQ-49 - Revision legal pre-lanzamiento.
 - REQ-60 - Configuracion manual de redirects en Supabase.
+- REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
@@ -1998,3 +1999,9 @@ Dar al administrador una herramienta segura para resetear o regenerar futuro de 
 ### Verificación sugerida
 
 - Tests de `api/admin.js` con mocks: preview, aplicar nutrición, aplicar entrenamiento, ambos, reinicio total, bloqueo a no-admin y protección de historial pasado.
+
+## REQ-127 - Personalizar remitente y asunto de los correos de autenticacion de Supabase (branding Fitbud)
+
+**Estado: pendiente. Requiere accion manual en el dashboard de Supabase (y de un proveedor SMTP externo para el remitente); no implementable por el agente autonomo.**
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).

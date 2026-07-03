@@ -3282,6 +3282,64 @@ Los criterios de aceptacion son **acciones humanas y verificacion manual**, no c
 
 ---
 
+## REQ-127 - Personalizar remitente y asunto de los correos de autenticacion de Supabase (branding Fitbud)
+
+**Estado: pendiente. Requiere accion manual en el dashboard de Supabase (y de un proveedor SMTP externo para el remitente); no implementable por el agente autonomo.**
+
+### Diagnostico
+
+`api/admin.js` llama a la API administrativa de GoTrue (Supabase Auth) por dos caminos:
+
+- `inviteAuthUser()` — `POST {SUPABASE_URL}/auth/v1/invite` con body `{ email, data }` y query param `redirect_to`.
+- Accion `resetPassword` — `POST {SUPABASE_URL}/auth/v1/recover` con body `{ email, redirect_to }`.
+
+Ninguno de los dos endpoints acepta un parametro para cambiar el nombre del remitente ("From") ni el asunto del correo. El campo `data` solo puebla `raw_user_meta_data` del usuario y queda disponible en las plantillas como `{{ .Data.campo }}`, pero no controla subject ni sender. Lo mismo aplica al SDK (`supabase-js`): `auth.admin.inviteUserByEmail()` y `auth.resetPasswordForEmail()` solo aceptan `redirectTo` y `data`/opciones de captcha, nada de branding. El remitente y el asunto de cada correo (invitacion, recuperacion, confirmacion de registro, magic link) se controlan exclusivamente desde el dashboard del proyecto. No existe ningun cambio de codigo que resuelva el branding del email.
+
+### Objetivo
+
+Que los correos de autenticacion (invitacion, recuperacion de contrasena, confirmacion de registro) se identifiquen como "Fitbud" en el asunto y, idealmente, tambien en el remitente, en vez de mostrar branding de Supabase.
+
+### Alcance — accion requerida
+
+Cambios manuales en el dashboard de Supabase:
+
+1. **Asunto y cuerpo del correo** (siempre disponible, no requiere SMTP propio): **Authentication → Email Templates**. Editar cada plantilla usada (`Invite user`, `Reset Password`, `Confirm signup`, y `Magic Link` si se usa) y:
+   - Cambiar el "Subject" para incluir "Fitbud", ej.: `Restablece tu contrasena de Fitbud`, `Te invitaron a Fitbud`.
+   - Ajustar el cuerpo HTML para mostrar el nombre/logo de Fitbud en vez del texto generico por defecto.
+2. **Nombre y direccion del remitente ("From")**: por defecto Supabase usa su propio mailer compartido (pensado solo para pruebas, con limite de envios y remitente fijo tipo `Supabase Auth <noreply@mail.app.supabase.io>`); el remitente no es editable en ese modo. Para que el correo llegue como "Fitbud <noreply@tudominio>" hace falta **SMTP propio**: **Project Settings → Auth → SMTP Settings** (la ruta exacta puede variar segun version del dashboard):
+   - Activar "Enable Custom SMTP".
+   - Configurar host/puerto/usuario/password de un proveedor SMTP (ej. Resend, SendGrid, Postmark, SES) con un dominio verificado.
+   - Setear "Sender name" = `Fitbud` y "Sender email" = una direccion del dominio propio (ej. `noreply@fitbud.app` o el dominio real del proyecto).
+3. Guardar y enviar una invitacion o un reset de prueba real para confirmar remitente y asunto en la bandeja de entrada.
+
+No se requiere ningun cambio de codigo, migracion SQL ni nuevo commit de app para el asunto/cuerpo. El remitente real solo cambia si ademas se activa SMTP propio.
+
+### Dependencias
+
+- Para el asunto/cuerpo: solo acceso al dashboard de Supabase, sin dependencias extra. Ver tambien [[REQ-60]] (misma seccion de Authentication, URL Configuration vs. Email Templates/SMTP).
+- Para el remitente real: cuenta en un proveedor SMTP (Resend/SendGrid/Postmark/SES) con dominio verificado; puede quedar pendiente hasta que se elija el proveedor.
+- No depende de ningun otro REQ de codigo.
+- **Condicion de parada del agente**: el agente autonomo nunca intenta ejecutar este REQ. Si lo encontrara en cola, debe detenerse con `external_dashboard_action_required`.
+
+### Por que no es automatizable por el agente
+
+El asunto/cuerpo vive en el dashboard de la cuenta de Supabase (proveedor externo). El remitente real ademas depende de credenciales de un proveedor SMTP externo. No hay API publica de administracion que el agente pueda invocar desde este repo con los secretos actuales para modificar ninguno de los dos. Requiere que el dueno del proyecto (Jona) entre al dashboard y, para el remitente, tambien configure una cuenta SMTP propia.
+
+### Criterios de aceptacion
+
+Los criterios de aceptacion son **acciones humanas y verificacion manual**, no codigo:
+
+- Las plantillas de Authentication → Email Templates (`Invite user`, `Reset Password`, `Confirm signup`) mencionan "Fitbud" en el asunto.
+- (Si se configura SMTP propio) el correo recibido muestra "Fitbud" como remitente, no "Supabase Auth".
+- El agente autonomo no completa ni intenta completar este REQ.
+
+### Verificacion sugerida
+
+1. Desde produccion, disparar una invitacion real y un reset de contrasena real.
+2. Revisar la bandeja de entrada: el asunto debe mencionar Fitbud; el remitente debe mostrar Fitbud si ya se configuro SMTP propio.
+
+---
+
 ## REQ-61 - Fix: "Preparar mi día" rechaza respuestas válidas cuando el perfil tiene restricciones de dieta
 
 **Estado: implementado.**
