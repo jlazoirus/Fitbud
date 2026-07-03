@@ -3525,7 +3525,8 @@ function homeAgendaData(ds){
   if(!items.length){
     return {state:"done",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
   }
-  return {state:"agenda",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
+  const pendingCount=items.filter(i=>i.actions).length;
+  return {state:"agenda",day,st,ew,workoutOutcome,doneMeals,totMeals,items,pendingCount};
 }
 function homeAgendaItemHtml(item){
   return `<div class="agenda-item ${esc(item.kind)}">
@@ -3583,7 +3584,7 @@ function homeAgendaHtml(ds){
         <h3 class="agenda-title">Lo que sigue hoy</h3>
         <div class="agenda-sub">Ordenado con tu plan, lo registrado y el estado del entrenamiento.</div>
       </div>
-      <span class="agenda-count">${data.items.length} pendiente${data.items.length===1?"":"s"}</span>
+      <span class="agenda-count">${data.pendingCount} pendiente${data.pendingCount===1?"":"s"}</span>
     </div>
     ${note}
     <div class="agenda-list">${data.items.map(homeAgendaItemHtml).join("")}</div>
