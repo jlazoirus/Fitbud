@@ -75,8 +75,8 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 16. REQ-108 - Perfil: guardado por sección con aviso de cambios sin guardar. (P1, depende de REQ-105 — el de mayor riesgo, al final)
 17. REQ-109 - Fix Home: badge "N pendientes" cuenta la fila de Descanso. (P2)
 18. REQ-110 - Fix: catch de aiGenerateWeek sin salida — opción práctica y reintento. (P1)
-19. REQ-111 - Fix API: /api/checkout valida Stripe antes que la sesión (503 vs 401/403). (P1)
-20. REQ-112 - Accesibilidad transversal: toasts aria-live, foco en modales, contraste muted. (P2)
+19. ~~REQ-111 - Fix API: /api/checkout valida Stripe antes que la sesión.~~ (implementado por REQ-59; entrada duplicada, no reabrir)
+20. REQ-112 - Accesibilidad: toasts aria-live y contraste de texto muted. (P2)
 
 Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall en "Preparar mi día" y fallback+reintento en errores del coach) ya quedaron implementados el 1 jul junto con mejoras de calidad del solver determinista (pre-rankeo calórico, variedad por `recentUsed` y desempate por fecha).
 
@@ -2022,81 +2022,44 @@ Ningún fallo del coach durante "Preparar mi semana" deja al usuario sin salida 
 
 ## REQ-111 - Fix API: /api/checkout valida configuración de Stripe antes que la sesión (503 en vez de 401/403)
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Ya resuelto por REQ-59 (`fix(checkout): REQ-59 validar sesión antes de Stripe`, commit `a7409ea`): `api/checkout.js` valida método → `verifyUser` (401) → `stripeKey` (503) → resto del flujo, verificado leyendo el archivo línea por línea el 2 jul 2026. Esta entrada reapareció por re-derivar el backlog desde una auditoría vieja (23 jun) sin verificar contra el código actual; se deja como registro para no reabrirla.
 
-### Origen
-
-Smoke test de la auditoría del 23 jun 2026 (`estrategia/05-Auditoria-Deploy-UX-UI-2026-06-23.md`, backlog #1); reconfirmado el 1 jul en la cadena del hallazgo P0-1.
-
-### Problema
-
-`api/checkout.js` responde `503` cuando falta `STRIPE_SECRET_KEY`, antes de validar método y sesión. Una petición sin auth recibe `503` en vez de `401/403`: rompe el contrato del smoke test (8/9) y filtra estado de configuración interna a clientes no autenticados.
-
-### Objetivo
-
-Contrato estable y seguro: primero método, luego sesión, luego configuración de pasarela.
-
-### Alcance
-
-1. Reordenar guardas en `api/checkout.js`: método HTTP → `verifyUser` (401/403) → config de Stripe (503) → flujo.
-2. Revisar que ningún otro endpoint con sesión de usuario tenga el patrón invertido (`webhook.js` queda fuera).
-
-### Fuera de alcance
-
-- Activar el checkout (REQ-26); precios/planes; contrato del webhook.
-
-### Riesgos
-
-- Bajo: reordenamiento de guardas. El mensaje de 503 no debe exponer qué variable falta (principio 9).
-
-### Criterios de aceptación
-
-- `POST /api/checkout` sin sesión devuelve `401/403` aunque Stripe no esté configurado.
-- `node scripts/smoke-test.mjs --url <producción>` pasa 9/9 tras el deploy.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Local sin `STRIPE_SECRET_KEY`: sin auth → 401/403; con auth válida → 503. Smoke test contra producción tras el deploy.
-
-## REQ-112 - Accesibilidad transversal: toasts anunciados, foco en modales y contraste de texto muted
+## REQ-112 - Accesibilidad: toasts anunciados a lectores de pantalla y contraste de texto muted
 
 **Estado: pendiente.**
 
 ### Origen
 
-Auditoría UI del 1 jul 2026 (hallazgo P2-11); complementa los aria-labels de Perfil (REQ-106).
+Auditoría UI del 1 jul 2026 (hallazgo P2-11); complementa los aria-labels de Perfil (REQ-106). Alcance recortado el 2 jul 2026: el ítem de trap de foco en modales ya estaba resuelto por REQ-37 (`_modalKeyHandler` en `index.html`: Escape cierra, Tab queda atrapado en `.sheet`, el foco vuelve al disparador al cerrar) — verificado contra el código, no repetir.
 
 ### Problema
 
-(a) Los toasts no se anuncian a lectores de pantalla (sin `aria-live`); (b) modales/hojas no atrapan el foco ni lo devuelven al disparador al cerrar; (c) `--muted` sobre superficies oscuras queda bajo contraste AA en textos largos.
+(a) Los toasts (`#toast`) no se anuncian a lectores de pantalla: no tienen `role`/`aria-live`. (b) `--muted` (`#8880aa`) da ~4.0:1 sobre `--surf4` y ~4.5:1 sobre `--surf3` (roza o incumple AA para texto de cuerpo); `--muted2` (`#52516e`) da 1.9–2.6:1 sobre todas las superficies del tema — muy por debajo de AA donde se usa como texto legible, no solo decorativo.
 
 ### Objetivo
 
-Avisos, modales y textos secundarios usables con lector de pantalla y legibles con baja visión, sin rediseñar la estética.
+Avisos y textos secundarios usables con lector de pantalla y legibles con baja visión, sin rediseñar la estética.
 
 ### Alcance
 
-1. Contenedor de toasts con `role="status"` y `aria-live="polite"`.
-2. `modal()` y overlays: foco inicial dentro, trap de Tab/Shift+Tab, Escape cierra, retorno de foco al disparador.
-3. Auditar contraste de `--muted`/`--muted2` sobre `--surf*` y ajustar a ≥4.5:1 en texto de cuerpo (labels decorativos pueden quedar en 3:1).
+1. `#toast` con `role="status"` y `aria-live="polite"`.
+2. Auditar cada uso de `--muted`/`--muted2` como color de texto: subir el token o mover a `--txt`/un tono intermedio donde el contenido sea texto de cuerpo real (no decorativo tipo punto de estado o cifra secundaria de una sola línea corta).
 
 ### Fuera de alcance
 
-- Los aria-labels de inputs de Perfil (REQ-106). Paleta de marca y tipografías.
+- Foco atrapado en modales (ya resuelto por REQ-37). Aria-labels de inputs de Perfil (REQ-106). Paleta de marca y tipografías.
 
 ### Riesgos
 
-- Subir el contraste de `--muted` afecta toda la app: revisar jerarquía visual en las vistas principales.
-- El trap de foco no debe romper inputs de modales existentes (check-in, generación, cortesía admin).
+- Subir el contraste de `--muted`/`--muted2` afecta toda la app: revisar jerarquía visual en las vistas principales para no aplanar la UI.
 
 ### Criterios de aceptación
 
 - Un toast se anuncia con VoiceOver/NVDA sin robar el foco.
-- Con modal abierto, Tab nunca sale del modal; al cerrar, el foco vuelve al botón que lo abrió.
-- Texto de cuerpo en `--muted` cumple ≥4.5:1.
+- Texto de cuerpo que hoy usa `--muted`/`--muted2` cumple ≥4.5:1 contra su superficie real.
 - `node scripts/release-gate.mjs` pasa.
 
 ### Verificación sugerida
 
-- Recorrido con VoiceOver en Safari iOS y teclado en desktop; medir contraste de los tokens finales.
+- Recorrido con VoiceOver en Safari iOS; medir contraste de los tokens finales sobre `--surf1`..`--surf4`.
