@@ -8,8 +8,8 @@
   // ── Constantes de plan ──────────────────────────────────────────────────────
   const CYCLE_MENUS=["A","B","C","D","A","B","B","C","D","A"];
   const PLAN_DURATION_OPTIONS=[
-    {value:4,label:"4 semanas · bloque corto"},
-    {value:10,label:"10 semanas · proceso completo"},
+    {value:4,label:"4 semanas · ciclo corto"},
+    {value:10,label:"10 semanas · recomendado"},
   ];
   const CHALLENGE_LABELS={
     maintain:"Mantener lo logrado",

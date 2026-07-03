@@ -2610,8 +2610,8 @@ function validateFoodSchedule(d){
   return "";
 }
 function validateFoodPreferences(d){
-  if(!Array.isArray(d.diet)||!d.diet.length)return "Elige al menos un patrón de alimentación";
-  if(d.diet.includes("omnivoro")&&(d.diet.includes("vegetariano")||d.diet.includes("vegano")))return "Omnívoro no puede combinarse con vegetariano o vegano";
+  if(!Array.isArray(d.diet)||!d.diet.length)return "Elige al menos una opción de alimentación";
+  if(d.diet.includes("omnivoro")&&(d.diet.includes("vegetariano")||d.diet.includes("vegano")))return "Como de todo no puede combinarse con vegetariano o vegano";
   return "";
 }
 function renderOnboarding(){
@@ -2621,7 +2621,7 @@ function renderOnboarding(){
   let body="";
   if(onboardingStep===1){
     body=`<h1>Primero, conozcamos tu punto de partida</h1>
-      <p class="onboarding-copy">Estos datos se usan para estimar tu gasto energético. El porcentaje de grasa es opcional, pero mejora el cálculo si lo conoces.</p>
+      <p class="onboarding-copy">Estos datos se usan para estimar tu gasto energético. Si no conoces tu grasa corporal, puedes dejarla vacía y completarla después.</p>
       <div class="dash">
         <div class="field" style="margin-top:0"><label>Nombre</label><input id="ob_name" value="${esc(d.name)}" autocomplete="name" placeholder="Tu nombre"></div>
         <div class="onboarding-grid">
@@ -2631,7 +2631,7 @@ function renderOnboarding(){
           <div class="field"><label>Edad</label><input id="ob_age" type="number" inputmode="numeric" min="${MINIMUM_AGE}" max="90" value="${d.age}" placeholder="30"></div>
           <div class="field"><label>Estatura (cm)</label><input id="ob_height" type="number" inputmode="decimal" min="130" max="230" value="${d.heightCm}" placeholder="175"></div>
           <div class="field"><label>Peso actual (kg)</label><input id="ob_weight" type="number" inputmode="decimal" min="35" max="250" step=".1" value="${d.weightKg}" placeholder="80"></div>
-          <div class="field"><label>Grasa corporal % (opcional)</label><input id="ob_bf" type="number" inputmode="decimal" min="3" max="60" step=".1" value="${d.bodyFatPct}" placeholder="20"></div>
+          <div class="field"><label>Grasa corporal (opcional)</label><input id="ob_bf" type="number" inputmode="decimal" min="3" max="60" step=".1" value="${d.bodyFatPct}" placeholder="Ej. 20"><div class="field-note">Déjalo vacío si no lo sabes; no bloquea tu plan.</div></div>
           <div class="field"><label>Nivel de actividad habitual</label><select id="ob_activity" onchange="updateOnboardingActivity(this.value)">
             ${Object.entries(ACTIVITY_LEVELS).map(([v,o])=>`<option value="${v}" ${sel(d.activityLevel,v)}>${o.label}</option>`).join("")}
           </select></div>
@@ -2644,7 +2644,7 @@ function renderOnboarding(){
       <div class="dash">
         <div class="field" style="margin-top:0"><label>Objetivo principal</label><select id="ob_goal" onchange="onboardingGoalChanged(this.value)">
           <option value="deficit" ${sel(d.goal,"deficit")}>Perder grasa</option>
-          <option value="mantenimiento" ${sel(d.goal,"mantenimiento")}>Mantener peso y recomponer</option>
+          <option value="mantenimiento" ${sel(d.goal,"mantenimiento")}>Mantener mi peso y mejorar mi cuerpo</option>
           <option value="volumen" ${sel(d.goal,"volumen")}>Ganar masa muscular</option>
         </select></div>
         <div class="ai-box"><b>Tu referencia: ${d.calorieTarget||"—"} kcal · ${d.proteinTarget||"—"} g proteína.</b> Ajustada a tu objetivo y tus datos personales.
@@ -2682,9 +2682,9 @@ function renderOnboarding(){
           <div class="field" style="margin-top:0"><label>Trabajo de fuerza</label><select id="ob_strength" onchange="updateOnboardingTrainingSummary()">
             ${Object.entries(STRENGTH_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.strengthMode,v)}>${l}</option>`).join("")}
           </select></div>
-          <div class="field"><label>Duración del plan</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
+          <div class="field" style="grid-column:1 / -1"><label>Ciclo de seguimiento</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
             ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
-          </select></div>
+          </select><div class="field-note">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado.</div></div>
         </div>
         <label class="muted small">Días disponibles</label>
         <div class="chips" style="margin:6px 0 12px">${WEEKDAY_OPTIONS.map(day=>{
@@ -2712,11 +2712,11 @@ function renderOnboarding(){
         </details>
       </div>${onboardingButtons(false)}`;
   }else{
-    const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]];
+    const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Como de todo"]];
     body=`<h1>Casi listo — tus preferencias y seguridad</h1>
       <p class="onboarding-copy">Solo lo imprescindible para calcular tus comidas. Después podrás afinar cocinas, horarios y presupuesto desde tu Perfil.</p>
       <div class="dash">
-        <label class="muted small">Patrón de alimentación y restricciones generales</label>
+        <label class="muted small">Cómo comes y restricciones generales</label>
         <div class="chips" style="margin:9px 0 4px">
           ${dietOptions.map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}
         </div>
@@ -5264,7 +5264,7 @@ function renderProfile(){
           <div class="scard"><div class="n">${macros.c} g</div><div class="l">carbohidratos</div></div>
           <div class="scard"><div class="n">${macros.f} g</div><div class="l">grasas</div></div>
         </div>
-        <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${p.goal==="volumen"?"ganar masa":p.goal==="mantenimiento"?"mantenimiento y recomposición":"pérdida de grasa"}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
+        <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${p.goal==="volumen"?"ganar masa":p.goal==="mantenimiento"?"mantener mi peso y mejorar mi cuerpo":"pérdida de grasa"}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
         <button class="btn" style="width:100%" onclick="startOnboarding()">Recalcular objetivos y preferencias</button>
       </div>
     </div>
@@ -5273,9 +5273,9 @@ function renderProfile(){
   <details id="pfSecComidas" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
   <summary onclick="return profileAccordionGuard(event,this)">Comidas</summary>
   <div class="pf-accordion-panel"><div class="dash">
-    <label class="muted small">Patrón de alimentación y restricciones generales</label>
+    <label class="muted small">Cómo comes y restricciones generales</label>
     <div class="chips" style="margin:9px 0 4px">
-      ${[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Omnívoro"]].map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="pf_diet_${v}" ${chk(v)}><span>${l}</span></label>`).join("")}
+      ${[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Como de todo"]].map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="pf_diet_${v}" ${chk(v)}><span>${l}</span></label>`).join("")}
     </div>
     <div class="onboarding-grid">
       <div class="field"><label for="pf_meal_count">Comidas al día</label><select id="pf_meal_count" onchange="updateProfileMealCount(this.value)">
@@ -5355,9 +5355,9 @@ function renderProfile(){
     <label class="muted small">Días disponibles y lugar real</label>
     ${trainingAvailabilityHtml("pf",p)}
     <div class="field-note">Recomendamos entre 3 y 6 días para combinar fuerza, tu disciplina y al menos un día de descanso.</div>
-    <div class="field"><label for="pf_duration">Duración del plan</label><select id="pf_duration" onchange="updateTrainingSummary()">
+    <div class="field"><label for="pf_duration">Ciclo de seguimiento</label><select id="pf_duration" onchange="updateTrainingSummary()">
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
-    </select><div class="muted small" style="margin-top:6px">Al cambiarla se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
+    </select><div class="muted small" style="margin-top:6px">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado. Al cambiarlo se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
     <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled)}</div>
     <details class="adv-settings">
       <summary>Equipo y limitaciones</summary>
@@ -6888,7 +6888,7 @@ function saveEditor(){
    Fase 6: INTEGRACIÓN CLAUDE API
    ============================================================ */
 // Arma el system prompt de Claude desde las preferencias del perfil.
-const DIET_LABELS={vegetariano:"vegetariano",vegano:"vegano",sin_huevo:"sin huevo",sin_lacteos:"sin lácteos",sin_gluten:"sin gluten",omnivoro:"omnívoro"};
+const DIET_LABELS={vegetariano:"vegetariano",vegano:"vegano",sin_huevo:"sin huevo",sin_lacteos:"sin lácteos",sin_gluten:"sin gluten",omnivoro:"come de todo"};
 function buildSysPrompt(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const safety=trainingSafetyHold()

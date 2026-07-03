@@ -1349,7 +1349,8 @@ Que cualquier usuario pueda alternar entre contraseña oculta y visible de forma
 
 ## REQ-114 - UX Onboarding: copy sin jerga en objetivo, grasa, ciclo y patrón de comida
 
-**Estado: pendiente.**
+**Estado: implementado.**
+Onboarding y Perfil conservan valores internos (`mantenimiento`, `omnivoro`, duracion 4/10) pero muestran copy cotidiano: "Mantener mi peso y mejorar mi cuerpo", "Como de todo", grasa corporal opcional con nota, y "Ciclo de seguimiento" con 10 semanas como proceso recomendado. Validador: `scripts/validate-onboarding-copy.mjs`.
 
 ### Origen
 

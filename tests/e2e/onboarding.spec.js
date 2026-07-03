@@ -22,6 +22,8 @@ test.describe("Onboarding", () => {
     await gotoApp(page);
     const app = page.locator("#app");
     await expect(app).toContainText(/punto de partida/i);
+    await expect(app).toContainText("Grasa corporal (opcional)");
+    await expect(app).toContainText("Déjalo vacío si no lo sabes");
 
     // Paso 1: datos corporales
     await page.fill("#ob_name", "Bro Nuevo");
@@ -33,6 +35,7 @@ test.describe("Onboarding", () => {
     await page.getByRole("button", { name: "Continuar" }).click();
 
     // Paso 2: macros calculados. La fórmula (Mifflin-St Jeor) vive en el tooltip "¿Cómo lo calculamos?" (REQ-103).
+    await expect(page.locator("#ob_goal")).toContainText("Mantener mi peso y mejorar mi cuerpo");
     await page.getByRole("button", { name: "¿Cómo lo calculamos?" }).click();
     const formulaModal = page.locator("#overlay");
     await expect(formulaModal).toContainText(/Mifflin-St Jeor/i);
@@ -52,6 +55,9 @@ test.describe("Onboarding", () => {
     await page.getByRole("button", { name: "Continuar" }).click();
 
     // Paso 3: semana de entrenamiento (solo fuerza, gym, 10 semanas, ≥3 días)
+    await expect(app).toContainText("Ciclo de seguimiento");
+    await expect(page.locator("#ob_duration")).toContainText("10 semanas · recomendado");
+    await expect(app).toContainText("10 semanas es el proceso completo recomendado");
     await page.check("#ob_has_cardio_no");
     await page.selectOption("#ob_strength", "gym");
     await page.selectOption("#ob_duration", "10");
@@ -62,6 +68,8 @@ test.describe("Onboarding", () => {
     await page.getByRole("button", { name: "Continuar" }).click();
 
     // Paso 4: dieta + privacidad + evaluación de seguridad
+    await expect(app).toContainText("Cómo comes y restricciones generales");
+    await expect(app).toContainText("Como de todo");
     await page.check("#ob_diet_omnivoro");
     await page.check("#ob_consent_core");
     for (const s of await page.locator('#app select[id^="ob_safety_"]').all()) {
