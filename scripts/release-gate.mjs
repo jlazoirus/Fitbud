@@ -110,6 +110,7 @@ run("validate-training-safety-mode.mjs", "node scripts/validate-training-safety-
 run("validate-splits.mjs", "node scripts/validate-splits.mjs");
 run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
 run("test-admin-api.mjs", "node scripts/test-admin-api.mjs");
+run("test-admin-reset.mjs", "node scripts/test-admin-reset.mjs");
 run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
 
 // ── Validadores de SQL y datos ───────────────────────────────────────────────

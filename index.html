@@ -9914,6 +9914,8 @@ function adminUsersHtml(users){
         <button class="btn btn-sm" onclick="adminResetLink('${u.id}')">Enviar reset</button>
         <button class="btn btn-sm" onclick="openAdminUserQuota('${u.id}')">Consumo</button>
         <button class="btn btn-sm" onclick="openAdminCourtesy('${u.id}')">Cortesía</button>
+        <button class="btn btn-sm" ${(me||u.is_admin)?'disabled style="opacity:.4"':''} onclick="openAdminResetPlan('${u.id}')">Regenerar plan</button>
+        <button class="btn btn-sm" ${(me||u.is_admin)?'disabled style="opacity:.4"':''} onclick="openAdminResetUser('${u.id}')">Reiniciar usuario</button>
       </div>
     </div>`;
   }).join("");
@@ -9951,6 +9953,71 @@ async function grantCourtesy(userId,btn){
     if(btn){btn.disabled=false;btn.textContent="Otorgar acceso";}
     toast(String(e.message||e));
   }
+}
+// REQ-126: resetear futuro / regenerar nutrición y/o entrenamiento de cualquier usuario.
+// Preview obligatorio antes de aplicar; solo toca días futuros sin nada ya registrado.
+function openAdminResetPlan(userId){
+  const user=adminUsersCache.find(u=>u.id===userId)||{id:userId,email:userId};
+  window._adminReset={userId,scope:"both",fromDate:null,preview:null};
+  modal(`<h3>Regenerar plan — ${esc(user.email||userId)}</h3>
+    <div class="muted small" style="margin-bottom:10px">Borra o archiva solo lo futuro desde la fecha elegida. Nunca toca días pasados ni comidas/entrenos ya registrados.</div>
+    <div class="field"><label for="arp_scope">Alcance</label><select id="arp_scope">
+      <option value="both">Nutrición y entrenamiento</option>
+      <option value="nutrition">Solo nutrición</option>
+      <option value="training">Solo entrenamiento</option>
+    </select></div>
+    <div class="field"><label for="arp_from">Fecha de inicio (opcional)</label><input id="arp_from" type="date"><div class="field-note">Si la dejas vacía, se usa hoy en la zona horaria del usuario.</div></div>
+    <div id="arpPreviewOut"></div>
+    <div class="row wrap" style="margin-top:10px">
+      <button class="btn btn-accent" onclick="adminPreviewResetPlan('${userId}')">Ver vista previa</button>
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+    </div>`);
+}
+async function adminPreviewResetPlan(userId){
+  const scope=($("#arp_scope")&&$("#arp_scope").value)||"both";
+  const fromDate=($("#arp_from")&&$("#arp_from").value)||undefined;
+  const out=$("#arpPreviewOut");if(out)out.innerHTML='<div class="ai-box">Calculando impacto…</div>';
+  try{
+    const preview=await adminApi("previewResetPlan",{userId,scope,fromDate});
+    window._adminReset={userId,scope,fromDate:preview.fromDate,preview};
+    if(out)out.innerHTML=`<div class="ai-box">
+      Desde <b>${esc(preview.fromDate)}</b> (hoy del usuario: ${esc(preview.today)}): <b>${preview.daysInRange}</b> día(s) en el horizonte revisado.<br>
+      <b>${preview.clearedCount}</b> se limpiarán · <b>${preview.protectedCount}</b> quedan protegidos por tener algo ya registrado.
+      ${preview.willSupersedePlanVersion?"<br>Se archivará la versión activa del plan de nutrición.":""}
+      ${preview.protectedDates&&preview.protectedDates.length?`<div class="muted small" style="margin-top:6px">Protegidos: ${preview.protectedDates.map(esc).join(", ")}</div>`:""}
+    </div>
+    <div class="row wrap" style="margin-top:10px">
+      <button class="btn btn-accent" ${preview.clearedCount?"":'disabled style="opacity:.4"'} onclick="adminApplyResetPlan()">Aplicar</button>
+    </div>`;
+  }catch(e){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}</div>`;}
+}
+async function adminApplyResetPlan(){
+  const st=window._adminReset;
+  if(!st||!st.preview){toast("Primero genera la vista previa.");return;}
+  if(!confirm(`¿Aplicar el reseteo? Esto limpiará ${st.preview.clearedCount} día(s) futuros desde ${st.preview.fromDate}. Esta acción no se puede deshacer.`))return;
+  try{
+    const result=await adminApi("applyResetPlan",{userId:st.userId,scope:st.scope,fromDate:st.fromDate});
+    window._adminReset=null;
+    closeModal();
+    toast(`Listo: ${result.daysCleared} día(s) reseteados, ${result.daysProtected} protegidos.`);
+  }catch(e){toast(e.message);}
+}
+// REQ-126 item 7: reiniciar cualquier usuario normal a onboarding (sin convertirlo en QA).
+function openAdminResetUser(userId){
+  const user=adminUsersCache.find(u=>u.id===userId)||{id:userId,email:userId};
+  modal(`<h3>Reiniciar usuario — ${esc(user.email||userId)}</h3>
+    <div class="ai-box" style="border-color:var(--bad)">⚠️ Borra perfil, planes, progreso, consentimientos y fotos, y lo devuelve a onboarding. No se puede deshacer.</div>
+    <div class="row wrap" style="margin-top:10px">
+      <button class="btn" style="border-color:var(--bad);color:var(--bad)" onclick="adminConfirmResetUser('${userId}')">Sí, reiniciar usuario</button>
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+    </div>`);
+}
+async function adminConfirmResetUser(userId){
+  if(!confirm("Esta acción es irreversible. ¿Confirmas el reinicio completo de este usuario?"))return;
+  try{
+    await adminApi("resetUserToOnboarding",{userId});
+    closeModal();toast("Usuario reiniciado. Volverá a onboarding en su próximo acceso.");
+  }catch(e){toast(e.message);}
 }
 async function loadAdminQuotaOverview(){
   const panel=$("#adminQuotaPanel");if(!panel)return;

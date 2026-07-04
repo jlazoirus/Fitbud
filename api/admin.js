@@ -64,6 +64,16 @@ async function profileById(id, e) {
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
+async function profileWithPrefsById(id, e) {
+  const response = await fetch(
+    e.url + "/rest/v1/profiles?id=eq." + encodeURIComponent(id) + "&select=id,email,is_admin,active,prefs",
+    { headers: serviceHeaders(e) }
+  );
+  if (!response.ok) return null;
+  const rows = await responseJson(response);
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
 async function authUserById(id, e) {
   const response = await fetch(e.url + "/auth/v1/admin/users/" + encodeURIComponent(id), {
     headers: serviceHeaders(e),
@@ -229,6 +239,205 @@ async function restRequest(e, path, options) {
     throw error;
   }
   return data;
+}
+
+// ---------------------------------------------------------------
+// REQ-126 — resetear/regenerar futuro de nutrición y/o entrenamiento
+// de cualquier usuario, y reiniciar un usuario a onboarding.
+// ---------------------------------------------------------------
+const RESET_SCOPES = new Set(["nutrition", "training", "both"]);
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// Techo defensivo: evita escanear/mutar un rango de fechas sin límite.
+const RESET_HORIZON_DAYS = 120;
+
+function todayInTimeZone(timeZone) {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  } catch (_) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
+function addDaysToDate(ds, n) {
+  const d = new Date(ds + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Un día queda protegido (nunca se toca) si ya tiene algo ejecutado dentro del
+// alcance elegido: comida registrada (nutrición) o entrenamiento hecho/ejecutado.
+function dayProtectedForScope(state, scope) {
+  const st = state || {};
+  const meals = st.meals && typeof st.meals === "object" ? st.meals : {};
+  const nutritionDone = Object.values(meals).some((m) => m && m.done)
+    || (Array.isArray(st.extras) && st.extras.some((x) => x && x.done));
+  const trainingDone = !!st.workoutDone || !!st.workoutExecution;
+  if (scope === "nutrition") return nutritionDone;
+  if (scope === "training") return trainingDone;
+  return nutritionDone || trainingDone;
+}
+
+// Limpia solo los campos del alcance elegido; nunca toca información fuera de ese alcance.
+function clearedStateForScope(state, scope) {
+  const st = Object.assign({}, state || {});
+  if (scope === "nutrition" || scope === "both") {
+    st.meals = {};
+    st.extras = [];
+  }
+  if (scope === "training" || scope === "both") {
+    delete st.workoutOverride;
+    delete st.workoutExecution;
+    st.workoutDone = false;
+  }
+  return st;
+}
+
+async function fetchFutureDayLogs(userId, fromDate, e) {
+  const toDate = addDaysToDate(fromDate, RESET_HORIZON_DAYS);
+  const rows = await restRequest(e, "day_log?user_id=eq." + encodeURIComponent(userId)
+    + "&log_date=gte." + fromDate + "&log_date=lte." + toDate
+    + "&select=log_date,state&order=log_date.asc");
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function fetchActivePlanVersion(userId, e) {
+  const rows = await restRequest(e, "plan_versions?user_id=eq." + encodeURIComponent(userId)
+    + "&status=eq.active&select=id,cycle_number,version_number,valid_from,valid_to&order=created_at.desc&limit=1");
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
+function summarizeResetTargets(rows, scope) {
+  let protectedCount = 0, clearedCount = 0;
+  const protectedDates = [];
+  rows.forEach((row) => {
+    if (dayProtectedForScope(row.state, scope)) { protectedCount++; protectedDates.push(row.log_date); }
+    else clearedCount++;
+  });
+  return { protectedCount, clearedCount, protectedDates: protectedDates.slice(0, 20) };
+}
+
+async function logAdminAction(e, { adminId, targetUserId, action, scope, fromDate, result }) {
+  try {
+    await fetch(e.url + "/rest/v1/admin_actions_log", {
+      method: "POST",
+      headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=minimal" }),
+      body: JSON.stringify({
+        admin_id: adminId || null,
+        target_user_id: targetUserId,
+        action,
+        scope: scope || null,
+        from_date: fromDate || null,
+        result: result || {},
+      }),
+    });
+  } catch (_) { /* la auditoría nunca debe bloquear la operación principal */ }
+}
+
+function validateResetPlanInput(body) {
+  const userId = String(body.userId || "");
+  const scope = String(body.scope || "");
+  if (!UUID_RE.test(userId) || !RESET_SCOPES.has(scope)) {
+    const error = new Error("Usuario y alcance (nutrition, training o both) válidos requeridos.");
+    error.status = 400;
+    throw error;
+  }
+  const fromDate = DATE_RE.test(String(body.fromDate || "")) ? String(body.fromDate) : null;
+  return { userId, scope, fromDate };
+}
+
+// Resuelve la fecha de inicio efectiva: la elegida por el admin si es futura,
+// o el día de hoy en la zona horaria del usuario objetivo (nunca el pasado).
+async function resolveResetTarget(body, e) {
+  const { userId, scope, fromDate: requestedFromDate } = validateResetPlanInput(body);
+  const target = await profileWithPrefsById(userId, e);
+  if (!target) {
+    const error = new Error("Usuario no encontrado.");
+    error.status = 404;
+    throw error;
+  }
+  const timeZone = (target.prefs && target.prefs.timeZone) || "UTC";
+  const today = todayInTimeZone(timeZone);
+  const fromDate = requestedFromDate && requestedFromDate > today ? requestedFromDate : today;
+  return { userId, scope, fromDate, today, target };
+}
+
+async function previewResetPlan(body, e) {
+  const { userId, scope, fromDate, today } = await resolveResetTarget(body, e);
+  const rows = await fetchFutureDayLogs(userId, fromDate, e);
+  const activePlanVersion = scope === "training" ? null : await fetchActivePlanVersion(userId, e);
+  const summary = summarizeResetTargets(rows, scope);
+  return {
+    userId, scope, fromDate, today,
+    daysInRange: rows.length,
+    ...summary,
+    willSupersedePlanVersion: !!activePlanVersion,
+    activePlanVersion,
+  };
+}
+
+async function applyResetPlan(body, caller, e) {
+  const { userId, scope, fromDate } = await resolveResetTarget(body, e);
+  const rows = await fetchFutureDayLogs(userId, fromDate, e);
+
+  let cleared = 0, protectedCount = 0;
+  for (const row of rows) {
+    if (dayProtectedForScope(row.state, scope)) { protectedCount++; continue; }
+    const nextState = clearedStateForScope(row.state, scope);
+    await restRequest(e, "day_log?user_id=eq." + encodeURIComponent(userId) + "&log_date=eq." + row.log_date, {
+      method: "PATCH",
+      headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=minimal" }),
+      body: JSON.stringify({ state: nextState, updated_at: new Date().toISOString() }),
+    });
+    cleared++;
+  }
+
+  let planVersionSuperseded = false;
+  if (scope !== "training") {
+    const active = await fetchActivePlanVersion(userId, e);
+    if (active) {
+      const validTo = active.valid_from && active.valid_from > fromDate ? active.valid_from : addDaysToDate(fromDate, -1);
+      await restRequest(e, "plan_versions?id=eq." + active.id + "&user_id=eq." + encodeURIComponent(userId), {
+        method: "PATCH",
+        headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=minimal" }),
+        body: JSON.stringify({ status: "superseded", valid_to: validTo, superseded_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
+      });
+      planVersionSuperseded = true;
+    }
+  }
+
+  const result = { daysCleared: cleared, daysProtected: protectedCount, planVersionSuperseded, fromDate };
+  await logAdminAction(e, { adminId: caller, targetUserId: userId, action: "reset_plan_apply", scope, fromDate, result });
+  return result;
+}
+
+// REQ-126 item 7: reinicia cualquier usuario normal a onboarding (datos, planes,
+// progreso y consentimientos) SIN convertirlo en usuario de prueba QA.
+async function resetUserToOnboarding(body, caller, e) {
+  const userId = String(body.userId || "");
+  if (!UUID_RE.test(userId)) {
+    const error = new Error("userId inválido.");
+    error.status = 400;
+    throw error;
+  }
+  if (userId === caller) {
+    const error = new Error("No puedes reiniciar tu propia cuenta desde el panel.");
+    error.status = 400;
+    throw error;
+  }
+  const [targetUser, targetProfile] = await Promise.all([authUserById(userId, e), profileById(userId, e)]);
+  if (!targetUser) {
+    const error = new Error("Usuario no encontrado.");
+    error.status = 404;
+    throw error;
+  }
+  if (targetProfile && targetProfile.is_admin) {
+    const error = new Error("No se puede reiniciar una cuenta administradora desde esta herramienta.");
+    error.status = 409;
+    throw error;
+  }
+  await resetTestUserData({ id: targetUser.id, email: targetUser.email || "" }, e);
+  const result = { ok: true };
+  await logAdminAction(e, { adminId: caller, targetUserId: userId, action: "reset_user", result });
+  return result;
 }
 
 async function quotaOverview(e) {
@@ -628,6 +837,21 @@ export default async function handler(req, res) {
 
     if (body.action === "resetQuota") {
       res.status(200).json({ ok: true, reset: await resetQuota(body, e) });
+      return;
+    }
+
+    if (body.action === "previewResetPlan") {
+      res.status(200).json(await previewResetPlan(body, e));
+      return;
+    }
+
+    if (body.action === "applyResetPlan") {
+      res.status(200).json({ ok: true, ...(await applyResetPlan(body, caller, e)) });
+      return;
+    }
+
+    if (body.action === "resetUserToOnboarding") {
+      res.status(200).json(await resetUserToOnboarding(body, caller, e));
       return;
     }
 
