@@ -1001,6 +1001,7 @@ function trainingPrefsFromPrefs(source){
     workoutSplit:p.workoutSplit,
     split:effectiveWorkoutSplit(p.trainingExperience,p.workoutSplit),
     priority:p.trainingPriority,
+    lightCardioEnabled:!!p.lightCardioEnabled,
     safetyMode:p.trainingSafetyMode,
     gentleMode:isGentleTrainingPlan(p),
     preferredTime:p.preferredTrainingTime,
@@ -1137,10 +1138,18 @@ function strengthResourceHtml(prefix,choice,selected){
   const values=Array.isArray(selected)&&selected.length?selected:defaultEquipmentForStrengthChoice(choice);
   return `<div class="field" id="${prefix}_strength_resources" style="grid-column:1 / -1"><label>Recursos disponibles</label><div class="chips">${checkChips(prefix+"_equipment",STRENGTH_RESOURCE_LABELS,values)}</div></div>`;
 }
-function workoutSchedule(days,dayIds,priority,locations,primary,experience,workoutSplit,strength){
+function workoutSchedule(days,dayIds,priority,locations,primary,experience,workoutSplit,strength,lightCardioEnabled){
   const selected=normalizedTrainingDays(dayIds,days);
-  const sessions=trainingTemplateForModes(selected.length,priority,experience,workoutSplit,strength,primary);
+  let sessions=trainingTemplateForModes(selected.length,priority,experience,workoutSplit,strength,primary);
   const sportIds=new Set(["calidad","facil","tecnica"]);
+  // Fix: strength_only sin actividad ligera no tiene sesiones de "facil/calidad/técnica"
+  // reales (sportSessions() devuelve un placeholder sin nombre para ese caso). La
+  // plantilla de días sí puede asignar esos slots, así que hay que sustituirlos por
+  // descanso aquí para no terminar con un id planificado que no resuelve a ningún
+  // entrenamiento real (workoutById devolvía null y renderWorkout fallaba).
+  if(primary==="strength_only"&&!lightCardioEnabled){
+    sessions=sessions.map(id=>sportIds.has(id)?"descanso":id);
+  }
   const remaining=sessions.slice();
   const assigned={};
   selected.forEach(day=>{
@@ -1169,7 +1178,7 @@ function plannedWorkoutId(ds,prefs){
   }
   const training=trainingPrefsFromPrefs(prefs||planPrefsForDate(ds));
   const wd=parseYmd(ds).getDay();
-  return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength)[wd]||"descanso";
+  return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength,training.lightCardioEnabled)[wd]||"descanso";
 }
 function trainingPlanSummary(days,primary,priority,lightCardio,strength){
   if(strength==="none"){
@@ -7864,7 +7873,7 @@ function trainingExpectedWeeks(prefs){
   const training=trainingPrefsFromPrefs(p);
   const planPrefs={...p,primarySport:training.primary};
   const calendar=planCalendarForPrefs(p);
-  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength);
+  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength,training.lightCardioEnabled);
   const strengthRoles=STRENGTH_SESSION_IDS;
   const catalog=activeTrainingCatalog();
   return calendar.weeks.map((week,index)=>{

@@ -30,10 +30,27 @@ const daysFromToday = (n) => {
   return ymd(d);
 };
 
-/** 4 días de entreno/semana, siempre incluyendo el día actual (0=Dom…6=Sáb). */
+// El orden real de días de entreno en la app es Lunes..Domingo (WEEKDAY_OPTIONS
+// en js/nutrition-pure.js), no el orden numérico de Date#getDay() (0=Domingo).
+// workoutSchedule() asigna las sesiones de gimnasio a los primeros días
+// procesados en ese orden y deja las de "facil"/"calidad"/"técnica" (o
+// descanso, para strength_only sin actividad ligera) para los últimos. Si el
+// día actual quedara de último, la sesión de hoy no sería de gimnasio.
+const WEEKDAY_APP_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Lunes..Domingo
+
+/**
+ * 4 días de entreno/semana, siempre incluyendo el día actual como el primero
+ * en el orden Lunes..Domingo, para que hoy reciba siempre una sesión de
+ * gimnasio (no la última, que puede ser "facil"/descanso). 0=Dom…6=Sáb.
+ */
 export function trainingDaysIncludingToday() {
   const dow = new Date().getDay();
-  return [...new Set([dow, (dow + 2) % 7, (dow + 4) % 7, (dow + 5) % 7])].sort();
+  const rank = WEEKDAY_APP_ORDER.indexOf(dow);
+  const days = new Set([dow]);
+  for (let offset = 1; days.size < 4; offset++) {
+    days.add(WEEKDAY_APP_ORDER[(rank + offset) % 7]);
+  }
+  return [...days];
 }
 
 /* ── Fixtures de usuario ──────────────────────────────────────────────── */
