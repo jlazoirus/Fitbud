@@ -1803,7 +1803,7 @@ Toda dieta aplicada debe ser viable: cumplir objetivos dentro de tolerancia o in
 
 ## REQ-123 - Fix Nutrición: todos los botones "Otra opción" soportan reintentos repetidos con feedback
 
-**Estado: pendiente.**
+**Estado: implementado.** Causa raíz encontrada: al agotarse el cupo diario de generaciones "frescas" para una acción, `reserve_coach_action` cambia a modo `reuse` y el servidor devolvía en silencio una respuesta pooled/template idéntica en cada reintento (mismo `contextKey`, mismo fallback determinista) — el usuario veía siempre la misma sugerencia y lo percibía como que el botón no hacía nada. `/api/claude` ahora marca `reused:true` en esa respuesta para todos los usuarios (antes solo iba en el diagnóstico de admin). `callClaude` expone la señal como `lastCoachCallReused` y `generateOneDay` la propaga en su resultado. `regenerateGenMeal`, `rerollChangeMealOptions` y `regenerateDayInWeekDraft` la usan para avisar con un toast claro ("Ya usaste tus opciones nuevas de hoy...") y para descartar la sugerencia repetida a favor del plato más cercano del catálogo aún no mostrado (`freshSelected` filtra por `seenSlugs`, `regenerateGenMeal` compara contra el nombre previo del slot). `regenerateDayInWeekDraft` y `genReviewHtml` (revisión de día) ahora siempre ofrecen "Reintentar" junto a "Volver al borrador"/"Completar con opción práctica", así ningún error deja el modal sin una acción hacia adelante. Verificado con `scripts/validate-retry-feedback.mjs` y `scripts/test-coach-quota.mjs`.
 
 ### Origen
 
