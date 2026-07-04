@@ -173,6 +173,28 @@ assert.ok(!rep2.rebalanceable, "reemplazo con +30% no es rebalanceable");
 assert.equal(d.NUTRITION_TOLERANCES.TARGET_KCAL_DELTA, 10, "tolerancia target = 10 kcal");
 assert.equal(d.NUTRITION_TOLERANCES.DAY_KCAL_PCT, 0.15, "tolerancia día = 15%");
 assert.equal(d.NUTRITION_TOLERANCES.SLOT_KCAL_PCT, 0.25, "tolerancia slot = 25%");
+assert.equal(d.NUTRITION_TOLERANCES.SLOT_HEAVY_KCAL_PCT, 0.15, "techo interino de contundencia = 15%");
+
+// ── Compatibilidad de plato por momento del día (REQ-131) ───────────────────
+const snackDish = { id: 201, slug: "shake-proteico", name: "Shake proteico", slot: "snack", compatible_slots: ["snack"] };
+assert.ok(d.compatibleSlotsForDish(snackDish).includes("media_manana"),
+  "un snack debe expandirse a media mañana para compatibilidad heurística");
+assert.ok(d.compatibleSlotsForDish(snackDish).includes("recena"),
+  "un snack debe expandirse a recena para compatibilidad heurística");
+const slotCatalog = {
+  dishes: [
+    snackDish,
+    { id: 202, slug: "guiso-de-pollo", name: "Guiso de pollo", slot: "almuerzo", compatible_slots: ["almuerzo", "cena"] },
+  ],
+};
+assert.equal(d.findDishForMeal({ nombre: "Shake proteico" }, slotCatalog).slug, "shake-proteico",
+  "findDishForMeal debe matchear por nombre catalogado");
+assert.equal(d.findDishForMeal({ dishSlug: "guiso-de-pollo" }, slotCatalog).name, "Guiso de pollo",
+  "findDishForMeal debe matchear por slug estable");
+assert.equal(d.slotKcalCeiling({ id: "desayuno", index: 0, target: { kcal: 400 } }, { mealCount: 4, mainMealIndex: 2 }), 460,
+  "slot no principal debe tener techo kcal = presupuesto * 1.15");
+assert.equal(d.slotKcalCeiling({ id: "almuerzo", index: 1, target: { kcal: 600 } }, { mealCount: 4, mainMealIndex: 2 }), 0,
+  "comida principal no debe tener techo heurístico de contundencia");
 
 // ── DIET_CONTRACT (REQ-128) ──────────────────────────────────────────────────
 assert.equal(d.DIET_CONTRACT.version, 1, "DIET_CONTRACT versionado");

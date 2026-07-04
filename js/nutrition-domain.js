@@ -23,6 +23,7 @@
     DAY_PROTEIN_MIN_PCT:0.85,
     DAY_CARB_PCT:0.30,
     SLOT_KCAL_PCT:0.25,
+    SLOT_HEAVY_KCAL_PCT:0.15,
     REPLACEMENT_KCAL_PCT:0.20,
   };
 
@@ -457,6 +458,18 @@
       }
       return {...slot,index,target};
     });
+  }
+
+  function slotKcalCeiling(slotTarget,prefs){
+    const target=slotTarget&&slotTarget.target?slotTarget.target:slotTarget;
+    const kcal=num(target&&target.kcal);
+    if(!(kcal>0))return 0;
+    const p=prefs||{};
+    const count=Math.min(6,Math.max(2,Number.parseInt(p.mealCount,10)||4));
+    const mainIndex=Math.min(Math.max(1,Number.parseInt(p.mainMealIndex,10)||2),count)-1;
+    const index=Number.isInteger(slotTarget&&slotTarget.index)?slotTarget.index:-1;
+    if(index===mainIndex)return 0;
+    return Math.round(kcal*(1+NUTRITION_TOLERANCES.SLOT_HEAVY_KCAL_PCT));
   }
 
   function categoryLimit(ingredient,baseMax){
@@ -1206,9 +1219,12 @@
     validateSlotMacros,
     validateReplacementFeasibility,
     mealSlotTargets,
+    slotKcalCeiling,
+    compatibleSlotsForDish,
     compatibleDishesForSlot,
     textHasAnimalProtein,
     mealHasAnimalProtein,
+    findDishForMeal,
     requiresOmnivoreAnimalProtein,
     validateOmnivoreAnimalProtein,
     finalizeNutritionDay,
@@ -1239,9 +1255,12 @@
   root.validateSlotMacros=validateSlotMacros;
   root.validateReplacementFeasibility=validateReplacementFeasibility;
   root.mealSlotTargets=mealSlotTargets;
+  root.slotKcalCeiling=slotKcalCeiling;
+  root.compatibleSlotsForDish=compatibleSlotsForDish;
   root.compatibleDishesForSlot=compatibleDishesForSlot;
   root.textHasAnimalProtein=textHasAnimalProtein;
   root.mealHasAnimalProtein=mealHasAnimalProtein;
+  root.findDishForMeal=findDishForMeal;
   root.requiresOmnivoreAnimalProtein=requiresOmnivoreAnimalProtein;
   root.validateOmnivoreAnimalProtein=validateOmnivoreAnimalProtein;
   root.finalizeNutritionDay=finalizeNutritionDay;

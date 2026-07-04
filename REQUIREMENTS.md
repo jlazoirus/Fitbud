@@ -85,7 +85,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 21. ~~REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad.~~ (implementado, P0)
 22. ~~REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas.~~ (implementado, P0)
 23. ~~REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo.~~ (implementado, P0)
-24. REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración. (P1)
+24. ~~REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración.~~ (implementado, P1)
 25. REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos. (P1)
 26. REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5. (P1)
 27. REQ-134 - Pipeline de crecimiento del catálogo validado por el motor. (P1)
@@ -1466,7 +1466,7 @@ Cero contradicciones sobre preferencias en el contexto que ve el modelo, y patr�
 
 ## REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración
 
-**Estado: pendiente.**
+**Estado: implementado.** `generateOneDay()` ahora calcula `mealSlotTargets` y envía presupuesto kcal/proteína por slot, arquetipos por momento del día y referencia de platos filtrada por `compatibleDishesForSlot` para cada slot. `validateGeneratedDay()` matchea comidas contra el catálogo con `findDishForMeal`, rechaza `compatible_slots` incompatibles y aplica un techo interino de contundencia (`slotKcalCeiling`, presupuesto ×1.15) en slots no principales. `regenerateGenMeal()` recibe el arquetipo del slot. Validador nuevo: `scripts/validate-slot-budget-prompt.mjs`, agregado al release gate.
 
 ### Origen
 
