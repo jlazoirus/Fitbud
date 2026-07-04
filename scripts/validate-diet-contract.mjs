@@ -199,6 +199,13 @@ const rows = [];
 const globalCauses = new Map();
 const startDate = "2026-07-06";
 const useFinalizer = typeof d.finalizeNutritionDay === "function";
+// REQ-137 #4: distinguir dias que fallan solo por residuo de macros (el
+// solver/pasada global hizo todo lo posible pero el catalogo no alcanza) de
+// dias que fallan por un problema estructural distinto (slot sin candidatos,
+// ingrediente desconocido, comida bloqueada, etc.), que sí es un bug a revisar.
+const CONTRACT_CAUSE_KEYS = new Set(["kcal_contract", "protein_contract", "carbs_contract", "fat_contract"]);
+let catalogGapDays = 0;
+let otherIssueDays = 0;
 
 for (const mealCount of mealCounts) {
   for (const diet of diets) {
@@ -240,12 +247,19 @@ for (const mealCount of mealCounts) {
         days.forEach(day => {
           const contract = day.contract || d.validateDietContractTotals(day.totals || {}, day.target || dayTarget);
           const dayOk = day.ok && contract.ok;
-          if (dayOk) okDays++;
-          if (!day.ok) {
-            (day.no_solution || [{ reason: "solver_no_solution" }]).forEach(item => {
-              addCause(causes, item.reason || "solver_no_solution");
-              addCause(globalCauses, item.reason || "solver_no_solution");
+          if (dayOk) {
+            okDays++;
+          } else {
+            const dayReasons = day.no_solution && day.no_solution.length
+              ? day.no_solution.map(item => item.reason || "solver_no_solution")
+              : ["solver_no_solution"];
+            dayReasons.forEach(reason => {
+              addCause(causes, reason);
+              addCause(globalCauses, reason);
             });
+            const onlyCatalogGap = dayReasons.length > 0 && dayReasons.every(reason => CONTRACT_CAUSE_KEYS.has(reason));
+            if (onlyCatalogGap) catalogGapDays++;
+            else otherIssueDays++;
           }
           if (!contract.ok && !day.contract) {
             contract.errors.forEach(error => {
@@ -288,6 +302,16 @@ const report = {
   },
   gateTargetPct: 98,
   total: { okDays: totalOk, totalDays, pct: Number(pct(totalOk, totalDays).toFixed(1)) },
+  // REQ-137 #4: de los dias que no cierran, cuantos son un catalog_gap legitimo
+  // (el solver + la pasada global + el complemento hicieron todo lo posible,
+  // pero el catalogo no tiene margen/ingredientes para llegar al target) frente
+  // a otros con una causa distinta que sí amerita revisión (slot sin
+  // candidatos, ingrediente desconocido, comida bloqueada, etc.).
+  failureBreakdown: {
+    catalogGapDays,
+    otherIssueDays,
+    note: "catalogGapDays = solo causas *_contract (residuo de macro); otherIssueDays = causa estructural distinta.",
+  },
   minDimension: {
     mealCount: min.mealCount,
     diet: min.diet,
@@ -321,6 +345,7 @@ if (jsonMode) {
   console.log(`Cobertura por slot: ${FOOD_SLOTS.map(slot => `${slot}=${report.catalog.slotCoverage[slot]}`).join(" · ")}.`);
   console.log(`Matriz: ${rows.length} dimensiones × 7 dias = ${totalDays} dias.`);
   console.log(`Factibilidad total: ${totalOk}/${totalDays} (${report.total.pct}%). Gate futuro: >=98% por dimension.`);
+  console.log(`De los ${totalDays - totalOk} dias que no cierran: ${catalogGapDays} son catalog_gap (solo residuo de macro) y ${otherIssueDays} tienen otra causa a revisar.`);
   console.log(`Minimo dimension: ${min.mealCount} comidas / ${min.diet} / ${min.target} / ${min.dislike} = ${min.okDays}/${min.totalDays} (${report.minDimension.pct}%).`);
   console.log("\nDimensiones:");
   rows.forEach(row => {

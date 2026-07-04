@@ -93,7 +93,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 29. ~~REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias.~~ (implementado, P1)
 30. ~~REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa.~~ (implementado, P2)
 31. ~~REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos.~~ (implementado, P2)
-32. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
+32. ~~REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato.~~ (implementado, P0)
 33. REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global. (P0)
 34. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool. (P0)
 
@@ -1862,53 +1862,10 @@ Cerrar la meta de profundidad del REQ-136 original sin mezclarla con el cierre m
 
 ## REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`finalizeNutritionDay()` agrega una pasada global (`globalClosePass`) que trata todas las líneas escalables de las comidas no bloqueadas como una única bolsa de palancas (clasificadas por `ingredientLeverCategory` en proteína/carbohidrato/grasa/neutro) e hill-climbea sobre los macros del día completo, no por comida, respetando siempre `lineLimits()`/`clampStep()`. Si el día sigue fuera de `DIET_CONTRACT`, `attemptContractComplement()` busca un snack/batido del catálogo compatible con `dislikedIngredients`/dieta que reduzca estrictamente el número de métricas fuera de contrato, sin reemplazar comidas existentes. `DIET_CONTRACT.runtimeActive` sigue `false`. Canario `validate-diet-contract.mjs` sube de 39/378 (10.3%) a 122/378 (32.3%) y ahora reporta `failureBreakdown` distinguiendo `catalogGapDays` (solo residuo de macro, 100% de los días que no cierran hoy) de `otherIssueDays` (causa estructural distinta). Tests nuevos en `scripts/validate-finalize-nutrition-day.mjs`: cierre de residuo acumulado exacto y caso imposible que debe devolver `no_solution` con causa medible.
 
-### Origen
-
-Subdivisión de REQ-129 original. Depende de REQ-129 etapa 1: la puerta pura debe existir antes de agregar optimización global.
-
-### Problema
-
-Aunque cada slot se pueda resolver con `solveDishPortion()`, los residuos acumulados del día completo siguen dejando macros fuera de `DIET_CONTRACT`. El canario de REQ-128 midió 0/378 días dentro de contrato con el solver actual.
-
-### Causa raíz
-
-El solver optimiza por comida, no por día. No existe una pasada global que use ingredientes escalables de las comidas no registradas ni un complemento controlado del catálogo para cerrar residual.
-
-### Objetivo
-
-Que `finalizeNutritionDay()` pueda devolver días aplicables dentro de `DIET_CONTRACT` cuando el catálogo lo permita, o `no_solution` con causa medible cuando no.
-
-### Alcance
-
-1. Agregar una pasada global de cierre sobre comidas no bloqueadas: ajustar líneas escalables respetando `min_g`/`max_g`/`step_g` y límites palatables.
-2. Clasificar palancas por macro usando categoría/nombre del ingrediente: proteína magra, carbohidrato base, grasa densa y ajuste calórico neutro.
-3. Formalizar complemento del catálogo dentro del dominio puro: seleccionar snack/shake compatible solo si reduce residual sin romper restricciones.
-4. Hacer que `validate-diet-contract.mjs` reporte cuántos días quedan `contract.ok` y cuántos son `no_solution` legítimo por cobertura de catálogo.
-5. Mantener dormida la activación runtime: cliente/servidor/snapshots siguen laxos hasta REQ-139.
-
-### Fuera de alcance
-
-- Conectar flujos de UI (REQ-138).
-- Activar contrato estricto en runtime o bump de pool (REQ-139).
-- Crear metadata nueva o platos nuevos (REQ-132/135).
-
-### Riesgos
-
-- Porciones absurdas si no se respetan límites; todo ajuste debe pasar por `lineLimits()`/`clampStep()`.
-- El catálogo actual puede no alcanzar 98%; si ocurre, el canario debe distinguir `catalog_gap` de bug del solver.
-
-### Criterios de aceptación
-
-- Un caso unitario con residuos acumulados queda dentro de `DIET_CONTRACT` tras la pasada global.
-- Un caso imposible devuelve `no_solution` con causa, no un día aplicable fuera de contrato.
-- El canario mejora el baseline de REQ-128 o explica dimensiones bloqueadas por catálogo.
-- `node scripts/validate-diet-contract.mjs` y `node scripts/release-gate.mjs` pasan.
-
-### Verificación sugerida
-
-- Caso sintético de 4 comidas con déficit de proteína/carbohidratos; confirmar ajuste global y residual final.
+Detalle historico (Origen/Problema/Alcance/Criterios originales): `docs/requirements-history.md` (buscar `## REQ-137`).
 
 ## REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global
 

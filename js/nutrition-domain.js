@@ -1048,6 +1048,168 @@
     };
   }
 
+  // ── Pasada global de cierre macro (REQ-137) ─────────────────────────────────
+  // El solver por comida (solveDishPortion) ya deja cada slot cerca de su target,
+  // pero los residuos de cada comida se acumulan y el día completo puede quedar
+  // fuera de DIET_CONTRACT aunque cada slot individual parezca razonable. Esta
+  // pasada trata todas las líneas escalables de las comidas NO bloqueadas como
+  // una única bolsa de palancas y hace hill-climbing sobre los macros del día
+  // completo (no por comida), respetando siempre lineLimits()/clampStep().
+  function ingredientLeverCategory(ingredient){
+    const cat=String(ingredient&&ingredient.category||"").toLowerCase();
+    const text=solverKey((ingredient&&ingredient.name)+" "+cat);
+    if(/legumbre|prote/.test(cat))return"protein";
+    if(/grasa/.test(cat)||/aceite|manteca|mantequilla|palta|aguacate|aceituna/.test(text))return"fat";
+    if(/cereal|fruta/.test(cat))return"carb";
+    const m=macroPer100(ingredient);
+    const pKcal=m.p*4,cKcal=m.c*4,fKcal=m.f*9;
+    const total=pKcal+cKcal+fKcal;
+    if(total<=0)return"neutral";
+    if(pKcal/total>=0.35)return"protein";
+    if(fKcal/total>=0.45)return"fat";
+    if(cKcal/total>=0.45)return"carb";
+    return"neutral";
+  }
+
+  // Reconstruye, por cada comida no bloqueada, los límites reales de escalado
+  // (min_g/max_g/step_g) buscando el plato de catálogo original; sin plato no
+  // hay límites confiables, así que esa línea queda fuera de la pasada global.
+  function collectGlobalLines(comidas,catalog,maps,lockedSlotIds){
+    const lines=[];
+    (comidas||[]).forEach(meal=>{
+      if(!meal||lockedSlotIds.has(meal.slot_id))return;
+      const dish=findDishForMeal(meal,catalog);
+      if(!dish)return;
+      const rawLines=dishLines(dish,catalog,maps);
+      const rawBySlug=new Map(rawLines.map(line=>[slugFor(line.ingredient),line]));
+      const ings=Array.isArray(meal.ingredientes)?meal.ingredientes:[];
+      ings.forEach((ing,index)=>{
+        const slug=String(ing.ingredientSlug||"").trim();
+        const rawLine=rawBySlug.get(slug);
+        const ingredient=rawLine&&rawLine.ingredient;
+        if(!ingredient||macroPer100(ingredient).kcal<0)return;
+        const limits=lineLimits({raw:rawLine.raw,grams:num(ing.gramos),ingredient});
+        if(!limits.scalable)return;
+        lines.push({meal,index,ingredient,grams:num(ing.gramos),limits,lever:ingredientLeverCategory(ingredient)});
+      });
+    });
+    return lines;
+  }
+
+  function rebuildMealFromLineUpdates(meal,updates){
+    const ingredientes=meal.ingredientes.map((ing,index)=>{
+      const upd=updates.get(index);
+      if(!upd)return ing;
+      const m=roundMacros(macrosForIngredient(upd.ingredient,upd.grams));
+      return {...ing,gramos:Math.round(upd.grams),kcal:m.kcal,proteina_g:m.p,carbohidratos_g:m.c,grasa_g:m.f};
+    });
+    const macros=roundMacros(ingredientes.reduce((sum,ing)=>addMacros(sum,{
+      kcal:num(ing.kcal),p:num(ing.proteina_g),c:num(ing.carbohidratos_g),f:num(ing.grasa_g),
+    }),{kcal:0,p:0,c:0,f:0}));
+    return {...meal,ingredientes,kcal:macros.kcal,proteina_g:macros.p,carbohidratos_g:macros.c,grasa_g:macros.f,source:meal.source||"global_close_pass"};
+  }
+
+  // Hill-climbing sobre TODAS las líneas ajustables del día (no por comida),
+  // puntuando con scoreMacros(totales_del_día, target). fixedTotals acumula lo
+  // que no se puede tocar (comidas bloqueadas + ingredientes no escalables).
+  function globalClosePass(comidas,target,catalog,maps,lockedSlotIds){
+    const lines=collectGlobalLines(comidas,catalog,maps,lockedSlotIds);
+    if(!lines.length)return comidas;
+    const adjustable=new Set(lines.map(l=>l.meal.slot_id+"|"+l.index));
+    const fixedTotals={kcal:0,p:0,c:0,f:0};
+    (comidas||[]).forEach(meal=>{
+      const ings=Array.isArray(meal.ingredientes)?meal.ingredientes:[];
+      ings.forEach((ing,index)=>{
+        if(adjustable.has(meal.slot_id+"|"+index))return;
+        addMacros(fixedTotals,{kcal:num(ing.kcal),p:num(ing.proteina_g),c:num(ing.carbohidratos_g),f:num(ing.grasa_g)});
+      });
+    });
+    const currentDayMacros=()=>lines.reduce((sum,line)=>addMacros(sum,macrosForIngredient(line.ingredient,line.grams)),{...fixedTotals});
+    let bestScore=scoreMacros(currentDayMacros(),target);
+    for(let iter=0;iter<120;iter++){
+      let improved=false;
+      for(const line of lines){
+        if(!line.limits.scalable)continue;
+        let bestGrams=line.grams;
+        for(const dir of [1,-1]){
+          const next=clampStep(line.grams+dir*line.limits.step,line.limits);
+          if(next===line.grams)continue;
+          const prevGrams=line.grams;
+          line.grams=next;
+          const score=scoreMacros(currentDayMacros(),target);
+          line.grams=prevGrams;
+          if(score+0.0001<bestScore){bestScore=score;bestGrams=next;improved=true;}
+        }
+        line.grams=bestGrams;
+      }
+      if(!improved)break;
+    }
+    const byMeal=new Map();
+    lines.forEach(line=>{
+      if(!byMeal.has(line.meal))byMeal.set(line.meal,new Map());
+      byMeal.get(line.meal).set(line.index,{grams:line.grams,ingredient:line.ingredient});
+    });
+    return comidas.map(meal=>{
+      const updates=byMeal.get(meal);
+      return updates?rebuildMealFromLineUpdates(meal,updates):meal;
+    });
+  }
+
+  // Complemento de catálogo (Alcance #3): si tras la pasada global el día sigue
+  // fuera de contrato por defecto (falta kcal/proteína/carbohidratos/grasa,
+  // nunca por exceso), busca un snack/batido compatible que reduzca el residual
+  // sin romper restricciones. Solo se acepta si mejora estrictamente el número
+  // de métricas fuera de contrato; nunca reemplaza comidas existentes.
+  function attemptContractComplement(comidas,target,totals,contract,prefs,catalog,maps,usedSlugs){
+    if(contract.ok)return null;
+    const residual=dayResidual(target,totals);
+    if(residual.kcal<=0)return null;
+    const candidateSlots=new Set([...SNACK_COMPATIBLE_SLOTS,...SHAKE_COMPATIBLE_SLOTS]);
+    const dishes=Array.isArray(catalog&&catalog.dishes)?catalog.dishes:[];
+    const complementTarget={
+      kcal:Math.max(0,residual.kcal),
+      p:Math.max(0,residual.p),
+      c:Math.max(0,residual.c),
+      f:Math.max(0,residual.f),
+    };
+    let best=null;
+    dishes.forEach(dish=>{
+      const slug=slugFor(dish);
+      if(usedSlugs.has(slug))return;
+      const compat=compatibleSlotsForDish(dish);
+      if(!compat.some(s=>candidateSlots.has(s)))return;
+      if(!dishDietAllowed(dish,prefs,catalog,maps))return;
+      const solved=solveDishPortion(dish,complementTarget,{catalog});
+      if(!solved.ok)return;
+      const newTotals=roundMacros(addMacros({...totals},solved.macros));
+      const newContract=validateDietContractTotals(newTotals,target);
+      const improvement=contract.errors.length-newContract.errors.length;
+      if(improvement<=0)return;
+      if(!best||improvement>best.improvement||(improvement===best.improvement&&solved.score<best.solved.score)){
+        best={dish,solved,newTotals,newContract,improvement};
+      }
+    });
+    if(!best)return null;
+    return {
+      meal:{
+        slot_id:"complemento",
+        nombre:best.dish.name,
+        dishSlug:slugFor(best.dish),
+        dishId:best.dish.id,
+        ingredientes:best.solved.ingredients.map(({nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g})=>({
+          nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g,
+        })),
+        kcal:best.solved.macros.kcal,
+        proteina_g:best.solved.macros.p,
+        carbohidratos_g:best.solved.macros.c,
+        grasa_g:best.solved.macros.f,
+        source:"contract_complement",
+      },
+      totals:best.newTotals,
+      contract:best.newContract,
+    };
+  }
+
   function finalizeNutritionDay(ctx){
     const prefs=ctx&&ctx.prefs||{};
     const dayTarget=ctx&&ctx.dayTarget||ctx&&ctx.target||{kcal:2000,p:150,c:200,f:65};
@@ -1115,9 +1277,20 @@
       }
     });
 
-    const comidas=slots.map(slot=>bySlot.get(slot.id)).filter(Boolean);
-    const totals=roundMacros(comidas.reduce((sum,meal)=>addMacros(sum,mealMacrosForTotals(meal)),{kcal:0,p:0,c:0,f:0}));
-    const contract=validateDietContractTotals(totals,target);
+    const usedSlugsBeforeClose=new Set(slots.map(slot=>bySlot.get(slot.id)).filter(Boolean).map(meal=>meal.dishSlug).filter(Boolean));
+    let comidas=globalClosePass(slots.map(slot=>bySlot.get(slot.id)).filter(Boolean),target,catalog,maps,lockedSlotIds);
+    let totals=roundMacros(comidas.reduce((sum,meal)=>addMacros(sum,mealMacrosForTotals(meal)),{kcal:0,p:0,c:0,f:0}));
+    let contract=validateDietContractTotals(totals,target);
+    let complement=null;
+    if(!contract.ok){
+      const attempt=attemptContractComplement(comidas,target,totals,contract,prefs,catalog,maps,usedSlugsBeforeClose);
+      if(attempt){
+        comidas=[...comidas,attempt.meal];
+        totals=attempt.totals;
+        contract=attempt.contract;
+        complement={dishSlug:attempt.meal.dishSlug,nombre:attempt.meal.nombre};
+      }
+    }
     const omnivoreAnimal=validateOmnivoreAnimalProtein(comidas,prefs,catalog);
     if(!contract.ok){
       contract.errors.forEach(error=>{
@@ -1137,6 +1310,7 @@
       target,
       residual:dayResidual(target,totals),
       contract,
+      complement,
       warns:omnivoreAnimal.warns,
       omnivoreAnimalProtein:omnivoreAnimal,
       comidas,
