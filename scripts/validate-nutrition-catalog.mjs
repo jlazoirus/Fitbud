@@ -125,7 +125,7 @@ function dishMenu(dish) {
 function inferCuisineTags(dish) {
   const name = String(dish.name || "");
   const menu = dishMenu(dish);
-  if (menu === "A" || /tacu tacu|aj[ií]|locro|chaufa/i.test(name)) return ["criolla"];
+  if (menu === "A" || /tacu tacu|aj[ií]|locro|chaufa|criolla|criollo/i.test(name)) return ["criolla"];
   if (menu === "B" || /hummus|falafel|griega|pita|cuscus/i.test(name)) return ["mediterranea"];
   if (menu === "D" || /taco|fajita|quesadilla|enchilada|azteca|chili/i.test(name)) return ["mexicana"];
   if (menu === "C" || /teriyaki|pad thai|ramen|pak choi|edamame/i.test(name)) return ["asiatica"];

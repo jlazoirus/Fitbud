@@ -91,7 +91,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 27. ~~REQ-134 - Pipeline de crecimiento del catálogo validado por el motor.~~ (implementado, P1)
 28. ~~REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks.~~ (implementado, P1)
 29. ~~REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias.~~ (implementado, P1)
-30. REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa. (P2)
+30. ~~REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa.~~ (implementado, P2)
 31. REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos. (P2)
 32. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
 33. REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global. (P0)
@@ -1766,7 +1766,8 @@ Preparar el catálogo para crecer por gustos: cada plato puede declarar cocina y
 
 ## REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`supabase/seed.sql` agrega lote 2B: 41 ingredientes y 45 platos nuevos (162 ingredientes, 145 platos, 522 líneas de receta en total; fuentes en `docs/catalog-lote-2b-sources.md`). Cada cocina (`criolla`, `mediterranea`, `mexicana`, `asiatica`) ahora cubre desayuno, snack y al menos un slot principal (almuerzo/cena), no solo almuerzo como en REQ-136. `inferCuisineTags` en `supabase/nutrition_catalog_semantics.sql` y su espejo de test en `scripts/validate-nutrition-catalog.mjs` reconocen además `criolla`/`criollo` en el nombre del plato. El lote también suma opciones `needs_kitchen=false`, `eat_out_ok` (bowl/tacos/pasta/pollo) y `budget_tier='low'`, más proteína alta con fuentes naturales (pollo, pescado, huevo, lácteos) sin depender de proteína en polvo. `node scripts/validate-nutrition-catalog.mjs`, `node supabase/validate.mjs` y el canario `node scripts/validate-diet-contract.mjs` pasan; el gate macro estricto sigue en calibración hasta REQ-137 (fuera de alcance de este REQ). Acción manual externa: re-ejecutar `supabase/seed.sql` y `supabase/nutrition_catalog_semantics.sql` en Supabase para reemplazar/backfillear el catálogo antes de usar el lote 2C (REQ-141).
 
 ### Origen
 
