@@ -244,6 +244,32 @@
     return foodBlockTermsForProfile(prefs,false);
   }
 
+  // Gustos declarados (REQ-119): términos positivos de ingredientes/platos favoritos.
+  // Separados de foodBlockTermsForProfile porque no bloquean, solo priorizan.
+  function likedTermsForProfile(prefs){
+    const p=prefs||{};
+    const terms=[
+      ...String(p.preferredIngredients||"").split(/[,;]/),
+      ...String(p.preferredDishes||"").split(/[,;]/),
+    ].map(x=>x.trim()).filter(Boolean);
+    return [...new Set(terms.map(t=>t.toLowerCase()))];
+  }
+
+  // Ajuste suave de score (no bloqueante): platos con ingredientes/nombres que
+  // coinciden con gustos declarados bajan de score (mejor), con disgustos suben
+  // (peor) para que el determinista evite disgustos cuando hay alternativas.
+  function preferenceScoreAdjustment(dish,prefs,catalog,maps){
+    const p=prefs||{};
+    const liked=likedTermsForProfile(p);
+    const disliked=String(p.dislikedIngredients||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean);
+    if(!liked.length&&!disliked.length)return 0;
+    const text=dishText(dish,catalog,maps);
+    let adj=0;
+    if(liked.length&&foodTextViolatesTerms(text,liked))adj-=0.12;
+    if(disliked.length&&foodTextViolatesTerms(text,disliked))adj+=0.15;
+    return adj;
+  }
+
   function dishDietAllowed(dish,prefs,catalog,maps){
     const diet=Array.isArray(prefs&&prefs.diet)?prefs.diet:[];
     const tags=asArray(dish&&dish.diet_tags);
@@ -479,7 +505,8 @@
         const yesterday=(!reuse&&prevDayUsed.size&&prevDayUsed.has(slug))?0.10:0;
         const recent=(!reuse&&!yesterday&&recentUsed.size&&recentUsed.has(slug))?0.06:0;
         const jitter=dateSeed?seededJitter(dateSeed+"|"+slot.id+"|"+slug)*0.03:0;
-        const score=solved.score+reuse+yesterday+recent+jitter;
+        const prefAdj=preferenceScoreAdjustment(dish,prefs,catalog,maps);
+        const score=solved.score+reuse+yesterday+recent+jitter+prefAdj;
         if(!best||score<best.rankScore)best={...solved,rankScore:score};
       });
       if(!best){
@@ -541,9 +568,10 @@
   // candidates: platos del catálogo ya filtrados por slot/dieta
   // mealTarget: {kcal,p,c,f} objetivo del slot
   // catalog: objeto {ingredients, dishes, dishIng}
-  function rankReplacementCandidates(meal,candidates,mealTarget,catalog){
+  function rankReplacementCandidates(meal,candidates,mealTarget,catalog,prefs){
     const currentKcal=num(meal&&meal.kcal)||0;
     const currentP=num(meal&&meal.proteina_g)||0;
+    const maps=catalogMaps(catalog);
     const results=[];
     (candidates||[]).slice(0,60).forEach(dish=>{
       const solved=solveDishPortion(dish,mealTarget,{catalog});
@@ -555,7 +583,7 @@
         dish,
         macros:m,
         ingredients:solved.ingredients,
-        score:solved.score+proximity*0.5,
+        score:solved.score+proximity*0.5+preferenceScoreAdjustment(dish,prefs,catalog,maps),
         deltaKcal:Math.round(deltaKcal),
         deltaP:Math.round(m.p-currentP),
         deltaC:Math.round(m.c-(num(meal&&meal.carbohidratos_g)||0)),
@@ -775,6 +803,8 @@
     foodTextViolatesTerms,
     foodBlockTermsForProfile,
     foodTextConflictForProfile,
+    likedTermsForProfile,
+    preferenceScoreAdjustment,
     validateTargetConsistency,
     validateDayTotals,
     validateSlotMacros,
