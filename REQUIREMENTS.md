@@ -1661,7 +1661,7 @@ Capturar gustos mínimos de alto impacto antes de generar la primera semana, sin
 
 ## REQ-120 - Nutrición: "No me gusta este plato" bloquea futuras sugerencias hasta editar Perfil
 
-**Estado: pendiente.**
+**Estado: implementado.** `profile.prefs.blockedDishes` guarda `{key,name}` por plato (key = `dish.slug` o nombre normalizado, deduplicado, tope 200). `dishDietAllowed` (`js/nutrition-domain.js`) excluye platos bloqueados del planificador determinista de día/semana (`compatibleDishesForSlot`); `coachDishBlockedByProfile` (index.html) hace lo mismo para la lista de referencia de IA, `changeMealCandidatePool`, `regenerateGenMeal`, `findGapSnack` y la validación de acciones del coach (`cambiar_plato`). Los prompts de generación de día y "otra opción" agregan una línea explícita con los nombres bloqueados (`coachBlockedDishesLine`) como refuerzo para platos generados por IA que no matchean el catálogo. Acción "🚫 No me gusta este plato" disponible desde el menú "···" de la comida aplicada (`openMealMore`/`blockCurrentMealDish`) y desde cada comida del borrador de día generado (`blockGenDraftMeal`). Perfil > Comidas lista los platos bloqueados con botón "Volver a sugerir" (`unblockDishFromProfile`) cuando hay al menos uno. Días ya ejecutados no se modifican (el bloqueo solo afecta generación futura). Verificado con `scripts/validate-blocked-dishes.mjs` y la suite E2E de Perfil/Nutrición.
 
 ### Origen
 
