@@ -1850,7 +1850,9 @@ Que cualquier acción "Otra opción"/"Rehacer opciones" pueda repetirse dentro d
 
 ## REQ-124 - Home y Nutrición: anillo de macros primero y agenda/comidas debajo
 
-**Estado: pendiente.**
+**Estado: implementado.** `renderHoy` renderiza `heroDash` (anillo/resumen de macros) antes que `homeAgendaHtml` (agenda), reemplazando el orden de REQ-97. `renderNutrition` mueve "Más opciones" al final, después de comidas del día y comidas extra. El tour guiado agrega un primer paso apuntando a `.mini-macro-dash` antes del paso de `.agenda-card`. Los comportamientos de "entrenamiento pendiente aunque las comidas estén completas" (`workoutPending` no depende de `pendingMeals`) y "día cerrado con racha" (`homeAgendaData` estado `done`) ya existían correctamente en `homeAgendaData`/`homeAgendaHtml` y no requirieron cambios. Verificado con `scripts/validate-home-macro-ring-first.mjs`.
+
+Nota aparte: `tests/e2e/entreno.spec.js` y `tests/e2e/navegacion.spec.js` fallan por un problema preexistente y no relacionado a este REQ — sus fixtures asumen un "hoy" fijo (día de gimnasio, etc.) y el reloj real del entorno cruzó de fecha durante la sesión de trabajo; confirmado reproducible en `main` sin este cambio (`git stash` + re-run). No se tocaron esos fixtures para no arriesgar otras pruebas; recomendable revisar si dependen de fecha real en vez de una fecha simulada estable.
 
 ### Origen
 
