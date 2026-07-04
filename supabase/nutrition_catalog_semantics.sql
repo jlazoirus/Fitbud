@@ -71,7 +71,7 @@ where slot = 'batido';
 with dish_flags as (
   select
     d.id,
-    bool_or(i.name in (
+    bool_or(i.category = 'Proteína animal' or i.name in (
       'Pechuga de pollo','Pavo molido magro','Carne de res magra',
       'Atún en agua','Salmón'
     )) as has_meat_or_fish,
@@ -101,7 +101,10 @@ set
   end,
   budget_tier = case
     when name ilike '%salmón%' or name ilike '%atún%' then 'flexible'
-    when name ilike '%arroz%' or name ilike '%frijol%' or name ilike '%lentejas%' then 'low'
+    when name ilike '%arroz%' or name ilike '%frijol%' or name ilike '%lentejas%' or
+         name ilike '%avena%' or name ilike '%pan%' or name ilike '%arepa%' or
+         name ilike '%garbanzo%' or name ilike '%camote%' or name ilike '%papa%' or
+         name ilike '%yuca%' or name ilike '%cereal%' then 'low'
     else 'medium'
   end,
   needs_kitchen = case
@@ -151,7 +154,7 @@ set meal_form = case
   when slot = 'snack' then 'snack'
   when name ilike '%bowl%' then 'bowl'
   when name ilike '%sopa%' or name ilike '%crema%' or name ilike '%ramen%' then 'soup'
-  when name ilike '%pan%' or name ilike '%pita%' or name ilike '%taco%' or name ilike '%quesadilla%' then 'sandwich'
+  when name ilike '%pan%' or name ilike '%pita%' or name ilike '%taco%' or name ilike '%quesadilla%' or name ilike '%wrap%' or name ilike '%tostada%' or name ilike '%arepa%' then 'sandwich'
   else 'plated'
 end
 where meal_form is null or meal_form = '';

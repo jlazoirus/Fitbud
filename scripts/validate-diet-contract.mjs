@@ -38,7 +38,7 @@ function inferMealForm(dish) {
   if (dish.slot === "snack") return "snack";
   if (/bowl/i.test(name)) return "bowl";
   if (/sopa|crema|ramen/i.test(name)) return "soup";
-  if (/pan|pita|taco|quesadilla/i.test(name)) return "sandwich";
+  if (/pan|pita|taco|quesadilla|wrap|tostada|arepa/i.test(name)) return "sandwich";
   return "plated";
 }
 
@@ -136,7 +136,7 @@ function parseCatalog() {
   for (const dish of dishes) {
     const lines = dishIng.filter(line => line.dish_id === dish.id);
     const ings = lines.map(line => ingredients.find(ing => ing.id === line.ingredient_id)).filter(Boolean);
-    const hasMeatOrFish = ings.some(ing => animalProteins.has(ing.name));
+    const hasMeatOrFish = ings.some(ing => ing.category === "Proteína animal" || animalProteins.has(ing.name));
     const hasVeganBlocker = ings.some(ing => ing.category === "Lácteo" || ["Huevo entero", "Miel"].includes(ing.name));
     dish.diet_tags = [
       !hasMeatOrFish ? "vegetariano" : "",
@@ -333,7 +333,7 @@ if (jsonMode) {
     console.log(`  - ${key}: ${count}`);
   });
   if (belowGate.length) {
-    console.log(`\nCalibracion: ${belowGate.length} dimension(es) quedan bajo 98%; REQ-128/129 solo miden y REQ-137/132/135 deben cerrar esas brechas antes de activar runtime.`);
+    console.log(`\nCalibracion: ${belowGate.length} dimension(es) quedan bajo 98%; REQ-128/129/135 ya miden y amplian cobertura, REQ-137 debe cerrar macros antes de activar runtime.`);
   } else {
     console.log("\nCalibracion: todas las dimensiones cumplen el gate futuro.");
   }

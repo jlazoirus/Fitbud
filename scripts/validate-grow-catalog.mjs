@@ -17,8 +17,8 @@ const fixture = {
   brief: "Fixture REQ-134: desayunos ligeros omnivoros",
   ingredients: [
     {
-      slug: "claras-pasteurizadas",
-      name: "Claras pasteurizadas",
+      slug: "claras-organicas-pasteurizadas",
+      name: "Claras organicas pasteurizadas",
       category: "Proteina animal",
       kcal: 52,
       protein_g: 11,
@@ -61,7 +61,7 @@ const fixture = {
       needs_kitchen: true,
       eat_out_ok: false,
       ingredients: [
-        { ingredient_slug: "claras-pasteurizadas", grams: 150, scalable: true, min_g: 100, max_g: 230, step_g: 10 },
+        { ingredient_slug: "claras-organicas-pasteurizadas", grams: 150, scalable: true, min_g: 100, max_g: 230, step_g: 10 },
         { ingredient_slug: "tortilla-integral-de-trigo", grams: 80, scalable: true, min_g: 55, max_g: 110, step_g: 5 },
         { ingredient_slug: "pechuga-de-pollo", grams: 70, scalable: true, min_g: 50, max_g: 120, step_g: 10 },
         { ingredient_slug: "palta", grams: 30, scalable: true, min_g: 20, max_g: 60, step_g: 5 },
@@ -103,7 +103,7 @@ assert.ok(summary.rejected >= 3, "Debe rechazar macros inconsistentes, fuente au
 const report = JSON.parse(readFileSync(summary.report, "utf8"));
 const sql = readFileSync(summary.sql, "utf8");
 
-assert.equal(report.accepted.ingredients[0].slug, "claras-pasteurizadas");
+assert.equal(report.accepted.ingredients[0].slug, "claras-organicas-pasteurizadas");
 assert.equal(report.accepted.dishes[0].slug, "wrap-de-claras-y-pollo");
 assert.ok(report.rejected.some((item) => item.slug === "proteina-imposible" && item.reasons.includes("ingredient_macro_inconsistent")),
   "Debe explicar rechazo por macros inconsistentes.");
@@ -116,7 +116,7 @@ assert.ok(sql.includes("insert into ingredients") && sql.includes("on conflict (
   "El SQL debe upsertear por slug, no por ID.");
 assert.ok(sql.includes("delete from dish_ingredients") && sql.includes("join ingredients i on i.slug"),
   "El SQL debe reconstruir recetas referenciando ingredientes por slug.");
-assert.ok(sql.includes("'Wrap de claras y pollo'") && sql.includes("'claras-pasteurizadas'"),
+assert.ok(sql.includes("'Wrap de claras y pollo'") && sql.includes("'claras-organicas-pasteurizadas'"),
   "El SQL debe contener el lote aceptado.");
 assert.ok(!/truncate|restart identity/i.test(sql), "El patch no debe truncar ni depender de IDs reiniciados.");
 

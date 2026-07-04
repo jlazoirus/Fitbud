@@ -14,6 +14,9 @@ const migration = readFileSync(join(ROOT, "supabase/nutrition_catalog_semantics.
 const FOOD_SLOTS = ["desayuno", "media_manana", "almuerzo", "merienda", "snack", "cena", "recena"];
 const SLOT_VOCAB = new Set([...FOOD_SLOTS, "batido"]);
 const MIN_CANDIDATES_PER_SLOT = 2;
+const REQ135_SLOT_MINIMUMS = { desayuno: 20, media_manana: 10, merienda: 10, snack: 15, recena: 8 };
+const REQ135_MIN_DISHES = 100;
+const REQ135_MIN_INGREDIENTS = 100;
 
 function slugify(value) {
   return String(value || "")
@@ -97,8 +100,21 @@ function inferMealForm(dish) {
   if (dish.slot === "snack") return "snack";
   if (/bowl/i.test(dish.name)) return "bowl";
   if (/sopa|crema|ramen/i.test(dish.name)) return "soup";
-  if (/pan|pita|taco|quesadilla/i.test(dish.name)) return "sandwich";
+  if (/pan|pita|taco|quesadilla|wrap|tostada|arepa/i.test(dish.name)) return "sandwich";
   return "plated";
+}
+
+function inferPrepMinutes(dish) {
+  if (dish.slot === "snack" || dish.slot === "batido") return 5;
+  if (dish.slot === "desayuno") return 15;
+  if (dish.slot === "cena") return 20;
+  return 30;
+}
+
+function inferBudgetTier(dish) {
+  if (/salm[oó]n|at[uú]n/i.test(dish.name)) return "flexible";
+  if (/arroz|frijol|lentejas|avena|pan|arepa|garbanzo|camote|papa|yuca|cereal/i.test(dish.name)) return "low";
+  return "medium";
 }
 
 function assertMigrationShape() {
@@ -156,7 +172,8 @@ function assertSlotCoverage(dishes) {
   }
   for (const slot of FOOD_SLOTS) {
     const count = coverage.get(slot).length;
-    assert.ok(count >= MIN_CANDIDATES_PER_SLOT, `${slot} necesita >=${MIN_CANDIDATES_PER_SLOT} candidatos; tiene ${count}`);
+    const minimum = REQ135_SLOT_MINIMUMS[slot] || MIN_CANDIDATES_PER_SLOT;
+    assert.ok(count >= minimum, `${slot} necesita >=${minimum} candidatos; tiene ${count}`);
   }
 }
 
@@ -171,21 +188,32 @@ function assertDietTagBackfill(dishes, ingredients, recipes) {
       const ing = byName.get(line.ingredient);
       return ing && (ing.category === "Lácteo" || ing.name === "Huevo entero" || ing.name === "Miel");
     });
-    if (!hasMeatOrFish) vegetarian += 1;
-    if (!hasMeatOrFish && !hasVeganBlocker) vegan += 1;
-    if (hasMeatOrFish) omnivoreOnly += 1;
+    const hasAnimalCategory = lines.some(line => byName.get(line.ingredient)?.category === "Proteína animal");
+    if (!hasMeatOrFish && !hasAnimalCategory) vegetarian += 1;
+    if (!hasMeatOrFish && !hasAnimalCategory && !hasVeganBlocker) vegan += 1;
+    if (hasMeatOrFish || hasAnimalCategory) omnivoreOnly += 1;
   }
   assert.ok(vegetarian > 0, "Debe haber platos vegetarianos etiquetables");
   assert.ok(vegan > 0, "Debe haber platos veganos etiquetables");
   assert.ok(omnivoreOnly > 0, "Debe haber platos omnívoros no vegetarianos");
+  assert.ok(vegetarian / dishes.length >= 0.30, `REQ-135 exige >=30% vegetariano; tiene ${vegetarian}/${dishes.length}`);
+  assert.ok(vegan / dishes.length >= 0.15, `REQ-135 exige >=15% vegano; tiene ${vegan}/${dishes.length}`);
+}
+
+function assertReq135Scale(ingredients, dishes) {
+  assert.ok(ingredients.length >= REQ135_MIN_INGREDIENTS, `REQ-135 exige >=${REQ135_MIN_INGREDIENTS} ingredientes; tiene ${ingredients.length}`);
+  assert.ok(dishes.length >= REQ135_MIN_DISHES, `REQ-135 exige >=${REQ135_MIN_DISHES} platos; tiene ${dishes.length}`);
+  const quick = dishes.filter(dish => inferPrepMinutes(dish) <= 15).length;
+  const lowBudget = dishes.filter(dish => inferBudgetTier(dish) === "low").length;
+  assert.ok(quick / dishes.length >= 1 / 3, `REQ-135 exige >=1/3 platos prep<=15; tiene ${quick}/${dishes.length}`);
+  assert.ok(lowBudget / dishes.length >= 1 / 3, `REQ-135 exige >=1/3 platos low budget; tiene ${lowBudget}/${dishes.length}`);
 }
 
 const ingredients = parseIngredients();
 const dishes = parseDishes();
 const recipes = parseRecipes();
 
-assert.ok(ingredients.length >= 50, "El seed debe incluir ingredientes suficientes");
-assert.ok(dishes.length >= 45, "El seed debe incluir platos suficientes");
+assertReq135Scale(ingredients, dishes);
 assertMigrationShape();
 assertUniqueSlugs("Ingrediente", ingredients);
 assertUniqueSlugs("Plato", dishes);

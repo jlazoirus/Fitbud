@@ -89,7 +89,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 25. ~~REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos.~~ (implementado, P1)
 26. ~~REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5.~~ (implementado, P1)
 27. ~~REQ-134 - Pipeline de crecimiento del catálogo validado por el motor.~~ (implementado, P1)
-28. REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks. (P1)
+28. ~~REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks.~~ (implementado, P1)
 29. REQ-136 - Catálogo lote 2: profundidad por gustos, cocinas y presupuesto. (P2)
 30. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
 31. REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global. (P0)
@@ -1662,7 +1662,7 @@ Tooling offline repetible: la IA propone lotes de recetas/ingredientes; el motor
 
 ## REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks
 
-**Estado: pendiente.**
+**Estado: implementado.** `supabase/seed.sql` crece a 121 ingredientes, 100 platos y 359 lineas de receta: +60 ingredientes con fuente de revision humana documentada en `docs/catalog-lote-1-sources.md` y +50 platos orientados a desayunos, snacks/batidos, almuerzos y cenas ligeras. `supabase/nutrition_catalog_semantics.sql` ahora etiqueta proteinas animales por categoria, no por una lista corta, e infiere `low` budget y `sandwich` para nombres nuevos como avena/pan/arepa/wrap. `scripts/validate-nutrition-catalog.mjs` endurece los minimos de REQ-135: ingredientes>=100, platos>=100, desayuno>=20, snack>=15, media_manana/merienda>=10, recena>=8, vegetariano>=30%, vegano>=15%, prep<=15 y low budget en al menos un tercio. Baseline local post-lote: desayuno=20, media_manana=30, almuerzo=37, merienda=30, snack=30, cena=13, recena=30; el canario ya no reporta `slot_without_candidates` y sube a 27/378 dias (`7.1%`). El objetivo macro >=98% queda pendiente funcional de cierre global en REQ-137, no de cobertura de catalogo.
 
 ### Origen
 
