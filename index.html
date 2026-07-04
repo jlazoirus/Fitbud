@@ -184,6 +184,7 @@
   .csec.collapsed .csec-body{display:none}
   .meal{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:10px;transition:.2s}
   .meal.done{border-color:var(--border-acc);background:var(--accent-dim)}
+  .meal.skipped{opacity:.6;border-style:dashed}
   .meal .slot{font-family:var(--font-body);font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
   .meal .name{font-family:var(--font-display);font-weight:600;font-size:16px;margin:3px 0 5px;line-height:1.25}
   .meal .nums{font-size:12px;color:var(--muted);font-family:var(--font-mono)}
@@ -2113,6 +2114,60 @@ function premiumTrialDaysLeft(){
 }
 function dayState(ds){if(!S.days[ds])S.days[ds]={meals:{},extras:[],workoutDone:false};const d=S.days[ds];if(!d.meals)d.meals={};if(!d.extras)d.extras=[];return d;}
 function mealState(ds,id){const d=dayState(ds);if(!d.meals[id])d.meals[id]={done:false};return d.meals[id];}
+// REQ-125: orden visual del día (comidas + extras), independiente de slot/horario/historial.
+function nextExtraOid(st){st.extraSeq=(st.extraSeq||0)+1;return st.extraSeq;}
+function dayItemKey(item){return item.type==="meal"?"meal:"+item.id:"extra:"+(item.oid!=null?"oid:"+item.oid:"idx:"+item.idx);}
+function dayDefaultItems(ds){
+  const day=buildDay(ds);const st=dayState(ds);
+  const meals=day.meals.map(m=>({type:"meal",id:m.id,base:m}));
+  const extras=st.extras.map((e,idx)=>({type:"extra",idx,oid:e.oid!=null?e.oid:null,data:e}));
+  return[...meals,...extras];
+}
+// Aplica el orden guardado (si existe), agrega al final cualquier ítem nuevo que no esté
+// en la lista guardada, y descarta claves de ítems que ya no existen (ej. extra eliminado).
+function dayEffectiveOrder(ds){
+  const st=dayState(ds);
+  const items=dayDefaultItems(ds);
+  const byKey=new Map(items.map(it=>[dayItemKey(it),it]));
+  const stored=Array.isArray(st.mealOrder)?st.mealOrder:[];
+  const ordered=[];const seen=new Set();
+  stored.forEach(key=>{if(byKey.has(key)&&!seen.has(key)){ordered.push(byKey.get(key));seen.add(key);}});
+  items.forEach(it=>{const key=dayItemKey(it);if(!seen.has(key)){ordered.push(it);seen.add(key);}});
+  return ordered;
+}
+// El reordenamiento es solo visual (no cambia slot/horario/macros) y solo aplica a
+// hoy/futuro: los días ya ejecutados conservan su disposición histórica.
+function canReorderDay(ds){return ds>=todayStr();}
+function moveDayItem(ds,key,dir){
+  if(!canReorderDay(ds))return;
+  const st=dayState(ds);
+  const order=dayEffectiveOrder(ds).map(dayItemKey);
+  const i=order.indexOf(key);if(i<0)return;
+  const j=i+dir;if(j<0||j>=order.length)return;
+  [order[i],order[j]]=[order[j],order[i]];
+  st.mealOrder=order;
+  commitDay(ds);render();
+}
+function reorderControlsHtml(ds,key,canUp,canDown){
+  if(!canReorderDay(ds))return"";
+  return `<div class="row" style="gap:4px;margin-top:6px">
+    <button class="btn btn-sm" aria-label="Mover arriba" ${canUp?"":"disabled"} onclick="moveDayItem('${ds}','${key}',-1)">↑</button>
+    <button class="btn btn-sm" aria-label="Mover abajo" ${canDown?"":"disabled"} onclick="moveDayItem('${ds}','${key}',1)">↓</button>
+  </div>`;
+}
+// Saltar una comida planificada: no cuenta como consumida, no borra el slot ni el
+// historial, y se puede deshacer. Una comida ya registrada no puede saltarse.
+function skipMeal(ds,id){
+  const ms=mealState(ds,id);
+  if(ms.done){toast("Esta comida ya está registrada; no se puede saltar.");return;}
+  ms.skipped=true;
+  commitDay(ds);closeModal();render();toast("Comida saltada. Puedes deshacerlo cuando quieras.");
+}
+function unskipMeal(ds,id){
+  const ms=mealState(ds,id);
+  delete ms.skipped;
+  commitDay(ds);render();toast("Comida restaurada al plan.");
+}
 // valor efectivo de una comida (con override si existe)
 function dishByName(name){return (DB.byName&&name)?DB.byName[name]:null;}
 function dishById(id){return DB.dishes.find(x=>x.id===id)||null;}
@@ -2171,7 +2226,9 @@ function mealValue(base,ms){
 // totales CONSUMIDOS (solo comidas marcadas como hechas)
 function dayTotals(ds){
   const day=buildDay(ds); const st=dayState(ds);
-  let t={kcal:0,p:0,c:0,f:0}, doneMeals=0, totMeals=day.meals.length+st.extras.length;
+  // REQ-125: una comida saltada no cuenta como pendiente ni como consumida.
+  const skippedCount=day.meals.filter(b=>st.meals[b.id]&&st.meals[b.id].skipped).length;
+  let t={kcal:0,p:0,c:0,f:0}, doneMeals=0, totMeals=day.meals.length-skippedCount+st.extras.length;
   day.meals.forEach(b=>{const ms=st.meals[b.id];if(ms&&ms.done){const v=mealValue(b,ms);t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;doneMeals++;}});
   st.extras.forEach(e=>{if(e.done){t.kcal+=+e.kcal||0;t.p+=+e.p||0;t.c+=+e.c||0;t.f+=+e.f||0;doneMeals++;}});
   return {t,doneMeals,totMeals,target:day.target};
@@ -3918,7 +3975,12 @@ function homeAgendaData(ds){
   const restDay=ew.workout&&ew.workout.id==="descanso";
   const safetyHold=trainingSafetyHold();
   const hasPreparedMeals=homeDayHasPreparedMeals(ds,day);
-  const pendingMeals=hasPreparedMeals?day.meals.filter(m=>!mealState(ds,m.id).done):[];
+  // REQ-125: usa el orden visual del usuario (si lo definió) para decidir la próxima
+  // comida pendiente, y excluye las comidas saltadas (no son una acción pendiente).
+  const pendingMeals=hasPreparedMeals
+    ?dayEffectiveOrder(ds).filter(it=>it.type==="meal").map(it=>it.base)
+      .filter(m=>{const ms=mealState(ds,m.id);return!ms.done&&!ms.skipped;})
+    :[];
   const workoutPending=!restDay&&!safetyHold&&!st.workoutDone&&workoutOutcome==="pending";
   const safetyPending=!restDay&&safetyHold&&workoutOutcome==="pending";
   const {doneMeals,totMeals}=dayTotals(ds);
@@ -4149,8 +4211,14 @@ function renderCoach(){renderHoy();}
 function renderNutrition(){
   const ds=current; const st=dayState(ds); const day=buildDay(ds);
   const prepared=homeDayHasPreparedMeals(ds,day);
-  const mealsHtml=day.meals.map(b=>mealCard(ds,b)).join("");
-  const extrasHtml=st.extras.map((e,i)=>extraCard(ds,e,i)).join("");
+  // REQ-125: comidas planificadas y extras se muestran en una sola lista ordenable
+  // (orden solo visual, no cambia slot/horario/macros/historial de cada ítem).
+  const orderedItems=dayEffectiveOrder(ds);
+  const itemsHtml=orderedItems.map((it,idx)=>{
+    const key=dayItemKey(it);
+    const order={key,canUp:idx>0,canDown:idx<orderedItems.length-1};
+    return it.type==="meal"?mealCard(ds,it.base,order):extraCard(ds,it.data,it.idx,order);
+  }).join("");
   // Un solo CTA primario: día sin preparar → tarjeta de arranque; día preparado → nada prominente (REQ-100).
   const emptyNutHtml=!prepared?`<section class="agenda-card agenda-state setup">
     <div class="agenda-head"><div>
@@ -4164,16 +4232,14 @@ function renderNutrition(){
   const moreBtn=`<div class="row" style="justify-content:flex-end;margin:0 0 6px">
     <button class="btn btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
   </div>`;
-  // REQ-124: anillo/resumen -> comidas del día -> comidas extra -> más opciones (al final).
+  // REQ-124: anillo/resumen -> comidas del día (+ extras interoperadas) -> más opciones (al final).
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
   ${emptyNutHtml}
   ${section("nut.macros","Macros del día",heroDash(ds,{compact:"always"})+`<div class="muted small">${dbStatusNote()}</div>`)}
-  ${section("nut.plan","Comidas del día",mealsHtml,`${day.meals.length}`)}
-  ${section("nut.extra","Comidas extra",
-    (extrasHtml||'<div class="muted small" style="margin:0 2px 8px">Ninguna todavía.</div>')+
-    '<button class="btn" style="width:100%" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
-    st.extras.length?`${st.extras.length}`:"")}
+  ${section("nut.plan","Comidas del día",
+    itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
+    `${orderedItems.length}`)}
   ${moreBtn}
   `;
 }
@@ -4874,8 +4940,26 @@ function mealRecipe(b,ms){
     .filter(l=>l.grams>0);
   return lines.length?{dish:d,lines}:null;
 }
-function mealCard(ds,b){
+function mealCard(ds,b,order){
   const ms=mealState(ds,b.id); const v=mealValue(b,ms);
+  const key=order&&order.key||("meal:"+b.id);
+  const reorderHtml=order?reorderControlsHtml(ds,key,order.canUp,order.canDown):"";
+  // REQ-125: comida saltada — no cuenta como consumida, se puede deshacer, conserva slot/horario.
+  if(ms.skipped){
+    return `<div class="meal skipped">
+      <div class="meal-head">
+        <div class="chk" aria-hidden="true">⏭</div>
+        <div>
+          <div class="slot">${b.slot}</div>
+          <div class="name muted">Saltada — no la harás hoy</div>
+        </div>
+      </div>
+      <div class="meal-actions">
+        <button class="btn btn-sm" onclick="unskipMeal('${ds}','${b.id}')">Deshacer</button>
+      </div>
+      ${reorderHtml}
+    </div>`;
+  }
   const r=mealRecipe(b,ms);
   const recipeHtml=r?`
     <div class="recipe">
@@ -4897,6 +4981,7 @@ function mealCard(ds,b){
       <button class="btn btn-sm" onclick="openMealMore('${ds}','${b.id}')">···</button>
     </div>
     ${recipeHtml}
+    ${reorderHtml}
   </div>`;
 }
 function toggleRecipe(btn){
@@ -4905,7 +4990,9 @@ function toggleRecipe(btn){
   const open=r.classList.toggle("open");
   btn.textContent=open?"Ocultar receta":"Ver receta";
 }
-function extraCard(ds,e,i){
+function extraCard(ds,e,i,order){
+  const key=order&&order.key||("extra:idx:"+i);
+  const reorderHtml=order?reorderControlsHtml(ds,key,order.canUp,order.canDown):"";
   return `<div class="meal ${e.done?'done':''}">
     <div class="meal-head">
       <button class="chk ${e.done?'on':''}" onclick="toggleExtra('${ds}',${i})">${e.done?'✓':''}</button>
@@ -4919,6 +5006,7 @@ function extraCard(ds,e,i){
       <button class="btn btn-sm" onclick="editExtra('${ds}',${i})">Editar</button>
       <button class="btn btn-sm" onclick="delExtra('${ds}',${i})">Eliminar</button>
     </div>
+    ${reorderHtml}
   </div>`;
 }
 
@@ -7349,6 +7437,7 @@ function openMealMore(ds,id){
     ${recHtml}
     <button class="opt" onclick="closeModal();openEditor('meal','${ds}','${id}')">✎ Editar valores / comida personalizada</button>
     ${v.name?`<button class="opt" onclick="blockCurrentMealDish('${ds}','${id}')">🚫 No me gusta este plato — no lo sugieras más</button>`:""}
+    ${!ms.done?`<button class="opt" onclick="skipMeal('${ds}','${id}')">⏭ Saltar esta comida — no la haré hoy</button>`:""}
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cerrar</button>`);
 }
 // REQ-120: bloquea el plato actualmente asignado a esta comida desde el menú "···".
@@ -7443,7 +7532,7 @@ function saveEditor(){
   const e=window._editor;const v=readEditor();
   if(!v.name){toast("Pon una descripción");return;}
   if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f};}
-  else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null)d.extras[e.extraIdx]=Object.assign(d.extras[e.extraIdx],v);else d.extras.push(Object.assign({done:true},v));}
+  else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null)d.extras[e.extraIdx]=Object.assign(d.extras[e.extraIdx],v);else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");
 }
 
@@ -8506,7 +8595,7 @@ function applyGeneratedDay(){
   if(extraComidas.length){
     const st=dayState(g.ds);
     extraComidas.forEach(c=>{
-      st.extras.push({name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,done:false,gen:true});
+      st.extras.push({name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,done:false,gen:true,oid:nextExtraOid(st)});
     });
     commitDay(g.ds);
   }
