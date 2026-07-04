@@ -83,7 +83,7 @@ Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall
 Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes convergentes — Codex (`docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`) y sesión de arquitectura de Claude — fusionados y aprobados por Jonathan con tres decisiones: tolerancias estrictas ±3%/±50 kcal y ±5 g proteína sujetas a canario, Sonnet 5 solo tras gate de telemetría, y ampliación drástica del catálogo. Orden recomendado (REQ-128 y REQ-129 son un par: el contrato no se activa sin el solver):
 
 21. ~~REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad.~~ (implementado, P0)
-22. REQ-129 - `finalizeNutritionDay()`: autoridad determinista única, cierre global del día y activación del contrato. (P0)
+22. REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas. (P0)
 23. REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo. (P0)
 24. REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración. (P1)
 25. REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos. (P1)
@@ -91,6 +91,9 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 27. REQ-134 - Pipeline de crecimiento del catálogo validado por el motor. (P1)
 28. REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks. (P1)
 29. REQ-136 - Catálogo lote 2: profundidad por gustos, cocinas y presupuesto. (P2)
+30. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
+31. REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global. (P0)
+32. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool. (P0)
 
 Pendiente no automatizable por agentes:
 
@@ -1345,70 +1348,69 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-128`).
 
-## REQ-129 - `finalizeNutritionDay()`: autoridad determinista única, cierre global del día y activación del contrato
+## REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas
 
 **Estado: pendiente.**
 
 ### Origen
 
-Mismo origen que REQ-128. Es la pieza central de la serie: implementa el principio "la IA propone; el motor calcula, valida y decide" en el camino PRINCIPAL, no solo en el fallback.
+Subdivisión autónoma del REQ-129 original (4 jul 2026). El alcance original mezclaba solver global, conexión de todos los flujos, validadores cliente/servidor, snapshots, prompt y pool; el propio REQ advertía dividir si no cabía en una corrida. Esta etapa crea la puerta pura dormida sin activar runtime.
 
 ### Problema
 
-- `generateOneDay()` le pide al modelo cuadrar gramos y macros ("Suma y verifica los totales antes de responder") — aritmética que un LLM no hace bien — y luego `validateGeneratedDay()` solo acepta o rechaza: nadie ajusta gramos después de la IA. Resultado: días que no llegan a los macros y porciones sin ajustar (bugs reportados 4 jul).
-- El solver de porciones existe (`solveDishPortion`, `optimizeLines`, REQ-80) pero solo opera en la ruta fallback y por plato/slot: no hay pasada global que cierre el día completo, así que los residuos por comida se acumulan (5 comidas a −2 g de proteína = día a −10 g).
-- Los caminos están fragmentados: día, semana, regenerar comida, reemplazos, `findGapSnack` y fallback tienen cada uno su propia lógica de aceptación.
+REQ-128 definió `DIET_CONTRACT`, pero no existe una función única que reciba propuestas, las normalice contra catálogo y devuelva un resultado aplicable o `no_solution` medible. Sin esa puerta, cualquier activación estricta obligaría a cambiar cliente, servidor y snapshots de una vez.
 
 ### Causa raíz
 
-Problema determinista de aritmética resuelto con herramienta probabilística de texto (diagnóstico ya documentado en `ANALISIS_ARQUITECTURA_NUTRICION_FITIA_v2.md` §1.1 y en el diagnóstico de Codex §"Propuesta de fix definitivo").
+La lógica actual está dividida entre `planDeterministicNutritionDay()`, `validateGeneratedDay()`, `recalcCoachMealMacros()`, `findGapSnack()` y validadores externos. Falta un contrato puro de dominio que pueda probarse antes de conectarlo al shell.
 
 ### Objetivo
 
-Una única puerta de aplicación: `finalizeNutritionDay()` en el dominio puro. Ningún día se aplica fuera de `DIET_CONTRACT`, venga de la IA, del solver o de un reemplazo.
+Crear `finalizeNutritionDay(ctx)` como API pura y dormida: normaliza propuestas y fallback determinista, recalcula macros desde catálogo y reporta `DIET_CONTRACT` sin cambiar aún qué días se aplican en runtime.
 
 ### Dependencias
 
 - REQ-128 aplicado (el contrato y el canario deben existir).
-- La activación del contrato y el bump de versiones de prompt van en el MISMO commit que el solver global: activar el contrato sin el solver produce cascada de rechazos; el solver sin contrato deja la aceptación laxa.
 
 ### Alcance
 
-1. Implementar `finalizeNutritionDay(ctx)` en `js/nutrition-domain.js`. Entrada: target diario, prefs, slots, catálogo, propuestas opcionales (de IA o deterministas). Salida: día aplicable dentro de `DIET_CONTRACT`, o `no_solution` con causa medible por slot/dimensión. Escalera interna:
-   - normalizar propuesta de IA por ingrediente (`normalizeCoachIngredient`); comida con ingrediente no mapeable se descarta (nunca se acepta con warning);
-   - ajuste por slot (`optimizeLines` contra `mealSlotTargets`, límites `min_g`/`max_g`/`step_g`);
-   - **pasada global de cierre del día** sobre ingredientes escalables de comidas NO registradas: palancas por rol (proteína magra para cerrar proteína, carbohidrato base para carbos, grasa densa para grasa/kcal), respetando límites palatables;
-   - complemento (snack del catálogo) solo si queda residual — formaliza `findGapSnack` dentro del contrato;
-   - slot sin solución → plato del catálogo vía solver puro; el día nunca se entrega fuera de contrato ni vacío.
-2. Cambiar el prompt de `generateOneDay()`: la IA deja de reportar macros y de verificar totales; entrega solo composición por slot (nombre real + ingredientes del catálogo + gramos semilla). Los gramos y macros finales son SIEMPRE del motor.
-3. Conectar `finalizeNutritionDay()` en TODOS los caminos: `generateOneDay`, `regenerateGenMeal`, `aiGenerateWeek`, `applyDeterministicDay`/`generateDeterministicWeek`, primera semana de onboarding (REQ-118) y reemplazos (REQ-83).
-4. Activar `DIET_CONTRACT` en todas las superficies del problema de REQ-128: `validateGeneratedDay` (cliente), `validateDayTotals` (dominio), `validateDietDay` del servidor usando el `validation.target` que ya recibe, tolerancia de snapshot en `domain-contracts.js`, y tests.
-5. Subir `COACH_PROMPT_VERSION` (cliente) y `PROMPT_VERSION` (servidor) para invalidar pool/caché generados bajo el contrato laxo (precedente REQ-121); debe ir en el mismo commit que la activación para evitar 422 en modo `reuse`.
-6. Mantener invariantes existentes: nunca reescribir comidas con `done=true`; UI sin lenguaje técnico (REQ-31).
+1. Implementar `finalizeNutritionDay(ctx)` en `js/nutrition-domain.js` y exportarla en namespace/global.
+2. Entradas mínimas: `{ prefs, dayTarget/target, catalog, slots?, proposal?, date?, workoutContext?, lockedMeals? }`.
+3. Si `proposal.comidas` existe, normalizar cada comida:
+   - mapear ingredientes con `normalizeCoachIngredient()`;
+   - descartar comida con ingrediente no mapeable (`unknown_ingredient`);
+   - resolver/recalcular macros desde catálogo o líneas normalizadas; no aceptar macros declarados;
+   - respetar restricciones y `compatibleDishesForSlot()` cuando el plato matchee catálogo.
+4. Para slots faltantes o propuestas descartadas, completar con `planDeterministicNutritionDay()`/`solveDishPortion()` por catálogo, conservando fecha/variedad cuando existan.
+5. Calcular `totals`, `residual`, `contract = validateDietContractTotals(...)`, `status:"ok"|"no_solution"`, `no_solution` con causas medibles, y `comidas` normalizadas en el mismo formato vigente.
+6. Respetar `lockedMeals`/comidas registradas: nunca modificar ni descartar una comida bloqueada; si impide cerrar contrato, reportar `locked_meal_contract_miss`.
+7. Actualizar `scripts/validate-diet-contract.mjs` para usar `finalizeNutritionDay()` cuando exista, manteniendo reporte por dimensión.
+8. Agregar tests unitarios que prueben: ingrediente desconocido no se acepta con warning; fallback completa slots faltantes; kcal viene de ingredientes del catálogo; `contract.ok` se reporta; locked meal no cambia.
 
 ### Fuera de alcance
 
-- Metadata nueva de catálogo (REQ-132) y platos nuevos (REQ-135/136).
-- Cambios de modelo o de forma de llamada a la API (REQ-133).
+- Pasada global de cierre macro estricto y complemento inteligente (REQ-137).
+- Conectar el cliente (`generateOneDay`, semana, reemplazos, onboarding) a la función nueva (REQ-138).
+- Activar `DIET_CONTRACT` en runtime, servidor, snapshots o prompt/pool versions (REQ-139).
+- Metadata nueva de catálogo (REQ-132), platos nuevos (REQ-135/136) o cambios de modelo/API (REQ-133).
 
 ### Riesgos
 
-- REQ grande. Si una corrida no lo cubre completo, dividir como precedente REQ-99→105..108, con regla dura: la activación del contrato (alcance 4) y el bump (alcance 5) aterrizan juntos y al final.
-- Con el catálogo actual, perfiles de 5-6 comidas pueden degradar más a slots deterministas por cobertura (se resuelve en REQ-132/135); el `no_solution` medible debe registrarse para dimensionarlo.
+- Si esta etapa cambia runtime por accidente, puede causar rechazos masivos: mantenerla dormida y probar por script.
+- El canario seguirá bajo el gate de 98% hasta REQ-137/132/135; eso es esperado si se reporta claramente.
 
 ### Criterios de aceptación
 
-- El canario de REQ-128 corre ahora contra `finalizeNutritionDay()` y el 100% de los días aplicados queda dentro de `DIET_CONTRACT`, con residual reportado.
-- Un día de IA con ingrediente desconocido o comida infactible no se acepta con warning: se repara por catálogo/solver o se reporta `no_solution` con causa.
-- El servidor rechaza días fuera de contrato usando el `target` que ya recibe.
-- Resultados del pool previos al bump no se sirven.
-- Comidas ya registradas jamás cambian al preparar/regenerar.
-- `node scripts/validate-diet-contract.mjs`, `node scripts/validate-nutrition-solver.mjs` y `node scripts/release-gate.mjs` pasan.
+- `finalizeNutritionDay()` existe, es pura y se exporta.
+- Una propuesta con ingrediente desconocido devuelve `no_solution` o reemplazo por catálogo; no pasa como warning aplicable.
+- El canario usa `finalizeNutritionDay()` y sigue produciendo reporte de factibilidad/causas.
+- Ningún comportamiento visible cambia todavía; `DIET_CONTRACT.runtimeActive` sigue `false`.
+- `node scripts/validate-diet-contract.mjs`, `node scripts/validate-nutrition-domain.mjs` y `node scripts/release-gate.mjs` pasan.
 
 ### Verificación sugerida
 
-- E2E: "Preparar mi día" y "Preparar mi semana" con perfil de proteína alta → totales dentro de contrato en UI.
-- Regenerar una comida individual → el día completo sigue dentro de contrato.
+- Unit test en `scripts/validate-nutrition-solver.mjs` o script dedicado `scripts/validate-finalize-nutrition-day.mjs`.
+- `node scripts/validate-diet-contract.mjs --json` para confirmar que el reporte incluye `contract` y causas.
 
 ## REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo
 
@@ -1756,3 +1758,152 @@ Profundidad real por gustos: que las preferencias del onboarding encuentren cand
 ### Verificación sugerida
 
 - E2E de dos perfiles con gustos opuestos: cero platos bloqueados, variedad semanal sin repetición > lo permitido por `repeatPreference`.
+
+## REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato
+
+**Estado: pendiente.**
+
+### Origen
+
+Subdivisión de REQ-129 original. Depende de REQ-129 etapa 1: la puerta pura debe existir antes de agregar optimización global.
+
+### Problema
+
+Aunque cada slot se pueda resolver con `solveDishPortion()`, los residuos acumulados del día completo siguen dejando macros fuera de `DIET_CONTRACT`. El canario de REQ-128 midió 0/378 días dentro de contrato con el solver actual.
+
+### Causa raíz
+
+El solver optimiza por comida, no por día. No existe una pasada global que use ingredientes escalables de las comidas no registradas ni un complemento controlado del catálogo para cerrar residual.
+
+### Objetivo
+
+Que `finalizeNutritionDay()` pueda devolver días aplicables dentro de `DIET_CONTRACT` cuando el catálogo lo permita, o `no_solution` con causa medible cuando no.
+
+### Alcance
+
+1. Agregar una pasada global de cierre sobre comidas no bloqueadas: ajustar líneas escalables respetando `min_g`/`max_g`/`step_g` y límites palatables.
+2. Clasificar palancas por macro usando categoría/nombre del ingrediente: proteína magra, carbohidrato base, grasa densa y ajuste calórico neutro.
+3. Formalizar complemento del catálogo dentro del dominio puro: seleccionar snack/shake compatible solo si reduce residual sin romper restricciones.
+4. Hacer que `validate-diet-contract.mjs` reporte cuántos días quedan `contract.ok` y cuántos son `no_solution` legítimo por cobertura de catálogo.
+5. Mantener dormida la activación runtime: cliente/servidor/snapshots siguen laxos hasta REQ-139.
+
+### Fuera de alcance
+
+- Conectar flujos de UI (REQ-138).
+- Activar contrato estricto en runtime o bump de pool (REQ-139).
+- Crear metadata nueva o platos nuevos (REQ-132/135).
+
+### Riesgos
+
+- Porciones absurdas si no se respetan límites; todo ajuste debe pasar por `lineLimits()`/`clampStep()`.
+- El catálogo actual puede no alcanzar 98%; si ocurre, el canario debe distinguir `catalog_gap` de bug del solver.
+
+### Criterios de aceptación
+
+- Un caso unitario con residuos acumulados queda dentro de `DIET_CONTRACT` tras la pasada global.
+- Un caso imposible devuelve `no_solution` con causa, no un día aplicable fuera de contrato.
+- El canario mejora el baseline de REQ-128 o explica dimensiones bloqueadas por catálogo.
+- `node scripts/validate-diet-contract.mjs` y `node scripts/release-gate.mjs` pasan.
+
+### Verificación sugerida
+
+- Caso sintético de 4 comidas con déficit de proteína/carbohidratos; confirmar ajuste global y residual final.
+
+## REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global
+
+**Estado: pendiente.**
+
+### Origen
+
+Subdivisión de REQ-129 original. Depende de REQ-129 y REQ-137.
+
+### Problema
+
+Aunque el dominio tenga una puerta final, los flujos visibles seguirán usando rutas fragmentadas (`validateGeneratedDay`, semana, determinista, regenerar comida, onboarding, reemplazos) hasta conectarla.
+
+### Causa raíz
+
+`index.html` contiene la orquestación histórica de nutrición y cada flujo acepta/rehace comidas con lógica local.
+
+### Objetivo
+
+Que todos los caminos del cliente pasen por `finalizeNutritionDay()` para obtener comidas normalizadas, pero sin activar aún el rechazo estricto global ni cambiar servidor/snapshots.
+
+### Alcance
+
+1. Cambiar `generateOneDay()` para pedir solo composición/semillas y finalizar con `finalizeNutritionDay()`.
+2. Usar `finalizeNutritionDay()` en `generateDeterministicWeek`, `applyDeterministicDay`, primera semana de onboarding, `regenerateDayInWeekDraft`, `regenerateGenMeal` y reemplazos cuando recalculen el día.
+3. Mantener protección de comidas `done=true` vía `lockedMeals`.
+4. Mantener copy de usuario sin términos técnicos prohibidos.
+5. Agregar/actualizar validadores estructurales para confirmar que los flujos llaman la puerta única.
+
+### Fuera de alcance
+
+- Activación del contrato en servidor/snapshot/pool (REQ-139).
+- Structured outputs o modelo por acción (REQ-133).
+
+### Riesgos
+
+- Cambios en `index.html` son amplios; verificar día, semana, regeneración y onboarding con mocks.
+- No reescribir historial ni comidas registradas.
+
+### Criterios de aceptación
+
+- Los flujos principales del cliente invocan `finalizeNutritionDay()`.
+- Regenerar una comida no cambia comidas registradas.
+- El prompt ya no le exige al modelo verificar totales como autoridad final.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E mockeado de preparar día, semana y onboarding inicial; inspeccionar que las comidas aplicadas vienen finalizadas.
+
+## REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool
+
+**Estado: pendiente.**
+
+### Origen
+
+Subdivisión final de REQ-129 original. Debe ejecutarse solo cuando REQ-129, REQ-137 y REQ-138 estén aplicados.
+
+### Problema
+
+Mientras el contrato siga dormido, los validadores laxos de cliente, dominio, servidor y snapshot todavía pueden aceptar planes fuera de la promesa "exacto a macros".
+
+### Causa raíz
+
+REQ-128 creó el contrato, pero dejó `runtimeActive:false` para evitar cascada de rechazos antes de tener solver global y conexión de flujos.
+
+### Objetivo
+
+Activar `DIET_CONTRACT` como criterio de aplicabilidad en todas las superficies, junto con bump de versiones para no reutilizar pool/caché previos.
+
+### Alcance
+
+1. Cambiar `DIET_CONTRACT.runtimeActive` y `validateDayTotals()` para usar el contrato estricto cuando aplique.
+2. Actualizar `validateGeneratedDay()` y `domain-contracts.js`/`validateNutritionPlanSnapshot()` a tolerancias del contrato.
+3. Actualizar `api/claude.js::validateDietDay()` para validar macros contra `validation.target`.
+4. Subir `COACH_PROMPT_VERSION` y `PROMPT_VERSION` en el mismo commit.
+5. Invalidar/rechazar resultados de pool previos al bump.
+6. Actualizar tests que esperaban tolerancias laxas y documentar el cambio en `CONTEXT.md`.
+
+### Fuera de alcance
+
+- Cambios de modelo/API (REQ-133).
+- Metadata/platos nuevos si el canario ya muestra brechas explícitas de catálogo (REQ-132/135).
+
+### Riesgos
+
+- Activar antes de que los flujos usen `finalizeNutritionDay()` rompería preparación de comidas; verificar dependencias antes de editar.
+- El servidor no tiene catálogo completo para recalcular ingredientes; debe validar contra macros finalizados enviados por cliente y target, no inventar macros.
+
+### Criterios de aceptación
+
+- `validate-diet-contract.mjs` corre contra `finalizeNutritionDay()` y los días aplicables quedan dentro del contrato.
+- Cliente, servidor y snapshot rechazan días fuera de contrato.
+- Pool/caché anterior no se reutiliza.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Test server `diet_day` con target y macros fuera de contrato debe fallar; con día finalizado debe pasar.
