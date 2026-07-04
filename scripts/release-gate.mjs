@@ -94,6 +94,7 @@ run("validate-day-scope-in-context.mjs", "node scripts/validate-day-scope-in-con
 run("validate-preference-cache-invalidation.mjs", "node scripts/validate-preference-cache-invalidation.mjs");
 run("validate-diet-completion-fallback.mjs", "node scripts/validate-diet-completion-fallback.mjs");
 run("validate-retry-feedback.mjs", "node scripts/validate-retry-feedback.mjs");
+run("validate-home-macro-ring-first.mjs", "node scripts/validate-home-macro-ring-first.mjs");
 run("validate-gap-snack.mjs", "node scripts/validate-gap-snack.mjs");
 run("validate-portion-editing.mjs", "node scripts/validate-portion-editing.mjs");
 run("validate-gap-snack-pending.mjs", "node scripts/validate-gap-snack-pending.mjs");

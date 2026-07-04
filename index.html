@@ -4091,6 +4091,8 @@ function buildContextualChips(ds){
   while(chips.length<2&&fallbacks.length)chips.push(fallbacks.shift());
   return chips.slice(0,4);
 }
+// REQ-124: el anillo/resumen de macros va antes que la agenda (reemplaza el orden
+// de REQ-97, que priorizaba la agenda) porque es el centro de control del día.
 function renderHoy(){
   const today=todayStr();
   current=clampDate(today);
@@ -4133,8 +4135,8 @@ function renderHoy(){
       <div class="avatar">${esc((name[0]||"F").toUpperCase())}</div>
     </div>
   </header>
-  ${homeAgendaHtml(ds)}
   ${heroDash(ds,{compact:true})}
+  ${homeAgendaHtml(ds)}
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
   ${checkinDue?weeklyCheckinBanner():needsProfileTuning((profile&&profile.prefs)||{})?`<button class="coach-chip" style="margin:0 0 12px" onclick="setView('perfil')" title="Agrega preferencias de cocina, horarios y equipo para mejores propuestas">✨ Afina tu plan</button>`:""}
@@ -4162,16 +4164,17 @@ function renderNutrition(){
   const moreBtn=`<div class="row" style="justify-content:flex-end;margin:0 0 6px">
     <button class="btn btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
   </div>`;
+  // REQ-124: anillo/resumen -> comidas del día -> comidas extra -> más opciones (al final).
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
   ${emptyNutHtml}
-  ${moreBtn}
   ${section("nut.macros","Macros del día",heroDash(ds,{compact:"always"})+`<div class="muted small">${dbStatusNote()}</div>`)}
   ${section("nut.plan","Comidas del día",mealsHtml,`${day.meals.length}`)}
   ${section("nut.extra","Comidas extra",
     (extrasHtml||'<div class="muted small" style="margin:0 2px 8px">Ninguna todavía.</div>')+
     '<button class="btn" style="width:100%" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
     st.extras.length?`${st.extras.length}`:"")}
+  ${moreBtn}
   `;
 }
 // Menú de acciones secundarias de Nutrición: solo acciones globales, no reemplazos de comidas.
@@ -10989,7 +10992,9 @@ let _tour=null;
 function tourSeen(){try{return localStorage.getItem(FITBROS_TOUR_KEY);}catch(e){return null;}}
 function tourMarkSeen(v){try{localStorage.setItem(FITBROS_TOUR_KEY,v||"done");}catch(e){}}
 function tourSteps(){
+  // REQ-124: el primer paso apunta al anillo de macros, el nuevo primer elemento de Home.
   return [
+    {sel:".mini-macro-dash",title:"Tu avance de macros, primero",body:"Este es tu centro de control del día: cuánto llevas de calorías, proteína, carbos y grasas.",placement:"bottom"},
     {sel:".agenda-card",title:"Tu día, en un solo lugar",body:"Aquí ves lo único que toca hacer ahora: la próxima comida o tu entrenamiento. Si falta el plan, el botón lo prepara al instante.",placement:"bottom"},
     {sel:'[data-tab="nutricion"]',title:"Nutrición",body:"Tus comidas del día con calorías y macros. Registra, reemplaza por otra opción o agrega un extra.",placement:"top"},
     {sel:'[data-tab="entreno"]',title:"Entreno",body:"Tu sesión guiada paso a paso: calentamiento, series e intervalos con temporizador y demostraciones.",placement:"top"},
