@@ -92,6 +92,7 @@ run("validate-coach-prompt-version.mjs", "node scripts/validate-coach-prompt-ver
 run("validate-week-skip-past.mjs", "node scripts/validate-week-skip-past.mjs");
 run("validate-day-scope-in-context.mjs", "node scripts/validate-day-scope-in-context.mjs");
 run("validate-preference-cache-invalidation.mjs", "node scripts/validate-preference-cache-invalidation.mjs");
+run("validate-diet-completion-fallback.mjs", "node scripts/validate-diet-completion-fallback.mjs");
 run("validate-gap-snack.mjs", "node scripts/validate-gap-snack.mjs");
 run("validate-portion-editing.mjs", "node scripts/validate-portion-editing.mjs");
 run("validate-gap-snack-pending.mjs", "node scripts/validate-gap-snack-pending.mjs");

@@ -3878,6 +3878,7 @@ async function homePrepareDay(ds){
   if(ds<todayStr()){toast("No puedes preparar un día pasado.");return;}
   homeTrackAction(ds,"prepare_day");
   current=ds;
+  _genDayFailStreak=0; // REQ-122: cada sesión de preparación empieza su propio conteo de fallos.
   if(!hasCompleteOnboarding((profile&&profile.prefs)||{})){startOnboarding();return;}
   // Con coach disponible Y acceso vigente: el coach prepara el día.
   // Sin acceso o sin coach: agenda determinista al instante — gratis, sin
@@ -8257,6 +8258,9 @@ Responde SOLO JSON válido, sin texto extra:
   const j=parseJSON(txt);
   return {res:validateGeneratedDay(j,day,target),day,target};
 }
+// REQ-122: cuenta intentos consecutivos que no llegan al objetivo; tras 2, se
+// completa automáticamente por ruta determinista en vez de insistir con la IA.
+let _genDayFailStreak=0;
 async function aiGenerateDay(){
   if(coachUnavailable())return;
   const actionKey="diet_day";
@@ -8265,6 +8269,18 @@ async function aiGenerateDay(){
   modal(`<h3>🍽️ Preparar mi día</h3><div id="genOut"><div class="loading-row"><div class="spinner"></div><span>Preparando tus comidas de hoy…</span></div></div>`);
   try{
     const {res,target}=await generateOneDay(ds,{action:"diet_day",requestId,partKey:"day"});
+    if(res.ok){_genDayFailStreak=0;}
+    else{
+      _genDayFailStreak++;
+      if(_genDayFailStreak>=2){
+        closeModal();
+        _genDayFailStreak=0;
+        const applied=await applyDeterministicDay(ds);
+        if(!applied)toast("No pudimos preparar tu día ahora. Inténtalo otra vez en unos minutos.");
+        else toast("Tras dos intentos, completamos tu día con una opción práctica que cumple tus metas.");
+        return;
+      }
+    }
     window._genDay={ds,comidas:res.comidas};
     $("#genOut").innerHTML=genReviewHtml(res,target);
   }catch(e){
@@ -8414,6 +8430,7 @@ function genReviewHtml(res,target){
     ${issues}${snackHtml}${warns}
     <div class="row wrap" style="margin-top:12px">
       ${res.ok?`<button class="btn btn-accent" onclick="applyGeneratedDay()">Aplicar al día</button>`:`<button class="btn" disabled style="opacity:.4">Aplicar al día</button>`}
+      ${!res.ok?`<button class="btn btn-accent" onclick="aiGenerateDay()">Reintentar</button><button class="btn" onclick="deterministicFromModal()">Completar con opción práctica ahora</button>`:""}
       <button class="btn" onclick="closeModal()">Descartar</button>
     </div>`;
 }
@@ -8504,8 +8521,12 @@ function genWeekReviewHtml(){
     </div>`).join("")}
     <button class="btn btn-sm" style="margin-top:6px" onclick="regenerateDayInWeekDraft(${index})">Preparar otro ${esc(prettyDate(d.ds).split(",")[0])}</button>
   </details>`).join("");
+  // REQ-122: un día que no cumplió el objetivo queda fuera de daysData (no bloqueado, pero
+  // ausente); ofrecer completarlo por ruta determinista en vez de dejar la semana incompleta.
   const problems=draft.problems&&draft.problems.length
-    ?`<div class="ai-box">⚠️ No se pudieron preparar: ${draft.problems.map(esc).join(", ")}.</div>`:"";
+    ?`<div class="ai-box">⚠️ No se pudieron preparar: ${draft.problems.map(esc).join(", ")}.
+        <div style="margin-top:8px"><button class="btn btn-sm btn-accent" onclick="deterministicWeekFromModal()">Completar días faltantes con opción práctica</button></div>
+      </div>`:"";
   // Lista de compras: usar shoppingList con slugs cuando está disponible (ruta determinista)
   const shopping=draft.shoppingList&&draft.shoppingList.length?draft.shoppingList:buildShoppingList(draft.daysData);
   const shopHtml=shopping.length
