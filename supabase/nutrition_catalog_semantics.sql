@@ -15,6 +15,8 @@ alter table dishes add column if not exists budget_tier text;
 alter table dishes add column if not exists needs_kitchen boolean;
 alter table dishes add column if not exists eat_out_ok boolean;
 alter table dishes add column if not exists protein_density text;
+alter table dishes add column if not exists meal_weight text;
+alter table dishes add column if not exists meal_form text;
 
 alter table dish_ingredients add column if not exists scalable boolean not null default true;
 alter table dish_ingredients add column if not exists min_g numeric;
@@ -143,6 +145,43 @@ from macros m
 where m.id = d.id
   and (d.protein_density is null or d.protein_density = '');
 
+update dishes
+set meal_form = case
+  when slot = 'batido' or name ilike '%shake%' or name ilike '%batido%' then 'shake'
+  when slot = 'snack' then 'snack'
+  when name ilike '%bowl%' then 'bowl'
+  when name ilike '%sopa%' or name ilike '%crema%' or name ilike '%ramen%' then 'soup'
+  when name ilike '%pan%' or name ilike '%pita%' or name ilike '%taco%' or name ilike '%quesadilla%' then 'sandwich'
+  else 'plated'
+end
+where meal_form is null or meal_form = '';
+
+update dishes
+set meal_weight = case
+  when slot in ('snack','batido') then 'light'
+  when slot = 'desayuno' then 'medium'
+  when name ilike '%yogur%' or name ilike '%caseína%' or name ilike '%caseina%' then 'light'
+  when slot = 'almuerzo' then 'heavy'
+  when slot = 'cena' and (
+    name ilike '%salmón%' or name ilike '%salmon%' or name ilike '%carne%' or
+    name ilike '%arroz%' or name ilike '%quinua%'
+  ) then 'heavy'
+  else 'medium'
+end
+where meal_weight is null or meal_weight = '';
+
+update dishes
+set compatible_slots = case
+  when slot = 'batido' then array['media_manana','merienda','snack','recena','batido']
+  else array['media_manana','merienda','snack','recena']
+end
+where meal_weight = 'light'
+  and (
+    slot in ('snack','batido') or
+    name ilike '%shake%' or name ilike '%batido%' or
+    name ilike '%yogur%' or name ilike '%caseína%' or name ilike '%caseina%'
+  );
+
 do $$
 begin
   alter table dishes add constraint dishes_compatible_slots_vocab
@@ -171,6 +210,22 @@ do $$
 begin
   alter table dishes add constraint dishes_protein_density_vocab
     check (protein_density is null or protein_density in ('low','medium','high','unknown'));
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table dishes add constraint dishes_meal_weight_vocab
+    check (meal_weight is null or meal_weight in ('light','medium','heavy'));
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table dishes add constraint dishes_meal_form_vocab
+    check (meal_form is null or meal_form in ('bowl','sandwich','shake','plated','soup','snack'));
 exception
   when duplicate_object then null;
 end $$;

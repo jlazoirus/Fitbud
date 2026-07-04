@@ -40,6 +40,10 @@ assert.ok(
   validateGeneratedDay.includes("slotKcalCeiling") && validateGeneratedDay.includes("demasiado contundente"),
   "validateGeneratedDay debe bloquear comidas no principales que excedan el techo kcal del slot."
 );
+assert.ok(
+  validateGeneratedDay.includes("dishAllowedForSlotMoment") && validateGeneratedDay.includes("metadata de momento del día"),
+  "validateGeneratedDay debe consumir meal_weight/meal_form cuando el catálogo lo trae."
+);
 
 const generateOneDay = sliceBetween("async function generateOneDay(", "async function aiGenerateDay(");
 assert.ok(
@@ -64,6 +68,12 @@ const regenerateMeal = sliceBetween("async function regenerateGenMeal(", "functi
 assert.ok(
   regenerateMeal.includes("slotArchetypePromptLine(slotId)") && regenerateMeal.includes("Momento del día"),
   "regenerateGenMeal debe recordar el arquetipo del slot al pedir otra opción."
+);
+
+const coachCompatibilityContext = sliceBetween("function coachCompatibilityContext(", "function coachQuota(");
+assert.ok(
+  coachCompatibilityContext.includes("meal_weight") && coachCompatibilityContext.includes("meal_form"),
+  "La metadata de momento del catálogo debe invalidar el contextKey del pool."
 );
 
 console.log("validate-slot-budget-prompt: prompt y validación por slot verificados.");

@@ -29,6 +29,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const seed = readFileSync(join(HERE, "seed.sql"), "utf8");
 
 const TOL = { kcal: 0.30, p: 0.35, c: 0.45, f: 0.60 };
+const FOOD_SLOTS = ["desayuno", "media_manana", "almuerzo", "merienda", "snack", "cena", "recena"];
 
 // Metas por slot/tipo de día (espejo de SLOTS en index.html).
 const SLOTS = {
@@ -94,11 +95,15 @@ const ingredients = {};
 
 // Platos declarados: ('Nombre','slot',menu)
 const dishes = new Set();
+const dishSlots = new Map();
 {
   const sec = seed.slice(seed.indexOf("insert into dishes"), seed.indexOf("-- ---------- RECETAS"));
-  const re = /\('((?:[^'\\]|\\.)*)',\s*'[^']*'\s*,\s*(?:null|'[^']*')\)/g;
+  const re = /\('((?:[^'\\]|\\.)*)',\s*'([^']*)'\s*,\s*(?:null|'[^']*')\)/g;
   let m;
-  while ((m = re.exec(sec))) dishes.add(m[1]);
+  while ((m = re.exec(sec))) {
+    dishes.add(m[1]);
+    dishSlots.set(m[1], m[2]);
+  }
 }
 
 // Recetas: ('Plato','Ingrediente',gramos)
@@ -126,6 +131,12 @@ function macros(lines) {
 // ---------- checks ----------
 const errors = [];
 const warnings = [];
+
+function compatibleSlots(slot) {
+  if (slot === "snack") return ["media_manana", "merienda", "snack", "recena"];
+  if (slot === "batido") return ["media_manana", "merienda", "snack", "recena", "batido"];
+  return [slot].filter(Boolean);
+}
 
 // 1) platos sin ingredientes  +  2) gramos inválidos  +  ingrediente inexistente
 for (const d of dishes) {
@@ -159,10 +170,22 @@ for (const [name, [type, slot]] of Object.entries(PLAN_SLOTS)) {
   if (bad.length) errors.push(`Macros fuera de tolerancia [${type}/${slot}] "${name}": ${bad.join(", ")}`);
 }
 
+// 5) cobertura por slot renderizable tras la semántica idempotente del catálogo
+const slotCoverage = Object.fromEntries(FOOD_SLOTS.map(slot => [slot, 0]));
+for (const name of dishes) {
+  for (const slot of compatibleSlots(dishSlots.get(name))) {
+    if (slot in slotCoverage) slotCoverage[slot] += 1;
+  }
+}
+for (const slot of FOOD_SLOTS) {
+  if (slotCoverage[slot] < 1) errors.push(`Cobertura de slot insuficiente: ${slot} tiene ${slotCoverage[slot]} candidatos`);
+}
+
 // ---------- report ----------
 const nDishes = dishes.size, nIng = Object.keys(ingredients).length, nRec = Object.keys(recipes).length;
 console.log(`Fitbud — validación de recetas`);
 console.log(`  ingredientes: ${nIng} · platos: ${nDishes} · recetas: ${nRec} · platos del plan verificados: ${Object.keys(PLAN_SLOTS).length}`);
+console.log(`  cobertura por slot: ${FOOD_SLOTS.map(slot => `${slot}=${slotCoverage[slot]}`).join(" · ")}`);
 if (warnings.length) { console.log(`\nAvisos:`); warnings.forEach(w => console.log("  ⚠ " + w)); }
 if (errors.length) {
   console.log(`\n✗ ${errors.length} problema(s):`);

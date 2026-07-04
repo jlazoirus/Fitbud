@@ -77,7 +77,28 @@ function assertUniqueSlugs(kind, rows) {
 function compatibleSlots(dish) {
   if (dish.slot === "snack") return ["media_manana", "merienda", "snack", "recena"];
   if (dish.slot === "batido") return ["media_manana", "merienda", "snack", "recena", "batido"];
+  if (inferMealWeight(dish) === "light" && /yogur|case[ií]na|shake|batido/i.test(dish.name)) {
+    return ["media_manana", "merienda", "snack", "recena"];
+  }
   return [dish.slot].filter(Boolean);
+}
+
+function inferMealWeight(dish) {
+  if (dish.slot === "snack" || dish.slot === "batido") return "light";
+  if (dish.slot === "desayuno") return "medium";
+  if (/yogur|case[ií]na/i.test(dish.name)) return "light";
+  if (dish.slot === "almuerzo") return "heavy";
+  if (dish.slot === "cena" && /salm[oó]n|carne|arroz|quinua/i.test(dish.name)) return "heavy";
+  return "medium";
+}
+
+function inferMealForm(dish) {
+  if (dish.slot === "batido" || /shake|batido/i.test(dish.name)) return "shake";
+  if (dish.slot === "snack") return "snack";
+  if (/bowl/i.test(dish.name)) return "bowl";
+  if (/sopa|crema|ramen/i.test(dish.name)) return "soup";
+  if (/pan|pita|taco|quesadilla/i.test(dish.name)) return "sandwich";
+  return "plated";
 }
 
 function assertMigrationShape() {
@@ -91,6 +112,8 @@ function assertMigrationShape() {
     "alter table dishes add column if not exists needs_kitchen boolean",
     "alter table dishes add column if not exists eat_out_ok boolean",
     "alter table dishes add column if not exists protein_density text",
+    "alter table dishes add column if not exists meal_weight text",
+    "alter table dishes add column if not exists meal_form text",
     "alter table dish_ingredients add column if not exists scalable boolean",
     "alter table dish_ingredients add column if not exists min_g numeric",
     "alter table dish_ingredients add column if not exists max_g numeric",
@@ -99,9 +122,27 @@ function assertMigrationShape() {
     "dishes_slug_unique_idx",
     "dishes_compatible_slots_vocab",
     "dishes_diet_tags_vocab",
+    "dishes_meal_weight_vocab",
+    "dishes_meal_form_vocab",
   ];
   for (const fragment of required) {
     assert.ok(migration.includes(fragment), `La migración debe incluir: ${fragment}`);
+  }
+}
+
+function assertMealMetadata(dishes) {
+  const weights = new Set(["light", "medium", "heavy"]);
+  const forms = new Set(["bowl", "sandwich", "shake", "plated", "soup", "snack"]);
+  for (const dish of dishes) {
+    const weight = inferMealWeight(dish);
+    const form = inferMealForm(dish);
+    assert.ok(weights.has(weight), `${dish.name} debe inferir meal_weight válido`);
+    assert.ok(forms.has(form), `${dish.name} debe inferir meal_form válido`);
+    const slots = compatibleSlots(dish);
+    if (weight === "heavy") {
+      assert.ok(!slots.includes("media_manana") && !slots.includes("merienda") && !slots.includes("recena"),
+        `${dish.name} heavy no debe cubrir slots ligeros`);
+    }
   }
 }
 
@@ -149,6 +190,7 @@ assertMigrationShape();
 assertUniqueSlugs("Ingrediente", ingredients);
 assertUniqueSlugs("Plato", dishes);
 assertSlotCoverage(dishes);
+assertMealMetadata(dishes);
 assertDietTagBackfill(dishes, ingredients, recipes);
 
-console.log(`Catálogo nutricional semántico OK: ${ingredients.length} ingredientes · ${dishes.length} platos · ${FOOD_SLOTS.length} slots cubiertos.`);
+console.log(`Catálogo nutricional semántico OK: ${ingredients.length} ingredientes · ${dishes.length} platos · ${FOOD_SLOTS.length} slots cubiertos · metadata de momento validada.`);

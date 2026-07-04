@@ -195,6 +195,14 @@ assert.equal(d.slotKcalCeiling({ id: "desayuno", index: 0, target: { kcal: 400 }
   "slot no principal debe tener techo kcal = presupuesto * 1.15");
 assert.equal(d.slotKcalCeiling({ id: "almuerzo", index: 1, target: { kcal: 600 } }, { mealCount: 4, mainMealIndex: 2 }), 0,
   "comida principal no debe tener techo heurístico de contundencia");
+const heavyLunch = { id: 203, slug: "guiso", name: "Guiso contundente", slot: "almuerzo", compatible_slots: ["desayuno", "almuerzo"], meal_weight: "heavy" };
+assert.ok(!d.dishAllowedForSlotMoment(heavyLunch, "desayuno", { mealCount: 4, mainMealIndex: 2 }),
+  "desayuno no principal debe rechazar platos heavy");
+assert.ok(d.dishAllowedForSlotMoment(heavyLunch, "desayuno", { mealCount: 2, mainMealIndex: 1 }),
+  "desayuno principal puede aceptar un plato heavy");
+const mediumSnack = { id: 204, slug: "sandwich", name: "Sandwich mediano", slot: "snack", compatible_slots: ["merienda"], meal_weight: "medium" };
+assert.ok(!d.compatibleDishesForSlot("merienda", { mealCount: 5, mainMealIndex: 3, diet: ["omnivoro"] }, { dishes: [mediumSnack] }).length,
+  "merienda debe aceptar solo platos light cuando hay meal_weight");
 
 // ── DIET_CONTRACT (REQ-128) ──────────────────────────────────────────────────
 assert.equal(d.DIET_CONTRACT.version, 1, "DIET_CONTRACT versionado");

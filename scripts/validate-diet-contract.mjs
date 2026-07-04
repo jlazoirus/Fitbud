@@ -32,6 +32,26 @@ function slugify(value) {
     .replace(/^-+|-+$/g, "");
 }
 
+function inferMealForm(dish) {
+  const name = String(dish && dish.name || "");
+  if (dish.slot === "batido" || /shake|batido/i.test(name)) return "shake";
+  if (dish.slot === "snack") return "snack";
+  if (/bowl/i.test(name)) return "bowl";
+  if (/sopa|crema|ramen/i.test(name)) return "soup";
+  if (/pan|pita|taco|quesadilla/i.test(name)) return "sandwich";
+  return "plated";
+}
+
+function inferMealWeight(dish) {
+  const name = String(dish && dish.name || "");
+  if (dish.slot === "snack" || dish.slot === "batido") return "light";
+  if (dish.slot === "desayuno") return "medium";
+  if (/yogur|case[ií]na/i.test(name)) return "light";
+  if (dish.slot === "almuerzo") return "heavy";
+  if (dish.slot === "cena" && /salm[oó]n|carne|arroz|quinua/i.test(name)) return "heavy";
+  return "medium";
+}
+
 function section(start, end) {
   const i = seed.indexOf(start);
   if (i < 0) throw new Error(`No se encontro seccion: ${start}`);
@@ -79,6 +99,13 @@ function parseCatalog() {
       : slot === "batido"
         ? ["media_manana", "merienda", "snack", "recena", "batido"]
         : [slot];
+    row.meal_form = inferMealForm(row);
+    row.meal_weight = inferMealWeight(row);
+    if (row.meal_weight === "light" && /yogur|case[ií]na|shake|batido/i.test(row.name)) {
+      row.compatible_slots = row.slot === "batido"
+        ? ["media_manana", "merienda", "snack", "recena", "batido"]
+        : ["media_manana", "merienda", "snack", "recena"];
+    }
     dishes.push(row);
     dishesByName.set(row.name, row);
   }
@@ -141,6 +168,15 @@ const dislikes = [
   { id: "sin_tofu", value: "tofu" },
   { id: "sin_yogur", value: "yogur" },
 ];
+const FOOD_SLOTS = ["desayuno", "media_manana", "almuerzo", "merienda", "snack", "cena", "recena"];
+
+function slotCoverage(catalog) {
+  const prefs = { mealCount: 6, mainMealIndex: 3, diet: ["omnivoro"] };
+  return Object.fromEntries(FOOD_SLOTS.map(slot => [
+    slot,
+    d.compatibleDishesForSlot(slot, prefs, catalog).length,
+  ]));
+}
 
 function pct(n, d0) {
   return d0 > 0 ? (n / d0 * 100) : 0;
@@ -248,6 +284,7 @@ const report = {
     ingredients: catalog.ingredients.length,
     dishes: catalog.dishes.length,
     dishIngredients: catalog.dishIng.length,
+    slotCoverage: slotCoverage(catalog),
   },
   gateTargetPct: 98,
   total: { okDays: totalOk, totalDays, pct: Number(pct(totalOk, totalDays).toFixed(1)) },
@@ -281,6 +318,7 @@ if (jsonMode) {
   console.log(`Motor: ${report.engine}.`);
   console.log(`Contrato: kcal ±3% o ±50 kcal; proteina ±5 g; carbohidratos ±8 g; grasa ±8 g.`);
   console.log(`Catalogo: ${report.catalog.ingredients} ingredientes · ${report.catalog.dishes} platos · ${report.catalog.dishIngredients} lineas de receta.`);
+  console.log(`Cobertura por slot: ${FOOD_SLOTS.map(slot => `${slot}=${report.catalog.slotCoverage[slot]}`).join(" · ")}.`);
   console.log(`Matriz: ${rows.length} dimensiones × 7 dias = ${totalDays} dias.`);
   console.log(`Factibilidad total: ${totalOk}/${totalDays} (${report.total.pct}%). Gate futuro: >=98% por dimension.`);
   console.log(`Minimo dimension: ${min.mealCount} comidas / ${min.diet} / ${min.target} / ${min.dislike} = ${min.okDays}/${min.totalDays} (${report.minDimension.pct}%).`);

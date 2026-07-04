@@ -32,8 +32,8 @@ console.log("  Test 1 pasado: coachCompatibilityContext incluye gustos/disgustos
 // 2. COACH_PROMPT_VERSION se subió para invalidar resultados cacheados antes de este cambio.
 const verMatch = html.match(/const\s+COACH_PROMPT_VERSION\s*=\s*(\d+)/);
 assert.ok(verMatch, "Debe existir const COACH_PROMPT_VERSION.");
-assert.ok(Number(verMatch[1]) >= 7, `COACH_PROMPT_VERSION debe ser >= 7 tras REQ-130 (actual: ${verMatch[1]}).`);
-console.log(`  Test 2 pasado: COACH_PROMPT_VERSION=${verMatch[1]} (>=7)`);
+assert.ok(Number(verMatch[1]) >= 8, `COACH_PROMPT_VERSION debe ser >= 8 tras REQ-132 (actual: ${verMatch[1]}).`);
+console.log(`  Test 2 pasado: COACH_PROMPT_VERSION=${verMatch[1]} (>=8)`);
 
 // 3. applyDayComidas nunca reescribe una comida ya registrada (done=true).
 const applyDay = extractFunctionSource(html, "applyDayComidas");

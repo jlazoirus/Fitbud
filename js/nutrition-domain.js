@@ -419,11 +419,33 @@
     return [...new Set(expanded.filter(Boolean))];
   }
 
+  function mealWeightForDish(dish){
+    return String(dish&&dish.meal_weight||"").trim().toLowerCase();
+  }
+
+  function mainSlotIdForPrefs(prefs){
+    const p=prefs||{};
+    const count=Math.min(6,Math.max(2,Number.parseInt(p.mealCount,10)||4));
+    const mainIndex=Math.min(Math.max(1,Number.parseInt(p.mainMealIndex,10)||2),count)-1;
+    const slots=mealSlotsForCount(count);
+    return slots[mainIndex]&&slots[mainIndex].id;
+  }
+
+  function dishAllowedForSlotMoment(dish,slot,prefs){
+    const slotId=typeof slot==="string"?slot:(slot&&slot.id)||"";
+    const weight=mealWeightForDish(dish);
+    if(!slotId||!weight)return true;
+    if(slotId==="desayuno")return weight!=="heavy"||mainSlotIdForPrefs(prefs)===slotId;
+    if(["media_manana","merienda","recena"].includes(slotId))return weight==="light";
+    return true;
+  }
+
   function compatibleDishesForSlot(slot,prefs,catalog){
     const slotId=typeof slot==="string"?slot:(slot&&slot.id)||"";
     const maps=catalogMaps(catalog);
     return (Array.isArray(catalog&&catalog.dishes)?catalog.dishes:[]).filter(dish=>{
       if(!compatibleSlotsForDish(dish).includes(slotId))return false;
+      if(!dishAllowedForSlotMoment(dish,slotId,prefs||{}))return false;
       return dishDietAllowed(dish,prefs||{},catalog||{},maps);
     });
   }
@@ -938,6 +960,9 @@
       if(!compatibleSlotsForDish(dish).includes(slot.id)){
         return{ok:false,reason:"dish_slot_incompatible",detail:`${dish.name} no corresponde a ${slot.id}.`,meal};
       }
+      if(!dishAllowedForSlotMoment(dish,slot.id,prefs)){
+        return{ok:false,reason:"dish_slot_weight_incompatible",detail:`${dish.name} es demasiado contundente para ${slot.id}.`,meal};
+      }
       if(!dishDietAllowed(dish,prefs,catalog,maps)){
         return{ok:false,reason:"dish_restricted",detail:`${dish.name} no respeta las preferencias/restricciones.`,meal};
       }
@@ -1221,6 +1246,8 @@
     mealSlotTargets,
     slotKcalCeiling,
     compatibleSlotsForDish,
+    mealWeightForDish,
+    dishAllowedForSlotMoment,
     compatibleDishesForSlot,
     textHasAnimalProtein,
     mealHasAnimalProtein,
@@ -1257,6 +1284,8 @@
   root.mealSlotTargets=mealSlotTargets;
   root.slotKcalCeiling=slotKcalCeiling;
   root.compatibleSlotsForDish=compatibleSlotsForDish;
+  root.mealWeightForDish=mealWeightForDish;
+  root.dishAllowedForSlotMoment=dishAllowedForSlotMoment;
   root.compatibleDishesForSlot=compatibleDishesForSlot;
   root.textHasAnimalProtein=textHasAnimalProtein;
   root.mealHasAnimalProtein=mealHasAnimalProtein;

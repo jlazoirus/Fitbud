@@ -41,6 +41,8 @@ create table dishes (
   needs_kitchen boolean,
   eat_out_ok boolean,
   protein_density text,
+  meal_weight text check (meal_weight is null or meal_weight in ('light','medium','heavy')),
+  meal_form text check (meal_form is null or meal_form in ('bowl','sandwich','shake','plated','soup','snack')),
   menu        text,            -- A | B | C | D | NULL (compartido)
   notes       text,
   created_at  timestamptz default now()

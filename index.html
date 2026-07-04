@@ -2198,6 +2198,9 @@ function dishSemanticsReady(){
   return (DB.dishes||[]).some(d=>Object.prototype.hasOwnProperty.call(d,"compatible_slots"))||
     (DB.dishIng||[]).some(l=>Object.prototype.hasOwnProperty.call(l,"scalable"));
 }
+function mealMomentSemanticsReady(){
+  return (DB.dishes||[]).some(d=>Object.prototype.hasOwnProperty.call(d,"meal_weight")||Object.prototype.hasOwnProperty.call(d,"meal_form"));
+}
 function catalogSlug(name){
   return String(name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
     .toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").replace(/-+/g,"-");
@@ -7310,7 +7313,9 @@ function changeMealCandidatePool(ds,id,excludeSlugs,limit){
     const target=effectiveDayTarget();
     const mealTargets=nd.mealSlotTargets?nd.mealSlotTargets(target,prefs,null):null;
     const mealTarget=mealTargets&&mealTargets.find(t=>t.id===id);
-    const compatible=DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked);
+    const compatible=nd.compatibleDishesForSlot
+      ?nd.compatibleDishesForSlot(id,prefs,DB)
+      :DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked);
     if(mealTarget&&compatible.length){
       const candidates=nd.rankReplacementCandidates(cv,compatible,mealTarget.target,DB,prefs);
       const ordered=[
@@ -7324,7 +7329,10 @@ function changeMealCandidatePool(ds,id,excludeSlugs,limit){
       }),options:[]};
     }
   }
-  const options=(DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked):[])
+  const optionDishes=DB.loaded&&nd&&nd.compatibleDishesForSlot
+    ?nd.compatibleDishesForSlot(id,migrateProfilePrefs((profile&&profile.prefs)||{}),DB)
+    :(DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked):[]);
+  const options=optionDishes
     .sort((a,b)=>{
       const as=excluded.has(a.slug||coachKey(a.name))?1:0;
       const bs=excluded.has(b.slug||coachKey(b.name))?1:0;
@@ -7720,7 +7728,8 @@ function coachHardRestrictions(){
 // así que cualquier resultado cacheado con prompts previos (que no los consideraba) queda inválido.
 // REQ-130: bump a 7 — disgustos son obligatorios, alta proteína filtra ejemplos
 // dinámicamente y omnívoro tiene regla activa de proteína animal.
-const COACH_PROMPT_VERSION=7;
+// REQ-132: bump a 8 — el prompt y los pools consumen metadata de forma/peso por slot.
+const COACH_PROMPT_VERSION=8;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -7745,7 +7754,9 @@ function coachCompatibilityContext(action){
       injuries:p.injuries,limitations:p.limitations,avoidMovements:p.avoidMovements,
     },
     catalog:{
-      dishes:hashText((DB.dishes||[]).map(d=>d.id+":"+d.name).join("|")),
+      dishes:hashText((DB.dishes||[]).map(d=>[
+        d.id,d.name,(catalogArray(d.compatible_slots)||[]).join(","),d.meal_weight||"",d.meal_form||"",
+      ].join(":")).join("|")),
       exercises:hashText((DB.exercises||[]).map(e=>e.slug+":"+(e.active!==false)).join("|")),
     },
   };
@@ -8361,6 +8372,9 @@ function validateGeneratedDay(j,day,target){
       if(!compatibleSlots.includes(slot_id)){
         issues.push(`"${nombre}" no corresponde a ${slot_id}; en el catálogo corresponde a ${compatibleSlots.join(", ")||"otro momento"}.`);
       }
+      if(ndCoach&&ndCoach.dishAllowedForSlotMoment&&!ndCoach.dishAllowedForSlotMoment(matchedDish,slot_id,prefs)){
+        issues.push(`"${nombre}" es demasiado contundente para ${slot_id} según su metadata de momento del día.`);
+      }
     }
     const slotTarget=slotTargetById.get(slot_id);
     const slotCeiling=ndCoach&&ndCoach.slotKcalCeiling
@@ -8894,9 +8908,7 @@ async function regenerateGenMeal(slotId){
   const remC=Math.max(5,target.c-usedC);
   const remF=Math.max(2,target.f-usedF);
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const slotDishesAll=DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,slotId)):[];
-  const slotDishesCompat=slotDishesAll.filter(d=>!coachDishBlockedByProfile(d).blocked);
-  const slotDishes=slotDishesCompat.length?slotDishesCompat:slotDishesAll;
+  const slotDishes=promptCompatibleDishesForSlot(slotId,prefs);
   const dishList=slotDishes.length?slotDishes.slice(0,40).map(d=>{const m=dishMacros(d.id);return `${d.name} [${dishSlotMeta(d)}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(sin platos compatibles en la base)";
   const likesLine=coachLikesLine(prefs);
   const blockedLine=coachBlockedDishesLine(prefs);
@@ -10769,6 +10781,8 @@ function editDish(id){
     needs_kitchen:dish.needs_kitchen!==false,
     eat_out_ok:!!dish.eat_out_ok,
     protein_density:dish.protein_density||"",
+    meal_weight:dish.meal_weight||"",
+    meal_form:dish.meal_form||"",
     lines
   };
   dishModal();
@@ -10787,6 +10801,8 @@ function dishSync(){
     const kitchen=document.getElementById("ds_kitchen");if(kitchen)d.needs_kitchen=kitchen.checked;
     const eatOut=document.getElementById("ds_eat_out");if(eatOut)d.eat_out_ok=eatOut.checked;
     const density=document.getElementById("ds_density");if(density)d.protein_density=density.value;
+    const weight=document.getElementById("ds_weight");if(weight)d.meal_weight=weight.value;
+    const form=document.getElementById("ds_form");if(form)d.meal_form=form.value;
   }
 }
 function dishModal(){
@@ -10808,6 +10824,10 @@ function dishModal(){
         <label class="chip-check"><input type="checkbox" id="ds_eat_out" ${d.eat_out_ok?"checked":""}><span>Útil fuera de casa</span></label>
       </div>
       <div class="field"><label>Densidad de proteína</label><select id="ds_density"><option value="">—</option>${["low","medium","high","unknown"].map(x=>`<option value="${x}" ${x===d.protein_density?"selected":""}>${x}</option>`).join("")}</select></div>
+      ${mealMomentSemanticsReady()?`<div class="grid2">
+        <div class="field"><label>Contundencia</label><select id="ds_weight"><option value="">—</option>${["light","medium","heavy"].map(x=>`<option value="${x}" ${x===d.meal_weight?"selected":""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label>Formato</label><select id="ds_form"><option value="">—</option>${["bowl","sandwich","shake","plated","soup","snack"].map(x=>`<option value="${x}" ${x===d.meal_form?"selected":""}>${x}</option>`).join("")}</select></div>
+      </div>`:""}
     </details>`:"";
   const linesHtml=d.lines.map((l,idx)=>`<div class="row" style="margin-bottom:6px">
     <select onchange="dishLineSet(${idx},'ingredient_id',this.value)" style="flex:1;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px">${DB.ingredients.map(i=>`<option value="${i.id}" ${i.id===+l.ingredient_id?"selected":""}>${esc(i.name)}</option>`).join("")}</select>
@@ -10847,6 +10867,10 @@ async function saveDish(){
     dishRow.needs_kitchen=!!d.needs_kitchen;
     dishRow.eat_out_ok=!!d.eat_out_ok;
     dishRow.protein_density=d.protein_density||null;
+    if(mealMomentSemanticsReady()){
+      dishRow.meal_weight=d.meal_weight||null;
+      dishRow.meal_form=d.meal_form||null;
+    }
   }
   if(dishId){const r=await supa.from("dishes").update(dishRow).eq("id",dishId);if(r.error){toast("Error: "+r.error.message);return;}}
   else{const r=await supa.from("dishes").insert(dishRow).select();if(r.error){toast("Error: "+r.error.message);return;}dishId=r.data[0].id;}

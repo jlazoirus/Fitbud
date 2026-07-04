@@ -86,7 +86,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 22. ~~REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas.~~ (implementado, P0)
 23. ~~REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo.~~ (implementado, P0)
 24. ~~REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración.~~ (implementado, P1)
-25. REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos. (P1)
+25. ~~REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos.~~ (implementado, P1)
 26. REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5. (P1)
 27. REQ-134 - Pipeline de crecimiento del catálogo validado por el motor. (P1)
 28. REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks. (P1)
@@ -1512,7 +1512,7 @@ Que cada comida respete su presupuesto y su momento del día, con lo que ya exis
 
 ## REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos
 
-**Estado: pendiente.**
+**Estado: implementado.** `supabase/nutrition_catalog_semantics.sql` agrega/backfillea `dishes.meal_weight` (`light/medium/heavy`) y `dishes.meal_form` (`bowl/sandwich/shake/plated/soup/snack`), con constraints idempotentes; `supabase/schema.sql` queda alineado para instalaciones nuevas. Los snacks, batidos y platos ligeros de yogur/caseína cubren `media_manana`, `merienda`, `snack` y `recena` sin crear platos nuevos. `compatibleDishesForSlot()` ahora rechaza `heavy` en desayuno no-principal y cualquier no-`light` en `media_manana`/`merienda`/`recena`; `validateGeneratedDay()` aplica la misma regla cuando matchea catálogo. `supabase/validate.mjs` y `validate-diet-contract.mjs` reportan cobertura por slot; baseline local: desayuno=6, media_manana>=7, almuerzo>=29, merienda>=7, snack>=7, cena>=5, recena>=7. `COACH_PROMPT_VERSION` sube a 8 y el `contextKey` incluye `compatible_slots`, `meal_weight` y `meal_form`. Acción manual externa: aplicar/re-ejecutar `supabase/nutrition_catalog_semantics.sql` en Supabase.
 
 ### Origen
 
