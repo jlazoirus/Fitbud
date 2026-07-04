@@ -1142,13 +1142,14 @@ function workoutSchedule(days,dayIds,priority,locations,primary,experience,worko
   const selected=normalizedTrainingDays(dayIds,days);
   let sessions=trainingTemplateForModes(selected.length,priority,experience,workoutSplit,strength,primary);
   const sportIds=new Set(["calidad","facil","tecnica"]);
-  // Fix: strength_only sin actividad ligera no tiene sesiones de "facil/calidad/técnica"
-  // reales (sportSessions() devuelve un placeholder sin nombre para ese caso). La
-  // plantilla de días sí puede asignar esos slots, así que hay que sustituirlos por
-  // descanso aquí para no terminar con un id planificado que no resuelve a ningún
-  // entrenamiento real (workoutById devolvía null y renderWorkout fallaba).
-  if(primary==="strength_only"&&!lightCardioEnabled){
-    sessions=sessions.map(id=>sportIds.has(id)?"descanso":id);
+  // Fix: "other" nunca tiene sesiones reales de "facil/calidad/técnica" (sportSessions()
+  // devuelve un placeholder sin nombre) y "strength_only" solo tiene una real ("facil",
+  // como "Actividad ligera libre") cuando lightCardioEnabled está activo. La plantilla de
+  // días puede asignar igual esos slots, así que hay que sustituir por descanso cualquier
+  // slot de deporte sin sesión real, o workoutById devuelve null y renderWorkout falla.
+  if(primary==="other"||primary==="strength_only"){
+    const realSportIds=(primary==="strength_only"&&lightCardioEnabled)?new Set(["facil"]):new Set();
+    sessions=sessions.map(id=>(sportIds.has(id)&&!realSportIds.has(id))?"descanso":id);
   }
   const remaining=sessions.slice();
   const assigned={};
