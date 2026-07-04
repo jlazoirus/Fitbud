@@ -8499,7 +8499,7 @@ Cada comida lleva ingredientes reales con gramos; ajusta porciones libremente pa
 PROHIBIDO inventar nombres genéricos o ficticios como "Desayuno práctica", "Alimento compatible", "Bowl práctico" o similares. Cada comida debe tener un nombre descriptivo real (ej. "Avena proteica con frutos rojos") y cada ingrediente debe ser un alimento real (ej. "Avena", "Proteína en polvo", "Tofu firme").
 Responde SOLO JSON válido, sin texto extra:
 {"explicacion":"breve","comidas":[{"slot_id":"desayuno","nombre":"...","ingredientes":[{"nombre":"Avena","gramos":50}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
-  const maxTok=highProt?1800:1400;
+  const maxTok=Math.min(4096,Math.max(highProt?2200:1800,mealCount*520));
   const fallback=JSON.stringify(deterministicDayPayload(ds));
   const quota=coachQuota(
     coachRequest.action,
@@ -10221,11 +10221,17 @@ async function loadAdminQuotaOverview(){
       const user=adminUsersCache.find(row=>row.id===item.user_id);
       return `${esc((user&&user.email)||item.user_id)} · ${esc(ADMIN_COACH_ACTION_LABELS[item.action]||item.action)}: ${item.requests}`;
     }).join("<br>");
+    const gateRows=(adminQuotaCache.modelGate||[]).map(row=>{
+      const invalid=row.invalid_provider_output_rate_pct==null?"0.0":row.invalid_provider_output_rate_pct;
+      const degradation=row.degradation_rate_pct==null?"0.0":row.degradation_rate_pct;
+      return `<div class="muted small">${esc(ADMIN_COACH_ACTION_LABELS[row.action]||row.action)} · ${esc(row.model||"modelo no registrado")}: ${row.fresh_attempts||0} nuevas · JSON inválido ${invalid}% · degradación ${degradation}% · $${Number(row.total_cost_usd||0).toFixed(4)} · ${Math.round(Number(row.avg_latency_ms)||0)} ms</div>`;
+    }).join("");
     panel.innerHTML=`<div class="row between wrap" style="margin-bottom:10px">
         <div><b>Consumo del coach</b><div class="muted small">Políticas server-side y origen de respuestas; visible solo para administradores.</div></div>
         <button class="btn btn-sm" onclick="loadAdminQuotaOverview()">Actualizar</button>
       </div>
       ${rows||'<div class="muted small">No hay políticas configuradas.</div>'}
+      ${gateRows?`<div class="ai-box" style="margin-top:12px"><b>Gate de modelo nutricional</b><br>${gateRows}<div class="muted small" style="margin-top:6px">Cambiar dieta a Sonnet 5 solo si diet_* supera 10% de degradación sostenida durante 1-2 semanas.</div></div>`:""}
       ${top?`<div class="ai-box" style="margin-top:12px"><b>Mayor actividad reciente</b><br>${top}</div>`:""}`;
   }catch(e){
     panel.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}<div class="muted small" style="margin-top:6px">Ejecuta supabase/coach_quota.sql para habilitar políticas, reutilización y auditoría.</div></div>`;

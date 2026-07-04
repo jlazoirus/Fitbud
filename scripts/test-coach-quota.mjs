@@ -87,6 +87,7 @@ const handler = await importHandler("api/claude.js");
 let providerCalls = 0;
 let completedCalls = 0;
 let failedCalls = 0;
+let providerPayloads = [];
 
 global.fetch = async (url, options = {}) => {
   const value = String(url);
@@ -115,6 +116,7 @@ global.fetch = async (url, options = {}) => {
   }
   if (value.includes("api.anthropic.com")) {
     providerCalls += 1;
+    providerPayloads.push(JSON.parse(options.body || "{}"));
     return response(200, {
       content: [{ text: optionText }],
       usage: { input_tokens: 100, output_tokens: 50 },
@@ -128,6 +130,42 @@ await handler({ method: "POST", headers: { authorization: "Bearer token" }, body
 assert(res.statusCode === 200, "Una reserva fresca valida debe responder.");
 assert(providerCalls === 1, "La reserva fresca debe llamar una sola vez al proveedor.");
 assert(completedCalls === 1 && failedCalls === 0, "Debe completar y guardar la opcion valida.");
+assert(providerPayloads[0].output_config?.format?.type === "json_schema", "REQ-133: meal_option debe usar structured outputs.");
+assert(providerPayloads[0].output_config.format.schema.properties.opciones, "REQ-133: el schema de meal_option debe exigir opciones.");
+
+process.env.ANTHROPIC_MODEL_MEAL_OPTION = "claude-sonnet-5";
+providerCalls = 0; completedCalls = 0; failedCalls = 0; providerPayloads = [];
+global.fetch = async (url, options = {}) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) {
+    return response(200, [{ usage_id: 16, mode: "fresh", usage_status: "reserved", effective_limit: 4, quota_day: "2026-06-15", policy_enabled: true }]);
+  }
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) {
+    return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  }
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) { completedCalls += 1; return response(200, [{ stored_result_id: 78 }]); }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) {
+    providerCalls += 1;
+    providerPayloads.push(JSON.parse(options.body || "{}"));
+    if (providerCalls === 1) return response(400, { error: { message: "output_config is not supported for this deployment" } });
+    return response(200, { content: [{ text: optionText }], usage: { input_tokens: 110, output_tokens: 55 } });
+  }
+  throw new Error("Ruta structured fallback no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer token" },
+  body: { ...quotaBody, quota: { ...quotaBody.quota, requestId: "17171717-1717-4717-8717-171717171717" } },
+}, res);
+delete process.env.ANTHROPIC_MODEL_MEAL_OPTION;
+assert(res.statusCode === 200, "REQ-133: si output_config falla con 400, debe reintentar sin structured outputs.");
+assert(providerCalls === 2 && completedCalls === 1 && failedCalls === 0, "REQ-133: el fallback compatible debe guardar una sola respuesta válida.");
+assert(providerPayloads[0].model === "claude-sonnet-5", "REQ-133: el modelo por acción vía env debe tomar precedencia.");
+assert(providerPayloads[0].output_config && !providerPayloads[1].output_config, "REQ-133: el segundo intento debe omitir output_config.");
 
 providerCalls = 0;
 global.fetch = async (url) => {

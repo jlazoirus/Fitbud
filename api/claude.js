@@ -1,13 +1,30 @@
 // Proxy serverless del coach (Vercel).
 // La credencial del proveedor y la service role viven exclusivamente aqui.
-const ALLOWED_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6"];
+const ALLOWED_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-sonnet-5"];
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const PROMPT_VERSION = "v1";
-// Costo estimado por token en USD (precios de agosto 2025).
+// Costo estimado por token en USD. Sonnet 5 conserva precio introductorio hasta 2026-08-31.
 const MODEL_COSTS = {
-  "claude-haiku-4-5-20251001": { input: 0.0000008, output: 0.000004 },
-  "claude-sonnet-4-6":         { input: 0.000003,  output: 0.000015 },
+  "claude-haiku-4-5-20251001": { input: 0.000001, output: 0.000005 },
+  "claude-sonnet-4-6":         { input: 0.000003, output: 0.000015 },
+  "claude-sonnet-5": {
+    input: 0.000003,
+    output: 0.000015,
+    introUntil: "2026-08-31T23:59:59Z",
+    intro: { input: 0.000002, output: 0.000010 },
+  },
 };
+const MODEL_ENV_BY_ACTION = {
+  diet_day: ["ANTHROPIC_MODEL_DIET_DAY", "ANTHROPIC_MODEL_DIET"],
+  diet_week: ["ANTHROPIC_MODEL_DIET_WEEK", "ANTHROPIC_MODEL_DIET"],
+  meal_option: ["ANTHROPIC_MODEL_MEAL_OPTION", "ANTHROPIC_MODEL_DIET"],
+  meal_estimate: ["ANTHROPIC_MODEL_MEAL_ESTIMATE"],
+  macro_review: ["ANTHROPIC_MODEL_MACRO_REVIEW"],
+  training_plan: ["ANTHROPIC_MODEL_TRAINING_PLAN", "ANTHROPIC_MODEL_TRAINING"],
+  training_replacement: ["ANTHROPIC_MODEL_TRAINING_REPLACEMENT", "ANTHROPIC_MODEL_TRAINING"],
+  coach_conversation: ["ANTHROPIC_MODEL_COACH_CONVERSATION"],
+};
+const STRUCTURED_OUTPUT_ACTIONS = new Set(["diet_day", "diet_week", "meal_option"]);
 const CONSENT_POLICY_VERSION = "2026-06-15-v2";
 const SAFETY_SCREENING_VERSION = "2026-06-15";
 const REQUIRED_CONSENTS = ["body_progress", "automated_coach"];
@@ -60,7 +77,10 @@ async function responseJson(response) {
 }
 
 function apiError(data, fallback) {
-  return (data && (data.msg || data.message || data.error_description || data.error)) || fallback;
+  const nested = data && data.error;
+  return (data && (data.msg || data.message || data.error_description))
+    || (typeof nested === "string" ? nested : nested && nested.message)
+    || fallback;
 }
 
 async function rpc(e, name, payload) {
@@ -235,6 +255,79 @@ function parseJsonText(text) {
   const end = value.lastIndexOf("}");
   if (start >= 0 && end >= start) value = value.slice(start, end + 1);
   return JSON.parse(value);
+}
+
+function jsonString() { return { type: "string" }; }
+function jsonNumber() { return { type: "number" }; }
+
+function dietDayOutputSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      explicacion: jsonString(),
+      comidas: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            slot_id: jsonString(),
+            nombre: jsonString(),
+            ingredientes: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  nombre: jsonString(),
+                  gramos: jsonNumber(),
+                },
+                required: ["nombre", "gramos"],
+              },
+            },
+            kcal: jsonNumber(),
+            proteina_g: jsonNumber(),
+            carbohidratos_g: jsonNumber(),
+            grasa_g: jsonNumber(),
+          },
+          required: ["slot_id", "nombre", "ingredientes", "kcal", "proteina_g", "carbohidratos_g", "grasa_g"],
+        },
+      },
+    },
+    required: ["explicacion", "comidas"],
+  };
+}
+
+function mealOptionOutputSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      opciones: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            nombre: jsonString(),
+            kcal: jsonNumber(),
+            proteina_g: jsonNumber(),
+            carbohidratos_g: jsonNumber(),
+            grasa_g: jsonNumber(),
+          },
+          required: ["nombre", "kcal", "proteina_g", "carbohidratos_g", "grasa_g"],
+        },
+      },
+    },
+    required: ["opciones"],
+  };
+}
+
+function structuredSchemaForAction(action) {
+  if (action === "diet_day" || action === "diet_week") return dietDayOutputSchema();
+  if (action === "meal_option") return mealOptionOutputSchema();
+  return null;
 }
 
 function finiteNumber(value) {
@@ -505,8 +598,33 @@ function firstRow(data) {
   return Array.isArray(data) ? data[0] : data;
 }
 
-function estimateCostUsd(model, inputTokens, outputTokens) {
+function allowedModel(value) {
+  const model = String(value || "").trim();
+  return ALLOWED_MODELS.includes(model) ? model : "";
+}
+
+function resolveModel(body, action) {
+  const envNames = MODEL_ENV_BY_ACTION[action] || [];
+  for (const name of envNames) {
+    const model = allowedModel(process.env[name]);
+    if (model) return { model, source: name };
+  }
+  const bodyModel = allowedModel(body && body.model);
+  if (bodyModel) return { model: bodyModel, source: "request" };
+  const globalModel = allowedModel(process.env.ANTHROPIC_MODEL);
+  if (globalModel) return { model: globalModel, source: "ANTHROPIC_MODEL" };
+  return { model: DEFAULT_MODEL, source: "default" };
+}
+
+function activeModelCost(model) {
   const costs = MODEL_COSTS[model] || MODEL_COSTS[DEFAULT_MODEL];
+  const until = costs && costs.introUntil ? Date.parse(costs.introUntil) : NaN;
+  if (costs && costs.intro && Number.isFinite(until) && Date.now() <= until) return costs.intro;
+  return costs || MODEL_COSTS[DEFAULT_MODEL];
+}
+
+function estimateCostUsd(model, inputTokens, outputTokens) {
+  const costs = activeModelCost(model);
   return Math.round((costs.input * (inputTokens || 0) + costs.output * (outputTokens || 0)) * 1e6) / 1e6;
 }
 
@@ -571,21 +689,19 @@ async function reserveCoachAction(e, auth, quota) {
   }
 }
 
-async function providerResponse(e, body, privacy) {
-  if (!e.providerKey) {
-    const error = new Error("El servicio del coach no esta configurado.");
-    error.status = 503;
-    throw error;
-  }
-  const model = ALLOWED_MODELS.includes(body.model)
-    ? body.model
-    : (ALLOWED_MODELS.includes(process.env.ANTHROPIC_MODEL) ? process.env.ANTHROPIC_MODEL : DEFAULT_MODEL);
-  const maxTokens = Math.min(Math.max(parseInt(body.maxTokens, 10) || 512, 1), 2048);
-  const safetyContext = privacy.safetyHold
-    ? " La evaluacion del usuario tiene una senal de alerta: no propongas rutinas ni progresiones de ejercicio; limita la respuesta a detener actividad y buscar evaluacion profesional."
-    : "";
-  const clientSystem = typeof body.system === "string" ? body.system : "";
-  const callStart = Date.now();
+function anthropicText(data) {
+  const blocks = Array.isArray(data && data.content) ? data.content : [];
+  const textBlock = blocks.find((block) => block && typeof block.text === "string");
+  return textBlock ? textBlock.text : "";
+}
+
+function structuredRejected(status, data) {
+  if (Number(status) !== 400) return false;
+  const message = apiError(data, "").toLowerCase();
+  return /output_config|output_format|json_schema|structured|schema|format|unsupported|not supported|too complex|compilation/i.test(message);
+}
+
+async function anthropicMessage(e, payload) {
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -593,26 +709,63 @@ async function providerResponse(e, body, privacy) {
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      system: clientSystem + " REGLAS OBLIGATORIAS DEL SERVIDOR: " + SERVER_GUARDRAILS + safetyContext,
-      messages: [{ role: "user", content: String(body.userText || "") }],
-    }),
+    body: JSON.stringify(payload),
   });
-  const latencyMs = Date.now() - callStart;
   const data = await responseJson(response);
+  return { response, data };
+}
+
+async function providerResponse(e, body, privacy, quota) {
+  if (!e.providerKey) {
+    const error = new Error("El servicio del coach no esta configurado.");
+    error.status = 503;
+    throw error;
+  }
+  const resolved = resolveModel(body, quota && quota.action);
+  const model = resolved.model;
+  const requestedTokens = body.maxTokens != null ? body.maxTokens : body.max_tokens;
+  const maxTokens = Math.min(Math.max(parseInt(requestedTokens, 10) || 512, 1), 4096);
+  const safetyContext = privacy.safetyHold
+    ? " La evaluacion del usuario tiene una senal de alerta: no propongas rutinas ni progresiones de ejercicio; limita la respuesta a detener actividad y buscar evaluacion profesional."
+    : "";
+  const clientSystem = typeof body.system === "string" ? body.system : "";
+  const callStart = Date.now();
+  const payload = {
+    model,
+    max_tokens: maxTokens,
+    system: clientSystem + " REGLAS OBLIGATORIAS DEL SERVIDOR: " + SERVER_GUARDRAILS + safetyContext,
+    messages: [{ role: "user", content: String(body.userText || "") }],
+  };
+  const schema = STRUCTURED_OUTPUT_ACTIONS.has(quota && quota.action) ? structuredSchemaForAction(quota.action) : null;
+  const structuredAttempted = !!schema;
+  let structuredFallback = false;
+  let { response, data } = await anthropicMessage(
+    e,
+    schema
+      ? { ...payload, output_config: { format: { type: "json_schema", schema } } }
+      : payload
+  );
+  if (!response.ok && schema && structuredRejected(response.status, data)) {
+    structuredFallback = true;
+    ({ response, data } = await anthropicMessage(e, payload));
+  }
+  const latencyMs = Date.now() - callStart;
   if (!response.ok) {
     const error = new Error(apiError(data, "Error " + response.status));
     error.status = response.status;
     throw error;
   }
   return {
-    text: (data.content && data.content[0] && data.content[0].text) || "",
+    text: anthropicText(data),
     inputTokens: Number(data.usage && data.usage.input_tokens) || 0,
     outputTokens: Number(data.usage && data.usage.output_tokens) || 0,
     model,
+    modelSource: resolved.source,
     latencyMs,
+    maxTokens,
+    structuredAttempted,
+    structuredUsed: structuredAttempted && !structuredFallback,
+    structuredFallback,
   };
 }
 
@@ -753,7 +906,7 @@ export default async function handler(req, res) {
 
     let generated;
     try {
-      generated = await providerResponse(e, body, privacy);
+      generated = await providerResponse(e, body, privacy, quota);
       providerMetrics = generated;
     } catch (error) {
       await failPart(e, reservation.usage_id, quota.partKey, "provider_" + (error.status || "error"));
@@ -774,6 +927,13 @@ export default async function handler(req, res) {
       p_response_text: generated.text,
       p_metadata: {
         model: generated.model,
+        model_source: generated.modelSource,
+        max_tokens: generated.maxTokens,
+        structured_outputs: {
+          attempted: generated.structuredAttempted,
+          used: generated.structuredUsed,
+          fallback: generated.structuredFallback,
+        },
         validation_version: 1,
         prompt_version: PROMPT_VERSION,
       },

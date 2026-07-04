@@ -62,10 +62,10 @@ assert.ok(
   "La línea OBLIGATORIO debe dar a proteína igual peso retórico que a calorías."
 );
 
-// 7. Token limit sube para highProt
+// 7. Token limit sube para highProt y para dias con mas comidas
 assert.ok(
-  /highProt\s*\?\s*1800\s*:\s*1400/.test(genSrc),
-  "El max_tokens debe subir a 1800 para metas de proteína alta (1400 normal)."
+  genSrc.includes("Math.min(4096") && genSrc.includes("highProt?2200:1800") && genSrc.includes("mealCount*520"),
+  "El max_tokens debe escalar por proteína alta y cantidad de comidas, con cap 4096."
 );
 
 // 8. Instrucción de verificar totales antes de responder

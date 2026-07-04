@@ -249,5 +249,45 @@ WHERE quota_date >= (now() - INTERVAL '30 days')::DATE
 GROUP BY action
 ORDER BY COALESCE(SUM(estimated_cost_usd), 0) DESC, action;
 
+-- 8. Gate de modelo para decidir si diet_* debe migrar a Sonnet 5.
+--    Ventana: 14 dias; los admins leen la vista desde /api/admin.
+CREATE OR REPLACE VIEW v_coach_model_gate AS
+SELECT
+  action,
+  COALESCE(metadata->>'model', 'unknown') AS model,
+  COUNT(*) FILTER (WHERE origin = 'fresh') AS fresh_attempts,
+  COUNT(*) FILTER (WHERE status = 'completed' AND origin = 'fresh') AS fresh_successes,
+  COUNT(*) FILTER (WHERE error_code = 'invalid_provider_output') AS invalid_provider_output,
+  ROUND(
+    100.0 * (COUNT(*) FILTER (WHERE error_code = 'invalid_provider_output'))::NUMERIC
+    / NULLIF(COUNT(*) FILTER (WHERE origin = 'fresh'), 0),
+    1
+  ) AS invalid_provider_output_rate_pct,
+  COUNT(*) FILTER (
+    WHERE status = 'reused'
+       OR origin = 'template'
+       OR error_code IN ('invalid_provider_output', 'invalid_template')
+  ) AS degraded_calls,
+  ROUND(
+    100.0 * (COUNT(*) FILTER (
+      WHERE status = 'reused'
+         OR origin = 'template'
+         OR error_code IN ('invalid_provider_output', 'invalid_template')
+    ))::NUMERIC / NULLIF(COUNT(*), 0),
+    1
+  ) AS degradation_rate_pct,
+  ROUND(SUM(COALESCE(estimated_cost_usd, 0))::NUMERIC, 4) AS total_cost_usd,
+  ROUND(AVG(NULLIF(latency_ms, 0))::NUMERIC, 0) AS avg_latency_ms,
+  MIN(created_at) AS first_seen_at,
+  MAX(created_at) AS last_seen_at
+FROM coach_usage
+WHERE quota_date >= (now() - INTERVAL '14 days')::DATE
+GROUP BY action, COALESCE(metadata->>'model', 'unknown')
+ORDER BY action, model;
+
+GRANT SELECT ON v_activation_funnel TO service_role;
+GRANT SELECT ON v_ai_cost_summary TO service_role;
+GRANT SELECT ON v_coach_model_gate TO service_role;
+
 -- Recuperacion: para rollback eliminar product_events, feature_flags, DROP las columnas nuevas
 -- de coach_usage, y restaurar las funciones originales desde coach_quota.sql.

@@ -87,7 +87,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 23. ~~REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo.~~ (implementado, P0)
 24. ~~REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración.~~ (implementado, P1)
 25. ~~REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos.~~ (implementado, P1)
-26. REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5. (P1)
+26. ~~REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5.~~ (implementado, P1)
 27. REQ-134 - Pipeline de crecimiento del catálogo validado por el motor. (P1)
 28. REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks. (P1)
 29. REQ-136 - Catálogo lote 2: profundidad por gustos, cocinas y presupuesto. (P2)
@@ -1560,7 +1560,7 @@ Que el motor pueda decidir adecuación por momento del día con datos, y que los
 
 ## REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5
 
-**Estado: pendiente.**
+**Estado: implementado.** `/api/claude` ahora usa `output_config.format` con JSON Schema para `diet_day`, `diet_week` y `meal_option`; si Anthropic rechaza el parámetro con 400, reintenta una vez sin structured outputs y conserva el parseo/validación existente como fallback. El proxy capea `maxTokens` en 4096, el cliente escala los tokens de nutrición según número de comidas, `ALLOWED_MODELS` incluye `claude-sonnet-5` y el modelo se resuelve por acción vía env (`ANTHROPIC_MODEL_DIET`, `ANTHROPIC_MODEL_MEAL_OPTION`, etc.) con default Haiku 4.5. `MODEL_COSTS` incluye Sonnet 5 con precio estándar e introductorio hasta 2026-08-31. `supabase/analytics.sql` agrega `v_coach_model_gate`, y el panel admin muestra JSON inválido, degradación, costo y latencia por acción/modelo. Gate documentado: cambiar `ANTHROPIC_MODEL_DIET` a `claude-sonnet-5` solo si `diet_*` supera 10% de degradación sostenida durante 1-2 semanas; `meal_estimate` y `coach_conversation` permanecen en Haiku. Acción manual externa: re-ejecutar `supabase/analytics.sql` en Supabase para crear/actualizar la vista.
 
 ### Origen
 

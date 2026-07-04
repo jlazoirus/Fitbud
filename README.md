@@ -164,8 +164,10 @@ No hay build: archivos estáticos en la raíz + funciones serverless en [`api/`]
    | `SUPABASE_PUBLISHABLE_KEY` | `sb_publishable_...` | No (pública) |
    | `SUPABASE_SERVICE_ROLE_KEY` | service role para cuotas, `/api/admin`, `/api/privacy` y reclutamiento beta | **Sí (solo servidor)** |
    | `ANTHROPIC_MODEL` *(opcional)* | `claude-haiku-4-5-20251001` | No |
+   | `ANTHROPIC_MODEL_DIET` *(opcional)* | `claude-haiku-4-5-20251001` o `claude-sonnet-5` | No |
+   | `ANTHROPIC_MODEL_MEAL_OPTION` *(opcional)* | `claude-haiku-4-5-20251001` | No |
 
-4. **Deploy**. Cada `git push` redepliega solo.
+4. **Deploy**. Cada `git push` redepliega solo. Mantén dieta en Haiku por defecto; cambia `ANTHROPIC_MODEL_DIET` a `claude-sonnet-5` solo si el panel admin muestra degradación sostenida de `diet_*` >10% durante 1-2 semanas.
 
 Así **todas las keys viven en Vercel**, ninguna en GitHub, y la de Claude tampoco es visible en el navegador (pasa por el proxy `/api/claude`).
 

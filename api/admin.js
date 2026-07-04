@@ -241,6 +241,16 @@ async function restRequest(e, path, options) {
   return data;
 }
 
+async function optionalRestRequest(e, path, options) {
+  try {
+    return await restRequest(e, path, options);
+  } catch (error) {
+    const message = String(error && error.message || "");
+    if (error.status === 404 || /schema cache|does not exist|not found|v_coach_model_gate/i.test(message)) return [];
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------
 // REQ-126 — resetear/regenerar futuro de nutrición y/o entrenamiento
 // de cualquier usuario, y reiniciar un usuario a onboarding.
@@ -442,7 +452,7 @@ async function resetUserToOnboarding(body, caller, e) {
 
 async function quotaOverview(e) {
   const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const [policies, overrides, usage] = await Promise.all([
+  const [policies, overrides, usage, modelGate] = await Promise.all([
     restRequest(e, "coach_quota_policies?select=action,entitlement_code,daily_limit,enabled,updated_at&order=action.asc"),
     restRequest(e, "coach_quota_overrides?select=user_id,action,entitlement_code,daily_limit,bonus_units,enabled,expires_at,updated_at&order=updated_at.desc&limit=500"),
     restRequest(
@@ -450,6 +460,10 @@ async function quotaOverview(e) {
       "coach_usage?select=user_id,action,status,origin,error_code,created_at&created_at=gte."
         + encodeURIComponent(since)
         + "&order=created_at.desc&limit=2000"
+    ),
+    optionalRestRequest(
+      e,
+      "v_coach_model_gate?select=action,model,fresh_attempts,fresh_successes,invalid_provider_output,invalid_provider_output_rate_pct,degraded_calls,degradation_rate_pct,total_cost_usd,avg_latency_ms&action=in.(diet_day,diet_week,meal_option)&order=action.asc"
     ),
   ]);
   const summary = {};
@@ -476,6 +490,7 @@ async function quotaOverview(e) {
     overrides: Array.isArray(overrides) ? overrides : [],
     summary,
     topConsumers,
+    modelGate: Array.isArray(modelGate) ? modelGate : [],
     windowDays: 7,
   };
 }
