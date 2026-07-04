@@ -3874,6 +3874,8 @@ function homeAdaptWorkout(ds){
   openWorkoutContingency(ds,"tiempo");
 }
 async function homePrepareDay(ds){
+  // REQ-121: no se regeneran días pasados; ya están ejecutados/cerrados.
+  if(ds<todayStr()){toast("No puedes preparar un día pasado.");return;}
   homeTrackAction(ds,"prepare_day");
   current=ds;
   if(!hasCompleteOnboarding((profile&&profile.prefs)||{})){startOnboarding();return;}
@@ -3890,10 +3892,11 @@ async function applyDeterministicDay(ds){
     if(supa&&!DB.loaded&&!DB.error){toast("Actualizando tus opciones…");await dbLoad();}
     const det=deterministicDayPayload(ds);
     if(det&&Array.isArray(det.comidas)&&det.comidas.length){
-      applyDayComidas(ds,det.comidas);
+      const preserved=applyDayComidas(ds,det.comidas);
       homeTrackAction(ds,"prepare_day_deterministic");
       render();scrollAppTop();
-      toast(det.ok===false?"Listo: preparamos la opción más viable para hoy.":"Tu día está listo con tus metas de hoy.");
+      const preservedNote=preserved?` Lo que ya registraste hoy no cambia.`:"";
+      toast((det.ok===false?"Listo: preparamos la opción más viable para hoy.":"Tu día está listo con tus metas de hoy.")+preservedNote);
       return true;
     }
   }catch(e){}
@@ -4179,7 +4182,8 @@ function openNutritionMoreMenu(){
   const hasPlan=weekHasGeneratedPlan(w);
   const item=(icon,label,onclick)=>`<button class="btn" style="width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start" onclick="closeModal();${onclick}">${miniIcon(icon)}<span>${label}</span></button>`;
   const items=[
-    prepared?item("refresh","Volver a preparar este día","homePrepareDay(current)"):"",
+    // REQ-121: no ofrecer "volver a preparar" en días pasados; ya están ejecutados/cerrados.
+    (prepared&&ds>=todayStr())?item("refresh","Volver a preparar este día","homePrepareDay(current)"):"",
     item("progreso","Revisar mis macros","aiReview()"),
     item("week",hasPlan?"Preparar otra semana":"Preparar semana","aiGenerateWeek()"),
   ].filter(Boolean).join("");
@@ -7518,7 +7522,9 @@ function coachHardRestrictions(){
 }
 // REQ-86: bump COACH_PROMPT_VERSION cada vez que cambia la lógica del prompt
 // para invalidar resultados reutilizables generados con prompts anteriores.
-const COACH_PROMPT_VERSION=5;
+// REQ-121: bump a 6 — el contextKey ahora incluye gustos/disgustos/platos bloqueados,
+// así que cualquier resultado cacheado con prompts previos (que no los consideraba) queda inválido.
+const COACH_PROMPT_VERSION=6;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -7529,6 +7535,10 @@ function coachCompatibilityContext(action){
       target,mealCount:p.mealCount,mealTimes:p.mealTimes,diet:p.diet||[],
       allergies:p.allergies||"",cookingMinutes:p.cookingMinutes,foodBudget:p.foodBudget,
       repeatPreference:p.repeatPreference,
+      // REQ-121: gustos/disgustos/platos bloqueados deben invalidar cache al editarse.
+      preferredIngredients:p.preferredIngredients||"",preferredDishes:p.preferredDishes||"",
+      preferredCuisines:p.preferredCuisines||[],dislikedIngredients:p.dislikedIngredients||"",
+      blockedDishes:(Array.isArray(p.blockedDishes)?p.blockedDishes:[]).map(b=>b&&b.key).sort(),
     },
     training:{
       primarySport:p.primarySport,plannedPrimarySport:effectiveTrainingPrimarySport(p),
@@ -8408,12 +8418,17 @@ function genReviewHtml(res,target){
     </div>`;
 }
 // Aplica las comidas generadas como override por slot (plan del usuario, vía day_log).
+// REQ-121: nunca reescribe una comida ya registrada (done=true) — solo el futuro cambia.
+// Devuelve cuántas comidas se preservaron por estar ya hechas, para poder avisar al usuario.
 function applyDayComidas(ds,comidas){
+  let preserved=0;
   (comidas||[]).forEach(c=>{
     const ms=mealState(ds,c.slot_id); if(!ms)return;
+    if(ms.done){preserved++;return;}
     ms.ovr={name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,gen:true,...(c.dishSlug?{dishSlug:c.dishSlug}:{})};
   });
   commitDay(ds);
+  return preserved;
 }
 // REQ-89: agrega el snack sugerido al borrador del día y re-valida.
 function addGapSnackToDay(){
@@ -8455,7 +8470,7 @@ function applyGeneratedDay(){
   const slotIds=new Set(day.meals.map(m=>m.id));
   const slotComidas=g.comidas.filter(c=>slotIds.has(c.slot_id));
   const extraComidas=g.comidas.filter(c=>!slotIds.has(c.slot_id));
-  applyDayComidas(g.ds,slotComidas);
+  const preserved=applyDayComidas(g.ds,slotComidas);
   if(extraComidas.length){
     const st=dayState(g.ds);
     extraComidas.forEach(c=>{
@@ -8463,7 +8478,8 @@ function applyGeneratedDay(){
     });
     commitDay(g.ds);
   }
-  window._genDay=null;window._genDayGapSnack=null;closeModal();render();toast("Día aplicado a tu plan");
+  window._genDay=null;window._genDayGapSnack=null;closeModal();render();
+  toast("Día aplicado a tu plan"+(preserved?". Lo que ya registraste no cambia.":""));
 }
 // --- Revisión de semana: borrador → confirmar → aplicar ---
 function genWeekReviewHtml(){
