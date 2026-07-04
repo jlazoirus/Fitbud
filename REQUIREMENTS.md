@@ -1755,7 +1755,7 @@ Que editar preferencias alimente inmediatamente toda regeneración futura sin to
 
 ## REQ-122 - Fix Nutrición: dietas deben llegar a objetivos o completar con sugerencias aplicables
 
-**Estado: pendiente.**
+**Estado: implementado.** Cuando el día generado no cumple el objetivo (`!res.ok`), `genReviewHtml` ya no deja solo un botón "Aplicar" deshabilitado: agrega "Reintentar" y "Completar con opción práctica ahora" (`deterministicFromModal`, que aplica `applyDeterministicDay` vía el solver determinista). `aiGenerateDay` cuenta intentos fallidos consecutivos en `_genDayFailStreak` y, al llegar a 2, aplica automáticamente la ruta determinista en vez de seguir insistiendo con la IA; `homePrepareDay` reinicia ese conteo en cada sesión nueva de preparación. En la revisión de semana, `genWeekReviewHtml` agrega el botón "Completar días faltantes con opción práctica" junto al aviso de días que no se pudieron preparar, reutilizando `deterministicWeekFromModal` (ya existía para el camino de error de red) para rellenar solo los días ausentes sin tocar los ya generados. Las restricciones duras (`dishDietAllowed`, `coachDishBlockedByProfile`) siguen aplicando como bloqueo absoluto en toda ruta, incluida la determinista. Verificado con `scripts/validate-diet-completion-fallback.mjs`.
 
 ### Origen
 
