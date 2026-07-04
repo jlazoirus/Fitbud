@@ -17,6 +17,7 @@ assert.ok(d, "FITBUD_NUTRITION_DOMAIN debe existir");
 assert.ok(d.DIET_CONTRACT, "DIET_CONTRACT debe estar exportado");
 assert.equal(d.DIET_CONTRACT.runtimeActive, false, "REQ-128 no debe activar runtime");
 assert.equal(d.DIET_CONTRACT.authoritativeKcal, "catalog_ingredient_kcal");
+assert.equal(typeof d.finalizeNutritionDay, "function", "REQ-129 debe exportar finalizeNutritionDay");
 
 function sqlString(value) {
   return String(value || "").replace(/''/g, "'");
@@ -161,6 +162,7 @@ function addCause(map, key) {
 const rows = [];
 const globalCauses = new Map();
 const startDate = "2026-07-06";
+const useFinalizer = typeof d.finalizeNutritionDay === "function";
 
 for (const mealCount of mealCounts) {
   for (const diet of diets) {
@@ -172,11 +174,35 @@ for (const mealCount of mealCounts) {
           diet: diet.value,
           dislikedIngredients: dislike.value,
         };
-        const week = d.planNutritionWeek({ prefs, dayTarget, catalog, numDays: 7, startDate });
         const causes = new Map();
         let okDays = 0;
-        week.days.forEach(day => {
-          const contract = d.validateDietContractTotals(day.totals || {}, day.target || dayTarget);
+        let prevDayUsed = new Set();
+        const recentUsed = new Set();
+        const days = [];
+        for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+          const day = useFinalizer
+            ? d.finalizeNutritionDay({
+                prefs,
+                dayTarget,
+                catalog,
+                date: `${startDate}+${dayIndex}`,
+                prevDayUsed,
+                recentUsed,
+              })
+            : d.planDeterministicNutritionDay({
+                prefs,
+                dayTarget,
+                catalog,
+                date: `${startDate}+${dayIndex}`,
+                prevDayUsed,
+                recentUsed,
+              });
+          prevDayUsed = new Set((day.comidas || []).map(c => c.dishSlug || "").filter(Boolean));
+          prevDayUsed.forEach(slug => recentUsed.add(slug));
+          days.push(day);
+        }
+        days.forEach(day => {
+          const contract = day.contract || d.validateDietContractTotals(day.totals || {}, day.target || dayTarget);
           const dayOk = day.ok && contract.ok;
           if (dayOk) okDays++;
           if (!day.ok) {
@@ -185,7 +211,7 @@ for (const mealCount of mealCounts) {
               addCause(globalCauses, item.reason || "solver_no_solution");
             });
           }
-          if (!contract.ok) {
+          if (!contract.ok && !day.contract) {
             contract.errors.forEach(error => {
               const key = causeKey(error);
               addCause(causes, key);
@@ -199,8 +225,8 @@ for (const mealCount of mealCounts) {
           target: targetId,
           dislike: dislike.id,
           okDays,
-          totalDays: week.days.length,
-          pct: pct(okDays, week.days.length),
+          totalDays: days.length,
+          pct: pct(okDays, days.length),
           causes,
         });
       }
@@ -217,6 +243,7 @@ const jsonMode = process.argv.includes("--json");
 
 const report = {
   contract: d.DIET_CONTRACT,
+  engine: useFinalizer ? "finalizeNutritionDay" : "planDeterministicNutritionDay",
   catalog: {
     ingredients: catalog.ingredients.length,
     dishes: catalog.dishes.length,
@@ -251,6 +278,7 @@ if (jsonMode) {
   console.log(JSON.stringify(report, null, 2));
 } else {
   console.log("=== Canary DIET_CONTRACT (REQ-128) ===");
+  console.log(`Motor: ${report.engine}.`);
   console.log(`Contrato: kcal ±3% o ±50 kcal; proteina ±5 g; carbohidratos ±8 g; grasa ±8 g.`);
   console.log(`Catalogo: ${report.catalog.ingredients} ingredientes · ${report.catalog.dishes} platos · ${report.catalog.dishIngredients} lineas de receta.`);
   console.log(`Matriz: ${rows.length} dimensiones × 7 dias = ${totalDays} dias.`);
@@ -267,7 +295,7 @@ if (jsonMode) {
     console.log(`  - ${key}: ${count}`);
   });
   if (belowGate.length) {
-    console.log(`\nCalibracion: ${belowGate.length} dimension(es) quedan bajo 98%; REQ-128 solo mide y REQ-129/132/135 deben cerrar esas brechas antes de activar runtime.`);
+    console.log(`\nCalibracion: ${belowGate.length} dimension(es) quedan bajo 98%; REQ-128/129 solo miden y REQ-137/132/135 deben cerrar esas brechas antes de activar runtime.`);
   } else {
     console.log("\nCalibracion: todas las dimensiones cumplen el gate futuro.");
   }

@@ -83,7 +83,7 @@ Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall
 Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes convergentes — Codex (`docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`) y sesión de arquitectura de Claude — fusionados y aprobados por Jonathan con tres decisiones: tolerancias estrictas ±3%/±50 kcal y ±5 g proteína sujetas a canario, Sonnet 5 solo tras gate de telemetría, y ampliación drástica del catálogo. Orden recomendado (REQ-128 y REQ-129 son un par: el contrato no se activa sin el solver):
 
 21. ~~REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad.~~ (implementado, P0)
-22. REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas. (P0)
+22. ~~REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas.~~ (implementado, P0)
 23. REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo. (P0)
 24. REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración. (P1)
 25. REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos. (P1)
@@ -1350,7 +1350,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-128`).
 
 ## REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas
 
-**Estado: pendiente.**
+**Estado: implementado.** `finalizeNutritionDay(ctx)` vive en `js/nutrition-domain.js`, se exporta en namespace/global y queda dormida: normaliza propuestas contra catálogo, descarta ingredientes desconocidos, completa slots faltantes con fallback determinista, conserva `lockedMeals`, calcula `totals`/`residual` y reporta `contract = validateDietContractTotals(...)` sin activar `DIET_CONTRACT.runtimeActive`. El canario `scripts/validate-diet-contract.mjs` ahora mide con `engine:"finalizeNutritionDay"` y el nuevo `scripts/validate-finalize-nutrition-day.mjs` cubre unknown ingredient, fallback, kcal desde catálogo, contract.ok y locked meal intacta.
 
 ### Origen
 

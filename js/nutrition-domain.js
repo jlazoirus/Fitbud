@@ -760,6 +760,267 @@
     return{macros:roundMacros(acc),knownCount,unknownCount,unknownNames,ingredientesResolved};
   }
 
+  // ── Puerta pura final de normalizacion nutricional (REQ-129 etapa 1) ────────
+  // Dormida: aun no cambia runtime ni rechazo visible. Sirve para que canarios y
+  // tests ejerzan una unica autoridad determinista antes de conectarla al shell.
+  function normalizeFinalizeSlots(ctx,dayTarget,prefs){
+    const generatedTargets=mealSlotTargets(dayTarget,prefs,ctx&&ctx.workoutContext);
+    const source=Array.isArray(ctx&&ctx.slots)&&ctx.slots.length?ctx.slots:generatedTargets;
+    return source.map((slot,index)=>{
+      const fallback=generatedTargets[index]||generatedTargets[generatedTargets.length-1]||{};
+      const rawId=slot&&((slot.id!=null&&slot.id)||(slot.slot_id!=null&&slot.slot_id)||slot.slotId||slot.slot);
+      const id=solverKey(rawId||fallback.id);
+      return {
+        id:MEAL_SLOT_VOCAB.has(id)?id:(fallback.id||id),
+        slot:(slot&&(slot.slot||slot.label||slot.name))||fallback.slot||id,
+        target:(slot&&slot.target)||fallback.target||dayTarget,
+        index,
+      };
+    }).filter(slot=>slot.id);
+  }
+
+  function proposalMealsFromContext(ctx){
+    const proposal=ctx&&ctx.proposal;
+    if(Array.isArray(proposal))return proposal;
+    if(Array.isArray(proposal&&proposal.comidas))return proposal.comidas;
+    if(Array.isArray(ctx&&ctx.comidas))return ctx.comidas;
+    return [];
+  }
+
+  function lockedMealsFromContext(ctx){
+    const source=ctx&&ctx.lockedMeals;
+    if(Array.isArray(source))return source;
+    if(source&&typeof source==="object"){
+      return Object.entries(source).map(([slotId,meal])=>({
+        ...(meal&&typeof meal==="object"?meal:{}),
+        slot_id:(meal&&meal.slot_id)||slotId,
+      }));
+    }
+    return [];
+  }
+
+  function cloneMeal(meal){
+    return JSON.parse(JSON.stringify(meal||{}));
+  }
+
+  function slotIdForMeal(meal,slotFallback){
+    const raw=meal&&(meal.slot_id||meal.slotId||meal.id||meal.slot)||slotFallback;
+    const key=solverKey(raw);
+    return MEAL_SLOT_VOCAB.has(key)?key:key;
+  }
+
+  function mealMacrosForTotals(meal){
+    return {
+      kcal:num(meal&&meal.kcal),
+      p:num(meal&&(meal.proteina_g!=null?meal.proteina_g:meal.p)),
+      c:num(meal&&(meal.carbohidratos_g!=null?meal.carbohidratos_g:meal.c)),
+      f:num(meal&&(meal.grasa_g!=null?meal.grasa_g:meal.f)),
+    };
+  }
+
+  function findDishForMeal(meal,catalog){
+    const dishes=Array.isArray(catalog&&catalog.dishes)?catalog.dishes:[];
+    if(!dishes.length)return null;
+    const dishId=meal&&(meal.dishId||meal.dish_id);
+    if(dishId!=null){
+      const byId=dishes.find(dish=>String(dish.id)===String(dishId));
+      if(byId)return byId;
+    }
+    const slug=String(meal&&(meal.dishSlug||meal.dish_slug||meal.slug)||"").trim();
+    if(slug){
+      const bySlug=dishes.find(dish=>slugFor(dish)===slug);
+      if(bySlug)return bySlug;
+    }
+    const nameKey=solverKey(meal&&(meal.nombre||meal.name||meal.dishName));
+    return nameKey?dishes.find(dish=>solverKey(dish&&dish.name)===nameKey)||null:null;
+  }
+
+  function normalizeSolvedMeal(solved,slot){
+    return {
+      slot_id:slot.id,
+      nombre:solved.dish&&solved.dish.name,
+      dishSlug:slugFor(solved.dish),
+      dishId:solved.dish&&solved.dish.id,
+      ingredientes:solved.ingredients.map(({nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g})=>({
+        nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g,
+      })),
+      kcal:solved.macros.kcal,
+      proteina_g:solved.macros.p,
+      carbohidratos_g:solved.macros.c,
+      grasa_g:solved.macros.f,
+      residual:solved.residual,
+      score:Number((solved.score||0).toFixed(4)),
+      source:"catalog_solver",
+    };
+  }
+
+  function normalizeProposalMeal(meal,slot,prefs,catalog,maps){
+    const dish=findDishForMeal(meal,catalog);
+    const label=meal&&(meal.nombre||meal.name||meal.dishName)||"comida propuesta";
+    if(dish){
+      if(!compatibleSlotsForDish(dish).includes(slot.id)){
+        return{ok:false,reason:"dish_slot_incompatible",detail:`${dish.name} no corresponde a ${slot.id}.`,meal};
+      }
+      if(!dishDietAllowed(dish,prefs,catalog,maps)){
+        return{ok:false,reason:"dish_restricted",detail:`${dish.name} no respeta las preferencias/restricciones.`,meal};
+      }
+    }
+
+    const ingredients=Array.isArray(meal&&meal.ingredientes)?meal.ingredientes:[];
+    if(ingredients.length){
+      const text=[label,...ingredients.map(ing=>ing&&ing.nombre||ing&&ing.name)].filter(Boolean).join(" ");
+      const conflict=foodTextViolatesTerms(text,solverRestrictionTerms(prefs));
+      if(conflict){
+        return{ok:false,reason:"restricted_ingredient",detail:conflict,meal};
+      }
+      const recalculated=recalcCoachMealMacros(meal,catalog);
+      if(recalculated.unknownCount>0){
+        return{ok:false,reason:"unknown_ingredient",detail:recalculated.unknownNames.join(", "),meal};
+      }
+      const macros=recalculated.macros;
+      return{ok:true,meal:{
+        slot_id:slot.id,
+        nombre:String(label),
+        dishSlug:dish?slugFor(dish):String(meal&&meal.dishSlug||meal&&meal.dish_slug||"").trim(),
+        dishId:dish&&dish.id,
+        ingredientes:recalculated.ingredientesResolved.map(ing=>({
+          nombre:ing.nombre,
+          gramos:Math.round(num(ing.gramos)),
+          ingredientSlug:ing.ingredientSlug,
+          kcal:ing.kcal,
+          proteina_g:ing.p,
+          carbohidratos_g:ing.c,
+          grasa_g:ing.f,
+        })),
+        kcal:macros.kcal,
+        proteina_g:macros.p,
+        carbohidratos_g:macros.c,
+        grasa_g:macros.f,
+        source:"proposal_recalculated",
+      }};
+    }
+
+    if(dish){
+      const solved=solveDishPortion(dish,slot.target,{catalog});
+      if(!solved.ok)return{ok:false,reason:solved.no_solution||"dish_without_solution",meal};
+      return{ok:true,meal:normalizeSolvedMeal(solved,slot)};
+    }
+
+    return{ok:false,reason:"meal_without_catalog_match",detail:String(label),meal};
+  }
+
+  function contractCauseKey(error){
+    const text=String(error||"").toLowerCase();
+    if(text.includes("kcal"))return"kcal_contract";
+    if(text.includes("proteina"))return"protein_contract";
+    if(text.includes("carbohidratos"))return"carbs_contract";
+    if(text.includes("grasa"))return"fat_contract";
+    return"contract_miss";
+  }
+
+  function dayResidual(target,totals){
+    return {
+      kcal:Math.round(num(target&&target.kcal)-num(totals&&totals.kcal)),
+      p:Math.round(num(target&&target.p)-num(totals&&totals.p)),
+      c:Math.round(num(target&&target.c)-num(totals&&totals.c)),
+      f:Math.round(num(target&&target.f)-num(totals&&totals.f)),
+    };
+  }
+
+  function finalizeNutritionDay(ctx){
+    const prefs=ctx&&ctx.prefs||{};
+    const dayTarget=ctx&&ctx.dayTarget||ctx&&ctx.target||{kcal:2000,p:150,c:200,f:65};
+    const target={kcal:num(dayTarget.kcal),p:num(dayTarget.p),c:num(dayTarget.c),f:num(dayTarget.f)};
+    const catalog=ctx&&ctx.catalog||{};
+    const maps=catalogMaps(catalog);
+    const slots=normalizeFinalizeSlots(ctx,target,prefs);
+    const bySlot=new Map();
+    const lockedSlotIds=new Set();
+    const diagnostics=[];
+    const causes=[];
+
+    lockedMealsFromContext(ctx).forEach(locked=>{
+      const slotId=slotIdForMeal(locked);
+      if(!slotId)return;
+      const copy=cloneMeal(locked);
+      if(!copy.slot_id)copy.slot_id=slotId;
+      bySlot.set(slotId,copy);
+      lockedSlotIds.add(slotId);
+    });
+
+    const slotById=new Map(slots.map(slot=>[slot.id,slot]));
+    proposalMealsFromContext(ctx).forEach((meal,index)=>{
+      const slotId=slotIdForMeal(meal,slots[index]&&slots[index].id);
+      const slot=slotById.get(slotId)||slots[index];
+      if(!slot){
+        diagnostics.push({reason:"proposal_without_slot",detail:meal&&meal.nombre||meal&&meal.name||""});
+        return;
+      }
+      if(lockedSlotIds.has(slot.id)){
+        diagnostics.push({slot:slot.id,reason:"slot_locked",detail:"La comida registrada se conserva sin cambios."});
+        return;
+      }
+      if(bySlot.has(slot.id)){
+        diagnostics.push({slot:slot.id,reason:"duplicate_slot",detail:"Ya existe una comida para este slot."});
+        return;
+      }
+      const normalized=normalizeProposalMeal(meal,slot,prefs,catalog,maps);
+      if(normalized.ok){
+        bySlot.set(slot.id,normalized.meal);
+      }else{
+        diagnostics.push({slot:slot.id,reason:normalized.reason,detail:normalized.detail||"",mealName:meal&&meal.nombre||meal&&meal.name||""});
+      }
+    });
+
+    const fallback=planDeterministicNutritionDay({
+      prefs,
+      dayTarget:target,
+      catalog,
+      slots,
+      workoutContext:ctx&&ctx.workoutContext,
+      date:ctx&&ctx.date,
+      prevDayUsed:ctx&&ctx.prevDayUsed,
+      recentUsed:ctx&&ctx.recentUsed,
+    });
+    const fallbackBySlot=new Map((fallback.comidas||[]).map(meal=>[slotIdForMeal(meal),meal]));
+    slots.forEach(slot=>{
+      if(bySlot.has(slot.id))return;
+      const meal=fallbackBySlot.get(slot.id);
+      if(meal){
+        bySlot.set(slot.id,{...cloneMeal(meal),source:"deterministic_fallback"});
+      }else{
+        const fallbackCause=(fallback.no_solution||[]).find(item=>item&&item.slot===slot.id);
+        causes.push({slot:slot.id,reason:(fallbackCause&&fallbackCause.reason)||"slot_without_solution"});
+      }
+    });
+
+    const comidas=slots.map(slot=>bySlot.get(slot.id)).filter(Boolean);
+    const totals=roundMacros(comidas.reduce((sum,meal)=>addMacros(sum,mealMacrosForTotals(meal)),{kcal:0,p:0,c:0,f:0}));
+    const contract=validateDietContractTotals(totals,target);
+    if(!contract.ok){
+      contract.errors.forEach(error=>{
+        causes.push({reason:contractCauseKey(error),detail:error});
+      });
+      if(lockedMealsFromContext(ctx).length){
+        causes.push({reason:"locked_meal_contract_miss",detail:"Una comida registrada impide cerrar el contrato del día."});
+      }
+    }
+    const status=causes.length||!contract.ok?"no_solution":"ok";
+    return {
+      ok:status==="ok",
+      status,
+      no_solution:status==="no_solution"?causes:null,
+      diagnostics,
+      totals,
+      target,
+      residual:dayResidual(target,totals),
+      contract,
+      comidas,
+      fallbackDiagnostics:fallback.diagnostics||[],
+      source:"finalizeNutritionDay",
+    };
+  }
+
   // ── Lista de compras desde plan semanal estructurado ─────────────────────────
   // days: array de {comidas:[{ingredientes:[{ingredientSlug, nombre, gramos}]}]}
   // Agrupa por ingredientSlug (o slugFor como fallback) y suma gramos.
@@ -879,6 +1140,7 @@
     validateReplacementFeasibility,
     mealSlotTargets,
     compatibleDishesForSlot,
+    finalizeNutritionDay,
     solveDishPortion,
     planDeterministicNutritionDay,
     rankReplacementCandidates,
@@ -907,6 +1169,7 @@
   root.validateReplacementFeasibility=validateReplacementFeasibility;
   root.mealSlotTargets=mealSlotTargets;
   root.compatibleDishesForSlot=compatibleDishesForSlot;
+  root.finalizeNutritionDay=finalizeNutritionDay;
   root.solveDishPortion=solveDishPortion;
   root.planDeterministicNutritionDay=planDeterministicNutritionDay;
 })(typeof window!=="undefined"?window:globalThis);
