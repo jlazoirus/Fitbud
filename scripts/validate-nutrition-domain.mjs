@@ -156,4 +156,26 @@ assert.equal(d.NUTRITION_TOLERANCES.TARGET_KCAL_DELTA, 10, "tolerancia target = 
 assert.equal(d.NUTRITION_TOLERANCES.DAY_KCAL_PCT, 0.15, "tolerancia día = 15%");
 assert.equal(d.NUTRITION_TOLERANCES.SLOT_KCAL_PCT, 0.25, "tolerancia slot = 25%");
 
+// ── DIET_CONTRACT (REQ-128) ──────────────────────────────────────────────────
+assert.equal(d.DIET_CONTRACT.version, 1, "DIET_CONTRACT versionado");
+assert.equal(d.DIET_CONTRACT.runtimeActive, false, "REQ-128 no activa runtime");
+assert.equal(d.DIET_CONTRACT.authoritativeKcal, "catalog_ingredient_kcal",
+  "kcal autoritativa debe venir del catalogo de ingredientes");
+assert.equal(d.DIET_CONTRACT.kcal.percent, 0.03, "kcal = ±3%");
+assert.equal(d.DIET_CONTRACT.kcal.minDelta, 50, "kcal = mínimo ±50");
+assert.equal(d.DIET_CONTRACT.protein.grams, 5, "proteína = ±5 g bilateral");
+assert.equal(d.DIET_CONTRACT.carbs.grams, 8, "carbohidratos = ±8 g");
+assert.equal(d.DIET_CONTRACT.fat.grams, 8, "grasa = ±8 g");
+assert.equal(d.dietContractTolerance("kcal", 1200), 50, "kcal usa el mínimo cuando 3% < 50");
+assert.equal(d.dietContractTolerance("kcal", 2400), 72, "kcal usa 3% cuando supera 50");
+
+const strictOk = d.validateDietContractTotals({ kcal: 2045, p: 146, c: 207, f: 59 }, target);
+assert.ok(strictOk.ok, "día dentro de DIET_CONTRACT debe pasar");
+const strictBad = d.validateDietContractTotals({ kcal: 1930, p: 158, c: 220, f: 78 }, target);
+assert.ok(!strictBad.ok, "día fuera de DIET_CONTRACT debe fallar");
+assert.ok(strictBad.errors.some(e => /proteina/i.test(e)),
+  "DIET_CONTRACT debe detectar proteína por exceso también");
+assert.ok(strictBad.errors.some(e => /carbohidratos/i.test(e)),
+  "DIET_CONTRACT debe validar carbohidratos bilateralmente");
+
 console.log("validate-nutrition-domain: todos los checks pasaron.");

@@ -54,8 +54,8 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 
 Automatizable por el agente desarrollador:
 
-1. REQ-81 - Planner semanal nutricional determinista y lista de compras derivada.
-2. REQ-82 - Plan nutricional activo versionado en `plan_versions`.
+1. ~~REQ-81 - Planner semanal nutricional determinista y lista de compras derivada.~~ (implementado)
+2. ~~REQ-82 - Plan nutricional activo versionado en `plan_versions`.~~ (implementado)
 3. ~~REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.~~ (implementado)
 4. ~~REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.~~ (implementado)
 
@@ -74,7 +74,7 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 15. ~~REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta.~~ (implementado, P1)
 16. ~~REQ-108 - Perfil: guardado por sección con aviso de cambios sin guardar.~~ (implementado, P1)
 17. ~~REQ-109 - Fix Home: badge "N pendientes" cuenta la fila de Descanso.~~ (implementado, P2)
-18. REQ-110 - Fix: catch de aiGenerateWeek sin salida — opción práctica y reintento. (P1)
+18. ~~REQ-110 - Fix: catch de aiGenerateWeek sin salida — opción práctica y reintento.~~ (implementado, P1)
 19. ~~REQ-111 - Fix API: /api/checkout valida Stripe antes que la sesión.~~ (implementado por REQ-59; entrada duplicada, no reabrir)
 20. ~~REQ-112 - Accesibilidad: toasts aria-live y contraste de texto muted.~~ (implementado, P2)
 
@@ -82,7 +82,7 @@ Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall
 
 Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes convergentes — Codex (`docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`) y sesión de arquitectura de Claude — fusionados y aprobados por Jonathan con tres decisiones: tolerancias estrictas ±3%/±50 kcal y ±5 g proteína sujetas a canario, Sonnet 5 solo tras gate de telemetría, y ampliación drástica del catálogo. Orden recomendado (REQ-128 y REQ-129 son un par: el contrato no se activa sin el solver):
 
-21. REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad. (P0)
+21. ~~REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad.~~ (implementado, P0)
 22. REQ-129 - `finalizeNutritionDay()`: autoridad determinista única, cierre global del día y activación del contrato. (P0)
 23. REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo. (P0)
 24. REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración. (P1)
@@ -621,443 +621,33 @@ Los siguientes REQ conservan detalle completo porque son trabajo operativo recie
 
 ## REQ-80 - Solver determinista de porciones para preparar un día nutricional
 
-**Estado: implementado (2026-06-30).**
+**Estado: implementado.** Agrega `planDeterministicNutritionDay()`, `solveDishPortion()` y filtros por slot/restricciones usando ingredientes reales como fallback principal cuando el coach no está disponible.
 
-### Origen
-
-Los bugs REQ-64, REQ-75 y REQ-76 muestran el mismo patrón: el sistema le pide al modelo que ajuste gramos y macros, luego intenta corregir con prompt engineering o con más platos. El análisis recomienda mover esa aritmética a un solver determinista que trabaje sobre ingredientes, gramos y metadata del catálogo.
-
-### Problema
-
-`deterministicDayPayload()` existe como fallback, pero usa constantes y divisiones aproximadas. No calcula porciones desde la composición real de cada receta ni puede explicar cuándo un plato no alcanza las metas dentro de límites palatables. En cambio, el camino principal de `generateOneDay()` sigue dependiendo de una respuesta textual con macros declarados.
-
-### Objetivo
-
-Crear un solver determinista que, dado un perfil, target diario, slots del día y catálogo compatible, produzca un día nutricional completo con platos, ingredientes en gramos y macros recalculados. Debe funcionar sin llamadas externas y convertirse en el fallback principal de "Preparar mi día".
-
-### Dependencias
-
-- Requiere REQ-77 para targets consistentes.
-- Requiere REQ-78 para contratos de dominio nutricional.
-- Requiere idealmente REQ-79 para `compatible_slots` y límites de escalado; si REQ-79 no está aplicado en producción, debe degradar usando `slot` y defaults seguros.
-
-### Alcance
-
-1. Implementar en el módulo nutricional puro funciones como:
-   - `mealSlotTargets(dayTarget, prefs, workoutContext)`;
-   - `compatibleDishesForSlot(slot, prefs, catalog)`;
-   - `solveDishPortion(dish, mealTarget, options)`;
-   - `planDeterministicNutritionDay(ctx)`.
-2. El solver debe optimizar `kcal`, proteína, carbohidratos y grasa como dimensiones independientes:
-   - no asumir que cuadrar P/C/F cuadra kcal;
-   - recalcular kcal desde `ingredients.kcal`;
-   - devolver residual y score por dimensión.
-3. Definir límites:
-   - gramos mínimos, máximos y step por ingrediente cuando existan;
-   - defaults conservadores cuando no existan;
-   - topes palatables para evitar porciones absurdas.
-4. Manejar `no_solution` de forma explícita:
-   - plato incompatible;
-   - proteína insuficiente;
-   - kcal fuera de tolerancia;
-   - ingrediente sin macros;
-   - slot sin candidatos.
-5. Integrar el solver como fallback principal en:
-   - `homePrepareDay()` cuando no hay coach disponible;
-   - la preparación inicial de semana (`prepareFirstWeekNutrition()`) ante fallo del servicio;
-   - `deterministicDayPayload()` o reemplazo equivalente.
-6. Mantener la UI sin lenguaje técnico: si no hay solución perfecta, mostrar una opción viable y un mensaje neutral, no detalles del solver.
-7. Agregar tests:
-   - metas normales y altas de proteína;
-   - perfil vegano/vegetariano/omnívoro;
-   - 2, 4 y 6 comidas;
-   - slot sin candidatos devuelve `no_solution` medible;
-   - kcal se valida con `ingredients.kcal`.
-
-### Fuera de alcance
-
-- No guardar todavía el día en `plan_versions.snapshot.nutritionPlan`.
-- No reemplazar por completo la generación semanal con coach.
-- No crear recetas nuevas.
-- No ejecutar migraciones de producción.
-
-### Riesgos
-
-- El catálogo puede no tener suficientes platos para metas extremas; eso debe producir una causa medible, no una tolerancia escondida.
-- El solver puede elegir porciones matemáticamente correctas pero poco apetecibles; los límites de porción son parte crítica del alcance.
-- Cambiar el fallback puede alterar expectativas de usuarios sin coach; debe verificarse en Home y Nutrición móvil.
-
-### Criterios de aceptación
-
-- "Preparar mi día" puede llenar un día válido sin llamar a `/api/claude`.
-- El día generado contiene platos, ingredientes con gramos y macros calculados por el motor.
-- Para metas altas de proteína, el solver combina opciones compatibles o devuelve una causa `no_solution` sin dejar el día vacío.
-- Los totales del día quedan dentro de la tolerancia documentada.
-- No se muestran palabras prohibidas por REQ-31.
-- `node scripts/validate-nutrition-solver.mjs` pasa.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Servir local y desactivar disponibilidad del coach; usar "Preparar mi día" en Home.
-- Probar perfiles de 2, 4 y 6 comidas.
-- Revisar red: cero llamadas a `/api/claude` durante el fallback determinista.
-- `node scripts/validate-nutrition-solver.mjs`.
-
----
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-80`).
 
 ## REQ-81 - Planner semanal nutricional determinista y lista de compras derivada
 
-**Estado: implementado.**
-Funciones puras `planNutritionWeek`, `scoreWeeklyVariety` y `buildShoppingListFromNutritionPlan` en `js/nutrition-domain.js`. Integradas en `aiGenerateWeek()` como ruta determinista cuando el coach no está disponible. `genWeekReviewHtml()` muestra resumen semanal, advertencias de variedad y lista de compras por slug. Tests en `scripts/validate-nutrition-week-planner.mjs`.
+**Estado: implementado.** Agrega `planNutritionWeek(ctx)`, variedad semanal y lista de compras agregada desde el plan nutricional determinista.
 
-### Origen
-
-Fitbros ya muestra borradores semanales y lista de compras cuando genera una semana, pero esa lista depende del resultado generado y no de un plan nutricional determinista estable. El análisis propone que la lista de compras sea una derivación del plan semanal estructurado, no un artefacto textual del coach.
-
-### Problema
-
-El usuario puede preparar una semana, pero la coherencia depende de respuestas externas y de overrides. Además, si luego se necesita operar sin coach o controlar costo, no existe un planner semanal determinista equivalente al generador de entrenamiento validado.
-
-### Objetivo
-
-Crear un planner semanal que use el solver diario para producir 7 días estructurados, controle repetición, respete restricciones y genere lista de compras agregada desde ingredientes y gramos aplicados.
-
-### Dependencias
-
-- Requiere REQ-80.
-- Aprovecha REQ-79 para variedad por slots y metadata.
-
-### Alcance
-
-1. Implementar funciones puras:
-   - `planNutritionWeek(ctx)`;
-   - `scoreWeeklyVariety(days, prefs)`;
-   - `buildShoppingListFromNutritionPlan(days)`.
-2. Generar exactamente 7 días desde fecha de inicio seleccionada.
-3. Controlar repetición:
-   - evitar repetir plato igual en días consecutivos si hay alternativa compatible;
-   - respetar `repeatPreference` cuando exista;
-   - permitir repetición pragmática si el catálogo no ofrece alternativas.
-4. Generar lista de compras por ingrediente:
-   - agrupar por `ingredientSlug` o fallback estable;
-   - sumar gramos;
-   - conservar nombre visible y categoría;
-   - redondear cantidades a unidades razonables cuando aplique.
-5. Integrar como fallback o modo determinista en el flujo actual de "Preparar mi semana", manteniendo revisión antes de aplicar.
-6. El borrador semanal debe mostrar:
-   - resumen de kcal/proteína promedio;
-   - advertencias de slots sin variedad;
-   - lista de compras derivada;
-   - botón para aplicar como hoy.
-7. Agregar tests de semana:
-   - suma diaria en tolerancia;
-   - lista de compras coincide con ingredientes de los 7 días;
-   - no duplica ingredientes por nombre distinto si comparten slug;
-   - respeta restricciones duras.
-
-### Fuera de alcance
-
-- No mover todavía el plan semanal activo a `plan_versions`.
-- No construir rebalanceo de reemplazos.
-- No crear panel nuevo de inventario o despensa.
-
-### Riesgos
-
-- El catálogo puede ser insuficiente para variedad real en 5-6 comidas; debe avisarse como limitación de catálogo, no fallar silenciosamente.
-- Si no existen slugs, la agregación de compras debe usar fallback seguro hasta REQ-79.
-
-### Criterios de aceptación
-
-- "Preparar mi semana" tiene una ruta determinista sin llamada externa cuando el coach no está disponible.
-- El borrador semanal contiene 7 días con comidas estructuradas y lista de compras derivada de ingredientes reales.
-- La lista de compras suma exactamente lo aplicado en los días del borrador, dentro de redondeos documentados.
-- Restricciones duras se respetan en todos los días.
-- `node scripts/validate-nutrition-week-planner.mjs` pasa.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Desactivar coach y preparar una semana.
-- Probar perfil vegetariano, vegano y omnívoro.
-- Comparar manualmente un ingrediente repetido en varios días contra su total en compras.
-- `node scripts/validate-nutrition-week-planner.mjs`.
-
----
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-81`).
 
 ## REQ-82 - Plan nutricional activo versionado en `plan_versions`
 
-**Estado: implementado.**
-`validateNutritionPlanSnapshot()` en `domain-contracts.js`. `buildNutritionPlanSnapshot()`, `saveNutritionPlanVersion()` y `activeNutritionPlanDay()` en `index.html`. `buildDay()` lee primero el nutritionPlan activo; `mealValue()` añade capa `nutritionPlan` entre override y fallback vacío. `applyWeekPlan()` guarda en `plan_versions` (con compatibilidad de override). Tests en `scripts/validate-nutrition-plan-snapshot.mjs`.
+**Estado: implementado.** Versiona nutrición activa en `plan_versions.snapshot.nutritionPlan`; Home lee prescripción desde snapshot y `day_log` queda como compatibilidad/override.
 
-### Origen
-
-El análisis identificó la falla arquitectónica más importante: la prescripción nutricional vive como overrides de `day_log.state.meals`, mientras `day_log` debería representar ejecución. Fitbros ya tiene `plan_versions` para entrenamiento y snapshots de plan; nutrición debe usar el mismo patrón.
-
-### Problema
-
-Actualmente:
-
-- `buildDay(ds)` puede construir slots vacíos.
-- `applyDayComidas()` guarda comidas generadas como overrides en `day_log`.
-- `day_log` mezcla prescripción, cambios y ejecución.
-- Auditar qué plan vio el usuario en una fecha futura o pasada depende de reconstruir estado mutable y overrides.
-
-Esto debilita historial inmutable, sync, reemplazos y compras.
-
-### Objetivo
-
-Guardar el plan nutricional prescrito como entidad de primera clase dentro de `plan_versions.snapshot.nutritionPlan`, con snapshots materializados y auditables. `day_log` debe quedar para registrar lo ejecutado, cambios aplicados, extras y estado offline, no como fuente principal de prescripción.
-
-### Dependencias
-
-- Requiere REQ-79 antes de guardar referencias estables.
-- Requiere REQ-80 o REQ-81 para producir planes estructurados.
-- Debe respetar REQ-13: versiones futuras no reescriben historial.
-
-### Alcance
-
-1. Definir schema de `nutritionPlan` dentro de `plan_versions.snapshot`:
-   - `version`;
-   - `catalogVersion` o fecha de catálogo si existe;
-   - `days[]`;
-   - `day.date`;
-   - `day.target`;
-   - `day.meals[]`;
-   - `meal.id` estable dentro del plan;
-   - `meal.slot`;
-   - `meal.dishSlug`, `dishName` y opcional `dishId` operativo;
-   - `meal.ingredients[]` con `ingredientSlug`, `name`, `grams`, macros por línea opcionales;
-   - `meal.macros` calculados al activar;
-   - `shoppingList`.
-2. Guardar snapshots materializados: aunque el catálogo cambie después, el snapshot conserva nombre, gramos y macros usados en ese momento.
-3. Adaptar `buildDay(ds)` para leer primero la prescripción de `nutritionPlan` activa para la fecha:
-   - si existe, renderiza comidas desde snapshot;
-   - si no existe, usa el fallback actual.
-4. Adaptar `mealValue()` para resolver:
-   - ejecución/override de `day_log` cuando exista;
-   - prescripción de `nutritionPlan`;
-   - catálogo DB/fallback solo como compatibilidad.
-5. Adaptar `applyDayComidas()` y flujos de aplicar semana:
-   - crear o actualizar borrador de `plan_versions` con `nutritionPlan`;
-   - activar solo después de confirmación;
-   - no escribir prescripción como override del día salvo compatibilidad temporal necesaria.
-6. Mantener `day_log.state.meals` para:
-   - `done`;
-   - replacement aplicado;
-   - edición manual real del día;
-   - notas/contingencias;
-   - estado de sync/conflicto.
-7. Migración/backfill:
-   - no intentar reconstruir todo el pasado;
-   - para perfiles sin `nutritionPlan`, seguir usando compatibilidad hasta que preparen día/semana;
-   - no borrar overrides existentes.
-8. Agregar validador de snapshot:
-   - every meal has slug/materialized name/macros;
-   - day targets sum within tolerance;
-   - shopping list matches days if present.
-
-### Fuera de alcance
-
-- No cambiar tablas SQL si `plan_versions.snapshot` JSONB es suficiente.
-- No reescribir historial existente.
-- No resolver reemplazos con rebalanceo; eso es REQ-83.
-
-### Riesgos
-
-- Mezclar snapshots nuevos con overrides antiguos puede duplicar comidas si no se define prioridad clara.
-- Los service workers viejos pueden servir una versión de `index.html` incompatible; subir `CACHE_NAME` si se toca el shell PWA.
-- El sync offline debe seguir considerando `day_log` como ejecución, no plan.
-
-### Criterios de aceptación
-
-- Un plan nutricional nuevo queda guardado en `plan_versions.snapshot.nutritionPlan`.
-- `buildDay()` renderiza comidas prescritas desde `nutritionPlan` sin depender de overrides en `day_log`.
-- Marcar una comida como hecha escribe ejecución en `day_log` sin modificar el snapshot prescrito.
-- Cambiar un plan futuro no reescribe días ya ejecutados.
-- Snapshots siguen auditables aunque cambie el catálogo, porque guardan slugs, nombres, gramos y macros materializados.
-- `node scripts/validate-nutrition-plan-snapshot.mjs` pasa.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Preparar una semana, activar, recargar y confirmar que `plan_versions.snapshot.nutritionPlan` contiene días y compras.
-- Marcar una comida, recargar y confirmar que el snapshot no cambia pero `day_log` sí.
-- Cambiar catálogo localmente y confirmar que el día histórico sigue mostrando lo materializado en el snapshot.
-
----
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-82`).
 
 ## REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras
 
-**Estado: implementado.** Motor puro `rankReplacementCandidates`, `solveReplacement`, `rebalanceFutureMeals` en `js/nutrition-domain.js`; `openChangeMeal`/`applyChangeMeal`/`revertMeal` en `index.html` enriquecidos con ranking y rebalanceo; contingencyLog incluye comidas rebalanceadas; 9 tests en `scripts/validate-nutrition-replacements.mjs`.
+**Estado: implementado.** Agrega ranking de reemplazos equivalentes y rebalanceo de comidas futuras no registradas, con reversión segura.
 
-### Origen
-
-REQ-36 unificó acciones de comida y REQ-19 agregó contingencias, pero el reemplazo actual sigue siendo principalmente una lista de platos con delta de kcal. El análisis nutricional propone el comportamiento tipo Fitia: cambiar una comida sin romper el día ni reescribir lo ya ejecutado.
-
-### Problema
-
-Hoy cambiar una comida:
-
-- muestra impacto, pero no siempre conserva coherencia de macros diarios;
-- no rebalancea el resto del día;
-- puede dejar déficit/exceso que el usuario debe resolver manualmente;
-- no usa todavía un solver de porciones ni una prescripción nutricional activa.
-
-### Objetivo
-
-Convertir "Cambiar" en un reemplazo equivalente: elegir alternativas compatibles, ajustar porciones y, cuando sea necesario, rebalancear comidas futuras no registradas para conservar los objetivos diarios. El usuario debe ver el impacto antes de confirmar.
-
-### Dependencias
-
-- Requiere REQ-80 para solver.
-- Requiere REQ-82 para distinguir prescripción de ejecución de forma robusta.
-
-### Alcance
-
-1. Implementar motor puro de reemplazo:
-   - `rankReplacementCandidates(meal, candidates, target, prefs)`;
-   - `solveReplacement(meal, candidate, dayPlan, dayLog)`;
-   - `rebalanceFutureMeals(dayPlan, changedMeal, dayLog)`.
-2. En el modal/hoja de "Cambiar":
-   - listar candidatos por cercanía a kcal/proteína y restricciones;
-   - mostrar delta de kcal, proteína, carbohidratos y grasa;
-   - indicar si requiere rebalancear otra comida futura;
-   - conservar motivo opcional y alcance.
-3. Rebalancear solo comidas del mismo día que:
-   - no estén marcadas como hechas;
-   - no tengan edición manual explícita;
-   - no pertenezcan a días completados.
-4. Si no se puede rebalancear:
-   - permitir aplicar con advertencia neutral si queda dentro de tolerancia aceptable;
-   - o bloquear si rompe restricciones/targets de forma severa.
-5. Guardar en `day_log.state.contingencyLog`:
-   - comida original;
-   - comida nueva;
-   - gramos/macros;
-   - comidas rebalanceadas;
-   - motivo;
-   - timestamp.
-6. Mantener "Volver al plan":
-   - revierte reemplazo y rebalanceos asociados cuando sea seguro;
-   - nunca borra registros ejecutados.
-7. Agregar tests:
-   - reemplazo dentro de tolerancia sin rebalanceo;
-   - reemplazo que rebalancea cena futura;
-   - comida ya registrada no se toca;
-   - día completado no se reescribe;
-   - restricciones duras bloquean candidato.
-
-### Fuera de alcance
-
-- No resolver rebalanceo semanal completo; este REQ opera por día.
-- No crear recetas nuevas.
-- No cambiar el flujo de entrenamiento.
-
-### Riesgos
-
-- Rebalancear silenciosamente puede erosionar confianza; cada cambio debe mostrarse antes de confirmar.
-- Revertir debe ser cuidadoso para no borrar acciones hechas después del reemplazo.
-- Los conflictos offline pueden involucrar cambios rebalanceados; el log debe ser claro.
-
-### Criterios de aceptación
-
-- Cambiar una comida propone alternativas compatibles rankeadas por cercanía a la meta.
-- Si el reemplazo desbalancea el día, el sistema propone ajustes en comidas futuras no registradas antes de aplicar.
-- Ninguna comida ya marcada como hecha se modifica por rebalanceo.
-- "Volver al plan" revierte el cambio sin borrar ejecución real.
-- El resumen del día muestra la adaptación y cualquier rebalanceo aplicado.
-- `node scripts/validate-nutrition-replacements.mjs` pasa.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Día con desayuno hecho y almuerzo pendiente: cambiar almuerzo y confirmar que desayuno no cambia.
-- Día con comida futura disponible: aplicar reemplazo alto en kcal y confirmar rebalanceo propuesto.
-- Forzar offline, aplicar cambio, reconectar y confirmar que sync mantiene log y estado.
-
----
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-83`).
 
 ## REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros
 
-**Estado: implementado.** `recalcCoachMealMacros(comida, catalog)` y `normalizeCoachIngredient` en `js/nutrition-domain.js` calculan macros reales desde el catálogo. `validateGeneratedDay` en `index.html` ignora macros declarados por el coach cuando el catálogo está disponible; marca ingredientes desconocidos con `needs_catalog_review`; mantiene fallback declarado cuando el catálogo no está cargado. 8 tests en `scripts/validate-nutrition-coach-contract.mjs`.
+**Estado: implementado.** Recalcula macros de comidas propuestas desde el catálogo real con `recalcCoachMealMacros()`; los macros declarados por el coach dejan de ser autoridad.
 
-### Origen
-
-El análisis concluye que los parches de prompt no deben seguir siendo la forma principal de corregir aritmética nutricional. La IA debe aportar variedad, explicación y traducción de preferencias, pero el sistema debe mapear ingredientes, calcular macros, ajustar porciones y validar antes de aplicar.
-
-### Problema
-
-`generateOneDay()` y flujos similares todavía dependen de respuestas que declaran macros y gramos. Aunque hay validaciones, el modelo sigue siendo la fuente inicial de un cálculo que debería ser determinista. Esto genera fallos recurrentes con metas altas, restricciones, porciones y catálogo incompleto.
-
-### Objetivo
-
-Reubicar al coach nutricional como capa auxiliar: propone recetas o alternativas, pero Fitbros solo aplica resultados que el motor nutricional pueda normalizar, recalcular y validar. La experiencia visible sigue siendo la misma: "tu coach" prepara opciones; internamente, el motor decide si son aplicables.
-
-### Dependencias
-
-- Requiere REQ-78 y REQ-80.
-- Idealmente requiere REQ-79 para mapear recetas a slugs/metadata.
-- Debe respetar REQ-31, REQ-32 y REQ-25.
-
-### Alcance
-
-1. Cambiar el contrato de generación nutricional:
-   - el coach puede proponer nombre, slot, ingredientes y preparación;
-   - macros declarados por la respuesta son informativos o ignorados;
-   - el motor calcula macros reales desde ingredientes mapeados.
-2. Implementar normalización de ingredientes:
-   - match por `ingredientSlug` si existe;
-   - match por nombre normalizado;
-   - si el ingrediente no existe, marcar `needs_catalog_review` o usar sustituto aprobado;
-   - no aplicar recetas con ingredientes desconocidos como plan activo.
-3. Pasar toda propuesta por:
-   - restricciones duras;
-   - solver de porciones;
-   - tolerancias del día/slot;
-   - validación de ingredientes conocidos;
-   - entitlement/cuota existente.
-4. Mantener fallback determinista:
-   - si el coach falla o propone algo inválido, usar solver determinista;
-   - no dejar el día vacío.
-5. Guardar resultados válidos en un pool privado solo si son recalculables y compatibles con el perfil actual.
-6. Opcional en este REQ si el alcance alcanza: crear una cola/admin de "recetas candidatas" para que recetas nuevas se revisen antes de entrar al catálogo global.
-7. Actualizar tests de `api/claude.js`/quota:
-   - respuesta con macros falsos pero ingredientes conocidos se recalcula;
-   - ingrediente desconocido no se aplica;
-   - restricción dura bloquea;
-   - quota agotada usa fallback sin llamada externa.
-
-### Fuera de alcance
-
-- No crear automáticamente recetas globales sin revisión.
-- No ampliar catálogo masivo.
-- No mostrar detalles técnicos al usuario.
-- No consumir servicios pagados fuera de las llamadas ya controladas por cuota.
-
-### Riesgos
-
-- Mapear ingredientes por nombre puede producir falsos positivos; debe preferirse slug o selección de catálogo.
-- Rechazar demasiadas propuestas puede reducir variedad; el fallback determinista debe cubrir la experiencia.
-- Si se guarda pool privado, debe revalidarse ante cambios de perfil.
-
-### Criterios de aceptación
-
-- Ninguna comida generada por el coach se aplica usando macros declarados como autoridad.
-- Las macros visibles salen del motor sobre ingredientes conocidos y gramos finales.
-- Una propuesta con ingrediente desconocido queda bloqueada o marcada para revisión, sin aplicarse como plan activo.
-- Al fallar una propuesta, el usuario recibe una opción determinista válida.
-- Se mantiene el techo de cuota y el vocabulario invisible.
-- `node scripts/test-coach-quota.mjs` pasa.
-- `node scripts/validate-nutrition-coach-contract.mjs` pasa.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Mockear respuesta con macros inflados y confirmar que la app recalcula.
-- Mockear ingrediente inexistente y confirmar bloqueo/fallback.
-- Agotar cuota y confirmar que no hay llamada externa adicional.
-- Recorrer "Preparar mi día" y "Preparar mi semana" como usuario normal, sin textos técnicos.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-84`).
 
 ## REQ-85 - Fix: fallbacks y IA generaban platos ficticios ("Desayuno práctica", "Alimento compatible")
 
@@ -1291,338 +881,63 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-108`).
 
 ## REQ-109 - Fix Home: el badge "N pendientes" cuenta la fila de Descanso
 
-**Estado: implementado.**
+**Estado: implementado.** Home calcula el badge de pendientes con `pendingCount=items.filter(i=>i.actions).length`, excluyendo la fila informativa de descanso sin ocultarla.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-109`).
 
 ## REQ-110 - Fix UX: catch de aiGenerateWeek sin salida — sumar opción práctica y reintento
 
-**Estado: implementado.**
+**Estado: implementado.** `aiGenerateWeek` conserva días parciales ante fallo, permite completar faltantes con semana práctica determinista o reintentar y evita modales sin salida.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-110`).
 
 ## REQ-111 - Fix API: /api/checkout valida configuración de Stripe antes que la sesión (503 en vez de 401/403)
 
-**Estado: implementado.**
+**Estado: implementado.** Entrada duplicada: la validación de `/api/checkout` ya quedó resuelta por REQ-59; se conserva como registro para no reabrirla.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-111`).
 
 ## REQ-112 - Accesibilidad: toasts anunciados a lectores de pantalla y contraste de texto muted
 
-**Estado: implementado.**
+**Estado: implementado.** `#toast` anuncia con `role="status"`/`aria-live="polite"` y el texto secundario real migra a contraste AA sin rediseñar la paleta.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-112`).
 
 ## REQ-113 - UX Auth: mostrar/ocultar contraseña en todos los campos de password
 
-**Estado: implementado.**
-`passwordField()` en `index.html` renderiza los campos de contraseña de login/registro, recuperación/invitación, preparación de usuario QA y cambio de contraseña admin con botón de ojo accesible (`aria-label`, `aria-controls`, `aria-pressed`, `type="button"`). `togglePasswordVisibility()` alterna `password`/`text`, conserva el valor y no dispara submit. Los ids, `autocomplete` y `minlength` existentes se mantienen; las llaves técnicas locales (`au_key`, `set_key`, `set_supakey`) siguen enmascaradas sin toggle por estar fuera del alcance de secretos técnicos. Validación estructural en `scripts/validate-password-toggle.mjs` y cobertura funcional en `tests/e2e/navegacion.spec.js`.
+**Estado: implementado.** passwordField() centraliza los campos de contraseña de usuario/admin con toggle accesible de mostrar/ocultar sin cambiar ids, autocomplete ni validaciones. Validadores: `scripts/validate-password-toggle.mjs` y E2E de navegación.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): en el textbox de password debe haber un icono que permita ver lo escrito.
-
-### Problema
-
-Los campos `type="password"` de login, registro, recuperación/invitación y modales administrativos no ofrecen control de visibilidad. En móvil esto aumenta errores de tipeo y fricción de activación, especialmente en el primer registro.
-
-### Causa raíz
-
-`index.html` renderiza inputs de contraseña directamente (`au_pwd`, `recovery_pwd`, `recovery_confirm`, `adminTestPwd`, `adminTestPwdConfirm`, `adminPwd`, `adminPwdConfirm`, y campos técnicos locales) sin componente/helper compartido ni botón de toggle.
-
-### Objetivo
-
-Que cualquier usuario pueda alternar entre contraseña oculta y visible de forma accesible, sin afectar autocomplete ni validaciones.
-
-### Alcance
-
-1. Crear un helper visual reutilizable para campos password con botón iconográfico de ojo/ojo tachado.
-2. Aplicarlo a login/registro, recuperación/invitación, preparación de usuario QA y cambio de contraseña admin.
-3. Mantener `autocomplete`, `minlength`, ids y validaciones existentes.
-4. El botón debe tener `aria-label` dinámico ("Mostrar contraseña" / "Ocultar contraseña") y no enviar formularios ni mover foco innecesariamente.
-
-### Fuera de alcance
-
-- Cambiar políticas de contraseña, login social, passkeys o recuperación por correo.
-- Mostrar secretos técnicos permanentes; para llaves/API locales aplicar el mismo patrón solo si no debilita el masking actual.
-
-### Riesgos
-
-- Un toggle mal implementado puede romper `autocomplete` o leer valores incorrectos en `doAuth`, `finishPasswordRecovery` y flujos admin.
-
-### Criterios de aceptación
-
-- Cada input de contraseña visible para usuario/admin tiene un botón de mostrar/ocultar.
-- Alternar visibilidad conserva el valor escrito y no dispara acciones de submit.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E o prueba manual mobile: registro, login, recuperación y cambio admin de contraseña alternando dos veces antes de enviar.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-113`).
 
 ## REQ-114 - UX Onboarding: copy sin jerga en objetivo, grasa, ciclo y patrón de comida
 
-**Estado: implementado.**
-Onboarding y Perfil conservan valores internos (`mantenimiento`, `omnivoro`, duracion 4/10) pero muestran copy cotidiano: "Mantener mi peso y mejorar mi cuerpo", "Como de todo", grasa corporal opcional con nota, y "Ciclo de seguimiento" con 10 semanas como proceso recomendado. Validador: `scripts/validate-onboarding-copy.mjs`.
+**Estado: implementado.** Onboarding y Perfil conservan valores internos, pero muestran copy cotidiano para objetivo, patrón de comida, grasa corporal opcional y ciclo de seguimiento. Validador: `scripts/validate-onboarding-copy.mjs`.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): "Mantener y recomponer", "Omnívoro", "% grasa" y "Duration" no son autoexplicativos para una persona normal.
-
-### Problema
-
-El onboarding todavía usa lenguaje técnico o poco cotidiano:
-
-- "Mantener peso y recomponer" no comunica claramente el objetivo.
-- "Omnívoro" no es como se identifica una persona que come de todo.
-- "% grasa" puede sentirse obligatorio o intimidante aunque sea opcional.
-- "Duración del plan" no explica que el usuario elige un ciclo de seguimiento, con 10 semanas como opción recomendada.
-
-### Causa raíz
-
-REQ-103 redujo jerga de macros y lugar, pero no cambió todos los labels de dominio ni sus ayudas contextuales. Las etiquetas visibles salen de `index.html` y de constantes compartidas en `js/nutrition-pure.js`.
-
-### Objetivo
-
-Que el onboarding sea entendible para principiantes sin cambiar los valores internos ni romper planes existentes.
-
-### Alcance
-
-1. Cambiar el copy visible de `mantenimiento` a una frase corta que conserve significado: mantener peso mientras mejora composición. Si no hay copy más corto y claro, usar "Mantener mi peso y mejorar mi cuerpo".
-2. Cambiar el label visible de `omnivoro` a "Como de todo"; conservar el valor interno `omnivoro`.
-3. Aclarar que el porcentaje de grasa corporal es opcional y se puede completar después, con tooltip o nota compacta según encaje en mobile.
-4. Cambiar "Duración del plan" por una decisión de ciclo: 4 semanas como ciclo corto para empezar, 10 semanas como proceso completo/recomendado por defecto.
-5. Replicar el copy consistente en Perfil donde aparezcan los mismos controles.
-
-### Fuera de alcance
-
-- Cambiar fórmulas de macros, `profileSchemaVersion`, valores guardados o historial.
-- Rediseñar el entrenamiento completo; eso queda en REQ-115 y REQ-116.
-
-### Riesgos
-
-- Cambiar labels sin conservar valores internos puede romper validaciones, tests y compatibilidad con perfiles existentes.
-
-### Criterios de aceptación
-
-- El onboarding no muestra "Omnívoro" ni "Mantener peso y recomponer" como labels principales.
-- El campo de grasa corporal queda claramente opcional.
-- 10 semanas sigue siendo el default.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Completar onboarding sin ingresar grasa corporal y confirmar que el perfil queda válido y el plan se puede preparar.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-114`).
 
 ## REQ-115 - UX Onboarding: entrenamiento en dos decisiones claras sin duplicar lugar y fuerza
 
-**Estado: implementado.**
-Onboarding y Perfil usan dos decisiones visibles: actividad física principal (`walking`, `running`, `cycling`, `swimming`, `other`, `strength_only`) y dónde entrenar fuerza (`gym`, `home`, `outdoor`, `none`). `strengthPlace` conserva casa/aire libre/gimnasio/no fuerza y se mapea de forma compatible a `strengthMode`, `trainingLocations` y `equipment`. Caminata tiene catálogo/roles propios y `strengthMode:"none"` permite plan solo de actividad sin exigir equipo. Validador: `scripts/validate-training-onboarding-decisions.mjs`.
+**Estado: implementado.** Onboarding y Perfil separan actividad física principal de lugar/recursos de fuerza; soportan caminar y no hacer fuerza, manteniendo compatibilidad con prefs antiguas. Validador: `scripts/validate-training-onboarding-decisions.mjs`.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): "Deporte cardio" no se entiende; el lugar de entrenamiento se cruza con gimnasio/peso corporal; la persona debería elegir dónde entrenar fuerza y con qué equipamiento si entrena en casa o al aire libre.
-
-### Problema
-
-El onboarding mezcla tres conceptos en controles separados: deporte cardio, trabajo de fuerza y lugar por día. Eso obliga al usuario a reconciliar "Gimnasio/Peso corporal" con "Lugar de entrenamiento", generando duplicidad y decisiones raras en mobile.
-
-### Causa raíz
-
-El modelo actual mantiene `primarySport`, `strengthMode`, `trainingLocations` y `equipment`, pero la UI los presenta como selectores paralelos en vez de una secuencia de intención:
-
-1. actividad física/deporte que quiere practicar;
-2. si quiere fuerza;
-3. dónde y con qué recursos quiere hacer esa fuerza.
-
-### Objetivo
-
-Que el flujo de entrenamiento sea autoexplicativo y capture la intención real sin duplicar decisiones.
-
-### Alcance
-
-1. Reemplazar "¿Tienes un deporte cardio...?" y "Deporte cardio" por "¿Practicas alguna actividad física?" sin usar la palabra cardiovascular.
-2. Ofrecer opciones explícitas: caminar, correr, bicicleta, natación, otro, ninguna.
-3. Reemplazar "Trabajo de fuerza" por una pregunta única: dónde quiere entrenar fuerza: gimnasio, casa con peso corporal/equipo, aire libre con peso corporal/equipo, o "No quiero fuerza por ahora".
-4. Si elige casa o aire libre, preguntar si tiene o quiere considerar equipamiento; permitir seleccionar ninguno, bandas/elásticos, mancuernas, barra/discos y barra de dominadas.
-5. Mantener compatibilidad interna con `primarySport`, `strengthMode`, `trainingLocations` y `equipment` mediante mapeo/migración.
-6. Actualizar Perfil con el mismo modelo para editarlo después.
-
-### Fuera de alcance
-
-- Cambiar el contenido de rutinas suaves por edad/restricción (REQ-116).
-- Crear ejercicios nuevos si el catálogo actual cubre las combinaciones básicas.
-- Permitir menores de edad.
-
-### Riesgos
-
-- `validateTrainingProfile`, `defaultTrainingLocations`, `trainingExpectedWeeks` y el generador de entrenamiento dependen de valores existentes. El cambio debe ser de presentación/mapeo antes de tocar contratos.
-
-### Criterios de aceptación
-
-- El usuario puede elegir caminar como actividad principal.
-- El usuario puede elegir no hacer fuerza por ahora sin caer en validaciones contradictorias.
-- Casa/aire libre muestran recursos disponibles sin repetir "Lugar de entrenamiento" como decisión duplicada.
-- Perfiles antiguos siguen migrando a una selección válida.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E onboarding con: caminata + no fuerza; ninguna actividad + fuerza en casa sin equipo; running + fuerza en gimnasio.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-115`).
 
 ## REQ-116 - Entrenamiento seguro: modo suave recomendado por edad o restricciones
 
-**Estado: implementado.**
-Onboarding y Perfil agregan `trainingSafetyMode` (`auto/gentle/full`) con recomendación visible por edad 18-21, 50+, 55+ o limitaciones declaradas. El modo recomendado baja volumen/intensidad, puede usar caminata como actividad efectiva de bajo impacto, filtra ejercicios complejos/invertidos/dominadas/pike push-ups antes de generar semanas y valida `gentleMode` en `training-plan.js`. Red flags del safety screening siguen pausando entrenamiento. Validador: `scripts/validate-training-safety-mode.mjs`.
+**Estado: implementado.** Agrega `trainingSafetyMode` (`auto/gentle/full`) con recomendación por edad o restricciones, dosis suave y filtro de ejercicios complejos sin saltar red flags. Validador: `scripts/validate-training-safety-mode.mjs`.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026) + revisión de guías oficiales WHO/CDC/HHS: caminar cuenta como actividad aeróbica válida; en adultos mayores conviene ajustar intensidad, sumar balance/fuerza cuando sea apropiado y adaptar a condiciones reales.
-
-### Problema
-
-El flujo actual puede sugerir rutinas estándar a usuarios de 18-21, mayores de 50, mayores de 55 o personas con restricciones, sin una recomendación visible de bajar intensidad, priorizar caminatas/cardio ligero o evitar movimientos complejos.
-
-### Causa raíz
-
-La app tiene safety screening y nivel de experiencia, pero no traduce edad/restricciones a una recomendación de plan más suave que el usuario pueda aceptar o rechazar. Además, "solo caminatas/cardio ligero" no está modelado como opción válida y explícita para mayores.
-
-### Objetivo
-
-Ofrecer planes más seguros y sostenibles sin imponerlos: sugerencia suave desde 50, recomendación más fuerte desde 55, y libertad para elegir plan completo si el usuario lo decide y no hay red flags médicos.
-
-### Alcance
-
-1. Si edad 18-21: sugerir empezar conservador, con técnica y progresión gradual, sin bloquear plan completo.
-2. Si edad >=50: sugerir modo suave/bajo impacto o fuerza ligera.
-3. Si edad >=55: sugerir caminar/cardio ligero como plan válido, con opción de fuerza mínima o plan completo.
-4. Si hay restricciones/limitaciones declaradas: recomendar modo suave y excluir movimientos complejos o invertidos cuando aplique.
-5. El modo suave debe reducir intensidad/volumen, favorecer caminatas, movilidad, ejercicios estables y alternativas de bajo impacto.
-6. La UI debe explicar la sugerencia con tono de cuidado, no de incapacidad.
-7. Si el safety screening tiene red flags, mantener la pausa de seguridad vigente y no permitir saltarla.
-
-### Fuera de alcance
-
-- Diagnóstico médico, rehabilitación clínica o planes para menores de 18.
-- Reescribir todo el catálogo de ejercicios; usar sustituciones y filtros disponibles donde sea posible.
-
-### Riesgos
-
-- Mensajes sobre edad y salud deben evitar promesas médicas o tono discriminatorio.
-- Permitir "solo cardio" requiere revisar validaciones que hoy esperan fuerza/equipment.
-
-### Criterios de aceptación
-
-- Usuario de 50-54 ve sugerencia de plan suave, pero puede elegir plan completo.
-- Usuario de 55+ puede elegir caminatas/cardio ligero como plan válido.
-- Usuario con red flag médico sigue bloqueado por safety hold.
-- Rutinas suaves no incluyen ejercicios complejos como pike push-ups, dominadas o movimientos invertidos salvo que el usuario elija plan completo y tenga perfil compatible.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E con edades 20, 52 y 58; validar copy, opciones y plan resultante. Revisar manualmente un plan suave de 55+ en mobile.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-116`).
 
 ## REQ-117 - Trial premium: primera semana con plan personalizado y cuotas limitadas
 
-**Estado: implementado.** Trial server-side en `coach_trials` (una fila por usuario, 7 días desde `onboardingCompletedAt` o primer uso premium), políticas `trial` en `coach_quota_policies`, y `reserve_coach_action` selecciona `entitlement_code='trial'` cuando aplica. `/api/claude` permite el trial sin plan pago, bloquea nuevas acciones costosas al agotar cambios incluidos con copy comercial sin términos internos y no llama al proveedor en ese caso; los usuarios con plan pago siguen por el camino premium normal. `/api/entitlement` expone `trial` para la UI, Perfil muestra "Semana gratis" y los gates del cliente aceptan trial activo. En entrenamiento, el trial usa coach premium solo para la semana 1 y completa semanas posteriores con alternativa validada sin llamada externa; personalizarlas abre conversión. Verificado con `scripts/test-coach-quota.mjs` (trial permitido, agotado bloqueado, pago permitido), `scripts/validate-coach-quota.mjs` y `scripts/validate-training-plan-wiring.mjs`.
+**Estado: implementado.** Agrega trial premium server-side de 7 días con políticas propias en `coach_quota_policies`, gates cliente/servidor y copy comercial sin términos técnicos. Validadores: `scripts/test-coach-quota.mjs`, `scripts/validate-coach-quota.mjs` y `scripts/validate-training-plan-wiring.mjs`.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): antes del paywall debe generarse la primera semana gratis de dieta y entrenamiento con experiencia premium, limitando llamadas para controlar gasto y sin mencionar IA al usuario.
-
-### Problema
-
-La estrategia pide entregar valor antes del paywall, pero la experiencia premium real está ligada a entitlement. Un usuario nuevo debe probar el producto completo, pero sin abrir consumo ilimitado de coach.
-
-### Causa raíz
-
-El modelo actual distingue `hasEntitlement()` y cuotas de coach por acción, pero no existe un estado de trial premium de primera semana con límites propios, mensajes de conversión y expiración clara.
-
-### Objetivo
-
-Dar a cada usuario nuevo una primera semana personalizada gratis, con acceso premium limitado y mensajes comerciales claros cuando se agoten los cambios/rearmados.
-
-### Alcance
-
-1. Crear estado de trial por usuario: inicio, fin, uso y expiración; duración inicial 7 días desde completar onboarding o primer plan generado.
-2. Durante trial, permitir generar la primera semana de nutrición y entrenamiento con el coach premium.
-3. Limitar acciones costosas de trial: rearmar semana/día, "otra opción", cambios de plato y regeneraciones; los límites deben ser configurables en políticas server-side o constantes claras.
-4. Al agotar límites de trial, mostrar copy visible: está en su semana gratis, ya usó sus cambios incluidos, puede activar un plan para seguir personalizando.
-5. Respetar REQ-31: no usar "IA", modelos, tokens, cuotas internas ni proveedor en UI normal; usar "coach", "plan personalizado", "cambios incluidos".
-6. Mantener fallback determinista gratuito si el servicio premium falla.
-
-### Fuera de alcance
-
-- Activar Stripe o cambiar precios.
-- Implementar métodos de pago locales.
-- Cambiar la frontera premium completa más allá del trial.
-
-### Riesgos
-
-- El gasto puede crecer si los límites no se aplican server-side.
-- El trial no debe convertirse en entitlement indefinido ni poder reiniciarse con refresh/localStorage.
-
-### Criterios de aceptación
-
-- Usuario nuevo sin plan pago puede generar su primera semana personalizada dentro del trial.
-- Agotar límites de trial bloquea nuevas llamadas costosas con mensaje comercial no técnico.
-- Un usuario con plan pago no queda limitado por límites de trial.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Tests de `api/claude.js`/cuotas con usuario trial: primera acción permitida, límite agotado bloqueado, usuario pago permitido.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-117`).
 
 ## REQ-118 - Activación: generar automáticamente la primera semana al terminar onboarding
 
-**Estado: implementado.**
-`saveOnboarding()` ahora prepara la primera semana automaticamente al cerrar onboarding inicial o nuevo ciclo. El flujo muestra progreso de comidas, entrenamiento y validacion; refresca entitlement/trial antes de generar; usa el coach cuando hay acceso vigente y completa faltantes con rutas deterministas. La activacion inicial se guarda como snapshot activo combinado `nutritionPlan + trainingPlan` en `plan_versions`, aplica comidas a `day_log` para compatibilidad local/offline y muestra reintento si una parte falla sin dejar la pantalla muerta. Validador: `scripts/validate-onboarding-first-week.mjs`.
+**Estado: implementado.** `saveOnboarding()` prepara automáticamente primera semana de nutrición y entrenamiento, guarda snapshot combinado en `plan_versions` y deja Home con plan o fallback/reintento. Validador: `scripts/validate-onboarding-first-week.mjs`.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): al terminar onboarding el usuario debe recibir automáticamente su primera semana completa, personalizada a sus gustos y objetivos.
-
-### Problema
-
-Hoy el onboarding termina y la preparación del día/semana depende de acciones posteriores. Para activación, el usuario debería salir del onboarding con "qué comer y entrenar esta semana" ya listo.
-
-### Causa raíz
-
-`saveOnboarding()` guarda preferencias y prepara estados iniciales, pero no orquesta una generación semanal premium automática de nutrición + entrenamiento ni una pantalla de progreso/revisión post-onboarding.
-
-### Objetivo
-
-Reducir time-to-first-value: registro -> onboarding -> primera semana personalizada lista, sin que el usuario tenga que buscar "Preparar semana".
-
-### Alcance
-
-1. Al guardar onboarding, iniciar generación de la primera semana de nutrición y entrenamiento usando el trial premium de REQ-117 cuando corresponda.
-2. Mostrar estado de progreso comprensible: preparando comidas, preparando entrenamiento, validando plan.
-3. Guardar nutrición en `plan_versions`/snapshot y entrenamiento como plan activo o borrador activado, sin reescribir historial.
-4. Si falla una parte, usar fallback determinista y avisar con opción de reintento sin dejar pantalla muerta.
-5. Al finalizar, llevar a Home con el anillo de macros, siguiente comida y sesión/descanso de hoy ya visibles.
-
-### Fuera de alcance
-
-- Rediseñar el paywall completo.
-- Regenerar semanas futuras después de la primera; eso sigue siendo acción premium normal.
-
-### Riesgos
-
-- Generar nutrición + entrenamiento puede tardar; la UX debe manejar espera, errores parciales y navegación.
-- No debe aplicar planes si falta consentimiento o safety screening vigente.
-
-### Criterios de aceptación
-
-- Un usuario nuevo completa onboarding y termina con primera semana aplicada o con fallback aplicado y reintento disponible.
-- La generación usa preferencias guardadas antes de llamar al coach.
-- Home no queda en estado "Aún falta preparar este día" después de onboarding exitoso.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E onboarding completo con mocks de coach exitoso y con fallo parcial; verificar Home y `plan_versions`.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-118`).
 
 ## REQ-119 - Onboarding nutricional: capturar gustos y disgustos antes del primer plan
 
@@ -2026,58 +1341,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
 
 ## REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad
 
-**Estado: pendiente.**
+**Estado: implementado.** Exporta `DIET_CONTRACT`, `dietContractTolerance()` y `validateDietContractTotals()` en `js/nutrition-domain.js` con kcal ±3% o ±50 kcal, proteína ±5 g bilateral, carbohidratos ±8 g, grasa ±8 g y kcal autoritativa de `ingredients.kcal`. El contrato queda en calibración (`runtimeActive:false`): no cambia cliente, servidor, snapshots ni `validateDayTotals` hasta REQ-129. `scripts/validate-diet-contract.mjs` reconstruye el catálogo desde `supabase/seed.sql` + semántica REQ-79, corre la matriz 2/4/6 comidas × patrón dietario × proteína normal/alta × disgustos × 7 días y se ejecuta en `node scripts/release-gate.mjs`. Baseline 2026-07-04: 0/378 días dentro de contrato; causas principales `protein_contract`, `carbs_contract`, `kcal_contract`, `fat_contract`, `kcal_out_of_tolerance`, `slot_without_candidates` y `protein_insufficient`. Ajuste propuesto: no relajar ni activar en silencio; REQ-129 debe implementar cierre global con `finalizeNutritionDay()` y REQ-132/135 cerrar slots/catálogo antes de re-correr el canario.
 
-### Origen
-
-Decisión de Jonathan (4 jul 2026) sobre la propuesta fusionada de dos análisis independientes convergentes: Codex (`docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`) y la sesión de arquitectura de Claude del mismo día. Números elegidos: kcal ±3% o ±50 kcal (lo que sea mayor), proteína ±5 g bilateral, carbohidratos y grasa ±8 g — **sujetos a calibración por canario antes de activarse**.
-
-### Problema
-
-"Exacto a los macros" no tiene hoy una definición única. Conviven al menos 7 contratos contradictorios:
-
-1. El prompt de `generateOneDay()` exige kcal ±10%.
-2. `validateGeneratedDay()` (cliente) acepta ±15% kcal y proteína ≥85% (unilateral: no detecta pasarse).
-3. `validateDietDay()` del servidor (`api/claude.js`) no valida macros en absoluto, aunque `dietQuotaValidation()` ya le envía `target` (lo ignora a propósito).
-4. `validateDayTotals()` en `js/nutrition-domain.js` usa `DAY_KCAL_PCT:0.15` y `DAY_PROTEIN_MIN_PCT:0.85`.
-5. El snapshot en `domain-contracts.js` tolera 20% de kcal.
-6. `supabase/validate.mjs` tolera hasta ±30-60% contra metas legadas.
-7. Los tests validan las tolerancias laxas, no exactitud.
-
-### Causa raíz
-
-Nunca se definió el contrato de aplicabilidad como objeto único de dominio; cada superficie fijó su número por conveniencia local.
-
-### Objetivo
-
-Un solo objeto `DIET_CONTRACT` como fuente de verdad de "día aplicable", con números calibrados contra el catálogo real antes de activarse en runtime.
-
-### Alcance
-
-1. Definir y exportar `DIET_CONTRACT` en `js/nutrition-domain.js`: kcal ±3% o ±50 kcal (lo mayor); proteína ±5 g bilateral; carbohidratos ±8 g; grasa ±8 g; kcal autoritativa = suma de `ingredients.kcal` del catálogo (nunca la declarada por el modelo, y sin asumir `kcal = 4P+4C+9F`, que el catálogo no cumple fila a fila).
-2. Crear `scripts/validate-diet-contract.mjs` (canario): matriz de perfiles (2/4/6 comidas × omnívoro/vegetariano/vegano × meta normal y alta de proteína × disgustos comunes) × 7 días, resuelta con el solver determinista actual; reporta % de días factibles dentro del contrato por dimensión y las causas de fallo.
-3. Si la factibilidad es <98% en alguna dimensión, documentar en este REQ el mínimo factible medido y el ajuste propuesto (nunca aflojar en silencio).
-4. NO activar todavía el contrato en los validadores de runtime (eso es REQ-129): este REQ solo entrega el objeto, el canario y tests unitarios del objeto.
-
-### Fuera de alcance
-
-- Cambiar `validateGeneratedDay`, el servidor, el snapshot o el prompt (REQ-129).
-- Ampliar catálogo (REQ-134..136).
-
-### Riesgos
-
-- Fijar números infactibles con el catálogo actual (61 ingredientes / 50 platos) provocaría cascada de rechazos al activarse; por eso el canario decide antes que el contrato entre en vigor.
-
-### Criterios de aceptación
-
-- `DIET_CONTRACT` exportado, documentado y con tests unitarios.
-- El canario corre offline, produce reporte de factibilidad por dimensión y causa.
-- Ningún comportamiento de runtime cambia todavía.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- `node scripts/validate-diet-contract.mjs` y revisión del reporte de factibilidad.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-128`).
 
 ## REQ-129 - `finalizeNutritionDay()`: autoridad determinista única, cierre global del día y activación del contrato
 

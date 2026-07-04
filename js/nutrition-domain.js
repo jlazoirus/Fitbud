@@ -26,6 +26,19 @@
     REPLACEMENT_KCAL_PCT:0.20,
   };
 
+  // Contrato estricto de aplicabilidad nutricional (REQ-128).
+  // Se exporta para calibracion/canarios; los validadores de runtime siguen
+  // usando NUTRITION_TOLERANCES hasta que REQ-129 active el cierre global.
+  const DIET_CONTRACT=Object.freeze({
+    version:1,
+    runtimeActive:false,
+    authoritativeKcal:"catalog_ingredient_kcal",
+    kcal:Object.freeze({percent:0.03,minDelta:50}),
+    protein:Object.freeze({grams:5}),
+    carbs:Object.freeze({grams:8}),
+    fat:Object.freeze({grams:8}),
+  });
+
   // ── kcal derivadas de macros ────────────────────────────────────────────────
   function kcalFromMacros(p,c,f){return Math.round(p*4+c*4+f*9);}
 
@@ -119,6 +132,37 @@
     if(off(totals.c,target.c,tol.DAY_CARB_PCT))
       warns.push("Carbohidratos "+Math.round(totals.c)+" g lejos de la meta ("+target.c+" g).");
     return{ok:errors.length===0,errors,warns};
+  }
+
+  function dietContractTolerance(metric,targetValue){
+    const t=Math.abs(num(targetValue));
+    if(metric==="kcal")return Math.max(DIET_CONTRACT.kcal.minDelta,t*DIET_CONTRACT.kcal.percent);
+    if(metric==="p")return DIET_CONTRACT.protein.grams;
+    if(metric==="c")return DIET_CONTRACT.carbs.grams;
+    if(metric==="f")return DIET_CONTRACT.fat.grams;
+    return 0;
+  }
+
+  function validateDietContractTotals(totals,target){
+    const errors=[],residual={},tolerances={};
+    [
+      ["kcal","kcal","kcal"],
+      ["p","p","proteina"],
+      ["c","c","carbohidratos"],
+      ["f","f","grasa"],
+    ].forEach(([metric,key,label])=>{
+      const actual=num(totals&&totals[key]);
+      const goal=num(target&&target[key]);
+      const delta=actual-goal;
+      const tolerance=dietContractTolerance(metric,goal);
+      residual[key]=Math.round(delta*10)/10;
+      tolerances[key]=Math.round(tolerance*10)/10;
+      if(Math.abs(delta)>tolerance){
+        const unit=metric==="kcal"?"kcal":"g";
+        errors.push(`${label} ${Math.round(actual)} ${unit} fuera del contrato (${Math.round(goal)} ${unit}, tolerancia ±${Math.round(tolerance*10)/10} ${unit}).`);
+      }
+    });
+    return{ok:errors.length===0,errors,residual,tolerances,contractVersion:DIET_CONTRACT.version};
   }
 
   // Slot individual vs. target de ese slot.
@@ -815,6 +859,7 @@
   const FITBUD_NUTRITION_DOMAIN={
     MEAL_SLOT_VOCAB,
     NUTRITION_TOLERANCES,
+    DIET_CONTRACT,
     kcalFromMacros,
     macrosFromIngredientMap,
     mealSlotsForCount,
@@ -828,6 +873,8 @@
     isDishBlockedByProfile,
     validateTargetConsistency,
     validateDayTotals,
+    dietContractTolerance,
+    validateDietContractTotals,
     validateSlotMacros,
     validateReplacementFeasibility,
     mealSlotTargets,
@@ -848,11 +895,14 @@
   // la función homónima (macrosFromLines) de index.html que usa ingById().
   root.MEAL_SLOT_VOCAB=MEAL_SLOT_VOCAB;
   root.NUTRITION_TOLERANCES=NUTRITION_TOLERANCES;
+  root.DIET_CONTRACT=DIET_CONTRACT;
   root.kcalFromMacros=kcalFromMacros;
   root.allergyTermsForProfile=allergyTermsForProfile;
   root.foodTextViolatesTerms=foodTextViolatesTerms;
   root.validateTargetConsistency=validateTargetConsistency;
   root.validateDayTotals=validateDayTotals;
+  root.dietContractTolerance=dietContractTolerance;
+  root.validateDietContractTotals=validateDietContractTotals;
   root.validateSlotMacros=validateSlotMacros;
   root.validateReplacementFeasibility=validateReplacementFeasibility;
   root.mealSlotTargets=mealSlotTargets;

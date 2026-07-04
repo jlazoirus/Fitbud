@@ -6123,3 +6123,397 @@ Avisos y textos secundarios usables con lector de pantalla y legibles con baja v
 ### Verificación sugerida
 
 - Recorrido con VoiceOver en Safari iOS; medir contraste de los tokens finales sobre `--surf1`..`--surf4`.
+
+---
+
+## REQ-113 - UX Auth: mostrar/ocultar contraseña en todos los campos de password
+
+**Estado: implementado.**
+`passwordField()` en `index.html` renderiza los campos de contraseña de login/registro, recuperación/invitación, preparación de usuario QA y cambio de contraseña admin con botón de ojo accesible (`aria-label`, `aria-controls`, `aria-pressed`, `type="button"`). `togglePasswordVisibility()` alterna `password`/`text`, conserva el valor y no dispara submit. Los ids, `autocomplete` y `minlength` existentes se mantienen; las llaves técnicas locales (`au_key`, `set_key`, `set_supakey`) siguen enmascaradas sin toggle por estar fuera del alcance de secretos técnicos. Validación estructural en `scripts/validate-password-toggle.mjs` y cobertura funcional en `tests/e2e/navegacion.spec.js`.
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): en el textbox de password debe haber un icono que permita ver lo escrito.
+
+### Problema
+
+Los campos `type="password"` de login, registro, recuperación/invitación y modales administrativos no ofrecen control de visibilidad. En móvil esto aumenta errores de tipeo y fricción de activación, especialmente en el primer registro.
+
+### Causa raíz
+
+`index.html` renderiza inputs de contraseña directamente (`au_pwd`, `recovery_pwd`, `recovery_confirm`, `adminTestPwd`, `adminTestPwdConfirm`, `adminPwd`, `adminPwdConfirm`, y campos técnicos locales) sin componente/helper compartido ni botón de toggle.
+
+### Objetivo
+
+Que cualquier usuario pueda alternar entre contraseña oculta y visible de forma accesible, sin afectar autocomplete ni validaciones.
+
+### Alcance
+
+1. Crear un helper visual reutilizable para campos password con botón iconográfico de ojo/ojo tachado.
+2. Aplicarlo a login/registro, recuperación/invitación, preparación de usuario QA y cambio de contraseña admin.
+3. Mantener `autocomplete`, `minlength`, ids y validaciones existentes.
+4. El botón debe tener `aria-label` dinámico ("Mostrar contraseña" / "Ocultar contraseña") y no enviar formularios ni mover foco innecesariamente.
+
+### Fuera de alcance
+
+- Cambiar políticas de contraseña, login social, passkeys o recuperación por correo.
+- Mostrar secretos técnicos permanentes; para llaves/API locales aplicar el mismo patrón solo si no debilita el masking actual.
+
+### Riesgos
+
+- Un toggle mal implementado puede romper `autocomplete` o leer valores incorrectos en `doAuth`, `finishPasswordRecovery` y flujos admin.
+
+### Criterios de aceptación
+
+- Cada input de contraseña visible para usuario/admin tiene un botón de mostrar/ocultar.
+- Alternar visibilidad conserva el valor escrito y no dispara acciones de submit.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E o prueba manual mobile: registro, login, recuperación y cambio admin de contraseña alternando dos veces antes de enviar.
+
+---
+
+## REQ-114 - UX Onboarding: copy sin jerga en objetivo, grasa, ciclo y patrón de comida
+
+**Estado: implementado.**
+Onboarding y Perfil conservan valores internos (`mantenimiento`, `omnivoro`, duracion 4/10) pero muestran copy cotidiano: "Mantener mi peso y mejorar mi cuerpo", "Como de todo", grasa corporal opcional con nota, y "Ciclo de seguimiento" con 10 semanas como proceso recomendado. Validador: `scripts/validate-onboarding-copy.mjs`.
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): "Mantener y recomponer", "Omnívoro", "% grasa" y "Duration" no son autoexplicativos para una persona normal.
+
+### Problema
+
+El onboarding todavía usa lenguaje técnico o poco cotidiano:
+
+- "Mantener peso y recomponer" no comunica claramente el objetivo.
+- "Omnívoro" no es como se identifica una persona que come de todo.
+- "% grasa" puede sentirse obligatorio o intimidante aunque sea opcional.
+- "Duración del plan" no explica que el usuario elige un ciclo de seguimiento, con 10 semanas como opción recomendada.
+
+### Causa raíz
+
+REQ-103 redujo jerga de macros y lugar, pero no cambió todos los labels de dominio ni sus ayudas contextuales. Las etiquetas visibles salen de `index.html` y de constantes compartidas en `js/nutrition-pure.js`.
+
+### Objetivo
+
+Que el onboarding sea entendible para principiantes sin cambiar los valores internos ni romper planes existentes.
+
+### Alcance
+
+1. Cambiar el copy visible de `mantenimiento` a una frase corta que conserve significado: mantener peso mientras mejora composición. Si no hay copy más corto y claro, usar "Mantener mi peso y mejorar mi cuerpo".
+2. Cambiar el label visible de `omnivoro` a "Como de todo"; conservar el valor interno `omnivoro`.
+3. Aclarar que el porcentaje de grasa corporal es opcional y se puede completar después, con tooltip o nota compacta según encaje en mobile.
+4. Cambiar "Duración del plan" por una decisión de ciclo: 4 semanas como ciclo corto para empezar, 10 semanas como proceso completo/recomendado por defecto.
+5. Replicar el copy consistente en Perfil donde aparezcan los mismos controles.
+
+### Fuera de alcance
+
+- Cambiar fórmulas de macros, `profileSchemaVersion`, valores guardados o historial.
+- Rediseñar el entrenamiento completo; eso queda en REQ-115 y REQ-116.
+
+### Riesgos
+
+- Cambiar labels sin conservar valores internos puede romper validaciones, tests y compatibilidad con perfiles existentes.
+
+### Criterios de aceptación
+
+- El onboarding no muestra "Omnívoro" ni "Mantener peso y recomponer" como labels principales.
+- El campo de grasa corporal queda claramente opcional.
+- 10 semanas sigue siendo el default.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Completar onboarding sin ingresar grasa corporal y confirmar que el perfil queda válido y el plan se puede preparar.
+
+---
+
+## REQ-115 - UX Onboarding: entrenamiento en dos decisiones claras sin duplicar lugar y fuerza
+
+**Estado: implementado.**
+Onboarding y Perfil usan dos decisiones visibles: actividad física principal (`walking`, `running`, `cycling`, `swimming`, `other`, `strength_only`) y dónde entrenar fuerza (`gym`, `home`, `outdoor`, `none`). `strengthPlace` conserva casa/aire libre/gimnasio/no fuerza y se mapea de forma compatible a `strengthMode`, `trainingLocations` y `equipment`. Caminata tiene catálogo/roles propios y `strengthMode:"none"` permite plan solo de actividad sin exigir equipo. Validador: `scripts/validate-training-onboarding-decisions.mjs`.
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): "Deporte cardio" no se entiende; el lugar de entrenamiento se cruza con gimnasio/peso corporal; la persona debería elegir dónde entrenar fuerza y con qué equipamiento si entrena en casa o al aire libre.
+
+### Problema
+
+El onboarding mezcla tres conceptos en controles separados: deporte cardio, trabajo de fuerza y lugar por día. Eso obliga al usuario a reconciliar "Gimnasio/Peso corporal" con "Lugar de entrenamiento", generando duplicidad y decisiones raras en mobile.
+
+### Causa raíz
+
+El modelo actual mantiene `primarySport`, `strengthMode`, `trainingLocations` y `equipment`, pero la UI los presenta como selectores paralelos en vez de una secuencia de intención:
+
+1. actividad física/deporte que quiere practicar;
+2. si quiere fuerza;
+3. dónde y con qué recursos quiere hacer esa fuerza.
+
+### Objetivo
+
+Que el flujo de entrenamiento sea autoexplicativo y capture la intención real sin duplicar decisiones.
+
+### Alcance
+
+1. Reemplazar "¿Tienes un deporte cardio...?" y "Deporte cardio" por "¿Practicas alguna actividad física?" sin usar la palabra cardiovascular.
+2. Ofrecer opciones explícitas: caminar, correr, bicicleta, natación, otro, ninguna.
+3. Reemplazar "Trabajo de fuerza" por una pregunta única: dónde quiere entrenar fuerza: gimnasio, casa con peso corporal/equipo, aire libre con peso corporal/equipo, o "No quiero fuerza por ahora".
+4. Si elige casa o aire libre, preguntar si tiene o quiere considerar equipamiento; permitir seleccionar ninguno, bandas/elásticos, mancuernas, barra/discos y barra de dominadas.
+5. Mantener compatibilidad interna con `primarySport`, `strengthMode`, `trainingLocations` y `equipment` mediante mapeo/migración.
+6. Actualizar Perfil con el mismo modelo para editarlo después.
+
+### Fuera de alcance
+
+- Cambiar el contenido de rutinas suaves por edad/restricción (REQ-116).
+- Crear ejercicios nuevos si el catálogo actual cubre las combinaciones básicas.
+- Permitir menores de edad.
+
+### Riesgos
+
+- `validateTrainingProfile`, `defaultTrainingLocations`, `trainingExpectedWeeks` y el generador de entrenamiento dependen de valores existentes. El cambio debe ser de presentación/mapeo antes de tocar contratos.
+
+### Criterios de aceptación
+
+- El usuario puede elegir caminar como actividad principal.
+- El usuario puede elegir no hacer fuerza por ahora sin caer en validaciones contradictorias.
+- Casa/aire libre muestran recursos disponibles sin repetir "Lugar de entrenamiento" como decisión duplicada.
+- Perfiles antiguos siguen migrando a una selección válida.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E onboarding con: caminata + no fuerza; ninguna actividad + fuerza en casa sin equipo; running + fuerza en gimnasio.
+
+---
+
+## REQ-116 - Entrenamiento seguro: modo suave recomendado por edad o restricciones
+
+**Estado: implementado.**
+Onboarding y Perfil agregan `trainingSafetyMode` (`auto/gentle/full`) con recomendación visible por edad 18-21, 50+, 55+ o limitaciones declaradas. El modo recomendado baja volumen/intensidad, puede usar caminata como actividad efectiva de bajo impacto, filtra ejercicios complejos/invertidos/dominadas/pike push-ups antes de generar semanas y valida `gentleMode` en `training-plan.js`. Red flags del safety screening siguen pausando entrenamiento. Validador: `scripts/validate-training-safety-mode.mjs`.
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026) + revisión de guías oficiales WHO/CDC/HHS: caminar cuenta como actividad aeróbica válida; en adultos mayores conviene ajustar intensidad, sumar balance/fuerza cuando sea apropiado y adaptar a condiciones reales.
+
+### Problema
+
+El flujo actual puede sugerir rutinas estándar a usuarios de 18-21, mayores de 50, mayores de 55 o personas con restricciones, sin una recomendación visible de bajar intensidad, priorizar caminatas/cardio ligero o evitar movimientos complejos.
+
+### Causa raíz
+
+La app tiene safety screening y nivel de experiencia, pero no traduce edad/restricciones a una recomendación de plan más suave que el usuario pueda aceptar o rechazar. Además, "solo caminatas/cardio ligero" no está modelado como opción válida y explícita para mayores.
+
+### Objetivo
+
+Ofrecer planes más seguros y sostenibles sin imponerlos: sugerencia suave desde 50, recomendación más fuerte desde 55, y libertad para elegir plan completo si el usuario lo decide y no hay red flags médicos.
+
+### Alcance
+
+1. Si edad 18-21: sugerir empezar conservador, con técnica y progresión gradual, sin bloquear plan completo.
+2. Si edad >=50: sugerir modo suave/bajo impacto o fuerza ligera.
+3. Si edad >=55: sugerir caminar/cardio ligero como plan válido, con opción de fuerza mínima o plan completo.
+4. Si hay restricciones/limitaciones declaradas: recomendar modo suave y excluir movimientos complejos o invertidos cuando aplique.
+5. El modo suave debe reducir intensidad/volumen, favorecer caminatas, movilidad, ejercicios estables y alternativas de bajo impacto.
+6. La UI debe explicar la sugerencia con tono de cuidado, no de incapacidad.
+7. Si el safety screening tiene red flags, mantener la pausa de seguridad vigente y no permitir saltarla.
+
+### Fuera de alcance
+
+- Diagnóstico médico, rehabilitación clínica o planes para menores de 18.
+- Reescribir todo el catálogo de ejercicios; usar sustituciones y filtros disponibles donde sea posible.
+
+### Riesgos
+
+- Mensajes sobre edad y salud deben evitar promesas médicas o tono discriminatorio.
+- Permitir "solo cardio" requiere revisar validaciones que hoy esperan fuerza/equipment.
+
+### Criterios de aceptación
+
+- Usuario de 50-54 ve sugerencia de plan suave, pero puede elegir plan completo.
+- Usuario de 55+ puede elegir caminatas/cardio ligero como plan válido.
+- Usuario con red flag médico sigue bloqueado por safety hold.
+- Rutinas suaves no incluyen ejercicios complejos como pike push-ups, dominadas o movimientos invertidos salvo que el usuario elija plan completo y tenga perfil compatible.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E con edades 20, 52 y 58; validar copy, opciones y plan resultante. Revisar manualmente un plan suave de 55+ en mobile.
+
+---
+
+## REQ-117 - Trial premium: primera semana con plan personalizado y cuotas limitadas
+
+**Estado: implementado.** Trial server-side en `coach_trials` (una fila por usuario, 7 días desde `onboardingCompletedAt` o primer uso premium), políticas `trial` en `coach_quota_policies`, y `reserve_coach_action` selecciona `entitlement_code='trial'` cuando aplica. `/api/claude` permite el trial sin plan pago, bloquea nuevas acciones costosas al agotar cambios incluidos con copy comercial sin términos internos y no llama al proveedor en ese caso; los usuarios con plan pago siguen por el camino premium normal. `/api/entitlement` expone `trial` para la UI, Perfil muestra "Semana gratis" y los gates del cliente aceptan trial activo. En entrenamiento, el trial usa coach premium solo para la semana 1 y completa semanas posteriores con alternativa validada sin llamada externa; personalizarlas abre conversión. Verificado con `scripts/test-coach-quota.mjs` (trial permitido, agotado bloqueado, pago permitido), `scripts/validate-coach-quota.mjs` y `scripts/validate-training-plan-wiring.mjs`.
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): antes del paywall debe generarse la primera semana gratis de dieta y entrenamiento con experiencia premium, limitando llamadas para controlar gasto y sin mencionar IA al usuario.
+
+### Problema
+
+La estrategia pide entregar valor antes del paywall, pero la experiencia premium real está ligada a entitlement. Un usuario nuevo debe probar el producto completo, pero sin abrir consumo ilimitado de coach.
+
+### Causa raíz
+
+El modelo actual distingue `hasEntitlement()` y cuotas de coach por acción, pero no existe un estado de trial premium de primera semana con límites propios, mensajes de conversión y expiración clara.
+
+### Objetivo
+
+Dar a cada usuario nuevo una primera semana personalizada gratis, con acceso premium limitado y mensajes comerciales claros cuando se agoten los cambios/rearmados.
+
+### Alcance
+
+1. Crear estado de trial por usuario: inicio, fin, uso y expiración; duración inicial 7 días desde completar onboarding o primer plan generado.
+2. Durante trial, permitir generar la primera semana de nutrición y entrenamiento con el coach premium.
+3. Limitar acciones costosas de trial: rearmar semana/día, "otra opción", cambios de plato y regeneraciones; los límites deben ser configurables en políticas server-side o constantes claras.
+4. Al agotar límites de trial, mostrar copy visible: está en su semana gratis, ya usó sus cambios incluidos, puede activar un plan para seguir personalizando.
+5. Respetar REQ-31: no usar "IA", modelos, tokens, cuotas internas ni proveedor en UI normal; usar "coach", "plan personalizado", "cambios incluidos".
+6. Mantener fallback determinista gratuito si el servicio premium falla.
+
+### Fuera de alcance
+
+- Activar Stripe o cambiar precios.
+- Implementar métodos de pago locales.
+- Cambiar la frontera premium completa más allá del trial.
+
+### Riesgos
+
+- El gasto puede crecer si los límites no se aplican server-side.
+- El trial no debe convertirse en entitlement indefinido ni poder reiniciarse con refresh/localStorage.
+
+### Criterios de aceptación
+
+- Usuario nuevo sin plan pago puede generar su primera semana personalizada dentro del trial.
+- Agotar límites de trial bloquea nuevas llamadas costosas con mensaje comercial no técnico.
+- Un usuario con plan pago no queda limitado por límites de trial.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Tests de `api/claude.js`/cuotas con usuario trial: primera acción permitida, límite agotado bloqueado, usuario pago permitido.
+
+---
+
+## REQ-118 - Activación: generar automáticamente la primera semana al terminar onboarding
+
+**Estado: implementado.**
+`saveOnboarding()` ahora prepara la primera semana automaticamente al cerrar onboarding inicial o nuevo ciclo. El flujo muestra progreso de comidas, entrenamiento y validacion; refresca entitlement/trial antes de generar; usa el coach cuando hay acceso vigente y completa faltantes con rutas deterministas. La activacion inicial se guarda como snapshot activo combinado `nutritionPlan + trainingPlan` en `plan_versions`, aplica comidas a `day_log` para compatibilidad local/offline y muestra reintento si una parte falla sin dejar la pantalla muerta. Validador: `scripts/validate-onboarding-first-week.mjs`.
+
+### Origen
+
+Feedback de producto de Jonathan (3 jul 2026): al terminar onboarding el usuario debe recibir automáticamente su primera semana completa, personalizada a sus gustos y objetivos.
+
+### Problema
+
+Hoy el onboarding termina y la preparación del día/semana depende de acciones posteriores. Para activación, el usuario debería salir del onboarding con "qué comer y entrenar esta semana" ya listo.
+
+### Causa raíz
+
+`saveOnboarding()` guarda preferencias y prepara estados iniciales, pero no orquesta una generación semanal premium automática de nutrición + entrenamiento ni una pantalla de progreso/revisión post-onboarding.
+
+### Objetivo
+
+Reducir time-to-first-value: registro -> onboarding -> primera semana personalizada lista, sin que el usuario tenga que buscar "Preparar semana".
+
+### Alcance
+
+1. Al guardar onboarding, iniciar generación de la primera semana de nutrición y entrenamiento usando el trial premium de REQ-117 cuando corresponda.
+2. Mostrar estado de progreso comprensible: preparando comidas, preparando entrenamiento, validando plan.
+3. Guardar nutrición en `plan_versions`/snapshot y entrenamiento como plan activo o borrador activado, sin reescribir historial.
+4. Si falla una parte, usar fallback determinista y avisar con opción de reintento sin dejar pantalla muerta.
+5. Al finalizar, llevar a Home con el anillo de macros, siguiente comida y sesión/descanso de hoy ya visibles.
+
+### Fuera de alcance
+
+- Rediseñar el paywall completo.
+- Regenerar semanas futuras después de la primera; eso sigue siendo acción premium normal.
+
+### Riesgos
+
+- Generar nutrición + entrenamiento puede tardar; la UX debe manejar espera, errores parciales y navegación.
+- No debe aplicar planes si falta consentimiento o safety screening vigente.
+
+### Criterios de aceptación
+
+- Un usuario nuevo completa onboarding y termina con primera semana aplicada o con fallback aplicado y reintento disponible.
+- La generación usa preferencias guardadas antes de llamar al coach.
+- Home no queda en estado "Aún falta preparar este día" después de onboarding exitoso.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E onboarding completo con mocks de coach exitoso y con fallo parcial; verificar Home y `plan_versions`.
+
+---
+
+## REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad
+
+**Estado: implementado.** `js/nutrition-domain.js` exporta `DIET_CONTRACT`, `dietContractTolerance()` y `validateDietContractTotals()` como contrato estricto separado del runtime; `scripts/validate-diet-contract.mjs` corre el canario offline sobre `supabase/seed.sql` + semántica REQ-79 y queda incluido en `node scripts/release-gate.mjs`. El contrato sigue con `runtimeActive:false`; activarlo y cerrar días queda para REQ-129.
+
+### Origen
+
+Decisión de Jonathan (4 jul 2026) sobre la propuesta fusionada de dos análisis independientes convergentes: Codex (`docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`) y la sesión de arquitectura de Claude del mismo día. Números elegidos: kcal ±3% o ±50 kcal (lo que sea mayor), proteína ±5 g bilateral, carbohidratos y grasa ±8 g — **sujetos a calibración por canario antes de activarse**.
+
+### Problema
+
+"Exacto a los macros" no tiene hoy una definición única. Conviven al menos 7 contratos contradictorios:
+
+1. El prompt de `generateOneDay()` exige kcal ±10%.
+2. `validateGeneratedDay()` (cliente) acepta ±15% kcal y proteína ≥85% (unilateral: no detecta pasarse).
+3. `validateDietDay()` del servidor (`api/claude.js`) no valida macros en absoluto, aunque `dietQuotaValidation()` ya le envía `target` (lo ignora a propósito).
+4. `validateDayTotals()` en `js/nutrition-domain.js` usa `DAY_KCAL_PCT:0.15` y `DAY_PROTEIN_MIN_PCT:0.85`.
+5. El snapshot en `domain-contracts.js` tolera 20% de kcal.
+6. `supabase/validate.mjs` tolera hasta ±30-60% contra metas legadas.
+7. Los tests validan las tolerancias laxas, no exactitud.
+
+### Causa raíz
+
+Nunca se definió el contrato de aplicabilidad como objeto único de dominio; cada superficie fijó su número por conveniencia local.
+
+### Objetivo
+
+Un solo objeto `DIET_CONTRACT` como fuente de verdad de "día aplicable", con números calibrados contra el catálogo real antes de activarse en runtime.
+
+### Alcance
+
+1. Definir y exportar `DIET_CONTRACT` en `js/nutrition-domain.js`: kcal ±3% o ±50 kcal (lo mayor); proteína ±5 g bilateral; carbohidratos ±8 g; grasa ±8 g; kcal autoritativa = suma de `ingredients.kcal` del catálogo (nunca la declarada por el modelo, y sin asumir `kcal = 4P+4C+9F`, que el catálogo no cumple fila a fila).
+2. Crear `scripts/validate-diet-contract.mjs` (canario): matriz de perfiles (2/4/6 comidas × omnívoro/vegetariano/vegano × meta normal y alta de proteína × disgustos comunes) × 7 días, resuelta con el solver determinista actual; reporta % de días factibles dentro del contrato por dimensión y las causas de fallo.
+3. Si la factibilidad es <98% en alguna dimensión, documentar en este REQ el mínimo factible medido y el ajuste propuesto (nunca aflojar en silencio).
+4. NO activar todavía el contrato en los validadores de runtime (eso es REQ-129): este REQ solo entrega el objeto, el canario y tests unitarios del objeto.
+
+### Calibración del canario (2026-07-04)
+
+Comando ejecutado: `node scripts/validate-diet-contract.mjs`.
+
+Resultado contra el solver determinista actual y el catálogo base enriquecido localmente:
+
+- Catálogo medido: 61 ingredientes, 50 platos, 180 líneas de receta.
+- Matriz: 54 dimensiones × 7 días = 378 días.
+- Factibilidad total dentro de `DIET_CONTRACT`: 0/378 (0%).
+- Mínimo por dimensión: 0/7 (0%); las 54 dimensiones quedan bajo el gate futuro de 98%.
+- Causas principales: `protein_contract` 332, `carbs_contract` 319, `kcal_contract` 273, `fat_contract` 170, `kcal_out_of_tolerance` 86, `slot_without_candidates` 42, `protein_insufficient` 21.
+
+Ajuste propuesto: no relajar el contrato ni activarlo en silencio. Mantener los números elegidos como objetivo de aplicabilidad y exigir que REQ-129 implemente `finalizeNutritionDay()` con cierre global de macros antes de activar runtime. REQ-132/135 deben cerrar las brechas de slots/catálogo; después de esas piezas se re-corre el canario. Si tras solver global + metadata/catálogo el gate sigue bajo 98%, la recalibración debe quedar documentada como decisión explícita de producto.
+
+### Fuera de alcance
+
+- Cambiar `validateGeneratedDay`, el servidor, el snapshot o el prompt (REQ-129).
+- Ampliar catálogo (REQ-134..136).
+
+### Riesgos
+
+- Fijar números infactibles con el catálogo actual (61 ingredientes / 50 platos) provocaría cascada de rechazos al activarse; por eso el canario decide antes que el contrato entre en vigor.
+
+### Criterios de aceptación
+
+- `DIET_CONTRACT` exportado, documentado y con tests unitarios.
+- El canario corre offline, produce reporte de factibilidad por dimensión y causa.
+- Ningún comportamiento de runtime cambia todavía.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `node scripts/validate-diet-contract.mjs` y revisión del reporte de factibilidad.

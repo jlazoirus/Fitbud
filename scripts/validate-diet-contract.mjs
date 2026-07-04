@@ -1,0 +1,275 @@
+#!/usr/bin/env node
+// REQ-128 — Canary offline del DIET_CONTRACT.
+// Reconstruye el catalogo local desde seed.sql + semantica REQ-79 y mide
+// factibilidad estricta sin activar el contrato en runtime.
+import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import assert from "node:assert/strict";
+import "../js/nutrition-pure.js";
+import "../js/nutrition-domain.js";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const seed = readFileSync(join(ROOT, "supabase", "seed.sql"), "utf8");
+const d = globalThis.FITBUD_NUTRITION_DOMAIN;
+
+assert.ok(d, "FITBUD_NUTRITION_DOMAIN debe existir");
+assert.ok(d.DIET_CONTRACT, "DIET_CONTRACT debe estar exportado");
+assert.equal(d.DIET_CONTRACT.runtimeActive, false, "REQ-128 no debe activar runtime");
+assert.equal(d.DIET_CONTRACT.authoritativeKcal, "catalog_ingredient_kcal");
+
+function sqlString(value) {
+  return String(value || "").replace(/''/g, "'");
+}
+
+function slugify(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function section(start, end) {
+  const i = seed.indexOf(start);
+  if (i < 0) throw new Error(`No se encontro seccion: ${start}`);
+  const j = seed.indexOf(end, i);
+  if (j < 0) throw new Error(`No se encontro fin de seccion: ${end}`);
+  return seed.slice(i, j);
+}
+
+function parseCatalog() {
+  const ingredients = [];
+  const ingredientsByName = new Map();
+  const ingSec = section("insert into ingredients", "-- ---------- PLATOS");
+  const ingRe = /\('((?:[^']|'')*)','((?:[^']|'')*)',\s*([\d.]+),\s*([\d.]+),\s*([\d.]+),\s*([\d.]+)\)/g;
+  let m;
+  while ((m = ingRe.exec(ingSec))) {
+    const row = {
+      id: ingredients.length + 1,
+      name: sqlString(m[1]),
+      category: sqlString(m[2]),
+      kcal: Number(m[3]),
+      protein_g: Number(m[4]),
+      carbs_g: Number(m[5]),
+      fat_g: Number(m[6]),
+    };
+    row.slug = slugify(row.name);
+    ingredients.push(row);
+    ingredientsByName.set(row.name, row);
+  }
+
+  const dishes = [];
+  const dishesByName = new Map();
+  const dishSec = section("insert into dishes", "-- ---------- RECETAS");
+  const dishRe = /\('((?:[^']|'')*)',\s*'([^']*)'\s*,\s*(null|'((?:[^']|'')*)')\)/g;
+  while ((m = dishRe.exec(dishSec))) {
+    const slot = sqlString(m[2]);
+    const row = {
+      id: dishes.length + 1,
+      name: sqlString(m[1]),
+      slot,
+      menu: m[3] === "null" ? null : sqlString(m[4]),
+    };
+    row.slug = slugify(row.name);
+    row.compatible_slots = slot === "snack"
+      ? ["media_manana", "merienda", "snack", "recena"]
+      : slot === "batido"
+        ? ["media_manana", "merienda", "snack", "recena", "batido"]
+        : [slot];
+    dishes.push(row);
+    dishesByName.set(row.name, row);
+  }
+
+  const dishIng = [];
+  const recSec = section("insert into dish_ingredients", "-- ---------- DIETAS");
+  const recRe = /\('((?:[^']|'')*)','((?:[^']|'')*)',\s*([\d.]+)\)/g;
+  while ((m = recRe.exec(recSec))) {
+    const dish = dishesByName.get(sqlString(m[1]));
+    const ingredient = ingredientsByName.get(sqlString(m[2]));
+    if (!dish || !ingredient) continue;
+    const grams = Number(m[3]);
+    dishIng.push({
+      dish_id: dish.id,
+      ingredient_id: ingredient.id,
+      grams,
+      scalable: true,
+      min_g: Math.max(5, Math.round(grams * 0.5)),
+      max_g: Math.max(grams, Math.round(grams * 2)),
+      step_g: 5,
+    });
+  }
+
+  const animalProteins = new Set([
+    "Pechuga de pollo", "Pavo molido magro", "Carne de res magra",
+    "Atun en agua", "Atún en agua", "Salmon", "Salmón",
+  ]);
+  for (const dish of dishes) {
+    const lines = dishIng.filter(line => line.dish_id === dish.id);
+    const ings = lines.map(line => ingredients.find(ing => ing.id === line.ingredient_id)).filter(Boolean);
+    const hasMeatOrFish = ings.some(ing => animalProteins.has(ing.name));
+    const hasVeganBlocker = ings.some(ing => ing.category === "Lácteo" || ["Huevo entero", "Miel"].includes(ing.name));
+    dish.diet_tags = [
+      !hasMeatOrFish ? "vegetariano" : "",
+      !hasMeatOrFish && !hasVeganBlocker ? "vegano" : "",
+      "omnivoro",
+    ].filter(Boolean);
+  }
+
+  return { ingredients, dishes, dishIng };
+}
+
+const catalog = parseCatalog();
+assert.ok(catalog.ingredients.length > 0, "catalogo con ingredientes");
+assert.ok(catalog.dishes.length > 0, "catalogo con platos");
+assert.ok(catalog.dishIng.length > 0, "catalogo con recetas");
+
+const TARGETS = {
+  normal: { kcal: 2000, p: 150, c: 205, f: 64 },
+  alta_proteina: { kcal: 2250, p: 190, c: 215, f: 70 },
+};
+const mealCounts = [2, 4, 6];
+const diets = [
+  { id: "omnivoro", value: ["omnivoro"] },
+  { id: "vegetariano", value: ["vegetariano"] },
+  { id: "vegano", value: ["vegano"] },
+];
+const dislikes = [
+  { id: "sin_disgustos", value: "" },
+  { id: "sin_tofu", value: "tofu" },
+  { id: "sin_yogur", value: "yogur" },
+];
+
+function pct(n, d0) {
+  return d0 > 0 ? (n / d0 * 100) : 0;
+}
+
+function causeKey(error) {
+  const text = String(error || "").toLowerCase();
+  if (text.includes("kcal")) return "kcal_contract";
+  if (text.includes("proteina")) return "protein_contract";
+  if (text.includes("carbohidratos")) return "carbs_contract";
+  if (text.includes("grasa")) return "fat_contract";
+  return text || "unknown";
+}
+
+function addCause(map, key) {
+  map.set(key, (map.get(key) || 0) + 1);
+}
+
+const rows = [];
+const globalCauses = new Map();
+const startDate = "2026-07-06";
+
+for (const mealCount of mealCounts) {
+  for (const diet of diets) {
+    for (const [targetId, dayTarget] of Object.entries(TARGETS)) {
+      for (const dislike of dislikes) {
+        const prefs = {
+          mealCount,
+          mainMealIndex: Math.min(2, mealCount),
+          diet: diet.value,
+          dislikedIngredients: dislike.value,
+        };
+        const week = d.planNutritionWeek({ prefs, dayTarget, catalog, numDays: 7, startDate });
+        const causes = new Map();
+        let okDays = 0;
+        week.days.forEach(day => {
+          const contract = d.validateDietContractTotals(day.totals || {}, day.target || dayTarget);
+          const dayOk = day.ok && contract.ok;
+          if (dayOk) okDays++;
+          if (!day.ok) {
+            (day.no_solution || [{ reason: "solver_no_solution" }]).forEach(item => {
+              addCause(causes, item.reason || "solver_no_solution");
+              addCause(globalCauses, item.reason || "solver_no_solution");
+            });
+          }
+          if (!contract.ok) {
+            contract.errors.forEach(error => {
+              const key = causeKey(error);
+              addCause(causes, key);
+              addCause(globalCauses, key);
+            });
+          }
+        });
+        rows.push({
+          mealCount,
+          diet: diet.id,
+          target: targetId,
+          dislike: dislike.id,
+          okDays,
+          totalDays: week.days.length,
+          pct: pct(okDays, week.days.length),
+          causes,
+        });
+      }
+    }
+  }
+}
+
+const totalOk = rows.reduce((sum, row) => sum + row.okDays, 0);
+const totalDays = rows.reduce((sum, row) => sum + row.totalDays, 0);
+const sorted = [...rows].sort((a, b) => a.pct - b.pct);
+const min = sorted[0];
+const belowGate = rows.filter(row => row.pct < 98);
+const jsonMode = process.argv.includes("--json");
+
+const report = {
+  contract: d.DIET_CONTRACT,
+  catalog: {
+    ingredients: catalog.ingredients.length,
+    dishes: catalog.dishes.length,
+    dishIngredients: catalog.dishIng.length,
+  },
+  gateTargetPct: 98,
+  total: { okDays: totalOk, totalDays, pct: Number(pct(totalOk, totalDays).toFixed(1)) },
+  minDimension: {
+    mealCount: min.mealCount,
+    diet: min.diet,
+    target: min.target,
+    dislike: min.dislike,
+    okDays: min.okDays,
+    totalDays: min.totalDays,
+    pct: Number(min.pct.toFixed(1)),
+  },
+  dimensionsBelowGate: belowGate.length,
+  causes: Object.fromEntries([...globalCauses.entries()].sort((a, b) => b[1] - a[1])),
+  rows: rows.map(row => ({
+    mealCount: row.mealCount,
+    diet: row.diet,
+    target: row.target,
+    dislike: row.dislike,
+    okDays: row.okDays,
+    totalDays: row.totalDays,
+    pct: Number(row.pct.toFixed(1)),
+    causes: Object.fromEntries([...row.causes.entries()].sort((a, b) => b[1] - a[1])),
+  })),
+};
+
+if (jsonMode) {
+  console.log(JSON.stringify(report, null, 2));
+} else {
+  console.log("=== Canary DIET_CONTRACT (REQ-128) ===");
+  console.log(`Contrato: kcal ±3% o ±50 kcal; proteina ±5 g; carbohidratos ±8 g; grasa ±8 g.`);
+  console.log(`Catalogo: ${report.catalog.ingredients} ingredientes · ${report.catalog.dishes} platos · ${report.catalog.dishIngredients} lineas de receta.`);
+  console.log(`Matriz: ${rows.length} dimensiones × 7 dias = ${totalDays} dias.`);
+  console.log(`Factibilidad total: ${totalOk}/${totalDays} (${report.total.pct}%). Gate futuro: >=98% por dimension.`);
+  console.log(`Minimo dimension: ${min.mealCount} comidas / ${min.diet} / ${min.target} / ${min.dislike} = ${min.okDays}/${min.totalDays} (${report.minDimension.pct}%).`);
+  console.log("\nDimensiones:");
+  rows.forEach(row => {
+    const label = `${row.mealCount} comidas | ${row.diet.padEnd(12)} | ${row.target.padEnd(13)} | ${row.dislike.padEnd(13)}`;
+    const causeText = [...row.causes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}:${v}`).join(", ") || "ok";
+    console.log(`  ${label} -> ${row.okDays}/${row.totalDays} (${row.pct.toFixed(1)}%) · ${causeText}`);
+  });
+  console.log("\nCausas principales:");
+  [...globalCauses.entries()].sort((a, b) => b[1] - a[1]).forEach(([key, count]) => {
+    console.log(`  - ${key}: ${count}`);
+  });
+  if (belowGate.length) {
+    console.log(`\nCalibracion: ${belowGate.length} dimension(es) quedan bajo 98%; REQ-128 solo mide y REQ-129/132/135 deben cerrar esas brechas antes de activar runtime.`);
+  } else {
+    console.log("\nCalibracion: todas las dimensiones cumplen el gate futuro.");
+  }
+  console.log("validate-diet-contract: canario ejecutado.");
+}
