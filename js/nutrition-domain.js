@@ -8,6 +8,7 @@
 
   // ── Vocabulario canónico de slots de comida ─────────────────────────────────
   const MEAL_SLOT_VOCAB=new Set(["desayuno","media_manana","almuerzo","merienda","snack","cena","recena"]);
+  const CUISINE_TAG_VOCAB=new Set(["criolla","mediterranea","mexicana","asiatica"]);
 
   // ── Tolerancias explícitas por nivel ────────────────────────────────────────
   // TARGET_KCAL_DELTA : targets calculados (calculateMacroTargets) — garantía post-REQ-77.
@@ -308,17 +309,35 @@
     return [...new Set(terms.map(t=>t.toLowerCase()))];
   }
 
+  function normalizeCuisineTag(value){
+    const key=solverKey(value).replace(/_/g,"");
+    if(key==="mediterranea"||key==="mediterraneo")return"mediterranea";
+    if(key==="peruana"||key==="peruano"||key==="criollaperuana"||key==="criollo")return"criolla";
+    return CUISINE_TAG_VOCAB.has(key)?key:"";
+  }
+
+  function cuisineTagsForDish(dish){
+    return [...new Set(asArray(dish&&dish.cuisine_tags).map(normalizeCuisineTag).filter(Boolean))];
+  }
+
+  function preferredCuisineTags(prefs){
+    return [...new Set(asArray(prefs&&prefs.preferredCuisines).map(normalizeCuisineTag).filter(Boolean))];
+  }
+
   // Ajuste suave de score (no bloqueante): platos con ingredientes/nombres que
   // coinciden con gustos declarados bajan de score (mejor), con disgustos suben
   // (peor) para que el determinista evite disgustos cuando hay alternativas.
   function preferenceScoreAdjustment(dish,prefs,catalog,maps){
     const p=prefs||{};
     const liked=likedTermsForProfile(p);
+    const preferredCuisines=preferredCuisineTags(p);
     const disliked=String(p.dislikedIngredients||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean);
-    if(!liked.length&&!disliked.length)return 0;
+    if(!liked.length&&!preferredCuisines.length&&!disliked.length)return 0;
     const text=dishText(dish,catalog,maps);
     let adj=0;
     if(liked.length&&foodTextViolatesTerms(text,liked))adj-=0.12;
+    const cuisineTags=cuisineTagsForDish(dish);
+    if(preferredCuisines.length&&cuisineTags.some(tag=>preferredCuisines.includes(tag)))adj-=0.10;
     if(disliked.length&&foodTextViolatesTerms(text,disliked))adj+=0.15;
     return adj;
   }
@@ -1234,6 +1253,8 @@
     foodBlockTermsForProfile,
     foodTextConflictForProfile,
     likedTermsForProfile,
+    cuisineTagsForDish,
+    preferredCuisineTags,
     preferenceScoreAdjustment,
     dishBlockKey,
     isDishBlockedByProfile,

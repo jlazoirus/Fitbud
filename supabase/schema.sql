@@ -36,6 +36,7 @@ create table dishes (
   slot        text,            -- desayuno | almuerzo | batido | cena | snack
   compatible_slots text[] not null default '{}',
   diet_tags   text[] not null default '{}',
+  cuisine_tags text[] not null default '{}',
   prep_minutes integer,
   budget_tier text,
   needs_kitchen boolean,

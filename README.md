@@ -112,7 +112,7 @@ En producción la IA funciona vía el proxy de Vercel. En desarrollo local (sin 
 La pestaña **Alimentos** usa una base de datos real (Supabase / PostgreSQL) con tres tablas:
 
 - **`ingredients`** — datos nutricionales por 100 g (kcal, proteína, carbos, grasa) y `slug` estable cuando está aplicada la migración semántica.
-- **`dishes`** + **`dish_ingredients`** — platos como recetas de ingredientes con gramos, slots compatibles, tags dietarios y límites de porción para planificación futura.
+- **`dishes`** + **`dish_ingredients`** — platos como recetas de ingredientes con gramos, slots compatibles, tags dietarios/de cocina y límites de porción para planificación futura.
 - **`diets`** + **`diet_dishes`** — los menús A/B/C/D y qué plato va cada día.
 
 Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se guardan a mano). Desde la app puedes ver, crear y editar ingredientes y platos. El seed actual contiene 121 ingredientes y 100 platos; las fuentes de revision del lote nuevo estan en [`docs/catalog-lote-1-sources.md`](docs/catalog-lote-1-sources.md).

@@ -10,6 +10,7 @@ alter table ingredients add column if not exists slug text;
 alter table dishes add column if not exists slug text;
 alter table dishes add column if not exists compatible_slots text[] not null default '{}';
 alter table dishes add column if not exists diet_tags text[] not null default '{}';
+alter table dishes add column if not exists cuisine_tags text[] not null default '{}';
 alter table dishes add column if not exists prep_minutes integer;
 alter table dishes add column if not exists budget_tier text;
 alter table dishes add column if not exists needs_kitchen boolean;
@@ -90,6 +91,16 @@ set diet_tags = array_remove(array[
 from dish_flags f
 where f.id = d.id
   and coalesce(array_length(d.diet_tags, 1), 0) = 0;
+
+update dishes
+set cuisine_tags = case
+  when menu = 'A' or name ilike '%tacu tacu%' or name ilike '%ají%' or name ilike '%aji%' or name ilike '%locro%' or name ilike '%chaufa%' then array['criolla']
+  when menu = 'B' or name ilike '%hummus%' or name ilike '%falafel%' or name ilike '%griega%' or name ilike '%pita%' or name ilike '%cuscus%' then array['mediterranea']
+  when menu = 'D' or name ilike '%taco%' or name ilike '%fajita%' or name ilike '%quesadilla%' or name ilike '%enchilada%' or name ilike '%azteca%' or name ilike '%chili%' then array['mexicana']
+  when menu = 'C' or name ilike '%teriyaki%' or name ilike '%pad thai%' or name ilike '%ramen%' or name ilike '%pak choi%' or name ilike '%edamame%' then array['asiatica']
+  else '{}'
+end
+where coalesce(array_length(cuisine_tags, 1), 0) = 0;
 
 update dishes
 set
@@ -197,6 +208,14 @@ do $$
 begin
   alter table dishes add constraint dishes_diet_tags_vocab
     check (diet_tags <@ array['vegetariano','vegano','omnivoro']::text[]);
+exception
+  when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter table dishes add constraint dishes_cuisine_tags_vocab
+    check (cuisine_tags <@ array['criolla','mediterranea','mexicana','asiatica']::text[]);
 exception
   when duplicate_object then null;
 end $$;

@@ -11,6 +11,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const VALID_SLOTS = new Set(["desayuno", "media_manana", "almuerzo", "merienda", "snack", "cena", "recena", "batido"]);
 const VALID_DIET_TAGS = new Set(["vegetariano", "vegano", "omnivoro"]);
+const VALID_CUISINE_TAGS = new Set(["criolla", "mediterranea", "mexicana", "asiatica"]);
 const VALID_WEIGHT = new Set(["light", "medium", "heavy"]);
 const VALID_FORM = new Set(["bowl", "sandwich", "shake", "plated", "soup", "snack"]);
 const VALID_BUDGET = new Set(["low", "medium", "flexible"]);
@@ -130,6 +131,7 @@ function parseCatalog() {
     row.slug = slugify(row.name);
     row.compatible_slots = [row.slot];
     row.diet_tags = ["omnivoro"];
+    row.cuisine_tags = [];
     row.meal_weight = row.slot === "almuerzo" ? "heavy" : row.slot === "snack" ? "light" : "medium";
     row.meal_form = row.slot === "snack" ? "snack" : "plated";
     dishes.push(row);
@@ -212,6 +214,7 @@ function normalizeDish(candidate) {
     slot: String(candidate.slot || arr(candidate.compatible_slots)[0] || "snack").trim(),
     compatible_slots: arr(candidate.compatible_slots),
     diet_tags: arr(candidate.diet_tags),
+    cuisine_tags: arr(candidate.cuisine_tags),
     meal_weight: String(candidate.meal_weight || "").trim(),
     meal_form: String(candidate.meal_form || "").trim(),
     prep_minutes: num(candidate.prep_minutes),
@@ -237,6 +240,7 @@ function dishMetadataReasons(dish, ingredientSlugs, catalog) {
   if (!VALID_SLOTS.has(dish.slot)) reasons.push("dish_slot_invalid");
   if (!dish.compatible_slots.length || dish.compatible_slots.some((slot) => !VALID_SLOTS.has(slot))) reasons.push("compatible_slots_invalid");
   if (!dish.diet_tags.length || dish.diet_tags.some((tag) => !VALID_DIET_TAGS.has(tag))) reasons.push("diet_tags_invalid");
+  if (!dish.cuisine_tags.length || dish.cuisine_tags.some((tag) => !VALID_CUISINE_TAGS.has(tag))) reasons.push("cuisine_tags_invalid");
   if (!VALID_WEIGHT.has(dish.meal_weight)) reasons.push("meal_weight_invalid");
   if (!VALID_FORM.has(dish.meal_form)) reasons.push("meal_form_invalid");
   if (!Number.isInteger(dish.prep_minutes) || dish.prep_minutes < 1 || dish.prep_minutes > 180) reasons.push("prep_minutes_invalid");
@@ -330,12 +334,12 @@ function generateSql(result, brief) {
     lines.push("");
   }
   if (result.acceptedDishes.length) {
-    lines.push("insert into dishes (name, slot, menu, slug, compatible_slots, diet_tags, prep_minutes, budget_tier, needs_kitchen, eat_out_ok, meal_weight, meal_form) values");
+    lines.push("insert into dishes (name, slot, menu, slug, compatible_slots, diet_tags, cuisine_tags, prep_minutes, budget_tier, needs_kitchen, eat_out_ok, meal_weight, meal_form) values");
     lines.push(result.acceptedDishes.map((dish) =>
-      `('${sqlString(dish.name)}','${sqlString(dish.slot)}',null,'${sqlString(dish.slug)}',${sqlArray(dish.compatible_slots)},${sqlArray(dish.diet_tags)},${dish.prep_minutes},'${sqlString(dish.budget_tier)}',${dish.needs_kitchen},${dish.eat_out_ok},'${sqlString(dish.meal_weight)}','${sqlString(dish.meal_form)}')`
+      `('${sqlString(dish.name)}','${sqlString(dish.slot)}',null,'${sqlString(dish.slug)}',${sqlArray(dish.compatible_slots)},${sqlArray(dish.diet_tags)},${sqlArray(dish.cuisine_tags)},${dish.prep_minutes},'${sqlString(dish.budget_tier)}',${dish.needs_kitchen},${dish.eat_out_ok},'${sqlString(dish.meal_weight)}','${sqlString(dish.meal_form)}')`
     ).join(",\n") + "\n" +
       "on conflict (slug) do update set\n" +
-      "  name = excluded.name,\n  slot = excluded.slot,\n  compatible_slots = excluded.compatible_slots,\n  diet_tags = excluded.diet_tags,\n  prep_minutes = excluded.prep_minutes,\n  budget_tier = excluded.budget_tier,\n  needs_kitchen = excluded.needs_kitchen,\n  eat_out_ok = excluded.eat_out_ok,\n  meal_weight = excluded.meal_weight,\n  meal_form = excluded.meal_form;");
+      "  name = excluded.name,\n  slot = excluded.slot,\n  compatible_slots = excluded.compatible_slots,\n  diet_tags = excluded.diet_tags,\n  cuisine_tags = excluded.cuisine_tags,\n  prep_minutes = excluded.prep_minutes,\n  budget_tier = excluded.budget_tier,\n  needs_kitchen = excluded.needs_kitchen,\n  eat_out_ok = excluded.eat_out_ok,\n  meal_weight = excluded.meal_weight,\n  meal_form = excluded.meal_form;");
     lines.push("");
     lines.push("delete from dish_ingredients di");
     lines.push("using dishes d");
@@ -370,7 +374,7 @@ async function callAnthropic(brief, limit) {
   const model = process.env.ANTHROPIC_MODEL_CATALOG || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
   const prompt = `Propón hasta ${limit} recetas para crecer el catálogo Fitbud. Brief: ${brief}.
 Responde SOLO JSON con:
-{"ingredients":[{"slug":"","name":"","category":"","kcal":0,"protein_g":0,"carbs_g":0,"fat_g":0,"source":""}],"dishes":[{"slug":"","name":"","slot":"","compatible_slots":[],"diet_tags":[],"meal_weight":"","meal_form":"","prep_minutes":0,"budget_tier":"","needs_kitchen":false,"eat_out_ok":false,"ingredients":[{"ingredient_slug":"","grams":0,"scalable":true,"min_g":0,"max_g":0,"step_g":5}]}]}
+{"ingredients":[{"slug":"","name":"","category":"","kcal":0,"protein_g":0,"carbs_g":0,"fat_g":0,"source":""}],"dishes":[{"slug":"","name":"","slot":"","compatible_slots":[],"diet_tags":[],"cuisine_tags":[],"meal_weight":"","meal_form":"","prep_minutes":0,"budget_tier":"","needs_kitchen":false,"eat_out_ok":false,"ingredients":[{"ingredient_slug":"","grams":0,"scalable":true,"min_g":0,"max_g":0,"step_g":5}]}]}
 Usa slugs estables en español sin tildes, fuentes nutricionales anotadas para ingredientes nuevos y metadata completa.`;
   const response = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",

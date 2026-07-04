@@ -2201,6 +2201,9 @@ function dishSemanticsReady(){
 function mealMomentSemanticsReady(){
   return (DB.dishes||[]).some(d=>Object.prototype.hasOwnProperty.call(d,"meal_weight")||Object.prototype.hasOwnProperty.call(d,"meal_form"));
 }
+function cuisineSemanticsReady(){
+  return (DB.dishes||[]).some(d=>Object.prototype.hasOwnProperty.call(d,"cuisine_tags"));
+}
 function catalogSlug(name){
   return String(name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
     .toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").replace(/-+/g,"-");
@@ -7729,7 +7732,8 @@ function coachHardRestrictions(){
 // REQ-130: bump a 7 — disgustos son obligatorios, alta proteína filtra ejemplos
 // dinámicamente y omnívoro tiene regla activa de proteína animal.
 // REQ-132: bump a 8 — el prompt y los pools consumen metadata de forma/peso por slot.
-const COACH_PROMPT_VERSION=8;
+// REQ-136: bump a 9 — el hash de catálogo incluye cuisine_tags para preferencias de cocina.
+const COACH_PROMPT_VERSION=9;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -7755,7 +7759,7 @@ function coachCompatibilityContext(action){
     },
     catalog:{
       dishes:hashText((DB.dishes||[]).map(d=>[
-        d.id,d.name,(catalogArray(d.compatible_slots)||[]).join(","),d.meal_weight||"",d.meal_form||"",
+        d.id,d.name,(catalogArray(d.compatible_slots)||[]).join(","),(catalogArray(d.cuisine_tags)||[]).join(","),d.meal_weight||"",d.meal_form||"",
       ].join(":")).join("|")),
       exercises:hashText((DB.exercises||[]).map(e=>e.slug+":"+(e.active!==false)).join("|")),
     },
@@ -10782,6 +10786,7 @@ function editDish(id){
     menu:dish.menu||"",
     compatible_slots:dishCompatibleSlots(dish),
     diet_tags:catalogArray(dish.diet_tags),
+    cuisine_tags:catalogArray(dish.cuisine_tags),
     prep_minutes:dish.prep_minutes||"",
     budget_tier:dish.budget_tier||"medium",
     needs_kitchen:dish.needs_kitchen!==false,
@@ -10802,6 +10807,7 @@ function dishSync(){
     const checked=NUTRITION_CATALOG_SLOT_OPTIONS.filter(s=>{const el=document.getElementById("ds_compat_"+s);return el&&el.checked;});
     if(checked.length)d.compatible_slots=checked;
     const tags=document.getElementById("ds_tags");if(tags)d.diet_tags=tags.value.split(",").map(x=>x.trim()).filter(Boolean);
+    const cuisineTags=document.getElementById("ds_cuisine_tags");if(cuisineTags)d.cuisine_tags=cuisineTags.value.split(",").map(x=>x.trim()).filter(Boolean);
     const prep=document.getElementById("ds_prep");if(prep)d.prep_minutes=prep.value;
     const budget=document.getElementById("ds_budget");if(budget)d.budget_tier=budget.value;
     const kitchen=document.getElementById("ds_kitchen");if(kitchen)d.needs_kitchen=kitchen.checked;
@@ -10821,6 +10827,7 @@ function dishModal(){
         ${NUTRITION_CATALOG_SLOT_OPTIONS.map(s=>`<label class="chip-check"><input type="checkbox" id="ds_compat_${s}" ${compat.includes(s)?"checked":""}><span>${s}</span></label>`).join("")}
       </div></div>
       <div class="field"><label>Tags de dieta</label><input id="ds_tags" value="${esc((d.diet_tags||[]).join(", "))}" placeholder="vegetariano, vegano, omnivoro"></div>
+      ${cuisineSemanticsReady()?`<div class="field"><label>Cocinas</label><input id="ds_cuisine_tags" value="${esc((d.cuisine_tags||[]).join(", "))}" placeholder="criolla, mediterranea, mexicana, asiatica"></div>`:""}
       <div class="grid2">
         <div class="field"><label>Preparación (min)</label><input id="ds_prep" type="number" inputmode="numeric" value="${esc(d.prep_minutes||"")}"></div>
         <div class="field"><label>Presupuesto</label><select id="ds_budget">${["low","medium","flexible"].map(x=>`<option value="${x}" ${x===d.budget_tier?"selected":""}>${x}</option>`).join("")}</select></div>
@@ -10868,6 +10875,7 @@ async function saveDish(){
     dishRow.slug=(existing&&existing.slug)||catalogSlug(d.name);
     dishRow.compatible_slots=(d.compatible_slots&&d.compatible_slots.length)?d.compatible_slots:[d.slot];
     dishRow.diet_tags=d.diet_tags||[];
+    if(cuisineSemanticsReady())dishRow.cuisine_tags=d.cuisine_tags||[];
     dishRow.prep_minutes=d.prep_minutes===""||d.prep_minutes==null?null:+d.prep_minutes;
     dishRow.budget_tier=d.budget_tier||null;
     dishRow.needs_kitchen=!!d.needs_kitchen;

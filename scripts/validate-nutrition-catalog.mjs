@@ -13,6 +13,7 @@ const migration = readFileSync(join(ROOT, "supabase/nutrition_catalog_semantics.
 
 const FOOD_SLOTS = ["desayuno", "media_manana", "almuerzo", "merienda", "snack", "cena", "recena"];
 const SLOT_VOCAB = new Set([...FOOD_SLOTS, "batido"]);
+const CUISINE_TAGS = new Set(["criolla", "mediterranea", "mexicana", "asiatica"]);
 const MIN_CANDIDATES_PER_SLOT = 2;
 const REQ135_SLOT_MINIMUMS = { desayuno: 20, media_manana: 10, merienda: 10, snack: 15, recena: 8 };
 const REQ135_MIN_DISHES = 100;
@@ -117,12 +118,27 @@ function inferBudgetTier(dish) {
   return "medium";
 }
 
+function dishMenu(dish) {
+  return String(dish.menu || "").replace(/'/g, "");
+}
+
+function inferCuisineTags(dish) {
+  const name = String(dish.name || "");
+  const menu = dishMenu(dish);
+  if (menu === "A" || /tacu tacu|aj[ií]|locro|chaufa/i.test(name)) return ["criolla"];
+  if (menu === "B" || /hummus|falafel|griega|pita|cuscus/i.test(name)) return ["mediterranea"];
+  if (menu === "D" || /taco|fajita|quesadilla|enchilada|azteca|chili/i.test(name)) return ["mexicana"];
+  if (menu === "C" || /teriyaki|pad thai|ramen|pak choi|edamame/i.test(name)) return ["asiatica"];
+  return [];
+}
+
 function assertMigrationShape() {
   const required = [
     "alter table ingredients add column if not exists slug text",
     "alter table dishes add column if not exists slug text",
     "alter table dishes add column if not exists compatible_slots text[]",
     "alter table dishes add column if not exists diet_tags text[]",
+    "alter table dishes add column if not exists cuisine_tags text[]",
     "alter table dishes add column if not exists prep_minutes integer",
     "alter table dishes add column if not exists budget_tier text",
     "alter table dishes add column if not exists needs_kitchen boolean",
@@ -138,6 +154,7 @@ function assertMigrationShape() {
     "dishes_slug_unique_idx",
     "dishes_compatible_slots_vocab",
     "dishes_diet_tags_vocab",
+    "dishes_cuisine_tags_vocab",
     "dishes_meal_weight_vocab",
     "dishes_meal_form_vocab",
   ];
@@ -200,6 +217,21 @@ function assertDietTagBackfill(dishes, ingredients, recipes) {
   assert.ok(vegan / dishes.length >= 0.15, `REQ-135 exige >=15% vegano; tiene ${vegan}/${dishes.length}`);
 }
 
+function assertCuisineCoverage(dishes) {
+  const coverage = new Map([...CUISINE_TAGS].map(tag => [tag, 0]));
+  for (const dish of dishes) {
+    const tags = inferCuisineTags(dish);
+    for (const tag of tags) {
+      assert.ok(CUISINE_TAGS.has(tag), `${dish.name} infiere cuisine_tag inválido: ${tag}`);
+      coverage.set(tag, (coverage.get(tag) || 0) + 1);
+    }
+  }
+  for (const tag of CUISINE_TAGS) {
+    const count = coverage.get(tag) || 0;
+    assert.ok(count >= 5, `REQ-136 exige cobertura inicial de cocina ${tag}; tiene ${count}`);
+  }
+}
+
 function assertReq135Scale(ingredients, dishes) {
   assert.ok(ingredients.length >= REQ135_MIN_INGREDIENTS, `REQ-135 exige >=${REQ135_MIN_INGREDIENTS} ingredientes; tiene ${ingredients.length}`);
   assert.ok(dishes.length >= REQ135_MIN_DISHES, `REQ-135 exige >=${REQ135_MIN_DISHES} platos; tiene ${dishes.length}`);
@@ -220,5 +252,6 @@ assertUniqueSlugs("Plato", dishes);
 assertSlotCoverage(dishes);
 assertMealMetadata(dishes);
 assertDietTagBackfill(dishes, ingredients, recipes);
+assertCuisineCoverage(dishes);
 
 console.log(`Catálogo nutricional semántico OK: ${ingredients.length} ingredientes · ${dishes.length} platos · ${FOOD_SLOTS.length} slots cubiertos · metadata de momento validada.`);

@@ -54,6 +54,7 @@ const fixture = {
       slot: "desayuno",
       compatible_slots: ["desayuno"],
       diet_tags: ["omnivoro"],
+      cuisine_tags: ["criolla"],
       meal_weight: "medium",
       meal_form: "sandwich",
       prep_minutes: 12,
@@ -73,6 +74,7 @@ const fixture = {
       slot: "snack",
       compatible_slots: ["snack"],
       diet_tags: ["omnivoro"],
+      cuisine_tags: ["mediterranea"],
       meal_weight: "light",
       meal_form: "snack",
       prep_minutes: 5,
@@ -114,6 +116,8 @@ assert.ok(report.rejected.some((item) => item.slug === "snack-sin-metadata" && i
 
 assert.ok(sql.includes("insert into ingredients") && sql.includes("on conflict (slug)"),
   "El SQL debe upsertear por slug, no por ID.");
+assert.ok(sql.includes("cuisine_tags") && sql.includes("array['criolla']::text[]"),
+  "El SQL debe incluir cuisine_tags validados.");
 assert.ok(sql.includes("delete from dish_ingredients") && sql.includes("join ingredients i on i.slug"),
   "El SQL debe reconstruir recetas referenciando ingredientes por slug.");
 assert.ok(sql.includes("'Wrap de claras y pollo'") && sql.includes("'claras-organicas-pasteurizadas'"),

@@ -90,7 +90,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 26. ~~REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5.~~ (implementado, P1)
 27. ~~REQ-134 - Pipeline de crecimiento del catálogo validado por el motor.~~ (implementado, P1)
 28. ~~REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks.~~ (implementado, P1)
-29. REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias. (P1)
+29. ~~REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias.~~ (implementado, P1)
 30. REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa. (P2)
 31. REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos. (P2)
 32. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
@@ -1714,7 +1714,7 @@ Que ningún slot quede sin candidatos variados y que el desayuno tenga profundid
 
 ## REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias
 
-**Estado: pendiente.**
+**Estado: implementado.** `supabase/schema.sql` y `supabase/nutrition_catalog_semantics.sql` agregan `dishes.cuisine_tags text[]` con constraint idempotente (`criolla`, `mediterranea`, `mexicana`, `asiatica`) y backfill por menu/nombre. `js/nutrition-domain.js` exporta `cuisineTagsForDish()` y `preferredCuisineTags()`; `preferenceScoreAdjustment()` aplica un bonus suave cuando `prefs.preferredCuisines` coincide con tags del plato. `index.html` preserva la metadata en el editor admin, incluye `cuisine_tags` en el hash de catálogo y sube `COACH_PROMPT_VERSION` a 9. El pipeline `scripts/grow-catalog.mjs` ahora exige y emite `cuisine_tags`, y `scripts/validate-cuisine-preferences.mjs` prueba que perfiles criollo/mediterráneo/mexicano rankean candidatos distintos con los mismos hard filters. Acción manual externa: re-ejecutar `supabase/nutrition_catalog_semantics.sql` en Supabase para crear/backfillear `cuisine_tags` antes de usar los lotes REQ-140/141.
 
 ### Origen
 
