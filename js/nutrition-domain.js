@@ -240,8 +240,13 @@
     return foodTextViolatesTerms(text,foodBlockTermsForProfile(prefs,(options&&options.includeSoft)===true));
   }
 
+  // REQ-127: includeSoft=true — dislikedIngredients también bloquea en el solver
+  // determinista, igual que en el prompt de IA (coachFoodBlockTerms de index.html).
+  // Antes el solver solo excluía alergias/patrón dietario y dejaba pasar disgustos
+  // declarados, así que el fallback determinista podía seguir sugiriendo ingredientes
+  // que el usuario marcó como "no me gusta".
   function solverRestrictionTerms(prefs){
-    return foodBlockTermsForProfile(prefs,false);
+    return foodBlockTermsForProfile(prefs,true);
   }
 
   // Gustos declarados (REQ-119): términos positivos de ingredientes/platos favoritos.

@@ -15,8 +15,8 @@ function sliceBetween(startNeedle, endNeedle) {
 
 const validateGeneratedDay = sliceBetween("function validateGeneratedDay(", "// REQ-89:");
 assert.ok(
-  validateGeneratedDay.includes("coachFoodBlockTerms(false)"),
-  "validateGeneratedDay debe construir restricciones duras completas del perfil."
+  validateGeneratedDay.includes("coachFoodBlockTerms(true)"),
+  "validateGeneratedDay debe construir restricciones duras completas del perfil, incluyendo dislikedIngredients (REQ-127)."
 );
 assert.ok(
   validateGeneratedDay.includes("foodTextConflictForProfile") && validateGeneratedDay.includes("profileConflict(hay)"),
@@ -45,14 +45,14 @@ assert.ok(
 
 const generateOneDay = sliceBetween("async function generateOneDay(", "async function aiGenerateDay(");
 assert.ok(
-  generateOneDay.includes("const hardRes=coachFoodBlockTerms(false)"),
-  "generateOneDay debe pedir el día con las mismas restricciones duras que luego valida."
+  generateOneDay.includes("const hardRes=coachFoodBlockTerms(true)"),
+  "generateOneDay debe pedir el día con las mismas restricciones duras que luego valida (incl. dislikedIngredients, REQ-127)."
 );
 
 const dietQuota = sliceBetween("function dietQuotaValidation(", "function mealOptionValidation(");
 assert.ok(
-  dietQuota.includes("hardRestrictions:coachFoodBlockTerms(false)"),
-  "dietQuotaValidation debe enviar restricciones duras completas al proxy."
+  dietQuota.includes("hardRestrictions:coachFoodBlockTerms(true)"),
+  "dietQuotaValidation debe enviar restricciones duras completas al proxy, incluyendo dislikedIngredients (REQ-127)."
 );
 
 const regenerateMeal = sliceBetween("async function regenerateGenMeal(", "function regenerateGenMealRestore(");

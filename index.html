@@ -7797,11 +7797,11 @@ function dietQuotaValidation(ds){
     expectedMeals:day.meals.length,
     slots:day.meals.map(meal=>meal.id),
     target:effectiveDayTarget(),
-    hardRestrictions:coachFoodBlockTerms(false),
+    hardRestrictions:coachFoodBlockTerms(true),
   };
 }
 function mealOptionValidation(remK,extra){
-  return Object.assign({hardRestrictions:coachFoodBlockTerms(false),maxKcal:Math.max(100,Number(remK)||0)},extra||{});
+  return Object.assign({hardRestrictions:coachFoodBlockTerms(true),maxKcal:Math.max(100,Number(remK)||0)},extra||{});
 }
 function validMealSuggestions(value){
   const hardTerms=coachFoodBlockTerms(false);
@@ -8229,9 +8229,10 @@ function validateGeneratedDay(j,day,target){
   const recent=recentMealNames(day.ds,5).map(s=>s.toLowerCase());
   const knownIng=new Set((DB.ingredients||[]).map(i=>i.name.toLowerCase()));
   const ndCoach=window.FITBUD_NUTRITION_DOMAIN;
-  const hardTerms=coachFoodBlockTerms(false);
+  // REQ-127: includeSoft=true para que dislikedIngredients también bloquee (no solo advierta).
+  const hardTerms=coachFoodBlockTerms(true);
   const profileConflict=text=>ndCoach&&ndCoach.foodTextConflictForProfile
-    ?ndCoach.foodTextConflictForProfile(text,prefs,{includeSoft:false})
+    ?ndCoach.foodTextConflictForProfile(text,prefs,{includeSoft:true})
     :coachTextHasTerms(text,hardTerms);
   let tot={kcal:0,p:0,c:0,f:0}; const comidas=[];
   j.comidas.forEach((c,idx)=>{
@@ -8255,11 +8256,11 @@ function validateGeneratedDay(j,day,target){
       macro={kcal:+c.kcal||0,p:+c.proteina_g||+c.p||0,c:+c.carbohidratos_g||+c.c||0,f:+c.grasa_g||+c.f||0};
     }
     tot.kcal+=macro.kcal;tot.p+=macro.p;tot.c+=macro.c;tot.f+=macro.f;
-    // Restricciones duras del perfil: patrón alimentario, alergias, sin lácteos y sin gluten.
+    // Restricciones duras del perfil: patrón alimentario, alergias, sin lácteos, sin gluten y
+    // dislikedIngredients (REQ-127: ahora bloquea igual que una restricción dura).
     const hay=(nombre+" "+ings.map(g=>g.nombre).join(" ")).toLowerCase();
     const conflict=profileConflict(hay);
     if(conflict)issues.push(`"${nombre}" incluye "${conflict}" (restricción obligatoria).`);
-    if(prefs.dislikedIngredients){prefs.dislikedIngredients.toLowerCase().split(/[,;]/).map(s=>s.trim()).filter(Boolean).forEach(a=>{if(hay.includes(a))warns.push(`"${nombre}" incluye "${a}", que marcaste como no preferido.`);});}
     // ingredientes nuevos: solo cuando el catálogo no está disponible para recalcular
     if(!(ndCoach&&ndCoach.recalcCoachMealMacros&&DB.loaded)){
       const nuevos=ings.filter(g=>g.nombre&&!knownIng.has(g.nombre.toLowerCase())).map(g=>g.nombre);
@@ -8317,23 +8318,27 @@ async function generateOneDay(ds,coachRequest){
   const mainMealIdx=Math.min(Math.max(1,prefs.mainMealIndex||2),day.meals.length)-1;
   const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
   const slots=day.meals.map((m,i)=>`${m.id} (${m.slot}${m.time?", ~"+m.time:""}${i===mainMealIdx?" [comida principal]":""})`).join(", ");
-  const hardRes=coachFoodBlockTerms(false);
+  // REQ-127: dislikedIngredients se incluye como restricción DURA (includeSoft=true), no solo
+  // como sugerencia. Antes solo bloqueaba la lista de referencia (REQ-61) pero el prompt lo
+  // presentaba como preferencia débil y la validación no lo consideraba, así que la IA seguía
+  // sugiriendo ingredientes marcados como "no me gusta" (ej. tofu).
+  const hardRes=coachFoodBlockTerms(true);
   // Excluir de la referencia los platos incompatibles con el perfil (duras + suaves: sin_lacteos,
-  // sin_gluten, dislikedIngredients). validateGeneratedDay no valida las suaves, así que el filtro
-  // de la lista de referencia es la única barrera para no sugerirlas. REQ-61.
+  // sin_gluten, dislikedIngredients). REQ-61.
   const compatDishes=DB.loaded?DB.dishes.filter(d=>!coachDishBlockedByProfile(d).blocked):[];
   const dishList=compatDishes.length?compatDishes.slice(0,60).map(d=>{const m=dishMacros(d.id);return `${d.name} [${dishSlotMeta(d)}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(base de datos no conectada)";
   const recent=recentMealNames(ds,5);
   const lp=(profile&&profile.prefs&&profile.prefs.learnedPatterns)||null;
   const learnedLine=lp&&lp.topIngredients&&lp.topIngredients.length?`\nEl usuario suele disfrutar ingredientes como: ${lp.topIngredients.join(", ")}. Incorpóralos cuando encajen con las metas.`:"";
   const likesLine=coachLikesLine(prefs);
-  const dislikeSoftLine=prefs.dislikedIngredients?`\nEvita "${prefs.dislikedIngredients}" salvo que no haya alternativa viable para cumplir la meta.`:"";
   const blockedLine=coachBlockedDishesLine(prefs);
   const cookCtx=`Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
-  const hardResLine=hardRes.length?`\nPROHIBIDO incluir en cualquier comida o ingrediente: ${hardRes.join(", ")}.`:"";
+  const hardResLine=hardRes.length?`\nNUNCA incluyas en ninguna comida o ingrediente, bajo ninguna circunstancia: ${hardRes.join(", ")}.`:"";
   // Carne/pescado se instruye por prompt (no por término) para no colisionar con substrings como "repollo". REQ-65.
   const dietList=Array.isArray(prefs.diet)?prefs.diet:[];
-  const vegLine=dietList.includes("vegano")?`\nPatrón VEGANO: no incluyas carne, aves, pescado, mariscos, lácteos, huevo ni miel; usa solo ingredientes de origen vegetal.`:dietList.includes("vegetariano")?`\nPatrón VEGETARIANO: no incluyas carne, aves, pescado ni mariscos.`:"";
+  // REQ-127: sin esta línea explícita, el modelo default a sugerencias vegetarianas aunque el
+  // usuario no marcó vegetariano/vegano. Hay que decir OMNÍVORO en voz alta, no solo omitir el veto.
+  const vegLine=dietList.includes("vegano")?`\nPatrón VEGANO: no incluyas carne, aves, pescado, mariscos, lácteos, huevo ni miel; usa solo ingredientes de origen vegetal.`:dietList.includes("vegetariano")?`\nPatrón VEGETARIANO: no incluyas carne, aves, pescado ni mariscos.`:`\nPatrón OMNÍVORO: el usuario NO es vegetariano ni vegano, así que NO generes un plan vegetariano por defecto. Incluye proteínas animales variadas a lo largo del día (pollo, res, cerdo, pescado, huevo, lácteos, etc.) cuando encajen con sus gustos y metas.`;
   const protPct=target.kcal>0?Math.round(target.p*4/target.kcal*100):0;
   const highProt=protPct>25;
   const mealCount=day.meals.length||4;
@@ -8346,7 +8351,7 @@ async function generateOneDay(ds,coachRequest){
   const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
 Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carbohidratos, ${target.f} g grasa.
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
-${cookCtx}${hardResLine}${vegLine}${highProtLine}${likesLine}${dislikeSoftLine}${blockedLine}
+${cookCtx}${hardResLine}${vegLine}${highProtLine}${likesLine}${blockedLine}
 Referencia de platos compatibles (úsalos como inspiración; ajusta gramajes o crea platos distintos si hace falta para alcanzar la meta): ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}${learnedLine}.
 OBLIGATORIO — el día DEBE cumplir AMBAS metas:
@@ -8750,11 +8755,18 @@ async function regenerateGenMeal(slotId){
   const dishList=slotDishes.length?slotDishes.slice(0,40).map(d=>{const m=dishMacros(d.id);return `${d.name} [${dishSlotMeta(d)}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(sin platos compatibles en la base)";
   const likesLine=coachLikesLine(prefs);
   const blockedLine=coachBlockedDishesLine(prefs);
+  // REQ-127: mismas restricciones duras (incl. dislikedIngredients) y aviso de patrón
+  // alimentario que usa generateOneDay, para que un "cambiar comida" individual no
+  // reintroduzca ingredientes no gustados ni sesgue a vegetariano por defecto.
+  const hardTerms=coachFoodBlockTerms(true);
+  const hardResLine=hardTerms.length?`\nNUNCA incluyas en ninguna comida o ingrediente, bajo ninguna circunstancia: ${hardTerms.join(", ")}.`:"";
+  const dietList=Array.isArray(prefs.diet)?prefs.diet:[];
+  const vegLine=dietList.includes("vegano")?`\nPatrón VEGANO: no incluyas carne, aves, pescado, mariscos, lácteos, huevo ni miel; usa solo ingredientes de origen vegetal.`:dietList.includes("vegetariano")?`\nPatrón VEGETARIANO: no incluyas carne, aves, pescado ni mariscos.`:`\nPatrón OMNÍVORO: el usuario NO es vegetariano ni vegano, así que NO generes una opción vegetariana por defecto. Incluye proteína animal cuando encaje con sus gustos y metas.`;
   const out=$("#genOut");if(out)out.innerHTML=`<div class="ai-box">Buscando otra opción para ${esc(slot.slot)}…</div>`;
   try{
     const prompt=`Sugiere UNA comida diferente para el slot "${slot.slot}" (id: ${slotId}) del ${prettyDate(draft.ds)}.
 Macros disponibles para este slot: ${remKcal} kcal, ${remP} g proteína, ${remC} g carbos, ${remF} g grasa.
-Tiempo: ≤${prefs.cookingMinutes||30} min. No repitas: ${draft.comidas.map(c=>c.nombre).join(", ")}.${likesLine}${blockedLine}
+Tiempo: ≤${prefs.cookingMinutes||30} min. No repitas: ${draft.comidas.map(c=>c.nombre).join(", ")}.${hardResLine}${vegLine}${likesLine}${blockedLine}
 Platos de referencia: ${dishList.slice(0,400)}.
 PROHIBIDO inventar nombres genéricos o ficticios. Usa un nombre descriptivo real y ingredientes reales.
 Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","comidas":[{"slot_id":"${slotId}","nombre":"...","ingredientes":[{"nombre":"...","gramos":0}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
@@ -8763,7 +8775,6 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     const fbIngs=fbDish?DB.dishIng.filter(di=>di.dish_id===fbDish.id).map(di=>{const ing=(DB.ingredients||[]).find(i=>i.id===di.ingredient_id);return{nombre:ing?ing.name:"Ingrediente",gramos:di.grams};}):[];
     const fallbackMeal=fbDish?{slot_id:slotId,nombre:fbDish.name,ingredientes:fbIngs,kcal:fbDish.kcal,proteina_g:fbDish.p,carbohidratos_g:fbDish.c,grasa_g:fbDish.f}:{slot_id:slotId,nombre:`${slot.slot} rápido`,ingredientes:[],kcal:0,proteina_g:0,carbohidratos_g:0,grasa_g:0};
     const fallback=JSON.stringify({explicacion:"Opción del catálogo para el slot.",comidas:[fallbackMeal]});
-    const hardTerms=coachFoodBlockTerms(false);
     const validation={expectedMeals:1,slots:[slotId],target:{kcal:remKcal,p:remP,c:remC,f:remF},hardRestrictions:hardTerms};
     const quota=coachQuota("diet_day",requestId,"slot-"+slotId,fallback,validation,slotId+":"+draft.ds);
     const prevName=coachKey((draft.comidas.find(c=>c.slot_id===slotId)||{}).nombre);
