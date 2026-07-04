@@ -1709,7 +1709,7 @@ Permitir bloquear platos de forma persistente, aplicable a todos los flujos de g
 
 ## REQ-121 - Nutrición: cambios de preferencias regeneran solo futuro y se respetan de inmediato
 
-**Estado: pendiente.**
+**Estado: implementado.** `coachCompatibilityContext` incluye ahora `preferredIngredients`, `preferredDishes`, `preferredCuisines`, `dislikedIngredients` y las keys de `blockedDishes` en el objeto serializado que arma `contextKey` (`coachQuota`); editar cualquiera de esas preferencias cambia el hash y evita que se reutilice un resultado cacheado/pooled generado con preferencias viejas. `COACH_PROMPT_VERSION` subió a 6 para invalidar de una vez lo cacheado antes de este cambio (incluido lo generado tras REQ-119/REQ-120 sin este contexto). `applyDayComidas` ya nunca reescribe una comida con `ms.done=true` (devuelve cuántas se preservaron y el toast lo confirma: "Lo que ya registraste no cambia"), así que regenerar el día de hoy solo toca comidas pendientes. `homePrepareDay` y la opción "Volver a preparar este día" del menú de Nutrición rechazan fechas pasadas (`ds<todayStr()`), consistente con `weekPendingDays` que ya excluía días pasados/con comidas registradas en la generación de semana. Verificado con `scripts/validate-preference-cache-invalidation.mjs`.
 
 ### Origen
 
