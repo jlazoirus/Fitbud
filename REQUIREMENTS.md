@@ -1901,7 +1901,7 @@ Home y Nutrición deben abrir con el anillo/resumen de macros, más compacto si 
 
 ## REQ-125 - Nutrición: reordenar comidas y saltar comidas sin cambiar horarios históricos
 
-**Estado: pendiente.**
+**Estado: implementado.** Comidas planificadas y extras ahora viven en una sola lista ordenable dentro de "Comidas del día" (antes eran dos secciones separadas). El orden se guarda en `dayState(ds).mealOrder` (solo visual: `moveDayItem` únicamente reescribe ese array, nunca slot/horario/`ovr`/macros) y se reconcilia en `dayEffectiveOrder` con los ítems reales del día (nuevos al final, claves obsoletas descartadas). Cada extra recibe un `oid` estable (`nextExtraOid`) para que su clave de orden no dependa de su índice en el array (evita romperse al eliminar una extra). Controles subir/bajar (fallback accesible, sin drag-and-drop) solo se muestran para hoy/futuro (`canReorderDay`); los días pasados no ofrecen reordenar. Nueva acción "Saltar esta comida" (`skipMeal`/`unskipMeal`, con "Deshacer") para comidas planificadas no consumidas: se ve como "Saltada", no cuenta como pendiente ni consumida (`dayTotals` excluye comidas saltadas de `totMeals`) y no puede aplicarse sobre una comida ya registrada. `homeAgendaData` usa `dayEffectiveOrder` y excluye comidas saltadas al elegir la próxima comida pendiente en Home. Verificado con `scripts/validate-meal-reorder-skip.mjs`; se actualizó `scripts/validate-home-macro-ring-first.mjs` (REQ-124) porque la sección "nut.extra" se fusionó en "nut.plan".
 
 ### Origen
 
