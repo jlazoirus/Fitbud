@@ -90,10 +90,12 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 26. ~~REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5.~~ (implementado, P1)
 27. ~~REQ-134 - Pipeline de crecimiento del catálogo validado por el motor.~~ (implementado, P1)
 28. ~~REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks.~~ (implementado, P1)
-29. REQ-136 - Catálogo lote 2: profundidad por gustos, cocinas y presupuesto. (P2)
-30. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
-31. REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global. (P0)
-32. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool. (P0)
+29. REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias. (P1)
+30. REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa. (P2)
+31. REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos. (P2)
+32. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
+33. REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global. (P0)
+34. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool. (P0)
 
 Pendiente no automatizable por agentes:
 
@@ -1710,21 +1712,21 @@ Que ningún slot quede sin candidatos variados y que el desayuno tenga profundid
 
 - Generar semana E2E para un perfil de 6 comidas: cero slots degradados por falta de candidatos.
 
-## REQ-136 - Catálogo lote 2: profundidad por gustos, cocinas y presupuesto
+## REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias
 
 **Estado: pendiente.**
 
 ### Origen
 
-Misma decisión que REQ-134: "todo tipo de gustos y preferencias".
+Subdivisión del REQ-136 original. Evidencia al 4 jul 2026: `preferredCuisines` se captura en onboarding/perfil, pero el dominio solo prioriza `preferredIngredients`/`preferredDishes`; `dishes` no tiene metadata de cocina. El lote de datos no puede cumplir la aceptación de "semanas alineadas a cocina" sin este contrato previo.
 
 ### Problema
 
-Aun con el lote 1, la variedad por cocina, gustos declarados (`preferredIngredients`, `preferredCuisines`), presupuesto bajo, sin cocina y comer fuera es superficial; usuarios con preferencias marcadas verán repetición o platos que no conectan con lo que comen.
+Las preferencias de cocina existen en `prefs.preferredCuisines`, pero el catálogo no declara cocina y `preferenceScoreAdjustment()` no las usa. Agregar 80 platos sin tags no garantiza que un perfil criollo, mediterráneo, mexicano o asiático reciba platos alineados.
 
 ### Causa raíz
 
-El catálogo nunca se pobló contra la matriz de preferencias que el onboarding ya captura (REQ-119).
+Falta un contrato de metadata (`cuisine_tags`) y una regla determinista que convierta `preferredCuisines` en score de selección.
 
 ### Dependencias
 
@@ -1732,32 +1734,129 @@ El catálogo nunca se pobló contra la matriz de preferencias que el onboarding 
 
 ### Objetivo
 
-Profundidad real por gustos: que las preferencias del onboarding encuentren candidatos, no solo scoring sobre los mismos 100 platos.
+Preparar el catálogo para crecer por gustos: cada plato puede declarar cocina y el solver prioriza las cocinas preferidas sin bloquear restricciones, variedad ni contrato.
 
 ### Alcance
 
-1. Lote vía pipeline REQ-134 orientado por: cocinas (criolla/peruana, mediterránea, mexicana, asiática), alta proteína sin depender de proteína en polvo, `needs_kitchen=false`, `eat_out_ok=true`, `budget_tier` bajo, y opciones sin gluten / sin lácteos.
-2. Meta de tamaño: platos ≥180 (desde ~100), ingredientes ≥200 (desde ~120), manteniendo mínimos por slot del lote 1.
-3. Fuente de priorización: gustos reales capturados en `prefs` (agregado anónimo si existe) y los `preferredCuisines` del onboarding.
-4. Aplicar SQL manual + actualizar conteos en docs/validadores + re-correr canario.
+1. Agregar `dishes.cuisine_tags text[]` a `supabase/schema.sql` y `supabase/nutrition_catalog_semantics.sql` con vocabulario inicial alineado a `CUISINE_LABELS` (`criolla`, `mediterranea`, `mexicana`, `asiatica`) y backfill por nombre/menu.
+2. Actualizar parsers/validadores de catálogo para exigir tags válidos y cobertura mínima por cocina antes de los lotes 2B/2C.
+3. Actualizar `js/nutrition-domain.js`: `likedTermsForProfile` o `preferenceScoreAdjustment` debe considerar `prefs.preferredCuisines` contra `dish.cuisine_tags`; el ajuste es suave, no bloqueante.
+4. Añadir test dedicado que demuestre que dos perfiles con cocinas opuestas rankean candidatos distintos cuando ambos cumplen slot/dieta.
+5. Documentar que el gate macro 98% sigue siendo responsabilidad de REQ-137; este REQ solo habilita alineación por gustos.
 
 ### Fuera de alcance
 
-- Personalización por usuario individual (el catálogo es común; la personalización la hacen filtros/scoring existentes).
+- Agregar los 80 platos restantes (REQ-140/REQ-141).
+- Personalización por usuario individual; el catálogo es común y la personalización la hacen filtros/scoring existentes.
 
 ### Riesgos
 
-- Crecer sin control de calidad diluye el catálogo: mantener el gate del pipeline (rechazo con causa) y revisión humana por lote.
+- Tags mal inferidos pueden sesgar demasiado el plan: mitigación con vocabulario chico, validadores y score suave.
 
 ### Criterios de aceptación
 
-- Un perfil con `preferredCuisines=["criolla"]` y otro `["mediterránea"]` reciben semanas mayoritariamente alineadas a su cocina sin violar contrato ni restricciones.
-- Factibilidad del canario se mantiene ≥98% con el catálogo ampliado.
+- `supabase/schema.sql` y `supabase/nutrition_catalog_semantics.sql` exponen `cuisine_tags` idempotente con constraint de vocabulario.
+- `scripts/validate-nutrition-catalog.mjs` valida cobertura por cocina en el catálogo actual.
+- Test puro: mismo slot/candidatos, `preferredCuisines=["criolla"]` favorece platos criollos y `["mediterranea"]` favorece mediterráneos sin tocar hard filters.
 - `node scripts/release-gate.mjs` pasa.
 
 ### Verificación sugerida
 
-- E2E de dos perfiles con gustos opuestos: cero platos bloqueados, variedad semanal sin repetición > lo permitido por `repeatPreference`.
+- `node scripts/validate-nutrition-catalog.mjs` y test nuevo de preference scoring.
+
+## REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa
+
+**Estado: pendiente.**
+
+### Origen
+
+Subdivisión del REQ-136 original. Depende de REQ-136 para que los platos nuevos tengan `cuisine_tags` útiles.
+
+### Problema
+
+El lote 1 resuelve cobertura por slot, pero la profundidad por cocina y por escenarios prácticos (`needs_kitchen=false`, `eat_out_ok=true`, bajo presupuesto) sigue siendo superficial.
+
+### Causa raíz
+
+El seed histórico fue creado por menú semanal, no por matriz de preferencias de onboarding.
+
+### Objetivo
+
+Primer lote de profundidad por cocina y escenarios: aumentar variedad real sin perder validación determinista.
+
+### Alcance
+
+1. Agregar lote validado por el pipeline o fixture offline con foco en criolla/peruana, mediterránea, mexicana y asiática.
+2. Subir el catálogo al menos a 140 platos y 160 ingredientes, manteniendo los mínimos de REQ-135 y cobertura por `cuisine_tags`.
+3. Aumentar opciones `needs_kitchen=false`, `eat_out_ok=true`, `budget_tier='low'` y alta proteína sin depender de proteína en polvo.
+4. Documentar fuentes de ingredientes nuevos y actualizar conteos en `CONTEXT.md`, README y validadores.
+5. Re-correr canario y confirmar que no reaparece `slot_without_candidates`; no exigir 98% macro hasta REQ-137.
+
+### Fuera de alcance
+
+- Alcanzar 180/200 finales (REQ-141).
+- Activar contrato macro runtime.
+
+### Riesgos
+
+- Aumentar platos sin suficientes tags de cocina puede diluir el scoring: mitigado por depender de REQ-136 y validar cobertura por cocina.
+- Reintroducir ingredientes no revisados: mitigado por fuentes documentadas y fixture/pipeline offline sin llamadas pagadas.
+
+### Criterios de aceptación
+
+- Conteos locales >=140 platos y >=160 ingredientes.
+- Cada cocina principal tiene cobertura en desayuno/snack y al menos un slot principal.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `node scripts/validate-nutrition-catalog.mjs`, `node supabase/validate.mjs` y canario `node scripts/validate-diet-contract.mjs`.
+
+## REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos
+
+**Estado: pendiente.**
+
+### Origen
+
+Subdivisión final del REQ-136 original.
+
+### Problema
+
+Después del lote 2B todavía faltará volumen para variedad semanal sostenida y preferencias específicas sin repetición.
+
+### Causa raíz
+
+Los gustos del onboarding necesitan más candidatos por cocina, presupuesto, sin lácteos, sin gluten, sin cocina y comer fuera.
+
+### Objetivo
+
+Cerrar la meta de profundidad del REQ-136 original sin mezclarla con el cierre macro de REQ-137.
+
+### Alcance
+
+1. Subir el catálogo a >=180 platos y >=200 ingredientes con fuentes documentadas.
+2. Mantener mínimos REQ-135, cobertura por cocina REQ-136 y escenarios REQ-140.
+3. Endurecer validadores para platos/ingredientes finales, cobertura por `cuisine_tags`, no cocina, comer fuera, sin lácteos y sin gluten cuando la metadata disponible lo permita.
+4. Re-correr canario: debe mantenerse sin `slot_without_candidates`; reportar porcentaje macro como input de REQ-137.
+
+### Fuera de alcance
+
+- Resolver el 98% macro con optimización global; eso es REQ-137.
+
+### Riesgos
+
+- Volumen alto de datos puede esconder duplicados o platos demasiado similares: mitigado por slugs únicos, validadores de cobertura y revisión de fuentes.
+- Canario macro puede seguir bajo aunque el catálogo cumpla volumen: mitigado documentando causas para REQ-137 en vez de relajar el contrato.
+
+### Criterios de aceptación
+
+- Conteos locales >=180 platos y >=200 ingredientes.
+- Perfiles con `preferredCuisines=["criolla"]` y `["mediterranea"]` tienen candidatos suficientes para semanas variadas.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `node scripts/validate-nutrition-catalog.mjs`, `node scripts/validate-diet-contract.mjs --json` y release gate completo.
 
 ## REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato
 

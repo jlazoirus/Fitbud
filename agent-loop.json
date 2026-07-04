@@ -52,7 +52,13 @@
     "REQ-56",
     "REQ-57",
     "REQ-58",
-    "REQ-59"
+    "REQ-59",
+    "REQ-136",
+    "REQ-140",
+    "REQ-141",
+    "REQ-137",
+    "REQ-138",
+    "REQ-139"
   ],
   "limits": {
     "requirementsPerRun": 1,
