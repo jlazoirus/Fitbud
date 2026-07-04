@@ -88,7 +88,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 24. ~~REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración.~~ (implementado, P1)
 25. ~~REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos.~~ (implementado, P1)
 26. ~~REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5.~~ (implementado, P1)
-27. REQ-134 - Pipeline de crecimiento del catálogo validado por el motor. (P1)
+27. ~~REQ-134 - Pipeline de crecimiento del catálogo validado por el motor.~~ (implementado, P1)
 28. REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks. (P1)
 29. REQ-136 - Catálogo lote 2: profundidad por gustos, cocinas y presupuesto. (P2)
 30. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
@@ -1611,7 +1611,7 @@ Llamadas con salida estructurada garantizada, límites correctos, modelo configu
 
 ## REQ-134 - Pipeline de crecimiento del catálogo validado por el motor
 
-**Estado: pendiente.**
+**Estado: implementado.** `scripts/grow-catalog.mjs` es un pipeline offline: con `--fixture` no usa red y con `--brief` llama a Anthropic solo desde local/CI con `ANTHROPIC_API_KEY`; normaliza candidatos contra `supabase/seed.sql`, exige slugs estables, fuente para ingredientes nuevos, metadata semantica completa y limites de porcion, rechaza macros inconsistentes (`kcal` vs `4P+4C+9F`) y prueba cada plato con `solveDishPortion` contra presupuestos tipicos por slot. La salida son dos archivos en `--out-dir`: patch SQL revisable referenciado por slug (sin `truncate` ni IDs) y reporte JSON con aceptados/rechazados. `scripts/validate-grow-catalog.mjs` cubre un fixture offline con ingrediente/plato aceptado y rechazos por macros, fuente ausente y metadata incompleta; `release-gate` lo ejecuta.
 
 ### Origen
 

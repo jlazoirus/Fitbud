@@ -117,6 +117,13 @@ La pestaña **Alimentos** usa una base de datos real (Supabase / PostgreSQL) con
 
 Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se guardan a mano). Desde la app puedes ver, crear y editar ingredientes y platos.
 
+Para crecer el catálogo en lotes revisables, usa el pipeline offline. No escribe en Supabase: genera un SQL por slug y un reporte JSON para aprobación humana.
+
+```bash
+node scripts/grow-catalog.mjs --brief "10 desayunos ligeros omnivoros" --out-dir /tmp/catalog-growth
+node scripts/validate-grow-catalog.mjs
+```
+
 ### Preparar la base
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).

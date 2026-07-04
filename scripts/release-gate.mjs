@@ -80,6 +80,7 @@ run("validate-nutrition-domain.mjs", "node scripts/validate-nutrition-domain.mjs
 run("validate-finalize-nutrition-day.mjs", "node scripts/validate-finalize-nutrition-day.mjs");
 run("validate-diet-contract.mjs", "node scripts/validate-diet-contract.mjs");
 run("validate-nutrition-catalog.mjs", "node scripts/validate-nutrition-catalog.mjs");
+run("validate-grow-catalog.mjs", "node scripts/validate-grow-catalog.mjs");
 run("validate-nutrition-solver.mjs", "node scripts/validate-nutrition-solver.mjs");
 run("validate-nutrition-week-planner.mjs", "node scripts/validate-nutrition-week-planner.mjs");
 run("validate-nutrition-plan-snapshot.mjs", "node scripts/validate-nutrition-plan-snapshot.mjs");

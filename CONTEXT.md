@@ -50,6 +50,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 - REQ-131 agrego presupuesto y adecuacion por momento del dia sin migracion: `mealSlotTargets` alimenta el prompt con kcal/proteina por slot; la referencia se filtra por `compatibleDishesForSlot`; `validateGeneratedDay` rechaza platos catalogados fuera de `compatible_slots` y aplica `slotKcalCeiling` (presupuesto x1.15) en slots no principales.
 - REQ-132 agrego metadata manual/idempotente de momento de comida: `dishes.meal_weight` (`light/medium/heavy`) y `meal_form`; `compatibleDishesForSlot` filtra heavy en desayuno no-principal y no-light en `media_manana`/`merienda`/`recena`. `COACH_PROMPT_VERSION=8` y el hash de catálogo incluyen `compatible_slots`, `meal_weight` y `meal_form`. Acción manual: aplicar/re-ejecutar `supabase/nutrition_catalog_semantics.sql` en Supabase para crear/backfillear columnas.
 - REQ-133 endurecio `/api/claude`: `diet_day`, `diet_week` y `meal_option` usan `output_config.format` con JSON Schema y fallback automatico sin structured outputs si la API rechaza el parametro; `maxTokens` capea en 4096. Modelos permitidos: Haiku 4.5, Sonnet 4.6 y Sonnet 5, con modelo por accion via env (`ANTHROPIC_MODEL_DIET`, etc.) y default Haiku. `supabase/analytics.sql` agrega `v_coach_model_gate`; cambiar dieta a Sonnet 5 solo si `diet_*` muestra >10% degradacion sostenida durante 1-2 semanas. Acción manual: re-ejecutar `supabase/analytics.sql` en Supabase para crear/actualizar la vista.
+- REQ-134 agrego pipeline offline `scripts/grow-catalog.mjs`: con `--fixture` valida sin red o con `--brief` usa `ANTHROPIC_API_KEY` local/CI para proponer recetas, recalcula candidatos contra `supabase/seed.sql`, exige slugs/fuentes/metadata semantica, prueba `solveDishPortion` por slot y emite SQL revisable + reporte de aceptados/rechazados sin tocar produccion. Test: `scripts/validate-grow-catalog.mjs`.
 - La primera nutricion posterior al onboarding usa las preferencias guardadas antes de aplicar comidas: `validateGeneratedDay` bloquea patrón alimentario, alergias, sin lácteos y sin gluten con `foodTextConflictForProfile`; si la generación semanal no pasa, `prepareFirstWeekNutrition()` completa faltantes con `deterministicDaysForWeek()`.
 - En `Cambiar comida`, el usuario puede tocar `Rehacer opciones` hasta 4 veces por día; usa `meal_option` con lista cerrada de platos candidatos y fallback determinista del catálogo. `regenerateGenMeal()` comparte ese límite para una comida individual. La acción no vive en `Más opciones`: ese menú queda solo para acciones globales de nutrición.
 
@@ -102,6 +103,7 @@ Checks utiles por area:
 ```bash
 node scripts/validate-nutrition-domain.mjs
 node scripts/validate-nutrition-catalog.mjs
+node scripts/validate-grow-catalog.mjs
 node scripts/validate-training-plan.mjs
 node scripts/test-sync-conflicts.mjs
 node scripts/audit-html.mjs
