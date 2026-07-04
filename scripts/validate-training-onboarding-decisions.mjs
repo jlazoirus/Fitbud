@@ -28,6 +28,15 @@ for (const value of ["gym", "home", "outdoor", "none"]) {
 
 assert.ok(pure.includes("activityOnlyTemplate"), "El dominio puro debe soportar plantillas sin fuerza.");
 assert.ok(pure.includes('none:"Sin fuerza por ahora"'), "El dominio puro debe validar fuerza pausada.");
+assert.ok(
+  pure.includes('strength==="none"?activityLocation'),
+  "Sin fuerza, defaultTrainingLocations debe usar el lugar de la actividad para no bloquear caminata/running.",
+);
+assert.ok(
+  index.includes('if(strength!=="none"&&p.trainingLocations') &&
+    index.includes('if(d.strengthMode!=="none")d.trainingDays.forEach'),
+  "Los overrides de lugar por día no deben sobrescribir el lugar de actividad cuando strengthMode es none.",
+);
 assert.ok(index.includes("strengthModeFromChoice"), "La UI debe mapear lugar de fuerza a strengthMode.");
 assert.ok(index.includes('d.primarySport==="strength_only"&&d.strengthMode==="none"'), "Debe bloquear actividad ninguna + fuerza pausada.");
 assert.ok(index.includes("STRENGTH_RESOURCE_LABELS"), "Casa/aire libre deben pedir recursos disponibles.");

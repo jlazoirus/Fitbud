@@ -114,10 +114,20 @@ test.describe("Onboarding", () => {
     expect(prefs.strengthMode).toBe("none");
     expect(prefs.strengthPlace).toBe("none");
     expect(prefs.onboardingCompletedAt).toBeTruthy();
+    expect(prefs.cycleFirstWeekPreparedAt).toBeTruthy();
 
     // Consentimientos y screening quedaron registrados (privacidad por defecto)
     expect(calls.filter((c) => c.table === "user_consents" && c.method === "POST").length).toBeGreaterThan(0);
     expect(calls.filter((c) => c.table === "safety_screenings" && c.method === "POST").length).toBeGreaterThan(0);
+    const planPosts = calls.filter((c) => c.table === "plan_versions" && c.method === "POST");
+    const combinedPlan = planPosts
+      .map((c) => (Array.isArray(c.payload) ? c.payload[0] : c.payload))
+      .find((row) => row?.snapshot?.nutritionPlan && row?.snapshot?.trainingPlan);
+    expect(combinedPlan, "Debe guardar nutritionPlan + trainingPlan en un snapshot activo").toBeTruthy();
+    expect(combinedPlan.status).toBe("active");
+    expect(combinedPlan.snapshot.nutritionPlan.days.length).toBeGreaterThan(0);
+    expect(combinedPlan.snapshot.trainingPlan.weeks.length).toBeGreaterThan(0);
+    expect(calls.filter((c) => c.table === "day_log" && c.method === "POST").length).toBeGreaterThan(0);
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });

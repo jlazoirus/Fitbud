@@ -249,7 +249,8 @@
     const bodyweightLocation=strengthPlace==="outdoor"?"outdoor":"home";
     return Object.fromEntries(dayIds.map((day,index)=>{
       const session=sessions[index];
-      const location=STRENGTH_SESSION_IDS.has(session)?(strength==="bodyweight"?bodyweightLocation:"gym"):(primary==="swimming"?"pool":"outdoor");
+      const activityLocation=primary==="swimming"?"pool":"outdoor";
+      const location=strength==="none"?activityLocation:STRENGTH_SESSION_IDS.has(session)?(strength==="bodyweight"?bodyweightLocation:"gym"):activityLocation;
       return [day,location];
     }));
   }

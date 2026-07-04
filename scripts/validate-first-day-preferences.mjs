@@ -27,14 +27,20 @@ assert.ok(
   "validateGeneratedDay no debe limitarse a la antigua validación especial de huevo."
 );
 
-const firstDay = sliceBetween("async function prepareFirstCycleDay(", "async function saveOnboarding(");
+const firstWeekNutrition = sliceBetween("async function prepareFirstWeekNutrition(", "async function prepareFirstWeekTraining(");
 assert.ok(
-  firstDay.includes("res&&res.ok") && firstDay.includes("deterministicDayPayload(ds)"),
-  "prepareFirstCycleDay debe aceptar solo días validados y caer al plan determinista si no pasan."
+  firstWeekNutrition.includes("res&&res.ok") && firstWeekNutrition.includes("deterministicDaysForWeek"),
+  "prepareFirstWeekNutrition debe aceptar solo días validados y completar faltantes por plan determinista."
 );
 assert.ok(
-  firstDay.includes("applyDayComidas(ds,comidas)"),
-  "prepareFirstCycleDay debe aplicar únicamente el set final de comidas ya validado o determinístico."
+  firstWeekNutrition.includes("buildNutritionPlanSnapshot"),
+  "prepareFirstWeekNutrition debe materializar únicamente el set final de comidas ya validado o determinístico."
+);
+
+const persistFirstWeek = sliceBetween("async function persistFirstWeekPlan(", "function firstWeekIssueModal(");
+assert.ok(
+  persistFirstWeek.includes("applyDayComidas(day.ds,day.comidas)"),
+  "persistFirstWeekPlan debe aplicar únicamente comidas ya validadas o determinísticas."
 );
 
 const generateOneDay = sliceBetween("async function generateOneDay(", "async function aiGenerateDay(");

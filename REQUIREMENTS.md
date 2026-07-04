@@ -652,7 +652,7 @@ Crear un solver determinista que, dado un perfil, target diario, slots del día 
    - slot sin candidatos.
 5. Integrar el solver como fallback principal en:
    - `homePrepareDay()` cuando no hay coach disponible;
-   - `prepareFirstCycleDay()` ante fallo del servicio;
+   - la preparación inicial de semana (`prepareFirstWeekNutrition()`) ante fallo del servicio;
    - `deterministicDayPayload()` o reemplazo equivalente.
 6. Mantener la UI sin lenguaje técnico: si no hay solución perfecta, mostrar una opción viable y un mensaje neutral, no detalles del solver.
 7. Agregar tests:
@@ -1564,7 +1564,8 @@ Dar a cada usuario nuevo una primera semana personalizada gratis, con acceso pre
 
 ## REQ-118 - Activación: generar automáticamente la primera semana al terminar onboarding
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`saveOnboarding()` ahora prepara la primera semana automaticamente al cerrar onboarding inicial o nuevo ciclo. El flujo muestra progreso de comidas, entrenamiento y validacion; refresca entitlement/trial antes de generar; usa el coach cuando hay acceso vigente y completa faltantes con rutas deterministas. La activacion inicial se guarda como snapshot activo combinado `nutritionPlan + trainingPlan` en `plan_versions`, aplica comidas a `day_log` para compatibilidad local/offline y muestra reintento si una parte falla sin dejar la pantalla muerta. Validador: `scripts/validate-onboarding-first-week.mjs`.
 
 ### Origen
 

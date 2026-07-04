@@ -415,6 +415,12 @@
   .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:24px}
   .step{height:5px;background:var(--surf3);border-radius:999px;overflow:hidden}
   .step.on{background:var(--accent)}
+  .setup-steps{display:grid;gap:10px;margin-top:18px}
+  .setup-step{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:var(--r);background:var(--surf2);color:var(--muted)}
+  .setup-step span{width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:var(--surf3);font-weight:800;color:var(--txt)}
+  .setup-step.on{border-color:var(--accent);color:var(--txt)}
+  .setup-step.done span{background:var(--ok);color:#06130d}
+  .setup-step.bad span{background:var(--bad);color:#fff}
   .onboarding-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
   @media(max-width:430px){.training-choice-grid{grid-template-columns:1fr}}
   .onboarding-actions{display:flex;gap:10px;margin-top:18px}
@@ -910,7 +916,7 @@ function migrateProfilePrefs(source){
   const workoutSplitNorm=(trainingExperienceNorm==="advanced"&&WORKOUT_SPLIT_LABELS[p.workoutSplit])?p.workoutSplit:undefined;
   const locationDefaults=defaultTrainingLocations(primary,strength,trainingDays,trainingPriority,trainingExperienceNorm,workoutSplitNorm,strengthPlace);
   const trainingLocations={...locationDefaults};
-  if(p.trainingLocations&&typeof p.trainingLocations==="object"){
+  if(strength!=="none"&&p.trainingLocations&&typeof p.trainingLocations==="object"){
     trainingDays.forEach(day=>{
       const value=p.trainingLocations[day];
       if(TRAINING_LOCATION_LABELS[value])trainingLocations[day]=value;
@@ -1514,6 +1520,7 @@ function planSnapshotDigest(prefs,meta){
     training,
     slots:mealSlotsForPrefs(normalized).map(s=>({id:s.id,label:s.slot,time:s.time})),
     trainingPlan:meta&&Object.prototype.hasOwnProperty.call(meta,"trainingPlan")?meta.trainingPlan:null,
+    nutritionPlan:meta&&Object.prototype.hasOwnProperty.call(meta,"nutritionPlan")?meta.nutritionPlan:null,
     origin:{
       source:(meta&&meta.source)||"manual",
       reason:(meta&&meta.reason)||"",
@@ -2745,7 +2752,7 @@ function readTrainingFields(prefix,d){
   d.trainingDays=WEEKDAY_OPTIONS.filter(day=>{const el=$("#"+prefix+"_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
   d.trainDays=d.trainingDays.length;
   d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
-  d.trainingDays.forEach(day=>{
+  if(d.strengthMode!=="none")d.trainingDays.forEach(day=>{
     const el=$("#"+prefix+"_location_"+day);
     if(el&&TRAINING_LOCATION_LABELS[el.value])d.trainingLocations[day]=el.value;
   });
@@ -2969,7 +2976,7 @@ function readOnboardingStep(){
     d.trainingDays=onboardingSelectedDays();
     d.trainDays=d.trainingDays.length;
     d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
-    d.trainingDays.forEach(day=>{
+    if(d.strengthMode!=="none")d.trainingDays.forEach(day=>{
       const el=$("#ob_location_"+day);
       if(el&&TRAINING_LOCATION_LABELS[el.value])d.trainingLocations[day]=el.value;
     });
@@ -3079,38 +3086,218 @@ function updateOnboardingActivity(value){
   const out=$("#obActivityDescription"),activity=ACTIVITY_LEVELS[value];
   if(out&&activity)out.textContent=activity.description;
 }
-// REQ-34: prepara el primer día del ciclo tras el onboarding, sin texto técnico (REQ-31).
-// Idempotente: si prefs.cycleFirstDayPreparedAt ya está, no vuelve a dispararse.
-// Intenta generación; cae a plantilla determinista ante cualquier fallo.
-async function prepareFirstCycleDay(ds){
-  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  if(prefs.cycleFirstDayPreparedAt)return;
-  const actionKey="first_day_prep";
-  if(coachActionsInFlight.has(actionKey))return;
+function firstWeekSetupStatusHtml(state){
+  const order=[
+    ["nutrition","Comidas"],
+    ["training","Entrenamiento"],
+    ["validate","Validando plan"],
+  ];
+  const current=(state&&state.current)||"nutrition";
+  const done=new Set((state&&state.done)||[]);
+  const failed=new Set((state&&state.failed)||[]);
+  return `<div class="setup-steps">${order.map(([key,label])=>{
+    const cls=failed.has(key)?"bad":done.has(key)?"done":key===current?"on":"";
+    const mark=failed.has(key)?"!":done.has(key)?"✓":key===current?"…":"";
+    return `<div class="setup-step ${cls}"><span>${mark}</span><b>${label}</b></div>`;
+  }).join("")}</div>`;
+}
+function renderFirstWeekSetup(state){
+  const s=state||{};
   $("#tabs").innerHTML="";
   $("#app").innerHTML=`<main class="onboarding">
     <div class="onboarding-brand">FITBROS · TU PLAN</div>
-    <h1>Preparando tu primer día</h1>
-    <p class="onboarding-copy">Estamos armando tu plan a la medida de tus metas. Solo un momento…</p>
+    <h1>Preparando tu primera semana</h1>
+    <p class="onboarding-copy">${esc(s.message||"Estamos armando comidas y entrenamiento según tus metas. Solo un momento…")}</p>
+    ${firstWeekSetupStatusHtml(s)}
   </main>`;
-  let comidas=null;
-  coachActionsInFlight.add(actionKey);
-  try{
-    if(aiAvailable()&&isActive()&&hasRequiredConsents()&&hasCurrentScreening()){
-      const requestId=coachRequestId();
+}
+function firstWeekForDate(ds){
+  return weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||WEEKS[0];
+}
+function deterministicDaysForWeek(week,days){
+  const det=generateDeterministicWeek(week,days);
+  return det&&Array.isArray(det.daysData)?det:null;
+}
+function firstWeekLabel(week){
+  return week&&week.num?("Semana "+week.num):"Semana de arranque";
+}
+async function prepareFirstWeekNutrition(ds,setup){
+  const week=firstWeekForDate(ds);
+  if(!week)return{ok:false,daysData:[],problems:["La semana inicial está fuera del plan."]};
+  const allDays=weekDays(week);
+  const days=weekPendingDays(allDays);
+  if(!allDays.length)return{ok:false,daysData:[],problems:["La semana inicial está fuera del plan."]};
+  if(!days.length)return{ok:true,week,label:firstWeekLabel(week),daysData:[],problems:[]};
+  if(supa&&!DB.loaded&&!DB.error){try{await dbLoad();}catch(e){}}
+  const daysData=[];const problems=[];
+  if(aiAvailable()&&hasEntitlement()){
+    const actionKey="first_week_diet";
+    const requestId=beginCoachAction(actionKey);
+    if(requestId){
       try{
-        const {res}=await generateOneDay(ds,{action:"diet_day",requestId,partKey:"first-day"});
-        if(res&&res.ok&&Array.isArray(res.comidas)&&res.comidas.length)comidas=res.comidas;
-      }catch(e){}
+        for(let i=0;i<days.length;i++){
+          const day=days[i];
+          if(setup){setup.message=`Preparando comidas: día ${i+1} de ${days.length}`;renderFirstWeekSetup(setup);}
+          try{
+            const {res}=await generateOneDay(day,{action:"diet_week",requestId,partKey:"day-"+(i+1)});
+            if(res&&res.ok&&Array.isArray(res.comidas)&&res.comidas.length)daysData.push({ds:day,comidas:res.comidas});
+            else problems.push(prettyDate(day)+": "+((res&&res.issues&&res.issues[0])||"no válido"));
+          }catch(e){problems.push(prettyDate(day)+": "+coachErrorMessage(e));}
+        }
+      }finally{endCoachAction(actionKey);}
     }
-    if(!comidas&&supa&&!DB.loaded&&!DB.error){try{await dbLoad();}catch(e){}}
-    if(!comidas){const det=deterministicDayPayload(ds);comidas=det.comidas||[];}
-    if(comidas.length)applyDayComidas(ds,comidas);
+  }
+  const doneIds=new Set(daysData.map(d=>d.ds));
+  const missing=days.filter(day=>!doneIds.has(day));
+  if(missing.length){
+    if(setup){setup.message="Completando comidas con opciones prácticas";renderFirstWeekSetup(setup);}
+    const det=deterministicDaysForWeek(week,missing);
+    if(det&&det.daysData.length){
+      daysData.push(...det.daysData);
+      if(det.variety&&setup)setup.nutritionVariety=det.variety;
+    }else{
+      missing.forEach(day=>problems.push(prettyDate(day)+": no se pudo completar con el catálogo."));
+    }
+  }
+  daysData.sort((a,b)=>a.ds.localeCompare(b.ds));
+  const shoppingList=(window.FITBUD_NUTRITION_DOMAIN&&window.FITBUD_NUTRITION_DOMAIN.buildShoppingListFromNutritionPlan)
+    ?window.FITBUD_NUTRITION_DOMAIN.buildShoppingListFromNutritionPlan(daysData)
+    :buildShoppingList(daysData);
+  const draft={week,label:firstWeekLabel(week),daysData,problems,shoppingList,variety:setup&&setup.nutritionVariety};
+  const nutritionPlan=buildNutritionPlanSnapshot(daysData,shoppingList);
+  return{ok:daysData.length>0,week,label:draft.label,draft,nutritionPlan,daysData,problems};
+}
+async function prepareFirstWeekTraining(setup){
+  if(trainingSafetyHold())return{ok:false,skipped:true,problems:["El entrenamiento quedó pausado por seguridad."]};
+  if(!hasRequiredConsents()||!hasCurrentScreening())return{ok:false,problems:["Revisa privacidad y seguridad antes de preparar entrenamiento."]};
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const expectedWeeks=trainingExpectedWeeks(prefs);
+  const missing=expectedWeeks.flatMap(week=>week.sessions.filter(session=>!session.allowedExerciseIds.length));
+  if(missing.length)return{ok:false,problems:["Faltan ejercicios compatibles con tus lugares o recursos."]};
+  const trialFirstWeekOnly=hasActivePremiumTrial()&&!entitlement;
+  const actionKey="first_week_training";
+  const requestId=beginCoachAction(actionKey);
+  if(!requestId)return{ok:false,problems:["El entrenamiento ya está en preparación."]};
+  const weeks=[];const warnings=[];
+  let fallbackOnly=!aiAvailable();
+  try{
+    for(let index=0;index<expectedWeeks.length;index++){
+      const expected=expectedWeeks[index];
+      if(setup){setup.message=`Preparando entrenamiento: semana ${index+1} de ${expectedWeeks.length}`;renderFirstWeekSetup(setup);}
+      let result;
+      if(trialFirstWeekOnly&&index>0){
+        result=await generateTrainingWeek(expected,prefs,{fallbackOnly:true});
+        warnings.push(`semana ${expected.week}`);
+        weeks.push(result.week);
+        continue;
+      }
+      try{
+        result=await generateTrainingWeek(expected,prefs,{
+          action:"training_plan",requestId,partKey:`week-${expected.week}`,fallbackOnly,
+        });
+        if(!result.ok)throw new Error(result.issues[0]||"La semana no pasó las validaciones.");
+      }catch(error){
+        fallbackOnly=true;
+        result=await generateTrainingWeek(expected,prefs,{fallbackOnly:true});
+        warnings.push(`semana ${expected.week}`);
+      }
+      weeks.push(result.week);
+    }
+  }finally{endCoachAction(actionKey);}
+  const plan={
+    version:TRAINING_PLAN.VERSION,
+    durationWeeks:resolvedPlanDuration(prefs),
+    startDate:START,endDate:END,
+    reason:"Combina tu actividad principal con fuerza, respeta tus días y ajusta la carga por fase.",
+    createdAt:new Date().toISOString(),
+    validation:{schema:"training_plan_week_v1",status:"passed",catalogHash:coachCompatibilityContext("training_plan").catalog.exercises},
+    weeks,
+  };
+  const check=TRAINING_PLAN.validatePlan(plan,{durationWeeks:resolvedPlanDuration(prefs)});
+  if(!check.ok)return{ok:false,problems:[check.issues[0]||"El plan de entrenamiento no pasó las validaciones."]};
+  return{
+    ok:true,plan,prefs,expectedWeeks,warnings,trialFirstWeekOnly,
+    prompt:trainingPlanPromptMetadata(prefs,expectedWeeks),
+  };
+}
+async function persistFirstWeekPlan(nutrition,training){
+  const nutritionDraft=nutrition&&nutrition.draft;
+  const trainingPlan=training&&training.ok?training.plan:null;
+  const nutritionPlan=nutrition&&nutrition.nutritionPlan?nutrition.nutritionPlan:null;
+  if(supa&&uid()&&(trainingPlan||nutritionPlan)){
+    await ensurePlanVersion({
+      prefs:migrateProfilePrefs((profile&&profile.prefs)||{}),
+      source:"activation",
+      reason:"Primera semana preparada al terminar onboarding",
+      validFrom:START,
+      validTo:END,
+      cycleNumber:cycleNumber(),
+      trainingPlan,
+      nutritionPlan,
+      prompt:training&&training.prompt||null,
+      model:trainingPlan?(effectiveSettings().model||DEFAULT_MODEL):null,
+    });
+    await pullPlanVersions();
+  }
+  if(nutritionDraft&&Array.isArray(nutritionDraft.daysData)){
+    nutritionDraft.daysData.forEach(day=>applyDayComidas(day.ds,day.comidas));
+    trackEvent("diet_week_applied",{count:nutritionDraft.daysData.length,source:"onboarding"});
+  }
+  if(trainingPlan)trackEvent("training_plan_applied",{duration_weeks:trainingPlan.durationWeeks||resolvedPlanDuration((profile&&profile.prefs)||{}),sport:(profile&&profile.prefs&&profile.prefs.primarySport)||"walking",source:"onboarding"});
+}
+function firstWeekIssueModal(summary){
+  if(!summary||!summary.errors||!summary.errors.length)return;
+  const details=summary.errors.map(esc).join("<br>");
+  modal(`<h3>Tu semana está casi lista</h3>
+    <p class="muted small">Dejamos aplicado lo que pudimos preparar y puedes reintentar lo pendiente sin perder tu avance.</p>
+    <div class="ai-box">⚠️ ${details}</div>
+    <button class="btn btn-accent" style="width:100%" onclick="retryInitialWeekSetup()">Reintentar lo pendiente</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Ir a Home</button>`);
+}
+async function retryInitialWeekSetup(){
+  closeModal();
+  const summary=await prepareFirstCycleWeek(current,{force:true});
+  render();scrollAppTop();
+  if(summary&&summary.errors&&summary.errors.length)firstWeekIssueModal(summary);
+  else toast("Tu primera semana está lista");
+}
+// REQ-118: prepara la primera semana al cerrar onboarding, sin texto técnico (REQ-31).
+// Idempotente: si prefs.cycleFirstWeekPreparedAt ya está, no vuelve a dispararse.
+async function prepareFirstCycleWeek(ds,options){
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  if(prefs.cycleFirstWeekPreparedAt&&!(options&&options.force))return{ok:true,skipped:true,errors:[]};
+  const setup={current:"nutrition",done:[],failed:[],message:"Preparando tus comidas"};
+  renderFirstWeekSetup(setup);
+  const summary={ok:false,nutrition:null,training:null,errors:[]};
+  try{
+    await loadEntitlement();
+    const nutrition=await prepareFirstWeekNutrition(ds,setup);
+    summary.nutrition=nutrition;
+    if(nutrition&&nutrition.ok)setup.done.push("nutrition");
+    else{setup.failed.push("nutrition");summary.errors.push(...((nutrition&&nutrition.problems)||["No pudimos preparar comidas."]));}
+    setup.current="training";setup.message="Preparando tu entrenamiento";renderFirstWeekSetup(setup);
+    const training=await prepareFirstWeekTraining(setup);
+    summary.training=training;
+    if(training&&training.ok)setup.done.push("training");
+    else{setup.failed.push("training");summary.errors.push(...((training&&training.problems)||["No pudimos preparar entrenamiento."]));}
+    setup.current="validate";setup.message="Guardando tu semana";renderFirstWeekSetup(setup);
+    if((nutrition&&nutrition.ok)||(training&&training.ok))await persistFirstWeekPlan(nutrition,training);
+    setup.done.push("validate");renderFirstWeekSetup(setup);
     const nowStr=new Date().toISOString();
-    if(profile&&profile.prefs)profile.prefs.cycleFirstDayPreparedAt=nowStr;
-    const markedPrefs={...migrateProfilePrefs((profile&&profile.prefs)||{}),cycleFirstDayPreparedAt:nowStr};
-    try{await saveProfilePrefs(markedPrefs,{source:"system",reason:"Primer día del ciclo preparado"});}catch(e){}
-  }finally{coachActionsInFlight.delete(actionKey);}
+    if(profile&&profile.prefs){
+      profile.prefs.cycleFirstWeekPreparedAt=nowStr;
+      profile.prefs.cycleFirstDayPreparedAt=nowStr;
+    }
+    const markedPrefs={...migrateProfilePrefs((profile&&profile.prefs)||{}),cycleFirstWeekPreparedAt:nowStr,cycleFirstDayPreparedAt:nowStr};
+    try{await saveProfilePrefs(markedPrefs,{source:"system",reason:"Primera semana preparada",skipPlanVersion:true});}catch(e){}
+    summary.ok=summary.errors.length===0;
+    window._firstWeekSetup=summary;
+    return summary;
+  }catch(e){
+    summary.errors.push(coachErrorMessage(e));
+    window._firstWeekSetup=summary;
+    return summary;
+  }
 }
 async function saveOnboarding(){
   readOnboardingStep();
@@ -3166,7 +3353,7 @@ async function saveOnboarding(){
     cycleStartWeight:d.weightKg,cycleStartBodyFat:d.bodyFatPct===""?null:d.bodyFatPct,
     onboardingPending:false,pendingChallenge:null,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
-    ...(firstCycle||newCycle?{cycleFirstDayPreparedAt:null}:{}),
+    ...(firstCycle||newCycle?{cycleFirstDayPreparedAt:null,cycleFirstWeekPreparedAt:null}:{}),
     ...(firstCycle||newCycle?{onboardingEssentialOnly:true,profileRefinedAt:null}:{}),
   };
   const result=await saveProfilePrefs(prefs,{
@@ -3187,8 +3374,10 @@ async function saveOnboarding(){
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
   view="hoy";current=clampDate(todayStr());
   trackEvent(firstCycle||newCycle?"onboarding_complete":"onboarding_review",{cycle:planCycleNumber,duration_weeks:duration,source:newCycle?"new_cycle":firstCycle?"first":"review"});
-  if(firstCycle||newCycle)await prepareFirstCycleDay(current);
-  render();scrollAppTop();toast(firstCycle||newCycle?"Tu primer día está listo":"Tu plan quedó actualizado");
+  const firstWeekSummary=(firstCycle||newCycle)?await prepareFirstCycleWeek(current):null;
+  render();scrollAppTop();
+  if(firstWeekSummary&&firstWeekSummary.errors&&firstWeekSummary.errors.length)firstWeekIssueModal(firstWeekSummary);
+  toast(firstCycle||newCycle?(firstWeekSummary&&firstWeekSummary.errors&&firstWeekSummary.errors.length?"Tu semana quedó parcialmente lista":"Tu primera semana está lista"):"Tu plan quedó actualizado");
 }
 function maybePromptProfileReview(){
   if(reviewPromptShown||onboardingActive||!session)return;
@@ -8754,18 +8943,20 @@ async function saveProfilePrefs(prefs,meta){
   if(!result.error){
     profile.prefs=normalized;
     refreshPlanCalendar();
-    try{
-      const version=await ensurePlanVersion({
-        prefs:normalized,
-        source:(meta&&meta.source)||"manual",
-        reason:(meta&&meta.reason)||"",
-        validFrom:validYmd(meta&&meta.validFrom)?meta.validFrom:todayStr(),
-        validTo:validYmd(meta&&meta.validTo)?meta.validTo:null,
-        cycleNumber:(meta&&meta.cycleNumber)!=null?meta.cycleNumber:normalized.planCycleNumber,
-      });
-      if(version)await backfillDayVersions();
-    }catch(e){
-      if(!String((e&&e.message)||e).match(/plan_versions|relation|column|constraint/i))console.warn("No se pudo sincronizar la versión del plan tras guardar el perfil.",e);
+    if(!(meta&&meta.skipPlanVersion)){
+      try{
+        const version=await ensurePlanVersion({
+          prefs:normalized,
+          source:(meta&&meta.source)||"manual",
+          reason:(meta&&meta.reason)||"",
+          validFrom:validYmd(meta&&meta.validFrom)?meta.validFrom:todayStr(),
+          validTo:validYmd(meta&&meta.validTo)?meta.validTo:null,
+          cycleNumber:(meta&&meta.cycleNumber)!=null?meta.cycleNumber:normalized.planCycleNumber,
+        });
+        if(version)await backfillDayVersions();
+      }catch(e){
+        if(!String((e&&e.message)||e).match(/plan_versions|relation|column|constraint/i))console.warn("No se pudo sincronizar la versión del plan tras guardar el perfil.",e);
+      }
     }
   }
   return result;
@@ -9053,7 +9244,8 @@ async function ensurePlanVersion(meta){
   const status=(meta&&meta.status)||"active";
   const current=planVersionForDate(validFrom)||planVersionActiveForCycle(cycleNo);
   const explicitTrainingPlan=!!(meta&&Object.prototype.hasOwnProperty.call(meta,"trainingPlan"));
-  if(current&&current.status==="active"&&!explicitTrainingPlan&&current.snapshot&&current.snapshot.prefs
+  const explicitNutritionPlan=!!(meta&&Object.prototype.hasOwnProperty.call(meta,"nutritionPlan"));
+  if(current&&current.status==="active"&&!explicitTrainingPlan&&!explicitNutritionPlan&&current.snapshot&&current.snapshot.prefs
     &&stableJson(current.snapshot.prefs)===stableJson(planSnapshotFields(prefs))){
     return current;
   }
