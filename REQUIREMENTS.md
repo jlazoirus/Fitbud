@@ -1614,7 +1614,7 @@ Reducir time-to-first-value: registro -> onboarding -> primera semana personaliz
 
 ## REQ-119 - Onboarding nutricional: capturar gustos y disgustos antes del primer plan
 
-**Estado: pendiente.**
+**Estado: implementado.** Onboarding agrega sección "Tus gustos (opcional)" con ingredientes favoritos, platos favoritos y disgustos (`ob_preferred_ingredients`, `ob_preferred_dishes`, `ob_disliked`), guardados en `prefs.preferredDishes` (nuevo) y campos existentes. Perfil expone `preferredDishes` como editable. El prompt de IA (día, semana, "otra opción") recibe `coachLikesLine` con gustos y línea de disgustos suaves; el fallback determinista aplica `preferenceScoreAdjustment` en `js/nutrition-domain.js` para priorizar platos con ingredientes/nombres afines y penalizar los que coinciden con disgustos, tanto en generación de día como en reemplazos (`rankReplacementCandidates`). Alergias/restricciones duras siguen bloqueando vía `hard_restrictions` sin mezclarse con gustos.
 
 ### Origen
 
