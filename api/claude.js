@@ -708,7 +708,10 @@ export default async function handler(req, res) {
         res.status(422).json({ error: "No existe una alternativa compatible para esta configuracion." });
         return;
       }
-      const response = { text: selected.selected_text };
+      // REQ-123: el cliente necesita saber que esto no es una generacion nueva
+      // (se agoto el cupo de "frescas" del dia) para poder avisar al usuario en
+      // vez de dejar que un boton de "otra opcion" parezca no hacer nada.
+      const response = { text: selected.selected_text, reused: true };
       if (auth.profile.is_admin) {
         response.adminDiagnostic = {
           origin: selected.selected_origin,

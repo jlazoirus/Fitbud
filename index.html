@@ -7215,6 +7215,7 @@ async function rerollChangeMealOptions(){
   if(button){button.disabled=true;button.textContent="Buscando…";}
   if(opts)opts.insertAdjacentHTML("afterbegin",`<div class="ai-box" id="chg-reroll-loading">Preparando otras opciones…</div>`);
   consumeMealOptionReroll();
+  let wasReused=false;
   try{
     const seen=changeMealCurrentSlugs(cm);
     cm.seenSlugs=seen;
@@ -7240,20 +7241,24 @@ Evita repetir los platos ya mostrados. Responde SOLO JSON válido:
 {"opciones":[{"nombre":"Nombre exacto del plato","kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
       try{
         const txt=await callClaude(prompt,600,quota);
+        wasReused=lastCoachCallReused;
         const parsed=parseJSON(txt);
         const selected=(parsed&&Array.isArray(parsed.opciones)?parsed.opciones:[])
           .map(o=>dishByCandidateName(o.dishName||o.nombre||o.name,candidates))
           .filter(Boolean);
-        if(selected.length){
-          const selectedSlugs=new Set(selected.map(d=>d.slug||coachKey(d.name)));
+        // REQ-123: si el cupo de frescas se agotó, el servidor puede reutilizar la
+        // misma respuesta de antes; descartamos lo ya visto para no repetir el plato.
+        const freshSelected=selected.filter(d=>!seen.has(d.slug||coachKey(d.name)));
+        if(freshSelected.length){
+          const selectedSlugs=new Set(freshSelected.map(d=>d.slug||coachKey(d.name)));
           const selectedPool=changeMealCandidatePool(cm.ds,cm.id,new Set([...seen].filter(slug=>!selectedSlugs.has(slug))),40);
           if(selectedPool.ranked&&selectedPool.ranked.length){
-            const mapped=selected.map(d=>selectedPool.ranked.find(r=>String(r.dish.id)===String(d.id))).filter(Boolean);
+            const mapped=freshSelected.map(d=>selectedPool.ranked.find(r=>String(r.dish.id)===String(d.id))).filter(Boolean);
             if(mapped.length){cm.ranked=mapped;cm.options=[];}
             else{cm.ranked=fallbackPool.ranked;cm.options=fallbackPool.options;}
           }else{
             cm.ranked=null;
-            cm.options=selected.map(d=>({name:d.name,dishName:d.name}));
+            cm.options=freshSelected.map(d=>({name:d.name,dishName:d.name}));
           }
         }else{
           cm.ranked=fallbackPool.ranked;cm.options=fallbackPool.options;
@@ -7265,6 +7270,7 @@ Evita repetir los platos ya mostrados. Responde SOLO JSON válido:
       cm.ranked=fallbackPool.ranked;cm.options=fallbackPool.options;
     }
     const out=$("#chg-opts");if(out)out.innerHTML=_buildChangeMealOpts();
+    if(wasReused)toast("Ya usaste tus opciones nuevas de hoy; te mostramos las alternativas más parecidas disponibles.");
   }finally{
     const loading=$("#chg-reroll-loading");if(loading)loading.remove();
     if(button)button.textContent="Rehacer opciones";
@@ -7594,9 +7600,13 @@ async function coachProxyFetch(payload){
   }
   throw lastError||new Error("No se pudo contactar al coach.");
 }
+// REQ-123: expone si la última respuesta fue "reutilizada" (cupo de frescas agotado)
+// para que los botones de "otra opción" puedan avisar en vez de parecer no hacer nada.
+let lastCoachCallReused=false;
 async function callClaude(userText,maxTokens,quota){
   if(!isActive())throw new Error("Tu cuenta está desactivada.");
   if(!hasRequiredConsents()||!hasCurrentScreening())throw new Error("Revisa privacidad y seguridad antes de usar tu coach.");
+  lastCoachCallReused=false;
   const cfg=effectiveSettings();
   // 1) Override local: si guardaste una API key en este navegador, llamada directa
   //    (útil para desarrollo local sin las funciones serverless).
@@ -7618,6 +7628,7 @@ async function callClaude(userText,maxTokens,quota){
   const data=await coachProxyFetch({
     userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL,quota
   });
+  lastCoachCallReused=!!data.reused;
   return data.text||"";
 }
 function parseJSON(txt){
@@ -8255,8 +8266,9 @@ Responde SOLO JSON válido, sin texto extra:
     ds
   );
   const txt=await callClaude(prompt,maxTok,quota);
+  const reused=lastCoachCallReused;
   const j=parseJSON(txt);
-  return {res:validateGeneratedDay(j,day,target),day,target};
+  return {res:validateGeneratedDay(j,day,target),day,target,reused};
 }
 // REQ-122: cuenta intentos consecutivos que no llegan al objetivo; tras 2, se
 // completa automáticamente por ruta determinista en vez de insistir con la IA.
@@ -8590,16 +8602,23 @@ async function regenerateDayInWeekDraft(index){
   const actionKey="diet_week_regen_"+index;
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   try{
-    const {res}=await generateOneDay(d.ds,{action:"diet_week",requestId,partKey:"day-regen"});
+    const {res,reused}=await generateOneDay(d.ds,{action:"diet_week",requestId,partKey:"day-regen"});
     if(res.ok){
       draft.daysData[index]={ds:d.ds,comidas:res.comidas};
       if(out)out.innerHTML=genWeekReviewHtml();
+      if(reused)toast("Ya usaste tus opciones nuevas de hoy; te mostramos la alternativa más parecida disponible.");
     }else{
       if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(res.issues[0]||"El día no pasó las validaciones.")}</div>
-        <div style="margin-top:8px"><button class="btn btn-sm" onclick="document.querySelector('#genwOut').innerHTML=genWeekReviewHtml()">Volver al borrador</button></div>`;
+        <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+          <button class="btn btn-accent btn-sm" onclick="regenerateDayInWeekDraft(${index})">Reintentar</button>
+          <button class="btn btn-sm" onclick="document.querySelector('#genwOut').innerHTML=genWeekReviewHtml()">Volver al borrador</button>
+        </div>`;
     }
   }catch(e){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>
-    <div style="margin-top:8px"><button class="btn btn-sm" onclick="document.querySelector('#genwOut').innerHTML=genWeekReviewHtml()">Volver al borrador</button></div>`;}
+    <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+      <button class="btn btn-accent btn-sm" onclick="regenerateDayInWeekDraft(${index})">Reintentar</button>
+      <button class="btn btn-sm" onclick="document.querySelector('#genwOut').innerHTML=genWeekReviewHtml()">Volver al borrador</button>
+    </div>`;}
   finally{endCoachAction(actionKey);}
 }
 // Regenera una sola comida del borrador del día sin afectar las demás.
@@ -8646,7 +8665,9 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     const hardTerms=coachFoodBlockTerms(false);
     const validation={expectedMeals:1,slots:[slotId],target:{kcal:remKcal,p:remP,c:remC,f:remF},hardRestrictions:hardTerms};
     const quota=coachQuota("diet_day",requestId,"slot-"+slotId,fallback,validation,slotId+":"+draft.ds);
+    const prevName=coachKey((draft.comidas.find(c=>c.slot_id===slotId)||{}).nombre);
     const txt=await callClaude(prompt,500,quota);
+    const wasReused=lastCoachCallReused;
     const parsed=parseJSON(txt);
     const oneMeal=(Array.isArray(parsed.comidas)&&parsed.comidas[0])||parsed;
     if(!oneMeal||!String(oneMeal.nombre||"").trim())throw new Error("La opción no tiene formato válido.");
@@ -8654,10 +8675,16 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     const ings=Array.isArray(oneMeal.ingredientes)?oneMeal.ingredientes.map(x=>({nombre:coachCopy((x.nombre||"").trim()),gramos:+x.gramos})):[];
     const hay=(nombre+" "+ings.map(g=>g.nombre).join(" ")).toLowerCase();
     if(coachTextHasTerms(hay,hardTerms))throw new Error("La opción contiene una restricción del perfil.");
-    const meal={slot_id:slotId,nombre,ingredientes:ings,kcal:Math.round(+oneMeal.kcal||remKcal),proteina_g:Math.round(+oneMeal.proteina_g||remP),carbohidratos_g:Math.round(+oneMeal.carbohidratos_g||remC),grasa_g:Math.round(+oneMeal.grasa_g||remF)};
+    // REQ-123: si el cupo de frescas se agotó y el servidor reutilizó la misma sugerencia
+    // de antes, usamos el plato más cercano del catálogo en su lugar para no repetir.
+    const reusedSameDish=wasReused&&coachKey(nombre)===prevName;
+    const meal=reusedSameDish&&fbDish
+      ?{slot_id:slotId,nombre:fbDish.name,ingredientes:fbIngs,kcal:fbDish.kcal,proteina_g:fbDish.p,carbohidratos_g:fbDish.c,grasa_g:fbDish.f}
+      :{slot_id:slotId,nombre,ingredientes:ings,kcal:Math.round(+oneMeal.kcal||remKcal),proteina_g:Math.round(+oneMeal.proteina_g||remP),carbohidratos_g:Math.round(+oneMeal.carbohidratos_g||remC),grasa_g:Math.round(+oneMeal.grasa_g||remF)};
     draft.comidas=draft.comidas.map(c=>c.slot_id===slotId?meal:c);
     const updatedRes=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
     if(out)out.innerHTML=genReviewHtml(updatedRes,target);
+    if(wasReused)toast("Ya usaste tus opciones nuevas de hoy; te mostramos la alternativa más parecida disponible.");
   }catch(e){
     if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>
       <div style="margin-top:8px"><button class="btn btn-sm" onclick="regenerateGenMealRestore()">Volver al borrador</button></div>`;
