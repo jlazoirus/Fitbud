@@ -1952,7 +1952,9 @@ Permitir ordenar visualmente el día de comidas en mobile y marcar comidas salta
 
 ## REQ-126 - Admin: resetear futuro y regenerar nutrición/entrenamiento para cualquier usuario
 
-**Estado: pendiente.**
+**Estado: implementado.** `api/admin.js` agrega `previewResetPlan`/`applyResetPlan` (usuario, alcance nutrition/training/both, fecha de inicio opcional = hoy en la zona horaria del usuario objetivo) y `resetUserToOnboarding` (reutiliza el wipe ya probado de `resetTestUserData` sin marcar al usuario como QA). Un día queda protegido (nunca se toca) si ya tiene una comida registrada o un entrenamiento hecho/ejecutado dentro del alcance elegido; aplicar solo reescribe `meals`/`extras` (nutrición) o `workoutDone`/`workoutOverride`/`workoutExecution` (entrenamiento) en `day_log.state` para los días no protegidos, y archiva (`status=superseded`) la versión de plan activa cuando el alcance incluye nutrición. El horizonte revisado cubre 120 días (sin techo artificial por debajo de 7). Toda acción se audita en la nueva tabla `admin_actions_log` (`supabase/admin_reset.sql`, requiere aplicarse manualmente en Supabase). Panel de administración: botones "Regenerar plan" (vista previa obligatoria antes de aplicar) y "Reiniciar usuario" (doble confirmación), deshabilitados para la propia cuenta y para otros administradores. Verificado con `scripts/test-admin-reset.mjs`.
+
+Pendiente de infraestructura (no ejecutable por el agente): aplicar `supabase/admin_reset.sql` en el proyecto de Supabase de producción para que `admin_actions_log` exista antes de usar estas acciones (la auditoría falla en silencio — no bloquea la operación principal — si la tabla no existe todavía).
 
 ### Origen
 
