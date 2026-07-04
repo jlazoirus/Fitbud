@@ -270,6 +270,18 @@ function containsRestriction(value, validation) {
   return restrictedTerms(validation).some((term) => termMatchesTokens(tokens, term));
 }
 
+const ANIMAL_PROTEIN_TERMS = [
+  "carne", "pollo", "pavo", "cerdo", "ternera", "res", "lomo",
+  "pescado", "atun", "atún", "salmon", "salmón", "trucha", "merluza",
+  "gamba", "langostino", "camaron", "camarón", "marisco", "calamar",
+  "pulpo", "huevo", "clara", "yema", "queso", "yogur", "yogurt", "cottage",
+];
+
+function containsAnimalProtein(value) {
+  const tokens = restrictionTokens(value);
+  return ANIMAL_PROTEIN_TERMS.some((term) => termMatchesTokens(tokens, term));
+}
+
 function validateDietDay(data, validation) {
   const meals = data && Array.isArray(data.comidas) ? data.comidas : [];
   const expected = Math.max(1, Number(validation.expectedMeals) || 0);
@@ -289,6 +301,17 @@ function validateDietDay(data, validation) {
     kcal += Number(meal.kcal);
     protein += Number(meal.proteina_g);
   }
+  // REQ-130: para omnivoro, la ausencia de proteina animal es warning/reintento
+  // del cliente. El proxy calcula la senal para que el contrato sea visible, pero
+  // no devuelve 422: una respuesta estructuralmente valida no se descarta aqui.
+  const animalProteinMissing = validation.requireAnimalProtein === true
+    && !meals.some((meal) => containsAnimalProtein(
+      String((meal && (meal.nombre || meal.name)) || "") + " "
+      + (Array.isArray(meal && meal.ingredientes)
+        ? meal.ingredientes.map((item) => item && (item.nombre || item.name) || "").join(" ")
+        : "")
+    ));
+  void animalProteinMissing;
   // La tolerancia de macros (kcal ±15%, proteína ≥85%) se valida en el cliente
   // con mejor UX: muestra el plan con advertencias y deja elegir al usuario.
   // Aquí solo validamos estructura para evitar rechazar respuestas válidas.

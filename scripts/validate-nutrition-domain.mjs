@@ -90,10 +90,28 @@ assert.ok(d.foodTextConflictForProfile("yogur griego con fruta", { diet: ["sin_l
   "sin_lacteos debe bloquear yogur");
 assert.ok(d.foodTextConflictForProfile("pan integral con palta", { diet: ["sin_gluten"] }),
   "sin_gluten debe bloquear pan/trigo");
-assert.equal(d.foodTextConflictForProfile("tofu salteado", { dislikedIngredients: "tofu" }), "",
-  "los ingredientes no preferidos no son restricción dura por defecto");
-assert.ok(d.foodTextConflictForProfile("tofu salteado", { dislikedIngredients: "tofu" }, { includeSoft: true }),
-  "includeSoft permite detectar ingredientes no preferidos");
+assert.ok(d.foodTextConflictForProfile("tofu salteado", { dislikedIngredients: "tofu" }),
+  "ingredientes no gustados bloquean por defecto");
+assert.equal(d.foodTextConflictForProfile("tofu salteado", { dislikedIngredients: "tofu" }, { includeSoft: false }), "",
+  "includeSoft:false permite una lectura solo de restricciones duras historicas");
+
+// ── Patrón omnívoro activo (REQ-130) ─────────────────────────────────────────
+assert.ok(d.requiresOmnivoreAnimalProtein({ diet: ["omnivoro"] }),
+  "omnivoro sin disgustos contrarios debe requerir proteína animal");
+assert.ok(!d.requiresOmnivoreAnimalProtein({ diet: ["omnivoro"], dislikedIngredients: "pollo, pescado" }),
+  "omnivoro con disgustos de carnes/pescado debe relajar la regla animal");
+assert.ok(!d.requiresOmnivoreAnimalProtein({ diet: ["vegetariano"] }),
+  "vegetariano no requiere proteína animal");
+const omniCheck = d.validateOmnivoreAnimalProtein([
+  { nombre: "Bowl de tofu", ingredientes: [{ nombre: "Tofu firme" }] },
+], { diet: ["omnivoro"] }, {});
+assert.equal(omniCheck.required, true, "validación omnívora debe declarar required");
+assert.equal(omniCheck.ok, false, "día omnívoro sin proteína animal debe advertir");
+assert.ok(omniCheck.warns.some(w => w.type === "omnivore_animal_protein_missing"),
+  "warning omnívoro debe tener tipo estable");
+assert.ok(d.validateOmnivoreAnimalProtein([
+  { nombre: "Pollo con arroz", ingredientes: [{ nombre: "Pechuga de pollo" }] },
+], { diet: ["omnivoro"] }, {}).ok, "día omnívoro con proteína animal pasa la regla");
 
 // ── validateTargetConsistency ─────────────────────────────────────────────────
 // Target consistente (post-REQ-77)

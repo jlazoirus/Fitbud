@@ -281,10 +281,13 @@
   }
 
   function foodTextConflictForProfile(text,prefs,options){
-    return foodTextViolatesTerms(text,foodBlockTermsForProfile(prefs,(options&&options.includeSoft)===true));
+    const includeSoft=options&&Object.prototype.hasOwnProperty.call(options,"includeSoft")
+      ?options.includeSoft===true
+      :true;
+    return foodTextViolatesTerms(text,foodBlockTermsForProfile(prefs,includeSoft));
   }
 
-  // REQ-127: includeSoft=true — dislikedIngredients también bloquea en el solver
+  // REQ-130: dislikedIngredients bloquea en el solver
   // determinista, igual que en el prompt de IA (coachFoodBlockTerms de index.html).
   // Antes el solver solo excluía alergias/patrón dietario y dejaba pasar disgustos
   // declarados, así que el fallback determinista podía seguir sugiriendo ingredientes
@@ -342,6 +345,65 @@
     if(isDishBlockedByProfile(dish,prefs))return false;
     const text=dishText(dish,catalog,maps);
     return !foodTextViolatesTerms(text,solverRestrictionTerms(prefs));
+  }
+
+  const ANIMAL_PROTEIN_TERMS=[
+    "carne","pollo","pavo","cerdo","ternera","res","lomo","jamon","jamón",
+    "pescado","atun","atún","salmon","salmón","trucha","merluza","gamba",
+    "langostino","camaron","camarón","marisco","calamar","pulpo","huevo",
+    "clara","yema","queso","yogur","yogurt","cottage","lacteo","lácteo",
+  ];
+  const ANIMAL_PROTEIN_RELAX_TERMS=[
+    "carne","pollo","pavo","cerdo","ternera","res","pescado","atun","atún",
+    "salmon","salmón","marisco","gamba","langostino","camaron","camarón",
+  ];
+
+  function textHasAnimalProtein(text){
+    return !!foodTextViolatesTerms(text,ANIMAL_PROTEIN_TERMS);
+  }
+
+  function dishHasAnimalProtein(dish,catalog,maps){
+    const localMaps=maps||catalogMaps(catalog);
+    return textHasAnimalProtein(dishText(dish,catalog,localMaps));
+  }
+
+  function mealHasAnimalProtein(meal,catalog){
+    const maps=catalogMaps(catalog);
+    const dish=findDishForMeal(meal,catalog);
+    if(dish&&dishHasAnimalProtein(dish,catalog,maps))return true;
+    const text=[
+      meal&&meal.nombre,
+      meal&&meal.name,
+      ...(Array.isArray(meal&&meal.ingredientes)?meal.ingredientes.map(ing=>ing&&ing.nombre||ing&&ing.name):[]),
+    ].filter(Boolean).join(" ");
+    return textHasAnimalProtein(text);
+  }
+
+  function omnivoreAnimalProteinRelaxed(prefs){
+    const text=[prefs&&prefs.dislikedIngredients,prefs&&prefs.allergies].filter(Boolean).join(", ");
+    return !!foodTextViolatesTerms(text,ANIMAL_PROTEIN_RELAX_TERMS);
+  }
+
+  function requiresOmnivoreAnimalProtein(prefs){
+    const diet=Array.isArray(prefs&&prefs.diet)?prefs.diet:[];
+    return diet.includes("omnivoro")
+      &&!diet.includes("vegetariano")
+      &&!diet.includes("vegano")
+      &&!omnivoreAnimalProteinRelaxed(prefs||{});
+  }
+
+  function validateOmnivoreAnimalProtein(comidas,prefs,catalog){
+    const required=requiresOmnivoreAnimalProtein(prefs);
+    const relaxed=!required&&Array.isArray(prefs&&prefs.diet)
+      &&prefs.diet.includes("omnivoro")
+      &&omnivoreAnimalProteinRelaxed(prefs||{});
+    if(!required)return{ok:true,required:false,relaxed,warns:[]};
+    const ok=(comidas||[]).some(meal=>mealHasAnimalProtein(meal,catalog||{}));
+    const warns=ok?[]:[{
+      type:"omnivore_animal_protein_missing",
+      message:"El patrón come de todo debe incluir al menos una comida con proteína animal si no contradice tus preferencias.",
+    }];
+    return{ok,required:true,relaxed:false,warns};
   }
 
   function compatibleSlotsForDish(dish){
@@ -602,6 +664,7 @@
         causes.push({reason:/Proteína/i.test(error)?"protein_insufficient":"kcal_out_of_tolerance",detail:error});
       });
     }
+    const omnivoreAnimal=validateOmnivoreAnimalProtein(comidas,prefs,catalog);
     const noSolution=causes.length>0;
     return {
       ok:!noSolution,
@@ -620,7 +683,8 @@
         ?"Preparamos la opción más viable con tu catálogo actual."
         :`Tu día quedó en ${totals.kcal} kcal con ${totals.p} g de proteína, dentro de tu meta y respetando tus restricciones.`,
       comidas,
-      warns:validation.warns||[],
+      warns:[...(validation.warns||[]),...omnivoreAnimal.warns],
+      omnivoreAnimalProtein:omnivoreAnimal,
     };
   }
 
@@ -997,6 +1061,7 @@
     const comidas=slots.map(slot=>bySlot.get(slot.id)).filter(Boolean);
     const totals=roundMacros(comidas.reduce((sum,meal)=>addMacros(sum,mealMacrosForTotals(meal)),{kcal:0,p:0,c:0,f:0}));
     const contract=validateDietContractTotals(totals,target);
+    const omnivoreAnimal=validateOmnivoreAnimalProtein(comidas,prefs,catalog);
     if(!contract.ok){
       contract.errors.forEach(error=>{
         causes.push({reason:contractCauseKey(error),detail:error});
@@ -1015,6 +1080,8 @@
       target,
       residual:dayResidual(target,totals),
       contract,
+      warns:omnivoreAnimal.warns,
+      omnivoreAnimalProtein:omnivoreAnimal,
       comidas,
       fallbackDiagnostics:fallback.diagnostics||[],
       source:"finalizeNutritionDay",
@@ -1140,6 +1207,10 @@
     validateReplacementFeasibility,
     mealSlotTargets,
     compatibleDishesForSlot,
+    textHasAnimalProtein,
+    mealHasAnimalProtein,
+    requiresOmnivoreAnimalProtein,
+    validateOmnivoreAnimalProtein,
     finalizeNutritionDay,
     solveDishPortion,
     planDeterministicNutritionDay,
@@ -1169,6 +1240,10 @@
   root.validateReplacementFeasibility=validateReplacementFeasibility;
   root.mealSlotTargets=mealSlotTargets;
   root.compatibleDishesForSlot=compatibleDishesForSlot;
+  root.textHasAnimalProtein=textHasAnimalProtein;
+  root.mealHasAnimalProtein=mealHasAnimalProtein;
+  root.requiresOmnivoreAnimalProtein=requiresOmnivoreAnimalProtein;
+  root.validateOmnivoreAnimalProtein=validateOmnivoreAnimalProtein;
   root.finalizeNutritionDay=finalizeNutritionDay;
   root.solveDishPortion=solveDishPortion;
   root.planDeterministicNutritionDay=planDeterministicNutritionDay;

@@ -429,6 +429,48 @@ await handler({ method: "POST", headers: { authorization: "Bearer token" }, body
 assert(res.statusCode === 200, "diet_day valido debe completarse con 200.");
 assert(completedCalls === 1 && failedCalls === 0, "diet_day valido debe guardar sin registrar fallo.");
 
+// --- REQ-130: omnivoro sin proteina animal es warning-only, no 422 duro ---
+const vegetarianOmnivoreText = JSON.stringify({
+  explicacion: "Plan valido, pero sin proteina animal.",
+  comidas: [
+    { slot_id: "desayuno", nombre: "Avena con fruta", ingredientes: [{ nombre: "Avena", gramos: 80 }, { nombre: "Platano", gramos: 100 }], kcal: 340, proteina_g: 12, carbohidratos_g: 65, grasa_g: 6 },
+    { slot_id: "almuerzo", nombre: "Bowl de tofu", ingredientes: [{ nombre: "Tofu firme", gramos: 180 }, { nombre: "Arroz", gramos: 200 }], kcal: 520, proteina_g: 32, carbohidratos_g: 70, grasa_g: 14 },
+    { slot_id: "snack", nombre: "Hummus con pan", ingredientes: [{ nombre: "Hummus", gramos: 80 }, { nombre: "Pan integral", gramos: 60 }], kcal: 260, proteina_g: 11, carbohidratos_g: 35, grasa_g: 9 },
+    { slot_id: "cena", nombre: "Lentejas con quinua", ingredientes: [{ nombre: "Lentejas", gramos: 180 }, { nombre: "Quinua", gramos: 120 }], kcal: 430, proteina_g: 24, carbohidratos_g: 68, grasa_g: 8 },
+  ],
+});
+completedCalls = 0; failedCalls = 0; providerCalls = 0;
+global.fetch = async (url) => {
+  const value = String(url);
+  const auth = authRoutes(value);
+  if (auth) return auth;
+  if (value.endsWith("/rest/v1/rpc/reserve_coach_action")) return response(200, [{ usage_id: 21, mode: "fresh", usage_status: "reserved", effective_limit: 3, quota_day: "2026-06-25", policy_enabled: true }]);
+  if (value.endsWith("/rest/v1/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+  if (value.endsWith("/rest/v1/rpc/complete_fresh_coach_part")) { completedCalls += 1; return response(200, [{ stored_result_id: 89 }]); }
+  if (value.endsWith("/rest/v1/rpc/fail_coach_generation_part")) { failedCalls += 1; return response(200, true); }
+  if (value.includes("api.anthropic.com")) { providerCalls += 1; return response(200, { content: [{ text: vegetarianOmnivoreText }], usage: { input_tokens: 200, output_tokens: 300 } }); }
+  throw new Error("Ruta diet_day omnivoro warning-only no simulada: " + value);
+};
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer token" },
+  body: {
+    userText: "Genera mi dia",
+    system: "Contexto",
+    quota: {
+      ...dietDayQuota,
+      requestId: "58585858-5858-4858-8858-585858585858",
+      partKey: "day-omnivore",
+      contextKey: "ctx-diet-day-omnivore-warning",
+      fallbackText: vegetarianOmnivoreText,
+      validation: { ...dietDayQuota.validation, requireAnimalProtein: true },
+    },
+  },
+}, res);
+assert(res.statusCode === 200, "REQ-130: omnivoro sin proteina animal no debe devolver 422 duro.");
+assert(completedCalls === 1 && failedCalls === 0, "REQ-130: warning-only debe guardar sin invalid_provider_output.");
+
 // --- diet_day: ingrediente restringido debe rechazar con 422 ---
 const restrictedDietDayText = JSON.stringify({
   explicacion: "Plan con proteina.",

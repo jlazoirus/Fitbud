@@ -84,7 +84,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 
 21. ~~REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad.~~ (implementado, P0)
 22. ~~REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas.~~ (implementado, P0)
-23. REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo. (P0)
+23. ~~REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo.~~ (implementado, P0)
 24. REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración. (P1)
 25. REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos. (P1)
 26. REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5. (P1)
@@ -1414,7 +1414,7 @@ Crear `finalizeNutritionDay(ctx)` como API pura y dormida: normaliza propuestas 
 
 ## REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo
 
-**Estado: pendiente.**
+**Estado: implementado.** `dislikedIngredients` ya se trata como exclusión obligatoria por defecto en dominio, cliente y proxy; el system prompt dejó de llamarlo preferencia blanda; `highProtLine` usa fuentes proteicas dinámicas filtradas por restricciones/disgustos y sin ejemplos de gramajes; el patrón omnívoro agrega señal verificable de proteína animal con warning/reintento dirigido (sin 422 duro) y relajación automática si el usuario excluye carnes/pescado. `COACH_PROMPT_VERSION` sube a 7 para invalidar pool previo. Se corrigieron las referencias erróneas `REQ-127` en código/tests. Validadores actualizados: `validate-nutrition-domain`, `validate-first-day-preferences`, `validate-high-protein-prompt`, `test-coach-quota`.
 
 ### Origen
 

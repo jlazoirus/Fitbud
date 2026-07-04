@@ -46,19 +46,29 @@ assert.ok(
   "El bloque highProt debe establecer un piso mínimo de proteína por comida."
 );
 
-// 5. La línea OBLIGATORIO da igual peso a proteína y calorías
+// 5. Fuentes dinámicas filtradas por restricciones/disgustos
+assert.ok(
+  genSrc.includes("proteinPromptSources(prefs)") && genSrc.includes("proteinSources.join"),
+  "El bloque highProt debe construir fuentes proteicas dinámicas filtradas por el perfil."
+);
+assert.ok(
+  !genSrc.includes("tofu + legumbre") && !genSrc.includes("300g de tofu") && !genSrc.includes("80g prot/100g"),
+  "El bloque highProt no debe contener ejemplos estáticos de tofu ni gramajes."
+);
+
+// 6. La línea OBLIGATORIO da igual peso a proteína y calorías
 assert.ok(
   genSrc.includes("AMBAS metas") && genSrc.includes("TAN importante como"),
   "La línea OBLIGATORIO debe dar a proteína igual peso retórico que a calorías."
 );
 
-// 6. Token limit sube para highProt
+// 7. Token limit sube para highProt
 assert.ok(
   /highProt\s*\?\s*1800\s*:\s*1400/.test(genSrc),
   "El max_tokens debe subir a 1800 para metas de proteína alta (1400 normal)."
 );
 
-// 7. Instrucción de verificar totales antes de responder
+// 8. Instrucción de verificar totales antes de responder
 assert.ok(
   genSrc.includes("Suma y verifica los totales"),
   "El prompt debe pedir a la IA que sume y verifique los totales antes de responder."

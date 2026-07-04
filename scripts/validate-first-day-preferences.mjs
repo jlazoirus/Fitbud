@@ -16,7 +16,7 @@ function sliceBetween(startNeedle, endNeedle) {
 const validateGeneratedDay = sliceBetween("function validateGeneratedDay(", "// REQ-89:");
 assert.ok(
   validateGeneratedDay.includes("coachFoodBlockTerms(true)"),
-  "validateGeneratedDay debe construir restricciones duras completas del perfil, incluyendo dislikedIngredients (REQ-127)."
+  "validateGeneratedDay debe construir restricciones duras completas del perfil, incluyendo dislikedIngredients (REQ-130)."
 );
 assert.ok(
   validateGeneratedDay.includes("foodTextConflictForProfile") && validateGeneratedDay.includes("profileConflict(hay)"),
@@ -25,6 +25,20 @@ assert.ok(
 assert.ok(
   !validateGeneratedDay.includes("noEgg&&"),
   "validateGeneratedDay no debe limitarse a la antigua validación especial de huevo."
+);
+assert.ok(
+  validateGeneratedDay.includes("validateOmnivoreAnimalProtein") && validateGeneratedDay.includes("omnivoreAnimalProtein"),
+  "validateGeneratedDay debe reportar patrón omnívoro como warning verificable, no 422 duro."
+);
+
+const buildSysPrompt = sliceBetween("function buildSysPrompt(", "function coachRequestId(");
+assert.ok(
+  buildSysPrompt.includes("disliked_ingredients") && buildSysPrompt.includes("obligatorios"),
+  "buildSysPrompt debe tratar disliked_ingredients como obligatorio."
+);
+assert.ok(
+  !/preferencias blandas/i.test(buildSysPrompt),
+  "buildSysPrompt no debe llamar blandos a los ingredientes no gustados."
 );
 
 const firstWeekNutrition = sliceBetween("async function prepareFirstWeekNutrition(", "async function prepareFirstWeekTraining(");
@@ -46,13 +60,30 @@ assert.ok(
 const generateOneDay = sliceBetween("async function generateOneDay(", "async function aiGenerateDay(");
 assert.ok(
   generateOneDay.includes("const hardRes=coachFoodBlockTerms(true)"),
-  "generateOneDay debe pedir el día con las mismas restricciones duras que luego valida (incl. dislikedIngredients, REQ-127)."
+  "generateOneDay debe pedir el día con las mismas restricciones duras que luego valida (incl. dislikedIngredients, REQ-130)."
+);
+assert.ok(
+  generateOneDay.includes("omnivoreAnimalProteinPromptLine(prefs)") && generateOneDay.includes("AJUSTE DIRIGIDO"),
+  "generateOneDay debe incluir patrón omnívoro activo y reintento dirigido sin bloquear."
+);
+assert.ok(
+  generateOneDay.includes("proteinPromptSources(prefs)") && !generateOneDay.includes("300g de tofu"),
+  "generateOneDay debe filtrar fuentes proteicas y no usar ejemplos estáticos bloqueables."
 );
 
 const dietQuota = sliceBetween("function dietQuotaValidation(", "function mealOptionValidation(");
 assert.ok(
   dietQuota.includes("hardRestrictions:coachFoodBlockTerms(true)"),
-  "dietQuotaValidation debe enviar restricciones duras completas al proxy, incluyendo dislikedIngredients (REQ-127)."
+  "dietQuotaValidation debe enviar restricciones duras completas al proxy, incluyendo dislikedIngredients (REQ-130)."
+);
+assert.ok(
+  dietQuota.includes("requireAnimalProtein"),
+  "dietQuotaValidation debe enviar la señal verificable del patrón omnívoro al proxy."
+);
+
+assert.ok(
+  html.includes("No quieres que aparezca") && html.includes("Se excluyen de tus próximas propuestas."),
+  "Onboarding y Perfil deben describir dislikedIngredients como exclusión, no preferencia blanda."
 );
 
 const regenerateMeal = sliceBetween("async function regenerateGenMeal(", "function regenerateGenMealRestore(");
