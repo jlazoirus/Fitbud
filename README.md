@@ -115,7 +115,7 @@ La pestaña **Alimentos** usa una base de datos real (Supabase / PostgreSQL) con
 - **`dishes`** + **`dish_ingredients`** — platos como recetas de ingredientes con gramos, slots compatibles, tags dietarios/de cocina y límites de porción para planificación futura.
 - **`diets`** + **`diet_dishes`** — los menús A/B/C/D y qué plato va cada día.
 
-Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se guardan a mano). Desde la app puedes ver, crear y editar ingredientes y platos. El seed actual contiene 162 ingredientes y 145 platos; las fuentes de revision de los lotes de crecimiento estan en [`docs/catalog-lote-1-sources.md`](docs/catalog-lote-1-sources.md) y [`docs/catalog-lote-2b-sources.md`](docs/catalog-lote-2b-sources.md).
+Los **macros de cada plato y dieta se calculan** sumando sus ingredientes (no se guardan a mano). Desde la app puedes ver, crear y editar ingredientes y platos. El seed actual contiene 200 ingredientes y 180 platos; las fuentes de revision de los lotes de crecimiento estan en [`docs/catalog-lote-1-sources.md`](docs/catalog-lote-1-sources.md), [`docs/catalog-lote-2b-sources.md`](docs/catalog-lote-2b-sources.md) y [`docs/catalog-lote-2c-sources.md`](docs/catalog-lote-2c-sources.md).
 
 Para crecer el catálogo en lotes revisables, usa el pipeline offline. No escribe en Supabase: genera un SQL por slug y un reporte JSON para aprobación humana.
 

@@ -18,6 +18,24 @@ const MIN_CANDIDATES_PER_SLOT = 2;
 const REQ135_SLOT_MINIMUMS = { desayuno: 20, media_manana: 10, merienda: 10, snack: 15, recena: 8 };
 const REQ135_MIN_DISHES = 100;
 const REQ135_MIN_INGREDIENTS = 100;
+const REQ141_MIN_DISHES = 180;
+const REQ141_MIN_INGREDIENTS = 200;
+const REQ141_MIN_NEEDS_KITCHEN_FALSE = 40;
+const REQ141_MIN_EAT_OUT_OK = 25;
+const REQ141_MIN_DAIRY_FREE = 100;
+const REQ141_MIN_GLUTEN_FREE = 120;
+// Ingredientes con trigo/cebada/centeno u otras fuentes conocidas de gluten.
+// Lista explícita y conservadora: solo cuenta un plato como "sin gluten" si
+// ninguno de sus ingredientes aparece aquí. No es una certificación de
+// alérgenos ni reemplaza el filtrado real de restricciones del usuario
+// (js/nutrition-domain.js); es una estimación de composición de catálogo
+// para dimensionar REQ-137 y priorizar lotes futuros.
+const GLUTEN_INGREDIENTS = new Set([
+  "Fideos de trigo secos", "Tortilla integral de trigo", "Pan de molde", "Pan integral",
+  "Wrap integral", "Pasta integral seca", "Cebada cocida", "Pan integral de centeno",
+  "Cuscus cocido", "Bulgur cocido", "Cereal integral sin azucar",
+  "Salsa de soya", "Salsa teriyaki", "Pasta de miso",
+]);
 
 function slugify(value) {
   return String(value || "")
@@ -110,6 +128,15 @@ function inferPrepMinutes(dish) {
   if (dish.slot === "desayuno") return 15;
   if (dish.slot === "cena") return 20;
   return 30;
+}
+
+function inferNeedsKitchen(dish) {
+  if (dish.slot === "snack" || dish.slot === "batido" || /yogur|shake/i.test(dish.name)) return false;
+  return true;
+}
+
+function inferEatOutOk(dish) {
+  return /bowl|tacos|pasta|pollo/i.test(dish.name);
 }
 
 function inferBudgetTier(dish) {
@@ -241,11 +268,44 @@ function assertReq135Scale(ingredients, dishes) {
   assert.ok(lowBudget / dishes.length >= 1 / 3, `REQ-135 exige >=1/3 platos low budget; tiene ${lowBudget}/${dishes.length}`);
 }
 
+function assertReq141Scale(ingredients, dishes) {
+  assert.ok(ingredients.length >= REQ141_MIN_INGREDIENTS, `REQ-141 exige >=${REQ141_MIN_INGREDIENTS} ingredientes; tiene ${ingredients.length}`);
+  assert.ok(dishes.length >= REQ141_MIN_DISHES, `REQ-141 exige >=${REQ141_MIN_DISHES} platos; tiene ${dishes.length}`);
+}
+
+function assertScenarioCoverage(dishes) {
+  const needsKitchenFalse = dishes.filter(dish => inferNeedsKitchen(dish) === false).length;
+  const eatOutOk = dishes.filter(dish => inferEatOutOk(dish)).length;
+  assert.ok(needsKitchenFalse >= REQ141_MIN_NEEDS_KITCHEN_FALSE,
+    `REQ-141 exige >=${REQ141_MIN_NEEDS_KITCHEN_FALSE} platos needs_kitchen=false; tiene ${needsKitchenFalse}`);
+  assert.ok(eatOutOk >= REQ141_MIN_EAT_OUT_OK,
+    `REQ-141 exige >=${REQ141_MIN_EAT_OUT_OK} platos eat_out_ok; tiene ${eatOutOk}`);
+}
+
+function assertAllergenCoverage(dishes, ingredients, recipes) {
+  const byName = new Map(ingredients.map(i => [i.name, i]));
+  const isDairyFree = (dish) => {
+    const lines = recipes.get(dish.name) || [];
+    return !lines.some(line => byName.get(line.ingredient)?.category === "Lácteo");
+  };
+  const isGlutenFree = (dish) => {
+    const lines = recipes.get(dish.name) || [];
+    return !lines.some(line => GLUTEN_INGREDIENTS.has(line.ingredient));
+  };
+  const dairyFree = dishes.filter(isDairyFree).length;
+  const glutenFree = dishes.filter(isGlutenFree).length;
+  assert.ok(dairyFree >= REQ141_MIN_DAIRY_FREE,
+    `REQ-141 exige >=${REQ141_MIN_DAIRY_FREE} platos sin lácteos (estimado por categoría); tiene ${dairyFree}`);
+  assert.ok(glutenFree >= REQ141_MIN_GLUTEN_FREE,
+    `REQ-141 exige >=${REQ141_MIN_GLUTEN_FREE} platos sin gluten (estimado por ingredientes conocidos); tiene ${glutenFree}`);
+}
+
 const ingredients = parseIngredients();
 const dishes = parseDishes();
 const recipes = parseRecipes();
 
 assertReq135Scale(ingredients, dishes);
+assertReq141Scale(ingredients, dishes);
 assertMigrationShape();
 assertUniqueSlugs("Ingrediente", ingredients);
 assertUniqueSlugs("Plato", dishes);
@@ -253,5 +313,7 @@ assertSlotCoverage(dishes);
 assertMealMetadata(dishes);
 assertDietTagBackfill(dishes, ingredients, recipes);
 assertCuisineCoverage(dishes);
+assertScenarioCoverage(dishes);
+assertAllergenCoverage(dishes, ingredients, recipes);
 
 console.log(`Catálogo nutricional semántico OK: ${ingredients.length} ingredientes · ${dishes.length} platos · ${FOOD_SLOTS.length} slots cubiertos · metadata de momento validada.`);

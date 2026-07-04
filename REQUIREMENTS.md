@@ -92,7 +92,7 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 28. ~~REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks.~~ (implementado, P1)
 29. ~~REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias.~~ (implementado, P1)
 30. ~~REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa.~~ (implementado, P2)
-31. REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos. (P2)
+31. ~~REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos.~~ (implementado, P2)
 32. REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato. (P0)
 33. REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global. (P0)
 34. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool. (P0)
@@ -1815,7 +1815,8 @@ Primer lote de profundidad por cocina y escenarios: aumentar variedad real sin p
 
 ## REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`supabase/seed.sql` agrega lote 2C: 38 ingredientes y 35 platos nuevos (200 ingredientes, 180 platos, 654 líneas de receta en total; fuentes en `docs/catalog-lote-2c-sources.md`), cerrando la meta final de profundidad del REQ-136 original. El lote suma proteínas nuevas (chuleta de cerdo, costilla, mejillones, calamar, anchoas, jamón serrano, chorizo, pollo molido), alternativas sin lácteos explícitas (leche/yogur de almendra y coco, queso vegano, levadura nutricional) y sin gluten explícitas (harinas de almendra/arroz/garbanzo, trigo sarraceno, amaranto, pan sin gluten multigrano, pasta de maíz), más condimentos regionales (ají panca, rocoto, huacatay, tomatillo, chipotle) para profundizar las 4 cocinas. `scripts/validate-nutrition-catalog.mjs` ahora exige explícitamente `REQ141_MIN_DISHES=180`/`REQ141_MIN_INGREDIENTS=200` y cobertura mínima de `needs_kitchen=false` (>=40), `eat_out_ok` (>=25), y estima cobertura de "sin lácteos"/"sin gluten" por categoría de ingrediente y una lista explícita de ingredientes con gluten conocido; estas dos últimas son heurísticas de composición de catálogo para dimensionar REQ-137, no una certificación de alérgenos ni reemplazan el filtrado real de restricciones del usuario (`js/nutrition-domain.js`). El canario `node scripts/validate-diet-contract.mjs` sube de 27/378 (7.1%) a 39/378 (10.3%) con `engine:"finalizeNutritionDay"`; el gate del 98% macro sigue siendo responsabilidad de REQ-137 (fuera de alcance). `node scripts/release-gate.mjs` pasa. Acción manual externa: re-ejecutar `supabase/seed.sql` en Supabase de producción para reemplazar el catálogo antes de que REQ-137 use el volumen completo.
 
 ### Origen
 
