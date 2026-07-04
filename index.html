@@ -902,6 +902,19 @@ const TRAINING_SAFETY_MODE_LABELS={
   gentle:"Suave / bajo impacto",
   full:"Plan completo",
 };
+// REQ-120: normaliza la lista de platos bloqueados ({key,name}), deduplicada por key.
+function normalizedBlockedDishes(value){
+  const list=Array.isArray(value)?value:[];
+  const seen=new Set(),out=[];
+  list.forEach(item=>{
+    const key=String(item&&item.key||"").trim();
+    const name=String(item&&item.name||"").trim();
+    if(!key||!name||seen.has(key))return;
+    seen.add(key);
+    out.push({key,name});
+  });
+  return out.slice(0,200);
+}
 function migrateProfilePrefs(source){
   const p={...(source&&typeof source==="object"?source:{})};
   let primary=SPORT_LABELS[p.primarySport]?p.primarySport:"";
@@ -961,6 +974,7 @@ function migrateProfilePrefs(source){
     foodNotes:String(p.foodNotes||p.foodNote||"").trim(),
     allergies,
     dislikedIngredients,
+    blockedDishes:normalizedBlockedDishes(p.blockedDishes),
   };
   if(strength==="none")prefs.equipment=[];
   else if(!prefs.equipment.length)prefs.equipment=equipmentDefault;
@@ -5237,6 +5251,12 @@ function coachLikesLine(prefs){
   const likes=[p.preferredIngredients,p.preferredDishes,cuisines.join(", ")].filter(Boolean).join("; ");
   return likes?`\nGustos del usuario (prioriza cuando encajen con las metas): ${likes}.`:"";
 }
+// REQ-120: nombres de platos rechazados explícitamente; refuerzo por si el nombre no matchea el catálogo.
+function coachBlockedDishesLine(prefs){
+  const list=Array.isArray(prefs&&prefs.blockedDishes)?prefs.blockedDishes:[];
+  const names=list.map(b=>b&&b.name).filter(Boolean);
+  return names.length?`\nNUNCA sugieras estos platos, el usuario los rechazó explícitamente: ${names.join(", ")}.`:"";
+}
 function coachFoodBlockTerms(includeSoft){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const terms=coachHardRestrictions();
@@ -5252,9 +5272,44 @@ function coachDishText(dish){
     .filter(Boolean);
   return [dish.name,dish.notes||"",...lines].join(" ");
 }
+// REQ-120: clave estable de plato para bloqueo persistente (dishSlug o nombre normalizado).
+function dishBlockKey(dish){
+  return String(dish&&dish.slug||"").trim()||coachKey(dish&&dish.name);
+}
+function dishBlockedBySavedList(dish){
+  const p=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const list=Array.isArray(p.blockedDishes)?p.blockedDishes:[];
+  if(!list.length)return false;
+  const key=dishBlockKey(dish);
+  return !!key&&list.some(b=>b&&b.key===key);
+}
 function coachDishBlockedByProfile(dish){
+  if(dishBlockedBySavedList(dish))return{blocked:true,term:"no_me_gusta"};
   const term=coachTextHasTerms(coachDishText(dish),coachFoodBlockTerms(true));
   return term?{blocked:true,term}:{blocked:false,term:""};
+}
+// REQ-120: bloquea un plato para que no vuelva a sugerirse (por dishSlug o nombre normalizado).
+async function blockDishFromProfile(name,dish){
+  const cleanName=String(name||"").trim();
+  const key=dish?dishBlockKey(dish):coachKey(cleanName);
+  if(!cleanName||!key)return false;
+  if(!profile)return false;
+  if(!profile.prefs)profile.prefs={};
+  const existing=Array.isArray(profile.prefs.blockedDishes)?profile.prefs.blockedDishes:[];
+  if(existing.some(b=>b&&b.key===key))return true;
+  profile.prefs.blockedDishes=normalizedBlockedDishes([...existing,{key,name:cleanName}]);
+  if(supa&&uid()){
+    try{await supa.from("profiles").update({prefs:profile.prefs,updated_at:new Date().toISOString()}).eq("id",uid());}catch(e){/* best-effort */}
+  }
+  return true;
+}
+// REQ-120: quita un plato de la lista de bloqueados ("volver a sugerir").
+async function unblockDishFromProfile(key){
+  if(!profile||!profile.prefs||!Array.isArray(profile.prefs.blockedDishes))return;
+  profile.prefs.blockedDishes=profile.prefs.blockedDishes.filter(b=>b&&b.key!==key);
+  if(supa&&uid()){
+    try{await supa.from("profiles").update({prefs:profile.prefs,updated_at:new Date().toISOString()}).eq("id",uid());}catch(e){/* best-effort */}
+  }
 }
 function coachActionCurrentWeek(ds){
   const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||(WEEKS&&WEEKS[0]);
@@ -5671,6 +5726,17 @@ function profileAccordionToggle(el){
     _profileAccordionSync=false;
   },0);
 }
+// REQ-120: lista de platos bloqueados con acción para volver a sugerirlos.
+function blockedDishesHtml(p){
+  const list=Array.isArray(p.blockedDishes)?p.blockedDishes:[];
+  if(!list.length)return `<div class="muted small">Aún no marcaste ningún plato como "no me gusta".</div>`;
+  return `<div class="chips">${list.map(b=>`<span class="chip-check" style="display:inline-flex;align-items:center;gap:6px">${esc(b.name)}<button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="unblockDishFromProfileUi('${esc(b.key)}')">Volver a sugerir</button></span>`).join("")}</div>`;
+}
+async function unblockDishFromProfileUi(key){
+  await unblockDishFromProfile(key);
+  render();
+  toast("Ese plato puede volver a aparecer en tus sugerencias");
+}
 function renderProfile(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const macros=profileMacroTargets();
@@ -5745,6 +5811,7 @@ function renderProfile(){
     <div class="field"><label for="pf_food_notes">Otras preferencias (opcional)</label><textarea id="pf_food_notes" rows="2" placeholder="Ej. prefiero desayunos salados">${esc(p.foodNotes)}</textarea></div>
     <div class="field"><label for="pf_allergies">Alergias y restricciones duras</label><input id="pf_allergies" value="${esc(p.allergies)}" placeholder="maní, mariscos…"><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
     <div class="field" style="margin-bottom:0"><label for="pf_disliked">Ingredientes que no te gustan</label><input id="pf_disliked" value="${esc(p.dislikedIngredients)}" placeholder="tofu, aceitunas…"><div class="field-note">Se evitan cuando existe una alternativa viable.</div></div>
+    ${Array.isArray(p.blockedDishes)&&p.blockedDishes.length?`<div class="field" style="margin-bottom:0;margin-top:9px"><label>Platos que ya no sugerimos</label>${blockedDishesHtml(p)}</div>`:""}
   </div></div>
   </details>
 
@@ -7262,12 +7329,26 @@ function applyChangeMeal(i){
 }
 function openMealMore(ds,id){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
-  const ms=mealState(ds,id);const r=mealRecipe(base,ms);
+  const ms=mealState(ds,id);const r=mealRecipe(base,ms);const v=mealValue(base,ms);
   const recHtml=r?`<div class="recipe open" style="margin:6px 0 10px">${r.lines.map(l=>`<div class="r-row"><span>${esc(l.name)}</span><span class="g">${l.grams} g</span></div>`).join("")}<div class="r-foot">${r.lines.length} ingredientes · ${r.generated?"opción de tu coach":"macros calculados desde la receta"}</div></div>`:"";
   modal(`<h3>${esc(base.slot)}</h3>
     ${recHtml}
     <button class="opt" onclick="closeModal();openEditor('meal','${ds}','${id}')">✎ Editar valores / comida personalizada</button>
+    ${v.name?`<button class="opt" onclick="blockCurrentMealDish('${ds}','${id}')">🚫 No me gusta este plato — no lo sugieras más</button>`:""}
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cerrar</button>`);
+}
+// REQ-120: bloquea el plato actualmente asignado a esta comida desde el menú "···".
+async function blockCurrentMealDish(ds,id){
+  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
+  const ms=mealState(ds,id);const v=mealValue(base,ms);
+  if(!v.name){toast("No hay un plato asignado para bloquear");return;}
+  const o=ms.ovr;
+  const dishName=(o&&o.dishName!=null?o.dishName:base.dishName)||v.name;
+  const dish=DB.loaded?dishByName(dishName):null;
+  const ok=await blockDishFromProfile(v.name,dish);
+  closeModal();
+  if(ok)toast(`No volveremos a sugerir "${v.name}". Puedes deshacerlo en Perfil.`);
+  else toast("No se pudo bloquear el plato. Intenta de nuevo.");
 }
 /* ---- Contingencia: entrenamiento ---- */
 function openWorkoutContingency(ds,reason){
@@ -8124,6 +8205,7 @@ async function generateOneDay(ds,coachRequest){
   const learnedLine=lp&&lp.topIngredients&&lp.topIngredients.length?`\nEl usuario suele disfrutar ingredientes como: ${lp.topIngredients.join(", ")}. Incorpóralos cuando encajen con las metas.`:"";
   const likesLine=coachLikesLine(prefs);
   const dislikeSoftLine=prefs.dislikedIngredients?`\nEvita "${prefs.dislikedIngredients}" salvo que no haya alternativa viable para cumplir la meta.`:"";
+  const blockedLine=coachBlockedDishesLine(prefs);
   const cookCtx=`Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
   const hardResLine=hardRes.length?`\nPROHIBIDO incluir en cualquier comida o ingrediente: ${hardRes.join(", ")}.`:"";
   // Carne/pescado se instruye por prompt (no por término) para no colisionar con substrings como "repollo". REQ-65.
@@ -8141,7 +8223,7 @@ async function generateOneDay(ds,coachRequest){
   const prompt=`Genera el plan de comidas de UN día para ${prettyDate(ds)}.
 Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carbohidratos, ${target.f} g grasa.
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
-${cookCtx}${hardResLine}${vegLine}${highProtLine}${likesLine}${dislikeSoftLine}
+${cookCtx}${hardResLine}${vegLine}${highProtLine}${likesLine}${dislikeSoftLine}${blockedLine}
 Referencia de platos compatibles (úsalos como inspiración; ajusta gramajes o crea platos distintos si hace falta para alcanzar la meta): ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}${learnedLine}.
 OBLIGATORIO — el día DEBE cumplir AMBAS metas:
@@ -8293,7 +8375,7 @@ function genReviewHtml(res,target){
     <b>${esc(c.nombre)}</b> <span class="muted small">(${c.slot_id})</span>
     <div class="o-meta">${c.kcal} kcal · P ${c.proteina_g} · C ${c.carbohidratos_g} · G ${c.grasa_g} g</div>
     <div class="muted small" style="margin-top:4px">${c.ingredientes.map((g,gIdx)=>`${esc(g.nombre)} <input type="number" inputmode="numeric" min="5" step="5" value="${g.gramos}" style="${igStyle}" onchange="updateGenMealGrams(${cIdx},${gIdx},+this.value)">g`).join(" · ")}</div>
-    <div style="margin-top:6px"><button class="btn btn-sm" onclick="regenerateGenMeal('${c.slot_id}')">Otra opción</button></div>
+    <div style="margin-top:6px"><button class="btn btn-sm" onclick="regenerateGenMeal('${c.slot_id}')">Otra opción</button> <button class="btn btn-sm" onclick="blockGenDraftMeal(${cIdx})">🚫 No me gusta</button></div>
   </div>`).join("");
   const issues=res.issues&&res.issues.length?`<div class="ai-box" style="border-color:var(--bad)">✗ No se puede aplicar:<br>${res.issues.map(esc).join("<br>")}</div>`:"";
   const warns=res.warns&&res.warns.length?`<div class="ai-box">⚠️ ${res.warns.map(esc).join("<br>")}</div>`:"";
@@ -8342,6 +8424,15 @@ function addGapSnackToDay(){
   const day=buildDay(draft.ds);const target=effectiveDayTarget();
   const res=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
   const out=$("#genOut");if(out)out.innerHTML=genReviewHtml(res,target);
+}
+// REQ-120: bloquea un plato sugerido en el borrador del día (antes de aplicarlo).
+async function blockGenDraftMeal(cIdx){
+  const draft=window._genDay;if(!draft||!draft.comidas)return;
+  const c=draft.comidas[cIdx];if(!c||!c.nombre)return;
+  const dish=DB.loaded?(c.dishSlug?DB.dishes.find(d=>d.slug===c.dishSlug):dishByName(c.nombre)):null;
+  const ok=await blockDishFromProfile(c.nombre,dish);
+  if(ok)toast(`No volveremos a sugerir "${c.nombre}". Puedes deshacerlo en Perfil.`);
+  else toast("No se pudo bloquear el plato. Intenta de nuevo.");
 }
 // REQ-90: editar gramos de ingredientes en el borrador del día y re-validar.
 function updateGenMealGrams(mealIdx,ingIdx,grams){
@@ -8501,11 +8592,12 @@ async function regenerateGenMeal(slotId){
   const slotDishes=slotDishesCompat.length?slotDishesCompat:slotDishesAll;
   const dishList=slotDishes.length?slotDishes.slice(0,40).map(d=>{const m=dishMacros(d.id);return `${d.name} [${dishSlotMeta(d)}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(sin platos compatibles en la base)";
   const likesLine=coachLikesLine(prefs);
+  const blockedLine=coachBlockedDishesLine(prefs);
   const out=$("#genOut");if(out)out.innerHTML=`<div class="ai-box">Buscando otra opción para ${esc(slot.slot)}…</div>`;
   try{
     const prompt=`Sugiere UNA comida diferente para el slot "${slot.slot}" (id: ${slotId}) del ${prettyDate(draft.ds)}.
 Macros disponibles para este slot: ${remKcal} kcal, ${remP} g proteína, ${remC} g carbos, ${remF} g grasa.
-Tiempo: ≤${prefs.cookingMinutes||30} min. No repitas: ${draft.comidas.map(c=>c.nombre).join(", ")}.${likesLine}
+Tiempo: ≤${prefs.cookingMinutes||30} min. No repitas: ${draft.comidas.map(c=>c.nombre).join(", ")}.${likesLine}${blockedLine}
 Platos de referencia: ${dishList.slice(0,400)}.
 PROHIBIDO inventar nombres genéricos o ficticios. Usa un nombre descriptivo real y ingredientes reales.
 Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","comidas":[{"slot_id":"${slotId}","nombre":"...","ingredientes":[{"nombre":"...","gramos":0}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;

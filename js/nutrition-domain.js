@@ -270,6 +270,19 @@
     return adj;
   }
 
+  // REQ-120: clave estable de plato (slug si existe, si no nombre normalizado).
+  // Debe coincidir con el patrón `dish.slug||coachKey(dish.name)` usado en index.html
+  // para identificar platos en changeMealCandidatePool y flujos relacionados.
+  function dishBlockKey(dish){
+    return String(dish&&dish.slug||"").trim()||solverKey(dish&&dish.name);
+  }
+  function isDishBlockedByProfile(dish,prefs){
+    const list=Array.isArray(prefs&&prefs.blockedDishes)?prefs.blockedDishes:[];
+    if(!list.length)return false;
+    const key=dishBlockKey(dish);
+    return !!key&&list.some(b=>b&&b.key===key);
+  }
+
   function dishDietAllowed(dish,prefs,catalog,maps){
     const diet=Array.isArray(prefs&&prefs.diet)?prefs.diet:[];
     const tags=asArray(dish&&dish.diet_tags);
@@ -277,6 +290,7 @@
       if(diet.includes("vegano")&&!tags.includes("vegano"))return false;
       if(diet.includes("vegetariano")&&!tags.includes("vegetariano")&&!tags.includes("vegano"))return false;
     }
+    if(isDishBlockedByProfile(dish,prefs))return false;
     const text=dishText(dish,catalog,maps);
     return !foodTextViolatesTerms(text,solverRestrictionTerms(prefs));
   }
@@ -805,6 +819,8 @@
     foodTextConflictForProfile,
     likedTermsForProfile,
     preferenceScoreAdjustment,
+    dishBlockKey,
+    isDishBlockedByProfile,
     validateTargetConsistency,
     validateDayTotals,
     validateSlotMacros,
