@@ -46,7 +46,7 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 - Supabase es fuente de verdad; `localStorage` es cache/offline. Datos personales van por usuario con RLS.
 - Login obligatorio, landing publica, paywall/checkout, cupones, historial de pagos, notificaciones, sync offline y roles admin ya existen.
 - Entrenamiento tiene catalogo, reproductor recuperable, planes personalizados 4/10 semanas, splits progresivos y adaptaciones.
-- Nutricion tiene catalogo con recetas, restricciones, dominio puro y metadata semantica de REQ-79. El foco pendiente es sacar la aritmetica nutricional del coach textual y pasarla a solver/planner determinista.
+- Nutricion tiene catalogo con recetas, restricciones, dominio puro y metadata semantica de REQ-79. El foco pendiente es sacar la aritmetica nutricional del coach textual y pasarla a solver/planner determinista: serie "dieta exacta" REQ-128..REQ-136 (diagnostico en `docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`).
 - Migraciones SQL nunca se ejecutan automaticamente en produccion; documentar acciones manuales.
 - Al tocar `index.html` o shell PWA, revisar si corresponde subir `CACHE_NAME` en `service-worker.js`.
 
@@ -79,6 +79,18 @@ Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-
 20. ~~REQ-112 - Accesibilidad: toasts aria-live y contraste de texto muted.~~ (implementado, P2)
 
 Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall en "Preparar mi día" y fallback+reintento en errores del coach) ya quedaron implementados el 1 jul junto con mejoras de calidad del solver determinista (pre-rankeo calórico, variedad por `recentUsed` y desempate por fecha).
+
+Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes convergentes — Codex (`docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`) y sesión de arquitectura de Claude — fusionados y aprobados por Jonathan con tres decisiones: tolerancias estrictas ±3%/±50 kcal y ±5 g proteína sujetas a canario, Sonnet 5 solo tras gate de telemetría, y ampliación drástica del catálogo. Orden recomendado (REQ-128 y REQ-129 son un par: el contrato no se activa sin el solver):
+
+21. REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad. (P0)
+22. REQ-129 - `finalizeNutritionDay()`: autoridad determinista única, cierre global del día y activación del contrato. (P0)
+23. REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo. (P0)
+24. REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración. (P1)
+25. REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos. (P1)
+26. REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5. (P1)
+27. REQ-134 - Pipeline de crecimiento del catálogo validado por el motor. (P1)
+28. REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks. (P1)
+29. REQ-136 - Catálogo lote 2: profundidad por gustos, cocinas y presupuesto. (P2)
 
 Pendiente no automatizable por agentes:
 
@@ -2011,3 +2023,470 @@ Dar al administrador una herramienta segura para resetear o regenerar futuro de 
 **Estado: pendiente. Requiere accion manual en el dashboard de Supabase (y de un proveedor SMTP externo para el remitente); no implementable por el agente autonomo.**
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
+
+## REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad
+
+**Estado: pendiente.**
+
+### Origen
+
+Decisión de Jonathan (4 jul 2026) sobre la propuesta fusionada de dos análisis independientes convergentes: Codex (`docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`) y la sesión de arquitectura de Claude del mismo día. Números elegidos: kcal ±3% o ±50 kcal (lo que sea mayor), proteína ±5 g bilateral, carbohidratos y grasa ±8 g — **sujetos a calibración por canario antes de activarse**.
+
+### Problema
+
+"Exacto a los macros" no tiene hoy una definición única. Conviven al menos 7 contratos contradictorios:
+
+1. El prompt de `generateOneDay()` exige kcal ±10%.
+2. `validateGeneratedDay()` (cliente) acepta ±15% kcal y proteína ≥85% (unilateral: no detecta pasarse).
+3. `validateDietDay()` del servidor (`api/claude.js`) no valida macros en absoluto, aunque `dietQuotaValidation()` ya le envía `target` (lo ignora a propósito).
+4. `validateDayTotals()` en `js/nutrition-domain.js` usa `DAY_KCAL_PCT:0.15` y `DAY_PROTEIN_MIN_PCT:0.85`.
+5. El snapshot en `domain-contracts.js` tolera 20% de kcal.
+6. `supabase/validate.mjs` tolera hasta ±30-60% contra metas legadas.
+7. Los tests validan las tolerancias laxas, no exactitud.
+
+### Causa raíz
+
+Nunca se definió el contrato de aplicabilidad como objeto único de dominio; cada superficie fijó su número por conveniencia local.
+
+### Objetivo
+
+Un solo objeto `DIET_CONTRACT` como fuente de verdad de "día aplicable", con números calibrados contra el catálogo real antes de activarse en runtime.
+
+### Alcance
+
+1. Definir y exportar `DIET_CONTRACT` en `js/nutrition-domain.js`: kcal ±3% o ±50 kcal (lo mayor); proteína ±5 g bilateral; carbohidratos ±8 g; grasa ±8 g; kcal autoritativa = suma de `ingredients.kcal` del catálogo (nunca la declarada por el modelo, y sin asumir `kcal = 4P+4C+9F`, que el catálogo no cumple fila a fila).
+2. Crear `scripts/validate-diet-contract.mjs` (canario): matriz de perfiles (2/4/6 comidas × omnívoro/vegetariano/vegano × meta normal y alta de proteína × disgustos comunes) × 7 días, resuelta con el solver determinista actual; reporta % de días factibles dentro del contrato por dimensión y las causas de fallo.
+3. Si la factibilidad es <98% en alguna dimensión, documentar en este REQ el mínimo factible medido y el ajuste propuesto (nunca aflojar en silencio).
+4. NO activar todavía el contrato en los validadores de runtime (eso es REQ-129): este REQ solo entrega el objeto, el canario y tests unitarios del objeto.
+
+### Fuera de alcance
+
+- Cambiar `validateGeneratedDay`, el servidor, el snapshot o el prompt (REQ-129).
+- Ampliar catálogo (REQ-134..136).
+
+### Riesgos
+
+- Fijar números infactibles con el catálogo actual (61 ingredientes / 50 platos) provocaría cascada de rechazos al activarse; por eso el canario decide antes que el contrato entre en vigor.
+
+### Criterios de aceptación
+
+- `DIET_CONTRACT` exportado, documentado y con tests unitarios.
+- El canario corre offline, produce reporte de factibilidad por dimensión y causa.
+- Ningún comportamiento de runtime cambia todavía.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `node scripts/validate-diet-contract.mjs` y revisión del reporte de factibilidad.
+
+## REQ-129 - `finalizeNutritionDay()`: autoridad determinista única, cierre global del día y activación del contrato
+
+**Estado: pendiente.**
+
+### Origen
+
+Mismo origen que REQ-128. Es la pieza central de la serie: implementa el principio "la IA propone; el motor calcula, valida y decide" en el camino PRINCIPAL, no solo en el fallback.
+
+### Problema
+
+- `generateOneDay()` le pide al modelo cuadrar gramos y macros ("Suma y verifica los totales antes de responder") — aritmética que un LLM no hace bien — y luego `validateGeneratedDay()` solo acepta o rechaza: nadie ajusta gramos después de la IA. Resultado: días que no llegan a los macros y porciones sin ajustar (bugs reportados 4 jul).
+- El solver de porciones existe (`solveDishPortion`, `optimizeLines`, REQ-80) pero solo opera en la ruta fallback y por plato/slot: no hay pasada global que cierre el día completo, así que los residuos por comida se acumulan (5 comidas a −2 g de proteína = día a −10 g).
+- Los caminos están fragmentados: día, semana, regenerar comida, reemplazos, `findGapSnack` y fallback tienen cada uno su propia lógica de aceptación.
+
+### Causa raíz
+
+Problema determinista de aritmética resuelto con herramienta probabilística de texto (diagnóstico ya documentado en `ANALISIS_ARQUITECTURA_NUTRICION_FITIA_v2.md` §1.1 y en el diagnóstico de Codex §"Propuesta de fix definitivo").
+
+### Objetivo
+
+Una única puerta de aplicación: `finalizeNutritionDay()` en el dominio puro. Ningún día se aplica fuera de `DIET_CONTRACT`, venga de la IA, del solver o de un reemplazo.
+
+### Dependencias
+
+- REQ-128 aplicado (el contrato y el canario deben existir).
+- La activación del contrato y el bump de versiones de prompt van en el MISMO commit que el solver global: activar el contrato sin el solver produce cascada de rechazos; el solver sin contrato deja la aceptación laxa.
+
+### Alcance
+
+1. Implementar `finalizeNutritionDay(ctx)` en `js/nutrition-domain.js`. Entrada: target diario, prefs, slots, catálogo, propuestas opcionales (de IA o deterministas). Salida: día aplicable dentro de `DIET_CONTRACT`, o `no_solution` con causa medible por slot/dimensión. Escalera interna:
+   - normalizar propuesta de IA por ingrediente (`normalizeCoachIngredient`); comida con ingrediente no mapeable se descarta (nunca se acepta con warning);
+   - ajuste por slot (`optimizeLines` contra `mealSlotTargets`, límites `min_g`/`max_g`/`step_g`);
+   - **pasada global de cierre del día** sobre ingredientes escalables de comidas NO registradas: palancas por rol (proteína magra para cerrar proteína, carbohidrato base para carbos, grasa densa para grasa/kcal), respetando límites palatables;
+   - complemento (snack del catálogo) solo si queda residual — formaliza `findGapSnack` dentro del contrato;
+   - slot sin solución → plato del catálogo vía solver puro; el día nunca se entrega fuera de contrato ni vacío.
+2. Cambiar el prompt de `generateOneDay()`: la IA deja de reportar macros y de verificar totales; entrega solo composición por slot (nombre real + ingredientes del catálogo + gramos semilla). Los gramos y macros finales son SIEMPRE del motor.
+3. Conectar `finalizeNutritionDay()` en TODOS los caminos: `generateOneDay`, `regenerateGenMeal`, `aiGenerateWeek`, `applyDeterministicDay`/`generateDeterministicWeek`, primera semana de onboarding (REQ-118) y reemplazos (REQ-83).
+4. Activar `DIET_CONTRACT` en todas las superficies del problema de REQ-128: `validateGeneratedDay` (cliente), `validateDayTotals` (dominio), `validateDietDay` del servidor usando el `validation.target` que ya recibe, tolerancia de snapshot en `domain-contracts.js`, y tests.
+5. Subir `COACH_PROMPT_VERSION` (cliente) y `PROMPT_VERSION` (servidor) para invalidar pool/caché generados bajo el contrato laxo (precedente REQ-121); debe ir en el mismo commit que la activación para evitar 422 en modo `reuse`.
+6. Mantener invariantes existentes: nunca reescribir comidas con `done=true`; UI sin lenguaje técnico (REQ-31).
+
+### Fuera de alcance
+
+- Metadata nueva de catálogo (REQ-132) y platos nuevos (REQ-135/136).
+- Cambios de modelo o de forma de llamada a la API (REQ-133).
+
+### Riesgos
+
+- REQ grande. Si una corrida no lo cubre completo, dividir como precedente REQ-99→105..108, con regla dura: la activación del contrato (alcance 4) y el bump (alcance 5) aterrizan juntos y al final.
+- Con el catálogo actual, perfiles de 5-6 comidas pueden degradar más a slots deterministas por cobertura (se resuelve en REQ-132/135); el `no_solution` medible debe registrarse para dimensionarlo.
+
+### Criterios de aceptación
+
+- El canario de REQ-128 corre ahora contra `finalizeNutritionDay()` y el 100% de los días aplicados queda dentro de `DIET_CONTRACT`, con residual reportado.
+- Un día de IA con ingrediente desconocido o comida infactible no se acepta con warning: se repara por catálogo/solver o se reporta `no_solution` con causa.
+- El servidor rechaza días fuera de contrato usando el `target` que ya recibe.
+- Resultados del pool previos al bump no se sirven.
+- Comidas ya registradas jamás cambian al preparar/regenerar.
+- `node scripts/validate-diet-contract.mjs`, `node scripts/validate-nutrition-solver.mjs` y `node scripts/release-gate.mjs` pasan.
+
+### Verificación sugerida
+
+- E2E: "Preparar mi día" y "Preparar mi semana" con perfil de proteína alta → totales dentro de contrato en UI.
+- Regenerar una comida individual → el día completo sigue dentro de contrato.
+
+## REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo
+
+**Estado: pendiente.**
+
+### Origen
+
+Verificación de código del 4 jul 2026 (sesión Claude) que confirmó los hallazgos del diagnóstico de Codex §"Prompt y contexto": el fix d6e86cb dejó contradicciones vivas.
+
+### Problema
+
+1. `buildSysPrompt()` dice literalmente "los ingredientes no preferidos son preferencias blandas" — y ese system prompt va en TODAS las llamadas, contradiciendo la restricción dura que el prompt de usuario declara desde d6e86cb. El modelo recibe órdenes opuestas en la misma petición.
+2. La línea de proteína alta (`highProtLine`) sugiere ejemplos estáticos: "tofu + legumbre", "300g de tofu en vez de 200g" — aunque el usuario tenga tofu en `dislikedIngredients`. El prompt puede prohibir y recomendar tofu a la vez.
+3. El copy de Perfil promete "Se evitan cuando existe una alternativa viable", que ya no describe el comportamiento (bloqueo duro).
+4. El patrón omnívoro existe solo como línea de prompt (d6e86cb); no hay regla verificable, así que un plan sin proteína animal pasa validación.
+5. Colisión de numeración: los comentarios del código de d6e86cb citan "REQ-127", que en este backlog es el branding de correos de Supabase.
+
+### Causa raíz
+
+El fix d6e86cb endureció prompt de usuario, validación y solver, pero no auditó el system prompt, los ejemplos embebidos ni el copy; y el patrón omnívoro quedó como instrucción sin verificación.
+
+### Objetivo
+
+Cero contradicciones sobre preferencias en el contexto que ve el modelo, y patrón omnívoro como regla activa verificable.
+
+### Alcance
+
+1. `buildSysPrompt()`: tratar `disliked_ingredients` con el mismo lenguaje obligatorio que `hard_restrictions`.
+2. `highProtLine` dinámica: construir los ejemplos de fuentes proteicas filtrando las restricciones y disgustos del usuario (nunca sugerir un ingrediente bloqueado); eliminar gramajes de ejemplo — tras REQ-129 los gramos son del solver.
+3. Alinear copy de Perfil y onboarding con el bloqueo real.
+4. Regla omnívora activa con relajación: para `diet` omnívoro sin disgustos que lo impidan, exigir ≥1 comida al día con proteína animal; si falla, warning + reintento dirigido (nunca 422 duro); si los disgustos del usuario excluyen carnes/pescado, la regla se relaja automáticamente.
+5. Auditar que los disgustos bloquean también en `compatibleDishesForSlot`, fallback determinista, pool (context key, REQ-121), servidor y tests.
+6. Corregir los comentarios "REQ-127" del código de d6e86cb para que citen este REQ.
+
+### Fuera de alcance
+
+- Scoring avanzado de gustos aprendidos (`learnedPatterns` sigue como está).
+
+### Riesgos
+
+- Usuarios con muchos disgustos reducen candidatos; la relajación de la regla omnívora y el `no_solution` medible de REQ-129 lo absorben.
+
+### Criterios de aceptación
+
+- Con "tofu" en `dislikedIngredients`: cero apariciones de tofu en system prompt, prompt de usuario (incluidos ejemplos), generación, validación y fallback, en día/semana/otra opción/reemplazos.
+- Usuario omnívoro sin disgustos contrarios recibe ≥1 comida con proteína animal al día.
+- El texto del prompt no contiene instrucciones contradictorias sobre preferencias (test de construcción de prompt).
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `node scripts/validate-first-day-preferences.mjs` extendido con el caso tofu-en-ejemplos y el caso omnívoro-activo.
+
+## REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración
+
+**Estado: pendiente.**
+
+### Origen
+
+Bug reportado por Jonathan (4 jul 2026): platos demasiado contundentes para el desayuno. Diagnóstico Codex §7 + propuesta Claude (etapa interina sin migración).
+
+### Problema
+
+El prompt lista los slots con id/hora pero no reparte el presupuesto calórico por comida ni exige adecuación del plato al momento del día; la lista de referencia manda ~60 platos de cualquier slot mezclados; la validación no comprueba slot-plato aunque el catálogo ya tiene `compatible_slots` (REQ-79). El modelo puede poner un guiso de almuerzo al desayuno y pasar validación.
+
+### Causa raíz
+
+La meta se comunica solo como total diario y la adecuación por slot nunca se validó.
+
+### Objetivo
+
+Que cada comida respete su presupuesto y su momento del día, con lo que ya existe (sin migración de schema).
+
+### Alcance
+
+1. Prompt: incluir presupuesto kcal/proteína por slot (desde `mealSlotTargets`), respetando `mainMealIndex`.
+2. Prompt: lista de platos de referencia filtrada por slot (los candidatos de desayuno para desayuno, etc.).
+3. Prompt: línea de arquetipos por slot (desayuno: avena, huevos, yogur, tostadas, batidos; no guisos ni platos de almuerzo; merienda/recena: ligero).
+4. Validación: si el plato propuesto matchea el catálogo, verificar `compatible_slots`; incompatible → issue → política de reparación de REQ-129.
+5. Heurística interina de contundencia: techo kcal por slot (p. ej. desayuno ≤ presupuesto del slot × 1.15 salvo comida principal) validado con los macros recalculados.
+
+### Fuera de alcance
+
+- Metadata nueva (`meal_weight`, `meal_form`) y backfill (REQ-132).
+
+### Riesgos
+
+- La heurística por kcal puede marcar falsos positivos en desayunos legítimamente grandes (comida principal en desayuno); el techo debe respetar `mainMealIndex`.
+
+### Criterios de aceptación
+
+- E2E: un perfil estándar nunca recibe en desayuno un plato del catálogo marcado solo como almuerzo/cena.
+- El prompt contiene presupuestos por slot y la referencia va filtrada por slot.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Generar 10 días de prueba y verificar distribución kcal por slot contra `mealSlotTargets`.
+
+## REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos
+
+**Estado: pendiente.**
+
+### Origen
+
+Diagnóstico Codex §"Catalogo" + hallazgo verificado del análisis v2 (2026-06-28): cobertura por slot rota.
+
+### Problema
+
+- Sin metadata de contundencia, un plato puede ser compatible en macros pero mala experiencia para desayuno; la heurística de REQ-131 es aproximada.
+- Cobertura del catálogo por slot: `media_manana`, `merienda` y `recena` = 0 platos. Los perfiles de 5-6 comidas no tienen candidatos y degradan siempre.
+
+### Causa raíz
+
+La metadata semántica de REQ-79 no incluyó contundencia/forma, y `compatible_slots` se pobló conservadoramente.
+
+### Objetivo
+
+Que el motor pueda decidir adecuación por momento del día con datos, y que los 7 slots renderizables tengan candidatos.
+
+### Alcance
+
+1. Migración SQL (aplicación manual documentada, como todas): columnas `meal_weight` (light/medium/heavy) y `meal_form` (bowl/sandwich/shake/plated/soup/snack) en `dishes` (extensión de `supabase/nutrition_catalog_semantics.sql` o archivo nuevo).
+2. Backfill de los ~50 platos existentes con `meal_weight`/`meal_form` y revisión de `compatible_slots` multi-slot: shakes/snacks/yogures existentes deben cubrir `media_manana`, `merienda` y `recena` (>0 candidatos por slot sin crear platos nuevos).
+3. Reglas de slot en dominio y validación: desayuno acepta light/medium (heavy solo si es comida principal); merienda/media mañana/recena solo light; almuerzo/cena sin restricción.
+4. `compatibleDishesForSlot` y el prompt (REQ-131) consumen la metadata nueva; la heurística de kcal de REQ-131 queda como respaldo cuando falte metadata.
+5. Actualizar `supabase/validate.mjs` y el canario para reportar cobertura por slot.
+
+### Fuera de alcance
+
+- Platos nuevos (REQ-135/136).
+
+### Riesgos
+
+- Migración manual en producción: dejar constancia como acción manual pendiente en el commit.
+- Backfill subjetivo: usar criterios documentados (kcal por porción base, forma) para que sea auditable.
+
+### Criterios de aceptación
+
+- Todos los slots renderizables tienen ≥1 candidato compatible (reportado por el canario).
+- Ningún plato heavy se aplica a desayuno no-principal ni a merienda/recena.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Canario con perfiles de 5 y 6 comidas: factibilidad por slot > 0 en los 7 slots.
+
+## REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5
+
+**Estado: pendiente.**
+
+### Origen
+
+Decisión de Jonathan (4 jul 2026): migrar a Sonnet 5 solo detrás de un gate de telemetría; propuesta Claude §API + diagnóstico Codex §8.
+
+### Problema
+
+- La respuesta del modelo se parsea con regex (`parseJsonText`); JSON truncado o con texto extra es un vector real de fallos.
+- El proxy capea `max_tokens` a 2048 (default 512); un día de 6 comidas roza el truncado.
+- `ALLOWED_MODELS` no incluye `claude-sonnet-5`; hay un solo modelo para todas las acciones; no existe criterio medible para decidir la migración.
+
+### Causa raíz
+
+La integración se construyó mínima (texto plano, un modelo) y nunca se endureció la forma de la llamada.
+
+### Objetivo
+
+Llamadas con salida estructurada garantizada, límites correctos, modelo configurable por acción, y decisión de migración a Sonnet 5 basada en datos.
+
+### Alcance
+
+1. Structured outputs en el proxy para `diet_day`, `diet_week` y `meal_option`: `output_config: {format: {type: "json_schema", schema}}` (soportado por Haiku 4.5 y Sonnet 5); mantener el parseo actual como fallback de compatibilidad si la API rechaza el parámetro.
+2. Subir el cap de `maxTokens` del proxy de 2048 a 4096; el cliente pide lo necesario por acción.
+3. `ALLOWED_MODELS` += `claude-sonnet-5`; actualizar `MODEL_COSTS` (Sonnet 5: $3/$15 por MTok; intro $2/$10 hasta 2026-08-31); permitir modelo por acción vía env (p. ej. `ANTHROPIC_MODEL_DIET`) con default actual (Haiku 4.5) — cambiar de modelo debe ser un cambio de configuración, no de código.
+4. Telemetría del gate: consulta/vista admin sobre `coach_generation_parts` con tasa de `invalid_provider_output`, tasa de degradación a ruta determinista, costo y latencia por acción/modelo.
+5. Documentar el gate en este REQ: si tras REQ-129..131 la tasa de degradación de `diet_*` con Haiku supera 10% sostenido durante 1-2 semanas, se cambia `ANTHROPIC_MODEL_DIET` a `claude-sonnet-5` (decisión de Jonathan con el dato en mano). `meal_estimate` y `coach_conversation` permanecen en Haiku.
+
+### Fuera de alcance
+
+- Cambiar el default global de modelo sin pasar por el gate.
+- Streaming, thinking u otras features de API no necesarias para este flujo.
+
+### Riesgos
+
+- Los resultados del pool anteriores no tienen schema garantizado: la validación de reuse ya cubre estructura; no re-validar formato con supuestos nuevos sin bump (coordinar con el bump de REQ-129 si los REQ aterrizan en otro orden).
+- Costo: Sonnet 5 en dieta ≈ $0.10-0.15/semana/usuario con precio intro; registrado ya por `estimateCostUsd`.
+
+### Criterios de aceptación
+
+- En un canario de N generaciones con structured outputs: 0 fallos de parseo/JSON inválido.
+- Cambiar el modelo de `diet_*` no requiere tocar código cliente.
+- El panel/consulta admin muestra tasa de degradación y costo por acción/modelo.
+- `node scripts/test-coach-quota.mjs` y `node scripts/release-gate.mjs` pasan.
+
+### Verificación sugerida
+
+- Llamada real de `diet_day` con schema y verificación de que la respuesta valida sin limpieza regex.
+
+## REQ-134 - Pipeline de crecimiento del catálogo validado por el motor
+
+**Estado: pendiente.**
+
+### Origen
+
+Decisión de Jonathan (4 jul 2026): "necesitamos ampliar drásticamente el catálogo de ingredientes y platos para todo tipo de gustos y preferencias". Diseño: análisis v2 §M9/Fase 6 (la IA propone offline; el sistema mapea, recalcula, valida y guarda).
+
+### Problema
+
+El catálogo tiene ~61 ingredientes / ~50 platos. La variedad percibida, la factibilidad del contrato estricto (REQ-128) y la cobertura de gustos dependen del tamaño del catálogo. Crecerlo a mano no escala; crecerlo con IA sin validación reintroduce el bug original (macros inventados no verificables).
+
+### Causa raíz
+
+No existe un camino de expansión validado: la IA runtime no debe crear platos, y no hay tooling offline que proponga candidatos verificados.
+
+### Objetivo
+
+Tooling offline repetible: la IA propone lotes de recetas/ingredientes; el motor los valida; un humano aprueba; la salida es SQL listo para aplicar manualmente.
+
+### Alcance
+
+1. Script offline `scripts/grow-catalog.mjs` (usa `ANTHROPIC_API_KEY` local/CI, nunca la app): pide a la IA lotes de recetas con composición por ingrediente y metadata completa, orientables por brief (slot, patrón dietético, cocina, presupuesto, tiempo).
+2. Validación determinista de cada candidato antes de aceptarlo al lote:
+   - consistencia `kcal` vs `4P+4C+9F` dentro de tolerancia documentada y rangos plausibles por 100 g;
+   - slug estable y dedupe contra catálogo existente (regla de REQ-79; los IDs autoincrementales no son referencia);
+   - metadata semántica obligatoria: `compatible_slots`, `diet_tags`, `meal_weight`, `meal_form`, `prep_minutes`, `budget_tier`, `needs_kitchen`, `eat_out_ok`, `scalable`/`min_g`/`max_g`/`step_g`;
+   - fit de prueba con `solveDishPortion` contra presupuestos típicos de su slot (un plato que no escala dentro de límites palatables se rechaza).
+3. Salida: archivo SQL de seed/patch para revisión y aplicación manual + reporte de aceptados/rechazados con causa. Nunca escribe a producción.
+4. Ingredientes nuevos exigen fuente nutricional anotada (etiqueta/tabla de referencia) para la aprobación humana.
+
+### Fuera de alcance
+
+- Aplicar los lotes (REQ-135/136 y acción manual en Supabase).
+- Cualquier generación de platos en runtime de usuario.
+
+### Riesgos
+
+- Datos nutricionales inventados por la IA: mitigado por validación de consistencia + fuente anotada + aprobación humana.
+- `seed.sql` usa `truncate ... restart identity`: el pipeline debe referenciar por slug, nunca por ID (riesgo ya documentado en v2 §8).
+
+### Criterios de aceptación
+
+- Correr el script con un brief produce un lote SQL válido y un reporte con causas de rechazo.
+- Un candidato con macros inconsistentes o sin metadata completa se rechaza automáticamente.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Brief de prueba "10 desayunos ligeros omnívoros" → lote válido; inyectar un candidato con kcal falsas → rechazado con causa.
+
+## REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks
+
+**Estado: pendiente.**
+
+### Origen
+
+Misma decisión que REQ-134. Prioridad del lote: los huecos que hoy rompen la experiencia (slots sin candidatos y desayunos repetitivos/contundentes).
+
+### Problema
+
+Cobertura actual por slot: almuerzo ~30, cena ~7, desayuno ~6, snack ~5, batido ~2, y `media_manana`/`merienda`/`recena` = 0. Los perfiles de 5-6 comidas no tienen de dónde elegir y el desayuno tiene 6 opciones para todos los gustos.
+
+### Causa raíz
+
+El catálogo se pobló para el plan original de 4 comidas de un usuario; nunca se dimensionó para la matriz real de perfiles.
+
+### Dependencias
+
+- REQ-134 (pipeline) y REQ-132 (metadata definida) aplicados.
+
+### Objetivo
+
+Que ningún slot quede sin candidatos variados y que el desayuno tenga profundidad real.
+
+### Alcance
+
+1. Generar y aprobar vía pipeline REQ-134 un lote con mínimos por slot: desayuno ≥20, media_manana ≥10, merienda ≥10, recena ≥8, snack/batido ≥15; total de platos del catálogo ≥100 (desde ~50).
+2. Ingredientes nuevos según lo exijan las recetas (~61 → ~120), cada uno con fuente anotada.
+3. Distribución del lote: ≥30% apto vegetariano, ≥15% apto vegano, cobertura de `budget_tier` bajo y de `prep_minutes` ≤15 en al menos un tercio.
+4. Aplicar SQL en Supabase (acción manual documentada) y actualizar `CONTEXT.md`/validadores con los conteos nuevos.
+5. Re-correr el canario de REQ-128: la factibilidad del contrato para perfiles de 5-6 comidas debe quedar ≥98%.
+
+### Fuera de alcance
+
+- Profundidad por cocinas/gustos específicos (REQ-136).
+
+### Riesgos
+
+- Volumen de revisión humana: el lote llega pre-validado por el pipeline, la aprobación es sobre plausibilidad nutricional y nombres.
+
+### Criterios de aceptación
+
+- Todos los slots con los mínimos definidos y metadata completa.
+- Canario ≥98% de factibilidad en la matriz completa de perfiles.
+- `node supabase/validate.mjs` (o equivalente vigente) y `node scripts/release-gate.mjs` pasan.
+
+### Verificación sugerida
+
+- Generar semana E2E para un perfil de 6 comidas: cero slots degradados por falta de candidatos.
+
+## REQ-136 - Catálogo lote 2: profundidad por gustos, cocinas y presupuesto
+
+**Estado: pendiente.**
+
+### Origen
+
+Misma decisión que REQ-134: "todo tipo de gustos y preferencias".
+
+### Problema
+
+Aun con el lote 1, la variedad por cocina, gustos declarados (`preferredIngredients`, `preferredCuisines`), presupuesto bajo, sin cocina y comer fuera es superficial; usuarios con preferencias marcadas verán repetición o platos que no conectan con lo que comen.
+
+### Causa raíz
+
+El catálogo nunca se pobló contra la matriz de preferencias que el onboarding ya captura (REQ-119).
+
+### Dependencias
+
+- REQ-134 y REQ-135 aplicados.
+
+### Objetivo
+
+Profundidad real por gustos: que las preferencias del onboarding encuentren candidatos, no solo scoring sobre los mismos 100 platos.
+
+### Alcance
+
+1. Lote vía pipeline REQ-134 orientado por: cocinas (criolla/peruana, mediterránea, mexicana, asiática), alta proteína sin depender de proteína en polvo, `needs_kitchen=false`, `eat_out_ok=true`, `budget_tier` bajo, y opciones sin gluten / sin lácteos.
+2. Meta de tamaño: platos ≥180 (desde ~100), ingredientes ≥200 (desde ~120), manteniendo mínimos por slot del lote 1.
+3. Fuente de priorización: gustos reales capturados en `prefs` (agregado anónimo si existe) y los `preferredCuisines` del onboarding.
+4. Aplicar SQL manual + actualizar conteos en docs/validadores + re-correr canario.
+
+### Fuera de alcance
+
+- Personalización por usuario individual (el catálogo es común; la personalización la hacen filtros/scoring existentes).
+
+### Riesgos
+
+- Crecer sin control de calidad diluye el catálogo: mantener el gate del pipeline (rechazo con causa) y revisión humana por lote.
+
+### Criterios de aceptación
+
+- Un perfil con `preferredCuisines=["criolla"]` y otro `["mediterránea"]` reciben semanas mayoritariamente alineadas a su cocina sin violar contrato ni restricciones.
+- Factibilidad del canario se mantiene ≥98% con el catálogo ampliado.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E de dos perfiles con gustos opuestos: cero platos bloqueados, variedad semanal sin repetición > lo permitido por `repeatPreference`.
