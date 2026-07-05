@@ -95,13 +95,13 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 31. ~~REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos.~~ (implementado, P2)
 32. ~~REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato.~~ (implementado, P0)
 33. ~~REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global.~~ (implementado, P0)
-34. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool. (P0)
-35. REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
+34. REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
 
 Pendiente no automatizable por agentes:
 
 - REQ-49 - Revision legal pre-lanzamiento.
 - REQ-60 - Configuracion manual de redirects en Supabase.
+- REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool. Bloqueado: canario en 32.3% (gate declarado >=98%) y decision de producto pendiente sobre que hacer cuando el contrato no cierra (ver seccion "Bloqueo" del REQ).
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
@@ -1813,7 +1813,13 @@ Que todos los caminos del cliente pasen por `finalizeNutritionDay()` para obtene
 
 ## REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool
 
-**Estado: pendiente.**
+**Estado: pendiente. Bloqueado por brecha de factibilidad de catálogo; condición de parada del agente hasta nueva revisión de producto.**
+
+### Bloqueo (2026-07-05, corrida autónoma)
+
+`node scripts/validate-diet-contract.mjs` hoy mide 122/378 (32.3%) de factibilidad con el motor `finalizeNutritionDay()` (post REQ-136/137/138/140/141), y el propio REQ-128 fijó el gate de activación en >=98% por dimensión. `failureBreakdown` confirma que el 100% de los 256 días que no cierran son `catalog_gap` (residuo de macro), no bugs del solver. Además, `validateGeneratedDay()` (`index.html:8375`) valida la propuesta cruda del modelo **antes** de que `finalizeDayWithGate()`/`finalizeNutritionDay()` corran `globalClosePass()`/`attemptContractComplement()`; si el alcance #2 de este REQ sube esos 2 checks de macro de `warns` a `issues` con tolerancias de `DIET_CONTRACT` (±3%/±50 kcal, ±5 g proteína), la propuesta cruda del modelo casi nunca las cumple — es justamente el motivo por el que existe el cierre determinista posterior. El resultado observable: `aiGenerateDay()` fallaría su primer intento en la inmensa mayoría de los perfiles (2 comidas, 6 comidas, vegano/vegetariano alta_proteina rondan 0-14% de factibilidad hoy) y, tras 2 intentos, degradaría siempre a `applyDeterministicDay()` — inhabilitando de facto la generación por IA para la mayoría de usuarios reales, no solo para casos límite. `finalizedDayIsComplete()` (`index.html:7901`) ya documenta a propósito que ignora `DIET_CONTRACT` "hasta REQ-139" para no bloquear la experiencia visible mientras el catálogo no alcanza el gate.
+
+Esto no es una decisión de alcance/tamaño sino de producto: activar el rechazo duro hoy cambiaría la promesa visible de la app (de "tu coach prepara tu día" a "casi siempre te doy la opción práctica genérica") para la mayoría de combinaciones de perfil, sin que el REQ original reconozca ese trade-off ni defina qué debe pasar con el usuario cuando el contrato no cierra (¿bloquear con error, degradar con aviso, o mantener el best-effort actual?). Requiere que un humano decida: (a) esperar a que el canario supere un umbral (p. ej. >=90-98%) antes de activar `runtimeActive`, y/o (b) redefinir "rechazo" para que el cliente gate sobre `finalized.contract.ok` (después del cierre) en vez de sobre la propuesta cruda del modelo (antes del cierre), aceptando igual una tasa de fallback determinista más alta de la actual mientras el catálogo crece. No se tocó código de producto en esta corrida; no se implementó el alcance de abajo.
 
 ### Origen
 
