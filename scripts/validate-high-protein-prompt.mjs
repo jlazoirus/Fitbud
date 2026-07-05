@@ -1,6 +1,10 @@
 // REQ-75 — Prompt de generateOneDay debe incluir instrucciones reforzadas
-// cuando la meta de proteína es alta (>25% de kcal) y dar a proteína igual
-// peso retórico que a calorías en la línea OBLIGATORIO.
+// cuando la meta de proteína es alta (>25% de kcal), con piso mínimo por
+// comida y prohibición de sacrificar proteína por variedad.
+// REQ-138 actualizó las aserciones #6 y #8: el prompt ya no le pide al modelo
+// verificar/sumar los totales del día como autoridad final (eso ahora lo
+// hace finalizeNutritionDay() aguas abajo); la proteína alta sigue reforzada
+// vía el bloque táctico highProt, no vía la vieja línea OBLIGATORIO global.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
@@ -56,10 +60,12 @@ assert.ok(
   "El bloque highProt no debe contener ejemplos estáticos de tofu ni gramajes."
 );
 
-// 6. La línea OBLIGATORIO da igual peso a proteína y calorías
+// 6. El bloque highProt sigue con peso retórico fuerte (OBLIGATORIA) y
+// prohíbe sacrificar proteína por variedad, aunque la vieja línea global
+// OBLIGATORIO — AMBAS metas ya no exista (REQ-138).
 assert.ok(
-  genSrc.includes("AMBAS metas") && genSrc.includes("TAN importante como"),
-  "La línea OBLIGATORIO debe dar a proteína igual peso retórico que a calorías."
+  genSrc.includes("Estrategia OBLIGATORIA") && genSrc.includes("no sacrifiques proteína por variedad"),
+  "El bloque highProt debe mantener peso retórico fuerte para la proteína."
 );
 
 // 7. Token limit sube para highProt y para dias con mas comidas
@@ -68,10 +74,11 @@ assert.ok(
   "El max_tokens debe escalar por proteína alta y cantidad de comidas, con cap 4096."
 );
 
-// 8. Instrucción de verificar totales antes de responder
+// 8. REQ-138: el prompt ya NO le exige al modelo sumar/verificar los totales
+// del día como autoridad final — ese cierre lo hace finalizeNutritionDay().
 assert.ok(
-  genSrc.includes("Suma y verifica los totales"),
-  "El prompt debe pedir a la IA que sume y verifique los totales antes de responder."
+  !genSrc.includes("Suma y verifica los totales") && !genSrc.includes("OBLIGATORIO — el día DEBE cumplir AMBAS metas"),
+  "El prompt no debe exigirle al modelo verificar los totales del día como autoridad final (REQ-138)."
 );
 
 // ── Simulación de casos ─────────────────────────────────────────────────────

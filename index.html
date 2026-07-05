@@ -7856,19 +7856,63 @@ function recentDishSlugs(ds,daysBack){
   }
   return used;
 }
+// REQ-138: comidas ya registradas (done=true) de un día, en el formato de comida
+// que espera finalizeNutritionDay() como lockedMeals — nunca se regeneran.
+function lockedMealsForDay(ds,day){
+  const st=dayState(ds);
+  const locked=[];
+  (day.meals||[]).forEach(m=>{
+    const ms=st.meals[m.id];
+    if(!ms||!ms.done)return;
+    const v=mealValue(m,ms);
+    locked.push({
+      slot_id:m.id,
+      nombre:v.name,
+      ingredientes:(ms.ovr&&ms.ovr.ingredientes)||m.ingredientes||[],
+      kcal:v.kcal,proteina_g:v.p,carbohidratos_g:v.c,grasa_g:v.f,
+      dishSlug:(ms.ovr&&ms.ovr.dishSlug)||m.dishSlug||null,
+    });
+  });
+  return locked;
+}
+// REQ-138: puerta única para el cliente — toda composición propuesta (IA o
+// determinista) pasa por finalizeNutritionDay() antes de mostrarse/aplicarse.
+// No activa el rechazo estricto del contrato: el "ok" visible sigue dependiendo
+// de que cada slot del día haya quedado cubierto, no de DIET_CONTRACT.
+function finalizeDayWithGate(ds,day,target,prefs,proposalComidas,extra){
+  const nd=window.FITBUD_NUTRITION_DOMAIN;
+  if(!nd||!nd.finalizeNutritionDay||!DB.loaded)return null;
+  const opts=extra||{};
+  const ctx={
+    prefs,dayTarget:target,catalog:DB,
+    slots:day.meals.map(m=>({id:m.id,slot:m.slot,time:m.time})),
+    proposal:proposalComidas||[],
+    lockedMeals:opts.lockedMeals||lockedMealsForDay(ds,day),
+    date:ds,
+    workoutContext:opts.workoutContext,
+    prevDayUsed:recentDishSlugs(ds,1),
+    recentUsed:recentDishSlugs(ds,3),
+  };
+  return nd.finalizeNutritionDay(ctx);
+}
+// Un día finalizado se considera "completo" (visible como ok) cuando cada slot
+// del día tiene una comida real; el ajuste fino de DIET_CONTRACT queda dormido
+// hasta REQ-139, así que no bloquea la experiencia visible.
+function finalizedDayIsComplete(day,finalized){
+  if(!finalized||!Array.isArray(finalized.comidas))return false;
+  const bySlot=new Set(finalized.comidas.map(c=>c.slot_id));
+  return (day.meals||[]).every(m=>bySlot.has(m.id));
+}
 function deterministicDayPayload(ds){
   const day=buildDay(ds),target=effectiveDayTarget();
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const solver=window.FITBUD_NUTRITION_DOMAIN&&window.FITBUD_NUTRITION_DOMAIN.planDeterministicNutritionDay;
-  if(solver&&DB.loaded){
+  const nd=window.FITBUD_NUTRITION_DOMAIN;
+  if(nd&&nd.finalizeNutritionDay&&DB.loaded){
     const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
-    const res=solver({
-      date:ds,dayTarget:target,prefs,slots:day.meals,catalog:DB,
-      workoutContext:{isTrainingDay},
-      prevDayUsed:recentDishSlugs(ds,1),
-      recentUsed:recentDishSlugs(ds,3),
-    });
-    if(res&&Array.isArray(res.comidas))return res;
+    const finalized=finalizeDayWithGate(ds,day,target,prefs,[],{workoutContext:{isTrainingDay}});
+    if(finalized&&Array.isArray(finalized.comidas)){
+      return {...finalized,ok:finalizedDayIsComplete(day,finalized),status:finalizedDayIsComplete(day,finalized)?"ok":"no_solution"};
+    }
   }
   return {
     ok:false,status:"no_solution",
@@ -8401,10 +8445,12 @@ function validateGeneratedDay(j,day,target){
     if(recent.includes(nombre.toLowerCase()))warns.push(`"${nombre}" se repite respecto a días recientes.`);
     comidas.push({slot_id,nombre,ingredientes:ings,kcal:Math.round(macro.kcal),proteina_g:Math.round(macro.p),carbohidratos_g:Math.round(macro.c),grasa_g:Math.round(macro.f)});
   });
-  // tolerancia del día: kcal ±15%, proteína no menos del 85% de la meta
+  // REQ-138: los totales que el modelo propone ya no son autoridad final — el
+  // cierre real de macros lo hace finalizeNutritionDay() aguas abajo. Estos
+  // desvíos quedan como aviso informativo, no bloquean la composición propuesta.
   const off=(v,t,tol)=>t>0&&Math.abs(v-t)>t*tol;
-  if(off(tot.kcal,target.kcal,0.15))issues.push(`kcal del día ${Math.round(tot.kcal)} fuera de ±15% de ${target.kcal}.`);
-  if(tot.p<target.p*0.85)issues.push(`Proteína ${Math.round(tot.p)} g por debajo del 85% de la meta (${target.p} g).`);
+  if(off(tot.kcal,target.kcal,0.15))warns.push(`kcal del día ${Math.round(tot.kcal)} fuera de ±15% de ${target.kcal}; se ajustará automáticamente.`);
+  if(tot.p<target.p*0.85)warns.push(`Proteína ${Math.round(tot.p)} g por debajo del 85% de la meta (${target.p} g); se ajustará automáticamente.`);
   if(off(tot.c,target.c,0.3))warns.push(`Carbohidratos ${Math.round(tot.c)} g lejos de la meta (${target.c} g).`);
   const omnivoreAnimal=ndCoach&&ndCoach.validateOmnivoreAnimalProtein
     ?ndCoach.validateOmnivoreAnimalProtein(comidas,prefs,DB)
@@ -8496,10 +8542,8 @@ ${cookCtx}${hardResLine}${vegLine}${animalLine}${highProtLine}${likesLine}${bloc
 Referencia de platos compatibles por slot (elige ideas del slot correspondiente; no uses platos listados en otro slot):
 ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}${learnedLine}.
-OBLIGATORIO — el día DEBE cumplir AMBAS metas:
-1. Calorías: ${target.kcal} kcal ±10%.
-2. Proteína: ≥${Math.round(target.p*0.85)} g (meta ${target.p} g). Alcanzar la proteína es TAN importante como las calorías.
-Cada comida lleva ingredientes reales con gramos; ajusta porciones libremente para cumplir ambas metas. Suma y verifica los totales antes de responder.
+Propón una composición realista cercana al presupuesto de cada slot (arriba); no necesitas ajustar los gramos para que la suma del día cierre exacto con las metas — el sistema recalcula y ajusta las porciones finales.
+Cada comida lleva ingredientes reales con gramos razonables para esa composición.
 PROHIBIDO inventar nombres genéricos o ficticios como "Desayuno práctica", "Alimento compatible", "Bowl práctico" o similares. Cada comida debe tener un nombre descriptivo real (ej. "Avena proteica con frutos rojos") y cada ingrediente debe ser un alimento real (ej. "Avena", "Proteína en polvo", "Tofu firme").
 Responde SOLO JSON válido, sin texto extra:
 {"explicacion":"breve","comidas":[{"slot_id":"desayuno","nombre":"...","ingredientes":[{"nombre":"Avena","gramos":50}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
@@ -8535,6 +8579,15 @@ AJUSTE DIRIGIDO: la propuesta anterior quedó demasiado vegetariana para un perf
       if(retryRes.ok&&(!retryRes.omnivoreAnimalProtein||retryRes.omnivoreAnimalProtein.ok))res=retryRes;
     }catch(_){
       res.warns.push("No pudimos ajustar el patrón come de todo en este intento; puedes pedir otra opción si prefieres.");
+    }
+  }
+  // REQ-138: puerta única — la composición ya validada (issues estructurales) se
+  // cierra por finalizeNutritionDay() antes de mostrarse; el contrato estricto
+  // sigue dormido, así que esto no cambia si el día se acepta o no.
+  if(res.ok){
+    const finalized=finalizeDayWithGate(ds,day,target,prefs,res.comidas,{workoutContext:{isTrainingDay}});
+    if(finalized&&Array.isArray(finalized.comidas)&&finalized.comidas.length){
+      res={...res,comidas:finalized.comidas,totals:finalized.totals,contract:finalized.contract};
     }
   }
   return {res,day,target,reused};
@@ -8586,10 +8639,13 @@ function generateDeterministicWeek(w,days){
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
   const result=nd.planNutritionWeek({prefs,dayTarget:target,catalog:DB,numDays:days.length,startDate:days[0]});
   if(!result||!result.days||!result.days.length)return null;
-  // Mapear días del plan a fechas reales de la semana
+  // Mapear días del plan a fechas reales de la semana y cerrar cada día por
+  // finalizeNutritionDay() (REQ-138) para aplicar el cierre global de macros.
   const daysData=days.map((ds,i)=>{
     const planDay=result.days[i]||result.days[result.days.length-1];
-    return{ds,comidas:planDay.comidas||[]};
+    const day=buildDay(ds);
+    const finalized=finalizeDayWithGate(ds,day,target,prefs,planDay.comidas||[]);
+    return{ds,comidas:(finalized&&finalized.comidas)||planDay.comidas||[]};
   });
   const label=w.num?("Semana "+w.num):"Semana de arranque";
   return{
@@ -8856,11 +8912,13 @@ async function regenerateDayInWeekDraft(index){
   // Ruta determinista cuando el coach no está disponible
   if(!aiAvailable()||!hasEntitlement()){
     const nd=window.FITBUD_NUTRITION_DOMAIN;
-    if(nd&&nd.planDeterministicNutritionDay&&DB.loaded){
+    if(nd&&nd.finalizeNutritionDay&&DB.loaded){
       const target=effectiveDayTarget();
       const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-      const res=nd.planDeterministicNutritionDay({prefs,dayTarget:target,catalog:DB});
-      draft.daysData[index]={ds:d.ds,comidas:res.comidas||[]};
+      const day=buildDay(d.ds);
+      // REQ-138: puerta única finalizeNutritionDay() también en el regenerado determinista.
+      const finalized=finalizeDayWithGate(d.ds,day,target,prefs,[]);
+      draft.daysData[index]={ds:d.ds,comidas:(finalized&&finalized.comidas)||[]};
       // Recalcular shoppingList con slug-aggregation
       const nd2=window.FITBUD_NUTRITION_DOMAIN;
       if(nd2&&nd2.buildShoppingListFromNutritionPlan)draft.shoppingList=nd2.buildShoppingListFromNutritionPlan(draft.daysData);
@@ -8956,7 +9014,11 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     const meal=reusedSameDish&&fbDish
       ?{slot_id:slotId,nombre:fbDish.name,ingredientes:fbIngs,kcal:fbDish.kcal,proteina_g:fbDish.p,carbohidratos_g:fbDish.c,grasa_g:fbDish.f}
       :{slot_id:slotId,nombre,ingredientes:ings,kcal:Math.round(+oneMeal.kcal||remKcal),proteina_g:Math.round(+oneMeal.proteina_g||remP),carbohidratos_g:Math.round(+oneMeal.carbohidratos_g||remC),grasa_g:Math.round(+oneMeal.grasa_g||remF)};
-    draft.comidas=draft.comidas.map(c=>c.slot_id===slotId?meal:c);
+    // REQ-138: puerta única — las demás comidas del borrador quedan bloqueadas
+    // (lockedMeals) y solo la comida regenerada pasa por finalizeNutritionDay(),
+    // que recalcula sus macros desde el catálogo y cierra el residuo del día.
+    const finalized=finalizeDayWithGate(draft.ds,day,target,prefs,[meal],{lockedMeals:others});
+    draft.comidas=(finalized&&finalized.comidas)||draft.comidas.map(c=>c.slot_id===slotId?meal:c);
     const updatedRes=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
     if(out)out.innerHTML=genReviewHtml(updatedRes,target);
     if(wasReused)toast("Ya usaste tus opciones nuevas de hoy; te mostramos la alternativa más parecida disponible.");
