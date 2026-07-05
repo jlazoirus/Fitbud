@@ -1916,3 +1916,66 @@ Dar a cualquier lote de catálogo futuro una forma de comparar el canario antes/
 ### Verificación sugerida
 
 - Usar los 5 lotes de prueba de REQ-143 (descartados, no comiteados) como casos de regresión conocidos: el tooling debe reportarlos como negativos.
+
+## REQ-145 - Fix E2E: el fixture de entreno deja "hoy" sin sesión de fuerza los domingos y pone el release-gate en rojo
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **entrenamiento** (2026-07-05, domingo). `node scripts/release-gate.mjs` cierra en rojo: `68/69`, único check bloqueante = "Suite E2E (npx playwright test)". El test que falla es `tests/e2e/entreno.spec.js › sesión guiada completa`, en ambos intentos (original + retry #1). El mismo síntoma (E2E fallando en fechas concretas) fue declarado **resuelto** en la nota de REQUIREMENTS.md:1190 (commit `4ce8102`, 2026-07-04), pero la corrección quedó incompleta para los domingos.
+
+### Problema
+
+El test da por invariante que "hoy es día de entreno con sesión de fuerza en gimnasio" (`entreno.spec.js:22` espera `/Gimnasio ·/`). Cuando la suite corre un **domingo**, la app renderiza en Entreno para hoy **"Descanso total"** en vez de una sesión de gimnasio, así que la aserción hace timeout (10 s) y el reproductor nunca arranca. Reproducción real capturada por Playwright (Chromium) hoy: la tarjeta de hoy muestra `Domingo, 5 jul · hoy · Semana 2` seguida de `Descanso total · Movilidad suave y caminata opcional ... Pendiente` y `Descanso planificado: no cuenta como sesión incompleta`, nunca `Gimnasio ·`.
+
+Como el release-gate ejecuta la suite E2E, cualquier corrida en domingo deja el gate en rojo, lo que **bloquea el push de ambos loops autónomos** (desarrollador y auditor) y emite una falsa señal de regresión del reproductor de entreno (REQ-92/REQ-96). El resto de días de la semana pasa.
+
+### Causa raíz
+
+Bug en el **fixture de tests**, no en la app. `trainingDaysIncludingToday()` (`tests/e2e/helpers.js:46-54`) arma el set de 4 días de entreno como `hoy + los 3 días siguientes` en orden cíclico Lunes..Domingo, e **incluye** hoy pero no garantiza que hoy caiga en un slot de fuerza una vez que la app reordena los días. La app ordena los días seleccionados en orden Lunes..Domingo (`normalizedTrainingDays`, `js/nutrition-pure.js:167`, con `WEEKDAY_OPTIONS` = Lun..Dom, Domingo último). El domingo (`getDay()===0`) es el último en ese orden, así que el bloque consecutivo que arranca en domingo deja a hoy como **4º** día seleccionado. La plantilla upper/lower de 4 días con prioridad "composition" es `["torsoA","piernaA","torsoB","facil"]` (`js/nutrition-pure.js:218`), y para `strength_only` sin actividad ligera el slot `facil` se sustituye por `descanso` (`workoutSchedule`, `index.html:1150-1152`). Resultado: el 4º día (hoy, domingo) = `descanso`. La propia nota del fixture (`helpers.js:37-38`) advierte "Si el día actual quedara de último, la sesión de hoy no sería de gimnasio", pero la implementación no lo evita.
+
+Simulación de solo lectura de la cadena fixture→scheduler para los 7 días (mismo template y orden que la app):
+
+```
+Dom  days=[1,2,3,0]  todaySlot=descanso  *** FAIL (rest) ***
+Lun  days=[1,2,3,4]  todaySlot=torsoA    OK (gym)
+Mar  days=[2,3,4,5]  todaySlot=torsoA    OK (gym)
+Mie  days=[3,4,5,6]  todaySlot=torsoA    OK (gym)
+Jue  days=[4,5,6,0]  todaySlot=torsoA    OK (gym)
+Vie  days=[1,5,6,0]  todaySlot=piernaA   OK (gym)
+Sab  days=[1,2,6,0]  todaySlot=torsoB    OK (gym)
+```
+
+El comportamiento de la app (domingo = descanso para un usuario `strength_only`, 4 días, upper/lower, composición) es el diseñado (periodización con un día de recuperación); lo que está roto es el invariante que el fixture dice garantizar.
+
+### Objetivo
+
+Que la suite E2E y, por lo tanto, el release-gate sean **deterministas respecto al día de la semana**: el test de entreno debe correr contra un estado donde hoy tiene efectivamente una sesión de fuerza en gimnasio, cualquier día que corra la suite (incluidos domingos).
+
+### Alcance
+
+1. Corregir `trainingDaysIncludingToday()` (`tests/e2e/helpers.js`) para que hoy quede en un slot de **fuerza**, no en el 4º slot `facil`/descanso. Opción robusta: en vez de "hoy + 3 siguientes", elegir los 4 días de forma que hoy sea el **primero** en orden Lunes..Domingo (p. ej. hoy + los 3 días previos en ese orden, o forzar `trainingPriority:"strength"` cuyo template de 4 días es `["torsoA","piernaA","torsoB","piernaB"]`, sin slot de descanso).
+2. Verificar que el fix cubre los 7 posibles `getDay()` (no solo el día en que se implemente), idealmente con una aserción/tabla de los 7 casos.
+3. Actualizar la nota "resuelta" de REQUIREMENTS.md:1190 para reflejar que el caso domingo faltaba.
+
+### Fuera de alcance
+
+- Cambiar el comportamiento de producción de `workoutSchedule`/plantillas de entreno (`index.html`, `js/nutrition-pure.js`): el descanso del 4º día es intencional; no tocar el runtime de la app.
+- Cambiar las aserciones de contenido del test (REQ-92: calentamiento + fuerza + vuelta a la calma). El test es correcto; el fixture es el que no cumple su invariante.
+
+### Riesgos
+
+- Al reordenar los días del fixture, verificar que sigan siendo 4 días válidos (`MIN/MAX_TRAINING_DAYS`) y que `navegacion.spec.js` (que reusa el mismo helper) siga pasando.
+- Forzar `trainingPriority:"strength"` cambia la plantilla; confirmar que la sesión de hoy siga teniendo ≥2 series y ≥5 bloques como exige `entreno.spec.js`.
+
+### Criterios de aceptación
+
+- `node scripts/release-gate.mjs` pasa (69/69) **corriendo un domingo** (no solo en días laborables). Verificable fijando la fecha del entorno o parametrizando el día en el fixture.
+- `npx playwright test tests/e2e/entreno.spec.js` pasa en los 7 días de la semana.
+- No se modifica código de runtime de la app (`index.html`, `js/*.js`) para este arreglo.
+
+### Verificación sugerida
+
+- Correr la suite con la fecha del sistema fijada a un domingo (p. ej. `TZ` + un mock de `Date` en el fixture, o `libfaketime`) y confirmar verde.
+- Tabla de los 7 `getDay()` mostrando que hoy cae siempre en un slot `torso*/pierna*/push*/pull*/legs*` (fuerza), nunca en `facil`/`descanso`.
