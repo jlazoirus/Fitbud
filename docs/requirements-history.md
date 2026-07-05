@@ -6686,3 +6686,101 @@ Cero contradicciones sobre preferencias en el contexto que ve el modelo, y patr�
 ### Verificación sugerida
 
 - `node scripts/validate-first-day-preferences.mjs` extendido con el caso tofu-en-ejemplos y el caso omnívoro-activo.
+
+## REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5
+
+### Origen
+
+Decisión de Jonathan (4 jul 2026): migrar a Sonnet 5 solo detrás de un gate de telemetría; propuesta Claude §API + diagnóstico Codex §8.
+
+### Problema
+
+- La respuesta del modelo se parsea con regex (`parseJsonText`); JSON truncado o con texto extra es un vector real de fallos.
+- El proxy capea `max_tokens` a 2048 (default 512); un día de 6 comidas roza el truncado.
+- `ALLOWED_MODELS` no incluye `claude-sonnet-5`; hay un solo modelo para todas las acciones; no existe criterio medible para decidir la migración.
+
+### Causa raíz
+
+La integración se construyó mínima (texto plano, un modelo) y nunca se endureció la forma de la llamada.
+
+### Objetivo
+
+Llamadas con salida estructurada garantizada, límites correctos, modelo configurable por acción, y decisión de migración a Sonnet 5 basada en datos.
+
+### Alcance
+
+1. Structured outputs en el proxy para `diet_day`, `diet_week` y `meal_option`: `output_config: {format: {type: "json_schema", schema}}` (soportado por Haiku 4.5 y Sonnet 5); mantener el parseo actual como fallback de compatibilidad si la API rechaza el parámetro.
+2. Subir el cap de `maxTokens` del proxy de 2048 a 4096; el cliente pide lo necesario por acción.
+3. `ALLOWED_MODELS` += `claude-sonnet-5`; actualizar `MODEL_COSTS` (Sonnet 5: $3/$15 por MTok; intro $2/$10 hasta 2026-08-31); permitir modelo por acción vía env (p. ej. `ANTHROPIC_MODEL_DIET`) con default actual (Haiku 4.5) — cambiar de modelo debe ser un cambio de configuración, no de código.
+4. Telemetría del gate: consulta/vista admin sobre `coach_generation_parts` con tasa de `invalid_provider_output`, tasa de degradación a ruta determinista, costo y latencia por acción/modelo.
+5. Documentar el gate en este REQ: si tras REQ-129..131 la tasa de degradación de `diet_*` con Haiku supera 10% sostenido durante 1-2 semanas, se cambia `ANTHROPIC_MODEL_DIET` a `claude-sonnet-5` (decisión de Jonathan con el dato en mano). `meal_estimate` y `coach_conversation` permanecen en Haiku.
+
+### Fuera de alcance
+
+- Cambiar el default global de modelo sin pasar por el gate.
+- Streaming, thinking u otras features de API no necesarias para este flujo.
+
+### Riesgos
+
+- Los resultados del pool anteriores no tienen schema garantizado: la validación de reuse ya cubre estructura; no re-validar formato con supuestos nuevos sin bump (coordinar con el bump de REQ-129 si los REQ aterrizan en otro orden).
+- Costo: Sonnet 5 en dieta ≈ $0.10-0.15/semana/usuario con precio intro; registrado ya por `estimateCostUsd`.
+
+### Criterios de aceptación
+
+- En un canario de N generaciones con structured outputs: 0 fallos de parseo/JSON inválido.
+- Cambiar el modelo de `diet_*` no requiere tocar código cliente.
+- El panel/consulta admin muestra tasa de degradación y costo por acción/modelo.
+- `node scripts/test-coach-quota.mjs` y `node scripts/release-gate.mjs` pasan.
+
+### Verificación sugerida
+
+- Llamada real de `diet_day` con schema y verificación de que la respuesta valida sin limpieza regex.
+
+## REQ-134 - Pipeline de crecimiento del catálogo validado por el motor
+
+### Origen
+
+Decisión de Jonathan (4 jul 2026): "necesitamos ampliar drásticamente el catálogo de ingredientes y platos para todo tipo de gustos y preferencias". Diseño: análisis v2 §M9/Fase 6 (la IA propone offline; el sistema mapea, recalcula, valida y guarda).
+
+### Problema
+
+El catálogo tiene ~61 ingredientes / ~50 platos. La variedad percibida, la factibilidad del contrato estricto (REQ-128) y la cobertura de gustos dependen del tamaño del catálogo. Crecerlo a mano no escala; crecerlo con IA sin validación reintroduce el bug original (macros inventados no verificables).
+
+### Causa raíz
+
+No existe un camino de expansión validado: la IA runtime no debe crear platos, y no hay tooling offline que proponga candidatos verificados.
+
+### Objetivo
+
+Tooling offline repetible: la IA propone lotes de recetas/ingredientes; el motor los valida; un humano aprueba; la salida es SQL listo para aplicar manualmente.
+
+### Alcance
+
+1. Script offline `scripts/grow-catalog.mjs` (usa `ANTHROPIC_API_KEY` local/CI, nunca la app): pide a la IA lotes de recetas con composición por ingrediente y metadata completa, orientables por brief (slot, patrón dietético, cocina, presupuesto, tiempo).
+2. Validación determinista de cada candidato antes de aceptarlo al lote:
+   - consistencia `kcal` vs `4P+4C+9F` dentro de tolerancia documentada y rangos plausibles por 100 g;
+   - slug estable y dedupe contra catálogo existente (regla de REQ-79; los IDs autoincrementales no son referencia);
+   - metadata semántica obligatoria: `compatible_slots`, `diet_tags`, `meal_weight`, `meal_form`, `prep_minutes`, `budget_tier`, `needs_kitchen`, `eat_out_ok`, `scalable`/`min_g`/`max_g`/`step_g`;
+   - fit de prueba con `solveDishPortion` contra presupuestos típicos de su slot (un plato que no escala dentro de límites palatables se rechaza).
+3. Salida: archivo SQL de seed/patch para revisión y aplicación manual + reporte de aceptados/rechazados con causa. Nunca escribe a producción.
+4. Ingredientes nuevos exigen fuente nutricional anotada (etiqueta/tabla de referencia) para la aprobación humana.
+
+### Fuera de alcance
+
+- Aplicar los lotes (REQ-135/136 y acción manual en Supabase).
+- Cualquier generación de platos en runtime de usuario.
+
+### Riesgos
+
+- Datos nutricionales inventados por la IA: mitigado por validación de consistencia + fuente anotada + aprobación humana.
+- `seed.sql` usa `truncate ... restart identity`: el pipeline debe referenciar por slug, nunca por ID (riesgo ya documentado en v2 §8).
+
+### Criterios de aceptación
+
+- Correr el script con un brief produce un lote SQL válido y un reporte con causas de rechazo.
+- Un candidato con macros inconsistentes o sin metadata completa se rechaza automáticamente.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Brief de prueba "10 desayunos ligeros omnívoros" → lote válido; inyectar un candidato con kcal falsas → rechazado con causa.

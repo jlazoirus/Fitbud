@@ -95,13 +95,14 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 31. ~~REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos.~~ (implementado, P2)
 32. ~~REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato.~~ (implementado, P0)
 33. ~~REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global.~~ (implementado, P0)
-34. REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
+34. REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. (P0; siguiente prioridad, exclusivamente catálogo)
+35. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool con aviso suave no bloqueante. (P1; alcance redefinido 2026-07-05, decision de Jonathan tomada, ya no depende del gate de catalogo)
+36. REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
 
 Pendiente no automatizable por agentes:
 
 - REQ-49 - Revision legal pre-lanzamiento.
 - REQ-60 - Configuracion manual de redirects en Supabase.
-- REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool. Bloqueado: canario en 32.3% (gate declarado >=98%) y decision de producto pendiente sobre que hacer cuando el contrato no cierra (ver seccion "Bloqueo" del REQ).
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
@@ -1457,103 +1458,13 @@ Que el motor pueda decidir adecuación por momento del día con datos, y que los
 
 **Estado: implementado.** `/api/claude` ahora usa `output_config.format` con JSON Schema para `diet_day`, `diet_week` y `meal_option`; si Anthropic rechaza el parámetro con 400, reintenta una vez sin structured outputs y conserva el parseo/validación existente como fallback. El proxy capea `maxTokens` en 4096, el cliente escala los tokens de nutrición según número de comidas, `ALLOWED_MODELS` incluye `claude-sonnet-5` y el modelo se resuelve por acción vía env (`ANTHROPIC_MODEL_DIET`, `ANTHROPIC_MODEL_MEAL_OPTION`, etc.) con default Haiku 4.5. `MODEL_COSTS` incluye Sonnet 5 con precio estándar e introductorio hasta 2026-08-31. `supabase/analytics.sql` agrega `v_coach_model_gate`, y el panel admin muestra JSON inválido, degradación, costo y latencia por acción/modelo. Gate documentado: cambiar `ANTHROPIC_MODEL_DIET` a `claude-sonnet-5` solo si `diet_*` supera 10% de degradación sostenida durante 1-2 semanas; `meal_estimate` y `coach_conversation` permanecen en Haiku. Acción manual externa: re-ejecutar `supabase/analytics.sql` en Supabase para crear/actualizar la vista.
 
-### Origen
-
-Decisión de Jonathan (4 jul 2026): migrar a Sonnet 5 solo detrás de un gate de telemetría; propuesta Claude §API + diagnóstico Codex §8.
-
-### Problema
-
-- La respuesta del modelo se parsea con regex (`parseJsonText`); JSON truncado o con texto extra es un vector real de fallos.
-- El proxy capea `max_tokens` a 2048 (default 512); un día de 6 comidas roza el truncado.
-- `ALLOWED_MODELS` no incluye `claude-sonnet-5`; hay un solo modelo para todas las acciones; no existe criterio medible para decidir la migración.
-
-### Causa raíz
-
-La integración se construyó mínima (texto plano, un modelo) y nunca se endureció la forma de la llamada.
-
-### Objetivo
-
-Llamadas con salida estructurada garantizada, límites correctos, modelo configurable por acción, y decisión de migración a Sonnet 5 basada en datos.
-
-### Alcance
-
-1. Structured outputs en el proxy para `diet_day`, `diet_week` y `meal_option`: `output_config: {format: {type: "json_schema", schema}}` (soportado por Haiku 4.5 y Sonnet 5); mantener el parseo actual como fallback de compatibilidad si la API rechaza el parámetro.
-2. Subir el cap de `maxTokens` del proxy de 2048 a 4096; el cliente pide lo necesario por acción.
-3. `ALLOWED_MODELS` += `claude-sonnet-5`; actualizar `MODEL_COSTS` (Sonnet 5: $3/$15 por MTok; intro $2/$10 hasta 2026-08-31); permitir modelo por acción vía env (p. ej. `ANTHROPIC_MODEL_DIET`) con default actual (Haiku 4.5) — cambiar de modelo debe ser un cambio de configuración, no de código.
-4. Telemetría del gate: consulta/vista admin sobre `coach_generation_parts` con tasa de `invalid_provider_output`, tasa de degradación a ruta determinista, costo y latencia por acción/modelo.
-5. Documentar el gate en este REQ: si tras REQ-129..131 la tasa de degradación de `diet_*` con Haiku supera 10% sostenido durante 1-2 semanas, se cambia `ANTHROPIC_MODEL_DIET` a `claude-sonnet-5` (decisión de Jonathan con el dato en mano). `meal_estimate` y `coach_conversation` permanecen en Haiku.
-
-### Fuera de alcance
-
-- Cambiar el default global de modelo sin pasar por el gate.
-- Streaming, thinking u otras features de API no necesarias para este flujo.
-
-### Riesgos
-
-- Los resultados del pool anteriores no tienen schema garantizado: la validación de reuse ya cubre estructura; no re-validar formato con supuestos nuevos sin bump (coordinar con el bump de REQ-129 si los REQ aterrizan en otro orden).
-- Costo: Sonnet 5 en dieta ≈ $0.10-0.15/semana/usuario con precio intro; registrado ya por `estimateCostUsd`.
-
-### Criterios de aceptación
-
-- En un canario de N generaciones con structured outputs: 0 fallos de parseo/JSON inválido.
-- Cambiar el modelo de `diet_*` no requiere tocar código cliente.
-- El panel/consulta admin muestra tasa de degradación y costo por acción/modelo.
-- `node scripts/test-coach-quota.mjs` y `node scripts/release-gate.mjs` pasan.
-
-### Verificación sugerida
-
-- Llamada real de `diet_day` con schema y verificación de que la respuesta valida sin limpieza regex.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-133`).
 
 ## REQ-134 - Pipeline de crecimiento del catálogo validado por el motor
 
 **Estado: implementado.** `scripts/grow-catalog.mjs` es un pipeline offline: con `--fixture` no usa red y con `--brief` llama a Anthropic solo desde local/CI con `ANTHROPIC_API_KEY`; normaliza candidatos contra `supabase/seed.sql`, exige slugs estables, fuente para ingredientes nuevos, metadata semantica completa y limites de porcion, rechaza macros inconsistentes (`kcal` vs `4P+4C+9F`) y prueba cada plato con `solveDishPortion` contra presupuestos tipicos por slot. La salida son dos archivos en `--out-dir`: patch SQL revisable referenciado por slug (sin `truncate` ni IDs) y reporte JSON con aceptados/rechazados. `scripts/validate-grow-catalog.mjs` cubre un fixture offline con ingrediente/plato aceptado y rechazos por macros, fuente ausente y metadata incompleta; `release-gate` lo ejecuta.
 
-### Origen
-
-Decisión de Jonathan (4 jul 2026): "necesitamos ampliar drásticamente el catálogo de ingredientes y platos para todo tipo de gustos y preferencias". Diseño: análisis v2 §M9/Fase 6 (la IA propone offline; el sistema mapea, recalcula, valida y guarda).
-
-### Problema
-
-El catálogo tiene ~61 ingredientes / ~50 platos. La variedad percibida, la factibilidad del contrato estricto (REQ-128) y la cobertura de gustos dependen del tamaño del catálogo. Crecerlo a mano no escala; crecerlo con IA sin validación reintroduce el bug original (macros inventados no verificables).
-
-### Causa raíz
-
-No existe un camino de expansión validado: la IA runtime no debe crear platos, y no hay tooling offline que proponga candidatos verificados.
-
-### Objetivo
-
-Tooling offline repetible: la IA propone lotes de recetas/ingredientes; el motor los valida; un humano aprueba; la salida es SQL listo para aplicar manualmente.
-
-### Alcance
-
-1. Script offline `scripts/grow-catalog.mjs` (usa `ANTHROPIC_API_KEY` local/CI, nunca la app): pide a la IA lotes de recetas con composición por ingrediente y metadata completa, orientables por brief (slot, patrón dietético, cocina, presupuesto, tiempo).
-2. Validación determinista de cada candidato antes de aceptarlo al lote:
-   - consistencia `kcal` vs `4P+4C+9F` dentro de tolerancia documentada y rangos plausibles por 100 g;
-   - slug estable y dedupe contra catálogo existente (regla de REQ-79; los IDs autoincrementales no son referencia);
-   - metadata semántica obligatoria: `compatible_slots`, `diet_tags`, `meal_weight`, `meal_form`, `prep_minutes`, `budget_tier`, `needs_kitchen`, `eat_out_ok`, `scalable`/`min_g`/`max_g`/`step_g`;
-   - fit de prueba con `solveDishPortion` contra presupuestos típicos de su slot (un plato que no escala dentro de límites palatables se rechaza).
-3. Salida: archivo SQL de seed/patch para revisión y aplicación manual + reporte de aceptados/rechazados con causa. Nunca escribe a producción.
-4. Ingredientes nuevos exigen fuente nutricional anotada (etiqueta/tabla de referencia) para la aprobación humana.
-
-### Fuera de alcance
-
-- Aplicar los lotes (REQ-135/136 y acción manual en Supabase).
-- Cualquier generación de platos en runtime de usuario.
-
-### Riesgos
-
-- Datos nutricionales inventados por la IA: mitigado por validación de consistencia + fuente anotada + aprobación humana.
-- `seed.sql` usa `truncate ... restart identity`: el pipeline debe referenciar por slug, nunca por ID (riesgo ya documentado en v2 §8).
-
-### Criterios de aceptación
-
-- Correr el script con un brief produce un lote SQL válido y un reporte con causas de rechazo.
-- Un candidato con macros inconsistentes o sin metadata completa se rechaza automáticamente.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Brief de prueba "10 desayunos ligeros omnívoros" → lote válido; inyectar un candidato con kcal falsas → rechazado con causa.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-134`).
 
 ## REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks
 
@@ -1811,61 +1722,61 @@ Que todos los caminos del cliente pasen por `finalizeNutritionDay()` para obtene
 
 - E2E mockeado de preparar día, semana y onboarding inicial; inspeccionar que las comidas aplicadas vienen finalizadas.
 
-## REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool
+## REQ-139 - Activar `DIET_CONTRACT` en runtime con aviso suave no bloqueante
 
-**Estado: pendiente. Bloqueado por brecha de factibilidad de catálogo; condición de parada del agente hasta nueva revisión de producto.**
+**Estado: pendiente.**
 
-### Bloqueo (2026-07-05, corrida autónoma)
+### Decisión de producto (2026-07-05, Jonathan)
 
-`node scripts/validate-diet-contract.mjs` hoy mide 122/378 (32.3%) de factibilidad con el motor `finalizeNutritionDay()` (post REQ-136/137/138/140/141), y el propio REQ-128 fijó el gate de activación en >=98% por dimensión. `failureBreakdown` confirma que el 100% de los 256 días que no cierran son `catalog_gap` (residuo de macro), no bugs del solver. Además, `validateGeneratedDay()` (`index.html:8375`) valida la propuesta cruda del modelo **antes** de que `finalizeDayWithGate()`/`finalizeNutritionDay()` corran `globalClosePass()`/`attemptContractComplement()`; si el alcance #2 de este REQ sube esos 2 checks de macro de `warns` a `issues` con tolerancias de `DIET_CONTRACT` (±3%/±50 kcal, ±5 g proteína), la propuesta cruda del modelo casi nunca las cumple — es justamente el motivo por el que existe el cierre determinista posterior. El resultado observable: `aiGenerateDay()` fallaría su primer intento en la inmensa mayoría de los perfiles (2 comidas, 6 comidas, vegano/vegetariano alta_proteina rondan 0-14% de factibilidad hoy) y, tras 2 intentos, degradaría siempre a `applyDeterministicDay()` — inhabilitando de facto la generación por IA para la mayoría de usuarios reales, no solo para casos límite. `finalizedDayIsComplete()` (`index.html:7901`) ya documenta a propósito que ignora `DIET_CONTRACT` "hasta REQ-139" para no bloquear la experiencia visible mientras el catálogo no alcanza el gate.
+El alcance original (rechazo duro en cliente/servidor/snapshot) habría roto `aiGenerateDay()` para la mayoría de perfiles: canario en 32.3%, debajo del gate ≥98% de REQ-128, y `validateGeneratedDay()` valida la propuesta cruda del modelo antes del cierre determinista. Detalle del análisis: commit "REQ-139: bloquear activacion de DIET_CONTRACT por brecha de catalogo".
 
-Esto no es una decisión de alcance/tamaño sino de producto: activar el rechazo duro hoy cambiaría la promesa visible de la app (de "tu coach prepara tu día" a "casi siempre te doy la opción práctica genérica") para la mayoría de combinaciones de perfil, sin que el REQ original reconozca ese trade-off ni defina qué debe pasar con el usuario cuando el contrato no cierra (¿bloquear con error, degradar con aviso, o mantener el best-effort actual?). Requiere que un humano decida: (a) esperar a que el canario supere un umbral (p. ej. >=90-98%) antes de activar `runtimeActive`, y/o (b) redefinir "rechazo" para que el cliente gate sobre `finalized.contract.ok` (después del cierre) en vez de sobre la propuesta cruda del modelo (antes del cierre), aceptando igual una tasa de fallback determinista más alta de la actual mientras el catálogo crece. No se tocó código de producto en esta corrida; no se implementó el alcance de abajo.
+Jonathan decidió: (1) el contrato se evalúa sobre el **día ya cerrado** por `finalizeNutritionDay()`, nunca sobre la propuesta cruda; `validateGeneratedDay()` no sube sus checks de macro a `issues`; (2) si el día cerrado no cumple `DIET_CONTRACT`, la UI muestra un **aviso suave** (ej. "Tu día quedó cerca de tu meta, no exacto") y el usuario aplica/guarda igual — ningún flujo bloquea; (3) el crecimiento de catálogo (REQ-143) ya no es prerrequisito duro, porque el aviso no depende de la factibilidad. Reemplaza el alcance/criterios originales de rechazo duro.
 
 ### Origen
 
-Subdivisión final de REQ-129 original. Debe ejecutarse solo cuando REQ-129, REQ-137 y REQ-138 estén aplicados.
+Subdivisión final de REQ-129. Redefinido 2026-07-05 (ver decisión arriba).
 
 ### Problema
 
-Mientras el contrato siga dormido, los validadores laxos de cliente, dominio, servidor y snapshot todavía pueden aceptar planes fuera de la promesa "exacto a macros".
-
-### Causa raíz
-
-REQ-128 creó el contrato, pero dejó `runtimeActive:false` para evitar cascada de rechazos antes de tener solver global y conexión de flujos.
+El "ok" visible de un día generado depende solo de `finalizedDayIsComplete()` (cobertura de slots); el usuario nunca ve si su día quedó cerca o lejos de sus metas, aunque `finalizeNutritionDay()` ya calcula `contract`/`residual`.
 
 ### Objetivo
 
-Activar `DIET_CONTRACT` como criterio de aplicabilidad en todas las superficies, junto con bump de versiones para no reutilizar pool/caché previos.
+Activar `DIET_CONTRACT` como señal informativa (no bloqueante) en el resultado ya cerrado, para que el usuario sepa cuándo su día quedó exacto y cuándo solo cercano, sin arriesgar la disponibilidad de la generación por IA mientras el catálogo sigue creciendo (REQ-143).
 
 ### Alcance
 
-1. Cambiar `DIET_CONTRACT.runtimeActive` y `validateDayTotals()` para usar el contrato estricto cuando aplique.
-2. Actualizar `validateGeneratedDay()` y `domain-contracts.js`/`validateNutritionPlanSnapshot()` a tolerancias del contrato.
-3. Actualizar `api/claude.js::validateDietDay()` para validar macros contra `validation.target`.
-4. Subir `COACH_PROMPT_VERSION` y `PROMPT_VERSION` en el mismo commit.
-5. Invalidar/rechazar resultados de pool previos al bump.
-6. Actualizar tests que esperaban tolerancias laxas y documentar el cambio en `CONTEXT.md`.
+1. Cambiar `DIET_CONTRACT.runtimeActive` a `true` (deja de ser solo calibración).
+2. En el resultado visible de `finalizeDayWithGate()` (día generado/regenerado/semana), cuando `finalized.contract.ok===false` agregar un aviso suave, sin vocabulario técnico prohibido (REQ-31; ej. "Tu día quedó cerca de tu meta, no exacto"), visible en la pantalla de revisión y en el día aplicado. No cambia `finalizedDayIsComplete()` como criterio de "aplicable" (sigue siendo cobertura de slots).
+3. NO subir los 2 checks de macro de `validateGeneratedDay()` de `warns` a `issues` — siguen evaluando la propuesta cruda del modelo solo informativamente.
+4. `api/claude.js::validateDietDay()`: no agregar rechazo nuevo por macros; puede anotar/loguear cumplimiento de contrato para telemetría futura, sin bloquear la respuesta.
+5. `domain-contracts.js::validateNutritionPlanSnapshot()`: mantiene su tolerancia estructural actual (~±20%) para guardar/sync; NO se ata a las tolerancias estrictas de `DIET_CONTRACT` (evitar bloquear el guardado de días válidos aunque no queden "exactos").
+6. Solo subir `COACH_PROMPT_VERSION`/`PROMPT_VERSION` e invalidar pool si el prompt o el criterio de aceptación del modelo cambian de verdad (probablemente no aplica bajo este alcance reducido).
+7. Actualizar/crear validador que confirme: (a) ningún flujo cliente/servidor/snapshot bloquea aplicar/guardar un día por incumplir `DIET_CONTRACT`; (b) el aviso suave aparece cuando corresponde sin vocabulario técnico prohibido.
 
 ### Fuera de alcance
 
+- Crecimiento de catálogo para subir la factibilidad del canario (REQ-143).
 - Cambios de modelo/API (REQ-133).
-- Metadata/platos nuevos si el canario ya muestra brechas explícitas de catálogo (REQ-132/135).
+- Reemplazo puntual de comida (REQ-142).
+- Cualquier rechazo/bloqueo duro atado a `DIET_CONTRACT` (queda derogado de este REQ; requeriría una nueva decisión de producto explícita).
 
 ### Riesgos
 
-- Activar antes de que los flujos usen `finalizeNutritionDay()` rompería preparación de comidas; verificar dependencias antes de editar.
-- El servidor no tiene catálogo completo para recalcular ingredientes; debe validar contra macros finalizados enviados por cliente y target, no inventar macros.
+- Confundir el aviso nuevo con los `warns` existentes de `validateGeneratedDay()`/`validateDayTotals()`: evitar mensajes duplicados en la misma pantalla.
+- El copy debe pasar el filtro REQ-31 (nada de "IA", "modelo", "prompt"): hablar de "tu coach"/"tu plan".
 
 ### Criterios de aceptación
 
-- `validate-diet-contract.mjs` corre contra `finalizeNutritionDay()` y los días aplicables quedan dentro del contrato.
-- Cliente, servidor y snapshot rechazan días fuera de contrato.
-- Pool/caché anterior no se reutiliza.
+- `DIET_CONTRACT.runtimeActive` queda `true`.
+- Cuando `finalized.contract.ok` es `false` tras `finalizeNutritionDay()`, la UI muestra un aviso suave y no bloqueante, sin vocabulario técnico prohibido.
+- Ningún flujo (cliente, servidor, snapshot) rechaza ni impide aplicar/guardar un día por no cumplir `DIET_CONTRACT`.
 - `node scripts/release-gate.mjs` pasa.
 
 ### Verificación sugerida
 
-- Test server `diet_day` con target y macros fuera de contrato debe fallar; con día finalizado debe pasar.
+- Test que arma un día con `contract.ok:false` y confirma que el flujo lo deja aplicar igual, mostrando el aviso suave.
+- Grep de vocabulario prohibido (REQ-31) en el copy nuevo.
 
 ## REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`
 
@@ -1913,3 +1824,56 @@ Evaluar si `rebalanceFutureMeals()` debe reemplazarse (o complementarse) por una
 ### Verificación sugerida
 
 - E2E mockeado de "Cambiar comida" con rebalanceo de 2+ comidas futuras; inspeccionar que el resultado final es consistente con `finalizeNutritionDay()` o que la decisión de no usarlo queda documentada.
+
+## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
+
+**Estado: pendiente.**
+
+### Origen
+
+Decisión de Jonathan (2026-07-05) tras el bloqueo de REQ-139: antes de subir el rigor de cualquier validación de macros, el catálogo debe crecer drásticamente. Este REQ es exclusivamente sobre contenido de catálogo — ningún cambio de validación, prompt, modelo ni UI.
+
+### Problema
+
+`node scripts/validate-diet-contract.mjs` mide 32.3% (122/378) de factibilidad con `finalizeNutritionDay()`. `failureBreakdown` confirma que el 100% de los 256 días que no cierran son `catalog_gap` (residuo de macro, no bug del solver). Causas principales por conteo: `carbs_contract` (133), `protein_contract` (111), `fat_contract` (47), `kcal_contract` (16). Las dimensiones más débiles hoy: cualquier combinación de "alta_proteina" con 2 o 6 comidas (varias en 0%-14%), vegano en general, y vegetariano/vegano con "sin_tofu" (0% en casi todos los conteos).
+
+### Causa raíz
+
+REQ-135/136/140/141 ampliaron el catálogo a 200 ingredientes/180 platos, suficiente para eliminar `slot_without_candidates`, pero no suficiente densidad de platos con perfiles de macro específicos (altos en proteína con pocos carbohidratos, opciones veganas sin tofu/yogur) para que el solver + `globalClosePass()` puedan cerrar dentro de ±3%/±50 kcal, ±5 g proteína, ±8 g carbohidratos/grasa en esas combinaciones.
+
+### Objetivo
+
+Subir la factibilidad del canario de forma sustancial (no un lote incremental menor) priorizando las causas y dimensiones más débiles listadas arriba, acercándose lo más posible al gate ≥98% de REQ-128 dentro del presupuesto de una ejecución; si no alcanza el gate completo, dejar documentado el remanente para un REQ de continuación (siguiendo el patrón REQ-136→140→141).
+
+### Alcance
+
+1. Usar el canario actual (`validate-diet-contract.mjs`) como brújula: priorizar ingredientes/platos que ataquen `carbs_contract`/`protein_contract` (las 2 causas dominantes) y las dimensiones en 0%-14% (alta_proteina 2/6 comidas, vegano, sin_tofu).
+2. Sumar ingredientes y platos nuevos en `supabase/seed.sql` con fuentes documentadas (`docs/catalog-lote-3-sources.md`, mismo formato que lotes 1/2B/2C), priorizando: fuentes de proteína magra con bajo carbohidrato para "alta_proteina"; platos veganos variados que no dependan de tofu o yogur como única fuente de proteína/grasa.
+3. Usar `scripts/grow-catalog.mjs` (pipeline de REQ-134, con `--fixture` si no hay `ANTHROPIC_API_KEY` disponible en el sandbox) para generar candidatos revisables, o curaduría manual equivalente a REQ-135/136/140/141 si el pipeline no aplica.
+4. Actualizar `scripts/validate-nutrition-catalog.mjs` si cambian mínimos de cobertura relevantes (sin bajar los ya exigidos por REQ-135/136/141).
+5. Re-correr `validate-diet-contract.mjs` y documentar el nuevo porcentaje y `failureBreakdown` en el Estado de este REQ.
+6. Documentar en `REQUIREMENTS.md`/`CONTEXT.md` la acción manual pendiente de re-ejecutar `supabase/seed.sql` en Supabase de producción.
+
+### Fuera de alcance
+
+- Cualquier cambio de validación/gating de `DIET_CONTRACT` (REQ-139, ya redefinido con aviso suave).
+- Cambios de modelo/prompt (REQ-133, cerrado).
+- Reemplazo puntual de comida (REQ-142).
+- Alcanzar el 98% exacto en una sola ejecución si el presupuesto de 90 minutos no alcanza — documentar remanente en vez de forzarlo.
+
+### Riesgos
+
+- Añadir platos sin fuente de macros verificable rompe la confianza en `ingredients.kcal` como autoridad (REQ-128); mantener el mismo estándar de fuentes que lotes previos.
+- Enfocarse solo en promedios puede no mover las dimensiones más débiles; usar `failureBreakdown` por dimensión, no solo el % global, para dirigir el lote.
+
+### Criterios de aceptación
+
+- El canario sube de forma sustancial desde 32.3% (documentar el nuevo % y `failureBreakdown`).
+- Las dimensiones hoy en 0% (ej. `vegano/alta_proteina/sin_tofu`, `vegetariano/normal/sin_tofu`) mejoran o quedan documentadas con causa explícita si no.
+- `node scripts/validate-nutrition-catalog.mjs` y `node supabase/validate.mjs` pasan.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `node scripts/validate-diet-contract.mjs` antes/después del lote, comparando `failureBreakdown` por causa y por dimensión.
+- `node supabase/validate.mjs` para integridad de recetas/macros del catálogo ampliado.
