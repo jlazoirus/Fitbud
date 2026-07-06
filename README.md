@@ -124,6 +124,14 @@ node scripts/grow-catalog.mjs --brief "10 desayunos ligeros omnivoros" --out-dir
 node scripts/validate-grow-catalog.mjs
 ```
 
+Antes de aceptar un lote nuevo, compara su impacto real sobre el canario estricto de dieta:
+
+```bash
+node scripts/diff-diet-contract.mjs --before /tmp/fitbud-seed-before.sql --after /tmp/fitbud-seed-after.sql
+```
+
+La guia de lectura esta en [`docs/diet-contract-catalog-diff.md`](docs/diet-contract-catalog-diff.md).
+
 ### Preparar la base
 
 1. Crea un proyecto gratis en [supabase.com](https://supabase.com).
