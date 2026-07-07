@@ -1678,3 +1678,73 @@ Que la suite E2E y, por lo tanto, el release-gate sean **deterministas respecto 
 
 - Correr la suite con la fecha del sistema fijada a un domingo (p. ej. `TZ` + un mock de `Date` en el fixture, o `libfaketime`) y confirmar verde.
 - Tabla de los 7 `getDay()` mostrando que hoy cae siempre en un slot `torso*/pierna*/push*/pull*/legs*` (fuerza), nunca en `facil`/`descanso`.
+
+## REQ-146 - Unificar el cálculo de racha: Progreso muestra "0 / racha rota" mientras hoy no se registra
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey `retencion` (racha, hitos y mensajes de recuperación). Auditando la pantalla Progreso con días previos completos pero **hoy sin registrar aún** (el caso normal cada mañana), la sección de rachas se contradice a sí misma y dispara un mensaje de "racha rota" falso.
+
+### Problema
+
+Reproducción funcional (Playwright + fixtures E2E, 0 llamadas pagadas): usuario con nutrición + entreno completos los últimos 4 días (2026-07-03..07-06) y **hoy (2026-07-07) sin registrar todavía**. En una sola pantalla Progreso conviven tres señales incompatibles:
+
+- Tarjeta "Racha (días)" (sección *Tus números*): **🔥 4**.
+- Tarjeta principal "Racha actual (combinada)" (sección *Rachas e hitos*): **—** (0), "Mejor: 4 días".
+- Banner de recuperación: **"Tu mejor racha fue de 4 días. Retoma hoy: el progreso que hiciste no desaparece."** — como si la racha estuviera rota.
+- Además salta el toast de hito **"🔥 ¡3 días de racha! Sigue así."** y se guarda un hito con fecha de hoy.
+
+El usuario que NO ha roto nada (solo aún no registró el día en curso) recibe un mensaje demoralizante de racha perdida junto a otra tarjeta que le dice que su racha sigue viva en 4. Es una fuga de confianza justo en el journey de retención, y ocurre a diario en la franja horaria previa a completar el día.
+
+Evidencia funcional (script `run-streak.mjs`, servidor local `http://127.0.0.1:8923`):
+```
+STREAK_INTERNALS: {"streakFn":4,"combCur":0,"combBest":4,"todayCombined":false}
+UI_PROGRESO: {"rachaDias":"🔥 4","rachaCombinada":"—",
+  "recoveryBanner":"Tu mejor racha fue de 4 días. Retoma hoy: el progreso que hiciste no desaparece."}
+CONSOLE_ERRORS: []
+```
+Screenshot: `Racha (días) 🔥 4` y banner "racha rota" y `Racha actual (combinada) —` visibles a la vez, más el toast de 3 días de racha. Sin errores de consola.
+
+### Causa raíz
+
+Coexisten **dos cálculos distintos** de la racha combinada:
+
+- `streak()` (`index.html:9415-9420`): cuenta hacia atrás desde hoy y, si hoy aún no está cumplido, **arranca en ayer** (`if(!combinedDayDone(ds))ds=addDays(ds,-1);`). Por eso devuelve 4 (racha viva). Lo usan `progressStats()` (`index.html:9149`→tarjeta "Racha (días)"), la agenda de Home (`index.html:4123`), el empty-state (`index.html:5092`) y `checkAndSaveMilestones()` (`index.html:9402`).
+- `streakStats().combCur` (`index.html:9350-9377`): pasada hacia adelante desde `START` hasta hoy que **exige que HOY sea `combinedDayDone`**; si hoy no está cumplido, `combCur=0`. Lo usa `renderStreakSection()` (`index.html:5163`) para la tarjeta "Racha actual (combinada)" y para el banner de recuperación `broken=s.combBest>0&&stk===0` (`index.html:5167-5169`).
+
+Como `streak()` ignora el día en curso incompleto pero `combCur` lo penaliza, ambos divergen exactamente durante la ventana "hoy aún no registrado". El banner de recuperación y el toast de hito quedan además calculados con fuentes opuestas (`combCur` vs `streak()`), de ahí la triple contradicción.
+
+### Objetivo
+
+Que la racha combinada tenga **una sola definición** y que la pantalla Progreso sea coherente: mientras el día en curso no esté cumplido pero exista una racha previa viva, no debe mostrarse "0" ni un mensaje de "racha rota". El número de la tarjeta principal, el de "Racha (días)" y el disparo del banner/hitos deben provenir del mismo cálculo.
+
+### Alcance
+
+1. Unificar el cálculo: que `renderStreakSection()` use el mismo criterio "hoy incompleto no rompe la racha" que `streak()` (p. ej. derivar `stk`/`combCur` de `streak()` o hacer que `streakStats().combCur` no penalice el día en curso aún no cumplido, distinguiendo "hoy pendiente" de "racha rota ayer").
+2. Recalcular la condición del banner de recuperación (`broken`) para que solo se dispare cuando la racha esté **realmente rota** (último día vencido sin cumplir), no cuando hoy simplemente sigue abierto.
+3. Verificar que las rachas separadas de nutrición y entrenamiento (`nutCur`/`trainCur`) mantengan una semántica coherente con la combinada respecto al día en curso.
+
+### Fuera de alcance
+
+- Cambiar la definición de `combinedDayDone`/`nutritionDayDone`/`trainingDayResult` ni los umbrales de cumplimiento.
+- Rediseñar la sección "Rachas e hitos" o los niveles de hito (3/7/14/30).
+- Tocar la lógica de sync o de persistencia de `streakMilestones`.
+
+### Riesgos
+
+- Al unificar, cuidar que la "mejor racha" (`combBest`) y los hitos ya guardados no cambien de valor retroactivamente.
+- `checkAndSaveMilestones()` ya usa `streak()`; si se alinea la UI con `streak()`, confirmar que no se dupliquen ni se adelanten hitos.
+- Evitar regresiones en Home/empty-state que ya consumen `streak()`.
+
+### Criterios de aceptación
+
+- Con días previos completos y hoy sin registrar, la tarjeta "Racha actual (combinada)" y "Racha (días)" muestran **el mismo número** (>0) y **no** aparece el banner de "racha rota".
+- El banner de recuperación solo aparece cuando la racha está efectivamente rota (existió un día vencido sin cumplir después del último día de racha).
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Reusar los helpers E2E (`installMocks`+`seedLoggedInUser`): sembrar N días previos combinados-completos, dejar hoy sin registrar, abrir Progreso y assertar que ambos números coinciden y que `.streak-recovery` no existe.
+- Segundo caso: dejar además ayer sin cumplir (racha realmente rota) y assertar que el banner sí aparece y ambos números son 0.
