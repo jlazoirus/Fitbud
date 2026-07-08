@@ -96,9 +96,12 @@ Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes converge
 32. ~~REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato.~~ (implementado, P0)
 33. ~~REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global.~~ (implementado, P0)
 34. ~~REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos.~~ (implementado, P0)
-35. REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. (P0; usar diff de REQ-144 antes de aceptar lotes)
-36. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool con aviso suave no bloqueante. (P1; alcance redefinido 2026-07-05, decision de Jonathan tomada, ya no depende del gate de catalogo)
-37. REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
+35. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool con aviso suave no bloqueante. (P0; alcance redefinido 2026-07-05, decision de Jonathan tomada, ya no depende del gate de catalogo; movido antes de REQ-143 en `agent-loop.json` el 2026-07-08 porque REQ-143 quedo pausado esperando decision de REQ-147)
+36. REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
+
+Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
+
+- REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
 
 Pendiente no automatizable por agentes:
 
@@ -106,6 +109,7 @@ Pendiente no automatizable por agentes:
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
+- REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
 ## Protocolo antes de implementar
@@ -1527,55 +1531,13 @@ Evaluar si `rebalanceFutureMeals()` debe reemplazarse (o complementarse) por una
 
 ## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
 
-**Estado: pendiente.**
+**Estado: pendiente. Requiere acción humana (decisión de producto en REQ-147) antes de intentar otro lote; no implementable por el agente autónomo hasta esa decisión.**
 
-### Origen
+Canario `validate-diet-contract.mjs`: 122/378 (32.3%), 100% `catalog_gap`. Dos sesiones (2026-07-05 y 2026-07-08), con estrategias de contenido distintas, midieron lotes con `scripts/diff-diet-contract.mjs` (REQ-144) y confirmaron un techo cercano a 32-33% bajo la selección local actual de `planDeterministicNutritionDay()`/`globalClosePass()`: el mejor plato aislado probado en 2026-07-08 sumó +1/378, uno de intención casi idéntica sumó -1/378, y la mayoría de platos nuevos (con proporción proteína:carbohidrato calibrada a mano tras confirmar que el 100% de los fallos de `carbs_contract` son por exceso de carbohidratos, nunca déficit) no movieron ningún día. Ningún lote nuevo se comiteó: no cumple "subir de forma sustancial sin bajar el agregado". Detalle completo de ambos experimentos (sonda de residuos, 5+13 platos probados, deltas por dimensión): `docs/requirements-history.md` (buscar `## REQ-143`). Ver REQ-147 para la decisión de producto pendiente antes de intentar otro lote o tocar la selección.
 
-Decisión de Jonathan (2026-07-05) tras el bloqueo de REQ-139: antes de subir el rigor de cualquier validación de macros, el catálogo debe crecer drásticamente. Este REQ es exclusivamente sobre contenido de catálogo — ningún cambio de validación, prompt, modelo ni UI.
+### Objetivo, alcance y criterios (si se retoma tras la decisión de REQ-147)
 
-### Problema
-
-`node scripts/validate-diet-contract.mjs` mide 32.3% (122/378), 100% `catalog_gap` (residuo de macro, no bug del solver). Causas: `carbs_contract` (133), `protein_contract` (111), `fat_contract` (47), `kcal_contract` (16). Dimensiones más débiles: "alta_proteina" con 2 o 6 comidas, vegano en general, vegetariano/vegano con "sin_tofu" (0% en casi todos los conteos).
-
-### Causa raíz
-
-REQ-135/136/140/141 ampliaron el catálogo a 200 ingredientes/180 platos, suficiente para eliminar `slot_without_candidates`, pero no suficiente densidad de platos con perfiles de macro específicos (altos en proteína con pocos carbohidratos, opciones veganas sin tofu/yogur) para que el solver + `globalClosePass()` puedan cerrar dentro de ±3%/±50 kcal, ±5 g proteína, ±8 g carbohidratos/grasa en esas combinaciones.
-
-**Actualización (2026-07-05, intento sin commit):** agregar contenido no garantiza subir el canario. `planDeterministicNutritionDay()` elige el plato de cada slot por score local (ajuste de macro a ese slot + desempate de variedad), sin optimizar el día completo; además `almuerzo/media_manana/merienda/snack/recena` ya superan el corte de 48 candidatos por slot (solo los 48 más cercanos en kcal reciben solver completo), así que sumar platos ahí puede desplazar sin aviso al plato que hoy cierra un día. Se probaron 5 lotes (4 a 22 platos, en `desayuno`/`cena` para evitar ese corte): el mejor subió "2 comidas" de 39/54 a 50/54 (`vegano/alta_proteina/sin_tofu` de 0% a 85.7%) pero bajó "4 comidas" de 66/162 a 53/162; el agregado quedó siempre bajo 32.3% (27.8%-31.2%). Un lote de solo 4 platos de desayuno, sin relación con ninguna dimensión débil, regresó el agregado igual de fuerte, confirmando que el efecto es del mecanismo de selección, no del contenido. Ningún lote se comiteó. Ver REQ-144: hace falta medir el impacto real de un candidato contra el canario de 378 días, no solo contra el ajuste genérico de `scripts/grow-catalog.mjs`.
-
-### Objetivo
-
-Subir la factibilidad del canario de forma sustancial (no un lote incremental menor) priorizando las causas y dimensiones más débiles listadas arriba, acercándose lo más posible al gate ≥98% de REQ-128; si no alcanza el gate completo, dejar documentado el remanente para un REQ de continuación (siguiendo el patrón REQ-136→140→141). REQ-144 ya provee el diff obligatorio: sin medir el impacto por lote antes de comitear, no se puede garantizar que un lote nuevo suba el canario en vez de regresarlo.
-
-### Alcance
-
-1. Con la herramienta de REQ-144, generar candidatos (`scripts/grow-catalog.mjs` o curaduría manual) priorizando `carbs_contract`/`protein_contract` y las dimensiones en 0%-14%.
-2. Medir cada candidato/lote contra el canario de 378 días antes de sumarlo a `supabase/seed.sql`; descartar lo que tenga impacto neto negativo o empeore una dimensión hoy sana.
-3. Documentar fuentes en `docs/catalog-lote-3-sources.md` (formato de lotes previos) solo para los platos aceptados.
-4. Actualizar `scripts/validate-nutrition-catalog.mjs` si cambian mínimos de cobertura (sin bajar los ya exigidos).
-5. Documentar el nuevo % y `failureBreakdown`, y la acción manual pendiente de re-ejecutar `seed.sql` en producción.
-
-### Fuera de alcance
-
-- Cambio de validación/gating de `DIET_CONTRACT` (REQ-139) o de la selección de `planDeterministicNutritionDay()` (rediseño de día completo, no cabe en un lote de catálogo).
-- Cambios de modelo/prompt (REQ-133, cerrado). Reemplazo puntual de comida (REQ-142).
-
-### Riesgos
-
-- Platos sin fuente de macros verificable rompen la confianza en `ingredients.kcal` (REQ-128); mantener el estándar de lotes previos.
-- Optimizar solo el % agregado puede ocultar que se rompió una dimensión sana (visto en el intento de 2026-07-05); revisar el reporte por dimensión, no solo el neto.
-
-### Criterios de aceptación
-
-- El canario sube de forma sustancial desde 32.3% **sin bajar el total agregado respecto a la medición previa** (documentar el nuevo % y `failureBreakdown`, y el delta por dimensión de REQ-144).
-- Las dimensiones hoy en 0% (ej. `vegano/alta_proteina/sin_tofu`, `vegetariano/normal/sin_tofu`) mejoran o quedan documentadas con causa explícita si no.
-- `node scripts/validate-nutrition-catalog.mjs` y `node supabase/validate.mjs` pasan.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Reporte de REQ-144 antes/después del lote completo (no solo el % agregado de `validate-diet-contract.mjs`).
-- `node supabase/validate.mjs` para integridad de recetas/macros del catálogo ampliado.
+Subir la factibilidad del canario de forma sustancial (no un lote incremental menor) priorizando `carbs_contract`/`protein_contract` y las dimensiones en 0%-14%, midiendo cada candidato con `scripts/diff-diet-contract.mjs` antes de sumarlo a `supabase/seed.sql`, sin bajar el agregado ni empeorar una dimensión hoy sana. Documentar fuentes en `docs/catalog-lote-3-sources.md` solo para platos aceptados. Fuera de alcance: cambiar `DIET_CONTRACT`/validación (REQ-139), tocar la selección de `planDeterministicNutritionDay()` (eso es REQ-147), modelo/prompt (REQ-133) o reemplazos puntuales (REQ-142). Detalle completo de objetivo/alcance/riesgos/criterios originales: `docs/requirements-history.md`.
 
 ## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
 
@@ -1748,3 +1710,46 @@ Que la racha combinada tenga **una sola definición** y que la pantalla Progreso
 
 - Reusar los helpers E2E (`installMocks`+`seedLoggedInUser`): sembrar N días previos combinados-completos, dejar hoy sin registrar, abrir Progreso y assertar que ambos números coinciden y que `.streak-recovery` no existe.
 - Segundo caso: dejar además ayer sin cumplir (racha realmente rota) y assertar que el banner sí aparece y ambos números son 0.
+
+## REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo del canario `DIET_CONTRACT`
+
+**Estado: pendiente. Requiere acción humana (decisión de producto de Jonathan) antes de implementar cualquier alcance; no implementable por el agente autónomo sin esa autorización, porque reabre una restricción que él mismo fijó en REQ-143 ("no rediseñar la selección").**
+
+### Origen
+
+Dos sesiones autónomas independientes (2026-07-05 y 2026-07-08) intentaron subir el canario `DIET_CONTRACT` (`node scripts/validate-diet-contract.mjs`, hoy 122/378 = 32.3%) agregando solo contenido al catálogo, tal como exige el alcance de REQ-143. Ambas, con estrategias de contenido distintas, encontraron el mismo techo cerca de 32%-33%. El detalle completo del experimento de 2026-07-08 (incluida la sonda cuantitativa que confirma que el 100% de los fallos de `carbs_contract` son por exceso de carbohidratos, nunca por déficit, y el par de platos casi idénticos "Tempeh..."/"Seitán..." con efecto neto de signo opuesto) está documentado en la actualización 2026-07-08 de REQ-143.
+
+### Problema
+
+`planDeterministicNutritionDay()` elige, por slot, el plato con mejor `scoreMacros()` local entre como máximo 48 candidatos pre-rankeados por cercanía calórica (`js/nutrition-domain.js:663-690`), y `globalClosePass()` (línea ~1115) solo reescala gramos de las líneas ya elegidas — nunca cambia de plato. No hay búsqueda, ni siquiera acotada, sobre combinaciones de platos por día: es una selección local, ávida, de un solo paso por slot. Agregar contenido no puede compensar esa limitación de forma confiable: un plato nuevo puede ganar la selección local en un slot y, sin que el sistema lo sepa, empeorar el cierre global del día, aunque el plato en aislamiento sea nutricionalmente mejor que el que reemplaza.
+
+### Objetivo
+
+Que alguien con autoridad de producto decida, con la evidencia de REQ-143/REQ-144 en mano, entre estas opciones (u otra): (a) autorizar una mejora acotada de selección (no un rediseño completo) para intentar subir el canario más allá del ~32-33% que el catálogo por sí solo parece dar; (b) seguir subiendo el catálogo en lotes pequeños y medidos aceptando que el techo actual hace improbable alcanzar "sustancial"; (c) posponer indefinidamente el gate de REQ-139/REQ-128 y priorizar otro journey. Mientras no haya decisión, el agente autónomo no debe seguir gastando sesiones completas en lotes de catálogo para este fin específico.
+
+### Alcance (solo si se autoriza la opción (a))
+
+1. Ideas acotadas a evaluar, sin necesariamente implementar todas: (i) ampliar el pre-rankeo de 48 a más candidatos cuando el catálogo lo permita sin costo de performance relevante para el canario offline; (ii) en `globalClosePass()`, permitir explorar 2-3 alternativas de plato por slot (no solo reescalar gramos) cuando el cierre falla, manteniendo el resto del día fijo; (iii) cualquier alternativa que el responsable de producto prefiera.
+2. Medir cada alternativa con `scripts/diff-diet-contract.mjs` antes/después, igual que un lote de catálogo, con desglose por dimensión.
+3. Mantener el resto de contratos de dominio (REQ-78/80/83/84) sin cambio de comportamiento; `DIET_CONTRACT.runtimeActive` sigue en `false` — esto es tooling/canario, no activación (REQ-139 es quien activa el aviso suave, ya redefinido y sin depender de este REQ).
+
+### Fuera de alcance
+
+- Activar `DIET_CONTRACT` en runtime (REQ-139, ya redefinido y ejecutable de forma independiente).
+- Cambiar modelo/prompt del coach (REQ-133, cerrado).
+- Implementar cualquier alcance de la sección anterior sin la decisión explícita de Jonathan registrada en este REQ: este documento describe una tensión de producto (dos restricciones que él mismo fijó — "solo catálogo" en REQ-143 y "no tocar selección" — que juntas no alcanzan el objetivo que él mismo fijó para REQ-143), no una luz verde para implementar.
+
+### Riesgos
+
+- Tocar la selección es más invasivo que un lote de catálogo: puede afectar variedad semanal, tiempo de cómputo del canario (378 días) y comportamiento ya validado por REQ-80/83/84/137. Si se autoriza, requiere el mismo rigor de canario + regresión que REQ-137.
+- No decidir indefinidamente deja REQ-143 pausado y consume ciclos de auditoría/PM de agentes futuros releyendo el mismo análisis; por eso REQ-143 se saca de `agent-loop.json` hasta que este REQ tenga una decisión.
+
+### Criterios de aceptación
+
+- No aplica hasta que exista una decisión de producto registrada aquí (fecha + decisión de Jonathan + qué opción de "Objetivo" se eligió).
+- Si la decisión es "no tocar la selección", cerrar este REQ documentando la decisión y actualizar REQ-143 para reflejar el techo de ~32-33% como límite conocido y aceptado del catálogo bajo la selección actual (o cerrarlo también, según lo que decida Jonathan).
+- Si la decisión es "sí, acotado", definir aquí mismo el sub-alcance elegido antes de que un agente lo implemente.
+
+### Verificación sugerida
+
+- N/A hasta la decisión. Si se autoriza, usar el mismo canario (`validate-diet-contract.mjs`) y diff (`diff-diet-contract.mjs`) como antes/después, con el mismo estándar de "no bajar el agregado ni una dimensión sana" que REQ-143.

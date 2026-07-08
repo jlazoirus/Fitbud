@@ -7127,3 +7127,66 @@ Cerrar la meta de profundidad del REQ-136 original sin mezclarla con el cierre m
 ### Verificación sugerida
 
 - `node scripts/validate-nutrition-catalog.mjs`, `node scripts/validate-diet-contract.mjs --json` y release gate completo.
+
+## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
+
+**Estado: pendiente. Requiere acción humana (decisión de producto en REQ-147) antes de intentar otro lote; no implementable por el agente autónomo hasta esa decisión.**
+
+### Origen
+
+Decisión de Jonathan (2026-07-05) tras el bloqueo de REQ-139: antes de subir el rigor de cualquier validación de macros, el catálogo debe crecer drásticamente. Este REQ es exclusivamente sobre contenido de catálogo — ningún cambio de validación, prompt, modelo ni UI.
+
+### Problema
+
+`node scripts/validate-diet-contract.mjs` mide 32.3% (122/378), 100% `catalog_gap` (residuo de macro, no bug del solver). Causas: `carbs_contract` (133), `protein_contract` (111), `fat_contract` (47), `kcal_contract` (16). Dimensiones más débiles: "alta_proteina" con 2 o 6 comidas, vegano en general, vegetariano/vegano con "sin_tofu" (0% en casi todos los conteos).
+
+### Causa raíz
+
+REQ-135/136/140/141 ampliaron el catálogo a 200 ingredientes/180 platos, suficiente para eliminar `slot_without_candidates`, pero no suficiente densidad de platos con perfiles de macro específicos (altos en proteína con pocos carbohidratos, opciones veganas sin tofu/yogur) para que el solver + `globalClosePass()` puedan cerrar dentro de ±3%/±50 kcal, ±5 g proteína, ±8 g carbohidratos/grasa en esas combinaciones.
+
+**Actualización (2026-07-05, intento sin commit):** agregar contenido no garantiza subir el canario. `planDeterministicNutritionDay()` elige el plato de cada slot por score local (ajuste de macro a ese slot + desempate de variedad), sin optimizar el día completo; además `almuerzo/media_manana/merienda/snack/recena` ya superan el corte de 48 candidatos por slot (solo los 48 más cercanos en kcal reciben solver completo), así que sumar platos ahí puede desplazar sin aviso al plato que hoy cierra un día. Se probaron 5 lotes (4 a 22 platos, en `desayuno`/`cena` para evitar ese corte): el mejor subió "2 comidas" de 39/54 a 50/54 (`vegano/alta_proteina/sin_tofu` de 0% a 85.7%) pero bajó "4 comidas" de 66/162 a 53/162; el agregado quedó siempre bajo 32.3% (27.8%-31.2%). Un lote de solo 4 platos de desayuno, sin relación con ninguna dimensión débil, regresó el agregado igual de fuerte, confirmando que el efecto es del mecanismo de selección, no del contenido. Ningún lote se comiteó. Ver REQ-144: hace falta medir el impacto real de un candidato contra el canario de 378 días, no solo contra el ajuste genérico de `scripts/grow-catalog.mjs`.
+
+**Actualización (2026-07-08, agente autónomo, sin commit de catálogo):** con `scripts/diff-diet-contract.mjs` (REQ-144) ya disponible, se repitió el experimento con una hipótesis más precisa. Una sonda de solo lectura sobre `finalizeNutritionDay()` (script descartable, no comiteado) mide el signo de cada residuo fuera de contrato en los 378 días: `carbs residual stats: {n:133, pos:133, neg:0}` — **el 100% de los fallos de `carbs_contract` son por exceso de carbohidratos, nunca por déficit**, un sesgo sistemático medible, no ruido. Causa técnica: `scoreMacros()` (`js/nutrition-domain.js:542-550`) pondera kcal ×1.4 y proteína hasta ×1.45 (si falta) pero carbohidratos solo ×0.55, así que el solver privilegia cerrar kcal/proteína a costa de carbohidratos cuando un plato no tiene ya, de fábrica, una proporción proteína:carbohidrato parecida al target.
+
+Se probó un lote de 13 platos nuevos (6 desayuno + 7 cena), usando **solo ingredientes ya verificados en catálogo** (sin ingredientes nuevos, sin riesgo de fuente de macros nueva) con proporción proteína:carbohidrato alta, priorizando `carbs_contract`/`protein_contract` como pide el alcance de este REQ. Medición con el diff de REQ-144, cada plato probado también de forma aislada para aislar el efecto:
+
+- 6 platos de desayuno (omnívoro/vegetariano/vegano bajos en carbohidratos) y 5 platos de cena omnívoros (pollo/salmón/camarones/merluza/lomo, todos con perfil bajo en carbohidratos verificado a mano): **0/378 de cambio neto cada uno**, probados individualmente. Nunca ganaron la selección local frente al catálogo existente en ningún día de la matriz.
+- 1 plato de cena vegano, "Tempeh a la plancha con espárragos y limón" (probado solo): **+1/378** (32.3% → 32.5%), sin regresiones en ninguna dimensión.
+- 1 plato de cena vegano, "Seitán salteado con pimientos y champiñones" (probado solo, misma intención y perfil de macros casi idéntico al del tempeh): **-1/378** (32.3% → 32.0%). Mejoró `2 comidas/vegano/alta_proteina/sin_tofu` en +6 días pero regresionó tres dimensiones `sin_tofu` vegetarianas/veganas de 4 y 6 comidas (-1 a -3 días cada una) — misma firma que el hallazgo de 2026-07-05: un plato nuevo puede ganar la selección local en un slot y desplazar, sin que el sistema lo sepa, un plato que hoy sí cerraba el día completo.
+- Lote completo sin el plato de seitán (12 platos, solo aporta el tempeh): **+1/378 neto** (32.3% → 32.5%), no negativo pero muy por debajo de "sustancial". No se comiteó: no cumple el criterio de aceptación de este REQ.
+
+**Conclusión:** dos sesiones independientes (2026-07-05 y 2026-07-08), con estrategias de contenido distintas (relleno general de slots vs. lote dirigido por el sesgo de carbohidratos medido), coinciden en que el catálogo bajo la selección local actual de `planDeterministicNutritionDay()`/`globalClosePass()` tiene un techo cercano a 32%-33%, y que el efecto plato-a-plato (+1 a -1 día por plato, sin relación clara con qué tan bien calibrado está el plato) domina sobre la señal de contenido. Subir el canario "de forma sustancial" — el objetivo explícito de este REQ — no parece alcanzable solo con lotes de catálogo sin tocar la selección, que está fuera de alcance aquí por decisión previa de Jonathan. Ver REQ-147 (nuevo): documenta esta tensión y pide una decisión de producto antes de invertir más tiempo de agente en lotes de catálogo o en tocar la selección.
+
+### Objetivo
+
+Subir la factibilidad del canario de forma sustancial (no un lote incremental menor) priorizando las causas y dimensiones más débiles listadas arriba, acercándose lo más posible al gate ≥98% de REQ-128; si no alcanza el gate completo, dejar documentado el remanente para un REQ de continuación (siguiendo el patrón REQ-136→140→141). REQ-144 ya provee el diff obligatorio: sin medir el impacto por lote antes de comitear, no se puede garantizar que un lote nuevo suba el canario en vez de regresarlo.
+
+### Alcance
+
+1. Con la herramienta de REQ-144, generar candidatos (`scripts/grow-catalog.mjs` o curaduría manual) priorizando `carbs_contract`/`protein_contract` y las dimensiones en 0%-14%.
+2. Medir cada candidato/lote contra el canario de 378 días antes de sumarlo a `supabase/seed.sql`; descartar lo que tenga impacto neto negativo o empeore una dimensión hoy sana.
+3. Documentar fuentes en `docs/catalog-lote-3-sources.md` (formato de lotes previos) solo para los platos aceptados.
+4. Actualizar `scripts/validate-nutrition-catalog.mjs` si cambian mínimos de cobertura (sin bajar los ya exigidos).
+5. Documentar el nuevo % y `failureBreakdown`, y la acción manual pendiente de re-ejecutar `seed.sql` en producción.
+
+### Fuera de alcance
+
+- Cambio de validación/gating de `DIET_CONTRACT` (REQ-139) o de la selección de `planDeterministicNutritionDay()` (rediseño de día completo, no cabe en un lote de catálogo).
+- Cambios de modelo/prompt (REQ-133, cerrado). Reemplazo puntual de comida (REQ-142).
+
+### Riesgos
+
+- Platos sin fuente de macros verificable rompen la confianza en `ingredients.kcal` (REQ-128); mantener el estándar de lotes previos.
+- Optimizar solo el % agregado puede ocultar que se rompió una dimensión sana (visto en el intento de 2026-07-05); revisar el reporte por dimensión, no solo el neto.
+
+### Criterios de aceptación
+
+- El canario sube de forma sustancial desde 32.3% **sin bajar el total agregado respecto a la medición previa** (documentar el nuevo % y `failureBreakdown`, y el delta por dimensión de REQ-144).
+- Las dimensiones hoy en 0% (ej. `vegano/alta_proteina/sin_tofu`, `vegetariano/normal/sin_tofu`) mejoran o quedan documentadas con causa explícita si no.
+- `node scripts/validate-nutrition-catalog.mjs` y `node supabase/validate.mjs` pasan.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Reporte de REQ-144 antes/después del lote completo (no solo el % agregado de `validate-diet-contract.mjs`).
+- `node supabase/validate.mjs` para integridad de recetas/macros del catálogo ampliado.
