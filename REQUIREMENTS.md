@@ -1753,3 +1753,49 @@ Que alguien con autoridad de producto decida, con la evidencia de REQ-143/REQ-14
 ### Verificación sugerida
 
 - N/A hasta la decisión. Si se autoriza, usar el mismo canario (`validate-diet-contract.mjs`) y diff (`diff-diet-contract.mjs`) como antes/después, con el mismo estándar de "no bajar el agregado ni una dimensión sana" que REQ-143.
+
+## REQ-148 - Fix billing: un reembolso parcial de Stripe revoca todo el entitlement pagado
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey de **facturación** (2026-07-10, rotación del loop auditor tras REQ-147). Verificación funcional en navegador (preview `fitbud`): la app carga con planes de fallback y `showPaywall('profile')` renderiza mensual USD 14 / trimestral USD 36 con "Disponible pronto" (REQ-104), sin errores de consola. La rama de reembolso del webhook **no es ejercitable en local** (requiere un `charge.refunded` real de Stripe); este hallazgo está verificado por lectura de código + semántica documentada de Stripe.
+
+### Problema
+
+Stripe emite `charge.refunded` tanto en reembolsos totales como parciales; en un parcial el objeto `charge` trae `refunded:false` y `amount_refunded < amount`. El webhook no distingue ambos casos y revoca el entitlement completo ante cualquier `charge.refunded`. Reproducción (Stripe test mode): (1) usuario compra "Paquete 3 meses" (USD 36, 90 días); (2) soporte emite un reembolso parcial de USD 5 (el usuario sigue con ~85 días pagados); (3) Stripe envía `charge.refunded` con `refunded:false`, `amount_refunded:500`, `amount:3600`; (4) `handleRefund()` PATCH-ea el entitlement a `revoked`; (5) el usuario pierde **todo** el acceso premium pese a haber pagado casi todo el período.
+
+### Causa raíz
+
+`handleRefund(e, charge)` en `api/webhook.js:134-151` revoca incondicionalmente: solo verifica `charge.payment_intent` y una fila `active/courtesy` con ese `payment_ref`, y hace `sbPatch(... { status:"revoked" })` (`api/webhook.js:145-149`). Nunca inspecciona `charge.refunded` ni compara `charge.amount_refunded` con `charge.amount`. Dispatcher en `api/webhook.js:200-201`. El criterio de REQ-26 ("Reembolso/expiración retira acceso premium") se redactó asumiendo reembolso total; el caso parcial no se acotó.
+
+### Objetivo
+
+Que un reembolso parcial no le quite al usuario el acceso que pagó: solo un reembolso total (o disputa) debe revocar. Los parciales quedan auditados en `billing_events` sin tocar el acceso.
+
+### Alcance
+
+1. En `handleRefund()`, revocar **solo** si `charge.refunded === true` o `Number(charge.amount_refunded) >= Number(charge.amount)`. En parcial, no revocar y loguear el evento como `skipped`/`partial_refund` conservando auditoría.
+2. Mantener idempotencia, verificación de firma y logging sin cambios.
+
+### Fuera de alcance
+
+- El monto mostrado en el historial (`moneyFromPayload()` en `api/entitlement.js:62-67` prioriza `amount` sobre `amount_refunded`): bug de visualización menor y distinto; documentarlo aparte, no aquí.
+- Reembolsos totales, disputas y expiración: comportamiento actual sin cambios.
+
+### Riesgos
+
+- Un reembolso total debe seguir revocando: cubrir ambos campos (`refunded` y `amount_refunded >= amount`).
+- Si un parcial se completa luego con otro reembolso hasta el total, el segundo `charge.refunded` debe poder revocar (no bloquear por idempotencia).
+
+### Criterios de aceptación
+
+- `charge.refunded` parcial (`refunded:false`, `amount_refunded < amount`) no cambia el `status`; queda auditado.
+- `charge.refunded` total revoca como hoy; duplicados/desordenados no corrompen estado.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Test de webhook con fixtures parcial vs total (patrón `scripts/test-admin-api.mjs`) afirmando revocación solo en el total.
+- Manual en Stripe test mode: reembolso parcial → entitlement sigue `active`; total → `revoked`.
