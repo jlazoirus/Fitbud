@@ -59,45 +59,10 @@ Automatizable por el agente desarrollador:
 3. ~~REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.~~ (implementado)
 4. ~~REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.~~ (implementado)
 
-Serie UX de la auditoría del 1 jul 2026 (`estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`) — en orden de prioridad:
+Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`, REQ-97..112) y serie "dieta exacta" (4 jul 2026, REQ-128..138 + REQ-140/141/144; diagnóstico en `docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`, decisiones: tolerancias estrictas sujetas a canario, Sonnet 5 solo tras gate de telemetría, ampliación de catálogo) ya están implementadas — su detalle vive en el ledger de abajo y en `docs/requirements-history.md`. Pendientes de esa secuencia:
 
-5. ~~REQ-97 - Reordenar Home: agenda primero, hero compacto, un banner a la vez.~~ (implementado, P0)
-6. ~~REQ-98 - Fix banner de check-in: fechas rotas, duplicado, tono de arranque.~~ (implementado, P1)
-7. ~~REQ-100 - Nutrición sin duplicación: un CTA contextual y hero compacto.~~ (implementado, P1)
-8. ~~REQ-101 - Entreno sin CTAs duplicados.~~ (implementado, P1)
-9. ~~REQ-102 - Progreso con estado cero guiado y peso en tarjetas.~~ (implementado, P1)
-10. ~~REQ-103 - Onboarding sin jerga: macros como resumen.~~ (implementado, P1)
-11. ~~REQ-99 - Perfil por secciones con guardado por sección.~~ (P1, el más grande; dividido el 2 jul en REQ-105..REQ-108, ver abajo)
-12. ~~REQ-104 - Copy y paywall coherentes.~~ (implementado, P2)
-13. ~~REQ-105 - Perfil: acordeón real (una sección a la vez).~~ (implementado, P1)
-14. ~~REQ-106 - Perfil: aria-label en todos los inputs.~~ (implementado, P1)
-15. ~~REQ-107 - Perfil: reagrupar Suscripción/Recordatorios/Avisos bajo Cuenta.~~ (implementado, P1)
-16. ~~REQ-108 - Perfil: guardado por sección con aviso de cambios sin guardar.~~ (implementado, P1)
-17. ~~REQ-109 - Fix Home: badge "N pendientes" cuenta la fila de Descanso.~~ (implementado, P2)
-18. ~~REQ-110 - Fix: catch de aiGenerateWeek sin salida — opción práctica y reintento.~~ (implementado, P1)
-19. ~~REQ-111 - Fix API: /api/checkout valida Stripe antes que la sesión.~~ (implementado por REQ-59; entrada duplicada, no reabrir)
-20. ~~REQ-112 - Accesibilidad: toasts aria-live y contraste de texto muted.~~ (implementado, P2)
-
-Nota: los hallazgos P0-1 y P0-2 de esa auditoría (ruta determinista sin paywall en "Preparar mi día" y fallback+reintento en errores del coach) ya quedaron implementados el 1 jul junto con mejoras de calidad del solver determinista (pre-rankeo calórico, variedad por `recentUsed` y desempate por fecha).
-
-Serie "dieta exacta" (4 jul 2026). Origen: dos análisis independientes convergentes — Codex (`docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`) y sesión de arquitectura de Claude — fusionados y aprobados por Jonathan con tres decisiones: tolerancias estrictas ±3%/±50 kcal y ±5 g proteína sujetas a canario, Sonnet 5 solo tras gate de telemetría, y ampliación drástica del catálogo. Orden recomendado (REQ-128 y REQ-129 son un par: el contrato no se activa sin el solver):
-
-21. ~~REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad.~~ (implementado, P0)
-22. ~~REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas.~~ (implementado, P0)
-23. ~~REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo.~~ (implementado, P0)
-24. ~~REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración.~~ (implementado, P1)
-25. ~~REQ-132 - Momento del día, etapa 2: metadata de contundencia y cobertura de slots vacíos.~~ (implementado, P1)
-26. ~~REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5.~~ (implementado, P1)
-27. ~~REQ-134 - Pipeline de crecimiento del catálogo validado por el motor.~~ (implementado, P1)
-28. ~~REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks.~~ (implementado, P1)
-29. ~~REQ-136 - Catálogo lote 2A: metadata de cocina y scoring de preferencias.~~ (implementado, P1)
-30. ~~REQ-140 - Catálogo lote 2B: profundidad por cocina, presupuesto y fuera de casa.~~ (implementado, P2)
-31. ~~REQ-141 - Catálogo lote 2C: meta 180/200 y validadores de gustos.~~ (implementado, P2)
-32. ~~REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato.~~ (implementado, P0)
-33. ~~REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global.~~ (implementado, P0)
-34. ~~REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos.~~ (implementado, P0)
-35. REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool con aviso suave no bloqueante. (P0; alcance redefinido 2026-07-05, decision de Jonathan tomada, ya no depende del gate de catalogo; movido antes de REQ-143 en `agent-loop.json` el 2026-07-08 porque REQ-143 quedo pausado esperando decision de REQ-147)
-36. REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
+- REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool con aviso suave no bloqueante. (P0; alcance redefinido 2026-07-05, decision de Jonathan tomada, ya no depende del gate de catalogo; movido antes de REQ-143 en `agent-loop.json` el 2026-07-08 porque REQ-143 quedo pausado esperando decision de REQ-147)
+- REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -1799,3 +1764,53 @@ Que un reembolso parcial no le quite al usuario el acceso que pagó: solo un ree
 
 - Test de webhook con fixtures parcial vs total (patrón `scripts/test-admin-api.mjs`) afirmando revocación solo en el total.
 - Manual en Stripe test mode: reembolso parcial → entitlement sigue `active`; total → `revoked`.
+
+## REQ-149 - Fix admin: "Regenerar plan · Solo nutrición" archiva también el entrenamiento futuro
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **administración** (panel "Usuarios" → "Regenerar plan", alcance "Solo nutrición"). Commit previo: `6fc83c1` (REQ-148).
+
+### Problema
+
+REQ-126 prometió un selector de alcance (nutrición/entrenamiento/ambos) para regenerar el futuro **sin tocar lo demás**. Pero "Solo nutrición" también archiva la prescripción de **entrenamiento** futura. Reproducción: (1) el usuario termina onboarding y `saveOnboarding()` guarda **una sola** versión activa combinada con `snapshot.nutritionPlan` **y** `snapshot.trainingPlan` en la misma fila (`ensurePlanVersion({…, trainingPlan, nutritionPlan})`, `index.html:3333-3343`); el índice `plan_versions_one_active_idx` (`supabase/plan_cycles.sql:40-42`) fuerza una única fila activa por ciclo. (2) El admin aplica "Solo nutrición". (3) `applyResetPlan()` con `scope="nutrition"` archiva esa fila combinada con `valid_to=fromDate-1`. (4) El entreno futuro pierde su versión activa (`planVersionForDate(ds)` ya no la cubre para `ds≥fromDate`) y cae a generación determinista, perdiendo sets/reps/sustituciones. (5) La vista previa engaña: muestra "Se archivará la versión activa del plan de nutrición." (`index.html:10231`) aunque la fila también trae entrenamiento. Evidencia: reproducción de la lógica del servidor con una única versión activa combinada → `scope="nutrition"` archiva `id=42`, `source="onboarding"`, `supersededHoldsTrainingSnapshot=true`. El flujo admin end-to-end no es ejercitable en local (requiere Supabase + service role): verificado por lectura de código + reproducción. `scripts/test-admin-reset.mjs` no cubre el caso (su mock devuelve una sola fila sin `snapshot`).
+
+### Causa raíz
+
+`fetchActivePlanVersion()` (`api/admin.js:312-316`) toma `plan_versions?status=eq.active&order=created_at.desc&limit=1` **sin filtrar por contenido de nutrición** (`snapshot.nutritionPlan`) ni por `source`; `applyResetPlan()`/`previewResetPlan()` (`api/admin.js:404-415` y `376`) la archivan siempre que `scope!=="training"`. Como nutrición y entrenamiento viven en la misma fila activa, archivar "por nutrición" arrastra el entrenamiento. El copy del preview (`index.html:10231`) asume que la fila es solo de nutrición.
+
+### Objetivo
+
+Que "Solo nutrición" afecte únicamente la nutrición y nunca archive la prescripción de entrenamiento futura, y que la vista previa describa con exactitud qué se archivará.
+
+### Alcance
+
+1. En `applyResetPlan()`/`previewResetPlan()`, al archivar por nutrición, preservar `snapshot.trainingPlan` de la versión activa (re-versionar la fila conservando el entrenamiento, o limitar el archivado a versiones sin entrenamiento activo).
+2. `fetchActivePlanVersion()` debe distinguir nutrición vs entrenamiento (`snapshot.nutritionPlan`/`trainingPlan`) en vez de tomar la última activa sin filtrar.
+3. Corregir el copy del preview (`index.html:10231`) según el alcance y contenido real.
+4. Extender `scripts/test-admin-reset.mjs` con una fila activa combinada afirmando que `scope="nutrition"` conserva el entrenamiento futuro.
+
+### Fuera de alcance
+
+- El bug del CHECK de `source:"nutrition"` (journey nutrición, REQ aparte).
+- Cambiar el modelo de una-fila-activa-por-ciclo o cómo `saveOnboarding` combina snapshots.
+- Alcance `training` (ya no toca `plan_versions`) y `both` (archiva todo a propósito).
+
+### Riesgos
+
+- Re-versionar la fila puede chocar con `one_active_idx`; cuidar orden (no dejar dos activas ni cero).
+- Preservar entrenamiento debe respetar `valid_from`/`valid_to` para no reintroducir prescripción en días ya protegidos.
+
+### Criterios de aceptación
+
+- Con una versión activa combinada, `applyResetPlan(scope="nutrition")` deja intacto el entrenamiento futuro.
+- La vista previa no afirma archivar "el plan de nutrición" cuando la fila también trae entrenamiento.
+- `scope="training"`/`"both"` sin cambios.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `scripts/test-admin-reset.mjs` con mock de fila combinada: tras `scope="nutrition"`, el entrenamiento futuro sigue disponible (versión activa con `snapshot.trainingPlan` cubriendo `ds≥fromDate`).
+- Manual (staging): usuario con plan combinado → "Solo nutrición" → Entreno conserva la rutina futura.
