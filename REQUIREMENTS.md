@@ -54,10 +54,7 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 
 Automatizable por el agente desarrollador:
 
-1. ~~REQ-81 - Planner semanal nutricional determinista y lista de compras derivada.~~ (implementado)
-2. ~~REQ-82 - Plan nutricional activo versionado en `plan_versions`.~~ (implementado)
-3. ~~REQ-83 - Reemplazos equivalentes con rebalanceo de comidas futuras.~~ (implementado)
-4. ~~REQ-84 - Coach nutricional como generador auxiliar validado, no autoridad de macros.~~ (implementado)
+REQ-81..84 (planner determinista, versionado en `plan_versions`, reemplazos con rebalanceo, coach auxiliar validado) ya implementados — detalle en `docs/requirements-history.md`.
 
 Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`, REQ-97..112) y serie "dieta exacta" (4 jul 2026, REQ-128..138 + REQ-140/141/144; diagnóstico en `docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`, decisiones: tolerancias estrictas sujetas a canario, Sonnet 5 solo tras gate de telemetría, ampliación de catálogo) ya están implementadas — su detalle vive en el ledger de abajo y en `docs/requirements-history.md`. Pendientes de esa secuencia:
 
@@ -1498,11 +1495,7 @@ Evaluar si `rebalanceFutureMeals()` debe reemplazarse (o complementarse) por una
 
 **Estado: pendiente. Requiere acción humana (decisión de producto en REQ-147) antes de intentar otro lote; no implementable por el agente autónomo hasta esa decisión.**
 
-Canario `validate-diet-contract.mjs`: 122/378 (32.3%), 100% `catalog_gap`. Dos sesiones (2026-07-05 y 2026-07-08), con estrategias de contenido distintas, midieron lotes con `scripts/diff-diet-contract.mjs` (REQ-144) y confirmaron un techo cercano a 32-33% bajo la selección local actual de `planDeterministicNutritionDay()`/`globalClosePass()`: el mejor plato aislado probado en 2026-07-08 sumó +1/378, uno de intención casi idéntica sumó -1/378, y la mayoría de platos nuevos (con proporción proteína:carbohidrato calibrada a mano tras confirmar que el 100% de los fallos de `carbs_contract` son por exceso de carbohidratos, nunca déficit) no movieron ningún día. Ningún lote nuevo se comiteó: no cumple "subir de forma sustancial sin bajar el agregado". Detalle completo de ambos experimentos (sonda de residuos, 5+13 platos probados, deltas por dimensión): `docs/requirements-history.md` (buscar `## REQ-143`). Ver REQ-147 para la decisión de producto pendiente antes de intentar otro lote o tocar la selección.
-
-### Objetivo, alcance y criterios (si se retoma tras la decisión de REQ-147)
-
-Subir la factibilidad del canario de forma sustancial (no un lote incremental menor) priorizando `carbs_contract`/`protein_contract` y las dimensiones en 0%-14%, midiendo cada candidato con `scripts/diff-diet-contract.mjs` antes de sumarlo a `supabase/seed.sql`, sin bajar el agregado ni empeorar una dimensión hoy sana. Documentar fuentes en `docs/catalog-lote-3-sources.md` solo para platos aceptados. Fuera de alcance: cambiar `DIET_CONTRACT`/validación (REQ-139), tocar la selección de `planDeterministicNutritionDay()` (eso es REQ-147), modelo/prompt (REQ-133) o reemplazos puntuales (REQ-142). Detalle completo de objetivo/alcance/riesgos/criterios originales: `docs/requirements-history.md`.
+Canario `validate-diet-contract.mjs`: 122/378 (32.3%), 100% `catalog_gap`. Dos sesiones (2026-07-05 y 2026-07-08) con estrategias distintas, midiendo cada lote con `scripts/diff-diet-contract.mjs` (REQ-144), confirmaron un techo cercano a 32-33% bajo la selección local de `planDeterministicNutritionDay()`/`globalClosePass()` (los fallos de `carbs_contract` son 100% por exceso de carbohidratos, nunca déficit). Ningún lote nuevo se comiteó. Detalle completo de ambos experimentos y del objetivo/alcance/criterios si se retoma tras REQ-147: `docs/requirements-history.md` (buscar `## REQ-143`).
 
 ## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
 
@@ -1814,3 +1807,46 @@ Que "Solo nutrición" afecte únicamente la nutrición y nunca archive la prescr
 
 - `scripts/test-admin-reset.mjs` con mock de fila combinada: tras `scope="nutrition"`, el entrenamiento futuro sigue disponible (versión activa con `snapshot.trainingPlan` cubriendo `ds≥fromDate`).
 - Manual (staging): usuario con plan combinado → "Solo nutrición" → Entreno conserva la rutina futura.
+
+## REQ-150 - PWA sirve HTML nuevo con JS del cache viejo tras un deploy (versión mezclada)
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey `pwa`: verificación en navegador (SW `fitbud-pwa-v67` activo, server local 8923); se revisó registro, shell y estrategias de `fetch`.
+
+### Problema
+
+Tras un deploy que toca `index.html` y algún `.js` (habitual en este monolito), abrir la PWA instalada trae `index.html` fresco de red mientras los `.js` salen del cache viejo en la misma carga: HTML nuevo + JS viejo puede romper la vista sin recuperación hasta recargar a mano. Reproducido contra el SW real: un centinela "STALE" en el cache de `training-plan.js` se devuelve vía `cacheFirst` mientras una navegación devuelve `index.html` fresco vía `networkFirst`.
+
+### Causa raíz
+
+`service-worker.js`: navegación `networkFirst` (39-42) vs `.js` mismo-origen `cacheFirst` (54); el único límite de versión es `CACHE_NAME` (sin hash de contenido) y `networkFirst` lo salta. `install` hace `skipWaiting()` (21) y `activate` `clients.claim()` (29), pero `registerServiceWorker()` (`index.html:11296-11306`) no escucha `updatefound`/`controllerchange` ni recarga.
+
+### Objetivo
+
+Que la PWA instalada nunca ejecute una mezcla de versiones.
+
+### Alcance
+
+1. Servir navegación y `.js` desde la misma generación de cache (shell `cacheFirst` con revalidación) o hashear el shell.
+2. Manejar la actualización en `registerServiceWorker()`: al detectar SW nuevo, recargar o avisar sin vocabulario técnico (REQ-31).
+
+### Fuera de alcance
+
+- Otras estrategias (`/api/`, media de Storage) y automatizar el bump de `CACHE_NAME`.
+
+### Riesgos
+
+- `cacheFirst` de navegación puede servir HTML viejo si `activate` no purga; recargar solo puede interrumpir (preferir aviso).
+
+### Criterios de aceptación
+
+- Tras un deploy con bump de `CACHE_NAME`, abrir la PWA no ejecuta HTML nuevo con JS viejo (o recarga sola).
+- UI de actualización, si existe, sin mención de IA/SW/cache/tokens (REQ-31).
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Cachear un `.js` viejo y confirmar que una navegación fresca ya no coexiste con JS viejo tras el fix.
