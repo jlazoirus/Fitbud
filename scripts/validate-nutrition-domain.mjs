@@ -206,7 +206,7 @@ assert.ok(!d.compatibleDishesForSlot("merienda", { mealCount: 5, mainMealIndex: 
 
 // ── DIET_CONTRACT (REQ-128) ──────────────────────────────────────────────────
 assert.equal(d.DIET_CONTRACT.version, 1, "DIET_CONTRACT versionado");
-assert.equal(d.DIET_CONTRACT.runtimeActive, false, "REQ-128 no activa runtime");
+assert.equal(d.DIET_CONTRACT.runtimeActive, true, "REQ-139 activa runtime como aviso suave");
 assert.equal(d.DIET_CONTRACT.authoritativeKcal, "catalog_ingredient_kcal",
   "kcal autoritativa debe venir del catalogo de ingredientes");
 assert.equal(d.DIET_CONTRACT.kcal.percent, 0.03, "kcal = ±3%");

@@ -29,11 +29,14 @@
   };
 
   // Contrato estricto de aplicabilidad nutricional (REQ-128).
-  // Se exporta para calibracion/canarios; los validadores de runtime siguen
-  // usando NUTRITION_TOLERANCES hasta que REQ-129 active el cierre global.
+  // REQ-139: runtimeActive=true — el contrato se evalúa sobre el día ya cerrado
+  // por finalizeNutritionDay() y solo alimenta un aviso suave no bloqueante en
+  // el cliente (dietContractNoticeText() en index.html). Nunca rechaza ni
+  // bloquea aplicar/guardar un día: finalizedDayIsComplete() (cobertura de
+  // slots) sigue siendo el único criterio de "aplicable".
   const DIET_CONTRACT=Object.freeze({
     version:1,
-    runtimeActive:false,
+    runtimeActive:true,
     authoritativeKcal:"catalog_ingredient_kcal",
     kcal:Object.freeze({percent:0.03,minDelta:50}),
     protein:Object.freeze({grams:5}),

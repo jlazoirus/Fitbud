@@ -3974,7 +3974,9 @@ async function applyDeterministicDay(ds){
       homeTrackAction(ds,"prepare_day_deterministic");
       render();scrollAppTop();
       const preservedNote=preserved?` Lo que ya registraste hoy no cambia.`:"";
-      toast((det.ok===false?"Listo: preparamos la opción más viable para hoy.":"Tu día está listo con tus metas de hoy.")+preservedNote);
+      // REQ-139: aviso suave, solo cuando el día quedó completo (no compite con el mensaje de "opción viable").
+      const contractNote=det.ok!==false?dietContractNoticeText(det.totals,det.target):"";
+      toast((det.ok===false?"Listo: preparamos la opción más viable para hoy.":"Tu día está listo con tus metas de hoy.")+(contractNote?" "+contractNote:"")+preservedNote);
       return true;
     }
   }catch(e){}
@@ -7895,13 +7897,28 @@ function finalizeDayWithGate(ds,day,target,prefs,proposalComidas,extra){
   };
   return nd.finalizeNutritionDay(ctx);
 }
-// Un día finalizado se considera "completo" (visible como ok) cuando cada slot
-// del día tiene una comida real; el ajuste fino de DIET_CONTRACT queda dormido
-// hasta REQ-139, así que no bloquea la experiencia visible.
+// Un día finalizado se considera "completo" (visible como ok, aplicable) cuando
+// cada slot del día tiene una comida real. DIET_CONTRACT (REQ-139) es solo
+// informativo sobre el día ya cerrado: nunca cambia si el día se puede aplicar.
 function finalizedDayIsComplete(day,finalized){
   if(!finalized||!Array.isArray(finalized.comidas))return false;
   const bySlot=new Set(finalized.comidas.map(c=>c.slot_id));
   return (day.meals||[]).every(m=>bySlot.has(m.id));
+}
+// Suma macros de un arreglo de comidas ya cerradas (formato {kcal,proteina_g,carbohidratos_g,grasa_g}).
+function comidasMacroTotals(comidas){
+  return (comidas||[]).reduce((s,c)=>({
+    kcal:s.kcal+(+c.kcal||0),p:s.p+(+c.proteina_g||0),c:s.c+(+c.carbohidratos_g||0),f:s.f+(+c.grasa_g||0),
+  }),{kcal:0,p:0,c:0,f:0});
+}
+// REQ-139: aviso suave y no bloqueante cuando el día ya cerrado (totals) no cumple
+// DIET_CONTRACT frente a su meta. Nunca impide aplicar/guardar el día; solo informa.
+// Copy sin vocabulario técnico (REQ-31): habla de "tu meta", no de "contrato" ni "IA".
+function dietContractNoticeText(totals,target){
+  const nd=window.FITBUD_NUTRITION_DOMAIN;
+  if(!nd||!nd.validateDietContractTotals||!totals||!target)return"";
+  const contract=nd.validateDietContractTotals(totals,target);
+  return contract.ok?"":"Tu día quedó cerca de tu meta, no exacto.";
 }
 function deterministicDayPayload(ds){
   const day=buildDay(ds),target=effectiveDayTarget();
@@ -8742,6 +8759,9 @@ function genReviewHtml(res,target){
   </div>`).join("");
   const issues=res.issues&&res.issues.length?`<div class="ai-box" style="border-color:var(--bad)">✗ No se puede aplicar:<br>${res.issues.map(esc).join("<br>")}</div>`:"";
   const warns=res.warns&&res.warns.length?`<div class="ai-box">⚠️ ${res.warns.map(esc).join("<br>")}</div>`:"";
+  // REQ-139: aviso suave, solo cuando el día es aplicable (evita duplicar el bloqueo de "issues").
+  const contractNote=res.ok?dietContractNoticeText(res.totals,target):"";
+  const contractHtml=contractNote?`<div class="muted small" style="margin-top:6px">${esc(contractNote)}</div>`:"";
   // REQ-89: sugerir snack para cerrar déficit
   let snackHtml="";
   if(!res.ok&&res.issues&&res.issues.length){
@@ -8764,7 +8784,7 @@ function genReviewHtml(res,target){
   return `${res.explicacion?`<div class="ai-box">${esc(res.explicacion)}</div>`:""}
     <div class="muted small" style="margin:10px 2px 4px">Total del día: <b>${t.kcal}</b> kcal · P ${t.p} · C ${t.c} · G ${t.f} g <span class="muted">(meta ${target.kcal}/${target.p}/${target.c}/${target.f})</span></div>
     ${meals}
-    ${issues}${snackHtml}${warns}
+    ${issues}${snackHtml}${warns}${contractHtml}
     <div class="row wrap" style="margin-top:12px">
       ${res.ok?`<button class="btn btn-accent" onclick="applyGeneratedDay()">Aplicar al día</button>`:`<button class="btn" disabled style="opacity:.4">Aplicar al día</button>`}
       ${!res.ok?`<button class="btn btn-accent" onclick="aiGenerateDay()">Reintentar</button><button class="btn" onclick="deterministicFromModal()">Completar con opción práctica ahora</button>`:""}
@@ -8824,6 +8844,8 @@ function applyGeneratedDay(){
   const slotIds=new Set(day.meals.map(m=>m.id));
   const slotComidas=g.comidas.filter(c=>slotIds.has(c.slot_id));
   const extraComidas=g.comidas.filter(c=>!slotIds.has(c.slot_id));
+  // REQ-139: aviso suave calculado antes de aplicar; nunca impide aplicar el día.
+  const contractNote=dietContractNoticeText(comidasMacroTotals(g.comidas),effectiveDayTarget());
   const preserved=applyDayComidas(g.ds,slotComidas);
   if(extraComidas.length){
     const st=dayState(g.ds);
@@ -8833,7 +8855,7 @@ function applyGeneratedDay(){
     commitDay(g.ds);
   }
   window._genDay=null;window._genDayGapSnack=null;closeModal();render();
-  toast("Día aplicado a tu plan"+(preserved?". Lo que ya registraste no cambia.":""));
+  toast("Día aplicado a tu plan"+(preserved?". Lo que ya registraste no cambia.":"")+(contractNote?" "+contractNote:""));
 }
 // --- Revisión de semana: borrador → confirmar → aplicar ---
 function genWeekReviewHtml(){
@@ -8849,15 +8871,21 @@ function genWeekReviewHtml(){
     ?`<div class="ai-box" style="border-color:var(--warn,#f59e0b)">⚠️ ${varWarns.map(w=>esc(w.message)).join("<br>")}</div>`
     :"";
   const wkIgStyle="width:52px;padding:2px 4px;text-align:right;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);font-size:13px";
-  const days=draft.daysData.map((d,index)=>`<details class="dash" ${index===0?"open":""}>
+  const wkTarget=(ws&&ws.target)||effectiveDayTarget();
+  const days=draft.daysData.map((d,index)=>{
+    // REQ-139: aviso suave por día, calculado desde las comidas ya cerradas del borrador.
+    const dNote=dietContractNoticeText(comidasMacroTotals(d.comidas),wkTarget);
+    return `<details class="dash" ${index===0?"open":""}>
     <summary><b>${esc(prettyDate(d.ds))}</b> <span class="muted small">${d.comidas.length} comidas</span></summary>
+    ${dNote?`<div class="muted small" style="margin:4px 0">${esc(dNote)}</div>`:""}
     ${d.comidas.map((c,mIdx)=>`<div class="opt" style="cursor:default;margin:6px 0">
       <b>${esc(c.nombre)}</b> <span class="muted small">(${c.slot_id})</span>
       <div class="o-meta">${c.kcal} kcal · P ${c.proteina_g} · C ${c.carbohidratos_g} · G ${c.grasa_g} g</div>
       <div class="muted small" style="margin-top:4px">${c.ingredientes.map((g,gIdx)=>`${esc(g.nombre)} <input type="number" inputmode="numeric" min="5" step="5" value="${g.gramos}" style="${wkIgStyle}" onchange="updateGenWeekMealGrams(${index},${mIdx},${gIdx},+this.value)">g`).join(" · ")}</div>
     </div>`).join("")}
     <button class="btn btn-sm" style="margin-top:6px" onclick="regenerateDayInWeekDraft(${index})">Preparar otro ${esc(prettyDate(d.ds).split(",")[0])}</button>
-  </details>`).join("");
+  </details>`;
+  }).join("");
   // REQ-122: un día que no cumplió el objetivo queda fuera de daysData (no bloqueado, pero
   // ausente); ofrecer completarlo por ruta determinista en vez de dejar la semana incompleta.
   const problems=draft.problems&&draft.problems.length
@@ -8900,10 +8928,14 @@ async function applyWeekPlan(){
     try{await saveNutritionPlanVersion(draft);}
     catch(e){console.warn("No se pudo versionar el plan nutricional.",e);}
   }
+  // REQ-139: aviso suave agregado, calculado antes de aplicar; nunca bloquea la semana.
+  const wkTarget=(draft.weekSummary&&draft.weekSummary.target)||effectiveDayTarget();
+  const offCount=draft.daysData.filter(d=>dietContractNoticeText(comidasMacroTotals(d.comidas),wkTarget)).length;
+  const contractNote=offCount?` ${offCount===1?"1 día quedó":offCount+" días quedaron"} cerca de tu meta, no exacto${offCount===1?"":"s"}.`:"";
   // Compatibilidad: también escribe overrides para clientes sin DB conectada
   draft.daysData.forEach(d=>applyDayComidas(d.ds,d.comidas));
   trackEvent("diet_week_applied",{count:draft.daysData.length});
-  window._genWeek=null;closeModal();render();toast(`${draft.daysData.length} días aplicados a tu plan`);
+  window._genWeek=null;closeModal();render();toast(`${draft.daysData.length} días aplicados a tu plan`+contractNote);
 }
 async function regenerateDayInWeekDraft(index){
   const draft=window._genWeek;if(!draft)return;

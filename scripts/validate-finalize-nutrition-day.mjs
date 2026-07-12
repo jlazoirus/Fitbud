@@ -8,7 +8,7 @@ const d = globalThis.FITBUD_NUTRITION_DOMAIN;
 assert.ok(d, "FITBUD_NUTRITION_DOMAIN debe existir");
 assert.equal(typeof d.finalizeNutritionDay, "function", "finalizeNutritionDay debe exportarse");
 assert.equal(typeof globalThis.finalizeNutritionDay, "function", "finalizeNutritionDay debe exponerse globalmente");
-assert.equal(d.DIET_CONTRACT.runtimeActive, false, "REQ-129 etapa 1 no debe activar DIET_CONTRACT");
+assert.equal(d.DIET_CONTRACT.runtimeActive, true, "REQ-139 activa DIET_CONTRACT como aviso suave");
 
 const SLOT_TARGET = { kcal: 390, p: 20, c: 50, f: 10 };
 const DAY_TARGET = { kcal: 390, p: 20, c: 50, f: 10 };

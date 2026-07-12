@@ -81,6 +81,7 @@ run("validate-finalize-nutrition-day.mjs", "node scripts/validate-finalize-nutri
 run("validate-nutrition-finalize-wiring.mjs", "node scripts/validate-nutrition-finalize-wiring.mjs");
 run("validate-diet-contract.mjs", "node scripts/validate-diet-contract.mjs");
 run("validate-diet-contract-diff.mjs", "node scripts/validate-diet-contract-diff.mjs");
+run("validate-diet-contract-runtime-notice.mjs", "node scripts/validate-diet-contract-runtime-notice.mjs");
 run("validate-nutrition-catalog.mjs", "node scripts/validate-nutrition-catalog.mjs");
 run("validate-cuisine-preferences.mjs", "node scripts/validate-cuisine-preferences.mjs");
 run("validate-grow-catalog.mjs", "node scripts/validate-grow-catalog.mjs");

@@ -7190,3 +7190,60 @@ Subir la factibilidad del canario de forma sustancial (no un lote incremental me
 
 - Reporte de REQ-144 antes/después del lote completo (no solo el % agregado de `validate-diet-contract.mjs`).
 - `node supabase/validate.mjs` para integridad de recetas/macros del catálogo ampliado.
+
+## REQ-139 - Activar `DIET_CONTRACT` en runtime con aviso suave no bloqueante
+
+**Estado: implementado (2026-07-12).**
+
+### Decisión de producto (2026-07-05, Jonathan)
+
+El alcance original (rechazo duro en cliente/servidor/snapshot) habría roto `aiGenerateDay()` para la mayoría de perfiles: canario en 32.3%, debajo del gate ≥98% de REQ-128, y `validateGeneratedDay()` valida la propuesta cruda del modelo antes del cierre determinista.
+
+Jonathan decidió: (1) el contrato se evalúa sobre el **día ya cerrado** por `finalizeNutritionDay()`, nunca sobre la propuesta cruda; `validateGeneratedDay()` no sube sus checks de macro a `issues`; (2) si el día cerrado no cumple `DIET_CONTRACT`, la UI muestra un **aviso suave** y el usuario aplica/guarda igual — ningún flujo bloquea; (3) el crecimiento de catálogo (REQ-143) ya no es prerrequisito duro, porque el aviso no depende de la factibilidad.
+
+### Origen
+
+Subdivisión final de REQ-129. Redefinido 2026-07-05 (ver decisión arriba).
+
+### Problema
+
+El "ok" visible de un día generado dependía solo de `finalizedDayIsComplete()` (cobertura de slots); el usuario nunca veía si su día quedó cerca o lejos de sus metas, aunque `finalizeNutritionDay()` ya calculaba `contract`/`residual`.
+
+### Causa raíz (verificada contra código antes de implementar)
+
+`finalizeDayWithGate()` ya calculaba `finalized.contract` en cada flujo (día, semana, regenerado de comida), pero ningún call-site de `index.html` leía ese campo: `deterministicDayPayload()` sobrescribía `ok`/`status` con `finalizedDayIsComplete()` (descartando el contrato para gating, correcto y sin cambios), y el resto de flujos (`generateOneDay`, `generateDeterministicWeek`, `regenerateDayInWeekDraft`, `regenerateGenMeal`) simplemente tomaban `finalized.comidas` sin propagar `contract` a la UI. El dato ya existía; faltaba mostrarlo.
+
+### Solución implementada
+
+- `js/nutrition-domain.js`: `DIET_CONTRACT.runtimeActive=true`. Ninguna otra función del dominio leía ese flag (se confirmó por grep antes de tocarlo), así que el cambio es puramente semántico/documental a nivel de dominio — el gating real vive en el cliente.
+- `index.html`: dos helpers nuevos junto a `finalizeDayWithGate()`/`finalizedDayIsComplete()`:
+  - `comidasMacroTotals(comidas)`: suma kcal/proteína/carbohidratos/grasa de un arreglo de comidas ya cerradas.
+  - `dietContractNoticeText(totals,target)`: delega en `nd.validateDietContractTotals()` (dominio puro, ya existía desde REQ-128) y devuelve `""` si el contrato cumple, o `"Tu día quedó cerca de tu meta, no exacto."` si no — copy sin vocabulario técnico (REQ-31).
+  - Se optó por recalcular el contrato desde `totals`/`target` en cada punto de renderizado (en vez de propagar el objeto `contract` de `finalizeNutritionDay()` por cada call-site) porque es una función pura y evita tener que enhebrar el campo por 5 flujos distintos con formas de retorno diferentes (`res`, `daysData[i]`, `det`).
+  - Se muestra en: `genReviewHtml()` (revisión de un día, solo cuando `res.ok` para no duplicar con el bloqueo de `issues`), `genWeekReviewHtml()` (una nota por día del borrador de semana), y en los toasts de `applyGeneratedDay()`, `applyWeekPlan()` (cuenta agregada de días no exactos) y `applyDeterministicDay()` (solo cuando el día quedó completo).
+  - `finalizedDayIsComplete()` no cambió: sigue siendo el único criterio de "aplicable" (cobertura de slots), documentado explícitamente en su comentario para evitar que una futura sesión lo acople al contrato.
+- `api/claude.js::validateDietDay()` y `domain-contracts.js::validateNutritionPlanSnapshot()`: sin cambios — no se agregó rechazo nuevo por macros (alcance opcional del REQ, no ejercido para minimizar riesgo).
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `js/nutrition-domain.js` | `DIET_CONTRACT.runtimeActive=true` |
+| `index.html` | `comidasMacroTotals()`, `dietContractNoticeText()`; wiring en `genReviewHtml`, `genWeekReviewHtml`, `applyGeneratedDay`, `applyWeekPlan`, `applyDeterministicDay` |
+| `scripts/validate-diet-contract-runtime-notice.mjs` | Validador estructural nuevo (sin ejecutar la app): runtimeActive=true, aviso presente en las 5 pantallas, ningún flujo de aplicar bloquea por contrato, sin vocabulario prohibido |
+| `scripts/validate-diet-contract.mjs`, `scripts/validate-finalize-nutrition-day.mjs`, `scripts/validate-nutrition-domain.mjs` | Aserciones de `runtimeActive` actualizadas de `false` a `true` |
+| `scripts/release-gate.mjs` | Agrega el validador nuevo al gate |
+| `service-worker.js` | `CACHE_NAME` v67 → v68 (shell `index.html` cambió) |
+
+### Criterios de aceptación
+
+- `DIET_CONTRACT.runtimeActive` queda `true`. ✓
+- Cuando el día cerrado no cumple el contrato, la UI muestra un aviso suave y no bloqueante, sin vocabulario técnico prohibido. ✓ (verificado en navegador con datos sintéticos: día 600 kcal sobre meta → aviso visible, botón "Aplicar al día" sigue habilitado)
+- Ningún flujo (cliente, servidor, snapshot) rechaza ni impide aplicar/guardar un día por no cumplir `DIET_CONTRACT`. ✓
+- `node scripts/release-gate.mjs` pasa. ✓ (69/71; los 2 no bloqueantes son el propio diff de git sin commitear y la suite E2E de `entreno.spec.js`, falla preexistente de REQ-145 no relacionada — hoy 2026-07-12 es domingo)
+
+### Verificación
+
+- `node scripts/validate-diet-contract-runtime-notice.mjs`, `node scripts/validate-nutrition-domain.mjs`, `node scripts/validate-finalize-nutrition-day.mjs`, `node scripts/validate-diet-contract.mjs`: todos pasan.
+- `node scripts/release-gate.mjs`: 69/71 (ver criterios arriba).
+- Navegador (servidor local 8923, sin llamadas pagadas): `dietContractNoticeText()` devuelve el aviso solo cuando el contrato falla y `""` cuando cumple exacto; `comidasMacroTotals()` suma correctamente; `genReviewHtml()` con un día 600 kcal fuera de meta muestra el aviso y mantiene "Aplicar al día" habilitado (nunca `disabled`); `genWeekReviewHtml()` con un borrador de 2 días (uno exacto, uno lejos) muestra exactamente 1 aviso, en el día correcto.

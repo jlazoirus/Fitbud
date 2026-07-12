@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // REQ-128 — Canary offline del DIET_CONTRACT.
 // Reconstruye el catalogo local desde seed.sql + semantica REQ-79 y mide
-// factibilidad estricta sin activar el contrato en runtime.
+// factibilidad estricta. REQ-139 activo el contrato en runtime solo como aviso
+// suave no bloqueante; este canario sigue midiendo el % que cierra exacto,
+// como referencia de calidad para crecer el catalogo (REQ-143/147).
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +17,7 @@ const d = globalThis.FITBUD_NUTRITION_DOMAIN;
 
 assert.ok(d, "FITBUD_NUTRITION_DOMAIN debe existir");
 assert.ok(d.DIET_CONTRACT, "DIET_CONTRACT debe estar exportado");
-assert.equal(d.DIET_CONTRACT.runtimeActive, false, "REQ-128 no debe activar runtime");
+assert.equal(d.DIET_CONTRACT.runtimeActive, true, "REQ-139 activa el aviso suave en runtime");
 assert.equal(d.DIET_CONTRACT.authoritativeKcal, "catalog_ingredient_kcal");
 assert.equal(typeof d.finalizeNutritionDay, "function", "REQ-129 debe exportar finalizeNutritionDay");
 
@@ -358,7 +360,7 @@ if (jsonMode) {
     console.log(`  - ${key}: ${count}`);
   });
   if (belowGate.length) {
-    console.log(`\nCalibracion: ${belowGate.length} dimension(es) quedan bajo 98%; REQ-128/129/135 ya miden y amplian cobertura, REQ-137 debe cerrar macros antes de activar runtime.`);
+    console.log(`\nCalibracion: ${belowGate.length} dimension(es) quedan bajo 98%; el aviso suave de REQ-139 ya esta activo, esto solo mide cuanto del catalogo cierra exacto (ver REQ-143/147).`);
   } else {
     console.log("\nCalibracion: todas las dimensiones cumplen el gate futuro.");
   }

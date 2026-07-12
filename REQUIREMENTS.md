@@ -56,9 +56,8 @@ Automatizable por el agente desarrollador:
 
 REQ-81..84 (planner determinista, versionado en `plan_versions`, reemplazos con rebalanceo, coach auxiliar validado) ya implementados — detalle en `docs/requirements-history.md`.
 
-Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`, REQ-97..112) y serie "dieta exacta" (4 jul 2026, REQ-128..138 + REQ-140/141/144; diagnóstico en `docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`, decisiones: tolerancias estrictas sujetas a canario, Sonnet 5 solo tras gate de telemetría, ampliación de catálogo) ya están implementadas — su detalle vive en el ledger de abajo y en `docs/requirements-history.md`. Pendientes de esa secuencia:
+Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`, REQ-97..112) y serie "dieta exacta" (4 jul 2026, REQ-128..139 + REQ-140/141/144; diagnóstico en `docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`, decisiones: tolerancias estrictas sujetas a canario, Sonnet 5 solo tras gate de telemetría, ampliación de catálogo, aviso suave no bloqueante) ya están implementadas — su detalle vive en el ledger de abajo y en `docs/requirements-history.md`. Pendientes de esa secuencia:
 
-- REQ-139 - Activar `DIET_CONTRACT` en runtime, servidor, snapshots y pool con aviso suave no bloqueante. (P0; alcance redefinido 2026-07-05, decision de Jonathan tomada, ya no depende del gate de catalogo; movido antes de REQ-143 en `agent-loop.json` el 2026-07-08 porque REQ-143 quedo pausado esperando decision de REQ-147)
 - REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
@@ -1390,59 +1389,10 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-138`).
 
 ## REQ-139 - Activar `DIET_CONTRACT` en runtime con aviso suave no bloqueante
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`DIET_CONTRACT.runtimeActive=true`. `dietContractNoticeText(totals,target)` (index.html) evalúa el día ya cerrado (nunca la propuesta cruda) vía `nd.validateDietContractTotals()` y muestra "Tu día quedó cerca de tu meta, no exacto." en `genReviewHtml`/`genWeekReviewHtml` y en los toasts de `applyGeneratedDay`/`applyWeekPlan`/`applyDeterministicDay`. `finalizedDayIsComplete()` sigue siendo el único criterio de "aplicable" (cobertura de slots); ningún flujo bloquea aplicar/guardar por incumplir el contrato. Validador: `scripts/validate-diet-contract-runtime-notice.mjs`.
 
-### Decisión de producto (2026-07-05, Jonathan)
-
-El alcance original (rechazo duro en cliente/servidor/snapshot) habría roto `aiGenerateDay()` para la mayoría de perfiles: canario en 32.3%, debajo del gate ≥98% de REQ-128, y `validateGeneratedDay()` valida la propuesta cruda del modelo antes del cierre determinista. Detalle del análisis: commit "REQ-139: bloquear activacion de DIET_CONTRACT por brecha de catalogo".
-
-Jonathan decidió: (1) el contrato se evalúa sobre el **día ya cerrado** por `finalizeNutritionDay()`, nunca sobre la propuesta cruda; `validateGeneratedDay()` no sube sus checks de macro a `issues`; (2) si el día cerrado no cumple `DIET_CONTRACT`, la UI muestra un **aviso suave** (ej. "Tu día quedó cerca de tu meta, no exacto") y el usuario aplica/guarda igual — ningún flujo bloquea; (3) el crecimiento de catálogo (REQ-143) ya no es prerrequisito duro, porque el aviso no depende de la factibilidad. Reemplaza el alcance/criterios originales de rechazo duro.
-
-### Origen
-
-Subdivisión final de REQ-129. Redefinido 2026-07-05 (ver decisión arriba).
-
-### Problema
-
-El "ok" visible de un día generado depende solo de `finalizedDayIsComplete()` (cobertura de slots); el usuario nunca ve si su día quedó cerca o lejos de sus metas, aunque `finalizeNutritionDay()` ya calcula `contract`/`residual`.
-
-### Objetivo
-
-Activar `DIET_CONTRACT` como señal informativa (no bloqueante) en el resultado ya cerrado, para que el usuario sepa cuándo su día quedó exacto y cuándo solo cercano, sin arriesgar la disponibilidad de la generación por IA mientras el catálogo sigue creciendo (REQ-143).
-
-### Alcance
-
-1. Cambiar `DIET_CONTRACT.runtimeActive` a `true` (deja de ser solo calibración).
-2. En el resultado visible de `finalizeDayWithGate()` (día generado/regenerado/semana), cuando `finalized.contract.ok===false` agregar un aviso suave, sin vocabulario técnico prohibido (REQ-31; ej. "Tu día quedó cerca de tu meta, no exacto"), visible en la pantalla de revisión y en el día aplicado. No cambia `finalizedDayIsComplete()` como criterio de "aplicable" (sigue siendo cobertura de slots).
-3. NO subir los 2 checks de macro de `validateGeneratedDay()` de `warns` a `issues` — siguen evaluando la propuesta cruda del modelo solo informativamente.
-4. `api/claude.js::validateDietDay()`: no agregar rechazo nuevo por macros; puede anotar/loguear cumplimiento de contrato para telemetría futura, sin bloquear la respuesta.
-5. `domain-contracts.js::validateNutritionPlanSnapshot()`: mantiene su tolerancia estructural actual (~±20%) para guardar/sync; NO se ata a las tolerancias estrictas de `DIET_CONTRACT` (evitar bloquear el guardado de días válidos aunque no queden "exactos").
-6. Solo subir `COACH_PROMPT_VERSION`/`PROMPT_VERSION` e invalidar pool si el prompt o el criterio de aceptación del modelo cambian de verdad (probablemente no aplica bajo este alcance reducido).
-7. Actualizar/crear validador que confirme: (a) ningún flujo cliente/servidor/snapshot bloquea aplicar/guardar un día por incumplir `DIET_CONTRACT`; (b) el aviso suave aparece cuando corresponde sin vocabulario técnico prohibido.
-
-### Fuera de alcance
-
-- Crecimiento de catálogo para subir la factibilidad del canario (REQ-143).
-- Cambios de modelo/API (REQ-133).
-- Reemplazo puntual de comida (REQ-142).
-- Cualquier rechazo/bloqueo duro atado a `DIET_CONTRACT` (queda derogado de este REQ; requeriría una nueva decisión de producto explícita).
-
-### Riesgos
-
-- Confundir el aviso nuevo con los `warns` existentes de `validateGeneratedDay()`/`validateDayTotals()`: evitar mensajes duplicados en la misma pantalla.
-- El copy debe pasar el filtro REQ-31 (nada de "IA", "modelo", "prompt"): hablar de "tu coach"/"tu plan".
-
-### Criterios de aceptación
-
-- `DIET_CONTRACT.runtimeActive` queda `true`.
-- Cuando `finalized.contract.ok` es `false` tras `finalizeNutritionDay()`, la UI muestra un aviso suave y no bloqueante, sin vocabulario técnico prohibido.
-- Ningún flujo (cliente, servidor, snapshot) rechaza ni impide aplicar/guardar un día por no cumplir `DIET_CONTRACT`.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Test que arma un día con `contract.ok:false` y confirma que el flujo lo deja aplicar igual, mostrando el aviso suave.
-- Grep de vocabulario prohibido (REQ-31) en el copy nuevo.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 
 ## REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`
 
