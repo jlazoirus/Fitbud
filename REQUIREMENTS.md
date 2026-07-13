@@ -1800,3 +1800,44 @@ Que la PWA instalada nunca ejecute una mezcla de versiones.
 ### Verificación sugerida
 
 - Cachear un `.js` viejo y confirmar que una navegación fresca ya no coexiste con JS viejo tras el fix.
+
+## REQ-151 - Landing muestra la sección "Planes" vacía cuando el catálogo carga después del primer render
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey de **adquisición** (rotación del loop auditor tras REQ-150). Verificación funcional en navegador (preview `fitbud`, servidor local 8923, 0 llamadas pagadas): un visitante sin sesión ve la landing con la sección "Planes / Elige tu ritmo" **sin tarjetas de precio**, el elemento de conversión central del funnel.
+
+### Problema
+
+Con `authReady:true`, `session:false`, `_showAuth:false` la landing está renderizada, y `catalogPlans` ya tiene 2 planes, pero el DOM muestra `<div class="l-plans"></div>` vacío (0 tarjetas). Reproducción: al cargar la página, `document.querySelectorAll('.l-plan').length === 0` mientras `catalogPlans.length === 2`; llamar `render()` manualmente pinta las 2 tarjetas ("Plan mensual USD14/mes", "Paquete 3 meses USD36/3 meses"). La sección queda vacía de forma permanente para el visitante pasivo (no hay evento que la re-renderice). Sin errores de consola.
+
+### Causa raíz
+
+Carrera en `boot()` (`index.html:11355-11376`): `loadCatalog()` se llama sin `await` (`index.html:11361`, "no-await ... en paralelo") y sin `.then(render)`. Tras `await refreshAuth()`, si no hay sesión se llama `render()` (`index.html:11375`) → `renderLanding()` → `landingPricingHtml()` (`index.html:6796`) → `activeCatalogPlans()` (`index.html:787`) devuelve `(catalogPlans||[])`. Cuando `refreshAuth` (sesión de Supabase, a menudo desde localStorage) gana la carrera al fetch de `/api/catalog`, `catalogPlans` aún es `null` (`index.html:771`) y `landingPricingHtml()` devuelve `""`. `loadCatalog()` fija `catalogPlans` (`index.html:772-786`) pero **nunca vuelve a renderizar**, así que la sección permanece vacía. Confirmado por grep: no existe `loadCatalog().then(...)` ni re-render tras poblar el catálogo.
+
+### Objetivo
+
+Que el visitante siempre vea las tarjetas de precio en la landing, sin importar el orden en que resuelvan `refreshAuth` y `loadCatalog`.
+
+### Alcance
+
+1. Re-renderizar (o repintar la sección de planes) cuando `loadCatalog()` termina y hay una landing/paywall visible, p. ej. `loadCatalog().then(()=>{ if(authReady&&!session&&!window._showAuth)render(); })`.
+
+### Fuera de alcance
+
+- El fallback de planes, el paywall autenticado (REQ-104) y el orden de otras cargas de boot.
+
+### Riesgos
+
+- Un re-render extra en boot; acotarlo a cuando la landing está visible para no repintar la app autenticada.
+
+### Criterios de aceptación
+
+- Con `catalogPlans` poblado tras el primer render, la landing muestra las 2 tarjetas sin interacción del usuario.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Servir en 8923, cargar como visitante sin sesión y confirmar `document.querySelectorAll('.l-plan').length > 0` sin llamar `render()` a mano.
