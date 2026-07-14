@@ -1801,3 +1801,50 @@ Que el visitante siempre vea las tarjetas de precio en la landing, sin importar 
 ### Verificación sugerida
 
 - Servir en 8923, cargar como visitante sin sesión y confirmar `document.querySelectorAll('.l-plan').length > 0` sin llamar `render()` a mano.
+
+## REQ-152 - Fix onboarding: "Mantenerlo por ahora" en el aviso de revisión de 4 semanas lanza ReferenceError y no cierra ni guarda
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey de **onboarding** (rotación del loop auditor tras REQ-151). Verificación funcional en navegador (preview `fitbud`, 8923, 0 llamadas pagadas): el aviso de revisión "Han pasado 4 semanas" (`maybePromptProfileReview()`, `index.html:3487-3496`) ofrece "Revisar mi plan" (`startOnboarding()`) y "Mantenerlo por ahora" (`keepCurrentProfile()`). Al pulsar "Mantenerlo por ahora" no pasa nada visible: el modal no se cierra.
+
+### Problema
+
+Al pulsar "Mantenerlo por ahora", `keepCurrentProfile()` lanza `ReferenceError: calendarChanged is not defined` **antes** de llamar a `saveProfilePrefs()`, así que:
+
+1. El modal nunca se cierra (`closeModal()` está al final y no se alcanza); el usuario solo puede salir por "Revisar mi plan", que lo manda a rehacer el onboarding (justo lo que quería evitar). Tampoco sale el toast de confirmación.
+2. Lo más grave: `onboardingReviewedAt` **no se persiste**, por lo que `profileReviewDue()` sigue devolviendo true y el aviso reaparece cada sesión. El usuario no puede posponer la revisión.
+
+Reproducción (consola): `await keepCurrentProfile()` → `ReferenceError: calendarChanged is not defined`; inyectando el modal real y clicando el botón, el DOM sigue mostrando "Mantenerlo por ahora" (modal abierto).
+
+### Causa raíz
+
+`keepCurrentProfile()` (`index.html:3497-3508`) referencia dos variables fuera de su ámbito: en el objeto que pasa a `saveProfilePrefs()` usa `reason:calendarChanged?...` y `validTo:planEndDate`. `calendarChanged` solo se declara como `const` local en `saveOnboarding()` (`index.html:3434`) y `saveProfile()` (`index.html:6230`); `planEndDate` solo como `let/const` local en `saveOnboarding()` (`index.html:3419`) y `saveProfile()` (`index.html:6229`). Ninguna es global. Con `"use strict"` activo (`index.html:761`), leer una variable no declarada lanza `ReferenceError` al construir el objeto literal, antes del `await`; como la función es `async`, el error queda como rechazo de promesa no manejado desde el `onclick`.
+
+### Objetivo
+
+Que "Mantenerlo por ahora" cierre el aviso, guarde `onboardingReviewedAt` y muestre la confirmación, de modo que la revisión se posponga los días previstos y no vuelva a molestar hasta entonces.
+
+### Alcance
+
+1. En `keepCurrentProfile()`, reemplazar las referencias fuera de ámbito por valores locales válidos: `reason` fijo (p. ej. `"Preferencias guardadas"`, este flujo no cambia el calendario) y `validTo` derivado de los prefs del perfil (`prefs.planEndDate` o `planEndFor(prefs.planStartDate,resolvedPlanDuration(prefs))`).
+
+### Fuera de alcance
+
+- La lógica de `saveOnboarding()`/`saveProfile()` (donde esas variables sí existen) y el resto del ciclo de revisión.
+
+### Riesgos
+
+- Un `validTo` incorrecto escribiría una `plan_versions` con vigencia rara; usar el `planEndDate` ya guardado en prefs mantiene coherencia. Regresión mínima: la función es corta y solo la usa este botón.
+
+### Criterios de aceptación
+
+- "Mantenerlo por ahora" cierra el modal, sin errores en consola, muestra el toast y persiste `onboardingReviewedAt`; el aviso no reaparece antes de `PROFILE_REVIEW_DAYS`.
+- `keepCurrentProfile` no referencia `calendarChanged` ni `planEndDate` fuera de ámbito.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- En consola con perfil/sesión válidos: `await keepCurrentProfile()` no lanza `ReferenceError`; el clic en "Mantenerlo por ahora" cierra el modal y persiste `onboardingReviewedAt`.
