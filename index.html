@@ -7513,19 +7513,55 @@ function applyChangeMeal(i){
     }
   }
   ms.ovr=newOvr;
-  // Rebalanceo de comidas futuras (REQ-83)
+  // Rebalanceo de comidas futuras (REQ-83) — conectado a finalizeNutritionDay()
+  // (REQ-142): la comida cambiada y todo lo demás quedan lockedMeals, las
+  // futuras candidatas entran como proposal (conservan plato) y
+  // globalClosePass() dentro de finalizeNutritionDay() cierra el día completo
+  // en vez de repartir -deltaKcal/n de forma proporcional.
   const rebalanced=[];
   const nd=window.FITBUD_NUTRITION_DOMAIN;
   if(ranked_item&&ranked_item.rebalanceNeeded&&ranked_item.futureMeals&&ranked_item.futureMeals.length&&nd&&nd.rebalanceFutureMeals){
     const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
     const target=effectiveDayTarget();
-    const adjustments=nd.rebalanceFutureMeals(ranked_item.futureMeals,ranked_item.deltaKcal,target,prefs,DB);
-    adjustments.forEach(adj=>{
-      const fms=mealState(ds,adj.slot_id);
-      const prevOvr=fms.ovr?{...fms.ovr}:null;
-      if(adj.newOvr){fms.ovr={...adj.newOvr};}
-      rebalanced.push({slot_id:adj.slot_id,slot:adj.slot,adjustKcal:adj.adjustKcal,prevOvr,applied:!!adj.newOvr});
-    });
+    const futureIds=new Set(ranked_item.futureMeals.map(fm=>fm.id));
+    const futureCurrent=new Map(ranked_item.futureMeals.map(fm=>{
+      const m=day.meals.find(x=>x.id===fm.id);
+      return[fm.id,m?mealEntryForFinalize(m,mealState(ds,fm.id)):null];
+    }).filter(([,entry])=>entry));
+    const lockedMeals=[
+      ...day.meals.filter(m=>m.id!==id&&!futureIds.has(m.id)).map(m=>mealEntryForFinalize(m,mealState(ds,m.id))),
+      mealEntryForFinalize(base,ms),
+    ];
+    const futureProposal=[...futureCurrent.values()];
+    const finalized=nd.finalizeNutritionDay&&DB.loaded
+      ?finalizeDayWithGate(ds,day,target,prefs,futureProposal,{lockedMeals})
+      :null;
+    if(finalized&&Array.isArray(finalized.comidas)){
+      ranked_item.futureMeals.forEach(fm=>{
+        const solved=finalized.comidas.find(c=>c.slot_id===fm.id);
+        const fms=mealState(ds,fm.id);
+        const prevOvr=fms.ovr?{...fms.ovr}:null;
+        const prevEntry=futureCurrent.get(fm.id);
+        if(solved){
+          fms.ovr={
+            name:solved.nombre,dishName:solved.nombre,gen:true,nutritionPlan:true,
+            kcal:solved.kcal,p:solved.proteina_g,c:solved.carbohidratos_g,f:solved.grasa_g,
+            ingredientes:solved.ingredientes,
+          };
+        }
+        const adjustKcal=solved&&prevEntry?Math.round(solved.kcal-prevEntry.kcal):0;
+        rebalanced.push({slot_id:fm.id,slot:fm.slot,adjustKcal,prevOvr,applied:!!solved});
+      });
+    }else{
+      // Capa de compatibilidad si finalizeNutritionDay() no está disponible.
+      const adjustments=nd.rebalanceFutureMeals(ranked_item.futureMeals,ranked_item.deltaKcal,target,prefs,DB);
+      adjustments.forEach(adj=>{
+        const fms=mealState(ds,adj.slot_id);
+        const prevOvr=fms.ovr?{...fms.ovr}:null;
+        if(adj.newOvr){fms.ovr={...adj.newOvr};}
+        rebalanced.push({slot_id:adj.slot_id,slot:adj.slot,adjustKcal:adj.adjustKcal,prevOvr,applied:!!adj.newOvr});
+      });
+    }
   }
   addContingencyEntry(ds,{
     type:"meal_replace",id,reason:reason||null,
@@ -7858,6 +7894,18 @@ function recentDishSlugs(ds,daysBack){
   }
   return used;
 }
+// Formato de comida que espera finalizeNutritionDay() en lockedMeals/proposal,
+// a partir del valor efectivo actual de una comida (base + override si existe).
+function mealEntryForFinalize(m,ms){
+  const v=mealValue(m,ms);
+  return {
+    slot_id:m.id,
+    nombre:v.name,
+    ingredientes:(ms.ovr&&ms.ovr.ingredientes)||m.ingredientes||[],
+    kcal:v.kcal,proteina_g:v.p,carbohidratos_g:v.c,grasa_g:v.f,
+    dishSlug:(ms.ovr&&ms.ovr.dishSlug)||m.dishSlug||null,
+  };
+}
 // REQ-138: comidas ya registradas (done=true) de un día, en el formato de comida
 // que espera finalizeNutritionDay() como lockedMeals — nunca se regeneran.
 function lockedMealsForDay(ds,day){
@@ -7866,14 +7914,7 @@ function lockedMealsForDay(ds,day){
   (day.meals||[]).forEach(m=>{
     const ms=st.meals[m.id];
     if(!ms||!ms.done)return;
-    const v=mealValue(m,ms);
-    locked.push({
-      slot_id:m.id,
-      nombre:v.name,
-      ingredientes:(ms.ovr&&ms.ovr.ingredientes)||m.ingredientes||[],
-      kcal:v.kcal,proteina_g:v.p,carbohidratos_g:v.c,grasa_g:v.f,
-      dishSlug:(ms.ovr&&ms.ovr.dishSlug)||m.dishSlug||null,
-    });
+    locked.push(mealEntryForFinalize(m,ms));
   });
   return locked;
 }

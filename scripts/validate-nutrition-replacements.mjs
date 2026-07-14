@@ -156,4 +156,50 @@ assert.ok(veganRanked.every(r => (r.dish.diet_tags || []).includes("vegano")),
   "solo candidatos veganos deben aparecer cuando se filtra por dieta");
 console.log(`  Test 9 pasado: restricción de dieta vegana respetada (${veganRanked.length} candidatos)`);
 
+// ── Test 10: reemplazo conectado a finalizeNutritionDay() (REQ-142) ──────────
+// Cambiar almuerzo por "Bowl de tofu con arroz" (delta grande) debe poder
+// cerrarse con finalizeNutritionDay(): la comida cambiada queda lockedMeals
+// (no la toca globalClosePass), las futuras entran como proposal y el cierre
+// global reemplaza el reparto proporcional de rebalanceFutureMeals().
+assert.ok(typeof d.finalizeNutritionDay === "function", "finalizeNutritionDay debe existir");
+const changedDish = dishes.find(d2 => d2.slug === "tofu-arroz");
+const changedSolved = d.solveDishPortion(changedDish, mealTarget, { catalog });
+assert.ok(changedSolved.ok, "debe resolver porción del plato recién elegido");
+const changedMeal = {
+  slot_id: "almuerzo", nombre: changedDish.name, dishSlug: changedDish.slug,
+  kcal: changedSolved.macros.kcal, proteina_g: changedSolved.macros.p,
+  carbohidratos_g: changedSolved.macros.c, grasa_g: changedSolved.macros.f,
+  ingredientes: changedSolved.ingredients,
+};
+const deltaKcalChanged = changedMeal.kcal - currentMeal.kcal;
+const solv5 = d.solveReplacement("almuerzo", deltaKcalChanged, dayMeals, dayLog_noRebal);
+assert.ok(solv5.rebalanceNeeded, "el cambio de plato debe requerir rebalanceo");
+assert.ok(solv5.futureMeals.some(fm => fm.id === "merienda") && solv5.futureMeals.some(fm => fm.id === "cena"),
+  "merienda y cena deben quedar como candidatas a rebalanceo");
+const desayunoLocked = { slot_id: "desayuno", nombre: "Avena proteica", dishSlug: "avena-proteica", kcal: 400, proteina_g: 30, carbohidratos_g: 45, grasa_g: 12, ingredientes: [] };
+const merCurrent = { slot_id: "merienda", nombre: "Yogur proteico", dishSlug: "yogur-proteico", kcal: 200, proteina_g: 15, carbohidratos_g: 20, grasa_g: 5, ingredientes: [] };
+const cenaCurrent = { slot_id: "cena", nombre: "Pollo con arroz", dishSlug: "pollo-arroz", kcal: 600, proteina_g: 50, carbohidratos_g: 60, grasa_g: 15, ingredientes: [] };
+const finalized = d.finalizeNutritionDay({
+  prefs, dayTarget, catalog,
+  slots: [
+    { id: "desayuno", slot: "desayuno" },
+    { id: "almuerzo", slot: "almuerzo" },
+    { id: "merienda", slot: "merienda" },
+    { id: "cena", slot: "cena" },
+  ],
+  proposal: [merCurrent, cenaCurrent],
+  lockedMeals: [desayunoLocked, changedMeal],
+});
+assert.ok(Array.isArray(finalized.comidas) && finalized.comidas.length === 4,
+  "el día cerrado debe seguir cubriendo los 4 slots");
+const closedAlmuerzo = finalized.comidas.find(c => c.slot_id === "almuerzo");
+assert.ok(closedAlmuerzo, "almuerzo debe seguir presente tras el cierre");
+assert.equal(closedAlmuerzo.dishSlug, "tofu-arroz", "almuerzo (locked) conserva el plato recién elegido");
+assert.equal(closedAlmuerzo.kcal, changedMeal.kcal, "almuerzo (locked) no se toca en el cierre global");
+const closedDesayuno = finalized.comidas.find(c => c.slot_id === "desayuno");
+assert.equal(closedDesayuno && closedDesayuno.kcal, 400, "desayuno (locked) no se toca en el cierre global");
+const closedCena = finalized.comidas.find(c => c.slot_id === "cena");
+assert.ok(closedCena && closedCena.dishSlug === "pollo-arroz", "cena conserva su plato cuando el cierre lo permite");
+console.log(`  Test 10 pasado: finalizeNutritionDay() cierra el día tras el reemplazo (totales ${finalized.totals.kcal} kcal vs meta ${dayTarget.kcal} kcal)`);
+
 console.log("validate-nutrition-replacements: todos los checks pasaron.");

@@ -1396,50 +1396,10 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 
 ## REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`applyChangeMeal()` en `index.html` ya no llama a `rebalanceFutureMeals()` en el camino principal: cuando `rebalanceNeeded`, arma un `ctx` para `finalizeDayWithGate()`/`finalizeNutritionDay()` con `lockedMeals` = todas las comidas del día salvo las futuras candidatas (usa el valor efectivo actual vía el nuevo helper `mealEntryForFinalize()`) más la comida recién elegida, y `proposal` = valor actual de las comidas futuras (conserva plato; `normalizeProposalMeal()` re-resuelve porción si no trae ingredientes, o recalcula macros desde sus ingredientes si los trae, y `globalClosePass()` termina el cierre del día completo por hill-climbing). Los ajustes resultantes se escriben como `ovr` (`gen:true,nutritionPlan:true`) igual que antes. `rebalanceFutureMeals()` se conserva como capa de compatibilidad (solo se usa si `finalizeNutritionDay()` no está disponible) y sigue exportada/probada. Copy ("· N ajustada(s)") y `contingencyLog` sin cambios. Validador: `scripts/validate-nutrition-replacements.mjs` (10 tests; se agregó el test 10 que ejercita `finalizeNutritionDay()` con el mismo `ctx` que arma `applyChangeMeal()`).
 
-### Origen
-
-Extraído de REQ-138 (4 jul 2026) al acotar su alcance: los 5 flujos de generación/regeneración de día ya quedaron conectados a `finalizeNutritionDay()`, pero el flujo de reemplazo puntual de una comida (`openChangeMeal`/`applyChangeMeal`) usa su propio mecanismo (REQ-83: `rankReplacementCandidates` + `solveReplacement` + `rebalanceFutureMeals`), distinto y ya probado, que no se tocó para no arriesgar una regresión sin análisis dedicado.
-
-### Problema
-
-Cuando el usuario cambia una comida y el reemplazo dispara rebalanceo de comidas futuras (`rebalanceNeeded`), ese rebalanceo reparte `-deltaKcal/n` proporcionalmente entre las comidas futuras (REQ-83), sin pasar por el cierre global de macros (`globalClosePass`) ni por la normalización de `finalizeNutritionDay()`. El día resultante no se beneficia del mismo cierre que sí aplican ahora `generateOneDay`, `deterministicDayPayload`, `generateDeterministicWeek`, `regenerateDayInWeekDraft` y `regenerateGenMeal`.
-
-### Causa raíz
-
-El REQ-83 se construyó antes que `finalizeNutritionDay()` (REQ-129/137) y resuelve el mismo problema (cerrar macros del día tras un cambio) con un algoritmo propio de rebalanceo proporcional en vez del hill-climbing de `globalClosePass()`.
-
-### Objetivo
-
-Evaluar si `rebalanceFutureMeals()` debe reemplazarse (o complementarse) por una llamada a `finalizeNutritionDay()` con las comidas ya-hechas/ya-elegidas como `lockedMeals`, sin regresar los 9 casos cubiertos por `scripts/validate-nutrition-replacements.mjs`.
-
-### Alcance
-
-1. Diseñar el `ctx` de `finalizeNutritionDay()` para el caso "una comida cambia, N futuras se ajustan": `lockedMeals` = comidas hechas + la recién elegida; `proposal` = comidas futuras actuales (para conservar plato) o vacío (para permitir que el fallback determinista las reconsidere).
-2. Decidir si se conserva `rebalanceFutureMeals()` como capa de compatibilidad (menos cambio de UI: "ajusta N comidas futuras") o se reemplaza por el resultado de `finalizeNutritionDay()`.
-3. Mantener el copy existente ("· N ajustada(s)") y el registro en `contingencyLog`.
-4. Actualizar/ampliar `scripts/validate-nutrition-replacements.mjs` para el nuevo camino.
-
-### Fuera de alcance
-
-- Activar `DIET_CONTRACT` en runtime (REQ-139).
-- Cambiar el ranking de candidatos (`rankReplacementCandidates`) ni el scope "solo hoy/esta semana".
-
-### Riesgos
-
-- `rebalanceFutureMeals()` ya tiene 9 tests verificados; reemplazarlo sin cuidado puede regresar casos límite (ej. sin comidas futuras, deltas pequeños que no requieren rebalanceo).
-- El "Cambiar comida" es una interacción de alta frecuencia; cualquier regresión de UX es muy visible.
-
-### Criterios de aceptación
-
-- El reemplazo de una comida con rebalanceo pasa por `finalizeNutritionDay()` (o se documenta explícitamente por qué no, con evidencia).
-- Los 9 casos de `scripts/validate-nutrition-replacements.mjs` (o su reemplazo equivalente) siguen pasando.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E mockeado de "Cambiar comida" con rebalanceo de 2+ comidas futuras; inspeccionar que el resultado final es consistente con `finalizeNutritionDay()` o que la decisión de no usarlo queda documentada.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-142`).
 
 ## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
 

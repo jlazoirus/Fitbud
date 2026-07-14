@@ -7247,3 +7247,55 @@ El "ok" visible de un día generado dependía solo de `finalizedDayIsComplete()`
 - `node scripts/validate-diet-contract-runtime-notice.mjs`, `node scripts/validate-nutrition-domain.mjs`, `node scripts/validate-finalize-nutrition-day.mjs`, `node scripts/validate-diet-contract.mjs`: todos pasan.
 - `node scripts/release-gate.mjs`: 69/71 (ver criterios arriba).
 - Navegador (servidor local 8923, sin llamadas pagadas): `dietContractNoticeText()` devuelve el aviso solo cuando el contrato falla y `""` cuando cumple exacto; `comidasMacroTotals()` suma correctamente; `genReviewHtml()` con un día 600 kcal fuera de meta muestra el aviso y mantiene "Aplicar al día" habilitado (nunca `disabled`); `genWeekReviewHtml()` con un borrador de 2 días (uno exacto, uno lejos) muestra exactamente 1 aviso, en el día correcto.
+
+## REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`
+
+**Estado: implementado (2026-07-14).**
+
+### Origen
+
+Extraído de REQ-138 (4 jul 2026) al acotar su alcance: los 5 flujos de generación/regeneración de día ya quedaron conectados a `finalizeNutritionDay()`, pero el flujo de reemplazo puntual de una comida (`openChangeMeal`/`applyChangeMeal`) usaba su propio mecanismo (REQ-83: `rankReplacementCandidates` + `solveReplacement` + `rebalanceFutureMeals`), distinto y ya probado, que no se tocó en su momento para no arriesgar una regresión sin análisis dedicado.
+
+### Problema
+
+Cuando el usuario cambiaba una comida y el reemplazo disparaba rebalanceo de comidas futuras (`rebalanceNeeded`), ese rebalanceo repartía `-deltaKcal/n` proporcionalmente entre las comidas futuras (REQ-83), sin pasar por el cierre global de macros (`globalClosePass`) ni por la normalización de `finalizeNutritionDay()`. El día resultante no se beneficiaba del mismo cierre que sí aplican `generateOneDay`, `deterministicDayPayload`, `generateDeterministicWeek`, `regenerateDayInWeekDraft` y `regenerateGenMeal`.
+
+### Causa raíz (verificada contra código antes de implementar)
+
+El REQ-83 se construyó antes que `finalizeNutritionDay()` (REQ-129/137) y resuelve el mismo problema (cerrar macros del día tras un cambio) con un algoritmo propio de rebalanceo proporcional en vez del hill-climbing de `globalClosePass()`. `finalizeDayWithGate()` ya existía y ya construye el `ctx` correcto (`lockedMeals`, `proposal`, `slots`) para cualquier flujo de día completo; solo faltaba que `applyChangeMeal()` lo usara en vez de `rebalanceFutureMeals()`.
+
+### Decisión de producto
+
+Se conservó `rebalanceFutureMeals()` (y `rankReplacementCandidates()`/`solveReplacement()`) sin tocar como capa de compatibilidad — siguen exportadas y con sus 9 tests originales intactos — y se usan solo si `finalizeNutritionDay()` no está disponible (nd o catálogo no cargado). En el camino normal (nd + `DB.loaded`, que es el único caso en que `rebalanceNeeded` puede activarse porque `ranked_item` solo existe con ambos cargados), `applyChangeMeal()` ahora arma el `ctx` de `finalizeNutritionDay()` y usa su resultado. No se activó `DIET_CONTRACT` en runtime para esta pantalla (fuera de alcance, ver REQ-139) ni se cambió el ranking de candidatos ni el scope "solo hoy/esta semana".
+
+### Solución implementada
+
+- `index.html`: nuevo helper `mealEntryForFinalize(m,ms)` (extraído del cuerpo de `lockedMealsForDay()`, que ahora lo reutiliza sin cambiar su comportamiento) construye el formato de comida `{slot_id,nombre,ingredientes,kcal,proteina_g,carbohidratos_g,grasa_g,dishSlug}` que espera `finalizeNutritionDay()`, a partir del valor efectivo actual (`mealValue()`, que ya resuelve override > nutritionPlan > plan base).
+- `applyChangeMeal()`: en la rama `ranked_item.rebalanceNeeded` con comidas futuras:
+  - `lockedMeals` = todas las comidas del día salvo la cambiada y las futuras candidatas (`ranked_item.futureMeals`), más la comida recién elegida (con sus macros/ingredientes ya resueltos por `rankReplacementCandidates`). Esto reproduce exactamente el comportamiento previo de "solo se tocan las futuras candidatas": comidas ya hechas, editadas manualmente o anteriores al slot cambiado quedan congeladas igual que antes (antes ni se tocaban; ahora se marcan `locked` explícitamente, mismo resultado).
+  - `proposal` = valor actual de cada comida futura candidata (mismo helper). Si trae `ingredientes`, `normalizeProposalMeal()` recalcula macros desde esos gramos (punto de partida realista); si no trae ingredientes, resuelve una porción nueva del mismo plato al target del slot. En ambos casos el plato (`dishSlug`) se conserva como punto de partida — "conservar plato" del alcance original.
+  - `finalizeDayWithGate(ds,day,target,prefs,proposal,{lockedMeals})` ejecuta `globalClosePass()` sobre las líneas escalables de las comidas futuras (no bloqueadas) para cerrar el día completo por hill-climbing, en vez del reparto proporcional `-deltaKcal/n`.
+  - El resultado (`finalized.comidas`) se mapea de vuelta a `ovr` por slot (`gen:true,nutritionPlan:true`, mismo shape que antes) y se registra en `contingencyLog` con `prevOvr`/`applied`, igual que la implementación anterior — el copy ("· N ajustada(s)") y el mecanismo de deshacer (`revertMeal`) no cambiaron.
+  - Si `finalizeNutritionDay()` no devuelve `comidas` (defensivo; en la práctica no ocurre porque `ranked_item` implica `nd` y `DB.loaded`), cae al camino anterior con `rebalanceFutureMeals()` sin cambios — capa de compatibilidad pedida en el alcance.
+- `js/nutrition-domain.js`: sin cambios. `rankReplacementCandidates`, `solveReplacement` y `rebalanceFutureMeals` siguen intactas y exportadas.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `index.html` | `mealEntryForFinalize()` nuevo (compartido con `lockedMealsForDay()`); `applyChangeMeal()` conecta el rebalanceo a `finalizeDayWithGate()`/`finalizeNutritionDay()` con `rebalanceFutureMeals()` como capa de compatibilidad |
+| `scripts/validate-nutrition-replacements.mjs` | Test 10 nuevo: arma el mismo `ctx` (lockedMeals = comida hecha + comida recién elegida; proposal = futuras) y verifica que `finalizeNutritionDay()` cierra los 4 slots, no toca las comidas locked y conserva plato en la comida futura cuando el cierre lo permite |
+
+### Criterios de aceptación
+
+- El reemplazo de una comida con rebalanceo pasa por `finalizeNutritionDay()`. ✓
+- Los 9 casos originales de `scripts/validate-nutrition-replacements.mjs` siguen pasando sin modificar las funciones puras que prueban (`rankReplacementCandidates`/`solveReplacement`/`rebalanceFutureMeals` no cambiaron). ✓ (10/10 con el test nuevo)
+- `node scripts/release-gate.mjs` pasa. ✓ (70/71; el único no bloqueante es "Sin modificaciones no intencionadas", esperado por el diff sin commitear de esta misma sesión)
+
+### Verificación
+
+- `node scripts/validate-nutrition-replacements.mjs`: 10/10 tests (9 originales + el nuevo de `finalizeNutritionDay()`).
+- `node scripts/validate-nutrition-domain.mjs`, `node scripts/validate-finalize-nutrition-day.mjs`, `node scripts/validate-nutrition-finalize-wiring.mjs`, `node scripts/validate-diet-contract-runtime-notice.mjs`, `node scripts/validate-nutrition-coach-contract.mjs`: todos pasan sin cambios.
+- `node scripts/release-gate.mjs`: 70/71 (ver criterios arriba).
+- JS embebido: se extrajo el último bloque `<script>` de `index.html` y se validó con `new Function(...)` (parsea sin errores de sintaxis).
+- No hay migraciones SQL ni cambios de shell PWA (no aplica subir `CACHE_NAME`).
