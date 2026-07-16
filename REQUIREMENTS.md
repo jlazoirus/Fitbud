@@ -1409,42 +1409,7 @@ Canario `validate-diet-contract.mjs`: 122/378 (32.3%), 100% `catalog_gap`. Dos s
 
 ## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
 
-**Estado: implementado.** Agrega `scripts/diff-diet-contract.mjs`, que acepta dos rutas de `seed.sql` y reporta delta de `okDays` total, catalogo, causas y las 54 dimensiones de la matriz. `scripts/validate-diet-contract-diff.mjs` valida el modo con semilla identica y el release gate lo ejecuta. Guia operativa: `docs/diet-contract-catalog-diff.md`.
-
-### Origen
-
-Hallazgo de REQ-143 (2026-07-05, sin commit): agregar platos, aun calibrados y confinados a slots sin corte de candidatos, puede regresar el % agregado de `validate-diet-contract.mjs` porque `planDeterministicNutritionDay()` elige por score local por slot sin optimizar el día completo.
-
-### Problema
-
-No hay forma barata de saber, antes de comitear un lote, si sube o baja el canario agregado y por dimensión. `scripts/grow-catalog.mjs` (REQ-134) solo valida que cada plato "encaje" contra `SLOT_TARGETS` genéricos de tolerancia amplia, no contra `finalizeNutritionDay()` sobre la matriz real de 378 días.
-
-### Objetivo
-
-Dar a cualquier lote de catálogo futuro una forma de comparar el canario antes/después de un candidato o lote completo, para aceptar solo cambios con impacto neto no negativo.
-
-### Alcance
-
-1. Agregar un modo a `scripts/validate-diet-contract.mjs` (o script nuevo `scripts/diff-diet-contract.mjs`) que acepte dos rutas de `seed.sql` y reporte el delta de `okDays` total y por dimensión.
-2. Documentar en `docs/` cómo correrlo antes de comitear un lote de catálogo.
-3. No modificar `DIET_CONTRACT` ni el solver: es tooling de medición offline.
-
-### Fuera de alcance
-
-- Cambiar la selección de `planDeterministicNutritionDay()` (rediseño de solver, fuera de este REQ). Activar el contrato en runtime (REQ-139).
-
-### Riesgos
-
-- Si el reporte solo muestra el delta neto sin desglose por dimensión, se repite el error que REQ-143 encontró a mano (optimizar el promedio a costa de una dimensión sana).
-
-### Criterios de aceptación
-
-- El nuevo modo/script corre sobre dos versiones de `supabase/seed.sql` y reporta `okDays` antes/después, delta total y por dimensión.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Usar los 5 lotes de prueba de REQ-143 (descartados, no comiteados) como casos de regresión conocidos: el tooling debe reportarlos como negativos.
+**Estado: implementado.** `scripts/diff-diet-contract.mjs` compara dos `seed.sql` y reporta el delta de `okDays` total, catálogo, causas y las 54 dimensiones; `scripts/validate-diet-contract-diff.mjs` lo valida y el release gate lo ejecuta. Detalle, motivación (REQ-143) y guía operativa: `docs/diet-contract-catalog-diff.md` y REQ-143 de `docs/requirements-history.md`.
 
 ## REQ-145 - Fix E2E: el fixture de entreno deja "hoy" sin sesión de fuerza los domingos y pone el release-gate en rojo
 
@@ -1848,3 +1813,45 @@ Que "Mantenerlo por ahora" cierre el aviso, guarde `onboardingReviewedAt` y mues
 ### Verificación sugerida
 
 - En consola con perfil/sesión válidos: `await keepCurrentProfile()` no lanza `ReferenceError`; el clic en "Mantenerlo por ahora" cierra el modal y persiste `onboardingReviewedAt`.
+
+## REQ-153 - Fix Home: las sugerencias del coach ignoran comidas saltadas (y la pausa por seguridad) y contradicen la agenda
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey Home (Hoy): la agenda (`homeAgendaData`) y los chips (`buildContextualChips`) calculan los pendientes por caminos distintos y se contradicen al saltar una comida.
+
+### Problema
+
+Reproducción (plan de 3 comidas + entreno): el usuario **salta el desayuno** (REQ-125), registra almuerzo y cena y completa el entreno. La agenda pasa a `done` ("Todo lo importante de hoy está cubierto") sin listar el desayuno, pero justo debajo el chip dice **"¿Qué como para Desayuno? Me quedan 754 kcal"**, empujando a comer lo que se acaba de saltar. Análogo con `trainingSafetyHold()` activo (ver Causa raíz).
+
+### Causa raíz
+
+`buildContextualChips(ds)` (`index.html:4150`) recalcula pendientes en vez de reusar la agenda: `pendingMeals=day.meals.filter(m=>!mealState(ds,m.id).done)` (`index.html:4154`) filtra solo por `!done`, **no excluye `.skipped`** como sí hace `homeAgendaData` (`index.html:4002-4005`, corregido por REQ-125); el chip usa `pendingMeals[0].slot` (`index.html:4162`). Y `workoutPending` (`index.html:4158`) omite `!safetyHold` que la agenda aplica (`index.html:4006-4007`). Alimenta los chips de `renderHoy` (`index.html:4194`). El mismo filtro sin `.skipped` vive en `nextDailyAction` (`index.html:3836`, al parecer sin uso).
+
+### Objetivo
+
+Que los chips reflejen el mismo estado que la agenda.
+
+### Alcance
+
+1. En `buildContextualChips`, excluir saltadas de `pendingMeals` (`!done && !skipped`), derivando de `homeAgendaData` si es posible.
+2. Respetar `trainingSafetyHold()` en `workoutPending`.
+
+### Fuera de alcance
+
+- Rediseñar `COACH_SUGGESTIONS` o `nextDailyAction` (posible código muerto, REQ aparte).
+
+### Riesgos
+
+- Reusar `homeAgendaData` no debe recomputar de más.
+
+### Criterios de aceptación
+
+- Tras saltar una comida ningún chip la propone; con pausa por seguridad ningún chip ofrece el entreno.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E/preview: plan aplicado, `skipMeal` en una comida; `buildContextualChips(ds)` no contiene "¿Qué como para <slot saltado>?".
