@@ -626,94 +626,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-84`).
 
 **Estado: implementado.** `validateGeneratedDay` rechaza nombres placeholder con regex `placeholderRe`; `regenerateGenMeal` usa el plato real más cercano del catálogo como fallback; ambos prompts prohíben nombres genéricos. 5 asserts en `scripts/validate-placeholder-meals.mjs`.
 
-### Problema
-
-Con metas altas de proteína (post REQ-75), el usuario recibió un día donde los macros totales cuadraban perfectamente, pero el desayuno se llamaba "Desayuno práctica" y su único ingrediente era "Alimento compatible" — un placeholder ficticio, no una comida real.
-
-### Causa raíz (verificada contra código)
-
-**No es un efecto del prompt reforzado de REQ-75.** Es un bug preexistente del sistema de fallbacks del coach:
-
-1. **`regenerateGenMeal` (línea ~7383)** construía un `fallbackText` literal con nombre `"${slot.slot} práctica"` e ingrediente `"Alimento compatible"` — valores inventados para rellenar macros matemáticamente.
-2. Cuando el sistema de quota devuelve `mode: "reuse"` (reutilización), `select_reusable_coach_part` busca en el pool de resultados previos. Si no encuentra uno compatible, **sirve el `fallbackText` como respuesta real** (coach_quota.sql línea 591).
-3. `validateGeneratedDay` no detectaba nombres ficticios: solo validaba macros, gramos y restricciones de dieta. El fallback pasaba todas las validaciones porque sus macros eran exactos.
-4. `deterministicSuggestionPayload` también usaba nombres genéricos ("Bowl práctico compatible", "Plato rápido compatible", "Opción simple para completar el día").
-
-### Solución
-
-Tres capas de defensa:
-
-**1. Validación (detectar):** `validateGeneratedDay` ahora rechaza nombres de plato e ingrediente que coincidan con un regex de términos placeholder (`práctica`, `genérico`, `compatible`, `relleno`, `placeholder`, `ficticio`, `completar el día`). Emite issue bloqueante, no warning.
-
-**2. Fallbacks (prevenir):** 
-- `regenerateGenMeal`: el fallback ahora selecciona el plato real del catálogo más cercano en macros al slot (por distancia kcal + proteína ponderada), con sus ingredientes reales de `DB.dishIng`.
-- `deterministicSuggestionPayload`: los nombres genéricos se reemplazaron por nombres descriptivos realistas ("Bowl de quinua con tofu", "Avena proteica con frutos", "Ensalada de garbanzos y queso").
-
-**3. Prompt (instruir):** Ambos prompts (`generateOneDay` y `regenerateGenMeal`) ahora incluyen una línea PROHIBIDO que veta explícitamente nombres genéricos/ficticios y exige nombres descriptivos reales con ingredientes reales.
-
-### Archivos modificados
-
-| Archivo | Cambio |
-|---|---|
-| `index.html` | Regex `placeholderRe` en `validateGeneratedDay`, fallback real en `regenerateGenMeal`, nombres realistas en `deterministicSuggestionPayload`, línea PROHIBIDO en ambos prompts |
-| `scripts/validate-placeholder-meals.mjs` | Validador estructural nuevo (5 asserts) |
-| `scripts/release-gate.mjs` | Agrega `validate-placeholder-meals.mjs` al gate |
-
-### Criterios de aceptación
-
-- `validateGeneratedDay` rechaza un plato llamado "Desayuno práctica" con ingrediente "Alimento compatible".
-- El fallback de `regenerateGenMeal` usa un plato real del catálogo (`fbDish`).
-- `deterministicSuggestionPayload` no contiene "compatible" ni "completar el día".
-- Los prompts de `generateOneDay` y `regenerateGenMeal` incluyen "PROHIBIDO inventar nombres genéricos".
-- `node scripts/validate-placeholder-meals.mjs` pasa.
-- `node scripts/release-gate.mjs` pasa.
-
 ## REQ-86 - Fix: caché de coach reutilizaba resultados generados con prompts obsoletos
 
 **Estado: implementado.** `COACH_PROMPT_VERSION` (constante en `index.html`) se incluye en `coachCompatibilityContext`, que alimenta el `contextKey` del sistema de quota. Bumpar la constante invalida todos los resultados reutilizables generados con versiones anteriores del prompt. 3 asserts en `scripts/validate-coach-prompt-version.mjs`.
-
-### Problema
-
-Después de REQ-75 (prompt reforzado para proteína alta) y REQ-85 (prohibir platos ficticios), el usuario seguía recibiendo días con kcal muy por debajo de la meta (1798 vs 2300, -22%). Las comidas tenían nombres reales (fix de REQ-85 funcionó), pero los macros no cumplían.
-
-### Causa raíz (verificada contra código)
-
-El `contextKey` del sistema de quota se genera en `coachCompatibilityContext` (línea ~6522) y se usa en `select_reusable_coach_part` (coach_quota.sql) para decidir si reutilizar un resultado previo del pool en vez de hacer una llamada fresca a la IA.
-
-El campo `version` dentro del contexto era un **literal hardcodeado `1`** que nunca cambiaba. Esto significa que:
-
-1. Un resultado generado con el prompt viejo (pre-REQ-75, sin instrucciones de alta proteína ni prohibición de ficticios) quedaba en `coach_option_pool` con un `contextKey` que incluía `version:1`.
-2. Al pedir "Preparar mi día" después de REQ-75/85, el `contextKey` seguía siendo idéntico (mismo `version:1`, mismos targets, mismas prefs) → `select_reusable_coach_part` devolvía el resultado viejo.
-3. El resultado viejo no tenía las mejoras del prompt nuevo, así que sus kcal/proteína podían estar fuera de rango.
-
-El `contextKey` **sí** invalida correctamente cuando cambian: targets de macros, prefs del usuario, catálogo de platos (hash), restricciones. Pero **no** invalidaba cuando cambiaba la lógica del prompt — que es exactamente lo que pasó con REQ-75/85.
-
-### Solución
-
-Extraer `version` a una constante `COACH_PROMPT_VERSION` y bumparla a `2`. Cada cambio futuro de lógica de prompt debe bumpar esta constante para invalidar el pool de resultados cacheados.
-
-```js
-const COACH_PROMPT_VERSION=2;
-// en coachCompatibilityContext:
-version:COACH_PROMPT_VERSION,  // antes: version:1
-```
-
-Al cambiar de `1` a `2`, el hash del `contextKey` cambia → todos los resultados previos en `coach_option_pool` quedan con un `contextKey` distinto → `select_reusable_coach_part` no los encuentra → se fuerza una generación fresca con el prompt actual.
-
-### Archivos modificados
-
-| Archivo | Cambio |
-|---|---|
-| `index.html` | Constante `COACH_PROMPT_VERSION=2`, usada en `coachCompatibilityContext` |
-| `scripts/validate-coach-prompt-version.mjs` | Validador: constante existe, >= 2, no hay literal numérico en version |
-| `scripts/release-gate.mjs` | Agrega validador al gate |
-
-### Criterios de aceptación
-
-- `COACH_PROMPT_VERSION` es una constante >= 2 en `index.html`.
-- `coachCompatibilityContext` usa `version:COACH_PROMPT_VERSION`, no un literal.
-- `node scripts/validate-coach-prompt-version.mjs` pasa.
-- `node scripts/release-gate.mjs` pasa.
 
 ## REQ-87 - Fix: "Preparar mi semana" sobrescribía días pasados y con datos registrados
 
@@ -1855,3 +1770,56 @@ Que los chips reflejen el mismo estado que la agenda.
 ### Verificación sugerida
 
 - E2E/preview: plan aplicado, `skipMeal` en una comida; `buildContextualChips(ds)` no contiene "¿Qué como para <slot saltado>?".
+
+## REQ-154 - Fix Nutrición: "Cambiar comida" guarda la porción escalada pero la tarjeta muestra (y suma) los macros de la receta base
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey Nutrición → acción "Otra opción / Cambiar comida" (`openChangeMeal` → `applyChangeMeal`). Los candidatos se rankean con la porción **escalada** al target del slot (REQ-83/131), pero `mealValue()` vuelve a calcular los macros desde la receta base del catálogo.
+
+### Problema
+
+Reproducción (catálogo cargado, `DB.loaded`): el usuario toca "Otra opción" en una comida principal y elige un plato cuya receta base es más pequeña que el objetivo del slot. El solver escala la porción hacia arriba y el botón de opción muestra p. ej. **1004 kcal · P 90** (receta escalada: pollo 265 g, arroz 300 g). Al aplicar:
+
+- La tarjeta de la comida muestra en el encabezado **654 kcal · P 62** (receta base 180/220/8 g), Δ **−350 kcal** / **−28 g proteína** frente a lo elegido.
+- Pero la receta que se despliega bajo esa misma tarjeta usa los gramos **escalados** (265 g de pollo ≈ 437 kcal solo el pollo), así que el encabezado de macros se contradice con su propia lista de ingredientes.
+- `dayTotals()` (anillo "kcal restantes", "Consumo de hoy", % de la meta y racha de adherencia) suma los **654 kcal base**, no los 1004 que el usuario creyó registrar. Con platos grandes escalados hacia abajo el error es inverso (sobrecuenta).
+
+El rebalanceo de comidas futuras (REQ-142) parte del delta escalado, de modo que el cierre del día queda calibrado contra un número que la UI luego no muestra. Es una violación del invariante "macros mostrados = macros guardados" (clase REQ-69) y contradice el diseño de REQ-82, que exige conservar "nombre, gramos y macros usados en ese momento".
+
+### Causa raíz
+
+`applyChangeMeal` guarda en `ms.ovr` los macros escalados y los ingredientes escalados del candidato rankeado (`newOvr.kcal=ranked_item.macros.kcal…`, `index.html:7505-7513`); esos macros vienen de `rankReplacementCandidates` → `solveDishPortion`, que escala la porción con `seed=mealTarget.kcal/base.kcal` acotado a `[0.35, 2.5]` (`js/nutrition-domain.js:595-602`, `755-778`). Pero `mealValue()` resuelve el override por **nombre de plato** antes que por los macros guardados: como `ms.ovr.dishName` está seteado y `DB.loaded`, entra en `const d=dishByName(dn); const m=dishMacros(d.id)` y devuelve la receta base sin escalar, **ignorando `ms.ovr.kcal/p/c/f`** (`index.html:2236-2237`; `dishMacros`, `index.html:10145`). En cambio `mealRecipe()` sí prioriza `ovr.ingredientes` escalados (`index.html:4952-4954`), y `mealCard` pinta el encabezado con `mealValue()` (`index.html:4997`) — de ahí las tres cifras inconsistentes.
+
+### Objetivo
+
+Que tras "Cambiar comida" el encabezado de macros, la receta desplegada, el candidato elegido y la suma del día muestren y contabilicen exactamente la porción que el usuario escogió.
+
+### Alcance
+
+1. En `mealValue()`, cuando el override es un reemplazo con macros materializados (`ovr.gen`/`ovr.dishName` con `ovr.kcal` presente), honrar los macros guardados (`ovr.kcal/p/c/f`) en vez de recalcular `dishMacros(d.id)` desde la receta base.
+2. Alternativa equivalente: no guardar macros/ingredientes escalados en `applyChangeMeal` y en su lugar persistir la porción/escala, resolviéndola de forma consistente en `mealValue()` y `mealRecipe()`.
+
+### Fuera de alcance
+
+- El motor de escalado (`solveDishPortion`) y el rebalanceo (REQ-142): el número escalado es el correcto; lo que falla es que la UI/suma no lo respeta.
+- Comidas sin override y comidas del snapshot `nutritionPlan` (`base.src==="nutritionPlan"`), que ya llevan sus macros materializados.
+- Overrides manuales del editor (`ovr.kcal` con `dishName==null`), que ya se muestran correctamente por la rama "custom".
+
+### Riesgos
+
+- Regresión en la ruta REQ-82: para overrides antiguos sin `ovr.kcal` (solo `dishName`) hay que conservar el fallback a `dishMacros`.
+- La resolución por nombre existe para reflejar ediciones de catálogo; distinguir "reemplazo materializado" de "solo prescribe plato" para no romper ese caso.
+
+### Criterios de aceptación
+
+- Tras elegir un reemplazo escalado, el encabezado de la tarjeta, la receta desplegada y `dayTotals()` muestran los mismos kcal/macros que el botón de opción seleccionado (± redondeo).
+- Overrides manuales y comidas del `nutritionPlan` siguen mostrando sus macros correctos.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Reproducción de dominio (0 llamadas pagadas): con el catálogo de prueba, `rankReplacementCandidates(current, [dish], {kcal:1000,…}, catalog)[0].macros.kcal ≈ 1004` mientras `dishMacros` de la receta base ≈ 654; el `mealValue()` corregido debe devolver ≈ 1004 para ese override.
+- Preview/E2E con catálogo real: aplicar "Otra opción" en una comida principal y verificar que encabezado, receta e "Consumo de hoy" coinciden con el candidato elegido.
