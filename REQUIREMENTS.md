@@ -1229,17 +1229,15 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
 
 ## REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad
 
-**Estado: implementado.** Exporta `DIET_CONTRACT`, `dietContractTolerance()` y `validateDietContractTotals()` en `js/nutrition-domain.js` con kcal ±3% o ±50 kcal, proteína ±5 g bilateral, carbohidratos ±8 g, grasa ±8 g y kcal autoritativa de `ingredients.kcal`. El contrato queda en calibración (`runtimeActive:false`): no cambia cliente, servidor, snapshots ni `validateDayTotals` hasta REQ-129. `scripts/validate-diet-contract.mjs` reconstruye el catálogo desde `supabase/seed.sql` + semántica REQ-79, corre la matriz 2/4/6 comidas × patrón dietario × proteína normal/alta × disgustos × 7 días y se ejecuta en `node scripts/release-gate.mjs`. Baseline 2026-07-04: 0/378 días dentro de contrato; causas principales `protein_contract`, `carbs_contract`, `kcal_contract`, `fat_contract`, `kcal_out_of_tolerance`, `slot_without_candidates` y `protein_insufficient`. Ajuste propuesto: no relajar ni activar en silencio; REQ-129 debe implementar cierre global con `finalizeNutritionDay()` y REQ-132/135 cerrar slots/catálogo antes de re-correr el canario.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-128`).
+**Estado: implementado.** Exporta `DIET_CONTRACT`, `dietContractTolerance()` y `validateDietContractTotals()` en `js/nutrition-domain.js` (tolerancias kcal/proteína/carbos/grasa, kcal autoritativa de `ingredients.kcal`), en calibración (`runtimeActive:false`, sin tocar runtime). Canario `scripts/validate-diet-contract.mjs` en el release-gate. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-128`).
 
 ## REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas
 
-**Estado: implementado.** `finalizeNutritionDay(ctx)` vive en `js/nutrition-domain.js`, se exporta en namespace/global y queda dormida: normaliza propuestas contra catálogo, descarta ingredientes desconocidos, completa slots faltantes con fallback determinista, conserva `lockedMeals`, calcula `totals`/`residual` y reporta `contract = validateDietContractTotals(...)` sin activar `DIET_CONTRACT.runtimeActive`. El canario `scripts/validate-diet-contract.mjs` ahora mide con `engine:"finalizeNutritionDay"` y el nuevo `scripts/validate-finalize-nutrition-day.mjs` cubre unknown ingredient, fallback, kcal desde catálogo, contract.ok y locked meal intacta. Detalle completo (origen, alcance, riesgos) archivado en `docs/requirements-history.md`.
+**Estado: implementado.** `finalizeNutritionDay(ctx)` en `js/nutrition-domain.js`, dormida: normaliza propuestas contra catálogo, descarta ingredientes desconocidos, completa slots con fallback determinista, conserva `lockedMeals`, reporta `contract` sin activar `runtimeActive`. Validadores: `validate-diet-contract` (engine `finalizeNutritionDay`) y `validate-finalize-nutrition-day`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-129`).
 
 ## REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo
 
-**Estado: implementado.** `dislikedIngredients` ya se trata como exclusión obligatoria por defecto en dominio, cliente y proxy; el system prompt dejó de llamarlo preferencia blanda; `highProtLine` usa fuentes proteicas dinámicas filtradas por restricciones/disgustos y sin ejemplos de gramajes; el patrón omnívoro agrega señal verificable de proteína animal con warning/reintento dirigido (sin 422 duro) y relajación automática si el usuario excluye carnes/pescado. `COACH_PROMPT_VERSION` sube a 7 para invalidar pool previo. Se corrigieron las referencias erróneas `REQ-127` en código/tests. Validadores actualizados: `validate-nutrition-domain`, `validate-first-day-preferences`, `validate-high-protein-prompt`, `test-coach-quota`. Detalle completo archivado en `docs/requirements-history.md`.
+**Estado: implementado.** `dislikedIngredients` como exclusión obligatoria en dominio/cliente/proxy; `highProtLine` con fuentes proteicas dinámicas filtradas; patrón omnívoro con warning/reintento suave (sin 422 duro) y relajación si se excluyen carnes/pescado; `COACH_PROMPT_VERSION`=7. Validadores: `validate-nutrition-domain`, `validate-first-day-preferences`, `validate-high-protein-prompt`, `test-coach-quota`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-130`).
 
 ## REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración
 
@@ -1291,10 +1289,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-141`).
 
 ## REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato
 
-**Estado: implementado.**
-`finalizeNutritionDay()` agrega una pasada global (`globalClosePass`) que trata todas las líneas escalables de las comidas no bloqueadas como una única bolsa de palancas (clasificadas por `ingredientLeverCategory` en proteína/carbohidrato/grasa/neutro) e hill-climbea sobre los macros del día completo, no por comida, respetando siempre `lineLimits()`/`clampStep()`. Si el día sigue fuera de `DIET_CONTRACT`, `attemptContractComplement()` busca un snack/batido del catálogo compatible con `dislikedIngredients`/dieta que reduzca estrictamente el número de métricas fuera de contrato, sin reemplazar comidas existentes. `DIET_CONTRACT.runtimeActive` sigue `false`. Canario `validate-diet-contract.mjs` sube de 39/378 (10.3%) a 122/378 (32.3%) y ahora reporta `failureBreakdown` distinguiendo `catalogGapDays` (solo residuo de macro, 100% de los días que no cierran hoy) de `otherIssueDays` (causa estructural distinta). Tests nuevos en `scripts/validate-finalize-nutrition-day.mjs`: cierre de residuo acumulado exacto y caso imposible que debe devolver `no_solution` con causa medible.
-
-Detalle historico (Origen/Problema/Alcance/Criterios originales): `docs/requirements-history.md` (buscar `## REQ-137`).
+**Estado: implementado.** `finalizeNutritionDay()` agrega una pasada global (`globalClosePass`) que hill-climbea sobre los macros del día completo respetando `lineLimits()`/`clampStep()`, y `attemptContractComplement()` añade snack/batido del catálogo compatible si el día sigue fuera de contrato; `runtimeActive` sigue `false`. Canario sube de 39/378 a 122/378 con `failureBreakdown`. Validador: `scripts/validate-finalize-nutrition-day.mjs`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-137`).
 
 ## REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global
 
@@ -1311,10 +1306,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 
 ## REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`
 
-**Estado: implementado.**
-`applyChangeMeal()` en `index.html` ya no llama a `rebalanceFutureMeals()` en el camino principal: cuando `rebalanceNeeded`, arma un `ctx` para `finalizeDayWithGate()`/`finalizeNutritionDay()` con `lockedMeals` = todas las comidas del día salvo las futuras candidatas (usa el valor efectivo actual vía el nuevo helper `mealEntryForFinalize()`) más la comida recién elegida, y `proposal` = valor actual de las comidas futuras (conserva plato; `normalizeProposalMeal()` re-resuelve porción si no trae ingredientes, o recalcula macros desde sus ingredientes si los trae, y `globalClosePass()` termina el cierre del día completo por hill-climbing). Los ajustes resultantes se escriben como `ovr` (`gen:true,nutritionPlan:true`) igual que antes. `rebalanceFutureMeals()` se conserva como capa de compatibilidad (solo se usa si `finalizeNutritionDay()` no está disponible) y sigue exportada/probada. Copy ("· N ajustada(s)") y `contingencyLog` sin cambios. Validador: `scripts/validate-nutrition-replacements.mjs` (10 tests; se agregó el test 10 que ejercita `finalizeNutritionDay()` con el mismo `ctx` que arma `applyChangeMeal()`).
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-142`).
+**Estado: implementado.** `applyChangeMeal()` arma un `ctx` para `finalizeDayWithGate()`/`finalizeNutritionDay()` (`lockedMeals` = comidas del día salvo las futuras candidatas + la recién elegida) en vez de `rebalanceFutureMeals()` (que queda como fallback compatible); escribe los ajustes como `ovr`. Validador: `scripts/validate-nutrition-replacements.mjs`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-142`).
 
 ## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
 
@@ -1823,3 +1815,47 @@ Que tras "Cambiar comida" el encabezado de macros, la receta desplegada, el cand
 
 - Reproducción de dominio (0 llamadas pagadas): con el catálogo de prueba, `rankReplacementCandidates(current, [dish], {kcal:1000,…}, catalog)[0].macros.kcal ≈ 1004` mientras `dishMacros` de la receta base ≈ 654; el `mealValue()` corregido debe devolver ≈ 1004 para ese override.
 - Preview/E2E con catálogo real: aplicar "Otra opción" en una comida principal y verificar que encabezado, receta e "Consumo de hoy" coinciden con el candidato elegido.
+
+## REQ-155 - Fix reproductor de entreno: "duración real" cuenta el tiempo con la app cerrada
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **entrenamiento** (2026-07-18). Verificación funcional del reproductor recuperable (REQ-16/92) con Playwright + fixtures E2E (0 llamadas pagadas).
+
+### Problema
+
+El usuario inicia una sesión guiada y la deja "En curso" sin tocar "Pausar sesión" (típico en móvil: la pantalla se bloquea, se cierra o se cambia de app, hay una interrupción). Al reabrir la app horas después y tocar "Finalizar y guardar sesión", el cronómetro y la tarjeta "duración real" cuentan todo el tiempo transcurrido —incluidas las horas con la app cerrada— como tiempo de entrenamiento. Reproducción: sesión iniciada, 0 actividad extra, `resumedAt` a 2 h atrás → el `.player-clock` muestra `02:00:00` y el registro guardado queda con `elapsedSeconds=7200` ("duración real: 2h 00m") para una sesión de minutos reales.
+
+### Causa raíz
+
+`WORKOUT_PLAYER.elapsedSeconds` (`workout-player.js:366-373`) suma `(now - resumedAt)` mientras el estado es `in_progress`. `resumedAt` solo avanza al reanudar (`index.html:4554,4746`) y el acumulado solo se congela al pausar (`captureWorkoutElapsed`, `index.html:4520-4522`). Nada congela el tiempo cuando la app se cierra o pasa a segundo plano con la sesión en curso; al reabrir, `normalizeExecution` (`workout-player.js:337`) conserva el `resumedAt` guardado para sesiones `in_progress`. `finishWorkoutExecution` (`index.html:4731`) persiste ese valor inflado como "duración real" en el resumen inmutable (`renderWorkoutExecution`, `index.html:4854`).
+
+### Objetivo
+
+Que "duración real" refleje el tiempo realmente ejercitado, no el reloj de pared con la app cerrada.
+
+### Alcance
+
+1. Tratar el cierre/segundo plano como pausa implícita del cronómetro: congelar `elapsedSeconds` y limpiar `resumedAt` en `visibilitychange`/`beforeunload`, o acotar el salto de `resumedAt` al reabrir antes de acumular.
+2. Aplicar el mismo tope al valor que `captureWorkoutElapsed` persiste en el cierre.
+
+### Fuera de alcance
+
+- El diseño del reproductor recuperable y la pausa manual (siguen igual).
+- Rachas/cumplimiento (no dependen de `elapsedSeconds`).
+
+### Riesgos
+
+- Un tope por inactividad puede subestimar sesiones largas legítimas; elegir umbral y evento de congelado con cuidado (`visibilitychange` vs. `beforeunload` en PWA/iOS).
+
+### Criterios de aceptación
+
+- Iniciar sesión, cerrar/segundo plano sin pausar y reabrir: cronómetro y "duración real" no incluyen el tiempo con la app cerrada.
+- Pausar manualmente sigue congelando el tiempo como hoy.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Repro Playwright (0 llamadas pagadas): iniciar sesión, fijar `resumedAt` a 2 h atrás con la app "cerrada" y finalizar → `elapsedSeconds` acotado, no 7200; `.player-clock` no salta a `02:00:00`.
