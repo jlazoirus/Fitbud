@@ -926,95 +926,13 @@ Permitir bloquear platos de forma persistente, aplicable a todos los flujos de g
 
 **Estado: implementado.** `coachCompatibilityContext` incluye ahora `preferredIngredients`, `preferredDishes`, `preferredCuisines`, `dislikedIngredients` y las keys de `blockedDishes` en el objeto serializado que arma `contextKey` (`coachQuota`); editar cualquiera de esas preferencias cambia el hash y evita que se reutilice un resultado cacheado/pooled generado con preferencias viejas. `COACH_PROMPT_VERSION` subió a 6 para invalidar de una vez lo cacheado antes de este cambio (incluido lo generado tras REQ-119/REQ-120 sin este contexto). `applyDayComidas` ya nunca reescribe una comida con `ms.done=true` (devuelve cuántas se preservaron y el toast lo confirma: "Lo que ya registraste no cambia"), así que regenerar el día de hoy solo toca comidas pendientes. `homePrepareDay` y la opción "Volver a preparar este día" del menú de Nutrición rechazan fechas pasadas (`ds<todayStr()`), consistente con `weekPendingDays` que ya excluía días pasados/con comidas registradas en la generación de semana. Verificado con `scripts/validate-preference-cache-invalidation.mjs`.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): si las preferencias de comida se actualizan, al regenerar el día deben tomarse en cuenta y solo debe cambiar el futuro.
-
-### Problema
-
-Aunque parte de la generación usa prefs actuales, no hay garantía visible/contractual de que todo flujo de regeneración invalide contexto anterior y preserve días ya registrados.
-
-### Causa raíz
-
-La app combina `plan_versions`, `day_log`, overrides, cache de coach y generación determinista. Algunos context keys ya incluyen preferencias, pero el contrato debe ser explícito para preferencias nuevas como gustos, platos bloqueados y disgustos.
-
-### Objetivo
-
-Que editar preferencias alimente inmediatamente toda regeneración futura sin tocar lo ya ejecutado.
-
-### Alcance
-
-1. Incluir gustos, disgustos y platos bloqueados en context keys/cache de generación cuando aplique.
-2. Al regenerar día/semana, excluir días pasados y días con comidas ya registradas.
-3. Si una comida futura fue generada antes del cambio de preferencias, regenerarla debe usar prefs actuales.
-4. Mostrar copy de confirmación cuando el cambio solo afecte propuestas futuras.
-
-### Fuera de alcance
-
-- Reescribir historial de `day_log` ya ejecutado.
-- Migrar planes antiguos salvo cuando el usuario regenere futuro.
-
-### Riesgos
-
-- Invalidar demasiado puede elevar consumo de coach; usar límites de trial/premium y fallback determinista.
-
-### Criterios de aceptación
-
-- Cambiar "no me gusta avena" y regenerar mañana evita avena si hay alternativas.
-- Comidas hechas hoy o en días pasados no se modifican.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Test con plan versionado activo + día futuro regenerado tras editar preferencias; confirmar que snapshot futuro cambia y día pasado no.
+_Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
 
 ## REQ-122 - Fix Nutrición: dietas deben llegar a objetivos o completar con sugerencias aplicables
 
 **Estado: implementado.** Cuando el día generado no cumple el objetivo (`!res.ok`), `genReviewHtml` ya no deja solo un botón "Aplicar" deshabilitado: agrega "Reintentar" y "Completar con opción práctica ahora" (`deterministicFromModal`, que aplica `applyDeterministicDay` vía el solver determinista). `aiGenerateDay` cuenta intentos fallidos consecutivos en `_genDayFailStreak` y, al llegar a 2, aplica automáticamente la ruta determinista en vez de seguir insistiendo con la IA; `homePrepareDay` reinicia ese conteo en cada sesión nueva de preparación. En la revisión de semana, `genWeekReviewHtml` agrega el botón "Completar días faltantes con opción práctica" junto al aviso de días que no se pudieron preparar, reutilizando `deterministicWeekFromModal` (ya existía para el camino de error de red) para rellenar solo los días ausentes sin tocar los ya generados. Las restricciones duras (`dishDietAllowed`, `coachDishBlockedByProfile`) siguen aplicando como bloqueo absoluto en toda ruta, incluida la determinista. Verificado con `scripts/validate-diet-completion-fallback.mjs`.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): las dietas no están generando correctamente, no llegan al objetivo y no dejan avanzar; si falla varias veces debe sugerir comidas extra/snacks para llegar a macros.
-
-### Problema
-
-Cuando una dieta generada queda fuera de tolerancia, el usuario puede quedar bloqueado o recibir una opción que no cumple el objetivo. La app ya tiene snack de cierre para déficit en algunos casos, pero no hay garantía robusta para día/semana ni recuperación tras fallos repetidos.
-
-### Causa raíz
-
-Los caminos de coach, solver determinista, edición de gramos, gap snack y validación de macros no están completamente unificados como contrato de "plan aplicable". La proteína y calorías pueden fallar por catálogo, porciones o respuesta del coach.
-
-### Objetivo
-
-Toda dieta aplicada debe ser viable: cumplir objetivos dentro de tolerancia o incluir una sugerencia concreta aplicable que complete el día sin bloquear al usuario.
-
-### Alcance
-
-1. Revisar `validateGeneratedDay`, `findGapSnack`, `genReviewHtml`, `generateOneDay`, `planDeterministicNutritionDay` y flujo semanal.
-2. Si el plan no llega a kcal/proteína, sugerir snack/comida extra compatible y permitir agregarlo al borrador.
-3. Si dos intentos consecutivos no cumplen objetivo, activar ruta de completado determinista con comida extra compatible.
-4. Permitir aplicar con aviso solo si el usuario entiende qué falta y hay una acción para completarlo; no aplicar silenciosamente un día claramente insuficiente.
-5. Mantener restricciones duras como bloqueo absoluto.
-
-### Fuera de alcance
-
-- Cambiar metas calculadas de macros.
-- Crear platos nuevos en catálogo global sin revisión.
-
-### Riesgos
-
-- Forzar macros puede generar porciones poco realistas; el solver debe preferir opciones consumibles y explicar cuando necesita comida extra.
-
-### Criterios de aceptación
-
-- Metas altas de proteína reciben plan aplicable o snack/comida extra aplicable.
-- La semana no queda bloqueada por un día con déficit recuperable.
-- Restricciones duras siguen bloqueando platos incompatibles.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Tests con objetivos altos y catálogo limitado: el sistema completa kcal/proteína con snack o comida extra sin violar restricciones.
+_Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
 
 ## REQ-123 - Fix Nutrición: todos los botones "Otra opción" soportan reintentos repetidos con feedback
 
@@ -1024,44 +942,7 @@ Toda dieta aplicada debe ser viable: cumplir objetivos dentro de tolerancia o in
 
 Feedback de producto de Jonathan (3 jul 2026): el botón de otra opción no funciona después del primer intento y no da feedback; revisar todos los botones "otra opción".
 
-### Problema
-
-Los flujos de alternativa de comida parecen funcionar una vez y fallar o quedar sin estado claro en el segundo intento. El usuario no sabe si se agotó límite, si falló el coach, si quedó el borrador anterior o si debe cerrar el modal.
-
-### Causa raíz
-
-Hay múltiples caminos: `regenerateGenMeal`, `regenerateDayInWeekDraft`, reemplazos de comida aplicada, "Rehacer opciones" y flujos de `meal_option`/cuota. No comparten un patrón uniforme de estado, fallback, límite diario y restauración.
-
-### Objetivo
-
-Que cualquier acción "Otra opción"/"Rehacer opciones" pueda repetirse dentro de su límite, tenga fallback y comunique claramente éxito, carga, límite agotado o error.
-
-### Alcance
-
-1. Auditar todos los botones visibles con copy "Otra opción", "Rehacer opciones", "Preparar otro..." y equivalentes.
-2. Unificar comportamiento: loading, consumo de límite, fallback determinista, volver al borrador y reintentar.
-3. Corregir el bug de segundo intento.
-4. Mostrar contador o mensaje claro cuando el límite de opciones del día/trial se agota.
-5. Mantener "Más opciones" sin duplicar reemplazos por comida.
-
-### Fuera de alcance
-
-- Cambiar límites de trial/premium definidos en REQ-117 salvo integrarlos.
-- Rediseñar el modal completo de revisión de semana.
-
-### Riesgos
-
-- Consumir cuota antes de validar puede penalizar fallos técnicos; la reserva/devolución debe seguir el patrón server-side existente.
-
-### Criterios de aceptación
-
-- Cada botón de alternativa funciona al menos dos veces seguidas o muestra límite agotado con feedback.
-- Ningún error deja modal muerto sin volver al borrador/reintentar.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E o script con mocks: día generado -> otra opción dos veces; semana -> preparar otro día dos veces; comida aplicada -> rehacer opciones dos veces.
+_Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
 
 ## REQ-124 - Home y Nutrición: anillo de macros primero y agenda/comidas debajo
 
@@ -1069,50 +950,7 @@ Que cualquier acción "Otra opción"/"Rehacer opciones" pueda repetirse dentro d
 
 Nota aparte (resuelta): `tests/e2e/entreno.spec.js` y `tests/e2e/navegacion.spec.js` fallaban en fechas concretas; en su momento se atribuyó a un problema de fecha del entorno, pero era un bug real de producción — ver commit "Fix: entrenamiento crasheaba para strength_only sin actividad ligera" (`workoutSchedule` no conocía `lightCardioEnabled` y podía asignar un slot "facil/calidad/técnica" sin sesión real, crasheando `renderWorkout`). Corregido junto con el helper de tests `trainingDaysIncludingToday()`, que ordenaba los días con el orden de `Date#getDay()` en vez del orden real de la app (Lunes..Domingo). Los 15 tests E2E pasan de nuevo.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): el gráfico/anillo de macros es crítico y debe aparecer primero en Home y Nutrición; luego siguiente comida y sesión pendiente.
-
-### Problema
-
-REQ-97 priorizó la agenda antes del hero compacto. La nueva decisión de producto cambia la jerarquía: el usuario debe ver primero su avance de macros, porque es el centro de control del día.
-
-### Causa raíz
-
-`renderHoy()` actualmente renderiza agenda antes de `heroDash`; `renderNutrition()` muestra un botón de más opciones antes del bloque de macros. Además el estado "done" de Home no está diseñado alrededor del anillo + racha + pendientes restantes.
-
-### Objetivo
-
-Home y Nutrición deben abrir con el anillo/resumen de macros, más compacto si hace falta, y luego mostrar la siguiente acción del día.
-
-### Alcance
-
-1. En Home: ordenar como anillo/resumen de macros -> siguiente comida -> entrenamiento pendiente/sesión de hoy -> coach.
-2. Si ya completó entrenamiento, no mostrar tarjeta de sesión; si falta entrenar, mantenerla pendiente aunque ya completó comidas.
-3. Si completó todas las comidas y entrenamiento, mostrar anillo + racha/mensaje de día cubierto.
-4. En Nutrición: ordenar como anillo/resumen -> comidas del día -> comidas extra/reordenadas -> más opciones.
-5. Hacer el anillo más compacto si es necesario para mobile sin perder lectura.
-6. Revisar tour/coachmarks para que apunten al nuevo primer elemento.
-
-### Fuera de alcance
-
-- Cambiar cálculo de macros.
-- Rediseñar todo el dashboard de progreso.
-
-### Riesgos
-
-- Contradice el orden definido en REQ-97; documentar la nueva decisión en el mismo commit para evitar reversiones automáticas.
-
-### Criterios de aceptación
-
-- En Home mobile, el primer bloque útil es el anillo/resumen de macros.
-- Si falta entrenar, Home lo muestra como pendiente aunque las comidas estén completas.
-- En Nutrición, "Más opciones" no aparece antes del resumen y las comidas.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Capturas Playwright mobile de Home: día vacío/preparado, comidas completas con entreno pendiente, día completo.
+_Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
 
 ## REQ-125 - Nutrición: reordenar comidas y saltar comidas sin cambiar horarios históricos
 
@@ -1859,3 +1697,58 @@ Que "duración real" refleje el tiempo realmente ejercitado, no el reloj de pare
 ### Verificación sugerida
 
 - Repro Playwright (0 llamadas pagadas): iniciar sesión, fijar `resumedAt` a 2 h atrás con la app "cerrada" y finalizar → `elapsedSeconds` acotado, no 7200; `.player-clock` no salta a `02:00:00`.
+
+## REQ-156 - Fix aislamiento: el cierre de sesión por evento (token expirado / logout remoto / otra pestaña) no purga la cola offline del usuario anterior
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **auth-roles** (rotación del loop auditor tras REQ-155). Verificación funcional en navegador (preview `fitbud`, servidor local 8923, 0 llamadas pagadas), ejercitando las funciones reales de sesión de la app. El invariante bajo prueba es el aislamiento entre usuarios en un dispositivo compartido, declarado explícitamente en el código (`index.html:1824` "Descarta toda la cola del usuario al cerrar sesión (aislamiento entre usuarios en el dispositivo)." y `index.html:9622` "aislar cola: no exponer datos al próximo usuario") y en `docs/requirements-history.md:1539` ("La cola se aísla por usuario en `clearSyncQueueForUser()` al detectar cierre de sesión.").
+
+### Problema
+
+La purga de la cola offline (`fitbud_syncq_v1`, que contiene payloads de `day_log`/`weight_log` con datos de salud del usuario: peso, comidas, ejecución de entreno) **solo ocurre cuando el usuario pulsa "Cerrar sesión"**. Cualquier cierre de sesión que llegue por el evento `onAuthStateChange('SIGNED_OUT')` — token/refresh vencido al reabrir la app, revocación remota de la sesión, "cerrar sesión en todos los dispositivos", o logout propagado desde otra pestaña — **deja intactas en el `localStorage` del dispositivo las mutaciones encoladas del usuario anterior**, contradiciendo el invariante de aislamiento.
+
+Reproducción funcional (ejecutada contra las funciones vivas de la app servida en 8923, sin sesión real ni mutación de producción):
+
+1. Sembrar la cola con una mutación `day_log` del `userA` con datos de salud (`state.weights["2026-07-28"]=81.4`, `state.meals.m1={done:true,kcal:640}`) y `session={user:{id:"userA"}}`.
+2. **Ruta A — botón "Cerrar sesión"** (orden real de `signOutUser`→`clearSignedOutState` con `session` aún seteada): entradas de `userA` en la cola pasan de `1 → 0` (purgada correctamente). ✔
+3. **Ruta B — evento `SIGNED_OUT`** (orden real del handler: `session=sess||null` y luego `clearSignedOutState()`): entradas de `userA` pasan de `1 → 1`. **La cola con datos de salud de `userA` persiste.** ✘
+
+Impacto: en un dispositivo compartido (familia, kiosco de gimnasio), tras un cierre de sesión no iniciado por el botón, los payloads de salud del usuario anterior quedan en el `localStorage` del dispositivo de forma indefinida y la cola crece sin acotar entre sesiones. No es una fuga visible en la UI del siguiente usuario —`drainSyncQueue` (`index.html:1933`) y `_updateSyncBadge` (`index.html:1862`) filtran por `x.uid===uid()`, así que `userB` no drena ni ve la cola de `userA`—, pero sí es una violación directa del invariante de aislamiento declarado y una retención de datos de salud personales en el dispositivo que el diseño promete borrar.
+
+### Causa raíz
+
+Dependencia de orden entre el handler del evento y `clearSignedOutState()`. El handler `onAuthStateChange` (`index.html:11385-11394`) hace primero `session=sess||null` (`index.html:11386`) y **después** `clearSignedOutState()` (`index.html:11388`). Pero `clearSignedOutState()` calcula el usuario a purgar leyendo la sesión: `const prevUid=uid();` (`index.html:9610`), y `uid()` devuelve `session&&session.user?session.user.id:null` (`index.html:9321`). Como el handler ya puso `session=null`, `prevUid` es `null`, y la purga `if(prevUid)clearSyncQueueForUser(prevUid)` (`index.html:9622`) se salta por completo; aunque no se saltara, `clearSyncQueueForUser(null)` filtra `x.uid!==null` (`index.html:1825-1826`), que **no** elimina las entradas del usuario real. La ruta del botón funciona solo por accidente de orden: `signOutUser` (`index.html:9637`) invoca `clearSignedOutState()` (`index.html:9644`) mientras `session` sigue seteada, por lo que ahí `prevUid` sí es correcto. La ruta de borrado de cuenta (`deleteMyAccount`→`clearSignedOutState`, `index.html:6512`) también conserva `session`, así que igualmente purga; el único camino defectuoso es el evento `SIGNED_OUT`.
+
+### Objetivo
+
+Que la cola offline del usuario que cierra sesión se purgue **en todos los caminos** de cierre (botón, borrado de cuenta y evento `SIGNED_OUT` por expiración/revocación/otra pestaña), cumpliendo el aislamiento entre usuarios que el código ya promete.
+
+### Alcance
+
+1. Purgar la cola con el `uid` correcto también en la ruta por evento. Opción mínima: en el handler `SIGNED_OUT` (`index.html:11388`), capturar `prevUid=uid()` **antes** de reasignar `session` (o pasar el `uid` a `clearSignedOutState`), y no nullificar `session` en `index.html:11386` hasta después de la purga.
+2. Alternativa robusta: que `clearSignedOutState()` acepte un `prevUid` explícito (con fallback al `uid()` actual) para no depender del orden de asignación de `session`.
+
+### Fuera de alcance
+
+- El motor de sincronización, el filtrado por `uid` de `drainSyncQueue`/`_updateSyncBadge` (que ya evita la fuga en UI) y la lógica de conflictos.
+- La limpieza de otras cachés por usuario (chat `fitbud_chat_v1_*`, etc.), que se resuelve por clave distinta de `uid` y no está en el alcance de este REQ atómico.
+- El comportamiento del botón "Cerrar sesión" y de `deleteMyAccount`, que ya purgan correctamente.
+
+### Riesgos
+
+- Retrasar la nullificación de `session` en el handler podría afectar a código que corre entre medias; acotar el cambio a capturar `prevUid` primero y purgar, manteniendo el resto del orden.
+- `drainSyncQueue` corre en `onAuth` del siguiente usuario; confirmar que la purga ocurre antes de que otro usuario inicie sesión (el handler es síncrono hasta `clearSignedOutState`, así que basta con el orden correcto).
+
+### Criterios de aceptación
+
+- Tras un evento `SIGNED_OUT` (token vencido / logout remoto / otra pestaña) con mutaciones encoladas del usuario saliente, `_getSyncQ().filter(x=>x.uid===prevUid).length === 0`.
+- El botón "Cerrar sesión" y `deleteMyAccount` siguen purgando la cola como hoy.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Repro en consola contra las funciones vivas (0 llamadas pagadas): sembrar `_setSyncQ([{uid:"userA",entity:"day_log",…,status:"pending"}])`, fijar `session={user:{id:"userA"}}`, luego `session=null; clearSignedOutState();` y confirmar que la cola de `userA` queda vacía tras el fix (hoy queda en 1).
+- Añadir un test de aislamiento (patrón `scripts/test-sync-conflicts.mjs`) que afirme la purga en el camino por evento.
