@@ -7299,3 +7299,56 @@ Se conservó `rebalanceFutureMeals()` (y `rankReplacementCandidates()`/`solveRep
 - `node scripts/release-gate.mjs`: 70/71 (ver criterios arriba).
 - JS embebido: se extrajo el último bloque `<script>` de `index.html` y se validó con `new Function(...)` (parsea sin errores de sintaxis).
 - No hay migraciones SQL ni cambios de shell PWA (no aplica subir `CACHE_NAME`).
+
+## REQ-145 - Fix E2E: el fixture de entreno deja "hoy" sin sesión de fuerza los domingos y pone el release-gate en rojo
+
+**Estado: implementado (2026-07-30).**
+
+### Origen
+
+Auditoría del journey **entrenamiento** (2026-07-05, domingo). `node scripts/release-gate.mjs` cerraba en rojo porque `tests/e2e/entreno.spec.js` esperaba una sesión de fuerza en gimnasio para hoy, pero el fixture podía dejar el domingo como descanso planificado.
+
+### Problema
+
+El test declaraba que "hoy es día de entreno con sesión de fuerza en gimnasio". En domingo, la app renderizaba `Descanso total` para el usuario E2E `strength_only` y el test hacía timeout esperando `Gimnasio ·`. Como la suite E2E forma parte del release gate, ambos loops autónomos quedaban bloqueados en domingos aunque no hubiese regresión del reproductor.
+
+### Causa raíz
+
+El bug era del fixture, no del runtime. `trainingDaysIncludingToday()` incluía hoy y tres días siguientes en orden cíclico Lunes..Domingo, pero la app vuelve a normalizar `trainingDays` con `WEEKDAY_OPTIONS` (`Lun..Dom`). Si hoy es domingo, queda último en el arreglo normalizado `[1,2,3,0]`. Con prioridad `composition`, el template upper/lower de 4 días es `["torsoA","piernaA","torsoB","facil"]`; para `strength_only` sin actividad ligera, `workoutSchedule()` convierte `facil` en `descanso`. Resultado: domingo = descanso.
+
+### Decisión de producto
+
+No se toca el comportamiento de producción: el descanso del cuarto slot para `strength_only` + `composition` sigue siendo intencional. El fixture E2E debe expresar mejor el invariante del test: si la spec quiere probar el reproductor de fuerza, el perfil de prueba debe pedir prioridad de fuerza.
+
+### Solución implementada
+
+- `tests/e2e/helpers.js`: `completePrefs()` usa `trainingPriority:"strength"`, cuyo template de 4 días es fuerza pura (`torsoA/piernaA/torsoB/piernaB`) para el split intermedio. Así, incluso si domingo queda último tras la normalización de la app, hoy no cae en `facil` ni `descanso`.
+- `tests/e2e/helpers.js`: `trainingDaysIncludingToday(referenceDate = new Date())` acepta fecha inyectada para verificar los 7 días sin manipular el reloj global. El helper sigue devolviendo 4 días únicos e incluyendo hoy.
+- `scripts/validate-e2e-training-fixture.mjs`: validador nuevo que importa las plantillas puras de `js/nutrition-pure.js`, reproduce la asignación relevante de `workoutSchedule()` y afirma que cada `getDay()` cae en un `STRENGTH_SESSION_IDS`.
+- `scripts/release-gate.mjs`: agrega el validador nuevo al gate.
+- `REQUIREMENTS.md`: la nota antigua de REQ-124 se corrigió para no afirmar que el caso domingo ya estaba cerrado; REQ-145 queda compactado en el hot path.
+
+### Archivos modificados
+
+| Archivo | Cambio |
+|---|---|
+| `tests/e2e/helpers.js` | Perfil fixture con prioridad de fuerza; helper parametrizable por fecha |
+| `scripts/validate-e2e-training-fixture.mjs` | Validador de los 7 días de semana |
+| `scripts/release-gate.mjs` | Incluye el validador nuevo |
+| `REQUIREMENTS.md` | REQ-145 implementado y compactado; nota de REQ-124 ajustada |
+| `docs/requirements-history.md` | Detalle histórico de REQ-145 |
+
+### Criterios de aceptación
+
+- `npx playwright test tests/e2e/entreno.spec.js` pasa con el fixture actual. ✓
+- El validador cubre los 7 posibles `getDay()` y confirma que hoy siempre cae en fuerza, incluido domingo. ✓
+- No se modifica runtime de la app (`index.html`, `js/*.js`) para este arreglo. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+### Verificación
+
+- `node scripts/validate-e2e-training-fixture.mjs`.
+- `npx playwright test tests/e2e/entreno.spec.js --reporter=list`.
+- `npx playwright test --reporter=list`.
+- `node scripts/validate-docs-index.mjs`.
+- `node scripts/release-gate.mjs`.

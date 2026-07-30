@@ -32,20 +32,19 @@ const daysFromToday = (n) => {
 
 // El orden real de días de entreno en la app es Lunes..Domingo (WEEKDAY_OPTIONS
 // en js/nutrition-pure.js), no el orden numérico de Date#getDay() (0=Domingo).
-// workoutSchedule() asigna las sesiones de gimnasio a los primeros días
-// procesados en ese orden y deja las de "facil"/"calidad"/"técnica" (o
-// descanso, para strength_only sin actividad ligera) para los últimos. Si el
-// día actual quedara de último, la sesión de hoy no sería de gimnasio.
+// workoutSchedule() asigna las sesiones segun este orden. El fixture usa
+// trainingPriority="strength" para que los 4 slots sean de fuerza incluso si
+// Domingo queda al final tras la normalizacion de la app.
 const WEEKDAY_APP_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Lunes..Domingo
 
 /**
- * 4 días de entreno/semana, siempre incluyendo el día actual como el primero
- * en el orden Lunes..Domingo, para que hoy reciba siempre una sesión de
- * gimnasio (no la última, que puede ser "facil"/descanso). 0=Dom…6=Sáb.
+ * 4 dias de entreno/semana, siempre incluyendo el dia actual. 0=Dom...6=Sab.
+ * Acepta una fecha inyectada para validar los 7 dias sin tocar el reloj real.
  */
-export function trainingDaysIncludingToday() {
-  const dow = new Date().getDay();
+export function trainingDaysIncludingToday(referenceDate = new Date()) {
+  const dow = referenceDate instanceof Date ? referenceDate.getDay() : Number(referenceDate);
   const rank = WEEKDAY_APP_ORDER.indexOf(dow);
+  if (rank < 0) throw new Error(`Dia de semana invalido para fixture E2E: ${referenceDate}`);
   const days = new Set([dow]);
   for (let offset = 1; days.size < 4; offset++) {
     days.add(WEEKDAY_APP_ORDER[(rank + offset) % 7]);
@@ -103,7 +102,7 @@ export function completePrefs(overrides = {}) {
     sessionMinutes: 60,
     equipment: ["barbell", "dumbbells", "machines", "pullup"],
     trainingExperience: "intermediate",
-    trainingPriority: "composition",
+    trainingPriority: "strength",
     preferredTrainingTime: "morning",
     injuries: "",
     limitations: "",
