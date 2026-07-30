@@ -1752,3 +1752,44 @@ Que la cola offline del usuario que cierra sesión se purgue **en todos los cami
 
 - Repro en consola contra las funciones vivas (0 llamadas pagadas): sembrar `_setSyncQ([{uid:"userA",entity:"day_log",…,status:"pending"}])`, fijar `session={user:{id:"userA"}}`, luego `session=null; clearSignedOutState();` y confirmar que la cola de `userA` queda vacía tras el fix (hoy queda en 1).
 - Añadir un test de aislamiento (patrón `scripts/test-sync-conflicts.mjs`) que afirme la purga en el camino por evento.
+
+## REQ-157 - Fix billing: renovar antes de vencer no acumula los días ya pagados
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey `facturacion`: al recorrer compra→webhook→entitlement, una segunda compra ignora el entitlement activo del usuario.
+
+### Problema
+
+Con plan activo, volver a pagar (botón "Renovar plan", visible a ≤14 días; `index.html:6752`) crea un entitlement `starts_at=now, expires_at=now+duración` sin sumar el tiempo restante. Con 20 días vivos + mensual nuevo pasa de `now+20` a `now+30` (debería `now+50`): se pierden 20 días ya pagados. Peor: si el plan activo vence después que el nuevo (trimestral vivo + compra mensual), el GET (`order=expires_at.desc&limit=1`, `api/entitlement.js:248`) conserva la fila más larga y la compra suma 0 días de acceso.
+
+### Causa raíz
+
+`handleCheckoutCompleted` (`api/webhook.js:113-114`) calcula `expiresAt = now + PLAN_DURATION_DAYS[planId]` incondicionalmente; nunca consulta el entitlement activo del usuario para extender desde su `expires_at`.
+
+### Objetivo
+
+Recomprar/renovar suma la nueva duración al vencimiento vigente, sin perder días ni pagos.
+
+### Alcance
+
+1. En `handleCheckoutCompleted`, buscar el entitlement activo del usuario y usar `max(now, expires_at vigente)` como base de `starts_at`/`expires_at`.
+
+### Fuera de alcance
+
+- Reembolsos (REQ-148); prorrateo entre planes distintos.
+
+### Riesgos
+
+- Conservar el guard de idempotencia por `payment_ref` para no duplicar en reintentos de webhook.
+
+### Criterios de aceptación
+
+- Comprar con plan activo extiende desde el vencimiento vigente; ninguna compra resta días.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Arnés con `fetch` mockeado que envía un segundo `checkout.session.completed` mientras existe un entitlement activo y afirma `expires_at = vencimiento vigente + duración`.
