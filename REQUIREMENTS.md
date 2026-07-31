@@ -1734,3 +1734,50 @@ Recomprar/renovar suma la nueva duración al vencimiento vigente, sin perder dí
 ### Verificación sugerida
 
 - Arnés con `fetch` mockeado que envía un segundo `checkout.session.completed` mientras existe un entitlement activo y afirma `expires_at = vencimiento vigente + duración`.
+
+## REQ-158 - Panel admin: "Cambiar contraseña" no protege a otros administradores (toma de cuenta entre admins)
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **administración** (panel "Usuarios"). Commit previo leído: `57a15b5` (REQ-145). Se revisó el guardado de acciones admin sobre otros administradores en `api/admin.js` y `index.html`.
+
+### Problema
+
+Un administrador puede fijar la contraseña de **otro** administrador (y luego iniciar sesión como él) sin ninguna barrera. REQ-126 dejó establecido el invariante de que las acciones sensibles del panel están "deshabilitadas para la propia cuenta y para otros administradores" (ver ledger de REQ-126). Ese invariante se cumple para "Desactivar" (bloquea al último admin y a uno mismo), "Regenerar plan" y "Reiniciar usuario" (deshabilitados para `me||u.is_admin`), pero **no** para "Cambiar contraseña", que es la acción más poderosa: cambia la credencial y habilita impersonación. Reproducción: como admin, abrir el panel de usuarios → en la fila de otro administrador, el botón "Cambiar contraseña" está activo → fijar una contraseña nueva → esa cuenta admin queda tomada. El servidor la acepta sin verificar que el objetivo sea admin ni distinto del que llama.
+
+### Causa raíz
+
+- API: la acción `setPassword` (`api/admin.js:730-744`) solo valida formato de UUID, longitud de contraseña y existencia del usuario; **no** comprueba `targetProfile.is_admin` ni `userId===caller`. Contrasta con `setActive` (`api/admin.js:702-705` self, `715-718` último admin), `resetUserToOnboarding` (`api/admin.js:431-435` self, `442-446` admin) y `prepareTestUser` (`api/admin.js:756-768`), que sí bloquean objetivos admin/self.
+- UI: `adminUsersHtml` (`index.html:10231`) renderiza `Cambiar contraseña` sin el atributo `disabled` que sí aplica a Desactivar (`index.html:10230`, `me`) y a Regenerar/Reiniciar (`index.html:10235-10236`, `me||u.is_admin`).
+
+### Objetivo
+
+Un administrador no puede tomar la cuenta de otro administrador cambiándole la contraseña desde el panel; la protección de cuentas admin es consistente entre todas las acciones sensibles.
+
+### Alcance
+
+1. En `setPassword` (`api/admin.js`), rechazar (409) cuando el `userId` objetivo es admin y distinto del que llama; permitir que el admin cambie su propia contraseña.
+2. En `adminUsersHtml` (`index.html`), deshabilitar el botón "Cambiar contraseña" para otras cuentas admin (patrón `u.is_admin&&!me`), conservándolo habilitado para la propia cuenta.
+
+### Fuera de alcance
+
+- "Enviar reset" (recuperación por correo que controla el propio usuario) y el resto de acciones ya guardadas.
+- Rediseñar el modelo de roles o añadir niveles de admin.
+
+### Riesgos
+
+- No romper el caso legítimo de que un admin cambie su propia contraseña.
+- Mantener alineadas la barrera de UI y la de servidor (el servidor es la que realmente protege).
+
+### Criterios de aceptación
+
+- `setPassword` sobre otro admin devuelve error y no altera la credencial; sobre uno mismo o sobre un usuario normal sigue funcionando.
+- En el panel, "Cambiar contraseña" aparece deshabilitado en filas de otros administradores.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Extender `scripts/test-admin-api.mjs` con un caso: `setPassword` con `userId` de otro admin → rechazado; con el propio o con un usuario normal → aceptado.
+- Evidencia funcional (esta auditoría): render de `adminUsersHtml` con `uid()` = admin-A y filas [admin-A, admin-B, usuario normal] → en la fila de admin-B, `Regenerar plan`/`Reiniciar usuario` salen `disabled` pero `Cambiar contraseña` y `Desactivar` quedan habilitados (screenshot del panel mock, 0 errores de consola).
