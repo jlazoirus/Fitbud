@@ -1781,3 +1781,48 @@ Un administrador no puede tomar la cuenta de otro administrador cambiándole la 
 
 - Extender `scripts/test-admin-api.mjs` con un caso: `setPassword` con `userId` de otro admin → rechazado; con el propio o con un usuario normal → aceptado.
 - Evidencia funcional (esta auditoría): render de `adminUsersHtml` con `uid()` = admin-A y filas [admin-A, admin-B, usuario normal] → en la fila de admin-B, `Regenerar plan`/`Reiniciar usuario` salen `disabled` pero `Cambiar contraseña` y `Desactivar` quedan habilitados (screenshot del panel mock, 0 errores de consola).
+
+## REQ-159 - El service worker cachea respuestas de error (404/500) y envenena el cache
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey `pwa`: verificación en navegador (SW `fitbud-pwa-v68` activo, servidor 8923). Distinto de REQ-150 (mezcla de versiones): aquí una respuesta **no-OK** se guarda y se sirve como buena.
+
+### Problema
+
+Ante un error transitorio (deploy en curso, hiccup del edge, URL de Storage vencida), el SW guarda la respuesta de error y la re-sirve hasta que cambie `CACHE_NAME`. En `cacheFirst` (assets, `.js` del shell, media de ejercicios), un 404/500 queda cacheado y se re-sirve aunque el servidor ya se recuperó: el asset/demo queda roto sin autorreparación. En `networkFirst` (navegación y `config.js`), un 500 de la red **sobrescribe** el último shell bueno; al recargar offline se sirve el 500 cacheado.
+
+### Causa raíz
+
+`service-worker.js`: `cacheFirst` (69-76), `networkFirst` (78-87) y `staleWhileRevalidate` (124-133) hacen `cache.put(request, response.clone())` **sin verificar `response.ok`**. `fetch` solo rechaza ante fallo de red, no ante 4xx/5xx, así que los errores entran al cache como válidos. No hay ningún check de `.ok`/`status` en el archivo.
+
+### Objetivo
+
+Que una respuesta de error nunca reemplace ni contamine una entrada de cache; el usuario nunca queda con un asset/shell roto de forma persistente por un error transitorio.
+
+### Alcance
+
+1. En los tres helpers, `cache.put` solo cuando `response && response.ok`.
+2. En `networkFirst`, si la red responde no-OK, no sobrescribir el cache y preferir la copia cacheada válida.
+
+### Fuera de alcance
+
+- Mezcla de versiones HTML/JS (REQ-150), bump de `CACHE_NAME` y estrategia de `/api/*`.
+
+### Riesgos
+
+- No romper el precache del install (`addAll` ya falla atómico ante no-OK).
+- Cuidar respuestas opacas (`type:"opaque"`, status 0) de CDN.
+
+### Criterios de aceptación
+
+- Un 404/500 no queda cacheado ni se re-sirve tras la recuperación.
+- Un 500 en navegación no sobrescribe el shell bueno; offline sirve el válido.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Arnés que carga `service-worker.js` real con `fetch` mockeado 503/500: hoy `cacheFirst` re-sirve el 503 tras recuperación y `networkFirst` sobrescribe el shell bueno.
+- Navegador: `fetch` a un asset mismo-origen inexistente → hoy `caches.match` en `fitbud-pwa-v68` devuelve un 404 cacheado.
