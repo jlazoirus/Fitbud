@@ -134,7 +134,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-04`).
 
 ## REQ-05 - Login simple y modo publico solo lectura para DB e IA
 
-**Estado: implementado, pero con una decision posterior que invalida parte del alcance original: el login es OBLIGATORIO. Hoy no existe modo anonimo de solo lectura; la primera pantalla es el login. La experiencia de visitante/muestra y el funnel comercial se definen en REQ-25 y en el nuevo REQ-33 (landing publica). Los criterios de "usuario anonimo" de abajo quedan derogados y se conservan solo como historia.**
+**Estado: implementado; derogado en parte — el login es OBLIGATORIO (sin modo anónimo). El funnel de visitante se rehace en REQ-25/REQ-33.**
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-05`).
 
@@ -1091,13 +1091,13 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-132`).
 
 ## REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5
 
-**Estado: implementado.** `/api/claude` ahora usa `output_config.format` con JSON Schema para `diet_day`, `diet_week` y `meal_option`; si Anthropic rechaza el parámetro con 400, reintenta una vez sin structured outputs y conserva el parseo/validación existente como fallback. El proxy capea `maxTokens` en 4096, el cliente escala los tokens de nutrición según número de comidas, `ALLOWED_MODELS` incluye `claude-sonnet-5` y el modelo se resuelve por acción vía env (`ANTHROPIC_MODEL_DIET`, `ANTHROPIC_MODEL_MEAL_OPTION`, etc.) con default Haiku 4.5. `MODEL_COSTS` incluye Sonnet 5 con precio estándar e introductorio hasta 2026-08-31. `supabase/analytics.sql` agrega `v_coach_model_gate`, y el panel admin muestra JSON inválido, degradación, costo y latencia por acción/modelo. Gate documentado: cambiar `ANTHROPIC_MODEL_DIET` a `claude-sonnet-5` solo si `diet_*` supera 10% de degradación sostenida durante 1-2 semanas; `meal_estimate` y `coach_conversation` permanecen en Haiku. Acción manual externa: re-ejecutar `supabase/analytics.sql` en Supabase para crear/actualizar la vista.
+**Estado: implementado.** `/api/claude` usa `output_config.format` (JSON Schema) para `diet_day`/`diet_week`/`meal_option` con fallback si Anthropic lo rechaza; capea `maxTokens` en 4096, resuelve modelo por acción vía env (default Haiku 4.5) e incluye `claude-sonnet-5`. `v_coach_model_gate` (`supabase/analytics.sql`, re-ejecutar en Supabase) gatea subir dieta a Sonnet 5 solo con >10% de degradación sostenida.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-133`).
 
 ## REQ-134 - Pipeline de crecimiento del catálogo validado por el motor
 
-**Estado: implementado.** `scripts/grow-catalog.mjs` es un pipeline offline: con `--fixture` no usa red y con `--brief` llama a Anthropic solo desde local/CI con `ANTHROPIC_API_KEY`; normaliza candidatos contra `supabase/seed.sql`, exige slugs estables, fuente para ingredientes nuevos, metadata semantica completa y limites de porcion, rechaza macros inconsistentes (`kcal` vs `4P+4C+9F`) y prueba cada plato con `solveDishPortion` contra presupuestos tipicos por slot. La salida son dos archivos en `--out-dir`: patch SQL revisable referenciado por slug (sin `truncate` ni IDs) y reporte JSON con aceptados/rechazados. `scripts/validate-grow-catalog.mjs` cubre un fixture offline con ingrediente/plato aceptado y rechazos por macros, fuente ausente y metadata incompleta; `release-gate` lo ejecuta.
+**Estado: implementado.** `scripts/grow-catalog.mjs` es un pipeline offline (`--fixture` sin red; `--brief` usa `ANTHROPIC_API_KEY` local/CI) que normaliza candidatos contra `supabase/seed.sql`, exige slugs/fuente/metadata/límites, rechaza macros inconsistentes y prueba `solveDishPortion` por slot; emite patch SQL + reporte. Validador `scripts/validate-grow-catalog.mjs` en `release-gate`.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-134`).
 
@@ -1150,7 +1150,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 
 **Estado: pendiente. Requiere acción humana (decisión de producto en REQ-147) antes de intentar otro lote; no implementable por el agente autónomo hasta esa decisión.**
 
-Canario `validate-diet-contract.mjs`: 122/378 (32.3%), 100% `catalog_gap`. Dos sesiones (2026-07-05 y 2026-07-08) con estrategias distintas, midiendo cada lote con `scripts/diff-diet-contract.mjs` (REQ-144), confirmaron un techo cercano a 32-33% bajo la selección local de `planDeterministicNutritionDay()`/`globalClosePass()` (los fallos de `carbs_contract` son 100% por exceso de carbohidratos, nunca déficit). Ningún lote nuevo se comiteó. Detalle completo de ambos experimentos y del objetivo/alcance/criterios si se retoma tras REQ-147: `docs/requirements-history.md` (buscar `## REQ-143`).
+Canario `validate-diet-contract.mjs` en 122/378 (32.3%), 100% `catalog_gap`; dos experimentos medidos con `scripts/diff-diet-contract.mjs` (REQ-144) confirmaron un techo ~32-33% bajo la selección local de `planDeterministicNutritionDay()`/`globalClosePass()`. Ningún lote nuevo se comiteó. Detalle completo (experimentos, objetivo/alcance/criterios si se retoma tras REQ-147): `docs/requirements-history.md` (buscar `## REQ-143`).
 
 ## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
 
@@ -1826,3 +1826,46 @@ Que una respuesta de error nunca reemplace ni contamine una entrada de cache; el
 
 - Arnés que carga `service-worker.js` real con `fetch` mockeado 503/500: hoy `cacheFirst` re-sirve el 503 tras recuperación y `networkFirst` sobrescribe el shell bueno.
 - Navegador: `fetch` a un asset mismo-origen inexistente → hoy `caches.match` en `fitbud-pwa-v68` devuelve un 404 cacheado.
+
+## REQ-160 - Fix check-in semanal: el ajuste de calorías ignora las metas "volumen" y "mantenimiento"
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey de onboarding, siguiendo el valor `goal` (`#ob_goal`, index.html:2955-2957) hasta sus consumidores.
+
+### Problema
+
+El check-in semanal (REQ-20) ramifica por `goal==="surplus"`/`"maintain"`, pero el perfil solo guarda `deficit`/`mantenimiento`/`volumen`: ambas caen en el `else` (déficit). `volumen` ganando +0.4 kg/sem RECORTA 100 kcal/día ("El peso subió esta semana"), saboteando la masa; `mantenimiento` bajando -0.5 kg/sem no recibe ajuste (déficit tolera hasta -0.8). Solo `deficit` funciona.
+
+### Causa raíz
+
+`analyzeCheckinAnswers`, index.html:11187/:11191 ramifica por `surplus`/`maintain`; el vocabulario real es `deficit`/`mantenimiento`/`volumen` (`#ob_goal` :2955-2957; `buildWeightRanges` :1459 sí usa `volumen`).
+
+### Objetivo
+
+En volumen la ganancia esperada no recorta calorías; en mantenimiento la deriva se corrige en cualquier dirección.
+
+### Alcance
+
+1. Mapear las ramas al vocabulario real (o normalizar `goal`) en `analyzeCheckinAnswers`.
+2. Cobertura determinista de las 3 metas.
+
+### Fuera de alcance
+
+- Umbrales kcal/kg y demás señales (hambre, energía, seguridad).
+
+### Riesgos
+
+- Cambia el ajuste para usuarios en curso; conservar `CHECKIN_MAX_KCAL_ADJUST`/`CHECKIN_MIN_KCAL`.
+
+### Criterios de aceptación
+
+- `volumen` ganando 0.15–0.6 kg/sem: `calorieAdjust===0`; <0.15: +kcal.
+- `mantenimiento` con |Δ|>0.4 kg/sem: corrección en el signo esperado.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `analyzeCheckinAnswers` con las 3 metas y pesos límite (arnés determinista, 0 llamadas).
