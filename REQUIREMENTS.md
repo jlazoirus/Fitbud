@@ -924,29 +924,23 @@ Permitir bloquear platos de forma persistente, aplicable a todos los flujos de g
 
 ## REQ-121 - Nutrición: cambios de preferencias regeneran solo futuro y se respetan de inmediato
 
-**Estado: implementado.** `coachCompatibilityContext` incluye ahora `preferredIngredients`, `preferredDishes`, `preferredCuisines`, `dislikedIngredients` y las keys de `blockedDishes` en el objeto serializado que arma `contextKey` (`coachQuota`); editar cualquiera de esas preferencias cambia el hash y evita que se reutilice un resultado cacheado/pooled generado con preferencias viejas. `COACH_PROMPT_VERSION` subió a 6 para invalidar de una vez lo cacheado antes de este cambio (incluido lo generado tras REQ-119/REQ-120 sin este contexto). `applyDayComidas` ya nunca reescribe una comida con `ms.done=true` (devuelve cuántas se preservaron y el toast lo confirma: "Lo que ya registraste no cambia"), así que regenerar el día de hoy solo toca comidas pendientes. `homePrepareDay` y la opción "Volver a preparar este día" del menú de Nutrición rechazan fechas pasadas (`ds<todayStr()`), consistente con `weekPendingDays` que ya excluía días pasados/con comidas registradas en la generación de semana. Verificado con `scripts/validate-preference-cache-invalidation.mjs`.
-
-_Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
+**Estado: implementado.** Editar preferencias (`preferredIngredients/Dishes/Cuisines`, `dislikedIngredients`, `blockedDishes`) cambia el `contextKey` y no reutiliza pooled/caché viejo; `COACH_PROMPT_VERSION=6` invalida lo previo; `applyDayComidas` no reescribe comidas `done=true`; `homePrepareDay` y "Volver a preparar" rechazan fechas pasadas. Detalle en el commit. Verificado con `scripts/validate-preference-cache-invalidation.mjs`.
 
 ## REQ-122 - Fix Nutrición: dietas deben llegar a objetivos o completar con sugerencias aplicables
 
-**Estado: implementado.** Cuando el día generado no cumple el objetivo (`!res.ok`), `genReviewHtml` ya no deja solo un botón "Aplicar" deshabilitado: agrega "Reintentar" y "Completar con opción práctica ahora" (`deterministicFromModal`, que aplica `applyDeterministicDay` vía el solver determinista). `aiGenerateDay` cuenta intentos fallidos consecutivos en `_genDayFailStreak` y, al llegar a 2, aplica automáticamente la ruta determinista en vez de seguir insistiendo con la IA; `homePrepareDay` reinicia ese conteo en cada sesión nueva de preparación. En la revisión de semana, `genWeekReviewHtml` agrega el botón "Completar días faltantes con opción práctica" junto al aviso de días que no se pudieron preparar, reutilizando `deterministicWeekFromModal` (ya existía para el camino de error de red) para rellenar solo los días ausentes sin tocar los ya generados. Las restricciones duras (`dishDietAllowed`, `coachDishBlockedByProfile`) siguen aplicando como bloqueo absoluto en toda ruta, incluida la determinista. Verificado con `scripts/validate-diet-completion-fallback.mjs`.
-
-_Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
+**Estado: implementado.** Cuando el día generado no cumple objetivo, la revisión ofrece "Reintentar" y "Completar con opción práctica" (`deterministicFromModal`/`applyDeterministicDay`); `aiGenerateDay` cae a determinista tras 2 fallos (`_genDayFailStreak`, reiniciado por `homePrepareDay`); la revisión de semana ofrece completar días faltantes; las restricciones duras siguen bloqueando en toda ruta. Detalle en el commit. Verificado con `scripts/validate-diet-completion-fallback.mjs`.
 
 ## REQ-123 - Fix Nutrición: todos los botones "Otra opción" soportan reintentos repetidos con feedback
 
-**Estado: implementado.** Causa raíz encontrada: al agotarse el cupo diario de generaciones "frescas" para una acción, `reserve_coach_action` cambia a modo `reuse` y el servidor devolvía en silencio una respuesta pooled/template idéntica en cada reintento (mismo `contextKey`, mismo fallback determinista) — el usuario veía siempre la misma sugerencia y lo percibía como que el botón no hacía nada. `/api/claude` ahora marca `reused:true` en esa respuesta para todos los usuarios (antes solo iba en el diagnóstico de admin). `callClaude` expone la señal como `lastCoachCallReused` y `generateOneDay` la propaga en su resultado. `regenerateGenMeal`, `rerollChangeMealOptions` y `regenerateDayInWeekDraft` la usan para avisar con un toast claro ("Ya usaste tus opciones nuevas de hoy...") y para descartar la sugerencia repetida a favor del plato más cercano del catálogo aún no mostrado (`freshSelected` filtra por `seenSlugs`, `regenerateGenMeal` compara contra el nombre previo del slot). `regenerateDayInWeekDraft` y `genReviewHtml` (revisión de día) ahora siempre ofrecen "Reintentar" junto a "Volver al borrador"/"Completar con opción práctica", así ningún error deja el modal sin una acción hacia adelante. Verificado con `scripts/validate-retry-feedback.mjs` y `scripts/test-coach-quota.mjs`.
+**Estado: implementado.** Al agotarse el cupo de generaciones frescas, `reserve_coach_action` pasa a `reuse` y devolvía en silencio la misma respuesta pooled (botón "sin efecto"); ahora `/api/claude` marca `reused:true`, `callClaude` lo expone (`lastCoachCallReused`) y `regenerateGenMeal`/`rerollChangeMealOptions`/`regenerateDayInWeekDraft` avisan con toast y descartan la sugerencia repetida por el plato más cercano no mostrado; los modales siempre ofrecen "Reintentar". Verificado con `scripts/validate-retry-feedback.mjs` y `scripts/test-coach-quota.mjs`.
 
 ### Origen
 
 Feedback de producto de Jonathan (3 jul 2026): el botón de otra opción no funciona después del primer intento y no da feedback; revisar todos los botones "otra opción".
 
-_Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
-
 ## REQ-124 - Home y Nutrición: anillo de macros primero y agenda/comidas debajo
 
-**Estado: implementado.** `renderHoy` renderiza `heroDash` (anillo/resumen de macros) antes que `homeAgendaHtml` (agenda), reemplazando el orden de REQ-97. `renderNutrition` mueve "Más opciones" al final, después de comidas del día y comidas extra. El tour guiado agrega un primer paso apuntando a `.mini-macro-dash` antes del paso de `.agenda-card`. Los comportamientos de "entrenamiento pendiente aunque las comidas estén completas" (`workoutPending` no depende de `pendingMeals`) y "día cerrado con racha" (`homeAgendaData` estado `done`) ya existían correctamente en `homeAgendaData`/`homeAgendaHtml` y no requirieron cambios. Verificado con `scripts/validate-home-macro-ring-first.mjs`.
+**Estado: implementado.** `renderHoy` renderiza `heroDash` (anillo/resumen de macros) antes que `homeAgendaHtml`, reemplazando el orden de REQ-97; `renderNutrition` mueve "Más opciones" al final; el tour guiado apunta primero a `.mini-macro-dash`. "Entrenamiento pendiente con comidas completas" y "día cerrado con racha" ya funcionaban en `homeAgendaData`. Verificado con `scripts/validate-home-macro-ring-first.mjs`.
 
 Nota aparte: el crash de producción para `strength_only` sin actividad ligera quedó corregido en su commit original; faltaba el caso domingo del fixture E2E, cerrado después en REQ-145.
 
@@ -1869,3 +1863,45 @@ En volumen la ganancia esperada no recorta calorías; en mantenimiento la deriva
 ### Verificación sugerida
 
 - `analyzeCheckinAnswers` con las 3 metas y pesos límite (arnés determinista, 0 llamadas).
+
+## REQ-161 - Fix Home: marcar comidas "Sin asignar" (0 kcal) como hechas infla el contador y la racha
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey `home` (Hoy), logueado con la suite E2E (REQ-96): día sin preparar → marcar los slots vacíos en Nutrición → volver a Home.
+
+### Problema
+
+En un día sin preparar cada slot se muestra "Sin asignar — … 0 kcal" pero con su check activo. Al tocar los tres checks (clics reales), Home se contradice en la misma pantalla: el anillo dice "0/2200 kcal · 3/3 comidas" y el header "🔥 1", mientras la agenda dice "Aún falta preparar este día". `nutritionDayDone`/`combinedDayDone` dan `true` con 0 kcal, así que la racha (métrica de retención) y los hitos se acreditan por días sin nutrición real.
+
+### Causa raíz
+
+`mealCard` (`index.html:4993`) pinta el botón `.chk` sin `disabled` aunque la comida esté vacía (`v.name` vacío, `v.kcal===0`) y `toggleMeal` (`index.html:5054`) alterna `ms.done` sin mirar contenido. Aguas abajo `dayTotals` (`index.html:2251`) la suma a `doneMeals`/`totMeals` y `nutritionDayDone` (`index.html:9346`) usa `done>=ceil(meals/2)` sobre el estado, no el contenido, así que `streak()`/`combinedDayDone` (`index.html:9416,9488`) suben. En cambio `homeDayHasPreparedMeals` (`index.html:3916`) sí exige contenido: por eso la agenda queda en "setup" y contradice al anillo.
+
+### Objetivo
+
+Una comida sin contenido no debe contar como cumplida (ni en "N/N comidas" ni en `nutritionDayDone`/racha/hitos), y Home no debe afirmar a la vez "N/N comidas + racha" y "aún falta preparar este día".
+
+### Alcance
+
+1. Impedir registrar una comida vacía: deshabilitar el check en `mealCard` cuando `mealValue` no tiene nombre ni macros, o que `toggleMeal` la ignore.
+2. Que `dayTotals` y `nutritionDayDone` cuenten como cumplida solo la comida con contenido real.
+
+### Fuera de alcance
+
+- Divergencia `streak()` vs `streakStats().combCur` del día en curso (REQ-146); empty states (REQ-57); umbrales de hito.
+
+### Riesgos
+
+- No romper el registro de comidas ya preparadas, de extras (que sí tienen contenido) ni de días pasados ya marcados.
+
+### Criterios de aceptación
+
+- Con día sin preparar, marcar slots vacíos no acredita "N/N comidas" ni racha, y agenda y anillo coinciden.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Repetir el flujo del Origen: tras marcar los slots vacíos, Home no debe mostrar "3/3 comidas" ni "🔥 1", y la agenda no debe contradecir al anillo.
