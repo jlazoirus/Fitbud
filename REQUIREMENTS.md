@@ -1001,57 +1001,7 @@ Permitir ordenar visualmente el día de comidas en mobile y marcar comidas salta
 
 **Estado: implementado.** `api/admin.js` agrega `previewResetPlan`/`applyResetPlan` (usuario, alcance nutrition/training/both, fecha de inicio opcional = hoy en la zona horaria del usuario objetivo) y `resetUserToOnboarding` (reutiliza el wipe ya probado de `resetTestUserData` sin marcar al usuario como QA). Un día queda protegido (nunca se toca) si ya tiene una comida registrada o un entrenamiento hecho/ejecutado dentro del alcance elegido; aplicar solo reescribe `meals`/`extras` (nutrición) o `workoutDone`/`workoutOverride`/`workoutExecution` (entrenamiento) en `day_log.state` para los días no protegidos, y archiva (`status=superseded`) la versión de plan activa cuando el alcance incluye nutrición. El horizonte revisado cubre 120 días (sin techo artificial por debajo de 7). Toda acción se audita en la nueva tabla `admin_actions_log` (`supabase/admin_reset.sql`, requiere aplicarse manualmente en Supabase). Panel de administración: botones "Regenerar plan" (vista previa obligatoria antes de aplicar) y "Reiniciar usuario" (doble confirmación), deshabilitados para la propia cuenta y para otros administradores. Verificado con `scripts/test-admin-reset.mjs`.
 
-Pendiente de infraestructura (no ejecutable por el agente): aplicar `supabase/admin_reset.sql` en el proyecto de Supabase de producción para que `admin_actions_log` exista antes de usar estas acciones (la auditoría falla en silencio — no bloquea la operación principal — si la tabla no existe todavía).
-
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): como administrador debe poder borrar para otro usuario todo lo futuro generado y volver a generar dieta y ejercicio para al menos toda la semana; también reiniciar a cero y devolverlo al onboarding si hace falta.
-
-### Problema
-
-El admin puede listar usuarios, activar/desactivar, invitar, resetear usuario QA y administrar consumo, pero no puede corregir planes futuros de un usuario normal sin intervención manual en base de datos.
-
-### Causa raíz
-
-`api/admin.js` tiene acciones administrativas acotadas; no existe una acción segura para borrar prescripción futura (`plan_versions`/`day_log` futuros) ni para preparar un flujo de regeneración por usuario y fecha.
-
-### Objetivo
-
-Dar al administrador una herramienta segura para resetear o regenerar futuro de nutrición y/o entrenamiento de cualquier usuario, con fecha de inicio y preview antes de aplicar.
-
-### Alcance
-
-1. En panel admin, agregar acción por usuario: "Regenerar plan" o "Resetear futuro".
-2. Permitir seleccionar: nutrición, entrenamiento o ambos.
-3. Permitir fecha de inicio; default = hoy en zona horaria del usuario/admin si no se elige.
-4. Preview obligatorio antes de aplicar: qué días/versiones se archivarán/borrarán y qué se regenerará.
-5. Al aplicar, borrar/archivar solo futuro desde la fecha elegida; no tocar días pasados ni registros ejecutados.
-6. Permitir regenerar como mínimo 7 días.
-7. Agregar opción separada de "Reiniciar usuario": borrar datos personales/planes/progreso según política existente y marcar onboarding pendiente para que vuelva a empezar.
-8. Auditar acción con admin, usuario objetivo, fecha, alcance y resultado.
-
-### Fuera de alcance
-
-- Ejecutar migraciones de producción automáticamente.
-- Saltarse RLS desde cliente; operaciones sensibles deben pasar por API admin server-side.
-- Crear pagos, cupones o entitlements nuevos.
-
-### Riesgos
-
-- Alto riesgo de pérdida de datos si la acción toca historial; requerir confirmación explícita y preview.
-- Regenerar con coach para otro usuario puede consumir cuota/costo; usar políticas admin claras y fallback determinista si corresponde.
-
-### Criterios de aceptación
-
-- Admin puede seleccionar usuario normal, fecha y tipo de plan a resetear/regenerar.
-- El preview muestra impacto antes de aplicar.
-- Aplicar desde hoy no modifica días pasados ni comidas/entrenos ya registrados.
-- Reiniciar usuario lo devuelve a onboarding sin convertirlo necesariamente en usuario QA.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Tests de `api/admin.js` con mocks: preview, aplicar nutrición, aplicar entrenamiento, ambos, reinicio total, bloqueo a no-admin y protección de historial pasado.
+Pendiente de infraestructura (no ejecutable por el agente): aplicar `supabase/admin_reset.sql` en el proyecto de Supabase de producción para que `admin_actions_log` exista antes de usar estas acciones (la auditoría falla en silencio — no bloquea la operación principal — si la tabla no existe todavía). Detalle histórico: commit de implementación de REQ-126.
 
 ## REQ-127 - Personalizar remitente y asunto de los correos de autenticacion de Supabase (branding Fitbud)
 
@@ -1905,3 +1855,48 @@ Una comida sin contenido no debe contar como cumplida (ni en "N/N comidas" ni en
 ### Verificación sugerida
 
 - Repetir el flujo del Origen: tras marcar los slots vacíos, Home no debe mostrar "3/3 comidas" ni "🔥 1", y la agenda no debe contradecir al anillo.
+
+## REQ-162 - Fix Nutrición: la tarjeta y la suma del día muestran la receta base del catálogo, no los macros materializados del plan
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey Nutrición. Tras "Preparar mi día" → "Aplicar al día", cada comida del snapshot `nutritionPlan` (REQ-82) se rinde con `mealValue()`/`mealRecipe()`. El planner escala las porciones al objetivo, pero la tarjeta muestra la receta base.
+
+### Problema
+
+Reproducción (catálogo cargado, `DB.loaded`): el plan materializa el Almuerzo en 495 kcal / P93 (300 g de pollo) y el usuario aprueba ese total en la revisión. En Nutrición la tarjeta muestra 165 kcal / P31 (100 g, receta base) y `dayTotals()` suma 165, no 495: anillo, "Consumo de hoy", % de meta y racha de adherencia cuentan la porción sin escalar (con platos mayores al objetivo, sobrecuenta). Afecta a todo plan cuyo `dishName` exista en el catálogo con macros distintos a los guardados. Además, editar la receta del catálogo luego muta días ya ejecutados que leen del snapshot (rompe historial inmutable).
+
+### Causa raíz
+
+`mealValue()` resuelve el plato por nombre ANTES que el snapshot: `if(dn&&DB.loaded){const d=dishByName(dn);…return dishMacros(d.id)}` (`index.html:2237`) devuelve la receta base y deja inalcanzable la rama materializada `if(base.src==="nutritionPlan"&&base.kcal>0)` (`index.html:2239`). Invierte el orden que fija REQ-82 (`nutritionPlan` primero, catálogo solo como compatibilidad). `mealRecipe()` (`index.html:4957-4962`) hace lo mismo con los gramos base en vez de `base.ingredientes`.
+
+### Objetivo
+
+Que una comida del plan muestre y sume los macros y gramos que el plan materializó, aunque el catálogo esté cargado.
+
+### Alcance
+
+1. En `mealValue()`, priorizar la rama `base.src==="nutritionPlan"` (con `base.kcal>0`) sobre la resolución por `dishName` en catálogo.
+2. Igual en `mealRecipe()`: usar `base.ingredientes` del snapshot antes que la receta base de `DB.dishIng`.
+
+### Fuera de alcance
+
+- Overrides (`ms.ovr`) de "Cambiar comida" (REQ-154) y ediciones manuales, que ya tienen su ruta.
+- El motor de escalado y el planner: el número materializado es correcto; falla la lectura.
+
+### Riesgos
+
+- Comidas de plan sin `base.kcal>0` deben seguir cayendo al catálogo como compatibilidad.
+- No romper la resolución por nombre para comidas sin snapshot.
+
+### Criterios de aceptación
+
+- Tras aplicar el plan, tarjeta, receta desplegada y `dayTotals()` muestran los macros/gramos materializados del snapshot (± redondeo), no la receta base.
+- Editar el catálogo no cambia días pasados renderizados desde snapshot.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Repro de runtime (0 pagadas): con `DB.loaded` y un plato cuya receta base ≠ macros del snapshot, `mealValue({src:"nutritionPlan",dishName,kcal:495},{})` debe devolver 495 (`src:"nutritionPlan"`), no `{kcal:165,src:"db"}`.
