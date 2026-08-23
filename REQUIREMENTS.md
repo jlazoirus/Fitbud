@@ -878,49 +878,7 @@ Capturar gustos mínimos de alto impacto antes de generar la primera semana, sin
 
 **Estado: implementado.** `profile.prefs.blockedDishes` guarda `{key,name}` por plato (key = `dish.slug` o nombre normalizado, deduplicado, tope 200). `dishDietAllowed` (`js/nutrition-domain.js`) excluye platos bloqueados del planificador determinista de día/semana (`compatibleDishesForSlot`); `coachDishBlockedByProfile` (index.html) hace lo mismo para la lista de referencia de IA, `changeMealCandidatePool`, `regenerateGenMeal`, `findGapSnack` y la validación de acciones del coach (`cambiar_plato`). Los prompts de generación de día y "otra opción" agregan una línea explícita con los nombres bloqueados (`coachBlockedDishesLine`) como refuerzo para platos generados por IA que no matchean el catálogo. Acción "🚫 No me gusta este plato" disponible desde el menú "···" de la comida aplicada (`openMealMore`/`blockCurrentMealDish`) y desde cada comida del borrador de día generado (`blockGenDraftMeal`). Perfil > Comidas lista los platos bloqueados con botón "Volver a sugerir" (`unblockDishFromProfile`) cuando hay al menos uno. Días ya ejecutados no se modifican (el bloqueo solo afecta generación futura). Verificado con `scripts/validate-blocked-dishes.mjs` y la suite E2E de Perfil/Nutrición.
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): agregar una opción para decir que un plato no gusta y que no vuelva a sugerirse, salvo que el usuario lo cambie en Perfil.
-
-### Problema
-
-El usuario puede cambiar una comida, pero no hay una acción explícita para enseñar al sistema que un plato específico no debe volver a aparecer. Esto provoca repetición de platos rechazados y erosiona la confianza.
-
-### Causa raíz
-
-Las preferencias negativas son principalmente texto libre (`dislikedIngredients`) y patrones aprendidos. No existe una lista estructurada de platos bloqueados por slug/nombre ni un flujo de desbloqueo.
-
-### Objetivo
-
-Permitir bloquear platos de forma persistente, aplicable a todos los flujos de generación y editable desde Perfil avanzado.
-
-### Alcance
-
-1. En cada comida sugerida/aplicada, agregar acción "No me gusta este plato" o equivalente.
-2. Guardar el bloqueo como preferencia estructurada por `dishSlug` cuando exista y por nombre normalizado como fallback.
-3. Excluir platos bloqueados en generación de día, semana, reemplazos, "otra opción" y regenerar día.
-4. En Perfil avanzado, listar platos bloqueados y permitir quitarlos ("volver a sugerir").
-5. Si bloquear un plato deja muy pocos candidatos, mostrar mensaje útil y usar fallback compatible sin romper macros.
-
-### Fuera de alcance
-
-- Bloquear ingredientes completos desde esta acción; ingredientes se manejan en preferencias.
-- Analytics de platos rechazados agregada a nivel global.
-
-### Riesgos
-
-- Bloqueos excesivos pueden dejar sin candidatos en dietas restrictivas; el sistema debe degradar con feedback claro.
-
-### Criterios de aceptación
-
-- Un plato marcado como no gustado no aparece en nuevas generaciones para ese usuario.
-- El usuario puede desbloquearlo desde Perfil y vuelve a ser elegible.
-- Días ya ejecutados no cambian.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Generar día con un plato, marcarlo como no gustado, regenerar día/semana y confirmar que no reaparece.
+_Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
 
 ## REQ-121 - Nutrición: cambios de preferencias regeneran solo futuro y se respetan de inmediato
 
@@ -948,54 +906,9 @@ _Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit q
 
 ## REQ-125 - Nutrición: reordenar comidas y saltar comidas sin cambiar horarios históricos
 
-**Estado: implementado.** Comidas planificadas y extras ahora viven en una sola lista ordenable dentro de "Comidas del día" (antes eran dos secciones separadas). El orden se guarda en `dayState(ds).mealOrder` (solo visual: `moveDayItem` únicamente reescribe ese array, nunca slot/horario/`ovr`/macros) y se reconcilia en `dayEffectiveOrder` con los ítems reales del día (nuevos al final, claves obsoletas descartadas). Cada extra recibe un `oid` estable (`nextExtraOid`) para que su clave de orden no dependa de su índice en el array (evita romperse al eliminar una extra). Controles subir/bajar (fallback accesible, sin drag-and-drop) solo se muestran para hoy/futuro (`canReorderDay`); los días pasados no ofrecen reordenar. Nueva acción "Saltar esta comida" (`skipMeal`/`unskipMeal`, con "Deshacer") para comidas planificadas no consumidas: se ve como "Saltada", no cuenta como pendiente ni consumida (`dayTotals` excluye comidas saltadas de `totMeals`) y no puede aplicarse sobre una comida ya registrada. `homeAgendaData` usa `dayEffectiveOrder` y excluye comidas saltadas al elegir la próxima comida pendiente en Home. Verificado con `scripts/validate-meal-reorder-skip.mjs`; se actualizó `scripts/validate-home-macro-ring-first.mjs` (REQ-124) porque la sección "nut.extra" se fusionó en "nut.plan".
+**Estado: implementado.** Comidas planificadas y extras viven en una sola lista ordenable dentro de "Comidas del día". El orden se guarda en `dayState(ds).mealOrder` (solo visual: `moveDayItem` reescribe ese array, nunca slot/horario/`ovr`/macros) y se reconcilia en `dayEffectiveOrder` con los ítems reales (nuevos al final, claves obsoletas descartadas). Cada extra recibe un `oid` estable (`nextExtraOid`) para que su clave de orden no dependa del índice. Controles subir/bajar (fallback accesible, sin drag-and-drop) solo para hoy/futuro (`canReorderDay`). Acción "Saltar esta comida" (`skipMeal`/`unskipMeal`, con "Deshacer") para comidas planificadas no consumidas: se ve como "Saltada", no cuenta como pendiente ni consumida (`dayTotals` la excluye de `totMeals`) y no aplica sobre una ya registrada. `homeAgendaData` usa `dayEffectiveOrder` y excluye saltadas al elegir la próxima comida. Verificado con `scripts/validate-meal-reorder-skip.mjs`; se actualizó `scripts/validate-home-macro-ring-first.mjs` (REQ-124) al fusionar "nut.extra" en "nut.plan".
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): el usuario debe reordenar comidas según cómo las consume durante el día; también debe poder saltarse una comida que ya no hará.
-
-### Problema
-
-Las comidas extra quedan al final y pueden perder visibilidad. Si el usuario agrega una comida que hará a media tarde, no puede subirla al lugar lógico. Tampoco hay acción explícita para marcar que no hará una comida planificada sin borrarla ni consumirla.
-
-### Causa raíz
-
-`renderNutrition()` separa comidas planificadas y extras por estructura fija; `day_log` no tiene un orden visual persistente ni estado "saltada" para slots de comida. El orden actual deriva de slots/arrays, no de intención diaria del usuario.
-
-### Objetivo
-
-Permitir ordenar visualmente el día de comidas en mobile y marcar comidas saltadas, preservando el historial y los horarios originales.
-
-### Alcance
-
-1. Permitir reordenar comidas planificadas y extras en la vista de Nutrición.
-2. Optimizar para mobile: drag and drop o control de agarre pequeño; si no queda claro/accesible, agregar botones subir/bajar discretos.
-3. El reordenamiento cambia solo el orden visual del día, no el slot, horario original, macros ni historial.
-4. Agregar acción "Saltar esta comida" para comidas planificadas no consumidas.
-5. Una comida saltada no cuenta como consumida; debe verse como saltada y permitir deshacer.
-6. Home debe usar el orden visual para decidir la siguiente comida pendiente cuando exista.
-
-### Fuera de alcance
-
-- Recalcular automáticamente macros al saltar una comida; eso puede quedar como sugerencia o acción posterior.
-- Cambiar el template global de horarios del usuario.
-
-### Riesgos
-
-- Drag and drop móvil puede ser frágil; los controles deben tener fallback accesible.
-- Saltar comida puede dejar macros bajos; coordinar copy con REQ-122.
-
-### Criterios de aceptación
-
-- Una comida extra puede moverse entre comidas planificadas y conserva su estado.
-- Una comida planificada puede marcarse como saltada y luego restaurarse.
-- El orden visual persiste al cambiar de tab o recargar.
-- Días pasados ya registrados no se reordenan automáticamente.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E mobile: agregar snack extra, moverlo arriba del almuerzo, saltar desayuno, verificar Home muestra la siguiente comida correcta.
+_Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
 
 ## REQ-126 - Admin: resetear futuro y regenerar nutrición/entrenamiento para cualquier usuario
 
@@ -1900,3 +1813,47 @@ Que una comida del plan muestre y sume los macros y gramos que el plan materiali
 ### Verificación sugerida
 
 - Repro de runtime (0 pagadas): con `DB.loaded` y un plato cuya receta base ≠ macros del snapshot, `mealValue({src:"nutritionPlan",dishName,kcal:495},{})` debe devolver 495 (`src:"nutritionPlan"`), no `{kcal:165,src:"db"}`.
+
+## REQ-163 - Fix Entreno: una sesión abandonada en curso cuenta como entreno "hecho" e infla la racha
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey Entreno. Al iniciar el reproductor y omitir un bloque (o marcar una sola serie) sin finalizar la sesión, el día ya cuenta como entreno cumplido para la racha, aunque el propio "Resumen" del día muestre "En curso".
+
+### Problema
+
+Reproducción funcional (Playwright + fixtures REQ-96, 0 llamadas pagadas): día de entreno de fuerza. Antes de tocar nada `trainingDayResult(hoy)="missed"` y `streakStats().trainCur=0`. El usuario pulsa "Iniciar sesión guiada", pulsa "Omitir bloque" una vez y abandona (nunca "Finalizar" ni "Terminar parcialmente"). Después: la sesión sigue `in_progress` (`workoutOutcomeForDay="in_progress"`, la tarjeta muestra "En curso · 0/6 bloques"), pero `trainingDayResult="done"` y `trainCur` sube a 1. Como `combinedDayDone` exige `trainingDayResult==="done"||"rest"`, en un día con la nutrición cumplida esa sesión abandonada completa la racha combinada y Home enciende 🔥 (y `checkAndSaveMilestones` puede otorgar hitos). La app se autocontradice: el día está "En curso"/pendiente pero la racha ya lo acreditó. Contradice REQ-23 (racha combinada = "entrenamiento hecho o descanso planificado"). Basta un bloque omitido o una serie marcada por día para sostener una racha sin entrenar de verdad.
+
+### Causa raíz
+
+`trainingDayResult(ds)` decide "done" con `workoutHasRecordedActivity(st)||!!st.workoutDone` (`index.html:9411`). `workoutHasRecordedActivity` (`index.html:4471-4477`) devuelve `true` ante cualquier `step.status==="done"||"skipped"` o cualquier `set.done`, **sin exigir un estado terminal** (`completed`/`partial`). Así una ejecución `in_progress`/`paused` con un solo bloque omitido ya se cuenta como día hecho en `streakStats()` (`:9431`), `combinedDayDone` (`:9419`) y `streak()` (`:9488`). El "Resumen" del día usa `workoutOutcomeForState` (`:5038`), que sí muestra "En curso" → divergencia visible.
+
+### Objetivo
+
+Que un día de entreno solo cuente como "hecho" para la racha cuando la sesión llegó a un cierre real (completa o parcial guardada), no por una sesión en curso o abandonada con bloques omitidos.
+
+### Alcance
+
+1. En `trainingDayResult()`, contar "done" solo si el resultado del día es terminal: `workoutOutcomeForState(st)` es `completed` o `partial` (o el legado `st.workoutDone`), no por mera actividad registrada de una sesión `in_progress`/`paused`.
+
+### Fuera de alcance
+
+- La divergencia `streak()` vs `streakStats().combCur` del día en curso (REQ-146) y las comidas vacías/nutrición (REQ-161): son otros caminos.
+- Cambiar qué cuenta como "parcial" en el cierre (`finishWorkoutExecution`), ni la duración (REQ-155).
+
+### Riesgos
+
+- No romper el caso legítimo: una sesión finalizada como "parcial" debe seguir contando; un descanso planificado sigue siendo "rest".
+- `workoutHasRecordedActivity` se usa además en otros lugares (p. ej. protección de días en REQ-126); acotar el cambio a `trainingDayResult` para no alterar esa protección.
+
+### Criterios de aceptación
+
+- Una sesión `in_progress`/`paused` (aunque tenga bloques omitidos o series sueltas) da `trainingDayResult="missed"` y no incrementa `trainCur` ni la racha combinada.
+- Una sesión finalizada (`completed`/`partial`) sí cuenta como día de entreno.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E: iniciar sesión, "Omitir bloque", no finalizar; comprobar `trainingDayResult(hoy)==="missed"` y `streakStats().trainCur` sin cambio, mientras la tarjeta sigue mostrando "En curso".
