@@ -829,50 +829,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-118`).
 
 ## REQ-119 - Onboarding nutricional: capturar gustos y disgustos antes del primer plan
 
-**Estado: implementado.** Onboarding agrega sección "Tus gustos (opcional)" con ingredientes favoritos, platos favoritos y disgustos (`ob_preferred_ingredients`, `ob_preferred_dishes`, `ob_disliked`), guardados en `prefs.preferredDishes` (nuevo) y campos existentes. Perfil expone `preferredDishes` como editable. El prompt de IA (día, semana, "otra opción") recibe `coachLikesLine` con gustos y línea de disgustos suaves; el fallback determinista aplica `preferenceScoreAdjustment` en `js/nutrition-domain.js` para priorizar platos con ingredientes/nombres afines y penalizar los que coinciden con disgustos, tanto en generación de día como en reemplazos (`rankReplacementCandidates`). Alergias/restricciones duras siguen bloqueando vía `hard_restrictions` sin mezclarse con gustos.
-
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): la dieta debe generarse desde el primer momento en base a gustos, porque una dieta genérica da mala impresión.
-
-### Problema
-
-El onboarding esencial captura patrón de alimentación y alergias, pero no pregunta de forma directa por ingredientes favoritos, platos que le gustan ni comidas/ingredientes que no le gustan. El primer plan puede sentirse genérico aunque cumpla macros.
-
-### Causa raíz
-
-Las preferencias detalladas existen en Perfil (`preferredIngredients`, `preferredCuisines`, `dislikedIngredients`, notas), pero parte de esos campos quedó fuera del onboarding para simplificarlo.
-
-### Objetivo
-
-Capturar gustos mínimos de alto impacto antes de generar la primera semana, sin volver pesado el onboarding.
-
-### Alcance
-
-1. En onboarding, agregar campos breves: ingredientes favoritos, platos que le gustan, comidas o ingredientes que no le gustan.
-2. Guardar esos valores en prefs existentes si alcanzan, o extender prefs de forma compatible si hace falta.
-3. Usar esos gustos en la primera generación semanal automática (REQ-118), día, semana, reemplazos y "otra opción".
-4. Mantener alergias/restricciones duras separadas de disgustos/preferencias.
-5. Reflejar los mismos campos en Perfil como configuración editable.
-
-### Fuera de alcance
-
-- Crear catálogo nuevo de platos para cada gusto.
-- Hacer scoring avanzado de preferencias aprendidas; esto puede apoyarse en `learnedPatterns` existente.
-
-### Riesgos
-
-- Demasiados campos en onboarding pueden bajar conversión. Deben ser compactos y opcionales salvo restricciones duras.
-
-### Criterios de aceptación
-
-- El usuario puede completar onboarding con gustos vacíos, pero si los llena se guardan y se usan en el primer plan.
-- El prompt/contexto y fallback determinista reciben preferencias positivas y negativas.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Test con "me gusta pollo/arroz" y "no me gusta avena": confirmar que el primer plan prioriza compatibles y evita disgustos cuando hay alternativas.
+**Estado: implementado.** Onboarding agrega sección "Tus gustos (opcional)" con ingredientes favoritos, platos favoritos y disgustos (`ob_preferred_ingredients`, `ob_preferred_dishes`, `ob_disliked`), guardados en `prefs.preferredDishes` (nuevo) y campos existentes. Perfil expone `preferredDishes` como editable. El prompt de IA (día, semana, "otra opción") recibe `coachLikesLine` con gustos y línea de disgustos suaves; el fallback determinista aplica `preferenceScoreAdjustment` en `js/nutrition-domain.js` para priorizar platos con ingredientes/nombres afines y penalizar los que coinciden con disgustos, tanto en generación de día como en reemplazos (`rankReplacementCandidates`). Alergias/restricciones duras siguen bloqueando vía `hard_restrictions` sin mezclarse con gustos. Detalle (origen 3 jul 2026, alcance onboarding+perfil, criterios) en el commit. Verificado con `scripts/release-gate.mjs`.
 
 ## REQ-120 - Nutrición: "No me gusta este plato" bloquea futuras sugerencias hasta editar Perfil
 
@@ -1857,3 +1814,46 @@ Que un día de entreno solo cuente como "hecho" para la racha cuando la sesión 
 ### Verificación sugerida
 
 - E2E: iniciar sesión, "Omitir bloque", no finalizar; comprobar `trainingDayResult(hoy)==="missed"` y `streakStats().trainCur` sin cambio, mientras la tarjeta sigue mostrando "En curso".
+
+## REQ-164 - Fix Progreso: la variación de peso on-target se pinta como advertencia en metas de volumen/mantenimiento
+
+**Estado: pendiente.**
+
+### Origen
+
+Journey `progreso`, sección "Peso corporal" → "Composición". Recorrido con meta `volumen` y ganancia de peso deliberada.
+
+### Problema
+
+En volumen, subir de peso es el objetivo del ciclo y `buildWeightRanges` prescribe un rango creciente, pero la tarjeta "Δ peso (sem)" pinta la ganancia como advertencia (ámbar) en vez de logro (verde), y "Δ grasa %" hace lo mismo. La pantalla se contradice: la tabla "Rango kg" sube semana a semana mientras el delta que la cumple sale en rojo/ámbar. En mantenimiento cualquier variación tiene el mismo sesgo "bajar=bueno". Solo `deficit` está bien coloreado.
+
+### Causa raíz
+
+`bodyComposition()` (index.html:5235-5236) fija el color sin mirar `prefs.goal`: `dKg<=0?var(--good):var(--warn)` y `dBf<=0?var(--good):var(--warn)`. `buildWeightRanges` (index.html:1459) sí es goal-aware (`deficit -.004`, `volumen +.002`, mantenimiento `0`).
+
+### Objetivo
+
+El color del delta refleja si el cambio va en la dirección del objetivo del usuario, coherente con el rango prescrito.
+
+### Alcance
+
+1. En `bodyComposition()`, derivar el color de `dKg`/`dBf` de la dirección esperada según `prefs.goal` (volumen: subir=bueno; déficit: bajar=bueno; mantenimiento: estabilidad, sin alarmar variaciones pequeñas).
+
+### Fuera de alcance
+
+- Umbrales del check-in (REQ-160) y el cálculo de racha (REQ-146).
+- `recapDelta`/tarjetas neutras que ya muestran +/- sin juicio de color.
+
+### Riesgos
+
+- No invertir el sentido para `deficit` (regresión); mantener `composition()` intacto.
+
+### Criterios de aceptación
+
+- Meta `volumen` con Δ peso >0 on-target: la tarjeta usa `var(--good)`, no `var(--warn)`.
+- Meta `deficit` con Δ peso <0: sigue en `var(--good)`.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E: sembrar meta `volumen` + dos semanas de peso ascendente, abrir Progreso y assertar `color:var(--good)` en "Δ peso (sem)".
