@@ -829,11 +829,11 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-118`).
 
 ## REQ-119 - Onboarding nutricional: capturar gustos y disgustos antes del primer plan
 
-**Estado: implementado.** Onboarding agrega sección "Tus gustos (opcional)" con ingredientes favoritos, platos favoritos y disgustos (`ob_preferred_ingredients`, `ob_preferred_dishes`, `ob_disliked`), guardados en `prefs.preferredDishes` (nuevo) y campos existentes. Perfil expone `preferredDishes` como editable. El prompt de IA (día, semana, "otra opción") recibe `coachLikesLine` con gustos y línea de disgustos suaves; el fallback determinista aplica `preferenceScoreAdjustment` en `js/nutrition-domain.js` para priorizar platos con ingredientes/nombres afines y penalizar los que coinciden con disgustos, tanto en generación de día como en reemplazos (`rankReplacementCandidates`). Alergias/restricciones duras siguen bloqueando vía `hard_restrictions` sin mezclarse con gustos. Detalle (origen 3 jul 2026, alcance onboarding+perfil, criterios) en el commit. Verificado con `scripts/release-gate.mjs`.
+**Estado: implementado.** Onboarding y Perfil capturan gustos/disgustos (`prefs.preferredDishes` nuevo + campos existentes). El prompt de IA recibe `coachLikesLine`; el fallback determinista aplica `preferenceScoreAdjustment` (`js/nutrition-domain.js`) para priorizar afines y penalizar disgustos en generación y reemplazos. Alergias/restricciones duras siguen bloqueando por separado. Detalle en el commit. Verificado con `scripts/release-gate.mjs`.
 
 ## REQ-120 - Nutrición: "No me gusta este plato" bloquea futuras sugerencias hasta editar Perfil
 
-**Estado: implementado.** `profile.prefs.blockedDishes` guarda `{key,name}` por plato (key = `dish.slug` o nombre normalizado, deduplicado, tope 200). `dishDietAllowed` (`js/nutrition-domain.js`) excluye platos bloqueados del planificador determinista de día/semana (`compatibleDishesForSlot`); `coachDishBlockedByProfile` (index.html) hace lo mismo para la lista de referencia de IA, `changeMealCandidatePool`, `regenerateGenMeal`, `findGapSnack` y la validación de acciones del coach (`cambiar_plato`). Los prompts de generación de día y "otra opción" agregan una línea explícita con los nombres bloqueados (`coachBlockedDishesLine`) como refuerzo para platos generados por IA que no matchean el catálogo. Acción "🚫 No me gusta este plato" disponible desde el menú "···" de la comida aplicada (`openMealMore`/`blockCurrentMealDish`) y desde cada comida del borrador de día generado (`blockGenDraftMeal`). Perfil > Comidas lista los platos bloqueados con botón "Volver a sugerir" (`unblockDishFromProfile`) cuando hay al menos uno. Días ya ejecutados no se modifican (el bloqueo solo afecta generación futura). Verificado con `scripts/validate-blocked-dishes.mjs` y la suite E2E de Perfil/Nutrición.
+**Estado: implementado.** `profile.prefs.blockedDishes` guarda `{key,name}` por plato bloqueado; el planificador determinista y todas las rutas de IA (`dishDietAllowed`, `coachDishBlockedByProfile`, reemplazos y validación de acciones del coach) los excluyen, con refuerzo por prompt. Acción "🚫 No me gusta este plato" desde la comida aplicada y el borrador generado; Perfil > Comidas permite "Volver a sugerir". Días ejecutados no se tocan. Detalle en el commit. Verificado con `scripts/validate-blocked-dishes.mjs` y la suite E2E.
 
 _Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
 
@@ -863,13 +863,13 @@ _Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit q
 
 ## REQ-125 - Nutrición: reordenar comidas y saltar comidas sin cambiar horarios históricos
 
-**Estado: implementado.** Comidas planificadas y extras viven en una sola lista ordenable dentro de "Comidas del día". El orden se guarda en `dayState(ds).mealOrder` (solo visual: `moveDayItem` reescribe ese array, nunca slot/horario/`ovr`/macros) y se reconcilia en `dayEffectiveOrder` con los ítems reales (nuevos al final, claves obsoletas descartadas). Cada extra recibe un `oid` estable (`nextExtraOid`) para que su clave de orden no dependa del índice. Controles subir/bajar (fallback accesible, sin drag-and-drop) solo para hoy/futuro (`canReorderDay`). Acción "Saltar esta comida" (`skipMeal`/`unskipMeal`, con "Deshacer") para comidas planificadas no consumidas: se ve como "Saltada", no cuenta como pendiente ni consumida (`dayTotals` la excluye de `totMeals`) y no aplica sobre una ya registrada. `homeAgendaData` usa `dayEffectiveOrder` y excluye saltadas al elegir la próxima comida. Verificado con `scripts/validate-meal-reorder-skip.mjs`; se actualizó `scripts/validate-home-macro-ring-first.mjs` (REQ-124) al fusionar "nut.extra" en "nut.plan".
+**Estado: implementado.** Comidas y extras en una lista ordenable; el orden se guarda en `dayState(ds).mealOrder` (solo visual, nunca slot/horario/macros) y se reconcilia en `dayEffectiveOrder`. Controles subir/bajar (accesibles, sin drag-and-drop) solo para hoy/futuro (`canReorderDay`). Acción "Saltar esta comida" (`skipMeal`/`unskipMeal`, con "Deshacer") no cuenta como pendiente ni consumida (`dayTotals` la excluye) ni aplica sobre una ya registrada; `homeAgendaData` excluye saltadas. Detalle en el commit. Verificado con `scripts/validate-meal-reorder-skip.mjs`.
 
 _Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
 
 ## REQ-126 - Admin: resetear futuro y regenerar nutrición/entrenamiento para cualquier usuario
 
-**Estado: implementado.** `api/admin.js` agrega `previewResetPlan`/`applyResetPlan` (usuario, alcance nutrition/training/both, fecha de inicio opcional = hoy en la zona horaria del usuario objetivo) y `resetUserToOnboarding` (reutiliza el wipe ya probado de `resetTestUserData` sin marcar al usuario como QA). Un día queda protegido (nunca se toca) si ya tiene una comida registrada o un entrenamiento hecho/ejecutado dentro del alcance elegido; aplicar solo reescribe `meals`/`extras` (nutrición) o `workoutDone`/`workoutOverride`/`workoutExecution` (entrenamiento) en `day_log.state` para los días no protegidos, y archiva (`status=superseded`) la versión de plan activa cuando el alcance incluye nutrición. El horizonte revisado cubre 120 días (sin techo artificial por debajo de 7). Toda acción se audita en la nueva tabla `admin_actions_log` (`supabase/admin_reset.sql`, requiere aplicarse manualmente en Supabase). Panel de administración: botones "Regenerar plan" (vista previa obligatoria antes de aplicar) y "Reiniciar usuario" (doble confirmación), deshabilitados para la propia cuenta y para otros administradores. Verificado con `scripts/test-admin-reset.mjs`.
+**Estado: implementado.** `api/admin.js` agrega `previewResetPlan`/`applyResetPlan` (alcance nutrition/training/both) y `resetUserToOnboarding`; los días con comida registrada o entreno hecho quedan protegidos, aplicar solo reescribe `day_log.state` de días no protegidos y archiva la versión de plan activa. Panel admin con "Regenerar plan" (vista previa obligatoria) y "Reiniciar usuario" (doble confirmación), bloqueados para la propia cuenta y otros admins. Detalle en el commit. **Infra pendiente:** `supabase/admin_reset.sql` (tabla `admin_actions_log`) requiere aplicarse manualmente en Supabase. Verificado con `scripts/test-admin-reset.mjs`.
 
 Pendiente de infraestructura (no ejecutable por el agente): aplicar `supabase/admin_reset.sql` en el proyecto de Supabase de producción para que `admin_actions_log` exista antes de usar estas acciones (la auditoría falla en silencio — no bloquea la operación principal — si la tabla no existe todavía). Detalle histórico: commit de implementación de REQ-126.
 
@@ -1857,3 +1857,47 @@ El color del delta refleja si el cambio va en la dirección del objetivo del usu
 ### Verificación sugerida
 
 - E2E: sembrar meta `volumen` + dos semanas de peso ascendente, abrir Progreso y assertar `color:var(--good)` en "Δ peso (sem)".
+
+## REQ-165 - Fix check-in semanal: las escalas sin responder se leen como el peor valor y disparan ajustes falsos
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey retención → check-in semanal (REQ-20). Las 7 escalas 1–5 son opcionales; al enviar sin marcarlas, el motor de ajuste devuelve mensajes negativos y cambia calorías sobre respuestas que el usuario nunca dio.
+
+### Problema
+
+`readCiScale` devuelve `null` para una escala sin marcar, y en las comparaciones `null<=2` es `true` (0≤2) mientras `null>=4` es `false`. Repro determinista (meta déficit, 2000 kcal): (A) enviar el check-in sin marcar nada → propuesta `keep:true` ("Tu plan está bien calibrado") pero con razón "Energía y sueño bajos: prioriza el descanso…", contradicción visible en la misma tarjeta sobre campos jamás respondidos. (B) marcar solo hambre=5 y dejar energía y sueño en blanco → `+100 kcal/día` con "Hambre alta y energía baja: añadir calorías". Control (C) idéntico pero energía=5, sueño=5 → solo `+50 kcal`. Mismo hambre: el delta extra sale enteramente de tratar energía sin responder como baja, subiendo el objetivo calórico contra una meta de déficit por un dato inexistente.
+
+### Causa raíz
+
+`analyzeCheckinAnswers` (`index.html:11201`,`:11204`,`:11207`) compara `answers.energy`/`answers.sleep` crudos (null→0 en `<=`), mientras las ramas de fatiga/adherencia sí neutralizan con `||3` (`:11212`,`:11218`,`:11221`). `readCiScale` produce el `null` (`index.html:11166`). Manejo de "sin responder" inconsistente entre ramas.
+
+### Objetivo
+
+Una escala sin responder no debe contar como valor extremo ni generar mensajes/ajustes: se trata como neutral o se ignora esa rama.
+
+### Alcance
+
+1. En `analyzeCheckinAnswers`, normalizar las escalas ausentes (p. ej. `||3` o guarda de `!=null`) en las ramas de energía y sueño, igual que hambre/dificultad/recuperación/adherencia.
+2. Que una razón negativa no coexista con `keep:true`.
+
+### Fuera de alcance
+
+- El mapeo de metas volumen/mantenimiento (REQ-160) y el coloreo de deltas (REQ-164): misma función/journey, otra causa.
+- Hacer obligatorias las escalas del formulario.
+
+### Riesgos
+
+- Cambia el ajuste de usuarios en curso; conservar `CHECKIN_MAX_KCAL_ADJUST`/`CHECKIN_MIN_KCAL` y las demás ramas.
+
+### Criterios de aceptación
+
+- Enviar el check-in con energía/sueño sin marcar no produce "Energía y sueño bajos" ni suma calorías por esa vía; caso B iguala al control C.
+- Ninguna propuesta con `keep:true` muestra una razón de déficit/molestia.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Arnés determinista (0 llamadas): `analyzeCheckinAnswers` con escalas en `null` vs marcadas altas; assertar mismos `calorieAdjust`/`details` salvo por lo realmente respondido.
