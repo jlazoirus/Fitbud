@@ -183,4 +183,54 @@ await handler({
 assert(res.statusCode === 409, "No debe invitar un correo que ya tiene cuenta.");
 assert(!requests.some((item) => item.url.includes("/auth/v1/invite")), "No debe llamar invite si el correo ya existe.");
 
+// ── setPassword (REQ-158): nunca sobre OTRO admin; sí sobre uno mismo o un usuario normal ──
+const otherAdmin = { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", email: "otheradmin@example.com" };
+const normalUser2 = { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", email: "user2@example.com" };
+function setPasswordMocks(profilesById) {
+  return async (url, options = {}) => {
+    const value = String(url);
+    if (value.endsWith("/auth/v1/user")) return response(200, admin);
+    if (value.includes("/rest/v1/profiles?id=eq." + admin.id)) {
+      return response(200, [{ id: admin.id, email: admin.email, is_admin: true, active: true }]);
+    }
+    for (const [id, profile] of Object.entries(profilesById)) {
+      if (value.includes("/rest/v1/profiles?id=eq." + id)) return response(200, [profile]);
+      if (value.includes("/auth/v1/admin/users/" + id) && (!options.method || options.method === "GET")) {
+        return response(200, { user: { id, email: profile.email } });
+      }
+      if (value.includes("/auth/v1/admin/users/" + id) && options.method === "PUT") return response(200, { user: { id } });
+    }
+    throw new Error("Ruta no simulada: " + value);
+  };
+}
+
+global.fetch = setPasswordMocks({ [otherAdmin.id]: { id: otherAdmin.id, email: otherAdmin.email, is_admin: true, active: true } });
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "setPassword", userId: otherAdmin.id, password: "NuevaClave123" },
+}, res);
+assert(res.statusCode === 409, "No debe permitir cambiar la contraseña de otro administrador.");
+
+global.fetch = setPasswordMocks({ [admin.id]: { id: admin.id, email: admin.email, is_admin: true, active: true } });
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "setPassword", userId: admin.id, password: "NuevaClave123" },
+}, res);
+assert(res.statusCode === 200 && res.body.ok === true, "Un admin sí debe poder cambiar su propia contraseña.");
+
+global.fetch = setPasswordMocks({ [normalUser2.id]: { id: normalUser2.id, email: normalUser2.email, is_admin: false, active: true } });
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "setPassword", userId: normalUser2.id, password: "NuevaClave123" },
+}, res);
+assert(res.statusCode === 200 && res.body.ok === true, "Cambiar la contraseña de un usuario normal sigue funcionando.");
+
+console.log("  setPassword (REQ-158): rechaza sobre otro admin, permite sobre uno mismo y sobre usuarios normales.");
+
 console.log("API admin: invitación y usuario QA reiniciable verificados con mocks.");

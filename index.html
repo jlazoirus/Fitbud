@@ -10258,7 +10258,7 @@ function adminUsersHtml(users){
       </div></div>
       <div class="meal-actions">
         <button class="btn btn-sm" ${me?'disabled style="opacity:.4"':''} onclick="adminToggleActive('${u.id}',${u.active?'false':'true'})">${u.active?'Desactivar':'Activar'}</button>
-        <button class="btn btn-sm" onclick="adminSetPassword('${u.id}')">Cambiar contraseña</button>
+        <button class="btn btn-sm" ${(u.is_admin&&!me)?'disabled style="opacity:.4" title="No puedes cambiar la contraseña de otro administrador"':''} onclick="adminSetPassword('${u.id}')">Cambiar contraseña</button>
         <button class="btn btn-sm" onclick="adminResetLink('${u.id}')">Enviar reset</button>
         <button class="btn btn-sm" onclick="openAdminUserQuota('${u.id}')">Consumo</button>
         <button class="btn btn-sm" onclick="openAdminCourtesy('${u.id}')">Cortesía</button>

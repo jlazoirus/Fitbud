@@ -1202,7 +1202,8 @@ Recomprar/renovar suma la nueva duración al vencimiento vigente, sin perder dí
 
 ## REQ-158 - Panel admin: "Cambiar contraseña" no protege a otros administradores (toma de cuenta entre admins)
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`setPassword` (`api/admin.js`) ahora resuelve `targetProfile` y rechaza con 409 cuando `userId!==caller&&targetProfile.is_admin` — mismo invariante que ya protegía `setActive`/`resetUserToOnboarding`; sobre uno mismo o un usuario normal sigue funcionando igual. `adminUsersHtml()` (`index.html`) deshabilita el botón "Cambiar contraseña" con el patrón `u.is_admin&&!me` (no `me||u.is_admin`, para no bloquear el cambio de la propia contraseña). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-admin-api.mjs` (3 casos: otro admin rechazado, uno mismo y usuario normal aceptados; confirmado que el rechazo falla exactamente como describe el REQ contra el código sin el fix) y verificación visual manual de `adminUsersHtml()` con filas admin-propio/admin-ajeno/usuario normal.
 
 ### Origen
 

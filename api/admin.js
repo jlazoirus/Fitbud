@@ -789,8 +789,16 @@ export default async function handler(req, res) {
         res.status(400).json({ error: "userId y contraseña de 8 a 128 caracteres requeridos." });
         return;
       }
-      if (!await authUserById(userId, e)) {
+      const [targetUser, targetProfile] = await Promise.all([authUserById(userId, e), profileById(userId, e)]);
+      if (!targetUser) {
         res.status(404).json({ error: "Usuario no encontrado." });
+        return;
+      }
+      // REQ-158: cambiar contraseña habilita impersonación — mismo invariante
+      // que ya protege setActive/resetUserToOnboarding: nunca sobre OTRO admin
+      // (uno mismo sigue permitido).
+      if (userId !== caller && targetProfile && targetProfile.is_admin) {
+        res.status(409).json({ error: "No puedes cambiar la contraseña de otro administrador." });
         return;
       }
       await updateAuthUser(userId, { password }, e);
