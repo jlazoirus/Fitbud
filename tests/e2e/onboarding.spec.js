@@ -3,7 +3,7 @@
 // y que el cálculo coincida con la fórmula declarada (Mifflin-St Jeor).
 import { test, expect } from "@playwright/test";
 import {
-  installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, profileFixture,
+  installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, profileFixture, completePrefs,
 } from "./helpers.js";
 
 // Datos del usuario de prueba y su cálculo esperado, independiente de la app
@@ -128,6 +128,37 @@ test.describe("Onboarding", () => {
     expect(combinedPlan.snapshot.nutritionPlan.days.length).toBeGreaterThan(0);
     expect(combinedPlan.snapshot.trainingPlan.weeks.length).toBeGreaterThan(0);
     expect(calls.filter((c) => c.table === "day_log" && c.method === "POST").length).toBeGreaterThan(0);
+
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("REQ-152: 'Mantenerlo por ahora' en el aviso de revisión cierra el modal y pospone sin errores", async ({ page, context }) => {
+    // onboardingReviewedAt de hace 40 días (> PROFILE_REVIEW_DAYS=28) dispara el aviso.
+    const staleReview = new Date(Date.now() - 40 * 24 * 3600 * 1000).toISOString();
+    const { calls } = await installMocks(context, {
+      prefs: completePrefs({ onboardingReviewedAt: staleReview, onboardingCompletedAt: staleReview }),
+    });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+
+    await expect(page.getByText("Han pasado 4 semanas")).toBeVisible();
+    await page.getByRole("button", { name: "Mantenerlo por ahora" }).click();
+
+    // El modal se cierra y aparece la confirmación (antes del fix, ReferenceError
+    // impedía llegar a closeModal()/toast() y el modal quedaba abierto).
+    await expect(page.getByText("Han pasado 4 semanas")).toHaveCount(0);
+    await expect(page.locator("#toast")).toContainText(/Te preguntaremos de nuevo/i);
+
+    // onboardingReviewedAt queda persistido (reciente), así que la revisión no vuelve a molestar de inmediato.
+    await expect
+      .poll(() => calls.filter((c) => c.table === "profiles" && c.method === "POST").length)
+      .toBeGreaterThan(0);
+    const saved = calls.filter((c) => c.table === "profiles" && c.method === "POST").at(-1).payload;
+    const savedPrefs = (Array.isArray(saved) ? saved[0] : saved).prefs;
+    expect(Date.now() - Date.parse(savedPrefs.onboardingReviewedAt)).toBeLessThan(60_000);
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });

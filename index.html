@@ -3499,11 +3499,15 @@ function maybePromptProfileReview(){
 }
 async function keepCurrentProfile(){
   const prefs={...((profile&&profile.prefs)||{}),onboardingReviewedAt:new Date().toISOString()};
+  // Este flujo solo pospone la revisión: nunca cambia el calendario del plan,
+  // así que el motivo es fijo y validTo sale de las prefs ya guardadas (o se
+  // recalcula si faltara), no de variables locales de saveOnboarding/saveProfile.
+  const validTo=validYmd(prefs.planEndDate)?prefs.planEndDate:planEndFor(prefs.planStartDate||todayStr(),resolvedPlanDuration(prefs));
   const result=await saveProfilePrefs(prefs,{
     source:"manual",
-    reason:calendarChanged?"Ajuste manual del plan":"Preferencias guardadas",
+    reason:"Preferencias guardadas",
     validFrom:todayStr(),
-    validTo:planEndDate,
+    validTo,
     cycleNumber:prefs.planCycleNumber,
   });
   if(result&&result.error){toast("No se pudo guardar: "+result.error.message);return;}
