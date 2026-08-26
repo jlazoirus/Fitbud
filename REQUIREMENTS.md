@@ -1296,7 +1296,8 @@ Que una respuesta de error nunca reemplace ni contamine una entrada de cache; el
 
 ## REQ-160 - Fix check-in semanal: el ajuste de calorías ignora las metas "volumen" y "mantenimiento"
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`analyzeCheckinAnswers()` (`index.html`) ramificaba por `goal==="surplus"`/`"maintain"`, vocabulario que el perfil nunca guarda (usa `deficit`/`mantenimiento`/`volumen`); ambas metas caían siempre en la rama de déficit. Cambiadas las dos comparaciones a `goal==="volumen"`/`"mantenimiento"`, sin tocar los umbrales/ajustes ya existentes (0.15–0.6 kg/sem sin ajuste en volumen, |Δ|>0.4 kg/sem corrige en mantenimiento) ni `CHECKIN_MAX_KCAL_ADJUST`/`CHECKIN_MIN_KCAL`. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-checkin-goal-mapping.mjs` (ejecuta la función real extraída de `index.html` en `node:vm`, cubriendo las 3 metas; confirmado que volumen/mantenimiento fallan exactamente como describe el REQ contra el código sin el fix).
 
 ### Origen
 

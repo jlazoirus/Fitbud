@@ -11215,10 +11215,10 @@ function analyzeCheckinAnswers(answers,prefs){
   const w=answers.weight,pw=answers.prevWeight;
   if(w&&pw){
     const delta=w-pw;
-    if(goal==="surplus"){
+    if(goal==="volumen"){
       if(delta<0.15){calorieAdjust+=100;details.push("Ganancia de peso menor a lo esperado: añadir calorías.");}
       else if(delta>0.6){calorieAdjust-=100;details.push("Ganancia rápida: reducir un poco para cuidar la composición.");}
-    }else if(goal==="maintain"){
+    }else if(goal==="mantenimiento"){
       if(delta>0.4){calorieAdjust-=100;details.push("Peso subiendo en mantenimiento: ajustar calorías.");}
       else if(delta<-0.4){calorieAdjust+=100;details.push("Peso bajando más de lo esperado: añadir calorías.");}
     }else{// deficit
