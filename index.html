@@ -2244,12 +2244,17 @@ function mealValue(base,ms){
   if(o&&o.gen&&o.dishName!=null&&o.kcal!=null){
     return{name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"replacement"};
   }
-  const dn=o&&o.dishName!=null?o.dishName:base.dishName;
-  if(dn&&DB.loaded){const d=dishByName(dn);if(d){const m=dishMacros(d.id);return{name,kcal:m.kcal,p:m.p,c:m.c,f:m.f,src:"db"};}}
-  // 2. Prescripción del nutritionPlan (snapshot materializado, REQ-82)
-  if(base.src==="nutritionPlan"&&base.kcal>0){
+  // 2. Prescripción del nutritionPlan (snapshot materializado, REQ-82) — tiene
+  // prioridad sobre la resolución por nombre de plato en el catálogo: el
+  // snapshot ya trae la porción ESCALADA al target del slot, y el catálogo
+  // puede tener un plato del mismo nombre con macros de receta BASE distintos
+  // (REQ-162). Solo se salta cuando el override cambió de plato (o.dishName
+  // presente): ahí sí debe resolver por catálogo la comida NUEVA elegida.
+  if((!o||o.dishName==null)&&base.src==="nutritionPlan"&&base.kcal>0){
     return{name:base.name||name,kcal:base.kcal,p:base.p,c:base.c,f:base.f,src:"nutritionPlan"};
   }
+  const dn=o&&o.dishName!=null?o.dishName:base.dishName;
+  if(dn&&DB.loaded){const d=dishByName(dn);if(d){const m=dishMacros(d.id);return{name,kcal:m.kcal,p:m.p,c:m.c,f:m.f,src:"db"};}}
   // 3. Fallback: plan/slot vacío
   return{name,kcal:base.kcal,p:base.p,c:base.c,f:base.f,src:"plan"};
 }
@@ -4976,6 +4981,13 @@ function mealRecipe(b,ms){
     if(lines.length)return{dish:{name:o.name},lines,generated:true};
   }
   if(o&&o.kcal!=null&&o.dishName==null)return null;           // macros manuales: sin receta
+  // Snapshot materializado del nutritionPlan (REQ-82): trae sus propios
+  // ingredientes ya escalados al target del slot; tiene prioridad sobre la
+  // receta BASE del catálogo (REQ-162, mismo criterio que mealValue()).
+  if((!o||o.dishName==null)&&b.src==="nutritionPlan"&&Array.isArray(b.ingredientes)&&b.ingredientes.length){
+    const lines=b.ingredientes.map(x=>({name:x.nombre||x.name||"(ingrediente)",grams:+(x.gramos!=null?x.gramos:x.grams)})).filter(l=>l.grams>0);
+    if(lines.length)return{dish:{name:b.name},lines};
+  }
   const dn=o&&o.dishName!=null?o.dishName:b.dishName;
   if(!dn||!DB.loaded)return null;
   const d=dishByName(dn);if(!d)return null;
