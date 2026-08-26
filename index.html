@@ -10307,7 +10307,7 @@ async function adminPreviewResetPlan(userId){
     if(out)out.innerHTML=`<div class="ai-box">
       Desde <b>${esc(preview.fromDate)}</b> (hoy del usuario: ${esc(preview.today)}): <b>${preview.daysInRange}</b> día(s) en el horizonte revisado.<br>
       <b>${preview.clearedCount}</b> se limpiarán · <b>${preview.protectedCount}</b> quedan protegidos por tener algo ya registrado.
-      ${preview.willSupersedePlanVersion?"<br>Se archivará la versión activa del plan de nutrición.":""}
+      ${preview.willSupersedePlanVersion?(preview.willPreserveTraining?"<br>Se archivará la nutrición del plan activo; el entrenamiento programado se conserva.":"<br>Se archivará la versión activa del plan de nutrición."):""}
       ${preview.protectedDates&&preview.protectedDates.length?`<div class="muted small" style="margin-top:6px">Protegidos: ${preview.protectedDates.map(esc).join(", ")}</div>`:""}
     </div>
     <div class="row wrap" style="margin-top:10px">

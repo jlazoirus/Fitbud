@@ -311,8 +311,49 @@ async function fetchFutureDayLogs(userId, fromDate, e) {
 
 async function fetchActivePlanVersion(userId, e) {
   const rows = await restRequest(e, "plan_versions?user_id=eq." + encodeURIComponent(userId)
-    + "&status=eq.active&select=id,cycle_number,version_number,valid_from,valid_to&order=created_at.desc&limit=1");
+    + "&status=eq.active&select=id,cycle_number,version_number,valid_from,valid_to,snapshot&order=created_at.desc&limit=1");
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
+// REQ-149: nutrición y entrenamiento pueden vivir combinados en la misma fila
+// activa (onboarding guarda snapshot.nutritionPlan + snapshot.trainingPlan
+// juntos). "Solo nutrición" no debe arrastrar el entrenamiento futuro al
+// archivar esa fila.
+function planVersionHasTrainingContent(active) {
+  const plan = active && active.snapshot && active.snapshot.trainingPlan;
+  return !!(plan && Array.isArray(plan.weeks) && plan.weeks.length);
+}
+
+// Re-versiona la fila superseded: inserta una nueva fila activa que conserva
+// solo snapshot.trainingPlan (sin nutritionPlan) cubriendo desde fromDate en
+// adelante, para que el entrenamiento futuro no pierda su prescripción al
+// archivar nutrición. Se llama DESPUÉS de superseder la fila combinada, así
+// que nunca hay dos filas activas a la vez para el mismo (user_id, cycle_number).
+async function insertTrainingOnlyVersion(userId, active, fromDate, e) {
+  const nextVersionRows = await restRequest(e, "plan_versions?user_id=eq." + encodeURIComponent(userId)
+    + "&cycle_number=eq." + active.cycle_number + "&select=version_number&order=version_number.desc&limit=1");
+  const lastVersionNumber = Array.isArray(nextVersionRows) && nextVersionRows[0]
+    ? Number(nextVersionRows[0].version_number) || 0 : Number(active.version_number) || 0;
+  const snapshot = Object.assign({}, active.snapshot, { nutritionPlan: null });
+  const now = new Date().toISOString();
+  await restRequest(e, "plan_versions", {
+    method: "POST",
+    headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=minimal" }),
+    body: JSON.stringify({
+      user_id: userId,
+      cycle_number: active.cycle_number,
+      version_number: lastVersionNumber + 1,
+      version_key: active.cycle_number + ":" + fromDate + ":admin_reset_nutrition:" + Date.now(),
+      source: "manual",
+      status: "active",
+      valid_from: fromDate,
+      valid_to: active.valid_to || null,
+      reason: "Admin: regenerar nutrición conservando entrenamiento (REQ-149)",
+      snapshot,
+      activated_at: now,
+      updated_at: now,
+    }),
+  });
 }
 
 function summarizeResetTargets(rows, scope) {
@@ -373,13 +414,19 @@ async function resolveResetTarget(body, e) {
 async function previewResetPlan(body, e) {
   const { userId, scope, fromDate, today } = await resolveResetTarget(body, e);
   const rows = await fetchFutureDayLogs(userId, fromDate, e);
-  const activePlanVersion = scope === "training" ? null : await fetchActivePlanVersion(userId, e);
+  const active = scope === "training" ? null : await fetchActivePlanVersion(userId, e);
   const summary = summarizeResetTargets(rows, scope);
+  // No exponer active.snapshot completo en la respuesta: solo metadata + el
+  // flag de si el entrenamiento futuro se conserva al archivar nutrición.
+  const activePlanVersion = active
+    ? { id: active.id, cycle_number: active.cycle_number, version_number: active.version_number, valid_from: active.valid_from, valid_to: active.valid_to }
+    : null;
   return {
     userId, scope, fromDate, today,
     daysInRange: rows.length,
     ...summary,
-    willSupersedePlanVersion: !!activePlanVersion,
+    willSupersedePlanVersion: !!active,
+    willPreserveTraining: scope === "nutrition" && planVersionHasTrainingContent(active),
     activePlanVersion,
   };
 }
@@ -401,6 +448,7 @@ async function applyResetPlan(body, caller, e) {
   }
 
   let planVersionSuperseded = false;
+  let trainingPreserved = false;
   if (scope !== "training") {
     const active = await fetchActivePlanVersion(userId, e);
     if (active) {
@@ -411,10 +459,17 @@ async function applyResetPlan(body, caller, e) {
         body: JSON.stringify({ status: "superseded", valid_to: validTo, superseded_at: new Date().toISOString(), updated_at: new Date().toISOString() }),
       });
       planVersionSuperseded = true;
+      // REQ-149: al archivar solo nutrición, si la fila combinada también
+      // traía entrenamiento futuro, re-versionarlo por separado en vez de
+      // dejarlo caer a generación determinista junto con la nutrición.
+      if (scope === "nutrition" && planVersionHasTrainingContent(active)) {
+        await insertTrainingOnlyVersion(userId, active, fromDate, e);
+        trainingPreserved = true;
+      }
     }
   }
 
-  const result = { daysCleared: cleared, daysProtected: protectedCount, planVersionSuperseded, fromDate };
+  const result = { daysCleared: cleared, daysProtected: protectedCount, planVersionSuperseded, trainingPreserved, fromDate };
   await logAdminAction(e, { adminId: caller, targetUserId: userId, action: "reset_plan_apply", scope, fromDate, result });
   return result;
 }

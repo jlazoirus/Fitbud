@@ -118,6 +118,88 @@ function baseFetchMocks(requests) {
   console.log("  Test 2 pasado: applyResetPlan limpia solo lo no protegido y archiva la versión activa");
 }
 
+// ── previewResetPlan/applyResetPlan (scope=nutrition, fila COMBINADA): preserva
+// el entrenamiento futuro en vez de archivarlo junto con la nutrición (REQ-149) ──
+{
+  const COMBINED_VERSION_ID = 77;
+  const combinedFetchMocks = (requests) => async (url, options = {}) => {
+    const value = String(url);
+    requests.push({ url: value, method: options.method || "GET", body: options.body || "" });
+    if (value.endsWith("/auth/v1/user")) return response(200, admin);
+    if (value.includes("/rest/v1/profiles?id=eq." + admin.id)) {
+      return response(200, [{ id: admin.id, email: admin.email, is_admin: true, active: true }]);
+    }
+    if (value.includes("/rest/v1/profiles?id=eq." + normalUser.id)) {
+      return response(200, [{ id: normalUser.id, email: normalUser.email, is_admin: false, active: true, prefs: { timeZone: "UTC" } }]);
+    }
+    if (value.startsWith("https://test.supabase.co/rest/v1/day_log?user_id=eq." + normalUser.id) && (!options.method || options.method === "GET")) {
+      return response(200, dayLogRows);
+    }
+    if (value.includes("/rest/v1/day_log?") && options.method === "PATCH") return response(200, [{}]);
+    if (value.includes("/rest/v1/plan_versions?user_id=eq." + normalUser.id) && value.includes("status=eq.active")) {
+      return response(200, [{
+        id: COMBINED_VERSION_ID, cycle_number: 1, version_number: 3, valid_from: "2026-06-15", valid_to: null,
+        snapshot: {
+          prefs: { calorieTarget: 2200 },
+          nutritionPlan: { days: [{ date: "2026-07-10", meals: [] }] },
+          trainingPlan: { weeks: [{ week: 1, days: [] }] },
+        },
+      }]);
+    }
+    if (value.includes("/rest/v1/plan_versions?id=eq." + COMBINED_VERSION_ID) && options.method === "PATCH") return response(200, [{}]);
+    if (value.includes("/rest/v1/plan_versions?user_id=eq." + normalUser.id) && value.includes("cycle_number=eq.1")) {
+      return response(200, [{ version_number: 3 }]);
+    }
+    if (value === "https://test.supabase.co/rest/v1/plan_versions" && options.method === "POST") return response(201, [{}]);
+    if (value.includes("/rest/v1/admin_actions_log") && options.method === "POST") return response(201, [{}]);
+    throw new Error("Ruta no simulada: " + value);
+  };
+
+  // Preview: debe avisar que el entrenamiento se conserva, no que se archiva.
+  {
+    const requests = [];
+    global.fetch = combinedFetchMocks(requests);
+    const res = capture();
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer admin-token" },
+      body: { action: "previewResetPlan", userId: normalUser.id, scope: "nutrition", fromDate: FUTURE_TODAY },
+    }, res);
+    assert(res.body.willSupersedePlanVersion === true, "Debe detectar la fila combinada activa.");
+    assert(res.body.willPreserveTraining === true, "Debe avisar que el entrenamiento futuro se conserva.");
+    assert(!("snapshot" in (res.body.activePlanVersion || {})), "No debe exponer el snapshot completo en la respuesta.");
+    console.log("  Test 2b pasado: previewResetPlan avisa que el entrenamiento se conserva sobre fila combinada");
+  }
+
+  // Apply: debe superseder la fila combinada Y crear una nueva fila activa solo de entrenamiento.
+  {
+    const requests = [];
+    global.fetch = combinedFetchMocks(requests);
+    const res = capture();
+    await handler({
+      method: "POST",
+      headers: { authorization: "Bearer admin-token" },
+      body: { action: "applyResetPlan", userId: normalUser.id, scope: "nutrition", fromDate: FUTURE_TODAY },
+    }, res);
+    assert(res.statusCode === 200 && res.body.ok === true, "applyResetPlan (combinada) debe responder ok:true.");
+    assert(res.body.planVersionSuperseded === true, "Debe archivar la fila combinada.");
+    assert(res.body.trainingPreserved === true, "Debe marcar que el entrenamiento se preservó.");
+    const supersedePatch = requests.find((r) => r.url.includes("/rest/v1/plan_versions?id=eq." + COMBINED_VERSION_ID) && r.method === "PATCH");
+    assert(supersedePatch && JSON.parse(supersedePatch.body).status === "superseded", "Debe superseder la fila combinada.");
+    const insertReq = requests.find((r) => r.url === "https://test.supabase.co/rest/v1/plan_versions" && r.method === "POST");
+    assert(insertReq, "Debe insertar una nueva fila activa preservando el entrenamiento.");
+    const insertedBody = JSON.parse(insertReq.body);
+    assert(insertedBody.status === "active" && insertedBody.cycle_number === 1, "La fila nueva debe quedar activa en el mismo ciclo.");
+    assert(insertedBody.valid_from === res.body.fromDate, "La fila nueva debe cubrir desde fromDate en adelante.");
+    assert(insertedBody.version_number === 4, "Debe usar el siguiente número de versión disponible.");
+    assert(insertedBody.snapshot.trainingPlan && insertedBody.snapshot.trainingPlan.weeks.length === 1,
+      "Debe conservar snapshot.trainingPlan intacto.");
+    assert(insertedBody.snapshot.nutritionPlan === null,
+      "La fila nueva no debe traer nutritionPlan (nutrición cae a generación fresca, no a la vieja materializada).");
+    console.log("  Test 2c pasado: applyResetPlan(scope=nutrition) sobre fila combinada preserva el entrenamiento futuro");
+  }
+}
+
 // ── applyResetPlan (scope=training): protege por entrenamiento, no por comidas ──
 {
   const requests = [];
