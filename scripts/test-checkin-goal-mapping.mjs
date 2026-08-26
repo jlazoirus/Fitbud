@@ -78,4 +78,35 @@ console.log("  Test 2 pasado: goal=volumen ya no se trata como déficit (antes r
 }
 console.log("  Test 3 pasado: goal=mantenimiento corrige en cualquier dirección (antes nunca ajustaba)");
 
-console.log("analyzeCheckinAnswers (REQ-160): volumen y mantenimiento usan su propia rama, no la de déficit. Verificado con vm sobre la función real.");
+// ── REQ-165: escalas 1-5 opcionales sin responder (readCiScale→null) no deben
+// leerse como el peor valor. Repro exacta del REQ (meta déficit, 2000 kcal). ──
+
+// (A) Enviar sin marcar nada → keep:true, sin ninguna razón de "energía/sueño bajos".
+{
+  const r = analyze({ hunger: null, energy: null, sleep: null, nutrition: null, difficulty: null, soreness: null, stress: null }, { goal: "deficit", calorieTarget: 2000 });
+  assert.equal(r.calorieAdjust, 0, "sin responder nada, no debe ajustar calorías.");
+  assert.equal(r.keep, true, "sin responder nada, debe quedar keep:true.");
+  assert.ok(!r.details.some(d => /energía y sueño bajos/i.test(d)), "no debe mencionar 'energía y sueño bajos' sobre escalas nunca respondidas.");
+  assert.ok(!/energía|sueño/i.test(r.reason), "la razón mostrada con keep:true no debe hablar de una molestia sobre datos inexistentes.");
+}
+console.log("  Test 4 pasado: check-in vacío → keep:true sin razón negativa fantasma (antes: 'Energía y sueño bajos' con keep:true)");
+
+// (B) hambre=5, energía/sueño SIN marcar → debe igualar al control (C) hambre=5+energía=5+sueño=5.
+{
+  const base = { hunger: 5, nutrition: 3, difficulty: 3, soreness: 3, stress: 3 };
+  const casoB = analyze({ ...base, energy: null, sleep: null }, { goal: "deficit", calorieTarget: 2000 });
+  const control = analyze({ ...base, energy: 5, sleep: 5 }, { goal: "deficit", calorieTarget: 2000 });
+  assert.equal(casoB.calorieAdjust, control.calorieAdjust,
+    `hambre alta con energía/sueño SIN responder debe dar el mismo ajuste que con energía/sueño altos (B=${casoB.calorieAdjust}, control=${control.calorieAdjust}).`);
+  assert.equal(casoB.calorieAdjust, 50, "hambre alta sola (sin energía baja real) debe sumar +50, no +100.");
+}
+console.log("  Test 5 pasado: hambre alta + energía/sueño sin responder = mismo ajuste que hambre+energía+sueño altos (+50, no +100)");
+
+// (C, no regresión) energía/sueño REALMENTE bajos sí deben seguir disparando el aviso.
+{
+  const r = analyze({ hunger: 2, energy: 1, sleep: 1, nutrition: 3, difficulty: 3, soreness: 3 }, { goal: "deficit", calorieTarget: 2000 });
+  assert.ok(r.details.some(d => /energía y sueño bajos/i.test(d)), "energía y sueño REALMENTE bajos (respondidos) sí deben seguir generando el aviso.");
+}
+console.log("  Test 6 pasado: energía/sueño realmente bajos (respondidos) siguen generando el aviso — sin regresión");
+
+console.log("analyzeCheckinAnswers (REQ-160/REQ-165): metas correctas y escalas sin responder no se leen como el peor valor. Verificado con vm sobre la función real.");
