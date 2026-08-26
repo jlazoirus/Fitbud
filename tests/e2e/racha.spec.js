@@ -15,8 +15,12 @@ import {
 } from "./helpers.js";
 
 // mealCount:3 en completePrefs() → MEAL_SLOT_TEMPLATES[3] = desayuno/almuerzo/cena.
+// Cada comida lleva un ovr con macros (REQ-161: una comida sin contenido real
+// no cuenta como cumplida, así que el fixture debe simular una comida
+// realmente registrada, no solo done:true).
+const doneMeal = () => ({ done: true, ovr: { name: "Comida registrada", kcal: 500, p: 30, c: 50, f: 15 } });
 const doneDayState = () => ({
-  meals: { desayuno: { done: true }, almuerzo: { done: true }, cena: { done: true } },
+  meals: { desayuno: doneMeal(), almuerzo: doneMeal(), cena: doneMeal() },
   extras: [],
   workoutDone: true,
 });

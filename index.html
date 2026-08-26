@@ -2253,6 +2253,9 @@ function mealValue(base,ms){
   // 3. Fallback: plan/slot vacío
   return{name,kcal:base.kcal,p:base.p,c:base.c,f:base.f,src:"plan"};
 }
+// Un slot "Sin asignar" (sin nombre ni macros) no es contenido real: no debe
+// poder registrarse como hecho ni contar como comida cumplida (REQ-161).
+function mealHasContent(v){return!!(v&&(v.name||v.kcal||v.p||v.c||v.f));}
 
 // totales CONSUMIDOS (solo comidas marcadas como hechas)
 function dayTotals(ds){
@@ -2260,7 +2263,7 @@ function dayTotals(ds){
   // REQ-125: una comida saltada no cuenta como pendiente ni como consumida.
   const skippedCount=day.meals.filter(b=>st.meals[b.id]&&st.meals[b.id].skipped).length;
   let t={kcal:0,p:0,c:0,f:0}, doneMeals=0, totMeals=day.meals.length-skippedCount+st.extras.length;
-  day.meals.forEach(b=>{const ms=st.meals[b.id];if(ms&&ms.done){const v=mealValue(b,ms);t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;doneMeals++;}});
+  day.meals.forEach(b=>{const ms=st.meals[b.id];if(ms&&ms.done){const v=mealValue(b,ms);if(mealHasContent(v)){t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;doneMeals++;}}});
   st.extras.forEach(e=>{if(e.done){t.kcal+=+e.kcal||0;t.p+=+e.p||0;t.c+=+e.c||0;t.f+=+e.f||0;doneMeals++;}});
   return {t,doneMeals,totMeals,target:day.target};
 }
@@ -5009,7 +5012,7 @@ function mealCard(ds,b,order){
     </div>`:"";
   return `<div class="meal ${ms.done?'done':''}">
     <div class="meal-head">
-      <button class="chk ${ms.done?'on':''}" onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
+      <button class="chk ${ms.done?'on':''}" ${!ms.done&&!mealHasContent(v)?'disabled title="Prepara una opción antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
       <div>
         <div class="slot">${b.slot}</div>
         <div class="name">${v.name?esc(v.name):'<span class="muted">Sin asignar — prepara una opción con tu coach o elige</span>'}</div>
@@ -5070,7 +5073,14 @@ function daySummary(ds){
 
 /* ---------- acciones ---------- */
 function nav(n){const nd=addDays(current,n);if(inRange(nd)){current=nd;render();scrollAppTop();syncDay(current);}}
-function toggleMeal(ds,id){const ms=mealState(ds,id);ms.done=!ms.done;commitDay(ds);render();}
+function toggleMeal(ds,id){
+  const ms=mealState(ds,id);
+  if(!ms.done){
+    const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);
+    if(!mealHasContent(mealValue(base||{},ms))){toast("Esta comida todavía no tiene una opción asignada.");return;}
+  }
+  ms.done=!ms.done;commitDay(ds);render();
+}
 function toggleExtra(ds,i){const d=dayState(ds);d.extras[i].done=!d.extras[i].done;commitDay(ds);render();}
 function toggleWorkout(){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado hasta una evaluación profesional");return;}
@@ -9362,7 +9372,7 @@ function dayActive(ds){
 function nutritionDayDone(ds){
   const day=buildDay(ds);
   if(!day.meals.length)return false;
-  const done=day.meals.filter(m=>mealState(ds,m.id).done).length;
+  const done=day.meals.filter(m=>{const ms=mealState(ds,m.id);return ms.done&&mealHasContent(mealValue(m,ms));}).length;
   return done>=Math.ceil(day.meals.length/2);
 }
 
