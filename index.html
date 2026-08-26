@@ -9420,18 +9420,24 @@ function combinedDayDone(ds){
 }
 
 // Métricas completas de rachas: pase hacia adelante desde START hasta hoy.
+// El día en curso (hoy) aún no cumplido no rompe la racha, igual que streak():
+// "pendiente" (hoy sin registrar todavía) es distinto de "rota" (un día ya
+// vencido sin cumplir). Solo los días anteriores a hoy resetean el contador.
 function streakStats(){
   const today=todayStr();
   let ds=START;
   let nutCur=0,nutBest=0,trainCur=0,trainBest=0,combCur=0,combBest=0;
   while(ds<=today&&ds<=END){
+    const isToday=ds===today;
     const nutDone=nutritionDayDone(ds);
     const trainRes=trainingDayResult(ds);
-    if(nutDone){nutCur++;if(nutCur>nutBest)nutBest=nutCur;}else nutCur=0;
+    if(nutDone){nutCur++;if(nutCur>nutBest)nutBest=nutCur;}
+    else if(!isToday)nutCur=0;
     if(trainRes==="done"){trainCur++;if(trainCur>trainBest)trainBest=trainCur;}
-    else if(trainRes!=="rest")trainCur=0;
+    else if(trainRes!=="rest"&&!isToday)trainCur=0;
     const combOk=nutDone&&(trainRes==="done"||trainRes==="rest");
-    if(combOk){combCur++;if(combCur>combBest)combBest=combCur;}else combCur=0;
+    if(combOk){combCur++;if(combCur>combBest)combBest=combCur;}
+    else if(!isToday)combCur=0;
     ds=addDays(ds,1);
   }
   // Consistencia de la semana actual (sesiones de entrenamiento)

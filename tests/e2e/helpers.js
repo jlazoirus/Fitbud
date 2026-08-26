@@ -24,7 +24,7 @@ const iso = (offsetMs = 0) => new Date(Date.now() + offsetMs).toISOString();
 const ymd = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 export const todayYmd = () => ymd(new Date());
-const daysFromToday = (n) => {
+export const daysFromToday = (n) => {
   const d = new Date();
   d.setDate(d.getDate() + n);
   return ymd(d);
