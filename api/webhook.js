@@ -111,12 +111,24 @@ async function handleCheckoutCompleted(e, session) {
   }
 
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + PLAN_DURATION_DAYS[planId] * 86400000);
+  // Extender desde el vencimiento vigente (activo o de cortesía, sin vencer
+  // aún) en vez de sumar la duración desde "ahora" a secas — si no, renovar
+  // con días pagados restantes los pierde (o, si el plan vigente dura más
+  // que el nuevo, la compra termina sumando 0 días de acceso extra).
+  const activeRows = await sbGet(
+    e,
+    "/rest/v1/user_entitlements?user_id=eq." + encodeURIComponent(userId)
+      + "&status=in.(active,courtesy)&expires_at=gt." + encodeURIComponent(now.toISOString())
+      + "&order=expires_at.desc&limit=1"
+  );
+  const currentExpiry = Array.isArray(activeRows) && activeRows.length ? new Date(activeRows[0].expires_at) : null;
+  const startBase = currentExpiry && currentExpiry > now ? currentExpiry : now;
+  const expiresAt = new Date(startBase.getTime() + PLAN_DURATION_DAYS[planId] * 86400000);
   const r = await sbPost(e, "/rest/v1/user_entitlements", {
     user_id:     userId,
     plan_id:     planId,
     status:      "active",
-    starts_at:   now.toISOString(),
+    starts_at:   startBase.toISOString(),
     expires_at:  expiresAt.toISOString(),
     origin:      "checkout",
     payment_ref: paymentRef,

@@ -1160,7 +1160,8 @@ Que la cola offline del usuario que cierra sesión se purgue **en todos los cami
 
 ## REQ-157 - Fix billing: renovar antes de vencer no acumula los días ya pagados
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`handleCheckoutCompleted()` (`api/webhook.js`) busca el entitlement vigente del usuario (`status in (active,courtesy)`, `expires_at>now`, el de vencimiento más lejano) antes de crear la fila nueva; usa `max(now, ese vencimiento)` como base tanto de `starts_at` como de `expires_at` (suma la duración del plan comprado desde ahí), en vez de contar siempre desde "ahora". Sin entitlement vigente el comportamiento es idéntico a hoy. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-webhook-renewal.mjs` (3 casos: sin entitlement, 20 días vivos + mensual → ~50 días, trimestral vivo + mensual → ~120 días; confirmado que el caso de renovación falla exactamente como describe el REQ contra el código sin el fix).
 
 ### Origen
 
