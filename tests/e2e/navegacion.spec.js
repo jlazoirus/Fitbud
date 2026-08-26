@@ -51,6 +51,26 @@ test.describe("Navegación", () => {
     expect(errors, `Errores de consola en la landing:\n${errors.join("\n")}`).toEqual([]);
   });
 
+  test("REQ-151: la landing pinta los planes aunque el catálogo cargue después del primer render", async ({ page, context }) => {
+    await installMocks(context);
+    // Retrasa /api/catalog para forzar que refreshAuth() (sin sesión) gane la
+    // carrera y boot() pinte la landing ANTES de que catalogPlans esté poblado.
+    await context.route("**/api/catalog", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ plans: [] }) });
+    });
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+
+    // Justo tras el primer render (antes de que resuelva /api/catalog) no hay tarjetas todavía.
+    await expect(page.locator(".l-plan")).toHaveCount(0);
+    // Sin ninguna interacción del usuario, deben aparecer solas cuando el catálogo carga.
+    await expect(page.locator(".l-plan")).toHaveCount(2, { timeout: 5_000 });
+
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
   test("REQ-113: el campo de contraseña permite mostrar y ocultar sin enviar", async ({ page, context }) => {
     await installMocks(context);
     const errors = collectConsoleErrors(page);

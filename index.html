@@ -11430,7 +11430,10 @@ async function boot(){
   // en vez del login. Si ya hay override local, no hace falta esperar.
   const hasLocalCreds=!!(S.settings&&S.settings.supaUrl&&S.settings.supaKey);
   if(!hasLocalCreds)await loadRemoteConfig();
-  loadCatalog(); // no-await: catálogo de planes en paralelo (REQ-25)
+  // no-await: catálogo de planes en paralelo (REQ-25). Si gana la carrera
+  // refreshAuth() y la landing ya se pintó sin catálogo, repintar al resolver
+  // para no dejar "Planes" vacía hasta la próxima interacción (REQ-151).
+  loadCatalog().then(()=>{if(authReady&&!session&&!window._showAuth)render();});
   const recoveryMode=passwordRedirectMode();
   const recoveryRedirect=!!recoveryMode;
   supaInit();

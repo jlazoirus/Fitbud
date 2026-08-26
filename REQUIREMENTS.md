@@ -1166,7 +1166,8 @@ Que la PWA instalada nunca ejecute una mezcla de versiones.
 
 ## REQ-151 - Landing muestra la sección "Planes" vacía cuando el catálogo carga después del primer render
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`boot()` (`index.html`) encadena `loadCatalog().then(()=>{if(authReady&&!session&&!window._showAuth)render();})` en vez de dejarla en paralelo sin seguimiento: si `refreshAuth()` gana la carrera y pinta la landing antes de que `catalogPlans` esté poblado, el `then` repinta al resolver el catálogo, acotado a cuando la landing sigue visible (no repinta la app autenticada). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/navegacion.spec.js` (retraso artificial de `/api/catalog`; confirmado que el test falla sin el fix y pasa con él).
 
 ### Origen
 
