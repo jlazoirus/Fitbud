@@ -5260,9 +5260,20 @@ function weightRows(){
   }).join("");
 }
 // Resumen de composición corporal: masa grasa/magra de la última semana + cambios.
+// Color de una variación (peso o grasa) según la dirección del objetivo del
+// usuario, no siempre "bajar=bueno" (REQ-164): en volumen subir es la meta;
+// en mantenimiento se tolera una variación pequeña sin alarmar (mismo umbral
+// de 0.4 que ya usa el check-in semanal, REQ-160, para "deriva significativa").
+function goalAwareDeltaColor(delta,goal){
+  if(delta==null)return"var(--good)";
+  if(goal==="volumen")return delta>=0?"var(--good)":"var(--warn)";
+  if(goal==="mantenimiento")return Math.abs(delta)<=0.4?"var(--good)":"var(--warn)";
+  return delta<=0?"var(--good)":"var(--warn)"; // deficit (y fallback)
+}
 function bodyComposition(){
   const last=lastWeighedWeek(); if(last==null)return "";
   const comp=composition(last);
+  const goal=(profile&&profile.prefs&&profile.prefs.goal)||"deficit";
   // semana previa con datos para los deltas
   const prevWk=Object.keys(WEIGHT_RANGES).map(Number).filter(n=>n<last&&wkg(n)!=null).sort((a,b)=>b-a)[0];
   const dKg=prevWk!=null?(wkg(last)-wkg(prevWk)):null;
@@ -5273,8 +5284,8 @@ function bodyComposition(){
     cards.push(`<div class="scard"><div class="n">${comp.lean.toFixed(1)}</div><div class="l">masa magra kg</div></div>`);
     cards.push(`<div class="scard"><div class="n">${comp.fat.toFixed(1)}</div><div class="l">masa grasa kg</div></div>`);
   }
-  if(dKg!=null) cards.push(`<div class="scard"><div class="n" style="color:${dKg<=0?'var(--good)':'var(--warn)'}">${sign(dKg)}</div><div class="l">Δ peso (sem)</div></div>`);
-  if(dBf!=null) cards.push(`<div class="scard"><div class="n" style="color:${dBf<=0?'var(--good)':'var(--warn)'}">${sign(dBf)}</div><div class="l">Δ grasa %</div></div>`);
+  if(dKg!=null) cards.push(`<div class="scard"><div class="n" style="color:${goalAwareDeltaColor(dKg,goal)}">${sign(dKg)}</div><div class="l">Δ peso (sem)</div></div>`);
+  if(dBf!=null) cards.push(`<div class="scard"><div class="n" style="color:${goalAwareDeltaColor(dBf,goal)}">${sign(dBf)}</div><div class="l">Δ grasa %</div></div>`);
   if(!cards.length)return "";
   const cols=Math.min(cards.length,2);
   return `<div class="muted small" style="margin:0 4px 8px">Composición · semana ${last}${wbf(last)!=null?` · ${wbf(last)}% grasa`:""}</div>
