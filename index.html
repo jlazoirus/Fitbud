@@ -4158,11 +4158,15 @@ function buildContextualChips(ds){
   const day=buildDay(ds);
   const st=dayState(ds);
   const {t,target,doneMeals,totMeals}=dayTotals(ds);
-  const pendingMeals=day.meals.filter(m=>!mealState(ds,m.id).done);
+  // Igual que homeAgendaData (REQ-125): una comida saltada no es una acción
+  // pendiente, así que el coach no debe sugerirla (REQ-153).
+  const pendingMeals=day.meals.filter(m=>{const ms=mealState(ds,m.id);return!ms.done&&!ms.skipped;});
   const ew=effectiveWorkout(ds);
   const restDay=ew.workout&&ew.workout.id==="descanso";
   const workoutOutcome=workoutOutcomeForState(st);
-  const workoutPending=!restDay&&!st.workoutDone&&workoutOutcome==="pending";
+  // Con pausa por seguridad (trainingSafetyHold) el entreno no cuenta como
+  // pendiente, igual que en homeAgendaData — el coach no debe ofrecerlo (REQ-153).
+  const workoutPending=!restDay&&!trainingSafetyHold()&&!st.workoutDone&&workoutOutcome==="pending";
   const kcalRem=Math.max(0,Math.round(target.kcal-t.kcal));
   const chips=[];
   if(pendingMeals.length>0){
