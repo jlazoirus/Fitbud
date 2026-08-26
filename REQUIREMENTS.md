@@ -1027,328 +1027,35 @@ Que alguien con autoridad de producto decida, con la evidencia de REQ-143/REQ-14
 **Estado: implementado.**
 `handleRefund()` (`api/webhook.js`) solo revoca cuando `charge.refunded===true` o `Number(charge.amount_refunded)>=Number(charge.amount)`; un reembolso parcial devuelve `skipped` (queda auditado en `billing_events` con el payload completo, sin tocar el entitlement). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-webhook-refund.mjs`.
 
-### Origen
-
-Journey de **facturación** (2026-07-10, rotación del loop auditor tras REQ-147). Verificación funcional en navegador (preview `fitbud`): la app carga con planes de fallback y `showPaywall('profile')` renderiza mensual USD 14 / trimestral USD 36 con "Disponible pronto" (REQ-104), sin errores de consola. La rama de reembolso del webhook **no es ejercitable en local** (requiere un `charge.refunded` real de Stripe); este hallazgo está verificado por lectura de código + semántica documentada de Stripe.
-
-### Problema
-
-Stripe emite `charge.refunded` tanto en reembolsos totales como parciales; en un parcial el objeto `charge` trae `refunded:false` y `amount_refunded < amount`. El webhook no distingue ambos casos y revoca el entitlement completo ante cualquier `charge.refunded`. Reproducción (Stripe test mode): (1) usuario compra "Paquete 3 meses" (USD 36, 90 días); (2) soporte emite un reembolso parcial de USD 5 (el usuario sigue con ~85 días pagados); (3) Stripe envía `charge.refunded` con `refunded:false`, `amount_refunded:500`, `amount:3600`; (4) `handleRefund()` PATCH-ea el entitlement a `revoked`; (5) el usuario pierde **todo** el acceso premium pese a haber pagado casi todo el período.
-
-### Causa raíz
-
-`handleRefund(e, charge)` en `api/webhook.js:134-151` revoca incondicionalmente: solo verifica `charge.payment_intent` y una fila `active/courtesy` con ese `payment_ref`, y hace `sbPatch(... { status:"revoked" })` (`api/webhook.js:145-149`). Nunca inspecciona `charge.refunded` ni compara `charge.amount_refunded` con `charge.amount`. Dispatcher en `api/webhook.js:200-201`. El criterio de REQ-26 ("Reembolso/expiración retira acceso premium") se redactó asumiendo reembolso total; el caso parcial no se acotó.
-
-### Objetivo
-
-Que un reembolso parcial no le quite al usuario el acceso que pagó: solo un reembolso total (o disputa) debe revocar. Los parciales quedan auditados en `billing_events` sin tocar el acceso.
-
-### Alcance
-
-1. En `handleRefund()`, revocar **solo** si `charge.refunded === true` o `Number(charge.amount_refunded) >= Number(charge.amount)`. En parcial, no revocar y loguear el evento como `skipped`/`partial_refund` conservando auditoría.
-2. Mantener idempotencia, verificación de firma y logging sin cambios.
-
-### Fuera de alcance
-
-- El monto mostrado en el historial (`moneyFromPayload()` en `api/entitlement.js:62-67` prioriza `amount` sobre `amount_refunded`): bug de visualización menor y distinto; documentarlo aparte, no aquí.
-- Reembolsos totales, disputas y expiración: comportamiento actual sin cambios.
-
-### Riesgos
-
-- Un reembolso total debe seguir revocando: cubrir ambos campos (`refunded` y `amount_refunded >= amount`).
-- Si un parcial se completa luego con otro reembolso hasta el total, el segundo `charge.refunded` debe poder revocar (no bloquear por idempotencia).
-
-### Criterios de aceptación
-
-- `charge.refunded` parcial (`refunded:false`, `amount_refunded < amount`) no cambia el `status`; queda auditado.
-- `charge.refunded` total revoca como hoy; duplicados/desordenados no corrompen estado.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Test de webhook con fixtures parcial vs total (patrón `scripts/test-admin-api.mjs`) afirmando revocación solo en el total.
-- Manual en Stripe test mode: reembolso parcial → entitlement sigue `active`; total → `revoked`.
-
 ## REQ-149 - Fix admin: "Regenerar plan · Solo nutrición" archiva también el entrenamiento futuro
 
 **Estado: implementado.**
 `fetchActivePlanVersion()` (`api/admin.js`) ahora trae `snapshot`; `applyResetPlan(scope="nutrition")` sigue archivando (`superseded`) la fila activa combinada, pero si `snapshot.trainingPlan` tiene contenido real (`planVersionHasTrainingContent()`), `insertTrainingOnlyVersion()` inserta una nueva fila activa (mismo `cycle_number`, próximo `version_number`) que conserva `trainingPlan` intacto con `nutritionPlan:null` desde `fromDate` — el entrenamiento futuro no pierde su prescripción y la nutrición sí cae a generación fresca, que es el efecto deseado. La fila vieja se supersede ANTES del insert, así nunca hay dos filas activas a la vez para `plan_versions_one_active_idx`. `previewResetPlan()` expone `willPreserveTraining` (sin filtrar el `snapshot` completo hacia el cliente) y el copy del modal admin distingue "se conserva el entrenamiento" de "se archiva el plan de nutrición". `scope="training"`/`"both"` sin cambios. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-admin-reset.mjs` (2 casos nuevos: preview y apply sobre fila combinada).
-
-### Origen
-
-Auditoría del journey **administración** (panel "Usuarios" → "Regenerar plan", alcance "Solo nutrición"). Commit previo: `6fc83c1` (REQ-148).
-
-### Problema
-
-REQ-126 prometió un selector de alcance (nutrición/entrenamiento/ambos) para regenerar el futuro **sin tocar lo demás**. Pero "Solo nutrición" también archiva la prescripción de **entrenamiento** futura. Reproducción: (1) el usuario termina onboarding y `saveOnboarding()` guarda **una sola** versión activa combinada con `snapshot.nutritionPlan` **y** `snapshot.trainingPlan` en la misma fila (`ensurePlanVersion({…, trainingPlan, nutritionPlan})`, `index.html:3333-3343`); el índice `plan_versions_one_active_idx` (`supabase/plan_cycles.sql:40-42`) fuerza una única fila activa por ciclo. (2) El admin aplica "Solo nutrición". (3) `applyResetPlan()` con `scope="nutrition"` archiva esa fila combinada con `valid_to=fromDate-1`. (4) El entreno futuro pierde su versión activa (`planVersionForDate(ds)` ya no la cubre para `ds≥fromDate`) y cae a generación determinista, perdiendo sets/reps/sustituciones. (5) La vista previa engaña: muestra "Se archivará la versión activa del plan de nutrición." (`index.html:10231`) aunque la fila también trae entrenamiento. Evidencia: reproducción de la lógica del servidor con una única versión activa combinada → `scope="nutrition"` archiva `id=42`, `source="onboarding"`, `supersededHoldsTrainingSnapshot=true`. El flujo admin end-to-end no es ejercitable en local (requiere Supabase + service role): verificado por lectura de código + reproducción. `scripts/test-admin-reset.mjs` no cubre el caso (su mock devuelve una sola fila sin `snapshot`).
-
-### Causa raíz
-
-`fetchActivePlanVersion()` (`api/admin.js:312-316`) toma `plan_versions?status=eq.active&order=created_at.desc&limit=1` **sin filtrar por contenido de nutrición** (`snapshot.nutritionPlan`) ni por `source`; `applyResetPlan()`/`previewResetPlan()` (`api/admin.js:404-415` y `376`) la archivan siempre que `scope!=="training"`. Como nutrición y entrenamiento viven en la misma fila activa, archivar "por nutrición" arrastra el entrenamiento. El copy del preview (`index.html:10231`) asume que la fila es solo de nutrición.
-
-### Objetivo
-
-Que "Solo nutrición" afecte únicamente la nutrición y nunca archive la prescripción de entrenamiento futura, y que la vista previa describa con exactitud qué se archivará.
-
-### Alcance
-
-1. En `applyResetPlan()`/`previewResetPlan()`, al archivar por nutrición, preservar `snapshot.trainingPlan` de la versión activa (re-versionar la fila conservando el entrenamiento, o limitar el archivado a versiones sin entrenamiento activo).
-2. `fetchActivePlanVersion()` debe distinguir nutrición vs entrenamiento (`snapshot.nutritionPlan`/`trainingPlan`) en vez de tomar la última activa sin filtrar.
-3. Corregir el copy del preview (`index.html:10231`) según el alcance y contenido real.
-4. Extender `scripts/test-admin-reset.mjs` con una fila activa combinada afirmando que `scope="nutrition"` conserva el entrenamiento futuro.
-
-### Fuera de alcance
-
-- El bug del CHECK de `source:"nutrition"` (journey nutrición, REQ aparte).
-- Cambiar el modelo de una-fila-activa-por-ciclo o cómo `saveOnboarding` combina snapshots.
-- Alcance `training` (ya no toca `plan_versions`) y `both` (archiva todo a propósito).
-
-### Riesgos
-
-- Re-versionar la fila puede chocar con `one_active_idx`; cuidar orden (no dejar dos activas ni cero).
-- Preservar entrenamiento debe respetar `valid_from`/`valid_to` para no reintroducir prescripción en días ya protegidos.
-
-### Criterios de aceptación
-
-- Con una versión activa combinada, `applyResetPlan(scope="nutrition")` deja intacto el entrenamiento futuro.
-- La vista previa no afirma archivar "el plan de nutrición" cuando la fila también trae entrenamiento.
-- `scope="training"`/`"both"` sin cambios.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- `scripts/test-admin-reset.mjs` con mock de fila combinada: tras `scope="nutrition"`, el entrenamiento futuro sigue disponible (versión activa con `snapshot.trainingPlan` cubriendo `ds≥fromDate`).
-- Manual (staging): usuario con plan combinado → "Solo nutrición" → Entreno conserva la rutina futura.
 
 ## REQ-150 - PWA sirve HTML nuevo con JS del cache viejo tras un deploy (versión mezclada)
 
 **Estado: implementado.**
 `service-worker.js`: la navegación ahora usa `cacheFirst(request,"./index.html")` en vez de `networkFirst` — se sirve desde la MISMA `CACHE_NAME` que los `.js` (`cacheFirst` sin cambios), así que HTML y JS siempre son de la misma generación; la versión nueva llega completa recién cuando el SW nuevo instala y activa (atómico vía `cache.addAll`). `CACHE_NAME` subido a `v69`. `registerServiceWorker()` (`index.html`) escucha `updatefound`/`statechange` y, cuando detecta una instalación real (no la primera) vía `navigator.serviceWorker.controller` ya presente, muestra un badge discreto ("↻ Actualizar", sin vocabulario técnico) en vez de recargar sola — recargar automáticamente podía interrumpir una acción en curso. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-service-worker-cache.mjs` (ejecuta el SW real en `node:vm` con `caches`/`fetch` simulados).
 
-### Origen
-
-Journey `pwa`: verificación en navegador (SW `fitbud-pwa-v67` activo, server local 8923); se revisó registro, shell y estrategias de `fetch`.
-
-### Problema
-
-Tras un deploy que toca `index.html` y algún `.js` (habitual en este monolito), abrir la PWA instalada trae `index.html` fresco de red mientras los `.js` salen del cache viejo en la misma carga: HTML nuevo + JS viejo puede romper la vista sin recuperación hasta recargar a mano. Reproducido contra el SW real: un centinela "STALE" en el cache de `training-plan.js` se devuelve vía `cacheFirst` mientras una navegación devuelve `index.html` fresco vía `networkFirst`.
-
-### Causa raíz
-
-`service-worker.js`: navegación `networkFirst` (39-42) vs `.js` mismo-origen `cacheFirst` (54); el único límite de versión es `CACHE_NAME` (sin hash de contenido) y `networkFirst` lo salta. `install` hace `skipWaiting()` (21) y `activate` `clients.claim()` (29), pero `registerServiceWorker()` (`index.html:11296-11306`) no escucha `updatefound`/`controllerchange` ni recarga.
-
-### Objetivo
-
-Que la PWA instalada nunca ejecute una mezcla de versiones.
-
-### Alcance
-
-1. Servir navegación y `.js` desde la misma generación de cache (shell `cacheFirst` con revalidación) o hashear el shell.
-2. Manejar la actualización en `registerServiceWorker()`: al detectar SW nuevo, recargar o avisar sin vocabulario técnico (REQ-31).
-
-### Fuera de alcance
-
-- Otras estrategias (`/api/`, media de Storage) y automatizar el bump de `CACHE_NAME`.
-
-### Riesgos
-
-- `cacheFirst` de navegación puede servir HTML viejo si `activate` no purga; recargar solo puede interrumpir (preferir aviso).
-
-### Criterios de aceptación
-
-- Tras un deploy con bump de `CACHE_NAME`, abrir la PWA no ejecuta HTML nuevo con JS viejo (o recarga sola).
-- UI de actualización, si existe, sin mención de IA/SW/cache/tokens (REQ-31).
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Cachear un `.js` viejo y confirmar que una navegación fresca ya no coexiste con JS viejo tras el fix.
-
 ## REQ-151 - Landing muestra la sección "Planes" vacía cuando el catálogo carga después del primer render
 
 **Estado: implementado.**
 `boot()` (`index.html`) encadena `loadCatalog().then(()=>{if(authReady&&!session&&!window._showAuth)render();})` en vez de dejarla en paralelo sin seguimiento: si `refreshAuth()` gana la carrera y pinta la landing antes de que `catalogPlans` esté poblado, el `then` repinta al resolver el catálogo, acotado a cuando la landing sigue visible (no repinta la app autenticada). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/navegacion.spec.js` (retraso artificial de `/api/catalog`; confirmado que el test falla sin el fix y pasa con él).
-
-### Origen
-
-Journey de **adquisición** (rotación del loop auditor tras REQ-150). Verificación funcional en navegador (preview `fitbud`, servidor local 8923, 0 llamadas pagadas): un visitante sin sesión ve la landing con la sección "Planes / Elige tu ritmo" **sin tarjetas de precio**, el elemento de conversión central del funnel.
-
-### Problema
-
-Con `authReady:true`, `session:false`, `_showAuth:false` la landing está renderizada, y `catalogPlans` ya tiene 2 planes, pero el DOM muestra `<div class="l-plans"></div>` vacío (0 tarjetas). Reproducción: al cargar la página, `document.querySelectorAll('.l-plan').length === 0` mientras `catalogPlans.length === 2`; llamar `render()` manualmente pinta las 2 tarjetas ("Plan mensual USD14/mes", "Paquete 3 meses USD36/3 meses"). La sección queda vacía de forma permanente para el visitante pasivo (no hay evento que la re-renderice). Sin errores de consola.
-
-### Causa raíz
-
-Carrera en `boot()` (`index.html:11355-11376`): `loadCatalog()` se llama sin `await` (`index.html:11361`, "no-await ... en paralelo") y sin `.then(render)`. Tras `await refreshAuth()`, si no hay sesión se llama `render()` (`index.html:11375`) → `renderLanding()` → `landingPricingHtml()` (`index.html:6796`) → `activeCatalogPlans()` (`index.html:787`) devuelve `(catalogPlans||[])`. Cuando `refreshAuth` (sesión de Supabase, a menudo desde localStorage) gana la carrera al fetch de `/api/catalog`, `catalogPlans` aún es `null` (`index.html:771`) y `landingPricingHtml()` devuelve `""`. `loadCatalog()` fija `catalogPlans` (`index.html:772-786`) pero **nunca vuelve a renderizar**, así que la sección permanece vacía. Confirmado por grep: no existe `loadCatalog().then(...)` ni re-render tras poblar el catálogo.
-
-### Objetivo
-
-Que el visitante siempre vea las tarjetas de precio en la landing, sin importar el orden en que resuelvan `refreshAuth` y `loadCatalog`.
-
-### Alcance
-
-1. Re-renderizar (o repintar la sección de planes) cuando `loadCatalog()` termina y hay una landing/paywall visible, p. ej. `loadCatalog().then(()=>{ if(authReady&&!session&&!window._showAuth)render(); })`.
-
-### Fuera de alcance
-
-- El fallback de planes, el paywall autenticado (REQ-104) y el orden de otras cargas de boot.
-
-### Riesgos
-
-- Un re-render extra en boot; acotarlo a cuando la landing está visible para no repintar la app autenticada.
-
-### Criterios de aceptación
-
-- Con `catalogPlans` poblado tras el primer render, la landing muestra las 2 tarjetas sin interacción del usuario.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Servir en 8923, cargar como visitante sin sesión y confirmar `document.querySelectorAll('.l-plan').length > 0` sin llamar `render()` a mano.
 
 ## REQ-152 - Fix onboarding: "Mantenerlo por ahora" en el aviso de revisión de 4 semanas lanza ReferenceError y no cierra ni guarda
 
 **Estado: implementado.**
 `keepCurrentProfile()` (`index.html`) ya no referencia `calendarChanged`/`planEndDate` (variables locales de `saveOnboarding()`/`saveProfile()`, fuera de su ámbito, causaban `ReferenceError` bajo `"use strict"` antes del `await`): usa `reason:"Preferencias guardadas"` fijo (este flujo nunca cambia el calendario) y `validTo` de `prefs.planEndDate` ya guardado, o `planEndFor(prefs.planStartDate,resolvedPlanDuration(prefs))` si faltara. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/onboarding.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix y pasa con él).
 
-### Origen
-
-Journey de **onboarding** (rotación del loop auditor tras REQ-151). Verificación funcional en navegador (preview `fitbud`, 8923, 0 llamadas pagadas): el aviso de revisión "Han pasado 4 semanas" (`maybePromptProfileReview()`, `index.html:3487-3496`) ofrece "Revisar mi plan" (`startOnboarding()`) y "Mantenerlo por ahora" (`keepCurrentProfile()`). Al pulsar "Mantenerlo por ahora" no pasa nada visible: el modal no se cierra.
-
-### Problema
-
-Al pulsar "Mantenerlo por ahora", `keepCurrentProfile()` lanza `ReferenceError: calendarChanged is not defined` **antes** de llamar a `saveProfilePrefs()`, así que:
-
-1. El modal nunca se cierra (`closeModal()` está al final y no se alcanza); el usuario solo puede salir por "Revisar mi plan", que lo manda a rehacer el onboarding (justo lo que quería evitar). Tampoco sale el toast de confirmación.
-2. Lo más grave: `onboardingReviewedAt` **no se persiste**, por lo que `profileReviewDue()` sigue devolviendo true y el aviso reaparece cada sesión. El usuario no puede posponer la revisión.
-
-Reproducción (consola): `await keepCurrentProfile()` → `ReferenceError: calendarChanged is not defined`; inyectando el modal real y clicando el botón, el DOM sigue mostrando "Mantenerlo por ahora" (modal abierto).
-
-### Causa raíz
-
-`keepCurrentProfile()` (`index.html:3497-3508`) referencia dos variables fuera de su ámbito: en el objeto que pasa a `saveProfilePrefs()` usa `reason:calendarChanged?...` y `validTo:planEndDate`. `calendarChanged` solo se declara como `const` local en `saveOnboarding()` (`index.html:3434`) y `saveProfile()` (`index.html:6230`); `planEndDate` solo como `let/const` local en `saveOnboarding()` (`index.html:3419`) y `saveProfile()` (`index.html:6229`). Ninguna es global. Con `"use strict"` activo (`index.html:761`), leer una variable no declarada lanza `ReferenceError` al construir el objeto literal, antes del `await`; como la función es `async`, el error queda como rechazo de promesa no manejado desde el `onclick`.
-
-### Objetivo
-
-Que "Mantenerlo por ahora" cierre el aviso, guarde `onboardingReviewedAt` y muestre la confirmación, de modo que la revisión se posponga los días previstos y no vuelva a molestar hasta entonces.
-
-### Alcance
-
-1. En `keepCurrentProfile()`, reemplazar las referencias fuera de ámbito por valores locales válidos: `reason` fijo (p. ej. `"Preferencias guardadas"`, este flujo no cambia el calendario) y `validTo` derivado de los prefs del perfil (`prefs.planEndDate` o `planEndFor(prefs.planStartDate,resolvedPlanDuration(prefs))`).
-
-### Fuera de alcance
-
-- La lógica de `saveOnboarding()`/`saveProfile()` (donde esas variables sí existen) y el resto del ciclo de revisión.
-
-### Riesgos
-
-- Un `validTo` incorrecto escribiría una `plan_versions` con vigencia rara; usar el `planEndDate` ya guardado en prefs mantiene coherencia. Regresión mínima: la función es corta y solo la usa este botón.
-
-### Criterios de aceptación
-
-- "Mantenerlo por ahora" cierra el modal, sin errores en consola, muestra el toast y persiste `onboardingReviewedAt`; el aviso no reaparece antes de `PROFILE_REVIEW_DAYS`.
-- `keepCurrentProfile` no referencia `calendarChanged` ni `planEndDate` fuera de ámbito.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- En consola con perfil/sesión válidos: `await keepCurrentProfile()` no lanza `ReferenceError`; el clic en "Mantenerlo por ahora" cierra el modal y persiste `onboardingReviewedAt`.
-
 ## REQ-153 - Fix Home: las sugerencias del coach ignoran comidas saltadas (y la pausa por seguridad) y contradicen la agenda
 
 **Estado: implementado.**
 `buildContextualChips(ds)` (`index.html`) ahora excluye comidas `.skipped` de `pendingMeals` (igual que `homeAgendaData`, REQ-125) y agrega `!trainingSafetyHold()` a `workoutPending`, así los chips nunca sugieren una comida recién saltada ni el entrenamiento mientras hay una pausa por seguridad activa — mismo criterio que ya usa la agenda, sin tocar `COACH_SUGGESTIONS`/`nextDailyAction` (fuera de alcance). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/home.spec.js` (nuevo; confirmado que ambos casos fallan exactamente como describe el REQ contra el código sin el fix y pasan con él).
 
-### Origen
-
-Auditoría del journey Home (Hoy): la agenda (`homeAgendaData`) y los chips (`buildContextualChips`) calculan los pendientes por caminos distintos y se contradicen al saltar una comida.
-
-### Problema
-
-Reproducción (plan de 3 comidas + entreno): el usuario **salta el desayuno** (REQ-125), registra almuerzo y cena y completa el entreno. La agenda pasa a `done` ("Todo lo importante de hoy está cubierto") sin listar el desayuno, pero justo debajo el chip dice **"¿Qué como para Desayuno? Me quedan 754 kcal"**, empujando a comer lo que se acaba de saltar. Análogo con `trainingSafetyHold()` activo (ver Causa raíz).
-
-### Causa raíz
-
-`buildContextualChips(ds)` (`index.html:4150`) recalcula pendientes en vez de reusar la agenda: `pendingMeals=day.meals.filter(m=>!mealState(ds,m.id).done)` (`index.html:4154`) filtra solo por `!done`, **no excluye `.skipped`** como sí hace `homeAgendaData` (`index.html:4002-4005`, corregido por REQ-125); el chip usa `pendingMeals[0].slot` (`index.html:4162`). Y `workoutPending` (`index.html:4158`) omite `!safetyHold` que la agenda aplica (`index.html:4006-4007`). Alimenta los chips de `renderHoy` (`index.html:4194`). El mismo filtro sin `.skipped` vive en `nextDailyAction` (`index.html:3836`, al parecer sin uso).
-
-### Objetivo
-
-Que los chips reflejen el mismo estado que la agenda.
-
-### Alcance
-
-1. En `buildContextualChips`, excluir saltadas de `pendingMeals` (`!done && !skipped`), derivando de `homeAgendaData` si es posible.
-2. Respetar `trainingSafetyHold()` en `workoutPending`.
-
-### Fuera de alcance
-
-- Rediseñar `COACH_SUGGESTIONS` o `nextDailyAction` (posible código muerto, REQ aparte).
-
-### Riesgos
-
-- Reusar `homeAgendaData` no debe recomputar de más.
-
-### Criterios de aceptación
-
-- Tras saltar una comida ningún chip la propone; con pausa por seguridad ningún chip ofrece el entreno.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E/preview: plan aplicado, `skipMeal` en una comida; `buildContextualChips(ds)` no contiene "¿Qué como para <slot saltado>?".
-
 ## REQ-154 - Fix Nutrición: "Cambiar comida" guarda la porción escalada pero la tarjeta muestra (y suma) los macros de la receta base
 
-**Estado: pendiente.**
-
-### Origen
-
-Auditoría del journey Nutrición → acción "Otra opción / Cambiar comida" (`openChangeMeal` → `applyChangeMeal`). Los candidatos se rankean con la porción **escalada** al target del slot (REQ-83/131), pero `mealValue()` vuelve a calcular los macros desde la receta base del catálogo.
-
-### Problema
-
-Reproducción (catálogo cargado, `DB.loaded`): el usuario toca "Otra opción" en una comida principal y elige un plato cuya receta base es más pequeña que el objetivo del slot. El solver escala la porción hacia arriba y el botón de opción muestra p. ej. **1004 kcal · P 90** (receta escalada: pollo 265 g, arroz 300 g). Al aplicar:
-
-- La tarjeta de la comida muestra en el encabezado **654 kcal · P 62** (receta base 180/220/8 g), Δ **−350 kcal** / **−28 g proteína** frente a lo elegido.
-- Pero la receta que se despliega bajo esa misma tarjeta usa los gramos **escalados** (265 g de pollo ≈ 437 kcal solo el pollo), así que el encabezado de macros se contradice con su propia lista de ingredientes.
-- `dayTotals()` (anillo "kcal restantes", "Consumo de hoy", % de la meta y racha de adherencia) suma los **654 kcal base**, no los 1004 que el usuario creyó registrar. Con platos grandes escalados hacia abajo el error es inverso (sobrecuenta).
-
-El rebalanceo de comidas futuras (REQ-142) parte del delta escalado, de modo que el cierre del día queda calibrado contra un número que la UI luego no muestra. Es una violación del invariante "macros mostrados = macros guardados" (clase REQ-69) y contradice el diseño de REQ-82, que exige conservar "nombre, gramos y macros usados en ese momento".
-
-### Causa raíz
-
-`applyChangeMeal` guarda en `ms.ovr` los macros escalados y los ingredientes escalados del candidato rankeado (`newOvr.kcal=ranked_item.macros.kcal…`, `index.html:7505-7513`); esos macros vienen de `rankReplacementCandidates` → `solveDishPortion`, que escala la porción con `seed=mealTarget.kcal/base.kcal` acotado a `[0.35, 2.5]` (`js/nutrition-domain.js:595-602`, `755-778`). Pero `mealValue()` resuelve el override por **nombre de plato** antes que por los macros guardados: como `ms.ovr.dishName` está seteado y `DB.loaded`, entra en `const d=dishByName(dn); const m=dishMacros(d.id)` y devuelve la receta base sin escalar, **ignorando `ms.ovr.kcal/p/c/f`** (`index.html:2236-2237`; `dishMacros`, `index.html:10145`). En cambio `mealRecipe()` sí prioriza `ovr.ingredientes` escalados (`index.html:4952-4954`), y `mealCard` pinta el encabezado con `mealValue()` (`index.html:4997`) — de ahí las tres cifras inconsistentes.
-
-### Objetivo
-
-Que tras "Cambiar comida" el encabezado de macros, la receta desplegada, el candidato elegido y la suma del día muestren y contabilicen exactamente la porción que el usuario escogió.
-
-### Alcance
-
-1. En `mealValue()`, cuando el override es un reemplazo con macros materializados (`ovr.gen`/`ovr.dishName` con `ovr.kcal` presente), honrar los macros guardados (`ovr.kcal/p/c/f`) en vez de recalcular `dishMacros(d.id)` desde la receta base.
-2. Alternativa equivalente: no guardar macros/ingredientes escalados en `applyChangeMeal` y en su lugar persistir la porción/escala, resolviéndola de forma consistente en `mealValue()` y `mealRecipe()`.
-
-### Fuera de alcance
-
-- El motor de escalado (`solveDishPortion`) y el rebalanceo (REQ-142): el número escalado es el correcto; lo que falla es que la UI/suma no lo respeta.
-- Comidas sin override y comidas del snapshot `nutritionPlan` (`base.src==="nutritionPlan"`), que ya llevan sus macros materializados.
-- Overrides manuales del editor (`ovr.kcal` con `dishName==null`), que ya se muestran correctamente por la rama "custom".
-
-### Riesgos
-
-- Regresión en la ruta REQ-82: para overrides antiguos sin `ovr.kcal` (solo `dishName`) hay que conservar el fallback a `dishMacros`.
-- La resolución por nombre existe para reflejar ediciones de catálogo; distinguir "reemplazo materializado" de "solo prescribe plato" para no romper ese caso.
-
-### Criterios de aceptación
-
-- Tras elegir un reemplazo escalado, el encabezado de la tarjeta, la receta desplegada y `dayTotals()` muestran los mismos kcal/macros que el botón de opción seleccionado (± redondeo).
-- Overrides manuales y comidas del `nutritionPlan` siguen mostrando sus macros correctos.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Reproducción de dominio (0 llamadas pagadas): con el catálogo de prueba, `rankReplacementCandidates(current, [dish], {kcal:1000,…}, catalog)[0].macros.kcal ≈ 1004` mientras `dishMacros` de la receta base ≈ 654; el `mealValue()` corregido debe devolver ≈ 1004 para ese override.
-- Preview/E2E con catálogo real: aplicar "Otra opción" en una comida principal y verificar que encabezado, receta e "Consumo de hoy" coinciden con el candidato elegido.
+**Estado: implementado.**
+`mealValue()` (`index.html`) gana una rama antes del recálculo por `dishMacros()`: si el override es un reemplazo materializado (`ovr.gen&&ovr.dishName!=null&&ovr.kcal!=null`, la forma que arman `applyChangeMeal()` y el rebalanceo de REQ-142), honra `ovr.kcal/p/c/f` en vez de recalcular desde la receta base sin escalar. Los dos caminos preexistentes (dishName sin kcal → `dishMacros()`; kcal sin dishName → "custom") quedan intactos. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-meal-value-replacement.mjs` (mealValue() real vía `node:vm` contra un candidato real de `rankReplacementCandidates()`).
 
 ## REQ-155 - Fix reproductor de entreno: "duración real" cuenta el tiempo con la app cerrada
 

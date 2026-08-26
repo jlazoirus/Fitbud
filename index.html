@@ -2236,6 +2236,14 @@ function mealValue(base,ms){
   if(o&&o.kcal!=null&&o.dishName==null){
     return{name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"custom"};
   }
+  // 1b. Reemplazo materializado (REQ-83/131/142, "Cambiar comida"/rebalanceo
+  // de futuras): el candidato ya trae sus propios macros sobre la porción
+  // ESCALADA al target del slot. Recalcular con dishMacros() de la receta
+  // BASE sin escalar contradice al encabezado con la receta/ingredientes ya
+  // escalados que se despliegan debajo y descuadra dayTotals() (REQ-154).
+  if(o&&o.gen&&o.dishName!=null&&o.kcal!=null){
+    return{name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"replacement"};
+  }
   const dn=o&&o.dishName!=null?o.dishName:base.dishName;
   if(dn&&DB.loaded){const d=dishByName(dn);if(d){const m=dishMacros(d.id);return{name,kcal:m.kcal,p:m.p,c:m.c,f:m.f,src:"db"};}}
   // 2. Prescripción del nutritionPlan (snapshot materializado, REQ-82)
