@@ -11651,6 +11651,23 @@ window.addEventListener("appinstalled",()=>{UI.installDismissed=true;uiSave();re
 // Cola offline: drenar al recuperar red; actualizar badge al perderla (REQ-28).
 window.addEventListener("online",()=>{_updateSyncBadge();if(supa&&session)drainSyncQueue();});
 window.addEventListener("offline",()=>_updateSyncBadge());
+// REQ-155: tratar el cierre/segundo plano como pausa implícita del cronómetro
+// del reproductor de entreno — si no, "duración real" cuenta el tiempo con la
+// app cerrada. Al volver a estar visible, normalizeExecution() ya resetea
+// resumedAt a "ahora" porque queda en null (misma lógica que una pausa/
+// reanudación manual), así que no hace falta un "reanudar" explícito aquí.
+function freezeInProgressWorkouts(){
+  Object.keys(S.days||{}).forEach(ds=>{
+    const execution=S.days[ds]&&S.days[ds].workoutExecution;
+    if(execution&&execution.status==="in_progress"&&execution.resumedAt){
+      captureWorkoutElapsed(execution);
+      execution.updatedAt=new Date().toISOString();
+      commitDay(ds);
+    }
+  });
+}
+document.addEventListener("visibilitychange",()=>{if(document.hidden)freezeInProgressWorkouts();});
+window.addEventListener("pagehide",freezeInProgressWorkouts);
 render();                      // splash mientras resolvemos la sesión
 boot();                        // carga config (Vercel) → conecta Supabase → resuelve sesión
 // Inicializar badge de sincronización (vive fuera de #app para sobrevivir render()).

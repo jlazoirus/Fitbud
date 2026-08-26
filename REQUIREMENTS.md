@@ -1059,7 +1059,8 @@ Que alguien con autoridad de producto decida, con la evidencia de REQ-143/REQ-14
 
 ## REQ-155 - Fix reproductor de entreno: "duración real" cuenta el tiempo con la app cerrada
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`freezeInProgressWorkouts()` (`index.html`) trata el cierre/segundo plano como pausa implícita: en `visibilitychange` (oculto) y `pagehide`, congela `elapsedSeconds` y limpia `resumedAt` (misma `captureWorkoutElapsed()` que ya usa la pausa manual) para cualquier `workoutExecution` `in_progress`, y persiste con `commitDay`. Al volver, `WORKOUT_PLAYER.normalizeExecution()` ya resetea `resumedAt` a "ahora" porque queda en `null` (lógica preexistente de pausa/reanudación), así que el cronómetro retoma sin sumar el hueco. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/entreno.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix).
 
 ### Origen
 

@@ -75,4 +75,48 @@ test.describe("Entreno", () => {
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  test("REQ-155: el cronómetro no cuenta el tiempo con la app en segundo plano", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await expect(page.locator("#app")).toContainText(/0\/\d+ bloques/);
+
+    // Simula que la app se va a segundo plano (pantalla bloqueada / cambio de
+    // app) SIN que el usuario haya pausado manualmente — dispara el listener
+    // real de visibilitychange (no una versión simulada de la función).
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", { value: true, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    const frozen = await page.evaluate(() => {
+      const execution = S.days[todayStr()].workoutExecution;
+      return { resumedAt: execution.resumedAt, elapsedSeconds: execution.elapsedSeconds };
+    });
+    expect(frozen.resumedAt, "al ocultarse, resumedAt debe quedar en null (pausa implícita)").toBeNull();
+    expect(frozen.elapsedSeconds, "recién iniciada, el tiempo congelado debe ser casi 0").toBeLessThan(30);
+
+    // Con resumedAt en null, elapsedSeconds() no debe sumar nada aunque "ahora"
+    // esté 2 horas en el futuro (simula la app cerrada ese tiempo real).
+    const afterTwoHours = await page.evaluate(() => {
+      const execution = S.days[todayStr()].workoutExecution;
+      return WORKOUT_PLAYER.elapsedSeconds(execution, Date.now() + 2 * 3600 * 1000);
+    });
+    expect(afterTwoHours).toBe(frozen.elapsedSeconds);
+    expect(afterTwoHours, "no debe acercarse a las 2h (7200s) que antes se contaban de más").toBeLessThan(30);
+
+    // Al volver (cualquier interacción re-normaliza la ejecución), el
+    // cronómetro retoma desde AHORA, no desde el hueco de 2 horas.
+    const resumedAt = await page.evaluate(() => normalizedWorkoutExecution(todayStr()).resumedAt);
+    expect(resumedAt).toBeTruthy();
+    expect(Date.now() - Date.parse(resumedAt)).toBeLessThan(10_000);
+
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
