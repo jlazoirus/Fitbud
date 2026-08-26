@@ -9631,8 +9631,13 @@ async function signUp(email,pwd){
   return r;
 }
 let _signOutBusy=false;
-function clearSignedOutState(){
-  const prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
+// REQ-156: prevUid es opcional para que el camino por evento SIGNED_OUT (donde
+// el listener ya puso session=null antes de llamar aquí) pueda pasar el uid
+// capturado a tiempo; los caminos que llaman sin argumento (botón "Cerrar
+// sesión", borrado de cuenta) siguen resolviéndolo con uid() como antes,
+// porque ahí la sesión todavía está seteada en ese momento.
+function clearSignedOutState(prevUid){
+  if(prevUid===undefined)prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
   session=null;profile=null;view="hoy";
   entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
   billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
@@ -11430,9 +11435,14 @@ function ensureDB(){if(supa&&!DB.loaded&&!DB.error)return dbLoad().then(render);
 function setupAuthListener(){
   if(!supa||window._authSub)return;
   window._authSub=supa.auth.onAuthStateChange((event,sess)=>{
+    // REQ-156: capturar el uid ANTES de reasignar session — si no, un cierre
+    // de sesión por evento (token vencido, logout remoto, otra pestaña) deja
+    // uid()===null y clearSignedOutState() no puede aislar/purgar la cola
+    // offline del usuario saliente.
+    const prevUid=event==="SIGNED_OUT"?uid():null;
     session=sess||null;
     if(event==="PASSWORD_RECOVERY"){passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode="recovery";authReady=true;render();}
-    else if(event==="SIGNED_OUT")clearSignedOutState();
+    else if(event==="SIGNED_OUT")clearSignedOutState(prevUid);
     else if(event==="SIGNED_IN"){
       const redirectMode=passwordRedirectMode();
       if(redirectMode){passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode=redirectMode;authReady=true;render();return;}

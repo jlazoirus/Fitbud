@@ -1104,7 +1104,8 @@ Que "duración real" refleje el tiempo realmente ejercitado, no el reloj de pare
 
 ## REQ-156 - Fix aislamiento: el cierre de sesión por evento (token expirado / logout remoto / otra pestaña) no purga la cola offline del usuario anterior
 
-**Estado: pendiente.**
+**Estado: implementado.**
+El handler `onAuthStateChange` (`index.html`) captura `prevUid=uid()` **antes** de reasignar `session=sess||null`, y lo pasa a `clearSignedOutState(prevUid)` en el evento `SIGNED_OUT`; sin ese cambio, `session` ya quedaba en `null` cuando `clearSignedOutState()` calculaba su propio `uid()`, y la purga de la cola offline del usuario saliente se saltaba. `clearSignedOutState(prevUid)` ahora acepta el uid como parámetro opcional (fallback a `uid()` si no se pasa), así que el botón "Cerrar sesión" y el borrado de cuenta —que llaman sin argumento mientras la sesión sigue seteada— quedan sin cambios. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/sync-isolation.spec.js` (dispara `supa.auth.signOut()` directo, el mismo evento que un token vencido o logout remoto; confirmado que el test falla exactamente como describe el REQ contra el código sin el fix).
 
 ### Origen
 
