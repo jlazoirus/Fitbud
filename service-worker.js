@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v68";
+const CACHE_NAME = "fitbud-pwa-v69";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -37,7 +37,12 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
 
   if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request, "./index.html"));
+    // REQ-150: servir la navegación desde la MISMA generación de cache que
+    // los .js (cacheFirst), no de la red directa — networkFirst podía traer
+    // un index.html recién desplegado mientras los .js seguían saliendo del
+    // cache de la versión anterior (mezcla de versiones). La versión nueva
+    // llega completa (HTML+JS) recién cuando este SW se instala y activa.
+    event.respondWith(cacheFirst(request, "./index.html"));
     return;
   }
 
@@ -66,8 +71,8 @@ self.addEventListener("fetch", event => {
   }
 });
 
-async function cacheFirst(request) {
-  const cached = await caches.match(request);
+async function cacheFirst(request, fallbackUrl) {
+  const cached = await caches.match(request) || (fallbackUrl && await caches.match(fallbackUrl));
   if (cached) return cached;
   const response = await fetch(request);
   const cache = await caches.open(CACHE_NAME);

@@ -124,6 +124,7 @@ run("test-admin-api.mjs", "node scripts/test-admin-api.mjs");
 run("test-admin-reset.mjs", "node scripts/test-admin-reset.mjs");
 run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
 run("test-webhook-refund.mjs", "node scripts/test-webhook-refund.mjs");
+run("test-service-worker-cache.mjs", "node scripts/test-service-worker-cache.mjs");
 
 // ── Validadores de SQL y datos ───────────────────────────────────────────────
 console.log("\n[ SQL y datos ]");
