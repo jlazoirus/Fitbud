@@ -119,4 +119,35 @@ test.describe("Entreno", () => {
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  test("REQ-163: una sesión abandonada 'en curso' no cuenta como entreno hecho para la racha", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+
+    const app = page.locator("#app");
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await expect(app).toContainText(/0\/\d+ bloques/);
+
+    // Omite UN bloque (calentamiento, siempre el primero) y ABANDONA — nunca
+    // "Finalizar y guardar sesión" ni "Terminar parcialmente".
+    await page.getByRole("button", { name: "Omitir bloque" }).click();
+
+    // El propio "Resumen" del día debe seguir mostrando "En curso" para
+    // entrenamiento: la sesión no cerró (completed/partial).
+    await expect(app).toContainText("En curso");
+
+    const result = await page.evaluate(() => ({
+      trainingDayResult: trainingDayResult(todayStr()),
+      trainCur: streakStats().trainCur,
+    }));
+    expect(result.trainingDayResult, "una sesión in_progress abandonada no debe contar como 'hecho'").toBe("missed");
+    expect(result.trainCur, "trainCur no debe subir por una sesión abandonada sin cerrar").toBe(0);
+
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });

@@ -9449,7 +9449,13 @@ function trainingDayResult(ds){
   const isRest=ew.workout&&ew.workout.id==="descanso";
   if(isRest)return "rest";
   const st=S.days[ds]||{};
-  const done=workoutHasRecordedActivity(st)||!!st.workoutDone;
+  // REQ-163: una sesión in_progress/paused (bloques omitidos, series sueltas)
+  // no es un cierre real — solo un resultado TERMINAL (completed/partial) o
+  // el legado st.workoutDone cuentan para la racha. workoutHasRecordedActivity()
+  // no se toca aquí a propósito: otros usos (p. ej. protección de días en
+  // REQ-126) siguen queriendo detectar cualquier actividad, no solo la cerrada.
+  const outcome=workoutOutcomeForState(st);
+  const done=outcome==="completed"||outcome==="partial"||!!st.workoutDone;
   return done?"done":"missed";
 }
 
