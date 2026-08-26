@@ -19,12 +19,14 @@ const BASE = "https://fitbud.test/";
 function normalizeUrl(u) {
   return new URL(u, BASE).href;
 }
-function fakeResponse(body) {
+function fakeResponse(body, opts) {
+  const ok = opts && opts.ok !== undefined ? opts.ok : true;
+  const status = opts && opts.status !== undefined ? opts.status : 200;
+  const type = opts && opts.type !== undefined ? opts.type : "basic";
   return {
     _body: body,
-    ok: true,
-    status: 200,
-    clone() { return fakeResponse(this._body); },
+    ok, status, type,
+    clone() { return fakeResponse(this._body, { ok: this.ok, status: this.status, type: this.type }); },
     async text() { return this._body; },
   };
 }
@@ -149,4 +151,59 @@ function fakeFetchEvent(request) {
   console.log("  Test 2 pasado: sin cache previo, la navegación cae a red y cachea el resultado");
 }
 
-console.log("Service worker (REQ-150): navegación y .js consistentemente de la misma generación de cache. Verificado con vm + mocks.");
+// ── REQ-159: cacheFirst NUNCA debe cachear un 404/500 — fetch() solo rechaza
+// ante fallo de red, no ante status de error, así que sin el check un error
+// transitorio quedaría "cacheado como bueno" y se re-serviría para siempre. ──
+{
+  let networkCalls = 0;
+  let networkStatus = 404;
+  const fetchImpl = async (request) => {
+    networkCalls++;
+    const url = typeof request === "string" ? request : request.url;
+    return networkStatus === 404
+      ? fakeResponse("NOT-FOUND", { ok: false, status: 404 })
+      : fakeResponse("OK-TRAS-RECUPERARSE:" + url, { ok: true, status: 200 });
+  };
+  const { listeners, caches, CACHE_NAME_MATCH } = loadServiceWorker({ fetchImpl });
+  const fetchHandler = listeners.fetch;
+
+  const errEvent = fakeFetchEvent({ method: "GET", mode: "no-cors", url: "https://fitbud.test/roto.js" });
+  fetchHandler(errEvent);
+  const errResponse = await errEvent.getResponse();
+  assert(errResponse.status === 404, "Debe devolver el 404 real (no hay nada mejor que servir la primera vez).");
+  const cache = await caches.open(CACHE_NAME_MATCH);
+  assert(!(await cache.match("https://fitbud.test/roto.js")), "Un 404 NUNCA debe quedar guardado en el cache.");
+
+  // El servidor "se recupera": la misma URL ahora responde 200 OK.
+  networkStatus = 200;
+  const okEvent = fakeFetchEvent({ method: "GET", mode: "no-cors", url: "https://fitbud.test/roto.js" });
+  fetchHandler(okEvent);
+  const okResponse = await okEvent.getResponse();
+  assert(okResponse.status === 200 && (await okResponse.text()).startsWith("OK-TRAS-RECUPERARSE"),
+    "Tras recuperarse el servidor, debe volver a pedirlo a la red (el 404 no debía haber quedado cacheado) y servir el 200.");
+  assert(networkCalls === 2, "Debe haber ido a la red las dos veces (el 404 no se sirvió de cache la segunda vez).");
+
+  console.log("  Test 3 pasado: cacheFirst nunca cachea un 404; tras recuperarse el servidor, sirve el 200 real");
+}
+
+// ── REQ-159: networkFirst no debe dejar que un 500 sobrescriba un shell bueno
+// ya cacheado — debe preferir la copia válida en vez del error transitorio. ──
+{
+  const fetchImpl = async () => fakeResponse("ERROR-500-TRANSITORIO", { ok: false, status: 500 });
+  const { listeners, caches, CACHE_NAME_MATCH } = loadServiceWorker({ fetchImpl });
+  const cache = await caches.open(CACHE_NAME_MATCH);
+  await cache.put("https://fitbud.test/config.js", fakeResponse("CONFIG-BUENO"));
+
+  const fetchHandler = listeners.fetch;
+  const event = fakeFetchEvent({ method: "GET", mode: "no-cors", url: "https://fitbud.test/config.js" });
+  fetchHandler(event);
+  const res = await event.getResponse();
+  assert((await res.text()) === "CONFIG-BUENO",
+    "Un 500 de la red no debe sobrescribir/reemplazar el shell bueno ya cacheado — debe servirse el válido.");
+  const stillCached = await cache.match("https://fitbud.test/config.js");
+  assert((await stillCached.text()) === "CONFIG-BUENO", "El cache no debe quedar envenenado con el 500.");
+
+  console.log("  Test 4 pasado: networkFirst no deja que un 500 sobrescriba el shell bueno ya cacheado");
+}
+
+console.log("Service worker (REQ-150/REQ-159): misma generación de cache y sin envenenar el cache con errores. Verificado con vm + mocks.");

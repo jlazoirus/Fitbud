@@ -1250,7 +1250,8 @@ Un administrador no puede tomar la cuenta de otro administrador cambiándole la 
 
 ## REQ-159 - El service worker cachea respuestas de error (404/500) y envenena el cache
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`service-worker.js` agrega `isCacheableResponse(response)` (ok, o `type==="opaque"` para no romper respuestas cross-origin sin CORS como el CDN) y la usa antes de todo `cache.put` en `cacheFirst`/`networkFirst`/`staleWhileRevalidate`; `networkFirst` además, si la red responde no-OK, prefiere la copia cacheada válida en vez de servir/guardar el error. `CACHE_NAME` subido a `v70`. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-service-worker-cache.mjs` (2 casos nuevos: un 404 nunca queda cacheado y el servidor se autorepara al recuperarse; un 500 no sobrescribe un shell bueno ya cacheado; confirmado que ambos fallan exactamente como describe el REQ contra el código sin el fix).
 
 ### Origen
 

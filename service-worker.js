@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v69";
+const CACHE_NAME = "fitbud-pwa-v70";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -71,12 +71,27 @@ self.addEventListener("fetch", event => {
   }
 });
 
+// REQ-159: fetch() solo rechaza ante fallo de red, no ante 4xx/5xx — sin este
+// check, un error transitorio (deploy en curso, hiccup del edge, URL de
+// Storage vencida) queda cacheado como si fuera bueno y se re-sirve hasta el
+// próximo bump de CACHE_NAME. Las respuestas opacas (cross-origin sin CORS,
+// p. ej. el CDN) siempre tienen status 0 y ok:false aunque el recurso se haya
+// servido bien — no hay forma de distinguir éxito de error ahí, así que se
+// mantienen cacheables como ya lo eran; esto solo bloquea errores verificables.
+function isCacheableResponse(response) {
+  if (!response) return false;
+  if (response.type === "opaque") return true;
+  return response.ok;
+}
+
 async function cacheFirst(request, fallbackUrl) {
   const cached = await caches.match(request) || (fallbackUrl && await caches.match(fallbackUrl));
   if (cached) return cached;
   const response = await fetch(request);
-  const cache = await caches.open(CACHE_NAME);
-  cache.put(request, response.clone());
+  if (isCacheableResponse(response)) {
+    const cache = await caches.open(CACHE_NAME);
+    cache.put(request, response.clone());
+  }
   return response;
 }
 
@@ -84,6 +99,13 @@ async function networkFirst(request, fallbackUrl) {
   const cache = await caches.open(CACHE_NAME);
   try {
     const response = await fetch(request);
+    if (!isCacheableResponse(response)) {
+      // La red respondió pero con error: no sobrescribir el cache bueno.
+      // Preferir la copia válida ya cacheada; si no hay ninguna, no queda
+      // más remedio que devolver el error (no hay nada mejor que servir).
+      const cachedGood = (await caches.match(request)) || (fallbackUrl && await caches.match(fallbackUrl));
+      return cachedGood || response;
+    }
     cache.put(request, response.clone());
     return response;
   } catch (error) {
@@ -131,7 +153,7 @@ async function staleWhileRevalidate(request) {
   const cached = await caches.match(request);
   const fresh = fetch(request)
     .then(response => {
-      cache.put(request, response.clone());
+      if (isCacheableResponse(response)) cache.put(request, response.clone());
       return response;
     })
     .catch(() => cached);
