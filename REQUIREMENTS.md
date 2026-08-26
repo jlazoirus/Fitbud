@@ -1024,7 +1024,8 @@ Que alguien con autoridad de producto decida, con la evidencia de REQ-143/REQ-14
 
 ## REQ-148 - Fix billing: un reembolso parcial de Stripe revoca todo el entitlement pagado
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`handleRefund()` (`api/webhook.js`) solo revoca cuando `charge.refunded===true` o `Number(charge.amount_refunded)>=Number(charge.amount)`; un reembolso parcial devuelve `skipped` (queda auditado en `billing_events` con el payload completo, sin tocar el entitlement). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-webhook-refund.mjs`.
 
 ### Origen
 

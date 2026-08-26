@@ -123,6 +123,7 @@ run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
 run("test-admin-api.mjs", "node scripts/test-admin-api.mjs");
 run("test-admin-reset.mjs", "node scripts/test-admin-reset.mjs");
 run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
+run("test-webhook-refund.mjs", "node scripts/test-webhook-refund.mjs");
 
 // ── Validadores de SQL y datos ───────────────────────────────────────────────
 console.log("\n[ SQL y datos ]");

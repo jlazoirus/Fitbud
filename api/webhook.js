@@ -135,6 +135,12 @@ async function handleRefund(e, charge) {
   // Revoca el entitlement ligado al mismo payment_intent
   const pi = charge.payment_intent;
   if (!pi) return { ok: true, skipped: true };
+  // Stripe emite charge.refunded en reembolsos totales Y parciales. Un parcial
+  // (refunded:false, amount_refunded < amount) no debe quitar el acceso ya
+  // pagado; solo revocar cuando el reembolso cubre el cargo completo.
+  const isFullRefund = charge.refunded === true
+    || Number(charge.amount_refunded) >= Number(charge.amount);
+  if (!isFullRefund) return { ok: true, skipped: true };
   const rows = await sbGet(
     e,
     "/rest/v1/user_entitlements?payment_ref=eq." + encodeURIComponent(pi)
