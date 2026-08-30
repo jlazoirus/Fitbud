@@ -962,9 +962,11 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 
 ## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
 
-**Estado: pendiente. Requiere acción humana (decisión de producto en REQ-147) antes de intentar otro lote; no implementable por el agente autónomo hasta esa decisión.**
+**Estado: pendiente. Requiere acción humana: sus criterios de aceptación ("subir de forma sustancial desde 32.3%") quedaron obsoletos y hay que re-basarlos antes de retomarlo; no implementable por el agente autónomo hasta esa decisión.**
 
-Canario `validate-diet-contract.mjs` en 122/378 (32.3%), 100% `catalog_gap`; dos experimentos medidos con `scripts/diff-diet-contract.mjs` (REQ-144) confirmaron un techo ~32-33% bajo la selección local de `planDeterministicNutritionDay()`/`globalClosePass()`. Ningún lote nuevo se comiteó. Detalle completo (experimentos, objetivo/alcance/criterios si se retoma tras REQ-147): `docs/requirements-history.md` (buscar `## REQ-143`).
+El "techo de catálogo ~32-33%" que motivaba este REQ **no existía**: era la función objetivo de `globalClosePass()`, corregida en REQ-166. El canario pasó de 122/378 (32.3%) a 289/378 (76.5%) sin agregar un solo plato. Las dos sesiones de lotes de catálogo (2026-07-05 y 2026-07-08) estaban alimentando un solver que optimizaba la métrica equivocada, y sus conclusiones sobre el contenido no son válidas.
+
+Lo que queda es un hueco de catálogo **real y ahora sí medible**: las 7 dimensiones que siguen en 0/7 son todas de **2 comidas** (cerrar 2250 kcal / 190 g de proteína en dos comidas) más vegano/`sin_tofu`. Si se retoma, el alcance debe apuntar solo ahí y medirse con `scripts/diff-diet-contract.mjs` contra la línea base nueva de 289/378, no contra 122/378. Detalle histórico de los experimentos (hoy superados): `docs/requirements-history.md` (buscar `## REQ-143`).
 
 ## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
 
@@ -981,7 +983,29 @@ Canario `validate-diet-contract.mjs` en 122/378 (32.3%), 100% `catalog_gap`; dos
 
 ## REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo del canario `DIET_CONTRACT`
 
-**Estado: pendiente. Requiere acción humana (decisión de producto de Jonathan) antes de implementar cualquier alcance; no implementable por el agente autónomo sin esa autorización, porque reabre una restricción que él mismo fijó en REQ-143 ("no rediseñar la selección").**
+**Estado: implementado.**
+Cerrado con la decisión de producto tomada y registrada abajo (2026-08-30); el sub-alcance elegido se implementó en REQ-166.
+
+### Decisión de producto (2026-08-30, Jonathan)
+
+La premisa del REQ era incorrecta y la medición lo demostró: **nunca hubo un techo de catálogo**. El ~32-33% no venía de la selección de platos ni de falta de contenido, sino de que `globalClosePass()` cerraba el día haciendo hill-climbing sobre `scoreMacros()` (kcal ×1.4, proteína ×1.45/0.45, carbohidratos ×0.55, grasa ×0.55) mientras `DIET_CONTRACT` exige tolerancias duras y **simétricas**. El optimizador estaba entrenado para sacrificar carbohidratos a cambio de precisión en kcal/proteína — que es exactamente lo que el contrato reprueba, y explica el hallazgo sin explicación del 2026-07-08 (`carbs residual {n:133, pos:133, neg:0}`: 133 de 133 fallos por exceso, cero por déficit).
+
+Jonathan autorizó una **cuarta opción, distinta de las tres del "Objetivo"**: corregir la función objetivo de la pasada global de cierre, **sin tocar la selección de platos** — no cambia qué plato gana cada slot, solo cuántos gramos recibe el plato ya elegido. La restricción de REQ-143 ("no rediseñar la selección") queda intacta y no fue necesario reabrirla. Se implementa en REQ-166.
+
+Medición que respaldó la decisión (canario real de 378 días, variantes descartables sobre copia del dominio):
+
+| Variante | Canario | Dimensiones 7/7 | Regresiones |
+|---|---|---|---|
+| baseline (`main`) | 122/378 · 32.3% | 5/54 | — |
+| ampliar pre-rankeo 48→200 (idea (i) del REQ) | 122/378 · 32.3% | 5/54 | — |
+| objetivo de contrato escalonado | 205/378 · 54.2% | — | 4 dims (−5 d) |
+| escalonado + reinicios | 261/378 · 69.0% | 25/54 | 1 dim (−2 d) |
+| **objetivo continuo normalizado por tolerancia** | **289/378 · 76.5%** | **38/54** | **ninguna** |
+
+Dos conclusiones operativas para futuras corridas:
+
+1. **La idea (i) del alcance (ampliar el pre-rankeo de candidatos) vale exactamente cero.** Medida y descartada; no volver a intentarla.
+2. El canario etiquetaba el 100% de los fallos como `catalog_gap`. **Esa etiqueta era un diagnóstico incorrecto** y costó dos sesiones completas de lotes de catálogo. Un fallo de contrato no prueba falta de catálogo mientras el cierre no optimice el contrato.
 
 ### Origen
 
@@ -1560,3 +1584,53 @@ Una escala sin responder no debe contar como valor extremo ni generar mensajes/a
 ### Verificación sugerida
 
 - Arnés determinista (0 llamadas): `analyzeCheckinAnswers` con escalas en `null` vs marcadas altas; assertar mismos `calorieAdjust`/`details` salvo por lo realmente respondido.
+
+## REQ-166 - La pasada global de cierre optimiza el contrato, no `scoreMacros()`
+
+**Estado: implementado.**
+`scoreDayAgainstContract()` (`js/nutrition-domain.js`) reemplaza a `scoreMacros()` como objetivo del hill-climbing de `globalClosePass()`: mide cada métrica en múltiplos de su propia tolerancia de `DIET_CONTRACT` y la eleva al cuadrado, así que las 4 pesan igual en unidades de contrato. No cambia qué plato se elige en ningún slot — `scoreMacros()` sigue siendo el score por comida de `solveDishPortion()`/`optimizeLines()`. Canario `validate-diet-contract.mjs`: 122/378 (32.3%) → 289/378 (76.5%), 34 dimensiones mejoran, **0 regresionan**, dimensiones al 100% de 5/54 a 38/54. Validador: `scripts/validate-global-close-objective.mjs`.
+
+### Origen
+
+Decisión de producto de Jonathan (2026-08-30) registrada en REQ-147, tras medir que el "techo de catálogo" de REQ-143 no era del catálogo.
+
+### Problema
+
+`globalClosePass()` (REQ-137) cierra el día repartiendo gramos entre las líneas escalables por hill-climbing, pero puntuaba con `scoreMacros()`, que pondera kcal ×1.4 y proteína hasta ×1.45 y deja carbohidratos y grasa en ×0.55. `DIET_CONTRACT` valida con tolerancias duras y simétricas (±3%/50 kcal, ±5 g proteína, ±8 g carbohidratos, ±8 g grasa). El cierre optimizaba una métrica que no era la que después lo evaluaba, y compraba precisión en kcal/proteína pagando con carbohidratos.
+
+### Causa raíz
+
+Objetivo desalineado, no falta de catálogo. Evidencia previa que quedaba sin explicación y ahora encaja: el 100% de los fallos de `carbs_contract` eran por exceso (`{n:133, pos:133, neg:0}`, sonda del 2026-07-08), nunca por déficit — el sesgo exacto que produce un peso ×0.55 en carbohidratos frente a ×1.4 en kcal.
+
+### Objetivo
+
+Que el cierre del día optimice la misma definición de "día correcto" que el contrato usa para juzgarlo, sin tocar la selección de platos.
+
+### Alcance
+
+1. `scoreDayAgainstContract(macros,target)` en `js/nutrition-domain.js`: suma de `(desvío / tolerancia_de_contrato)²` sobre kcal/proteína/carbohidratos/grasa, reutilizando `dietContractTolerance()`.
+2. `globalClosePass()` puntúa con esa función en sus dos usos (score inicial y evaluación de cada paso).
+3. `scoreMacros()` no se modifica ni cambia de rol: sigue eligiendo plato y resolviendo porción por comida.
+4. Validador estructural y numérico `scripts/validate-global-close-objective.mjs` en el release gate.
+
+### Fuera de alcance
+
+- Selección de platos (`planDeterministicNutritionDay()`), pre-rankeo de candidatos y variedad semanal: sin cambios.
+- Reinicios múltiples del hill-climbing: medidos (+0 días sobre el objetivo continuo) y descartados por no aportar.
+- Catálogo (REQ-143), activación de contrato en runtime (REQ-139, ya activo como aviso suave), prompts y modelo.
+
+### Riesgos
+
+- **Continuidad del objetivo.** Un objetivo escalonado (plano dentro de tolerancia, salto al salir) deja al hill-climbing sin gradiente y lo clava en el punto de partida: medido 205/378 contra 289/378 del continuo. El validador cubre esta propiedad con asserts de monotonía estricta.
+- Cambian los gramajes mostrados al usuario. Verificado en un día de muestra: mismos platos, límites de receta respetados, gramaje máximo incluso menor (335 g contra 360 g) y totales más cerca de la meta.
+
+### Criterios de aceptación
+
+- El canario sube sin regresionar ninguna dimensión sana. ✓ (34 mejoran, 0 empeoran, +167 días)
+- La selección de plato por slot no cambia. ✓ (`scoreMacros()` intacto en `optimizeLines()`, verificado por el validador)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+### Verificación
+
+- `node scripts/validate-global-close-objective.mjs`, `node scripts/validate-diet-contract.mjs`, `node scripts/release-gate.mjs`.
+- Diff por dimensión baseline contra implementación, con la matriz completa de 54 dimensiones.

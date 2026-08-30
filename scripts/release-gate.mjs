@@ -79,6 +79,7 @@ run("validate-macro-targets-invariant.mjs", "node scripts/validate-macro-targets
 run("validate-nutrition-domain.mjs", "node scripts/validate-nutrition-domain.mjs");
 run("validate-finalize-nutrition-day.mjs", "node scripts/validate-finalize-nutrition-day.mjs");
 run("validate-nutrition-finalize-wiring.mjs", "node scripts/validate-nutrition-finalize-wiring.mjs");
+run("validate-global-close-objective.mjs", "node scripts/validate-global-close-objective.mjs");
 run("validate-diet-contract.mjs", "node scripts/validate-diet-contract.mjs");
 run("validate-diet-contract-diff.mjs", "node scripts/validate-diet-contract-diff.mjs");
 run("validate-diet-contract-runtime-notice.mjs", "node scripts/validate-diet-contract-runtime-notice.mjs");

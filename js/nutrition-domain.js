@@ -1112,9 +1112,40 @@
     return {...meal,ingredientes,kcal:macros.kcal,proteina_g:macros.p,carbohidratos_g:macros.c,grasa_g:macros.f,source:meal.source||"global_close_pass"};
   }
 
+  // Objetivo de la pasada global (REQ-166). scoreMacros() pondera kcal ×1.4 y
+  // proteína hasta ×1.45 pero carbohidratos y grasa solo ×0.55, así que cerrar
+  // el día con ese score sacrifica carbohidratos a cambio de precisión en
+  // kcal/proteína — exactamente lo que DIET_CONTRACT reprueba, con tolerancias
+  // duras y simétricas. Aquí cada métrica se mide en múltiplos de SU tolerancia
+  // de contrato y se eleva al cuadrado: las 4 pesan igual en unidades de
+  // contrato, y el error grande domina sobre el chico.
+  //
+  // Se mantiene continuo a propósito. Un objetivo escalonado (plano dentro de
+  // tolerancia, salto al salir) deja al hill-climbing sin gradiente: ningún
+  // paso de una línea mejora el score y la búsqueda se clava en el punto de
+  // partida. Medido: escalonado 205/378, continuo cuadrático 289/378.
+  //
+  // scoreMacros() NO cambia: sigue siendo el score por comida de
+  // solveDishPortion()/optimizeLines(), que decide qué plato gana cada slot.
+  // Esta función solo reparte gramos entre platos ya elegidos.
+  function scoreDayAgainstContract(macros,target){
+    const t=target||{};
+    const term=(actual,goal,metric)=>{
+      const g=num(goal);
+      if(g<=0)return 0;
+      const dev=Math.abs(num(actual)-g)/Math.max(1,num(dietContractTolerance(metric,g)));
+      return dev*dev;
+    };
+    return term(macros.kcal,t.kcal,"kcal")+
+      term(macros.p,t.p,"p")+
+      term(macros.c,t.c,"c")+
+      term(macros.f,t.f,"f");
+  }
+
   // Hill-climbing sobre TODAS las líneas ajustables del día (no por comida),
-  // puntuando con scoreMacros(totales_del_día, target). fixedTotals acumula lo
-  // que no se puede tocar (comidas bloqueadas + ingredientes no escalables).
+  // puntuando con scoreDayAgainstContract(totales_del_día, target). fixedTotals
+  // acumula lo que no se puede tocar (comidas bloqueadas + ingredientes no
+  // escalables).
   function globalClosePass(comidas,target,catalog,maps,lockedSlotIds){
     const lines=collectGlobalLines(comidas,catalog,maps,lockedSlotIds);
     if(!lines.length)return comidas;
@@ -1128,7 +1159,7 @@
       });
     });
     const currentDayMacros=()=>lines.reduce((sum,line)=>addMacros(sum,macrosForIngredient(line.ingredient,line.grams)),{...fixedTotals});
-    let bestScore=scoreMacros(currentDayMacros(),target);
+    let bestScore=scoreDayAgainstContract(currentDayMacros(),target);
     for(let iter=0;iter<120;iter++){
       let improved=false;
       for(const line of lines){
@@ -1139,7 +1170,7 @@
           if(next===line.grams)continue;
           const prevGrams=line.grams;
           line.grams=next;
-          const score=scoreMacros(currentDayMacros(),target);
+          const score=scoreDayAgainstContract(currentDayMacros(),target);
           line.grams=prevGrams;
           if(score+0.0001<bestScore){bestScore=score;bestGrams=next;improved=true;}
         }
@@ -1441,6 +1472,7 @@
     validateDietContractTotals,
     validateSlotMacros,
     validateReplacementFeasibility,
+    scoreDayAgainstContract,
     mealSlotTargets,
     slotKcalCeiling,
     compatibleSlotsForDish,
