@@ -80,7 +80,8 @@ export function buildMealsForTargets(target, slotIds) {
     );
     return {
       slot_id,
-      nombre: `${NAMES[i % NAMES.length]}`,
+      // REQ-170: el desayuno lleva un nombre de desayuno; un plato de almuerzo se reemplaza.
+      nombre: slot_id === "desayuno" ? "Bowl proteico de la mañana" : `${NAMES[i % NAMES.length]}`,
       ingredientes,
       kcal: Math.round(tot.kcal),
       proteina_g: Math.round(tot.p),

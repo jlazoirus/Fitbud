@@ -462,6 +462,35 @@
     return true;
   }
 
+  // REQ-170: las comidas que propone el coach casi nunca coinciden con un plato
+  // del catálogo, así que no tienen meal_weight ni compatible_slots y se saltaban
+  // los filtros de momento del día: un "lomo saltado" pasaba como desayuno. Para
+  // esas comidas se revisa el NOMBRE contra platos típicos de almuerzo/cena
+  // (comparación por tokens: "res" no coincide con "fresas"). Los ingredientes no
+  // se revisan: "galletas de arroz", "harina de arroz" o los frijoles de unos
+  // huevos rancheros son desayunos/snacks legítimos.
+  const HEAVY_MEAL_TERMS=Object.freeze([
+    "arroz con","con arroz","arroz tapado","chaufa","tacu tacu",
+    "tallarin","tallarines","fideos","espagueti","spaghetti","lasana","macarrones",
+    "lomo","saltado","guiso","estofado","sudado","seco de","cau cau","carapulcra","aji de gallina",
+    "lentejas","menestra","pizza","hamburguesa","parrilla","parrillada","asado","costilla","costillas",
+    "chuleta","milanesa","cazuela","bistec","carne de res","cerdo","pure de papa","pollo a la brasa",
+  ]);
+  const LIGHT_MOMENT_SLOTS=new Set(["desayuno","media_manana","merienda","recena"]);
+  function slotMomentTextConflict(text,slot,prefs){
+    const slotId=typeof slot==="string"?slot:(slot&&slot.id)||"";
+    if(!LIGHT_MOMENT_SLOTS.has(slotId))return"";
+    if(slotId==="desayuno"&&mainSlotIdForPrefs(prefs)===slotId)return"";
+    return foodTextViolatesTerms(text,HEAVY_MEAL_TERMS);
+  }
+  // REQ-169: un nombre rechazado (permanente o en la sesión) bloquea también
+  // comidas propuestas que no coinciden con ningún plato del catálogo.
+  function mealNameBlockedByProfile(meal,prefs){
+    const list=Array.isArray(prefs&&prefs.blockedDishes)?prefs.blockedDishes:[];
+    const key=solverKey(meal&&(meal.nombre||meal.name||meal.dishName));
+    return !!key&&list.some(b=>b&&(b.key===key||solverKey(b.name)===key));
+  }
+
   function compatibleDishesForSlot(slot,prefs,catalog){
     const slotId=typeof slot==="string"?slot:(slot&&slot.id)||"";
     const maps=catalogMaps(catalog);
@@ -988,6 +1017,14 @@
       if(!dishDietAllowed(dish,prefs,catalog,maps)){
         return{ok:false,reason:"dish_restricted",detail:`${dish.name} no respeta las preferencias/restricciones.`,meal};
       }
+    }else{
+      if(mealNameBlockedByProfile(meal,prefs)){
+        return{ok:false,reason:"dish_blocked_by_user",detail:String(label),meal};
+      }
+      const heavy=slotMomentTextConflict(label,slot.id,prefs);
+      if(heavy){
+        return{ok:false,reason:"slot_moment_heuristic",detail:`${label} no corresponde a ${slot.id} (${heavy}).`,meal};
+      }
     }
 
     const ingredients=Array.isArray(meal&&meal.ingredientes)?meal.ingredientes:[];
@@ -1074,18 +1111,45 @@
     return"neutral";
   }
 
+  // REQ-171: comidas propuestas por el coach casi nunca coinciden por nombre con
+  // un plato del catálogo. Antes quedaban fuera de la pasada global y el día no
+  // convergía a la meta de kcal (el prompt delega el ajuste fino al motor). Sus
+  // ingredientes ya resueltos escalan entre 0.5× y 1.75× de lo propuesto, con
+  // los mismos topes por categoría que las recetas del catálogo.
+  const PROPOSAL_SCALE_MIN=0.5;
+  const PROPOSAL_SCALE_MAX=1.75;
+  function proposalLineRaw(grams){
+    const g=num(grams);
+    return {
+      scalable:g>=5,
+      min_g:Math.max(5,Math.round(g*PROPOSAL_SCALE_MIN)),
+      max_g:Math.max(5,Math.round(g*PROPOSAL_SCALE_MAX)),
+      step_g:g>=100?10:5,
+    };
+  }
+
   // Reconstruye, por cada comida no bloqueada, los límites reales de escalado
-  // (min_g/max_g/step_g) buscando el plato de catálogo original; sin plato no
-  // hay límites confiables, así que esa línea queda fuera de la pasada global.
+  // (min_g/max_g/step_g) buscando el plato de catálogo original; sin plato, usa
+  // límites relativos a lo propuesto (REQ-171).
   function collectGlobalLines(comidas,catalog,maps,lockedSlotIds){
     const lines=[];
     (comidas||[]).forEach(meal=>{
       if(!meal||lockedSlotIds.has(meal.slot_id))return;
       const dish=findDishForMeal(meal,catalog);
-      if(!dish)return;
+      const ings=Array.isArray(meal.ingredientes)?meal.ingredientes:[];
+      if(!dish){
+        if(meal.source!=="proposal_recalculated")return;
+        ings.forEach((ing,index)=>{
+          const ingredient=ingredientForLine(ing,maps);
+          if(!ingredient||macroPer100(ingredient).kcal<0)return;
+          const limits=lineLimits({raw:proposalLineRaw(ing.gramos),grams:num(ing.gramos),ingredient});
+          if(!limits.scalable)return;
+          lines.push({meal,index,ingredient,grams:num(ing.gramos),limits,lever:ingredientLeverCategory(ingredient)});
+        });
+        return;
+      }
       const rawLines=dishLines(dish,catalog,maps);
       const rawBySlug=new Map(rawLines.map(line=>[slugFor(line.ingredient),line]));
-      const ings=Array.isArray(meal.ingredientes)?meal.ingredientes:[];
       ings.forEach((ing,index)=>{
         const slug=String(ing.ingredientSlug||"").trim();
         const rawLine=rawBySlug.get(slug);
@@ -1478,6 +1542,8 @@
     compatibleSlotsForDish,
     mealWeightForDish,
     dishAllowedForSlotMoment,
+    slotMomentTextConflict,
+    mealNameBlockedByProfile,
     compatibleDishesForSlot,
     textHasAnimalProtein,
     mealHasAnimalProtein,

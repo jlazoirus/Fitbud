@@ -5465,6 +5465,40 @@ function coachBlockedDishesLine(prefs){
   const names=list.map(b=>b&&b.name).filter(Boolean);
   return names.length?`\nNUNCA sugieras estos platos, el usuario los rechazó explícitamente: ${names.join(", ")}.`:"";
 }
+// REQ-169: opciones que el usuario descartó en esta sesión ("Otra opción" o
+// "No me gusta"), por día. Viven en memoria: las regeneraciones del mismo día no
+// deben volver a proponerlas aunque el descarte no haya sido permanente.
+const SESSION_REJECTED_MEALS=new Map();
+function rememberRejectedMeal(ds,name){
+  const clean=String(name||"").trim();
+  if(!ds||!clean)return;
+  const dish=DB.loaded?dishByName(clean):null;
+  const key=dish?dishBlockKey(dish):coachKey(clean);
+  if(!key)return;
+  if(!SESSION_REJECTED_MEALS.has(ds))SESSION_REJECTED_MEALS.set(ds,new Map());
+  SESSION_REJECTED_MEALS.get(ds).set(key,clean);
+}
+function sessionRejectedMeals(ds){
+  const byKey=SESSION_REJECTED_MEALS.get(ds);
+  return byKey?[...byKey.entries()].map(([key,name])=>({key,name})):[];
+}
+// Prefs con los descartes de la sesión sumados a blockedDishes: así el catálogo
+// de referencia, el fallback determinista y el cierre del día también los evitan.
+function prefsWithSessionRejections(prefs,ds){
+  const extra=sessionRejectedMeals(ds);
+  if(!extra.length)return prefs;
+  return {...prefs,blockedDishes:[...(Array.isArray(prefs.blockedDishes)?prefs.blockedDishes:[]),...extra]};
+}
+function coachRejectedMealsLine(ds){
+  const names=sessionRejectedMeals(ds).map(r=>r.name);
+  return names.length?`\nHoy el usuario ya descartó: ${names.join(", ")}. NO las vuelvas a proponer, ni el mismo plato con otro nombre.`:"";
+}
+// Distingue la reutilización de respuestas por descartes: una respuesta guardada
+// antes de un descarte no debe volver a servirse después.
+function rejectionScope(scope,ds){
+  const keys=sessionRejectedMeals(ds).map(r=>r.key).sort();
+  return keys.length?`${scope}:r${hashText(keys.join("|"))}`:scope;
+}
 function coachFoodBlockTerms(includeSoft){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const terms=coachHardRestrictions();
@@ -5513,7 +5547,7 @@ function nutritionSlotTargetsForDay(day,target,prefs,isTrainingDay){
 }
 function slotArchetypeText(slotId){
   return {
-    desayuno:"avena, huevos, yogur, tostadas o batidos; no guisos ni platos de almuerzo",
+    desayuno:"alimentos típicos de mañana: huevos, avena, yogur, frutas, tostadas o batidos; no guisos ni platos de almuerzo. NUNCA platos contundentes como arroz con pollo, lomo, guisos, menestras o similares",
     media_manana:"opción ligera: fruta, yogur, batido o tostada pequeña",
     almuerzo:"plato completo: proteína, carbohidrato base y vegetales",
     merienda:"opción ligera: yogur, fruta, batido o sándwich pequeño",
@@ -7708,6 +7742,7 @@ async function blockCurrentMealDish(ds,id){
   const dishName=(o&&o.dishName!=null?o.dishName:base.dishName)||v.name;
   const dish=DB.loaded?dishByName(dishName):null;
   const ok=await blockDishFromProfile(v.name,dish);
+  if(ok)rememberRejectedMeal(ds,v.name);
   closeModal();
   if(ok)toast(`No volveremos a sugerir "${v.name}". Puedes deshacerlo en Perfil.`);
   else toast("No se pudo bloquear el plato. Intenta de nuevo.");
@@ -7886,7 +7921,8 @@ function coachHardRestrictions(){
 // dinámicamente y omnívoro tiene regla activa de proteína animal.
 // REQ-132: bump a 8 — el prompt y los pools consumen metadata de forma/peso por slot.
 // REQ-136: bump a 9 — el hash de catálogo incluye cuisine_tags para preferencias de cocina.
-const COACH_PROMPT_VERSION=9;
+// REQ-169/170/171: bump a 10 — descartes de la sesión, desayuno reforzado y meta ±50 kcal en el prompt.
+const COACH_PROMPT_VERSION=10;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -8078,7 +8114,7 @@ function dietContractNoticeText(totals,target){
 }
 function deterministicDayPayload(ds){
   const day=buildDay(ds),target=effectiveDayTarget();
-  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const prefs=prefsWithSessionRejections(migrateProfilePrefs((profile&&profile.prefs)||{}),ds);
   const nd=window.FITBUD_NUTRITION_DOMAIN;
   if(nd&&nd.finalizeNutritionDay&&DB.loaded){
     const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
@@ -8616,6 +8652,15 @@ function validateGeneratedDay(j,day,target){
       if(nuevos.length&&DB.loaded)warns.push(`"${nombre}": ingredientes nuevos (${nuevos.join(", ")}).`);
     }
     if(recent.includes(nombre.toLowerCase()))warns.push(`"${nombre}" se repite respecto a días recientes.`);
+    // REQ-169/170: el cierre del día (finalizeNutritionDay) reemplaza estas comidas;
+    // aquí solo se explica el cambio al usuario.
+    const rejectedKeys=new Set(sessionRejectedMeals(day.ds).map(r=>r.key));
+    const rejectedByUser=(matchedDish&&(dishBlockedBySavedList(matchedDish)||rejectedKeys.has(dishBlockKey(matchedDish))))
+      ||(!matchedDish&&ndCoach&&ndCoach.mealNameBlockedByProfile&&ndCoach.mealNameBlockedByProfile({nombre},prefsWithSessionRejections(prefs,day.ds)));
+    if(rejectedByUser)warns.push(`"${nombre}" ya lo descartaste; lo cambiamos por otra opción.`);
+    else if(!matchedDish&&ndCoach&&ndCoach.slotMomentTextConflict&&ndCoach.slotMomentTextConflict(nombre,slot_id,prefs)){
+      warns.push(`"${nombre}" no es una opción típica para ${slot_id}; la cambiamos por una que sí lo es.`);
+    }
     comidas.push({slot_id,nombre,ingredientes:ings,kcal:Math.round(macro.kcal),proteina_g:Math.round(macro.p),carbohidratos_g:Math.round(macro.c),grasa_g:Math.round(macro.f)});
   });
   // REQ-138: los totales que el modelo propone ya no son autoridad final — el
@@ -8669,7 +8714,8 @@ function findGapSnack(totals,target){
 // Núcleo reutilizable: genera UN día a la medida de los macros del usuario y lo valida.
 async function generateOneDay(ds,coachRequest){
   const day=buildDay(ds); const target=effectiveDayTarget();
-  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  // REQ-169: los descartes de la sesión cuentan como bloqueos para este día.
+  const prefs=prefsWithSessionRejections(migrateProfilePrefs((profile&&profile.prefs)||{}),ds);
   const mainMealIdx=Math.min(Math.max(1,prefs.mainMealIndex||2),day.meals.length)-1;
   const isTrainingDay=!!plannedWorkoutId(ds,null)&&plannedWorkoutId(ds,null)!=="descanso";
   const slotTargets=nutritionSlotTargetsForDay(day,target,prefs,isTrainingDay);
@@ -8687,7 +8733,7 @@ async function generateOneDay(ds,coachRequest){
   const lp=(profile&&profile.prefs&&profile.prefs.learnedPatterns)||null;
   const learnedLine=lp&&lp.topIngredients&&lp.topIngredients.length?`\nEl usuario suele disfrutar ingredientes como: ${lp.topIngredients.join(", ")}. Incorpóralos cuando encajen con las metas.`:"";
   const likesLine=coachLikesLine(prefs);
-  const blockedLine=coachBlockedDishesLine(prefs);
+  const blockedLine=coachBlockedDishesLine(migrateProfilePrefs((profile&&profile.prefs)||{}))+coachRejectedMealsLine(ds);
   const cookCtx=`Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
   const hardResLine=hardRes.length?`\nNUNCA incluyas en ninguna comida o ingrediente, bajo ninguna circunstancia: ${hardRes.join(", ")}.`:"";
   // Carne/pescado se instruye por prompt (no por término) para no colisionar con substrings como "repollo". REQ-65.
@@ -8715,7 +8761,7 @@ ${cookCtx}${hardResLine}${vegLine}${animalLine}${highProtLine}${likesLine}${bloc
 Referencia de platos compatibles por slot (elige ideas del slot correspondiente; no uses platos listados en otro slot):
 ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}${learnedLine}.
-Propón una composición realista cercana al presupuesto de cada slot (arriba); no necesitas ajustar los gramos para que la suma del día cierre exacto con las metas — el sistema recalcula y ajusta las porciones finales.
+Ajusta los gramos para que cada comida quede cerca del presupuesto de su slot (arriba) y la suma del día quede a ±50 kcal de ${target.kcal} kcal. El sistema recalcula los macros con su base de alimentos y hace el ajuste fino de porciones, pero parte de tus gramos: no entregues un día muy por debajo o por encima de la meta.
 Cada comida lleva ingredientes reales con gramos razonables para esa composición.
 PROHIBIDO inventar nombres genéricos o ficticios como "Desayuno práctica", "Alimento compatible", "Bowl práctico" o similares. Cada comida debe tener un nombre descriptivo real (ej. "Avena proteica con frutos rojos") y cada ingrediente debe ser un alimento real (ej. "Avena", "Proteína en polvo", "Tofu firme").
 Responde SOLO JSON válido, sin texto extra:
@@ -8728,7 +8774,7 @@ Responde SOLO JSON válido, sin texto extra:
     coachRequest.partKey,
     fallback,
     dietQuotaValidation(ds),
-    ds
+    rejectionScope(ds,ds)
   );
   const txt=await callClaude(prompt,maxTok,quota);
   const reused=lastCoachCallReused;
@@ -8745,7 +8791,7 @@ AJUSTE DIRIGIDO: la propuesta anterior quedó demasiado vegetariana para un perf
         `${coachRequest.partKey}-omnivore`,
         fallback,
         dietQuotaValidation(ds),
-        ds+":omnivore"
+        rejectionScope(ds+":omnivore",ds)
       );
       const retryTxt=await callClaude(retryPrompt,maxTok,retryQuota);
       const retryRes=validateGeneratedDay(parseJSON(retryTxt),day,target);
@@ -8976,8 +9022,19 @@ async function blockGenDraftMeal(cIdx){
   const c=draft.comidas[cIdx];if(!c||!c.nombre)return;
   const dish=DB.loaded?(c.dishSlug?DB.dishes.find(d=>d.slug===c.dishSlug):dishByName(c.nombre)):null;
   const ok=await blockDishFromProfile(c.nombre,dish);
-  if(ok)toast(`No volveremos a sugerir "${c.nombre}". Puedes deshacerlo en Perfil.`);
-  else toast("No se pudo bloquear el plato. Intenta de nuevo.");
+  if(!ok){toast("No se pudo bloquear el plato. Intenta de nuevo.");return;}
+  rememberRejectedMeal(draft.ds,c.nombre);
+  // REQ-169: sacarlo del borrador ya; antes seguía ahí y se podía aplicar igual.
+  // El hueco lo llena el catálogo (sin consumir opciones del coach).
+  const day=buildDay(draft.ds);const target=effectiveDayTarget();
+  const prefs=prefsWithSessionRejections(migrateProfilePrefs((profile&&profile.prefs)||{}),draft.ds);
+  const others=draft.comidas.filter((_,i)=>i!==cIdx);
+  const finalized=finalizeDayWithGate(draft.ds,day,target,prefs,[],{lockedMeals:others});
+  const refilled=finalized&&Array.isArray(finalized.comidas)&&finalized.comidas.some(m=>m.slot_id===c.slot_id);
+  draft.comidas=refilled?finalized.comidas:others;
+  const res=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
+  const out=$("#genOut");if(out)out.innerHTML=genReviewHtml(res,target);
+  toast(`No volveremos a sugerir "${c.nombre}".${refilled?" Lo cambiamos por otra opción.":""} Puedes deshacerlo en Perfil.`);
 }
 // REQ-90: editar gramos de ingredientes en el borrador del día y re-validar.
 function updateGenMealGrams(mealIdx,ingIdx,grams){
@@ -9148,6 +9205,8 @@ async function regenerateGenMeal(slotId){
   }
   const day=buildDay(draft.ds);const target=effectiveDayTarget();
   const slot=day.meals.find(m=>m.id===slotId);if(!slot){endCoachAction(actionKey);return;}
+  // REQ-169: pedir otra opción descarta la actual para el resto de la sesión.
+  rememberRejectedMeal(draft.ds,(draft.comidas.find(c=>c.slot_id===slotId)||{}).nombre);
   const others=draft.comidas.filter(c=>c.slot_id!==slotId);
   const usedKcal=others.reduce((s,c)=>s+Number(c.kcal||0),0);
   const usedP=others.reduce((s,c)=>s+Number(c.proteina_g||0),0);
@@ -9157,11 +9216,13 @@ async function regenerateGenMeal(slotId){
   const remP=Math.max(5,target.p-usedP);
   const remC=Math.max(5,target.c-usedC);
   const remF=Math.max(2,target.f-usedF);
-  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const slotDishes=promptCompatibleDishesForSlot(slotId,prefs);
+  const profilePrefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const prefs=prefsWithSessionRejections(profilePrefs,draft.ds);
+  const draftNames=new Set(others.map(c=>coachKey(c.nombre)));
+  const slotDishes=promptCompatibleDishesForSlot(slotId,prefs).filter(d=>!draftNames.has(coachKey(d.name)));
   const dishList=slotDishes.length?slotDishes.slice(0,40).map(d=>{const m=dishMacros(d.id);return `${d.name} [${dishSlotMeta(d)}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`;}).join("; "):"(sin platos compatibles en la base)";
   const likesLine=coachLikesLine(prefs);
-  const blockedLine=coachBlockedDishesLine(prefs);
+  const blockedLine=coachBlockedDishesLine(profilePrefs)+coachRejectedMealsLine(draft.ds);
   // REQ-130: mismas restricciones duras (incl. dislikedIngredients) y aviso de patrón
   // alimentario que usa generateOneDay, para que un "cambiar comida" individual no
   // reintroduzca ingredientes no gustados ni sesgue a vegetariano por defecto.
@@ -9185,7 +9246,7 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     const fallbackMeal=fbDish?{slot_id:slotId,nombre:fbDish.name,ingredientes:fbIngs,kcal:fbDish.kcal,proteina_g:fbDish.p,carbohidratos_g:fbDish.c,grasa_g:fbDish.f}:{slot_id:slotId,nombre:`${slot.slot} rápido`,ingredientes:[],kcal:0,proteina_g:0,carbohidratos_g:0,grasa_g:0};
     const fallback=JSON.stringify({explicacion:"Opción del catálogo para el slot.",comidas:[fallbackMeal]});
     const validation={expectedMeals:1,slots:[slotId],target:{kcal:remKcal,p:remP,c:remC,f:remF},hardRestrictions:hardTerms};
-    const quota=coachQuota("diet_day",requestId,"slot-"+slotId,fallback,validation,slotId+":"+draft.ds);
+    const quota=coachQuota("diet_day",requestId,"slot-"+slotId,fallback,validation,rejectionScope(slotId+":"+draft.ds,draft.ds));
     const prevName=coachKey((draft.comidas.find(c=>c.slot_id===slotId)||{}).nombre);
     const txt=await callClaude(prompt,500,quota);
     const wasReused=lastCoachCallReused;
@@ -9198,7 +9259,14 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     if(coachTextHasTerms(hay,hardTerms))throw new Error("La opción contiene una restricción del perfil.");
     // REQ-123: si el cupo de frescas se agotó y el servidor reutilizó la misma sugerencia
     // de antes, usamos el plato más cercano del catálogo en su lugar para no repetir.
-    const reusedSameDish=wasReused&&coachKey(nombre)===prevName;
+    // REQ-169/170: lo mismo si el coach devuelve algo ya descartado o un plato
+    // contundente para un momento ligero (ej. arroz con pollo en el desayuno).
+    const ndCoach=window.FITBUD_NUTRITION_DOMAIN;
+    const unsuitable=!!(ndCoach&&(
+      (ndCoach.mealNameBlockedByProfile&&ndCoach.mealNameBlockedByProfile({nombre},prefs))||
+      (ndCoach.slotMomentTextConflict&&ndCoach.slotMomentTextConflict(nombre,slotId,prefs))
+    ));
+    const reusedSameDish=(wasReused&&coachKey(nombre)===prevName)||unsuitable;
     const meal=reusedSameDish&&fbDish
       ?{slot_id:slotId,nombre:fbDish.name,ingredientes:fbIngs,kcal:fbDish.kcal,proteina_g:fbDish.p,carbohidratos_g:fbDish.c,grasa_g:fbDish.f}
       :{slot_id:slotId,nombre,ingredientes:ings,kcal:Math.round(+oneMeal.kcal||remKcal),proteina_g:Math.round(+oneMeal.proteina_g||remP),carbohidratos_g:Math.round(+oneMeal.carbohidratos_g||remC),grasa_g:Math.round(+oneMeal.grasa_g||remF)};

@@ -41,7 +41,7 @@ test.describe("Nutrición", () => {
     const overlay = page.locator("#overlay");
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
     await expect(overlay).toContainText("meta 2200/160/220/65");
-    await expect(overlay).toContainText("Bowl de pollo con arroz al olivo");
+    await expect(overlay).toContainText("Bowl proteico de la mañana");
     await expect(overlay).toContainText("Pechuga de pollo");
 
     // El total recalculado del catálogo debe cumplir la meta (±15 % kcal, ≥85 % prot)
@@ -57,7 +57,7 @@ test.describe("Nutrición", () => {
 
     // La agenda del día ahora tiene las comidas generadas
     const app = page.locator("#app");
-    await expect(app).toContainText("Bowl de pollo con arroz al olivo");
+    await expect(app).toContainText("Bowl proteico de la mañana");
 
     // Y el día viajó a day_log (persistencia por usuario)
     await expect
@@ -66,7 +66,7 @@ test.describe("Nutrición", () => {
 
     // En Nutrición las comidas aparecen con sus slots
     await page.locator("#tabs").getByText("Nutrición").click();
-    await expect(app).toContainText("Bowl de pollo con arroz al olivo");
+    await expect(app).toContainText("Bowl proteico de la mañana");
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });

@@ -7352,3 +7352,284 @@ No se toca el comportamiento de producción: el descanso del cuarto slot para `s
 - `npx playwright test --reporter=list`.
 - `node scripts/validate-docs-index.mjs`.
 - `node scripts/release-gate.mjs`.
+
+## REQ-155 - Fix reproductor de entreno: "duración real" cuenta el tiempo con la app cerrada
+
+**Estado: implementado.**
+`freezeInProgressWorkouts()` (`index.html`) trata el cierre/segundo plano como pausa implícita: en `visibilitychange` (oculto) y `pagehide`, congela `elapsedSeconds` y limpia `resumedAt` (misma `captureWorkoutElapsed()` que ya usa la pausa manual) para cualquier `workoutExecution` `in_progress`, y persiste con `commitDay`. Al volver, `WORKOUT_PLAYER.normalizeExecution()` ya resetea `resumedAt` a "ahora" porque queda en `null` (lógica preexistente de pausa/reanudación), así que el cronómetro retoma sin sumar el hueco. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/entreno.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix).
+
+### Origen
+
+Auditoría del journey **entrenamiento** (2026-07-18). Verificación funcional del reproductor recuperable (REQ-16/92) con Playwright + fixtures E2E (0 llamadas pagadas).
+
+### Problema
+
+El usuario inicia una sesión guiada y la deja "En curso" sin tocar "Pausar sesión" (típico en móvil: la pantalla se bloquea, se cierra o se cambia de app, hay una interrupción). Al reabrir la app horas después y tocar "Finalizar y guardar sesión", el cronómetro y la tarjeta "duración real" cuentan todo el tiempo transcurrido —incluidas las horas con la app cerrada— como tiempo de entrenamiento. Reproducción: sesión iniciada, 0 actividad extra, `resumedAt` a 2 h atrás → el `.player-clock` muestra `02:00:00` y el registro guardado queda con `elapsedSeconds=7200` ("duración real: 2h 00m") para una sesión de minutos reales.
+
+### Causa raíz
+
+`WORKOUT_PLAYER.elapsedSeconds` (`workout-player.js:366-373`) suma `(now - resumedAt)` mientras el estado es `in_progress`. `resumedAt` solo avanza al reanudar (`index.html:4554,4746`) y el acumulado solo se congela al pausar (`captureWorkoutElapsed`, `index.html:4520-4522`). Nada congela el tiempo cuando la app se cierra o pasa a segundo plano con la sesión en curso; al reabrir, `normalizeExecution` (`workout-player.js:337`) conserva el `resumedAt` guardado para sesiones `in_progress`. `finishWorkoutExecution` (`index.html:4731`) persiste ese valor inflado como "duración real" en el resumen inmutable (`renderWorkoutExecution`, `index.html:4854`).
+
+### Objetivo
+
+Que "duración real" refleje el tiempo realmente ejercitado, no el reloj de pared con la app cerrada.
+
+### Alcance
+
+1. Tratar el cierre/segundo plano como pausa implícita del cronómetro: congelar `elapsedSeconds` y limpiar `resumedAt` en `visibilitychange`/`beforeunload`, o acotar el salto de `resumedAt` al reabrir antes de acumular.
+2. Aplicar el mismo tope al valor que `captureWorkoutElapsed` persiste en el cierre.
+
+### Fuera de alcance
+
+- El diseño del reproductor recuperable y la pausa manual (siguen igual).
+- Rachas/cumplimiento (no dependen de `elapsedSeconds`).
+
+### Riesgos
+
+- Un tope por inactividad puede subestimar sesiones largas legítimas; elegir umbral y evento de congelado con cuidado (`visibilitychange` vs. `beforeunload` en PWA/iOS).
+
+### Criterios de aceptación
+
+- Iniciar sesión, cerrar/segundo plano sin pausar y reabrir: cronómetro y "duración real" no incluyen el tiempo con la app cerrada.
+- Pausar manualmente sigue congelando el tiempo como hoy.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Repro Playwright (0 llamadas pagadas): iniciar sesión, fijar `resumedAt` a 2 h atrás con la app "cerrada" y finalizar → `elapsedSeconds` acotado, no 7200; `.player-clock` no salta a `02:00:00`.
+
+## REQ-156 - Fix aislamiento: el cierre de sesión por evento (token expirado / logout remoto / otra pestaña) no purga la cola offline del usuario anterior
+
+**Estado: implementado.**
+El handler `onAuthStateChange` (`index.html`) captura `prevUid=uid()` **antes** de reasignar `session=sess||null`, y lo pasa a `clearSignedOutState(prevUid)` en el evento `SIGNED_OUT`; sin ese cambio, `session` ya quedaba en `null` cuando `clearSignedOutState()` calculaba su propio `uid()`, y la purga de la cola offline del usuario saliente se saltaba. `clearSignedOutState(prevUid)` ahora acepta el uid como parámetro opcional (fallback a `uid()` si no se pasa), así que el botón "Cerrar sesión" y el borrado de cuenta —que llaman sin argumento mientras la sesión sigue seteada— quedan sin cambios. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/sync-isolation.spec.js` (dispara `supa.auth.signOut()` directo, el mismo evento que un token vencido o logout remoto; confirmado que el test falla exactamente como describe el REQ contra el código sin el fix).
+
+### Origen
+
+Auditoría del journey **auth-roles** (rotación del loop auditor tras REQ-155). Verificación funcional en navegador (preview `fitbud`, servidor local 8923, 0 llamadas pagadas), ejercitando las funciones reales de sesión de la app. El invariante bajo prueba es el aislamiento entre usuarios en un dispositivo compartido, declarado explícitamente en el código (`index.html:1824` "Descarta toda la cola del usuario al cerrar sesión (aislamiento entre usuarios en el dispositivo)." y `index.html:9622` "aislar cola: no exponer datos al próximo usuario") y en `docs/requirements-history.md:1539` ("La cola se aísla por usuario en `clearSyncQueueForUser()` al detectar cierre de sesión.").
+
+### Problema
+
+La purga de la cola offline (`fitbud_syncq_v1`, que contiene payloads de `day_log`/`weight_log` con datos de salud del usuario: peso, comidas, ejecución de entreno) **solo ocurre cuando el usuario pulsa "Cerrar sesión"**. Cualquier cierre de sesión que llegue por el evento `onAuthStateChange('SIGNED_OUT')` — token/refresh vencido al reabrir la app, revocación remota de la sesión, "cerrar sesión en todos los dispositivos", o logout propagado desde otra pestaña — **deja intactas en el `localStorage` del dispositivo las mutaciones encoladas del usuario anterior**, contradiciendo el invariante de aislamiento.
+
+Reproducción funcional (ejecutada contra las funciones vivas de la app servida en 8923, sin sesión real ni mutación de producción):
+
+1. Sembrar la cola con una mutación `day_log` del `userA` con datos de salud (`state.weights["2026-07-28"]=81.4`, `state.meals.m1={done:true,kcal:640}`) y `session={user:{id:"userA"}}`.
+2. **Ruta A — botón "Cerrar sesión"** (orden real de `signOutUser`→`clearSignedOutState` con `session` aún seteada): entradas de `userA` en la cola pasan de `1 → 0` (purgada correctamente). ✔
+3. **Ruta B — evento `SIGNED_OUT`** (orden real del handler: `session=sess||null` y luego `clearSignedOutState()`): entradas de `userA` pasan de `1 → 1`. **La cola con datos de salud de `userA` persiste.** ✘
+
+Impacto: en un dispositivo compartido (familia, kiosco de gimnasio), tras un cierre de sesión no iniciado por el botón, los payloads de salud del usuario anterior quedan en el `localStorage` del dispositivo de forma indefinida y la cola crece sin acotar entre sesiones. No es una fuga visible en la UI del siguiente usuario —`drainSyncQueue` (`index.html:1933`) y `_updateSyncBadge` (`index.html:1862`) filtran por `x.uid===uid()`, así que `userB` no drena ni ve la cola de `userA`—, pero sí es una violación directa del invariante de aislamiento declarado y una retención de datos de salud personales en el dispositivo que el diseño promete borrar.
+
+### Causa raíz
+
+Dependencia de orden entre el handler del evento y `clearSignedOutState()`. El handler `onAuthStateChange` (`index.html:11385-11394`) hace primero `session=sess||null` (`index.html:11386`) y **después** `clearSignedOutState()` (`index.html:11388`). Pero `clearSignedOutState()` calcula el usuario a purgar leyendo la sesión: `const prevUid=uid();` (`index.html:9610`), y `uid()` devuelve `session&&session.user?session.user.id:null` (`index.html:9321`). Como el handler ya puso `session=null`, `prevUid` es `null`, y la purga `if(prevUid)clearSyncQueueForUser(prevUid)` (`index.html:9622`) se salta por completo; aunque no se saltara, `clearSyncQueueForUser(null)` filtra `x.uid!==null` (`index.html:1825-1826`), que **no** elimina las entradas del usuario real. La ruta del botón funciona solo por accidente de orden: `signOutUser` (`index.html:9637`) invoca `clearSignedOutState()` (`index.html:9644`) mientras `session` sigue seteada, por lo que ahí `prevUid` sí es correcto. La ruta de borrado de cuenta (`deleteMyAccount`→`clearSignedOutState`, `index.html:6512`) también conserva `session`, así que igualmente purga; el único camino defectuoso es el evento `SIGNED_OUT`.
+
+### Objetivo
+
+Que la cola offline del usuario que cierra sesión se purgue **en todos los caminos** de cierre (botón, borrado de cuenta y evento `SIGNED_OUT` por expiración/revocación/otra pestaña), cumpliendo el aislamiento entre usuarios que el código ya promete.
+
+### Alcance
+
+1. Purgar la cola con el `uid` correcto también en la ruta por evento. Opción mínima: en el handler `SIGNED_OUT` (`index.html:11388`), capturar `prevUid=uid()` **antes** de reasignar `session` (o pasar el `uid` a `clearSignedOutState`), y no nullificar `session` en `index.html:11386` hasta después de la purga.
+2. Alternativa robusta: que `clearSignedOutState()` acepte un `prevUid` explícito (con fallback al `uid()` actual) para no depender del orden de asignación de `session`.
+
+### Fuera de alcance
+
+- El motor de sincronización, el filtrado por `uid` de `drainSyncQueue`/`_updateSyncBadge` (que ya evita la fuga en UI) y la lógica de conflictos.
+- La limpieza de otras cachés por usuario (chat `fitbud_chat_v1_*`, etc.), que se resuelve por clave distinta de `uid` y no está en el alcance de este REQ atómico.
+- El comportamiento del botón "Cerrar sesión" y de `deleteMyAccount`, que ya purgan correctamente.
+
+### Riesgos
+
+- Retrasar la nullificación de `session` en el handler podría afectar a código que corre entre medias; acotar el cambio a capturar `prevUid` primero y purgar, manteniendo el resto del orden.
+- `drainSyncQueue` corre en `onAuth` del siguiente usuario; confirmar que la purga ocurre antes de que otro usuario inicie sesión (el handler es síncrono hasta `clearSignedOutState`, así que basta con el orden correcto).
+
+### Criterios de aceptación
+
+- Tras un evento `SIGNED_OUT` (token vencido / logout remoto / otra pestaña) con mutaciones encoladas del usuario saliente, `_getSyncQ().filter(x=>x.uid===prevUid).length === 0`.
+- El botón "Cerrar sesión" y `deleteMyAccount` siguen purgando la cola como hoy.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Repro en consola contra las funciones vivas (0 llamadas pagadas): sembrar `_setSyncQ([{uid:"userA",entity:"day_log",…,status:"pending"}])`, fijar `session={user:{id:"userA"}}`, luego `session=null; clearSignedOutState();` y confirmar que la cola de `userA` queda vacía tras el fix (hoy queda en 1).
+- Añadir un test de aislamiento (patrón `scripts/test-sync-conflicts.mjs`) que afirme la purga en el camino por evento.
+
+## REQ-157 - Fix billing: renovar antes de vencer no acumula los días ya pagados
+
+**Estado: implementado.**
+`handleCheckoutCompleted()` (`api/webhook.js`) busca el entitlement vigente del usuario (`status in (active,courtesy)`, `expires_at>now`, el de vencimiento más lejano) antes de crear la fila nueva; usa `max(now, ese vencimiento)` como base tanto de `starts_at` como de `expires_at` (suma la duración del plan comprado desde ahí), en vez de contar siempre desde "ahora". Sin entitlement vigente el comportamiento es idéntico a hoy. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-webhook-renewal.mjs` (3 casos: sin entitlement, 20 días vivos + mensual → ~50 días, trimestral vivo + mensual → ~120 días; confirmado que el caso de renovación falla exactamente como describe el REQ contra el código sin el fix).
+
+### Origen
+
+Journey `facturacion`: al recorrer compra→webhook→entitlement, una segunda compra ignora el entitlement activo del usuario.
+
+### Problema
+
+Con plan activo, volver a pagar (botón "Renovar plan", visible a ≤14 días; `index.html:6752`) crea un entitlement `starts_at=now, expires_at=now+duración` sin sumar el tiempo restante. Con 20 días vivos + mensual nuevo pasa de `now+20` a `now+30` (debería `now+50`): se pierden 20 días ya pagados. Peor: si el plan activo vence después que el nuevo (trimestral vivo + compra mensual), el GET (`order=expires_at.desc&limit=1`, `api/entitlement.js:248`) conserva la fila más larga y la compra suma 0 días de acceso.
+
+### Causa raíz
+
+`handleCheckoutCompleted` (`api/webhook.js:113-114`) calcula `expiresAt = now + PLAN_DURATION_DAYS[planId]` incondicionalmente; nunca consulta el entitlement activo del usuario para extender desde su `expires_at`.
+
+### Objetivo
+
+Recomprar/renovar suma la nueva duración al vencimiento vigente, sin perder días ni pagos.
+
+### Alcance
+
+1. En `handleCheckoutCompleted`, buscar el entitlement activo del usuario y usar `max(now, expires_at vigente)` como base de `starts_at`/`expires_at`.
+
+### Fuera de alcance
+
+- Reembolsos (REQ-148); prorrateo entre planes distintos.
+
+### Riesgos
+
+- Conservar el guard de idempotencia por `payment_ref` para no duplicar en reintentos de webhook.
+
+### Criterios de aceptación
+
+- Comprar con plan activo extiende desde el vencimiento vigente; ninguna compra resta días.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Arnés con `fetch` mockeado que envía un segundo `checkout.session.completed` mientras existe un entitlement activo y afirma `expires_at = vencimiento vigente + duración`.
+
+## REQ-158 - Panel admin: "Cambiar contraseña" no protege a otros administradores (toma de cuenta entre admins)
+
+**Estado: implementado.**
+`setPassword` (`api/admin.js`) ahora resuelve `targetProfile` y rechaza con 409 cuando `userId!==caller&&targetProfile.is_admin` — mismo invariante que ya protegía `setActive`/`resetUserToOnboarding`; sobre uno mismo o un usuario normal sigue funcionando igual. `adminUsersHtml()` (`index.html`) deshabilita el botón "Cambiar contraseña" con el patrón `u.is_admin&&!me` (no `me||u.is_admin`, para no bloquear el cambio de la propia contraseña). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-admin-api.mjs` (3 casos: otro admin rechazado, uno mismo y usuario normal aceptados; confirmado que el rechazo falla exactamente como describe el REQ contra el código sin el fix) y verificación visual manual de `adminUsersHtml()` con filas admin-propio/admin-ajeno/usuario normal.
+
+### Origen
+
+Auditoría del journey **administración** (panel "Usuarios"). Commit previo leído: `57a15b5` (REQ-145). Se revisó el guardado de acciones admin sobre otros administradores en `api/admin.js` y `index.html`.
+
+### Problema
+
+Un administrador puede fijar la contraseña de **otro** administrador (y luego iniciar sesión como él) sin ninguna barrera. REQ-126 dejó establecido el invariante de que las acciones sensibles del panel están "deshabilitadas para la propia cuenta y para otros administradores" (ver ledger de REQ-126). Ese invariante se cumple para "Desactivar" (bloquea al último admin y a uno mismo), "Regenerar plan" y "Reiniciar usuario" (deshabilitados para `me||u.is_admin`), pero **no** para "Cambiar contraseña", que es la acción más poderosa: cambia la credencial y habilita impersonación. Reproducción: como admin, abrir el panel de usuarios → en la fila de otro administrador, el botón "Cambiar contraseña" está activo → fijar una contraseña nueva → esa cuenta admin queda tomada. El servidor la acepta sin verificar que el objetivo sea admin ni distinto del que llama.
+
+### Causa raíz
+
+- API: la acción `setPassword` (`api/admin.js:730-744`) solo valida formato de UUID, longitud de contraseña y existencia del usuario; **no** comprueba `targetProfile.is_admin` ni `userId===caller`. Contrasta con `setActive` (`api/admin.js:702-705` self, `715-718` último admin), `resetUserToOnboarding` (`api/admin.js:431-435` self, `442-446` admin) y `prepareTestUser` (`api/admin.js:756-768`), que sí bloquean objetivos admin/self.
+- UI: `adminUsersHtml` (`index.html:10231`) renderiza `Cambiar contraseña` sin el atributo `disabled` que sí aplica a Desactivar (`index.html:10230`, `me`) y a Regenerar/Reiniciar (`index.html:10235-10236`, `me||u.is_admin`).
+
+### Objetivo
+
+Un administrador no puede tomar la cuenta de otro administrador cambiándole la contraseña desde el panel; la protección de cuentas admin es consistente entre todas las acciones sensibles.
+
+### Alcance
+
+1. En `setPassword` (`api/admin.js`), rechazar (409) cuando el `userId` objetivo es admin y distinto del que llama; permitir que el admin cambie su propia contraseña.
+2. En `adminUsersHtml` (`index.html`), deshabilitar el botón "Cambiar contraseña" para otras cuentas admin (patrón `u.is_admin&&!me`), conservándolo habilitado para la propia cuenta.
+
+### Fuera de alcance
+
+- "Enviar reset" (recuperación por correo que controla el propio usuario) y el resto de acciones ya guardadas.
+- Rediseñar el modelo de roles o añadir niveles de admin.
+
+### Riesgos
+
+- No romper el caso legítimo de que un admin cambie su propia contraseña.
+- Mantener alineadas la barrera de UI y la de servidor (el servidor es la que realmente protege).
+
+### Criterios de aceptación
+
+- `setPassword` sobre otro admin devuelve error y no altera la credencial; sobre uno mismo o sobre un usuario normal sigue funcionando.
+- En el panel, "Cambiar contraseña" aparece deshabilitado en filas de otros administradores.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Extender `scripts/test-admin-api.mjs` con un caso: `setPassword` con `userId` de otro admin → rechazado; con el propio o con un usuario normal → aceptado.
+- Evidencia funcional (esta auditoría): render de `adminUsersHtml` con `uid()` = admin-A y filas [admin-A, admin-B, usuario normal] → en la fila de admin-B, `Regenerar plan`/`Reiniciar usuario` salen `disabled` pero `Cambiar contraseña` y `Desactivar` quedan habilitados (screenshot del panel mock, 0 errores de consola).
+
+## REQ-159 - El service worker cachea respuestas de error (404/500) y envenena el cache
+
+**Estado: implementado.**
+`service-worker.js` agrega `isCacheableResponse(response)` (ok, o `type==="opaque"` para no romper respuestas cross-origin sin CORS como el CDN) y la usa antes de todo `cache.put` en `cacheFirst`/`networkFirst`/`staleWhileRevalidate`; `networkFirst` además, si la red responde no-OK, prefiere la copia cacheada válida en vez de servir/guardar el error. `CACHE_NAME` subido a `v70`. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-service-worker-cache.mjs` (2 casos nuevos: un 404 nunca queda cacheado y el servidor se autorepara al recuperarse; un 500 no sobrescribe un shell bueno ya cacheado; confirmado que ambos fallan exactamente como describe el REQ contra el código sin el fix).
+
+### Origen
+
+Journey `pwa`: verificación en navegador (SW `fitbud-pwa-v68` activo, servidor 8923). Distinto de REQ-150 (mezcla de versiones): aquí una respuesta **no-OK** se guarda y se sirve como buena.
+
+### Problema
+
+Ante un error transitorio (deploy en curso, hiccup del edge, URL de Storage vencida), el SW guarda la respuesta de error y la re-sirve hasta que cambie `CACHE_NAME`. En `cacheFirst` (assets, `.js` del shell, media de ejercicios), un 404/500 queda cacheado y se re-sirve aunque el servidor ya se recuperó: el asset/demo queda roto sin autorreparación. En `networkFirst` (navegación y `config.js`), un 500 de la red **sobrescribe** el último shell bueno; al recargar offline se sirve el 500 cacheado.
+
+### Causa raíz
+
+`service-worker.js`: `cacheFirst` (69-76), `networkFirst` (78-87) y `staleWhileRevalidate` (124-133) hacen `cache.put(request, response.clone())` **sin verificar `response.ok`**. `fetch` solo rechaza ante fallo de red, no ante 4xx/5xx, así que los errores entran al cache como válidos. No hay ningún check de `.ok`/`status` en el archivo.
+
+### Objetivo
+
+Que una respuesta de error nunca reemplace ni contamine una entrada de cache; el usuario nunca queda con un asset/shell roto de forma persistente por un error transitorio.
+
+### Alcance
+
+1. En los tres helpers, `cache.put` solo cuando `response && response.ok`.
+2. En `networkFirst`, si la red responde no-OK, no sobrescribir el cache y preferir la copia cacheada válida.
+
+### Fuera de alcance
+
+- Mezcla de versiones HTML/JS (REQ-150), bump de `CACHE_NAME` y estrategia de `/api/*`.
+
+### Riesgos
+
+- No romper el precache del install (`addAll` ya falla atómico ante no-OK).
+- Cuidar respuestas opacas (`type:"opaque"`, status 0) de CDN.
+
+### Criterios de aceptación
+
+- Un 404/500 no queda cacheado ni se re-sirve tras la recuperación.
+- Un 500 en navegación no sobrescribe el shell bueno; offline sirve el válido.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Arnés que carga `service-worker.js` real con `fetch` mockeado 503/500: hoy `cacheFirst` re-sirve el 503 tras recuperación y `networkFirst` sobrescribe el shell bueno.
+- Navegador: `fetch` a un asset mismo-origen inexistente → hoy `caches.match` en `fitbud-pwa-v68` devuelve un 404 cacheado.
+
+## REQ-160 - Fix check-in semanal: el ajuste de calorías ignora las metas "volumen" y "mantenimiento"
+
+**Estado: implementado.**
+`analyzeCheckinAnswers()` (`index.html`) ramificaba por `goal==="surplus"`/`"maintain"`, vocabulario que el perfil nunca guarda (usa `deficit`/`mantenimiento`/`volumen`); ambas metas caían siempre en la rama de déficit. Cambiadas las dos comparaciones a `goal==="volumen"`/`"mantenimiento"`, sin tocar los umbrales/ajustes ya existentes (0.15–0.6 kg/sem sin ajuste en volumen, |Δ|>0.4 kg/sem corrige en mantenimiento) ni `CHECKIN_MAX_KCAL_ADJUST`/`CHECKIN_MIN_KCAL`. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-checkin-goal-mapping.mjs` (ejecuta la función real extraída de `index.html` en `node:vm`, cubriendo las 3 metas; confirmado que volumen/mantenimiento fallan exactamente como describe el REQ contra el código sin el fix).
+
+### Origen
+
+Auditoría del journey de onboarding, siguiendo el valor `goal` (`#ob_goal`, index.html:2955-2957) hasta sus consumidores.
+
+### Problema
+
+El check-in semanal (REQ-20) ramifica por `goal==="surplus"`/`"maintain"`, pero el perfil solo guarda `deficit`/`mantenimiento`/`volumen`: ambas caen en el `else` (déficit). `volumen` ganando +0.4 kg/sem RECORTA 100 kcal/día ("El peso subió esta semana"), saboteando la masa; `mantenimiento` bajando -0.5 kg/sem no recibe ajuste (déficit tolera hasta -0.8). Solo `deficit` funciona.
+
+### Causa raíz
+
+`analyzeCheckinAnswers`, index.html:11187/:11191 ramifica por `surplus`/`maintain`; el vocabulario real es `deficit`/`mantenimiento`/`volumen` (`#ob_goal` :2955-2957; `buildWeightRanges` :1459 sí usa `volumen`).
+
+### Objetivo
+
+En volumen la ganancia esperada no recorta calorías; en mantenimiento la deriva se corrige en cualquier dirección.
+
+### Alcance
+
+1. Mapear las ramas al vocabulario real (o normalizar `goal`) en `analyzeCheckinAnswers`.
+2. Cobertura determinista de las 3 metas.
+
+### Fuera de alcance
+
+- Umbrales kcal/kg y demás señales (hambre, energía, seguridad).
+
+### Riesgos
+
+- Cambia el ajuste para usuarios en curso; conservar `CHECKIN_MAX_KCAL_ADJUST`/`CHECKIN_MIN_KCAL`.
+
+### Criterios de aceptación
+
+- `volumen` ganando 0.15–0.6 kg/sem: `calorieAdjust===0`; <0.15: +kcal.
+- `mantenimiento` con |Δ|>0.4 kg/sem: corrección en el signo esperado.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `analyzeCheckinAnswers` con las 3 metas y pesos límite (arnés determinista, 0 llamadas).
