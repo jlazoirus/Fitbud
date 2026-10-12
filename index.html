@@ -7188,9 +7188,34 @@ async function finishPasswordRecovery(){
   const pwd=$("#recovery_pwd").value,confirmPwd=$("#recovery_confirm").value,out=$("#recoveryOut");
   if(pwd.length<8){out.textContent="Usa al menos 8 caracteres.";return;}
   if(pwd!==confirmPwd){out.textContent="Las contraseñas no coinciden.";return;}
+  if(_recoveryBusy)return;
+  _recoveryBusy=true;
+  const btn=document.querySelector("#app .dash .btn-accent");
+  if(btn)btn.disabled=true;
   out.textContent="Actualizando…";
-  const result=await supa.auth.updateUser({password:pwd});
-  if(result.error){out.textContent="⚠️ "+result.error.message;return;}
+  try{
+    // La sesión del enlace puede haberse perdido (token usado, vencido o
+    // consumido por la vista previa del correo): validarla antes de guardar.
+    let live=null;
+    try{const r=await supa.auth.getSession();live=r&&r.data&&r.data.session;}catch(e){}
+    if(!live){
+      session=null;
+      passwordRecoveryError=passwordRecoveryMode==="invite"
+        ?"El enlace de invitación ya se usó o expiró. Si ya creaste tu contraseña, inicia sesión; si no, pide una nueva invitación."
+        :"El enlace de recuperación ya se usó o expiró. Pide uno nuevo desde el inicio de sesión.";
+      render();
+      return;
+    }
+    const result=await supa.auth.updateUser({password:pwd});
+    if(result.error){
+      const m=String(result.error.message||"");
+      out.textContent=/session missing/i.test(m)
+        ?"⚠️ La sesión del enlace se perdió. Pide un enlace nuevo o inicia sesión si ya creaste tu contraseña."
+        :"⚠️ "+m;
+      if(btn)btn.disabled=false;
+      return;
+    }
+  }finally{_recoveryBusy=false;}
   if(history&&history.replaceState)history.replaceState({},document.title,location.pathname);
   const invite=passwordRecoveryMode==="invite";
   passwordRecovery=false;
@@ -9670,6 +9695,7 @@ async function signUp(email,pwd){
   return r;
 }
 let _signOutBusy=false;
+let _recoveryBusy=false;
 // REQ-156: prevUid es opcional para que el camino por evento SIGNED_OUT (donde
 // el listener ya puso session=null antes de llamar aquí) pueda pasar el uid
 // capturado a tiempo; los caminos que llaman sin argumento (botón "Cerrar

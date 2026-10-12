@@ -1634,3 +1634,37 @@ Que el cierre del día optimice la misma definición de "día correcto" que el c
 
 - `node scripts/validate-global-close-objective.mjs`, `node scripts/validate-diet-contract.mjs`, `node scripts/release-gate.mjs`.
 - Diff por dimensión baseline contra implementación, con la matriz completa de 54 dimensiones.
+
+## REQ-167 - Fix activación de cuenta: "Auth session missing!" crudo al crear la contraseña desde una invitación
+
+**Estado: implementado.**
+`finishPasswordRecovery()` revalida la sesión del enlace con `getSession()` antes de `updateUser()`, bloquea el botón mientras trabaja y traduce el error a español; si la sesión ya no existe, muestra la pantalla "No pudimos abrir el enlace" con el siguiente paso.
+
+### Origen
+
+Reporte de Jonathan (2026-10-12) al dar de alta a una usuaria nueva por invitación: el formulario "Crea tu contraseña" se pintó, pero al pulsar "Activar cuenta" apareció `⚠️ Auth session missing!` y la contraseña no se guardó (login posterior: "invalid login credentials").
+
+### Problema
+
+El formulario se renderiza con la sesión del enlace, pero al enviar la sesión ya no estaba. La usuaria vio un error en inglés sin salida clara y podía pulsar varias veces.
+
+### Causa raíz
+
+`finishPasswordRecovery()` (`index.html`) llamaba `supa.auth.updateUser()` sin comprobar que la sesión siguiera viva ni proteger el doble envío, y mostraba `result.error.message` tal cual. La pérdida de sesión en sí (enlace de un solo uso consumido, vista previa del correo o doble toque) no se pudo reproducir sin un token real.
+
+### Alcance
+
+1. Guardia `_recoveryBusy` + botón deshabilitado durante el envío.
+2. `getSession()` antes de `updateUser()`; sin sesión → pantalla de enlace inválido con mensaje accionable.
+3. Mensaje en español para "session missing".
+
+### Fuera de alcance
+
+- Causa de la pérdida de sesión del enlace y configuración de SMTP/Redirect URLs de Supabase (el SMTP por defecto limitó los reintentos: "email rate limit exceeded").
+
+### Criterios de aceptación
+
+- Un enlace consumido o vencido nunca muestra texto en inglés y siempre indica el siguiente paso. ✓
+- Un segundo toque mientras se guarda no dispara otra petición. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
