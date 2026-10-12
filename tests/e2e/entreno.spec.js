@@ -20,6 +20,9 @@ test.describe("Entreno", () => {
     // Hoy es día de entreno (el fixture lo garantiza) con sesión de fuerza en gimnasio
     await expect(app).toContainText(/Gimnasio ·/);
     await expect(app).toContainText(/ejercicios guiados/i);
+    // REQ-174: antes de empezar se ve la dosis de cada ejercicio
+    await expect(app).toContainText(/Qué vas a hacer hoy · \d+ ejercicios · \d+ series/);
+    await expect(app.locator(".plan-row:not(.plan-timed) .plan-dose").first()).toContainText(/\d+ × /);
 
     // Arrancar el reproductor
     await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();

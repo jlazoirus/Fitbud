@@ -1610,3 +1610,25 @@ El service worker sirve HTML y JS cache-first (REQ-150) y el navegador solo inst
 
 - Con `--base 24e2607` y sin subir la versión, el validador falla nombrando los archivos; con `v72` pasa. ✓
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-174 - Entreno: antes de empezar se ve qué se va a hacer (series × repeticiones)
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-12): antes de iniciar el entreno el resumen no dice qué se va a hacer ni cuántas series o repeticiones.
+
+### Problema
+
+La tarjeta de la sesión solo mostraba el nombre y un texto general; la "Vista previa de ejercicios" muestra técnica pero no la dosis. La dosis solo aparecía ejercicio por ejercicio dentro del reproductor.
+
+### Alcance
+
+1. `workoutPlanSummaryHtml(prescription)` en la tarjeta del entreno (sin sesión en curso): total de ejercicios, series y minutos; por ejercicio, series × repeticiones, descanso y RPE; calentamiento y vuelta a la calma con su duración; enlace "¿Qué es RPE?".
+2. `CACHE_NAME` → `fitbud-pwa-v73` (REQ-173).
+
+### Criterios de aceptación
+
+- El E2E de Entreno ve "Qué vas a hacer hoy · N ejercicios · N series" y la dosis "N × reps" antes de iniciar. ✓
+- `node scripts/release-gate.mjs` pasa. ✓

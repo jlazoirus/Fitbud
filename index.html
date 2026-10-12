@@ -278,6 +278,16 @@
   .player-controls .btn{min-height:48px;border-radius:var(--r-md);white-space:normal}
   .player-controls .primary{grid-column:1 / -1}
   .set-list{display:grid;gap:8px;margin-top:12px}
+  .plan-summary{margin:10px 0 4px}
+  .plan-list{list-style:none;margin:8px 0 6px;padding:0;display:grid;gap:6px}
+  .plan-row{display:flex;gap:10px;align-items:flex-start;background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:9px 10px}
+  .plan-n{flex:0 0 22px;height:22px;border-radius:999px;background:var(--accent-dim);color:var(--purple-200);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .plan-main{min-width:0;flex:1}
+  .plan-main b{display:block;font-size:14px;overflow-wrap:anywhere}
+  .plan-dose{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:2px}
+  .plan-dose span:first-child{color:var(--txt);font-weight:700}
+  .plan-timed{background:transparent}
+  .link-btn{background:none;border:none;padding:0;color:var(--purple-200);text-decoration:underline;font:inherit;cursor:pointer}
   .set-row{background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
   .set-row.done{border-color:var(--good);background:var(--good-dim)}
   .set-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -4950,6 +4960,33 @@ function activeGeneratedTrainingVersion(){
   const active=planVersionActiveForCycle(cycleNumber());
   return active&&active.snapshot&&active.snapshot.trainingPlan?active:null;
 }
+// REQ-174: antes de empezar se ve qué se va a hacer: cada ejercicio con series
+// × repeticiones, descanso y esfuerzo, más calentamiento y vuelta a la calma.
+function formatRestShort(seconds){
+  const s=Math.max(0,Math.round(+seconds||0));
+  if(s<60)return `${s} s`;
+  const m=Math.floor(s/60),r=s%60;
+  return r?`${m} min ${r} s`:`${m} min`;
+}
+function workoutPlanSummaryHtml(prescription){
+  const steps=(prescription&&prescription.steps)||[];
+  if(!steps.some(step=>step.type==="strength"))return"";
+  let n=0;
+  const rows=steps.map(step=>{
+    if(step.type==="strength"){
+      n++;
+      const exercise=exerciseBySlug(step.exerciseSlug,true);
+      const name=exercise?exercise.name:step.label;
+      return `<li class="plan-row"><span class="plan-n">${n}</span><div class="plan-main"><b>${esc(name)}</b>
+        <div class="plan-dose"><span>${step.prescribedSets} × ${esc(step.reps)}</span><span>Descanso ${formatRestShort(step.restSeconds)}</span><span>RPE ${esc(step.targetRpe)}/10</span></div></div></li>`;
+    }
+    const minutes=Math.max(1,Math.round((+step.durationSeconds||0)/60));
+    return `<li class="plan-row plan-timed"><span class="plan-n">·</span><div class="plan-main"><b>${esc(step.label)}</b><div class="plan-dose"><span>${minutes} min</span></div></div></li>`;
+  }).join("");
+  const sets=steps.filter(step=>step.type==="strength").reduce((sum,step)=>sum+(+step.prescribedSets||0),0);
+  return `<div class="plan-summary"><div class="muted small">Qué vas a hacer hoy · ${n} ejercicios · ${sets} series${prescription.estimatedMinutes?` · ~${prescription.estimatedMinutes} min`:""}</div><ol class="plan-list">${rows}</ol>
+    <button class="link-btn small" onclick="explainWorkoutEffort()">¿Qué es RPE?</button></div>`;
+}
 function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
   const training=trainingPrefs();
@@ -4996,6 +5033,7 @@ function renderWorkout(){
         ${workoutStatusHtml(ds,execution)}
       </div>
     </div>
+    ${!execution&&!restDay?workoutPlanSummaryHtml(prescription):""}
     <div class="meal-actions">
       ${contentIssues.length?'<div class="alert">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción antes de iniciarla.</div>':""}
       ${!execution&&!st.workoutDone&&!restDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>`:""}
