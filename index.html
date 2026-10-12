@@ -267,20 +267,29 @@
   .player-phase{font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
   .player-step h3{font-size:21px;margin-top:5px}
   .player-target{font-size:14px;line-height:1.45;margin-top:8px}
-  .player-dose{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}
-  .player-dose .scard{padding:10px 8px}
-  .player-dose .n{font-size:16px}
+  .player-dose{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+  .player-dose .scard{padding:10px 6px;min-width:0}
+  .player-dose .scard .n{font-size:16px;line-height:1.15;overflow-wrap:anywhere}
+  .scard-info{font:inherit;color:inherit;width:100%;cursor:pointer}
+  .scard-info .l{color:var(--purple-200)}
   .player-timer{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px;background:var(--black);border:1px solid var(--border);border-radius:var(--r-md);margin:12px 0}
   .workout-timer-value{font-family:var(--font-mono);font-size:44px;font-weight:700;letter-spacing:-.04em}
   .player-controls{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
   .player-controls .btn{min-height:48px;border-radius:var(--r-md);white-space:normal}
   .player-controls .primary{grid-column:1 / -1}
   .set-list{display:grid;gap:8px;margin-top:12px}
-  .set-row{display:grid;grid-template-columns:38px minmax(70px,1fr) minmax(70px,1fr) minmax(62px,.8fr);gap:7px;align-items:end;background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
+  .set-row{background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
   .set-row.done{border-color:var(--good);background:var(--good-dim)}
-  .set-row label{font-size:10px;color:var(--muted);display:block}
+  .set-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .set-title{font-weight:700;font-size:14px;margin-right:auto}
+  .set-extra{font-size:10px;font-weight:600;color:var(--terra-300);text-transform:uppercase;letter-spacing:.08em;margin-left:4px}
+  .set-done{min-height:40px;padding:0 16px;border-radius:999px;border:1.5px solid var(--accent);background:transparent;color:var(--txt);font:inherit;font-size:13px;font-weight:700;white-space:nowrap;cursor:pointer;transition:.15s}
+  .set-done.on{background:var(--good);border-color:var(--good);color:#06240f}
+  .set-remove{min-height:40px;padding:0 10px;border:none;background:none;color:var(--muted);font:inherit;font-size:12px;text-decoration:underline;cursor:pointer}
+  .set-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  .set-row label{font-size:10px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .set-row input{width:100%;min-width:0;background:var(--surf2);border:1px solid var(--border-2);border-radius:10px;color:var(--txt);padding:9px 7px;font:inherit}
-  .set-row .chk{margin-bottom:2px}
+  .set-add{width:100%;margin-top:8px;border-style:dashed}
   .player-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px 0}
   .player-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:5px}
   .player-status i{width:8px;height:8px;border-radius:999px;background:var(--muted2)}
@@ -455,9 +464,7 @@
     .onboarding h1{font-size:26px}
     .challenge-grid{grid-template-columns:1fr}
     .exercise-filters{grid-template-columns:1fr}
-    .player-dose{grid-template-columns:1fr 1fr}
-    .set-row{grid-template-columns:36px 1fr 1fr}
-    .set-row .set-rpe{grid-column:2 / -1}
+    .player-dose{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
   /* Check-in semanal (REQ-20) */
   .ci-banner{background:linear-gradient(135deg,var(--accent-dim),rgba(200,100,60,.10));border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:16px;margin-bottom:14px}
@@ -4814,12 +4821,42 @@ function renderWorkoutTimer(ds,execution,step){
   </div>`;
 }
 function renderStrengthSet(ds,step,stepIndex,set,setIndex){
+  const extra=setIndex>=step.prescribedSets;
+  const removable=extra&&setIndex===step.sets.length-1&&!set.done;
   return `<div class="set-row ${set.done?"done":""}">
-    <button class="chk ${set.done?"on":""}" aria-label="Serie ${setIndex+1}" onclick="toggleWorkoutSet('${ds}',${stepIndex},${setIndex})">${set.done?"✓":setIndex+1}</button>
-    <div><label>${step.unit==="seg"?"Segundos":"Repeticiones"}</label><input type="number" min="0" inputmode="decimal" value="${set.reps==null?"":esc(set.reps)}" placeholder="${esc(step.defaultReps)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'reps',this.value)"></div>
-    <div><label>Carga / asistencia</label><input type="text" value="${esc(set.load||"")}" placeholder="kg o variante" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'load',this.value)"></div>
-    <div class="set-rpe"><label>RPE</label><input type="number" min="1" max="10" inputmode="decimal" value="${set.rpe==null?"":esc(set.rpe)}" placeholder="${esc(step.targetRpe)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'rpe',this.value)"></div>
+    <div class="set-head">
+      <span class="set-title">Serie ${setIndex+1}${extra?' <span class="set-extra">extra</span>':""}</span>
+      ${removable?`<button class="set-remove" onclick="removeWorkoutSet('${ds}',${stepIndex})">Quitar</button>`:""}
+      <button class="set-done ${set.done?"on":""}" aria-pressed="${set.done?"true":"false"}" aria-label="Serie ${setIndex+1}: ${set.done?"hecha, tocar para desmarcar":"marcar como hecha"}" onclick="toggleWorkoutSet('${ds}',${stepIndex},${setIndex})">${set.done?"✓ Hecha":"Marcar hecha"}</button>
+    </div>
+    <div class="set-fields">
+      <div><label>${step.unit==="seg"?"Segundos":"Repeticiones"}</label><input type="number" min="0" inputmode="decimal" value="${set.reps==null?"":esc(set.reps)}" placeholder="${esc(step.defaultReps)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'reps',this.value)"></div>
+      <div><label>Carga / asistencia</label><input type="text" value="${esc(set.load||"")}" placeholder="kg" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'load',this.value)"></div>
+      <div><label>Esfuerzo (RPE)</label><input type="number" min="1" max="10" inputmode="decimal" value="${set.rpe==null?"":esc(set.rpe)}" placeholder="${esc(step.targetRpe)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'rpe',this.value)"></div>
+    </div>
   </div>`;
+}
+function addWorkoutSet(ds,stepIndex){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
+  const step=execution.steps[stepIndex];if(!step||step.type!=="strength")return;
+  if((step.extraSets||0)>=10){toast("Puedes añadir hasta 10 series extra");return;}
+  step.extraSets=(step.extraSets||0)+1;
+  step.sets.push({done:false,reps:null,load:"",rpe:null,completedAt:null});
+  persistWorkoutExecution(ds,execution,true);
+}
+function removeWorkoutSet(ds,stepIndex){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
+  const step=execution.steps[stepIndex];if(!step||step.type!=="strength"||!(step.extraSets>0))return;
+  const last=step.sets[step.sets.length-1];if(!last||last.done)return;
+  step.sets.pop();step.extraSets-=1;
+  persistWorkoutExecution(ds,execution,true);
+}
+function explainWorkoutEffort(){
+  modal(`<h3>Esfuerzo: RPE y RIR</h3>
+    <p class="exercise-copy"><b>RPE</b> es qué tan dura sentiste la serie, del 1 al 10. Un 10 significa que no podías hacer ni una repetición más.</p>
+    <p class="exercise-copy"><b>RIR</b> son las repeticiones que te quedaban en reserva con buena técnica. RIR 2 equivale a un RPE 8: terminas la serie sintiendo que podrías hacer unas 2 más.</p>
+    <p class="exercise-copy">Usa el objetivo para elegir la carga. Al terminar cada serie, anota el RPE que sentiste.</p>
+    <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`);
 }
 function renderActiveWorkoutStep(ds,execution){
   const step=currentWorkoutStep(execution);
@@ -4847,13 +4884,14 @@ function renderActiveWorkoutStep(ds,execution){
       <div class="scard"><div class="n">${esc(step.reps)}</div><div class="l">reps objetivo</div></div>
       <div class="scard"><div class="n">${step.restSeconds}s</div><div class="l">descanso</div></div>
       <div class="scard"><div class="n">${esc(step.tempo)}</div><div class="l">tempo</div></div>
-      <div class="scard"><div class="n">RPE ${step.targetRpe}</div><div class="l">esfuerzo</div></div>
-      <div class="scard"><div class="n">${step.targetRir} RIR</div><div class="l">reserva</div></div>
+      <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué es el esfuerzo RPE"><div class="n">${step.targetRpe}/10</div><div class="l">esfuerzo (RPE) ⓘ</div></button>
+      <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué son las repeticiones en reserva RIR"><div class="n">${step.targetRir}</div><div class="l">en reserva (RIR) ⓘ</div></button>
     </div>
     <div class="muted small"><b style="color:var(--txt)">Carga sugerida:</b> ${esc(step.suggestedLoad)}</div>
     ${variation?`<div class="alert violet" style="margin-top:10px">${esc(variation)}</div>`:""}
     ${execution.timer&&execution.timer.kind==="rest"?renderWorkoutTimer(ds,execution,step):""}
     <div class="set-list">${step.sets.map((set,index)=>renderStrengthSet(ds,step,stepIndex,set,index)).join("")}</div>
+    <button class="btn set-add" onclick="addWorkoutSet('${ds}',${stepIndex})">+ Añadir serie</button>
     <div class="row wrap" style="margin-top:12px">
       <button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','regression')">Usar versión más fácil</button>
       <button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','progression')">Usar progresión</button>

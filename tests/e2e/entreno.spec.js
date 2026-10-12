@@ -42,7 +42,7 @@ test.describe("Entreno", () => {
       const siguiente = page.getByRole("button", { name: "Siguiente ejercicio" }).first();
       if (await siguiente.isVisible().catch(() => false)) {
         sawStrengthBlock = true;
-        const series = page.locator('#app button.chk[aria-label^="Serie"]');
+        const series = page.locator('#app button.set-done[aria-label^="Serie"]');
         const n = await series.count();
         expect(n).toBeGreaterThanOrEqual(2); // un ejercicio de fuerza tiene ≥2 series
         for (let s = 0; s < n; s++) await series.nth(s).click();

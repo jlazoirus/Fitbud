@@ -1668,3 +1668,42 @@ El formulario se renderiza con la sesión del enlace, pero al enviar la sesión 
 - Un segundo toque mientras se guarda no dispara otra petición. ✓
 - `node scripts/release-gate.mjs` pasa. ✓
 
+## REQ-168 - Reproductor de entreno usable en móvil: dosis sin desborde, RPE explicado, series añadibles y "serie hecha" explícita
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Jonathan (2026-10-12) probando el plan Push/Legs/Pull cargado a una usuaria, con capturas de iPhone y escritorio.
+
+### Problema
+
+1. En móvil se cortaban las tarjetas de la dosis (descanso, RIR) y en escritorio se salían del borde de la tarjeta.
+2. "RPE" y "RIR" no se explican en ninguna parte.
+3. No se pueden registrar más series que las prescritas.
+4. Marcar una serie como hecha dependía de tocar un círculo con el número de serie; no se entendía que era un control.
+
+### Causa raíz
+
+1. `.scard .n` (24px) se declara después de `.player-dose .n` (16px) con igual especificidad y gana; además la grilla usaba `repeat(3,1fr)`, que no baja del ancho mínimo del contenido ("Controlado").
+2. Sin ayuda contextual.
+3. `normalizeStep()` (`workout-player.js`) recorta `sets` a `prescribedSets` en cada normalización.
+4. `renderStrengthSet()` reutilizaba el `.chk` circular de comidas con el número de serie como contenido.
+
+### Alcance
+
+1. `.player-dose` con `minmax(0,1fr)` y `.player-dose .scard .n` con mayor especificidad; 2 columnas bajo 380px.
+2. Tarjetas de esfuerzo `N/10 · esfuerzo (RPE) ⓘ` y `en reserva (RIR) ⓘ` tocables → `explainWorkoutEffort()`; la columna del set dice "Esfuerzo (RPE)".
+3. `step.extraSets` persistido (0–10) en `normalizeStep()`; botón "+ Añadir serie" y "Quitar" en la última serie extra sin completar.
+4. Fila de serie con título "Serie N" y botón explícito "Marcar hecha" → "✓ Hecha" (`aria-pressed`).
+
+### Fuera de alcance
+
+- Cambiar la prescripción del plan o el cálculo de carga sugerida.
+
+### Criterios de aceptación
+
+- A 375px ninguna tarjeta de dosis ni fila de serie se sale de la tarjeta del ejercicio y no hay scroll horizontal. ✓ (verificado con Playwright)
+- Añadir serie suma una fila que sobrevive a la normalización; quitarla solo es posible si es extra y no está hecha. ✓
+- El E2E de Entreno completa la sesión con el nuevo control. ✓
+- `node scripts/release-gate.mjs` pasa. ✓

@@ -312,7 +312,9 @@
     const step=Object.assign({},prescribed,saved||{});
     if(prescribed.type==="strength"){
       const prior=Array.isArray(saved&&saved.sets)?saved.sets:[];
-      step.sets=Array.from({length:prescribed.prescribedSets},(_,index)=>Object.assign(emptySet(),prior[index]||{}));
+      // Series añadidas por el usuario además de las prescritas (máx. 10).
+      step.extraSets=Math.round(clamp(number(saved&&saved.extraSets,0),0,10));
+      step.sets=Array.from({length:prescribed.prescribedSets+step.extraSets},(_,index)=>Object.assign(emptySet(),prior[index]||{}));
       step.exerciseSlug=String(step.exerciseSlug||prescribed.exerciseSlug);
       step.originalExerciseSlug=String(step.originalExerciseSlug||prescribed.originalExerciseSlug||prescribed.exerciseSlug);
       step.variation=step.variation||"standard";
