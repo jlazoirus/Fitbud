@@ -82,6 +82,7 @@ run("validate-nutrition-finalize-wiring.mjs", "node scripts/validate-nutrition-f
 run("validate-global-close-objective.mjs", "node scripts/validate-global-close-objective.mjs");
 run("validate-proposal-close.mjs", "node scripts/validate-proposal-close.mjs");
 run("validate-session-rejections.mjs", "node scripts/validate-session-rejections.mjs");
+run("validate-meal-photo-estimate.mjs", "node scripts/validate-meal-photo-estimate.mjs");
 run("validate-diet-contract.mjs", "node scripts/validate-diet-contract.mjs");
 run("validate-diet-contract-diff.mjs", "node scripts/validate-diet-contract-diff.mjs");
 run("validate-diet-contract-runtime-notice.mjs", "node scripts/validate-diet-contract-runtime-notice.mjs");

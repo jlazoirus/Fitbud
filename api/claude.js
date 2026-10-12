@@ -24,7 +24,13 @@ const MODEL_ENV_BY_ACTION = {
   training_replacement: ["ANTHROPIC_MODEL_TRAINING_REPLACEMENT", "ANTHROPIC_MODEL_TRAINING"],
   coach_conversation: ["ANTHROPIC_MODEL_COACH_CONVERSATION"],
 };
-const STRUCTURED_OUTPUT_ACTIONS = new Set(["diet_day", "diet_week", "meal_option"]);
+const STRUCTURED_OUTPUT_ACTIONS = new Set(["diet_day", "diet_week", "meal_option", "meal_estimate"]);
+// REQ-172: foto de comida para "Estimar macros". Solo esa accion acepta imagen;
+// el cliente la reduce a ~1024 px, asi que 3 MB de base64 es holgado y deja la
+// peticion bajo el limite de cuerpo de Vercel (4.5 MB).
+const IMAGE_ACTIONS = new Set(["meal_estimate"]);
+const IMAGE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const MAX_IMAGE_BASE64 = 3_000_000;
 const CONSENT_POLICY_VERSION = "2026-06-15-v2";
 const SAFETY_SCREENING_VERSION = "2026-06-15";
 const REQUIRED_CONSENTS = ["body_progress", "automated_coach"];
@@ -249,6 +255,20 @@ function quotaInput(body) {
   return { action, requestId, partKey, contextKey, fallbackText, validation };
 }
 
+// La imagen nunca se guarda ni se registra: solo viaja en esta llamada al proveedor.
+function imageInput(body, action) {
+  const image = body && body.image;
+  if (image == null) return null;
+  if (!IMAGE_ACTIONS.has(action)) throw new Error("Esta accion no acepta imagenes.");
+  const mediaType = String(image.mediaType || image.media_type || "");
+  const data = String(image.data || "");
+  if (!IMAGE_MEDIA_TYPES.has(mediaType)) throw new Error("Formato de imagen no soportado.");
+  if (!data || data.length > MAX_IMAGE_BASE64 || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) {
+    throw new Error("Imagen invalida o demasiado grande.");
+  }
+  return { mediaType, data };
+}
+
 function parseJsonText(text) {
   let value = String(text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
   const start = value.indexOf("{");
@@ -324,9 +344,29 @@ function mealOptionOutputSchema() {
   };
 }
 
+// REQ-172: siempre trae la mejor estimacion actual; "preguntas" (0-2) pide lo
+// que mas cambia las kcal y la foto no muestra (porcion, aceite, salsas...).
+function mealEstimateOutputSchema() {
+  return {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      nombre: jsonString(),
+      kcal: jsonNumber(),
+      proteina_g: jsonNumber(),
+      carbohidratos_g: jsonNumber(),
+      grasa_g: jsonNumber(),
+      nota: jsonString(),
+      preguntas: { type: "array", items: jsonString() },
+    },
+    required: ["nombre", "kcal", "proteina_g", "carbohidratos_g", "grasa_g", "nota", "preguntas"],
+  };
+}
+
 function structuredSchemaForAction(action) {
   if (action === "diet_day" || action === "diet_week") return dietDayOutputSchema();
   if (action === "meal_option") return mealOptionOutputSchema();
+  if (action === "meal_estimate") return mealEstimateOutputSchema();
   return null;
 }
 
@@ -586,7 +626,10 @@ function validateCoachOutput(action, text, validation) {
   if (action === "diet_day" || action === "diet_week") return validateDietDay(data, validation);
   if (action === "meal_option") return validateMealOptions(data, validation);
   if (action === "meal_estimate") {
-    return [data.kcal, data.proteina_g, data.carbohidratos_g, data.grasa_g].every(finiteNumber);
+    if (![data.kcal, data.proteina_g, data.carbohidratos_g, data.grasa_g].every(finiteNumber)) return false;
+    if (data.preguntas == null) return true;
+    return Array.isArray(data.preguntas) && data.preguntas.length <= 3
+      && data.preguntas.every(q => typeof q === "string" && q.length <= 300);
   }
   if (action === "macro_review") {
     return typeof data.evaluacion === "string" && typeof data.sugerencia === "string";
@@ -715,6 +758,16 @@ async function anthropicMessage(e, payload) {
   return { response, data };
 }
 
+function userContent(body, quota) {
+  const text = String(body.userText || "");
+  const image = imageInput(body, quota && quota.action);
+  if (!image) return text;
+  return [
+    { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
+    { type: "text", text },
+  ];
+}
+
 async function providerResponse(e, body, privacy, quota) {
   if (!e.providerKey) {
     const error = new Error("El servicio del coach no esta configurado.");
@@ -734,7 +787,7 @@ async function providerResponse(e, body, privacy, quota) {
     model,
     max_tokens: maxTokens,
     system: clientSystem + " REGLAS OBLIGATORIAS DEL SERVIDOR: " + SERVER_GUARDRAILS + safetyContext,
-    messages: [{ role: "user", content: String(body.userText || "") }],
+    messages: [{ role: "user", content: userContent(body, quota) }],
   };
   const schema = STRUCTURED_OUTPUT_ACTIONS.has(quota && quota.action) ? structuredSchemaForAction(quota.action) : null;
   const structuredAttempted = !!schema;
@@ -810,6 +863,7 @@ export default async function handler(req, res) {
   try {
     body = bodyObject(req);
     quota = quotaInput(body);
+    imageInput(body, quota.action);
   } catch (error) {
     res.status(400).json({ error: String((error && error.message) || error) });
     return;

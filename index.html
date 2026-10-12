@@ -345,6 +345,8 @@
   .closebar{display:flex;justify-content:flex-end;margin-bottom:4px}
   .closebar button{background:var(--surf3);width:36px;height:36px;border-radius:999px;font-size:16px;color:var(--muted)}
   .ai-box{background:var(--accent-dim);border:1px solid var(--border-acc);border-radius:var(--r-md);padding:12px;font-size:14px;margin-top:10px;white-space:pre-wrap;line-height:1.5}
+  .meal-photo-preview{display:block;width:100%;max-height:220px;object-fit:cover;border-radius:var(--r-md);margin-top:10px}
+  .photo-questions{display:grid;gap:8px;margin-top:10px}
   .mic{background:var(--surf3);border:1px solid var(--border-2);width:48px;height:48px;border-radius:var(--r-sm);font-size:20px}
   .mic.live{background:var(--bad);border-color:var(--bad);animation:pulse 1s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
@@ -7806,6 +7808,7 @@ function openEditor(kind,ds,id){
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
 function editorSheet(title,pre){
   const aiOn=aiAvailable();
+  window._photoEstimate=null;
   modal(`<h3>${title}</h3>
     <div class="field"><label>Descripción</label>
       <div class="row"><textarea id="f_name" rows="2" placeholder="Ej. 2 panes con palta y café">${esc(pre.name||"")}</textarea>
@@ -7817,7 +7820,12 @@ function editorSheet(title,pre){
       <div class="field"><label>Carb g</label><input id="f_c" type="number" inputmode="numeric" value="${pre.c}"></div>
       <div class="field"><label>Grasa g</label><input id="f_f" type="number" inputmode="numeric" value="${pre.f}"></div>
     </div>
-    ${aiOn?`<button class="btn" style="width:100%" onclick="aiEstimate()">✨ Estimar macros</button>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
+    ${aiOn?`<div class="row" style="gap:8px">
+      <button class="btn" style="flex:1" onclick="aiEstimate()">✨ Estimar macros</button>
+      <button class="btn" style="flex:1" onclick="pickMealPhoto()">📷 Estimar con foto</button>
+    </div>
+    <input id="f_photo" type="file" accept="image/*" capture="environment" hidden onchange="onMealPhotoSelected(this)">
+    <img id="f_photo_preview" class="meal-photo-preview" alt="Foto de la comida" hidden>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
     <div id="aiOut"></div>
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
 }
@@ -7996,7 +8004,8 @@ async function coachProxyFetch(payload){
 // REQ-123: expone si la última respuesta fue "reutilizada" (cupo de frescas agotado)
 // para que los botones de "otra opción" puedan avisar en vez de parecer no hacer nada.
 let lastCoachCallReused=false;
-async function callClaude(userText,maxTokens,quota){
+async function callClaude(userText,maxTokens,quota,opts){
+  const image=opts&&opts.image||null;
   if(!isActive())throw new Error("Tu cuenta está desactivada.");
   if(!hasRequiredConsents()||!hasCurrentScreening())throw new Error("Revisa privacidad y seguridad antes de usar tu coach.");
   lastCoachCallReused=false;
@@ -8007,7 +8016,7 @@ async function callClaude(userText,maxTokens,quota){
     const res=await fetch("https://api.anthropic.com/v1/messages",{
       method:"POST",
       headers:{"x-api-key":cfg.apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true","content-type":"application/json"},
-      body:JSON.stringify({model:cfg.model||DEFAULT_MODEL,max_tokens:maxTokens||512,system:buildSysPrompt(),messages:[{role:"user",content:userText}]})
+      body:JSON.stringify({model:cfg.model||DEFAULT_MODEL,max_tokens:maxTokens||512,system:buildSysPrompt(),messages:[{role:"user",content:image?[{type:"image",source:{type:"base64",media_type:image.mediaType,data:image.data}},{type:"text",text:userText}]:userText}]})
     });
     if(!res.ok){const e=await res.text();throw new Error("API "+res.status+": "+e.slice(0,200));}
     const data=await res.json();
@@ -8019,7 +8028,8 @@ async function callClaude(userText,maxTokens,quota){
   if(!token)throw new Error("Inicia sesión para usar tu coach.");
   if(!quota||!quota.action||!quota.requestId)throw new Error("La acción del coach no tiene una reserva válida.");
   const data=await coachProxyFetch({
-    userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL,quota
+    userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL,quota,
+    ...(image?{image}:{})
   });
   lastCoachCallReused=!!data.reused;
   return data.text||"";
@@ -8561,6 +8571,95 @@ async function aiEstimate(){
     out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}</div>`;
   }catch(e){out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
   finally{endCoachAction(actionKey);}
+}
+
+// REQ-172 — estimar con foto: el coach mira la foto, devuelve su mejor
+// estimación y, si algo que no se ve cambia mucho las kcal, hasta 2 preguntas.
+// Cada ronda reenvía la foto con las respuestas (el servidor no guarda nada).
+const MEAL_PHOTO_MAX_PX=1024;
+const MEAL_PHOTO_MAX_ROUNDS=3;
+function pickMealPhoto(){const input=$("#f_photo");if(input){input.value="";input.click();}}
+async function mealPhotoToJpeg(file){
+  let source;
+  try{source=await createImageBitmap(file,{imageOrientation:"from-image"});}
+  catch(_){
+    source=await new Promise((resolve,reject)=>{
+      const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("No pudimos leer la foto."));
+      img.src=URL.createObjectURL(file);
+    });
+  }
+  const w=source.width||source.naturalWidth,h=source.height||source.naturalHeight;
+  const scale=Math.min(1,MEAL_PHOTO_MAX_PX/Math.max(w,h));
+  const canvas=document.createElement("canvas");
+  canvas.width=Math.round(w*scale);canvas.height=Math.round(h*scale);
+  canvas.getContext("2d").drawImage(source,0,0,canvas.width,canvas.height);
+  const dataUrl=canvas.toDataURL("image/jpeg",0.82);
+  return {mediaType:"image/jpeg",data:dataUrl.slice(dataUrl.indexOf(",")+1),dataUrl};
+}
+async function onMealPhotoSelected(input){
+  const file=input&&input.files&&input.files[0];if(!file)return;
+  const out=$("#aiOut");
+  try{
+    if(out)out.innerHTML=`<div class="ai-box">Preparando la foto…</div>`;
+    const photo=await mealPhotoToJpeg(file);
+    const preview=$("#f_photo_preview");if(preview){preview.src=photo.dataUrl;preview.hidden=false;}
+    window._photoEstimate={image:{mediaType:photo.mediaType,data:photo.data},hash:hashText(photo.data),answers:[],questions:[],round:0};
+    await photoEstimateRound();
+  }catch(e){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message||"No pudimos leer la foto.")}</div>`;}
+}
+async function photoEstimateRound(){
+  const st=window._photoEstimate;if(!st)return;
+  const actionKey="meal_estimate";
+  const requestId=beginCoachAction(actionKey);if(!requestId)return;
+  const out=$("#aiOut");if(out)out.innerHTML=`<div class="ai-box">Mirando tu comida…</div>`;
+  try{
+    st.round++;
+    const desc=$("#f_name")?$("#f_name").value.trim():"";
+    const qa=st.answers.map(a=>`- ${a.q} → ${a.a||"(no sabe)"}`).join("\n");
+    const canAsk=st.round<MEAL_PHOTO_MAX_ROUNDS;
+    const prompt=`Estima kcal y macros de la comida de la foto.${desc?` El usuario la describe así: "${desc}".`:""}
+${qa?`Aclaraciones del usuario:\n${qa}\n`:""}Calcula la porción que se ve; usa el plato, los cubiertos o las manos como referencia de tamaño.
+${canAsk?`Si algo que no se ve cambia mucho las kcal (cantidad real, aceite o fritura, salsas, bebida, ingredientes escondidos), incluye hasta 2 preguntas cortas y concretas en "preguntas". No repitas preguntas ya respondidas. Si la foto basta, deja "preguntas" vacío.`:`No hagas más preguntas: deja "preguntas" vacío y da tu estimación final.`}
+Entrega siempre tu mejor estimación actual. "nombre": nombre corto y descriptivo del plato. "nota": una frase con lo que supusiste.
+Responde SOLO JSON: {"nombre":"...","kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0,"nota":"...","preguntas":[]}`;
+    const fallback=JSON.stringify({nombre:"",kcal:0,proteina_g:0,carbohidratos_g:0,grasa_g:0,nota:"No pudimos analizar la foto ahora. Describe la comida o ingresa los macros.",preguntas:[]});
+    // La foto va en la clave: una respuesta guardada solo se reutiliza para la misma foto y respuestas.
+    const quota=coachQuota("meal_estimate",requestId,"photo-"+st.round,fallback,{},`photo:${st.hash}:${hashText(qa)}`);
+    const j=parseJSON(await callClaude(prompt,700,quota,{image:st.image}));
+    renderPhotoEstimate(j,canAsk);
+  }catch(e){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
+  finally{endCoachAction(actionKey);}
+}
+function renderPhotoEstimate(j,canAsk){
+  const st=window._photoEstimate;const out=$("#aiOut");if(!st||!out)return;
+  const kcal=Math.round(+j.kcal||0);
+  if(kcal>0){
+    $("#f_kcal").value=kcal;$("#f_p").value=Math.round(+j.proteina_g||0);$("#f_c").value=Math.round(+j.carbohidratos_g||0);$("#f_f").value=Math.round(+j.grasa_g||0);
+    // El nombre se completa si está vacío o si lo puso una ronda anterior; lo que escribió el usuario se respeta.
+    const name=$("#f_name");
+    if(name&&j.nombre&&(!name.value.trim()||name.value===st.autoName)){name.value=coachCopy(String(j.nombre).trim());st.autoName=name.value;}
+  }
+  const asked=new Set(st.answers.map(a=>coachKey(a.q)));
+  st.questions=canAsk&&Array.isArray(j.preguntas)
+    ?j.preguntas.map(q=>coachCopy(String(q||"").trim())).filter(q=>q&&!asked.has(coachKey(q))).slice(0,2)
+    :[];
+  const note=coachCopy(String(j.nota||"").trim())||"Estimado. Revisa y ajusta si quieres.";
+  out.innerHTML=`<div class="ai-box">${kcal>0?"✓ ":""}${esc(note)}</div>${st.questions.length?`<div class="photo-questions">
+      <div class="muted small">Para afinar la estimación:</div>
+      ${st.questions.map((q,i)=>`<div class="field" style="margin:0"><label for="pq_${i}">${esc(q)}</label><input id="pq_${i}" type="text" autocomplete="off" placeholder="Tu respuesta"></div>`).join("")}
+      <div class="row" style="gap:8px"><button class="btn btn-accent btn-sm" onclick="answerPhotoQuestions()">Responder y recalcular</button><button class="btn btn-sm" onclick="skipPhotoQuestions()">Así está bien</button></div>
+    </div>`:""}`;
+}
+function answerPhotoQuestions(){
+  const st=window._photoEstimate;if(!st||!st.questions.length)return;
+  const answers=st.questions.map((q,i)=>({q,a:(($("#pq_"+i)||{}).value||"").trim()}));
+  if(answers.every(a=>!a.a)){toast("Responde al menos una pregunta o toca \"Así está bien\"");return;}
+  st.answers.push(...answers);
+  photoEstimateRound();
+}
+function skipPhotoQuestions(){
+  const st=window._photoEstimate;if(st)st.questions=[];
+  const box=document.querySelector("#aiOut .photo-questions");if(box)box.remove();
 }
 
 /* ============================================================

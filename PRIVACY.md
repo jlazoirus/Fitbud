@@ -28,6 +28,8 @@ Antes de habilitar entrenamiento se pregunta por dolor de pecho, mareo o desmayo
 
 Los datos personales se aislan por usuario mediante RLS. Las fotos se guardan en un bucket privado bajo la carpeta del usuario y se muestran mediante URLs firmadas de una hora. Las claves privilegiadas solo existen en funciones server-side.
 
+Las fotos de comida para "Estimar con foto" no se guardan: el telefono las reduce, se envian solo en esa consulta al proveedor del coach para estimar macros y se descartan. Lo que queda guardado es la estimacion en texto, nunca la imagen.
+
 La exportacion genera un JSON legible con perfil, progreso, planes, ciclos, consentimientos, evaluaciones, historial de uso del coach y opciones personales guardadas. Las fotos se enumeran como metadatos privados; no se publican enlaces permanentes.
 
 ## Retencion y borrado

@@ -1560,3 +1560,31 @@ Con propuestas del coach solo el 66% de los días quedaba dentro de la toleranci
 - Días en tolerancia de kcal con propuestas: 66.0% → 93.1%; |Δkcal| mediana 35 → 18, p90 253 → 47; 100% de propuestas conservadas. ✓
 - El canario determinista no cambia (289/378, 76.5%). ✓
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-172 - Estimar macros de una comida con una foto, con preguntas de aclaración
+
+**Estado: implementado.**
+
+### Origen
+
+Pedido de Jonathan (2026-10-12): al agregar o editar una comida, tomar una foto, enviarla al coach para estimar los macros y que pregunte lo que necesite aclarar.
+
+### Alcance
+
+1. Editor de comidas (agregar y editar, `editorSheet()`): botón "📷 Estimar con foto" con `capture="environment"`; la foto se reduce en el teléfono a 1024 px JPEG (`mealPhotoToJpeg()`) y se muestra como vista previa.
+2. `photoEstimateRound()`: acción existente `meal_estimate` (sin migración ni cuota nueva; cada ronda consume una unidad) con la foto, la descripción y las respuestas previas. La respuesta trae siempre la mejor estimación y hasta 2 `preguntas` sobre lo que no se ve y cambia las kcal (porción, aceite, salsas, bebida). Máximo 3 rondas; las preguntas ya respondidas no se repiten. "Así está bien" acepta la estimación actual.
+3. El nombre se completa si está vacío o si lo puso una ronda anterior; lo que escribió el usuario se respeta.
+4. Proxy (`api/claude.js`): `imageInput()` acepta imagen solo en `meal_estimate`, tipos JPEG/PNG/WebP y ≤3 MB en base64, y la valida antes de reservar cuota; `userContent()` envía el bloque `image` antes del texto; `meal_estimate` pasa a structured outputs con `mealEstimateOutputSchema()`.
+5. La clave de reutilización incluye el hash de la foto y de las respuestas: una respuesta guardada nunca se sirve para otra foto.
+6. Privacidad: la foto no se guarda ni se registra; solo viaja en la consulta (`PRIVACY.md`).
+
+### Fuera de alcance
+
+- Guardar la foto junto a la comida o en el historial.
+- Estimar con foto desde el reemplazo de comidas del plan ("Cambiar comida").
+
+### Criterios de aceptación
+
+- Foto → estimación con pregunta → respuesta → estimación final que se guarda. ✓ (`tests/e2e/foto-comida.spec.js`)
+- Otras acciones rechazan imágenes; tipos y tamaño validados; validación antes de la cuota. ✓ (`scripts/validate-meal-photo-estimate.mjs`)
+- `node scripts/release-gate.mjs` pasa. ✓
