@@ -1588,3 +1588,25 @@ Pedido de Jonathan (2026-10-12): al agregar o editar una comida, tomar una foto,
 - Foto → estimación con pregunta → respuesta → estimación final que se guarda. ✓ (`tests/e2e/foto-comida.spec.js`)
 - Otras acciones rechazan imágenes; tipos y tamaño validados; validación antes de la cuota. ✓ (`scripts/validate-meal-photo-estimate.mjs`)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-173 - Fix PWA: los deploys no llegan a la app instalada si no cambia `CACHE_NAME`
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-12) no encontraba "Estimar con foto" tras el deploy de REQ-172.
+
+### Causa raíz
+
+El service worker sirve HTML y JS cache-first (REQ-150) y el navegador solo instala uno nuevo cuando cambia `service-worker.js`. Los deploys de REQ-167 a REQ-172 cambiaron `index.html`, `workout-player.js` y `js/nutrition-domain.js` sin subir `CACHE_NAME` (seguía en `fitbud-pwa-v71`), así que la PWA instalada siguió mostrando la versión anterior.
+
+### Alcance
+
+1. `CACHE_NAME` → `fitbud-pwa-v72`.
+2. `scripts/validate-sw-cache-bump.mjs` en el release gate: si cambió un archivo del `APP_SHELL` contra `origin/main` (o `--base <ref>`), `CACHE_NAME` debe ser distinto.
+
+### Criterios de aceptación
+
+- Con `--base 24e2607` y sin subir la versión, el validador falla nombrando los archivos; con `v72` pasa. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
