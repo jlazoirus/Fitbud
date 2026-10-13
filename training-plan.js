@@ -180,7 +180,7 @@
       id:session.id,
       kind,
       name:session.name,
-      detail:`${session.objective} · ${session.durationMinutes} min · ${session.intensity}`,
+      detail:`${session.objective} · ${text(session.durationLabel)||`${session.durationMinutes} min`} · ${session.intensity}`,
       sport:strength?null:session.type,
       role:session.role,
       exerciseIds:session.exercises.map(item=>item.exerciseId),
@@ -188,6 +188,8 @@
       generatedPrescription:{
         objective:session.objective,
         durationMinutes:session.durationMinutes,
+        durationLabel:text(session.durationLabel),
+        warmup:text(session.warmup),
         intensity:session.intensity,
         exercises:session.exercises,
         blocks:session.blocks,

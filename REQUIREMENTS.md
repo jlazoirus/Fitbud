@@ -1676,3 +1676,27 @@ Alta fallida de una usuaria (2026-10-12): enlace de invitación consumido, "Auth
 
 - Una cuenta con `must_change_password` ve la pantalla de contraseña, la guarda y entra a la app. ✓ (E2E)
 - `scripts/validate-admin-create-user.mjs`: formato, aleatoriedad y cableado. ✓
+
+## REQ-177 - Planes de un coach conservan sus textos: calentamiento por día, duración y descanso
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-12): la rutina cargada a una usuaria debe ser ejercicio por ejercicio igual a la del coach (LeoFitnessCoach).
+
+### Problema
+
+El plan guardaba duración y descanso como números (55 min, 105 s) y usaba un calentamiento genérico, así que no podía mostrar los rangos ("45–60 min", "90–120 s") ni el calentamiento específico de cada día.
+
+### Alcance
+
+1. Campos opcionales en `snapshot.trainingPlan`: `session.durationLabel`, `session.warmup`, `exercise.restLabel`.
+2. `workoutFromSession()` (`training-plan.js`) usa `durationLabel` en el detalle y los pasa a `generatedPrescription`; `generatedStrengthSteps()` (`workout-player.js`) usa `warmup` como objetivo del calentamiento y copia `restLabel` al paso; el temporizador sigue usando `restSeconds` (mínimo del rango).
+3. El reproductor y el resumen previo (REQ-174) muestran `restLabel` y `durationLabel` cuando existen.
+4. `scripts/validate-coach-plan-labels.mjs` en el release gate. `CACHE_NAME` v75.
+
+### Criterios de aceptación
+
+- Una sesión con textos del coach llega al reproductor con el mismo calentamiento, duración y descanso. ✓
+- `node scripts/release-gate.mjs` pasa. ✓

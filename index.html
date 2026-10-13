@@ -4900,7 +4900,7 @@ function renderActiveWorkoutStep(ds,execution){
     <div class="player-dose">
       <div class="scard"><div class="n">${step.prescribedSets}</div><div class="l">series</div></div>
       <div class="scard"><div class="n">${esc(step.reps)}</div><div class="l">reps objetivo</div></div>
-      <div class="scard"><div class="n">${step.restSeconds}s</div><div class="l">descanso</div></div>
+      <div class="scard"><div class="n">${esc(step.restLabel||`${step.restSeconds}s`)}</div><div class="l">descanso</div></div>
       <div class="scard"><div class="n">${esc(step.tempo)}</div><div class="l">tempo</div></div>
       <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué es el esfuerzo RPE"><div class="n">${step.targetRpe}/10</div><div class="l">esfuerzo (RPE) ⓘ</div></button>
       <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué son las repeticiones en reserva RIR"><div class="n">${step.targetRir}</div><div class="l">en reserva (RIR) ⓘ</div></button>
@@ -4984,13 +4984,13 @@ function workoutPlanSummaryHtml(prescription){
       const exercise=exerciseBySlug(step.exerciseSlug,true);
       const name=exercise?exercise.name:step.label;
       return `<li class="plan-row"><span class="plan-n">${n}</span><div class="plan-main"><b>${esc(name)}</b>
-        <div class="plan-dose"><span>${step.prescribedSets} × ${esc(step.reps)}</span><span>Descanso ${formatRestShort(step.restSeconds)}</span><span>RPE ${esc(step.targetRpe)}/10</span></div></div></li>`;
+        <div class="plan-dose"><span>${step.prescribedSets} × ${esc(step.reps)}</span><span>Descanso ${esc(step.restLabel||formatRestShort(step.restSeconds))}</span><span>RPE ${esc(step.targetRpe)}/10</span></div></div></li>`;
     }
     const minutes=Math.max(1,Math.round((+step.durationSeconds||0)/60));
     return `<li class="plan-row plan-timed"><span class="plan-n">·</span><div class="plan-main"><b>${esc(step.label)}</b><div class="plan-dose"><span>${minutes} min</span></div></div></li>`;
   }).join("");
   const sets=steps.filter(step=>step.type==="strength").reduce((sum,step)=>sum+(+step.prescribedSets||0),0);
-  return `<div class="plan-summary"><div class="muted small">Qué vas a hacer hoy · ${n} ejercicios · ${sets} series${prescription.estimatedMinutes?` · ~${prescription.estimatedMinutes} min`:""}</div><ol class="plan-list">${rows}</ol>
+  return `<div class="plan-summary"><div class="muted small">Qué vas a hacer hoy · ${n} ejercicios · ${sets} series${prescription.durationLabel?` · ${esc(prescription.durationLabel)}`:prescription.estimatedMinutes?` · ~${prescription.estimatedMinutes} min`:""}</div><ol class="plan-list">${rows}</ol>
     <button class="link-btn small" onclick="explainWorkoutEffort()">¿Qué es RPE?</button></div>`;
 }
 function renderWorkout(){

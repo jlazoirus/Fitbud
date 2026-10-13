@@ -156,9 +156,10 @@
     const bySlug=new Map(exercises.map(exercise=>[exercise.slug,exercise]));
     const warmupMinutes=clamp(Math.round(number(custom.durationMinutes||context.sessionMinutes,60)*.12),5,10);
     const cooldownMinutes=clamp(Math.round(number(custom.durationMinutes||context.sessionMinutes,60)*.08),4,8);
+    // REQ-177: un plan del coach puede traer su propio calentamiento por día.
     const steps=[timedStep(
       "warmup","warmup","Calentamiento",
-      "Movilidad dinámica y series de aproximación de los primeros movimientos","RPE 2-3",warmupMinutes*60
+      String(custom.warmup||"").trim()||"Movilidad dinámica y series de aproximación de los primeros movimientos","RPE 2-3",warmupMinutes*60
     )];
     (custom.exercises||[]).forEach((dose,index)=>{
       const exercise=bySlug.get(dose.exerciseId)||{};
@@ -174,6 +175,8 @@
         reps:String(dose.reps||"8-12"),
         defaultReps:Math.max(1,Math.round(number(String(dose.reps||"").match(/\d+/)?.[0],10))),
         restSeconds:clamp(dose.restSeconds,20,300),
+        // REQ-177: texto del descanso tal como lo escribió el coach ("90–120 s"); el temporizador usa restSeconds.
+        restLabel:String(dose.restLabel||"").trim(),
         tempo:String(dose.tempo||"Controlado"),
         targetRpe:clamp(dose.targetRpe,3,9),
         targetRir:clamp(dose.targetRir,0,5),
@@ -228,6 +231,7 @@
           sessionType:"strength",
           objective:workout.generatedPrescription.objective||"Completar la sesión con técnica estable",
           estimatedMinutes:clamp(workout.generatedPrescription.durationMinutes||context.sessionMinutes,20,180),
+          durationLabel:String(workout.generatedPrescription.durationLabel||"").trim(),
           phaseLabel:"Plan personalizado",
           steps:generatedStrengthSteps(workout,exercises,context),
         };
