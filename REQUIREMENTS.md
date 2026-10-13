@@ -1632,3 +1632,47 @@ La tarjeta de la sesión solo mostraba el nombre y un texto general; la "Vista p
 
 - El E2E de Entreno ve "Qué vas a hacer hoy · N ejercicios · N series" y la dosis "N × reps" antes de iniciar. ✓
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-175 - Capa de espera que bloquea la app mientras el coach responde
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-12): mientras el coach genera (por ejemplo, el plan de entrenamiento), se puede cerrar el modal con la X; la generación sigue corriendo detrás y al volver a pedirla la pantalla no se actualiza ("Esta acción ya está en proceso"). Pidió un spinner que bloquee toda la pantalla hasta que responda.
+
+### Alcance
+
+1. `showCoachBusy()`/`hideCoachBusy()`: capa a pantalla completa (`#coach-busy`, z-index sobre el modal) con spinner y mensaje por acción (`coachBusyLabel()`: "Preparando tu plan…", "Estimando tu comida…"…).
+2. Ligada a la acción completa: `beginCoachAction()` la muestra y `endCoachAction()` la oculta solo si la acción estaba en curso; `callClaude()` también la sostiene. Cubre generaciones con varias consultas seguidas sin huecos.
+3. Escape no cierra el modal mientras el coach responde.
+4. Salvaguardas: tope de 90 s por intento en `coachProxyFetch()` (AbortController) y cierre automático de la capa a los 4 min con aviso, para que la app nunca quede bloqueada.
+
+### Criterios de aceptación
+
+- Durante "Preparar mi plan" la X del modal queda tapada, Escape no cierra y al responder el resultado sigue en el modal. ✓ (`tests/e2e/alta-y-espera.spec.js`)
+- Durante "Estimar macros" el botón Guardar queda tapado hasta la respuesta. ✓
+
+## REQ-176 - Alta de usuarios sin depender del correo
+
+**Estado: implementado.**
+
+### Origen
+
+Alta fallida de una usuaria (2026-10-12): enlace de invitación consumido, "Auth session missing!" (REQ-167) y "email rate limit exceeded" del SMTP por defecto de Supabase.
+
+### Alcance
+
+1. `api/admin.js` acción `createUser`: crea la cuenta confirmada con contraseña temporal `xxxx-xxxx-xxxx` (aleatoria criptográfica, sin caracteres ambiguos), `user_metadata.must_change_password=true` y perfil activo; nunca pisa una cuenta existente (409).
+2. Panel admin "Crear cuenta": muestra la contraseña una sola vez y un mensaje listo para copiar o enviar por WhatsApp.
+3. Primer ingreso: `onAuth()` detecta `must_change_password` y muestra "Crea tu propia contraseña"; `updateUser` guarda la contraseña y limpia la marca con la misma sesión (sin enlaces de correo) y la app continúa.
+4. "Invitar por correo" se mantiene como alternativa.
+
+### Fuera de alcance (acción manual)
+
+- SMTP propio en Supabase (Auth → SMTP) y Redirect URLs de producción (REQ-60): necesitan credenciales del proveedor y el dashboard.
+
+### Criterios de aceptación
+
+- Una cuenta con `must_change_password` ve la pantalla de contraseña, la guarda y entra a la app. ✓ (E2E)
+- `scripts/validate-admin-create-user.mjs`: formato, aleatoriedad y cableado. ✓

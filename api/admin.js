@@ -94,7 +94,7 @@ async function updateAuthUser(id, attributes, e) {
   return data;
 }
 
-async function createAuthUser(email, password, e) {
+async function createAuthUser(email, password, e, metadata) {
   const response = await fetch(e.url + "/auth/v1/admin/users", {
     method: "POST",
     headers: serviceHeaders(e, { "content-type": "application/json" }),
@@ -102,12 +102,21 @@ async function createAuthUser(email, password, e) {
       email,
       password,
       email_confirm: true,
-      user_metadata: { fitbros_test_user: true },
+      user_metadata: metadata || { fitbros_test_user: true },
     }),
   });
   const data = await responseJson(response);
-  if (!response.ok) throw new Error(apiError(data, "No se pudo crear el usuario de prueba."));
+  if (!response.ok) throw new Error(apiError(data, "No se pudo crear el usuario."));
   return data && data.user ? data.user : data;
+}
+
+// REQ-176: contraseña temporal legible (sin 0/O/1/l/I), 3 bloques de 4.
+// La ve solo el admin, una vez; el usuario la cambia en su primer ingreso.
+const TEMP_PASSWORD_ALPHABET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function tempPassword() {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  const chars = Array.from(bytes, b => TEMP_PASSWORD_ALPHABET[b % TEMP_PASSWORD_ALPHABET.length]).join("");
+  return `${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8, 12)}`;
 }
 
 async function inviteAuthUser(email, redirectTo, caller, e) {
@@ -845,6 +854,31 @@ export default async function handler(req, res) {
         created,
         user: { id: targetUser.id, email, is_test_user: true },
       });
+      return;
+    }
+
+    // REQ-176: alta sin correo. El SMTP por defecto de Supabase limita a pocos
+    // correos por hora y el enlace de un solo uso puede consumirse antes de
+    // abrirse; aquí la cuenta nace confirmada con una contraseña temporal que el
+    // admin comparte, y la app obliga a cambiarla en el primer ingreso.
+    if (body.action === "createUser") {
+      const email = String(body.email || "").trim().toLowerCase();
+      if (!EMAIL_RE.test(email) || email.length > 254) {
+        res.status(400).json({ error: "Correo válido requerido." });
+        return;
+      }
+      if (await authUserByEmail(email, e)) {
+        res.status(409).json({ error: "Ese correo ya tiene una cuenta. Usa “Contraseña” en la lista para darle una nueva." });
+        return;
+      }
+      const password = tempPassword();
+      const created = await createAuthUser(email, password, e, {
+        fitbros_created_by_admin: true,
+        must_change_password: true,
+        created_by: caller,
+      });
+      if (created && created.id) await upsertProfileStatus({ id: created.id, email }, true, e);
+      res.status(200).json({ ok: true, user: { id: created && created.id, email }, tempPassword: password });
       return;
     }
 

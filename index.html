@@ -278,6 +278,12 @@
   .player-controls .btn{min-height:48px;border-radius:var(--r-md);white-space:normal}
   .player-controls .primary{grid-column:1 / -1}
   .set-list{display:grid;gap:8px;margin-top:12px}
+  .coach-busy{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(5,5,9,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+  .coach-busy[hidden]{display:none}
+  .coach-busy-card{background:var(--surf2);border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:22px 20px;max-width:320px;width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
+  .coach-busy-card .spinner{width:34px;height:34px}
+  .temp-pass{font-family:var(--font-mono);font-size:20px;font-weight:700;letter-spacing:.04em;margin:8px 0;user-select:all}
+  .welcome-msg{white-space:pre-wrap;font:inherit;font-size:12px;color:var(--muted);margin:6px 0 0;user-select:all}
   .plan-summary{margin:10px 0 4px}
   .plan-list{list-style:none;margin:8px 0 6px;padding:0;display:grid;gap:6px}
   .plan-row{display:flex;gap:10px;align-items:flex-start;background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:9px 10px}
@@ -7285,13 +7291,14 @@ function renderPasswordRecovery(){
     return;
   }
   const invite=passwordRecoveryMode==="invite";
+  const firstLogin=passwordRecoveryMode==="first_login";
   $("#app").innerHTML=`<div class="auth">
     <div class="auth-brand">Fitbros</div>
-    <div class="muted small center" style="margin-bottom:20px">${invite?"Crea tu contraseña para activar la cuenta.":"Define una nueva contraseña para tu cuenta."}</div>
+    <div class="muted small center" style="margin-bottom:20px">${firstLogin?"Bienvenido. Crea tu propia contraseña para terminar de activar tu cuenta.":invite?"Crea tu contraseña para activar la cuenta.":"Define una nueva contraseña para tu cuenta."}</div>
     <div class="dash">
       ${passwordField({id:"recovery_pwd",label:"Nueva contraseña",autocomplete:"new-password",minlength:"8"})}
       ${passwordField({id:"recovery_confirm",label:"Confirmar contraseña",autocomplete:"new-password",minlength:"8"})}
-      <button class="btn btn-accent" style="width:100%" onclick="finishPasswordRecovery()">${invite?"Activar cuenta":"Actualizar contraseña"}</button>
+      <button class="btn btn-accent" style="width:100%" onclick="finishPasswordRecovery()">${firstLogin?"Guardar y entrar":invite?"Activar cuenta":"Actualizar contraseña"}</button>
       <div id="recoveryOut" class="muted small" style="margin-top:10px"></div>
     </div>
   </div>`;
@@ -7318,7 +7325,8 @@ async function finishPasswordRecovery(){
       render();
       return;
     }
-    const result=await supa.auth.updateUser({password:pwd});
+    const firstLogin=passwordRecoveryMode==="first_login";
+    const result=await supa.auth.updateUser(firstLogin?{password:pwd,data:{must_change_password:false}}:{password:pwd});
     if(result.error){
       const m=String(result.error.message||"");
       out.textContent=/session missing/i.test(m)
@@ -7328,6 +7336,15 @@ async function finishPasswordRecovery(){
       return;
     }
   }finally{_recoveryBusy=false;}
+  if(passwordRecoveryMode==="first_login"){
+    // Sigue con la misma sesión: no hace falta volver a iniciar sesión.
+    try{const r=await supa.auth.getSession();session=(r.data&&r.data.session)||session;}catch(_){}
+    if(session&&session.user)session.user.user_metadata={...(session.user.user_metadata||{}),must_change_password:false};
+    passwordRecovery=false;passwordRecoveryError="";passwordRecoveryMode="recovery";
+    toast("Contraseña creada. ¡Bienvenido a Fitbros!");
+    await onAuth();
+    return;
+  }
   if(history&&history.replaceState)history.replaceState({},document.title,location.pathname);
   const invite=passwordRecoveryMode==="invite";
   passwordRecovery=false;
@@ -7343,6 +7360,7 @@ async function finishPasswordRecovery(){
    ============================================================ */
 let _modalTrigger=null;
 function _modalKeyHandler(e){
+  if(coachBusy())return; // REQ-175: no cerrar el modal mientras el coach responde
   if(e.key==="Escape"){closeModal();return;}
   if(e.key==="Tab"){
     const sheet=document.querySelector("#overlay .sheet");if(!sheet)return;
@@ -7941,11 +7959,14 @@ function coachRequestId(){
   return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
 }
 const coachActionsInFlight=new Set();
+// REQ-175: la capa de espera cubre la acción completa (varias consultas
+// seguidas, p. ej. una por semana del plan), no solo cada llamada: así no hay
+// huecos donde tocar la X del modal y dejar una generación corriendo detrás.
 function beginCoachAction(key){
   if(coachActionsInFlight.has(key)){toast("Esta acción ya está en proceso");return null;}
-  coachActionsInFlight.add(key);return coachRequestId();
+  coachActionsInFlight.add(key);showCoachBusy(key);return coachRequestId();
 }
-function endCoachAction(key){coachActionsInFlight.delete(key);}
+function endCoachAction(key){if(coachActionsInFlight.delete(key))hideCoachBusy();}
 function coachHardRestrictions(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const terms=String(p.allergies||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean);
@@ -8010,14 +8031,24 @@ function coachQuota(action,requestId,partKey,fallbackText,validation,scope){
     validation:validation||{},
   };
 }
+const COACH_FETCH_TIMEOUT_MS=90000;
 async function coachProxyFetch(payload){
   let lastError=null;
   for(let attempt=0;attempt<2;attempt++){
     try{
-      const res=await fetch("/api/claude",{
-        method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+session.access_token},
-        body:JSON.stringify(payload)
-      });
+      // REQ-175: tope por intento para que la capa de espera nunca quede colgada.
+      const controller=new AbortController();
+      const timer=setTimeout(()=>controller.abort(),COACH_FETCH_TIMEOUT_MS);
+      let res;
+      try{
+        res=await fetch("/api/claude",{
+          method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+session.access_token},
+          body:JSON.stringify(payload),signal:controller.signal
+        });
+      }catch(fetchError){
+        if(fetchError&&fetchError.name==="AbortError")throw new Error("Tu coach tardó demasiado en responder. Inténtalo de nuevo en un momento.");
+        throw fetchError;
+      }finally{clearTimeout(timer);}
       const data=await res.json().catch(()=>({}));
       if(res.status===409&&attempt===0){await new Promise(resolve=>setTimeout(resolve,350));continue;}
       if(res.status===402){
@@ -8042,35 +8073,81 @@ async function coachProxyFetch(payload){
 // REQ-123: expone si la última respuesta fue "reutilizada" (cupo de frescas agotado)
 // para que los botones de "otra opción" puedan avisar en vez de parecer no hacer nada.
 let lastCoachCallReused=false;
+// REQ-175: mientras el coach responde, una capa a pantalla completa bloquea la
+// app (sin tocar otros botones ni cerrar el modal) y dice qué está pasando.
+const COACH_BUSY_LABELS={
+  diet_day:"Preparando tus comidas…",diet_week:"Preparando tu semana…",diet_meal:"Buscando otra opción…",meal_option:"Buscando otra opción…",
+  meal_estimate:"Estimando tu comida…",macro_review:"Revisando tus macros…",training_plan:"Preparando tu plan…",
+  training_replacement:"Preparando otra sesión…",coach_conversation:"Tu coach está respondiendo…","coach-convo":"Tu coach está respondiendo…",
+  first_week_diet:"Preparando tu primera semana…",first_week_training:"Preparando tu primera semana…",
+};
+// Acepta la acción del proxy o la clave de la acción en curso (diet_meal_desayuno, training_plan_week_3…).
+function coachBusyLabel(key){
+  const k=String(key||"");
+  const match=Object.keys(COACH_BUSY_LABELS).sort((a,b)=>b.length-a.length).find(prefix=>k===prefix||k.startsWith(prefix+"_"));
+  return match?COACH_BUSY_LABELS[match]:"Tu coach está trabajando…";
+}
+let _coachBusyDepth=0;
+let _coachBusyWatchdog=null;
+// Salvaguarda: si algún camino no cerrara la acción, la app no queda bloqueada.
+const COACH_BUSY_MAX_MS=240000;
+function coachBusy(){return _coachBusyDepth>0;}
+function showCoachBusy(action){
+  _coachBusyDepth++;
+  let el=document.getElementById("coach-busy");
+  if(!el){
+    el=document.createElement("div");el.id="coach-busy";el.className="coach-busy";
+    el.setAttribute("role","alertdialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-live","polite");
+    document.body.appendChild(el);
+  }
+  el.innerHTML=`<div class="coach-busy-card"><div class="spinner"></div><b>${esc(coachBusyLabel(action))}</b><div class="muted small">Puede tardar unos segundos. No cierres la app.</div></div>`;
+  el.hidden=false;
+  clearTimeout(_coachBusyWatchdog);
+  _coachBusyWatchdog=setTimeout(()=>{
+    _coachBusyDepth=0;coachActionsInFlight.clear();
+    const busy=document.getElementById("coach-busy");if(busy)busy.hidden=true;
+    toast("Tu coach no respondió a tiempo. Inténtalo de nuevo.");
+  },COACH_BUSY_MAX_MS);
+}
+function hideCoachBusy(){
+  _coachBusyDepth=Math.max(0,_coachBusyDepth-1);
+  if(!_coachBusyDepth){
+    clearTimeout(_coachBusyWatchdog);
+    const el=document.getElementById("coach-busy");if(el)el.hidden=true;
+  }
+}
 async function callClaude(userText,maxTokens,quota,opts){
   const image=opts&&opts.image||null;
-  if(!isActive())throw new Error("Tu cuenta está desactivada.");
-  if(!hasRequiredConsents()||!hasCurrentScreening())throw new Error("Revisa privacidad y seguridad antes de usar tu coach.");
-  lastCoachCallReused=false;
-  const cfg=effectiveSettings();
-  // 1) Override local: si guardaste una API key en este navegador, llamada directa
-  //    (útil para desarrollo local sin las funciones serverless).
-  if(cfg.apiKey){
-    const res=await fetch("https://api.anthropic.com/v1/messages",{
-      method:"POST",
-      headers:{"x-api-key":cfg.apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true","content-type":"application/json"},
-      body:JSON.stringify({model:cfg.model||DEFAULT_MODEL,max_tokens:maxTokens||512,system:buildSysPrompt(),messages:[{role:"user",content:image?[{type:"image",source:{type:"base64",media_type:image.mediaType,data:image.data}},{type:"text",text:userText}]:userText}]})
+  showCoachBusy(quota&&quota.action);
+  try{
+    if(!isActive())throw new Error("Tu cuenta está desactivada.");
+    if(!hasRequiredConsents()||!hasCurrentScreening())throw new Error("Revisa privacidad y seguridad antes de usar tu coach.");
+    lastCoachCallReused=false;
+    const cfg=effectiveSettings();
+    // 1) Override local: si guardaste una API key en este navegador, llamada directa
+    //    (útil para desarrollo local sin las funciones serverless).
+    if(cfg.apiKey){
+      const res=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",
+        headers:{"x-api-key":cfg.apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true","content-type":"application/json"},
+        body:JSON.stringify({model:cfg.model||DEFAULT_MODEL,max_tokens:maxTokens||512,system:buildSysPrompt(),messages:[{role:"user",content:image?[{type:"image",source:{type:"base64",media_type:image.mediaType,data:image.data}},{type:"text",text:userText}]:userText}]})
+      });
+      if(!res.ok){const e=await res.text();throw new Error("API "+res.status+": "+e.slice(0,200));}
+      const data=await res.json();
+      return (data.content&&data.content[0]&&data.content[0].text)||"";
+    }
+    // 2) Producción (Vercel): proxy /api/claude. La API key vive solo en el servidor.
+    //    El proxy exige sesión: enviamos el token de Supabase (Bearer) para que valide.
+    const token=session&&session.access_token;
+    if(!token)throw new Error("Inicia sesión para usar tu coach.");
+    if(!quota||!quota.action||!quota.requestId)throw new Error("La acción del coach no tiene una reserva válida.");
+    const data=await coachProxyFetch({
+      userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL,quota,
+      ...(image?{image}:{})
     });
-    if(!res.ok){const e=await res.text();throw new Error("API "+res.status+": "+e.slice(0,200));}
-    const data=await res.json();
-    return (data.content&&data.content[0]&&data.content[0].text)||"";
-  }
-  // 2) Producción (Vercel): proxy /api/claude. La API key vive solo en el servidor.
-  //    El proxy exige sesión: enviamos el token de Supabase (Bearer) para que valide.
-  const token=session&&session.access_token;
-  if(!token)throw new Error("Inicia sesión para usar tu coach.");
-  if(!quota||!quota.action||!quota.requestId)throw new Error("La acción del coach no tiene una reserva válida.");
-  const data=await coachProxyFetch({
-    userText,system:buildSysPrompt(),maxTokens:maxTokens||512,model:cfg.model||DEFAULT_MODEL,quota,
-    ...(image?{image}:{})
-  });
-  lastCoachCallReused=!!data.reused;
-  return data.text||"";
+    lastCoachCallReused=!!data.reused;
+    return data.text||"";
+  }finally{hideCoachBusy();}
 }
 function parseJSON(txt){
   let t=txt.trim().replace(/^```(json)?/i,"").replace(/```$/,"").trim();
@@ -9995,8 +10072,18 @@ async function signOutUser(button){
 }
 // Reacciona a login/logout y recarga datos del usuario (idempotente).
 let _authBusy=false;
+// REQ-176: cuentas creadas por el admin entran con una contraseña temporal.
+function mustChangePassword(){
+  const meta=session&&session.user&&session.user.user_metadata;
+  return !!(meta&&meta.must_change_password===true);
+}
 async function onAuth(){
-  if(_authBusy)return; _authBusy=true;
+  if(_authBusy)return;
+  if(mustChangePassword()){
+    passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode="first_login";authReady=true;render();
+    return;
+  }
+  _authBusy=true;
   try{
     await loadProfile();
     await loadPrivacyState();
@@ -10512,6 +10599,13 @@ async function renderAdminUsers(){
     <div class="dash" style="margin-bottom:14px">
       <div class="row between wrap" style="gap:10px;margin-bottom:14px">
         <div style="flex:1;min-width:210px">
+          <b>Crear cuenta</b>
+          <div class="muted small" style="margin-top:5px">Sin correo: te damos una contraseña temporal para enviarla por WhatsApp. Al entrar, la persona crea la suya.</div>
+        </div>
+        <button class="btn btn-accent" onclick="openAdminCreateUser()">Crear cuenta</button>
+      </div>
+      <div class="row between wrap" style="gap:10px;margin-bottom:14px">
+        <div style="flex:1;min-width:210px">
           <b>Invitar usuario</b>
           <div class="muted small" style="margin-top:5px">Envía un correo para activar la cuenta y crear contraseña desde Fitbros.</div>
         </div>
@@ -10762,6 +10856,43 @@ async function resetAdminUserQuota(userId){
     if(out)out.textContent=`Consumo reiniciado (${result.reset||0} reservas devueltas).`;
     await loadAdminQuotaOverview();
   }catch(e){if(out)out.textContent="⚠️ "+e.message;}
+}
+// REQ-176: alta sin depender del correo (límite del SMTP, enlaces de un solo uso).
+function openAdminCreateUser(){
+  modal(`<h3>Crear cuenta</h3>
+    <p class="muted small">La cuenta queda activa con una contraseña temporal. En su primer ingreso, Fitbros le pide crear su propia contraseña.</p>
+    <div class="field"><label>Correo</label><input id="adminCreateEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
+    <button id="adminCreateBtn" class="btn btn-accent" style="width:100%" onclick="createAdminUser()">Crear cuenta</button>
+    <div id="adminCreateOut" class="muted small" style="margin-top:10px"></div>`);
+}
+function adminWelcomeMessage(email,password){
+  return `¡Hola! Ya tienes tu cuenta en Fitbros.\n\nEntra en ${location.origin}/\nCorreo: ${email}\nContraseña temporal: ${password}\n\nAl entrar te pedirá crear tu propia contraseña.`;
+}
+async function createAdminUser(){
+  const email=($("#adminCreateEmail")&&$("#adminCreateEmail").value||"").trim().toLowerCase();
+  const out=$("#adminCreateOut"),btn=$("#adminCreateBtn");
+  if(!email||!email.includes("@")){if(out)out.textContent="Escribe un correo válido.";return;}
+  if(btn){btn.disabled=true;btn.textContent="Creando…";}
+  try{
+    const result=await adminApi("createUser",{email});
+    window._adminWelcome=adminWelcomeMessage(email,result.tempPassword);
+    if(btn)btn.remove();
+    out.innerHTML=`<div class="ai-box"><b>Cuenta creada.</b> Esta contraseña solo se muestra ahora:
+      <div class="temp-pass">${esc(result.tempPassword)}</div>
+      <pre class="welcome-msg">${esc(window._adminWelcome)}</pre></div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button class="btn btn-accent" style="flex:1" onclick="copyAdminWelcome()">Copiar mensaje</button>
+        <a class="btn" style="flex:1;text-align:center" href="https://wa.me/?text=${encodeURIComponent(window._adminWelcome)}" target="_blank" rel="noopener">WhatsApp</a>
+      </div>`;
+    renderAdminUsers();
+  }catch(e){
+    if(out)out.textContent="⚠️ "+e.message;
+    if(btn){btn.disabled=false;btn.textContent="Crear cuenta";}
+  }
+}
+async function copyAdminWelcome(){
+  try{await navigator.clipboard.writeText(window._adminWelcome||"");toast("Mensaje copiado");}
+  catch(_){toast("No se pudo copiar; selecciona el texto y cópialo a mano");}
 }
 function openAdminInviteUser(){
   modal(`<h3>Invitar usuario</h3>
