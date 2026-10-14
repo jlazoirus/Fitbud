@@ -429,6 +429,22 @@ async function runJob(e, dryRun) {
   return results;
 }
 
+// ── Keep-alive de Supabase (REQ-178) ──────────────────────────────────────────
+// El plan gratuito de Supabase pausa el proyecto tras ~7 días sin actividad y
+// eso tumba login y sync. El cron diario hace una lectura mínima ANTES de
+// autenticar: aunque el job se corte por CRON_SECRET (Vercel identifica sus
+// crons por user-agent y solo manda Authorization si CRON_SECRET existe), la
+// base recibe actividad cada día. Una fila, solo el id, nada se devuelve.
+async function keepSupabaseAwake(e) {
+  if (!e.url || !e.service) return false;
+  try {
+    const r = await fetch(e.url + "/rest/v1/profiles?select=id&limit=1", { headers: getHeaders(e) });
+    return r.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
 // ── Handler de Vercel ─────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -444,11 +460,13 @@ export default async function handler(req, res) {
     return handleUnsubscribe(unsubToken, e, res);
   }
 
+  const awake = await keepSupabaseAwake(e);
+
   // Job del cron — verificar CRON_SECRET
   const authHeader = req.headers["authorization"] || "";
   const isVercelCron = req.headers["x-vercel-cron"] === "1";
   if (!isVercelCron && (!e.cronSecret || authHeader !== "Bearer " + e.cronSecret)) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json({ error: "Unauthorized", keepAlive: awake });
   }
 
   if (!e.url || !e.service) return res.status(500).json({ error: "Supabase no configurado" });

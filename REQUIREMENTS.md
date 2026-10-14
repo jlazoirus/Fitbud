@@ -1753,3 +1753,29 @@ En el historial de pagos, un evento de reembolso muestra el monto efectivamente 
 
 - Test del proyector de `billing-history` con los tres payloads (parcial, total, pago normal).
 - Manual: inyectar en `billingHistory` un evento `charge.refunded` con `amount_cents` derivado del reembolso real y confirmar en Perfil → Suscripción → "Historial de pagos" que el renglón muestra el monto reembolsado.
+
+## REQ-179 - Supabase no se pausa por inactividad: keep-alive en el cron diario
+
+**Estado: implementado.**
+
+### Origen
+
+2026-10-12: el proyecto de Supabase (plan gratuito) estaba pausado; login, sync y catálogo caídos en producción ("Load failed") hasta restaurarlo a mano.
+
+### Causa raíz
+
+El plan gratuito pausa el proyecto tras ~7 días sin actividad. El cron diario `/api/notify` sí consulta la base, pero corta antes en la autenticación: espera `x-vercel-cron: 1` o `Authorization: Bearer CRON_SECRET`, y Vercel identifica sus crons por `user-agent: vercel-cron/1.0` y solo envía `Authorization` si `CRON_SECRET` existe. Sin esa variable, el job devolvía 401 sin tocar la base.
+
+### Alcance
+
+1. `keepSupabaseAwake()` en `api/notify.js`: lectura mínima (`profiles?select=id&limit=1`, service role, no devuelve datos) al inicio de cada invocación, antes de autenticar; un fallo no rompe el handler.
+2. `scripts/validate-supabase-keepalive.mjs` en el release gate.
+
+### Fuera de alcance
+
+- Configurar `CRON_SECRET` en Vercel para que los recordatorios por correo/push (REQ-24/38) también corran; el keep-alive no depende de eso.
+
+### Criterios de aceptación
+
+- Una invocación de cron sin secreto responde 401 pero ejecuta la lectura mínima. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
