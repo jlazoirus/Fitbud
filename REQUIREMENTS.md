@@ -1700,3 +1700,56 @@ El plan guardaba duración y descanso como números (55 min, 105 s) y usaba un c
 
 - Una sesión con textos del coach llega al reproductor con el mismo calentamiento, duración y descanso. ✓
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-178 - Fix facturación: el historial de pagos muestra el cargo original en lugar del monto reembolsado en reembolsos parciales
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey `facturacion` (Perfil → Suscripción → "Historial de pagos"). Commit previo leído: `903acd2` (REQ-177). Partiendo de REQ-148 (un reembolso parcial de Stripe ya NO revoca el entitlement y queda auditado como evento `charge.refunded` visible al usuario), se revisó cómo se proyecta el monto de cada evento hacia la UI.
+
+### Problema
+
+Un reembolso parcial (p. ej. $7 sobre un cargo de $14) aparece en el historial del usuario como **"Reembolso registrado · USD 14.00"**: se muestra el cargo original completo, no los $7 realmente devueltos. Un reembolso total coincide por casualidad (el monto original y el reembolsado son iguales), así que el bug solo se manifiesta en reembolsos parciales — justo el caso que REQ-148 hizo visible al dejarlos como evento sin revocar acceso. El usuario ve un monto de reembolso inflado respecto a lo que se le devolvió.
+
+### Causa raíz
+
+`moneyFromPayload(payload)` en `api/entitlement.js:62-67`:
+
+```js
+const amount = firstFinite(obj.amount_total, obj.amount_paid, obj.amount, obj.amount_refunded);
+```
+
+`billing_events.payload` guarda el `event` completo de Stripe (`api/webhook.js:226`), así que para `charge.refunded` el `payload.data.object` es un **charge**: tiene `amount` (cargo original) y `amount_refunded` (lo reembolsado), pero NO `amount_total` ni `amount_paid` (esos viven en `checkout.session`). Como `amount` precede a `amount_refunded` en `firstFinite`, la proyección devuelve el cargo original (1400) antes de llegar al monto reembolsado (700). El orden de precedencia es fijo para todos los tipos de evento; `charge.refunded` necesita priorizar `amount_refunded`.
+
+### Objetivo
+
+En el historial de pagos, un evento de reembolso muestra el monto efectivamente reembolsado, de modo que un reembolso parcial de $7 se lea "USD 7.00" y no "USD 14.00".
+
+### Alcance
+
+1. En `moneyFromPayload`/`projectEvent` (`api/entitlement.js`), para `event_type === "charge.refunded"` resolver el monto priorizando `obj.amount_refunded` (cae a `amount` solo si falta). El resto de tipos (`checkout.session.completed`, `checkout.session.expired`, `payment_intent.payment_failed`, `charge.dispute.created`) conservan su orden actual.
+2. Cubrir el caso con un test del proyector (reembolso parcial → monto reembolsado; reembolso total → sigue correcto; pago normal → sin cambios).
+
+### Fuera de alcance
+
+- La lógica de revocación de `handleRefund` (REQ-148) no se toca: parcial sigue sin revocar.
+- El formateo de moneda del cliente (`billingAmountText`, `index.html`) ya es correcto; el defecto está en el valor proyectado por el servidor.
+- `billingEventLabel`/`billingStatusLabel` (etiquetas) no cambian.
+
+### Riesgos
+
+- Regresión en el monto de otros tipos de evento si el cambio no se acota a `charge.refunded`.
+- Reembolsos antiguos ya registrados conservan su payload; la corrección aplica al proyectar, así que el historial se corrige al releerse sin migrar datos.
+
+### Criterios de aceptación
+
+- Un `charge.refunded` con `amount:1400, amount_refunded:700` se proyecta con `amount_cents:700` (UI: "USD 7.00").
+- Un reembolso total (`amount==amount_refunded`) y un `checkout.session.completed` siguen mostrando el monto correcto.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Test del proyector de `billing-history` con los tres payloads (parcial, total, pago normal).
+- Manual: inyectar en `billingHistory` un evento `charge.refunded` con `amount_cents` derivado del reembolso real y confirmar en Perfil → Suscripción → "Historial de pagos" que el renglón muestra el monto reembolsado.
