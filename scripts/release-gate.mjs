@@ -30,7 +30,7 @@ function run(label, cmd, opts = {}) {
   }
 }
 
-console.log("=== Fitbros Release Gate ===\n");
+console.log("=== Evolv Release Gate ===\n");
 
 // ── Worktree y rama ──────────────────────────────────────────────────────────
 console.log("[ Estado del repositorio ]");

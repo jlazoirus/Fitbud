@@ -34,11 +34,11 @@ if (DRY) {
 
 console.log(`Smoke test → ${BASE}\n`);
 
-await check("GET / devuelve 200 con título Fitbros", async () => {
+await check("GET / devuelve 200 con título Evolv", async () => {
   const r = await fetch(BASE + "/");
   assert(r.ok, `HTTP ${r.status}`);
   const html = await r.text();
-  assert(html.includes("Fitbros"), "Título 'Fitbros' no encontrado en la respuesta.");
+  assert(html.includes("Evolv"), "Título 'Evolv' no encontrado en la respuesta.");
   assert(html.includes("<html"), "Respuesta no parece HTML.");
 });
 
@@ -105,7 +105,7 @@ await check("service-worker.js devuelve JS válido", async () => {
   const r = await fetch(BASE + "/service-worker.js");
   assert(r.ok, `HTTP ${r.status}`);
   const text = await r.text();
-  assert(text.includes("CACHE_NAME") || text.includes("fitbud-pwa"), "El SW no parece el de Fitbros.");
+  assert(text.includes("CACHE_NAME") || text.includes("fitbud-pwa"), "El SW no parece el de Evolv.");
   assert(!text.includes("ANTHROPIC_API_KEY") && !text.includes("sk-ant-"), "El SW no debe contener secrets.");
 });
 

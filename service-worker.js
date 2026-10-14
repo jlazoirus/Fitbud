@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v75";
+const CACHE_NAME = "fitbud-pwa-v76";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -118,7 +118,7 @@ async function networkFirst(request, fallbackUrl) {
 self.addEventListener("push", event => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (_) {}
-  const title = data.title || "Fitbros";
+  const title = data.title || "Evolv";
   const body  = data.body  || "Tienes actividad pendiente.";
   event.waitUntil(
     self.registration.showNotification(title, {

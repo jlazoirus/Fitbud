@@ -3,59 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="Fitbros — tu cuerpo, tu sistema. Nutrición y entrenamiento personalizados para tu día a día.">
-<meta name="theme-color" content="#07070f">
+<meta name="description" content="Evolv — tu mejor versión, un día a la vez. Nutrición y entrenamiento personalizados para tu día a día.">
+<meta name="theme-color" content="#101010">
 <meta name="color-scheme" content="dark">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="application-name" content="Fitbros">
+<meta name="application-name" content="Evolv">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Fitbros">
+<meta name="apple-mobile-web-app-title" content="Evolv">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="assets/icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Fitbros — Tu cuerpo, tu sistema">
+<meta property="og:title" content="Evolv — Tu mejor versión, un día a la vez">
 <meta property="og:description" content="Nutrición y entrenamiento personalizados para tu día a día. Siempre tienes una opción viable.">
 <meta property="og:image" content="assets/icon-512.png">
 <meta property="og:url" content="https://fitbud-green.vercel.app/">
-<meta property="og:site_name" content="Fitbros">
+<meta property="og:site_name" content="Evolv">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Fitbros — Tu cuerpo, tu sistema">
+<meta name="twitter:title" content="Evolv — Tu mejor versión, un día a la vez">
 <meta name="twitter:description" content="Nutrición y entrenamiento personalizados para tu día a día.">
 <meta name="twitter:image" content="assets/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<title>Fitbros — Tu cuerpo, tu sistema</title>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<title>Evolv — Tu mejor versión, un día a la vez</title>
 <style>
   /* ════════════════════════════════════════════
-     FITBROS — Mobile design tokens
+     EVOLV — Mobile design tokens
      Dark · Púrpura primario · Terracota secundario
   ═══════════════════════════════════════════════ */
   :root{
-    /* Marca */
-    --purple-200:#b8a2ff; --purple-300:#9878ff; --purple-400:#7c5cfc; --purple-500:#5c3cd8; --purple-600:#3c1fac;
-    --terra-300:#df8c64; --terra-400:#d2744b; --terra-500:#c8643c;
+    /* Marca Evolv · dirección "Escala" (REQ-180). Los nombres --purple-* / --terra-*
+       se conservan por compatibilidad con las reglas existentes: hoy --purple-* es la
+       escala lima (acción, progreso) y --terra-* la escala azul señal (datos, fases). */
+    --purple-200:#ecffb0; --purple-300:#e2ff73; --purple-400:#d6ff3a; --purple-500:#bde81c; --purple-600:#8fb000;
+    --terra-200:#c2d6ff; --terra-300:#8fb4ff; --terra-400:#3a7bff; --terra-500:#2f66db;
     /* Superficies */
-    --black:#07070f; --surf1:#0f0f1c; --surf2:#161626; --surf3:#1d1d30; --surf4:#26263e;
+    --black:#101010; --surf1:#161616; --surf2:#1e1e1e; --surf3:#262626; --surf4:#303030;
     /* Líneas */
-    --border:rgba(255,255,255,.07); --border-2:rgba(255,255,255,.12); --border-acc:rgba(124,92,252,.22);
+    --border:rgba(255,255,255,.08); --border-2:rgba(255,255,255,.13); --border-acc:rgba(214,255,58,.24);
     /* Acentos */
-    --accent:var(--purple-400); --accent2:var(--terra-500);
-    --accent-dim:rgba(124,92,252,.14); --accent-glow:rgba(124,92,252,.28);
-    --terra-dim:rgba(200,100,60,.16); --terra-glow:rgba(200,100,60,.30);
+    --accent:var(--purple-400); --accent2:var(--terra-400); --on-accent:#101010;
+    --accent-dim:rgba(214,255,58,.12); --accent-glow:rgba(214,255,58,.22);
+    --terra-dim:rgba(58,123,255,.16); --terra-glow:rgba(58,123,255,.30);
     /* Semántica */
     --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
     --good-dim:rgba(34,197,94,.14); --warn-dim:rgba(245,158,11,.14); --bad-dim:rgba(239,68,68,.14);
     /* Aliases compat. con la app */
     --bg:var(--black); --card:var(--surf1); --card2:var(--surf2); --line:var(--border);
-    --txt:#f0eeff; --muted:#9992b6; --muted2:#52516e;
+    --txt:#f2f2ee; --muted:#a8a8a0; --muted2:#5f5f58;
     /* Tipos de día */
-    --pesas:var(--purple-400); --bajo:var(--terra-400); --refeed:var(--warn); --dietbreak:var(--purple-300); --libre:#52516e;
+    --pesas:var(--purple-400); --bajo:var(--terra-400); --refeed:var(--warn); --dietbreak:var(--purple-300); --libre:#5f5f58;
     /* Tipografía */
-    --font-display:'Syne',system-ui,sans-serif;
-    --font-body:'DM Sans',system-ui,sans-serif;
+    --font-display:'Unbounded',system-ui,sans-serif;
+    --font-body:'Manrope',system-ui,sans-serif;
     --font-mono:'JetBrains Mono',ui-monospace,monospace;
     --r-sm:12px; --r-md:16px; --r-lg:22px;
     /* Bordes seguros para iPhone en modo PWA/standalone. */
@@ -70,8 +72,8 @@
     font-family:var(--font-body);background:var(--black);color:var(--txt);margin:0;padding:0;height:100vh;height:100dvh;overflow:hidden;
     display:flex;flex-direction:column;
     -webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased;
-    background-image:radial-gradient(circle at 12% 8%,rgba(124,92,252,.10),transparent 42%),
-                     radial-gradient(circle at 90% 96%,rgba(200,100,60,.07),transparent 46%);
+    background-image:radial-gradient(circle at 12% 8%,rgba(214,255,58,.04),transparent 40%),
+                     radial-gradient(circle at 90% 96%,rgba(58,123,255,.05),transparent 46%);
     background-attachment:fixed;
   }
   #app{
@@ -87,7 +89,7 @@
   button{font-family:inherit;cursor:pointer;border:none;border-radius:var(--r-sm);color:var(--txt)}
   .btn{background:var(--surf2);padding:9px 14px;font-size:14px;font-weight:500;border:1px solid var(--border-2);border-radius:999px;transition:.15s}
   .btn:active{transform:scale(.97)}
-  .btn-accent{background:var(--accent);color:#fff;font-weight:700;font-family:var(--font-display);border:none;box-shadow:0 6px 22px var(--accent-glow)}
+  .btn-accent{background:var(--accent);color:var(--on-accent);font-weight:700;font-family:var(--font-display);border:none;box-shadow:0 6px 22px var(--accent-glow)}
   .btn-sm{padding:7px 13px;font-size:13px}
   /* Touch targets accesibles en pantallas táctiles (auditoría UX 23 jun 2026): mínimo 44px */
   @media(pointer:coarse){
@@ -191,7 +193,7 @@
   .meal .nums b{color:var(--txt);font-weight:500}
   .meal-actions{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
   .chk{width:32px;height:32px;border-radius:999px;border:2px solid var(--surf4);background:transparent;flex:0 0 auto;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.2s}
-  .chk.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chk.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   .meal-head{display:flex;gap:13px}
   .meal-head .chk{margin-top:2px}
   .meal-head > div{flex:1;min-width:0}
@@ -201,7 +203,7 @@
   .recipe .r-row .g{font-family:var(--font-mono);color:var(--muted);white-space:nowrap}
   .recipe .r-foot{font-size:11px;color:var(--muted);font-family:var(--font-mono);margin-top:7px}
 
-  .workout{background:linear-gradient(160deg,rgba(200,100,60,.16),var(--surf1));border:1px solid var(--terra-dim);border-radius:var(--r-lg);padding:16px}
+  .workout{background:linear-gradient(160deg,rgba(58,123,255,.16),var(--surf1));border:1px solid var(--terra-dim);border-radius:var(--r-lg);padding:16px}
   .workout .name{font-family:var(--font-display);font-size:17px}
   .workout .detail{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.45}
   .exercise-list{display:grid;gap:12px}
@@ -415,13 +417,13 @@
   .card-link:active{transform:scale(.99)}
   .cl-title{font-family:var(--font-display);font-weight:700;font-size:16px}
   .chev{color:var(--muted2);flex:0 0 auto}
-  .avatar{width:40px;height:40px;border-radius:999px;background:linear-gradient(135deg,var(--purple-300),var(--terra-400));display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;color:#fff;font-size:15px;flex:0 0 auto}
+  .avatar{width:40px;height:40px;border-radius:999px;background:var(--surf3);border:1px solid var(--border-acc);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-weight:800;color:var(--accent);font-size:15px;flex:0 0 auto}
   .shead-sub .badge{font-size:10px;padding:2px 8px}
   .splash{display:flex;align-items:center;justify-content:center;min-height:70vh}
 
   /* Auth / login */
   .auth{max-width:380px;margin:0 auto;padding-top:7vh}
-  .auth-brand{font-family:var(--font-display);font-weight:800;font-size:32px;letter-spacing:-.03em;text-align:center;margin-bottom:6px}
+  .auth-brand{font-family:var(--font-display);font-weight:800;font-size:32px;letter-spacing:-.03em;text-align:center;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:12px}
 
   /* Chips de preferencias (Perfil) */
   .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -485,10 +487,10 @@
     .player-dose{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
   /* Check-in semanal (REQ-20) */
-  .ci-banner{background:linear-gradient(135deg,var(--accent-dim),rgba(200,100,60,.10));border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:16px;margin-bottom:14px}
+  .ci-banner{background:linear-gradient(135deg,var(--accent-dim),rgba(58,123,255,.10));border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:16px;margin-bottom:14px}
   .ci-scale{display:flex;gap:6px;margin-top:7px}
   .ci-scale button{flex:1;height:38px;border-radius:var(--r-sm);background:var(--surf3);border:1px solid var(--border-2);color:var(--muted);font-size:13px;font-weight:600;transition:.15s;line-height:1}
-  .ci-scale button.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+  .ci-scale button.sel{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   .ci-scale-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-top:3px}
   .ci-delta{background:var(--surf3);border-radius:var(--r-md);padding:12px 14px;margin:10px 0}
   .ci-delta .ci-dlab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
@@ -513,7 +515,7 @@
   .agenda-item{display:grid;grid-template-columns:38px 1fr;gap:12px;padding:13px 0;border-top:1px solid var(--border)}
   .agenda-item:first-child{border-top:0;padding-top:4px}
   .agenda-icon{width:38px;height:38px;border-radius:var(--r-md);display:grid;place-items:center;background:var(--surf2);border:1px solid var(--border);font-size:18px;line-height:1}
-  .agenda-item.meal .agenda-icon{background:rgba(200,100,60,.12);border-color:var(--terra-dim)}
+  .agenda-item.meal .agenda-icon{background:rgba(58,123,255,.12);border-color:var(--terra-dim)}
   .agenda-item.workout .agenda-icon,.agenda-item.resume .agenda-icon{background:var(--accent-dim);border-color:var(--border-acc)}
   .agenda-item.done .agenda-icon{background:rgba(16,185,129,.10);border-color:rgba(16,185,129,.28)}
   .agenda-label{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase;margin-bottom:2px}
@@ -523,7 +525,7 @@
   .agenda-actions .btn{min-height:44px;flex:1 1 128px}
   .agenda-state{background:linear-gradient(160deg,var(--accent-dim),var(--surf1));border-color:var(--border-acc)}
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
-  .agenda-state.setup{background:linear-gradient(160deg,rgba(200,100,60,.13),var(--surf1));border-color:var(--terra-dim)}
+  .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
   .agenda-summary div{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
   .agenda-summary b{display:block;font-family:var(--font-display);font-size:19px;line-height:1}
@@ -568,7 +570,7 @@
   .coach-msg.coach{align-self:flex-start;align-items:flex-start}
   .coach-msg.summary{align-self:center;max-width:100%}
   .chat-bubble{padding:11px 14px;border-radius:var(--r-lg);font-size:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
-  .coach-msg.user .chat-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+  .coach-msg.user .chat-bubble{background:var(--accent);color:var(--on-accent);border-bottom-right-radius:4px}
   .coach-msg.coach .chat-bubble{background:var(--surf1);border:1px solid var(--border);border-bottom-left-radius:4px}
   .coach-msg.summary .chat-bubble{background:var(--surf3);border:1px dashed var(--border-2);font-size:12px;color:var(--muted);text-align:center;border-radius:var(--r-md)}
   .coach-msg .chat-meta{font-size:11px;color:var(--muted2);margin-top:3px;display:flex;gap:6px;align-items:center}
@@ -588,7 +590,7 @@
   .coach-input-row{display:flex;gap:8px;padding:10px 14px 12px;background:var(--bg);border-top:1px solid var(--border);flex-shrink:0}
   .coach-input-row textarea{flex:1;resize:none;background:var(--surf1);border:1px solid var(--border-2);border-radius:var(--r-md);color:var(--txt);padding:10px 12px;font-size:14px;font-family:inherit;min-height:42px;max-height:120px;line-height:1.4}
   .coach-input-row textarea:focus{outline:none;border-color:var(--accent)}
-  .coach-input-row button{height:42px;width:42px;flex-shrink:0;border-radius:var(--r-sm);background:var(--accent);color:#fff;font-size:18px;align-self:flex-end}
+  .coach-input-row button{height:42px;width:42px;flex-shrink:0;border-radius:var(--r-sm);background:var(--accent);color:var(--on-accent);font-size:18px;align-self:flex-end}
   .coach-input-row button:disabled{opacity:.4}
   .coach-typing{display:flex;gap:4px;padding:4px 2px;align-items:center}
   .coach-typing span{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:bounce 1.1s infinite}
@@ -608,27 +610,29 @@
   .landing{width:100%;max-width:none;margin:0;padding:0 max(16px,var(--safe-right)) calc(40px + var(--safe-bottom)) max(16px,var(--safe-left));overflow-x:hidden}
   .landing-nav,.l-hero,.l-section,.l-cta-final,.l-footer{width:100%;max-width:1120px;margin-left:auto;margin-right:auto}
   .landing-nav{display:flex;justify-content:space-between;align-items:center;padding:max(18px,calc(12px + var(--safe-top))) 0 20px}
-  .landing-brand{font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:0;color:var(--txt)}
+  .landing-brand{font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:-.02em;color:var(--txt);display:inline-flex;align-items:center;gap:10px}
+  .brand-v{color:var(--accent)}
+  .brand-mark{display:block;flex-shrink:0}
   .landing-nav-actions{display:flex;gap:8px;align-items:center}
 
   /* Hero */
   .l-hero{padding:4px 0 30px;display:grid;gap:18px;text-align:left;min-width:0}
   .l-hero-copy{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
-  .l-hero-eyebrow{font-size:11px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.14em;font-weight:700;margin-bottom:16px}
-  .l-hero h1{font-family:var(--font-display);font-size:clamp(42px,14vw,58px);font-weight:800;letter-spacing:0;line-height:1.02;margin:0 0 14px;background:linear-gradient(135deg,var(--txt) 0%,var(--purple-200) 60%,var(--terra-300) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;overflow-wrap:break-word}
+  .l-hero-eyebrow{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.14em;font-weight:700;margin-bottom:16px}
+  .l-hero h1{font-family:var(--font-display);font-size:clamp(30px,9vw,40px);font-weight:800;letter-spacing:-.02em;line-height:1.06;margin:0 0 14px;color:var(--txt)}
   .l-hero-sub{font-size:15px;color:var(--muted);line-height:1.52;margin:0 0 22px;max-width:440px}
   .l-hero-ctas{display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px;margin:0}
   .l-hero-ctas .btn{min-height:48px;font-size:15px;border-radius:14px;justify-content:center;display:flex;align-items:center}
   .l-hero-note{font-size:11px;color:var(--muted);margin-top:12px;text-align:left}
 
   /* Mockup / demo placeholder */
-  .l-mockup{border:1px solid var(--border-acc);border-radius:var(--r-lg);background:linear-gradient(160deg,var(--surf2),var(--surf1));padding:14px;margin:0 auto;max-width:320px;width:100%;min-width:0;box-shadow:0 20px 60px rgba(124,92,252,.18)}
+  .l-mockup{border:1px solid var(--border-acc);border-radius:var(--r-lg);background:linear-gradient(160deg,var(--surf2),var(--surf1));padding:14px;margin:0 auto;max-width:320px;width:100%;min-width:0;box-shadow:0 20px 60px rgba(214,255,58,.18)}
   .l-mockup-day{font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:10px}
   .l-mockup-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surf1);border:1px solid var(--border);border-radius:12px;padding:9px 11px;margin-bottom:7px}
   .l-mockup-row .lmr-name{font-size:13px;font-weight:600;font-family:var(--font-display)}
   .l-mockup-row .lmr-mac{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
-  .l-mockup-row .lmr-chk{width:22px;height:22px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
-  .l-mockup-workout{background:linear-gradient(135deg,rgba(200,100,60,.18),var(--surf1));border:1px solid var(--terra-dim);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
+  .l-mockup-row .lmr-chk{width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+  .l-mockup-workout{background:linear-gradient(135deg,rgba(58,123,255,.18),var(--surf1));border:1px solid var(--terra-dim);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
   .l-mockup-workout .lmw-name{font-size:13px;font-weight:700;font-family:var(--font-display)}
   .l-mockup-workout .lmw-det{font-size:11px;color:var(--muted);margin-top:2px}
   .l-mockup-ring{display:flex;align-items:center;gap:6px;margin-bottom:12px;background:var(--surf2);border-radius:12px;padding:9px 12px}
@@ -694,7 +698,7 @@
     .landing-brand{font-size:25px}
     .l-hero{grid-template-columns:minmax(0,1fr) minmax(360px,430px);align-items:center;gap:64px;padding:26px 0 58px}
     .l-hero-copy{max-width:590px}
-    .l-hero h1{font-size:72px;line-height:.95}
+    .l-hero h1{font-size:54px;line-height:1.02}
     .l-hero-sub{font-size:18px;max-width:560px;margin-bottom:26px}
     .l-hero-ctas{flex-direction:row;max-width:none}
     .l-hero-ctas .btn{padding-left:20px;padding-right:20px}
@@ -757,7 +761,7 @@
   .pf-accordion .availability-day{grid-template-columns:minmax(106px,.9fr) minmax(126px,1.1fr);gap:8px;padding:8px 9px}
   .pf-accordion .availability-day select{padding:8px;min-height:40px}
   .pf-save-float{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:0;right:0;padding:0 16px;z-index:49;pointer-events:none}
-  .pf-save-float button{width:100%;max-width:528px;margin:0 auto;display:block;background:var(--accent);color:#fff;border:none;border-radius:var(--r-lg);padding:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.55);pointer-events:auto;font-family:var(--font-display)}
+  .pf-save-float button{width:100%;max-width:528px;margin:0 auto;display:block;background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--r-lg);padding:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.55);pointer-events:auto;font-family:var(--font-display)}
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
 <script src="config.js"></script>
@@ -790,7 +794,7 @@
 function scrollAppTop(){const a=document.getElementById("app");if(a)a.scrollTop=0;else scrollAppTop();}
 function scrollAppBottom(){const a=document.getElementById("app");if(a)a.scrollTop=a.scrollHeight;else scrollAppBottom();}
 /* ============================================================
-   Fitbros — tracker de nutrición y entrenamiento con IA (un solo archivo)
+   Evolv — coach de nutrición y entrenamiento (un solo archivo)
    Fases 1-8: datos, vista HOY, navegación, reemplazos,
    macros en vivo, IA (Claude API), voz y extras.
    ============================================================ */
@@ -2704,7 +2708,7 @@ async function savePrivacyChoices(source,origin){
 function renderPrivacyUnavailable(){
   $("#tabs").innerHTML="";
   $("#app").innerHTML=`<main class="onboarding">
-    <div class="onboarding-brand">FITBROS · PRIVACIDAD</div>
+    <div class="onboarding-brand">EVOLV · PRIVACIDAD</div>
     <h1>No podemos continuar todavía</h1>
     <p class="onboarding-copy">La protección de tus datos y la evaluación de seguridad deben estar disponibles antes de crear o adaptar un plan.</p>
     <div class="alert">${esc(isAdmin()?privacyError:"Intenta nuevamente más tarde. Si continúa, contacta a soporte.")}</div>
@@ -2716,16 +2720,16 @@ function renderPrivacyGate(){
   const responses=(safetyScreening&&safetyScreening.responses)||{};
   $("#tabs").innerHTML="";
   $("#app").innerHTML=`<main class="onboarding">
-    <div class="onboarding-brand">FITBROS · PRIVACIDAD Y SEGURIDAD</div>
+    <div class="onboarding-brand">EVOLV · PRIVACIDAD Y SEGURIDAD</div>
     <h1>Tus datos trabajan para ti</h1>
     <p class="onboarding-copy">Solo usamos lo necesario para adaptar tu plan y ayudarte a revisar tu progreso.</p>
     <div class="dash">
       <div class="alert violet"><b>Sin usos ocultos.</b><br>No vendemos tus datos ni los usamos para publicidad. Se procesan únicamente para personalizar tus entrenamientos, alimentación y seguimiento.</div>
-      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_consent_core" ${hasRequiredConsents()?"checked":""}><span>Acepto que Fitbros use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
+      <label class="chip-check" style="display:flex;margin-bottom:8px"><input type="checkbox" id="pg_consent_core" ${hasRequiredConsents()?"checked":""}><span>Acepto que Evolv use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
       <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="pg_consent_photos" ${hasCurrentConsent("progress_photos")?"checked":""}><span>Opcional: guardar fotos de progreso personal para comparar mi avance.</span></label>
       <div class="muted small" style="margin-bottom:8px"><b>Antes de entrenar:</b> estas preguntas nos ayudan a evitar recomendaciones que podrían no ser adecuadas para ti.</div>
       ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("pg_"+key,responses[key]===true?"yes":responses[key]===false?"no":"")}</div>`).join("")}
-      <div class="alert"><b>Fitbros no sustituye atención médica.</b><br>Detén el ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
+      <div class="alert"><b>Evolv no sustituye atención médica.</b><br>Detén el ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
       <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
     </div>
     <button id="privacyGateBtn" class="btn btn-accent privacy-control" style="width:100%" onclick="savePrivacyGate()">Aceptar y continuar</button>
@@ -2752,14 +2756,14 @@ function openPrivacyNotice(){
   modal(`<h3>Privacidad sencilla</h3>
     <p class="muted small">Tus datos corporales, preferencias y registros de progreso se usan únicamente para crear recomendaciones más útiles y mostrarte cómo avanzas.</p>
     <p class="muted small">No vendemos tus datos ni los usamos para publicidad. Las fotos son opcionales, privadas y se muestran mediante enlaces temporales.</p>
-    <p class="muted small">Puedes retirar el permiso de fotos, exportar tus datos o borrar tu cuenta desde Perfil. Fitbros no diagnostica ni sustituye a un profesional.</p>
+    <p class="muted small">Puedes retirar el permiso de fotos, exportar tus datos o borrar tu cuenta desde Perfil. Evolv no diagnostica ni sustituye a un profesional.</p>
     <div class="alert">Texto preliminar pendiente de revisión profesional antes del lanzamiento comercial. Versión ${CONSENT_POLICY_VERSION}.</div>
     <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`);
 }
 function openTermsNotice(){
   modal(`<h3>Términos de uso</h3>
-    <p class="muted small">Fitbros es una herramienta de seguimiento personal de nutrición y entrenamiento. El contenido generado es orientativo y no constituye consejo médico ni nutricional profesional.</p>
-    <p class="muted small">Al usar Fitbros aceptas no depender exclusivamente de la app para decisiones de salud. Consulta a un profesional si tienes condiciones médicas.</p>
+    <p class="muted small">Evolv es una herramienta de seguimiento personal de nutrición y entrenamiento. El contenido generado es orientativo y no constituye consejo médico ni nutricional profesional.</p>
+    <p class="muted small">Al usar Evolv aceptas no depender exclusivamente de la app para decisiones de salud. Consulta a un profesional si tienes condiciones médicas.</p>
     <p class="muted small">Puedes cancelar tu cuenta en cualquier momento desde Perfil. La cancelación elimina tus datos personales conforme a nuestra política de privacidad.</p>
     <div class="alert">Texto preliminar pendiente de revisión profesional antes del lanzamiento comercial. Versión ${CONSENT_POLICY_VERSION}.</div>
     <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`);
@@ -3089,10 +3093,10 @@ function renderOnboarding(){
       <div class="section-h" style="margin-left:0">Privacidad y seguridad</div>
       <div class="dash">
         <div class="alert violet"><b>Tus datos trabajan para ti.</b><br>No los vendemos ni los usamos para publicidad. Solo los procesamos para adaptar tu plan y ayudarte a revisar tu progreso.</div>
-        <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="ob_consent_core" ${d.consentCore?"checked":""}><span>Acepto que Fitbros use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
+        <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="ob_consent_core" ${d.consentCore?"checked":""}><span>Acepto que Evolv use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
         <div class="muted small" style="margin-bottom:8px"><b>Antes de entrenar:</b> responde estas preguntas para evitar recomendaciones que podrían no ser adecuadas para ti.</div>
         ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("ob_safety_"+key,d.safetyResponses[key])}</div>`).join("")}
-        <div class="alert"><b>Fitbros es bienestar, no atención médica.</b><br>Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
+        <div class="alert"><b>Evolv es bienestar, no atención médica.</b><br>Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
         <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
       </div>${onboardingButtons(true)}`;
   }
@@ -3100,7 +3104,7 @@ function renderOnboarding(){
   const challengeNote=d.challenge&&CHALLENGE_LABELS[d.challenge]
     ? `<div class="alert violet"><b>Siguiente desafío:</b> ${CHALLENGE_LABELS[d.challenge]}. Revisaremos todos tus datos antes de crear las próximas ${d.planDurationWeeks} semanas.</div>`
     :"";
-  $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">FITBROS · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</main>`;
+  $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">EVOLV · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</main>`;
 }
 function readOnboardingStep(){
   const d=onboardingDraft;
@@ -3254,7 +3258,7 @@ function renderFirstWeekSetup(state){
   const s=state||{};
   $("#tabs").innerHTML="";
   $("#app").innerHTML=`<main class="onboarding">
-    <div class="onboarding-brand">FITBROS · TU PLAN</div>
+    <div class="onboarding-brand">EVOLV · TU PLAN</div>
     <h1>Preparando tu primera semana</h1>
     <p class="onboarding-copy">${esc(s.message||"Estamos armando comidas y entrenamiento según tus metas. Solo un momento…")}</p>
     ${firstWeekSetupStatusHtml(s)}
@@ -3591,7 +3595,7 @@ function showMacroInfo(key){
   if(!info)return;
   modal(`<h3>${esc(info.label)}</h3><p class="muted small">${esc(info.text)}</p>`);
 }
-// Cabecera de pantalla (eyebrow + título Syne + chip de ícono a la derecha)
+// Cabecera de pantalla (eyebrow + título display + chip de ícono a la derecha)
 function screenHeader(title,sub,icon){
   return `<header class="shead">
     <div>${sub?`<div class="shead-sub">${sub}</div>`:""}<h2>${esc(title)}</h2></div>
@@ -3634,7 +3638,7 @@ function renderSplash(){$("#app").innerHTML=`<div class="splash"><div class="mut
 function renderInactive(){
   const email=(session&&session.user&&session.user.email)||"";
   $("#app").innerHTML=`<div class="auth">
-    <div class="auth-brand">Fitbros</div>
+    <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
     <div class="dash">
       <h3>Cuenta desactivada</h3>
       <p class="muted small">La cuenta ${esc(email)} no puede modificar datos ni pedir nuevas recomendaciones. Contacta a un administrador para reactivarla.</p>
@@ -3643,7 +3647,14 @@ function renderInactive(){
   </div>`;
 }
 
-// Íconos de línea (estilo Fitbros). Cada uno es el contenido de un <svg> 24×24.
+// REQ-180: logo Evolv (dirección "Escala"): tres escalones lima sobre carbón y el
+// nombre en minúsculas con la v final en lima.
+function brandMark(size){
+  const s=size||28;
+  return `<svg class="brand-mark" width="${s}" height="${s}" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1e1e1e"/><rect x="13" y="38" width="9" height="13" rx="2" fill="var(--accent)"/><rect x="27.5" y="28" width="9" height="23" rx="2" fill="var(--accent)"/><rect x="42" y="14" width="9" height="37" rx="2" fill="var(--accent)"/></svg>`;
+}
+function brandWordmark(){return `<span>evol<span class="brand-v">v</span></span>`;}
+// Íconos de línea (estilo Evolv). Cada uno es el contenido de un <svg> 24×24.
 const TAB_ICONS={
   hoy:'<path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
   nutricion:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>',
@@ -3718,7 +3729,7 @@ function updateInstallPrompt(){
   el.id="a2hs"; el.className="a2hs";
   el.innerHTML=`<div class="a2hs-ic">📲</div>
     <div class="a2hs-body">
-      <div class="a2hs-title">Agrega Fitbros a tu inicio</div>
+      <div class="a2hs-title">Agrega Evolv a tu inicio</div>
       <div class="a2hs-txt">${txt}</div>
       <div class="a2hs-actions">${action}<button class="btn btn-sm" onclick="dismissInstall()">${action?'Ahora no':'Entendido'}</button></div>
     </div>
@@ -6490,7 +6501,7 @@ async function exportPersonalData(button){
     const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
     const url=URL.createObjectURL(blob);
     const link=document.createElement("a");
-    link.href=url;link.download=`fitbros-datos-${todayStr()}.json`;
+    link.href=url;link.download=`evolv-datos-${todayStr()}.json`;
     document.body.appendChild(link);link.click();link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),1000);
     toast("Exportación descargada");
@@ -6986,7 +6997,7 @@ function renderLanding(){
 
     <!-- Barra de navegación -->
     <nav class="landing-nav">
-      <div class="landing-brand">Fitbros</div>
+      <div class="landing-brand" role="img" aria-label="Evolv">${brandMark(30)}${brandWordmark()}</div>
       <div class="landing-nav-actions">
         <button class="btn btn-sm" onclick="showAuthFromLanding('in')">Iniciar sesión</button>
         <button class="btn btn-sm btn-accent" onclick="showAuthFromLanding('up')">Empezar</button>
@@ -6996,8 +7007,8 @@ function renderLanding(){
     <!-- Hero -->
     <section class="l-hero">
       <div class="l-hero-copy">
-        <div class="l-hero-eyebrow">Tu coach personal</div>
-        <h1>Fitbros</h1>
+        <div class="l-hero-eyebrow">Tu coach de todos los días</div>
+        <h1>Tu mejor versión, un día a la vez.</h1>
         <p class="l-hero-sub">Tu plan diario de nutrición y entrenamiento: una opción viable para comer y entrenar hoy, armada con tu cuerpo, horarios y recursos reales.</p>
         <div class="l-hero-ctas">
           <button class="btn btn-accent" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
@@ -7009,8 +7020,8 @@ function renderLanding(){
         <div class="l-mockup-day">Hoy · Martes</div>
         <div class="l-mockup-ring">
           <svg class="lmr-arc" viewBox="0 0 36 36">
-            <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(124,92,252,.2)" stroke-width="4"/>
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#7c5cfc" stroke-width="4"
+            <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(214,255,58,.2)" stroke-width="4"/>
+            <circle cx="18" cy="18" r="14" fill="none" stroke="#d6ff3a" stroke-width="4"
               stroke-dasharray="66 88" stroke-dashoffset="22" stroke-linecap="round" transform="rotate(-90 18 18)"/>
           </svg>
           <div><div class="lmr-txt">1 640 kcal</div><div class="lmr-sub">de 1 900 kcal</div></div>
@@ -7114,7 +7125,7 @@ function renderLanding(){
             ¿Necesito experiencia en nutrición o entrenamiento?
             <span class="l-faq-ic">+</span>
           </button>
-          <div class="l-faq-a">No. Fitbros explica qué hacer, cómo hacerlo y por qué. Cada ejercicio tiene instrucciones y alternativas para principiantes. El plan de comidas usa recetas reales con ingredientes y cantidades.</div>
+          <div class="l-faq-a">No. Evolv explica qué hacer, cómo hacerlo y por qué. Cada ejercicio tiene instrucciones y alternativas para principiantes. El plan de comidas usa recetas reales con ingredientes y cantidades.</div>
         </div>
         <div class="l-faq-item">
           <button class="l-faq-q" onclick="toggleFaq(this)">
@@ -7135,7 +7146,7 @@ function renderLanding(){
             ¿Qué pasa si me pierdo un día?
             <span class="l-faq-ic">+</span>
           </button>
-          <div class="l-faq-a">Las rachas de Fitbros son justas: los descansos planificados no se cuentan como fallos. Si te pierdes un entrenamiento, el modo contingencia te da tres opciones: recuperarlo, seguir con el plan o convertirlo en descanso. Sin castigos.</div>
+          <div class="l-faq-a">Las rachas de Evolv son justas: los descansos planificados no se cuentan como fallos. Si te pierdes un entrenamiento, el modo contingencia te da tres opciones: recuperarlo, seguir con el plan o convertirlo en descanso. Sin castigos.</div>
         </div>
         <div class="l-faq-item">
           <button class="l-faq-q" onclick="toggleFaq(this)">
@@ -7158,7 +7169,7 @@ function renderLanding(){
     <!-- Footer -->
     <footer class="l-footer">
       <div class="l-footer-legal">
-        © 2026 Fitbros · <a href="#" onclick="showAuthFromLanding('in');return false">Iniciar sesión</a>
+        © 2026 Evolv · <a href="#" onclick="showAuthFromLanding('in');return false">Iniciar sesión</a>
         · <a href="#" onclick="openPrivacyNotice();return false">Privacidad</a>
         · <a href="#" onclick="openTermsNotice();return false">Términos</a>
       </div>
@@ -7174,7 +7185,7 @@ function renderAuth(){
       // Producción: las credenciales vienen de /api/config. No mostramos el
       // formulario de conexión al usuario; si falló, ofrecemos reintentar.
       $("#app").innerHTML=`<div class="auth">
-        <div class="auth-brand">Fitbros</div>
+        <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
         <div class="muted small center" style="margin-bottom:18px">Conectando con el servidor…</div>
         <div class="center"><button class="btn btn-accent" onclick="retryConnect()">Reintentar</button></div>
       </div>`;
@@ -7184,9 +7195,9 @@ function renderAuth(){
     const cfg=effectiveSettings();
     $("#app").innerHTML=`<div class="auth">
       <div style="margin-bottom:18px">
-        <button class="btn btn-sm" onclick="window._showAuth=false;render()" style="font-size:12px;padding:6px 11px">← Conoce Fitbros</button>
+        <button class="btn btn-sm" onclick="window._showAuth=false;render()" style="font-size:12px;padding:6px 11px">← Conoce Evolv</button>
       </div>
-      <div class="auth-brand">Fitbros</div>
+      <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
       <div class="muted small center" style="margin-bottom:18px">Conecta tu proyecto Supabase para continuar.</div>
       <div class="dash">
         <div class="field"><label>Project URL o ID</label><input id="au_url" value="${esc(cfg.supaUrl||"")}" placeholder="xxxx ó https://xxxx.supabase.co"></div>
@@ -7199,9 +7210,9 @@ function renderAuth(){
   const mode=window._authMode||"in";
   $("#app").innerHTML=`<div class="auth">
     <div style="margin-bottom:18px">
-      <button class="btn btn-sm" onclick="window._showAuth=false;render()" style="font-size:12px;padding:6px 11px">← Conoce Fitbros</button>
+      <button class="btn btn-sm" onclick="window._showAuth=false;render()" style="font-size:12px;padding:6px 11px">← Conoce Evolv</button>
     </div>
-    <div class="auth-brand">Fitbros</div>
+    <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
     <div class="muted small center" style="margin-bottom:20px">${mode==="in"?"Inicia sesión para continuar":"Crea tu cuenta gratis"}</div>
     <div class="dash">
       <div class="field"><label>Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
@@ -7281,7 +7292,7 @@ function renderPasswordRecovery(){
     const invite=passwordRecoveryMode==="invite";
     const msg=passwordRecoveryError||(invite?"El enlace de invitación ya expiró o no se pudo validar. Pide una nueva invitación.":"El enlace de recuperación ya expiró o no se pudo validar. Pide uno nuevo desde el inicio de sesión.");
     $("#app").innerHTML=`<div class="auth">
-      <div class="auth-brand">Fitbros</div>
+      <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
       <div class="dash">
         <h3>No pudimos abrir el enlace</h3>
         <p class="muted small">${esc(msg)}</p>
@@ -7293,7 +7304,7 @@ function renderPasswordRecovery(){
   const invite=passwordRecoveryMode==="invite";
   const firstLogin=passwordRecoveryMode==="first_login";
   $("#app").innerHTML=`<div class="auth">
-    <div class="auth-brand">Fitbros</div>
+    <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
     <div class="muted small center" style="margin-bottom:20px">${firstLogin?"Bienvenido. Crea tu propia contraseña para terminar de activar tu cuenta.":invite?"Crea tu contraseña para activar la cuenta.":"Define una nueva contraseña para tu cuenta."}</div>
     <div class="dash">
       ${passwordField({id:"recovery_pwd",label:"Nueva contraseña",autocomplete:"new-password",minlength:"8"})}
@@ -7341,7 +7352,7 @@ async function finishPasswordRecovery(){
     try{const r=await supa.auth.getSession();session=(r.data&&r.data.session)||session;}catch(_){}
     if(session&&session.user)session.user.user_metadata={...(session.user.user_metadata||{}),must_change_password:false};
     passwordRecovery=false;passwordRecoveryError="";passwordRecoveryMode="recovery";
-    toast("Contraseña creada. ¡Bienvenido a Fitbros!");
+    toast("Contraseña creada. ¡Bienvenido a Evolv!");
     await onAuth();
     return;
   }
@@ -10607,7 +10618,7 @@ async function renderAdminUsers(){
       <div class="row between wrap" style="gap:10px;margin-bottom:14px">
         <div style="flex:1;min-width:210px">
           <b>Invitar usuario</b>
-          <div class="muted small" style="margin-top:5px">Envía un correo para activar la cuenta y crear contraseña desde Fitbros.</div>
+          <div class="muted small" style="margin-top:5px">Envía un correo para activar la cuenta y crear contraseña desde Evolv.</div>
         </div>
         <button class="btn btn-accent" onclick="openAdminInviteUser()">Enviar invitación</button>
       </div>
@@ -10860,13 +10871,13 @@ async function resetAdminUserQuota(userId){
 // REQ-176: alta sin depender del correo (límite del SMTP, enlaces de un solo uso).
 function openAdminCreateUser(){
   modal(`<h3>Crear cuenta</h3>
-    <p class="muted small">La cuenta queda activa con una contraseña temporal. En su primer ingreso, Fitbros le pide crear su propia contraseña.</p>
+    <p class="muted small">La cuenta queda activa con una contraseña temporal. En su primer ingreso, Evolv le pide crear su propia contraseña.</p>
     <div class="field"><label>Correo</label><input id="adminCreateEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
     <button id="adminCreateBtn" class="btn btn-accent" style="width:100%" onclick="createAdminUser()">Crear cuenta</button>
     <div id="adminCreateOut" class="muted small" style="margin-top:10px"></div>`);
 }
 function adminWelcomeMessage(email,password){
-  return `¡Hola! Ya tienes tu cuenta en Fitbros.\n\nEntra en ${location.origin}/\nCorreo: ${email}\nContraseña temporal: ${password}\n\nAl entrar te pedirá crear tu propia contraseña.`;
+  return `¡Hola! Ya tienes tu cuenta en Evolv.\n\nEntra en ${location.origin}/\nCorreo: ${email}\nContraseña temporal: ${password}\n\nAl entrar te pedirá crear tu propia contraseña.`;
 }
 async function createAdminUser(){
   const email=($("#adminCreateEmail")&&$("#adminCreateEmail").value||"").trim().toLowerCase();
@@ -11072,8 +11083,8 @@ function editExercise(slug){
     slug:"",name:"",aliases:[],discipline:"bodyweight",level:"beginner",equipment:[],places:["home"],
     muscles:[],movement_pattern:"core",start_position:"",steps:[],breathing:"",common_errors:[],
     safety_signals:[],regression:"",progression:"",substitute_slugs:[],contraindications:[],
-    media_type:"inline_svg",media_key:"core",static_key:"core",source_name:"Fitbros Studio",
-    source_url:"",license_name:"Contenido propio Fitbros",attribution:"Fitbros Studio",active:true,
+    media_type:"inline_svg",media_key:"core",static_key:"core",source_name:"Evolv Studio",
+    source_url:"",license_name:"Contenido propio Evolv",attribution:"Evolv Studio",active:true,
   };
   window._exerciseOriginal=slug||null;
   const mediaKeys=["squat","hinge","push","pull","lunge","bridge","core","calf","isolation","run","cycle","swim"];
@@ -12013,8 +12024,8 @@ function tourEnsureStyle(){
   .tour-dots{font-size:12px;color:var(--muted2,#7b769a)}
   .tour-actions{display:flex;gap:8px}
   .tour-btn{min-height:40px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:600;border:1px solid var(--border-2,#332b52);background:var(--surf3,#221d3a);color:var(--txt,#fff);cursor:pointer}
-  .tour-btn.primary{background:var(--accent,#7c5cff);border-color:transparent;color:#fff}
-  .tour-skip{background:none;border:none;color:var(--muted,#9992b6);font-size:12px;cursor:pointer;min-height:40px;padding:0 4px}
+  .tour-btn.primary{background:var(--accent,#d6ff3a);border-color:transparent;color:var(--on-accent,#101010)}
+  .tour-skip{background:none;border:none;color:var(--muted,#a8a8a0);font-size:12px;cursor:pointer;min-height:40px;padding:0 4px}
   @media(prefers-reduced-motion:reduce){.tour-spot{transition:none}}`;
   document.head.appendChild(s);
 }

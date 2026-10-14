@@ -43,7 +43,7 @@ test.describe("Navegación", () => {
     await gotoApp(page);
 
     await expect(page.locator("#tabs")).toBeEmpty();
-    await expect(page.locator("#app")).toContainText(/Fitbros/i);
+    await expect(page.locator("#app")).toContainText(/Evolv/i);
     // La landing nunca menciona vocabulario interno de IA (REQ-31)
     const bodyText = await page.locator("#app").innerText();
     expect(bodyText).not.toMatch(/\b(Claude|Anthropic|prompt|tokens?)\b/i);

@@ -3,10 +3,10 @@
 
   const OWN_MEDIA={
     media_type:"inline_svg",
-    source_name:"Fitbros Studio",
+    source_name:"Evolv Studio",
     source_url:"",
-    license_name:"Contenido propio Fitbros",
-    attribution:"Fitbros Studio",
+    license_name:"Contenido propio Evolv",
+    attribution:"Evolv Studio",
     active:true,
   };
 

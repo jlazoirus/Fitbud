@@ -1,11 +1,11 @@
-# Privacidad, consentimiento y seguridad de Fitbros
+# Privacidad, consentimiento y seguridad de Evolv
 
 **Version operativa:** 2026-06-15-v2
 **Estado legal:** texto preliminar. Requiere revision profesional antes de un lanzamiento comercial.
 
 ## Alcance
 
-Fitbros es una herramienta de bienestar. No diagnostica enfermedades, no prescribe tratamientos y no reemplaza a un medico, nutricionista, fisioterapeuta u otro profesional de salud.
+Evolv es una herramienta de bienestar. No diagnostica enfermedades, no prescribe tratamientos y no reemplaza a un medico, nutricionista, fisioterapeuta u otro profesional de salud.
 
 La edad minima operativa es **18 anos**. No se habilitan cuentas de menores hasta definir el tratamiento legal y los consentimientos correspondientes.
 
@@ -18,7 +18,7 @@ La interfaz solicita como maximo dos permisos:
 
 Para conservar una auditoria precisa, el permiso necesario se registra internamente en los propositos de datos corporales y recomendaciones del coach, aunque el usuario lo acepta mediante un solo check. Los permisos de correo y marketing no se solicitan en este flujo y quedan retirados. Una nueva version de esta politica exige una nueva aceptacion del permiso necesario.
 
-Fitbros no vende los datos personales ni los usa para publicidad. Los datos se procesan para personalizar entrenamientos, alimentacion y seguimiento, o para mostrar el progreso solicitado por el usuario.
+Evolv no vende los datos personales ni los usa para publicidad. Los datos se procesan para personalizar entrenamientos, alimentacion y seguimiento, o para mostrar el progreso solicitado por el usuario.
 
 ## Aptitud y senales de alerta
 
@@ -35,7 +35,7 @@ La exportacion genera un JSON legible con perfil, progreso, planes, ciclos, cons
 ## Retencion y borrado
 
 - Mientras la cuenta exista, se conserva el historial para que el usuario pueda consultar y exportar su progreso, incluso si deja de tener un plan activo.
-- Al borrar la cuenta, Fitbros elimina primero las fotos del almacenamiento activo y luego la cuenta de Auth; las tablas personales se eliminan por cascada.
+- Al borrar la cuenta, Evolv elimina primero las fotos del almacenamiento activo y luego la cuenta de Auth; las tablas personales se eliminan por cascada.
 - Los logs de aplicacion no deben contener fotos, alergias, notas de salud ni prompts completos.
 - Los respaldos gestionados por proveedores deben configurarse para expirar en un maximo operativo de 30 dias. Este plazo y los contratos de los proveedores deben verificarse legalmente antes del lanzamiento comercial.
 - Datos anonimizados solo pueden conservarse si ya no permiten identificar ni reconstruir a la persona.

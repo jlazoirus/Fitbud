@@ -1779,3 +1779,29 @@ El plan gratuito pausa el proyecto tras ~7 días sin actividad. El cron diario `
 
 - Una invocación de cron sin secreto responde 401 pero ejecuta la lectura mínima. ✓
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-180 - Rebranding Fitbros → Evolv (dirección "Escala")
+
+**Estado: implementado.**
+
+### Origen
+
+Decisión de Jonathan (2026-10-14): renombrar la marca a Evolv y adoptar la dirección C "Escala" de la exploración de marca (casi negro + lima eléctrica, Unbounded + Manrope, ícono de tres escalones). Modo oscuro por defecto.
+
+### Alcance
+
+1. Tokens (`index.html :root`): lima `#D6FF3A` como acento con `--on-accent:#101010` (texto oscuro sobre lima), azul señal `#3A7BFF` como secundario, superficies carbón/grafito, texto `#F2F2EE`/`#A8A8A0`. Se conservan los nombres `--purple-*`/`--terra-*` (ahora escala lima/azul) para no reescribir reglas. Fondos de acento con texto blanco pasan a `--on-accent`; avatar y botón del tour corregidos por contraste.
+2. Tipografías: Unbounded (display) y Manrope (texto) vía Google Fonts.
+3. Logo: `brandMark()` (escalones) + `brandWordmark()` ("evol" + "v" lima) en portada y pantallas de acceso; íconos PWA 180/192/512 regenerados dentro de la zona segura maskable.
+4. Textos visibles "Fitbros" → "Evolv" (app, manifiesto, notificaciones push, beta, PRIVACY.md, README); tagline "Tu mejor versión, un día a la vez."; atribución de ejercicios propios "Evolv Studio" (catálogo local y 9 filas en producción).
+5. Portada: hero con el tagline como titular y logo en la barra.
+6. Se conservan identificadores internos (`fitbros_tour_v1`, `startFitbrosTour`, `fitbros_test_user`, lock de los loops) para no resetear estado de usuarios ni romper herramientas.
+
+### Fuera de alcance (pendiente)
+
+- Dominio `evolv.vercel.app` (renombrar proyecto o agregar dominio en Vercel) y URLs de Supabase Auth/correos.
+- Remitente y plantillas de correo con la marca Evolv.
+
+### Criterios de aceptación
+
+- Release gate y E2E en verde; capturas a 390 px de portada, login, Hoy y Entreno revisadas. ✓

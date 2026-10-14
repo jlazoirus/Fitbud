@@ -34,11 +34,11 @@ Cada usuario configura en **Perfil**:
 - entre **3 y 6 días exactos** y el lugar disponible cada día;
 - minutos por sesión, equipo, experiencia, prioridad, horario y movimientos a evitar.
 
-El reparto se adapta a la disponibilidad real y coloca las sesiones deportivas en los días compatibles con piscina o exterior. Natación valida que existan suficientes días con piscina. Desde **Entreno → Preparar mi plan**, Fitbros construye las 4 o 10 semanas, valida ejercicios, dosis, tiempo y limitaciones, y muestra el borrador antes de activarlo. El bloque corto consolida en la semana 4; el largo descarga en la semana 6 y consolida en la semana 10. Una semana o sesión puede prepararse otra vez sin reemplazar el resto.
+El reparto se adapta a la disponibilidad real y coloca las sesiones deportivas en los días compatibles con piscina o exterior. Natación valida que existan suficientes días con piscina. Desde **Entreno → Preparar mi plan**, Evolv construye las 4 o 10 semanas, valida ejercicios, dosis, tiempo y limitaciones, y muestra el borrador antes de activarlo. El bloque corto consolida en la semana 4; el largo descarga en la semana 6 y consolida en la semana 10. Una semana o sesión puede prepararse otra vez sin reemplazar el resto.
 
 Todas las sesiones publicadas usan IDs del catálogo de ejercicios, no nombres libres. La vista **Entreno** muestra la demostración y las instrucciones de cada movimiento; `prefers-reduced-motion` deja la ilustración estática. Los administradores pueden buscar, filtrar, crear, editar o archivar ejercicios desde **Perfil → Ejercicios** y revisar que cada registro tenga fuente, licencia y media.
 
-Al iniciar una sesión, Fitbros la ordena en calentamiento, bloque principal y vuelta a la calma. En fuerza registra cada serie con repeticiones, carga o asistencia y RPE; los descansos tienen temporizador y una sustitución conserva la dosis del movimiento. Running, cycling y natación se presentan como bloques con objetivo, intensidad, recuperación y timer. Pausar, cerrar o recargar conserva el avance en el estado diario sincronizado con Supabase. El cierre solicita dificultad y señales anormales antes de marcar el resultado como completo o parcial.
+Al iniciar una sesión, Evolv la ordena en calentamiento, bloque principal y vuelta a la calma. En fuerza registra cada serie con repeticiones, carga o asistencia y RPE; los descansos tienen temporizador y una sustitución conserva la dosis del movimiento. Running, cycling y natación se presentan como bloques con objetivo, intensidad, recuperación y timer. Pausar, cerrar o recargar conserva el avance en el estado diario sincronizado con Supabase. El cierre solicita dificultad y señales anormales antes de marcar el resultado como completo o parcial.
 
 ## Configuración inicial y macros
 
@@ -73,7 +73,7 @@ Las funciones serverless ([`api/`](api/)) son el corazón de la seguridad:
 
 ## Privacidad y seguridad
 
-Ningún plan nuevo ni llamada del coach se habilita sin el permiso esencial y la evaluación de seguridad vigentes. La interfaz reúne el uso de datos para personalizar el plan en un solo check y deja como segundo check opcional únicamente las fotos de progreso personal. Fitbros no vende estos datos ni los usa para publicidad. Una señal de alerta pausa las rutinas y mantiene disponibles nutrición, historial y exportación.
+Ningún plan nuevo ni llamada del coach se habilita sin el permiso esencial y la evaluación de seguridad vigentes. La interfaz reúne el uso de datos para personalizar el plan en un solo check y deja como segundo check opcional únicamente las fotos de progreso personal. Evolv no vende estos datos ni los usa para publicidad. Una señal de alerta pausa las rutinas y mantiene disponibles nutrición, historial y exportación.
 
 La política operativa, retención y advertencias para revisión legal están en [`PRIVACY.md`](PRIVACY.md). El texto es preliminar y requiere revisión profesional antes del lanzamiento comercial.
 

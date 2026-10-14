@@ -1,14 +1,14 @@
 {
-  "name": "Fitbros",
-  "short_name": "Fitbros",
-  "description": "Tu cuerpo, tu sistema. Nutrición y entrenamiento personalizados para tu día a día.",
+  "name": "Evolv",
+  "short_name": "Evolv",
+  "description": "Tu mejor versión, un día a la vez. Nutrición y entrenamiento personalizados para tu día a día.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#07070f",
-  "theme_color": "#07070f",
+  "background_color": "#101010",
+  "theme_color": "#101010",
   "icons": [
     {
       "src": "assets/icon-192.png",
