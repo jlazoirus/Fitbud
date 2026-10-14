@@ -1795,6 +1795,7 @@ Decisión de Jonathan (2026-10-14): renombrar la marca a Evolv y adoptar la dire
 3. Logo: `brandMark()` (escalones) + `brandWordmark()` ("evol" + "v" lima) en portada y pantallas de acceso; íconos PWA 180/192/512 regenerados dentro de la zona segura maskable.
 4. Textos visibles "Fitbros" → "Evolv" (app, manifiesto, notificaciones push, beta, PRIVACY.md, README); tagline "Tu mejor versión, un día a la vez."; atribución de ejercicios propios "Evolv Studio" (catálogo local y 9 filas en producción).
 5. Portada: hero con el tagline como titular y logo en la barra.
+   Unbounded solo en titulares grandes (`h1,h2`, hero, secciones de la portada), marca y números grandes (kcal, racha, precios); nombres de comidas/ejercicios, botones, `h3` y títulos de tarjeta usan Manrope en peso fuerte para no partir textos largos.
 6. Se conservan identificadores internos (`fitbros_tour_v1`, `startFitbrosTour`, `fitbros_test_user`, lock de los loops) para no resetear estado de usuarios ni romper herramientas.
 
 ### Fuera de alcance (pendiente)
