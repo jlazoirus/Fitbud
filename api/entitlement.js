@@ -59,17 +59,22 @@ function firstFinite(...values) {
   return null;
 }
 
-function moneyFromPayload(payload) {
+function moneyFromPayload(payload, eventType) {
   const obj = payload && payload.data && payload.data.object ? payload.data.object : {};
-  const amount = firstFinite(obj.amount_total, obj.amount_paid, obj.amount, obj.amount_refunded);
+  // charge.refunded payloads are Stripe charges: amount_refunded (lo devuelto) debe
+  // primar sobre amount (el cargo original), o un reembolso parcial se ve inflado.
+  const amount = eventType === "charge.refunded"
+    ? firstFinite(obj.amount_refunded, obj.amount)
+    : firstFinite(obj.amount_total, obj.amount_paid, obj.amount, obj.amount_refunded);
   const currency = obj.currency ? String(obj.currency).toUpperCase() : null;
   return { amount_cents: amount, currency };
 }
 
 function projectEvent(row) {
-  const money = moneyFromPayload(row && row.payload);
+  const eventType = String((row && row.event_type) || "");
+  const money = moneyFromPayload(row && row.payload, eventType);
   return {
-    event_type: String((row && row.event_type) || ""),
+    event_type: eventType,
     plan_id: String((row && row.plan_id) || ""),
     status: String((row && row.status) || ""),
     created_at: String((row && row.created_at) || ""),

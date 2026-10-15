@@ -63,18 +63,36 @@ global.fetch = async (url, options = {}) => {
   if (value.includes("/rest/v1/billing_events?")) {
     assert(value.includes("user_id=eq." + user.id), "La consulta debe filtrar por el usuario autenticado.");
     assert(options.headers.Authorization === "Bearer service", "billing_events debe leerse con service role.");
-    return response(200, [{
-      event_type: "checkout.session.completed",
-      plan_id: "monthly",
-      status: "processed",
-      created_at: "2026-06-23T20:10:00.000Z",
-      payload: {
-        id: "evt_secret",
-        stripe_event_id: "evt_secret",
-        data: { object: { amount_total: 1400, currency: "usd" } },
+    return response(200, [
+      {
+        event_type: "checkout.session.completed",
+        plan_id: "monthly",
+        status: "processed",
+        created_at: "2026-06-23T20:10:00.000Z",
+        payload: {
+          id: "evt_secret",
+          stripe_event_id: "evt_secret",
+          data: { object: { amount_total: 1400, currency: "usd" } },
+        },
+        error: "internal detail",
       },
-      error: "internal detail",
-    }]);
+      {
+        // REQ-178: reembolso parcial ($7 de un cargo de $14) — debe proyectar lo reembolsado, no el cargo.
+        event_type: "charge.refunded",
+        plan_id: "monthly",
+        status: "refunded",
+        created_at: "2026-10-13T12:00:00.000Z",
+        payload: { data: { object: { amount: 1400, amount_refunded: 700, currency: "usd" } } },
+      },
+      {
+        // Reembolso total: amount == amount_refunded, debe seguir correcto.
+        event_type: "charge.refunded",
+        plan_id: "monthly",
+        status: "refunded",
+        created_at: "2026-10-01T12:00:00.000Z",
+        payload: { data: { object: { amount: 1400, amount_refunded: 1400, currency: "usd" } } },
+      },
+    ]);
   }
   throw new Error("Ruta no simulada: " + value);
 };
@@ -82,8 +100,8 @@ global.fetch = async (url, options = {}) => {
 res = capture();
 await handler({ method: "GET", query: { action: "billing-history" }, headers: { authorization: "Bearer user-token" } }, res);
 assert(res.statusCode === 200, "Debe responder 200 con sesión válida.");
-assert(Array.isArray(res.body.history) && res.body.history.length === 1, "Debe devolver historial proyectado.");
-const item = res.body.history[0];
+assert(Array.isArray(res.body.history) && res.body.history.length === 3, "Debe devolver historial proyectado.");
+const [item, partialRefund, totalRefund] = res.body.history;
 assert(item.event_type === "checkout.session.completed", "Debe conservar el tipo seguro del movimiento.");
 assert(item.plan_id === "monthly", "Debe conservar el plan.");
 assert(item.status === "processed", "Debe conservar el estado.");
@@ -93,4 +111,7 @@ assert(!("stripe_event_id" in item), "No debe devolver ID externo.");
 assert(!("error" in item), "No debe devolver errores internos.");
 assert(requests.some(item => item.url.includes("/rest/v1/billing_events?")), "Debe consultar billing_events.");
 
-console.log("API billing-history (vía entitlement): autenticación, filtro y proyección segura verificados con mocks.");
+assert(partialRefund.amount_cents === 700, "REQ-178: un reembolso parcial debe proyectar el monto reembolsado (700), no el cargo original (1400).");
+assert(totalRefund.amount_cents === 1400, "Un reembolso total debe seguir proyectando el monto correcto.");
+
+console.log("API billing-history (vía entitlement): autenticación, filtro y proyección segura (incl. reembolsos parciales) verificados con mocks.");

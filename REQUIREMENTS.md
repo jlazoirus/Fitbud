@@ -1703,7 +1703,8 @@ El plan guardaba duración y descanso como números (55 min, 105 s) y usaba un c
 
 ## REQ-178 - Fix facturación: el historial de pagos muestra el cargo original en lugar del monto reembolsado en reembolsos parciales
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`moneyFromPayload` ahora recibe `event_type`; para `charge.refunded` prioriza `amount_refunded` sobre `amount` (el resto de tipos conserva el orden anterior). Test en `scripts/test-billing-history-api.mjs` cubre reembolso parcial, total y pago normal.
 
 ### Origen
 
