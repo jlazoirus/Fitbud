@@ -1807,3 +1807,45 @@ Decisión de Jonathan (2026-10-14): renombrar la marca a Evolv y adoptar la dire
 ### Criterios de aceptación
 
 - Release gate y E2E en verde; capturas a 390 px de portada, login, Hoy y Entreno revisadas. ✓
+
+## REQ-181 - Admin: el modal "Consumo" no precarga la cortesía vigente y la sobrescribe al guardar
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría journey administración (commit previo 45bb2ce). Panel admin → tarjeta de usuario → "Consumo".
+
+### Problema
+
+`quotaOverview` devuelve `overrides` (cortesías por usuario), pero el cliente nunca los muestra ni los precarga. Al abrir "Consumo" de un usuario con override vigente (p. ej. límite 5, 50 unidades extra, activa, expira 2026-12-01), el formulario aparece vacío (límite "Heredar", bonus 0, "Heredar política"). Si el admin solo quería ajustar un campo y pulsa "Guardar cortesía", se envía `dailyLimit:""`, `bonusUnits:0`, `enabled:null` → el upsert `on_conflict=user_id,action` (merge-duplicates) reescribe `daily_limit=null, bonus_units=0, enabled=null, expires_at=null`, borrando la cortesía en silencio.
+
+### Causa raíz
+
+`openAdminUserQuota()` (`index.html:~10831`) arma el modal solo desde `policies`; ignora `adminQuotaCache.overrides`. `adminQuotaCache.overrides` está poblado pero no se consume en ninguna parte (`index.html`). El upsert full-row vive en `setQuotaOverride` (`api/admin.js:590`).
+
+### Objetivo
+
+El admin ve la cortesía vigente y editarla no destruye valores no tocados.
+
+### Alcance
+
+1. Precargar en el modal el override existente (`overrides.find(user_id,action)`): límite, bonus, disponibilidad y expiración.
+2. Mostrar las cortesías activas en el panel (`loadAdminQuotaOverview`) usando `overrides`.
+
+### Fuera de alcance
+
+- Políticas generales, reset de consumo, otras acciones admin.
+
+### Riesgos
+
+- Reescribir la ruta de guardado sin romper la creación de overrides nuevos.
+
+### Criterios de aceptación
+
+- Reabrir "Consumo" muestra los valores vigentes; guardar sin cambios los conserva.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Seed de override (bonus 50, expira 2026-12-01), abrir "Consumo", guardar; confirmar que el override no cambia.
