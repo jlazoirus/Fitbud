@@ -13,7 +13,9 @@ const read = (file) => readFileSync(join(ROOT, file), "utf8");
 
 // Archivos públicos que el runtime no referencia de forma detectable. Vacío a
 // propósito: agregar aquí solo con una razón explícita.
-const EXTRA_PUBLIC = [];
+const EXTRA_PUBLIC = [
+  "assets/og-image.png", // og:image/twitter:image con URL absoluta (REQ-189)
+];
 
 function compileRules(text) {
   return text.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#")).map((line) => {

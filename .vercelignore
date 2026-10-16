@@ -11,6 +11,7 @@
 !/config.js
 !/service-worker.js
 !/manifest.webmanifest
+!/favicon.ico
 !/exercise-catalog.js
 !/workout-player.js
 !/training-plan.js

@@ -7862,3 +7862,150 @@ Que el cierre del día optimice la misma definición de "día correcto" que el c
 
 - `node scripts/validate-global-close-objective.mjs`, `node scripts/validate-diet-contract.mjs`, `node scripts/release-gate.mjs`.
 - Diff por dimensión baseline contra implementación, con la matriz completa de 54 dimensiones.
+
+## REQ-164 - Fix Progreso: la variación de peso on-target se pinta como advertencia en metas de volumen/mantenimiento
+
+**Estado: implementado.**
+`goalAwareDeltaColor(delta,goal)` (`index.html`) centraliza el color de `Δ peso (sem)`/`Δ grasa %` en `bodyComposition()` según `prefs.goal`: volumen (subir=bueno), mantenimiento (tolera hasta ±0.4, mismo umbral que el check-in de REQ-160), deficit/fallback (bajar=bueno, sin cambio de sentido). `composition()` no se tocó. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/progreso.spec.js` (meta volumen + 2 semanas de peso ascendente; confirmado que el test falla exactamente como describe el REQ —`var(--warn)` en vez de `var(--good)`— contra el código sin el fix).
+
+### Origen
+
+Journey `progreso`, sección "Peso corporal" → "Composición". Recorrido con meta `volumen` y ganancia de peso deliberada.
+
+### Problema
+
+En volumen, subir de peso es el objetivo del ciclo y `buildWeightRanges` prescribe un rango creciente, pero la tarjeta "Δ peso (sem)" pinta la ganancia como advertencia (ámbar) en vez de logro (verde), y "Δ grasa %" hace lo mismo. La pantalla se contradice: la tabla "Rango kg" sube semana a semana mientras el delta que la cumple sale en rojo/ámbar. En mantenimiento cualquier variación tiene el mismo sesgo "bajar=bueno". Solo `deficit` está bien coloreado.
+
+### Causa raíz
+
+`bodyComposition()` (index.html:5235-5236) fija el color sin mirar `prefs.goal`: `dKg<=0?var(--good):var(--warn)` y `dBf<=0?var(--good):var(--warn)`. `buildWeightRanges` (index.html:1459) sí es goal-aware (`deficit -.004`, `volumen +.002`, mantenimiento `0`).
+
+### Objetivo
+
+El color del delta refleja si el cambio va en la dirección del objetivo del usuario, coherente con el rango prescrito.
+
+### Alcance
+
+1. En `bodyComposition()`, derivar el color de `dKg`/`dBf` de la dirección esperada según `prefs.goal` (volumen: subir=bueno; déficit: bajar=bueno; mantenimiento: estabilidad, sin alarmar variaciones pequeñas).
+
+### Fuera de alcance
+
+- Umbrales del check-in (REQ-160) y el cálculo de racha (REQ-146).
+- `recapDelta`/tarjetas neutras que ya muestran +/- sin juicio de color.
+
+### Riesgos
+
+- No invertir el sentido para `deficit` (regresión); mantener `composition()` intacto.
+
+### Criterios de aceptación
+
+- Meta `volumen` con Δ peso >0 on-target: la tarjeta usa `var(--good)`, no `var(--warn)`.
+- Meta `deficit` con Δ peso <0: sigue en `var(--good)`.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E: sembrar meta `volumen` + dos semanas de peso ascendente, abrir Progreso y assertar `color:var(--good)` en "Δ peso (sem)".
+
+## REQ-167 - Fix activación de cuenta: "Auth session missing!" crudo al crear la contraseña desde una invitación
+
+**Estado: implementado.**
+`finishPasswordRecovery()` revalida la sesión del enlace con `getSession()` antes de `updateUser()`, bloquea el botón mientras trabaja y traduce el error a español; si la sesión ya no existe, muestra la pantalla "No pudimos abrir el enlace" con el siguiente paso.
+
+### Origen
+
+Reporte de Jonathan (2026-10-12) al dar de alta a una usuaria nueva por invitación: el formulario "Crea tu contraseña" se pintó, pero al pulsar "Activar cuenta" apareció `⚠️ Auth session missing!` y la contraseña no se guardó (login posterior: "invalid login credentials").
+
+### Problema
+
+El formulario se renderiza con la sesión del enlace, pero al enviar la sesión ya no estaba. La usuaria vio un error en inglés sin salida clara y podía pulsar varias veces.
+
+### Causa raíz
+
+`finishPasswordRecovery()` (`index.html`) llamaba `supa.auth.updateUser()` sin comprobar que la sesión siguiera viva ni proteger el doble envío, y mostraba `result.error.message` tal cual. La pérdida de sesión en sí (enlace de un solo uso consumido, vista previa del correo o doble toque) no se pudo reproducir sin un token real.
+
+### Alcance
+
+1. Guardia `_recoveryBusy` + botón deshabilitado durante el envío.
+2. `getSession()` antes de `updateUser()`; sin sesión → pantalla de enlace inválido con mensaje accionable.
+3. Mensaje en español para "session missing".
+
+### Fuera de alcance
+
+- Causa de la pérdida de sesión del enlace y configuración de SMTP/Redirect URLs de Supabase (el SMTP por defecto limitó los reintentos: "email rate limit exceeded").
+
+### Criterios de aceptación
+
+- Un enlace consumido o vencido nunca muestra texto en inglés y siempre indica el siguiente paso. ✓
+- Un segundo toque mientras se guarda no dispara otra petición. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-169 - Fix nutrición: lo descartado en el borrador del día vuelve al regenerar
+
+**Estado: implementado.**
+
+### Origen
+
+Bug A reportado por Jonathan (2026-10-12): tras "no me gusta" en una comida, al regenerar el día el coach vuelve a sugerir lo mismo.
+
+### Problema
+
+1. "Otra opción" reemplazaba la comida, pero no la recordaba: el prompt solo decía "No repitas" con el borrador *actual*, así que la opción descartada podía volver en la siguiente ("A → B → A") o al regenerar el día.
+2. "🚫 No me gusta" en el borrador la bloqueaba a futuro (`prefs.blockedDishes`), pero el plato seguía en el borrador y se podía aplicar igual.
+3. Si el coach repetía un nombre bloqueado que no está en el catálogo, nada lo filtraba: el bloqueo solo actuaba sobre platos del catálogo y como texto en el prompt.
+
+### Causa raíz
+
+- `regenerateGenMeal()` y `generateOneDay()` (`index.html`) no tenían memoria de descartes de la sesión; `recentMealNames()` solo mira días anteriores.
+- `blockGenDraftMeal()` no tocaba `window._genDay`.
+- `normalizeProposalMeal()` (`js/nutrition-domain.js`) solo aplicaba `isDishBlockedByProfile()` cuando la propuesta coincidía con un plato del catálogo.
+
+### Alcance
+
+1. `SESSION_REJECTED_MEALS` (por día, en memoria) alimentado por "Otra opción", "No me gusta" del borrador y "No me gusta" de una comida aplicada.
+2. `prefsWithSessionRejections()` suma los descartes a `blockedDishes` en la referencia de platos, el fallback determinista y `finalizeNutritionDay()`; `coachRejectedMealsLine()` los lista en el prompt del día y de "Otra opción"; `rejectionScope()` evita que la reutilización de respuestas sirva una guardada antes del descarte.
+3. `mealNameBlockedByProfile()` en el dominio: una propuesta fuera de catálogo con nombre bloqueado/descartado se reemplaza (`dish_blocked_by_user`).
+4. "No me gusta" en el borrador reemplaza el plato al instante con el catálogo, sin consumir opciones del coach.
+
+### Fuera de alcance
+
+- Persistir descartes "suaves" entre sesiones (los permanentes ya viven en `prefs.blockedDishes`).
+
+### Criterios de aceptación
+
+- Con un plato descartado, el siguiente prompt lo lista y el borrador no lo contiene aunque el coach lo repita. ✓ (`tests/e2e/descartes.spec.js`)
+- Un descarte bloquea tanto propuestas inventadas como platos del catálogo y el fallback. ✓ (`scripts/validate-session-rejections.mjs`)
+
+## REQ-170 - Fix nutrición: platos de almuerzo propuestos para el desayuno
+
+**Estado: implementado.**
+
+### Origen
+
+Bug B reportado por Jonathan (2026-10-12): el coach sugiere platos contundentes (arroz con pollo, lomo, guisos) en el desayuno.
+
+### Problema
+
+REQ-131/132 filtran por `compatible_slots`/`meal_weight`, pero solo cuando la comida propuesta coincide por nombre exacto con un plato del catálogo. Las propuestas del coach casi nunca coinciden, así que pasaban sin ningún chequeo de momento del día.
+
+### Causa raíz
+
+- `normalizeProposalMeal()` y `validateGeneratedDay()` solo validan slot/peso dentro de `if(dish)` / `if(matchedDish)`.
+- En producción, además, `dishes` no tiene `compatible_slots`, `meal_weight`, `meal_form`, `cuisine_tags` ni `slug` (la migración `supabase/nutrition_catalog_semantics.sql` no está aplicada) y tiene 50 platos, no los lotes de REQ-135/140 del seed.
+- El mock E2E del coach proponía "Bowl de pollo con arroz" como desayuno y la suite lo aceptaba.
+
+### Alcance
+
+1. `slotMomentTextConflict()` en el dominio: compara el **nombre** (por tokens) contra platos de almuerzo/cena (`arroz con`, `con arroz`, `lomo`, `saltado`, `guiso`, `chaufa`, `menestra`…) para desayuno (salvo que sea la comida principal), media mañana, merienda y recena. No mira ingredientes: "galletas de arroz" o huevos rancheros con frijoles son válidos.
+2. `normalizeProposalMeal()` reemplaza esas propuestas por el fallback del catálogo (`slot_moment_heuristic`); `regenerateGenMeal()` cae al plato de catálogo más cercano; el borrador explica el cambio.
+3. Arquetipo de desayuno del prompt reforzado: "huevos, avena, yogur, frutas, tostadas o batidos… NUNCA platos contundentes como arroz con pollo, lomo, guisos".
+4. Mock E2E del coach con un desayuno real.
+
+### Fuera de alcance
+
+- Aplicar `supabase/nutrition_catalog_semantics.sql` y los lotes de catálogo en producción (acción manual del usuario; sin eso los platos del catálogo siguen filtrándose solo por `slot`).
+
+### Criterios de aceptación
+
+- "Arroz con pollo casero" propuesto como desayuno no llega al borrador. ✓ (E2E)
+- Ningún plato del catálogo apto para un momento ligero queda marcado como contundente. ✓ (`validate-session-rejections.mjs`)
