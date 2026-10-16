@@ -183,4 +183,23 @@ test.describe("Perfil", () => {
 
     expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
   });
+  test("REQ-186: el descanso entre ejercicios se configura en Perfil y llega a Entreno", async ({ page, context }) => {
+    const { calls } = await installMocks(context, { prefs: completePrefs({ diet: ["omnivoro"] }) });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#pfSecEntreno > summary").click();
+    await expect(page.locator("#pf_between_rest")).toHaveValue("120");
+    await page.selectOption("#pf_between_rest", "90");
+    await page.click("#profileSaveFloat button");
+    await expect(page.locator("#profileSaveFloat")).toBeHidden();
+    const saved = calls.filter((c) => c.table === "profiles" && c.payload && c.payload.prefs).map((c) => c.payload.prefs);
+    expect(saved.at(-1).betweenExerciseRestSeconds).toBe(90);
+
+    await page.locator("#tabs").getByText("Entreno").click();
+    await expect(page.locator("#app")).toContainText("Entre ejercicios: 1 min 30 s de descanso");
+    expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
+  });
 });

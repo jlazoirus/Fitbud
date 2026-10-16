@@ -64,7 +64,7 @@ Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que 
 
 - REQ-184 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
 - REQ-185 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; implementado)
-- REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto). (P1)
+- REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable). (P1; implementado)
 - REQ-187 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
@@ -1775,9 +1775,11 @@ Que el descanso siempre muestre el tiempo real restante y termine solo, aunque l
 
 - Prueba manual en iPhone (PWA instalada): marcar serie, bloquear 30 s, desbloquear → el contador sigue bajando con el tiempo real.
 
-## REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto)
+## REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable)
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+Decisión de Jonathan (2026-10-16): 2:00 por defecto y configurable por usuario. `profile.prefs.betweenExerciseRestSeconds` (60–300 s, normalizado en `migrateProfilePrefs()`), editable en Perfil → Entreno. `toggleWorkoutSet()` arranca el descanso `{kind:"rest",transition:true}` al completar todas las series si sigue otro ejercicio de fuerza; `completeWorkoutStep()` lo conserva (o lo arranca si se avanzó por otra vía) y lo anula si sigue la vuelta a la calma. `CACHE_NAME` → `fitbud-pwa-v82`.
 
 ### Origen
 
@@ -1797,15 +1799,14 @@ Que al terminar un ejercicio de fuerza empiece un descanso cronometrado que acom
 
 ### Alcance
 
-1. Al marcar la última serie de un ejercicio de fuerza seguido de otro de fuerza, arrancar un descanso de transición (`kind:"rest"`) de `max(step.restSeconds,120)` s.
-2. `completeWorkoutStep()` conserva un descanso en curso; el siguiente ejercicio lo muestra arriba como "Descanso antes de empezar" con Pausar/+15 s/Omitir.
+1. Al marcar la última serie de un ejercicio de fuerza seguido de otro de fuerza, arrancar un descanso de transición (`kind:"rest"`) con la duración elegida por el usuario (2:00 por defecto).
+2. `completeWorkoutStep()` conserva un descanso en curso; el siguiente ejercicio lo muestra como "Descanso entre ejercicios" con Pausar/+15 s/Omitir.
 3. Marcar la primera serie del siguiente ejercicio cierra el descanso de transición y arranca el normal.
 4. Tras el último ejercicio de fuerza (sigue la vuelta a la calma) no se arranca descanso.
 5. Mostrar el descanso entre ejercicios en el resumen previo (REQ-174) y subir `CACHE_NAME`.
 
 ### Fuera de alcance
 
-- Hacer configurable el descanso entre ejercicios en el perfil (posible REQ futuro).
 - Cambiar los descansos que prescribe el plan.
 
 ### Riesgos
@@ -1815,10 +1816,11 @@ Que al terminar un ejercicio de fuerza empiece un descanso cronometrado que acom
 
 ### Criterios de aceptación
 
-- Al marcar la última serie del ejercicio 1 aparece "Descanso 02:00"; tras "Siguiente ejercicio" sigue visible y bajando en el ejercicio 2.
-- "Omitir" lo quita; marcar una serie del ejercicio 2 lo reemplaza por el descanso entre series.
-- Tras el último ejercicio de fuerza no aparece descanso.
-- `node scripts/release-gate.mjs` pasa.
+- Al marcar la última serie del ejercicio 1 aparece "Descanso entre ejercicios 02:00"; tras "Siguiente ejercicio" sigue visible y bajando en el ejercicio 2. ✓
+- "Omitir" lo quita; marcar una serie del ejercicio 2 lo reemplaza por el descanso entre series. ✓
+- Tras el último ejercicio de fuerza no aparece descanso entre ejercicios. ✓
+- Elegir 1:30 en Perfil se guarda en `prefs` y Entreno lo muestra. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
 
 ### Verificación sugerida
 

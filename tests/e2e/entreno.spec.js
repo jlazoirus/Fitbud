@@ -319,4 +319,71 @@ test.describe("Entreno", () => {
     expect(await page.evaluate(() => normalizedWorkoutExecution(current).timer)).toBeNull();
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+  test("REQ-186: al terminar un ejercicio corre el descanso entre ejercicios (2:00 por defecto)", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await expect(app).toContainText("Entre ejercicios: 2 min de descanso");
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await page.getByRole("button", { name: "Marcar completado" }).click();
+
+    const series = page.locator('#app button.set-done[aria-label^="Serie"]');
+    const timerBox = app.locator(".player-timer");
+    const timerValue = app.locator(".workout-timer-value");
+    const n = await series.count();
+    for (let s = 0; s < n - 1; s++) await series.nth(s).click();
+    await expect(timerBox).toContainText("Descanso"); // entre series, como antes
+    await expect(timerBox).not.toContainText("entre ejercicios");
+    await series.nth(n - 1).click();
+    // Última serie: arranca el descanso entre ejercicios con 2:00.
+    await expect(timerBox).toContainText("Descanso entre ejercicios");
+    await expect(timerValue).toHaveText(/^(02:00|01:5\d)$/);
+    const ejercicio1 = (await app.locator(".player-step > h3").first().innerText()).trim();
+
+    // Pasa al siguiente ejercicio y el descanso sigue corriendo (no se reinicia).
+    await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
+    await expect(app.locator(".player-step > h3").first()).not.toHaveText(ejercicio1);
+    await expect(timerBox).toContainText("Descanso entre ejercicios");
+    await page.waitForTimeout(1500);
+    await expect(timerValue).toHaveText(/^01:5\d$/);
+
+    // Marcar la primera serie del ejercicio 2 lo reemplaza por el descanso entre series.
+    await series.first().click();
+    await expect(timerBox).not.toContainText("entre ejercicios");
+    await expect(timerBox).toContainText("Descanso");
+
+    // Omitir lo quita.
+    await timerBox.getByRole("button", { name: "Omitir" }).click();
+    await expect(timerBox).toHaveCount(0);
+
+    // Tras el último ejercicio de fuerza no arranca ningún descanso.
+    for (;;) {
+      const siguiente = page.getByRole("button", { name: "Siguiente ejercicio" });
+      if (!(await siguiente.isVisible().catch(() => false))) break;
+      const isLast = await page.evaluate(() => {
+        const ex = normalizedWorkoutExecution(current);
+        return !ex.steps.slice(ex.currentStep + 1).some((step) => step.type === "strength" && step.status === "pending");
+      });
+      const pending = page.locator('#app button.set-done:not(.on)');
+      while (await pending.count()) await pending.first().click();
+      if (isLast) {
+        // Puede seguir el descanso entre series de la serie anterior, pero no
+        // arranca un descanso entre ejercicios: sigue la vuelta a la calma.
+        expect(await page.evaluate(() => {
+          const timer = normalizedWorkoutExecution(current).timer;
+          return !!(timer && timer.transition);
+        })).toBe(false);
+        await expect(app).not.toContainText("Descanso entre ejercicios");
+        await siguiente.click();
+        break;
+      }
+      await siguiente.click();
+    }
+    expect(await page.evaluate(() => normalizedWorkoutExecution(current).timer)).toBeNull();
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
