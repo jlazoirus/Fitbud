@@ -1853,3 +1853,27 @@ Jonathan compró `evolvapp.club` en Porkbun (2026-10-16) para la marca Evolv (RE
 
 - Webhook de Stripe (checkout deshabilitado); al activarlo, registrar `https://evolvapp.club/api/webhook`.
 - Dominio autenticado en Brevo (remitente `@evolvapp.club`).
+
+## REQ-184 - Seguridad: el sitio público no publica los archivos internos del repositorio
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría de la web pública (2026-10-16). Con `outputDirectory: "."` y sin build, Vercel servía como estáticos todos los archivos del repo: `https://evolvapp.club/NEGOCIO.md`, `/REQUIREMENTS.md`, `/CONTEXT.md`, `/STRIPE_SETUP.md`, `/agent-loop.json`, `/docs/architecture-reference.md`, `/estrategia/*.md`, `/supabase/admin.sql`, `/scripts/*.mjs` y `/tests/e2e/*` respondían 200. No había secretos (solo placeholders), pero sí estrategia de negocio, esquema SQL con políticas RLS y las reglas de los agentes.
+
+### Alcance
+
+1. `.vercelignore` en modo allowlist: ignora todo (`/*`) y reincluye solo lo que el runtime carga: `index.html`, `beta-reclutamiento.html`, `config.js`, `service-worker.js`, `manifest.webmanifest`, los módulos JS de la raíz, `js/`, `assets/` (de `assets/ux-audit-2026-06-23/` solo `04-home-mobile.png`, que usa la página de beta), `api/`, `package.json`, `package-lock.json` (dependencias de las funciones) y `vercel.json`.
+2. `scripts/validate-deploy-allowlist.mjs` (en el release gate) evalúa el `.vercelignore` con semántica gitignore sobre `git ls-files` y falla si: falta algún archivo que el runtime carga (`<script src>`/`href` locales de las páginas, `APP_SHELL` del service worker, `api/*.js`), o se despliega un archivo no declarado como público. Un archivo nuevo obliga a decidir explícitamente si se publica.
+
+### Fuera de alcance
+
+- Las capturas de `assets/ux-audit-2026-06-23/` siguen versionadas; solo dejan de publicarse.
+- Los demás hallazgos de la auditoría (avisos legales preliminares, accesibilidad de formularios, etc.) van en REQ propios.
+
+### Criterios de aceptación
+
+- `curl -I https://evolvapp.club/NEGOCIO.md` (y `/REQUIREMENTS.md`, `/supabase/admin.sql`, `/scripts/release-gate.mjs`) devuelve 404 tras el deploy.
+- La landing, la app, `/beta-reclutamiento.html`, `/service-worker.js` y `/api/catalog` siguen respondiendo 200.
+- `node scripts/validate-deploy-allowlist.mjs` pasa y está en `release-gate.mjs`.

@@ -1,0 +1,28 @@
+# REQ-184 — Allowlist de despliegue. Vercel sirve como estáticos todos los
+# archivos subidos (outputDirectory "."), así que se ignora todo y se
+# reincluye solo lo que el runtime carga. Un archivo nuevo que deba
+# publicarse se agrega aquí; scripts/validate-deploy-allowlist.mjs (en el
+# release gate) exige que el runtime lo referencie o que se declare.
+/*
+
+# Páginas y shell PWA
+!/index.html
+!/beta-reclutamiento.html
+!/config.js
+!/service-worker.js
+!/manifest.webmanifest
+!/exercise-catalog.js
+!/workout-player.js
+!/training-plan.js
+!/domain-contracts.js
+!/sync-conflicts.js
+!/js
+!/assets
+/assets/ux-audit-2026-06-23/*
+!/assets/ux-audit-2026-06-23/04-home-mobile.png
+
+# Funciones serverless y su configuración
+!/api
+!/package.json
+!/package-lock.json
+!/vercel.json
