@@ -1623,3 +1623,21 @@ Auditoría impeccable de UI (2026-10-16): Progreso mostraba S1–S10 con dos cam
 ### Criterios de aceptación
 
 - `tests/e2e/progreso.spec.js`: semana siguiente oculta hasta abrir el plegable; el foco cae en la semana actual; comida vacía sin `.nums`. ✓
+
+## REQ-195 - Marca: restos de color de Fitbros y tokens CSS sin definir
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): los chips del coach usaban `var(--accent-text,#c4b5fd)` con la variable sin definir, así que se veían lila (marca anterior); `.alert.violet` tenía texto `#d8ccff`; también caían a su fallback o a nada `--white`, `--ok`, `--r` y `--accent-rgb` (violeta 139,92,246). El tour conservaba fondos violeta como fallback.
+
+### Alcance
+
+1. Chips, alertas "violet", `.chat-type.educativo`, `.setup-step` y flechas de día pasan a tokens Evolv definidos (`--purple-200`, `--accent-dim`, `--good`, `--txt`, `--r-md`).
+2. Tour: sin fallbacks violeta; botones de 44 px.
+3. `scripts/validate-css-tokens.mjs` (en el release gate) falla si `index.html` o `beta-reclutamiento.html` usan una `var(--x)` sin definir.
+
+### Criterios de aceptación
+
+- `node scripts/validate-css-tokens.mjs` pasa ahora y falla con el `index.html` anterior (5 variables). ✓
