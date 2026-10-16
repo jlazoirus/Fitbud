@@ -19,6 +19,20 @@ El repositorio tiene **dos** agentes autónomos. Comparten el lock `.git/fitbros
 
 El auditor **NO modifica código de la app**: su único archivo escribible es `REQUIREMENTS.md`. Las reglas de comportamiento del auditor están en `.claude/agents/qa-auditor.md` — es un archivo de texto plano que cualquier agente debe **leer como spec**; el bloque YAML de cabecera (`name`, `tools`, `model`) es metadato para Claude Code y puede ignorarse cuando lo lee otra herramienta como Codex.
 
+## Tercer track: migración a apps nativas (varios agentes en paralelo)
+
+La migración de la web/PWA a apps nativas iOS/Android (Expo / React Native en `native/`) es un track aparte con su propio backlog:
+
+| Qué | Dónde |
+|-----|-------|
+| Plan maestro, decisión técnica, paridad | `docs/native-migration/PLAN.md`, `ADR-001-stack.md`, `PARITY.md` |
+| Tareas `NAT-xx` (spec) | `docs/native-migration/BACKLOG.md` |
+| Estado, dependencias, alcance y dueño | `native-migration.json` |
+| Runbook | `NATIVE_AGENT.md` |
+| Selector / validador | `node scripts/native-next-task.mjs --next \| --claim NAT-xx --agent <id> \| --done NAT-xx \| --validate` |
+
+Diferencias con los dos loops anteriores: **no usa** el lock `.git/fitbros-agent-loop.lock` y admite varios agentes a la vez; cada uno reclama una tarea con un commit en `origin/main` (gana el primer push) y escribe solo dentro de los `paths` de su tarea. El loop desarrollador no toma tareas NAT y el auditor no las modifica. Las tareas `NAT-Hx` son decisiones humanas: ningún agente las cierra.
+
 ## Memoria operativa entre corridas (continuidad, no fuente de verdad)
 
 Cada corrida autónoma arranca en frío: no hereda el historial conversacional de la anterior. Para preservar continuidad operativa entre corridas existe una **bitácora compartida fuera del repo**:
@@ -89,4 +103,5 @@ El selector del auditor rota el journey automáticamente (estado en `.git/fitbro
 ```bash
 node scripts/agent-next-requirement.mjs --self-test
 node scripts/agent-next-audit.mjs --self-test
+node scripts/native-next-task.mjs --self-test
 ```
