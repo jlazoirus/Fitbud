@@ -1568,3 +1568,21 @@ Auditoría impeccable de UI (2026-10-16): axe marcaba `select-name` (crítico) e
 ### Criterios de aceptación
 
 - `tests/e2e/accesibilidad.spec.js`: un `<main>` y un `h1` por tab, campos del onboarding asociados a su etiqueta, progreso anunciado y FAQ con `aria-expanded`. ✓
+
+## REQ-192 - Táctil: todos los controles miden 44 px en pantallas táctiles
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16), medida con emulación táctil (`pointer:coarse`): la regla de 44 px de la auditoría de junio cubría `.btn-sm`, `.chip-check` y `.csec-h`, pero no `.btn` (35–39 px), los chips del coach (32), el check de comida (32), "Ver técnica" (34), "¿Qué es RPE?" (20), el botón de ayuda (40), el de enviar (42), los selects de disponibilidad de Perfil (40) ni el cierre de los sheets (36). En escritorio el badge de sincronización flotaba fuera de la columna de 560 px.
+
+### Alcance
+
+1. Bloque `@media(pointer:coarse)` al final del `<style>` (gana la cascada): `min-height:44px` en `.btn`, `.coach-chip`, campos y selects; `::after` con `inset:-7px` en `.chk`, `.demo-expand` y `.a2hs-x` para ampliar el área sin cambiar el tamaño visual; checkboxes de 20 px.
+2. Botón de enviar del coach: 44 px, `aria-label` e ícono SVG en lugar de "➤".
+3. `.sync-badge` se alinea al borde de la columna.
+
+### Criterios de aceptación
+
+- `tests/e2e/tactil.spec.js`: ningún control visible de las 5 tabs mide menos de 44×44 px en táctil (falla con el código anterior). ✓
