@@ -12,18 +12,23 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Evolv">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="assets/icon-192.png" sizes="192x192">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Evolv — Tu mejor versión, un día a la vez">
 <meta property="og:description" content="Nutrición y entrenamiento personalizados para tu día a día. Siempre tienes una opción viable.">
-<meta property="og:image" content="assets/icon-512.png">
+<meta property="og:image" content="https://evolvapp.club/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Evolv — Tu mejor versión, un día a la vez">
+<meta property="og:locale" content="es_ES">
 <meta property="og:url" content="https://evolvapp.club/">
 <meta property="og:site_name" content="Evolv">
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Evolv — Tu mejor versión, un día a la vez">
 <meta name="twitter:description" content="Nutrición y entrenamiento personalizados para tu día a día.">
-<meta name="twitter:image" content="assets/icon-512.png">
+<meta name="twitter:image" content="https://evolvapp.club/assets/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -3700,7 +3705,8 @@ function renderInactive(){
 // nombre en minúsculas con la v final en lima.
 function brandMark(size){
   const s=size||28;
-  return `<svg class="brand-mark" width="${s}" height="${s}" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1e1e1e"/><rect x="13" y="38" width="9" height="13" rx="2" fill="var(--accent)"/><rect x="27.5" y="28" width="9" height="23" rx="2" fill="var(--accent)"/><rect x="42" y="14" width="9" height="37" rx="2" fill="var(--accent)"/></svg>`;
+  // REQ-189: chevrons ascendentes (mismo dibujo que los íconos PWA).
+  return `<svg class="brand-mark" width="${s}" height="${s}" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#1e1e1e"/><g transform="translate(0 35)" fill="none" stroke="var(--accent)" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"><path d="M146 352 L256 262 L366 352" stroke-opacity=".35"/><path d="M146 266 L256 176 L366 266" stroke-opacity=".65"/><path d="M146 180 L256 90 L366 180"/></g></svg>`;
 }
 function brandWordmark(){return `<span>evol<span class="brand-v">v</span></span>`;}
 // Íconos de línea (estilo Evolv). Cada uno es el contenido de un <svg> 24×24.
