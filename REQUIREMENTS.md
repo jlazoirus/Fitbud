@@ -1810,7 +1810,8 @@ Decisión de Jonathan (2026-10-14): renombrar la marca a Evolv y adoptar la dire
 
 ## REQ-181 - Admin: el modal "Consumo" no precarga la cortesía vigente y la sobrescribe al guardar
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`openAdminUserQuota`/`fillAdminQuotaFields` precargan límite, bonus, disponibilidad y expiración desde `adminQuotaCache.overrides` (cambia también al cambiar de acción); `saveAdminUserQuota` ahora envía `expiresAt`. `loadAdminQuotaOverview` lista las cortesías activas. Detalle en el commit.
 
 ### Origen
 

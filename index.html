@@ -10804,6 +10804,20 @@ async function loadAdminQuotaOverview(){
       const user=adminUsersCache.find(row=>row.id===item.user_id);
       return `${esc((user&&user.email)||item.user_id)} · ${esc(ADMIN_COACH_ACTION_LABELS[item.action]||item.action)}: ${item.requests}`;
     }).join("<br>");
+    const now=Date.now();
+    const activeOverrides=(adminQuotaCache.overrides||[]).filter(o=>
+      (o.daily_limit!=null||Number(o.bonus_units)>0||o.enabled!=null)
+      && (!o.expires_at||new Date(o.expires_at).getTime()>now)
+    );
+    const overridesRows=activeOverrides.slice(0,10).map(o=>{
+      const user=adminUsersCache.find(row=>row.id===o.user_id);
+      const limitTxt=o.daily_limit==null?"hereda límite":`límite ${o.daily_limit}`;
+      const bonusTxt=Number(o.bonus_units)>0?`+${o.bonus_units} extra`:"";
+      const enabledTxt=o.enabled===true?"forzada activa":o.enabled===false?"forzada inactiva":"";
+      const expTxt=o.expires_at?`hasta ${prettyDateTime(o.expires_at).split(" ").slice(0,2).join(" ")}`:"";
+      const parts=[limitTxt,bonusTxt,enabledTxt,expTxt].filter(Boolean).join(" · ");
+      return `${esc((user&&user.email)||o.user_id)} · ${esc(ADMIN_COACH_ACTION_LABELS[o.action]||o.action)}: ${esc(parts)}`;
+    }).join("<br>");
     const gateRows=(adminQuotaCache.modelGate||[]).map(row=>{
       const invalid=row.invalid_provider_output_rate_pct==null?"0.0":row.invalid_provider_output_rate_pct;
       const degradation=row.degradation_rate_pct==null?"0.0":row.degradation_rate_pct;
@@ -10815,6 +10829,7 @@ async function loadAdminQuotaOverview(){
       </div>
       ${rows||'<div class="muted small">No hay políticas configuradas.</div>'}
       ${gateRows?`<div class="ai-box" style="margin-top:12px"><b>Gate de modelo nutricional</b><br>${gateRows}<div class="muted small" style="margin-top:6px">Cambiar dieta a Sonnet 5 solo si diet_* supera 10% de degradación sostenida durante 1-2 semanas.</div></div>`:""}
+      ${overridesRows?`<div class="ai-box" style="margin-top:12px"><b>Cortesías activas</b><br>${overridesRows}</div>`:""}
       ${top?`<div class="ai-box" style="margin-top:12px"><b>Mayor actividad reciente</b><br>${top}</div>`:""}`;
   }catch(e){
     panel.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}<div class="muted small" style="margin-top:6px">Ejecuta supabase/coach_quota.sql para habilitar políticas, reutilización y auditoría.</div></div>`;
@@ -10828,22 +10843,34 @@ async function saveAdminQuotaPolicy(action){
     toast("Política actualizada");await loadAdminQuotaOverview();
   }catch(e){toast(e.message);}
 }
+function findAdminQuotaOverride(userId,action){
+  return (adminQuotaCache.overrides||[]).find(o=>o.user_id===userId&&o.action===action)||null;
+}
+function fillAdminQuotaFields(userId,action){
+  const override=findAdminQuotaOverride(userId,action);
+  $("#adminQuotaLimit").value=override&&override.daily_limit!=null?override.daily_limit:"";
+  $("#adminQuotaBonus").value=override?(override.bonus_units||0):0;
+  $("#adminQuotaEnabled").value=override&&typeof override.enabled==="boolean"?String(override.enabled):"";
+  $("#adminQuotaExpires").value=override&&override.expires_at?String(override.expires_at).slice(0,10):"";
+}
 function openAdminUserQuota(id){
   const user=adminUsersCache.find(row=>row.id===id)||{id,email:id};
   const policies=adminQuotaCache.policies||[];
   if(!policies.length){toast("Carga primero las políticas de consumo");return;}
   const options=policies.map(policy=>`<option value="${policy.action}">${esc(ADMIN_COACH_ACTION_LABELS[policy.action]||policy.action)}</option>`).join("");
   modal(`<h3>Consumo y cortesía</h3>
-    <p class="muted small">${esc(user.email||user.id)}. El límite vacío hereda la política general; las unidades extra se suman solo a esta cuenta.</p>
-    <div class="field"><label>Acción</label><select id="adminQuotaAction">${options}</select></div>
+    <p class="muted small">${esc(user.email||user.id)}. El límite vacío hereda la política general; las unidades extra se suman solo a esta cuenta. Guardar sin tocar un campo conserva el valor vigente.</p>
+    <div class="field"><label>Acción</label><select id="adminQuotaAction" onchange="fillAdminQuotaFields('${user.id}',this.value)">${options}</select></div>
     <div class="field"><label>Límite diario personalizado (opcional)</label><input id="adminQuotaLimit" type="number" min="0" max="1000" placeholder="Heredar"></div>
     <div class="field"><label>Unidades extra de cortesía</label><input id="adminQuotaBonus" type="number" min="0" max="1000" value="0"></div>
     <div class="field"><label>Disponibilidad</label><select id="adminQuotaEnabled"><option value="">Heredar política</option><option value="true">Activa</option><option value="false">Desactivada</option></select></div>
+    <div class="field"><label>Expira (opcional)</label><input id="adminQuotaExpires" type="date"></div>
     <div class="row wrap">
       <button class="btn btn-accent" onclick="saveAdminUserQuota('${user.id}')">Guardar cortesía</button>
       <button class="btn" onclick="resetAdminUserQuota('${user.id}')">Reiniciar consumo de hoy</button>
     </div>
     <div id="adminQuotaOut" class="muted small" style="margin-top:8px"></div>`);
+  fillAdminQuotaFields(user.id,policies[0].action);
 }
 async function saveAdminUserQuota(userId){
   const out=$("#adminQuotaOut"),enabledValue=$("#adminQuotaEnabled").value;
@@ -10854,6 +10881,7 @@ async function saveAdminUserQuota(userId){
       dailyLimit:$("#adminQuotaLimit").value,
       bonusUnits:+$("#adminQuotaBonus").value||0,
       enabled:enabledValue===""?null:enabledValue==="true",
+      expiresAt:$("#adminQuotaExpires").value||null,
     });
     if(out)out.textContent="Cortesía guardada.";
     await loadAdminQuotaOverview();
