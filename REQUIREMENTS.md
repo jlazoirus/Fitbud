@@ -1605,3 +1605,21 @@ Auditoría impeccable de UI (2026-10-16): Nutrición decía "llena los **slots**
 ### Criterios de aceptación
 
 - `tests/e2e/textos.spec.js`: Nutrición sin "slots"/"base de datos"/"o elige", fecha "Viernes, 16 oct", y la beta con "¿Qué te describe mejor?". ✓
+
+## REQ-194 - Progreso y Nutrición: menos campos vacíos para el usuario nuevo
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): Progreso mostraba S1–S10 con dos campos cada una (20 inputs vacíos) y "Ingresar mi peso" enfocaba siempre la semana 1; cada comida sin asignar de Nutrición mostraba "0 kcal · P 0 · C 0 · G 0 g" y su check no tenía nombre accesible.
+
+### Alcance
+
+1. `weightTableHtml()`: se ven las semanas hasta la actual (`currentWeightWeek()`) o la última con datos; las siguientes van en `<details class="wt-later">`. "Ingresar mi peso" enfoca la semana actual.
+2. Comida sin contenido: "Sin asignar" + una línea de ayuda, sin macros en cero.
+3. El check de cada comida tiene `aria-label`/`aria-pressed`.
+
+### Criterios de aceptación
+
+- `tests/e2e/progreso.spec.js`: semana siguiente oculta hasta abrir el plegable; el foco cae en la semana actual; comida vacía sin `.nums`. ✓

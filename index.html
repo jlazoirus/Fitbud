@@ -197,6 +197,7 @@
   .meal .name{font-family:var(--font-body);font-weight:600;font-size:16px;margin:3px 0 5px;line-height:1.25}
   .meal .nums{font-size:12px;color:var(--muted);font-family:var(--font-mono)}
   .meal .nums b{color:var(--txt);font-weight:500}
+  .meal-empty-hint{font-size:13px;color:var(--muted);line-height:1.4}
   .meal-actions{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
   .chk{width:32px;height:32px;border-radius:999px;border:2px solid var(--surf4);background:transparent;flex:0 0 auto;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.2s}
   .chk.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
@@ -419,6 +420,11 @@
     table.wt td:nth-child(4)::before{content:"% grasa"}
     table.wt input{width:100%;min-height:44px;font-size:16px;border-radius:var(--r-md);padding:0 8px;box-sizing:border-box}
   }
+  .wt-later{margin-top:6px}
+  .wt-later summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;min-height:44px;display:flex;align-items:center}
+  .wt-later summary::after{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin:-4px 0 0 10px;transition:transform .15s}
+  .wt-later[open] summary::after{transform:rotate(-135deg);margin-top:4px}
+  table.wt tr.wt-current td:first-child{color:var(--accent)}
   .chart{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px;margin:14px 0}
 
   .summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -5280,11 +5286,15 @@ function mealCard(ds,b,order){
     </div>`:"";
   return `<div class="meal ${ms.done?'done':''}">
     <div class="meal-head">
-      <button class="chk ${ms.done?'on':''}" ${!ms.done&&!mealHasContent(v)?'disabled title="Prepara una opción antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
+      <button class="chk ${ms.done?'on':''}" aria-label="${esc(b.slot)}: ${ms.done?'hecha, tocar para desmarcar':'marcar como hecha'}" aria-pressed="${ms.done?'true':'false'}" ${!ms.done&&!mealHasContent(v)?'disabled title="Prepara una opción antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
       <div>
         <div class="slot">${b.slot}</div>
-        <div class="name">${v.name?esc(v.name):'<span class="muted">Sin asignar — prepara tu día o toca «Otra opción»</span>'}</div>
-        <div class="nums"><b>${v.kcal}</b> kcal · P <b>${v.p}</b> · C <b>${v.c}</b> · G <b>${v.f}</b> g</div>
+        ${mealHasContent(v)
+          ?`<div class="name">${v.name?esc(v.name):'<span class="muted">Comida sin nombre</span>'}</div>
+        <div class="nums"><b>${v.kcal}</b> kcal · P <b>${v.p}</b> · C <b>${v.c}</b> · G <b>${v.f}</b> g</div>`
+          // REQ-194: un hueco vacío no muestra "0 kcal · P 0 · C 0 · G 0 g"
+          :`<div class="name muted">Sin asignar</div>
+        <div class="meal-empty-hint">Prepara tu día o toca «Otra opción».</div>`}
       </div>
     </div>
     <div class="meal-actions">
@@ -5412,7 +5422,7 @@ function renderProgress(){
     ${section("pr.peso","Peso corporal",
       (empty?"":weightSetupCard(false))
       +weightChart()+bodyComposition()+
-      `<table class="wt"><thead><tr><th>Sem</th><th>Rango kg</th><th>Peso kg</th><th>% grasa</th></tr></thead><tbody>${weightRows()}</tbody></table>`)}
+      weightTableHtml())}
     ${section("pr.semana","Semana",weekSection()+weeklyCheckinHistory())}`;
 }
 function progressJourney(){
@@ -5507,11 +5517,28 @@ function renderStreakSection(){
   ${nextHint}
   ${milestonesHtml}`;
 }
-function weightRows(){
-  return Object.keys(WEIGHT_RANGES).map(n=>{
+// REQ-194: semana del ciclo en la que cae hoy (1 antes de empezar, la última al terminar).
+function currentWeightWeek(){
+  const weeks=Object.keys(WEIGHT_RANGES).map(Number);const last=Math.max(...weeks);
+  const today=todayStr();if(today<START)return 1;if(today>END)return last;
+  const w=weekOf(today);return Math.min(last,Math.max(1,(w&&w.num)||1));
+}
+// Hasta la semana actual (o la última con datos) se ve; las siguientes quedan
+// plegadas para no mostrar un muro de campos vacíos.
+function weightTableHtml(){
+  const weeks=Object.keys(WEIGHT_RANGES).map(Number);
+  const upto=Math.max(currentWeightWeek(),...weeks.filter(n=>wkg(n)!=null||wbf(n)!=null));
+  const head=`<thead><tr><th>Sem</th><th>Rango kg</th><th>Peso kg</th><th>% grasa</th></tr></thead>`;
+  const now=weeks.filter(n=>n<=upto),later=weeks.filter(n=>n>upto);
+  return `<table class="wt">${head}<tbody>${weightRows(now)}</tbody></table>`
+    +(later.length?`<details class="wt-later"><summary>Semanas siguientes (S${later[0]}–S${later[later.length-1]})</summary><table class="wt">${head}<tbody>${weightRows(later)}</tbody></table></details>`:"");
+}
+function weightRows(weeks){
+  const cur=currentWeightWeek();
+  return (weeks||Object.keys(WEIGHT_RANGES)).map(n=>{
     const kg=wkg(n), bf=wbf(n);
-    return `<tr><td>S${n}</td><td class="muted">${WEIGHT_RANGES[n].replace(/ .*/,'')}</td>
-      <td><input type="number" step="0.1" inputmode="decimal" value="${kg!=null?kg:""}" onchange="setWeight(${n},this.value)" placeholder="kg" aria-label="Peso de la semana ${n} en kilogramos"></td>
+    return `<tr${+n===cur?' class="wt-current"':''}><td>S${n}</td><td class="muted">${WEIGHT_RANGES[n].replace(/ .*/,'')}</td>
+      <td><input type="number" step="0.1" inputmode="decimal" data-week="${n}" value="${kg!=null?kg:""}" onchange="setWeight(${n},this.value)" placeholder="kg" aria-label="Peso de la semana ${n} en kilogramos"></td>
       <td><input type="number" step="0.1" inputmode="decimal" value="${bf!=null?bf:""}" onchange="setBodyFat(${n},this.value)" placeholder="%" aria-label="Grasa corporal de la semana ${n} en porcentaje"></td></tr>`;
   }).join("");
 }
@@ -9870,7 +9897,7 @@ function setWeightEntry(n,patch){
 }
 function setWeight(n,v){setWeightEntry(n,{kg:v});}
 function setBodyFat(n,v){setWeightEntry(n,{bf:v});}
-function scrollToWeightInput(){const el=document.querySelector('.wt input');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.focus();}}
+function scrollToWeightInput(){const el=document.querySelector(`.wt input[data-week="${currentWeightWeek()}"]`)||document.querySelector('.wt input');if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.focus();}}
 // Composición corporal derivada para una semana con peso y % grasa.
 function composition(n){const kg=wkg(n),bf=wbf(n);if(kg==null||bf==null)return null;const fat=kg*bf/100;return{kg,bf,fat,lean:kg-fat};}
 // Última semana (mayor índice) con datos de peso.

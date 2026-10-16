@@ -70,4 +70,35 @@ test.describe("Progreso", () => {
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  test("REQ-194: solo se ven las semanas hasta la actual; las siguientes quedan plegadas", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Progreso").click();
+
+    const cur = await page.evaluate(() => currentWeightWeek());
+    await expect(page.getByLabel(`Peso de la semana ${cur} en kilogramos`)).toBeVisible();
+    const later = page.getByLabel(`Peso de la semana ${cur + 1} en kilogramos`);
+    await expect(later).toBeHidden();
+    await page.locator(".wt-later summary").click();
+    await expect(later).toBeVisible();
+
+    // "Ingresar mi peso" lleva al campo de la semana actual, no al de la semana 1
+    await page.getByRole("button", { name: "Ingresar mi peso" }).click();
+    await expect(page.getByLabel(`Peso de la semana ${cur} en kilogramos`)).toBeFocused();
+  });
+
+  test("REQ-194: una comida sin asignar no muestra macros en cero", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Nutrición").click();
+    const firstMeal = page.locator(".meal").first();
+    await expect(firstMeal).toContainText("Sin asignar");
+    await expect(firstMeal.locator(".nums")).toHaveCount(0);
+    await expect(firstMeal.getByRole("button", { name: /marcar como hecha/ })).toBeDisabled();
+  });
 });
