@@ -18,7 +18,7 @@
 <meta property="og:title" content="Evolv — Tu mejor versión, un día a la vez">
 <meta property="og:description" content="Nutrición y entrenamiento personalizados para tu día a día. Siempre tienes una opción viable.">
 <meta property="og:image" content="assets/icon-512.png">
-<meta property="og:url" content="https://fitbud-green.vercel.app/">
+<meta property="og:url" content="https://evolvapp.club/">
 <meta property="og:site_name" content="Evolv">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Evolv — Tu mejor versión, un día a la vez">
@@ -287,6 +287,9 @@
   .coach-busy-card .spinner{width:34px;height:34px}
   .temp-pass{font-family:var(--font-mono);font-size:20px;font-weight:700;letter-spacing:.04em;margin:8px 0;user-select:all}
   .welcome-msg{white-space:pre-wrap;font:inherit;font-size:12px;color:var(--muted);margin:6px 0 0;user-select:all}
+  .domain-move{position:fixed;left:12px;right:12px;top:calc(10px + var(--safe-top));z-index:180;max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:var(--r-md);background:var(--surf2);border:1px solid var(--border-acc);font-size:13px;color:var(--muted)}
+  .domain-move b{color:var(--txt);font-size:14px}
+  .domain-move .btn{align-self:flex-start;margin-top:4px;text-decoration:none}
   .plan-summary{margin:10px 0 4px}
   .plan-list{list-style:none;margin:8px 0 6px;padding:0;display:grid;gap:6px}
   .plan-row{display:flex;gap:10px;align-items:flex-start;background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:9px 10px}
@@ -11933,6 +11936,25 @@ function setupAuthListener(){
     }
   });
 }
+// REQ-183: Evolv vive en evolvapp.club. Los dominios viejos siguen sirviendo la
+// app (un redirect HTTP dejaría la PWA instalada atascada en su caché), pero:
+// sin sesión se va directo al dominio nuevo; con sesión se avisa, porque la
+// sesión y los datos locales son por dominio y hay que volver a entrar allí.
+const CANONICAL_ORIGIN="https://evolvapp.club";
+const LEGACY_HOSTS=new Set(["fitbros.vercel.app","fitbud-green.vercel.app"]);
+function legacyHostMigration(){
+  if(!LEGACY_HOSTS.has(location.hostname))return false;
+  if(!session&&!passwordRedirectMode()){
+    location.replace(CANONICAL_ORIGIN+location.pathname+location.search+location.hash);
+    return true;
+  }
+  if(!document.getElementById("domain-move")){
+    const el=document.createElement("div");el.id="domain-move";el.className="domain-move";el.setAttribute("role","status");
+    el.innerHTML=`<b>Evolv se mudó a evolvapp.club</b><span>Entra ahí con tu mismo correo y contraseña; tu progreso está guardado.</span><a class="btn btn-accent btn-sm" href="${CANONICAL_ORIGIN}/">Ir a evolvapp.club</a>`;
+    document.body.appendChild(el);
+  }
+  return false;
+}
 async function boot(){
   // Producción: las credenciales de Supabase llegan de /api/config (Vercel).
   // Cárgalas ANTES de pintar, para no mostrar la pantalla de "conectar Supabase"
@@ -11949,6 +11971,7 @@ async function boot(){
   if(recoveryRedirect){passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode=recoveryMode;}
   setupAuthListener();
   await refreshAuth();         // resuelve sesión (authReady=true)
+  if(legacyHostMigration())return;
   if(recoveryRedirect){
     passwordRecovery=true;
     passwordRecoveryMode=recoveryMode;

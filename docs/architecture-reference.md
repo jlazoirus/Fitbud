@@ -12,7 +12,7 @@ Documento de handoff para retomar el proyecto en otra sesión sin perder context
 PWA/app web de un solo `index.html` (vanilla JS, sin frameworks ni build step) que gestiona **ciclos sucesivos de 4 o 10 semanas** de nutrición y entrenamiento. El ciclo original fue sáb 13 jun 2026 → dom 23 ago 2026; los siguientes se generan por usuario. Calcula calorías y macros, tiene funciones de IA (Claude) y una base de datos de alimentos (Supabase).
 
 - **Repo:** https://github.com/jlazoirus/Fitbud (público)
-- **En vivo (producción):** https://fitbud-green.vercel.app/
+- **En vivo (producción):** https://evolvapp.club/
 - **Usuario/objetivo:** vegetariano sin huevo, ~180 g proteína/día, déficit agresivo. Plan en `plan-10-semanas-recomposicion.md` (fuente de verdad de menús/entrenos).
 
 ## 2. Stack y arquitectura
@@ -169,11 +169,11 @@ Prioridad en `effectiveSettings()`: **override local (Ajustes, localStorage)** �
 Modelos válidos (whitelist en `api/claude.js`): `claude-haiku-4-5-20251001` (default), `claude-sonnet-4-6`.
 
 ## 9. Despliegue, ejecución y verificación
-- **Producción:** Vercel auto-deploy en cada `git push` a `main`. Usar el dominio limpio `fitbud-green.vercel.app` (NO las URLs con hash, que están protegidas).
+- **Producción:** Vercel auto-deploy en cada `git push` a `main`. Usar el dominio limpio `evolvapp.club` (NO las URLs con hash, que están protegidas).
 - **Deployment Protection:** debe estar **desactivada** (Settings → Deployment Protection → Vercel Authentication) o `/api/*` da 401.
 - **GitHub Pages:** puede servir el estático pero NO corre `api/`; ahí la IA queda off salvo key local.
 - **Local:** `python3 -m http.server 8923` y abrir `http://localhost:8923` (hay `.claude/launch.json` con server "fitbud" en :8923). En local `/api/*` no existe → IA solo con key local en Ajustes.
-- **Verificación rápida:** `curl https://fitbud-green.vercel.app/api/config` (debe dar JSON con proxy:true y supabase lleno). Conteo de datos vía Supabase REST con la publishable key (`/rest/v1/dishes?select=id` + header `apikey`).
+- **Verificación rápida:** `curl https://evolvapp.club/api/config` (debe dar JSON con proxy:true y supabase lleno). Conteo de datos vía Supabase REST con la publishable key (`/rest/v1/dishes?select=id` + header `apikey`).
 - **Syntax check del JS embebido:** extraer el último `<script>` de index.html y `node --check`.
 
 ## 10. Extensiones

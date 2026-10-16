@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Smoke test de producción — REQ-30
 // Prueba los endpoints críticos de la app desplegada.
-// Uso: node scripts/smoke-test.mjs [--url https://fitbud-green.vercel.app]
+// Uso: node scripts/smoke-test.mjs [--url https://evolvapp.club]
 // Sale con código 0 si todos los checks pasan, 1 si alguno falla.
 // No requiere credenciales: solo prueba rutas públicas y rechazos de auth.
 
-const DEFAULT_URL = "https://fitbud-green.vercel.app";
+const DEFAULT_URL = "https://evolvapp.club";
 const args = process.argv.slice(2);
 const urlIdx = args.indexOf("--url");
 const BASE = urlIdx >= 0 && args[urlIdx + 1] ? args[urlIdx + 1].replace(/\/$/, "") : DEFAULT_URL;

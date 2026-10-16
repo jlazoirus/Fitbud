@@ -1832,3 +1832,24 @@ Que cambiar el ícono de la app obligue a subir `CACHE_NAME`, para que ningún c
 ### Verificación sugerida
 
 - Reproducir el diff que corre el validador: `git diff --name-only <base> HEAD -- <lista APP_SHELL>`. Tras el fix el ícono aparece en el pathspec; antes no. Demostrado en la auditoría contra `06cd60f..9c2997b`: `icon-180.png` cambió en ese rango pero el pathspec del shell no lo veía (solo `icon-192`/`icon-512`).
+
+## REQ-183 - Dominio propio: Evolv en evolvapp.club
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan compró `evolvapp.club` en Porkbun (2026-10-16) para la marca Evolv (REQ-180).
+
+### Alcance
+
+1. Porkbun DNS: `A @ → 216.198.79.1` y `CNAME www → *.vercel-dns-017.com`, sin los registros de parking.
+2. Vercel: `evolvapp.club` en Production y `www.evolvapp.club` con 308 al dominio raíz; `NOTIFY_APP_URL=https://evolvapp.club` (correos y retorno de checkout).
+3. Supabase Auth: Site URL `https://evolvapp.club` y `https://evolvapp.club/**` permitida (las URLs viejas siguen permitidas durante la transición).
+4. Código: URLs por defecto de `api/notify.js`, `api/checkout.js`, `og:url`, smoke test y documentación.
+5. Dominios viejos (`fitbros.vercel.app`, `fitbud-green.vercel.app`): no se redirigen por HTTP (la PWA instalada quedaría atascada en su caché, porque el service worker no puede actualizarse con un redirect). `legacyHostMigration()` manda a los visitantes sin sesión al dominio nuevo y, con sesión, muestra el aviso "Evolv se mudó a evolvapp.club".
+
+### Fuera de alcance
+
+- Webhook de Stripe (checkout deshabilitado); al activarlo, registrar `https://evolvapp.club/api/webhook`.
+- Dominio autenticado en Brevo (remitente `@evolvapp.club`).

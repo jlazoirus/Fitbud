@@ -7,7 +7,7 @@
 // Variables de entorno requeridas en Vercel (además de las ya existentes):
 //   RESEND_API_KEY       — API key de resend.com
 //   NOTIFY_FROM_EMAIL    — dirección remitente verificada, ej: recordatorios@fitbros.app
-//   NOTIFY_APP_URL       — URL pública de la app, ej: https://fitbud-green.vercel.app
+//   NOTIFY_APP_URL       — URL pública de la app, ej: https://evolvapp.club
 //   CRON_SECRET          — cadena aleatoria; Vercel la inyecta en Authorization al ejecutar cron
 //
 // vercel.json define: { "crons": [{ "path": "/api/notify", "schedule": "0 8 * * *" }] }
@@ -44,7 +44,7 @@ function env() {
     service: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
     resendKey: process.env.RESEND_API_KEY || "",
     fromEmail: process.env.NOTIFY_FROM_EMAIL || "recordatorios@fitbros.app",
-    appUrl: (process.env.NOTIFY_APP_URL || "https://fitbud-green.vercel.app").replace(/\/$/, ""),
+    appUrl: (process.env.NOTIFY_APP_URL || "https://evolvapp.club").replace(/\/$/, ""),
     cronSecret: process.env.CRON_SECRET || "",
   };
 }

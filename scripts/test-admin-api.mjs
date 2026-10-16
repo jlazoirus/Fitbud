@@ -74,11 +74,11 @@ global.fetch = async (url, options = {}) => {
 let res = capture();
 await handler({
   method: "POST",
-  headers: { authorization: "Bearer admin-token", origin: "https://fitbud-green.vercel.app" },
+  headers: { authorization: "Bearer admin-token", origin: "https://evolvapp.club" },
   body: {
     action: "inviteUser",
     email: invitedUser.email,
-    redirectTo: "https://fitbud-green.vercel.app/index.html?auth=invite",
+    redirectTo: "https://evolvapp.club/index.html?auth=invite",
   },
 }, res);
 assert(res.statusCode === 200 && res.body.ok === true, "Debe enviar invitación a un correo nuevo.");

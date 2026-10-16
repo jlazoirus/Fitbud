@@ -10,7 +10,7 @@ function env() {
     stripeKey:     process.env.STRIPE_SECRET_KEY || "",
     priceMonthly:  process.env.STRIPE_PRICE_MONTHLY || "",
     priceQuarterly: process.env.STRIPE_PRICE_QUARTERLY || "",
-    appUrl: (process.env.NOTIFY_APP_URL || "https://fitbud-green.vercel.app").replace(/\/$/, ""),
+    appUrl: (process.env.NOTIFY_APP_URL || "https://evolvapp.club").replace(/\/$/, ""),
   };
 }
 

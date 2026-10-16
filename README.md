@@ -2,7 +2,7 @@
 
 Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 10 semanas**. El ciclo original va del sáb 13 jun al dom 23 ago 2026; los siguientes se recalculan por usuario. App estática, sin frameworks ni build step.
 
-**🔗 En vivo:** https://fitbud-green.vercel.app/ (desplegado en Vercel; las credenciales viven como variables de entorno en Vercel, no en este repo).
+**🔗 En vivo:** https://evolvapp.club/ (desplegado en Vercel; las credenciales viven como variables de entorno en Vercel, no en este repo).
 
 ## Qué hace
 

@@ -1,5 +1,5 @@
 // Serverless: recibe y procesa webhooks de Stripe (firmados con HMAC-SHA256).
-// POST /api/webhook  (registrar en Stripe → https://fitbud-green.vercel.app/api/webhook)
+// POST /api/webhook  (registrar en Stripe → https://evolvapp.club/api/webhook)
 // Vars: STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // Eventos: checkout.session.completed, charge.refunded, charge.dispute.created,
 //          payment_intent.payment_failed, checkout.session.expired

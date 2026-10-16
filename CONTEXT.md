@@ -12,7 +12,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 
 - Frontend vanilla sin framework ni build step. `index.html` es el shell principal; funciones publicas siguen expuestas para handlers inline.
 - Modulos puros sin DOM: `js/nutrition-pure.js`, `js/nutrition-domain.js`, `domain-contracts.js`, `workout-player.js`, `training-plan.js`, `sync-conflicts.js`.
-- Hosting en Vercel: estatico + funciones `api/*.js`. Produccion: `https://fitbud-green.vercel.app/`.
+- Hosting en Vercel: estatico + funciones `api/*.js`. Produccion: `https://evolvapp.club/`.
 - Supabase es fuente de verdad. `localStorage` espeja/cachea para offline; no debe ser la unica ubicacion de datos personales.
 - PWA: `manifest.webmanifest`, `service-worker.js`, iconos en `assets/`. `index.html`/`config.js` son network-first; `/api/*` network-only.
 
