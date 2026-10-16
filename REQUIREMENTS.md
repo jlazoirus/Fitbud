@@ -1586,3 +1586,22 @@ Auditoría impeccable de UI (2026-10-16), medida con emulación táctil (`pointe
 ### Criterios de aceptación
 
 - `tests/e2e/tactil.spec.js`: ningún control visible de las 5 tabs mide menos de 44×44 px en táctil (falla con el código anterior). ✓
+
+## REQ-193 - Textos: sin vocabulario interno, fechas consistentes y beta con ortografía completa
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): Nutrición decía "llena los **slots**", "Macros calculados desde **tu base de datos**" y "prepara una opción con tu coach **o elige**" (frase cortada); `text-transform:capitalize` convertía "16 oct" en "16 Oct" en Nutrición/Entreno/Progreso mientras Hoy decía "16 oct"; el chip de check-in usaba el emoji 📋; `beta-reclutamiento.html` no tenía tildes ni "¿" ("Que te describe mejor?", "Pais", "despues").
+
+### Alcance
+
+1. Copy de Nutrición y `dbStatusNote()` en lenguaje del usuario; error de carga con recuperación ("Revisa tu conexión y vuelve a intentarlo").
+2. Sin `text-transform:capitalize` en `.dtitle .date` y `.wk-left .d`.
+3. Chip de check-in sin emoji.
+4. Beta: ortografía en textos visibles y placeholders; los `value` que se envían al API no cambian (no altera el scoring ni datos históricos).
+
+### Criterios de aceptación
+
+- `tests/e2e/textos.spec.js`: Nutrición sin "slots"/"base de datos"/"o elige", fecha "Viernes, 16 oct", y la beta con "¿Qué te describe mejor?". ✓

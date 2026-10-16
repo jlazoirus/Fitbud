@@ -119,7 +119,7 @@
   .daynav button{background:var(--surf2);border:1px solid var(--border-2);width:44px;height:44px;border-radius:14px;font-size:20px;color:var(--white);display:flex;align-items:center;justify-content:center;transition:.15s}
   .daynav button:active{transform:scale(.94)}
   .dtitle{flex:1;text-align:center}
-  .dtitle .date{font-family:var(--font-body);font-size:19px;font-weight:700;letter-spacing:-.02em;text-transform:capitalize}
+  .dtitle .date{font-family:var(--font-body);font-size:19px;font-weight:700;letter-spacing:-.02em}
   .badge{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.04em;white-space:nowrap}
   .b-PESAS{background:var(--accent-dim);color:var(--purple-200)}
   .b-BAJO{background:var(--terra-dim);color:var(--terra-300)}
@@ -348,7 +348,7 @@
   /* Week view */
   .wk-day{display:flex;justify-content:space-between;align-items:center;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-md);padding:13px 15px;margin-bottom:8px;transition:.15s}
   .wk-day.today{border-color:var(--border-acc);background:var(--accent-dim)}
-  .wk-left .d{font-family:var(--font-body);font-weight:600;text-transform:capitalize}
+  .wk-left .d{font-family:var(--font-body);font-weight:600}
   .wk-left .m{font-size:12px;color:var(--muted);margin-top:3px}
   .wk-day .center>div:first-child{font-family:var(--font-body);font-weight:700}
   .dot{width:9px;height:9px;border-radius:999px;display:inline-block;margin-left:6px}
@@ -2399,9 +2399,9 @@ function paceClass(consumed,target,isToday){
 }
 function pctW(v,t){return Math.min(100,t?Math.round(v/t*100):0);}
 function dbStatusNote(){
-  if(DB.loaded)return "✓ Macros calculados desde tu base de datos.";
-  if(supa&&!DB.error)return "Cargando macros desde la base de datos…";
-  if(supa&&DB.error)return "⚠️ No se pudo leer la base de datos.";
+  if(DB.loaded)return "✓ Macros calculados por ingrediente.";
+  if(supa&&!DB.error)return "Cargando tus alimentos…";
+  if(supa&&DB.error)return "No pudimos cargar los alimentos. Revisa tu conexión y vuelve a intentarlo.";
   return "Prepara tu día o semana con tu coach, o agrega comidas; los macros se calculan por ingredientes.";
 }
 
@@ -4390,7 +4390,7 @@ function renderNutrition(){
     <div class="agenda-head"><div>
       <div class="agenda-kicker">Nutrición</div>
       <h3 class="agenda-title">Prepara tus comidas de hoy</h3>
-      <div class="agenda-sub">Aquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Un día preparado llena los slots automáticamente.</div>
+      <div class="agenda-sub">Aquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Al preparar el día, cada comida se llena sola.</div>
     </div></div>
     <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
   </section>`:"";
@@ -5283,7 +5283,7 @@ function mealCard(ds,b,order){
       <button class="chk ${ms.done?'on':''}" ${!ms.done&&!mealHasContent(v)?'disabled title="Prepara una opción antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
       <div>
         <div class="slot">${b.slot}</div>
-        <div class="name">${v.name?esc(v.name):'<span class="muted">Sin asignar — prepara una opción con tu coach o elige</span>'}</div>
+        <div class="name">${v.name?esc(v.name):'<span class="muted">Sin asignar — prepara tu día o toca «Otra opción»</span>'}</div>
         <div class="nums"><b>${v.kcal}</b> kcal · P <b>${v.p}</b> · C <b>${v.c}</b> · G <b>${v.f}</b> g</div>
       </div>
     </div>
@@ -11903,7 +11903,7 @@ function weeklyCheckinBanner(){
 // Acceso discreto al check-in pendiente para vistas que no son Home (evita banner duplicado).
 function weeklyCheckinChip(){
   const due=weeklyCheckinDue();if(!due)return"";
-  return`<button class="coach-chip" style="margin:0 0 14px" onclick="openWeeklyCheckin()">📋 Check-in semana ${due.num} pendiente · ${weeklyCheckinRangeLabel(due.start,due.end)}</button>`;
+  return`<button class="coach-chip" style="margin:0 0 14px" onclick="openWeeklyCheckin()">Check-in semana ${due.num} pendiente · ${weeklyCheckinRangeLabel(due.start,due.end)}</button>`;
 }
 
 // Calcula sesiones planificadas/realizadas en la semana y peso previo.
