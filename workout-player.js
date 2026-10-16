@@ -395,7 +395,7 @@
     let completedSets=0,totalSets=0;
     steps.filter(step=>step.type==="strength").forEach(step=>{
       const sets=Array.isArray(step.sets)?step.sets:[];
-      // REQ-184: una serie extra sin hacer no es una serie que falte.
+      // REQ-185: una serie extra sin hacer no es una serie que falte.
       const prescribed=Math.round(number(step.prescribedSets,sets.length));
       sets.forEach((set,index)=>{
         if(set.done)completedSets++;

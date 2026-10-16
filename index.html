@@ -972,7 +972,7 @@ function normalizedBlockedDishes(value){
   });
   return out.slice(0,200);
 }
-// REQ-187: comidas favoritas del usuario (privadas, en profile.prefs).
+// REQ-188: comidas favoritas del usuario (privadas, en profile.prefs).
 const SAVED_MEALS_MAX=50;
 function mealMacrosEntry(v){
   const name=String(v&&v.name||"").trim().slice(0,160);
@@ -987,7 +987,7 @@ function normalizedSavedMeals(list){
   });
   return out;
 }
-// REQ-186: descanso cronometrado entre ejercicios de fuerza (2:00 por defecto).
+// REQ-187: descanso cronometrado entre ejercicios de fuerza (2:00 por defecto).
 const BETWEEN_EXERCISE_REST_OPTIONS=[60,90,120,150,180,240,300];
 const DEFAULT_BETWEEN_EXERCISE_REST=120;
 function normalizedBetweenExerciseRest(value){
@@ -4723,7 +4723,7 @@ function skipWorkoutTimer(ds){
   if(execution.timer.kind==="step")return finishTimedWorkoutStep(ds,true);
   execution.timer=null;persistWorkoutExecution(ds,execution,true);toast("Descanso omitido");
 }
-// REQ-184: series prescritas sin marcar (las extra sin hacer no cuentan).
+// REQ-185: series prescritas sin marcar (las extra sin hacer no cuentan).
 function pendingPrescribedSets(execution,onlyStepIndex){
   const out=[];
   execution.steps.forEach((step,stepIndex)=>{
@@ -4757,7 +4757,7 @@ function completeWorkoutStep(ds,mode){
   }
   step.status="done";step.completedAt=new Date().toISOString();
   const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
-  // REQ-186: entre dos ejercicios de fuerza corre el descanso entre ejercicios;
+  // REQ-187: entre dos ejercicios de fuerza corre el descanso entre ejercicios;
   // si ya arrancó con la última serie, se conserva (no se reinicia).
   const toStrength=step.type==="strength"&&next>=0&&execution.steps[next].type==="strength";
   if(!toStrength)execution.timer=null;
@@ -4803,7 +4803,7 @@ function toggleWorkoutSet(ds,stepIndex,setIndex){
   if(!set.done)return;
   if(step.sets.some(item=>!item.done))startWorkoutTimer(ds,step.restSeconds,"rest");
   else{
-    // REQ-186: última serie hecha y sigue otro ejercicio de fuerza → descanso entre ejercicios.
+    // REQ-187: última serie hecha y sigue otro ejercicio de fuerza → descanso entre ejercicios.
     const next=nextWorkoutStepIndex(execution,stepIndex+1);
     if(next>=0&&next!==stepIndex&&execution.steps[next].type==="strength")startWorkoutTimer(ds,betweenExerciseRestSeconds(),"rest",true);
   }
@@ -4866,7 +4866,7 @@ function openFinishWorkout(ds,partial,keep){
     }
     persistWorkoutExecution(ds,execution,true);
   }
-  // REQ-184: decir qué falta para cerrarla completada y permitir marcarlo aquí.
+  // REQ-185: decir qué falta para cerrarla completada y permitir marcarlo aquí.
   const pending=!partial&&execution.steps.every(step=>step.status==="done")?pendingPrescribedSets(execution):[];
   const pendingHtml=pending.length?`<div class="alert violet finish-pending"><b>${pending.length===1?"Falta":"Faltan"} ${seriesCount(pending.length)} por marcar</b>, por eso se guardaría como parcial:
       <ul>${pending.map(item=>`<li>${esc(item.label)}</li>`).join("")}</ul>
@@ -4913,7 +4913,7 @@ function finishWorkoutExecution(ds,partialRequested){
   persistWorkoutExecution(ds,execution,false);closeModal();render();
   toast(execution.status==="completed"?"Sesión completada":"Sesión guardada como parcial");
 }
-// REQ-184: una sesión guardada parcial solo por series sin marcar se reabre
+// REQ-185: una sesión guardada parcial solo por series sin marcar se reabre
 // en el ejercicio que las tiene, para marcarlas y cerrarla completada.
 function reviewPendingWorkoutSets(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
@@ -4947,7 +4947,7 @@ function workoutTimerTick(){
   if(clock&&execution)clock.textContent=formatWorkoutTime(WORKOUT_PLAYER.elapsedSeconds(execution,Date.now()));
   const timer=document.querySelector(".workout-timer-value");
   if(!timer)return;
-  // REQ-185: la pantalla muestra un descanso que el estado ya no tiene: re-renderizar
+  // REQ-186: la pantalla muestra un descanso que el estado ya no tiene: re-renderizar
   // en vez de dejar un contador congelado con botones que no responden.
   if(!execution||!execution.timer){if(workoutRerenderSafe())render();return;}
   const remaining=WORKOUT_PLAYER.timerRemaining(execution.timer,Date.now());
@@ -8006,7 +8006,7 @@ function openEditor(kind,ds,id){
   editorSheet(title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
-/* REQ-187: reutilizar comidas ya registradas o favoritas y sumar alimentos sueltos por gramos. */
+/* REQ-188: reutilizar comidas ya registradas o favoritas y sumar alimentos sueltos por gramos. */
 function recentCustomMeals(limit){
   const out=[],seen=new Set();
   const push=v=>{
@@ -10728,7 +10728,7 @@ async function pushDay(ds){
       const{plan_version_id:_,...compat}=payload;
       await supa.from("day_log").upsert(compat,{onConflict:"user_id,log_date"});
     }else if(result.error)throw result.error;
-    // REQ-185: no reemplazar S.days[ds] con la copia enviada: si el día cambió
+    // REQ-186: no reemplazar S.days[ds] con la copia enviada: si el día cambió
     // mientras viajaba (p. ej. serie hecha → descanso), esa copia es vieja y
     // borraría el cambio más nuevo. commitDay() ya normalizó el estado local.
     if(planVersionId&&S.days[ds]&&!S.days[ds].planVersionId){S.days[ds].planVersionId=planVersionId;save();}
@@ -10770,7 +10770,7 @@ async function pullAllDays(){
     if(!r.error&&Array.isArray(r.data)){
       r.data.forEach(row=>{
         if(_hasPendingDay(row.log_date))return; // preservar cambios offline pendientes
-        if((_dayCommitSeq[row.log_date]||0)!==(seqs[row.log_date]||0))return; // REQ-185
+        if((_dayCommitSeq[row.log_date]||0)!==(seqs[row.log_date]||0))return; // REQ-186
         if(row.state&&typeof row.state==="object"){
           const state={...row.state};
           prepareDayStateForSync(state);
@@ -10785,7 +10785,7 @@ async function pullAllDays(){
     }
   }catch(e){}
 }
-// REQ-185: cuenta los cambios locales por día; una lectura remota que empezó
+// REQ-186: cuenta los cambios locales por día; una lectura remota que empezó
 // antes de un cambio no debe pisarlo al llegar.
 const _dayCommitSeq={};
 // Guarda local + sube a la DB (usar tras cualquier cambio del día).
@@ -12450,7 +12450,7 @@ function freezeInProgressWorkouts(){
 }
 document.addEventListener("visibilitychange",()=>{if(document.hidden)freezeInProgressWorkouts();else resyncWorkoutView();});
 window.addEventListener("pagehide",freezeInProgressWorkouts);
-// REQ-185: al volver a primer plano (iOS puede suspender los intervalos de la
+// REQ-186: al volver a primer plano (iOS puede suspender los intervalos de la
 // PWA), recalcular ya el reproductor en vez de esperar al próximo tick.
 function resyncWorkoutView(){if(view==="entreno"&&session&&workoutRerenderSafe()){render();workoutTimerTick();}}
 window.addEventListener("pageshow",e=>{if(e.persisted)resyncWorkoutView();});

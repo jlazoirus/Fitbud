@@ -183,7 +183,7 @@ test.describe("Perfil", () => {
 
     expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
   });
-  test("REQ-186: el descanso entre ejercicios se configura en Perfil y llega a Entreno", async ({ page, context }) => {
+  test("REQ-187: el descanso entre ejercicios se configura en Perfil y llega a Entreno", async ({ page, context }) => {
     const { calls } = await installMocks(context, { prefs: completePrefs({ diet: ["omnivoro"] }) });
     await seedLoggedInUser(page);
     await autoDismissNudges(page);

@@ -1,4 +1,4 @@
-// REQ-187: reutilizar comidas recientes y favoritas, y registrar alimentos
+// REQ-188: reutilizar comidas recientes y favoritas, y registrar alimentos
 // sueltos por gramos desde el catálogo (0 llamadas pagadas).
 import { test, expect } from "@playwright/test";
 import {

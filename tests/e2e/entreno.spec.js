@@ -153,7 +153,7 @@ test.describe("Entreno", () => {
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
-  // REQ-184: recorre la sesión dejando UNA serie prescrita sin marcar en el primer
+  // REQ-185: recorre la sesión dejando UNA serie prescrita sin marcar en el primer
   // ejercicio de fuerza y una serie extra sin hacer en el segundo.
   async function runSessionLeavingOneSet(page) {
     const app = page.locator("#app");
@@ -195,7 +195,7 @@ test.describe("Entreno", () => {
     await overlay.getByRole("button", { name: "Guardar resultado" }).click();
   }
 
-  test("REQ-184: la serie sin marcar se marca desde el cierre y la sesión queda completada", async ({ page, context }) => {
+  test("REQ-185: la serie sin marcar se marca desde el cierre y la sesión queda completada", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -223,7 +223,7 @@ test.describe("Entreno", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  test("REQ-184: una sesión guardada parcial por una serie sin marcar se puede corregir", async ({ page, context }) => {
+  test("REQ-185: una sesión guardada parcial por una serie sin marcar se puede corregir", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -247,7 +247,7 @@ test.describe("Entreno", () => {
     await expect(app).toContainText("Sesión completada");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
-  test("REQ-185: el descanso no se congela si un guardado anterior responde tarde", async ({ page, context }) => {
+  test("REQ-186: el descanso no se congela si un guardado anterior responde tarde", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -286,7 +286,7 @@ test.describe("Entreno", () => {
     await expect(timer).not.toHaveText(start); // la cuenta atrás sigue bajando
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
-  test("REQ-185: al volver a primer plano el descanso refleja el tiempo real aunque los intervalos se hayan suspendido", async ({ page, context }) => {
+  test("REQ-186: al volver a primer plano el descanso refleja el tiempo real aunque los intervalos se hayan suspendido", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -319,7 +319,7 @@ test.describe("Entreno", () => {
     expect(await page.evaluate(() => normalizedWorkoutExecution(current).timer)).toBeNull();
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
-  test("REQ-186: al terminar un ejercicio corre el descanso entre ejercicios (2:00 por defecto)", async ({ page, context }) => {
+  test("REQ-187: al terminar un ejercicio corre el descanso entre ejercicios (2:00 por defecto)", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
