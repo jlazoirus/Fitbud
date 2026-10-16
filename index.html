@@ -4871,13 +4871,22 @@ function discardWorkoutExecution(ds){
   const st=dayState(ds);delete st.workoutExecution;st.workoutDone=false;commitDay(ds);render();toast("Sesión descartada");
 }
 let workoutTimerCompleting=false;
+// No re-renderizar por debajo de un modal ni mientras se escribe en un campo
+// (perdería el foco); el siguiente tick lo reintenta.
+function workoutRerenderSafe(){
+  const active=document.activeElement;
+  return !$("#overlay")&&!(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
+}
 function workoutTimerTick(){
-  if(view!=="entreno"||!session)return;
+  if(view!=="entreno")return;
   const execution=normalizedWorkoutExecution(current);
   const clock=document.querySelector(".player-clock");
   if(clock&&execution)clock.textContent=formatWorkoutTime(WORKOUT_PLAYER.elapsedSeconds(execution,Date.now()));
   const timer=document.querySelector(".workout-timer-value");
-  if(!timer||!execution||!execution.timer)return;
+  if(!timer)return;
+  // REQ-185: la pantalla muestra un descanso que el estado ya no tiene: re-renderizar
+  // en vez de dejar un contador congelado con botones que no responden.
+  if(!execution||!execution.timer){if(workoutRerenderSafe())render();return;}
   const remaining=WORKOUT_PLAYER.timerRemaining(execution.timer,Date.now());
   timer.textContent=formatWorkoutTime(remaining);
   if(remaining>0||!execution.timer.running||workoutTimerCompleting)return;
@@ -10525,7 +10534,10 @@ async function pushDay(ds){
       const{plan_version_id:_,...compat}=payload;
       await supa.from("day_log").upsert(compat,{onConflict:"user_id,log_date"});
     }else if(result.error)throw result.error;
-    S.days[ds]=state;save();
+    // REQ-185: no reemplazar S.days[ds] con la copia enviada: si el día cambió
+    // mientras viajaba (p. ej. serie hecha → descanso), esa copia es vieja y
+    // borraría el cambio más nuevo. commitDay() ya normalizó el estado local.
+    if(planVersionId&&S.days[ds]&&!S.days[ds].planVersionId){S.days[ds].planVersionId=planVersionId;save();}
     _rememberRemoteVersion("day_log",ds,payload.updated_at,payload);
     _dequeueMutation("day_log",ds);
   }catch(e){enqueueMutation("day_log",ds,payload);}
@@ -10535,8 +10547,10 @@ async function pushDay(ds){
 async function pullDay(ds){
   if(!supa||!ds||!uid())return false;
   if(_hasPendingDay(ds))return true; // estado local autoridad mientras pendiente
+  const seq=_dayCommitSeq[ds]||0;
   try{
     let r=await supa.from("day_log").select("state,plan_version_id,updated_at").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
+    if((_dayCommitSeq[ds]||0)!==seq)return true; // cambió mientras leíamos: manda lo local
     if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("state,updated_at").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
     if(!r.error&&r.data&&r.data.state&&typeof r.data.state==="object"){
       const state={...r.data.state};
@@ -10555,12 +10569,14 @@ async function pullDay(ds){
 // para preservar los cambios offline hechos en este dispositivo.
 async function pullAllDays(){
   if(!supa||!uid())return;
+  const seqs={..._dayCommitSeq};
   try{
     let r=await supa.from("day_log").select("log_date,state,plan_version_id,updated_at").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
     if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("log_date,state,updated_at").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
     if(!r.error&&Array.isArray(r.data)){
       r.data.forEach(row=>{
         if(_hasPendingDay(row.log_date))return; // preservar cambios offline pendientes
+        if((_dayCommitSeq[row.log_date]||0)!==(seqs[row.log_date]||0))return; // REQ-185
         if(row.state&&typeof row.state==="object"){
           const state={...row.state};
           prepareDayStateForSync(state);
@@ -10575,8 +10591,12 @@ async function pullAllDays(){
     }
   }catch(e){}
 }
+// REQ-185: cuenta los cambios locales por día; una lectura remota que empezó
+// antes de un cambio no debe pisarlo al llegar.
+const _dayCommitSeq={};
 // Guarda local + sube a la DB (usar tras cualquier cambio del día).
 function commitDay(ds){
+  _dayCommitSeq[ds]=(_dayCommitSeq[ds]||0)+1;
   const st=dayState(ds);
   prepareDayStateForSync(st);
   const planVersionId=st.planVersionId||resolvePlanVersionIdForDate(ds);
@@ -12234,8 +12254,12 @@ function freezeInProgressWorkouts(){
     }
   });
 }
-document.addEventListener("visibilitychange",()=>{if(document.hidden)freezeInProgressWorkouts();});
+document.addEventListener("visibilitychange",()=>{if(document.hidden)freezeInProgressWorkouts();else resyncWorkoutView();});
 window.addEventListener("pagehide",freezeInProgressWorkouts);
+// REQ-185: al volver a primer plano (iOS puede suspender los intervalos de la
+// PWA), recalcular ya el reproductor en vez de esperar al próximo tick.
+function resyncWorkoutView(){if(view==="entreno"&&session&&workoutRerenderSafe()){render();workoutTimerTick();}}
+window.addEventListener("pageshow",e=>{if(e.persisted)resyncWorkoutView();});
 render();                      // splash mientras resolvemos la sesión
 boot();                        // carga config (Vercel) → conecta Supabase → resuelve sesión
 // Inicializar badge de sincronización (vive fuera de #app para sobrevivir render()).

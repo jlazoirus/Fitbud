@@ -63,7 +63,7 @@ Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-0
 Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que hoy le impide cerrar bien su entreno primero, luego lo que lo hace más cómodo, luego nutrición:
 
 - REQ-184 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
-- REQ-185 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; reproducir antes de arreglar)
+- REQ-185 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; implementado)
 - REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto). (P1)
 - REQ-187 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1)
 
@@ -1727,7 +1727,9 @@ Que quien hizo todo pueda cerrar la sesión como completada, y que la app diga q
 
 ## REQ-185 - Fix Entreno: el cronómetro de descanso se queda congelado
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+Causa real (reproducida en `tests/e2e/entreno.spec.js`): `pushDay()` reemplazaba `S.days[ds]` con la copia enviada al recibir la respuesta. Marcar una serie dispara dos guardados (serie hecha → descanso); si el primero responde último, el estado vuelve a "sin descanso" mientras la pantalla sigue en "01:59 · Pausar" y el tick, Pausar y Omitir dejan de actuar. Fix: `pushDay()` ya no reemplaza el día; `pullDay()`/`pullAllDays()` descartan una lectura si el día cambió mientras viajaba (`_dayCommitSeq`); el tick re-renderiza si la pantalla muestra un descanso que el estado no tiene y ya no depende de `session`; al volver a primer plano (`visibilitychange`, `pageshow`) se re-sincroniza el reproductor. `CACHE_NAME` → `fitbud-pwa-v81`.
 
 ### Origen
 
@@ -1765,9 +1767,9 @@ Que el descanso siempre muestre el tiempo real restante y termine solo, aunque l
 
 ### Criterios de aceptación
 
-- Test que reproduce el congelamiento antes del fix y pasa después.
-- Simular 90 s oculto con un descanso de 60 s: al volver, el descanso está terminado.
-- `node scripts/release-gate.mjs` pasa.
+- Test que reproduce el congelamiento antes del fix y pasa después. ✓
+- Simular el descanso + 30 s oculto con los intervalos suspendidos: al volver, el descanso está terminado. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
 
 ### Verificación sugerida
 

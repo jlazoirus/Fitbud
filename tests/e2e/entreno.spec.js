@@ -247,4 +247,76 @@ test.describe("Entreno", () => {
     await expect(app).toContainText("Sesión completada");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+  test("REQ-185: el descanso no se congela si un guardado anterior responde tarde", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await page.getByRole("button", { name: "Marcar completado" }).click();
+    await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
+
+    // Marcar una serie dispara dos guardados seguidos (serie hecha, luego
+    // descanso). Con red irregular el primero puede responder después del
+    // segundo: se retrasa solo ese.
+    let delayed = false;
+    await context.route("**/rest/v1/day_log*", async (route) => {
+      if (route.request().method() === "POST" && !delayed) {
+        delayed = true;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      await route.fallback();
+    });
+    await page.locator("#app button.set-done").first().click();
+    const timer = app.locator(".workout-timer-value");
+    await expect(timer).toBeVisible();
+    const start = (await timer.innerText()).trim();
+
+    await page.waitForTimeout(3500);
+    expect(delayed).toBe(true);
+    const state = await page.evaluate(() => {
+      const ex = normalizedWorkoutExecution(current);
+      return { timer: !!(ex && ex.timer), setDone: ex.steps[ex.currentStep].sets[0].done };
+    });
+    expect(state.setDone).toBe(true);
+    expect(state.timer, "el estado no debe perder el descanso en curso").toBe(true);
+    await expect(timer).not.toHaveText(start); // la cuenta atrás sigue bajando
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+  test("REQ-185: al volver a primer plano el descanso refleja el tiempo real aunque los intervalos se hayan suspendido", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    await page.clock.install();
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await page.getByRole("button", { name: "Marcar completado" }).click();
+    await page.locator("#app button.set-done").first().click();
+    await expect(app.locator(".workout-timer-value")).toBeVisible();
+    const restSeconds = await page.evaluate(() => normalizedWorkoutExecution(current).timer.totalSeconds);
+
+    // Pantalla bloqueada: ningún intervalo corre, pero el reloj real avanza.
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", { value: true, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    const now = await page.evaluate(() => Date.now());
+    await page.clock.pauseAt(now + 1000);
+    await page.clock.setSystemTime(now + (restSeconds + 30) * 1000);
+    await page.evaluate(() => {
+      Object.defineProperty(document, "hidden", { value: false, configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+
+    // Sin avanzar ningún intervalo, la vuelta ya cerró el descanso.
+    await expect(app.locator(".workout-timer-value")).toHaveCount(0);
+    expect(await page.evaluate(() => normalizedWorkoutExecution(current).timer)).toBeNull();
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
