@@ -4677,10 +4677,35 @@ function skipWorkoutTimer(ds){
   if(execution.timer.kind==="step")return finishTimedWorkoutStep(ds,true);
   execution.timer=null;persistWorkoutExecution(ds,execution,true);toast("Descanso omitido");
 }
-function completeWorkoutStep(ds){
+// REQ-184: series prescritas sin marcar (las extra sin hacer no cuentan).
+function pendingPrescribedSets(execution,onlyStepIndex){
+  const out=[];
+  execution.steps.forEach((step,stepIndex)=>{
+    if(step.type!=="strength"||step.status==="skipped")return;
+    if(onlyStepIndex!=null&&stepIndex!==onlyStepIndex)return;
+    const exercise=exerciseBySlug(step.exerciseSlug,true);
+    step.sets.slice(0,step.prescribedSets).forEach((set,setIndex)=>{
+      if(!set.done)out.push({stepIndex,setIndex,label:`${exercise?exercise.name:step.label} · Serie ${setIndex+1}`});
+    });
+  });
+  return out;
+}
+function markWorkoutSetDone(step,set){
+  set.done=true;
+  if(set.reps==null)set.reps=step.defaultReps;
+  if(set.rpe==null)set.rpe=step.targetRpe;
+  set.completedAt=new Date().toISOString();
+}
+function seriesCount(n){return `${n} ${n===1?"serie":"series"}`;}
+// mode: "fill" marca las series prescritas pendientes con la dosis objetivo;
+// "advance" avanza sin registrarlas; sin mode pregunta si quedan pendientes.
+function completeWorkoutStep(ds,mode){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step)return;
   if(step.type==="strength"){
+    const pending=pendingPrescribedSets(execution,execution.steps.indexOf(step));
+    if(pending.length&&mode==="fill")pending.forEach(item=>markWorkoutSetDone(step,step.sets[item.setIndex]));
+    else if(pending.length&&mode!=="advance"){openPendingSetsPrompt(ds,step,pending);return;}
     const completed=step.sets.filter(set=>set.done).length;
     if(!completed){toast("Registra al menos una serie antes de avanzar");return;}
   }
@@ -4689,6 +4714,14 @@ function completeWorkoutStep(ds){
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
   if(next<0)toast("Todos los bloques están registrados. Finaliza la sesión.");
+}
+function openPendingSetsPrompt(ds,step,pending){
+  const anyDone=step.sets.some(set=>set.done);
+  modal(`<h3>Te ${pending.length===1?"queda":"quedan"} ${seriesCount(pending.length)} sin marcar</h3>
+    <p class="muted small">Si ya ${pending.length===1?"la hiciste, márcala":"las hiciste, márcalas"} para que la sesión cuente como completada. Se registran con las repeticiones y el esfuerzo objetivo; puedes corregirlos después.</p>
+    <button class="btn btn-accent" style="width:100%" onclick="closeModal();completeWorkoutStep('${ds}','fill')">Marcar ${pending.length===1?"la serie":`las ${pending.length}`} como ${pending.length===1?"hecha":"hechas"} y seguir</button>
+    ${anyDone?`<button class="btn" style="width:100%;margin-top:8px" onclick="closeModal();completeWorkoutStep('${ds}','advance')">Seguir sin registrar${pending.length===1?"la":"las"}</button>`:""}
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Volver al ejercicio</button>`);
 }
 function skipWorkoutStep(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
@@ -4707,12 +4740,8 @@ function saveWorkoutSetField(ds,stepIndex,setIndex,field,value){
 function toggleWorkoutSet(ds,stepIndex,setIndex){
   const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
   const step=execution.steps[stepIndex],set=step&&step.sets&&step.sets[setIndex];if(!set)return;
-  set.done=!set.done;
-  if(set.done){
-    if(set.reps==null)set.reps=step.defaultReps;
-    if(set.rpe==null)set.rpe=step.targetRpe;
-    set.completedAt=new Date().toISOString();
-  }else set.completedAt=null;
+  if(set.done){set.done=false;set.completedAt=null;}
+  else markWorkoutSetDone(step,set);
   persistWorkoutExecution(ds,execution,true);
   if(set.done&&setIndex<step.sets.length-1)startWorkoutTimer(ds,step.restSeconds,"rest");
 }
@@ -4760,12 +4789,9 @@ function applyExerciseSubstitution(ds,slug){
   persistWorkoutExecution(ds,execution,false);closeModal();render();toast("Ejercicio sustituido");
 }
 function workoutFullyCompleted(execution){
-  return execution.steps.every(step=>{
-    if(step.status!=="done")return false;
-    return step.type!=="strength"||step.sets.every(set=>set.done);
-  });
+  return execution.steps.every(step=>step.status==="done")&&!pendingPrescribedSets(execution).length;
 }
-function openFinishWorkout(ds,partial){
+function openFinishWorkout(ds,partial,keep){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const complete=workoutFullyCompleted(execution);
   if(execution.status==="in_progress"){
@@ -4777,7 +4803,13 @@ function openFinishWorkout(ds,partial){
     }
     persistWorkoutExecution(ds,execution,true);
   }
+  // REQ-184: decir qué falta para cerrarla completada y permitir marcarlo aquí.
+  const pending=!partial&&execution.steps.every(step=>step.status==="done")?pendingPrescribedSets(execution):[];
+  const pendingHtml=pending.length?`<div class="alert violet finish-pending"><b>${pending.length===1?"Falta":"Faltan"} ${seriesCount(pending.length)} por marcar</b>, por eso se guardaría como parcial:
+      <ul>${pending.map(item=>`<li>${esc(item.label)}</li>`).join("")}</ul>
+      <button class="btn btn-accent btn-sm" onclick="fillPendingWorkoutSets('${ds}')">${pending.length===1?"Marcarla como hecha":"Marcarlas como hechas"}</button></div>`:"";
   modal(`<h3>${partial||!complete?"Cerrar sesión parcial":"Finalizar sesión"}</h3>
+    ${pendingHtml}
     <p class="muted small">Antes de guardar, registra cómo se sintió la sesión. El historial conservará lo realmente ejecutado.</p>
     <div class="field"><label>¿Sentiste dolor o malestar anormal?</label><select id="finishPain">
       <option value="">Selecciona</option><option value="none">No</option>
@@ -4788,8 +4820,18 @@ function openFinishWorkout(ds,partial){
       <option value="">Selecciona</option><option value="easy">Más fácil de lo esperado</option>
       <option value="expected">Adecuada</option><option value="hard">Más difícil de lo esperado</option>
     </select></div>
-    <div class="field"><label>Notas opcionales</label><textarea id="finishNotes" rows="3" placeholder="Carga, técnica, energía o cualquier contexto útil">${esc(execution.notes||"")}</textarea></div>
+    <div class="field"><label>Notas opcionales</label><textarea id="finishNotes" rows="3" placeholder="Carga, técnica, energía o cualquier contexto útil">${esc(keep?keep.notes:(execution.notes||""))}</textarea></div>
     <button class="btn btn-accent" style="width:100%" onclick="finishWorkoutExecution('${ds}',${partial||!complete})">Guardar resultado</button>`);
+  if(keep){$("#finishPain").value=keep.pain||"";$("#finishDifficulty").value=keep.difficulty||"";}
+}
+function fillPendingWorkoutSets(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const keep={pain:$("#finishPain").value,difficulty:$("#finishDifficulty").value,notes:$("#finishNotes").value};
+  pendingPrescribedSets(execution).forEach(item=>{
+    const step=execution.steps[item.stepIndex];markWorkoutSetDone(step,step.sets[item.setIndex]);
+  });
+  persistWorkoutExecution(ds,execution,true);
+  openFinishWorkout(ds,false,keep);
 }
 function finishWorkoutExecution(ds,partialRequested){
   const pain=$("#finishPain").value,difficulty=$("#finishDifficulty").value;
@@ -4808,8 +4850,16 @@ function finishWorkoutExecution(ds,partialRequested){
   persistWorkoutExecution(ds,execution,false);closeModal();render();
   toast(execution.status==="completed"?"Sesión completada":"Sesión guardada como parcial");
 }
-function resumePartialWorkout(ds){
+// REQ-184: una sesión guardada parcial solo por series sin marcar se reabre
+// en el ejercicio que las tiene, para marcarlas y cerrarla completada.
+function reviewPendingWorkoutSets(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
+  const pending=pendingPrescribedSets(execution);if(!pending.length)return;
+  pending.forEach(item=>{execution.steps[item.stepIndex].status="pending";});
+  resumePartialWorkout(ds,execution);
+}
+function resumePartialWorkout(ds,reviewed){
+  const execution=reviewed||normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
   execution.status="in_progress";execution.completedAt=null;execution.resumedAt=new Date().toISOString();
   execution.pain="";execution.difficulty="";
   const next=nextWorkoutStepIndex(execution,0);
@@ -4943,6 +4993,7 @@ function renderWorkoutExecution(ds,execution){
   const percentage=progress.total?Math.round((progress.completed+progress.skipped)/progress.total*100):0;
   if(execution.status==="completed"||execution.status==="partial"){
     const sets=WORKOUT_PLAYER.strengthTotals(execution);
+    const pendingSets=pendingPrescribedSets(execution);
     const painLabels={none:"Sin dolor anormal",discomfort:"Molestia que alteró la técnica",sharp_pain:"Dolor agudo",dizziness:"Mareo o falta de aire inusual"};
     const difficultyLabels={easy:"Más fácil de lo esperado",expected:"Dificultad adecuada",hard:"Más difícil de lo esperado"};
     return `<div class="dash">
@@ -4957,6 +5008,7 @@ function renderWorkoutExecution(ds,execution){
       <div class="muted small">${esc(painLabels[execution.pain]||"Cierre sin respuesta")} · ${esc(difficultyLabels[execution.difficulty]||"Dificultad sin respuesta")}</div>
       ${execution.notes?`<div class="exercise-copy"><b>Notas:</b> ${esc(execution.notes)}</div>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&progress.remaining?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="resumePartialWorkout('${ds}')">Continuar sesión</button>`:""}
+      ${execution.status==="partial"&&!execution.needsReview&&!progress.remaining&&ds===todayStr()&&pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="reviewPendingWorkoutSets('${ds}')">Marcar ${seriesCount(pendingSets.length)} sin registrar</button>`:""}
     </div>`;
   }
   return `<div class="dash">

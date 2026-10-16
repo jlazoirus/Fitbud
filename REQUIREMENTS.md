@@ -62,7 +62,7 @@ Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-0
 
 Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que hoy le impide cerrar bien su entreno primero, luego lo que lo hace más cómodo, luego nutrición:
 
-- REQ-184 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0)
+- REQ-184 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
 - REQ-185 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; reproducir antes de arreglar)
 - REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto). (P1)
 - REQ-187 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1)
@@ -1674,7 +1674,9 @@ Jonathan compró `evolvapp.club` en Porkbun (2026-10-16) para la marca Evolv (RE
 
 ## REQ-184 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+`pendingPrescribedSets()` y `markWorkoutSetDone()` (`index.html`) centralizan qué falta; "Siguiente ejercicio" abre `openPendingSetsPrompt()`; el cierre lista lo pendiente con "Marcarla(s) como hecha(s)" (`fillPendingWorkoutSets()`, conserva lo respondido); `reviewPendingWorkoutSets()` reabre una sesión parcial de hoy en el ejercicio pendiente; `strengthTotals()` (`workout-player.js`) cuenta las extra solo si se hicieron. `CACHE_NAME` → `fitbud-pwa-v80`. Además, `gotoApp()` (`tests/e2e/helpers.js`) espera a que termine `onAuth()`: su `view="hoy"` final pisaba la navegación y hacía fallar de forma intermitente los E2E de Entreno.
 
 ### Origen
 
@@ -1714,10 +1716,10 @@ Que quien hizo todo pueda cerrar la sesión como completada, y que la app diga q
 
 ### Criterios de aceptación
 
-- Escenario de Claudia (7/7 bloques, 1 serie prescrita sin marcar): desde el modal de cierre se marca y se guarda "Sesión completada".
-- Una serie extra sin hacer no impide "completada".
-- Una sesión ya guardada parcial con series pendientes se puede reabrir y cerrar completada el mismo día.
-- `tests/e2e/entreno.spec.js` cubre los tres casos; `node scripts/release-gate.mjs` pasa.
+- Escenario de Claudia (7/7 bloques, 1 serie prescrita sin marcar): desde el modal de cierre se marca y se guarda "Sesión completada". ✓
+- Una serie extra sin hacer no impide "completada". ✓
+- Una sesión ya guardada parcial con series pendientes se puede reabrir y cerrar completada el mismo día. ✓
+- `tests/e2e/entreno.spec.js` cubre los tres casos (fallan contra el código previo); `node scripts/release-gate.mjs` pasa. ✓
 
 ### Verificación sugerida
 

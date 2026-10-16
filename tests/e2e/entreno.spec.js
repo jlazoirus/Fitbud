@@ -153,4 +153,98 @@ test.describe("Entreno", () => {
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+  // REQ-184: recorre la sesión dejando UNA serie prescrita sin marcar en el primer
+  // ejercicio de fuerza y una serie extra sin hacer en el segundo.
+  async function runSessionLeavingOneSet(page) {
+    const app = page.locator("#app");
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    const text = await app.innerText();
+    const total = Number((text.match(/0\/(\d+) bloques/) || [])[1]);
+    let strength = 0;
+    let firstExercise = "";
+    for (let bloque = 0; bloque < total; bloque++) {
+      const siguiente = page.getByRole("button", { name: "Siguiente ejercicio" }).first();
+      if (await siguiente.isVisible().catch(() => false)) {
+        strength++;
+        const series = page.locator('#app button.set-done[aria-label^="Serie"]');
+        const n = await series.count();
+        if (strength === 1) {
+          firstExercise = (await app.locator(".player-step > h3").first().innerText()).trim();
+          for (let s = 0; s < n - 1; s++) await series.nth(s).click();
+          await siguiente.click();
+          const overlay = page.locator("#overlay");
+          await expect(overlay).toContainText("Te queda 1 serie sin marcar");
+          await overlay.getByRole("button", { name: "Seguir sin registrarla" }).click();
+        } else {
+          for (let s = 0; s < n; s++) await series.nth(s).click();
+          if (strength === 2) await page.getByRole("button", { name: "+ Añadir serie" }).click();
+          await siguiente.click();
+        }
+      } else {
+        await page.getByRole("button", { name: "Marcar completado" }).click();
+      }
+      await expect(app).toContainText(new RegExp(`${bloque + 1}\\/${total} bloques`));
+    }
+    expect(strength).toBeGreaterThanOrEqual(2);
+    return firstExercise;
+  }
+  async function answerAndSave(page) {
+    const overlay = page.locator("#overlay");
+    await overlay.locator("#finishPain").selectOption({ label: "No" });
+    await overlay.locator("#finishDifficulty").selectOption({ label: "Adecuada" });
+    await overlay.getByRole("button", { name: "Guardar resultado" }).click();
+  }
+
+  test("REQ-184: la serie sin marcar se marca desde el cierre y la sesión queda completada", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+
+    const firstExercise = await runSessionLeavingOneSet(page);
+    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    const overlay = page.locator("#overlay");
+    // El modal dice qué falta (y no cuenta la serie extra sin hacer).
+    await expect(overlay).toContainText("Falta 1 serie por marcar");
+    await expect(overlay.locator(".finish-pending li")).toHaveText([new RegExp(`^${firstExercise} · Serie \\d+$`)]);
+    await overlay.locator("#finishPain").selectOption({ label: "No" });
+    await overlay.getByRole("button", { name: "Marcarla como hecha" }).click();
+    await expect(overlay).not.toContainText("por marcar");
+    await expect(overlay.locator("#finishPain")).toHaveValue("none"); // conserva lo respondido
+    await expect(overlay.locator("h3")).toHaveText("Finalizar sesión");
+    await answerAndSave(page);
+
+    await expect(app).toContainText("Sesión completada");
+    const sets = (await app.innerText()).match(/(\d+)\/(\d+)\s*series registradas/);
+    expect(sets && sets[1]).toBe(sets && sets[2]);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("REQ-184: una sesión guardada parcial por una serie sin marcar se puede corregir", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+
+    await runSessionLeavingOneSet(page);
+    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    await answerAndSave(page);
+    await expect(app).toContainText("Sesión parcial");
+
+    // Antes no había salida: 0 bloques pendientes ⇒ sin "Continuar sesión".
+    await page.getByRole("button", { name: "Marcar 1 serie sin registrar" }).click();
+    await page.locator('#app button.set-done:not(.on)').first().click();
+    await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
+    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    await expect(page.locator("#overlay")).not.toContainText("por marcar");
+    await answerAndSave(page);
+    await expect(app).toContainText("Sesión completada");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
