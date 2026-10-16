@@ -3808,7 +3808,9 @@ function showCardioNudge(ctx){
       <input type="checkbox" id="nudge_light_cardio">
       <span>Agregar actividad ligera a mi plan</span>
     </label>
-    <button class="btn btn-accent" style="width:100%;margin-top:4px" onclick="dismissCardioNudge()">Continuar</button>`);
+    <button class="btn btn-accent" style="width:100%;margin-top:4px" onclick="dismissCardioNudge()">Continuar</button>`,
+    // REQ-190: cerrar con ✕, Esc o tocando fuera también cuenta como visto.
+    {onClose:()=>{UI.cardioNudgeDismissed=true;uiSave();}});
 }
 function dismissCardioNudge(){
   const enabled=!!(document.getElementById("nudge_light_cardio")&&document.getElementById("nudge_light_cardio").checked);
@@ -7522,8 +7524,10 @@ function _modalKeyHandler(e){
     else{if(document.activeElement===last){first.focus();e.preventDefault();}}
   }
 }
-function modal(html){
+let _modalOnClose=null;
+function modal(html,opts){
   const existing=$("#overlay");
+  _modalOnClose=(opts&&typeof opts.onClose==="function")?opts.onClose:null;
   if(!existing)_modalTrigger=document.activeElement;
   let o=existing;
   if(!o){o=document.createElement("div");o.id="overlay";o.className="overlay";o.addEventListener("click",e=>{if(e.target===o)closeModal();});document.body.appendChild(o);}
@@ -7536,10 +7540,12 @@ function modal(html){
   setTimeout(()=>{const btn=sheet&&sheet.querySelector(".closebar button");if(btn)btn.focus();},0);
 }
 function closeModal(){
+  const onClose=_modalOnClose;_modalOnClose=null;
   document.removeEventListener("keydown",_modalKeyHandler);
   const o=$("#overlay");if(o)o.remove();stopMic();
   if(_modalTrigger&&typeof _modalTrigger.focus==="function")try{_modalTrigger.focus();}catch(_){}
   _modalTrigger=null;
+  if(onClose)try{onClose();}catch(_){}
 }
 
 function openReplace(ds,id,reason){

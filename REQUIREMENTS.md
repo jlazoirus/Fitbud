@@ -1814,3 +1814,20 @@ Jonathan (2026-10-16): no le gusta el logo de la PWA; pide actualizar también e
 - Tras el deploy, el depurador de compartir de Facebook o una vista previa de WhatsApp muestran la imagen nueva (verificación manual: esas plataformas guardan la vista previa vieja en caché).
 - Portada y login muestran el nuevo `brandMark()`. ✓
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-190 - Fix Perfil: el aviso de actividad ligera reaparece en cada visita
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16). Para un usuario "solo fuerza", `renderProfile()` llama a `showCardioNudge("profile")` y solo el botón "Continuar" marcaba `UI.cardioNudgeDismissed`; cerrar con ✕, Esc o tocando fuera pasaba por `closeModal()` sin marcarlo, así que el sheet tapaba Perfil en cada visita.
+
+### Alcance
+
+1. `modal(html, {onClose})`: `closeModal()` ejecuta el callback una vez, por cualquier vía de cierre.
+2. `showCardioNudge()` usa `onClose` para marcar el aviso como visto; "Continuar" sigue guardando la elección del checkbox.
+
+### Criterios de aceptación
+
+- Cerrar el aviso con ✕ o Esc y volver a Perfil (también tras recargar) no lo muestra de nuevo. ✓ (`tests/e2e/perfil.spec.js`)
