@@ -364,6 +364,26 @@
   .opt{width:100%;text-align:left;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:13px;margin-bottom:8px;font-size:14px;line-height:1.3;transition:.15s}
   .opt:active{transform:scale(.99);border-color:var(--accent)}
   .opt .o-meta{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)}
+  .qp{margin-bottom:12px}
+  .qp-tabs{display:flex;gap:6px;margin-bottom:8px}
+  .qp-tab{flex:1;padding:8px 6px;border-radius:999px;border:1px solid var(--border-2);background:var(--surf2);font-size:13px;font-weight:500}
+  .qp-tab.on{background:var(--accent);border-color:var(--accent);color:#0b0b0b}
+  .qp-search,.qp-grams{background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);font-size:15px;font-family:inherit}
+  .qp-search{width:100%;margin-bottom:8px;padding:10px 11px}
+  .qp-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+  .qp-item{display:flex;align-items:center;gap:8px;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:8px 10px}
+  .qp-main{flex:1;min-width:0;text-align:left;font-size:14px;line-height:1.3}
+  .qp-pick{background:none;padding:2px 0;border-radius:0}
+  .qp-main b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qp-main .o-meta{font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--font-mono)}
+  .qp-star{width:36px;height:36px;flex:0 0 36px;border-radius:999px;font-size:18px;color:var(--muted)}
+  .qp-star.on{color:var(--accent)}
+  .qp-grams{width:64px;flex:0 0 64px;padding:6px 8px}
+  .qp-portion-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:8px}
+  .qp-portion-row .muted{margin-right:4px}
+  .qp-portion.on{background:var(--accent);border-color:var(--accent);color:#0b0b0b}
+  .qp-save-fav{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px}
+  .qp-save-fav input{accent-color:var(--accent);width:17px;height:17px}
   .closebar{display:flex;justify-content:flex-end;margin-bottom:4px}
   .closebar button{background:var(--surf3);width:36px;height:36px;border-radius:999px;font-size:16px;color:var(--muted)}
   .ai-box{background:var(--accent-dim);border:1px solid var(--border-acc);border-radius:var(--r-md);padding:12px;font-size:14px;margin-top:10px;white-space:pre-wrap;line-height:1.5}
@@ -952,6 +972,21 @@ function normalizedBlockedDishes(value){
   });
   return out.slice(0,200);
 }
+// REQ-187: comidas favoritas del usuario (privadas, en profile.prefs).
+const SAVED_MEALS_MAX=50;
+function mealMacrosEntry(v){
+  const name=String(v&&v.name||"").trim().slice(0,160);
+  const num=x=>Math.max(0,Math.min(5000,Math.round(Number(x)||0)));
+  return name?{name,kcal:num(v.kcal),p:num(v.p),c:num(v.c),f:num(v.f)}:null;
+}
+function normalizedSavedMeals(list){
+  const out=[],seen=new Set();
+  (Array.isArray(list)?list:[]).forEach(item=>{
+    const entry=mealMacrosEntry(item),key=entry&&catalogSlug(entry.name);
+    if(entry&&key&&!seen.has(key)&&out.length<SAVED_MEALS_MAX){seen.add(key);out.push(entry);}
+  });
+  return out;
+}
 // REQ-186: descanso cronometrado entre ejercicios de fuerza (2:00 por defecto).
 const BETWEEN_EXERCISE_REST_OPTIONS=[60,90,120,150,180,240,300];
 const DEFAULT_BETWEEN_EXERCISE_REST=120;
@@ -995,6 +1030,7 @@ function migrateProfilePrefs(source){
     trainingLocations,
     sessionMinutes:Math.min(180,Math.max(20,Number.parseInt(p.sessionMinutes,10)||60)),
     betweenExerciseRestSeconds:normalizedBetweenExerciseRest(p.betweenExerciseRestSeconds),
+    ...(p.savedMeals!=null?{savedMeals:normalizedSavedMeals(p.savedMeals)}:{}),
     equipment:normalizedList(p.equipment,Object.keys(EQUIPMENT_LABELS)),
     trainingExperience:trainingExperienceNorm,
     workoutSplit:workoutSplitNorm,
@@ -7970,10 +8006,132 @@ function openEditor(kind,ds,id){
   editorSheet(title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
+/* REQ-187: reutilizar comidas ya registradas o favoritas y sumar alimentos sueltos por gramos. */
+function recentCustomMeals(limit){
+  const out=[],seen=new Set();
+  const push=v=>{
+    const entry=mealMacrosEntry(v),key=entry&&catalogSlug(entry.name);
+    if(entry&&key&&entry.kcal>0&&!seen.has(key)){seen.add(key);out.push(entry);}
+  };
+  Object.keys(S.days||{}).sort().reverse().forEach(ds=>{
+    const d=S.days[ds]||{};
+    // Lo que el usuario escribió (no los platos que propuso el plan).
+    Object.values(d.meals||{}).forEach(ms=>{const o=ms&&ms.ovr;if(o&&!o.dishName&&!o.gen)push(o);});
+    (d.extras||[]).slice().reverse().forEach(push);
+  });
+  return out.slice(0,limit||20);
+}
+function savedMeals(){return normalizedSavedMeals(profile&&profile.prefs&&profile.prefs.savedMeals);}
+function isSavedMeal(name){const key=catalogSlug(name);return savedMeals().some(m=>catalogSlug(m.name)===key);}
+async function persistSavedMeals(list){
+  const prefs={...((profile&&profile.prefs)||{}),savedMeals:normalizedSavedMeals(list)};
+  const result=await saveProfilePrefs(prefs,{skipPlanVersion:true});
+  if(result&&result.error){toast("No se pudo guardar en favoritas");return false;}
+  return true;
+}
+async function toggleSavedMeal(entry){
+  const e=mealMacrosEntry(entry);if(!e)return;
+  const key=catalogSlug(e.name),list=savedMeals();
+  const exists=list.some(m=>catalogSlug(m.name)===key);
+  if(!exists&&list.length>=SAVED_MEALS_MAX){toast(`Puedes guardar hasta ${SAVED_MEALS_MAX} favoritas`);return;}
+  const ok=await persistSavedMeals(exists?list.filter(m=>catalogSlug(m.name)!==key):[e].concat(list));
+  if(ok)toast(exists?"Quitada de favoritas":"Guardada en favoritas");
+}
+function quickPickTab(tab){
+  const qp=window._qp;if(!qp)return;
+  qp.tab=tab;qp.query="";
+  const search=$("#qpSearch");if(search)search.value="";
+  if(tab==="food"){qp.base=null;renderPortionChips();}
+  renderQuickPicks();
+}
+function quickPickSearch(value){const qp=window._qp;if(!qp)return;qp.query=value;renderQuickPicks();}
+function renderQuickPicks(){
+  const qp=window._qp,box=$("#qpList");if(!qp||!box)return;
+  document.querySelectorAll(".qp-tab").forEach(b=>{const on=b.dataset.tab===qp.tab;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on?"true":"false");});
+  const search=$("#qpSearch");
+  if(search)search.placeholder=qp.tab==="food"?"Busca un alimento: avena, pollo…":"Buscar";
+  const q=catalogSlug(qp.query||"");
+  if(qp.tab==="food"){
+    const foods=DB.loaded?(DB.ingredients||[]):[];
+    if(!foods.length){box.innerHTML='<div class="muted small">El catálogo de alimentos no está disponible ahora.</div>';return;}
+    if(!q){box.innerHTML='<div class="muted small">Escribe para buscar y elige los gramos.</div>';return;}
+    qp.items=foods.filter(i=>catalogSlug(i.name).includes(q)).slice(0,8);
+    box.innerHTML=qp.items.length?qp.items.map((ing,i)=>`<div class="qp-item qp-food">
+        <div class="qp-main"><b>${esc(ing.name)}</b><div class="o-meta">${Math.round(+ing.kcal||0)} kcal · P ${Math.round(+ing.protein_g||0)} · C ${Math.round(+ing.carbs_g||0)} · G ${Math.round(+ing.fat_g||0)} por 100 g</div></div>
+        <input class="qp-grams" id="qpGrams${i}" type="number" inputmode="decimal" min="1" max="2000" value="100" aria-label="Gramos de ${esc(ing.name)}"><span class="muted small">g</span>
+        <button class="btn btn-sm" onclick="addFoodToEditor(${i})">Añadir</button>
+      </div>`).join(""):'<div class="muted small">No encontramos ese alimento en el catálogo.</div>';
+    return;
+  }
+  const source=qp.tab==="fav"?savedMeals():recentCustomMeals(20);
+  qp.items=source.filter(m=>!q||catalogSlug(m.name).includes(q));
+  const empty=qp.tab==="fav"?"Aún no tienes favoritas. Toca ☆ en una comida o marca «Guardar en favoritas» al guardar.":"Aquí aparecerán las comidas que registres.";
+  box.innerHTML=qp.items.length?qp.items.map((m,i)=>{
+    const fav=isSavedMeal(m.name);
+    return `<div class="qp-item">
+      <button class="qp-main qp-pick" onclick="applyQuickPick(${i})"><b>${esc(m.name)}</b><div class="o-meta">${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f}</div></button>
+      <button class="qp-star ${fav?"on":""}" onclick="toggleQuickPickFavorite(${i})" aria-pressed="${fav?"true":"false"}" aria-label="${fav?"Quitar de favoritas":"Guardar en favoritas"}: ${esc(m.name)}">${fav?"★":"☆"}</button>
+    </div>`;
+  }).join(""):`<div class="muted small">${q?"Nada coincide con tu búsqueda.":empty}</div>`;
+}
+async function toggleQuickPickFavorite(i){
+  const qp=window._qp,item=qp&&qp.items&&qp.items[i];if(!item)return;
+  await toggleSavedMeal(item);renderQuickPicks();
+}
+function setEditorValues(v){
+  $("#f_name").value=v.name;
+  [["kcal","f_kcal"],["p","f_p"],["c","f_c"],["f","f_f"]].forEach(([k,id])=>{$("#"+id).value=Math.round(v[k]||0);});
+}
+function applyQuickPick(i){
+  const qp=window._qp,item=qp&&qp.items&&qp.items[i];if(!item)return;
+  qp.base=mealMacrosEntry(item);qp.portion=1;
+  setEditorValues(qp.base);renderPortionChips();
+}
+function renderPortionChips(){
+  const qp=window._qp,box=$("#qpPortion");if(!qp||!box)return;
+  if(!qp.base){box.innerHTML="";return;}
+  box.innerHTML=`<span class="muted small">Porción</span>${[0.5,1,1.5,2].map(f=>`<button class="pill qp-portion ${qp.portion===f?"on":""}" aria-pressed="${qp.portion===f?"true":"false"}" onclick="setQuickPickPortion(${f})">×${String(f).replace(".",",")}</button>`).join("")}`;
+}
+function setQuickPickPortion(factor){
+  const qp=window._qp;if(!qp||!qp.base)return;
+  qp.portion=factor;
+  const b=qp.base;
+  setEditorValues({name:b.name,kcal:b.kcal*factor,p:b.p*factor,c:b.c*factor,f:b.f*factor});
+  renderPortionChips();
+}
+function addFoodToEditor(i){
+  const qp=window._qp,ing=qp&&qp.items&&qp.items[i];if(!ing)return;
+  const grams=Math.round(Number($("#qpGrams"+i).value)||0);
+  if(grams<=0||grams>2000){toast("Indica los gramos (1–2000)");return;}
+  const k=grams/100,cur=readEditor();
+  const part=`${ing.name} ${grams} g`;
+  // Sumar: varios alimentos sueltos forman una comida.
+  setEditorValues({
+    name:cur.name?`${cur.name} + ${part}`:part,
+    kcal:cur.kcal+(+ing.kcal||0)*k,p:cur.p+(+ing.protein_g||0)*k,c:cur.c+(+ing.carbs_g||0)*k,f:cur.f+(+ing.fat_g||0)*k,
+  });
+  qp.base=null;renderPortionChips();
+  toast(`${part} añadido`);
+}
+function quickPicksHtml(){
+  const hasRecent=recentCustomMeals(1).length,hasFav=savedMeals().length;
+  window._qp={tab:hasRecent?"recent":hasFav?"fav":"food",query:"",items:[],base:null,portion:1};
+  return `<div class="qp">
+    <div class="qp-tabs" role="group" aria-label="Elegir una comida">
+      <button class="qp-tab" data-tab="recent" onclick="quickPickTab('recent')">Recientes</button>
+      <button class="qp-tab" data-tab="fav" onclick="quickPickTab('fav')">Favoritas</button>
+      <button class="qp-tab" data-tab="food" onclick="quickPickTab('food')">Alimento</button>
+    </div>
+    <input id="qpSearch" class="qp-search" type="search" autocomplete="off" oninput="quickPickSearch(this.value)">
+    <div id="qpList" class="qp-list"></div>
+    <div id="qpPortion" class="qp-portion-row"></div>
+  </div>`;
+}
 function editorSheet(title,pre){
   const aiOn=aiAvailable();
   window._photoEstimate=null;
   modal(`<h3>${title}</h3>
+    ${quickPicksHtml()}
     <div class="field"><label>Descripción</label>
       <div class="row"><textarea id="f_name" rows="2" placeholder="Ej. 2 panes con palta y café">${esc(pre.name||"")}</textarea>
       <button class="mic" id="micBtn" onclick="toggleMic()" title="${aiOn?'Dictar':'El dictado no está disponible ahora'}">🎤</button></div>
@@ -7991,12 +8149,16 @@ function editorSheet(title,pre){
     <input id="f_photo" type="file" accept="image/*" capture="environment" hidden onchange="onMealPhotoSelected(this)">
     <img id="f_photo_preview" class="meal-photo-preview" alt="Foto de la comida" hidden>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
     <div id="aiOut"></div>
+    <label class="qp-save-fav"><input type="checkbox" id="f_fav" ${pre.name&&isSavedMeal(pre.name)?"checked disabled":""}> Guardar en favoritas</label>
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
+  renderQuickPicks();
 }
 function readEditor(){return{name:$("#f_name").value.trim(),kcal:+$("#f_kcal").value||0,p:+$("#f_p").value||0,c:+$("#f_c").value||0,f:+$("#f_f").value||0};}
 function saveEditor(){
   const e=window._editor;const v=readEditor();
   if(!v.name){toast("Pon una descripción");return;}
+  const fav=$("#f_fav");
+  if(fav&&fav.checked&&!fav.disabled&&!isSavedMeal(v.name))toggleSavedMeal(v);
   if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f};}
   else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null)d.extras[e.extraIdx]=Object.assign(d.extras[e.extraIdx],v);else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");

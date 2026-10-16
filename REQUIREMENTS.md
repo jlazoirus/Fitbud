@@ -65,7 +65,7 @@ Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que 
 - REQ-184 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
 - REQ-185 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; implementado)
 - REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable). (P1; implementado)
-- REQ-187 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1)
+- REQ-187 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1; implementado)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -1828,7 +1828,9 @@ Que al terminar un ejercicio de fuerza empiece un descanso cronometrado que acom
 
 ## REQ-187 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+Decisión de Jonathan (2026-10-16): favoritas en el perfil, sin migración. `editorSheet()` (`index.html`) abre con pestañas Recientes (`recentCustomMeals()`: lo escrito por el usuario en `ms.ovr` sin `dishName`/`gen` y `extras`, últimas 20 distintas) · Favoritas (`profile.prefs.savedMeals`, `normalizedSavedMeals()`, máx. 50, guardado con `saveProfilePrefs(...,{skipPlanVersion:true})`; fuera de `planSnapshotFields()`, no crea versiones de plan) · Alimento (`DB.ingredients` por 100 g, búsqueda sin tildes, suma varios alimentos). Porción ×0,5/×1/×1,5/×2 y "Guardar en favoritas" al guardar. `CACHE_NAME` → `fitbud-pwa-v83`.
 
 ### Origen
 
@@ -1868,10 +1870,10 @@ Registrar una comida repetida en dos toques y un alimento suelto sin calcular ma
 
 ### Criterios de aceptación
 
-- Una comida registrada ayer aparece en "Recientes" y al tocarla se guarda con sus macros sin escribir nada.
-- Una favorita sobrevive a cerrar sesión e iniciar en otro dispositivo.
-- "Avena 60 g" calcula los macros desde el catálogo.
-- `node scripts/release-gate.mjs` pasa.
+- Una comida registrada ayer aparece en "Recientes" y al tocarla se guarda con sus macros sin escribir nada. ✓
+- Una favorita sobrevive a cerrar sesión e iniciar en otro dispositivo (vive en `profiles.prefs`). ✓
+- "Avena 60 g" calcula los macros desde el catálogo. ✓
+- `node scripts/release-gate.mjs` pasa. ✓ (`tests/e2e/comidas-guardadas.spec.js`)
 
 ### Verificación sugerida
 
