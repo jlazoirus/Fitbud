@@ -62,10 +62,10 @@ Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-0
 
 Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que hoy le impide cerrar bien su entreno primero, luego lo que lo hace más cómodo, luego nutrición:
 
-- REQ-184 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
-- REQ-185 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; implementado)
-- REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable). (P1; implementado)
-- REQ-187 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1; implementado)
+- REQ-185 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
+- REQ-186 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; implementado)
+- REQ-187 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable). (P1; implementado)
+- REQ-188 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1; implementado)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -1672,7 +1672,31 @@ Jonathan compró `evolvapp.club` en Porkbun (2026-10-16) para la marca Evolv (RE
 - Webhook de Stripe (checkout deshabilitado); al activarlo, registrar `https://evolvapp.club/api/webhook`.
 - Dominio autenticado en Brevo (remitente `@evolvapp.club`).
 
-## REQ-184 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla
+## REQ-184 - Seguridad: el sitio público no publica los archivos internos del repositorio
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría de la web pública (2026-10-16). Con `outputDirectory: "."` y sin build, Vercel servía como estáticos todos los archivos del repo: `https://evolvapp.club/NEGOCIO.md`, `/REQUIREMENTS.md`, `/CONTEXT.md`, `/STRIPE_SETUP.md`, `/agent-loop.json`, `/docs/architecture-reference.md`, `/estrategia/*.md`, `/supabase/admin.sql`, `/scripts/*.mjs` y `/tests/e2e/*` respondían 200. No había secretos (solo placeholders), pero sí estrategia de negocio, esquema SQL con políticas RLS y las reglas de los agentes.
+
+### Alcance
+
+1. `.vercelignore` en modo allowlist: ignora todo (`/*`) y reincluye solo lo que el runtime carga: `index.html`, `beta-reclutamiento.html`, `config.js`, `service-worker.js`, `manifest.webmanifest`, los módulos JS de la raíz, `js/`, `assets/` (de `assets/ux-audit-2026-06-23/` solo `04-home-mobile.png`, que usa la página de beta), `api/`, `package.json`, `package-lock.json` (dependencias de las funciones) y `vercel.json`.
+2. `scripts/validate-deploy-allowlist.mjs` (en el release gate) evalúa el `.vercelignore` con semántica gitignore sobre `git ls-files` y falla si: falta algún archivo que el runtime carga (`<script src>`/`href` locales de las páginas, `APP_SHELL` del service worker, `api/*.js`), o se despliega un archivo no declarado como público. Un archivo nuevo obliga a decidir explícitamente si se publica.
+
+### Fuera de alcance
+
+- Las capturas de `assets/ux-audit-2026-06-23/` siguen versionadas; solo dejan de publicarse.
+- Los demás hallazgos de la auditoría (avisos legales preliminares, accesibilidad de formularios, etc.) van en REQ propios.
+
+### Criterios de aceptación
+
+- `curl -I https://evolvapp.club/NEGOCIO.md` (y `/REQUIREMENTS.md`, `/supabase/admin.sql`, `/scripts/release-gate.mjs`) devuelve 404 tras el deploy.
+- La landing, la app, `/beta-reclutamiento.html`, `/service-worker.js` y `/api/catalog` siguen respondiendo 200.
+- `node scripts/validate-deploy-allowlist.mjs` pasa y está en `release-gate.mjs`.
+
+## REQ-185 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla
 
 **Estado: implementado.**
 
@@ -1725,7 +1749,7 @@ Que quien hizo todo pueda cerrar la sesión como completada, y que la app diga q
 
 - Playwright con fixtures: iniciar, marcar todas menos una, "Siguiente ejercicio" hasta el final, finalizar → aparece la lista de series pendientes.
 
-## REQ-185 - Fix Entreno: el cronómetro de descanso se queda congelado
+## REQ-186 - Fix Entreno: el cronómetro de descanso se queda congelado
 
 **Estado: implementado.**
 
@@ -1775,7 +1799,7 @@ Que el descanso siempre muestre el tiempo real restante y termine solo, aunque l
 
 - Prueba manual en iPhone (PWA instalada): marcar serie, bloquear 30 s, desbloquear → el contador sigue bajando con el tiempo real.
 
-## REQ-186 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable)
+## REQ-187 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable)
 
 **Estado: implementado.**
 
@@ -1811,7 +1835,7 @@ Que al terminar un ejercicio de fuerza empiece un descanso cronometrado que acom
 
 ### Riesgos
 
-- Depende de que el temporizador sea fiable: implementar después de REQ-185.
+- Depende de que el temporizador sea fiable: implementar después de REQ-186.
 - No alargar la "duración real": el descanso no altera `elapsedSeconds`.
 
 ### Criterios de aceptación
@@ -1826,7 +1850,7 @@ Que al terminar un ejercicio de fuerza empiece un descanso cronometrado que acom
 
 - Playwright en `tests/e2e/entreno.spec.js` con reloj simulado; captura a 375px.
 
-## REQ-187 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos
+## REQ-188 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos
 
 **Estado: implementado.**
 
