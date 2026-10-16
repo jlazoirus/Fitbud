@@ -1831,3 +1831,24 @@ Auditoría impeccable de UI (2026-10-16). Para un usuario "solo fuerza", `render
 ### Criterios de aceptación
 
 - Cerrar el aviso con ✕ o Esc y volver a Perfil (también tras recargar) no lo muestra de nuevo. ✓ (`tests/e2e/perfil.spec.js`)
+
+## REQ-191 - Accesibilidad: campos con nombre, landmarks, FAQ, contraste de `--muted2` y movimiento reducido
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): axe marcaba `select-name` (crítico) en el onboarding y `aria-prohibited-attr` en `.steps`; ninguna vista tenía `<main>` ni `h1`; la FAQ no exponía su estado; `--muted2` (`#5f5f58`, 2.6–3.0:1) seguía en texto real (etiquetas de macros, "/2200 kcal"), fuera del alcance de REQ-112.
+
+### Alcance
+
+1. 97 `<label>` seguidos de su control pasan a `for="id"`; los campos de serie de Entreno (sin id) reciben `aria-label` con el número de serie; `#coachInput` recibe `aria-label`.
+2. `.steps` del onboarding: `role="progressbar"` con `aria-valuenow`/`aria-valuemax`.
+3. `#app` es el único `<main>` (los `<main>` internos de onboarding/recap pasan a `div`); Hoy, Progreso, Perfil y las vistas con navegación de día (`dayHeaderNav`) tienen `h1`.
+4. FAQ de la portada: `aria-expanded` se actualiza al abrir/cerrar.
+5. `--muted2` → `#8f8f87` (≥4.5:1 sobre `--bg`, `--surf1` y `--surf2`).
+6. `prefers-reduced-motion`: `pulse` del micrófono, `bounce` del "escribiendo" y `a2hsIn` se sustituyen por estados estáticos.
+
+### Criterios de aceptación
+
+- `tests/e2e/accesibilidad.spec.js`: un `<main>` y un `h1` por tab, campos del onboarding asociados a su etiqueta, progreso anunciado y FAQ con `aria-expanded`. ✓

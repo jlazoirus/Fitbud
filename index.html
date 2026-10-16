@@ -57,7 +57,7 @@
     --good-dim:rgba(34,197,94,.14); --warn-dim:rgba(245,158,11,.14); --bad-dim:rgba(239,68,68,.14);
     /* Aliases compat. con la app */
     --bg:var(--black); --card:var(--surf1); --card2:var(--surf2); --line:var(--border);
-    --txt:#f2f2ee; --muted:#a8a8a0; --muted2:#5f5f58;
+    --txt:#f2f2ee; --muted:#a8a8a0; --muted2:#8f8f87; /* REQ-191: ≥4.5:1 sobre bg/surf1/surf2 */
     /* Tipos de día */
     --pesas:var(--purple-400); --bajo:var(--terra-400); --refeed:var(--warn); --dietbreak:var(--purple-300); --libre:#5f5f58;
     /* Tipografía */
@@ -113,8 +113,8 @@
 
   /* Header */
   header{padding:6px 2px 14px}
-  header h2{font-size:26px;font-weight:800;letter-spacing:-.03em}
-  header h2 .muted,header h2 .small,h2 .muted,h2 .small{font-family:var(--font-body);font-weight:400;letter-spacing:0}
+  header h1,header h2{font-size:26px;font-weight:800;letter-spacing:-.03em}
+  header h1 .muted,header h1 .small,h1 .muted,h1 .small,header h2 .muted,header h2 .small,h2 .muted,h2 .small{font-family:var(--font-body);font-weight:400;letter-spacing:0}
   .daynav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
   .daynav button{background:var(--surf2);border:1px solid var(--border-2);width:44px;height:44px;border-radius:14px;font-size:20px;color:var(--white);display:flex;align-items:center;justify-content:center;transition:.15s}
   .daynav button:active{transform:scale(.94)}
@@ -633,7 +633,15 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .spinner{width:18px;height:18px;border:2px solid var(--border-2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
   .loading-row{display:flex;align-items:center;gap:10px;padding:14px 0;color:var(--muted);font-size:14px}
-  @media(prefers-reduced-motion:reduce){.spinner{animation:none;opacity:.6}}
+  @media(prefers-reduced-motion:reduce){
+    .spinner{animation:none;opacity:.6}
+    /* REQ-191: sin movimiento, el estado se sigue leyendo por color/opacidad */
+    .mic.live{animation:none}
+    .coach-typing span{animation:none;opacity:.55}
+    .coach-typing span:nth-child(2){opacity:.75}
+    .coach-typing span:nth-child(3){opacity:.95}
+    .a2hs{animation:none}
+  }
 
   /* ── Landing pública (REQ-33) ─────────────────────────────────────────── */
   .landing{width:100%;max-width:none;margin:0;padding:0 max(16px,var(--safe-right)) calc(40px + var(--safe-bottom)) max(16px,var(--safe-left));overflow-x:hidden}
@@ -812,7 +820,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-<div id="app"></div>
+<main id="app"></main>
 <div class="tabs" id="tabs"></div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div class="sync-badge" id="sync-badge" hidden></div>
@@ -2465,7 +2473,7 @@ function renderPlanRecap(){
     ["strength","＋","Ganar fuerza","Dar más peso a la progresión de fuerza y al desarrollo muscular."],
   ];
   const photo=recapPhotoUrl?`<img class="photo-preview" src="${recapPhotoUrl}" alt="Vista previa de tu foto de progreso">`:"";
-  $("#app").innerHTML=`<main class="recap">
+  $("#app").innerHTML=`<div class="recap">
     <div class="recap-hero">
       <div class="onboarding-brand">CICLO ${cycleNumber()} · COMPLETADO</div>
       <h1>${PLAN_DURATION_WEEKS} semanas que ya son tuyas.</h1>
@@ -2487,7 +2495,7 @@ function renderPlanRecap(){
     </div>
     <button id="nextChallengeBtn" class="btn btn-accent" style="width:100%;margin-top:16px" onclick="startNextChallenge()" ${selected?"":"disabled"}>${selected?"Recalcular mi siguiente plan":"Elige un desafío"}</button>
     <div id="recapOut" class="muted small center" style="margin-top:9px"></div>
-  </main>`;
+  </div>`;
 }
 function openPhotoConsent(){
   modal(`<h3>Fotos de progreso personal</h3>
@@ -2761,19 +2769,19 @@ async function savePrivacyChoices(source,origin){
 }
 function renderPrivacyUnavailable(){
   $("#tabs").innerHTML="";
-  $("#app").innerHTML=`<main class="onboarding">
+  $("#app").innerHTML=`<div class="onboarding">
     <div class="onboarding-brand">EVOLV · PRIVACIDAD</div>
     <h1>No podemos continuar todavía</h1>
     <p class="onboarding-copy">La protección de tus datos y la evaluación de seguridad deben estar disponibles antes de crear o adaptar un plan.</p>
     <div class="alert">${esc(isAdmin()?privacyError:"Intenta nuevamente más tarde. Si continúa, contacta a soporte.")}</div>
     <button class="btn" style="width:100%" onclick="loadPrivacyState().then(render)">Reintentar</button>
-  </main>`;
+  </div>`;
 }
 function renderPrivacyGate(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const responses=(safetyScreening&&safetyScreening.responses)||{};
   $("#tabs").innerHTML="";
-  $("#app").innerHTML=`<main class="onboarding">
+  $("#app").innerHTML=`<div class="onboarding">
     <div class="onboarding-brand">EVOLV · PRIVACIDAD Y SEGURIDAD</div>
     <h1>Tus datos trabajan para ti</h1>
     <p class="onboarding-copy">Solo usamos lo necesario para adaptar tu plan y ayudarte a revisar tu progreso.</p>
@@ -2787,7 +2795,7 @@ function renderPrivacyGate(){
       <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
     </div>
     <button id="privacyGateBtn" class="btn btn-accent privacy-control" style="width:100%" onclick="savePrivacyGate()">Aceptar y continuar</button>
-  </main>`;
+  </div>`;
 }
 async function savePrivacyGate(){
   const data={
@@ -2831,7 +2839,7 @@ function startOnboarding(){
   scrollAppTop();
 }
 function onboardingSteps(){
-  return `<div class="steps" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
+  return `<div class="steps" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="${onboardingStep}" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
 }
 function onboardingButtons(last){
   return `<div class="onboarding-actions">
@@ -3035,16 +3043,16 @@ function renderOnboarding(){
     body=`<h1>Primero, conozcamos tu punto de partida</h1>
       <p class="onboarding-copy">Estos datos se usan para estimar tu gasto energético. Si no conoces tu grasa corporal, puedes dejarla vacía y completarla después.</p>
       <div class="dash">
-        <div class="field" style="margin-top:0"><label>Nombre</label><input id="ob_name" value="${esc(d.name)}" autocomplete="name" placeholder="Tu nombre"></div>
+        <div class="field" style="margin-top:0"><label for="ob_name">Nombre</label><input id="ob_name" value="${esc(d.name)}" autocomplete="name" placeholder="Tu nombre"></div>
         <div class="onboarding-grid">
-          <div class="field"><label>Sexo para la fórmula</label><select id="ob_sex">
+          <div class="field"><label for="ob_sex">Sexo para la fórmula</label><select id="ob_sex">
             <option value="">Selecciona</option><option value="male" ${sel(d.sex,"male")}>Masculino</option><option value="female" ${sel(d.sex,"female")}>Femenino</option>
           </select></div>
-          <div class="field"><label>Edad</label><input id="ob_age" type="number" inputmode="numeric" min="${MINIMUM_AGE}" max="90" value="${d.age}" placeholder="30"></div>
-          <div class="field"><label>Estatura (cm)</label><input id="ob_height" type="number" inputmode="decimal" min="130" max="230" value="${d.heightCm}" placeholder="175"></div>
-          <div class="field"><label>Peso actual (kg)</label><input id="ob_weight" type="number" inputmode="decimal" min="35" max="250" step=".1" value="${d.weightKg}" placeholder="80"></div>
-          <div class="field"><label>Grasa corporal (opcional)</label><input id="ob_bf" type="number" inputmode="decimal" min="3" max="60" step=".1" value="${d.bodyFatPct}" placeholder="Ej. 20"><div class="field-note">Déjalo vacío si no lo sabes; no bloquea tu plan.</div></div>
-          <div class="field"><label>Nivel de actividad habitual</label><select id="ob_activity" onchange="updateOnboardingActivity(this.value)">
+          <div class="field"><label for="ob_age">Edad</label><input id="ob_age" type="number" inputmode="numeric" min="${MINIMUM_AGE}" max="90" value="${d.age}" placeholder="30"></div>
+          <div class="field"><label for="ob_height">Estatura (cm)</label><input id="ob_height" type="number" inputmode="decimal" min="130" max="230" value="${d.heightCm}" placeholder="175"></div>
+          <div class="field"><label for="ob_weight">Peso actual (kg)</label><input id="ob_weight" type="number" inputmode="decimal" min="35" max="250" step=".1" value="${d.weightKg}" placeholder="80"></div>
+          <div class="field"><label for="ob_bf">Grasa corporal (opcional)</label><input id="ob_bf" type="number" inputmode="decimal" min="3" max="60" step=".1" value="${d.bodyFatPct}" placeholder="Ej. 20"><div class="field-note">Déjalo vacío si no lo sabes; no bloquea tu plan.</div></div>
+          <div class="field"><label for="ob_activity">Nivel de actividad habitual</label><select id="ob_activity" onchange="updateOnboardingActivity(this.value)">
             ${Object.entries(ACTIVITY_LEVELS).map(([v,o])=>`<option value="${v}" ${sel(d.activityLevel,v)}>${o.label}</option>`).join("")}
           </select></div>
         </div>
@@ -3054,7 +3062,7 @@ function renderOnboarding(){
     body=`<h1>Define tu objetivo y tus macros</h1>
       <p class="onboarding-copy">Calculamos una referencia inicial a partir de tus datos. Puedes ajustarla si quieres.</p>
       <div class="dash">
-        <div class="field" style="margin-top:0"><label>Objetivo principal</label><select id="ob_goal" onchange="onboardingGoalChanged(this.value)">
+        <div class="field" style="margin-top:0"><label for="ob_goal">Objetivo principal</label><select id="ob_goal" onchange="onboardingGoalChanged(this.value)">
           <option value="deficit" ${sel(d.goal,"deficit")}>Perder grasa</option>
           <option value="mantenimiento" ${sel(d.goal,"mantenimiento")}>Mantener mi peso y mejorar mi cuerpo</option>
           <option value="volumen" ${sel(d.goal,"volumen")}>Ganar masa muscular</option>
@@ -3065,10 +3073,10 @@ function renderOnboarding(){
         <details class="adv-settings">
           <summary>Ajustar valores (opcional)</summary>
           <div class="onboarding-grid" style="margin-top:8px">
-            <div class="field"><label>Calorías</label><input id="ob_kcal" type="number" inputmode="numeric" value="${d.calorieTarget}"></div>
-            <div class="field"><label>Proteína (g)</label><input id="ob_protein" type="number" inputmode="numeric" value="${d.proteinTarget}"></div>
-            <div class="field"><label>Carbohidratos (g)</label><input id="ob_carbs" type="number" inputmode="numeric" value="${d.carbTarget}"></div>
-            <div class="field"><label>Grasas (g)</label><input id="ob_fat" type="number" inputmode="numeric" value="${d.fatTarget}"></div>
+            <div class="field"><label for="ob_kcal">Calorías</label><input id="ob_kcal" type="number" inputmode="numeric" value="${d.calorieTarget}"></div>
+            <div class="field"><label for="ob_protein">Proteína (g)</label><input id="ob_protein" type="number" inputmode="numeric" value="${d.proteinTarget}"></div>
+            <div class="field"><label for="ob_carbs">Carbohidratos (g)</label><input id="ob_carbs" type="number" inputmode="numeric" value="${d.carbTarget}"></div>
+            <div class="field"><label for="ob_fat">Grasas (g)</label><input id="ob_fat" type="number" inputmode="numeric" value="${d.fatTarget}"></div>
           </div>
           <button class="btn btn-sm" style="margin-top:8px" onclick="recalculateOnboarding()">Recalcular valores</button>
         </details>
@@ -3090,7 +3098,7 @@ function renderOnboarding(){
             ${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(strengthChoice,v)}>${l}</option>`).join("")}
           </select></div>
           ${strengthResourceHtml("ob",strengthChoice,d.equipment)}
-          <div class="field" style="grid-column:1 / -1"><label>Ciclo de seguimiento</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
+          <div class="field" style="grid-column:1 / -1"><label for="ob_duration">Ciclo de seguimiento</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
             ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
           </select><div class="field-note">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado.</div></div>
         </div>
@@ -3108,10 +3116,10 @@ function renderOnboarding(){
         <details class="adv-settings">
           <summary>Opciones avanzadas (opcional)</summary>
           <div class="onboarding-grid" style="margin-top:8px">
-            <div class="field"><label>Experiencia</label><select id="ob_experience">
+            <div class="field"><label for="ob_experience">Experiencia</label><select id="ob_experience">
               ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.trainingExperience,v)}>${l}</option>`).join("")}
             </select></div>
-            <div class="field"><label>Minutos por sesión</label><input id="ob_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${d.sessionMinutes}"></div>
+            <div class="field"><label for="ob_minutes">Minutos por sesión</label><input id="ob_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${d.sessionMinutes}"></div>
           </div>
         </details>
       </div>${onboardingButtons(false)}`;
@@ -3124,20 +3132,20 @@ function renderOnboarding(){
         <div class="chips" style="margin:9px 0 4px">
           ${dietOptions.map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}
         </div>
-        <div class="field"><label>Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
+        <div class="field"><label for="ob_allergies">Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
         <details class="adv-settings" open>
           <summary>Tus gustos (opcional)</summary>
           <div class="onboarding-grid" style="margin-top:8px">
-            <div class="field"><label>Ingredientes favoritos</label><input id="ob_preferred_ingredients" value="${esc(d.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
-            <div class="field"><label>Platos que te gustan</label><input id="ob_preferred_dishes" value="${esc(d.preferredDishes)}" placeholder="lomo saltado, pollo a la plancha..."></div>
-            <div class="field"><label>No quieres que aparezca</label><input id="ob_disliked" value="${esc(d.dislikedIngredients)}" placeholder="tofu, aceitunas..."></div>
+            <div class="field"><label for="ob_preferred_ingredients">Ingredientes favoritos</label><input id="ob_preferred_ingredients" value="${esc(d.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
+            <div class="field"><label for="ob_preferred_dishes">Platos que te gustan</label><input id="ob_preferred_dishes" value="${esc(d.preferredDishes)}" placeholder="lomo saltado, pollo a la plancha..."></div>
+            <div class="field"><label for="ob_disliked">No quieres que aparezca</label><input id="ob_disliked" value="${esc(d.dislikedIngredients)}" placeholder="tofu, aceitunas..."></div>
           </div>
           <div class="field-note">Tus favoritos guían las propuestas; lo que no quieres se excluye.</div>
         </details>
         <details class="adv-settings">
           <summary>Ajustar número de comidas (opcional)</summary>
           <div class="onboarding-grid" style="margin-top:8px">
-            <div class="field"><label>Comidas al día</label><select id="ob_meal_count" onchange="updateOnboardingMealCount(this.value)">
+            <div class="field"><label for="ob_meal_count">Comidas al día</label><select id="ob_meal_count" onchange="updateOnboardingMealCount(this.value)">
               ${[2,3,4,5,6].map(value=>`<option value="${value}" ${d.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
             </select></div>
           </div>
@@ -3158,7 +3166,7 @@ function renderOnboarding(){
   const challengeNote=d.challenge&&CHALLENGE_LABELS[d.challenge]
     ? `<div class="alert violet"><b>Siguiente desafío:</b> ${CHALLENGE_LABELS[d.challenge]}. Revisaremos todos tus datos antes de crear las próximas ${d.planDurationWeeks} semanas.</div>`
     :"";
-  $("#app").innerHTML=`<main class="onboarding"><div class="onboarding-brand">EVOLV · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</main>`;
+  $("#app").innerHTML=`<div class="onboarding"><div class="onboarding-brand">EVOLV · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</div>`;
 }
 function readOnboardingStep(){
   const d=onboardingDraft;
@@ -3311,12 +3319,12 @@ function firstWeekSetupStatusHtml(state){
 function renderFirstWeekSetup(state){
   const s=state||{};
   $("#tabs").innerHTML="";
-  $("#app").innerHTML=`<main class="onboarding">
+  $("#app").innerHTML=`<div class="onboarding">
     <div class="onboarding-brand">EVOLV · TU PLAN</div>
     <h1>Preparando tu primera semana</h1>
     <p class="onboarding-copy">${esc(s.message||"Estamos armando comidas y entrenamiento según tus metas. Solo un momento…")}</p>
     ${firstWeekSetupStatusHtml(s)}
-  </main>`;
+  </div>`;
 }
 function firstWeekForDate(ds){
   return weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||WEEKS[0];
@@ -3652,7 +3660,7 @@ function showMacroInfo(key){
 // Cabecera de pantalla (eyebrow + título display + chip de ícono a la derecha)
 function screenHeader(title,sub,icon){
   return `<header class="shead">
-    <div>${sub?`<div class="shead-sub">${sub}</div>`:""}<h2>${esc(title)}</h2></div>
+    <div>${sub?`<div class="shead-sub">${sub}</div>`:""}<h1>${esc(title)}</h1></div>
     ${icon?`<div class="shead-ic">${tabIcon(icon)}</div>`:""}
   </header>`;
 }
@@ -3869,7 +3877,7 @@ function dayHeaderNav(ds){
     <div class="daynav">
       <button onclick="nav(-1)" ${ds<=START?"disabled style=opacity:.3":""}>‹</button>
       <div class="dtitle">
-        <div class="date">${prettyDate(ds)}${isToday?' · <span class="muted small">hoy</span>':''}</div>
+        <h1 class="date">${prettyDate(ds)}${isToday?' · <span class="muted small">hoy</span>':''}</h1>
         ${w&&w.num?`<div style="margin-top:5px"><span class="weeknote">${w.label==="Arranque"?"Arranque":"Semana "+w.num}</span></div>`:""}
       </div>
       <button onclick="nav(1)" ${ds>=END?"disabled style=opacity:.3":""}>›</button>
@@ -4320,7 +4328,7 @@ function renderHoy(){
     ${clearBtn}
     <div class="coach-msgs-home" id="coachMsgs">${msgsHtml}${typingHtml}</div>
     <div class="coach-input-row" style="margin:0 -14px;border-radius:0">
-      <textarea id="coachInput" placeholder="Escribe tu pregunta…" rows="1"
+      <textarea id="coachInput" aria-label="Pregunta a tu coach" placeholder="Escribe tu pregunta…" rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();coachSendFromInput();}"
         oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
       <button onclick="coachSendFromInput()" title="Enviar">➤</button>
@@ -4331,7 +4339,7 @@ function renderHoy(){
   <header class="shead">
     <div>
       <div class="shead-sub">${wdName}, ${dayMon}</div>
-      <h2>Hola, ${esc(name)}</h2>
+      <h1>Hola, ${esc(name)}</h1>
     </div>
     <div class="row" style="gap:9px">
       ${stk>0?`<span class="badge b-BAJO">🔥 ${stk}</span>`:""}
@@ -4882,16 +4890,16 @@ function openFinishWorkout(ds,partial,keep){
   modal(`<h3>${partial||!complete?"Cerrar sesión parcial":"Finalizar sesión"}</h3>
     ${pendingHtml}
     <p class="muted small">Antes de guardar, registra cómo se sintió la sesión. El historial conservará lo realmente ejecutado.</p>
-    <div class="field"><label>¿Sentiste dolor o malestar anormal?</label><select id="finishPain">
+    <div class="field"><label for="finishPain">¿Sentiste dolor o malestar anormal?</label><select id="finishPain">
       <option value="">Selecciona</option><option value="none">No</option>
       <option value="discomfort">Molestia que alteró la técnica</option>
       <option value="sharp_pain">Dolor agudo</option><option value="dizziness">Mareo o falta de aire inusual</option>
     </select></div>
-    <div class="field"><label>Dificultad general</label><select id="finishDifficulty">
+    <div class="field"><label for="finishDifficulty">Dificultad general</label><select id="finishDifficulty">
       <option value="">Selecciona</option><option value="easy">Más fácil de lo esperado</option>
       <option value="expected">Adecuada</option><option value="hard">Más difícil de lo esperado</option>
     </select></div>
-    <div class="field"><label>Notas opcionales</label><textarea id="finishNotes" rows="3" placeholder="Carga, técnica, energía o cualquier contexto útil">${esc(keep?keep.notes:(execution.notes||""))}</textarea></div>
+    <div class="field"><label for="finishNotes">Notas opcionales</label><textarea id="finishNotes" rows="3" placeholder="Carga, técnica, energía o cualquier contexto útil">${esc(keep?keep.notes:(execution.notes||""))}</textarea></div>
     <button class="btn btn-accent" style="width:100%" onclick="finishWorkoutExecution('${ds}',${partial||!complete})">Guardar resultado</button>`);
   if(keep){$("#finishPain").value=keep.pain||"";$("#finishDifficulty").value=keep.difficulty||"";}
 }
@@ -4993,9 +5001,9 @@ function renderStrengthSet(ds,step,stepIndex,set,setIndex){
       <button class="set-done ${set.done?"on":""}" aria-pressed="${set.done?"true":"false"}" aria-label="Serie ${setIndex+1}: ${set.done?"hecha, tocar para desmarcar":"marcar como hecha"}" onclick="toggleWorkoutSet('${ds}',${stepIndex},${setIndex})">${set.done?"✓ Hecha":"Marcar hecha"}</button>
     </div>
     <div class="set-fields">
-      <div><label>${step.unit==="seg"?"Segundos":"Repeticiones"}</label><input type="number" min="0" inputmode="decimal" value="${set.reps==null?"":esc(set.reps)}" placeholder="${esc(step.defaultReps)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'reps',this.value)"></div>
-      <div><label>Carga / asistencia</label><input type="text" value="${esc(set.load||"")}" placeholder="kg" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'load',this.value)"></div>
-      <div><label>Esfuerzo (RPE)</label><input type="number" min="1" max="10" inputmode="decimal" value="${set.rpe==null?"":esc(set.rpe)}" placeholder="${esc(step.targetRpe)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'rpe',this.value)"></div>
+      <div><label>${step.unit==="seg"?"Segundos":"Repeticiones"}</label><input aria-label="${step.unit==="seg"?"Segundos":"Repeticiones"}, serie ${setIndex+1}" type="number" min="0" inputmode="decimal" value="${set.reps==null?"":esc(set.reps)}" placeholder="${esc(step.defaultReps)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'reps',this.value)"></div>
+      <div><label>Carga / asistencia</label><input aria-label="Carga o asistencia, serie ${setIndex+1}" type="text" value="${esc(set.load||"")}" placeholder="kg" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'load',this.value)"></div>
+      <div><label>Esfuerzo (RPE)</label><input aria-label="Esfuerzo (RPE), serie ${setIndex+1}" type="number" min="1" max="10" inputmode="decimal" value="${set.rpe==null?"":esc(set.rpe)}" placeholder="${esc(step.targetRpe)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'rpe',this.value)"></div>
     </div>
   </div>`;
 }
@@ -6851,7 +6859,8 @@ function showAuthFromLanding(mode){
 }
 
 function toggleFaq(el){
-  el.closest(".l-faq-item").classList.toggle("open");
+  const open=el.closest(".l-faq-item").classList.toggle("open");
+  el.setAttribute("aria-expanded",open?"true":"false");
 }
 
 /* ---- Paywall y estado de suscripción (REQ-25) ---- */
@@ -6944,7 +6953,7 @@ async function restorePurchase(btn){
 function couponRedeemSectionHtml(){
   return`<details class="adv-settings" style="border-top:1px solid var(--border);margin-top:14px;padding-top:12px">
     <summary>¿Tienes un código de acceso?</summary>
-    <div class="field" style="margin-top:10px"><label>Código de acceso</label><input id="couponCode" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="Ej. FIT-X7K2-9ABQ"></div>
+    <div class="field" style="margin-top:10px"><label for="couponCode">Código de acceso</label><input id="couponCode" type="text" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="Ej. FIT-X7K2-9ABQ"></div>
     <button class="btn" style="width:100%;min-height:44px" onclick="redeemCoupon(this)">Canjear</button>
   </details>`;
 }
@@ -7262,35 +7271,35 @@ function renderLanding(){
       <div class="l-section-label">Preguntas frecuentes</div>
       <div class="l-faq">
         <div class="l-faq-item">
-          <button class="l-faq-q" onclick="toggleFaq(this)">
+          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
             ¿Necesito experiencia en nutrición o entrenamiento?
             <span class="l-faq-ic">+</span>
           </button>
           <div class="l-faq-a">No. Evolv explica qué hacer, cómo hacerlo y por qué. Cada ejercicio tiene instrucciones y alternativas para principiantes. El plan de comidas usa recetas reales con ingredientes y cantidades.</div>
         </div>
         <div class="l-faq-item">
-          <button class="l-faq-q" onclick="toggleFaq(this)">
+          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
             ¿El plan sirve si soy vegetariano o tengo alergias?
             <span class="l-faq-ic">+</span>
           </button>
           <div class="l-faq-a">Sí. Al configurar tu perfil indicas restricciones (vegetariano, sin gluten, sin lactosa, alergias específicas, etc.). Estas se aplican como reglas duras: ninguna comida las viola.</div>
         </div>
         <div class="l-faq-item">
-          <button class="l-faq-q" onclick="toggleFaq(this)">
+          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
             ¿Puedo entrenar en casa sin equipo?
             <span class="l-faq-ic">+</span>
           </button>
           <div class="l-faq-a">Sí. Configura tu lugar de entrenamiento (casa, gimnasio, exterior o piscina) y el equipo disponible. Tu plan de entrenamiento se arma solo con lo que tienes.</div>
         </div>
         <div class="l-faq-item">
-          <button class="l-faq-q" onclick="toggleFaq(this)">
+          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
             ¿Qué pasa si me pierdo un día?
             <span class="l-faq-ic">+</span>
           </button>
           <div class="l-faq-a">Las rachas de Evolv son justas: los descansos planificados no se cuentan como fallos. Si te pierdes un entrenamiento, el modo contingencia te da tres opciones: recuperarlo, seguir con el plan o convertirlo en descanso. Sin castigos.</div>
         </div>
         <div class="l-faq-item">
-          <button class="l-faq-q" onclick="toggleFaq(this)">
+          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
             ¿Mis datos son privados?
             <span class="l-faq-ic">+</span>
           </button>
@@ -7341,8 +7350,8 @@ function renderAuth(){
       <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
       <div class="muted small center" style="margin-bottom:18px">Conecta tu proyecto Supabase para continuar.</div>
       <div class="dash">
-        <div class="field"><label>Project URL o ID</label><input id="au_url" value="${esc(cfg.supaUrl||"")}" placeholder="xxxx ó https://xxxx.supabase.co"></div>
-        <div class="field"><label>Publishable key</label><input id="au_key" type="password" placeholder="sb_publishable_…"></div>
+        <div class="field"><label for="au_url">Project URL o ID</label><input id="au_url" value="${esc(cfg.supaUrl||"")}" placeholder="xxxx ó https://xxxx.supabase.co"></div>
+        <div class="field"><label for="au_key">Publishable key</label><input id="au_key" type="password" placeholder="sb_publishable_…"></div>
         <button class="btn btn-accent" style="width:100%" onclick="connectFromAuth()">Conectar</button>
       </div>
     </div>`;
@@ -7356,7 +7365,7 @@ function renderAuth(){
     <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
     <div class="muted small center" style="margin-bottom:20px">${mode==="in"?"Inicia sesión para continuar":"Crea tu cuenta gratis"}</div>
     <div class="dash">
-      <div class="field"><label>Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
+      <div class="field"><label for="au_email">Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
       ${passwordField({id:"au_pwd",label:"Contraseña",autocomplete:mode==="in"?"current-password":"new-password",placeholder:"••••••••"})}
       <button class="btn btn-accent" style="width:100%" onclick="doAuth()">${mode==="in"?"Entrar":"Registrarme"}</button>
       ${mode==="up"?`<p class="muted small center" style="margin-top:10px;font-size:12px;line-height:1.5">Al crear tu cuenta aceptas nuestros <a href="#" onclick="openTermsNotice();return false">Términos</a> y el <a href="#" onclick="openPrivacyNotice();return false">Aviso de privacidad</a>.</p>`:""}
@@ -8149,10 +8158,10 @@ function editorSheet(title,pre){
       <button class="mic" id="micBtn" onclick="toggleMic()" title="${aiOn?'Dictar':'El dictado no está disponible ahora'}">🎤</button></div>
     </div>
     <div class="grid4">
-      <div class="field"><label>kcal</label><input id="f_kcal" type="number" inputmode="numeric" value="${pre.kcal}"></div>
-      <div class="field"><label>Prot g</label><input id="f_p" type="number" inputmode="numeric" value="${pre.p}"></div>
-      <div class="field"><label>Carb g</label><input id="f_c" type="number" inputmode="numeric" value="${pre.c}"></div>
-      <div class="field"><label>Grasa g</label><input id="f_f" type="number" inputmode="numeric" value="${pre.f}"></div>
+      <div class="field"><label for="f_kcal">kcal</label><input id="f_kcal" type="number" inputmode="numeric" value="${pre.kcal}"></div>
+      <div class="field"><label for="f_p">Prot g</label><input id="f_p" type="number" inputmode="numeric" value="${pre.p}"></div>
+      <div class="field"><label for="f_c">Carb g</label><input id="f_c" type="number" inputmode="numeric" value="${pre.c}"></div>
+      <div class="field"><label for="f_f">Grasa g</label><input id="f_f" type="number" inputmode="numeric" value="${pre.f}"></div>
     </div>
     ${aiOn?`<div class="row" style="gap:8px">
       <button class="btn" style="flex:1" onclick="aiEstimate()">✨ Estimar macros</button>
@@ -9907,11 +9916,11 @@ function renderSettings(){
   const supaNote=supaSource==="vercel"?"Credenciales servidas por Vercel (/api/config). Los campos de abajo solo sobrescriben en este navegador.":supaSource==="config"?"Leyendo credenciales desde config.js. Los campos de abajo pueden sobrescribir este navegador.":supaSource==="local"?"Usando override local de este navegador.":"Se configuran en Vercel (variables SUPABASE_URL y SUPABASE_PUBLISHABLE_KEY) o aquí abajo.";
   $("#app").innerHTML=`${screenHeader("Ajustes","IA, base de datos y datos locales","settings")}
     <div class="dash">
-      <div class="field"><label>API key de Anthropic (console.anthropic.com)</label>
+      <div class="field"><label for="set_key">API key de Anthropic (console.anthropic.com)</label>
         <input id="set_key" type="password" placeholder="${k?masked:'sk-ant-...'}" value="">
         <div class="muted small" style="margin-top:6px">${keyNote}</div>
       </div>
-      <div class="field"><label>Modelo</label>
+      <div class="field"><label for="set_model">Modelo</label>
         <select id="set_model">
           <option value="claude-haiku-4-5-20251001" ${cfg.model==="claude-haiku-4-5-20251001"?"selected":""}>Haiku 4.5 (rápido y económico)</option>
           <option value="claude-sonnet-4-6" ${cfg.model==="claude-sonnet-4-6"?"selected":""}>Sonnet 4.6 (sugerencias más elaboradas)</option>
@@ -9929,10 +9938,10 @@ function renderSettings(){
     <div class="dash">
       <div class="row between"><b>🗄️ Base de datos (Supabase)</b><span class="badge ${supa?'b-BAJO':'b-Libre'}">${supa?'Conectada':(supaConfigured?'Config pendiente':'Sin conectar')}</span></div>
       <div class="muted small" style="margin:6px 0 10px">${supaNote}</div>
-      <div class="field"><label>Project URL o ID</label>
+      <div class="field"><label for="set_supaurl">Project URL o ID</label>
         <input id="set_supaurl" type="text" placeholder="tu-project-id  ó  https://xxxxx.supabase.co" value="${esc(cfg.supaUrl||'')}">
       </div>
-      <div class="field"><label>Publishable key (sb_publishable_…)</label>
+      <div class="field"><label for="set_supakey">Publishable key (sb_publishable_…)</label>
         <input id="set_supakey" type="password" placeholder="${cfg.supaKey?maskedSecret(cfg.supaKey):'sb_publishable_...'}" value="">
       </div>
       <button class="btn btn-accent" style="width:100%" onclick="saveSupabase()">Guardar y conectar</button>
@@ -10926,8 +10935,8 @@ async function renderAdminUsers(){
         <div class="scard"><div class="n">${admins}</div><div class="l">admins activos</div></div>
       </div>
       <div class="row" style="align-items:flex-end;margin-bottom:12px">
-        <div class="field" style="flex:1;margin:0"><label>Buscar</label><input id="adminSearch" type="search" placeholder="correo" oninput="filterAdminUsers()"></div>
-        <div class="field" style="width:130px;margin:0"><label>Estado</label><select id="adminStatus" onchange="filterAdminUsers()"><option value="all">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option></select></div>
+        <div class="field" style="flex:1;margin:0"><label for="adminSearch">Buscar</label><input id="adminSearch" type="search" placeholder="correo" oninput="filterAdminUsers()"></div>
+        <div class="field" style="width:130px;margin:0"><label for="adminStatus">Estado</label><select id="adminStatus" onchange="filterAdminUsers()"><option value="all">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option></select></div>
       </div>
       <div id="adminCards"></div>`;
     filterAdminUsers();
@@ -10968,9 +10977,9 @@ async function openAdminCourtesy(userId){
   const options=plans.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} (${p.duration_days} días)</option>`).join("");
   modal(`<h3>Acceso de cortesía</h3>
     <div class="muted small" style="margin-bottom:14px">Otorga acceso temporal sin cobro. El entitlement queda auditado con tu usuario.</div>
-    <div class="field"><label>Plan</label><select id="courtesyPlan">${options}</select></div>
-    <div class="field"><label>Días de acceso</label><input id="courtesyDays" type="number" inputmode="numeric" min="1" max="365" value="30"></div>
-    <div class="field" style="margin-bottom:0"><label>Nota interna (opcional)</label><input id="courtesyNotes" placeholder="Ej. beta tester, promo especial"></div>
+    <div class="field"><label for="courtesyPlan">Plan</label><select id="courtesyPlan">${options}</select></div>
+    <div class="field"><label for="courtesyDays">Días de acceso</label><input id="courtesyDays" type="number" inputmode="numeric" min="1" max="365" value="30"></div>
+    <div class="field" style="margin-bottom:0"><label for="courtesyNotes">Nota interna (opcional)</label><input id="courtesyNotes" placeholder="Ej. beta tester, promo especial"></div>
     <div class="row wrap" style="margin-top:14px">
       <button class="btn btn-accent" onclick="grantCourtesy('${userId}',this)">Otorgar acceso</button>
       <button class="btn" onclick="closeModal()">Cancelar</button>
@@ -11141,11 +11150,11 @@ function openAdminUserQuota(id){
   const options=policies.map(policy=>`<option value="${policy.action}">${esc(ADMIN_COACH_ACTION_LABELS[policy.action]||policy.action)}</option>`).join("");
   modal(`<h3>Consumo y cortesía</h3>
     <p class="muted small">${esc(user.email||user.id)}. El límite vacío hereda la política general; las unidades extra se suman solo a esta cuenta. Guardar sin tocar un campo conserva el valor vigente.</p>
-    <div class="field"><label>Acción</label><select id="adminQuotaAction" onchange="fillAdminQuotaFields('${user.id}',this.value)">${options}</select></div>
-    <div class="field"><label>Límite diario personalizado (opcional)</label><input id="adminQuotaLimit" type="number" min="0" max="1000" placeholder="Heredar"></div>
-    <div class="field"><label>Unidades extra de cortesía</label><input id="adminQuotaBonus" type="number" min="0" max="1000" value="0"></div>
-    <div class="field"><label>Disponibilidad</label><select id="adminQuotaEnabled"><option value="">Heredar política</option><option value="true">Activa</option><option value="false">Desactivada</option></select></div>
-    <div class="field"><label>Expira (opcional)</label><input id="adminQuotaExpires" type="date"></div>
+    <div class="field"><label for="adminQuotaAction">Acción</label><select id="adminQuotaAction" onchange="fillAdminQuotaFields('${user.id}',this.value)">${options}</select></div>
+    <div class="field"><label for="adminQuotaLimit">Límite diario personalizado (opcional)</label><input id="adminQuotaLimit" type="number" min="0" max="1000" placeholder="Heredar"></div>
+    <div class="field"><label for="adminQuotaBonus">Unidades extra de cortesía</label><input id="adminQuotaBonus" type="number" min="0" max="1000" value="0"></div>
+    <div class="field"><label for="adminQuotaEnabled">Disponibilidad</label><select id="adminQuotaEnabled"><option value="">Heredar política</option><option value="true">Activa</option><option value="false">Desactivada</option></select></div>
+    <div class="field"><label for="adminQuotaExpires">Expira (opcional)</label><input id="adminQuotaExpires" type="date"></div>
     <div class="row wrap">
       <button class="btn btn-accent" onclick="saveAdminUserQuota('${user.id}')">Guardar cortesía</button>
       <button class="btn" onclick="resetAdminUserQuota('${user.id}')">Reiniciar consumo de hoy</button>
@@ -11182,7 +11191,7 @@ async function resetAdminUserQuota(userId){
 function openAdminCreateUser(){
   modal(`<h3>Crear cuenta</h3>
     <p class="muted small">La cuenta queda activa con una contraseña temporal. En su primer ingreso, Evolv le pide crear su propia contraseña.</p>
-    <div class="field"><label>Correo</label><input id="adminCreateEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
+    <div class="field"><label for="adminCreateEmail">Correo</label><input id="adminCreateEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
     <button id="adminCreateBtn" class="btn btn-accent" style="width:100%" onclick="createAdminUser()">Crear cuenta</button>
     <div id="adminCreateOut" class="muted small" style="margin-top:10px"></div>`);
 }
@@ -11218,7 +11227,7 @@ async function copyAdminWelcome(){
 function openAdminInviteUser(){
   modal(`<h3>Invitar usuario</h3>
     <p class="muted small">El correo permite activar la cuenta y crear contraseña. Si el correo ya existe, usa el reset de contraseña desde la lista.</p>
-    <div class="field"><label>Correo</label><input id="adminInviteEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
+    <div class="field"><label for="adminInviteEmail">Correo</label><input id="adminInviteEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
     <button id="adminInviteBtn" class="btn btn-accent" style="width:100%" onclick="sendAdminInvite()">Enviar invitación</button>
     <div id="adminInviteOut" class="muted small" style="margin-top:10px"></div>`);
 }
@@ -11240,7 +11249,7 @@ async function sendAdminInvite(){
 function openAdminTestUser(){
   modal(`<h3>Preparar usuario de prueba</h3>
     <p class="muted small">Si la cuenta ya existe, se borrará toda su actividad y volverá a entrar como usuario nuevo. Por seguridad, una cuenta normal nunca puede convertirse en cuenta de prueba.</p>
-    <div class="field"><label>Correo de prueba</label><input id="adminTestEmail" type="email" autocomplete="off" value="qa-flow@fitbros.app"></div>
+    <div class="field"><label for="adminTestEmail">Correo de prueba</label><input id="adminTestEmail" type="email" autocomplete="off" value="qa-flow@fitbros.app"></div>
     ${passwordField({id:"adminTestPwd",label:"Contraseña",autocomplete:"new-password",minlength:"8",placeholder:"Mínimo 8 caracteres"})}
     ${passwordField({id:"adminTestPwdConfirm",label:"Confirmar contraseña",autocomplete:"new-password",minlength:"8"})}
     <div class="row wrap" style="margin-top:12px">
@@ -11400,37 +11409,37 @@ function editExercise(slug){
   const mediaKeys=["squat","hinge","push","pull","lunge","bridge","core","calf","isolation","run","cycle","swim"];
   modal(`<h3>${existing?"Editar":"Nuevo"} ejercicio</h3>
     <div class="onboarding-grid">
-      <div class="field"><label>ID estable</label><input id="ex_slug" value="${esc(ex.slug)}" ${existing?"disabled":""} placeholder="sentadilla-copa"></div>
-      <div class="field"><label>Nombre</label><input id="ex_name" value="${esc(ex.name)}"></div>
-      <div class="field"><label>Disciplina</label><select id="ex_discipline">${["gym","bodyweight","strength","running","cycling","swimming"].map(value=>`<option value="${value}" ${ex.discipline===value?"selected":""}>${value}</option>`).join("")}</select></div>
-      <div class="field"><label>Nivel</label><select id="ex_level">${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([value,label])=>`<option value="${value}" ${ex.level===value?"selected":""}>${label}</option>`).join("")}</select></div>
-      <div class="field"><label>Patrón</label><input id="ex_pattern" value="${esc(ex.movement_pattern)}"></div>
-      <div class="field"><label>SVG fallback (patrón)</label><select id="ex_media_key">${mediaKeys.map(value=>`<option value="${value}" ${ex.media_key===value?"selected":""}>${value}</option>`).join("")}</select></div>
+      <div class="field"><label for="ex_slug">ID estable</label><input id="ex_slug" value="${esc(ex.slug)}" ${existing?"disabled":""} placeholder="sentadilla-copa"></div>
+      <div class="field"><label for="ex_name">Nombre</label><input id="ex_name" value="${esc(ex.name)}"></div>
+      <div class="field"><label for="ex_discipline">Disciplina</label><select id="ex_discipline">${["gym","bodyweight","strength","running","cycling","swimming"].map(value=>`<option value="${value}" ${ex.discipline===value?"selected":""}>${value}</option>`).join("")}</select></div>
+      <div class="field"><label for="ex_level">Nivel</label><select id="ex_level">${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([value,label])=>`<option value="${value}" ${ex.level===value?"selected":""}>${label}</option>`).join("")}</select></div>
+      <div class="field"><label for="ex_pattern">Patrón</label><input id="ex_pattern" value="${esc(ex.movement_pattern)}"></div>
+      <div class="field"><label for="ex_media_key">SVG fallback (patrón)</label><select id="ex_media_key">${mediaKeys.map(value=>`<option value="${value}" ${ex.media_key===value?"selected":""}>${value}</option>`).join("")}</select></div>
     </div>
-    <div class="field"><label>Aliases (comas)</label><input id="ex_aliases" value="${exerciseFieldValue(ex,"aliases")}"></div>
-    <div class="field"><label>Equipo (comas)</label><input id="ex_equipment" value="${exerciseFieldValue(ex,"equipment")}"></div>
-    <div class="field"><label>Lugares (comas)</label><input id="ex_places" value="${exerciseFieldValue(ex,"places")}"></div>
-    <div class="field"><label>Grupos musculares (comas)</label><input id="ex_muscles" value="${exerciseFieldValue(ex,"muscles")}"></div>
-    <div class="field"><label>Posición inicial</label><textarea id="ex_start" rows="2">${esc(ex.start_position)}</textarea></div>
-    <div class="field"><label>Pasos (uno por línea)</label><textarea id="ex_steps" rows="4">${exerciseFieldValue(ex,"steps","\n")}</textarea></div>
-    <div class="field"><label>Respiración</label><textarea id="ex_breathing" rows="2">${esc(ex.breathing)}</textarea></div>
-    <div class="field"><label>Errores comunes (uno por línea)</label><textarea id="ex_errors" rows="3">${exerciseFieldValue(ex,"common_errors","\n")}</textarea></div>
-    <div class="field"><label>Señales para detenerse (una por línea)</label><textarea id="ex_safety" rows="3">${exerciseFieldValue(ex,"safety_signals","\n")}</textarea></div>
-    <div class="field"><label>Regresión</label><input id="ex_regression" value="${esc(ex.regression)}"></div>
-    <div class="field"><label>Progresión</label><input id="ex_progression" value="${esc(ex.progression)}"></div>
-    <div class="field"><label>Sustitutos por ID (comas)</label><input id="ex_substitutes" value="${exerciseFieldValue(ex,"substitute_slugs")}"></div>
-    <div class="field"><label>Contraindicaciones/limitaciones (una por línea)</label><textarea id="ex_contraindications" rows="3">${exerciseFieldValue(ex,"contraindications","\n")}</textarea></div>
-    <div class="field"><label>Tipo de media</label><select id="ex_media_type">${["inline_svg","image_sequence","image","video","gif"].map(v=>`<option value="${v}" ${(ex.media_type||"inline_svg")===v?"selected":""}>${v}</option>`).join("")}</select></div>
-    <div class="field"><label>Fotogramas o clip — una URL por línea, la 1ª es el inicio (debe estar en Storage)</label><textarea id="ex_frames" rows="2" placeholder="https://…/storage/v1/object/public/exercise-media/slug/0.jpg">${exerciseFieldValue(ex,"frames","\n")}</textarea></div>
-    <div class="field"><label>Imagen estática (poster)</label><input id="ex_poster" value="${esc(ex.poster_url||"")}" placeholder="URL en Storage (opcional)"></div>
-    <div class="field"><label>Clip principal (media_url, opcional)</label><input id="ex_media_url" value="${esc(ex.media_url||"")}" placeholder="URL de video/gif en Storage (opcional)"></div>
+    <div class="field"><label for="ex_aliases">Aliases (comas)</label><input id="ex_aliases" value="${exerciseFieldValue(ex,"aliases")}"></div>
+    <div class="field"><label for="ex_equipment">Equipo (comas)</label><input id="ex_equipment" value="${exerciseFieldValue(ex,"equipment")}"></div>
+    <div class="field"><label for="ex_places">Lugares (comas)</label><input id="ex_places" value="${exerciseFieldValue(ex,"places")}"></div>
+    <div class="field"><label for="ex_muscles">Grupos musculares (comas)</label><input id="ex_muscles" value="${exerciseFieldValue(ex,"muscles")}"></div>
+    <div class="field"><label for="ex_start">Posición inicial</label><textarea id="ex_start" rows="2">${esc(ex.start_position)}</textarea></div>
+    <div class="field"><label for="ex_steps">Pasos (uno por línea)</label><textarea id="ex_steps" rows="4">${exerciseFieldValue(ex,"steps","\n")}</textarea></div>
+    <div class="field"><label for="ex_breathing">Respiración</label><textarea id="ex_breathing" rows="2">${esc(ex.breathing)}</textarea></div>
+    <div class="field"><label for="ex_errors">Errores comunes (uno por línea)</label><textarea id="ex_errors" rows="3">${exerciseFieldValue(ex,"common_errors","\n")}</textarea></div>
+    <div class="field"><label for="ex_safety">Señales para detenerse (una por línea)</label><textarea id="ex_safety" rows="3">${exerciseFieldValue(ex,"safety_signals","\n")}</textarea></div>
+    <div class="field"><label for="ex_regression">Regresión</label><input id="ex_regression" value="${esc(ex.regression)}"></div>
+    <div class="field"><label for="ex_progression">Progresión</label><input id="ex_progression" value="${esc(ex.progression)}"></div>
+    <div class="field"><label for="ex_substitutes">Sustitutos por ID (comas)</label><input id="ex_substitutes" value="${exerciseFieldValue(ex,"substitute_slugs")}"></div>
+    <div class="field"><label for="ex_contraindications">Contraindicaciones/limitaciones (una por línea)</label><textarea id="ex_contraindications" rows="3">${exerciseFieldValue(ex,"contraindications","\n")}</textarea></div>
+    <div class="field"><label for="ex_media_type">Tipo de media</label><select id="ex_media_type">${["inline_svg","image_sequence","image","video","gif"].map(v=>`<option value="${v}" ${(ex.media_type||"inline_svg")===v?"selected":""}>${v}</option>`).join("")}</select></div>
+    <div class="field"><label for="ex_frames">Fotogramas o clip — una URL por línea, la 1ª es el inicio (debe estar en Storage)</label><textarea id="ex_frames" rows="2" placeholder="https://…/storage/v1/object/public/exercise-media/slug/0.jpg">${exerciseFieldValue(ex,"frames","\n")}</textarea></div>
+    <div class="field"><label for="ex_poster">Imagen estática (poster)</label><input id="ex_poster" value="${esc(ex.poster_url||"")}" placeholder="URL en Storage (opcional)"></div>
+    <div class="field"><label for="ex_media_url">Clip principal (media_url, opcional)</label><input id="ex_media_url" value="${esc(ex.media_url||"")}" placeholder="URL de video/gif en Storage (opcional)"></div>
     <div class="row" style="margin-bottom:8px"><button class="btn btn-sm" type="button" onclick="previewExerciseMedia()">Previsualizar media</button></div>
     <div id="ex_media_preview" class="exercise-demo" style="border-radius:var(--r-md);border:1px solid var(--border);margin-bottom:12px"></div>
     <div class="onboarding-grid">
-      <div class="field"><label>Fuente</label><input id="ex_source" value="${esc(ex.source_name)}"></div>
-      <div class="field"><label>URL fuente</label><input id="ex_source_url" value="${esc(ex.source_url||"")}"></div>
-      <div class="field"><label>Licencia</label><input id="ex_license" value="${esc(ex.license_name)}"></div>
-      <div class="field"><label>Atribución</label><input id="ex_attribution" value="${esc(ex.attribution||"")}"></div>
+      <div class="field"><label for="ex_source">Fuente</label><input id="ex_source" value="${esc(ex.source_name)}"></div>
+      <div class="field"><label for="ex_source_url">URL fuente</label><input id="ex_source_url" value="${esc(ex.source_url||"")}"></div>
+      <div class="field"><label for="ex_license">Licencia</label><input id="ex_license" value="${esc(ex.license_name)}"></div>
+      <div class="field"><label for="ex_attribution">Atribución</label><input id="ex_attribution" value="${esc(ex.attribution||"")}"></div>
     </div>
     <label class="chip-check" style="display:flex;margin-bottom:12px"><input id="ex_active" type="checkbox" ${ex.active!==false?"checked":""}><span>Ejercicio activo y publicable</span></label>
     <button class="btn btn-accent" style="width:100%" onclick="saveExercise()">Guardar ejercicio</button>
@@ -11593,9 +11602,9 @@ function editDiet(id){
   const dt=id?DB.diets.find(d=>d.id===id):{code:"",name:"",description:""};
   window._diet={id};
   modal(`<h3>${id?"Editar":"Nueva"} dieta</h3>`+
-    `<div class="field"><label>Código</label><input id="dtt_code" value="${esc(dt.code||"")}" placeholder="A, B, REFEED…" maxlength="20"></div>`+
-    `<div class="field"><label>Nombre</label><input id="dtt_name" value="${esc(dt.name||"")}" placeholder="Menú A — Criollo"></div>`+
-    `<div class="field"><label>Descripción</label><input id="dtt_desc" value="${esc(dt.description||"")}" placeholder="Semanas 1, 5, 10"></div>`+
+    `<div class="field"><label for="dtt_code">Código</label><input id="dtt_code" value="${esc(dt.code||"")}" placeholder="A, B, REFEED…" maxlength="20"></div>`+
+    `<div class="field"><label for="dtt_name">Nombre</label><input id="dtt_name" value="${esc(dt.name||"")}" placeholder="Menú A — Criollo"></div>`+
+    `<div class="field"><label for="dtt_desc">Descripción</label><input id="dtt_desc" value="${esc(dt.description||"")}" placeholder="Semanas 1, 5, 10"></div>`+
     `<button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="saveDiet()">Guardar</button>`+
     (id?`<button class="btn" style="width:100%;margin-top:8px" onclick="deleteDiet(${id})">Eliminar dieta</button>`:""));
 }
@@ -11630,9 +11639,9 @@ function editDietDish(dietId,id){
   const dishOpts=DB.dishes.map(d=>`<option value="${d.id}" ${d.id===it.dish_id?"selected":""}>${esc(d.name)} · ${esc(dishSlotMeta(d))}</option>`).join("");
   modal(`<h3>${id?"Editar":"Nueva"} asignación</h3>`+
     `<div class="muted small" style="margin-bottom:12px">${esc(dietName)}</div>`+
-    `<div class="field"><label>Día</label><select id="dd_day">${dayOpts}${noDay}</select></div>`+
-    `<div class="field"><label>Slot</label><select id="dd_slot">${slots.map(s=>`<option ${s===(it.slot||"almuerzo")?"selected":""}>${s}</option>`).join("")}</select></div>`+
-    `<div class="field"><label>Plato</label><select id="dd_dish">${dishOpts}</select></div>`+
+    `<div class="field"><label for="dd_day">Día</label><select id="dd_day">${dayOpts}${noDay}</select></div>`+
+    `<div class="field"><label for="dd_slot">Slot</label><select id="dd_slot">${slots.map(s=>`<option ${s===(it.slot||"almuerzo")?"selected":""}>${s}</option>`).join("")}</select></div>`+
+    `<div class="field"><label for="dd_dish">Plato</label><select id="dd_dish">${dishOpts}</select></div>`+
     `<button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="saveDietDish()">Guardar</button>`+
     (id?`<button class="btn" style="width:100%;margin-top:8px" onclick="deleteDietDish(${id})">Quitar asignación</button>`:""));
 }
@@ -11671,13 +11680,13 @@ function editIngredient(id){
   const it=id?ingById(id):{name:"",category:"",kcal:"",protein_g:"",carbs_g:"",fat_g:""};
   window._ing={id};
   modal(`<h3>${id?"Editar":"Nuevo"} ingrediente <span class="muted small">(valores por 100 g)</span></h3>
-    <div class="field"><label>Nombre</label><input id="ig_name" value="${esc(it.name)}"></div>
-    <div class="field"><label>Categoría</label><input id="ig_cat" value="${esc(it.category||"")}" placeholder="Proteína, Cereal, Verdura…"></div>
+    <div class="field"><label for="ig_name">Nombre</label><input id="ig_name" value="${esc(it.name)}"></div>
+    <div class="field"><label for="ig_cat">Categoría</label><input id="ig_cat" value="${esc(it.category||"")}" placeholder="Proteína, Cereal, Verdura…"></div>
     <div class="grid4">
-      <div class="field"><label>kcal</label><input id="ig_kcal" type="number" inputmode="decimal" value="${it.kcal}"></div>
-      <div class="field"><label>Prot</label><input id="ig_p" type="number" inputmode="decimal" value="${it.protein_g}"></div>
-      <div class="field"><label>Carb</label><input id="ig_c" type="number" inputmode="decimal" value="${it.carbs_g}"></div>
-      <div class="field"><label>Grasa</label><input id="ig_f" type="number" inputmode="decimal" value="${it.fat_g}"></div>
+      <div class="field"><label for="ig_kcal">kcal</label><input id="ig_kcal" type="number" inputmode="decimal" value="${it.kcal}"></div>
+      <div class="field"><label for="ig_p">Prot</label><input id="ig_p" type="number" inputmode="decimal" value="${it.protein_g}"></div>
+      <div class="field"><label for="ig_c">Carb</label><input id="ig_c" type="number" inputmode="decimal" value="${it.carbs_g}"></div>
+      <div class="field"><label for="ig_f">Grasa</label><input id="ig_f" type="number" inputmode="decimal" value="${it.fat_g}"></div>
     </div>
     <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="saveIngredient()">Guardar</button>
     ${id?`<button class="btn" style="width:100%;margin-top:8px" onclick="deleteIngredient(${id})">Eliminar</button>`:""}`);
@@ -11751,20 +11760,20 @@ function dishModal(){
       <div class="field"><label>Slots compatibles</label><div class="row wrap" style="gap:6px">
         ${NUTRITION_CATALOG_SLOT_OPTIONS.map(s=>`<label class="chip-check"><input type="checkbox" id="ds_compat_${s}" ${compat.includes(s)?"checked":""}><span>${s}</span></label>`).join("")}
       </div></div>
-      <div class="field"><label>Tags de dieta</label><input id="ds_tags" value="${esc((d.diet_tags||[]).join(", "))}" placeholder="vegetariano, vegano, omnivoro"></div>
-      ${cuisineSemanticsReady()?`<div class="field"><label>Cocinas</label><input id="ds_cuisine_tags" value="${esc((d.cuisine_tags||[]).join(", "))}" placeholder="criolla, mediterranea, mexicana, asiatica"></div>`:""}
+      <div class="field"><label for="ds_tags">Tags de dieta</label><input id="ds_tags" value="${esc((d.diet_tags||[]).join(", "))}" placeholder="vegetariano, vegano, omnivoro"></div>
+      ${cuisineSemanticsReady()?`<div class="field"><label for="ds_cuisine_tags">Cocinas</label><input id="ds_cuisine_tags" value="${esc((d.cuisine_tags||[]).join(", "))}" placeholder="criolla, mediterranea, mexicana, asiatica"></div>`:""}
       <div class="grid2">
-        <div class="field"><label>Preparación (min)</label><input id="ds_prep" type="number" inputmode="numeric" value="${esc(d.prep_minutes||"")}"></div>
-        <div class="field"><label>Presupuesto</label><select id="ds_budget">${["low","medium","flexible"].map(x=>`<option value="${x}" ${x===d.budget_tier?"selected":""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label for="ds_prep">Preparación (min)</label><input id="ds_prep" type="number" inputmode="numeric" value="${esc(d.prep_minutes||"")}"></div>
+        <div class="field"><label for="ds_budget">Presupuesto</label><select id="ds_budget">${["low","medium","flexible"].map(x=>`<option value="${x}" ${x===d.budget_tier?"selected":""}>${x}</option>`).join("")}</select></div>
       </div>
       <div class="grid2">
         <label class="chip-check"><input type="checkbox" id="ds_kitchen" ${d.needs_kitchen!==false?"checked":""}><span>Requiere cocina</span></label>
         <label class="chip-check"><input type="checkbox" id="ds_eat_out" ${d.eat_out_ok?"checked":""}><span>Útil fuera de casa</span></label>
       </div>
-      <div class="field"><label>Densidad de proteína</label><select id="ds_density"><option value="">—</option>${["low","medium","high","unknown"].map(x=>`<option value="${x}" ${x===d.protein_density?"selected":""}>${x}</option>`).join("")}</select></div>
+      <div class="field"><label for="ds_density">Densidad de proteína</label><select id="ds_density"><option value="">—</option>${["low","medium","high","unknown"].map(x=>`<option value="${x}" ${x===d.protein_density?"selected":""}>${x}</option>`).join("")}</select></div>
       ${mealMomentSemanticsReady()?`<div class="grid2">
-        <div class="field"><label>Contundencia</label><select id="ds_weight"><option value="">—</option>${["light","medium","heavy"].map(x=>`<option value="${x}" ${x===d.meal_weight?"selected":""}>${x}</option>`).join("")}</select></div>
-        <div class="field"><label>Formato</label><select id="ds_form"><option value="">—</option>${["bowl","sandwich","shake","plated","soup","snack"].map(x=>`<option value="${x}" ${x===d.meal_form?"selected":""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label for="ds_weight">Contundencia</label><select id="ds_weight"><option value="">—</option>${["light","medium","heavy"].map(x=>`<option value="${x}" ${x===d.meal_weight?"selected":""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label for="ds_form">Formato</label><select id="ds_form"><option value="">—</option>${["bowl","sandwich","shake","plated","soup","snack"].map(x=>`<option value="${x}" ${x===d.meal_form?"selected":""}>${x}</option>`).join("")}</select></div>
       </div>`:""}
     </details>`:"";
   const linesHtml=d.lines.map((l,idx)=>`<div class="row" style="margin-bottom:6px">
@@ -11774,10 +11783,10 @@ function dishModal(){
     <button class="btn btn-sm" onclick="dishLineDel(${idx})">✕</button>
   </div>`).join("");
   modal(`<h3>${d.id?"Editar":"Nuevo"} plato</h3>
-    <div class="field"><label>Nombre</label><input id="ds_name" value="${esc(d.name)}"></div>
+    <div class="field"><label for="ds_name">Nombre</label><input id="ds_name" value="${esc(d.name)}"></div>
     <div class="row">
-      <div class="field" style="flex:1"><label>Slot</label><select id="ds_slot" onchange="window._dish.slot=this.value">${slots.map(s=>`<option ${s===d.slot?"selected":""}>${s}</option>`).join("")}</select></div>
-      <div class="field" style="flex:1"><label>Menú</label><select id="ds_menu" onchange="window._dish.menu=this.value"><option value="">—</option>${["A","B","C","D"].map(x=>`<option ${x===d.menu?"selected":""}>${x}</option>`).join("")}</select></div>
+      <div class="field" style="flex:1"><label for="ds_slot">Slot</label><select id="ds_slot" onchange="window._dish.slot=this.value">${slots.map(s=>`<option ${s===d.slot?"selected":""}>${s}</option>`).join("")}</select></div>
+      <div class="field" style="flex:1"><label for="ds_menu">Menú</label><select id="ds_menu" onchange="window._dish.menu=this.value"><option value="">—</option>${["A","B","C","D"].map(x=>`<option ${x===d.menu?"selected":""}>${x}</option>`).join("")}</select></div>
     </div>
     ${semanticHtml}
     <div class="section-h" style="margin-left:0">Ingredientes (g)</div>
