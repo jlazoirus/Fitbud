@@ -460,4 +460,11 @@ export async function gotoApp(page) {
     () => !document.querySelector("#app .splash") && document.querySelector("#app")?.childElementCount > 0,
     { timeout: 15_000 },
   );
+  // onAuth() sigue cargando tras quitar el splash y al terminar fija view="hoy";
+  // si el test navega antes, esa vista le pisa la navegación. Con sesión,
+  // esperar a que onAuth() termine (profile cargado y _authBusy liberado).
+  await page.waitForFunction(
+    () => typeof session === "undefined" || !session || (typeof profile !== "undefined" && profile && !_authBusy),
+    { timeout: 15_000 },
+  );
 }

@@ -58,6 +58,10 @@ execution.steps[1].sets[0].done=true;
 execution.steps[1].status="done";
 assert.deepEqual(player.progress(execution),{completed:2,skipped:0,total:5,remaining:3});
 assert.deepEqual(player.strengthTotals(execution),{completedSets:1,totalSets:12});
+// REQ-185: las series extra solo cuentan si se hicieron.
+execution.steps[1].sets.push({done:false},{done:true});
+assert.deepEqual(player.strengthTotals(execution),{completedSets:2,totalSets:13});
+execution.steps[1].sets.splice(4,2);
 
 const restored=player.normalizeExecution(JSON.parse(JSON.stringify(execution)),strength,started+180000);
 assert.equal(restored.steps[1].sets[0].done,true);

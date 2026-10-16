@@ -364,6 +364,26 @@
   .opt{width:100%;text-align:left;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:13px;margin-bottom:8px;font-size:14px;line-height:1.3;transition:.15s}
   .opt:active{transform:scale(.99);border-color:var(--accent)}
   .opt .o-meta{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)}
+  .qp{margin-bottom:12px}
+  .qp-tabs{display:flex;gap:6px;margin-bottom:8px}
+  .qp-tab{flex:1;padding:8px 6px;border-radius:999px;border:1px solid var(--border-2);background:var(--surf2);font-size:13px;font-weight:500}
+  .qp-tab.on{background:var(--accent);border-color:var(--accent);color:#0b0b0b}
+  .qp-search,.qp-grams{background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);font-size:15px;font-family:inherit}
+  .qp-search{width:100%;margin-bottom:8px;padding:10px 11px}
+  .qp-list{max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:6px}
+  .qp-item{display:flex;align-items:center;gap:8px;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:8px 10px}
+  .qp-main{flex:1;min-width:0;text-align:left;font-size:14px;line-height:1.3}
+  .qp-pick{background:none;padding:2px 0;border-radius:0}
+  .qp-main b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qp-main .o-meta{font-size:12px;color:var(--muted);margin-top:2px;font-family:var(--font-mono)}
+  .qp-star{width:36px;height:36px;flex:0 0 36px;border-radius:999px;font-size:18px;color:var(--muted)}
+  .qp-star.on{color:var(--accent)}
+  .qp-grams{width:64px;flex:0 0 64px;padding:6px 8px}
+  .qp-portion-row{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-top:8px}
+  .qp-portion-row .muted{margin-right:4px}
+  .qp-portion.on{background:var(--accent);border-color:var(--accent);color:#0b0b0b}
+  .qp-save-fav{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px}
+  .qp-save-fav input{accent-color:var(--accent);width:17px;height:17px}
   .closebar{display:flex;justify-content:flex-end;margin-bottom:4px}
   .closebar button{background:var(--surf3);width:36px;height:36px;border-radius:999px;font-size:16px;color:var(--muted)}
   .ai-box{background:var(--accent-dim);border:1px solid var(--border-acc);border-radius:var(--r-md);padding:12px;font-size:14px;margin-top:10px;white-space:pre-wrap;line-height:1.5}
@@ -952,6 +972,28 @@ function normalizedBlockedDishes(value){
   });
   return out.slice(0,200);
 }
+// REQ-188: comidas favoritas del usuario (privadas, en profile.prefs).
+const SAVED_MEALS_MAX=50;
+function mealMacrosEntry(v){
+  const name=String(v&&v.name||"").trim().slice(0,160);
+  const num=x=>Math.max(0,Math.min(5000,Math.round(Number(x)||0)));
+  return name?{name,kcal:num(v.kcal),p:num(v.p),c:num(v.c),f:num(v.f)}:null;
+}
+function normalizedSavedMeals(list){
+  const out=[],seen=new Set();
+  (Array.isArray(list)?list:[]).forEach(item=>{
+    const entry=mealMacrosEntry(item),key=entry&&catalogSlug(entry.name);
+    if(entry&&key&&!seen.has(key)&&out.length<SAVED_MEALS_MAX){seen.add(key);out.push(entry);}
+  });
+  return out;
+}
+// REQ-187: descanso cronometrado entre ejercicios de fuerza (2:00 por defecto).
+const BETWEEN_EXERCISE_REST_OPTIONS=[60,90,120,150,180,240,300];
+const DEFAULT_BETWEEN_EXERCISE_REST=120;
+function normalizedBetweenExerciseRest(value){
+  const n=Number(value);
+  return BETWEEN_EXERCISE_REST_OPTIONS.includes(n)?n:DEFAULT_BETWEEN_EXERCISE_REST;
+}
 function migrateProfilePrefs(source){
   const p={...(source&&typeof source==="object"?source:{})};
   let primary=SPORT_LABELS[p.primarySport]?p.primarySport:"";
@@ -987,6 +1029,8 @@ function migrateProfilePrefs(source){
     trainingDays,
     trainingLocations,
     sessionMinutes:Math.min(180,Math.max(20,Number.parseInt(p.sessionMinutes,10)||60)),
+    betweenExerciseRestSeconds:normalizedBetweenExerciseRest(p.betweenExerciseRestSeconds),
+    ...(p.savedMeals!=null?{savedMeals:normalizedSavedMeals(p.savedMeals)}:{}),
     equipment:normalizedList(p.equipment,Object.keys(EQUIPMENT_LABELS)),
     trainingExperience:trainingExperienceNorm,
     workoutSplit:workoutSplitNorm,
@@ -1032,6 +1076,7 @@ function trainingPrefsFromPrefs(source){
     dayIds:[...(p.trainingDays||[])],
     locations:{...(p.trainingLocations||{})},
     sessionMinutes:p.sessionMinutes,
+    betweenExerciseRestSeconds:p.betweenExerciseRestSeconds,
     equipment:[...(p.equipment||[])],
     experience:p.trainingExperience,
     workoutSplit:p.workoutSplit,
@@ -4626,12 +4671,13 @@ function pauseResumeWorkoutExecution(ds){
   }else return;
   persistWorkoutExecution(ds,execution,true);
 }
-function startWorkoutTimer(ds,seconds,kind){
+function startWorkoutTimer(ds,seconds,kind,transition){
   const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
   const step=currentWorkoutStep(execution);
   const total=Math.max(1,Math.round(Number(seconds)||0));
   execution.timer={
     kind:kind||"step",
+    transition:!!transition,
     stepId:step&&step.id||null,
     totalSeconds:total,
     remainingSeconds:total,
@@ -4677,18 +4723,62 @@ function skipWorkoutTimer(ds){
   if(execution.timer.kind==="step")return finishTimedWorkoutStep(ds,true);
   execution.timer=null;persistWorkoutExecution(ds,execution,true);toast("Descanso omitido");
 }
-function completeWorkoutStep(ds){
+// REQ-185: series prescritas sin marcar (las extra sin hacer no cuentan).
+function pendingPrescribedSets(execution,onlyStepIndex){
+  const out=[];
+  execution.steps.forEach((step,stepIndex)=>{
+    if(step.type!=="strength"||step.status==="skipped")return;
+    if(onlyStepIndex!=null&&stepIndex!==onlyStepIndex)return;
+    const exercise=exerciseBySlug(step.exerciseSlug,true);
+    step.sets.slice(0,step.prescribedSets).forEach((set,setIndex)=>{
+      if(!set.done)out.push({stepIndex,setIndex,label:`${exercise?exercise.name:step.label} · Serie ${setIndex+1}`});
+    });
+  });
+  return out;
+}
+function markWorkoutSetDone(step,set){
+  set.done=true;
+  if(set.reps==null)set.reps=step.defaultReps;
+  if(set.rpe==null)set.rpe=step.targetRpe;
+  set.completedAt=new Date().toISOString();
+}
+function seriesCount(n){return `${n} ${n===1?"serie":"series"}`;}
+// mode: "fill" marca las series prescritas pendientes con la dosis objetivo;
+// "advance" avanza sin registrarlas; sin mode pregunta si quedan pendientes.
+function completeWorkoutStep(ds,mode){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step)return;
   if(step.type==="strength"){
+    const pending=pendingPrescribedSets(execution,execution.steps.indexOf(step));
+    if(pending.length&&mode==="fill")pending.forEach(item=>markWorkoutSetDone(step,step.sets[item.setIndex]));
+    else if(pending.length&&mode!=="advance"){openPendingSetsPrompt(ds,step,pending);return;}
     const completed=step.sets.filter(set=>set.done).length;
     if(!completed){toast("Registra al menos una serie antes de avanzar");return;}
   }
-  step.status="done";step.completedAt=new Date().toISOString();execution.timer=null;
+  step.status="done";step.completedAt=new Date().toISOString();
   const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
+  // REQ-187: entre dos ejercicios de fuerza corre el descanso entre ejercicios;
+  // si ya arrancó con la última serie, se conserva (no se reinicia).
+  const toStrength=step.type==="strength"&&next>=0&&execution.steps[next].type==="strength";
+  if(!toStrength)execution.timer=null;
+  else if(!(execution.timer&&execution.timer.transition))execution.timer=betweenExerciseTimer();
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
   if(next<0)toast("Todos los bloques están registrados. Finaliza la sesión.");
+}
+function betweenExerciseRestSeconds(){return normalizedBetweenExerciseRest(trainingPrefs().betweenExerciseRestSeconds);}
+function betweenExerciseTimer(){
+  const total=betweenExerciseRestSeconds();
+  return {kind:"rest",transition:true,stepId:null,totalSeconds:total,remainingSeconds:total,running:true,
+    endsAt:new Date(Date.now()+total*1000).toISOString()};
+}
+function openPendingSetsPrompt(ds,step,pending){
+  const anyDone=step.sets.some(set=>set.done);
+  modal(`<h3>Te ${pending.length===1?"queda":"quedan"} ${seriesCount(pending.length)} sin marcar</h3>
+    <p class="muted small">Si ya ${pending.length===1?"la hiciste, márcala":"las hiciste, márcalas"} para que la sesión cuente como completada. Se registran con las repeticiones y el esfuerzo objetivo; puedes corregirlos después.</p>
+    <button class="btn btn-accent" style="width:100%" onclick="closeModal();completeWorkoutStep('${ds}','fill')">Marcar ${pending.length===1?"la serie":`las ${pending.length}`} como ${pending.length===1?"hecha":"hechas"} y seguir</button>
+    ${anyDone?`<button class="btn" style="width:100%;margin-top:8px" onclick="closeModal();completeWorkoutStep('${ds}','advance')">Seguir sin registrar${pending.length===1?"la":"las"}</button>`:""}
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Volver al ejercicio</button>`);
 }
 function skipWorkoutStep(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
@@ -4707,14 +4797,16 @@ function saveWorkoutSetField(ds,stepIndex,setIndex,field,value){
 function toggleWorkoutSet(ds,stepIndex,setIndex){
   const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
   const step=execution.steps[stepIndex],set=step&&step.sets&&step.sets[setIndex];if(!set)return;
-  set.done=!set.done;
-  if(set.done){
-    if(set.reps==null)set.reps=step.defaultReps;
-    if(set.rpe==null)set.rpe=step.targetRpe;
-    set.completedAt=new Date().toISOString();
-  }else set.completedAt=null;
+  if(set.done){set.done=false;set.completedAt=null;}
+  else markWorkoutSetDone(step,set);
   persistWorkoutExecution(ds,execution,true);
-  if(set.done&&setIndex<step.sets.length-1)startWorkoutTimer(ds,step.restSeconds,"rest");
+  if(!set.done)return;
+  if(step.sets.some(item=>!item.done))startWorkoutTimer(ds,step.restSeconds,"rest");
+  else{
+    // REQ-187: última serie hecha y sigue otro ejercicio de fuerza → descanso entre ejercicios.
+    const next=nextWorkoutStepIndex(execution,stepIndex+1);
+    if(next>=0&&next!==stepIndex&&execution.steps[next].type==="strength")startWorkoutTimer(ds,betweenExerciseRestSeconds(),"rest",true);
+  }
 }
 function setWorkoutVariation(ds,variation){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
@@ -4760,12 +4852,9 @@ function applyExerciseSubstitution(ds,slug){
   persistWorkoutExecution(ds,execution,false);closeModal();render();toast("Ejercicio sustituido");
 }
 function workoutFullyCompleted(execution){
-  return execution.steps.every(step=>{
-    if(step.status!=="done")return false;
-    return step.type!=="strength"||step.sets.every(set=>set.done);
-  });
+  return execution.steps.every(step=>step.status==="done")&&!pendingPrescribedSets(execution).length;
 }
-function openFinishWorkout(ds,partial){
+function openFinishWorkout(ds,partial,keep){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const complete=workoutFullyCompleted(execution);
   if(execution.status==="in_progress"){
@@ -4777,7 +4866,13 @@ function openFinishWorkout(ds,partial){
     }
     persistWorkoutExecution(ds,execution,true);
   }
+  // REQ-185: decir qué falta para cerrarla completada y permitir marcarlo aquí.
+  const pending=!partial&&execution.steps.every(step=>step.status==="done")?pendingPrescribedSets(execution):[];
+  const pendingHtml=pending.length?`<div class="alert violet finish-pending"><b>${pending.length===1?"Falta":"Faltan"} ${seriesCount(pending.length)} por marcar</b>, por eso se guardaría como parcial:
+      <ul>${pending.map(item=>`<li>${esc(item.label)}</li>`).join("")}</ul>
+      <button class="btn btn-accent btn-sm" onclick="fillPendingWorkoutSets('${ds}')">${pending.length===1?"Marcarla como hecha":"Marcarlas como hechas"}</button></div>`:"";
   modal(`<h3>${partial||!complete?"Cerrar sesión parcial":"Finalizar sesión"}</h3>
+    ${pendingHtml}
     <p class="muted small">Antes de guardar, registra cómo se sintió la sesión. El historial conservará lo realmente ejecutado.</p>
     <div class="field"><label>¿Sentiste dolor o malestar anormal?</label><select id="finishPain">
       <option value="">Selecciona</option><option value="none">No</option>
@@ -4788,8 +4883,18 @@ function openFinishWorkout(ds,partial){
       <option value="">Selecciona</option><option value="easy">Más fácil de lo esperado</option>
       <option value="expected">Adecuada</option><option value="hard">Más difícil de lo esperado</option>
     </select></div>
-    <div class="field"><label>Notas opcionales</label><textarea id="finishNotes" rows="3" placeholder="Carga, técnica, energía o cualquier contexto útil">${esc(execution.notes||"")}</textarea></div>
+    <div class="field"><label>Notas opcionales</label><textarea id="finishNotes" rows="3" placeholder="Carga, técnica, energía o cualquier contexto útil">${esc(keep?keep.notes:(execution.notes||""))}</textarea></div>
     <button class="btn btn-accent" style="width:100%" onclick="finishWorkoutExecution('${ds}',${partial||!complete})">Guardar resultado</button>`);
+  if(keep){$("#finishPain").value=keep.pain||"";$("#finishDifficulty").value=keep.difficulty||"";}
+}
+function fillPendingWorkoutSets(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const keep={pain:$("#finishPain").value,difficulty:$("#finishDifficulty").value,notes:$("#finishNotes").value};
+  pendingPrescribedSets(execution).forEach(item=>{
+    const step=execution.steps[item.stepIndex];markWorkoutSetDone(step,step.sets[item.setIndex]);
+  });
+  persistWorkoutExecution(ds,execution,true);
+  openFinishWorkout(ds,false,keep);
 }
 function finishWorkoutExecution(ds,partialRequested){
   const pain=$("#finishPain").value,difficulty=$("#finishDifficulty").value;
@@ -4808,8 +4913,16 @@ function finishWorkoutExecution(ds,partialRequested){
   persistWorkoutExecution(ds,execution,false);closeModal();render();
   toast(execution.status==="completed"?"Sesión completada":"Sesión guardada como parcial");
 }
-function resumePartialWorkout(ds){
+// REQ-185: una sesión guardada parcial solo por series sin marcar se reabre
+// en el ejercicio que las tiene, para marcarlas y cerrarla completada.
+function reviewPendingWorkoutSets(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
+  const pending=pendingPrescribedSets(execution);if(!pending.length)return;
+  pending.forEach(item=>{execution.steps[item.stepIndex].status="pending";});
+  resumePartialWorkout(ds,execution);
+}
+function resumePartialWorkout(ds,reviewed){
+  const execution=reviewed||normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
   execution.status="in_progress";execution.completedAt=null;execution.resumedAt=new Date().toISOString();
   execution.pain="";execution.difficulty="";
   const next=nextWorkoutStepIndex(execution,0);
@@ -4821,13 +4934,22 @@ function discardWorkoutExecution(ds){
   const st=dayState(ds);delete st.workoutExecution;st.workoutDone=false;commitDay(ds);render();toast("Sesión descartada");
 }
 let workoutTimerCompleting=false;
+// No re-renderizar por debajo de un modal ni mientras se escribe en un campo
+// (perdería el foco); el siguiente tick lo reintenta.
+function workoutRerenderSafe(){
+  const active=document.activeElement;
+  return !$("#overlay")&&!(active&&/^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
+}
 function workoutTimerTick(){
-  if(view!=="entreno"||!session)return;
+  if(view!=="entreno")return;
   const execution=normalizedWorkoutExecution(current);
   const clock=document.querySelector(".player-clock");
   if(clock&&execution)clock.textContent=formatWorkoutTime(WORKOUT_PLAYER.elapsedSeconds(execution,Date.now()));
   const timer=document.querySelector(".workout-timer-value");
-  if(!timer||!execution||!execution.timer)return;
+  if(!timer)return;
+  // REQ-186: la pantalla muestra un descanso que el estado ya no tiene: re-renderizar
+  // en vez de dejar un contador congelado con botones que no responden.
+  if(!execution||!execution.timer){if(workoutRerenderSafe())render();return;}
   const remaining=WORKOUT_PLAYER.timerRemaining(execution.timer,Date.now());
   timer.textContent=formatWorkoutTime(remaining);
   if(remaining>0||!execution.timer.running||workoutTimerCompleting)return;
@@ -4844,7 +4966,7 @@ function renderWorkoutTimer(ds,execution,step){
   if(!timer)return `<button class="btn btn-accent" style="width:100%;min-height:48px" onclick="startCurrentWorkoutStep('${ds}')">Iniciar bloque</button>`;
   const remaining=WORKOUT_PLAYER.timerRemaining(timer,Date.now());
   return `<div class="player-timer">
-    <div class="muted small">${timer.kind==="rest"?"Descanso":"Tiempo del bloque"}</div>
+    <div class="muted small">${timer.kind==="rest"?(timer.transition?"Descanso entre ejercicios":"Descanso"):"Tiempo del bloque"}</div>
     <div class="workout-timer-value">${formatWorkoutTime(remaining)}</div>
     <div class="row wrap" style="justify-content:center">
       <button class="btn btn-sm" onclick="toggleWorkoutTimer('${ds}')">${timer.running?"Pausar":"Reanudar"}</button>
@@ -4943,6 +5065,7 @@ function renderWorkoutExecution(ds,execution){
   const percentage=progress.total?Math.round((progress.completed+progress.skipped)/progress.total*100):0;
   if(execution.status==="completed"||execution.status==="partial"){
     const sets=WORKOUT_PLAYER.strengthTotals(execution);
+    const pendingSets=pendingPrescribedSets(execution);
     const painLabels={none:"Sin dolor anormal",discomfort:"Molestia que alteró la técnica",sharp_pain:"Dolor agudo",dizziness:"Mareo o falta de aire inusual"};
     const difficultyLabels={easy:"Más fácil de lo esperado",expected:"Dificultad adecuada",hard:"Más difícil de lo esperado"};
     return `<div class="dash">
@@ -4957,6 +5080,7 @@ function renderWorkoutExecution(ds,execution){
       <div class="muted small">${esc(painLabels[execution.pain]||"Cierre sin respuesta")} · ${esc(difficultyLabels[execution.difficulty]||"Dificultad sin respuesta")}</div>
       ${execution.notes?`<div class="exercise-copy"><b>Notas:</b> ${esc(execution.notes)}</div>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&progress.remaining?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="resumePartialWorkout('${ds}')">Continuar sesión</button>`:""}
+      ${execution.status==="partial"&&!execution.needsReview&&!progress.remaining&&ds===todayStr()&&pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="reviewPendingWorkoutSets('${ds}')">Marcar ${seriesCount(pendingSets.length)} sin registrar</button>`:""}
     </div>`;
   }
   return `<div class="dash">
@@ -5006,6 +5130,7 @@ function workoutPlanSummaryHtml(prescription){
   }).join("");
   const sets=steps.filter(step=>step.type==="strength").reduce((sum,step)=>sum+(+step.prescribedSets||0),0);
   return `<div class="plan-summary"><div class="muted small">Qué vas a hacer hoy · ${n} ejercicios · ${sets} series${prescription.durationLabel?` · ${esc(prescription.durationLabel)}`:prescription.estimatedMinutes?` · ~${prescription.estimatedMinutes} min`:""}</div><ol class="plan-list">${rows}</ol>
+    ${n>1?`<div class="muted small plan-between-rest">Entre ejercicios: ${formatRestShort(betweenExerciseRestSeconds())} de descanso</div>`:""}
     <button class="link-btn small" onclick="explainWorkoutEffort()">¿Qué es RPE?</button></div>`;
 }
 function renderWorkout(){
@@ -6229,6 +6354,9 @@ function renderProfile(){
         <div class="field-note">Solo aplica cuando tu nivel es Avanzado.</div>
       </div>
       <div class="field"><label for="pf_minutes">Minutos por sesión</label><input id="pf_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${p.sessionMinutes}"></div>
+      <div class="field"><label for="pf_between_rest">Descanso entre ejercicios</label><select id="pf_between_rest">
+        ${BETWEEN_EXERCISE_REST_OPTIONS.map(s=>`<option value="${s}" ${p.betweenExerciseRestSeconds===s?"selected":""}>${formatRestShort(s)}${s===DEFAULT_BETWEEN_EXERCISE_REST?" (por defecto)":""}</option>`).join("")}
+      </select><div class="field-note">Arranca al marcar la última serie de un ejercicio.</div></div>
       <div class="field"><label for="pf_time">Horario preferido</label><select id="pf_time">
         ${Object.entries(TRAINING_TIME_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.preferredTrainingTime,v)}>${l}</option>`).join("")}
       </select></div>
@@ -6416,6 +6544,7 @@ async function saveProfile(){
   const prefs={...previous,
     profileSchemaVersion:PROFILE_SCHEMA_VERSION,
     name:$("#pf_name").value.trim(),
+    betweenExerciseRestSeconds:normalizedBetweenExerciseRest($("#pf_between_rest")&&$("#pf_between_rest").value),
     diet,
     mealCount:draft.mealCount,mealTimes:draft.mealTimes,
     eatingWindowStart:draft.eatingWindowStart,eatingWindowEnd:draft.eatingWindowEnd,mainMealIndex:draft.mainMealIndex,
@@ -7877,10 +8006,132 @@ function openEditor(kind,ds,id){
   editorSheet(title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
+/* REQ-188: reutilizar comidas ya registradas o favoritas y sumar alimentos sueltos por gramos. */
+function recentCustomMeals(limit){
+  const out=[],seen=new Set();
+  const push=v=>{
+    const entry=mealMacrosEntry(v),key=entry&&catalogSlug(entry.name);
+    if(entry&&key&&entry.kcal>0&&!seen.has(key)){seen.add(key);out.push(entry);}
+  };
+  Object.keys(S.days||{}).sort().reverse().forEach(ds=>{
+    const d=S.days[ds]||{};
+    // Lo que el usuario escribió (no los platos que propuso el plan).
+    Object.values(d.meals||{}).forEach(ms=>{const o=ms&&ms.ovr;if(o&&!o.dishName&&!o.gen)push(o);});
+    (d.extras||[]).slice().reverse().forEach(push);
+  });
+  return out.slice(0,limit||20);
+}
+function savedMeals(){return normalizedSavedMeals(profile&&profile.prefs&&profile.prefs.savedMeals);}
+function isSavedMeal(name){const key=catalogSlug(name);return savedMeals().some(m=>catalogSlug(m.name)===key);}
+async function persistSavedMeals(list){
+  const prefs={...((profile&&profile.prefs)||{}),savedMeals:normalizedSavedMeals(list)};
+  const result=await saveProfilePrefs(prefs,{skipPlanVersion:true});
+  if(result&&result.error){toast("No se pudo guardar en favoritas");return false;}
+  return true;
+}
+async function toggleSavedMeal(entry){
+  const e=mealMacrosEntry(entry);if(!e)return;
+  const key=catalogSlug(e.name),list=savedMeals();
+  const exists=list.some(m=>catalogSlug(m.name)===key);
+  if(!exists&&list.length>=SAVED_MEALS_MAX){toast(`Puedes guardar hasta ${SAVED_MEALS_MAX} favoritas`);return;}
+  const ok=await persistSavedMeals(exists?list.filter(m=>catalogSlug(m.name)!==key):[e].concat(list));
+  if(ok)toast(exists?"Quitada de favoritas":"Guardada en favoritas");
+}
+function quickPickTab(tab){
+  const qp=window._qp;if(!qp)return;
+  qp.tab=tab;qp.query="";
+  const search=$("#qpSearch");if(search)search.value="";
+  if(tab==="food"){qp.base=null;renderPortionChips();}
+  renderQuickPicks();
+}
+function quickPickSearch(value){const qp=window._qp;if(!qp)return;qp.query=value;renderQuickPicks();}
+function renderQuickPicks(){
+  const qp=window._qp,box=$("#qpList");if(!qp||!box)return;
+  document.querySelectorAll(".qp-tab").forEach(b=>{const on=b.dataset.tab===qp.tab;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on?"true":"false");});
+  const search=$("#qpSearch");
+  if(search)search.placeholder=qp.tab==="food"?"Busca un alimento: avena, pollo…":"Buscar";
+  const q=catalogSlug(qp.query||"");
+  if(qp.tab==="food"){
+    const foods=DB.loaded?(DB.ingredients||[]):[];
+    if(!foods.length){box.innerHTML='<div class="muted small">El catálogo de alimentos no está disponible ahora.</div>';return;}
+    if(!q){box.innerHTML='<div class="muted small">Escribe para buscar y elige los gramos.</div>';return;}
+    qp.items=foods.filter(i=>catalogSlug(i.name).includes(q)).slice(0,8);
+    box.innerHTML=qp.items.length?qp.items.map((ing,i)=>`<div class="qp-item qp-food">
+        <div class="qp-main"><b>${esc(ing.name)}</b><div class="o-meta">${Math.round(+ing.kcal||0)} kcal · P ${Math.round(+ing.protein_g||0)} · C ${Math.round(+ing.carbs_g||0)} · G ${Math.round(+ing.fat_g||0)} por 100 g</div></div>
+        <input class="qp-grams" id="qpGrams${i}" type="number" inputmode="decimal" min="1" max="2000" value="100" aria-label="Gramos de ${esc(ing.name)}"><span class="muted small">g</span>
+        <button class="btn btn-sm" onclick="addFoodToEditor(${i})">Añadir</button>
+      </div>`).join(""):'<div class="muted small">No encontramos ese alimento en el catálogo.</div>';
+    return;
+  }
+  const source=qp.tab==="fav"?savedMeals():recentCustomMeals(20);
+  qp.items=source.filter(m=>!q||catalogSlug(m.name).includes(q));
+  const empty=qp.tab==="fav"?"Aún no tienes favoritas. Toca ☆ en una comida o marca «Guardar en favoritas» al guardar.":"Aquí aparecerán las comidas que registres.";
+  box.innerHTML=qp.items.length?qp.items.map((m,i)=>{
+    const fav=isSavedMeal(m.name);
+    return `<div class="qp-item">
+      <button class="qp-main qp-pick" onclick="applyQuickPick(${i})"><b>${esc(m.name)}</b><div class="o-meta">${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f}</div></button>
+      <button class="qp-star ${fav?"on":""}" onclick="toggleQuickPickFavorite(${i})" aria-pressed="${fav?"true":"false"}" aria-label="${fav?"Quitar de favoritas":"Guardar en favoritas"}: ${esc(m.name)}">${fav?"★":"☆"}</button>
+    </div>`;
+  }).join(""):`<div class="muted small">${q?"Nada coincide con tu búsqueda.":empty}</div>`;
+}
+async function toggleQuickPickFavorite(i){
+  const qp=window._qp,item=qp&&qp.items&&qp.items[i];if(!item)return;
+  await toggleSavedMeal(item);renderQuickPicks();
+}
+function setEditorValues(v){
+  $("#f_name").value=v.name;
+  [["kcal","f_kcal"],["p","f_p"],["c","f_c"],["f","f_f"]].forEach(([k,id])=>{$("#"+id).value=Math.round(v[k]||0);});
+}
+function applyQuickPick(i){
+  const qp=window._qp,item=qp&&qp.items&&qp.items[i];if(!item)return;
+  qp.base=mealMacrosEntry(item);qp.portion=1;
+  setEditorValues(qp.base);renderPortionChips();
+}
+function renderPortionChips(){
+  const qp=window._qp,box=$("#qpPortion");if(!qp||!box)return;
+  if(!qp.base){box.innerHTML="";return;}
+  box.innerHTML=`<span class="muted small">Porción</span>${[0.5,1,1.5,2].map(f=>`<button class="pill qp-portion ${qp.portion===f?"on":""}" aria-pressed="${qp.portion===f?"true":"false"}" onclick="setQuickPickPortion(${f})">×${String(f).replace(".",",")}</button>`).join("")}`;
+}
+function setQuickPickPortion(factor){
+  const qp=window._qp;if(!qp||!qp.base)return;
+  qp.portion=factor;
+  const b=qp.base;
+  setEditorValues({name:b.name,kcal:b.kcal*factor,p:b.p*factor,c:b.c*factor,f:b.f*factor});
+  renderPortionChips();
+}
+function addFoodToEditor(i){
+  const qp=window._qp,ing=qp&&qp.items&&qp.items[i];if(!ing)return;
+  const grams=Math.round(Number($("#qpGrams"+i).value)||0);
+  if(grams<=0||grams>2000){toast("Indica los gramos (1–2000)");return;}
+  const k=grams/100,cur=readEditor();
+  const part=`${ing.name} ${grams} g`;
+  // Sumar: varios alimentos sueltos forman una comida.
+  setEditorValues({
+    name:cur.name?`${cur.name} + ${part}`:part,
+    kcal:cur.kcal+(+ing.kcal||0)*k,p:cur.p+(+ing.protein_g||0)*k,c:cur.c+(+ing.carbs_g||0)*k,f:cur.f+(+ing.fat_g||0)*k,
+  });
+  qp.base=null;renderPortionChips();
+  toast(`${part} añadido`);
+}
+function quickPicksHtml(){
+  const hasRecent=recentCustomMeals(1).length,hasFav=savedMeals().length;
+  window._qp={tab:hasRecent?"recent":hasFav?"fav":"food",query:"",items:[],base:null,portion:1};
+  return `<div class="qp">
+    <div class="qp-tabs" role="group" aria-label="Elegir una comida">
+      <button class="qp-tab" data-tab="recent" onclick="quickPickTab('recent')">Recientes</button>
+      <button class="qp-tab" data-tab="fav" onclick="quickPickTab('fav')">Favoritas</button>
+      <button class="qp-tab" data-tab="food" onclick="quickPickTab('food')">Alimento</button>
+    </div>
+    <input id="qpSearch" class="qp-search" type="search" autocomplete="off" oninput="quickPickSearch(this.value)">
+    <div id="qpList" class="qp-list"></div>
+    <div id="qpPortion" class="qp-portion-row"></div>
+  </div>`;
+}
 function editorSheet(title,pre){
   const aiOn=aiAvailable();
   window._photoEstimate=null;
   modal(`<h3>${title}</h3>
+    ${quickPicksHtml()}
     <div class="field"><label>Descripción</label>
       <div class="row"><textarea id="f_name" rows="2" placeholder="Ej. 2 panes con palta y café">${esc(pre.name||"")}</textarea>
       <button class="mic" id="micBtn" onclick="toggleMic()" title="${aiOn?'Dictar':'El dictado no está disponible ahora'}">🎤</button></div>
@@ -7898,12 +8149,16 @@ function editorSheet(title,pre){
     <input id="f_photo" type="file" accept="image/*" capture="environment" hidden onchange="onMealPhotoSelected(this)">
     <img id="f_photo_preview" class="meal-photo-preview" alt="Foto de la comida" hidden>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
     <div id="aiOut"></div>
+    <label class="qp-save-fav"><input type="checkbox" id="f_fav" ${pre.name&&isSavedMeal(pre.name)?"checked disabled":""}> Guardar en favoritas</label>
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
+  renderQuickPicks();
 }
 function readEditor(){return{name:$("#f_name").value.trim(),kcal:+$("#f_kcal").value||0,p:+$("#f_p").value||0,c:+$("#f_c").value||0,f:+$("#f_f").value||0};}
 function saveEditor(){
   const e=window._editor;const v=readEditor();
   if(!v.name){toast("Pon una descripción");return;}
+  const fav=$("#f_fav");
+  if(fav&&fav.checked&&!fav.disabled&&!isSavedMeal(v.name))toggleSavedMeal(v);
   if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f};}
   else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null)d.extras[e.extraIdx]=Object.assign(d.extras[e.extraIdx],v);else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");
@@ -10473,7 +10728,10 @@ async function pushDay(ds){
       const{plan_version_id:_,...compat}=payload;
       await supa.from("day_log").upsert(compat,{onConflict:"user_id,log_date"});
     }else if(result.error)throw result.error;
-    S.days[ds]=state;save();
+    // REQ-186: no reemplazar S.days[ds] con la copia enviada: si el día cambió
+    // mientras viajaba (p. ej. serie hecha → descanso), esa copia es vieja y
+    // borraría el cambio más nuevo. commitDay() ya normalizó el estado local.
+    if(planVersionId&&S.days[ds]&&!S.days[ds].planVersionId){S.days[ds].planVersionId=planVersionId;save();}
     _rememberRemoteVersion("day_log",ds,payload.updated_at,payload);
     _dequeueMutation("day_log",ds);
   }catch(e){enqueueMutation("day_log",ds,payload);}
@@ -10483,8 +10741,10 @@ async function pushDay(ds){
 async function pullDay(ds){
   if(!supa||!ds||!uid())return false;
   if(_hasPendingDay(ds))return true; // estado local autoridad mientras pendiente
+  const seq=_dayCommitSeq[ds]||0;
   try{
     let r=await supa.from("day_log").select("state,plan_version_id,updated_at").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
+    if((_dayCommitSeq[ds]||0)!==seq)return true; // cambió mientras leíamos: manda lo local
     if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("state,updated_at").eq("user_id",uid()).eq("log_date",ds).maybeSingle();
     if(!r.error&&r.data&&r.data.state&&typeof r.data.state==="object"){
       const state={...r.data.state};
@@ -10503,12 +10763,14 @@ async function pullDay(ds){
 // para preservar los cambios offline hechos en este dispositivo.
 async function pullAllDays(){
   if(!supa||!uid())return;
+  const seqs={..._dayCommitSeq};
   try{
     let r=await supa.from("day_log").select("log_date,state,plan_version_id,updated_at").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
     if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("log_date,state,updated_at").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
     if(!r.error&&Array.isArray(r.data)){
       r.data.forEach(row=>{
         if(_hasPendingDay(row.log_date))return; // preservar cambios offline pendientes
+        if((_dayCommitSeq[row.log_date]||0)!==(seqs[row.log_date]||0))return; // REQ-186
         if(row.state&&typeof row.state==="object"){
           const state={...row.state};
           prepareDayStateForSync(state);
@@ -10523,8 +10785,12 @@ async function pullAllDays(){
     }
   }catch(e){}
 }
+// REQ-186: cuenta los cambios locales por día; una lectura remota que empezó
+// antes de un cambio no debe pisarlo al llegar.
+const _dayCommitSeq={};
 // Guarda local + sube a la DB (usar tras cualquier cambio del día).
 function commitDay(ds){
+  _dayCommitSeq[ds]=(_dayCommitSeq[ds]||0)+1;
   const st=dayState(ds);
   prepareDayStateForSync(st);
   const planVersionId=st.planVersionId||resolvePlanVersionIdForDate(ds);
@@ -12182,8 +12448,12 @@ function freezeInProgressWorkouts(){
     }
   });
 }
-document.addEventListener("visibilitychange",()=>{if(document.hidden)freezeInProgressWorkouts();});
+document.addEventListener("visibilitychange",()=>{if(document.hidden)freezeInProgressWorkouts();else resyncWorkoutView();});
 window.addEventListener("pagehide",freezeInProgressWorkouts);
+// REQ-186: al volver a primer plano (iOS puede suspender los intervalos de la
+// PWA), recalcular ya el reproductor en vez de esperar al próximo tick.
+function resyncWorkoutView(){if(view==="entreno"&&session&&workoutRerenderSafe()){render();workoutTimerTick();}}
+window.addEventListener("pageshow",e=>{if(e.persisted)resyncWorkoutView();});
 render();                      // splash mientras resolvemos la sesión
 boot();                        // carga config (Vercel) → conecta Supabase → resuelve sesión
 // Inicializar badge de sincronización (vive fuera de #app para sobrevivir render()).

@@ -60,6 +60,13 @@ Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-0
 
 - REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
 
+Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que hoy le impide cerrar bien su entreno primero, luego lo que lo hace más cómodo, luego nutrición:
+
+- REQ-185 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
+- REQ-186 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; implementado)
+- REQ-187 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable). (P1; implementado)
+- REQ-188 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1; implementado)
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -1059,136 +1066,26 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-160`).
 ## REQ-161 - Fix Home: marcar comidas "Sin asignar" (0 kcal) como hechas infla el contador y la racha
 
 **Estado: implementado.**
+
 `mealHasContent(v)` (`index.html`) centraliza el criterio de "contenido real" (nombre o algún macro), igual que ya exigía `homeDayHasPreparedMeals`. `toggleMeal()` ignora el intento de marcar como hecha una comida sin contenido (toast explicativo); el botón `.chk` en `mealCard()` sale `disabled` en ese caso. `dayTotals()` y `nutritionDayDone()` solo cuentan como cumplida la comida `done` que además tenga contenido real, como defensa adicional si `done:true` llegara por otra vía. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/home.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix); ajustado el fixture de `tests/e2e/racha.spec.js` (REQ-146) para que sus días "cumplidos" simulen comidas con contenido real, ya que antes se apoyaba en el comportamiento que este REQ corrige.
 
-### Origen
-
-Journey `home` (Hoy), logueado con la suite E2E (REQ-96): día sin preparar → marcar los slots vacíos en Nutrición → volver a Home.
-
-### Problema
-
-En un día sin preparar cada slot se muestra "Sin asignar — … 0 kcal" pero con su check activo. Al tocar los tres checks (clics reales), Home se contradice en la misma pantalla: el anillo dice "0/2200 kcal · 3/3 comidas" y el header "🔥 1", mientras la agenda dice "Aún falta preparar este día". `nutritionDayDone`/`combinedDayDone` dan `true` con 0 kcal, así que la racha (métrica de retención) y los hitos se acreditan por días sin nutrición real.
-
-### Causa raíz
-
-`mealCard` (`index.html:4993`) pinta el botón `.chk` sin `disabled` aunque la comida esté vacía (`v.name` vacío, `v.kcal===0`) y `toggleMeal` (`index.html:5054`) alterna `ms.done` sin mirar contenido. Aguas abajo `dayTotals` (`index.html:2251`) la suma a `doneMeals`/`totMeals` y `nutritionDayDone` (`index.html:9346`) usa `done>=ceil(meals/2)` sobre el estado, no el contenido, así que `streak()`/`combinedDayDone` (`index.html:9416,9488`) suben. En cambio `homeDayHasPreparedMeals` (`index.html:3916`) sí exige contenido: por eso la agenda queda en "setup" y contradice al anillo.
-
-### Objetivo
-
-Una comida sin contenido no debe contar como cumplida (ni en "N/N comidas" ni en `nutritionDayDone`/racha/hitos), y Home no debe afirmar a la vez "N/N comidas + racha" y "aún falta preparar este día".
-
-### Alcance
-
-1. Impedir registrar una comida vacía: deshabilitar el check en `mealCard` cuando `mealValue` no tiene nombre ni macros, o que `toggleMeal` la ignore.
-2. Que `dayTotals` y `nutritionDayDone` cuenten como cumplida solo la comida con contenido real.
-
-### Fuera de alcance
-
-- Divergencia `streak()` vs `streakStats().combCur` del día en curso (REQ-146); empty states (REQ-57); umbrales de hito.
-
-### Riesgos
-
-- No romper el registro de comidas ya preparadas, de extras (que sí tienen contenido) ni de días pasados ya marcados.
-
-### Criterios de aceptación
-
-- Con día sin preparar, marcar slots vacíos no acredita "N/N comidas" ni racha, y agenda y anillo coinciden.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Repetir el flujo del Origen: tras marcar los slots vacíos, Home no debe mostrar "3/3 comidas" ni "🔥 1", y la agenda no debe contradecir al anillo.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-161`).
 
 ## REQ-162 - Fix Nutrición: la tarjeta y la suma del día muestran la receta base del catálogo, no los macros materializados del plan
 
 **Estado: implementado.**
+
 `mealValue()` y `mealRecipe()` (`index.html`) ahora priorizan `base.src==="nutritionPlan"` (con `base.kcal>0`/`base.ingredientes`) sobre la resolución por `dishName` en el catálogo, siempre que no haya un override que cambie de plato (`!o||o.dishName==null`) — si el usuario reemplazó la comida (REQ-154), esa ruta sigue ganando. Sin snapshot materializado, la resolución por catálogo sigue funcionando igual que antes (compatibilidad). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-nutritionplan-priority.mjs` (4 casos: snapshot gana al catálogo en macros e ingredientes, un reemplazo explícito sigue ganando al snapshot, y sin snapshot la compatibilidad con catálogo no se rompe; confirmado que el caso principal falla exactamente como describe el REQ —165 vs 495 kcal— contra el código sin el fix).
 
-### Origen
-
-Auditoría del journey Nutrición. Tras "Preparar mi día" → "Aplicar al día", cada comida del snapshot `nutritionPlan` (REQ-82) se rinde con `mealValue()`/`mealRecipe()`. El planner escala las porciones al objetivo, pero la tarjeta muestra la receta base.
-
-### Problema
-
-Reproducción (catálogo cargado, `DB.loaded`): el plan materializa el Almuerzo en 495 kcal / P93 (300 g de pollo) y el usuario aprueba ese total en la revisión. En Nutrición la tarjeta muestra 165 kcal / P31 (100 g, receta base) y `dayTotals()` suma 165, no 495: anillo, "Consumo de hoy", % de meta y racha de adherencia cuentan la porción sin escalar (con platos mayores al objetivo, sobrecuenta). Afecta a todo plan cuyo `dishName` exista en el catálogo con macros distintos a los guardados. Además, editar la receta del catálogo luego muta días ya ejecutados que leen del snapshot (rompe historial inmutable).
-
-### Causa raíz
-
-`mealValue()` resuelve el plato por nombre ANTES que el snapshot: `if(dn&&DB.loaded){const d=dishByName(dn);…return dishMacros(d.id)}` (`index.html:2237`) devuelve la receta base y deja inalcanzable la rama materializada `if(base.src==="nutritionPlan"&&base.kcal>0)` (`index.html:2239`). Invierte el orden que fija REQ-82 (`nutritionPlan` primero, catálogo solo como compatibilidad). `mealRecipe()` (`index.html:4957-4962`) hace lo mismo con los gramos base en vez de `base.ingredientes`.
-
-### Objetivo
-
-Que una comida del plan muestre y sume los macros y gramos que el plan materializó, aunque el catálogo esté cargado.
-
-### Alcance
-
-1. En `mealValue()`, priorizar la rama `base.src==="nutritionPlan"` (con `base.kcal>0`) sobre la resolución por `dishName` en catálogo.
-2. Igual en `mealRecipe()`: usar `base.ingredientes` del snapshot antes que la receta base de `DB.dishIng`.
-
-### Fuera de alcance
-
-- Overrides (`ms.ovr`) de "Cambiar comida" (REQ-154) y ediciones manuales, que ya tienen su ruta.
-- El motor de escalado y el planner: el número materializado es correcto; falla la lectura.
-
-### Riesgos
-
-- Comidas de plan sin `base.kcal>0` deben seguir cayendo al catálogo como compatibilidad.
-- No romper la resolución por nombre para comidas sin snapshot.
-
-### Criterios de aceptación
-
-- Tras aplicar el plan, tarjeta, receta desplegada y `dayTotals()` muestran los macros/gramos materializados del snapshot (± redondeo), no la receta base.
-- Editar el catálogo no cambia días pasados renderizados desde snapshot.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Repro de runtime (0 pagadas): con `DB.loaded` y un plato cuya receta base ≠ macros del snapshot, `mealValue({src:"nutritionPlan",dishName,kcal:495},{})` debe devolver 495 (`src:"nutritionPlan"`), no `{kcal:165,src:"db"}`.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-162`).
 
 ## REQ-163 - Fix Entreno: una sesión abandonada en curso cuenta como entreno "hecho" e infla la racha
 
 **Estado: implementado.**
+
 `trainingDayResult()` (`index.html`) ya no cuenta "done" por `workoutHasRecordedActivity()` (cualquier bloque omitido o serie marcada, sin exigir cierre); ahora exige un resultado TERMINAL vía `workoutOutcomeForState(st)` (`completed`/`partial`) o el legado `st.workoutDone`. `workoutHasRecordedActivity()` no se tocó (otros usos, p. ej. protección de días en REQ-126, siguen queriendo detectar cualquier actividad). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/entreno.spec.js` (inicia sesión, omite un bloque y abandona sin finalizar; confirmado que el test falla exactamente como describe el REQ —"done" en vez de "missed"— contra el código sin el fix).
 
-### Origen
-
-Auditoría del journey Entreno. Al iniciar el reproductor y omitir un bloque (o marcar una sola serie) sin finalizar la sesión, el día ya cuenta como entreno cumplido para la racha, aunque el propio "Resumen" del día muestre "En curso".
-
-### Problema
-
-Reproducción funcional (Playwright + fixtures REQ-96, 0 llamadas pagadas): día de entreno de fuerza. Antes de tocar nada `trainingDayResult(hoy)="missed"` y `streakStats().trainCur=0`. El usuario pulsa "Iniciar sesión guiada", pulsa "Omitir bloque" una vez y abandona (nunca "Finalizar" ni "Terminar parcialmente"). Después: la sesión sigue `in_progress` (`workoutOutcomeForDay="in_progress"`, la tarjeta muestra "En curso · 0/6 bloques"), pero `trainingDayResult="done"` y `trainCur` sube a 1. Como `combinedDayDone` exige `trainingDayResult==="done"||"rest"`, en un día con la nutrición cumplida esa sesión abandonada completa la racha combinada y Home enciende 🔥 (y `checkAndSaveMilestones` puede otorgar hitos). La app se autocontradice: el día está "En curso"/pendiente pero la racha ya lo acreditó. Contradice REQ-23 (racha combinada = "entrenamiento hecho o descanso planificado"). Basta un bloque omitido o una serie marcada por día para sostener una racha sin entrenar de verdad.
-
-### Causa raíz
-
-`trainingDayResult(ds)` decide "done" con `workoutHasRecordedActivity(st)||!!st.workoutDone` (`index.html:9411`). `workoutHasRecordedActivity` (`index.html:4471-4477`) devuelve `true` ante cualquier `step.status==="done"||"skipped"` o cualquier `set.done`, **sin exigir un estado terminal** (`completed`/`partial`). Así una ejecución `in_progress`/`paused` con un solo bloque omitido ya se cuenta como día hecho en `streakStats()` (`:9431`), `combinedDayDone` (`:9419`) y `streak()` (`:9488`). El "Resumen" del día usa `workoutOutcomeForState` (`:5038`), que sí muestra "En curso" → divergencia visible.
-
-### Objetivo
-
-Que un día de entreno solo cuente como "hecho" para la racha cuando la sesión llegó a un cierre real (completa o parcial guardada), no por una sesión en curso o abandonada con bloques omitidos.
-
-### Alcance
-
-1. En `trainingDayResult()`, contar "done" solo si el resultado del día es terminal: `workoutOutcomeForState(st)` es `completed` o `partial` (o el legado `st.workoutDone`), no por mera actividad registrada de una sesión `in_progress`/`paused`.
-
-### Fuera de alcance
-
-- La divergencia `streak()` vs `streakStats().combCur` del día en curso (REQ-146) y las comidas vacías/nutrición (REQ-161): son otros caminos.
-- Cambiar qué cuenta como "parcial" en el cierre (`finishWorkoutExecution`), ni la duración (REQ-155).
-
-### Riesgos
-
-- No romper el caso legítimo: una sesión finalizada como "parcial" debe seguir contando; un descanso planificado sigue siendo "rest".
-- `workoutHasRecordedActivity` se usa además en otros lugares (p. ej. protección de días en REQ-126); acotar el cambio a `trainingDayResult` para no alterar esa protección.
-
-### Criterios de aceptación
-
-- Una sesión `in_progress`/`paused` (aunque tenga bloques omitidos o series sueltas) da `trainingDayResult="missed"` y no incrementa `trainCur` ni la racha combinada.
-- Una sesión finalizada (`completed`/`partial`) sí cuenta como día de entreno.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E: iniciar sesión, "Omitir bloque", no finalizar; comprobar `trainingDayResult(hoy)==="missed"` y `streakStats().trainCur` sin cambio, mientras la tarjeta sigue mostrando "En curso".
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-163`).
 
 ## REQ-164 - Fix Progreso: la variación de peso on-target se pinta como advertencia en metas de volumen/mantenimiento
 
@@ -1237,97 +1134,18 @@ El color del delta refleja si el cambio va en la dirección del objetivo del usu
 ## REQ-165 - Fix check-in semanal: las escalas sin responder se leen como el peor valor y disparan ajustes falsos
 
 **Estado: implementado.**
+
 `analyzeCheckinAnswers()` (`index.html`) neutraliza `answers.energy`/`answers.sleep` con `||3` (punto medio) en la rama de hambre/energía, igual que ya hacían nutrición/dificultad/recuperación — antes, `null<=2` evaluaba `true` y una escala nunca respondida se leía como "energía/sueño bajos", disparando mensajes y ajustes de calorías sobre datos inexistentes (incluso con `keep:true`). `hunger` no se tocó (su comparación `>=4` ya era segura ante `null`). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-checkin-goal-mapping.mjs` (3 casos nuevos: check-in vacío → sin razón fantasma; hambre alta + energía/sueño sin responder = mismo ajuste que con energía/sueño altos; energía/sueño realmente bajos siguen generando el aviso; confirmado que fallan exactamente como describe el REQ contra el código sin el fix).
 
-### Origen
-
-Auditoría del journey retención → check-in semanal (REQ-20). Las 7 escalas 1–5 son opcionales; al enviar sin marcarlas, el motor de ajuste devuelve mensajes negativos y cambia calorías sobre respuestas que el usuario nunca dio.
-
-### Problema
-
-`readCiScale` devuelve `null` para una escala sin marcar, y en las comparaciones `null<=2` es `true` (0≤2) mientras `null>=4` es `false`. Repro determinista (meta déficit, 2000 kcal): (A) enviar el check-in sin marcar nada → propuesta `keep:true` ("Tu plan está bien calibrado") pero con razón "Energía y sueño bajos: prioriza el descanso…", contradicción visible en la misma tarjeta sobre campos jamás respondidos. (B) marcar solo hambre=5 y dejar energía y sueño en blanco → `+100 kcal/día` con "Hambre alta y energía baja: añadir calorías". Control (C) idéntico pero energía=5, sueño=5 → solo `+50 kcal`. Mismo hambre: el delta extra sale enteramente de tratar energía sin responder como baja, subiendo el objetivo calórico contra una meta de déficit por un dato inexistente.
-
-### Causa raíz
-
-`analyzeCheckinAnswers` (`index.html:11201`,`:11204`,`:11207`) compara `answers.energy`/`answers.sleep` crudos (null→0 en `<=`), mientras las ramas de fatiga/adherencia sí neutralizan con `||3` (`:11212`,`:11218`,`:11221`). `readCiScale` produce el `null` (`index.html:11166`). Manejo de "sin responder" inconsistente entre ramas.
-
-### Objetivo
-
-Una escala sin responder no debe contar como valor extremo ni generar mensajes/ajustes: se trata como neutral o se ignora esa rama.
-
-### Alcance
-
-1. En `analyzeCheckinAnswers`, normalizar las escalas ausentes (p. ej. `||3` o guarda de `!=null`) en las ramas de energía y sueño, igual que hambre/dificultad/recuperación/adherencia.
-2. Que una razón negativa no coexista con `keep:true`.
-
-### Fuera de alcance
-
-- El mapeo de metas volumen/mantenimiento (REQ-160) y el coloreo de deltas (REQ-164): misma función/journey, otra causa.
-- Hacer obligatorias las escalas del formulario.
-
-### Riesgos
-
-- Cambia el ajuste de usuarios en curso; conservar `CHECKIN_MAX_KCAL_ADJUST`/`CHECKIN_MIN_KCAL` y las demás ramas.
-
-### Criterios de aceptación
-
-- Enviar el check-in con energía/sueño sin marcar no produce "Energía y sueño bajos" ni suma calorías por esa vía; caso B iguala al control C.
-- Ninguna propuesta con `keep:true` muestra una razón de déficit/molestia.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Arnés determinista (0 llamadas): `analyzeCheckinAnswers` con escalas en `null` vs marcadas altas; assertar mismos `calorieAdjust`/`details` salvo por lo realmente respondido.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-165`).
 
 ## REQ-166 - La pasada global de cierre optimiza el contrato, no `scoreMacros()`
 
 **Estado: implementado.**
+
 `scoreDayAgainstContract()` (`js/nutrition-domain.js`) reemplaza a `scoreMacros()` como objetivo del hill-climbing de `globalClosePass()`: mide cada métrica en múltiplos de su propia tolerancia de `DIET_CONTRACT` y la eleva al cuadrado, así que las 4 pesan igual en unidades de contrato. No cambia qué plato se elige en ningún slot — `scoreMacros()` sigue siendo el score por comida de `solveDishPortion()`/`optimizeLines()`. Canario `validate-diet-contract.mjs`: 122/378 (32.3%) → 289/378 (76.5%), 34 dimensiones mejoran, **0 regresionan**, dimensiones al 100% de 5/54 a 38/54. Validador: `scripts/validate-global-close-objective.mjs`.
 
-### Origen
-
-Decisión de producto de Jonathan (2026-08-30) registrada en REQ-147, tras medir que el "techo de catálogo" de REQ-143 no era del catálogo.
-
-### Problema
-
-`globalClosePass()` (REQ-137) cierra el día repartiendo gramos entre las líneas escalables por hill-climbing, pero puntuaba con `scoreMacros()`, que pondera kcal ×1.4 y proteína hasta ×1.45 y deja carbohidratos y grasa en ×0.55. `DIET_CONTRACT` valida con tolerancias duras y simétricas (±3%/50 kcal, ±5 g proteína, ±8 g carbohidratos, ±8 g grasa). El cierre optimizaba una métrica que no era la que después lo evaluaba, y compraba precisión en kcal/proteína pagando con carbohidratos.
-
-### Causa raíz
-
-Objetivo desalineado, no falta de catálogo. Evidencia previa que quedaba sin explicación y ahora encaja: el 100% de los fallos de `carbs_contract` eran por exceso (`{n:133, pos:133, neg:0}`, sonda del 2026-07-08), nunca por déficit — el sesgo exacto que produce un peso ×0.55 en carbohidratos frente a ×1.4 en kcal.
-
-### Objetivo
-
-Que el cierre del día optimice la misma definición de "día correcto" que el contrato usa para juzgarlo, sin tocar la selección de platos.
-
-### Alcance
-
-1. `scoreDayAgainstContract(macros,target)` en `js/nutrition-domain.js`: suma de `(desvío / tolerancia_de_contrato)²` sobre kcal/proteína/carbohidratos/grasa, reutilizando `dietContractTolerance()`.
-2. `globalClosePass()` puntúa con esa función en sus dos usos (score inicial y evaluación de cada paso).
-3. `scoreMacros()` no se modifica ni cambia de rol: sigue eligiendo plato y resolviendo porción por comida.
-4. Validador estructural y numérico `scripts/validate-global-close-objective.mjs` en el release gate.
-
-### Fuera de alcance
-
-- Selección de platos (`planDeterministicNutritionDay()`), pre-rankeo de candidatos y variedad semanal: sin cambios.
-- Reinicios múltiples del hill-climbing: medidos (+0 días sobre el objetivo continuo) y descartados por no aportar.
-- Catálogo (REQ-143), activación de contrato en runtime (REQ-139, ya activo como aviso suave), prompts y modelo.
-
-### Riesgos
-
-- **Continuidad del objetivo.** Un objetivo escalonado (plano dentro de tolerancia, salto al salir) deja al hill-climbing sin gradiente y lo clava en el punto de partida: medido 205/378 contra 289/378 del continuo. El validador cubre esta propiedad con asserts de monotonía estricta.
-- Cambian los gramajes mostrados al usuario. Verificado en un día de muestra: mismos platos, límites de receta respetados, gramaje máximo incluso menor (335 g contra 360 g) y totales más cerca de la meta.
-
-### Criterios de aceptación
-
-- El canario sube sin regresionar ninguna dimensión sana. ✓ (34 mejoran, 0 empeoran, +167 días)
-- La selección de plato por slot no cambia. ✓ (`scoreMacros()` intacto en `optimizeLines()`, verificado por el validador)
-- `node scripts/release-gate.mjs` pasa. ✓
-
-### Verificación
-
-- `node scripts/validate-global-close-objective.mjs`, `node scripts/validate-diet-contract.mjs`, `node scripts/release-gate.mjs`.
-- Diff por dimensión baseline contra implementación, con la matriz completa de 54 dimensiones.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-166`).
 
 ## REQ-167 - Fix activación de cuenta: "Auth session missing!" crudo al crear la contraseña desde una invitación
 
@@ -1877,3 +1695,210 @@ Auditoría de la web pública (2026-10-16). Con `outputDirectory: "."` y sin bui
 - `curl -I https://evolvapp.club/NEGOCIO.md` (y `/REQUIREMENTS.md`, `/supabase/admin.sql`, `/scripts/release-gate.mjs`) devuelve 404 tras el deploy.
 - La landing, la app, `/beta-reclutamiento.html`, `/service-worker.js` y `/api/catalog` siguen respondiendo 200.
 - `node scripts/validate-deploy-allowlist.mjs` pasa y está en `release-gate.mjs`.
+
+## REQ-185 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla
+
+**Estado: implementado.**
+
+`pendingPrescribedSets()` y `markWorkoutSetDone()` (`index.html`) centralizan qué falta; "Siguiente ejercicio" abre `openPendingSetsPrompt()`; el cierre lista lo pendiente con "Marcarla(s) como hecha(s)" (`fillPendingWorkoutSets()`, conserva lo respondido); `reviewPendingWorkoutSets()` reabre una sesión parcial de hoy en el ejercicio pendiente; `strengthTotals()` (`workout-player.js`) cuenta las extra solo si se hicieron. `CACHE_NAME` → `fitbud-pwa-v80`. Además, `gotoApp()` (`tests/e2e/helpers.js`) espera a que termine `onAuth()`: su `view="hoy"` final pisaba la navegación y hacía fallar de forma intermitente los E2E de Entreno.
+
+### Origen
+
+Feedback de Claudia (beta, 2026-10-16, día Pull): "Cuando le voy a guardar la sesión, no sé por qué se me guarda parcialmente, pero no me deja terminar de cerrarla como completada". Captura del resultado: 7/7 bloques completados, 16/17 series registradas, 0 bloques omitidos → "Sesión parcial". En otra captura, la Serie 2 del último ejercicio (curl martillo, 2 series) sigue en "Marcar hecha".
+
+### Problema
+
+1. "Siguiente ejercicio" avanza con series prescritas sin marcar y sin avisar.
+2. Al finalizar, una sola serie sin marcar convierte la sesión en parcial (el modal se titula "Cerrar sesión parcial" sin decir por qué).
+3. Una vez guardada, no hay cómo corregirla: "Continuar sesión" no aparece porque no quedan bloques pendientes.
+
+### Causa raíz
+
+- `completeWorkoutStep()` (`index.html`, ~l. 4683) solo exige `completed>=1` serie.
+- `workoutFullyCompleted()` (~l. 4770) exige `step.sets.every(set=>set.done)`, incluidas las series extra añadidas y no hechas (REQ-168).
+- `renderWorkoutExecution()` (~l. 4993) muestra "Continuar sesión" solo si `progress.remaining>0`; `resumePartialWorkout()` salta al primer bloque `pending`, que no existe.
+
+### Objetivo
+
+Que quien hizo todo pueda cerrar la sesión como completada, y que la app diga qué falta cuando no.
+
+### Alcance
+
+1. "Siguiente ejercicio" con series prescritas sin marcar: hoja con "Marcar las N restantes como hechas" (usa reps/RPE objetivo como hace `toggleWorkoutSet`) o "Avanzar sin registrarlas".
+2. Modal de cierre: si faltan series, listar cuáles ("Curl martillo · Serie 2") con botón "Marcarlas como hechas" antes de guardar.
+3. Las series extra (`setIndex>=prescribedSets`) sin hacer no cuentan para `workoutFullyCompleted()` ni en "series registradas".
+4. En una sesión parcial sin `needsReview` con series pendientes, ofrecer "Revisar series" aunque `progress.remaining===0`, llevando al ejercicio con la serie pendiente.
+
+### Fuera de alcance
+
+- Cambiar la regla de seguridad: dolor o malestar sigue guardando parcial con `needsReview`.
+- Editar sesiones de días anteriores (historial inmutable).
+
+### Riesgos
+
+- La racha usa `completed`/`partial` como terminal (REQ-163); no debe cambiar qué días cuentan.
+
+### Criterios de aceptación
+
+- Escenario de Claudia (7/7 bloques, 1 serie prescrita sin marcar): desde el modal de cierre se marca y se guarda "Sesión completada". ✓
+- Una serie extra sin hacer no impide "completada". ✓
+- Una sesión ya guardada parcial con series pendientes se puede reabrir y cerrar completada el mismo día. ✓
+- `tests/e2e/entreno.spec.js` cubre los tres casos (fallan contra el código previo); `node scripts/release-gate.mjs` pasa. ✓
+
+### Verificación sugerida
+
+- Playwright con fixtures: iniciar, marcar todas menos una, "Siguiente ejercicio" hasta el final, finalizar → aparece la lista de series pendientes.
+
+## REQ-186 - Fix Entreno: el cronómetro de descanso se queda congelado
+
+**Estado: implementado.**
+
+Causa real (reproducida en `tests/e2e/entreno.spec.js`): `pushDay()` reemplazaba `S.days[ds]` con la copia enviada al recibir la respuesta. Marcar una serie dispara dos guardados (serie hecha → descanso); si el primero responde último, el estado vuelve a "sin descanso" mientras la pantalla sigue en "01:59 · Pausar" y el tick, Pausar y Omitir dejan de actuar. Fix: `pushDay()` ya no reemplaza el día; `pullDay()`/`pullAllDays()` descartan una lectura si el día cambió mientras viajaba (`_dayCommitSeq`); el tick re-renderiza si la pantalla muestra un descanso que el estado no tiene y ya no depende de `session`; al volver a primer plano (`visibilitychange`, `pageshow`) se re-sincroniza el reproductor. `CACHE_NAME` → `fitbud-pwa-v81`.
+
+### Origen
+
+Feedback de Claudia (2026-10-16): "el cronómetro de descanso hay veces que no sé por qué se queda pegado". Captura: "Descanso 01:00" con el botón "Pausar" visible (corriendo) tras marcar la Serie 1.
+
+### Problema
+
+A veces el descanso no baja de su valor inicial aunque figura en marcha. No se ha reproducido todavía.
+
+### Causa raíz
+
+Por confirmar. Fragilidades verificadas en el código:
+
+1. La cuenta atrás solo avanza con `setInterval(workoutTimerTick,1000)` (`index.html` ~l. 12163), y `workoutTimerTick()` (~l. 4824) sale sin hacer nada si `view!=="entreno"`, si `session` es `null` (p. ej. durante un refresco de token) o si `normalizedWorkoutExecution(current)` devuelve `null`.
+2. Al ocultar la app se congela el tiempo (`visibilitychange`/`pagehide`, ~l. 12185), pero al volver no se reconcilia ni se re-renderiza; en la PWA de iOS los intervalos pueden quedar suspendidos tras bloquear la pantalla.
+3. `pullDay()` (~l. 10483) reemplaza `S.days[ds]` entero con el estado remoto si no hay push pendiente; un `syncDay()` al volver puede pisar el temporizador local con uno más viejo.
+
+### Objetivo
+
+Que el descanso siempre muestre el tiempo real restante y termine solo, aunque la app se bloquee, pase a segundo plano o sincronice.
+
+### Alcance
+
+1. Reproducir primero (Playwright con reloj simulado + eventos de visibilidad + `pullDay` concurrente) y documentar la causa real en este REQ.
+2. Corregir la causa encontrada. Mínimo: el tick no depende de `session`; al volver a primer plano (`visibilitychange`, `pageshow`, `focus`) se recalcula y re-renderiza el temporizador; un descanso vencido en segundo plano se cierra al volver.
+3. Un `pullDay()` no pisa una ejecución `in_progress` local con un `updatedAt` remoto más viejo.
+
+### Fuera de alcance
+
+- Sonido, vibración o notificación al terminar el descanso (otro REQ).
+
+### Riesgos
+
+- Tocar `pullDay()` afecta la sincronización de todo el día: limitar el cambio a `workoutExecution` y cubrirlo con `scripts/test-sync-*`/`sync-conflicts.js`.
+
+### Criterios de aceptación
+
+- Test que reproduce el congelamiento antes del fix y pasa después. ✓
+- Simular el descanso + 30 s oculto con los intervalos suspendidos: al volver, el descanso está terminado. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+### Verificación sugerida
+
+- Prueba manual en iPhone (PWA instalada): marcar serie, bloquear 30 s, desbloquear → el contador sigue bajando con el tiempo real.
+
+## REQ-187 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable)
+
+**Estado: implementado.**
+
+Decisión de Jonathan (2026-10-16): 2:00 por defecto y configurable por usuario. `profile.prefs.betweenExerciseRestSeconds` (60–300 s, normalizado en `migrateProfilePrefs()`), editable en Perfil → Entreno. `toggleWorkoutSet()` arranca el descanso `{kind:"rest",transition:true}` al completar todas las series si sigue otro ejercicio de fuerza; `completeWorkoutStep()` lo conserva (o lo arranca si se avanzó por otra vía) y lo anula si sigue la vuelta a la calma. `CACHE_NAME` → `fitbud-pwa-v82`.
+
+### Origen
+
+Feedback de Claudia (2026-10-16): "Echo de menos que entre ejercicio y ejercicio aparezca un contador de dos minutos de descanso… solo hay entre serie".
+
+### Problema
+
+El descanso cronometrado solo aparece entre series del mismo ejercicio. Tras la última serie, y al pasar al siguiente ejercicio, no hay contador.
+
+### Causa raíz
+
+`toggleWorkoutSet()` (`index.html` ~l. 4717) arranca el descanso solo si `setIndex<step.sets.length-1`, y `completeWorkoutStep()` (~l. 4688) pone `execution.timer=null` al avanzar.
+
+### Objetivo
+
+Que al terminar un ejercicio de fuerza empiece un descanso cronometrado que acompaña al siguiente ejercicio.
+
+### Alcance
+
+1. Al marcar la última serie de un ejercicio de fuerza seguido de otro de fuerza, arrancar un descanso de transición (`kind:"rest"`) con la duración elegida por el usuario (2:00 por defecto).
+2. `completeWorkoutStep()` conserva un descanso en curso; el siguiente ejercicio lo muestra como "Descanso entre ejercicios" con Pausar/+15 s/Omitir.
+3. Marcar la primera serie del siguiente ejercicio cierra el descanso de transición y arranca el normal.
+4. Tras el último ejercicio de fuerza (sigue la vuelta a la calma) no se arranca descanso.
+5. Mostrar el descanso entre ejercicios en el resumen previo (REQ-174) y subir `CACHE_NAME`.
+
+### Fuera de alcance
+
+- Cambiar los descansos que prescribe el plan.
+
+### Riesgos
+
+- Depende de que el temporizador sea fiable: implementar después de REQ-186.
+- No alargar la "duración real": el descanso no altera `elapsedSeconds`.
+
+### Criterios de aceptación
+
+- Al marcar la última serie del ejercicio 1 aparece "Descanso entre ejercicios 02:00"; tras "Siguiente ejercicio" sigue visible y bajando en el ejercicio 2. ✓
+- "Omitir" lo quita; marcar una serie del ejercicio 2 lo reemplaza por el descanso entre series. ✓
+- Tras el último ejercicio de fuerza no aparece descanso entre ejercicios. ✓
+- Elegir 1:30 en Perfil se guarda en `prefs` y Entreno lo muestra. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+### Verificación sugerida
+
+- Playwright en `tests/e2e/entreno.spec.js` con reloj simulado; captura a 375px.
+
+## REQ-188 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos
+
+**Estado: implementado.**
+
+Decisión de Jonathan (2026-10-16): favoritas en el perfil, sin migración. `editorSheet()` (`index.html`) abre con pestañas Recientes (`recentCustomMeals()`: lo escrito por el usuario en `ms.ovr` sin `dishName`/`gen` y `extras`, últimas 20 distintas) · Favoritas (`profile.prefs.savedMeals`, `normalizedSavedMeals()`, máx. 50, guardado con `saveProfilePrefs(...,{skipPlanVersion:true})`; fuera de `planSnapshotFields()`, no crea versiones de plan) · Alimento (`DB.ingredients` por 100 g, búsqueda sin tildes, suma varios alimentos). Porción ×0,5/×1/×1,5/×2 y "Guardar en favoritas" al guardar. `CACHE_NAME` → `fitbud-pwa-v83`.
+
+### Origen
+
+Feedback de Claudia (2026-10-16): come muchas veces lo mismo y quiere no volver a meter esa comida, con "un histórico de cosas que he metido o que quiero guardar en favoritos"; seleccionar y que se pongan los macros. También alimentos sueltos, no solo platos enteros.
+
+### Problema
+
+Cada comida personalizada o extra se escribe desde cero (descripción + macros o estimación). No hay recientes, favoritos ni forma de sumar un alimento del catálogo por gramos.
+
+### Causa raíz
+
+`editorSheet()`/`saveEditor()` (`index.html` ~l. 7880–7910) guardan el valor solo en el día (`ms.ovr` o `dayState(ds).extras`); nada lo indexa para reutilizarlo. El catálogo `ingredients` (macros por 100 g, `supabase/schema.sql`) solo se usa dentro de recetas.
+
+### Objetivo
+
+Registrar una comida repetida en dos toques y un alimento suelto sin calcular macros a mano.
+
+### Alcance
+
+1. Fase A — recientes y favoritas (sin migración):
+   - "Recientes": últimas 20 comidas distintas (por nombre normalizado) de `ms.ovr` y `extras` en `S.days`, con buscador.
+   - Estrella "Guardar en favoritas" al guardar y en la lista; persistir en `profile.prefs.savedMeals` (máx. 50, `{name,kcal,p,c,f}`) vía `saveProfilePrefs()`.
+   - En `editorSheet()`, arriba: pestañas "Recientes · Favoritas"; tocar una precarga nombre y macros, con porción ×0.5/×1/×1.5/×2.
+2. Fase B — alimento suelto: pestaña "Alimento" que busca en `DB.ingredients`, pide gramos y calcula kcal/macros (`valor×g/100`); se guarda como extra o como override igual que hoy.
+3. Cada fase en su propio commit si el implementador lo prefiere (mismo REQ).
+
+### Fuera de alcance
+
+- Escáner de código de barras o bases externas de alimentos.
+- Que los favoritos cambien el plan generado.
+
+### Riesgos
+
+- Privacidad: favoritos y recientes son datos del usuario; nada a analytics.
+- `profile.prefs` crece: limitar a 50 y validar tipos.
+- REQ-31: la UI no menciona IA.
+
+### Criterios de aceptación
+
+- Una comida registrada ayer aparece en "Recientes" y al tocarla se guarda con sus macros sin escribir nada. ✓
+- Una favorita sobrevive a cerrar sesión e iniciar en otro dispositivo (vive en `profiles.prefs`). ✓
+- "Avena 60 g" calcula los macros desde el catálogo. ✓
+- `node scripts/release-gate.mjs` pasa. ✓ (`tests/e2e/comidas-guardadas.spec.js`)
+
+### Verificación sugerida
+
+- Playwright en `tests/e2e/nutricion*.spec.js` con fixtures (0 llamadas pagadas); captura a 375px del selector.
