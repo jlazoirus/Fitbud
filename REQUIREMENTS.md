@@ -983,68 +983,7 @@ Lo que queda es un hueco de catálogo **real y ahora sí medible**: las 7 dimens
 
 ## REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo del canario `DIET_CONTRACT`
 
-**Estado: implementado.**
-Cerrado con la decisión de producto tomada y registrada abajo (2026-08-30); el sub-alcance elegido se implementó en REQ-166.
-
-### Decisión de producto (2026-08-30, Jonathan)
-
-La premisa del REQ era incorrecta y la medición lo demostró: **nunca hubo un techo de catálogo**. El ~32-33% no venía de la selección de platos ni de falta de contenido, sino de que `globalClosePass()` cerraba el día haciendo hill-climbing sobre `scoreMacros()` (kcal ×1.4, proteína ×1.45/0.45, carbohidratos ×0.55, grasa ×0.55) mientras `DIET_CONTRACT` exige tolerancias duras y **simétricas**. El optimizador estaba entrenado para sacrificar carbohidratos a cambio de precisión en kcal/proteína — que es exactamente lo que el contrato reprueba, y explica el hallazgo sin explicación del 2026-07-08 (`carbs residual {n:133, pos:133, neg:0}`: 133 de 133 fallos por exceso, cero por déficit).
-
-Jonathan autorizó una **cuarta opción, distinta de las tres del "Objetivo"**: corregir la función objetivo de la pasada global de cierre, **sin tocar la selección de platos** — no cambia qué plato gana cada slot, solo cuántos gramos recibe el plato ya elegido. La restricción de REQ-143 ("no rediseñar la selección") queda intacta y no fue necesario reabrirla. Se implementa en REQ-166.
-
-Medición que respaldó la decisión (canario real de 378 días, variantes descartables sobre copia del dominio):
-
-| Variante | Canario | Dimensiones 7/7 | Regresiones |
-|---|---|---|---|
-| baseline (`main`) | 122/378 · 32.3% | 5/54 | — |
-| ampliar pre-rankeo 48→200 (idea (i) del REQ) | 122/378 · 32.3% | 5/54 | — |
-| objetivo de contrato escalonado | 205/378 · 54.2% | — | 4 dims (−5 d) |
-| escalonado + reinicios | 261/378 · 69.0% | 25/54 | 1 dim (−2 d) |
-| **objetivo continuo normalizado por tolerancia** | **289/378 · 76.5%** | **38/54** | **ninguna** |
-
-Dos conclusiones operativas para futuras corridas:
-
-1. **La idea (i) del alcance (ampliar el pre-rankeo de candidatos) vale exactamente cero.** Medida y descartada; no volver a intentarla.
-2. El canario etiquetaba el 100% de los fallos como `catalog_gap`. **Esa etiqueta era un diagnóstico incorrecto** y costó dos sesiones completas de lotes de catálogo. Un fallo de contrato no prueba falta de catálogo mientras el cierre no optimice el contrato.
-
-### Origen
-
-Dos sesiones autónomas independientes (2026-07-05 y 2026-07-08) intentaron subir el canario `DIET_CONTRACT` (`node scripts/validate-diet-contract.mjs`, hoy 122/378 = 32.3%) agregando solo contenido al catálogo, tal como exige el alcance de REQ-143. Ambas, con estrategias de contenido distintas, encontraron el mismo techo cerca de 32%-33%. El detalle completo del experimento de 2026-07-08 (incluida la sonda cuantitativa que confirma que el 100% de los fallos de `carbs_contract` son por exceso de carbohidratos, nunca por déficit, y el par de platos casi idénticos "Tempeh..."/"Seitán..." con efecto neto de signo opuesto) está documentado en la actualización 2026-07-08 de REQ-143.
-
-### Problema
-
-`planDeterministicNutritionDay()` elige, por slot, el plato con mejor `scoreMacros()` local entre como máximo 48 candidatos pre-rankeados por cercanía calórica (`js/nutrition-domain.js:663-690`), y `globalClosePass()` (línea ~1115) solo reescala gramos de las líneas ya elegidas — nunca cambia de plato. No hay búsqueda, ni siquiera acotada, sobre combinaciones de platos por día: es una selección local, ávida, de un solo paso por slot. Agregar contenido no puede compensar esa limitación de forma confiable: un plato nuevo puede ganar la selección local en un slot y, sin que el sistema lo sepa, empeorar el cierre global del día, aunque el plato en aislamiento sea nutricionalmente mejor que el que reemplaza.
-
-### Objetivo
-
-Que alguien con autoridad de producto decida, con la evidencia de REQ-143/REQ-144 en mano, entre estas opciones (u otra): (a) autorizar una mejora acotada de selección (no un rediseño completo) para intentar subir el canario más allá del ~32-33% que el catálogo por sí solo parece dar; (b) seguir subiendo el catálogo en lotes pequeños y medidos aceptando que el techo actual hace improbable alcanzar "sustancial"; (c) posponer indefinidamente el gate de REQ-139/REQ-128 y priorizar otro journey. Mientras no haya decisión, el agente autónomo no debe seguir gastando sesiones completas en lotes de catálogo para este fin específico.
-
-### Alcance (solo si se autoriza la opción (a))
-
-1. Ideas acotadas a evaluar, sin necesariamente implementar todas: (i) ampliar el pre-rankeo de 48 a más candidatos cuando el catálogo lo permita sin costo de performance relevante para el canario offline; (ii) en `globalClosePass()`, permitir explorar 2-3 alternativas de plato por slot (no solo reescalar gramos) cuando el cierre falla, manteniendo el resto del día fijo; (iii) cualquier alternativa que el responsable de producto prefiera.
-2. Medir cada alternativa con `scripts/diff-diet-contract.mjs` antes/después, igual que un lote de catálogo, con desglose por dimensión.
-3. Mantener el resto de contratos de dominio (REQ-78/80/83/84) sin cambio de comportamiento; `DIET_CONTRACT.runtimeActive` sigue en `false` — esto es tooling/canario, no activación (REQ-139 es quien activa el aviso suave, ya redefinido y sin depender de este REQ).
-
-### Fuera de alcance
-
-- Activar `DIET_CONTRACT` en runtime (REQ-139, ya redefinido y ejecutable de forma independiente).
-- Cambiar modelo/prompt del coach (REQ-133, cerrado).
-- Implementar cualquier alcance de la sección anterior sin la decisión explícita de Jonathan registrada en este REQ: este documento describe una tensión de producto (dos restricciones que él mismo fijó — "solo catálogo" en REQ-143 y "no tocar selección" — que juntas no alcanzan el objetivo que él mismo fijó para REQ-143), no una luz verde para implementar.
-
-### Riesgos
-
-- Tocar la selección es más invasivo que un lote de catálogo: puede afectar variedad semanal, tiempo de cómputo del canario (378 días) y comportamiento ya validado por REQ-80/83/84/137. Si se autoriza, requiere el mismo rigor de canario + regresión que REQ-137.
-- No decidir indefinidamente deja REQ-143 pausado y consume ciclos de auditoría/PM de agentes futuros releyendo el mismo análisis; por eso REQ-143 se saca de `agent-loop.json` hasta que este REQ tenga una decisión.
-
-### Criterios de aceptación
-
-- No aplica hasta que exista una decisión de producto registrada aquí (fecha + decisión de Jonathan + qué opción de "Objetivo" se eligió).
-- Si la decisión es "no tocar la selección", cerrar este REQ documentando la decisión y actualizar REQ-143 para reflejar el techo de ~32-33% como límite conocido y aceptado del catálogo bajo la selección actual (o cerrarlo también, según lo que decida Jonathan).
-- Si la decisión es "sí, acotado", definir aquí mismo el sub-alcance elegido antes de que un agente lo implemente.
-
-### Verificación sugerida
-
-- N/A hasta la decisión. Si se autoriza, usar el mismo canario (`validate-diet-contract.mjs`) y diff (`diff-diet-contract.mjs`) como antes/después, con el mismo estándar de "no bajar el agregado ni una dimensión sana" que REQ-143.
+**Estado: implementado.** Cerrado con decisión de producto (Jonathan, 2026-08-30): no había techo de catálogo; el ~32-33% del canario `DIET_CONTRACT` venía de que `globalClosePass()` optimizaba `scoreMacros()` (asimétrico) mientras el contrato exige tolerancias duras y simétricas (100% de los fallos de carbohidratos eran por exceso). Se autorizó una cuarta opción —corregir la función objetivo del cierre sin tocar la selección de platos (REQ-143 intacto)— implementada en REQ-166 (canario 32.3%→76.5%, 38/54 dimensiones, sin regresiones). Aprendizajes para futuras corridas: ampliar el pre-rankeo 48→200 no mueve el canario (medido y descartado, no reintentar); la etiqueta `catalog_gap` era un diagnóstico incorrecto y costó dos sesiones de lotes de catálogo. Detalle completo en git (commit de REQ-166) y en REQ-143.
 
 ## REQ-148 - Fix billing: un reembolso parcial de Stripe revoca todo el entitlement pagado
 
@@ -1850,3 +1789,46 @@ El admin ve la cortesía vigente y editarla no destruye valores no tocados.
 ### Verificación sugerida
 
 - Seed de override (bonus 50, expira 2026-12-01), abrir "Consumo", guardar; confirmar que el override no cambia.
+
+## REQ-182 - Fix PWA: el gate de bump de caché no cubre `assets/icon-180.png` (apple-touch-icon cache-first fuera de `APP_SHELL`)
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey `pwa` (rotación del auditor) sobre HEAD `1a93967`. Revisados `service-worker.js`, `scripts/validate-sw-cache-bump.mjs`, `index.html` (`<head>` PWA) y `manifest.webmanifest`. El rebrand REQ-180 regeneró los tres íconos (`icon-180/192/512`) el 2026-10-14.
+
+### Problema
+
+El service worker cachea cache-first **cualquier** recurso estático del mismo origen (`service-worker.js:49-60`), pero el gate que obliga a subir `CACHE_NAME` cuando cambia un recurso cache-first (REQ-173) solo vigila la lista `APP_SHELL`. `assets/icon-180.png` —el `apple-touch-icon` que `index.html:16` referencia en cada vista— es cache-first pero no está en `APP_SHELL` ni en la lista que vigila el validador. Si un deploy cambia solo ese ícono (p. ej. un retoque de marca posterior a REQ-180), `node scripts/validate-sw-cache-bump.mjs` reporta "sin cambios en el shell", el gate pasa sin exigir bump, y cada cliente que ya cacheó el ícono viejo lo sigue sirviendo indefinidamente (cacheFirst nunca revalida) hasta que un cambio no relacionado del `APP_SHELL` suba `CACHE_NAME`. En el rebrand REQ-180 el ícono se refrescó solo por casualidad —`index.html`/`service-worker.js` cambiaron en el mismo commit y forzaron el bump—; un cambio de ícono aislado se escaparía.
+
+### Causa raíz
+
+`APP_SHELL` (`service-worker.js:2-15`) incluye `icon-192`/`icon-512` pero omite `assets/icon-180.png`, aunque `index.html:16` lo carga como `apple-touch-icon`. El validador deriva su lista vigilada de `APP_SHELL` + `index.html` (`scripts/validate-sw-cache-bump.mjs:18-19`), así que un diff de `icon-180.png` nunca entra en su pathspec: es el único recurso estático de mismo origen que `index.html` referencia fuera del `APP_SHELL` (`config.js` es network-first y queda fuera a propósito).
+
+### Objetivo
+
+Que cambiar el ícono de la app obligue a subir `CACHE_NAME`, para que ningún cliente instalado quede con un `apple-touch-icon` obsoleto, y que el ícono quede disponible offline como el resto del shell.
+
+### Alcance
+
+1. Agregar `"./assets/icon-180.png"` a `APP_SHELL` en `service-worker.js` (lo precachea y, de paso, lo mete en la lista que el validador vigila).
+2. Subir `CACHE_NAME` por el cambio del shell.
+
+### Fuera de alcance
+
+- Rediseñar el ícono o la estrategia de caché; `config.js` (network-first) sigue fuera del `APP_SHELL` a propósito.
+- Separar `purpose: "any"` vs `maskable` en el manifest (discusión aparte).
+
+### Riesgos
+
+- Mínimos: una entrada más en el precache del SW. El propio `validate-sw-cache-bump.mjs` exigirá el bump de `CACHE_NAME` (ya incluido en el Alcance), así que no hay riesgo de olvidarlo.
+
+### Criterios de aceptación
+
+- `assets/icon-180.png` figura en `APP_SHELL`; un cambio aislado de ese ícono hace fallar `node scripts/validate-sw-cache-bump.mjs` mientras no se suba `CACHE_NAME`.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Reproducir el diff que corre el validador: `git diff --name-only <base> HEAD -- <lista APP_SHELL>`. Tras el fix el ícono aparece en el pathspec; antes no. Demostrado en la auditoría contra `06cd60f..9c2997b`: `icon-180.png` cambió en ese rango pero el pathspec del shell no lo veía (solo `icon-192`/`icon-512`).
