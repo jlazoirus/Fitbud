@@ -118,11 +118,11 @@ test.describe("Navegación", () => {
     await expect(page.locator(".splash")).toHaveCount(0);
 
     // La FAQ abierta sobrevive a la confirmación de "sin sesión"
-    const q = page.locator(".l-faq-q").first();
-    await q.click();
+    const item = page.locator(".l-faq-item").first();
+    await item.locator("summary").click();
     releaseConfig();
     await page.waitForFunction(() => typeof authReady !== "undefined" && authReady);
-    await expect(q).toHaveAttribute("aria-expanded", "true");
+    await expect(item).toHaveAttribute("open", "");
     expect(errors).toEqual([]);
   });
 

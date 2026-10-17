@@ -649,119 +649,180 @@
     .a2hs{animation:none}
   }
 
-  /* ── Landing pública (REQ-33) ─────────────────────────────────────────── */
-  .landing{width:100%;max-width:none;margin:0;padding:0 max(16px,var(--safe-right)) calc(40px + var(--safe-bottom)) max(16px,var(--safe-left));overflow-x:hidden}
-  .landing-nav,.l-hero,.l-section,.l-cta-final,.l-footer{width:100%;max-width:1120px;margin-left:auto;margin-right:auto}
-  .landing-nav{display:flex;justify-content:space-between;align-items:center;padding:max(18px,calc(12px + var(--safe-top))) 0 20px}
-  .landing-brand{font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:-.02em;color:var(--txt);display:inline-flex;align-items:center;gap:10px}
+  /* ── Portada pública: "Escalera de días" (REQ-197) ──────────────────────
+     Marca Escala (REQ-180): carbón + lima sólida, Unbounded + Manrope. La
+     firma es una escalera de 5 peldaños que sube a medida que se baja por la
+     página; sin brillos, sin degradados de acento y sin emoji. */
+  body:has(#app.landing-host){background-image:none}
+  .landing{--l-max:1180px;--l-pad:max(16px,var(--safe-left));width:100%;margin:0;padding:0 0 var(--safe-bottom);overflow-x:clip;background:var(--black);font-variant-numeric:tabular-nums}
+  .landing ::selection{background:var(--accent);color:var(--on-accent)}
+  .landing :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+  .landing .btn-accent{box-shadow:none}
+  .l-wrap{width:100%;max-width:var(--l-max);margin:0 auto;padding:0 var(--l-pad)}
   .brand-v{color:var(--accent)}
-  .brand-mark{display:block;flex-shrink:0}
-  .landing-nav-actions{display:flex;gap:8px;align-items:center}
+
+  /* Barra superior */
+  .landing-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:max(16px,calc(10px + var(--safe-top)));padding-bottom:12px}
+  .landing-brand{font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:-.02em;color:var(--txt);display:inline-flex;align-items:center;gap:10px}
+  .landing-nav-actions{display:flex;gap:6px;align-items:center}
+  .l-btn{min-height:44px;padding:0 18px;border-radius:999px;font-family:var(--font-body);font-size:14px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:background .15s,color .15s,transform .1s}
+  .l-btn:active{transform:scale(.98)}
+  .l-btn-lime{background:var(--accent);color:var(--on-accent);border:none}
+  .l-btn-lime:hover{background:var(--purple-300)}
+  .l-btn-ghost{background:transparent;color:var(--txt);border:1px solid var(--border-2)}
+  .l-btn-ghost:hover{border-color:var(--txt)}
+  .l-btn-text{background:none;border:none;color:var(--txt);padding:0 12px}
+  .l-btn-text:hover{color:var(--accent)}
+  .l-btn-ink{background:var(--black);color:var(--accent);border:none}
+  .l-btn-ink:hover{background:#262626}
+  .l-btn-lg{min-height:56px;padding:0 26px;font-size:16px}
 
   /* Hero */
-  .l-hero{padding:4px 0 30px;display:grid;gap:18px;text-align:left;min-width:0}
-  .l-hero-copy{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
-  .l-hero-eyebrow{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.14em;font-weight:700;margin-bottom:16px}
-  .l-hero h1{font-family:var(--font-display);font-size:clamp(30px,9vw,40px);font-weight:800;letter-spacing:-.02em;line-height:1.06;margin:0 0 14px;color:var(--txt)}
-  .l-hero-sub{font-size:15px;color:var(--muted);line-height:1.52;margin:0 0 22px;max-width:440px}
-  .l-hero-ctas{display:flex;flex-direction:column;gap:10px;width:100%;max-width:300px;margin:0}
-  .l-hero-ctas .btn{min-height:48px;font-size:15px;border-radius:14px;justify-content:center;display:flex;align-items:center}
-  .l-hero-note{font-size:11px;color:var(--muted);margin-top:12px;text-align:left}
+  .l-hero{padding-top:28px;padding-bottom:56px;display:grid;gap:32px}
+  .l-hero h1{font-family:var(--font-display);font-weight:800;font-size:clamp(44px,12.4vw,96px);line-height:.94;letter-spacing:-.035em;margin:0;text-wrap:balance}
+  .l-hero h1 .l-lime{color:var(--accent);display:block}
+  .l-hero-body{display:grid;gap:32px;align-items:start}
+  .l-hero-sub{font-size:17px;line-height:1.55;color:var(--muted);margin:0 0 24px;max-width:46ch}
+  .l-hero-sub b{color:var(--txt);font-weight:700}
+  .l-hero-ctas{display:flex;flex-wrap:wrap;gap:10px}
+  .l-hero-note{font-size:13px;color:var(--muted);margin-top:14px}
 
-  /* Mockup / demo placeholder */
-  .l-mockup{border:1px solid var(--border-acc);border-radius:var(--r-lg);background:linear-gradient(160deg,var(--surf2),var(--surf1));padding:14px;margin:0 auto;max-width:320px;width:100%;min-width:0;box-shadow:0 20px 60px rgba(214,255,58,.18)}
-  .l-mockup-day{font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700;margin-bottom:10px}
-  .l-mockup-row{display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surf1);border:1px solid var(--border);border-radius:12px;padding:9px 11px;margin-bottom:7px}
-  .l-mockup-row .lmr-name{font-size:13px;font-weight:600;font-family:var(--font-body)}
-  .l-mockup-row .lmr-mac{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
-  .l-mockup-row .lmr-chk{width:22px;height:22px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
-  .l-mockup-workout{background:linear-gradient(135deg,rgba(58,123,255,.18),var(--surf1));border:1px solid var(--terra-dim);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
-  .l-mockup-workout .lmw-name{font-size:13px;font-weight:700;font-family:var(--font-body)}
-  .l-mockup-workout .lmw-det{font-size:11px;color:var(--muted);margin-top:2px}
-  .l-mockup-ring{display:flex;align-items:center;gap:6px;margin-bottom:12px;background:var(--surf2);border-radius:12px;padding:9px 12px}
-  .l-mockup-ring .lmr-arc{width:36px;height:36px;flex-shrink:0}
-  .l-mockup-ring .lmr-txt{font-size:12px;font-weight:600;font-family:var(--font-display)}
-  .l-mockup-ring .lmr-sub{font-size:10px;color:var(--muted)}
+  /* Demo del día (contenido de ejemplo, marcado como tal) */
+  .l-demo{background:var(--surf1);border:1px solid var(--surf3);border-radius:var(--r-lg);padding:18px;max-width:460px;width:100%}
+  .l-demo-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .l-demo-day{font-weight:700;font-size:14px}
+  .l-tag{font-size:12px;font-weight:600;color:var(--muted);border:1px solid var(--border-2);border-radius:999px;padding:3px 10px}
+  .l-demo-kcal{display:flex;align-items:baseline;gap:8px;margin-bottom:8px}
+  .l-demo-kcal b{font-family:var(--font-display);font-size:30px;font-weight:800;letter-spacing:-.03em}
+  .l-demo-kcal span{color:var(--muted);font-size:14px}
+  .l-demo-bar{height:6px;background:var(--surf3);border-radius:99px;overflow:hidden;margin-bottom:16px}
+  .l-demo-bar i{display:block;height:100%;width:86%;background:var(--accent);border-radius:99px}
+  .l-demo-list{display:grid;gap:8px}
+  .l-demo-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--surf2);border-radius:var(--r-sm);padding:12px 14px;transition:opacity .25s cubic-bezier(.16,1,.3,1),transform .25s cubic-bezier(.16,1,.3,1)}
+  .l-demo-row.swap{opacity:0;transform:translateY(6px)}
+  .l-demo-slot{font-size:12px;font-weight:700;color:var(--terra-300);width:64px}
+  .l-demo-name{font-size:14px;font-weight:600;line-height:1.3}
+  .l-demo-meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .l-demo-chk{width:22px;height:22px;border-radius:50%;border:2px solid var(--surf4);display:flex;align-items:center;justify-content:center}
+  .l-demo-chk.on{background:var(--accent);border-color:var(--accent)}
+  .l-demo-row.train{background:var(--terra-dim)}
+  .l-demo-row.train .l-demo-slot{color:var(--terra-200)}
+  .l-demo-ask{font-size:13px;font-weight:700;margin:18px 0 8px}
+  .l-demo-chips{display:flex;flex-wrap:wrap;gap:8px}
+  .l-chip{min-height:44px;padding:0 14px;border-radius:999px;border:1px solid var(--border-2);background:transparent;color:var(--txt);font-family:var(--font-body);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+  .l-chip:hover{border-color:var(--accent)}
+  .l-chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .l-demo-note{font-size:13px;color:var(--muted);margin-top:12px;min-height:20px}
+  .l-demo-note b{color:var(--accent);font-weight:700}
 
-  /* Features */
-  .l-section{margin-bottom:36px}
-  .l-section-label{font-size:11px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.14em;font-weight:700;text-align:center;margin-bottom:20px}
-  .l-section h2{font-family:var(--font-display);font-size:24px;font-weight:800;letter-spacing:0;text-align:center;margin:0 0 20px}
-  .l-feat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .l-feat{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px}
-  .l-feat.wide{grid-column:1 / -1}
-  .l-feat-ic{font-size:26px;margin-bottom:10px}
-  .l-feat-title{font-family:var(--font-body);font-size:15px;font-weight:700;margin-bottom:5px}
-  .l-feat-body{font-size:13px;color:var(--muted);line-height:1.45}
+  /* La escalera */
+  .l-climb{padding-top:72px;padding-bottom:40px;border-top:1px solid var(--border)}
+  .l-climb-head h2,.l-sec-h{font-family:var(--font-display);font-weight:800;font-size:clamp(30px,7.6vw,56px);line-height:1;letter-spacing:-.03em;margin:0 0 14px;text-wrap:balance}
+  .l-climb-head p,.l-sec-sub{font-size:17px;color:var(--muted);line-height:1.55;margin:0;max-width:52ch}
+  .l-climb-grid{display:grid;gap:0;margin-top:40px}
+  .l-stair-rail{display:none}
+  .l-step{display:grid;gap:16px;padding:36px 0;border-top:1px solid var(--border);scroll-margin-top:24px}
+  .l-step:first-child{border-top:none}
+  .l-step-when{display:flex;align-items:center;gap:14px;font-family:var(--font-display);font-weight:800;font-size:clamp(28px,7vw,44px);letter-spacing:-.03em;line-height:1;color:var(--accent);margin:0}
+  .l-step-when .l-mini-stair{flex:0 0 auto}
+  .l-step-lead{font-family:var(--font-body);font-size:22px;font-weight:800;letter-spacing:-.015em;line-height:1.2;margin:0}
+  .l-step-body{font-size:16px;color:var(--muted);line-height:1.6;margin:0;max-width:56ch}
+  .l-step-demo{background:var(--surf1);border:1px solid var(--surf3);border-radius:var(--r-md);padding:16px;max-width:460px}
+  .l-step-demo .l-tag{float:right;margin:-2px 0 6px 10px}
+  .l-ing{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
+  .l-ing:last-of-type{border-bottom:none}
+  .l-ing span:last-child{color:var(--muted)}
+  .l-ex-name{font-weight:700;font-size:15px;margin-bottom:2px}
+  .l-ex-meta{font-size:13px;color:var(--muted);margin-bottom:12px}
+  .l-sets{display:flex;gap:8px;flex-wrap:wrap}
+  .l-set{min-width:56px;height:40px;border-radius:12px;border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--muted)}
+  .l-set.done{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .l-rest{display:flex;align-items:baseline;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:13px;color:var(--muted)}
+  .l-rest b{font-family:var(--font-display);font-size:24px;color:var(--txt);letter-spacing:-.02em}
+  .l-outs{display:flex;flex-wrap:wrap;gap:8px}
+  .l-out{min-height:40px;padding:0 14px;border-radius:999px;border:1px solid var(--border-2);display:inline-flex;align-items:center;font-size:13px;font-weight:600}
+  .l-out.pick{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .l-prop{font-size:14px;line-height:1.5}
+  .l-prop b{color:var(--txt)}
+  .l-prop-change{display:block;font-family:var(--font-display);font-size:20px;letter-spacing:-.02em;color:var(--accent);margin:10px 0 12px}
+  .l-prop-actions{display:flex;gap:8px}
+  .l-prop-actions span{min-height:40px;padding:0 16px;border-radius:999px;display:inline-flex;align-items:center;font-size:13px;font-weight:700;border:1px solid var(--border-2)}
+  .l-prop-actions span:first-child{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .l-recap{width:100%;border-collapse:collapse;font-size:14px}
+  .l-recap th{font-size:12px;color:var(--muted);font-weight:600;text-align:left;padding:0 0 8px}
+  .l-recap td{padding:9px 0;border-top:1px solid var(--border)}
+  .l-recap td:not(:first-child),.l-recap th:not(:first-child){text-align:right}
+  .l-recap tr:last-child td{color:var(--accent);font-weight:700}
+  .l-mini-stair .tr{stroke:var(--surf4)}
+  .l-mini-stair .tr.lit{stroke:var(--accent)}
 
-  /* Steps (cómo funciona) */
-  .l-steps{display:flex;flex-direction:column;gap:0}
-  .l-step{display:flex;gap:14px;padding:16px 0;position:relative}
-  .l-step:not(:last-child):before{content:'';position:absolute;left:18px;top:48px;bottom:0;width:2px;background:var(--border)}
-  .l-step-num{width:36px;height:36px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--border-acc);display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:14px;font-weight:800;color:var(--accent);flex:0 0 auto;position:relative;z-index:1}
-  .l-step-body{flex:1;padding-top:6px}
-  .l-step-title{font-family:var(--font-body);font-size:15px;font-weight:700;margin-bottom:4px}
-  .l-step-desc{font-size:13px;color:var(--muted);line-height:1.45}
-
-  /* Pricing */
-  .l-plans{display:flex;flex-direction:column;gap:12px}
-  .l-plan{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px}
-  .l-plan.highlight{border-color:var(--accent);background:linear-gradient(160deg,var(--accent-dim),var(--surf1));box-shadow:0 8px 30px var(--accent-glow)}
-  .l-plan-badge{font-size:10px;color:var(--purple-200);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:6px}
-  .l-plan-name{font-family:var(--font-body);font-size:18px;font-weight:800;margin-bottom:4px}
-  .l-plan-price{font-family:var(--font-display);font-size:28px;font-weight:800;letter-spacing:-.02em;margin-bottom:2px}
-  .l-plan-price .l-plan-cur{font-size:16px;vertical-align:top;margin-top:5px;display:inline-block}
-  .l-plan-price .l-plan-period{font-size:13px;color:var(--muted);font-family:var(--font-body);font-weight:400}
-  .l-plan-desc{font-size:12px;color:var(--muted);margin:8px 0 14px;line-height:1.4}
-  .l-plan-items{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
-  .l-plan-item{font-size:13px;display:flex;gap:8px;align-items:flex-start;color:var(--txt)}
-  .l-plan-item:before{content:'✓';color:var(--good);font-weight:700;flex:0 0 auto;margin-top:1px}
+  /* Planes */
+  .l-pricing{padding-top:72px;padding-bottom:24px;border-top:1px solid var(--border)}
+  .l-plans{display:grid;gap:14px;margin-top:32px}
+  .l-plan{background:var(--surf1);border:1px solid var(--surf3);border-radius:var(--r-lg);padding:24px;display:flex;flex-direction:column}
+  .l-plan.highlight{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  .l-plan-badge{align-self:flex-start;font-size:12px;font-weight:700;border-radius:999px;padding:4px 10px;margin-bottom:12px;background:var(--on-accent);color:var(--accent)}
+  .l-plan-name{font-size:18px;font-weight:800;margin-bottom:10px}
+  .l-plan-price{font-family:var(--font-display);font-size:48px;font-weight:800;letter-spacing:-.04em;line-height:1;margin-bottom:6px}
+  .l-plan-cur{font-size:18px;letter-spacing:0;margin-right:4px;vertical-align:.9em}
+  .l-plan-period{font-family:var(--font-body);font-size:15px;font-weight:600;letter-spacing:0;opacity:.7}
+  .l-plan-desc{font-size:14px;line-height:1.5;margin:10px 0 18px;opacity:.8}
+  .l-plan-items{display:grid;gap:9px;margin-bottom:22px}
+  .l-plan-item{display:flex;gap:10px;font-size:14px;line-height:1.4}
+  .l-plan-item svg{flex:0 0 auto;margin-top:2px}
+  .l-plan .l-btn{margin-top:auto;width:100%}
+  .l-plan:not(.highlight) .l-plan-item svg{color:var(--accent)}
 
   /* FAQ */
-  .l-faq{display:flex;flex-direction:column;gap:0}
-  .l-faq-item{border-bottom:1px solid var(--border);padding:14px 0}
-  .l-faq-item:first-child{border-top:1px solid var(--border)}
-  .l-faq-q{font-size:14px;font-weight:600;cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;background:none;border:none;width:100%;text-align:left;color:var(--txt);padding:0;font-family:inherit;min-height:44px}
-  .l-faq-ic{flex:0 0 auto;font-size:18px;color:var(--muted);transition:transform .2s;line-height:1.2}
-  .l-faq-a{font-size:13px;color:var(--muted);line-height:1.55;margin-top:8px;display:none}
-  .l-faq-item.open .l-faq-a{display:block}
-  .l-faq-item.open .l-faq-ic{transform:rotate(45deg)}
+  .l-faq-sec{padding-top:72px;padding-bottom:24px;border-top:1px solid var(--border)}
+  .l-faq{margin-top:24px;max-width:780px}
+  .l-faq-item{border-top:1px solid var(--border)}
+  .l-faq-item:last-child{border-bottom:1px solid var(--border)}
+  .l-faq-q{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:60px;padding:14px 0;font-size:16px;font-weight:700}
+  .l-faq-q::-webkit-details-marker{display:none}
+  .l-faq-q::after{content:"";flex:0 0 auto;width:10px;height:10px;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);transform:rotate(45deg);margin:-6px 4px 0 0;transition:transform .2s cubic-bezier(.16,1,.3,1)}
+  .l-faq-item[open] .l-faq-q::after{transform:rotate(-135deg);margin-top:4px}
+  .l-faq-a{font-size:15px;color:var(--muted);line-height:1.6;margin:0 0 18px;max-width:64ch}
 
-  /* CTA final */
-  .l-cta-final{background:linear-gradient(160deg,var(--accent-dim),var(--surf2));border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:28px 20px;text-align:center;margin-bottom:32px}
-  .l-cta-final h2{font-family:var(--font-display);font-size:22px;font-weight:800;margin:0 0 10px}
-  .l-cta-final p{font-size:13px;color:var(--muted);margin:0 0 20px;line-height:1.5}
-  .l-cta-final .btn{min-height:46px;font-size:15px;border-radius:14px;display:flex;align-items:center;justify-content:center;width:100%;max-width:280px;margin:0 auto 10px}
+  /* Cierre: campo lima a sangre completa */
+  .l-cta-final{margin-top:72px;background:var(--accent);color:var(--on-accent)}
+  .l-cta-final .l-wrap{padding-top:64px;padding-bottom:64px;display:grid;gap:20px;justify-items:start}
+  .l-cta-final h2{font-family:var(--font-display);font-weight:800;font-size:clamp(44px,12vw,104px);line-height:.92;letter-spacing:-.04em;margin:0}
+  .l-cta-final p{font-size:17px;line-height:1.5;margin:0;max-width:46ch;font-weight:600}
+  .l-cta-note{font-size:13px;font-weight:600;opacity:.75}
+  .l-cta-final :focus-visible{outline-color:var(--on-accent)}
 
-  /* Footer de la landing */
-  .l-footer{border-top:1px solid var(--border);padding:18px 0 6px;text-align:center}
-  @media(min-width:900px){
-    .landing{padding:0 40px calc(72px + var(--safe-bottom))}
-    .landing-nav{padding:max(24px,calc(16px + var(--safe-top))) 0 28px}
-    .landing-brand{font-size:25px}
-    .l-hero{grid-template-columns:minmax(0,1fr) minmax(360px,430px);align-items:center;gap:64px;padding:26px 0 58px}
-    .l-hero-copy{max-width:590px}
-    .l-hero h1{font-size:54px;line-height:1.02}
-    .l-hero-sub{font-size:18px;max-width:560px;margin-bottom:26px}
-    .l-hero-ctas{flex-direction:row;max-width:none}
-    .l-hero-ctas .btn{padding-left:20px;padding-right:20px}
-    .l-mockup{max-width:430px;padding:22px;justify-self:end}
-    .l-mockup-ring{padding:12px 14px}
-    .l-mockup-row{padding:12px 14px}
-    .l-mockup-row .lmr-name,.l-mockup-workout .lmw-name{font-size:14px}
-    .l-section{margin-bottom:56px}
-    .l-section h2{font-size:32px}
-    .l-feat-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-    .l-feat.wide{grid-column:span 2}
-    .l-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-    .l-step{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px}
-    .l-step:not(:last-child):before{display:none}
-    .l-step-body{padding-top:4px}
-    .l-plans{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;max-width:760px;margin:0 auto}
-    .l-plan{display:flex;flex-direction:column}
-    .l-plan .btn{margin-top:auto}
-    .l-faq{max-width:760px;margin:0 auto}
-    .l-cta-final{max-width:860px}
+  .l-footer{padding-top:24px;padding-bottom:calc(28px + var(--safe-bottom));display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:center;font-size:13px;color:var(--muted)}
+  .l-footer nav{display:flex;flex-wrap:wrap;gap:4px}
+  .l-footer a{color:var(--muted);text-decoration:none;min-height:44px;display:inline-flex;align-items:center;padding:0 8px}
+  .l-footer a:hover{color:var(--txt)}
+
+  @media(min-width:760px){
+    .landing{--l-pad:40px}
+    .l-hero{padding-top:56px;padding-bottom:88px;gap:48px}
+    .l-hero-body{grid-template-columns:minmax(0,1fr) minmax(380px,460px);gap:56px}
+    .l-hero-sub{font-size:19px}
+    .l-step{grid-template-columns:minmax(0,1fr) minmax(300px,440px);gap:24px 48px;align-items:start;padding:56px 0}
+    .l-step-text{display:grid;gap:14px;align-content:start}
+    .l-plans{grid-template-columns:repeat(2,minmax(0,1fr));max-width:860px}
+  }
+  /* Escritorio: la escalera grande queda fija y se enciende peldaño a peldaño */
+  @media(min-width:1080px){
+    .l-climb-grid{grid-template-columns:260px minmax(0,1fr);gap:48px}
+    .l-step{grid-template-columns:minmax(0,1fr) 360px;gap:20px 40px}
+    .l-step-when{font-size:40px}
+    .l-stair-rail{display:block;position:sticky;top:48px;align-self:start;width:260px;height:260px;margin-top:64px}
+    .l-stair-rail svg{position:absolute;inset:0;overflow:visible}
+    .l-stair-rail .tr{stroke:var(--surf4);transition:stroke .35s cubic-bezier(.16,1,.3,1)}
+    .l-stair-rail .tr.lit{stroke:var(--accent)}
+    .l-stair-label{position:absolute;min-height:44px;min-width:44px;display:flex;align-items:center;padding:0 6px;background:none;border:none;font-family:var(--font-body);font-size:14px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap;transition:color .35s}
+    .l-stair-label[aria-current="step"]{color:var(--txt)}
+    .l-stair-label:hover{color:var(--accent)}
+    .l-step .l-mini-stair{display:none}
+  }
+  @media(prefers-reduced-motion:reduce){
+    .l-demo-row,.l-demo-row.swap{transition:none;transform:none;opacity:1}
+    .l-stair-rail .tr,.l-stair-label,.l-faq-q::after{transition:none}
   }
   /* ---- Paywall (REQ-25) ---- */
   .paywall-expired{background:var(--surf3);border:1px solid var(--bad);color:var(--bad);padding:10px 14px;border-radius:var(--r-md);font-size:13px;margin-bottom:14px;line-height:1.4}
@@ -6902,10 +6963,6 @@ function showAuthFromLanding(mode){
   render();
 }
 
-function toggleFaq(el){
-  const open=el.closest(".l-faq-item").classList.toggle("open");
-  el.setAttribute("aria-expanded",open?"true":"false");
-}
 
 /* ---- Paywall y estado de suscripción (REQ-25) ---- */
 function showPaywall(context){
@@ -7177,10 +7234,139 @@ function refreshLandingPlans(){
   if(!box||_landingKey===landingRenderKey())return;
   _landingKey=landingRenderKey();box.innerHTML=landingPricingHtml();
 }
+// REQ-197: portada "Escalera de días". Los escalones van del día a día al
+// cierre del ciclo; la escalera sube (abajo-izquierda → arriba-derecha)
+// mientras el visitante baja por la página.
+const LANDING_STEPS=[
+  {id:"hoy",label:"Hoy",when:"Hoy",lead:"Sabes qué comer, y cuánto.",
+   body:"Cada comida llega con sus ingredientes en gramos y sus macros, según tus metas, cuántas veces comes al día y el tiempo que tienes para cocinar. Las alergias y restricciones son reglas: ninguna comida las rompe.",
+   demo:`<span class="l-tag">Ejemplo</span>
+     <div class="l-ex-name">Desayuno · Avena con plátano</div>
+     <div class="l-ex-meta">420 kcal · 28 g de proteína</div>
+     <div class="l-ing"><span>Avena en hojuelas</span><span>60 g</span></div>
+     <div class="l-ing"><span>Leche descremada</span><span>250 ml</span></div>
+     <div class="l-ing"><span>Plátano</span><span>1 unidad</span></div>
+     <div class="l-ing"><span>Proteína de suero</span><span>20 g</span></div>`},
+  {id:"entreno",label:"Entreno",when:"En el entreno",lead:"Cada serie, guiada.",
+   body:"Rutinas de 4 o 10 semanas para gimnasio, casa o exterior. Ves la técnica, marcas cada serie y el descanso corre solo. ¿No tienes la máquina? Te damos una alternativa.",
+   demo:`<span class="l-tag">Ejemplo</span>
+     <div class="l-ex-name">Press de banca</div>
+     <div class="l-ex-meta">3 × 8–10 · esfuerzo 7 de 10</div>
+     <div class="l-sets"><span class="l-set done">S1</span><span class="l-set done">S2</span><span class="l-set">S3</span></div>
+     <div class="l-rest">Descanso <b>1:24</b> de 2:00</div>`},
+  {id:"imprevistos",label:"Imprevistos",when:"Si el día se tuerce",lead:"El plan se adapta. Tú no lo abandonas.",
+   body:"Solo 20 minutos, entrenar en casa, comer fuera o perderte una sesión: eliges una salida y el día sigue en pie. Los descansos planificados no rompen tu racha.",
+   demo:`<span class="l-tag">Ejemplo</span>
+     <div class="l-ex-name">¿Qué pasó hoy?</div>
+     <div class="l-ex-meta">Elige una salida para tu entreno</div>
+     <div class="l-outs"><span class="l-out pick">Solo 20 min</span><span class="l-out">En casa</span><span class="l-out">Sin equipo</span><span class="l-out">Me perdí la sesión</span></div>`},
+  {id:"semana",label:"Cada semana",when:"Cada semana",lead:"Un ajuste pequeño, con tu permiso.",
+   body:"Tu coach revisa cómo te fue —peso, comidas y entrenos— y propone un cambio concreto en calorías o intensidad. Nada se aplica sin que lo confirmes.",
+   demo:`<span class="l-tag">Ejemplo</span>
+     <div class="l-prop"><b>Check-in · semana 3.</b> Bajaste 0,4 kg y cumpliste 5 de 7 días.</div>
+     <span class="l-prop-change">−100 kcal en días de descanso</span>
+     <div class="l-prop-actions" aria-hidden="true"><span>Aplicar</span><span>Ahora no</span></div>`},
+  {id:"ciclo",label:"Fin de ciclo",when:"Al cerrar el ciclo",lead:"Ves todo lo que subiste.",
+   body:"Al terminar tus 4 o 10 semanas recibes el resumen de tu ciclo: peso, adherencia, rachas y tus fotos de progreso, que solo ves tú. El siguiente ciclo arranca desde ahí.",
+   demo:`<span class="l-tag">Ejemplo</span>
+     <table class="l-recap"><thead><tr><th>Semana</th><th>Peso</th><th>Comidas</th></tr></thead>
+     <tbody><tr><td>1</td><td>81,2 kg</td><td>71 %</td></tr><tr><td>5</td><td>79,6 kg</td><td>83 %</td></tr><tr><td>10</td><td>78,1 kg</td><td>88 %</td></tr></tbody></table>`},
+];
+// Escalera de n peldaños; los primeros `lit` en lima.
+function stairSvg(size,lit,stroke,cls){
+  const n=LANDING_STEPS.length,w=size/n;
+  const paths=LANDING_STEPS.map((_,i)=>{
+    const x=i*w,y0=size-i*w,y1=size-(i+1)*w;
+    return `<path class="tr${i<lit?" lit":""}" d="M${x} ${y0}V${y1}H${x+w}"/>`;
+  }).join("");
+  return `<svg class="${cls||""}" width="${size}" height="${size}" viewBox="${-stroke} ${-stroke} ${size+2*stroke} ${size+2*stroke}" fill="none" stroke-width="${stroke}" stroke-linecap="square" aria-hidden="true">${paths}</svg>`;
+}
+function landingStairRailHtml(){
+  const size=260,w=size/LANDING_STEPS.length;
+  const labels=LANDING_STEPS.map((st,i)=>`<button class="l-stair-label" style="left:${Math.round(i*w+4)}px;top:${Math.round(size-(i+1)*w+(i===LANDING_STEPS.length-1?-50:8))}px" onclick="landingGoStep(${i})"${i===0?' aria-current="step"':""}>${st.label}</button>`).join("");
+  return `<nav class="l-stair-rail" aria-label="Recorrido de Evolv" data-lit="1">${stairSvg(size,1,6)}${labels}</nav>`;
+}
+function landingStepsHtml(){
+  return LANDING_STEPS.map((st,i)=>`<article class="l-step" id="l-step-${st.id}" data-step="${i}">
+      <div class="l-step-text">
+        <h3 class="l-step-when">${stairSvg(30,i+1,3,"l-mini-stair")}${st.when}</h3>
+        <p class="l-step-lead">${st.lead}</p>
+        <p class="l-step-body">${st.body}</p>
+      </div>
+      <div class="l-step-demo">${st.demo}</div>
+    </article>`).join("");
+}
+function landingGoStep(i){
+  const el=document.getElementById("l-step-"+LANDING_STEPS[i].id);if(!el)return;
+  const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({behavior:reduced?"auto":"smooth",block:"center"});
+}
+let _landingStairObserver=null;
+function initLandingStair(){
+  if(_landingStairObserver){_landingStairObserver.disconnect();_landingStairObserver=null;}
+  const rail=document.querySelector("#app .l-stair-rail");
+  if(!rail||!("IntersectionObserver" in window))return;
+  const setLit=(n)=>{
+    rail.dataset.lit=String(n);
+    rail.querySelectorAll(".tr").forEach((p,i)=>p.classList.toggle("lit",i<n));
+    rail.querySelectorAll(".l-stair-label").forEach((b,i)=>{if(i===n-1)b.setAttribute("aria-current","step");else b.removeAttribute("aria-current");});
+  };
+  _landingStairObserver=new IntersectionObserver(entries=>{
+    entries.forEach(e=>{if(e.isIntersecting)setLit(Number(e.target.dataset.step)+1);});
+  },{root:document.getElementById("app"),rootMargin:"-45% 0px -50% 0px"});
+  document.querySelectorAll("#app .l-step").forEach(el=>_landingStairObserver.observe(el));
+}
+// Demo del día: tres imprevistos reales de la app sobre datos de ejemplo.
+const LANDING_DEMO={
+  base:{lunch:["Arroz con lentejas y huevo","610 kcal · 34 g de proteína"],train:["Fuerza · Tren superior","5 ejercicios · 55 min"],note:""},
+  fuera:{lunch:["Pollo a la brasa sin piel + ensalada","¼ de pollo · 590 kcal · 41 g de proteína"],note:"Comes fuera y <b>el día sigue dentro de tus metas</b>."},
+  corto:{train:["Circuito exprés","4 ejercicios · 20 min"],note:"Veinte minutos <b>también cuentan</b> para tu semana."},
+  casa:{train:["En casa, sin equipo","6 ejercicios · 35 min"],note:"Mismos grupos musculares, <b>sin pisar el gimnasio</b>."},
+};
+function landingDemo(kind,btn){
+  const box=document.querySelector("#app .l-demo");if(!box)return;
+  const wasOn=btn&&btn.getAttribute("aria-pressed")==="true";
+  box.querySelectorAll(".l-chip").forEach(c=>c.setAttribute("aria-pressed","false"));
+  const key=wasOn?"base":kind;
+  if(!wasOn&&btn)btn.setAttribute("aria-pressed","true");
+  const d=Object.assign({},LANDING_DEMO.base,LANDING_DEMO[key]);
+  const paint=(sel,[name,meta])=>{
+    const row=box.querySelector(sel);if(!row)return;
+    const changed=row.querySelector(".l-demo-name").textContent!==name;
+    if(!changed)return;
+    row.classList.add("swap");
+    setTimeout(()=>{row.querySelector(".l-demo-name").textContent=name;row.querySelector(".l-demo-meta").textContent=meta;row.classList.remove("swap");},140);
+  };
+  paint('[data-row="lunch"]',d.lunch);paint('[data-row="train"]',d.train);
+  box.querySelector(".l-demo-note").innerHTML=d.note;
+}
+function landingDemoHtml(){
+  const b=LANDING_DEMO.base;
+  const check='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--on-accent)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  return `<div class="l-demo">
+    <div class="l-demo-top"><span class="l-demo-day">Hoy · martes</span><span class="l-tag">Ejemplo</span></div>
+    <div class="l-demo-kcal"><b>1 640</b><span>de 1 900 kcal</span></div>
+    <div class="l-demo-bar" aria-hidden="true"><i></i></div>
+    <div class="l-demo-list" aria-live="polite">
+      <div class="l-demo-row"><span class="l-demo-slot">Desayuno</span><div><div class="l-demo-name">Avena con plátano y canela</div><div class="l-demo-meta">420 kcal · 28 g de proteína</div></div><span class="l-demo-chk on" role="img" aria-label="Hecha">${check}</span></div>
+      <div class="l-demo-row" data-row="lunch"><span class="l-demo-slot">Almuerzo</span><div><div class="l-demo-name">${b.lunch[0]}</div><div class="l-demo-meta">${b.lunch[1]}</div></div><span class="l-demo-chk on" role="img" aria-label="Hecha">${check}</span></div>
+      <div class="l-demo-row train" data-row="train"><span class="l-demo-slot">Entreno</span><div><div class="l-demo-name">${b.train[0]}</div><div class="l-demo-meta">${b.train[1]}</div></div><span class="l-demo-chk" role="img" aria-label="Pendiente"></span></div>
+    </div>
+    <div class="l-demo-ask" id="l-demo-ask">¿Y si hoy…?</div>
+    <div class="l-demo-chips" role="group" aria-labelledby="l-demo-ask">
+      <button class="l-chip" aria-pressed="false" onclick="landingDemo('fuera',this)">Como fuera</button>
+      <button class="l-chip" aria-pressed="false" onclick="landingDemo('corto',this)">Solo tengo 20 min</button>
+      <button class="l-chip" aria-pressed="false" onclick="landingDemo('casa',this)">Entreno en casa</button>
+    </div>
+    <div class="l-demo-note" aria-live="polite"></div>
+  </div>`;
+}
+
 function landingPricingHtml(){
   const plans=activeCatalogPlans();
+  const tick='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   return plans.map(p=>{
-    const items=(p.features||[]).map(f=>`<div class="l-plan-item">${esc(f)}</div>`).join("");
+    const items=(p.features||[]).map(f=>`<div class="l-plan-item">${tick}<span>${esc(f)}</span></div>`).join("");
     const badge=p.badge?`<div class="l-plan-badge">${esc(p.badge)}</div>`:"";
     const isHi=!!(p.badge||(p.duration_days>31));
     return`<div class="l-plan${isHi?" highlight":""}">
@@ -7189,196 +7375,88 @@ function landingPricingHtml(){
       <div class="l-plan-price"><span class="l-plan-cur">USD</span>${p.price_usd} <span class="l-plan-period">/ ${p.duration_days<=31?"mes":"3 meses"}</span></div>
       <div class="l-plan-desc">${esc(p.description||"")}</div>
       <div class="l-plan-items">${items}</div>
-      <button class="btn btn-accent" style="width:100%;min-height:44px;border-radius:12px;font-size:14px" onclick="showAuthFromLanding('up')">Empezar ahora</button>
+      <button class="l-btn l-btn-lg ${isHi?"l-btn-ink":"l-btn-lime"}" onclick="showAuthFromLanding('up')">Empezar ahora</button>
     </div>`;
   }).join("");
 }
 
+const LANDING_FAQ=[
+  ["¿Necesito experiencia en nutrición o entrenamiento?","No. Evolv explica qué hacer, cómo hacerlo y por qué. Cada ejercicio tiene instrucciones y alternativas para principiantes. El plan de comidas usa recetas reales con ingredientes y cantidades."],
+  ["¿El plan sirve si soy vegetariano o tengo alergias?","Sí. Al configurar tu perfil indicas restricciones (vegetariano, sin gluten, sin lactosa, alergias específicas, etc.). Estas se aplican como reglas duras: ninguna comida las viola."],
+  ["¿Puedo entrenar en casa sin equipo?","Sí. Configura tu lugar de entrenamiento (casa, gimnasio, exterior o piscina) y el equipo disponible. Tu plan de entrenamiento se arma solo con lo que tienes."],
+  ["¿Qué pasa si me pierdo un día?","Las rachas de Evolv son justas: los descansos planificados no se cuentan como fallos. Si te pierdes un entrenamiento, el modo contingencia te da tres opciones: recuperarlo, seguir con el plan o convertirlo en descanso. Sin castigos."],
+  ["¿Mis datos son privados?","Sí. Tu progreso, fotos, conversaciones y datos corporales son privados y solo tú los puedes ver. Puedes exportar o solicitar el borrado de tu cuenta y todos tus datos en cualquier momento."],
+];
+
 function renderLanding(){
   _landingKey=landingRenderKey();
   const plansHtml=landingPricingHtml();
+  const faqHtml=LANDING_FAQ.map(([q,a])=>`<details class="l-faq-item"><summary class="l-faq-q">${q}</summary><p class="l-faq-a">${a}</p></details>`).join("");
   $("#app").innerHTML=`<div class="landing">
-
-    <!-- Barra de navegación -->
-    <nav class="landing-nav">
+    <header class="l-wrap landing-nav">
       <div class="landing-brand" role="img" aria-label="Evolv">${brandMark(30)}${brandWordmark()}</div>
       <div class="landing-nav-actions">
-        <button class="btn btn-sm" onclick="showAuthFromLanding('in')">Iniciar sesión</button>
-        <button class="btn btn-sm btn-accent" onclick="showAuthFromLanding('up')">Empezar</button>
+        <button class="l-btn l-btn-text" onclick="showAuthFromLanding('in')">Iniciar sesión</button>
+        <button class="l-btn l-btn-lime" onclick="showAuthFromLanding('up')">Empezar</button>
       </div>
-    </nav>
+    </header>
 
-    <!-- Hero -->
-    <section class="l-hero">
-      <div class="l-hero-copy">
-        <div class="l-hero-eyebrow">Tu coach de todos los días</div>
-        <h1>Tu mejor versión, un día a la vez.</h1>
-        <p class="l-hero-sub">Tu plan diario de nutrición y entrenamiento: una opción viable para comer y entrenar hoy, armada con tu cuerpo, horarios y recursos reales.</p>
-        <div class="l-hero-ctas">
-          <button class="btn btn-accent" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
-          <button class="btn" onclick="showAuthFromLanding('in')">Ya tengo cuenta</button>
-        </div>
-        <div class="l-hero-note">Sin tarjeta de crédito para empezar · Sin renovación automática</div>
-      </div>
-      <div class="l-mockup" aria-hidden="true">
-        <div class="l-mockup-day">Hoy · Martes</div>
-        <div class="l-mockup-ring">
-          <svg class="lmr-arc" viewBox="0 0 36 36">
-            <circle cx="18" cy="18" r="14" fill="none" stroke="rgba(214,255,58,.2)" stroke-width="4"/>
-            <circle cx="18" cy="18" r="14" fill="none" stroke="#d6ff3a" stroke-width="4"
-              stroke-dasharray="66 88" stroke-dashoffset="22" stroke-linecap="round" transform="rotate(-90 18 18)"/>
-          </svg>
-          <div><div class="lmr-txt">1 640 kcal</div><div class="lmr-sub">de 1 900 kcal</div></div>
-        </div>
-        <div class="l-mockup-row">
-          <div><div class="lmr-name">Avena con proteína y arándanos</div><div class="lmr-mac">38P · 52C · 9G</div></div>
-          <div class="lmr-chk">✓</div>
-        </div>
-        <div class="l-mockup-row">
-          <div><div class="lmr-name">Arroz con lentejas y vegetales</div><div class="lmr-mac">42P · 68C · 10G</div></div>
-          <div class="lmr-chk">✓</div>
-        </div>
-        <div class="l-mockup-row" style="opacity:.65">
-          <div><div class="lmr-name">Batido de proteína + plátano</div><div class="lmr-mac">35P · 40C · 5G</div></div>
-          <div class="lmr-chk" style="background:transparent;border:2px solid rgba(255,255,255,.18)"></div>
-        </div>
-        <div class="l-mockup-workout">
-          <div>
-            <div class="lmw-name">Fuerza — Tren superior</div>
-            <div class="lmw-det">5 ejercicios · ~55 min</div>
+    <section class="l-wrap l-hero">
+      <h1>Tu mejor versión, <span class="l-lime">un día a la vez.</span></h1>
+      <div class="l-hero-body">
+        <div>
+          <p class="l-hero-sub">Evolv arma <b>lo que comes y entrenas hoy</b> con tu cuerpo, tus horarios y lo que tienes a mano. Y cuando el día se tuerce, lo ajusta contigo.</p>
+          <div class="l-hero-ctas">
+            <button class="l-btn l-btn-lime l-btn-lg" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
+            <button class="l-btn l-btn-ghost l-btn-lg" onclick="showAuthFromLanding('in')">Ya tengo cuenta</button>
           </div>
-          <div style="font-size:20px">▶</div>
+          <div class="l-hero-note">Sin tarjeta de crédito para empezar · Sin renovación automática</div>
         </div>
+        ${landingDemoHtml()}
       </div>
     </section>
 
-    <!-- Qué incluye (features) -->
-    <section class="l-section">
-      <div class="l-section-label">Qué obtienes</div>
-      <div class="l-feat-grid">
-        <div class="l-feat wide">
-          <div class="l-feat-ic">🥗</div>
-          <div class="l-feat-title">Nutrición adaptada a ti</div>
-          <div class="l-feat-body">Tu plan de comidas se arma con tus metas, número de comidas, tiempo para cocinar, preferencias y restricciones. Sin menús genéricos.</div>
-        </div>
-        <div class="l-feat">
-          <div class="l-feat-ic">🏋️</div>
-          <div class="l-feat-title">Entrenamiento guiado</div>
-          <div class="l-feat-body">Rutinas de 4 o 10 semanas con instrucciones paso a paso, demostraciones y alternativas si no tienes el equipo.</div>
-        </div>
-        <div class="l-feat">
-          <div class="l-feat-ic">🔄</div>
-          <div class="l-feat-title">Modo contingencia</div>
-          <div class="l-feat-body">¿No puedes cocinar hoy? ¿Solo tienes 20 minutos? Adapta el plan al día real sin perder tus metas.</div>
-        </div>
-        <div class="l-feat">
-          <div class="l-feat-ic">📈</div>
-          <div class="l-feat-title">Seguimiento de progreso</div>
-          <div class="l-feat-body">Registra peso, adherencia y rachas. Al final del ciclo ves todo lo que lograste y arrancas el siguiente.</div>
-        </div>
-        <div class="l-feat">
-          <div class="l-feat-ic">⚡</div>
-          <div class="l-feat-title">Check-in semanal</div>
-          <div class="l-feat-body">Cada semana tu coach revisa cómo te fue y propone ajustes pequeños en calorías o intensidad. Tú confirmas antes de aplicar.</div>
-        </div>
+    <section class="l-wrap l-climb" aria-labelledby="l-climb-h">
+      <div class="l-climb-head">
+        <h2 id="l-climb-h">Un escalón cada día.</h2>
+        <p>Evolv no te pide un cambio de vida el lunes. Te da el siguiente paso, y el siguiente.</p>
+      </div>
+      <div class="l-climb-grid">
+        ${landingStairRailHtml()}
+        <div class="l-steps">${landingStepsHtml()}</div>
       </div>
     </section>
 
-    <!-- Cómo funciona -->
-    <section class="l-section">
-      <div class="l-section-label">Cómo funciona</div>
-      <h2>De cero a tu primer plan en minutos</h2>
-      <div class="l-steps">
-        <div class="l-step">
-          <div class="l-step-num">1</div>
-          <div class="l-step-body">
-            <div class="l-step-title">Cuéntanos sobre ti</div>
-            <div class="l-step-desc">Tus metas, disponibilidad, alergias, lugar de entrenamiento y experiencia. Solo lo que importa para tu plan.</div>
-          </div>
-        </div>
-        <div class="l-step">
-          <div class="l-step-num">2</div>
-          <div class="l-step-body">
-            <div class="l-step-title">Tu plan listo en segundos</div>
-            <div class="l-step-desc">Recibes un plan de nutrición y entrenamiento personalizado para las próximas semanas. Todo validado contra tus restricciones.</div>
-          </div>
-        </div>
-        <div class="l-step">
-          <div class="l-step-num">3</div>
-          <div class="l-step-body">
-            <div class="l-step-title">Ejecuta y adapta</div>
-            <div class="l-step-desc">Registra lo que comes, sigue tus rutinas guiadas y adapta cuando la vida no sale como planeado. El plan se ajusta contigo cada semana.</div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Precios -->
-    <section class="l-section">
-      <div class="l-section-label">Planes</div>
-      <h2>Elige tu ritmo</h2>
+    <section class="l-wrap l-pricing" aria-labelledby="l-pricing-h">
+      <h2 class="l-sec-h" id="l-pricing-h">Elige tu ritmo.</h2>
+      <p class="l-sec-sub">Pagas solo el período que eliges. Sin permanencia.</p>
       <div class="l-plans">${plansHtml}</div>
     </section>
 
-    <!-- FAQ -->
-    <section class="l-section">
-      <div class="l-section-label">Preguntas frecuentes</div>
-      <div class="l-faq">
-        <div class="l-faq-item">
-          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
-            ¿Necesito experiencia en nutrición o entrenamiento?
-            <span class="l-faq-ic">+</span>
-          </button>
-          <div class="l-faq-a">No. Evolv explica qué hacer, cómo hacerlo y por qué. Cada ejercicio tiene instrucciones y alternativas para principiantes. El plan de comidas usa recetas reales con ingredientes y cantidades.</div>
-        </div>
-        <div class="l-faq-item">
-          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
-            ¿El plan sirve si soy vegetariano o tengo alergias?
-            <span class="l-faq-ic">+</span>
-          </button>
-          <div class="l-faq-a">Sí. Al configurar tu perfil indicas restricciones (vegetariano, sin gluten, sin lactosa, alergias específicas, etc.). Estas se aplican como reglas duras: ninguna comida las viola.</div>
-        </div>
-        <div class="l-faq-item">
-          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
-            ¿Puedo entrenar en casa sin equipo?
-            <span class="l-faq-ic">+</span>
-          </button>
-          <div class="l-faq-a">Sí. Configura tu lugar de entrenamiento (casa, gimnasio, exterior o piscina) y el equipo disponible. Tu plan de entrenamiento se arma solo con lo que tienes.</div>
-        </div>
-        <div class="l-faq-item">
-          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
-            ¿Qué pasa si me pierdo un día?
-            <span class="l-faq-ic">+</span>
-          </button>
-          <div class="l-faq-a">Las rachas de Evolv son justas: los descansos planificados no se cuentan como fallos. Si te pierdes un entrenamiento, el modo contingencia te da tres opciones: recuperarlo, seguir con el plan o convertirlo en descanso. Sin castigos.</div>
-        </div>
-        <div class="l-faq-item">
-          <button class="l-faq-q" aria-expanded="false" onclick="toggleFaq(this)">
-            ¿Mis datos son privados?
-            <span class="l-faq-ic">+</span>
-          </button>
-          <div class="l-faq-a">Sí. Tu progreso, fotos, conversaciones y datos corporales son privados y solo tú los puedes ver. Puedes exportar o solicitar el borrado de tu cuenta y todos tus datos en cualquier momento.</div>
-        </div>
+    <section class="l-wrap l-faq-sec" aria-labelledby="l-faq-h">
+      <h2 class="l-sec-h" id="l-faq-h">Preguntas frecuentes</h2>
+      <div class="l-faq">${faqHtml}</div>
+    </section>
+
+    <section class="l-cta-final" aria-labelledby="l-cta-h">
+      <div class="l-wrap">
+        <h2 id="l-cta-h">Empieza hoy.</h2>
+        <p>Tu perfil toma cinco minutos y tu primer día queda listo al terminar.</p>
+        <button class="l-btn l-btn-ink l-btn-lg" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
+        <div class="l-cta-note">Sin renovación automática · Sin tarjeta para empezar</div>
       </div>
     </section>
 
-    <!-- CTA final -->
-    <div class="l-cta-final">
-      <h2>Empieza hoy, sin excusas</h2>
-      <p>Configura tu perfil en 5 minutos y tu primer plan estará listo antes de que termines.</p>
-      <button class="btn btn-accent" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
-      <div class="muted small center" style="margin-top:8px">Sin renovación automática · Sin tarjeta para empezar</div>
-    </div>
-
-    <!-- Footer -->
-    <footer class="l-footer">
-      <div class="l-footer-legal">
-        © 2026 Evolv · <a href="#" onclick="showAuthFromLanding('in');return false">Iniciar sesión</a>
-        · <a href="#" onclick="openPrivacyNotice();return false">Privacidad</a>
-        · <a href="#" onclick="openTermsNotice();return false">Términos</a>
-      </div>
+    <footer class="l-wrap l-footer">
+      <span>© 2026 Evolv</span>
+      <nav aria-label="Legal">
+        <a href="#" onclick="showAuthFromLanding('in');return false">Iniciar sesión</a>
+        <a href="#" onclick="openPrivacyNotice();return false">Privacidad</a>
+        <a href="#" onclick="openTermsNotice();return false">Términos</a>
+      </nav>
     </footer>
   </div>`;
+  initLandingStair();
 }
 
 function renderAuth(){

@@ -1664,3 +1664,23 @@ Auditoría impeccable (2026-10-16), medido en producción: LCP móvil de 3.4 s e
 
 - `navegacion.spec.js`: con `/api/config` colgada la portada se ve y la FAQ abierta sobrevive; con sesión guardada no se muestra la portada. ✓
 - 4G emulado + CPU ×4, local: 5.6 s → 5.1 s hasta el titular. ✓
+
+## REQ-197 - Portada: rediseño "Escalera de días" dentro de la marca Escala
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-16), tras la auditoría impeccable: rediseñar la web pública para que refleje la marca y no parezca una landing genérica. La portada anterior era la plantilla de la categoría: etiqueta en mayúsculas sobre cada sección, grilla de tarjetas iguales con emoji (🥗🏋️🔄📈⚡) y un hueco en escritorio, brillos de acento y FAQ sin estado. Eligió la dirección "Escalera de días" y, como prueba, solo demostración del producto (sin testimonios ni cifras inventadas).
+
+### Alcance
+
+1. Misma marca (REQ-180/189): carbón + lima sólida, Unbounded + Manrope, chevrons. Sin brillos, degradados de acento ni emoji.
+2. Hero: titular de marca a gran tamaño + demo del día (marcada "Ejemplo") con tres imprevistos reales de la app ("Como fuera", "Solo tengo 20 min", "Entreno en casa") que cambian almuerzo o entreno.
+3. Cinco escalones en orden temporal (Hoy, En el entreno, Si el día se tuerce, Cada semana, Al cerrar el ciclo), cada uno con un fragmento de la UI real. En escritorio, una escalera fija que sube y se enciende peldaño a peldaño al bajar (`initLandingStair()`); en móvil, una escalera mini por escalón.
+4. Planes del catálogo con el destacado en campo lima; FAQ con `<details>`; cierre en campo lima a sangre completa. Copy existente y verdadero: no se añaden afirmaciones comerciales.
+
+### Criterios de aceptación
+
+- `tests/e2e/portada.spec.js`: la demo cambia y se revierte; sin emoji ni vocabulario de IA; la escalera se enciende y sigue a la vista. ✓
+- axe (WCAG 2.2 AA + best-practice) sin violaciones a 390 y 1440 px; sin scroll horizontal; controles ≥44 px. ✓

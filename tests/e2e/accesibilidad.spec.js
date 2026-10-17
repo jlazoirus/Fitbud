@@ -36,15 +36,16 @@ test.describe("Accesibilidad", () => {
     await expect(progress).toHaveAttribute("aria-valuemax", "4");
   });
 
-  test("la FAQ de la portada expone si está abierta", async ({ page, context }) => {
+  test("la FAQ de la portada usa <details> nativo (estado anunciado por el navegador)", async ({ page, context }) => {
     await installMocks(context);
     await gotoApp(page);
-    const q = page.locator(".l-faq-q").first();
-    await expect(q).toHaveAttribute("aria-expanded", "false");
-    await q.click();
-    await expect(q).toHaveAttribute("aria-expanded", "true");
-    await q.click();
-    await expect(q).toHaveAttribute("aria-expanded", "false");
+    const item = page.locator(".l-faq-item").first();
+    await expect(item).toHaveJSProperty("tagName", "DETAILS");
+    await expect(item).not.toHaveAttribute("open", "");
+    await item.locator("summary").click();
+    await expect(item).toHaveAttribute("open", "");
+    await item.locator("summary").click();
+    await expect(item).not.toHaveAttribute("open", "");
     await expect(page.locator("main")).toHaveCount(1);
     await expect(page.locator("h1")).toHaveCount(1);
   });
