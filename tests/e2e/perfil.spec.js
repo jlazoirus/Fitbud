@@ -202,4 +202,45 @@ test.describe("Perfil", () => {
     await expect(page.locator("#app")).toContainText("Entre ejercicios: 1 min 30 s de descanso");
     expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  test("REQ-191: cerrar el aviso de actividad ligera con ✕ no lo vuelve a mostrar", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+    const nudge = page.locator("#overlay .sheet", { hasText: "Actividad ligera para tu salud" });
+    const tabs = page.locator("#tabs");
+
+    // Primera visita: el aviso aparece (usuario "solo fuerza") y se cierra con ✕
+    await tabs.getByText("Perfil").click();
+    await expect(nudge).toBeVisible();
+    await page.locator("#overlay .closebar button").click();
+    await expect(nudge).toHaveCount(0);
+
+    // Volver a Perfil ya no lo muestra
+    await tabs.getByText("Hoy").click();
+    await tabs.getByText("Perfil").click();
+    await expect(page.locator("details.pf-accordion").first()).toBeVisible();
+    await expect(nudge).toHaveCount(0);
+    expect(await page.evaluate(() => UI.cardioNudgeDismissed)).toBe(true);
+
+    expect(errors).toEqual([]);
+  });
+
+  test("REQ-191: cerrar el aviso con Esc también cuenta como visto", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await gotoApp(page);
+    const nudge = page.locator("#overlay .sheet", { hasText: "Actividad ligera para tu salud" });
+    await page.locator("#tabs").getByText("Perfil").click();
+    await expect(nudge).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(nudge).toHaveCount(0);
+    await page.reload();
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Perfil").click();
+    await expect(page.locator("details.pf-accordion").first()).toBeVisible();
+    await expect(nudge).toHaveCount(0);
+  });
 });

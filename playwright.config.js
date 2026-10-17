@@ -3,6 +3,11 @@
 // en tests/e2e/helpers.js con fixtures deterministas (0 llamadas pagadas).
 import { defineConfig } from "@playwright/test";
 
+// Los helpers calculan "hoy" con la hora de Node y el navegador corre en
+// America/Lima (timezoneId abajo): entre 00:00 y 05:00 UTC eran días distintos
+// y fallaban los tests de racha y cronómetro. Misma zona en ambos lados.
+process.env.TZ = "America/Lima";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 45_000,

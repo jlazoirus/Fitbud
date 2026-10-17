@@ -1,0 +1,3 @@
+# Copia de terceros (pbakaus/impeccable): se mantiene idéntica al original,
+# así que queda fuera de la revisión de espacios de git diff --check.
+.claude/skills/impeccable/** -whitespace

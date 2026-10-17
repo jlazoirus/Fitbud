@@ -283,11 +283,13 @@ export async function installMocks(context, opts = {}) {
     return route.abort("blockedbyclient");
   });
 
-  // 2) CDN de supabase-js → copia vendorizada local (offline).
-  await context.route("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2*", (route) =>
+  // 2) CDN de supabase-js → copia vendorizada local (offline). Es el mismo
+  // archivo que fija index.html (REQ-197): si no, el SRI lo bloquea.
+  await context.route((url) => url.href.startsWith("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"), (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/javascript",
+      headers: { "access-control-allow-origin": "*" }, // crossorigin="anonymous" + SRI
       body: fs.readFileSync(path.join(HERE, "vendor", "supabase-js-2.min.js")),
     }),
   );

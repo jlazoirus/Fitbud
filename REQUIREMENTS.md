@@ -1421,73 +1421,15 @@ El plan gratuito pausa el proyecto tras ~7 días sin actividad. El cron diario `
 
 ## REQ-180 - Rebranding Fitbros → Evolv (dirección "Escala")
 
-**Estado: implementado.**
+**Estado: implementado.** Marca Evolv, dirección "Escala": casi negro + lima `#D6FF3A` (`--on-accent:#101010`), azul señal `#3A7BFF`, Unbounded (titulares/números grandes) + Manrope, modo oscuro. Los tokens `--purple-*`/`--terra-*` son hoy las escalas lima/azul.
 
-### Origen
-
-Decisión de Jonathan (2026-10-14): renombrar la marca a Evolv y adoptar la dirección C "Escala" de la exploración de marca (casi negro + lima eléctrica, Unbounded + Manrope, ícono de tres escalones). Modo oscuro por defecto.
-
-### Alcance
-
-1. Tokens (`index.html :root`): lima `#D6FF3A` como acento con `--on-accent:#101010` (texto oscuro sobre lima), azul señal `#3A7BFF` como secundario, superficies carbón/grafito, texto `#F2F2EE`/`#A8A8A0`. Se conservan los nombres `--purple-*`/`--terra-*` (ahora escala lima/azul) para no reescribir reglas. Fondos de acento con texto blanco pasan a `--on-accent`; avatar y botón del tour corregidos por contraste.
-2. Tipografías: Unbounded (display) y Manrope (texto) vía Google Fonts.
-3. Logo: `brandMark()` (escalones) + `brandWordmark()` ("evol" + "v" lima) en portada y pantallas de acceso; íconos PWA 180/192/512 regenerados dentro de la zona segura maskable.
-4. Textos visibles "Fitbros" → "Evolv" (app, manifiesto, notificaciones push, beta, PRIVACY.md, README); tagline "Tu mejor versión, un día a la vez."; atribución de ejercicios propios "Evolv Studio" (catálogo local y 9 filas en producción).
-5. Portada: hero con el tagline como titular y logo en la barra.
-   Unbounded solo en titulares grandes (`h1,h2`, hero, secciones de la portada), marca y números grandes (kcal, racha, precios); nombres de comidas/ejercicios, botones, `h3` y títulos de tarjeta usan Manrope en peso fuerte para no partir textos largos.
-6. Se conservan identificadores internos (`fitbros_tour_v1`, `startFitbrosTour`, `fitbros_test_user`, lock de los loops) para no resetear estado de usuarios ni romper herramientas.
-
-### Fuera de alcance (pendiente)
-
-- Dominio `evolv.vercel.app` (renombrar proyecto o agregar dominio en Vercel) y URLs de Supabase Auth/correos.
-- Remitente y plantillas de correo con la marca Evolv.
-
-### Criterios de aceptación
-
-- Release gate y E2E en verde; capturas a 390 px de portada, login, Hoy y Entreno revisadas. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-180`).
 
 ## REQ-181 - Admin: el modal "Consumo" no precarga la cortesía vigente y la sobrescribe al guardar
 
-**Estado: implementado.**
-`openAdminUserQuota`/`fillAdminQuotaFields` precargan límite, bonus, disponibilidad y expiración desde `adminQuotaCache.overrides` (cambia también al cambiar de acción); `saveAdminUserQuota` ahora envía `expiresAt`. `loadAdminQuotaOverview` lista las cortesías activas. Detalle en el commit.
+**Estado: implementado.** El modal "Consumo" del admin precarga la cortesía vigente y no la sobrescribe al guardar.
 
-### Origen
-
-Auditoría journey administración (commit previo 45bb2ce). Panel admin → tarjeta de usuario → "Consumo".
-
-### Problema
-
-`quotaOverview` devuelve `overrides` (cortesías por usuario), pero el cliente nunca los muestra ni los precarga. Al abrir "Consumo" de un usuario con override vigente (p. ej. límite 5, 50 unidades extra, activa, expira 2026-12-01), el formulario aparece vacío (límite "Heredar", bonus 0, "Heredar política"). Si el admin solo quería ajustar un campo y pulsa "Guardar cortesía", se envía `dailyLimit:""`, `bonusUnits:0`, `enabled:null` → el upsert `on_conflict=user_id,action` (merge-duplicates) reescribe `daily_limit=null, bonus_units=0, enabled=null, expires_at=null`, borrando la cortesía en silencio.
-
-### Causa raíz
-
-`openAdminUserQuota()` (`index.html:~10831`) arma el modal solo desde `policies`; ignora `adminQuotaCache.overrides`. `adminQuotaCache.overrides` está poblado pero no se consume en ninguna parte (`index.html`). El upsert full-row vive en `setQuotaOverride` (`api/admin.js:590`).
-
-### Objetivo
-
-El admin ve la cortesía vigente y editarla no destruye valores no tocados.
-
-### Alcance
-
-1. Precargar en el modal el override existente (`overrides.find(user_id,action)`): límite, bonus, disponibilidad y expiración.
-2. Mostrar las cortesías activas en el panel (`loadAdminQuotaOverview`) usando `overrides`.
-
-### Fuera de alcance
-
-- Políticas generales, reset de consumo, otras acciones admin.
-
-### Riesgos
-
-- Reescribir la ruta de guardado sin romper la creación de overrides nuevos.
-
-### Criterios de aceptación
-
-- Reabrir "Consumo" muestra los valores vigentes; guardar sin cambios los conserva.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Seed de override (bonus 50, expira 2026-12-01), abrir "Consumo", guardar; confirmar que el override no cambia.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-181`).
 
 ## REQ-182 - Fix PWA: el gate de bump de caché no cubre `assets/icon-180.png` (apple-touch-icon cache-first fuera de `APP_SHELL`)
 
@@ -1555,265 +1497,39 @@ Jonathan compró `evolvapp.club` en Porkbun (2026-10-16) para la marca Evolv (RE
 
 ## REQ-184 - Seguridad: el sitio público no publica los archivos internos del repositorio
 
-**Estado: implementado.**
+**Estado: implementado.** `.vercelignore` en modo allowlist y `scripts/validate-deploy-allowlist.mjs` en el release gate: solo se publica lo que el runtime carga.
 
-### Origen
-
-Auditoría de la web pública (2026-10-16). Con `outputDirectory: "."` y sin build, Vercel servía como estáticos todos los archivos del repo: `https://evolvapp.club/NEGOCIO.md`, `/REQUIREMENTS.md`, `/CONTEXT.md`, `/STRIPE_SETUP.md`, `/agent-loop.json`, `/docs/architecture-reference.md`, `/estrategia/*.md`, `/supabase/admin.sql`, `/scripts/*.mjs` y `/tests/e2e/*` respondían 200. No había secretos (solo placeholders), pero sí estrategia de negocio, esquema SQL con políticas RLS y las reglas de los agentes.
-
-### Alcance
-
-1. `.vercelignore` en modo allowlist: ignora todo (`/*`) y reincluye solo lo que el runtime carga: `index.html`, `beta-reclutamiento.html`, `config.js`, `service-worker.js`, `manifest.webmanifest`, los módulos JS de la raíz, `js/`, `assets/` (de `assets/ux-audit-2026-06-23/` solo `04-home-mobile.png`, que usa la página de beta), `api/`, `package.json`, `package-lock.json` (dependencias de las funciones) y `vercel.json`.
-2. `scripts/validate-deploy-allowlist.mjs` (en el release gate) evalúa el `.vercelignore` con semántica gitignore sobre `git ls-files` y falla si: falta algún archivo que el runtime carga (`<script src>`/`href` locales de las páginas, `APP_SHELL` del service worker, `api/*.js`), o se despliega un archivo no declarado como público. Un archivo nuevo obliga a decidir explícitamente si se publica.
-
-### Fuera de alcance
-
-- Las capturas de `assets/ux-audit-2026-06-23/` siguen versionadas; solo dejan de publicarse.
-- Los demás hallazgos de la auditoría (avisos legales preliminares, accesibilidad de formularios, etc.) van en REQ propios.
-
-### Criterios de aceptación
-
-- `curl -I https://evolvapp.club/NEGOCIO.md` (y `/REQUIREMENTS.md`, `/supabase/admin.sql`, `/scripts/release-gate.mjs`) devuelve 404 tras el deploy.
-- La landing, la app, `/beta-reclutamiento.html`, `/service-worker.js` y `/api/catalog` siguen respondiendo 200.
-- `node scripts/validate-deploy-allowlist.mjs` pasa y está en `release-gate.mjs`.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-184`).
 
 ## REQ-185 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla
 
-**Estado: implementado.**
+**Estado: implementado.** Una serie sin marcar ya no deja la sesión de Entreno "parcial" sin salida.
 
-`pendingPrescribedSets()` y `markWorkoutSetDone()` (`index.html`) centralizan qué falta; "Siguiente ejercicio" abre `openPendingSetsPrompt()`; el cierre lista lo pendiente con "Marcarla(s) como hecha(s)" (`fillPendingWorkoutSets()`, conserva lo respondido); `reviewPendingWorkoutSets()` reabre una sesión parcial de hoy en el ejercicio pendiente; `strengthTotals()` (`workout-player.js`) cuenta las extra solo si se hicieron. `CACHE_NAME` → `fitbud-pwa-v80`. Además, `gotoApp()` (`tests/e2e/helpers.js`) espera a que termine `onAuth()`: su `view="hoy"` final pisaba la navegación y hacía fallar de forma intermitente los E2E de Entreno.
-
-### Origen
-
-Feedback de Claudia (beta, 2026-10-16, día Pull): "Cuando le voy a guardar la sesión, no sé por qué se me guarda parcialmente, pero no me deja terminar de cerrarla como completada". Captura del resultado: 7/7 bloques completados, 16/17 series registradas, 0 bloques omitidos → "Sesión parcial". En otra captura, la Serie 2 del último ejercicio (curl martillo, 2 series) sigue en "Marcar hecha".
-
-### Problema
-
-1. "Siguiente ejercicio" avanza con series prescritas sin marcar y sin avisar.
-2. Al finalizar, una sola serie sin marcar convierte la sesión en parcial (el modal se titula "Cerrar sesión parcial" sin decir por qué).
-3. Una vez guardada, no hay cómo corregirla: "Continuar sesión" no aparece porque no quedan bloques pendientes.
-
-### Causa raíz
-
-- `completeWorkoutStep()` (`index.html`, ~l. 4683) solo exige `completed>=1` serie.
-- `workoutFullyCompleted()` (~l. 4770) exige `step.sets.every(set=>set.done)`, incluidas las series extra añadidas y no hechas (REQ-168).
-- `renderWorkoutExecution()` (~l. 4993) muestra "Continuar sesión" solo si `progress.remaining>0`; `resumePartialWorkout()` salta al primer bloque `pending`, que no existe.
-
-### Objetivo
-
-Que quien hizo todo pueda cerrar la sesión como completada, y que la app diga qué falta cuando no.
-
-### Alcance
-
-1. "Siguiente ejercicio" con series prescritas sin marcar: hoja con "Marcar las N restantes como hechas" (usa reps/RPE objetivo como hace `toggleWorkoutSet`) o "Avanzar sin registrarlas".
-2. Modal de cierre: si faltan series, listar cuáles ("Curl martillo · Serie 2") con botón "Marcarlas como hechas" antes de guardar.
-3. Las series extra (`setIndex>=prescribedSets`) sin hacer no cuentan para `workoutFullyCompleted()` ni en "series registradas".
-4. En una sesión parcial sin `needsReview` con series pendientes, ofrecer "Revisar series" aunque `progress.remaining===0`, llevando al ejercicio con la serie pendiente.
-
-### Fuera de alcance
-
-- Cambiar la regla de seguridad: dolor o malestar sigue guardando parcial con `needsReview`.
-- Editar sesiones de días anteriores (historial inmutable).
-
-### Riesgos
-
-- La racha usa `completed`/`partial` como terminal (REQ-163); no debe cambiar qué días cuentan.
-
-### Criterios de aceptación
-
-- Escenario de Claudia (7/7 bloques, 1 serie prescrita sin marcar): desde el modal de cierre se marca y se guarda "Sesión completada". ✓
-- Una serie extra sin hacer no impide "completada". ✓
-- Una sesión ya guardada parcial con series pendientes se puede reabrir y cerrar completada el mismo día. ✓
-- `tests/e2e/entreno.spec.js` cubre los tres casos (fallan contra el código previo); `node scripts/release-gate.mjs` pasa. ✓
-
-### Verificación sugerida
-
-- Playwright con fixtures: iniciar, marcar todas menos una, "Siguiente ejercicio" hasta el final, finalizar → aparece la lista de series pendientes.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-185`).
 
 ## REQ-186 - Fix Entreno: el cronómetro de descanso se queda congelado
 
-**Estado: implementado.**
+**Estado: implementado.** El cronómetro de descanso ya no se congela.
 
-Causa real (reproducida en `tests/e2e/entreno.spec.js`): `pushDay()` reemplazaba `S.days[ds]` con la copia enviada al recibir la respuesta. Marcar una serie dispara dos guardados (serie hecha → descanso); si el primero responde último, el estado vuelve a "sin descanso" mientras la pantalla sigue en "01:59 · Pausar" y el tick, Pausar y Omitir dejan de actuar. Fix: `pushDay()` ya no reemplaza el día; `pullDay()`/`pullAllDays()` descartan una lectura si el día cambió mientras viajaba (`_dayCommitSeq`); el tick re-renderiza si la pantalla muestra un descanso que el estado no tiene y ya no depende de `session`; al volver a primer plano (`visibilitychange`, `pageshow`) se re-sincroniza el reproductor. `CACHE_NAME` → `fitbud-pwa-v81`.
-
-### Origen
-
-Feedback de Claudia (2026-10-16): "el cronómetro de descanso hay veces que no sé por qué se queda pegado". Captura: "Descanso 01:00" con el botón "Pausar" visible (corriendo) tras marcar la Serie 1.
-
-### Problema
-
-A veces el descanso no baja de su valor inicial aunque figura en marcha. No se ha reproducido todavía.
-
-### Causa raíz
-
-Por confirmar. Fragilidades verificadas en el código:
-
-1. La cuenta atrás solo avanza con `setInterval(workoutTimerTick,1000)` (`index.html` ~l. 12163), y `workoutTimerTick()` (~l. 4824) sale sin hacer nada si `view!=="entreno"`, si `session` es `null` (p. ej. durante un refresco de token) o si `normalizedWorkoutExecution(current)` devuelve `null`.
-2. Al ocultar la app se congela el tiempo (`visibilitychange`/`pagehide`, ~l. 12185), pero al volver no se reconcilia ni se re-renderiza; en la PWA de iOS los intervalos pueden quedar suspendidos tras bloquear la pantalla.
-3. `pullDay()` (~l. 10483) reemplaza `S.days[ds]` entero con el estado remoto si no hay push pendiente; un `syncDay()` al volver puede pisar el temporizador local con uno más viejo.
-
-### Objetivo
-
-Que el descanso siempre muestre el tiempo real restante y termine solo, aunque la app se bloquee, pase a segundo plano o sincronice.
-
-### Alcance
-
-1. Reproducir primero (Playwright con reloj simulado + eventos de visibilidad + `pullDay` concurrente) y documentar la causa real en este REQ.
-2. Corregir la causa encontrada. Mínimo: el tick no depende de `session`; al volver a primer plano (`visibilitychange`, `pageshow`, `focus`) se recalcula y re-renderiza el temporizador; un descanso vencido en segundo plano se cierra al volver.
-3. Un `pullDay()` no pisa una ejecución `in_progress` local con un `updatedAt` remoto más viejo.
-
-### Fuera de alcance
-
-- Sonido, vibración o notificación al terminar el descanso (otro REQ).
-
-### Riesgos
-
-- Tocar `pullDay()` afecta la sincronización de todo el día: limitar el cambio a `workoutExecution` y cubrirlo con `scripts/test-sync-*`/`sync-conflicts.js`.
-
-### Criterios de aceptación
-
-- Test que reproduce el congelamiento antes del fix y pasa después. ✓
-- Simular el descanso + 30 s oculto con los intervalos suspendidos: al volver, el descanso está terminado. ✓
-- `node scripts/release-gate.mjs` pasa. ✓
-
-### Verificación sugerida
-
-- Prueba manual en iPhone (PWA instalada): marcar serie, bloquear 30 s, desbloquear → el contador sigue bajando con el tiempo real.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-186`).
 
 ## REQ-187 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable)
 
-**Estado: implementado.**
+**Estado: implementado.** Descanso cronometrado entre ejercicios (2:00 por defecto), configurable en Perfil.
 
-Decisión de Jonathan (2026-10-16): 2:00 por defecto y configurable por usuario. `profile.prefs.betweenExerciseRestSeconds` (60–300 s, normalizado en `migrateProfilePrefs()`), editable en Perfil → Entreno. `toggleWorkoutSet()` arranca el descanso `{kind:"rest",transition:true}` al completar todas las series si sigue otro ejercicio de fuerza; `completeWorkoutStep()` lo conserva (o lo arranca si se avanzó por otra vía) y lo anula si sigue la vuelta a la calma. `CACHE_NAME` → `fitbud-pwa-v82`.
-
-### Origen
-
-Feedback de Claudia (2026-10-16): "Echo de menos que entre ejercicio y ejercicio aparezca un contador de dos minutos de descanso… solo hay entre serie".
-
-### Problema
-
-El descanso cronometrado solo aparece entre series del mismo ejercicio. Tras la última serie, y al pasar al siguiente ejercicio, no hay contador.
-
-### Causa raíz
-
-`toggleWorkoutSet()` (`index.html` ~l. 4717) arranca el descanso solo si `setIndex<step.sets.length-1`, y `completeWorkoutStep()` (~l. 4688) pone `execution.timer=null` al avanzar.
-
-### Objetivo
-
-Que al terminar un ejercicio de fuerza empiece un descanso cronometrado que acompaña al siguiente ejercicio.
-
-### Alcance
-
-1. Al marcar la última serie de un ejercicio de fuerza seguido de otro de fuerza, arrancar un descanso de transición (`kind:"rest"`) con la duración elegida por el usuario (2:00 por defecto).
-2. `completeWorkoutStep()` conserva un descanso en curso; el siguiente ejercicio lo muestra como "Descanso entre ejercicios" con Pausar/+15 s/Omitir.
-3. Marcar la primera serie del siguiente ejercicio cierra el descanso de transición y arranca el normal.
-4. Tras el último ejercicio de fuerza (sigue la vuelta a la calma) no se arranca descanso.
-5. Mostrar el descanso entre ejercicios en el resumen previo (REQ-174) y subir `CACHE_NAME`.
-
-### Fuera de alcance
-
-- Cambiar los descansos que prescribe el plan.
-
-### Riesgos
-
-- Depende de que el temporizador sea fiable: implementar después de REQ-186.
-- No alargar la "duración real": el descanso no altera `elapsedSeconds`.
-
-### Criterios de aceptación
-
-- Al marcar la última serie del ejercicio 1 aparece "Descanso entre ejercicios 02:00"; tras "Siguiente ejercicio" sigue visible y bajando en el ejercicio 2. ✓
-- "Omitir" lo quita; marcar una serie del ejercicio 2 lo reemplaza por el descanso entre series. ✓
-- Tras el último ejercicio de fuerza no aparece descanso entre ejercicios. ✓
-- Elegir 1:30 en Perfil se guarda en `prefs` y Entreno lo muestra. ✓
-- `node scripts/release-gate.mjs` pasa. ✓
-
-### Verificación sugerida
-
-- Playwright en `tests/e2e/entreno.spec.js` con reloj simulado; captura a 375px.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-187`).
 
 ## REQ-188 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos
 
-**Estado: implementado.**
+**Estado: implementado.** Comidas recientes y favoritas reutilizables, y alimentos sueltos por gramos.
 
-Decisión de Jonathan (2026-10-16): favoritas en el perfil, sin migración. `editorSheet()` (`index.html`) abre con pestañas Recientes (`recentCustomMeals()`: lo escrito por el usuario en `ms.ovr` sin `dishName`/`gen` y `extras`, últimas 20 distintas) · Favoritas (`profile.prefs.savedMeals`, `normalizedSavedMeals()`, máx. 50, guardado con `saveProfilePrefs(...,{skipPlanVersion:true})`; fuera de `planSnapshotFields()`, no crea versiones de plan) · Alimento (`DB.ingredients` por 100 g, búsqueda sin tildes, suma varios alimentos). Porción ×0,5/×1/×1,5/×2 y "Guardar en favoritas" al guardar. `CACHE_NAME` → `fitbud-pwa-v83`.
-
-### Origen
-
-Feedback de Claudia (2026-10-16): come muchas veces lo mismo y quiere no volver a meter esa comida, con "un histórico de cosas que he metido o que quiero guardar en favoritos"; seleccionar y que se pongan los macros. También alimentos sueltos, no solo platos enteros.
-
-### Problema
-
-Cada comida personalizada o extra se escribe desde cero (descripción + macros o estimación). No hay recientes, favoritos ni forma de sumar un alimento del catálogo por gramos.
-
-### Causa raíz
-
-`editorSheet()`/`saveEditor()` (`index.html` ~l. 7880–7910) guardan el valor solo en el día (`ms.ovr` o `dayState(ds).extras`); nada lo indexa para reutilizarlo. El catálogo `ingredients` (macros por 100 g, `supabase/schema.sql`) solo se usa dentro de recetas.
-
-### Objetivo
-
-Registrar una comida repetida en dos toques y un alimento suelto sin calcular macros a mano.
-
-### Alcance
-
-1. Fase A — recientes y favoritas (sin migración):
-   - "Recientes": últimas 20 comidas distintas (por nombre normalizado) de `ms.ovr` y `extras` en `S.days`, con buscador.
-   - Estrella "Guardar en favoritas" al guardar y en la lista; persistir en `profile.prefs.savedMeals` (máx. 50, `{name,kcal,p,c,f}`) vía `saveProfilePrefs()`.
-   - En `editorSheet()`, arriba: pestañas "Recientes · Favoritas"; tocar una precarga nombre y macros, con porción ×0.5/×1/×1.5/×2.
-2. Fase B — alimento suelto: pestaña "Alimento" que busca en `DB.ingredients`, pide gramos y calcula kcal/macros (`valor×g/100`); se guarda como extra o como override igual que hoy.
-3. Cada fase en su propio commit si el implementador lo prefiere (mismo REQ).
-
-### Fuera de alcance
-
-- Escáner de código de barras o bases externas de alimentos.
-- Que los favoritos cambien el plan generado.
-
-### Riesgos
-
-- Privacidad: favoritos y recientes son datos del usuario; nada a analytics.
-- `profile.prefs` crece: limitar a 50 y validar tipos.
-- REQ-31: la UI no menciona IA.
-
-### Criterios de aceptación
-
-- Una comida registrada ayer aparece en "Recientes" y al tocarla se guarda con sus macros sin escribir nada. ✓
-- Una favorita sobrevive a cerrar sesión e iniciar en otro dispositivo (vive en `profiles.prefs`). ✓
-- "Avena 60 g" calcula los macros desde el catálogo. ✓
-- `node scripts/release-gate.mjs` pasa. ✓ (`tests/e2e/comidas-guardadas.spec.js`)
-
-### Verificación sugerida
-
-- Playwright en `tests/e2e/nutricion*.spec.js` con fixtures (0 llamadas pagadas); captura a 375px del selector.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-188`).
 
 ## REQ-189 - Marca: ícono de la app con chevrons ascendentes (PWA, favicon y Open Graph)
 
-**Estado: implementado.**
+**Estado: implementado.** Ícono de chevrons ascendentes en PWA, `brandMark()`, favicon (`/favicon.ico`, `assets/favicon.svg`) y Open Graph (`assets/og-image.png` 1200×630).
 
-### Origen
-
-Jonathan (2026-10-16): no le gusta el logo de la PWA; pide actualizar también el favicon de la web y la imagen Open Graph. Las tres barras ascendentes de REQ-180 se leen como el indicador de señal del celular en la pantalla de inicio. Entre cinco opciones dentro de la misma marca (casi negro + lima), eligió "chevrons ascendentes".
-
-### Alcance
-
-1. `assets/icon-180.png`, `icon-192.png` e `icon-512.png` regenerados: tres chevrons lima con opacidad creciente (35% → 65% → 100%) sobre `#101010`, centrados dentro de la zona segura maskable (círculo r=205 sobre 512).
-2. `brandMark()` (`index.html`) usa el mismo dibujo en la portada y las pantallas de acceso.
-3. Favicon de la web: `/favicon.ico` (16/32/48 px, en la raíz, donde lo piden navegadores y buscadores) y `assets/favicon.svg`, enlazados desde `index.html` y `beta-reclutamiento.html` (antes usaban el PNG de 192 px; beta no tenía).
-4. Open Graph/Twitter: `assets/og-image.png` 1200×630 (marca, tagline y dominio) con URL absoluta `https://evolvapp.club/...` en `og:image`/`twitter:image`, más `og:image:width/height/alt`, `og:locale` y `twitter:card=summary_large_image`. Antes `og:image` era la ruta relativa `assets/icon-512.png` (cuadrada), que WhatsApp, Facebook y LinkedIn no resuelven. `beta-reclutamiento.html` recibe la misma imagen, `og:url` y `og:site_name`.
-5. `.vercelignore` publica `/favicon.ico`; `validate-deploy-allowlist.mjs` declara `assets/og-image.png` en `EXTRA_PUBLIC` (se referencia con URL absoluta).
-6. `CACHE_NAME` → `fitbud-pwa-v84`: al activarse el service worker nuevo se borra la caché vieja y se vuelven a pedir los íconos.
-
-### Fuera de alcance
-
-- Wordmark "evol·v", colores y tipografías (sin cambios).
-- Añadir `icon-180.png` a `APP_SHELL` (REQ-182).
-- iOS guarda el ícono de la pantalla de inicio al instalar: quien ya tiene la PWA instalada en iPhone verá el ícono nuevo solo al reinstalarla.
-
-### Criterios de aceptación
-
-- Los tres PNG tienen el tamaño declarado y el dibujo no se corta con la máscara circular de Android. ✓
-- Ambas páginas enlazan `favicon.ico` + `favicon.svg`; `og:image` es absoluta y apunta a una imagen 1200×630. ✓
-- Tras el deploy, el depurador de compartir de Facebook o una vista previa de WhatsApp muestran la imagen nueva (verificación manual: esas plataformas guardan la vista previa vieja en caché).
-- Portada y login muestran el nuevo `brandMark()`. ✓
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-189`).
 
 ## REQ-190 - Registro: pantalla "Revisa tu correo" en lugar del formulario con un aviso
 
@@ -1828,3 +1544,159 @@ Jonathan (2026-10-17): tras registrarse, el formulario quedaba visible con "Cuen
 1. `doAuth()`: si `signUp` no devuelve sesión, guarda el correo y cambia a `_authMode="check"`.
 2. `renderConfirmEmail()`: pantalla sin inputs con el correo, consejos (spam, abrir en el mismo dispositivo, cuenta existente), "Ya confirmé, iniciar sesión" (precarga el correo), "Reenviar correo" (`supa.auth.resend`, espera de 60 s) y "Usar otro correo".
 3. E2E `tests/e2e/registro.spec.js`.
+
+## REQ-191 - Fix Perfil: el aviso de actividad ligera reaparece en cada visita
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16). Para un usuario "solo fuerza", `renderProfile()` llama a `showCardioNudge("profile")` y solo el botón "Continuar" marcaba `UI.cardioNudgeDismissed`; cerrar con ✕, Esc o tocando fuera pasaba por `closeModal()` sin marcarlo, así que el sheet tapaba Perfil en cada visita.
+
+### Alcance
+
+1. `modal(html, {onClose})`: `closeModal()` ejecuta el callback una vez, por cualquier vía de cierre.
+2. `showCardioNudge()` usa `onClose` para marcar el aviso como visto; "Continuar" sigue guardando la elección del checkbox.
+
+### Criterios de aceptación
+
+- Cerrar el aviso con ✕ o Esc y volver a Perfil (también tras recargar) no lo muestra de nuevo. ✓ (`tests/e2e/perfil.spec.js`)
+
+## REQ-192 - Accesibilidad: campos con nombre, landmarks, FAQ, contraste de `--muted2` y movimiento reducido
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): axe marcaba `select-name` (crítico) en el onboarding y `aria-prohibited-attr` en `.steps`; ninguna vista tenía `<main>` ni `h1`; la FAQ no exponía su estado; `--muted2` (`#5f5f58`, 2.6–3.0:1) seguía en texto real (etiquetas de macros, "/2200 kcal"), fuera del alcance de REQ-112.
+
+### Alcance
+
+1. 97 `<label>` seguidos de su control pasan a `for="id"`; los campos de serie de Entreno (sin id) reciben `aria-label` con el número de serie; `#coachInput` recibe `aria-label`.
+2. `.steps` del onboarding: `role="progressbar"` con `aria-valuenow`/`aria-valuemax`.
+3. `#app` es el único `<main>` (los `<main>` internos de onboarding/recap pasan a `div`); Hoy, Progreso, Perfil y las vistas con navegación de día (`dayHeaderNav`) tienen `h1`.
+4. FAQ de la portada: `aria-expanded` se actualiza al abrir/cerrar.
+5. `--muted2` → `#8f8f87` (≥4.5:1 sobre `--bg`, `--surf1` y `--surf2`).
+6. `prefers-reduced-motion`: `pulse` del micrófono, `bounce` del "escribiendo" y `a2hsIn` se sustituyen por estados estáticos.
+7. Orden de títulos sin saltos (`.agenda-title` y el nombre de cada ejercicio pasan a `h2`) y `#sync-badge` como `<aside aria-live>` dentro de un landmark: axe (WCAG 2.2 AA + best-practice) queda en 0 en Hoy, Nutrición, Entreno, Progreso, Perfil y onboarding.
+
+### Criterios de aceptación
+
+- `tests/e2e/accesibilidad.spec.js`: un `<main>` y un `h1` por tab, campos del onboarding asociados a su etiqueta, progreso anunciado y FAQ con `aria-expanded`. ✓
+
+## REQ-193 - Táctil: todos los controles miden 44 px en pantallas táctiles
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16), medida con emulación táctil (`pointer:coarse`): la regla de 44 px de la auditoría de junio cubría `.btn-sm`, `.chip-check` y `.csec-h`, pero no `.btn` (35–39 px), los chips del coach (32), el check de comida (32), "Ver técnica" (34), "¿Qué es RPE?" (20), el botón de ayuda (40), el de enviar (42), los selects de disponibilidad de Perfil (40) ni el cierre de los sheets (36). En escritorio el badge de sincronización flotaba fuera de la columna de 560 px.
+
+### Alcance
+
+1. Bloque `@media(pointer:coarse)` al final del `<style>` (gana la cascada): `min-height:44px` en `.btn`, `.coach-chip`, campos y selects; `::after` con `inset:-7px` en `.chk`, `.demo-expand` y `.a2hs-x` para ampliar el área sin cambiar el tamaño visual; checkboxes de 20 px.
+2. Botón de enviar del coach: 44 px, `aria-label` e ícono SVG en lugar de "➤".
+3. `.sync-badge` se alinea al borde de la columna.
+
+### Criterios de aceptación
+
+- `tests/e2e/tactil.spec.js`: ningún control visible de las 5 tabs mide menos de 44×44 px en táctil (falla con el código anterior). ✓
+
+## REQ-194 - Textos: sin vocabulario interno, fechas consistentes y beta con ortografía completa
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): Nutrición decía "llena los **slots**", "Macros calculados desde **tu base de datos**" y "prepara una opción con tu coach **o elige**" (frase cortada); `text-transform:capitalize` convertía "16 oct" en "16 Oct" en Nutrición/Entreno/Progreso mientras Hoy decía "16 oct"; el chip de check-in usaba el emoji 📋; `beta-reclutamiento.html` no tenía tildes ni "¿" ("Que te describe mejor?", "Pais", "despues").
+
+### Alcance
+
+1. Copy de Nutrición y `dbStatusNote()` en lenguaje del usuario; error de carga con recuperación ("Revisa tu conexión y vuelve a intentarlo").
+2. Sin `text-transform:capitalize` en `.dtitle .date` y `.wk-left .d`.
+3. Chip de check-in sin emoji.
+4. Beta: ortografía en textos visibles y placeholders; los `value` que se envían al API no cambian (no altera el scoring ni datos históricos).
+
+### Criterios de aceptación
+
+- `tests/e2e/textos.spec.js`: Nutrición sin "slots"/"base de datos"/"o elige", fecha "Viernes, 16 oct", y la beta con "¿Qué te describe mejor?". ✓
+
+## REQ-195 - Progreso y Nutrición: menos campos vacíos para el usuario nuevo
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): Progreso mostraba S1–S10 con dos campos cada una (20 inputs vacíos) y "Ingresar mi peso" enfocaba siempre la semana 1; cada comida sin asignar de Nutrición mostraba "0 kcal · P 0 · C 0 · G 0 g" y su check no tenía nombre accesible.
+
+### Alcance
+
+1. `weightTableHtml()`: se ven las semanas hasta la actual (`currentWeightWeek()`) o la última con datos; las siguientes van en `<details class="wt-later">`. "Ingresar mi peso" enfoca la semana actual.
+2. Comida sin contenido: "Sin asignar" + una línea de ayuda, sin macros en cero.
+3. El check de cada comida tiene `aria-label`/`aria-pressed`.
+
+### Criterios de aceptación
+
+- `tests/e2e/progreso.spec.js`: semana siguiente oculta hasta abrir el plegable; el foco cae en la semana actual; comida vacía sin `.nums`. ✓
+
+## REQ-196 - Marca: restos de color de Fitbros y tokens CSS sin definir
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): los chips del coach usaban `var(--accent-text,#c4b5fd)` con la variable sin definir, así que se veían lila (marca anterior); `.alert.violet` tenía texto `#d8ccff`; también caían a su fallback o a nada `--white`, `--ok`, `--r` y `--accent-rgb` (violeta 139,92,246). El tour conservaba fondos violeta como fallback.
+
+### Alcance
+
+1. Chips, alertas "violet", `.chat-type.educativo`, `.setup-step` y flechas de día pasan a tokens Evolv definidos (`--purple-200`, `--accent-dim`, `--good`, `--txt`, `--r-md`).
+2. Tour: sin fallbacks violeta; botones de 44 px.
+3. `scripts/validate-css-tokens.mjs` (en el release gate) falla si `index.html` o `beta-reclutamiento.html` usan una `var(--x)` sin definir.
+4. Detector de impeccable (`impeccable detect index.html`): `.btn-accent` sin halo lima (`dark-glow`); el badge "Actualizar app" pasa de `div` lila de 10 px a `<button>` de 12 px con tokens azul señal y dentro de la columna.
+
+### Criterios de aceptación
+
+- `node scripts/validate-css-tokens.mjs` pasa ahora y falla con el `index.html` anterior (5 variables). ✓
+
+## REQ-197 - Rendimiento: la portada no espera a la config ni a Supabase, y supabase-js va fijado con SRI
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable (2026-10-16), medido en producción: LCP móvil de 3.4 s en frío. Para un visitante sin sesión, `boot()` esperaba `/api/config` → `supabase.auth.getSession()` antes de pintar la portada, y supabase-js se cargaba de forma bloqueante desde `@supabase/supabase-js@2` (versión flotante: hoy 2.118.0, publicada el día anterior; sin SRI).
+
+### Alcance
+
+1. `boot()`: sin sesión guardada (`hasStoredAuthSession()`) ni enlace de recuperación, pinta la portada antes de pedir la config; al confirmar "sin sesión" solo se actualizan los planes (`refreshLandingPlans()`), sin repintar ni perder la FAQ abierta. El catálogo se pide en paralelo desde el inicio.
+2. supabase-js `2.117.2` exacta, con `integrity` + `crossorigin` y `defer`; `supabaseLibReady()` la espera antes de `supaInit()`.
+3. `scripts/validate-cdn-pins.mjs` (release gate): scripts de CDN con versión exacta y SRI, y la copia de `tests/e2e/vendor/` igual al hash.
+
+### Fuera de alcance
+
+- Separar la portada de la app (el HTML de 207 KB brotli/750 KB sigue siendo el costo principal): requiere decidir rutas, PWA y service worker.
+
+### Criterios de aceptación
+
+- `navegacion.spec.js`: con `/api/config` colgada la portada se ve y la FAQ abierta sobrevive; con sesión guardada no se muestra la portada. ✓
+- 4G emulado + CPU ×4, local: 5.6 s → 5.1 s hasta el titular. ✓
+
+## REQ-198 - Portada: rediseño "Escalera de días" dentro de la marca Escala
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-16), tras la auditoría impeccable: rediseñar la web pública para que refleje la marca y no parezca una landing genérica. La portada anterior era la plantilla de la categoría: etiqueta en mayúsculas sobre cada sección, grilla de tarjetas iguales con emoji (🥗🏋️🔄📈⚡) y un hueco en escritorio, brillos de acento y FAQ sin estado. Eligió la dirección "Escalera de días" y, como prueba, solo demostración del producto (sin testimonios ni cifras inventadas).
+
+### Alcance
+
+1. Misma marca (REQ-180/189): carbón + lima sólida, Unbounded + Manrope, chevrons. Sin brillos, degradados de acento ni emoji.
+2. Hero: titular de marca a gran tamaño + demo del día (marcada "Ejemplo") con tres imprevistos reales de la app ("Como fuera", "Solo tengo 20 min", "Entreno en casa") que cambian almuerzo o entreno.
+3. Cinco escalones en orden temporal (Hoy, En el entreno, Si el día se tuerce, Cada semana, Al cerrar el ciclo), cada uno con un fragmento de la UI real. En escritorio, una escalera fija que sube y se enciende peldaño a peldaño al bajar (`initLandingStair()`); en móvil, una escalera mini por escalón.
+4. Planes del catálogo con el destacado en campo lima; FAQ con `<details>`; cierre en campo lima a sangre completa. Copy existente y verdadero: no se añaden afirmaciones comerciales.
+
+### Criterios de aceptación
+
+- `tests/e2e/portada.spec.js`: la demo cambia y se revierte; sin emoji ni vocabulario de IA; la escalera se enciende y sigue a la vista. ✓
+- axe (WCAG 2.2 AA + best-practice) sin violaciones a 390 y 1440 px; sin scroll horizontal; controles ≥44 px. ✓
