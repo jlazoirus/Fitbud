@@ -1564,6 +1564,7 @@ Auditoría impeccable de UI (2026-10-16): axe marcaba `select-name` (crítico) e
 4. FAQ de la portada: `aria-expanded` se actualiza al abrir/cerrar.
 5. `--muted2` → `#8f8f87` (≥4.5:1 sobre `--bg`, `--surf1` y `--surf2`).
 6. `prefers-reduced-motion`: `pulse` del micrófono, `bounce` del "escribiendo" y `a2hsIn` se sustituyen por estados estáticos.
+7. Orden de títulos sin saltos (`.agenda-title` y el nombre de cada ejercicio pasan a `h2`) y `#sync-badge` como `<aside aria-live>` dentro de un landmark: axe (WCAG 2.2 AA + best-practice) queda en 0 en Hoy, Nutrición, Entreno, Progreso, Perfil y onboarding.
 
 ### Criterios de aceptación
 

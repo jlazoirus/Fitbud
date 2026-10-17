@@ -256,7 +256,7 @@
   @keyframes demoSwim{0%,100%{transform:translateX(-12px) rotate(-2deg)}50%{transform:translateX(12px) rotate(2deg)}}
   .exercise-body{padding:14px 15px}
   .exercise-title{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-  .exercise-title h3{font-family:var(--font-body);font-size:16px;margin:0}
+  .exercise-title h2,.exercise-title h3{font-family:var(--font-body);font-size:16px;margin:0;letter-spacing:0}
   .exercise-meta{font-size:11px;color:var(--muted);margin-top:4px}
   .exercise-copy{font-size:13px;line-height:1.48;color:var(--muted);margin-top:10px}
   .exercise-copy b{color:var(--txt)}
@@ -542,7 +542,7 @@
   .agenda-card{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;margin:14px 0}
   .agenda-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
   .agenda-kicker{font-size:11px;color:var(--terra-300);text-transform:uppercase;font-weight:800;margin-bottom:4px}
-  .agenda-title{font-family:var(--font-body);font-size:21px;font-weight:800;margin:0;line-height:1.18}
+  .agenda-title{font-family:var(--font-body);font-size:21px;font-weight:800;margin:0;line-height:1.18;letter-spacing:0}
   .agenda-sub{font-size:12px;color:var(--muted);line-height:1.35;margin-top:4px}
   .agenda-count{background:var(--surf2);border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:11px;font-weight:700;padding:5px 8px;white-space:nowrap}
   .agenda-note{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r-md);color:var(--muted);font-size:12px;line-height:1.35;padding:10px 12px;margin:8px 0 10px}
@@ -907,7 +907,7 @@
 <main id="app"></main>
 <div class="tabs" id="tabs"></div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-<div class="sync-badge" id="sync-badge" hidden></div>
+<aside class="sync-badge" id="sync-badge" aria-live="polite" aria-label="Estado de sincronización" hidden></aside>
 <div class="update-badge" id="update-badge" hidden onclick="applyPendingAppUpdate()" role="button" aria-label="Actualizar la app a la última versión">↻ Actualizar</div>
 
 <script>
@@ -4311,7 +4311,7 @@ function homeAgendaHtml(ds){
       <div class="agenda-head">
         <div>
           <div class="agenda-kicker">Tu agenda</div>
-          <h3 class="agenda-title">Aún falta preparar este día</h3>
+          <h2 class="agenda-title">Aún falta preparar este día</h2>
           <div class="agenda-sub">Tu coach arma comidas y entreno para hoy en segundos.</div>
         </div>
       </div>
@@ -4327,7 +4327,7 @@ function homeAgendaHtml(ds){
       <div class="agenda-head">
         <div>
           <div class="agenda-kicker">Día cerrado</div>
-          <h3 class="agenda-title">Todo lo importante de hoy está cubierto</h3>
+          <h2 class="agenda-title">Todo lo importante de hoy está cubierto</h2>
           <div class="agenda-sub">Puedes revisar progreso o dejar notas adicionales desde las vistas de detalle.</div>
         </div>
         <span class="agenda-count">Racha ${streak()}</span>
@@ -4344,7 +4344,7 @@ function homeAgendaHtml(ds){
     <div class="agenda-head">
       <div>
         <div class="agenda-kicker">Tu agenda</div>
-        <h3 class="agenda-title">Lo que sigue hoy</h3>
+        <h2 class="agenda-title">Lo que sigue hoy</h2>
         <div class="agenda-sub">Ordenado con tu plan, lo registrado y el estado del entrenamiento.</div>
       </div>
       <span class="agenda-count">${data.pendingCount} pendiente${data.pendingCount===1?"":"s"}</span>
@@ -4457,7 +4457,7 @@ function renderNutrition(){
   const emptyNutHtml=!prepared?`<section class="agenda-card agenda-state setup">
     <div class="agenda-head"><div>
       <div class="agenda-kicker">Nutrición</div>
-      <h3 class="agenda-title">Prepara tus comidas de hoy</h3>
+      <h2 class="agenda-title">Prepara tus comidas de hoy</h2>
       <div class="agenda-sub">Aquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Al preparar el día, cada comida se llena sola.</div>
     </div></div>
     <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
@@ -4609,7 +4609,7 @@ function exerciseCard(exercise,admin){
     <div class="exercise-demo">${exerciseMediaHtml(exercise,{autoplay:!pausedByDefault})}<button class="demo-expand" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Ver técnica de ${esc(exercise.name)} ampliada">⤢</button></div>
     <div class="exercise-body">
       <div class="exercise-title">
-        <div><h3>${esc(exercise.name)}</h3><div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(equipment.join(", "))}`:""}</div></div>
+        <div><h2>${esc(exercise.name)}</h2><div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(equipment.join(", "))}`:""}</div></div>
         ${exercise.active===false?'<span class="badge b-Libre">Archivado</span>':""}
       </div>
       ${admin?`<div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
@@ -5250,7 +5250,7 @@ function renderWorkout(){
   const emptyWkHtml=(contentIssues.length&&!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold())?`<section class="agenda-card agenda-state setup">
     <div class="agenda-head"><div>
       <div class="agenda-kicker">Entreno</div>
-      <h3 class="agenda-title">Tu sesión de hoy no está disponible</h3>
+      <h2 class="agenda-title">Tu sesión de hoy no está disponible</h2>
       <div class="agenda-sub">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción abajo antes de iniciarla.</div>
     </div></div>
   </section>`:"";
@@ -5467,7 +5467,7 @@ function weightSetupCard(empty){
   return `<section class="agenda-card agenda-state setup" style="margin:0 0 14px">
     <div class="agenda-head"><div>
       <div class="agenda-kicker">Progreso</div>
-      <h3 class="agenda-title">Registra tu peso de la semana</h3>
+      <h2 class="agenda-title">Registra tu peso de la semana</h2>
       <div class="agenda-sub">${empty?"Con tu primer registro desbloqueas tu gráfico de evolución, tu racha y tu adherencia a comidas.":"Ver tu peso semana a semana revela si el plan funciona — sin adivinar. Completa el campo de la semana actual para activar el gráfico."}</div>
     </div></div>
     <div class="agenda-actions"><button class="btn btn-accent" onclick="scrollToWeightInput()">Ingresar mi peso</button></div>
