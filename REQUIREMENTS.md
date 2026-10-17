@@ -1638,6 +1638,7 @@ Auditoría impeccable de UI (2026-10-16): los chips del coach usaban `var(--acce
 1. Chips, alertas "violet", `.chat-type.educativo`, `.setup-step` y flechas de día pasan a tokens Evolv definidos (`--purple-200`, `--accent-dim`, `--good`, `--txt`, `--r-md`).
 2. Tour: sin fallbacks violeta; botones de 44 px.
 3. `scripts/validate-css-tokens.mjs` (en el release gate) falla si `index.html` o `beta-reclutamiento.html` usan una `var(--x)` sin definir.
+4. Detector de impeccable (`impeccable detect index.html`): `.btn-accent` sin halo lima (`dark-glow`); el badge "Actualizar app" pasa de `div` lila de 10 px a `<button>` de 12 px con tokens azul señal y dentro de la columna.
 
 ### Criterios de aceptación
 
