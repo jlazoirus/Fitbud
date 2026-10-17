@@ -1,4 +1,4 @@
-// REQ-191: nombres accesibles, landmarks y estado de la FAQ.
+// REQ-192: nombres accesibles, landmarks y estado de la FAQ.
 import { test, expect } from "@playwright/test";
 import {
   installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, profileFixture,

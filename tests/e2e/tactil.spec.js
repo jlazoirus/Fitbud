@@ -1,4 +1,4 @@
-// REQ-192: en pantallas táctiles todo control mide al menos 44×44 px
+// REQ-193: en pantallas táctiles todo control mide al menos 44×44 px
 // (o amplía su área táctil con ::after sin cambiar el tamaño visual).
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, gotoApp, autoDismissNudges } from "./helpers.js";
@@ -26,7 +26,7 @@ async function smallTargets(page) {
   });
 }
 
-test("REQ-192: los controles de las 5 tabs miden ≥44 px en táctil", async ({ page, context }) => {
+test("REQ-193: los controles de las 5 tabs miden ≥44 px en táctil", async ({ page, context }) => {
   await installMocks(context);
   await seedLoggedInUser(page);
   await autoDismissNudges(page);

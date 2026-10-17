@@ -14,7 +14,7 @@ assert.ok(index.includes('["omnivoro","Como de todo"]'), "El valor omnivoro debe
 assert.ok(index.includes("Como de todo no puede combinarse"), "La validación debe usar el label visible nuevo.");
 assert.ok(!index.includes("Omnívoro"), "El shell visible no debe mostrar Omnívoro.");
 
-// REQ-191: los labels del onboarding van asociados a su campo con for="…".
+// REQ-192: los labels del onboarding van asociados a su campo con for="…".
 const label = (text, id) => index.includes(`<label for="${id}">${text}</label>`);
 assert.ok(label("Grasa corporal (opcional)", "ob_bf"), "El campo de grasa corporal debe ser claramente opcional.");
 assert.ok(index.includes("Déjalo vacío si no lo sabes; no bloquea tu plan."), "El campo opcional debe explicar que puede quedar vacío.");

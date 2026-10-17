@@ -1,4 +1,4 @@
-// REQ-197: portada "Escalera de días".
+// REQ-198: portada "Escalera de días".
 import { test, expect } from "@playwright/test";
 import { installMocks, collectConsoleErrors, gotoApp } from "./helpers.js";
 

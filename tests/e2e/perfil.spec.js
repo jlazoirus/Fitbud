@@ -203,7 +203,7 @@ test.describe("Perfil", () => {
     expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  test("REQ-190: cerrar el aviso de actividad ligera con ✕ no lo vuelve a mostrar", async ({ page, context }) => {
+  test("REQ-191: cerrar el aviso de actividad ligera con ✕ no lo vuelve a mostrar", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     const errors = collectConsoleErrors(page);
@@ -228,7 +228,7 @@ test.describe("Perfil", () => {
     expect(errors).toEqual([]);
   });
 
-  test("REQ-190: cerrar el aviso con Esc también cuenta como visto", async ({ page, context }) => {
+  test("REQ-191: cerrar el aviso con Esc también cuenta como visto", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await gotoApp(page);

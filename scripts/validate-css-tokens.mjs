@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REQ-195: toda var(--x) usada en las páginas públicas debe estar definida.
+// REQ-196: toda var(--x) usada en las páginas públicas debe estar definida.
 // Una variable sin definir cae a su fallback (o a nada) y así sobrevivieron
 // colores de la marca anterior (lila) tras el rebranding a Evolv.
 import fs from "node:fs";

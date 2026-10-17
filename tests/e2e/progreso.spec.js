@@ -71,7 +71,7 @@ test.describe("Progreso", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  test("REQ-194: solo se ven las semanas hasta la actual; las siguientes quedan plegadas", async ({ page, context }) => {
+  test("REQ-195: solo se ven las semanas hasta la actual; las siguientes quedan plegadas", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -90,7 +90,7 @@ test.describe("Progreso", () => {
     await expect(page.getByLabel(`Peso de la semana ${cur} en kilogramos`)).toBeFocused();
   });
 
-  test("REQ-194: una comida sin asignar no muestra macros en cero", async ({ page, context }) => {
+  test("REQ-195: una comida sin asignar no muestra macros en cero", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);

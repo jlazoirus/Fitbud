@@ -1531,7 +1531,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-188`).
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-189`).
 
-## REQ-190 - Fix Perfil: el aviso de actividad ligera reaparece en cada visita
+## REQ-191 - Fix Perfil: el aviso de actividad ligera reaparece en cada visita
 
 **Estado: implementado.**
 
@@ -1548,7 +1548,7 @@ Auditoría impeccable de UI (2026-10-16). Para un usuario "solo fuerza", `render
 
 - Cerrar el aviso con ✕ o Esc y volver a Perfil (también tras recargar) no lo muestra de nuevo. ✓ (`tests/e2e/perfil.spec.js`)
 
-## REQ-191 - Accesibilidad: campos con nombre, landmarks, FAQ, contraste de `--muted2` y movimiento reducido
+## REQ-192 - Accesibilidad: campos con nombre, landmarks, FAQ, contraste de `--muted2` y movimiento reducido
 
 **Estado: implementado.**
 
@@ -1570,7 +1570,7 @@ Auditoría impeccable de UI (2026-10-16): axe marcaba `select-name` (crítico) e
 
 - `tests/e2e/accesibilidad.spec.js`: un `<main>` y un `h1` por tab, campos del onboarding asociados a su etiqueta, progreso anunciado y FAQ con `aria-expanded`. ✓
 
-## REQ-192 - Táctil: todos los controles miden 44 px en pantallas táctiles
+## REQ-193 - Táctil: todos los controles miden 44 px en pantallas táctiles
 
 **Estado: implementado.**
 
@@ -1588,7 +1588,7 @@ Auditoría impeccable de UI (2026-10-16), medida con emulación táctil (`pointe
 
 - `tests/e2e/tactil.spec.js`: ningún control visible de las 5 tabs mide menos de 44×44 px en táctil (falla con el código anterior). ✓
 
-## REQ-193 - Textos: sin vocabulario interno, fechas consistentes y beta con ortografía completa
+## REQ-194 - Textos: sin vocabulario interno, fechas consistentes y beta con ortografía completa
 
 **Estado: implementado.**
 
@@ -1607,7 +1607,7 @@ Auditoría impeccable de UI (2026-10-16): Nutrición decía "llena los **slots**
 
 - `tests/e2e/textos.spec.js`: Nutrición sin "slots"/"base de datos"/"o elige", fecha "Viernes, 16 oct", y la beta con "¿Qué te describe mejor?". ✓
 
-## REQ-194 - Progreso y Nutrición: menos campos vacíos para el usuario nuevo
+## REQ-195 - Progreso y Nutrición: menos campos vacíos para el usuario nuevo
 
 **Estado: implementado.**
 
@@ -1625,7 +1625,7 @@ Auditoría impeccable de UI (2026-10-16): Progreso mostraba S1–S10 con dos cam
 
 - `tests/e2e/progreso.spec.js`: semana siguiente oculta hasta abrir el plegable; el foco cae en la semana actual; comida vacía sin `.nums`. ✓
 
-## REQ-195 - Marca: restos de color de Fitbros y tokens CSS sin definir
+## REQ-196 - Marca: restos de color de Fitbros y tokens CSS sin definir
 
 **Estado: implementado.**
 
@@ -1644,7 +1644,7 @@ Auditoría impeccable de UI (2026-10-16): los chips del coach usaban `var(--acce
 
 - `node scripts/validate-css-tokens.mjs` pasa ahora y falla con el `index.html` anterior (5 variables). ✓
 
-## REQ-196 - Rendimiento: la portada no espera a la config ni a Supabase, y supabase-js va fijado con SRI
+## REQ-197 - Rendimiento: la portada no espera a la config ni a Supabase, y supabase-js va fijado con SRI
 
 **Estado: implementado.**
 
@@ -1667,7 +1667,7 @@ Auditoría impeccable (2026-10-16), medido en producción: LCP móvil de 3.4 s e
 - `navegacion.spec.js`: con `/api/config` colgada la portada se ve y la FAQ abierta sobrevive; con sesión guardada no se muestra la portada. ✓
 - 4G emulado + CPU ×4, local: 5.6 s → 5.1 s hasta el titular. ✓
 
-## REQ-197 - Portada: rediseño "Escalera de días" dentro de la marca Escala
+## REQ-198 - Portada: rediseño "Escalera de días" dentro de la marca Escala
 
 **Estado: implementado.**
 

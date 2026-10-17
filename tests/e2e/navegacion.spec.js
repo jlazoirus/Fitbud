@@ -104,7 +104,7 @@ test.describe("Navegación", () => {
     expect(errors, `Errores de consola en toggle de contraseña:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  test("REQ-196: sin sesión guardada la portada se pinta sin esperar a /api/config", async ({ page, context }) => {
+  test("REQ-197: sin sesión guardada la portada se pinta sin esperar a /api/config", async ({ page, context }) => {
     await installMocks(context);
     let releaseConfig;
     const configGate = new Promise((resolve) => { releaseConfig = resolve; });
@@ -126,7 +126,7 @@ test.describe("Navegación", () => {
     expect(errors).toEqual([]);
   });
 
-  test("REQ-196: con sesión guardada no se muestra la portada mientras se resuelve", async ({ page, context }) => {
+  test("REQ-197: con sesión guardada no se muestra la portada mientras se resuelve", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await page.goto("/index.html");

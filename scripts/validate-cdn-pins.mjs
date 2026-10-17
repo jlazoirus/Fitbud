@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REQ-196: los scripts de CDN de las páginas públicas van con versión exacta y SRI.
+// REQ-197: los scripts de CDN de las páginas públicas van con versión exacta y SRI.
 // Una versión flotante (p. ej. "@2") cambia el código en producción sin deploy;
 // la copia offline de la suite E2E debe ser el mismo archivo que pide index.html.
 import fs from "node:fs";
