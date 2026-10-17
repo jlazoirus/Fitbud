@@ -1814,3 +1814,17 @@ Jonathan (2026-10-16): no le gusta el logo de la PWA; pide actualizar también e
 - Tras el deploy, el depurador de compartir de Facebook o una vista previa de WhatsApp muestran la imagen nueva (verificación manual: esas plataformas guardan la vista previa vieja en caché).
 - Portada y login muestran el nuevo `brandMark()`. ✓
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-190 - Registro: pantalla "Revisa tu correo" en lugar del formulario con un aviso
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-17): tras registrarse, el formulario quedaba visible con "Cuenta creada. Confirma tu correo…" en letra pequeña; confuso.
+
+### Alcance
+
+1. `doAuth()`: si `signUp` no devuelve sesión, guarda el correo y cambia a `_authMode="check"`.
+2. `renderConfirmEmail()`: pantalla sin inputs con el correo, consejos (spam, abrir en el mismo dispositivo, cuenta existente), "Ya confirmé, iniciar sesión" (precarga el correo), "Reenviar correo" (`supa.auth.resend`, espera de 60 s) y "Usar otro correo".
+3. E2E `tests/e2e/registro.spec.js`.
