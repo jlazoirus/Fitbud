@@ -147,6 +147,7 @@ run("validate-migrations.mjs", "node scripts/validate-migrations.mjs");
 // ── Auditorías de seguridad y calidad ───────────────────────────────────────
 console.log("\n[ Seguridad y calidad ]");
 run("validate-docs-index.mjs", "node scripts/validate-docs-index.mjs");
+run("native-next-task.mjs --validate (plan de migración nativa)", "node scripts/native-next-task.mjs --validate");
 run("audit-secrets.mjs", "node scripts/audit-secrets.mjs");
 run("audit-html.mjs", "node scripts/audit-html.mjs");
 run("validate-css-tokens.mjs", "node scripts/validate-css-tokens.mjs");
