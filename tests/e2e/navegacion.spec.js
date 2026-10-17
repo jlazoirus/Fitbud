@@ -103,4 +103,35 @@ test.describe("Navegación", () => {
 
     expect(errors, `Errores de consola en toggle de contraseña:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  test("REQ-196: sin sesión guardada la portada se pinta sin esperar a /api/config", async ({ page, context }) => {
+    await installMocks(context);
+    let releaseConfig;
+    const configGate = new Promise((resolve) => { releaseConfig = resolve; });
+    await context.route("**/api/config", async (route) => {
+      await configGate; // la config (y con ella Supabase) queda colgada a propósito
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ supabase: { url: "https://e2etestref.supabase.co", publishableKey: "e2e-publishable-key" }, anthropic: { model: "", proxy: true } }) });
+    });
+    const errors = collectConsoleErrors(page);
+    await page.goto("/index.html");
+    await expect(page.locator(".landing h1")).toBeVisible({ timeout: 3_000 });
+    await expect(page.locator(".splash")).toHaveCount(0);
+
+    // La FAQ abierta sobrevive a la confirmación de "sin sesión"
+    const q = page.locator(".l-faq-q").first();
+    await q.click();
+    releaseConfig();
+    await page.waitForFunction(() => typeof authReady !== "undefined" && authReady);
+    await expect(q).toHaveAttribute("aria-expanded", "true");
+    expect(errors).toEqual([]);
+  });
+
+  test("REQ-196: con sesión guardada no se muestra la portada mientras se resuelve", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await page.goto("/index.html");
+    await expect(page.locator(".landing")).toHaveCount(0);
+    await gotoApp(page);
+    await expect(page.locator("#tabs")).toContainText("Hoy");
+  });
 });

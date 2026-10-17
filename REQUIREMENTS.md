@@ -1641,3 +1641,26 @@ Auditoría impeccable de UI (2026-10-16): los chips del coach usaban `var(--acce
 ### Criterios de aceptación
 
 - `node scripts/validate-css-tokens.mjs` pasa ahora y falla con el `index.html` anterior (5 variables). ✓
+
+## REQ-196 - Rendimiento: la portada no espera a la config ni a Supabase, y supabase-js va fijado con SRI
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable (2026-10-16), medido en producción: LCP móvil de 3.4 s en frío. Para un visitante sin sesión, `boot()` esperaba `/api/config` → `supabase.auth.getSession()` antes de pintar la portada, y supabase-js se cargaba de forma bloqueante desde `@supabase/supabase-js@2` (versión flotante: hoy 2.118.0, publicada el día anterior; sin SRI).
+
+### Alcance
+
+1. `boot()`: sin sesión guardada (`hasStoredAuthSession()`) ni enlace de recuperación, pinta la portada antes de pedir la config; al confirmar "sin sesión" solo se actualizan los planes (`refreshLandingPlans()`), sin repintar ni perder la FAQ abierta. El catálogo se pide en paralelo desde el inicio.
+2. supabase-js `2.117.2` exacta, con `integrity` + `crossorigin` y `defer`; `supabaseLibReady()` la espera antes de `supaInit()`.
+3. `scripts/validate-cdn-pins.mjs` (release gate): scripts de CDN con versión exacta y SRI, y la copia de `tests/e2e/vendor/` igual al hash.
+
+### Fuera de alcance
+
+- Separar la portada de la app (el HTML de 207 KB brotli/750 KB sigue siendo el costo principal): requiere decidir rutas, PWA y service worker.
+
+### Criterios de aceptación
+
+- `navegacion.spec.js`: con `/api/config` colgada la portada se ve y la FAQ abierta sobrevive; con sesión guardada no se muestra la portada. ✓
+- 4G emulado + CPU ×4, local: 5.6 s → 5.1 s hasta el titular. ✓
