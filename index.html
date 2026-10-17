@@ -296,6 +296,13 @@
   .domain-move{position:fixed;left:12px;right:12px;top:calc(10px + var(--safe-top));z-index:180;max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:var(--r-md);background:var(--surf2);border:1px solid var(--border-acc);font-size:13px;color:var(--muted)}
   .domain-move b{color:var(--txt);font-size:14px}
   .domain-move .btn{align-self:flex-start;margin-top:4px;text-decoration:none}
+  .confirm-email{text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .confirm-email h2{font-size:24px;margin:6px 0 2px}
+  .confirm-email p{margin:0 0 6px;color:var(--muted);line-height:1.5;overflow-wrap:anywhere}
+  .confirm-email p b{color:var(--txt)}
+  .confirm-email ul{text-align:left;margin:4px 0 14px;padding-left:18px;line-height:1.5;align-self:stretch}
+  .confirm-email-icon{width:56px;height:56px;border-radius:999px;background:var(--accent-dim);color:var(--accent);display:flex;align-items:center;justify-content:center}
+  .confirm-email-icon svg{width:26px;height:26px}
   .plan-summary{margin:10px 0 4px}
   .plan-list{list-style:none;margin:8px 0 6px;padding:0;display:grid;gap:6px}
   .plan-row{display:flex;gap:10px;align-items:flex-start;background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:9px 10px}
@@ -3804,6 +3811,7 @@ function brandMark(size){
 function brandWordmark(){return `<span>evol<span class="brand-v">v</span></span>`;}
 // Íconos de línea (estilo Evolv). Cada uno es el contenido de un <svg> 24×24.
 const TAB_ICONS={
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   hoy:'<path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',
   nutricion:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/>',
   entreno:'<path d="M6.5 7v10M17.5 7v10M3.5 9.5v5M20.5 9.5v5M6.5 12h11"/>',
@@ -7491,6 +7499,7 @@ function renderAuth(){
     return;
   }
   const mode=window._authMode||"in";
+  if(mode==="check"&&window._pendingConfirmEmail)return renderConfirmEmail();
   $("#app").innerHTML=`<div class="auth">
     <div style="margin-bottom:18px">
       <button class="btn btn-sm" onclick="window._showAuth=false;render()" style="font-size:12px;padding:6px 11px">← Conoce Evolv</button>
@@ -7509,6 +7518,49 @@ function renderAuth(){
       ${mode==="in"?'<button class="btn btn-sm" style="margin-top:8px" onclick="requestOwnPasswordReset()">Olvidé mi contraseña</button>':""}
     </div>
   </div>`;
+}
+function renderConfirmEmail(){
+  const email=window._pendingConfirmEmail;
+  $("#app").innerHTML=`<div class="auth">
+    <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
+    <div class="dash confirm-email" role="status">
+      <div class="confirm-email-icon" aria-hidden="true">${miniIcon("mail")}</div>
+      <h2>Revisa tu correo</h2>
+      <p>Te enviamos un enlace para activar tu cuenta a <b>${esc(email)}</b>.</p>
+      <ul class="muted small">
+        <li>Ábrelo desde el teléfono o computador donde vas a usar Evolv.</li>
+        <li>Si no aparece en unos minutos, revisa la carpeta de spam o promociones.</li>
+        <li>Si ya tenías una cuenta con este correo, inicia sesión directamente.</li>
+      </ul>
+      <button class="btn btn-accent" style="width:100%" onclick="confirmEmailGoToLogin()">Ya confirmé, iniciar sesión</button>
+      <button id="resendConfirmBtn" class="btn" style="width:100%;margin-top:8px" onclick="resendConfirmEmail()">Reenviar correo</button>
+      <div id="confirmOut" class="muted small center" style="margin-top:10px" aria-live="polite"></div>
+    </div>
+    <div class="center" style="margin-top:14px">
+      <button class="btn btn-sm" onclick="window._pendingConfirmEmail=null;window._authMode='up';renderAuth()">Usar otro correo</button>
+    </div>
+  </div>`;
+}
+function confirmEmailGoToLogin(){
+  const email=window._pendingConfirmEmail;
+  window._authMode="in";renderAuth();
+  const input=$("#au_email");if(input&&email){input.value=email;const pwd=$("#au_pwd");if(pwd)pwd.focus();}
+}
+let _resendConfirmUntil=0;
+async function resendConfirmEmail(){
+  const out=$("#confirmOut"),btn=$("#resendConfirmBtn");
+  const wait=Math.ceil((_resendConfirmUntil-Date.now())/1000);
+  if(wait>0){if(out)out.textContent=`Espera ${wait} s para pedir otro correo.`;return;}
+  if(btn)btn.disabled=true;
+  if(out)out.textContent="Enviando…";
+  try{
+    const r=await supa.auth.resend({type:"signup",email:window._pendingConfirmEmail,options:{emailRedirectTo:authRedirectUrl()}});
+    if(r&&r.error)throw r.error;
+    _resendConfirmUntil=Date.now()+60000;
+    if(out)out.textContent="Listo, te enviamos otro enlace. Usa el más reciente.";
+  }catch(e){
+    if(out)out.textContent=/rate|seconds/i.test(String(e&&e.message))?"Ya pediste un correo hace poco. Intenta de nuevo en un minuto.":"No pudimos reenviar el correo. Intenta otra vez.";
+  }finally{if(btn)btn.disabled=false;}
 }
 function toggleAuthMode(){window._authMode=(window._authMode==="up")?"in":"up";renderAuth();}
 function authRedirectUrl(mode){
@@ -7557,7 +7609,9 @@ async function doAuth(){
   const mode=window._authMode||"in";
   const r=mode==="up"?await signUp(email,pwd):await signIn(email,pwd);
   if(r.error){if(out)out.textContent="⚠️ "+r.error.message;return;}
-  if(mode==="up"&&!(r.data&&r.data.session)){if(out)out.textContent="Cuenta creada. Confirma tu correo y luego inicia sesión.";window._authMode="in";return;}
+  // REQ-190: sin sesión tras registrarse = falta confirmar el correo. Pantalla
+  // propia en vez de dejar el formulario visible con un aviso pequeño.
+  if(mode==="up"&&!(r.data&&r.data.session)){window._pendingConfirmEmail=email;window._authMode="check";renderAuth();return;}
   const{data}=await supa.auth.getSession();session=(data&&data.session)||null;
   if(session)onAuth();
 }
