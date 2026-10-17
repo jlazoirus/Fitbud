@@ -3,6 +3,8 @@
 !.claude/agents/
 # Skill de diseño impeccable (pbakaus/impeccable), versionada para las sesiones en la nube
 !.claude/skills/
+# Hooks compartidos del proyecto (detector de impeccable), también en la nube
+!.claude/settings.json
 
 # OS
 .DS_Store
