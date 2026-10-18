@@ -1795,3 +1795,19 @@ Jonathan (2026-10-18): setup de la beta de fundadores. Los códigos de canje (RE
 
 - `tests/e2e/invitacion.spec.js`: el enlace abre el registro y limpia la URL; con sesión el código se canjea una vez y se borra; un código usado avisa y no se reintenta. ✓
 - El script contra un Supabase simulado hace GET de la postulación, POST del código y PATCH a `beta_invited`. ✓
+
+## REQ-204 - Beta: la cabecera de la postulación deja de decir "Beta cerrada"
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-18): quitar el distintivo "Beta cerrada · Perú, Chile y México" de la cabecera de `beta-reclutamiento.html`.
+
+### Alcance
+
+1. Se quita el distintivo y su CSS (`.badge`, `.badge-where`). Los países siguen en la nota bajo los botones del hero.
+
+### Criterios de aceptación
+
+- La cabecera muestra solo el logo; `tests/e2e/beta.spec.js` y `textos.spec.js` pasan. ✓
