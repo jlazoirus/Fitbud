@@ -15,8 +15,9 @@ Difusión ──► evolvapp.club/beta ──► postulación (Supabase)
 ## 0. Una sola vez, antes de difundir
 
 1. En Supabase (SQL editor, en este orden si faltan): `supabase/entitlements.sql`, `supabase/coupon_codes.sql`, `supabase/beta_recruitment.sql`. Son idempotentes; no se aplican solos desde el repo.
-2. En Vercel: `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (las usa `/api/beta-recruitment`).
-3. Prueba real: postula tú mismo en `https://evolvapp.club/beta?source=prueba`, invítate con el paso 3 y crea una cuenta con el enlace. Después archiva tu postulación.
+2. En Vercel: `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` (las usan `/api/beta-recruitment` y el registro por invitación).
+3. **Beta cerrada:** en Supabase → Authentication → Sign In / Providers, desactiva "Allow new users to sign up". Desde ahí solo se crean cuentas con un código de invitación válido (`/api/entitlement`, acción `invite-signup`, con service role). Para reabrir el registro más adelante: vuelve a activarlo y pon `SIGNUP_MODE=open` en Vercel.
+4. Prueba real: postula tú mismo en `https://evolvapp.club/beta?source=prueba`, invítate con el paso 3 de abajo y crea una cuenta con el enlace. Después archiva tu postulación.
 
 ## 1. Difundir
 
@@ -56,7 +57,7 @@ SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/invite-beta-tester.m
 #   --dry-run        muestra el mensaje sin crear código ni tocar la postulación
 ```
 
-Crea el código, marca la postulación como `beta_invited` (con nota y fecha) e imprime el mensaje y un enlace `wa.me` que abre WhatsApp con el texto listo. La persona abre `evolvapp.club/?codigo=…`, crea su cuenta y el acceso se activa solo al iniciar sesión. Si confirma el correo en otro dispositivo, el mismo código se canjea a mano en Perfil → Mi suscripción.
+Crea el código, marca la postulación como `beta_invited` (con nota y fecha) e imprime el mensaje y un enlace `wa.me` que abre WhatsApp con el texto listo. La persona abre `evolvapp.club/?codigo=…` y ve el registro con el código ya puesto; al crear la cuenta entra directo, sin confirmar correo, con el acceso activo. Si abre Evolv sin el enlace, escribe el código en el campo "Código de invitación" del registro. Quien ya tenía cuenta lo canjea en Perfil → Mi suscripción.
 
 ## 4. Durante la beta
 

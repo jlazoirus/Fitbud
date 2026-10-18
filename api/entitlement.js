@@ -5,6 +5,7 @@
 // POST action:"revoke"           → admin: revocar acceso de cortesía
 // POST action:"generate"         → admin: generar código de canje
 // POST action:"redeem"           → usuario autenticado: canjear código
+// POST action:"invite-signup"    → sin sesión: crear cuenta con código de invitación (beta cerrada)
 
 import crypto from "node:crypto";
 
@@ -213,6 +214,86 @@ function couponError(data) {
   return "No pudimos canjear el código. Intenta de nuevo.";
 }
 
+// ── registro por invitación (REQ-205) ────────────────────────────────────────
+// En la beta cerrada las altas públicas de Supabase están desactivadas: la
+// cuenta se crea aquí con service role solo si el código existe, no se usó y
+// no venció. El correo se da por confirmado porque el código llegó por
+// WhatsApp a la persona invitada. Si el canje falla (otro lo usó primero) la
+// cuenta recién creada se borra para no dejar usuarios sin acceso.
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+async function inviteSignup(e, body, res) {
+  const code = normalizeCouponCode(body.code);
+  const email = String(body.email || "").trim().toLowerCase();
+  const password = String(body.password || "");
+  if (!/^FIT-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(code)) {
+    res.status(400).json({ error: "Código no válido." });
+    return;
+  }
+  if (email.length > 254 || !EMAIL_RE.test(email)) {
+    res.status(400).json({ error: "Revisa el correo." });
+    return;
+  }
+  if (password.length < 8 || password.length > 72) {
+    res.status(400).json({ error: "La contraseña debe tener al menos 8 caracteres." });
+    return;
+  }
+
+  const cr = await fetch(
+    e.url + "/rest/v1/redemption_codes?code=eq." + encodeURIComponent(code) + "&select=code,redeemed_by,valid_until",
+    { headers: svcHeaders(e) }
+  );
+  const rows = await rj(cr);
+  if (!cr.ok || !Array.isArray(rows)) {
+    res.status(503).json({ error: "El registro no está disponible en este momento." });
+    return;
+  }
+  const row = rows[0];
+  if (!row) { res.status(400).json({ error: "Código no válido." }); return; }
+  if (row.redeemed_by) { res.status(400).json({ error: "Este código ya fue utilizado." }); return; }
+  if (row.valid_until && Date.parse(row.valid_until) < Date.now()) {
+    res.status(400).json({ error: "El código ha expirado." });
+    return;
+  }
+
+  const ur = await fetch(e.url + "/auth/v1/admin/users", {
+    method: "POST",
+    headers: svcHeaders(e, { "content-type": "application/json" }),
+    body: JSON.stringify({ email, password, email_confirm: true }),
+  });
+  const created = await rj(ur);
+  if (!ur.ok) {
+    const msg = String(created.code || created.error_code || created.msg || created.message || "");
+    if (ur.status === 422 && /exists|registered/i.test(msg)) {
+      res.status(409).json({ error: "Ya existe una cuenta con este correo. Inicia sesión y canjea tu código en Perfil → Mi suscripción." });
+    } else if (/password/i.test(msg)) {
+      res.status(400).json({ error: "Elige una contraseña más segura." });
+    } else {
+      res.status(500).json({ error: "No pudimos crear tu cuenta. Intenta de nuevo." });
+    }
+    return;
+  }
+  const userId = created.id || (created.user && created.user.id);
+
+  const rr = await fetch(e.url + "/rest/v1/rpc/redeem_redemption_code", {
+    method: "POST",
+    headers: svcHeaders(e, { "content-type": "application/json" }),
+    body: JSON.stringify({ p_code: code, p_user_id: userId }),
+  });
+  const redeemed = await rj(rr);
+  if (!rr.ok) {
+    await fetch(e.url + "/auth/v1/admin/users/" + encodeURIComponent(userId), {
+      method: "DELETE",
+      headers: svcHeaders(e),
+    }).catch(() => {});
+    res.status(400).json({ error: couponError(redeemed) });
+    return;
+  }
+  const ent = Array.isArray(redeemed) ? redeemed[0] : redeemed;
+  res.status(201).json({ ok: true, entitlement: entitlementOut(ent || {}) });
+}
+
 // ── handler ───────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
@@ -220,6 +301,18 @@ export default async function handler(req, res) {
   if (!e.url || !e.service) {
     res.status(500).json({ error: "Servicio no configurado." });
     return;
+  }
+  if (req.method === "POST") {
+    let pre = null;
+    try { pre = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {}; } catch (_) {}
+    if (pre && pre.action === "invite-signup") {
+      try {
+        await inviteSignup(e, pre, res);
+      } catch (_) {
+        res.status(500).json({ error: "No pudimos crear tu cuenta. Intenta de nuevo." });
+      }
+      return;
+    }
   }
   const auth = await verifyUser(req, e);
   if (!auth) {

@@ -1811,3 +1811,23 @@ Jonathan (2026-10-18): quitar el distintivo "Beta cerrada · Perú, Chile y Méx
 ### Criterios de aceptación
 
 - La cabecera muestra solo el logo; `tests/e2e/beta.spec.js` y `textos.spec.js` pasan. ✓
+
+## REQ-205 - Beta cerrada: crear cuenta solo con código de invitación
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-18): "hazlo realidad". Con REQ-203 cualquiera podía crear cuenta y recibir la semana de prueba; la beta solo regalaba los tres meses.
+
+### Alcance
+
+1. `api/entitlement.js`, acción `invite-signup` (sin sesión): valida código (existe, sin usar, vigente), correo y contraseña (≥8); crea el usuario con service role (`/auth/v1/admin/users`, correo confirmado) y canjea el código. Si el canje falla, borra la cuenta recién creada. Correo ya registrado → 409 con instrucción de canjear en Perfil.
+2. `/api/config` expone `signup.mode`: `invite` por defecto, `open` con `SIGNUP_MODE=open`.
+3. `index.html`: en modo `invite` el registro pide "Código de invitación" (prellenado desde `/?codigo=`) y enlaza a postular; tras crear la cuenta entra directo. Los botones de los planes llevan a postular y el subtítulo de precios lo explica. SW v89.
+4. `BETA_PROGRAM.md`: desactivar "Allow new users to sign up" en Supabase (paso manual) y cómo reabrir.
+
+### Criterios de aceptación
+
+- `scripts/test-invite-signup-api.mjs` (gate): código válido crea y canjea; inexistente, usado, vencido, contraseña corta o correo inválido no crean cuenta; correo repetido → 409; canje perdido en carrera borra la cuenta; las demás acciones exigen sesión. ✓
+- `tests/e2e/invitacion.spec.js`: registro con código manda `invite-signup` y entra; sin código no llama a la API. `registro.spec.js` cubre el modo `open`. ✓

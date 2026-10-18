@@ -18,6 +18,11 @@ test("registro sin sesión muestra la pantalla de confirmar correo", async ({ pa
     calls.push("resend");
     return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
   });
+  // REQ-205: este flujo (correo por confirmar) es el del registro abierto.
+  await page.route("**/api/config", (route) => route.fulfill({
+    status: 200, contentType: "application/json",
+    body: JSON.stringify({ supabase: { url: SUPA_URL, publishableKey: "e2e-publishable-key" }, anthropic: { model: "", proxy: true }, signup: { mode: "open" } }),
+  }));
   await page.addInitScript(() => localStorage.setItem("fitbros_tour_v1", "done"));
   await gotoApp(page);
 

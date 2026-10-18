@@ -972,11 +972,13 @@ let REMOTE={supabase:{url:"",publishableKey:""},anthropic:{model:"",proxy:false}
 async function loadRemoteConfig(){
   try{
     const r=await fetch("/api/config",{cache:"no-store"});
-    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{},checkout:j.checkout||{}};}
+    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{},checkout:j.checkout||{},signup:j.signup||{}};}
   }catch(e){/* sin funciones serverless (p.ej. GitHub Pages): se ignora */}
 }
 // REQ-104: checkout activo solo si el servidor confirma STRIPE_SECRET_KEY configurada.
 function checkoutAvailable(){return !!(REMOTE.checkout&&REMOTE.checkout.enabled);}
+// REQ-205: beta cerrada salvo que el servidor diga lo contrario (SIGNUP_MODE=open).
+function inviteOnlySignup(){return !(REMOTE.signup&&REMOTE.signup.mode==="open");}
 function effectiveSettings(){
   const local=S.settings||{};
   return {
@@ -7281,7 +7283,7 @@ function subscriptionStatusHtml(){
 // REQ-197: la portada solo se repinta si cambió lo que muestra (los planes);
 // así no se pierde el scroll ni la pregunta abierta de la FAQ.
 let _landingKey=null;
-function landingRenderKey(){return JSON.stringify(activeCatalogPlans().map(p=>[p.id||p.name,p.price_usd,p.badge||""]));}
+function landingRenderKey(){return JSON.stringify([inviteOnlySignup(),activeCatalogPlans().map(p=>[p.id||p.name,p.price_usd,p.badge||""])]);}
 function refreshLandingPlans(){
   const box=document.querySelector("#app .landing .l-plans");
   if(!box||_landingKey===landingRenderKey())return;
@@ -7428,7 +7430,9 @@ function landingPricingHtml(){
       <div class="l-plan-price"><span class="l-plan-cur">USD</span>${p.price_usd} <span class="l-plan-period">/ ${p.duration_days<=31?"mes":"3 meses"}</span></div>
       <div class="l-plan-desc">${esc(p.description||"")}</div>
       <div class="l-plan-items">${items}</div>
-      <button class="l-btn l-btn-lg ${isHi?"l-btn-ink":"l-btn-lime"}" onclick="showAuthFromLanding('up')">Empezar ahora</button>
+      ${inviteOnlySignup()
+        ?`<a class="l-btn l-btn-lg ${isHi?"l-btn-ink":"l-btn-lime"}" href="beta-reclutamiento.html?source=portada-planes">Postular a la beta</a>`
+        :`<button class="l-btn l-btn-lg ${isHi?"l-btn-ink":"l-btn-lime"}" onclick="showAuthFromLanding('up')">Empezar ahora</button>`}
     </div>`;
   }).join("");
 }
@@ -7482,7 +7486,7 @@ function renderLanding(){
 
     <section class="l-wrap l-pricing" aria-labelledby="l-pricing-h">
       <h2 class="l-sec-h" id="l-pricing-h">Elige tu ritmo.</h2>
-      <p class="l-sec-sub">Pagas solo el período que eliges. Sin permanencia. Quienes entren a la beta tendrán precio de fundador.</p>
+      <p class="l-sec-sub">${inviteOnlySignup()?"Precios al abrir los planes. Quienes entren a la beta tendrán precio de fundador.":"Pagas solo el período que eliges. Sin permanencia."}</p>
       <div class="l-plans">${plansHtml}</div>
     </section>
 
@@ -7554,6 +7558,8 @@ function renderAuth(){
     <div class="dash">
       <div class="field"><label for="au_email">Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
       ${passwordField({id:"au_pwd",label:"Contraseña",autocomplete:mode==="in"?"current-password":"new-password",placeholder:"••••••••"})}
+      ${mode==="up"&&inviteOnlySignup()?`<div class="field"><label for="au_code">Código de invitación</label><input id="au_code" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="FIT-XXXX-XXXX" value="${esc(pendingInviteCode())}"></div>
+      ${pendingInviteCode()?"":`<p class="muted small" style="margin:-4px 0 12px">Evolv está en beta cerrada. ¿No tienes código? <a href="beta-reclutamiento.html?source=registro">Postula a la beta</a>.</p>`}`:""}
       <button class="btn btn-accent" style="width:100%" onclick="doAuth()">${mode==="in"?"Entrar":"Registrarme"}</button>
       ${mode==="up"?`<p class="muted small center" style="margin-top:10px;font-size:12px;line-height:1.5">Al crear tu cuenta aceptas nuestros <a href="#" onclick="openTermsNotice();return false">Términos</a> y el <a href="#" onclick="openPrivacyNotice();return false">Aviso de privacidad</a>.</p>`:""}
       <div id="auOut" class="muted small" style="margin-top:10px"></div>
@@ -7652,6 +7658,7 @@ async function doAuth(){
   if(!email||!pwd){if(out)out.textContent="Pon correo y contraseña";return;}
   if(out)out.textContent="…";
   const mode=window._authMode||"in";
+  if(mode==="up"&&inviteOnlySignup())return inviteSignUp(email,pwd,out);
   const r=mode==="up"?await signUp(email,pwd):await signIn(email,pwd);
   if(r.error){if(out)out.textContent="⚠️ "+r.error.message;return;}
   // REQ-190: sin sesión tras registrarse = falta confirmar el correo. Pantalla
@@ -7659,6 +7666,23 @@ async function doAuth(){
   if(mode==="up"&&!(r.data&&r.data.session)){window._pendingConfirmEmail=email;window._authMode="check";renderAuth();return;}
   const{data}=await supa.auth.getSession();session=(data&&data.session)||null;
   if(session)onAuth();
+}
+// REQ-205: en la beta cerrada la cuenta la crea el servidor tras validar el
+// código; el correo queda confirmado y se entra directo con el acceso activo.
+async function inviteSignUp(email,pwd,out){
+  const code=(($("#au_code")&&$("#au_code").value)||"").trim();
+  if(!code){if(out)out.textContent="Escribe tu código de invitación.";const c=$("#au_code");if(c)c.focus();return;}
+  let data={};
+  try{
+    const r=await fetch("/api/entitlement",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"invite-signup",code,email,password:pwd})});
+    data=await r.json().catch(()=>({}));
+    if(!r.ok){if(out)out.textContent="⚠️ "+(data.error||"No pudimos crear tu cuenta. Intenta de nuevo.");return;}
+  }catch(e){if(out)out.textContent="⚠️ Sin conexión. Intenta de nuevo.";return;}
+  clearInviteCode();
+  const s=await signIn(email,pwd);
+  if(s.error){window._authMode="in";renderAuth();const o=$("#auOut");if(o)o.textContent="Tu cuenta está lista. Inicia sesión para entrar.";return;}
+  const{data:sd}=await supa.auth.getSession();session=(sd&&sd.session)||null;
+  if(session){toast("¡Bienvenido a la beta! Tienes acceso completo por "+couponDurationText(data.entitlement)+".");onAuth();}
 }
 async function requestOwnPasswordReset(){
   const email=$("#au_email")&&$("#au_email").value.trim();

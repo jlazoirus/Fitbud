@@ -14,6 +14,12 @@ export default function handler(req, res) {
       // El proxy solo se anuncia cuando puede aplicar cuota server-side.
       proxy: !!process.env.ANTHROPIC_API_KEY && !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     },
+    signup: {
+      // REQ-205: beta cerrada por defecto (registro solo con código de
+      // invitación). SIGNUP_MODE=open reabre el registro; además hay que
+      // reactivar las altas públicas en Supabase (Auth → Sign In / Providers).
+      mode: process.env.SIGNUP_MODE === "open" ? "open" : "invite",
+    },
     checkout: {
       // REQ-104: el cliente usa esto para ocultar botones de compra si el
       // checkout no esta configurado, en vez de dejarlos fallar en /api/checkout.
