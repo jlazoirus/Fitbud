@@ -466,6 +466,7 @@
   /* Auth / login */
   .auth{max-width:380px;margin:0 auto;padding-top:7vh}
   .auth-brand{font-family:var(--font-display);font-weight:800;font-size:32px;letter-spacing:-.03em;text-align:center;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:12px}
+  .auth-invite{margin:0 0 16px;padding:12px 14px;border-radius:var(--r-md);background:var(--accent-dim);border:1px solid var(--accent-glow);font-size:14px;line-height:1.5;color:var(--txt)}
 
   /* Chips de preferencias (Perfil) */
   .chips{display:flex;flex-wrap:wrap;gap:8px}
@@ -7101,6 +7102,49 @@ async function redeemCoupon(btn){
     toast(String(e.message||e));
   }
 }
+/* ---- Invitación a la beta (REQ-203) ----
+   El enlace de invitación (/?codigo=FIT-XXXX-XXXX) guarda el código, abre el
+   registro y lo canjea solo al iniciar sesión. Si el correo se confirma en
+   otro dispositivo, el código sigue sirviendo a mano en "¿Tienes un código?". */
+const INVITE_CODE_KEY="evolv_invite_code";
+function captureInviteCode(){
+  try{
+    const params=new URLSearchParams(location.search);
+    const raw=params.get("codigo");
+    if(raw===null)return false;
+    params.delete("codigo");
+    const qs=params.toString();
+    history.replaceState(history.state,"",location.pathname+(qs?"?"+qs:"")+location.hash);
+    const compact=String(raw).toUpperCase().replace(/[^A-Z0-9]/g,"");
+    if(!/^FIT[A-Z0-9]{8}$/.test(compact))return false;
+    localStorage.setItem(INVITE_CODE_KEY,"FIT-"+compact.slice(3,7)+"-"+compact.slice(7));
+    return true;
+  }catch(e){return false;}
+}
+function pendingInviteCode(){try{return localStorage.getItem(INVITE_CODE_KEY)||"";}catch(e){return "";}}
+function clearInviteCode(){try{localStorage.removeItem(INVITE_CODE_KEY);}catch(e){}}
+let _inviteRedeeming=false;
+async function redeemPendingInvite(){
+  const code=pendingInviteCode();
+  const token=session&&session.access_token;
+  if(!code||!token||_inviteRedeeming)return;
+  _inviteRedeeming=true;
+  try{
+    const r=await fetch("/api/entitlement",{
+      method:"POST",
+      headers:{"content-type":"application/json","Authorization":"Bearer "+token},
+      body:JSON.stringify({action:"redeem",code})
+    });
+    // Sesión vencida o servicio caído: se reintenta en el próximo inicio de sesión.
+    if(r.status===401||r.status===404||r.status>=500)return;
+    const data=await r.json().catch(()=>({}));
+    clearInviteCode();
+    if(!r.ok){toast(data.error||"No pudimos activar tu invitación.");return;}
+    await loadEntitlement();
+    render();
+    toast("¡Bienvenido a la beta! Tienes acceso completo por "+couponDurationText(data.entitlement)+".");
+  }catch(e){}finally{_inviteRedeeming=false;}
+}
 function planDisplayName(planId){
   const plan=(catalogPlans||[]).find(p=>String(p.id)===String(planId));
   if(plan&&plan.name)return plan.name;
@@ -7506,6 +7550,7 @@ function renderAuth(){
     </div>
     <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
     <div class="muted small center" style="margin-bottom:20px">${mode==="in"?"Inicia sesión para continuar":"Crea tu cuenta gratis"}</div>
+    ${pendingInviteCode()?`<div class="auth-invite" role="status"><b>Tu invitación a la beta está lista.</b> ${mode==="in"?"Inicia sesión":"Crea tu cuenta"} y tu acceso completo se activa solo.</div>`:""}
     <div class="dash">
       <div class="field"><label for="au_email">Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
       ${passwordField({id:"au_pwd",label:"Contraseña",autocomplete:mode==="in"?"current-password":"new-password",placeholder:"••••••••"})}
@@ -10578,7 +10623,7 @@ async function onAuth(){
     await loadPrivacyState();
     entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
     billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
-    loadEntitlement().then(()=>{if(session)render();}); // no-await: no debe bloquear el arranque (REQ-25)
+    loadEntitlement().then(()=>{if(session){render();redeemPendingInvite();}}); // no-await: no debe bloquear el arranque (REQ-25)
     S.days={};S.weights={};save();   // descarta caché de otra sesión; la DB manda
     if(!isActive()){
       onboardingActive=false;onboardingDraft=null;view="hoy";render();
@@ -12457,7 +12502,9 @@ async function boot(){
   // Si la portada ya se pintó sin catálogo, se actualizan solo los planes al
   // resolver (REQ-151) para no perder el scroll ni la FAQ abierta.
   loadCatalog().then(()=>{if(!session)refreshLandingPlans();});
-  if(!passwordRedirectMode()&&!hasStoredAuthSession()){
+  // REQ-203: el enlace de invitación abre directo el registro.
+  if(captureInviteCode()&&!hasStoredAuthSession()){window._showAuth=true;window._authMode="up";}
+  if(!passwordRedirectMode()&&!hasStoredAuthSession()&&!window._showAuth){
     $("#tabs").innerHTML="";$("#app").classList.add("landing-host");
     renderLanding();
   }

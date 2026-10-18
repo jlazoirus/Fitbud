@@ -1776,3 +1776,22 @@ Jonathan (2026-10-18): la beta de fundadores (REQ-201) necesita tráfico, pero l
 
 - `tests/e2e/portada.spec.js`: dos enlaces "Postular a la beta" con `source`, llevan a la página de postulación; "Ya tengo cuenta" abre el acceso. `registro.spec.js` entra por "Empezar ahora". ✓
 - impeccable sin hallazgos; axe sin violaciones a 390 y 1440 px. ✓
+
+## REQ-203 - Beta: enlace de invitación que activa el acceso solo y script para invitar
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-18): setup de la beta de fundadores. Los códigos de canje (REQ-50) existían, pero invitar era manual (generar código desde la API como admin, copiarlo, explicar dónde pegarlo) y el invitado tenía que encontrar "¿Tienes un código?" en Perfil después de registrarse.
+
+### Alcance
+
+1. `index.html`: `/?codigo=FIT-XXXX-XXXX` guarda el código en `localStorage`, lo quita de la URL y abre el registro con el aviso "Tu invitación a la beta está lista". Al iniciar sesión se canjea solo (`redeemPendingInvite`) y se borra; si el código no sirve se avisa y se borra; sesión vencida o servicio caído lo deja para el próximo inicio.
+2. `scripts/invite-beta-tester.mjs <id>`: crea un código (90 días, plan `quarterly`, activable 30 días), marca la postulación `beta_invited` con nota y fecha, e imprime el mensaje y un enlace `wa.me`. `--self-test` en el release gate.
+3. `BETA_PROGRAM.md`: runbook (preparación, difusión, revisión, invitación, check-ins, cierre).
+
+### Criterios de aceptación
+
+- `tests/e2e/invitacion.spec.js`: el enlace abre el registro y limpia la URL; con sesión el código se canjea una vez y se borra; un código usado avisa y no se reintenta. ✓
+- El script contra un Supabase simulado hace GET de la postulación, POST del código y PATCH a `beta_invited`. ✓
