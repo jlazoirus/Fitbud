@@ -1701,3 +1701,21 @@ Jonathan (2026-10-16), tras la auditoría impeccable: rediseñar la web pública
 
 - `tests/e2e/portada.spec.js`: la demo cambia y se revierte; sin emoji ni vocabulario de IA; la escalera se enciende y sigue a la vista. ✓
 - axe (WCAG 2.2 AA + best-practice) sin violaciones a 390 y 1440 px; sin scroll horizontal; controles ≥44 px. ✓
+
+## REQ-199 - Beta: la página de reclutamiento pasa a la marca Escala
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-17), tras REQ-198: `beta-reclutamiento.html` seguía con el sistema anterior (fondo crema, Inter, morado/terracota) y una captura de junio con la marca Fitbros. El detector de impeccable marcaba `cream-palette`, `overused-font` y `tight-leading`.
+
+### Alcance
+
+1. Tokens, tipografías (Unbounded + Manrope) y logo de chevrons de `index.html`; opciones marcadas en lima, foco visible, controles ≥44 px. Estructura, textos, campos, `value` enviados al API y script sin cambios (salvo la tilde de "médica").
+2. La captura vieja se reemplaza por la tarjeta "Hoy" de la portada (HTML, marcada "Ejemplo"); `.vercelignore` deja de publicar `assets/ux-audit-2026-06-23/04-home-mobile.png`.
+3. `validate-deploy-allowlist.mjs` trata `href="/"` como `index.html`.
+
+### Criterios de aceptación
+
+- `impeccable detect beta-reclutamiento.html` sin hallazgos; axe sin violaciones a 390 y 1440 px; envío con API simulada muestra el resultado y manda los mismos `value`. ✓
