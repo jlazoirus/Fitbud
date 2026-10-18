@@ -3,6 +3,12 @@
   "framework": null,
   "buildCommand": null,
   "outputDirectory": ".",
+  "rewrites": [
+    {
+      "source": "/beta",
+      "destination": "/beta-reclutamiento.html"
+    }
+  ],
   "crons": [
     {
       "path": "/api/notify",

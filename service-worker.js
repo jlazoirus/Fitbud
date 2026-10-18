@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v87";
+const CACHE_NAME = "fitbud-pwa-v88";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -38,6 +38,14 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
 
   if (request.mode === "navigate") {
+    // REQ-201: solo la app (/ e /index.html) sale del cache. Las otras
+    // páginas del sitio (la postulación a la beta) no son parte del shell:
+    // antes recibían index.html y el visitante con la PWA instalada nunca
+    // llegaba al formulario. Red primero; sin red, la app.
+    if (url.origin === self.location.origin && url.pathname !== "/" && !url.pathname.endsWith("/index.html")) {
+      event.respondWith(fetch(request).catch(() => caches.match("./index.html")));
+      return;
+    }
     // REQ-150: servir la navegación desde la MISMA generación de cache que
     // los .js (cacheFirst), no de la red directa — networkFirst podía traer
     // un index.html recién desplegado mientras los .js seguían saliendo del

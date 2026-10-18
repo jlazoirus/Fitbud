@@ -1736,3 +1736,24 @@ Revisión previa al setup de beta testers (2026-10-18). Las opciones de "Objetiv
 ### Criterios de aceptación
 
 - El validador falla con el formulario anterior (2 objetivos) y pasa ahora. ✓
+
+## REQ-201 - Beta: la postulación pasa a "Programa de fundadores" y el SW deja de tapar la página
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-18): antes de vender, abrir una beta de 2-3 meses en Perú, Chile y México con early adopters que den feedback. `beta-reclutamiento.html` seguía planteada como investigación ("entrevistas + beta de 1-2 semanas", "No es una oferta comercial") y al enviar mostraba al postulante su segmento y "Prioridad Baja". Además, `service-worker.js` respondía toda navegación con `index.html` cacheado: quien ya tenía la PWA nunca veía el formulario (reproducido con Playwright y SW activo).
+
+### Alcance
+
+1. La página explica el trato (tres meses gratis sin tarjeta, línea directa, precio de fundador; a cambio uso real, una llamada inicial y check-ins cortos), los cuatro pasos y una FAQ. Campos, `value` y API sin cambios; solo cambian los textos de disponibilidad ("beta de 3 meses").
+2. La confirmación dice "Recibida" y el siguiente paso; segmento y prioridad quedan solo para el equipo.
+3. `service-worker.js` (v88): solo `/` e `/index.html` salen del cache; las demás navegaciones van a la red y, sin red, a la app.
+4. `vercel.json`: `/beta` sirve la página de postulación.
+
+### Criterios de aceptación
+
+- `tests/e2e/beta.spec.js`: postulación completa con API simulada, envía `goal:"Ganar musculo"`, `availability:"interview_beta"` y `source`, y no muestra prioridad ni segmento. ✓
+- Con SW activo, `/beta-reclutamiento.html` muestra la página de postulación (antes la portada). ✓
+- impeccable sin hallazgos; axe sin violaciones a 390 y 1440 px; sin scroll horizontal. ✓
