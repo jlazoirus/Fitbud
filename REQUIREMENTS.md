@@ -1757,3 +1757,22 @@ Jonathan (2026-10-18): antes de vender, abrir una beta de 2-3 meses en Perú, Ch
 - `tests/e2e/beta.spec.js`: postulación completa con API simulada, envía `goal:"Ganar musculo"`, `availability:"interview_beta"` y `source`, y no muestra prioridad ni segmento. ✓
 - Con SW activo, `/beta-reclutamiento.html` muestra la página de postulación (antes la portada). ✓
 - impeccable sin hallazgos; axe sin violaciones a 390 y 1440 px; sin scroll horizontal. ✓
+
+## REQ-202 - Portada: los CTA llevan a postular a la beta de fundadores
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-18): la beta de fundadores (REQ-201) necesita tráfico, pero la portada empujaba a "Crear mi cuenta gratis" y no mencionaba la beta.
+
+### Alcance
+
+1. Nav ("Postular"), hero ("Postular a la beta") y CTA final ("Sé de los primeros.") enlazan a `beta-reclutamiento.html` con `source=portada`, `portada-nav` o `portada-final` para saber qué botón convierte.
+2. "Ya tengo cuenta" e "Iniciar sesión" siguen abriendo el acceso; los botones de los planes siguen abriendo el registro. Los precios siguen visibles y avisan del precio de fundador.
+3. `.l-btn` sin subrayado para servir también como enlace.
+
+### Criterios de aceptación
+
+- `tests/e2e/portada.spec.js`: dos enlaces "Postular a la beta" con `source`, llevan a la página de postulación; "Ya tengo cuenta" abre el acceso. `registro.spec.js` entra por "Empezar ahora". ✓
+- impeccable sin hallazgos; axe sin violaciones a 390 y 1440 px. ✓

@@ -66,7 +66,8 @@ const required = new Set(["index.html", "beta-reclutamiento.html", "service-work
 for (const page of ["index.html", "beta-reclutamiento.html"]) {
   for (const [, ref] of read(page).matchAll(/(?:src|href)="([^"]+)"/g)) {
     if (/^[a-z]+:|^\/\/|^#|\$\{/.test(ref)) continue;
-    required.add(ref.replace(/^\.?\//, "") || "index.html"); // href="/" es la portada
+    // href="/" es la portada; ?source=… y #ancla no son parte del archivo
+    required.add(ref.replace(/[?#].*$/, "").replace(/^\.?\//, "") || "index.html");
   }
 }
 const shell = read("service-worker.js").match(/const APP_SHELL = \[([\s\S]*?)\];/);

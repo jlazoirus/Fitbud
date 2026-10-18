@@ -28,14 +28,20 @@ test.describe("Portada", () => {
     expect(errors).toEqual([]);
   });
 
-  test("sin emoji ni vocabulario interno, y los CTA llevan al registro", async ({ page, context }) => {
+  test("sin emoji ni vocabulario interno; los CTA llevan a postular a la beta (REQ-202)", async ({ page, context }) => {
     await installMocks(context);
     await gotoApp(page);
     const text = await page.locator(".landing").innerText();
     expect(text).not.toMatch(/\p{Emoji_Presentation}/u);
     expect(text).not.toMatch(/\b(IA|Claude|Anthropic|prompt|tokens?|modelo de lenguaje)\b/i);
     await expect(page.locator(".l-step")).toHaveCount(5);
-    await page.getByRole("button", { name: "Crear mi cuenta gratis" }).first().click();
+    const apply = page.getByRole("link", { name: "Postular a la beta" });
+    await expect(apply).toHaveCount(2);
+    await expect(apply.first()).toHaveAttribute("href", "beta-reclutamiento.html?source=portada");
+    await apply.first().click();
+    await expect(page.locator("h1")).toContainText("Úsalo gratis tres meses");
+    await gotoApp(page);
+    await page.getByRole("button", { name: "Ya tengo cuenta" }).click();
     await expect(page.locator("#au_email")).toBeVisible();
   });
 

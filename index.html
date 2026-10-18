@@ -672,7 +672,7 @@
   .landing-nav{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:max(16px,calc(10px + var(--safe-top)));padding-bottom:12px}
   .landing-brand{font-family:var(--font-display);font-weight:800;font-size:22px;letter-spacing:-.02em;color:var(--txt);display:inline-flex;align-items:center;gap:10px}
   .landing-nav-actions{display:flex;gap:6px;align-items:center}
-  .l-btn{min-height:44px;padding:0 18px;border-radius:999px;font-family:var(--font-body);font-size:14px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:background .15s,color .15s,transform .1s}
+  .l-btn{min-height:44px;padding:0 18px;border-radius:999px;font-family:var(--font-body);font-size:14px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;text-decoration:none;transition:background .15s,color .15s,transform .1s}
   .l-btn:active{transform:scale(.98)}
   .l-btn-lime{background:var(--accent);color:var(--on-accent);border:none}
   .l-btn-lime:hover{background:var(--purple-300)}
@@ -7406,7 +7406,7 @@ function renderLanding(){
       <div class="landing-brand" role="img" aria-label="Evolv">${brandMark(30)}${brandWordmark()}</div>
       <div class="landing-nav-actions">
         <button class="l-btn l-btn-text" onclick="showAuthFromLanding('in')">Iniciar sesión</button>
-        <button class="l-btn l-btn-lime" onclick="showAuthFromLanding('up')">Empezar</button>
+        <a class="l-btn l-btn-lime" href="beta-reclutamiento.html?source=portada-nav">Postular</a>
       </div>
     </header>
 
@@ -7416,10 +7416,10 @@ function renderLanding(){
         <div>
           <p class="l-hero-sub">Evolv arma <b>lo que comes y entrenas hoy</b> con tu cuerpo, tus horarios y lo que tienes a mano. Y cuando el día se tuerce, lo ajusta contigo.</p>
           <div class="l-hero-ctas">
-            <button class="l-btn l-btn-lime l-btn-lg" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
+            <a class="l-btn l-btn-lime l-btn-lg" href="beta-reclutamiento.html?source=portada">Postular a la beta</a>
             <button class="l-btn l-btn-ghost l-btn-lg" onclick="showAuthFromLanding('in')">Ya tengo cuenta</button>
           </div>
-          <div class="l-hero-note">Sin tarjeta de crédito para empezar · Sin renovación automática</div>
+          <div class="l-hero-note">Beta de fundadores en Perú, Chile y México · Tres meses gratis, sin tarjeta</div>
         </div>
         ${landingDemoHtml()}
       </div>
@@ -7438,7 +7438,7 @@ function renderLanding(){
 
     <section class="l-wrap l-pricing" aria-labelledby="l-pricing-h">
       <h2 class="l-sec-h" id="l-pricing-h">Elige tu ritmo.</h2>
-      <p class="l-sec-sub">Pagas solo el período que eliges. Sin permanencia.</p>
+      <p class="l-sec-sub">Pagas solo el período que eliges. Sin permanencia. Quienes entren a la beta tendrán precio de fundador.</p>
       <div class="l-plans">${plansHtml}</div>
     </section>
 
@@ -7449,10 +7449,10 @@ function renderLanding(){
 
     <section class="l-cta-final" aria-labelledby="l-cta-h">
       <div class="l-wrap">
-        <h2 id="l-cta-h">Empieza hoy.</h2>
-        <p>Tu perfil toma cinco minutos y tu primer día queda listo al terminar.</p>
-        <button class="l-btn l-btn-ink l-btn-lg" onclick="showAuthFromLanding('up')">Crear mi cuenta gratis</button>
-        <div class="l-cta-note">Sin renovación automática · Sin tarjeta para empezar</div>
+        <h2 id="l-cta-h">Sé de los primeros.</h2>
+        <p>Buscamos personas que usen Evolv tres meses y nos digan qué mejorar. A cambio, acceso completo gratis y precio de fundador.</p>
+        <a class="l-btn l-btn-ink l-btn-lg" href="beta-reclutamiento.html?source=portada-final">Postular a la beta</a>
+        <div class="l-cta-note">Postular toma 2 minutos · Te escribimos por WhatsApp</div>
       </div>
     </section>
 
