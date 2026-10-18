@@ -1433,7 +1433,8 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-181`).
 
 ## REQ-182 - Fix PWA: el gate de bump de caché no cubre `assets/icon-180.png` (apple-touch-icon cache-first fuera de `APP_SHELL`)
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`assets/icon-180.png` entró a `APP_SHELL` (`service-worker.js`); `CACHE_NAME` subió a `fitbud-pwa-v87`. El validador deriva su pathspec de `APP_SHELL`, así que ya vigila el ícono.
 
 ### Origen
 
