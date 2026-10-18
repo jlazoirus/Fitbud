@@ -1719,3 +1719,20 @@ Jonathan (2026-10-17), tras REQ-198: `beta-reclutamiento.html` seguía con el si
 ### Criterios de aceptación
 
 - `impeccable detect beta-reclutamiento.html` sin hallazgos; axe sin violaciones a 390 y 1440 px; envío con API simulada muestra el resultado y manda los mismos `value`. ✓
+
+## REQ-200 - Fix beta: la postulación falla con "Ganar músculo" o "Comer más sano y crear hábitos"
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión previa al setup de beta testers (2026-10-18). Las opciones de "Objetivo principal" no tenían `value`, así que enviaban su texto visible; REQ-194 les puso tildes y `api/beta-recruitment.js` (`ALLOWED_GOALS`, sin tildes) empezó a responder "Objetivo invalido" para dos de los cinco objetivos. Regresión en producción desde el merge de REQ-191..198.
+
+### Alcance
+
+1. Cada opción de objetivo lleva `value` con el texto que acepta la API; el texto visible conserva las tildes.
+2. `scripts/validate-beta-form-values.mjs` (release gate): todo valor de `stage`, `goal`, `recentAttempt`, `tools`, `pains`, `investment`, `availability` y `health` del formulario está en la lista de la API.
+
+### Criterios de aceptación
+
+- El validador falla con el formulario anterior (2 objetivos) y pasa ahora. ✓
