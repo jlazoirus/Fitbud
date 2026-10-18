@@ -1719,3 +1719,79 @@ Jonathan (2026-10-17), tras REQ-198: `beta-reclutamiento.html` seguía con el si
 ### Criterios de aceptación
 
 - `impeccable detect beta-reclutamiento.html` sin hallazgos; axe sin violaciones a 390 y 1440 px; envío con API simulada muestra el resultado y manda los mismos `value`. ✓
+
+## REQ-200 - Fix beta: la postulación falla con "Ganar músculo" o "Comer más sano y crear hábitos"
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión previa al setup de beta testers (2026-10-18). Las opciones de "Objetivo principal" no tenían `value`, así que enviaban su texto visible; REQ-194 les puso tildes y `api/beta-recruitment.js` (`ALLOWED_GOALS`, sin tildes) empezó a responder "Objetivo invalido" para dos de los cinco objetivos. Regresión en producción desde el merge de REQ-191..198.
+
+### Alcance
+
+1. Cada opción de objetivo lleva `value` con el texto que acepta la API; el texto visible conserva las tildes.
+2. `scripts/validate-beta-form-values.mjs` (release gate): todo valor de `stage`, `goal`, `recentAttempt`, `tools`, `pains`, `investment`, `availability` y `health` del formulario está en la lista de la API.
+
+### Criterios de aceptación
+
+- El validador falla con el formulario anterior (2 objetivos) y pasa ahora. ✓
+
+## REQ-201 - Beta: la postulación pasa a "Programa de fundadores" y el SW deja de tapar la página
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-18): antes de vender, abrir una beta de 2-3 meses en Perú, Chile y México con early adopters que den feedback. `beta-reclutamiento.html` seguía planteada como investigación ("entrevistas + beta de 1-2 semanas", "No es una oferta comercial") y al enviar mostraba al postulante su segmento y "Prioridad Baja". Además, `service-worker.js` respondía toda navegación con `index.html` cacheado: quien ya tenía la PWA nunca veía el formulario (reproducido con Playwright y SW activo).
+
+### Alcance
+
+1. La página explica el trato (tres meses gratis sin tarjeta, línea directa, precio de fundador; a cambio uso real, una llamada inicial y check-ins cortos), los cuatro pasos y una FAQ. Campos, `value` y API sin cambios; solo cambian los textos de disponibilidad ("beta de 3 meses").
+2. La confirmación dice "Recibida" y el siguiente paso; segmento y prioridad quedan solo para el equipo.
+3. `service-worker.js` (v88): solo `/` e `/index.html` salen del cache; las demás navegaciones van a la red y, sin red, a la app.
+4. `vercel.json`: `/beta` sirve la página de postulación.
+
+### Criterios de aceptación
+
+- `tests/e2e/beta.spec.js`: postulación completa con API simulada, envía `goal:"Ganar musculo"`, `availability:"interview_beta"` y `source`, y no muestra prioridad ni segmento. ✓
+- Con SW activo, `/beta-reclutamiento.html` muestra la página de postulación (antes la portada). ✓
+- impeccable sin hallazgos; axe sin violaciones a 390 y 1440 px; sin scroll horizontal. ✓
+
+## REQ-202 - Portada: los CTA llevan a postular a la beta de fundadores
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-18): la beta de fundadores (REQ-201) necesita tráfico, pero la portada empujaba a "Crear mi cuenta gratis" y no mencionaba la beta.
+
+### Alcance
+
+1. Nav ("Postular"), hero ("Postular a la beta") y CTA final ("Sé de los primeros.") enlazan a `beta-reclutamiento.html` con `source=portada`, `portada-nav` o `portada-final` para saber qué botón convierte.
+2. "Ya tengo cuenta" e "Iniciar sesión" siguen abriendo el acceso; los botones de los planes siguen abriendo el registro. Los precios siguen visibles y avisan del precio de fundador.
+3. `.l-btn` sin subrayado para servir también como enlace.
+
+### Criterios de aceptación
+
+- `tests/e2e/portada.spec.js`: dos enlaces "Postular a la beta" con `source`, llevan a la página de postulación; "Ya tengo cuenta" abre el acceso. `registro.spec.js` entra por "Empezar ahora". ✓
+- impeccable sin hallazgos; axe sin violaciones a 390 y 1440 px. ✓
+
+## REQ-203 - Beta: enlace de invitación que activa el acceso solo y script para invitar
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-18): setup de la beta de fundadores. Los códigos de canje (REQ-50) existían, pero invitar era manual (generar código desde la API como admin, copiarlo, explicar dónde pegarlo) y el invitado tenía que encontrar "¿Tienes un código?" en Perfil después de registrarse.
+
+### Alcance
+
+1. `index.html`: `/?codigo=FIT-XXXX-XXXX` guarda el código en `localStorage`, lo quita de la URL y abre el registro con el aviso "Tu invitación a la beta está lista". Al iniciar sesión se canjea solo (`redeemPendingInvite`) y se borra; si el código no sirve se avisa y se borra; sesión vencida o servicio caído lo deja para el próximo inicio.
+2. `scripts/invite-beta-tester.mjs <id>`: crea un código (90 días, plan `quarterly`, activable 30 días), marca la postulación `beta_invited` con nota y fecha, e imprime el mensaje y un enlace `wa.me`. `--self-test` en el release gate.
+3. `BETA_PROGRAM.md`: runbook (preparación, difusión, revisión, invitación, check-ins, cierre).
+
+### Criterios de aceptación
+
+- `tests/e2e/invitacion.spec.js`: el enlace abre el registro y limpia la URL; con sesión el código se canjea una vez y se borra; un código usado avisa y no se reintenta. ✓
+- El script contra un Supabase simulado hace GET de la postulación, POST del código y PATCH a `beta_invited`. ✓

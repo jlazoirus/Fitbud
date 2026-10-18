@@ -135,6 +135,7 @@ run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
 run("test-admin-api.mjs", "node scripts/test-admin-api.mjs");
 run("test-admin-reset.mjs", "node scripts/test-admin-reset.mjs");
 run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
+run("invite-beta-tester.mjs --self-test", "node scripts/invite-beta-tester.mjs --self-test");
 run("test-webhook-refund.mjs", "node scripts/test-webhook-refund.mjs");
 run("test-webhook-renewal.mjs", "node scripts/test-webhook-renewal.mjs");
 run("test-service-worker-cache.mjs", "node scripts/test-service-worker-cache.mjs");
@@ -151,6 +152,7 @@ run("audit-secrets.mjs", "node scripts/audit-secrets.mjs");
 run("audit-html.mjs", "node scripts/audit-html.mjs");
 run("validate-css-tokens.mjs", "node scripts/validate-css-tokens.mjs");
 run("validate-cdn-pins.mjs", "node scripts/validate-cdn-pins.mjs");
+run("validate-beta-form-values.mjs", "node scripts/validate-beta-form-values.mjs");
 
 // ── Suite E2E de journeys críticos (REQ-96) ──────────────────────────────────
 // Recorre la app real en Chromium headless con la red 100% mockeada
