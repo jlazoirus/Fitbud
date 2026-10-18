@@ -36,7 +36,9 @@ test.describe("Portada", () => {
     expect(text).not.toMatch(/\b(IA|Claude|Anthropic|prompt|tokens?|modelo de lenguaje)\b/i);
     await expect(page.locator(".l-step")).toHaveCount(5);
     const apply = page.getByRole("link", { name: "Postular a la beta" });
-    await expect(apply).toHaveCount(2);
+    // hero + CTA final + un botón por plan (REQ-205: beta cerrada)
+    expect(await apply.count()).toBeGreaterThanOrEqual(3);
+    await expect(page.locator(".l-plan a.l-btn").first()).toHaveAttribute("href", "beta-reclutamiento.html?source=portada-planes");
     await expect(apply.first()).toHaveAttribute("href", "beta-reclutamiento.html?source=portada");
     await apply.first().click();
     await expect(page.locator("h1")).toContainText("Úsalo gratis tres meses");

@@ -136,6 +136,7 @@ run("test-admin-api.mjs", "node scripts/test-admin-api.mjs");
 run("test-admin-reset.mjs", "node scripts/test-admin-reset.mjs");
 run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
 run("invite-beta-tester.mjs --self-test", "node scripts/invite-beta-tester.mjs --self-test");
+run("test-invite-signup-api.mjs", "node scripts/test-invite-signup-api.mjs");
 run("test-webhook-refund.mjs", "node scripts/test-webhook-refund.mjs");
 run("test-webhook-renewal.mjs", "node scripts/test-webhook-renewal.mjs");
 run("test-service-worker-cache.mjs", "node scripts/test-service-worker-cache.mjs");

@@ -33,7 +33,7 @@ export function inviteMessage({ name, code, days, validUntil, appUrl }) {
     `Este es tu acceso completo por ${months}, sin costo: ${link}`,
     "",
     "Ábrelo en el teléfono donde vas a usar Evolv y crea tu cuenta; el acceso se activa solo. "
-      + `Si en algún momento te pide un código, es ${code} (Perfil → Mi suscripción → ¿Tienes un código de acceso?).`,
+      + `Si te pide el código de invitación, es ${code}.`,
     "",
     `El enlace se puede activar hasta el ${until}. ¿Te acomoda una llamada de 15 minutos esta semana para conocer tu caso?`,
   ].join("\n");
