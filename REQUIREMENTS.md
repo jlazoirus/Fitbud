@@ -1876,3 +1876,53 @@ Jonathan (2026-10-19): necesita ver a los postulantes y aceptarlos de forma clar
 
 - `scripts/test-admin-beta-api.mjs` (gate): conteos, código de 90 días `quarterly` auditado, `beta_invited` con nota, mensaje y `wa.me` correctos, ids inválidos, estados no permitidos y 403 para no admin. ✓
 - `tests/e2e/admin-beta.spec.js`: el admin acepta y ve el mensaje con el enlace; un usuario normal no entra a la vista. ✓
+
+## REQ-219 - Portada: los CTA del hero, la navegación y el subtítulo no respetan `SIGNUP_MODE=open`
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey `adquisicion` (2026-10-19, commit previo `5fc9b10`). REQ-205 hizo que las tarjetas de planes de la portada cambien su CTA según el modo de registro (`inviteOnlySignup()`): "Postular a la beta" en beta cerrada, "Empezar ahora" en registro abierto. Pero los otros CTA de conversión de la portada quedaron fijos a la postulación de beta (REQ-202), sin enterarse del modo.
+
+### Problema
+
+Cuando el servidor pase a `SIGNUP_MODE=open` (fin de la beta), la portada queda contradictoria: las tarjetas de planes dicen "Empezar ahora" (registro directo), pero el CTA principal del hero, el de la navegación y el final siguen diciendo "Postular a la beta" y enlazan a `beta-reclutamiento.html` (una postulación a una beta ya cerrada), y el subtítulo de precios sigue con el texto de beta. El botón más visible manda a un callejón sin salida justo cuando se abre el registro al público — funnel de adquisición roto.
+
+Además, aunque el subtítulo (`.l-sec-sub`) sí depende de `inviteOnlySignup()`, está fuera de la caja `.l-plans`, y `boot()` solo refresca esa caja al resolver la config: tras el pintado optimista queda congelado con el texto del primer render.
+
+Reproducción: portada sin sesión; `boot()` pinta con `inviteOnlySignup()`=true (REMOTE.signup aún sin cargar); `/api/config` resuelve `signup.mode:"open"`; se ejecuta `refreshLandingPlans()`. Resultado: tarjetas → "Empezar ahora"; hero → "Postular a la beta" (`?source=portada`); nav → "Postular" (`?source=portada-nav`); subtítulo → "Precios al abrir los planes. Quienes entren a la beta tendrán precio de fundador.".
+
+### Causa raíz
+
+`index.html`: CTA de hero (`:7592`), navegación (`:7582`) y final (`:7627`) tienen el texto y el `href="beta-reclutamiento.html…"` hardcodeados, sin consultar `inviteOnlySignup()` — a diferencia del CTA de las tarjetas (`:7558-7560`). El subtítulo (`:7614`) sí lo consulta pero vive fuera de `.l-plans`; `refreshLandingPlans()` (`:7411-7415`) solo reescribe `.l-plans`, y `boot()` (`:12787-12788`) solo llama a `refreshLandingPlans()` (no repinta la portada) cuando ya estaba pintada. `inviteOnlySignup()` (`:988`) devuelve true por defecto mientras `REMOTE.signup` no esté cargado (`:978`).
+
+### Objetivo
+
+Con `SIGNUP_MODE=open`, toda la portada ofrece registro directo (hero, nav y CTA final = "Empezar ahora" hacia el registro, subtítulo sin texto de beta); con `invite`, todo sigue llevando a postular. El cambio de modo al resolver `/api/config` se refleja en todos esos elementos, no solo en las tarjetas.
+
+### Alcance
+
+1. Hacer que los CTA de hero, nav y final elijan texto y destino según `inviteOnlySignup()` (postular vs. abrir registro), igual que la tarjeta de planes.
+2. Al resolver la config en `boot()`, actualizar también hero/nav/CTA final/subtítulo cuando el modo cambie respecto al pintado optimista (p. ej. repintar la portada si `inviteOnlySignup()` cambió, o extender `refreshLandingPlans` para cubrir esos nodos), conservando scroll y FAQ abierta como hoy.
+
+### Fuera de alcance
+
+- Cualquier cambio en `beta-reclutamiento.html` o en el flujo de postulación.
+- El texto/estética de los botones de registro abierto (ya existe "Empezar ahora").
+
+### Riesgos
+
+- Repintar la portada al resolver la config podría perder el scroll o una FAQ abierta (REQ-151/197): preferir actualización in situ de los nodos afectados.
+
+### Criterios de aceptación
+
+- Con `signup.mode:"open"`, la portada no muestra ningún CTA "Postular…" ni enlace a `beta-reclutamiento.html`; hero, nav y CTA final llevan al registro directo y el subtítulo no menciona la beta.
+- Con `signup.mode:"invite"`, la portada mantiene el comportamiento actual (todos los CTA a postular).
+- El cambio de modo tras el pintado optimista se refleja en hero/nav/subtítulo, no solo en las tarjetas.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- `tests/e2e/portada.spec.js`: con la config en modo `open`, afirmar que no hay enlaces a `beta-reclutamiento.html` y que el hero lleva al registro; con `invite`, que sí llevan a postular.
+- Manual: cargar la portada, forzar `REMOTE.signup={mode:"open"}` y reejecutar el flujo de `boot()`; comprobar que hero, nav, CTA final y subtítulo dejan de hablar de beta.
