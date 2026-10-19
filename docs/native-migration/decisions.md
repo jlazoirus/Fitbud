@@ -4,6 +4,7 @@ Aquí se anotan las respuestas a las tareas `NAT-Hx` (ver `BACKLOG.md`). Solo in
 
 | ID | Decisión | Fecha | Quién | Resultado |
 |---|---|---|---|---|
+| — | Aplazar la ejecución hasta validar con usuarios en la web; reanudar con decisión GO (`estrategia/01-Plan-de-Validacion.md` §5) | 2026-10-19 | Jonathan | en pausa |
 | NAT-H1 | Aprobar ADR-001 (Expo / React Native) | | | pendiente |
 | NAT-H2 | Cuentas de tienda, bundle id, Team ID, huella SHA-256 Android | | | pendiente |
 | NAT-H3 | Modelo de cobro dentro de las apps | | | pendiente |
