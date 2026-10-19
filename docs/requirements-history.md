@@ -9478,3 +9478,41 @@ Decisión (Jonathan, 2026-10-19: "sigue todo tú"): fase 1 oculta por enlace, si
 2. Perfil → Cuenta muestra "Modo de la app (en prueba)" Normal/Conversación solo con la marca; `setUiMode()` guarda `prefs.uiMode`.
 3. `render()` → `renderChatMode()` sin tabs: saludo determinista (entreno de hoy + kcal/proteína), chips que responden con tarjetas (`chatAsk()`: entreno con `renderWorkoutExecution()`, comidas con `mealCard()`, peso con `chatSaveWeight()`), turnos locales del día en `sessionStorage` e hilo del coach (`loadCoachChat()`) intercalado; "Vista normal" siempre visible. SW v103.
 4. E2E `tests/e2e/conversacion.spec.js`: con la marca se hace el día desde el hilo sin llamadas al coach en las tarjetas; sin la marca no aparece.
+
+## REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): "hay que arreglar el scroll horizontal; no coge todo el ancho de la pantalla y siempre hay una barra de scroll".
+
+### Problema
+
+No se pudo reproducir en Chromium móvil emulado (2026-10-18): Hoy, Nutrición, Entreno (también con el reproductor abierto), Progreso, Perfil con todos sus acordeones, los 4 pasos del onboarding, la portada y `beta-reclutamiento.html` (versión anterior al rediseño de REQ-199), a 360, 375 y 390 px, tienen `scrollWidth == clientWidth`, ningún elemento sobresale de `#app` y ningún contenedor tiene scroll horizontal propio.
+
+### Causa raíz (hipótesis a confirmar)
+
+- `index.html:76-77`: `body` es `height:100dvh; overflow:hidden` y el scroll vive en `#app` (`index.html:84-85`, `overflow-y:auto; max-width:560px`), no en el documento. En escritorio, y en navegadores con barras clásicas (Windows, o macOS con "mostrar barras siempre"), la app es una columna de 560 px con su propia barra vertical en medio de la pantalla. Eso encaja con "no coge todo el ancho" y "siempre hay una barra".
+- En iOS, `overflow-x:hidden` solo está en `body`/`#app` y no en `html`. Si algún contenido real (nombres largos de platos o ejercicios del coach, que los mocks no tienen) desborda, Safari permite arrastrar la página de lado.
+
+### Objetivo
+
+En cualquier dispositivo, la app ocupa el ancho disponible de forma intencional y no muestra barras de scroll que no aporten.
+
+### Alcance (una vez reproducido)
+
+1. Según la evidencia: o la barra de `#app` se estiliza/oculta (`scrollbar-gutter`, `scrollbar-width:thin`), o el scroll pasa al documento manteniendo la barra de tabs fija; en móvil, `overflow-x:clip` en `html` y corte de palabras largas (`overflow-wrap:anywhere`) en títulos de platos y ejercicios.
+2. E2E que falle con el código actual en el caso reproducido.
+
+### Criterios de aceptación
+
+- El caso de la captura deja de verse; sin regresión en `tactil.spec.js`, `accesibilidad.spec.js` y `portada.spec.js`.
+
+### Verificación sugerida
+
+- Jonathan: captura + modelo de teléfono/navegador (o "escritorio, Chrome en Windows").
+
+### Implementación
+
+Sin cambios propios. Descartado por decisión de Jonathan (2026-10-19); mitigación de causas plausibles en REQ-221.

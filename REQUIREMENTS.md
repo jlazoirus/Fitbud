@@ -70,7 +70,7 @@ Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que 
 Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la beta primero (cobro), luego lo que confunde en el alta y el entreno, luego funciones nuevas:
 
 - REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días; cobro siempre en la web. (P0; implementado)
-- REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (P0; espera captura para reproducir; mitigación en REQ-221)
+- REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (descartado: no se reprodujo; mitigación en REQ-221)
 - REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1; implementado)
 - REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1; implementado)
 - REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1; implementado)
@@ -89,7 +89,6 @@ Pendiente no automatizable por agentes:
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
-- REQ-209 - Scroll/ancho: falta captura y dispositivo para reproducir.
 - REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
@@ -1437,37 +1436,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-208`).
 
 ## REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll
 
-**Estado: pendiente. Requiere acción humana: captura y dispositivo/navegador donde se ve, para reproducir; no implementable por el agente autónomo hasta tenerlos.**
+**Estado: implementado.** Descartado por decisión de Jonathan (2026-10-19): no se reprodujo en Chromium móvil ni en producción; la mitigación quedó en REQ-221. Si vuelve a aparecer, se abre un REQ nuevo con captura y dispositivo.
 
-### Origen
-
-Feedback beta de Jonathan (2026-10-18): "hay que arreglar el scroll horizontal; no coge todo el ancho de la pantalla y siempre hay una barra de scroll".
-
-### Problema
-
-No se pudo reproducir en Chromium móvil emulado (2026-10-18): Hoy, Nutrición, Entreno (también con el reproductor abierto), Progreso, Perfil con todos sus acordeones, los 4 pasos del onboarding, la portada y `beta-reclutamiento.html` (versión anterior al rediseño de REQ-199), a 360, 375 y 390 px, tienen `scrollWidth == clientWidth`, ningún elemento sobresale de `#app` y ningún contenedor tiene scroll horizontal propio.
-
-### Causa raíz (hipótesis a confirmar)
-
-- `index.html:76-77`: `body` es `height:100dvh; overflow:hidden` y el scroll vive en `#app` (`index.html:84-85`, `overflow-y:auto; max-width:560px`), no en el documento. En escritorio, y en navegadores con barras clásicas (Windows, o macOS con "mostrar barras siempre"), la app es una columna de 560 px con su propia barra vertical en medio de la pantalla. Eso encaja con "no coge todo el ancho" y "siempre hay una barra".
-- En iOS, `overflow-x:hidden` solo está en `body`/`#app` y no en `html`. Si algún contenido real (nombres largos de platos o ejercicios del coach, que los mocks no tienen) desborda, Safari permite arrastrar la página de lado.
-
-### Objetivo
-
-En cualquier dispositivo, la app ocupa el ancho disponible de forma intencional y no muestra barras de scroll que no aporten.
-
-### Alcance (una vez reproducido)
-
-1. Según la evidencia: o la barra de `#app` se estiliza/oculta (`scrollbar-gutter`, `scrollbar-width:thin`), o el scroll pasa al documento manteniendo la barra de tabs fija; en móvil, `overflow-x:clip` en `html` y corte de palabras largas (`overflow-wrap:anywhere`) en títulos de platos y ejercicios.
-2. E2E que falle con el código actual en el caso reproducido.
-
-### Criterios de aceptación
-
-- El caso de la captura deja de verse; sin regresión en `tactil.spec.js`, `accesibilidad.spec.js` y `portada.spec.js`.
-
-### Verificación sugerida
-
-- Jonathan: captura + modelo de teléfono/navegador (o "escritorio, Chrome en Windows").
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-209`).
 
 ## REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding
 
