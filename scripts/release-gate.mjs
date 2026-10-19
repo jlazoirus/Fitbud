@@ -133,6 +133,7 @@ run("validate-strength-only-schedule.mjs", "node scripts/validate-strength-only-
 run("validate-e2e-training-fixture.mjs", "node scripts/validate-e2e-training-fixture.mjs");
 run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
 run("test-admin-api.mjs", "node scripts/test-admin-api.mjs");
+run("test-admin-beta-api.mjs", "node scripts/test-admin-beta-api.mjs");
 run("test-admin-reset.mjs", "node scripts/test-admin-reset.mjs");
 run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
 run("invite-beta-tester.mjs --self-test", "node scripts/invite-beta-tester.mjs --self-test");

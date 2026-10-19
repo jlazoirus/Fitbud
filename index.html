@@ -3795,6 +3795,7 @@ function render(){
   if(isAdmin()&&view==="exercises")return renderExerciseAdmin();
   if(isAdmin()&&view==="settings")return renderSettings();
   if(isAdmin()&&view==="admin")return renderAdminUsers();
+  if(isAdmin()&&view==="adminBeta")return renderAdminBeta();
   if(isAdmin()&&view==="analytics")return renderAnalytics();
   renderHoy();
 }
@@ -3962,7 +3963,7 @@ function renderTabs(){
   $("#tabs").innerHTML=tabs.map(([v,l])=>`<button data-tab="${v}" class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
 }
 function setView(v){
-  if((v==="foods"||v==="exercises"||v==="settings"||v==="admin")&&!isAdmin())v="perfil";
+  if((v==="foods"||v==="exercises"||v==="settings"||v==="admin"||v==="adminBeta")&&!isAdmin())v="perfil";
   if(v==="coach")v="hoy";
   view=v;
   if(v==="hoy")current=clampDate(todayStr());
@@ -6702,6 +6703,7 @@ function renderProfile(){
   <summary onclick="return profileAccordionGuard(event,this)">Administración</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, alimentos, ejercicios y la configuración técnica.</div>
+    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('adminBeta')">🌱 Postulantes beta</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('foods')">🥗 Alimentos (catálogo)</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('exercises')">🏋️ Ejercicios (catálogo)</button>
@@ -11609,6 +11611,109 @@ async function createAdminUser(){
   }catch(e){
     if(out)out.textContent="⚠️ "+e.message;
     if(btn){btn.disabled=false;btn.textContent="Crear cuenta";}
+  }
+}
+/* ---- Postulantes de la beta (REQ-218) ----
+   Aceptar crea un acceso de 90 días (plan completo y cuotas diarias del coach)
+   y deja el mensaje de WhatsApp con el enlace que crea la cuenta y lo activa. */
+let adminBetaFilter="pending";
+let adminBetaCache=[];
+const BETA_FILTER_LABELS={pending:"Por revisar",invited:"Aceptados",closed:"Descartados",all:"Todos"};
+const BETA_STATUS_LABELS={new:"Nueva",shortlisted:"Preseleccionada",contacted:"Contactada",interview_scheduled:"Llamada agendada",interviewed:"Entrevistada",beta_invited:"Aceptada",rejected:"Descartada",archived:"Archivada"};
+const BETA_STAGE_LABELS={beginner:"Quiere empezar",returning:"Está retomando",consistent:"Con cierta constancia",advanced:"Entrena en serio"};
+const BETA_GOAL_LABELS={"Ganar musculo":"Ganar músculo","Comer mas sano y crear habitos":"Comer más sano y crear hábitos"};
+const BETA_AVAIL_LABELS={interview_beta:"Llamada y beta de 3 meses",interview:"Solo la llamada",later:"Más adelante"};
+const BETA_INVEST_LABELS={none:"Nada por ahora",time:"Tiempo",app:"Paga o pagó una app",coach:"Paga o pagó coach, nutricionista o gym"};
+async function renderAdminBeta(){
+  $("#app").innerHTML=`${screenHeader("Postulantes beta","Administración","perfil")}
+    <div class="row between wrap" style="margin-bottom:12px">
+      <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
+      <button class="btn btn-sm" onclick="loadAdminBeta()">Actualizar</button>
+    </div>
+    <div class="ai-box" style="margin-bottom:14px">Al aceptar a alguien se crea su acceso de 90 días con el plan completo y las cuotas diarias del coach. Te dejamos el mensaje listo para enviarlo por WhatsApp; con ese enlace la persona crea su cuenta y el acceso se activa solo.</div>
+    <div class="chips" role="group" aria-label="Filtrar postulantes" id="betaFilters" style="margin-bottom:14px"></div>
+    <div id="betaList" class="muted small">Cargando postulantes…</div>`;
+  await loadAdminBeta();
+}
+async function loadAdminBeta(){
+  const list=$("#betaList");if(!list)return;
+  list.innerHTML='<div class="muted small">Cargando postulantes…</div>';
+  try{
+    const out=await adminApi("betaApplicants",{filter:adminBetaFilter});
+    adminBetaCache=out.applicants||[];
+    const counts=out.counts||{};
+    const filters=$("#betaFilters");
+    if(filters)filters.innerHTML=Object.entries(BETA_FILTER_LABELS).map(([key,label])=>{
+      const n=key==="all"?(counts.pending||0)+(counts.invited||0)+(counts.closed||0):counts[key];
+      return `<button class="btn btn-sm${key===adminBetaFilter?" btn-accent":""}" aria-pressed="${key===adminBetaFilter}" onclick="adminBetaFilter='${key}';loadAdminBeta()">${label}${n!==undefined?` (${n})`:""}</button>`;
+    }).join("");
+    list.innerHTML=adminBetaCache.length?adminBetaCache.map(adminBetaCardHtml).join(""):`<div class="muted small">${adminBetaFilter==="pending"?"No hay postulaciones por revisar. Comparte evolvapp.club/beta para recibir más.":"No hay postulaciones en esta lista."}</div>`;
+  }catch(e){
+    list.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}</div>`;
+  }
+}
+function adminBetaCardHtml(a){
+  const phone=String(a.whatsapp||"").replace(/\D/g,"");
+  const closed=a.status==="rejected"||a.status==="archived";
+  const invited=a.status==="beta_invited";
+  const pains=Array.isArray(a.pains)?a.pains:[];
+  const tools=Array.isArray(a.tools)?a.tools:[];
+  const caution=a.health==="caution"?'<span class="pill" style="background:var(--warn-dim);color:#fcd34d">lesión o indicación médica</span>':"";
+  const actions=closed
+    ?`<button class="btn btn-sm" onclick="adminBetaSetStatus(${a.id},'new',this)">Volver a revisar</button>`
+    :`<button class="btn btn-sm${invited?"":" btn-accent"}" onclick="adminBetaAccept(${a.id},this)">${invited?"Generar enlace nuevo":"Aceptar (90 días)"}</button>
+      ${invited?"":`<button class="btn btn-sm" onclick="adminBetaSetStatus(${a.id},'rejected',this)">Descartar</button>`}`;
+  return `<div class="meal">
+    <div class="meal-head"><div>
+      <div class="name">${esc(a.name||"Sin nombre")} <span class="pill">${esc(BETA_STATUS_LABELS[a.status]||a.status||"")}</span>${caution}</div>
+      <div class="nums muted">${esc(a.country_city||"")} · ${esc(a.age_band||"")} · postuló ${prettyDateTime(a.created_at)}${a.source?` · vino de ${esc(a.source)}`:""}</div>
+    </div></div>
+    <div class="small" style="margin:8px 0 4px">${esc(BETA_GOAL_LABELS[a.goal]||a.goal||"")} · ${esc(BETA_STAGE_LABELS[a.stage]||a.stage||"")} · ${esc(BETA_AVAIL_LABELS[a.availability]||a.availability||"")}</div>
+    ${pains.length?`<div class="muted small">Se le rompe: ${esc(pains.join(" · "))}</div>`:""}
+    <div class="muted small">Usa: ${esc(tools.length?tools.join(" · "):"nada")} · Invierte: ${esc(BETA_INVEST_LABELS[a.investment]||a.investment||"")}</div>
+    ${a.story?`<details style="margin-top:6px"><summary class="small">Su historia</summary><p class="small" style="margin:6px 0 0;white-space:pre-wrap">${esc(a.story)}</p></details>`:""}
+    <div class="muted small" style="margin-top:6px">${esc(a.segment||"")} · prioridad ${esc(a.priority||"—")}${a.priority_score!=null?` (${a.priority_score})`:""}</div>
+    ${a.review_notes?`<div class="muted small" style="margin-top:4px;white-space:pre-wrap">${esc(a.review_notes)}</div>`:""}
+    <div class="meal-actions" style="margin-top:10px">
+      ${actions}
+      ${phone?`<a class="btn btn-sm" href="https://wa.me/${phone}" target="_blank" rel="noopener">Abrir WhatsApp</a>`:""}
+    </div>
+  </div>`;
+}
+async function adminBetaAccept(id,btn){
+  if(btn){btn.disabled=true;btn.textContent="Creando acceso…";}
+  try{
+    const out=await adminApi("betaAccept",{id});
+    window._betaInviteMsg=out.message||"";
+    const first=String((out.applicant&&out.applicant.name)||"").split(/\s+/)[0];
+    const until=prettyDateTime(out.validUntil).split(" ").slice(0,2).join(" ");
+    modal(`<h3>${first?esc(first)+" está dentro":"Postulante aceptado"}</h3>
+      <div class="muted small" style="margin-bottom:12px">Código ${esc(out.code)} · ${out.days} días de acceso completo · el enlace se puede activar hasta el ${esc(until)}.</div>
+      <div class="field"><label for="betaInviteMsg">Mensaje para enviar</label><textarea id="betaInviteMsg" rows="9" readonly>${esc(out.message||"")}</textarea></div>
+      <div class="row wrap" style="margin-top:12px">
+        ${out.whatsappUrl?`<a class="btn btn-accent" href="${esc(out.whatsappUrl)}" target="_blank" rel="noopener">Enviar por WhatsApp</a>`:""}
+        <button class="btn" onclick="copyBetaInvite()">Copiar mensaje</button>
+        <button class="btn" onclick="closeModal()">Listo</button>
+      </div>`);
+    loadAdminBeta();
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent="Aceptar (90 días)";}
+    toast(String(e.message||e));
+  }
+}
+async function copyBetaInvite(){
+  try{await navigator.clipboard.writeText(window._betaInviteMsg||"");toast("Mensaje copiado");}
+  catch(_){toast("No se pudo copiar; selecciona el texto y cópialo a mano");}
+}
+async function adminBetaSetStatus(id,status,btn){
+  if(btn)btn.disabled=true;
+  try{
+    await adminApi("betaSetStatus",{id,status});
+    toast(status==="rejected"?"Postulación descartada":"Postulación de vuelta en revisión");
+    loadAdminBeta();
+  }catch(e){
+    if(btn)btn.disabled=false;
+    toast(String(e.message||e));
   }
 }
 async function copyAdminWelcome(){

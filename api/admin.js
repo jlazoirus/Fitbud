@@ -1,6 +1,8 @@
 // Administración de usuarios (Vercel) — REQ-07.
 // SUPABASE_SERVICE_ROLE_KEY vive exclusivamente en el servidor.
 
+import crypto from "node:crypto";
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BAN_DURATION = "876000h"; // 100 años; "none" levanta el bloqueo.
@@ -722,6 +724,157 @@ function safeRedirect(req, candidate) {
   }
 }
 
+// ── Postulantes de la beta (REQ-218) ─────────────────────────────────────────
+// Aceptar = crear un código de 90 días (plan quarterly) y dejar listo el
+// mensaje de WhatsApp con el enlace /?codigo=…; la persona crea su cuenta con
+// él y el acceso completo (con las cuotas diarias del coach) se activa solo.
+
+const BETA_SELECT = [
+  "id", "created_at", "name", "whatsapp", "age_band", "country_city", "source",
+  "stage", "goal", "recent_attempt", "tools", "pains", "story", "investment",
+  "availability", "health", "segment", "priority", "priority_score",
+  "beta_eligible", "status", "review_notes", "contacted_at",
+].join(",");
+const BETA_FILTERS = {
+  pending: "&status=in.(new,shortlisted,contacted,interview_scheduled,interviewed)",
+  invited: "&status=eq.beta_invited",
+  closed: "&status=in.(rejected,archived)",
+  all: "",
+};
+const BETA_SET_STATUS = new Set(["new", "shortlisted", "rejected", "archived"]);
+const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // mismo que api/entitlement.js
+
+function betaInviteCode() {
+  let body = "";
+  for (let i = 0; i < 8; i++) body += CODE_ALPHABET[crypto.randomInt(0, CODE_ALPHABET.length)];
+  return "FIT-" + body.slice(0, 4) + "-" + body.slice(4);
+}
+
+export function betaInviteMessage({ name, code, days, validUntil, appUrl }) {
+  const first = String(name || "").trim().split(/\s+/)[0] || "";
+  const link = appUrl.replace(/\/$/, "") + "/?codigo=" + code;
+  const until = new Date(validUntil).toLocaleDateString("es-PE", { day: "numeric", month: "long", timeZone: "America/Lima" });
+  const length = days % 30 === 0 && days >= 60 ? `${days / 30} meses` : `${days} días`;
+  return {
+    link,
+    text: [
+      `Hola${first ? " " + first : ""}, te escribimos de Evolv. Gracias por postular a la beta de fundadores: entraste al grupo.`,
+      "",
+      `Este es tu acceso completo por ${length}, sin costo: ${link}`,
+      "",
+      `Ábrelo en el teléfono donde vas a usar Evolv y crea tu cuenta; el acceso se activa solo. Si te pide el código de invitación, es ${code}.`,
+      "",
+      `El enlace se puede activar hasta el ${until}. ¿Te acomoda una llamada de 15 minutos esta semana para conocer tu caso?`,
+    ].join("\n"),
+  };
+}
+
+async function betaSubmission(e, id) {
+  const r = await fetch(e.url + "/rest/v1/beta_recruitment_submissions?id=eq." + id + "&select=" + BETA_SELECT, {
+    headers: serviceHeaders(e),
+  });
+  const rows = await responseJson(r);
+  if (!r.ok) throw new Error(apiError(rows, "No se pudo leer la postulación."));
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+async function betaPatch(e, id, patch) {
+  const r = await fetch(e.url + "/rest/v1/beta_recruitment_submissions?id=eq." + id + "&select=" + BETA_SELECT, {
+    method: "PATCH",
+    headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=representation" }),
+    body: JSON.stringify(Object.assign({ updated_at: new Date().toISOString() }, patch)),
+  });
+  const rows = await responseJson(r);
+  if (!r.ok) throw new Error(apiError(rows, "No se pudo actualizar la postulación."));
+  return Array.isArray(rows) ? rows[0] || null : null;
+}
+
+function betaId(value) {
+  const id = Number(value);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+async function listBetaApplicants(e, filter) {
+  const where = Object.prototype.hasOwnProperty.call(BETA_FILTERS, filter) ? BETA_FILTERS[filter] : BETA_FILTERS.pending;
+  const r = await fetch(
+    e.url + "/rest/v1/beta_recruitment_submissions?select=" + BETA_SELECT + where
+      + "&order=priority_score.desc,created_at.asc&limit=300",
+    { headers: serviceHeaders(e) }
+  );
+  const rows = await responseJson(r);
+  if (!r.ok) {
+    const missing = r.status === 404 || String(rows && rows.code) === "42P01";
+    throw new Error(missing ? "Falta aplicar supabase/beta_recruitment.sql en Supabase." : apiError(rows, "No se pudieron leer las postulaciones."));
+  }
+  const counts = { pending: 0, invited: 0, closed: 0 };
+  const cr = await fetch(e.url + "/rest/v1/beta_recruitment_submissions?select=status&limit=5000", { headers: serviceHeaders(e) });
+  const all = await responseJson(cr);
+  if (cr.ok && Array.isArray(all)) {
+    for (const row of all) {
+      if (row.status === "beta_invited") counts.invited += 1;
+      else if (row.status === "rejected" || row.status === "archived") counts.closed += 1;
+      else counts.pending += 1;
+    }
+  }
+  return { applicants: Array.isArray(rows) ? rows : [], counts };
+}
+
+async function acceptBetaApplicant(e, caller, body) {
+  const id = betaId(body.id);
+  if (!id) return { status: 400, data: { error: "Postulación inválida." } };
+  const days = body.days === undefined ? 90 : Number(body.days);
+  if (!Number.isInteger(days) || days < 1 || days > 365) return { status: 400, data: { error: "Días de acceso inválidos." } };
+  const sub = await betaSubmission(e, id);
+  if (!sub) return { status: 404, data: { error: "No existe esa postulación." } };
+
+  const validUntil = new Date(Date.now() + 30 * 86400000).toISOString();
+  let code = "";
+  for (let attempt = 0; attempt < 8 && !code; attempt++) {
+    const candidate = betaInviteCode();
+    const r = await fetch(e.url + "/rest/v1/redemption_codes", {
+      method: "POST",
+      headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=minimal" }),
+      body: JSON.stringify({ code: candidate, plan_id: "quarterly", duration_days: days, valid_until: validUntil, created_by: caller }),
+    });
+    if (r.ok) { code = candidate; break; }
+    const err = await responseJson(r);
+    if (!(r.status === 409 || String(err.code) === "23505")) {
+      return { status: 500, data: { error: apiError(err, "No se pudo crear el código (¿aplicaste supabase/coupon_codes.sql?).") } };
+    }
+  }
+  if (!code) return { status: 500, data: { error: "No se pudo generar un código único. Intenta de nuevo." } };
+
+  const note = `${new Date().toISOString().slice(0, 10)}: aceptado en la beta con ${code} (${days} días).`;
+  const updated = await betaPatch(e, id, {
+    status: "beta_invited",
+    contacted_at: new Date().toISOString(),
+    review_notes: sub.review_notes ? sub.review_notes + "\n" + note : note,
+  });
+  const message = betaInviteMessage({ name: sub.name, code, days, validUntil, appUrl: process.env.APP_URL || "https://evolvapp.club" });
+  const phone = String(sub.whatsapp || "").replace(/\D/g, "");
+  return {
+    status: 200,
+    data: {
+      applicant: updated || Object.assign({}, sub, { status: "beta_invited" }),
+      code,
+      days,
+      validUntil,
+      link: message.link,
+      message: message.text,
+      whatsappUrl: phone ? "https://wa.me/" + phone + "?text=" + encodeURIComponent(message.text) : "",
+    },
+  };
+}
+
+async function setBetaApplicantStatus(e, body) {
+  const id = betaId(body.id);
+  const status = String(body.status || "");
+  if (!id || !BETA_SET_STATUS.has(status)) return { status: 400, data: { error: "Cambio de estado inválido." } };
+  const updated = await betaPatch(e, id, { status });
+  if (!updated) return { status: 404, data: { error: "No existe esa postulación." } };
+  return { status: 200, data: { applicant: updated } };
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Método no permitido" });
@@ -754,6 +907,23 @@ export default async function handler(req, res) {
   try {
     if (body.action === "list") {
       res.status(200).json({ users: await listUsers(e) });
+      return;
+    }
+
+    if (body.action === "betaApplicants") {
+      res.status(200).json(await listBetaApplicants(e, String(body.filter || "pending")));
+      return;
+    }
+
+    if (body.action === "betaAccept") {
+      const out = await acceptBetaApplicant(e, caller, body);
+      res.status(out.status).json(out.data);
+      return;
+    }
+
+    if (body.action === "betaSetStatus") {
+      const out = await setBetaApplicantStatus(e, body);
+      res.status(out.status).json(out.data);
       return;
     }
 

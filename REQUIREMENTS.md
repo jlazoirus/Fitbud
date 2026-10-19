@@ -1945,3 +1945,22 @@ Jonathan (2026-10-19): quien postula tiene que saber, de forma amable, que sus d
 
 - `tests/e2e/beta.spec.js`: envío completo muestra el panel y oculta el formulario; sin fricción no se envía; la cuarta fricción no desmarca otra; el borrador sobrevive a recargar; un 400 de WhatsApp se explica y enfoca el campo. ✓
 - impeccable sin hallazgos; axe sin violaciones en el panel. ✓
+
+## REQ-218 - Admin: pantalla "Postulantes beta" para revisar, aceptar con 90 días y avisar por WhatsApp
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19): necesita ver a los postulantes y aceptarlos de forma clara, y que al aceptarlos se les asignen por defecto los 3 meses gratis con las cuotas del coach. Hasta ahora solo existían scripts de terminal (REQ-203).
+
+### Alcance
+
+1. `api/admin.js` (solo admin activo): `betaApplicants` (filtros por revisar / aceptados / descartados / todos, con conteos), `betaAccept` (código de 90 días del plan `quarterly`, activable 30 días, auditado con el admin; postulación en `beta_invited` con nota; devuelve mensaje, enlace `/?codigo=` y `wa.me`) y `betaSetStatus` (`new`, `shortlisted`, `rejected`, `archived`; `beta_invited` solo se pone aceptando).
+2. `index.html`: Perfil → Administración → "Postulantes beta" (vista `adminBeta`, solo admin). Tarjetas con datos legibles, historia plegable, aviso de lesión, "Aceptar (90 días)", "Descartar", "Volver a revisar", "Generar enlace nuevo" y "Abrir WhatsApp". Al aceptar, modal con el mensaje, "Enviar por WhatsApp" y "Copiar mensaje". SW v92.
+3. `BETA_PROGRAM.md`: revisar y aceptar desde la app; la terminal queda como alternativa.
+
+### Criterios de aceptación
+
+- `scripts/test-admin-beta-api.mjs` (gate): conteos, código de 90 días `quarterly` auditado, `beta_invited` con nota, mensaje y `wa.me` correctos, ids inválidos, estados no permitidos y 403 para no admin. ✓
+- `tests/e2e/admin-beta.spec.js`: el admin acepta y ve el mensaje con el enlace; un usuario normal no entra a la vista. ✓
