@@ -47,6 +47,30 @@ test.describe("Portada", () => {
     await expect(page.locator("#au_email")).toBeVisible();
   });
 
+  // REQ-219: con el registro abierto, toda la portada ofrece crear cuenta (no postular),
+  // también cuando el modo llega después del pintado optimista.
+  test("con SIGNUP_MODE=open, hero, navegación, planes y cierre llevan al registro", async ({ page, context }) => {
+    await installMocks(context);
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    await page.route("**/api/config", async (route) => {
+      await gate; // la portada se pinta antes de conocer el modo (REQ-197)
+      route.fulfill({ status: 200, contentType: "application/json",
+        body: JSON.stringify({ supabase: { url: "https://e2emock.supabase.co", publishableKey: "e2e-publishable-key" }, anthropic: { model: "", proxy: true }, signup: { mode: "open" } }) });
+    });
+    await gotoApp(page);
+    await expect(page.getByRole("link", { name: "Postular a la beta" }).first()).toBeVisible();
+    await page.locator(".l-faq-item summary").first().click();
+    release();
+    await expect(page.locator('.landing a[href*="beta-reclutamiento.html"]')).toHaveCount(0);
+    await expect(page.locator(".landing")).not.toContainText(/beta/i);
+    await expect(page.locator(".l-hero-ctas").getByRole("button", { name: "Empezar ahora" })).toBeVisible();
+    await expect(page.locator(".landing-nav").getByRole("button", { name: "Empezar" })).toBeVisible();
+    await expect(page.locator(".l-faq-item").first()).toHaveAttribute("open", "");
+    await page.locator(".l-cta-final").getByRole("button", { name: "Empezar ahora" }).click();
+    await expect(page.locator("#au_email")).toBeVisible();
+  });
+
   test.describe("escritorio", () => {
     test.use({ viewport: { width: 1440, height: 900 } });
     test("la escalera se enciende peldaño a peldaño al bajar", async ({ page, context }) => {

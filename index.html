@@ -303,6 +303,7 @@
   .move-list .dose{display:block;color:var(--muted);font-size:13px}
   .move-now{margin-top:12px;padding:14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1)}
   .move-now h4{font-size:18px;margin:4px 0 2px;line-height:1.25}
+  .l-mode{display:contents}
   /* REQ-215: lista de compra */
   .shop-scope{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
   .shop-scope .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
@@ -7665,6 +7666,28 @@ function refreshLandingPlans(){
   const box=document.querySelector("#app .landing .l-plans");
   if(!box||_landingKey===landingRenderKey())return;
   _landingKey=landingRenderKey();box.innerHTML=landingPricingHtml();
+  // REQ-219: los CTA y textos que dependen del modo de registro se actualizan in situ
+  // (sin repintar la portada: se conservan el scroll y la FAQ abierta).
+  document.querySelectorAll("#app .landing [data-lmode]").forEach(node=>{node.innerHTML=landingModeHtml(node.dataset.lmode);});
+}
+// REQ-219: beta cerrada → postular; registro abierto → crear cuenta directo.
+function landingModeHtml(slot){
+  const invite=inviteOnlySignup();
+  const signUp=(cls,label)=>`<button class="l-btn ${cls}" onclick="showAuthFromLanding('up')">${label}</button>`;
+  if(slot==="nav")return invite?`<a class="l-btn l-btn-lime" href="beta-reclutamiento.html?source=portada-nav">Postular</a>`:signUp("l-btn-lime","Empezar");
+  if(slot==="hero")return invite?`<a class="l-btn l-btn-lime l-btn-lg" href="beta-reclutamiento.html?source=portada">Postular a la beta</a>`:signUp("l-btn-lime l-btn-lg","Empezar ahora");
+  if(slot==="heroNote")return invite?"Beta de fundadores en Perú, Chile y México · Tres meses gratis, sin tarjeta":"Tu plan listo en minutos · Pagas solo el período que eliges";
+  if(slot==="sub")return invite?"Precios al abrir los planes. Quienes entren a la beta tendrán precio de fundador.":"Pagas solo el período que eliges. Sin permanencia.";
+  if(slot==="final")return invite
+    ?`<h2 id="l-cta-h">Sé de los primeros.</h2>
+        <p>Buscamos personas que usen Evolv tres meses y nos digan qué mejorar. A cambio, acceso completo gratis y precio de fundador.</p>
+        <a class="l-btn l-btn-ink l-btn-lg" href="beta-reclutamiento.html?source=portada-final">Postular a la beta</a>
+        <div class="l-cta-note">Postular toma 2 minutos · Te escribimos por WhatsApp</div>`
+    :`<h2 id="l-cta-h">Empieza hoy.</h2>
+        <p>Tu plan de comidas y entrenos, armado con tu cuerpo y tus horarios, y ajustado cuando el día se tuerce.</p>
+        ${signUp("l-btn-ink l-btn-lg","Empezar ahora")}
+        <div class="l-cta-note">Crear tu cuenta toma 2 minutos · Sin permanencia</div>`;
+  return "";
 }
 // REQ-198: portada "Escalera de días". Los escalones van del día a día al
 // cierre del ciclo; la escalera sube (abajo-izquierda → arriba-derecha)
@@ -7831,7 +7854,7 @@ function renderLanding(){
       <div class="landing-brand" role="img" aria-label="Evolv">${brandMark(30)}${brandWordmark()}</div>
       <div class="landing-nav-actions">
         <button class="l-btn l-btn-text" onclick="showAuthFromLanding('in')">Iniciar sesión</button>
-        <a class="l-btn l-btn-lime" href="beta-reclutamiento.html?source=portada-nav">Postular</a>
+        <span class="l-mode" data-lmode="nav">${landingModeHtml("nav")}</span>
       </div>
     </header>
 
@@ -7841,10 +7864,10 @@ function renderLanding(){
         <div>
           <p class="l-hero-sub">Evolv arma <b>lo que comes y entrenas hoy</b> con tu cuerpo, tus horarios y lo que tienes a mano. Y cuando el día se tuerce, lo ajusta contigo.</p>
           <div class="l-hero-ctas">
-            <a class="l-btn l-btn-lime l-btn-lg" href="beta-reclutamiento.html?source=portada">Postular a la beta</a>
+            <span class="l-mode" data-lmode="hero">${landingModeHtml("hero")}</span>
             <button class="l-btn l-btn-ghost l-btn-lg" onclick="showAuthFromLanding('in')">Ya tengo cuenta</button>
           </div>
-          <div class="l-hero-note">Beta de fundadores en Perú, Chile y México · Tres meses gratis, sin tarjeta</div>
+          <div class="l-hero-note" data-lmode="heroNote">${landingModeHtml("heroNote")}</div>
         </div>
         ${landingDemoHtml()}
       </div>
@@ -7863,7 +7886,7 @@ function renderLanding(){
 
     <section class="l-wrap l-pricing" aria-labelledby="l-pricing-h">
       <h2 class="l-sec-h" id="l-pricing-h">Elige tu ritmo.</h2>
-      <p class="l-sec-sub">${inviteOnlySignup()?"Precios al abrir los planes. Quienes entren a la beta tendrán precio de fundador.":"Pagas solo el período que eliges. Sin permanencia."}</p>
+      <p class="l-sec-sub" data-lmode="sub">${landingModeHtml("sub")}</p>
       <div class="l-plans">${plansHtml}</div>
     </section>
 
@@ -7873,12 +7896,7 @@ function renderLanding(){
     </section>
 
     <section class="l-cta-final" aria-labelledby="l-cta-h">
-      <div class="l-wrap">
-        <h2 id="l-cta-h">Sé de los primeros.</h2>
-        <p>Buscamos personas que usen Evolv tres meses y nos digan qué mejorar. A cambio, acceso completo gratis y precio de fundador.</p>
-        <a class="l-btn l-btn-ink l-btn-lg" href="beta-reclutamiento.html?source=portada-final">Postular a la beta</a>
-        <div class="l-cta-note">Postular toma 2 minutos · Te escribimos por WhatsApp</div>
-      </div>
+      <div class="l-wrap" data-lmode="final">${landingModeHtml("final")}</div>
     </section>
 
     <footer class="l-wrap l-footer">
