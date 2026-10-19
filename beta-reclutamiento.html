@@ -4,9 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Evolv · Beta de fundadores</title>
-  <meta name="description" content="Usa Evolv gratis tres meses y ayúdanos a mejorarlo. Beta cerrada en Perú, Chile y México. Postular toma 2 minutos.">
+  <meta name="description" content="Usa Evolv gratis tres meses y ayúdanos a mejorarlo. Postular toma 2 minutos.">
   <meta property="og:title" content="Evolv · Beta de fundadores">
-  <meta property="og:description" content="Tres meses gratis para las primeras personas que nos digan qué funciona y qué no. Perú, Chile y México.">
+  <meta property="og:description" content="Tres meses gratis para las primeras personas que nos digan qué funciona y qué no.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://evolvapp.club/beta-reclutamiento.html">
   <meta property="og:site_name" content="Evolv">
@@ -377,7 +377,7 @@
           <a class="button" href="#postular">Postular a la beta</a>
           <a class="button secondary" href="#como">Cómo funciona</a>
         </div>
-        <p class="hero-note">Perú, Chile y México · Postular toma 2 minutos · Sin costo ni tarjeta</p>
+        <p class="hero-note">Postular toma 2 minutos · Sin costo ni tarjeta</p>
       </div>
       <aside class="side" aria-label="Vista de Evolv">
       <div class="preview">
@@ -442,8 +442,8 @@
               </div>
               <div>
                 <label for="whatsapp">WhatsApp</label>
-                <input id="whatsapp" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+51 999 999 999" aria-describedby="whatsappHint">
-                <p class="field-hint" id="whatsappHint">Con código de país (+51, +56, +52). Solo lo usamos para escribirte sobre la beta.</p>
+                <input id="whatsapp" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+ código de país y número" aria-describedby="whatsappHint">
+                <p class="field-hint" id="whatsappHint">Con el código de tu país (empieza con +). Solo lo usamos para escribirte sobre la beta.</p>
               </div>
               <div>
                 <label for="age">Edad</label>
@@ -458,7 +458,7 @@
               </div>
               <div>
                 <label for="city">País / ciudad</label>
-                <input id="city" name="city" maxlength="120" placeholder="Lima, Perú" required>
+                <input id="city" name="city" maxlength="120" placeholder="Ciudad, país" required>
               </div>
             </div>
           </fieldset>
@@ -658,7 +658,7 @@
       updatePainCount(false);
       const phone = form.elements.whatsapp;
       const digits = phone.value.replace(/\D/g, "").length;
-      phone.setCustomValidity(digits && (digits < 8 || digits > 15) ? "Incluye el código de país, por ejemplo +51 999 999 999." : "");
+      phone.setCustomValidity(digits && (digits < 8 || digits > 15) ? "Incluye el código de tu país: el número completo empieza con +." : "");
       if (!form.reportValidity()) return;
       setSubmitting(true);
       result.hidden = true;

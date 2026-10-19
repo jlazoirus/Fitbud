@@ -34,6 +34,7 @@ test.describe("Portada", () => {
     const text = await page.locator(".landing").innerText();
     expect(text).not.toMatch(/\p{Emoji_Presentation}/u);
     expect(text).not.toMatch(/\b(IA|Claude|Anthropic|prompt|tokens?|modelo de lenguaje)\b/i);
+    expect(text).not.toMatch(/Perú|Chile|México/); // REQ-223
     await expect(page.locator(".l-step")).toHaveCount(5);
     const apply = page.getByRole("link", { name: "Postular a la beta" });
     // hero + CTA final + un botón por plan (REQ-205: beta cerrada)

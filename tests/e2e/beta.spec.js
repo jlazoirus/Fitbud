@@ -18,6 +18,9 @@ test("REQ-201: postular muestra la confirmación sin segmento ni prioridad", asy
   await page.goto("/beta-reclutamiento.html?source=portada");
 
   await expect(page.locator("h1")).toContainText("Úsalo gratis tres meses");
+  // REQ-223: la beta no se limita a países en ningún texto
+  expect(await page.locator("body").innerText()).not.toMatch(/Perú|Chile|México/);
+  expect(await page.locator('meta[name="description"]').getAttribute("content")).not.toMatch(/Perú|Chile|México/);
   await expect(page.getByRole("heading", { name: "Cómo funciona" })).toBeVisible();
   await page.getByRole("link", { name: "Postular a la beta" }).click();
   await expect(page).toHaveURL(/#postular$/);
@@ -76,7 +79,7 @@ test("REQ-217: un error de la API se explica y lleva al campo", async ({ page, c
   await installMocks(context);
   await context.route("**/api/beta-recruitment", (route) => route.fulfill({
     status: 400, contentType: "application/json",
-    body: JSON.stringify({ error: "Revisa tu número de WhatsApp: incluye el código de país, por ejemplo +51 999 999 999." }),
+    body: JSON.stringify({ error: "Revisa tu número de WhatsApp: incluye el código de tu país (empieza con +)." }),
   }));
   await page.goto("/beta-reclutamiento.html");
   await page.getByLabel("Nombre").fill("Ana");

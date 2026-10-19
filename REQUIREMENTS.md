@@ -1606,3 +1606,20 @@ Jonathan (2026-10-19, captura): en "Consumo y cortesía" de un beta tester, lím
 ### Criterios de aceptación
 
 - `scripts/test-coach-quota.mjs`: 3000/3000 en `coach_conversation` se guarda; 20000 responde 400 nombrando el campo y el rango. ✓
+
+## REQ-223 - Textos: la beta no se limita a países
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningún texto". La portada decía "Beta de fundadores en Perú, Chile y México" y la postulación repetía los países en la nota del hero, las meta descripciones, la ayuda de WhatsApp (+51, +56, +52) y los ejemplos ("Lima, Perú", "+51 999 999 999").
+
+### Alcance
+
+1. `index.html` (nota del hero en modo invitación) y `beta-reclutamiento.html` (meta, nota del hero, ayuda y ejemplos de WhatsApp y ciudad) sin países; los ejemplos pasan a "+ código de país y número" y "Ciudad, país".
+2. `api/beta-recruitment.js`: el error de WhatsApp pide el código del país sin ejemplo de un país. SW v105.
+
+### Criterios de aceptación
+
+- `tests/e2e/portada.spec.js` y `tests/e2e/beta.spec.js`: ni la portada ni la postulación (incluida la meta descripción) mencionan Perú, Chile o México. ✓
