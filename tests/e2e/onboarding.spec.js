@@ -129,6 +129,12 @@ test.describe("Onboarding", () => {
     expect(combinedPlan.snapshot.trainingPlan.weeks.length).toBeGreaterThan(0);
     expect(calls.filter((c) => c.table === "day_log" && c.method === "POST").length).toBeGreaterThan(0);
 
+    // REQ-210: el peso del alta queda como semana 1; Progreso no lo vuelve a pedir
+    const w1 = calls.filter((c) => c.table === "weight_log" && c.method === "POST")
+      .map((c) => (Array.isArray(c.payload) ? c.payload[0] : c.payload)).find((row) => row?.week === 1);
+    expect(w1?.kg).toBe(USUARIO.peso);
+    expect(prefs.startWeightSeededCycle).toBe(1);
+
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 

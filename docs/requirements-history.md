@@ -9055,3 +9055,54 @@ Toda cuenta beta (alta con código de invitación, o creada por el admin como be
 2. `index.html`: `freeAccessActive()`/`noPricesMode()`; `showPaywall()` → `showAccessNotice()` sin precios; `coachErrorMessage()` neutro; Perfil → Mi suscripción "Acceso beta · acceso completo hasta…", aviso suave en los últimos 7 días, sin historial de pagos; invitación pendiente con "Activar mi invitación" y reintento en `online`; casilla "Usuario beta (90 días sin cobro)" en Crear cuenta e Invitar. SW v94.
 3. `AGENTS.md` y `CONTEXT.md`: invariante de cobro siempre en la web.
 4. E2E `tests/e2e/beta-acceso.spec.js`.
+
+## REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): al crear la cuenta ya se pide peso y % de grasa, pero luego Progreso los vuelve a pedir para la semana 1.
+
+### Problema
+
+Un usuario nuevo escribe su peso y grasa en el alta y, al abrir Progreso, la tarjeta "Registra tu peso de la semana" y la fila S1 vacía le piden lo mismo otra vez.
+
+### Causa raíz
+
+- `saveOnboarding()` guarda `weightKg`, `bodyFatPct`, `cycleStartWeight` y `cycleStartBodyFat` en `profiles.prefs` (`index.html:3670`), pero no escribe la semana 1 de `S.weights`/`weight_log`.
+- `weightSetupCard()` (`index.html:5600`) se muestra mientras `lastWeighedWeek()===null`, y `weightTableHtml()` (`index.html:5725`) deja S1 vacía con "Ingresar mi peso".
+
+### Objetivo
+
+El dato del alta es el registro de la semana 1. Progreso lo muestra ya cargado y explica que la próxima medición es la de la semana 2.
+
+### Alcance
+
+1. Al terminar el onboarding inicial o un ciclo nuevo, si la semana 1 está vacía, escribirla con `setWeightEntry(1,{kg,bf})`, por la misma ruta que sincroniza `weight_log`. Nunca pisar un valor existente.
+2. Usuarios que ya tienen S1 vacía y `cycleStartWeight`: rellenar S1 al cargar Progreso, una vez, con la misma regla.
+3. Copy: con S1 cargada desde el alta, la tarjeta de configuración dice "Tu punto de partida: 75 kg (semana 1). Vuelve a pesarte el <día> para la semana 2", en vez de pedir el dato otra vez.
+
+### Fuera de alcance
+
+- Cambiar `WEIGHT_RANGES` o el check-in semanal.
+
+### Riesgos
+
+- Historial inmutable: solo se rellena un hueco y nunca se sobrescribe. Un usuario que borra S1 a propósito no debe verla reaparecer: la marca "rellenado una vez" vive en prefs.
+
+### Criterios de aceptación
+
+- E2E: onboarding con 75 kg / 18% → Progreso muestra S1 = 75 / 18 y no muestra "Registra tu peso de la semana" para S1.
+- Una S1 ya registrada con otro valor no cambia.
+
+### Verificación sugerida
+
+- `tests/e2e/progreso.spec.js` + `tests/e2e/onboarding.spec.js`.
+
+### Implementación
+
+1. `saveOnboarding()`: en ciclo nuevo o primer ciclo guarda `startWeightSeededCycle` y llama `seedStartWeight()` (escribe S1 en `S.weights` + `weight_log` vía `pushWeight`; nunca pisa un valor).
+2. `backfillStartWeightOnce()` tras `pullWeights()` al iniciar sesión: cuentas previas con `cycleStartWeight` y sin marca del ciclo; guarda la marca para que una S1 borrada no reaparezca.
+3. `startWeightNoteCard()` en Progreso con solo S1: "Tu punto de partida: 80 kg · 20% de grasa" y la fecha de la semana 2. SW v95.
+4. E2E `tests/e2e/peso-inicial.spec.js` (3) + asserts en `onboarding.spec.js`.

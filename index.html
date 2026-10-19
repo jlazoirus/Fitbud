@@ -3677,6 +3677,7 @@ async function saveOnboarding(){
     avoid:[d.allergies,d.dislikedIngredients].filter(Boolean).join(", "),
     planCycleNumber,planStartDate,planEndDate,planDurationWeeks:duration,
     cycleStartWeight:d.weightKg,cycleStartBodyFat:d.bodyFatPct===""?null:d.bodyFatPct,
+    ...(firstCycle||newCycle?{startWeightSeededCycle:planCycleNumber}:{}),
     onboardingPending:false,pendingChallenge:null,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
     ...(firstCycle||newCycle?{cycleFirstDayPreparedAt:null,cycleFirstWeekPreparedAt:null}:{}),
@@ -3697,6 +3698,7 @@ async function saveOnboarding(){
     await upsertActiveCycle();
     await pullCycleHistory();
   }
+  if(newCycle||firstCycle)seedStartWeight();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
   view="hoy";current=clampDate(todayStr());
   trackEvent(firstCycle||newCycle?"onboarding_complete":"onboarding_review",{cycle:planCycleNumber,duration_weeks:duration,source:newCycle?"new_cycle":firstCycle?"first":"review"});
@@ -5607,6 +5609,18 @@ function progressIsEmpty(){
   const anyWorkout=outcomes.some(outcome=>outcome==="completed"||outcome==="partial");
   return lastWeighedWeek()===null&&!anyWorkout&&streak()===0;
 }
+// REQ-210: con solo la semana 1 (la del alta) se explica cuándo toca la siguiente.
+function startWeightNoteCard(){
+  if(lastWeighedWeek()!==1||currentWeightWeek()!==1)return "";
+  const kg=wkg(1),bf=wbf(1);
+  return `<section class="agenda-card agenda-state" style="margin:0 0 14px">
+    <div class="agenda-head"><div>
+      <div class="agenda-kicker">Progreso</div>
+      <h2 class="agenda-title">Tu punto de partida: ${kg} kg${bf!=null?` · ${bf}% de grasa`:""}</h2>
+      <div class="agenda-sub">Lo tomamos de tu registro como semana 1. Vuelve a pesarte el ${esc(prettyDate(addDays(START,7)).toLowerCase())} para la semana 2.</div>
+    </div></div>
+  </section>`;
+}
 function weightSetupCard(empty){
   if(lastWeighedWeek()!==null)return "";
   return `<section class="agenda-card agenda-state setup" style="margin:0 0 14px">
@@ -5622,7 +5636,7 @@ function renderProgress(){
   const empty=progressIsEmpty();
   $("#app").innerHTML=`${screenHeader("Progreso","Tu evolución","progreso")}
     ${weeklyCheckinChip()}
-    ${empty?weightSetupCard(true):""}
+    ${empty?weightSetupCard(true):startWeightNoteCard()}
     ${section("pr.stats","Tus números",progressStats(),null,empty)}
     ${section("pr.rachas","Rachas e hitos",renderStreakSection(),null,empty)}
     ${section("pr.ciclos","Tus ciclos",progressJourney(),`${cycleNumber()}`)}
@@ -10284,6 +10298,27 @@ function composition(n){const kg=wkg(n),bf=wbf(n);if(kg==null||bf==null)return n
 // Última semana (mayor índice) con datos de peso.
 function lastWeighedWeek(){const ks=Object.keys(WEIGHT_RANGES).map(Number).filter(n=>wkg(n)!=null);return ks.length?Math.max(...ks):null;}
 function positiveWeight(value){const n=Number(value);return Number.isFinite(n)&&n>0?n:null;}
+// REQ-210: el peso y la grasa del alta son el registro de la semana 1; Progreso
+// no los vuelve a pedir. Nunca pisa un valor ya registrado.
+function seedStartWeight(){
+  const p=(profile&&profile.prefs)||{};
+  const kg=positiveWeight(p.cycleStartWeight);
+  if(kg==null||wEntry(1))return false;
+  const bf=positiveWeight(p.cycleStartBodyFat);
+  S.weights[1]={kg,bf};save();
+  pushWeight(1,kg,bf);
+  return true;
+}
+// Cuentas creadas antes de REQ-210: se rellena una sola vez por ciclo (tras leer
+// los pesos remotos), así un usuario que borra la semana 1 no la ve reaparecer.
+async function backfillStartWeightOnce(){
+  const p=(profile&&profile.prefs)||{};
+  const cycle=cycleNumber();
+  if(Number(p.startWeightSeededCycle)===cycle||!hasCompleteOnboarding(p))return;
+  if(START>todayStr())return;
+  seedStartWeight();
+  await saveProfilePrefs({...p,startWeightSeededCycle:cycle});
+}
 function startWeightReference(){
   const loggedWeekOne=positiveWeight(wkg(1));
   if(loggedWeekOne!=null)return loggedWeekOne;
@@ -10841,7 +10876,8 @@ async function onAuth(){
       if(version)await backfillDayVersions();
       await upsertActiveCycle();
     }
-    await Promise.all([pullAllDays(),pullWeights()]);
+    const [,weightsPulled]=await Promise.all([pullAllDays(),pullWeights()]);
+    if(weightsPulled)await backfillStartWeightOnce();
     maybeUpdateLearnedPatterns(); // REQ-63: best-effort, sin await, sin notificación al usuario
     drainSyncQueue(); // vaciar cola offline pendiente al reconectar (no-await)
     onboardingStep=1;reviewPromptShown=false;
