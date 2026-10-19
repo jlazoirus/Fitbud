@@ -36,6 +36,10 @@ Postula en 2 minutos: evolvapp.club/beta
 
 ## 2. Revisar postulaciones
 
+**Desde la app (recomendado):** entra con tu cuenta de admin → Perfil → Administración → **Postulantes beta**. Ves cada postulación con su objetivo, dónde se le rompe el plan, su historia, la prioridad sugerida y un aviso si marcó lesión o indicación médica. Filtros: Por revisar, Aceptados, Descartados, Todos.
+
+Desde la terminal, si lo prefieres:
+
 ```bash
 SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/review-beta-recruitment.mjs          # nuevas y preseleccionadas
 SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/review-beta-recruitment.mjs --all    # todas
@@ -48,7 +52,11 @@ Criterios para el primer grupo (15-20 personas):
 - Prioriza disponibilidad "Llamada y beta de 3 meses" y casos concretos en "Cuéntanos la última vez".
 - Quien marcó lesión o indicación médica: llamada primero; la parte de entrenamiento solo si el caso lo permite.
 
-## 3. Invitar
+## 3. Aceptar e invitar
+
+**Desde la app:** en Postulantes beta, botón **Aceptar (90 días)**. Se crea el código (plan completo con las cuotas diarias del coach, activable 30 días), la postulación pasa a "Aceptada" con nota y fecha, y aparece el mensaje listo con **Enviar por WhatsApp** y **Copiar mensaje**. "Descartar" la saca de la lista sin avisarle; "Volver a revisar" la recupera. A quien ya aceptaste puedes generarle un enlace nuevo si el anterior venció.
+
+Desde la terminal:
 
 ```bash
 SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/invite-beta-tester.mjs <id>

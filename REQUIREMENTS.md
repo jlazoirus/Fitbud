@@ -1323,131 +1323,43 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-198`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-17), tras REQ-198: `beta-reclutamiento.html` seguía con el sistema anterior (fondo crema, Inter, morado/terracota) y una captura de junio con la marca Fitbros. El detector de impeccable marcaba `cream-palette`, `overused-font` y `tight-leading`.
-
-### Alcance
-
-1. Tokens, tipografías (Unbounded + Manrope) y logo de chevrons de `index.html`; opciones marcadas en lima, foco visible, controles ≥44 px. Estructura, textos, campos, `value` enviados al API y script sin cambios (salvo la tilde de "médica").
-2. La captura vieja se reemplaza por la tarjeta "Hoy" de la portada (HTML, marcada "Ejemplo"); `.vercelignore` deja de publicar `assets/ux-audit-2026-06-23/04-home-mobile.png`.
-3. `validate-deploy-allowlist.mjs` trata `href="/"` como `index.html`.
-
-### Criterios de aceptación
-
-- `impeccable detect beta-reclutamiento.html` sin hallazgos; axe sin violaciones a 390 y 1440 px; envío con API simulada muestra el resultado y manda los mismos `value`. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-199`).
 
 ## REQ-200 - Fix beta: la postulación falla con "Ganar músculo" o "Comer más sano y crear hábitos"
 
 **Estado: implementado.**
 
-### Origen
-
-Revisión previa al setup de beta testers (2026-10-18). Las opciones de "Objetivo principal" no tenían `value`, así que enviaban su texto visible; REQ-194 les puso tildes y `api/beta-recruitment.js` (`ALLOWED_GOALS`, sin tildes) empezó a responder "Objetivo invalido" para dos de los cinco objetivos. Regresión en producción desde el merge de REQ-191..198.
-
-### Alcance
-
-1. Cada opción de objetivo lleva `value` con el texto que acepta la API; el texto visible conserva las tildes.
-2. `scripts/validate-beta-form-values.mjs` (release gate): todo valor de `stage`, `goal`, `recentAttempt`, `tools`, `pains`, `investment`, `availability` y `health` del formulario está en la lista de la API.
-
-### Criterios de aceptación
-
-- El validador falla con el formulario anterior (2 objetivos) y pasa ahora. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-200`).
 
 ## REQ-201 - Beta: la postulación pasa a "Programa de fundadores" y el SW deja de tapar la página
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-18): antes de vender, abrir una beta de 2-3 meses en Perú, Chile y México con early adopters que den feedback. `beta-reclutamiento.html` seguía planteada como investigación ("entrevistas + beta de 1-2 semanas", "No es una oferta comercial") y al enviar mostraba al postulante su segmento y "Prioridad Baja". Además, `service-worker.js` respondía toda navegación con `index.html` cacheado: quien ya tenía la PWA nunca veía el formulario (reproducido con Playwright y SW activo).
-
-### Alcance
-
-1. La página explica el trato (tres meses gratis sin tarjeta, línea directa, precio de fundador; a cambio uso real, una llamada inicial y check-ins cortos), los cuatro pasos y una FAQ. Campos, `value` y API sin cambios; solo cambian los textos de disponibilidad ("beta de 3 meses").
-2. La confirmación dice "Recibida" y el siguiente paso; segmento y prioridad quedan solo para el equipo.
-3. `service-worker.js` (v88): solo `/` e `/index.html` salen del cache; las demás navegaciones van a la red y, sin red, a la app.
-4. `vercel.json`: `/beta` sirve la página de postulación.
-
-### Criterios de aceptación
-
-- `tests/e2e/beta.spec.js`: postulación completa con API simulada, envía `goal:"Ganar musculo"`, `availability:"interview_beta"` y `source`, y no muestra prioridad ni segmento. ✓
-- Con SW activo, `/beta-reclutamiento.html` muestra la página de postulación (antes la portada). ✓
-- impeccable sin hallazgos; axe sin violaciones a 390 y 1440 px; sin scroll horizontal. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-201`).
 
 ## REQ-202 - Portada: los CTA llevan a postular a la beta de fundadores
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-18): la beta de fundadores (REQ-201) necesita tráfico, pero la portada empujaba a "Crear mi cuenta gratis" y no mencionaba la beta.
-
-### Alcance
-
-1. Nav ("Postular"), hero ("Postular a la beta") y CTA final ("Sé de los primeros.") enlazan a `beta-reclutamiento.html` con `source=portada`, `portada-nav` o `portada-final` para saber qué botón convierte.
-2. "Ya tengo cuenta" e "Iniciar sesión" siguen abriendo el acceso; los botones de los planes siguen abriendo el registro. Los precios siguen visibles y avisan del precio de fundador.
-3. `.l-btn` sin subrayado para servir también como enlace.
-
-### Criterios de aceptación
-
-- `tests/e2e/portada.spec.js`: dos enlaces "Postular a la beta" con `source`, llevan a la página de postulación; "Ya tengo cuenta" abre el acceso. `registro.spec.js` entra por "Empezar ahora". ✓
-- impeccable sin hallazgos; axe sin violaciones a 390 y 1440 px. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-202`).
 
 ## REQ-203 - Beta: enlace de invitación que activa el acceso solo y script para invitar
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-18): setup de la beta de fundadores. Los códigos de canje (REQ-50) existían, pero invitar era manual (generar código desde la API como admin, copiarlo, explicar dónde pegarlo) y el invitado tenía que encontrar "¿Tienes un código?" en Perfil después de registrarse.
-
-### Alcance
-
-1. `index.html`: `/?codigo=FIT-XXXX-XXXX` guarda el código en `localStorage`, lo quita de la URL y abre el registro con el aviso "Tu invitación a la beta está lista". Al iniciar sesión se canjea solo (`redeemPendingInvite`) y se borra; si el código no sirve se avisa y se borra; sesión vencida o servicio caído lo deja para el próximo inicio.
-2. `scripts/invite-beta-tester.mjs <id>`: crea un código (90 días, plan `quarterly`, activable 30 días), marca la postulación `beta_invited` con nota y fecha, e imprime el mensaje y un enlace `wa.me`. `--self-test` en el release gate.
-3. `BETA_PROGRAM.md`: runbook (preparación, difusión, revisión, invitación, check-ins, cierre).
-
-### Criterios de aceptación
-
-- `tests/e2e/invitacion.spec.js`: el enlace abre el registro y limpia la URL; con sesión el código se canjea una vez y se borra; un código usado avisa y no se reintenta. ✓
-- El script contra un Supabase simulado hace GET de la postulación, POST del código y PATCH a `beta_invited`. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-203`).
 
 ## REQ-204 - Beta: la cabecera de la postulación deja de decir "Beta cerrada"
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-18): quitar el distintivo "Beta cerrada · Perú, Chile y México" de la cabecera de `beta-reclutamiento.html`.
-
-### Alcance
-
-1. Se quita el distintivo y su CSS (`.badge`, `.badge-where`). Los países siguen en la nota bajo los botones del hero.
-
-### Criterios de aceptación
-
-- La cabecera muestra solo el logo; `tests/e2e/beta.spec.js` y `textos.spec.js` pasan. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-204`).
 
 ## REQ-205 - Beta cerrada: crear cuenta solo con código de invitación
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-18): "hazlo realidad". Con REQ-203 cualquiera podía crear cuenta y recibir la semana de prueba; la beta solo regalaba los tres meses.
-
-### Alcance
-
-1. `api/entitlement.js`, acción `invite-signup` (sin sesión): valida código (existe, sin usar, vigente), correo y contraseña (≥8); crea el usuario con service role (`/auth/v1/admin/users`, correo confirmado) y canjea el código. Si el canje falla, borra la cuenta recién creada. Correo ya registrado → 409 con instrucción de canjear en Perfil.
-2. `/api/config` expone `signup.mode`: `invite` por defecto, `open` con `SIGNUP_MODE=open`.
-3. `index.html`: en modo `invite` el registro pide "Código de invitación" (prellenado desde `/?codigo=`) y enlaza a postular; tras crear la cuenta entra directo. Los botones de los planes llevan a postular y el subtítulo de precios lo explica. SW v89.
-4. `BETA_PROGRAM.md`: desactivar "Allow new users to sign up" en Supabase (paso manual) y cómo reabrir.
-
-### Criterios de aceptación
-
-- `scripts/test-invite-signup-api.mjs` (gate): código válido crea y canjea; inexistente, usado, vencido, contraseña corta o correo inválido no crean cuenta; correo repetido → 409; canje perdido en carrera borra la cuenta; las demás acciones exigen sesión. ✓
-- `tests/e2e/invitacion.spec.js`: registro con código manda `invite-signup` y entra; sin código no llama a la API. `registro.spec.js` cubre el modo `open`. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-205`).
 
 ## REQ-206 - Entreno: registrar a mano lo entrenado (también en días de descanso) con estimación de calorías
 
@@ -1925,3 +1837,42 @@ Un modo "Conversación" que se activa desde Perfil (solo para cuentas con la mar
 ### Verificación sugerida
 
 - Prototipo navegable antes de implementar (`impeccable shape`), revisado por Jonathan.
+
+## REQ-217 - Beta: la postulación cierra con una confirmación amable y sin callejones sin salida
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19): quien postula tiene que saber, de forma amable, que sus datos llegaron, que se revisarán y que se le escribirá si queda. La crítica de impeccable (19/36) encontró además: tras enviar, el formulario seguía visible y se podía volver a enviar; la API rechazaba "Dónde se rompe" vacío y casos de menos de 20 caracteres que el navegador dejaba pasar, con mensajes sin tildes ("WhatsApp invalido.") y un "intenta más tarde" engañoso; "Limpiar" borraba todo junto al botón de enviar; recargar perdía lo escrito; elegir una cuarta fricción desmarcaba otra.
+
+### Alcance
+
+1. Al enviar, el formulario se reemplaza por un panel "¡Gracias, {nombre}! Ya tenemos tu postulación." con el número de WhatsApp al que se le escribirá y tres pasos (recibida → la revisamos → te escribimos). Recibe el foco. Ya no muestra el número de postulación.
+2. Validación igual a la API: al menos una fricción (contador "n de 3"), historia de 20 a 1400 caracteres, WhatsApp de 8 a 15 dígitos con código de país, `maxlength` en nombre y ciudad. La cuarta fricción no se marca y se avisa.
+3. `api/beta-recruitment.js`: mensajes en español claro con tildes; los 500 no exponen texto interno. Si el error nombra un campo, la página lleva el foco ahí.
+4. Borrador en `localStorage` (con try/catch) que se borra al enviar; sin botón "Limpiar"; el aviso de salud pasa arriba de la historia.
+
+### Criterios de aceptación
+
+- `tests/e2e/beta.spec.js`: envío completo muestra el panel y oculta el formulario; sin fricción no se envía; la cuarta fricción no desmarca otra; el borrador sobrevive a recargar; un 400 de WhatsApp se explica y enfoca el campo. ✓
+- impeccable sin hallazgos; axe sin violaciones en el panel. ✓
+
+## REQ-218 - Admin: pantalla "Postulantes beta" para revisar, aceptar con 90 días y avisar por WhatsApp
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19): necesita ver a los postulantes y aceptarlos de forma clara, y que al aceptarlos se les asignen por defecto los 3 meses gratis con las cuotas del coach. Hasta ahora solo existían scripts de terminal (REQ-203).
+
+### Alcance
+
+1. `api/admin.js` (solo admin activo): `betaApplicants` (filtros por revisar / aceptados / descartados / todos, con conteos), `betaAccept` (código de 90 días del plan `quarterly`, activable 30 días, auditado con el admin; postulación en `beta_invited` con nota; devuelve mensaje, enlace `/?codigo=` y `wa.me`) y `betaSetStatus` (`new`, `shortlisted`, `rejected`, `archived`; `beta_invited` solo se pone aceptando).
+2. `index.html`: Perfil → Administración → "Postulantes beta" (vista `adminBeta`, solo admin). Tarjetas con datos legibles, historia plegable, aviso de lesión, "Aceptar (90 días)", "Descartar", "Volver a revisar", "Generar enlace nuevo" y "Abrir WhatsApp". Al aceptar, modal con el mensaje, "Enviar por WhatsApp" y "Copiar mensaje". SW v92.
+3. `BETA_PROGRAM.md`: revisar y aceptar desde la app; la terminal queda como alternativa.
+
+### Criterios de aceptación
+
+- `scripts/test-admin-beta-api.mjs` (gate): conteos, código de 90 días `quarterly` auditado, `beta_invited` con nota, mensaje y `wa.me` correctos, ids inválidos, estados no permitidos y 403 para no admin. ✓
+- `tests/e2e/admin-beta.spec.js`: el admin acepta y ve el mensaje con el enlace; un usuario normal no entra a la vista. ✓
