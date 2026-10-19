@@ -1925,3 +1925,23 @@ Un modo "Conversación" que se activa desde Perfil (solo para cuentas con la mar
 ### Verificación sugerida
 
 - Prototipo navegable antes de implementar (`impeccable shape`), revisado por Jonathan.
+
+## REQ-217 - Beta: la postulación cierra con una confirmación amable y sin callejones sin salida
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19): quien postula tiene que saber, de forma amable, que sus datos llegaron, que se revisarán y que se le escribirá si queda. La crítica de impeccable (19/36) encontró además: tras enviar, el formulario seguía visible y se podía volver a enviar; la API rechazaba "Dónde se rompe" vacío y casos de menos de 20 caracteres que el navegador dejaba pasar, con mensajes sin tildes ("WhatsApp invalido.") y un "intenta más tarde" engañoso; "Limpiar" borraba todo junto al botón de enviar; recargar perdía lo escrito; elegir una cuarta fricción desmarcaba otra.
+
+### Alcance
+
+1. Al enviar, el formulario se reemplaza por un panel "¡Gracias, {nombre}! Ya tenemos tu postulación." con el número de WhatsApp al que se le escribirá y tres pasos (recibida → la revisamos → te escribimos). Recibe el foco. Ya no muestra el número de postulación.
+2. Validación igual a la API: al menos una fricción (contador "n de 3"), historia de 20 a 1400 caracteres, WhatsApp de 8 a 15 dígitos con código de país, `maxlength` en nombre y ciudad. La cuarta fricción no se marca y se avisa.
+3. `api/beta-recruitment.js`: mensajes en español claro con tildes; los 500 no exponen texto interno. Si el error nombra un campo, la página lleva el foco ahí.
+4. Borrador en `localStorage` (con try/catch) que se borra al enviar; sin botón "Limpiar"; el aviso de salud pasa arriba de la historia.
+
+### Criterios de aceptación
+
+- `tests/e2e/beta.spec.js`: envío completo muestra el panel y oculta el formulario; sin fricción no se envía; la cuarta fricción no desmarca otra; el borrador sobrevive a recargar; un 400 de WhatsApp se explica y enfoca el campo. ✓
+- impeccable sin hallazgos; axe sin violaciones en el panel. ✓

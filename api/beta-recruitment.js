@@ -146,19 +146,19 @@ function parsePayload(body) {
   const website = clean(body.website, 120);
 
   const errors = [];
-  if (website) errors.push("No se pudo procesar la postulacion.");
-  if (name.length < 2) errors.push("Nombre requerido.");
-  if (whatsappNormalized.length < 8 || whatsappNormalized.length > 15) errors.push("WhatsApp invalido.");
-  if (!ageBand) errors.push("Edad requerida.");
-  if (!countryCity) errors.push("Pais o ciudad requerido.");
-  if (!ALLOWED_STAGES.has(stage)) errors.push("Estado actual invalido.");
-  if (!ALLOWED_GOALS.has(goal)) errors.push("Objetivo invalido.");
-  if (!ALLOWED_RECENT.has(recentAttempt)) errors.push("Intento reciente invalido.");
-  if (!pains.length) errors.push("Selecciona al menos una friccion.");
-  if (story.length < 20) errors.push("Cuéntanos un caso concreto.");
-  if (!ALLOWED_INVESTMENTS.has(investment)) errors.push("Inversion actual invalida.");
-  if (!ALLOWED_AVAILABILITY.has(availability)) errors.push("Disponibilidad invalida.");
-  if (!ALLOWED_HEALTH.has(health)) errors.push("Respuesta de seguridad invalida.");
+  if (website) errors.push("No pudimos procesar tu postulación.");
+  if (name.length < 2) errors.push("Escribe tu nombre.");
+  if (whatsappNormalized.length < 8 || whatsappNormalized.length > 15) errors.push("Revisa tu número de WhatsApp: incluye el código de país, por ejemplo +51 999 999 999.");
+  if (!ageBand) errors.push("Elige tu rango de edad.");
+  if (!countryCity) errors.push("Escribe tu país y ciudad.");
+  if (!ALLOWED_STAGES.has(stage)) errors.push("Elige qué te describe mejor.");
+  if (!ALLOWED_GOALS.has(goal)) errors.push("Elige tu objetivo principal.");
+  if (!ALLOWED_RECENT.has(recentAttempt)) errors.push("Cuéntanos si intentaste algo en los últimos 6 meses.");
+  if (!pains.length) errors.push("Marca al menos una opción en \"Dónde se rompe\".");
+  if (story.length < 20) errors.push("Cuéntanos un poco más sobre la última vez que te pasó (al menos 20 caracteres).");
+  if (!ALLOWED_INVESTMENTS.has(investment)) errors.push("Elige cuánto inviertes hoy en resolver esto.");
+  if (!ALLOWED_AVAILABILITY.has(availability)) errors.push("Elige tu disponibilidad.");
+  if (!ALLOWED_HEALTH.has(health)) errors.push("Responde la pregunta de seguridad.");
 
   return {
     errors,
@@ -246,12 +246,12 @@ async function handlePost(req, res, e) {
   if (!response.ok) {
     if (response.status === 404 || String(payload && payload.code) === "42P01") {
       res.status(503).json({
-        error: "Falta aplicar la migracion de reclutamiento beta.",
+        error: "Las postulaciones no están disponibles en este momento. Intenta más tarde.",
         setup_pending: true,
       });
       return;
     }
-    res.status(500).json({ error: (payload && payload.message) || "No se pudo guardar la postulacion." });
+    res.status(500).json({ error: "No pudimos guardar tu postulación. Intenta de nuevo en unos minutos." });
     return;
   }
 
@@ -271,19 +271,19 @@ async function handlePost(req, res, e) {
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    res.status(405).json({ error: "Metodo no permitido." });
+    res.status(405).json({ error: "Método no permitido." });
     return;
   }
 
   const e = env();
   if (!e.url || !e.service) {
-    res.status(500).json({ error: "Falta configuracion server-side." });
+    res.status(500).json({ error: "Las postulaciones no están disponibles en este momento. Intenta más tarde." });
     return;
   }
 
   try {
     await handlePost(req, res, e);
   } catch (error) {
-    res.status(500).json({ error: String((error && error.message) || error) });
+    res.status(500).json({ error: "No pudimos guardar tu postulación. Intenta de nuevo en unos minutos." });
   }
 }
