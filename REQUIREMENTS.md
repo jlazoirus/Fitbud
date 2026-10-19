@@ -1926,3 +1926,19 @@ Con `SIGNUP_MODE=open`, toda la portada ofrece registro directo (hero, nav y CTA
 
 - `tests/e2e/portada.spec.js`: con la config en modo `open`, afirmar que no hay enlaces a `beta-reclutamiento.html` y que el hero lleva al registro; con `invite`, que sí llevan a postular.
 - Manual: cargar la portada, forzar `REMOTE.signup={mode:"open"}` y reejecutar el flujo de `boot()`; comprobar que hero, nav, CTA final y subtítulo dejan de hablar de beta.
+
+## REQ-220 - Fix táctil: "¿Qué es RPE?" medía 42 px y dejaba el release gate en rojo
+
+**Estado: implementado.**
+
+### Origen
+
+`tests/e2e/tactil.spec.js` (REQ-193) fallaba en `main` desde 2026-10-18: el enlace "¿Qué es RPE?" del resumen de Entreno (`.link-btn.small`) medía 100×42 px en táctil. El gate quedaba en rojo para todos los loops.
+
+### Alcance
+
+1. `@media(pointer:coarse)`: `.link-btn` con `min-height:44px` y `box-sizing:border-box`, sin cambiar su aspecto. SW v93.
+
+### Criterios de aceptación
+
+- `tactil.spec.js` pasa y el release gate queda en verde. ✓
