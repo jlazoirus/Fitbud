@@ -1831,3 +1831,72 @@ Jonathan (2026-10-18): "hazlo realidad". Con REQ-203 cualquiera podía crear cue
 
 - `scripts/test-invite-signup-api.mjs` (gate): código válido crea y canjea; inexistente, usado, vencido, contraseña corta o correo inválido no crean cuenta; correo repetido → 409; canje perdido en carrera borra la cuenta; las demás acciones exigen sesión. ✓
 - `tests/e2e/invitacion.spec.js`: registro con código manda `invite-signup` y entra; sin código no llama a la API. `registro.spec.js` cubre el modo `open`. ✓
+
+## REQ-206 - Entreno: registrar a mano lo entrenado (también en días de descanso) con estimación de calorías
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Claudia (beta, 2026-10-18): aunque tenga día de descanso, si no le apetece descansar quiere añadir que hoy entrenó, qué hizo y que la app le estime cuánto gastó según el deporte.
+
+### Problema
+
+Un día de descanso solo mostraba "Descanso planificado" sin acciones, y un día de entreno solo admitía la sesión guiada del plan. No había forma de registrar otra actividad ni de saber su gasto.
+
+### Alcance
+
+1. `dayState(ds).manualActivities` (`{id,sport,minutes,intensity,notes,kcal,weightKg,loggedAt}`), sincronizado con el resto de `day_log.state` sin migración (el merge de `sync-conflicts.js` ya conserva campos nuevos); `validateDayLogState()` exige que sea array si existe.
+2. Estimación determinista, sin llamadas externas: `kcal = MET × kg × horas`, redondeada a 5, con 16 deportes y tres intensidades (MET aproximados del Compendio de Actividades Físicas). Peso: el último registrado, el del perfil o 70 kg de referencia (la app lo avisa).
+3. Entreno: sección "Actividad registrada" con "Hoy entrené igual: registrar actividad" (descanso) o "＋ Registrar otra actividad" (día de entreno); editar y quitar. Modal con deporte, minutos, intensidad, detalle opcional y estimación en vivo.
+4. Hoy: la fila de descanso de la agenda ofrece "Entrené igual" sin contar como pendiente, y la tarjeta de descanso de la acción del día "Hoy entrené igual"; con actividad registrada ambas lo resumen.
+5. Una actividad registrada cuenta como día entrenado: `workoutOutcomeForState()` la trata como completada y `trainingDayResult()` devuelve `done` también en descanso. Solo hoy o días pasados; no con la pausa por seguridad activa.
+6. `CACHE_NAME` → `fitbud-pwa-v90`.
+
+### Fuera de alcance
+
+- Sumar las calorías gastadas al objetivo de comida del día.
+- Importar actividades de relojes o apps de salud.
+
+### Riesgos
+
+- La estimación MET es aproximada (±20-30%); la UI la presenta como "≈ … kcal gastadas" y estimación.
+
+### Criterios de aceptación
+
+- En un día de descanso se registra "Pádel 60 min moderada" y la app estima ≈ 450 kcal con 75 kg; el día pasa a contar como entrenado y al quitarla vuelve a descanso. ✓
+- En un día de entreno se registra otro deporte y el día cuenta como entrenado. ✓
+- La fila de descanso no infla el contador de pendientes de Hoy. ✓
+- `node scripts/release-gate.mjs` pasa. ✓ (`tests/e2e/actividad-manual.spec.js`)
+
+## REQ-207 - Fix: "Estimar con foto" no deja elegir una foto de la galería
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19): al estimar una comida con foto, el móvil solo abre la cámara; no se puede elegir una foto ya hecha.
+
+### Causa raíz
+
+Los dos selectores de foto (`#f_photo` en el editor de comidas, REQ-172, y el de la foto del resumen de progreso) declaraban `capture="environment"`, que en iOS y Android abre directamente la cámara trasera y omite la fototeca. El resumen incluso dice "Tomar o elegir foto".
+
+### Alcance
+
+1. Quitar `capture` de ambos inputs (`accept="image/*"` se mantiene): el sistema muestra su menú nativo con fototeca, cámara y archivos.
+2. `tests/e2e/foto-comida.spec.js` y `scripts/validate-meal-photo-estimate.mjs` (que exigía `capture`) comprueban ahora que el input no fuerza la cámara.
+3. `CACHE_NAME` → `fitbud-pwa-v91`.
+
+### Fuera de alcance
+
+- Elegir varias fotos a la vez.
+
+### Riesgos
+
+- Ninguno: la cámara sigue disponible desde el mismo menú del sistema.
+
+### Criterios de aceptación
+
+- Ningún `<input type="file">` de la app declara `capture`. ✓
+- En iPhone, "Estimar con foto" ofrece "Fototeca" y "Tomar foto" (verificación manual tras el deploy).
+- `node scripts/release-gate.mjs` pasa. ✓

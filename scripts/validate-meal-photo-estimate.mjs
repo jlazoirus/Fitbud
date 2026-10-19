@@ -38,7 +38,9 @@ console.log("  Proxy: schema, orden de bloques y validación previa a la cuota")
 
 // ── Cableado del cliente ──────────────────────────────────────────────────────
 const editor = html.slice(html.indexOf("function editorSheet("), html.indexOf("function readEditor("));
-assert.ok(editor.includes('accept="image/*" capture="environment"'), "el editor (agregar/editar) ofrece cámara");
+assert.ok(editor.includes('id="f_photo" type="file" accept="image/*"'), "el editor (agregar/editar) ofrece foto");
+// REQ-207: sin `capture`, el móvil ofrece galería y cámara (con él solo abre la cámara).
+assert.ok(!/capture=/.test(editor), "el selector de foto no fuerza la cámara");
 assert.ok(editor.includes("pickMealPhoto()"), "botón Estimar con foto");
 assert.ok(html.includes("...(image?{image}:{})"), "callClaude envía la imagen al proxy");
 assert.ok(html.includes("`photo:${st.hash}:${hashText(qa)}`"), "la reutilización de respuestas depende de la foto y las respuestas");

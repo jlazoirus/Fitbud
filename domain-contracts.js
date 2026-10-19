@@ -76,6 +76,7 @@
     if(!state.meals||typeof state.meals!=="object"||Array.isArray(state.meals))errors.push("meals debe ser un objeto plano.");
     if(!Array.isArray(state.extras))errors.push("extras debe ser un array.");
     if(state.contingencyLog!==undefined&&!Array.isArray(state.contingencyLog))errors.push("contingencyLog debe ser un array.");
+    if(state.manualActivities!==undefined&&!Array.isArray(state.manualActivities))errors.push("manualActivities debe ser un array.");
     return ok(errors);
   }
 

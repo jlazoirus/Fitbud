@@ -199,6 +199,12 @@
   .meal .nums b{color:var(--txt);font-weight:500}
   .meal-empty-hint{font-size:13px;color:var(--muted);line-height:1.4}
   .meal-actions{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+  .activity-row{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;background:var(--surf2);border:1px solid var(--border-2);border-radius:var(--r-md);padding:12px;margin-bottom:8px}
+  .activity-main{min-width:0}
+  .activity-notes{font-size:13px;color:var(--txt);margin-top:4px;overflow-wrap:anywhere}
+  .activity-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+  .activity-estimate{background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:12px;margin:4px 0 8px;font-size:14px}
+  .activity-estimate .n{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--accent)}
   .chk{width:32px;height:32px;border-radius:999px;border:2px solid var(--surf4);background:transparent;flex:0 0 auto;font-size:16px;display:flex;align-items:center;justify-content:center;transition:.2s}
   .chk.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   .meal-head{display:flex;gap:13px}
@@ -374,6 +380,7 @@
   .password-toggle{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:999px;background:transparent;border:1px solid transparent;color:var(--muted);display:flex;align-items:center;justify-content:center}
   .password-toggle:hover,.password-toggle:focus{color:var(--txt);border-color:var(--border-2);background:var(--surf2)}
   .grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px}
+  .grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
   .opt{width:100%;text-align:left;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:13px;margin-bottom:8px;font-size:14px;line-height:1.3;transition:.15s}
   .opt:active{transform:scale(.99);border-color:var(--accent)}
   .opt .o-meta{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)}
@@ -2554,7 +2561,7 @@ function recapPhotoSection(photo){
     <div class="muted small" style="margin:5px 0 12px">Toma una foto de cuerpo entero, con luz uniforme y una postura natural. Será privada y solo visible en tu cuenta.</div>
     <label class="btn btn-accent" style="display:inline-flex;align-items:center;justify-content:center">
       ${recapPhotoFile?"Cambiar foto":"Tomar o elegir foto"}
-      <input type="file" accept="image/*" capture="environment" onchange="previewRecapPhoto(this)" style="display:none">
+      <input type="file" accept="image/*" onchange="previewRecapPhoto(this)" style="display:none">
     </label>
   </div>`;
 }
@@ -4113,13 +4120,20 @@ function nextDailyAction(ds){
       reason:"Comidas del día registradas"};
   }
 
-  // 5. Descanso planificado
+  // 5. Descanso planificado (REQ-206: con opción de registrar que entrenó igual)
   if(restDay){
+    const acts=manualActivities(st);
+    if(acts.length)return{type:"rest",
+      eyebrow:"Descanso planificado · entrenaste igual",
+      title:"Actividad registrada",
+      detail:esc(acts.map(a=>`${activitySport(a.sport)[1]} · ${manualActivitySummary(a)}`).join(" / ")),
+      cta:`<button class="btn" style="width:100%;min-height:44px" onclick="setView('progreso')">Ver mi progreso</button>`,
+      reason:"Cuenta como día entrenado"};
     return{type:"rest",
       eyebrow:"Descanso planificado",
       title:"Día de recuperación",
       detail:esc(ew.workout.detail||"Movilidad suave y caminata opcional."),
-      cta:`<button class="btn" style="width:100%;min-height:44px" onclick="setView('progreso')">Ver mi progreso</button>`,
+      cta:`<div class="row" style="gap:8px"><button class="btn" style="flex:1;min-height:44px" onclick="setView('progreso')">Ver mi progreso</button><button class="btn" style="flex:1;min-height:44px" onclick="openManualActivity('${ds}')">Hoy entrené igual</button></div>`,
       reason:"El descanso es parte del plan"};
   }
 
@@ -4291,16 +4305,17 @@ function homeAgendaData(ds){
       kind:"rest",
       icon:"○",
       label:"Entreno",
-      title:"Descanso planificado",
-      meta:ew.workout&&ew.workout.detail?ew.workout.detail:"El descanso también cuenta dentro del plan.",
-      actions:""
+      title:manualActivities(st).length?"Descanso · entrenaste igual":"Descanso planificado",
+      meta:manualActivities(st).length?manualActivities(st).map(a=>`${activitySport(a.sport)[1]} · ${manualActivitySummary(a)}`).join(" / "):(ew.workout&&ew.workout.detail?ew.workout.detail:"El descanso también cuenta dentro del plan."),
+      actions:manualActivities(st).length||!canLogManualActivity(ds)?"":`<button class="btn" onclick="openManualActivity('${ds}')">Entrené igual</button>`
     });
   }
 
   if(!items.length){
     return {state:"done",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
   }
-  const pendingCount=items.filter(i=>i.actions).length;
+  // El descanso no es pendiente aunque ofrezca "Entrené igual" (REQ-206).
+  const pendingCount=items.filter(i=>i.actions&&i.kind!=="rest").length;
   return {state:"agenda",day,st,ew,workoutOutcome,doneMeals,totMeals,items,pendingCount};
 }
 function homeAgendaItemHtml(item){
@@ -4689,7 +4704,49 @@ function workoutOutcomeForState(st){
     const outcome=WORKOUT_PLAYER.outcome(execution);
     if(outcome!=="pending")return outcome;
   }
-  return st&&st.workoutDone?"completed":"pending";
+  if(st&&st.workoutDone)return "completed";
+  // REQ-206: una actividad registrada a mano también es entrenar ese día.
+  return manualActivities(st).length?"completed":"pending";
+}
+/* REQ-206: registrar a mano lo que entrenaste (también en días de descanso),
+   con una estimación de calorías determinista: MET × kg × horas. Valores MET
+   aproximados del Compendio de Actividades Físicas (Ainsworth et al.). */
+const MANUAL_ACTIVITY_SPORTS=[
+  ["strength","Fuerza / gimnasio",[3.5,5,6]],
+  ["running","Correr",[7,9.8,11.5]],
+  ["walking","Caminar",[2.8,3.5,5]],
+  ["hiking","Senderismo",[5.3,6,7.8]],
+  ["cycling","Bicicleta",[4,6.8,10]],
+  ["spinning","Spinning / bici estática",[4.8,6.8,8.8]],
+  ["swimming","Natación",[5.8,7,9.8]],
+  ["hiit","HIIT / funcional / CrossFit",[5,8,9]],
+  ["yoga","Yoga / pilates / movilidad",[2.5,3,4]],
+  ["dance","Baile / zumba",[4.5,5.5,7.3]],
+  ["padel","Pádel / tenis",[5,6,8]],
+  ["football","Fútbol",[5,7,10]],
+  ["court","Básquet / vóley",[4,6.5,8]],
+  ["climbing","Escalada",[5.8,7.5,8]],
+  ["combat","Boxeo / artes marciales",[5.5,7.8,10.3]],
+  ["other","Otra actividad",[3.5,5,7]],
+];
+const ACTIVITY_INTENSITIES=[["light","Suave"],["moderate","Moderada"],["vigorous","Intensa"]];
+function manualActivities(st){
+  return Array.isArray(st&&st.manualActivities)?st.manualActivities.filter(a=>a&&typeof a==="object"&&a.sport):[];
+}
+function activitySport(id){return MANUAL_ACTIVITY_SPORTS.find(s=>s[0]===id)||MANUAL_ACTIVITY_SPORTS[MANUAL_ACTIVITY_SPORTS.length-1];}
+function activityIntensityLabel(id){return (ACTIVITY_INTENSITIES.find(i=>i[0]===id)||ACTIVITY_INTENSITIES[1])[1];}
+function activityWeightKg(){
+  const kg=latestLoggedWeight()||Number(profile&&profile.prefs&&profile.prefs.weightKg);
+  return kg>=30&&kg<=300?{kg,known:true}:{kg:70,known:false};
+}
+function estimateActivityKcal(sport,minutes,intensity,kg){
+  const mets=activitySport(sport)[2];
+  const met=mets[{light:0,moderate:1,vigorous:2}[intensity]??1];
+  const min=Math.max(0,Math.min(600,Number(minutes)||0));
+  return Math.round(met*kg*min/60/5)*5;
+}
+function manualActivitySummary(a){
+  return `${a.minutes} min · ${activityIntensityLabel(a.intensity)} · ≈ ${a.kcal} kcal`;
 }
 function workoutOutcomeForDay(ds){return workoutOutcomeForState(S.days[ds]||{});}
 function workoutHasRecordedActivity(st){
@@ -4708,7 +4765,72 @@ function workoutStatusLabel(outcome){
     pending:"Pendiente",
   }[outcome]||"Pendiente";
 }
+function canLogManualActivity(ds){return ds<=todayStr()&&!trainingSafetyHold();}
+function manualActivityBlock(ds,restDay){
+  const list=manualActivities(S.days[ds]);
+  if(!list.length&&!canLogManualActivity(ds))return "";
+  const rows=list.map((a,i)=>`<div class="activity-row">
+      <div class="activity-main"><b>${esc(activitySport(a.sport)[1])}</b><div class="muted small">${esc(manualActivitySummary(a))}</div>${a.notes?`<div class="activity-notes">${esc(a.notes)}</div>`:""}</div>
+      ${canLogManualActivity(ds)?`<div class="activity-actions"><button class="btn btn-sm" onclick="openManualActivity('${ds}',${i})">Editar</button><button class="btn btn-sm" onclick="removeManualActivity('${ds}',${i})">Quitar</button></div>`:""}
+    </div>`).join("");
+  const label=list.length?"＋ Añadir otra actividad":restDay?"Hoy entrené igual: registrar actividad":"＋ Registrar otra actividad";
+  return section("wk.actividad","Actividad registrada",`${rows||`<p class="muted small" style="margin:0 0 10px">${restDay?"¿No te apetece descansar? Registra lo que entrenaste y te estimamos las calorías.":"¿Hiciste otro deporte? Regístralo y te estimamos las calorías."}</p>`}
+    ${canLogManualActivity(ds)?`<button class="btn ${list.length?"":"btn-accent"}" style="width:100%" onclick="openManualActivity('${ds}')">${label}</button>`:""}`,list.length?String(list.length):"");
+}
+function openManualActivity(ds,index){
+  if(!canLogManualActivity(ds)){toast("No se puede registrar actividad en este día");return;}
+  const prev=index!=null?manualActivities(S.days[ds])[index]:null;
+  const primary=profile&&profile.prefs&&profile.prefs.primarySport;
+  const sport=prev?prev.sport:(MANUAL_ACTIVITY_SPORTS.some(s=>s[0]===primary)&&primary!=="other"?primary:"strength");
+  const w=activityWeightKg();
+  modal(`<h3>${prev?"Editar actividad":"Registrar actividad"}</h3>
+    <p class="muted small">Cuenta como día entrenado, aunque hoy tocara descanso.</p>
+    <div class="field"><label for="ma_sport">¿Qué hiciste?</label><select id="ma_sport" onchange="updateManualActivityEstimate()">
+      ${MANUAL_ACTIVITY_SPORTS.map(([id,label])=>`<option value="${id}" ${id===sport?"selected":""}>${esc(label)}</option>`).join("")}
+    </select></div>
+    <div class="grid2">
+      <div class="field"><label for="ma_minutes">Minutos</label><input id="ma_minutes" type="number" inputmode="numeric" min="5" max="600" step="5" value="${prev?prev.minutes:45}" oninput="updateManualActivityEstimate()"></div>
+      <div class="field"><label for="ma_intensity">Intensidad</label><select id="ma_intensity" onchange="updateManualActivityEstimate()">
+        ${ACTIVITY_INTENSITIES.map(([id,label])=>`<option value="${id}" ${id===(prev?prev.intensity:"moderate")?"selected":""}>${label}</option>`).join("")}
+      </select></div>
+    </div>
+    <div class="field"><label for="ma_notes">Detalle (opcional)</label><textarea id="ma_notes" rows="2" maxlength="300" placeholder="Ej. pádel con amigas, 2 partidos · pierna y glúteo">${esc(prev&&prev.notes||"")}</textarea></div>
+    <div class="activity-estimate" id="ma_estimate" aria-live="polite"></div>
+    <div class="muted small">Estimación según la actividad, la duración, la intensidad y ${w.known?`tu peso (${String(Math.round(w.kg*10)/10).replace(".",",")} kg)`:"un peso de referencia de 70 kg (registra tu peso para afinarla)"}.</div>
+    <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveManualActivity('${ds}',${index!=null?index:"null"})">Guardar actividad</button>`);
+  updateManualActivityEstimate();
+}
+function readManualActivityForm(){
+  return {sport:$("#ma_sport").value,minutes:Math.round(Number($("#ma_minutes").value)||0),intensity:$("#ma_intensity").value,notes:$("#ma_notes").value.trim().slice(0,300)};
+}
+function updateManualActivityEstimate(){
+  const box=$("#ma_estimate");if(!box)return;
+  const f=readManualActivityForm();
+  const kcal=f.minutes>0?estimateActivityKcal(f.sport,f.minutes,f.intensity,activityWeightKg().kg):0;
+  box.innerHTML=`<span class="n">≈ ${kcal}</span> <span class="muted">kcal gastadas</span>`;
+}
+function saveManualActivity(ds,index){
+  if(!canLogManualActivity(ds))return;
+  const f=readManualActivityForm();
+  if(f.minutes<5||f.minutes>600){toast("Indica entre 5 y 600 minutos");return;}
+  const w=activityWeightKg();
+  const st=dayState(ds);
+  const list=manualActivities(st);
+  const entry={id:index!=null&&list[index]?list[index].id:`a${Date.now().toString(36)}`,...f,
+    kcal:estimateActivityKcal(f.sport,f.minutes,f.intensity,w.kg),weightKg:w.kg,loggedAt:new Date().toISOString()};
+  if(index!=null&&list[index])list[index]=entry;else list.push(entry);
+  st.manualActivities=list;
+  commitDay(ds);closeModal();render();
+  toast(index!=null?"Actividad actualizada":"Actividad registrada");
+}
+function removeManualActivity(ds,index){
+  const st=dayState(ds);const list=manualActivities(st);const a=list[index];if(!a)return;
+  if(!confirm(`¿Quitar ${activitySport(a.sport)[1]} (${a.minutes} min)?`))return;
+  list.splice(index,1);st.manualActivities=list;
+  commitDay(ds);render();toast("Actividad quitada");
+}
 function workoutStatusHtml(ds,execution){
+  if(!execution&&!(S.days[ds]||{}).workoutDone&&manualActivities(S.days[ds]).length)return '<span class="player-status completed"><i></i>Actividad registrada</span>';
   const outcome=execution?WORKOUT_PLAYER.outcome(execution):workoutOutcomeForDay(ds);
   const progress=execution?WORKOUT_PLAYER.progress(execution):null;
   const detail=progress&&outcome!=="completed"&&outcome!=="partial"?` · ${progress.completed}/${progress.total} bloques`:"";
@@ -5296,12 +5418,13 @@ function renderWorkout(){
       ${contentIssues.length?'<div class="alert">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción antes de iniciarla.</div>':""}
       ${!execution&&!st.workoutDone&&!restDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>`:""}
       ${!execution&&st.workoutDone?'<span class="muted small">Completado con el registro anterior; las series no estaban disponibles.</span>':""}
-      ${restDay?'<span class="muted small">Descanso planificado: no cuenta como sesión incompleta.</span>':""}
+      ${restDay?`<span class="muted small">${manualActivities(st).length?"Descanso planificado, pero entrenaste igual: cuenta como día entrenado.":"Descanso planificado: no cuenta como sesión incompleta."}</span>`:""}
       <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()||execution||st.workoutDone?"disabled":""}>Cambiar entrenamiento</button>
       ${ew.overridden&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
       ${!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar hoy:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','casa')">En casa</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','equipo')">Sin equipo</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
   </div>`)}
+  ${manualActivityBlock(ds,restDay)}
   ${execution?renderWorkoutExecution(ds,execution):""}
   ${!execution&&exerciseArray(ew.workout.exerciseIds).length?section("wk.ejercicios","Vista previa de ejercicios",workoutExercisesHtml(ew.workout),`${exerciseArray(ew.workout.exerciseIds).length}`):""}
   ${daySummary(ds)}
@@ -8423,7 +8546,7 @@ function editorSheet(title,pre){
       <button class="btn" style="flex:1" onclick="aiEstimate()">✨ Estimar macros</button>
       <button class="btn" style="flex:1" onclick="pickMealPhoto()">📷 Estimar con foto</button>
     </div>
-    <input id="f_photo" type="file" accept="image/*" capture="environment" hidden onchange="onMealPhotoSelected(this)">
+    <input id="f_photo" type="file" accept="image/*" hidden onchange="onMealPhotoSelected(this)">
     <img id="f_photo_preview" class="meal-photo-preview" alt="Foto de la comida" hidden>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
     <div id="aiOut"></div>
     <label class="qp-save-fav"><input type="checkbox" id="f_fav" ${pre.name&&isSavedMeal(pre.name)?"checked disabled":""}> Guardar en favoritas</label>
@@ -10361,8 +10484,9 @@ async function maybeUpdateLearnedPatterns(){
 function trainingDayResult(ds){
   const ew=effectiveWorkout(ds);
   const isRest=ew.workout&&ew.workout.id==="descanso";
-  if(isRest)return "rest";
   const st=S.days[ds]||{};
+  // REQ-206: descanso planificado, pero entrenó igual → cuenta como entrenado.
+  if(isRest)return manualActivities(st).length?"done":"rest";
   // REQ-163: una sesión in_progress/paused (bloques omitidos, series sueltas)
   // no es un cierre real — solo un resultado TERMINAL (completed/partial) o
   // el legado st.workoutDone cuentan para la racha. workoutHasRecordedActivity()
