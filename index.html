@@ -7805,7 +7805,7 @@ function landingModeHtml(slot){
   const signUp=(cls,label)=>`<button class="l-btn ${cls}" onclick="showAuthFromLanding('up')">${label}</button>`;
   if(slot==="nav")return invite?`<a class="l-btn l-btn-lime" href="beta-reclutamiento.html?source=portada-nav">Postular</a>`:signUp("l-btn-lime","Empezar");
   if(slot==="hero")return invite?`<a class="l-btn l-btn-lime l-btn-lg" href="beta-reclutamiento.html?source=portada">Postular a la beta</a>`:signUp("l-btn-lime l-btn-lg","Empezar ahora");
-  if(slot==="heroNote")return invite?"Beta de fundadores en Perú, Chile y México · Tres meses gratis, sin tarjeta":"Tu plan listo en minutos · Pagas solo el período que eliges";
+  if(slot==="heroNote")return invite?"Beta de fundadores · Tres meses gratis, sin tarjeta":"Tu plan listo en minutos · Pagas solo el período que eliges";
   if(slot==="sub")return invite?"Precios al abrir los planes. Quienes entren a la beta tendrán precio de fundador.":"Pagas solo el período que eliges. Sin permanencia.";
   if(slot==="final")return invite
     ?`<h2 id="l-cta-h">Sé de los primeros.</h2>

@@ -148,7 +148,7 @@ function parsePayload(body) {
   const errors = [];
   if (website) errors.push("No pudimos procesar tu postulación.");
   if (name.length < 2) errors.push("Escribe tu nombre.");
-  if (whatsappNormalized.length < 8 || whatsappNormalized.length > 15) errors.push("Revisa tu número de WhatsApp: incluye el código de país, por ejemplo +51 999 999 999.");
+  if (whatsappNormalized.length < 8 || whatsappNormalized.length > 15) errors.push("Revisa tu número de WhatsApp: incluye el código de tu país (empieza con +).");
   if (!ageBand) errors.push("Elige tu rango de edad.");
   if (!countryCity) errors.push("Escribe tu país y ciudad.");
   if (!ALLOWED_STAGES.has(stage)) errors.push("Elige qué te describe mejor.");
