@@ -9319,3 +9319,56 @@ Perfil → Objetivo ofrece "Empezar de nuevo mi plan": el usuario elige 4 o 10 s
 2. `restartNudgeCard()` en Hoy: ≥14 días desde el último entreno completado/parcial (o desde el inicio), "Retomar" la pospone 7 días (`restartNudgeDismissedAt`).
 3. Progreso → recorrido marca "Interrumpido". Evento `plan_restart` en la allowlist de analytics. No toca entitlement, cortesía, beta ni trial (`onboardingCompletedAt` se conserva). SW v99.
 4. E2E `tests/e2e/ciclo-nuevo.spec.js` (2).
+
+## REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar"
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): hace falta una lista de compra que separe lo que ya tienes en casa de lo que tienes que comprar, con la cantidad necesaria para la semana.
+
+### Problema
+
+El usuario no tiene dónde ver qué comprar para la semana después de aplicar el plan, ni puede descontar lo que ya tiene en casa.
+
+### Causa raíz
+
+- La lista existe solo dentro del modal de revisión de "Preparar semana" (`index.html:9992-9997`): un `<details>` de solo lectura que desaparece al aplicar. Se guarda en `snapshot.shoppingList` (`index.html:1795`), pero ninguna pantalla la vuelve a mostrar.
+- Se calcula sobre el plan propuesto: si después el usuario cambia una comida (override en `day_log`), la lista queda vieja.
+
+### Objetivo
+
+Una pantalla "Lista de compra" en Nutrición, siempre disponible para la semana activa, con cantidades para lo que queda de semana y dos estados por ingrediente.
+
+### Alcance
+
+1. Entrada en Nutrición ("Lista de compra · semana N") que abre una vista o sheet.
+2. Cantidades calculadas con `buildShoppingListFromNutritionPlan()` sobre las comidas **efectivas** de cada día (`mealValue()`: override > plan), por defecto de hoy al final de la semana, con opción "semana completa". Agrupar por categoría y redondear a unidades prácticas cuando el catálogo lo permita ("3 huevos", "1 kg de pollo"), conservando los gramos.
+3. Cada ingrediente se marca "Ya lo tengo" o "Por comprar" (por defecto). Dos secciones con contador ("Por comprar · 12"). Marcar no cambia el plan.
+4. Las marcas se guardan por usuario y semana (clave `version_key` del plan) en `profiles.prefs.shoppingChecks`, sincronizadas como el resto de prefs, sin migración. Se limpian las de semanas pasadas.
+5. Copiar/compartir la lista "Por comprar" como texto (Web Share API, o portapapeles como respaldo).
+
+### Fuera de alcance
+
+- Precios, tiendas o pedidos en línea. Despensa persistente entre semanas (candidato futuro).
+
+### Riesgos
+
+- Privacidad: la lista es dato personal; no va a analytics (solo el evento `shopping_list_opened` sin contenido).
+
+### Criterios de aceptación
+
+- E2E: cambiar una comida actualiza la cantidad del ingrediente afectado; marcar "Ya lo tengo" lo mueve de sección y sobrevive a recargar.
+- La vista funciona sin conexión con el último plan cacheado.
+
+### Verificación sugerida
+
+- `tests/e2e/lista-compra.spec.js` (nuevo) + `validate-nutrition-domain.mjs`.
+
+### Implementación
+
+1. `shoppingList(scope)` suma `mealRecipe()` de cada comida efectiva (cambios incluidos, sin las saltadas) de hoy (o del inicio) al fin de la semana del plan; categoría desde `DB.ingredients`; `shoppingQty()` redondea (g/kg, huevos en unidades).
+2. Hoja `openShoppingList()` con `#shopSheet` (se actualiza sin recrearse para conservar scroll y foco): "Por comprar · N" y "Ya lo tengo · N", selector "Lo que queda de semana"/"Semana completa", "Compartir lo que falta" (Web Share o portapapeles).
+3. Marcas en `profiles.prefs.shoppingChecks={key:"ciclo:inicioSemana",have:[...]}`: solo la semana actual, sin migración. Evento `shopping_list_opened` sin contenido. SW v100.
+4. E2E `tests/e2e/lista-compra.spec.js` (2).

@@ -297,6 +297,14 @@
   .move-list .dose{display:block;color:var(--muted);font-size:13px}
   .move-now{margin-top:12px;padding:14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1)}
   .move-now h4{font-size:18px;margin:4px 0 2px;line-height:1.25}
+  /* REQ-215: lista de compra */
+  .shop-scope{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
+  .shop-scope .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+  .shop-h{font-family:var(--font-body);font-size:13px;font-weight:700;margin:16px 0 6px;color:var(--muted)}
+  .shop-cat{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted2);margin:10px 0 2px}
+  .shop-item{display:flex;align-items:center;gap:10px;min-height:44px;padding:4px 0;border-bottom:1px solid var(--border);cursor:pointer}
+  .shop-item .q{margin-left:auto;color:var(--muted);font-size:13px;white-space:nowrap}
+  .shop-item.have .n{color:var(--muted);text-decoration:line-through}
   .player-controls .btn{min-height:48px;border-radius:var(--r-md);white-space:normal}
   .player-controls .primary{grid-column:1 / -1}
   .set-list{display:grid;gap:8px;margin-top:12px}
@@ -4541,8 +4549,102 @@ function renderNutrition(){
   ${section("nut.plan","Comidas del día",
     itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
     `${orderedItems.length}`)}
+  <button class="btn" style="width:100%;margin:0 0 10px" onclick="openShoppingList()">Lista de compra · semana ${shoppingWeek()?shoppingWeek().num:""}</button>
   ${moreBtn}
   `;
+}
+/* ---- REQ-215: lista de compra semanal ----
+   Cantidades sobre las comidas EFECTIVAS de cada día (cambios incluidos, sin
+   las saltadas) y marcas "ya lo tengo" por semana en profiles.prefs. */
+let shoppingScope="rest";
+const SHOPPING_UNITS={"huevo entero":{grams:50,one:"huevo",many:"huevos"},"huevo":{grams:50,one:"huevo",many:"huevos"}};
+function shoppingWeek(){
+  const today=todayStr();
+  return weekOf(today,planPrefsForDate(today))||weekOf(today)||null;
+}
+function shoppingKey(name){return String(name||"").trim().toLowerCase();}
+function shoppingList(scope){
+  const w=shoppingWeek();
+  if(!w)return {week:null,items:[]};
+  const today=todayStr();
+  const from=scope==="week"||today<w.start?w.start:today;
+  const totals=new Map();
+  const catByName=new Map((DB.ingredients||[]).map(i=>[shoppingKey(i.name),i.category||""]));
+  for(let ds=from;ds<=w.end;ds=addDays(ds,1)){
+    if(ds<START||ds>END)continue;
+    const st=S.days[ds]||{};
+    buildDay(ds).meals.forEach(b=>{
+      const ms=(st.meals||{})[b.id]||{};
+      if(ms.skipped)return;
+      const recipe=mealRecipe(b,ms);
+      (recipe&&recipe.lines||[]).forEach(line=>{
+        const key=shoppingKey(line.name);if(!key||!(line.grams>0))return;
+        const prev=totals.get(key)||{key,name:line.name,grams:0,category:catByName.get(key)||"Otros"};
+        prev.grams+=line.grams;totals.set(key,prev);
+      });
+    });
+  }
+  const items=[...totals.values()].sort((a,b)=>a.category.localeCompare(b.category,"es")||a.name.localeCompare(b.name,"es"));
+  return {week:w,from,items};
+}
+function shoppingQty(item){
+  const unit=SHOPPING_UNITS[item.key];
+  const g=item.grams<50?Math.round(item.grams/5)*5:Math.ceil(item.grams/10)*10;
+  const weight=g>=1000?`${(g/1000).toFixed(g%1000?1:0)} kg`:`${Math.max(5,g)} g`;
+  if(unit){const n=Math.max(1,Math.round(item.grams/unit.grams));return `${n} ${n===1?unit.one:unit.many}`;}
+  return weight;
+}
+function shoppingChecksForWeek(w){
+  const c=(profile&&profile.prefs&&profile.prefs.shoppingChecks)||{};
+  const key=`${cycleNumber()}:${w&&w.start}`;
+  return {key,have:new Set(c.key===key&&Array.isArray(c.have)?c.have:[])};
+}
+function openShoppingList(scope){
+  if(scope)shoppingScope=scope;
+  const body=document.getElementById("shopSheet");
+  // Ya abierta: se actualiza el contenido sin recrear la hoja (conserva el scroll).
+  if(body){body.innerHTML=shoppingSheetHtml();return;}
+  trackEvent("shopping_list_opened",{});
+  modal(`<h3>Lista de compra</h3><div id="shopSheet">${shoppingSheetHtml()}</div>`);
+}
+function shoppingSheetHtml(){
+  const {week,items}=shoppingList(shoppingScope);
+  if(!week)return `<p class="muted small">Tu plan aún no tiene una semana activa.</p>`;
+  const {have}=shoppingChecksForWeek(week);
+  const toBuy=items.filter(i=>!have.has(i.key)),owned=items.filter(i=>have.has(i.key));
+  const row=i=>`<label class="shop-item${have.has(i.key)?" have":""}"><input type="checkbox" data-key="${esc(i.key)}" ${have.has(i.key)?"checked":""} onchange="toggleShoppingHave(this.dataset.key)" aria-label="Ya tengo ${esc(i.name)}"><span class="n">${esc(i.name)}</span><span class="q">${esc(shoppingQty(i))}</span></label>`;
+  const grouped=list=>{let cat="";return list.map(i=>{const h=i.category!==cat?`<div class="shop-cat">${esc(i.category)}</div>`:"";cat=i.category;return h+row(i);}).join("");};
+  const range=shoppingScope==="week"?`${prettyDate(week.start)} al ${prettyDate(week.end)}`:`de hoy al ${prettyDate(week.end).toLowerCase()}`;
+  return `<div class="muted small">Semana ${week.num} · ${esc(range)}. Marca lo que ya tienes en casa.</div>
+    <div class="shop-scope" role="group" aria-label="Días que cubre la lista">
+      <button class="btn btn-sm" aria-pressed="${shoppingScope!=="week"}" onclick="openShoppingList('rest')">Lo que queda de semana</button>
+      <button class="btn btn-sm" aria-pressed="${shoppingScope==="week"}" onclick="openShoppingList('week')">Semana completa</button>
+    </div>
+    ${items.length?`<div class="shop-h">Por comprar · ${toBuy.length}</div>${toBuy.length?grouped(toBuy):`<div class="muted small">Ya tienes todo lo necesario.</div>`}
+      ${owned.length?`<div class="shop-h">Ya lo tengo · ${owned.length}</div>${grouped(owned)}`:""}
+      <button class="btn btn-accent" style="width:100%;margin-top:14px" onclick="shareShoppingList()" ${toBuy.length?"":"disabled"}>Compartir lo que falta</button>`
+      :`<p class="muted small" style="margin-top:12px">Aún no hay comidas preparadas para estos días. Prepara tu semana desde Nutrición → Más opciones y la lista se arma sola.</p>`}`;
+}
+async function toggleShoppingHave(key){
+  const w=shoppingWeek();if(!w||!profile)return;
+  const {key:weekKey,have}=shoppingChecksForWeek(w);
+  if(have.has(key))have.delete(key);else have.add(key);
+  // Solo se guarda la semana actual: las marcas de semanas pasadas se descartan.
+  const prefs={...(profile.prefs||{}),shoppingChecks:{key:weekKey,have:[...have]}};
+  profile.prefs=prefs;
+  openShoppingList();
+  const input=[...document.querySelectorAll("#shopSheet input[data-key]")].find(el=>el.dataset.key===key);
+  if(input)input.focus({preventScroll:true});
+  await saveProfilePrefs(prefs);
+}
+async function shareShoppingList(){
+  const {week,items}=shoppingList(shoppingScope);
+  const {have}=shoppingChecksForWeek(week);
+  const text=`Lista de compra · semana ${week.num}\n`+items.filter(i=>!have.has(i.key)).map(i=>`- ${i.name}: ${shoppingQty(i)}`).join("\n");
+  try{
+    if(navigator.share){await navigator.share({title:"Lista de compra",text});return;}
+    await navigator.clipboard.writeText(text);toast("Lista copiada");
+  }catch(e){if(e&&e.name!=="AbortError")toast("No se pudo compartir la lista");}
 }
 // Menú de acciones secundarias de Nutrición: solo acciones globales, no reemplazos de comidas.
 function openNutritionMoreMenu(){
