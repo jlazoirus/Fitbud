@@ -75,7 +75,7 @@ Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la b
 - REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1; implementado)
 - REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1; implementado)
 - REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1; implementado)
-- REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1)
+- REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1; implementado)
 - REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar". (P2)
 - REQ-216 - Modo conversacional (beta oculta). (P2; espera decisión de producto)
 
@@ -1496,49 +1496,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-213`).
 
 ## REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento
 
-**Estado: pendiente.**
+**Estado: implementado.** Perfil → Objetivo "Empezar de nuevo mi plan" (4 o 10 semanas) archiva el ciclo como interrumpido y arranca hoy desde la semana 1; tras 14 días sin entrenar, Hoy sugiere retomar o empezar de nuevo.
 
-### Origen
-
-Feedback beta de Jonathan (2026-10-18): tiene que haber una forma de reiniciar el plan de 10 semanas sin tocar la suscripción. Si pasan muchos días sin entrenar, la app debería sugerirlo, y si el usuario decide volver a empezar de cero, debe poder rehacer el plan de 4 o 10 semanas.
-
-### Problema
-
-Quien se atrasa o abandona unas semanas no puede volver a empezar: el plan sigue contando desde la fecha original hasta el recap final, y solo un admin puede reiniciar (borrando datos).
-
-### Causa raíz
-
-- El único camino a un ciclo nuevo es el recap de fin de ciclo: `startNextChallenge()` (`index.html:2658`) archiva el ciclo (`archiveCompletedCycle`, `index.html:10864`) y marca `onboardingPending:true`. Antes del final no hay acción de usuario. El reinicio de REQ-126 es solo de admin y borra datos.
-- Nada detecta la inactividad prolongada para ofrecer reiniciar.
-
-### Objetivo
-
-Perfil → Objetivo ofrece "Empezar de nuevo mi plan": el usuario elige 4 o 10 semanas, revisa sus datos precargados y arranca un ciclo nuevo desde hoy. El historial y la suscripción se conservan.
-
-### Alcance
-
-1. Acción "Empezar de nuevo" con confirmación que explica el impacto: "Tu historial se conserva; tu plan arranca hoy desde la semana 1".
-2. Reusar la ruta del recap: archivar el ciclo actual como **interrumpido** (sin exigir el resumen completo ni la foto), `onboardingPending:true` y onboarding con los datos actuales precargados y la duración elegible. `saveOnboarding()` ya prepara la primera semana (REQ-118).
-3. Sugerencia: con 14 días o más sin entreno registrado (y sin descanso planificado), tarjeta en Hoy: "Hace 2 semanas que no entrenas. ¿Retomamos donde ibas o empiezas de nuevo?", con "Retomar" (sigue el plan) y "Empezar de nuevo" (paso 1). Se puede descartar y no reaparece en 7 días.
-4. No toca entitlement, cortesía, beta ni trial: el trial no se renueva por empezar de nuevo.
-
-### Fuera de alcance
-
-- Borrar historial (sigue siendo acción de admin, REQ-126).
-
-### Riesgos
-
-- Historial inmutable: los `day_log` y `plan_versions` pasados quedan intactos; las versiones activas futuras pasan a `superseded`.
-- `trialStartedAt()` (`api/claude.js:197`) lee `onboardingCompletedAt`: un ciclo nuevo no debe reabrir el trial. Verificar que `get_or_create_coach_trial` es idempotente por usuario.
-
-### Criterios de aceptación
-
-- E2E: en la semana 5, "Empezar de nuevo" → 4 semanas → Hoy muestra la semana 1 desde hoy; Progreso conserva los pesos anteriores en el ciclo archivado.
-- Con 14 días sin entreno aparece la sugerencia y "Retomar" la oculta.
-
-### Verificación sugerida
-
-- `tests/e2e/ciclo-nuevo.spec.js` (nuevo) + `validate-training-plan.mjs`.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-214`).
 
 ## REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar"
 

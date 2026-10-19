@@ -9266,3 +9266,56 @@ Con una versión nueva instalada, la app se actualiza sola en un momento seguro,
 1. `index.html`: se quita `#update-badge` y su CSS. `notifyAppUpdateAvailable()` marca la actualización (`evolv_update_pending_since`); `visibilitychange` recarga si la app estuvo ≥30 s oculta y `appBusyForUpdate()` es falso (modal abierto, coach respondiendo, Perfil con cambios sin guardar, cola de sync pendiente o entreno `in_progress`).
 2. `appUpdateOfferedInProfile()`: tras 24 h, línea "Hay una versión nueva de la app · Actualizar" en Perfil → Cuenta. Tras recargar, toast "App actualizada" una vez (`announceAppUpdated()`). SW v98.
 3. E2E `tests/e2e/actualizacion.spec.js` (3).
+
+## REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): tiene que haber una forma de reiniciar el plan de 10 semanas sin tocar la suscripción. Si pasan muchos días sin entrenar, la app debería sugerirlo, y si el usuario decide volver a empezar de cero, debe poder rehacer el plan de 4 o 10 semanas.
+
+### Problema
+
+Quien se atrasa o abandona unas semanas no puede volver a empezar: el plan sigue contando desde la fecha original hasta el recap final, y solo un admin puede reiniciar (borrando datos).
+
+### Causa raíz
+
+- El único camino a un ciclo nuevo es el recap de fin de ciclo: `startNextChallenge()` (`index.html:2658`) archiva el ciclo (`archiveCompletedCycle`, `index.html:10864`) y marca `onboardingPending:true`. Antes del final no hay acción de usuario. El reinicio de REQ-126 es solo de admin y borra datos.
+- Nada detecta la inactividad prolongada para ofrecer reiniciar.
+
+### Objetivo
+
+Perfil → Objetivo ofrece "Empezar de nuevo mi plan": el usuario elige 4 o 10 semanas, revisa sus datos precargados y arranca un ciclo nuevo desde hoy. El historial y la suscripción se conservan.
+
+### Alcance
+
+1. Acción "Empezar de nuevo" con confirmación que explica el impacto: "Tu historial se conserva; tu plan arranca hoy desde la semana 1".
+2. Reusar la ruta del recap: archivar el ciclo actual como **interrumpido** (sin exigir el resumen completo ni la foto), `onboardingPending:true` y onboarding con los datos actuales precargados y la duración elegible. `saveOnboarding()` ya prepara la primera semana (REQ-118).
+3. Sugerencia: con 14 días o más sin entreno registrado (y sin descanso planificado), tarjeta en Hoy: "Hace 2 semanas que no entrenas. ¿Retomamos donde ibas o empiezas de nuevo?", con "Retomar" (sigue el plan) y "Empezar de nuevo" (paso 1). Se puede descartar y no reaparece en 7 días.
+4. No toca entitlement, cortesía, beta ni trial: el trial no se renueva por empezar de nuevo.
+
+### Fuera de alcance
+
+- Borrar historial (sigue siendo acción de admin, REQ-126).
+
+### Riesgos
+
+- Historial inmutable: los `day_log` y `plan_versions` pasados quedan intactos; las versiones activas futuras pasan a `superseded`.
+- `trialStartedAt()` (`api/claude.js:197`) lee `onboardingCompletedAt`: un ciclo nuevo no debe reabrir el trial. Verificar que `get_or_create_coach_trial` es idempotente por usuario.
+
+### Criterios de aceptación
+
+- E2E: en la semana 5, "Empezar de nuevo" → 4 semanas → Hoy muestra la semana 1 desde hoy; Progreso conserva los pesos anteriores en el ciclo archivado.
+- Con 14 días sin entreno aparece la sugerencia y "Retomar" la oculta.
+
+### Verificación sugerida
+
+- `tests/e2e/ciclo-nuevo.spec.js` (nuevo) + `validate-training-plan.mjs`.
+
+### Implementación
+
+1. `openRestartPlan()`/`confirmRestartPlan()`: `cycleSummary(until)` hasta ayer, `archiveCompletedCycle(..., endDate)` con `summary.interrupted` (sin migración: `plan_cycles.status` sigue en `completed`), prefs `onboardingPending` + `restartCycle` y onboarding precargado con la duración elegida. `saveOnboarding()` arranca hoy cuando `restartCycle`; la versión activa anterior se cierra en ayer por la ruta existente de `plan_versions`.
+2. `restartNudgeCard()` en Hoy: ≥14 días desde el último entreno completado/parcial (o desde el inicio), "Retomar" la pospone 7 días (`restartNudgeDismissedAt`).
+3. Progreso → recorrido marca "Interrumpido". Evento `plan_restart` en la allowlist de analytics. No toca entitlement, cortesía, beta ni trial (`onboardingCompletedAt` se conserva). SW v99.
+4. E2E `tests/e2e/ciclo-nuevo.spec.js` (2).

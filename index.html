@@ -2534,9 +2534,11 @@ function planNeedsRecap(){
     && todayStr()>END
     && Number(p.recapCompletedCycle||0)<cycleNumber();
 }
-function cycleSummary(){
+function cycleSummary(untilDs){
+  // REQ-214: un ciclo interrumpido se resume hasta el día en que se deja.
+  const last=validYmd(untilDs)&&untilDs<END?untilDs:END;
   let ds=START,activeDays=0,bestStreak=0,currentStreak=0,workouts=0,partialWorkouts=0,doneMeals=0,plannedMeals=0;
-  while(ds<=END){
+  while(ds<=last){
     const st=S.days[ds]||{};
     const day=buildDay(ds);
     const mealStates=st.meals||{};
@@ -3665,7 +3667,8 @@ async function saveOnboarding(){
   let planCycleNumber=Math.max(1,Number.parseInt(previous.planCycleNumber,10)||1);
   if(newCycle){
     planCycleNumber+=1;
-    planStartDate=todayStr()>END?todayStr():addDays(END,1);
+    // REQ-214: "Empezar de nuevo" arranca hoy; tras el recap, al día siguiente del ciclo anterior.
+    planStartDate=previous.restartCycle||todayStr()>END?todayStr():addDays(END,1);
     planEndDate=planEndFor(planStartDate,duration);
   }else if(firstCycle&&!validYmd(planStartDate)){
     planStartDate=todayStr();
@@ -3702,7 +3705,7 @@ async function saveOnboarding(){
     planCycleNumber,planStartDate,planEndDate,planDurationWeeks:duration,
     cycleStartWeight:d.weightKg,cycleStartBodyFat:d.bodyFatPct===""?null:d.bodyFatPct,
     ...(firstCycle||newCycle?{startWeightSeededCycle:planCycleNumber}:{}),
-    onboardingPending:false,pendingChallenge:null,
+    onboardingPending:false,pendingChallenge:null,restartCycle:false,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
     ...(firstCycle||newCycle?{cycleFirstDayPreparedAt:null,cycleFirstWeekPreparedAt:null}:{}),
     ...(firstCycle||newCycle?{onboardingEssentialOnly:true,profileRefinedAt:null}:{}),
@@ -4494,6 +4497,7 @@ function renderHoy(){
       <div class="avatar">${esc((name[0]||"F").toUpperCase())}</div>
     </div>
   </header>
+  ${restartNudgeCard()}
   ${heroDash(ds,{compact:true})}
   ${homeAgendaHtml(ds)}
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
@@ -5736,8 +5740,8 @@ function progressJourney(){
     const photo=row.photo_url?`<img class="journey-photo" src="${row.photo_url}" alt="Foto de progreso del ciclo ${row.cycle_number}">`:"";
     return `<div class="dash">
       <div class="row between" style="align-items:flex-start">
-        <div><div class="slot">Ciclo ${row.cycle_number}</div><div class="cl-title">${CHALLENGE_LABELS[row.challenge]||"Ciclo completado"}</div></div>
-        <span class="badge b-PESAS">Completado</span>
+        <div><div class="slot">Ciclo ${row.cycle_number}</div><div class="cl-title">${CHALLENGE_LABELS[row.challenge]||(s.interrupted?"Ciclo interrumpido":"Ciclo completado")}</div></div>
+        <span class="badge ${s.interrupted?"b-Libre":"b-PESAS"}">${s.interrupted?"Interrumpido":"Completado"}</span>
       </div>
       <div class="muted small" style="margin:4px 0 12px">${prettyDate(row.start_date)} → ${prettyDate(row.end_date)}</div>
       ${photo}
@@ -6637,6 +6641,7 @@ function renderProfile(){
         </div>
         <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${esc((GOAL_OPTIONS[p.goal]||GOAL_OPTIONS.deficit).label.toLowerCase())}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
         <button class="btn" style="width:100%" onclick="startOnboarding()">Recalcular objetivos y preferencias</button>
+        <button class="btn" style="width:100%;margin-top:8px" onclick="openRestartPlan()">Empezar de nuevo mi plan</button>
       </div>
     </div>
   </details>
@@ -11024,11 +11029,92 @@ async function uploadProgressPhoto(file,cycleNo){
   if(result.error)throw new Error("No se pudo guardar la foto. Aplica supabase/plan_cycles.sql y vuelve a intentar.");
   return path;
 }
-async function archiveCompletedCycle(summary,challenge,photoPath){
+/* ---- REQ-214: empezar de nuevo el plan (4 o 10 semanas) en cualquier momento ----
+   El ciclo actual queda archivado como interrumpido (summary.interrupted) y el
+   nuevo arranca hoy desde la semana 1. No toca acceso, cortesía, beta ni trial. */
+const RESTART_NUDGE_DAYS=14;
+const RESTART_NUDGE_SNOOZE_DAYS=7;
+function openRestartPlan(){
+  const duration=resolvedPlanDuration((profile&&profile.prefs)||{});
+  modal(`<h3>Empezar de nuevo mi plan</h3>
+    <p class="muted small">Tu plan arranca hoy desde la semana 1. Tu historial y tu progreso se conservan: el ciclo actual queda guardado como interrumpido. Tu acceso no cambia.</p>
+    <div class="field"><label for="restartDuration">Duración del nuevo ciclo</label><select id="restartDuration">
+      <option value="10" ${duration===10?"selected":""}>10 semanas · recomendado</option>
+      <option value="4" ${duration===4?"selected":""}>4 semanas · ciclo corto</option>
+    </select></div>
+    <p class="muted small">Antes de empezar revisas tus datos (peso, objetivo, días de entreno) por si algo cambió.</p>
+    <button id="restartPlanBtn" class="btn btn-accent" style="width:100%" onclick="confirmRestartPlan()">Revisar mis datos y empezar</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cancelar</button>`);
+}
+async function confirmRestartPlan(){
+  const duration=Number(($("#restartDuration")&&$("#restartDuration").value)||10);
+  const btn=$("#restartPlanBtn");
+  if(btn){btn.disabled=true;btn.textContent="Guardando tu ciclo…";}
+  try{
+    const until=todayStr()>END?END:addDays(todayStr(),-1);
+    const summary={...cycleSummary(until),interrupted:true,interruptedOn:todayStr()};
+    await archiveCompletedCycle(summary,null,null,until);
+    const prefs={...((profile&&profile.prefs)||{}),
+      onboardingPending:true,restartCycle:true,pendingChallenge:null,
+      lastCycleSummary:summary,planDurationWeeks:validPlanDuration(duration)?duration:10,
+    };
+    const saved=await saveProfilePrefs(prefs);
+    if(saved&&saved.error)throw saved.error;
+    trackEvent("plan_restart",{duration_weeks:prefs.planDurationWeeks});
+    closeModal();
+    onboardingDraft=onboardingDefaults();
+    onboardingDraft.planDurationWeeks=prefs.planDurationWeeks;
+    onboardingActive=true;onboardingStep=1;reviewPromptShown=true;
+    render();scrollAppTop();
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent="Revisar mis datos y empezar";}
+    toast((e&&e.message)||"No pudimos guardar tu ciclo. Inténtalo de nuevo.");
+  }
+}
+function lastTrainingDate(){
+  return Object.keys(S.days||{}).filter(ds=>{
+    const outcome=workoutOutcomeForState(S.days[ds]||{});
+    return outcome==="completed"||outcome==="partial";
+  }).sort().pop()||null;
+}
+function daysBetween(a,b){return Math.round((parseYmd(b)-parseYmd(a))/86400000);}
+function restartNudgeDue(){
+  const p=(profile&&profile.prefs)||{};
+  if(!hasCompleteOnboarding(p)||onboardingActive)return false;
+  const today=todayStr();
+  if(today<START||today>END)return false;
+  const since=[lastTrainingDate(),START].filter(Boolean).sort().pop();
+  if(daysBetween(since,today)<RESTART_NUDGE_DAYS)return false;
+  const snoozed=Date.parse(p.restartNudgeDismissedAt||"");
+  return !(Number.isFinite(snoozed)&&Date.now()-snoozed<RESTART_NUDGE_SNOOZE_DAYS*86400000);
+}
+function restartNudgeCard(){
+  if(!restartNudgeDue())return "";
+  const since=[lastTrainingDate(),START].filter(Boolean).sort().pop();
+  const weeks=Math.floor(daysBetween(since,todayStr())/7);
+  return `<section class="agenda-card agenda-state" style="margin:0 0 14px">
+    <div class="agenda-head"><div>
+      <div class="agenda-kicker">Tu plan</div>
+      <h2 class="agenda-title">Hace ${weeks} semana${weeks===1?"":"s"} que no entrenas</h2>
+      <div class="agenda-sub">¿Retomamos donde ibas o prefieres empezar de nuevo desde la semana 1? Tu historial se conserva.</div>
+    </div></div>
+    <div class="agenda-actions row" style="gap:8px">
+      <button class="btn" style="flex:1" onclick="dismissRestartNudge()">Retomar</button>
+      <button class="btn btn-accent" style="flex:1" onclick="openRestartPlan()">Empezar de nuevo</button>
+    </div>
+  </section>`;
+}
+async function dismissRestartNudge(){
+  const prefs={...((profile&&profile.prefs)||{}),restartNudgeDismissedAt:new Date().toISOString()};
+  profile.prefs=prefs;render();
+  toast("Vamos: tu plan sigue donde ibas");
+  await saveProfilePrefs(prefs);
+}
+async function archiveCompletedCycle(summary,challenge,photoPath,endDate){
   if(!supa||!uid())throw new Error("Sin conexión con tu historial.");
   const currentChallenge=(profile&&profile.prefs&&profile.prefs.challenge)||null;
   const row={
-    user_id:uid(),cycle_number:cycleNumber(),start_date:START,end_date:END,
+    user_id:uid(),cycle_number:cycleNumber(),start_date:START,end_date:validYmd(endDate)&&endDate>=START?endDate:END,
     challenge:currentChallenge,next_challenge:challenge||null,summary:summary||{},photo_path:photoPath||null,
     status:"completed",completed_at:new Date().toISOString(),
   };

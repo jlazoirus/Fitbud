@@ -7,6 +7,7 @@ const ALLOWED_EVENT_TYPES = new Set([
   "session_start",
   "onboarding_complete",
   "onboarding_review",
+  "plan_restart",
   "first_plan_ready",
   "diet_day_generated",
   "diet_day_applied",
