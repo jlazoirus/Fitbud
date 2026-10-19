@@ -11777,6 +11777,7 @@ const ADMIN_COACH_ACTION_LABELS={
   diet_day:"Dieta · día",diet_week:"Dieta · semana",meal_option:"Opción de comida",
   meal_estimate:"Estimar comida",macro_review:"Revisar macros",
   training_plan:"Plan de entrenamiento",training_replacement:"Reemplazo de entrenamiento",
+  coach_conversation:"Conversación con el coach",
 };
 function prettyDateTime(iso){try{const d=new Date(iso);if(isNaN(d))return "—";return d.getDate()+" "+MON[d.getMonth()]+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}catch(e){return "—";}}
 async function adminApi(action,payload){
@@ -12047,8 +12048,9 @@ function openAdminUserQuota(id){
   modal(`<h3>Consumo y cortesía</h3>
     <p class="muted small">${esc(user.email||user.id)}. El límite vacío hereda la política general; las unidades extra se suman solo a esta cuenta. Guardar sin tocar un campo conserva el valor vigente.</p>
     <div class="field"><label for="adminQuotaAction">Acción</label><select id="adminQuotaAction" onchange="fillAdminQuotaFields('${user.id}',this.value)">${options}</select></div>
-    <div class="field"><label for="adminQuotaLimit">Límite diario personalizado (opcional)</label><input id="adminQuotaLimit" type="number" min="0" max="1000" placeholder="Heredar"></div>
-    <div class="field"><label for="adminQuotaBonus">Unidades extra de cortesía</label><input id="adminQuotaBonus" type="number" min="0" max="1000" value="0"></div>
+    <div class="field"><label for="adminQuotaLimit">Límite diario personalizado (opcional)</label><input id="adminQuotaLimit" type="number" inputmode="numeric" min="0" max="10000" placeholder="Heredar" aria-describedby="adminQuotaHint"></div>
+    <div class="field"><label for="adminQuotaBonus">Unidades extra de cortesía</label><input id="adminQuotaBonus" type="number" inputmode="numeric" min="0" max="10000" value="0" aria-describedby="adminQuotaHint"></div>
+    <p class="muted small" id="adminQuotaHint" style="margin-top:-6px">Por día y por acción, de 0 a 10.000.</p>
     <div class="field"><label for="adminQuotaEnabled">Disponibilidad</label><select id="adminQuotaEnabled"><option value="">Heredar política</option><option value="true">Activa</option><option value="false">Desactivada</option></select></div>
     <div class="field"><label for="adminQuotaExpires">Expira (opcional)</label><input id="adminQuotaExpires" type="date"></div>
     <div class="row wrap">
@@ -12060,6 +12062,10 @@ function openAdminUserQuota(id){
 }
 async function saveAdminUserQuota(userId){
   const out=$("#adminQuotaOut"),enabledValue=$("#adminQuotaEnabled").value;
+  for(const id of ["adminQuotaLimit","adminQuotaBonus"]){
+    const input=$("#"+id);
+    if(input&&!input.checkValidity()){if(out)out.textContent="⚠️ "+(id==="adminQuotaLimit"?"El límite diario va de 0 a 10.000 (o vacío para heredar la política).":"Las unidades extra van de 0 a 10.000.");input.focus();return;}
+  }
   if(out)out.textContent="Guardando…";
   try{
     await adminApi("setQuotaOverride",{
