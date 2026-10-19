@@ -36,7 +36,7 @@ test.describe("Entreno", () => {
     expect(totalBloques).toBeGreaterThanOrEqual(5);
 
     // Completar cada bloque como usuario: series en los de fuerza,
-    // "Marcar completado" en calentamiento/cardio/vuelta a la calma.
+    // "Ya calenté"/"Ya terminé" (REQ-212) o "Marcar completado" en los bloques de tiempo.
     let sawStrengthBlock = false;
     for (let bloque = 0; bloque < totalBloques; bloque++) {
       const finalizar = page.getByRole("button", { name: "Finalizar y guardar sesión" });
@@ -51,7 +51,7 @@ test.describe("Entreno", () => {
         for (let s = 0; s < n; s++) await series.nth(s).click();
         await siguiente.click();
       } else {
-        await page.getByRole("button", { name: "Marcar completado" }).click();
+        await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
       }
       await expect(app).toContainText(new RegExp(`${bloque + 1}\\/${totalBloques} bloques`));
     }
@@ -181,7 +181,7 @@ test.describe("Entreno", () => {
           await siguiente.click();
         }
       } else {
-        await page.getByRole("button", { name: "Marcar completado" }).click();
+        await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
       }
       await expect(app).toContainText(new RegExp(`${bloque + 1}\\/${total} bloques`));
     }
@@ -256,7 +256,7 @@ test.describe("Entreno", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
     await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
-    await page.getByRole("button", { name: "Marcar completado" }).click();
+    await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
     await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
 
     // Marcar una serie dispara dos guardados seguidos (serie hecha, luego
@@ -296,7 +296,7 @@ test.describe("Entreno", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
     await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
-    await page.getByRole("button", { name: "Marcar completado" }).click();
+    await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
     await page.locator("#app button.set-done").first().click();
     await expect(app.locator(".workout-timer-value")).toBeVisible();
     const restSeconds = await page.evaluate(() => normalizedWorkoutExecution(current).timer.totalSeconds);
@@ -329,7 +329,7 @@ test.describe("Entreno", () => {
     const app = page.locator("#app");
     await expect(app).toContainText("Entre ejercicios: 2 min de descanso");
     await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
-    await page.getByRole("button", { name: "Marcar completado" }).click();
+    await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
 
     const series = page.locator('#app button.set-done[aria-label^="Serie"]');
     const timerBox = app.locator(".player-timer");
@@ -385,5 +385,38 @@ test.describe("Entreno", () => {
     }
     expect(await page.evaluate(() => normalizedWorkoutExecution(current).timer)).toBeNull();
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
+// REQ-212: el calentamiento dice qué movimientos hacer y el cronómetro es opcional.
+test.describe("Calentamiento guiado", () => {
+  test("lista movimientos concretos, 'Ya calenté' avanza sin cronómetro y 'Guíame' los recorre", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    // El resumen previo (REQ-174) nombra los movimientos del calentamiento
+    await expect(app.locator(".plan-timed").first()).toContainText(/Círculos|Marcha/);
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+
+    const moves = app.locator(".move-list li");
+    expect(await moves.count()).toBeGreaterThanOrEqual(4);
+    await expect(moves.first()).toContainText(/\d/); // cada movimiento trae su dosis
+    await expect(app.locator(".workout-timer-value")).toHaveCount(0); // sin cuenta atrás automática
+
+    // Guíame: recorre movimiento a movimiento, con cronómetro solo si lo pides
+    await page.getByRole("button", { name: "Guíame" }).click();
+    await expect(app).toContainText(/Movimiento 1 de \d/);
+    await page.getByRole("button", { name: "Siguiente" }).click();
+    await expect(app).toContainText(/Movimiento 2 de \d/);
+    await page.getByRole("button", { name: "Anterior" }).click();
+    await expect(app).toContainText(/Movimiento 1 de \d/);
+    await page.getByRole("button", { name: "Ya calenté sin terminar la guía" }).click();
+    await expect(app).toContainText(/1\/\d+ bloques/);
+    await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
+    expect(errors).toEqual([]);
   });
 });

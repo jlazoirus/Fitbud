@@ -91,3 +91,27 @@ assert.equal(custom.steps[1].restSeconds,150);
 assert.equal(custom.objective,"Practicar técnica con carga controlada");
 
 console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporizador y recuperación persistente.");
+
+// REQ-212: calentamiento y vuelta a la calma con movimientos concretos según la zona.
+{
+  const build=slugs=>player.buildPrescription({
+    workout:{id:"x",kind:"Gimnasio",name:"x"},
+    exercises:slugs.map(slug=>catalog.find(item=>item.slug===slug)),
+    context:{week:2,durationWeeks:10,sessionMinutes:60},
+  });
+  const legs=build(["back-squat","romanian-deadlift","walking-lunge"]);
+  const upper=build(["bench-press","seated-cable-row","overhead-press"]);
+  for(const session of [legs,upper]){
+    const warm=session.steps[0],cool=session.steps.at(-1);
+    assert.ok(warm.movements.length>=4&&warm.movements.length<=6,"El calentamiento trae de 4 a 6 movimientos");
+    assert.ok(cool.movements.length>=4,"La vuelta a la calma trae movimientos concretos");
+    assert.ok([...warm.movements,...cool.movements].every(m=>m.name&&m.dose),"Cada movimiento tiene nombre y dosis");
+  }
+  const names=step=>step.movements.map(m=>m.name).join("|");
+  assert.notEqual(names(legs.steps[0]),names(upper.steps[0]),"Piernas y tren superior calientan distinto");
+  assert.match(names(legs.steps[0]),/cadera|Sentadilla/,"Piernas calienta cadera y rodillas");
+  assert.match(names(upper.steps[0]),/brazos|pared/,"Tren superior calienta hombros");
+  const run=player.buildPrescription({workout:{id:"base",kind:"Correr",name:"r",sport:"running"},exercises:[],context:{sessionMinutes:45}});
+  assert.ok(run.steps[0].movements.length>=3&&run.steps.at(-1).movements.length>=3,"El cardio también lista movimientos");
+  console.log("REQ-212: calentamiento y vuelta a la calma con movimientos por zona.");
+}

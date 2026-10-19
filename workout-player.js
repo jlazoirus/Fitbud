@@ -56,6 +56,70 @@
         : `Carga controlable que deje ${phase.rir} repeticiones en reserva`,
     };
   }
+  // REQ-212: calentamiento y vuelta a la calma con movimientos concretos y
+  // dosis, elegidos por la zona que trabaja la sesión. Ninguno es de impacto ni
+  // invertido, así que sirven también en modo suave (REQ-116).
+  const mv=(name,dose,seconds)=>seconds?{name,dose,seconds}:{name,dose};
+  const MOVES={
+    march:mv("Marcha en el sitio subiendo rodillas","1 min",60),
+    armCircles:mv("Círculos de brazos","10 hacia delante y 10 hacia atrás"),
+    chestOpen:mv("Abrir y cerrar los brazos a la altura del pecho","12 repeticiones"),
+    trunkRotation:mv("Rotación de tronco de pie","8 por lado"),
+    wallPushUp:mv("Flexiones contra la pared","10 lentas"),
+    catCamel:mv("Gato-camello en cuatro apoyos","8 lentas"),
+    hipCircles:mv("Círculos de cadera","8 por lado"),
+    legSwing:mv("Balanceo de pierna adelante y atrás, con apoyo","10 por pierna"),
+    airSquat:mv("Sentadilla sin peso, lenta","10 repeticiones"),
+    gluteBridge:mv("Puente de glúteo","12 repeticiones"),
+    ankleCircles:mv("Círculos de tobillo","10 por lado"),
+    kneeHug:mv("Rodilla al pecho caminando","8 por pierna"),
+    rampSet:mv("Serie ligera del primer ejercicio","8-10 repeticiones, mucho más fácil que las de trabajo"),
+    chestStretch:mv("Estiramiento de pecho en el marco de una puerta","30 s por lado",30),
+    shoulderCross:mv("Hombro cruzado delante del pecho","30 s por lado",30),
+    tricepsStretch:mv("Tríceps por encima de la cabeza","30 s por lado",30),
+    childPose:mv("Postura del niño","45 s",45),
+    quadStretch:mv("Cuádriceps de pie, con apoyo","30 s por lado",30),
+    hamstringStretch:mv("Isquiotibiales sentado, pierna estirada","30 s por lado",30),
+    figureFour:mv("Glúteo en figura 4, tumbado boca arriba","30 s por lado",30),
+    calfStretch:mv("Gemelos contra la pared","30 s por lado",30),
+    breathing:mv("Respiración lenta: inhala 4 s, exhala 6 s","1 min",60),
+  };
+  const LOWER_PATTERNS=new Set(["squat","hinge","lunge","bridge","calf"]);
+  const UPPER_PATTERNS=new Set(["push","pull"]);
+  const LOWER_MUSCLES=/cuádriceps|isquio|glúteo|pantorr|gemelo|aductor/i;
+  function sessionFocus(exercises){
+    let lower=0,upper=0;
+    (exercises||[]).forEach(exercise=>{
+      const pattern=exercise&&exercise.movement_pattern;
+      if(LOWER_PATTERNS.has(pattern))lower++;
+      else if(UPPER_PATTERNS.has(pattern))upper++;
+      else if(pattern==="isolation")(LOWER_MUSCLES.test((exercise.muscles||[]).join(" "))?lower++:upper++);
+    });
+    if(lower&&!upper)return "lower";
+    if(upper&&!lower)return "upper";
+    return "full";
+  }
+  function strengthMovements(phase,focus){
+    const m=MOVES;
+    if(phase==="warmup"){
+      const base={
+        lower:[m.march,m.hipCircles,m.legSwing,m.airSquat,m.gluteBridge],
+        upper:[m.armCircles,m.chestOpen,m.trunkRotation,m.wallPushUp,m.catCamel],
+        full:[m.march,m.armCircles,m.hipCircles,m.trunkRotation,m.airSquat],
+      }[focus];
+      return base.concat([m.rampSet]);
+    }
+    return {
+      lower:[m.quadStretch,m.hamstringStretch,m.figureFour,m.calfStretch,m.breathing],
+      upper:[m.chestStretch,m.shoulderCross,m.tricepsStretch,m.childPose,m.breathing],
+      full:[m.quadStretch,m.hamstringStretch,m.chestStretch,m.childPose,m.breathing],
+    }[focus];
+  }
+  function cardioMovements(phase,sport,easyName,target){
+    const m=MOVES,easy=mv(easyName,target);
+    if(sport==="swimming")return phase==="warmup"?[m.armCircles,m.trunkRotation,easy]:[easy,m.shoulderCross,m.breathing];
+    return phase==="warmup"?[m.ankleCircles,m.legSwing,m.kneeHug,easy]:[easy,m.calfStretch,m.quadStretch,m.breathing];
+  }
   function timedStep(id,phase,label,target,intensity,durationSeconds,extra){
     return Object.assign({
       id,
@@ -81,7 +145,8 @@
     const cooldownSeconds=sport==="swimming"?300:600;
     const warmupTarget=sport==="swimming"?"200-300 m suaves":`${Math.round(warmupSeconds/60)} min suaves`;
     const cooldownTarget=sport==="swimming"?"200 m suaves":`${Math.round(cooldownSeconds/60)} min suaves`;
-    const steps=[timedStep("warmup","warmup",labels.warmup,warmupTarget,"RPE 2-3",warmupSeconds)];
+    const easyVerb=sport==="swimming"?"Nado suave":sport==="cycling"?"Pedaleo suave":sport==="walking"?"Caminata suave":"Trote suave";
+    const steps=[timedStep("warmup","warmup",labels.warmup,warmupTarget,"RPE 2-3",warmupSeconds,{movements:cardioMovements("warmup",sport,easyVerb,warmupTarget)})];
 
     if(sessionId==="calidad"){
       const quality={
@@ -148,7 +213,7 @@
       steps.push(timedStep("endurance","main",labels.easy,(targets[sport]||targets.running)[phase],"RPE 3-5",mainSeconds));
     }
 
-    steps.push(timedStep("cooldown","cooldown",labels.cooldown,cooldownTarget,"RPE 1-2",cooldownSeconds));
+    steps.push(timedStep("cooldown","cooldown",labels.cooldown,cooldownTarget,"RPE 1-2",cooldownSeconds,{movements:cardioMovements("cooldown",sport,easyVerb,cooldownTarget)}));
     return steps;
   }
   function generatedStrengthSteps(workout,exercises,context){
@@ -156,10 +221,14 @@
     const bySlug=new Map(exercises.map(exercise=>[exercise.slug,exercise]));
     const warmupMinutes=clamp(Math.round(number(custom.durationMinutes||context.sessionMinutes,60)*.12),5,10);
     const cooldownMinutes=clamp(Math.round(number(custom.durationMinutes||context.sessionMinutes,60)*.08),4,8);
-    // REQ-177: un plan del coach puede traer su propio calentamiento por día.
+    // REQ-177: un plan del coach puede traer su propio calentamiento por día;
+    // REQ-212: se muestra como indicación junto a los movimientos concretos.
+    const focus=sessionFocus((custom.exercises||[]).map(dose=>bySlug.get(dose.exerciseId)).filter(Boolean));
+    const coachWarmup=String(custom.warmup||"").trim();
     const steps=[timedStep(
       "warmup","warmup","Calentamiento",
-      String(custom.warmup||"").trim()||"Movilidad dinámica y series de aproximación de los primeros movimientos","RPE 2-3",warmupMinutes*60
+      coachWarmup||"Movilidad y una serie ligera para preparar las articulaciones","RPE 2-3",warmupMinutes*60,
+      {movements:strengthMovements("warmup",focus),coachNote:coachWarmup}
     )];
     (custom.exercises||[]).forEach((dose,index)=>{
       const exercise=bySlug.get(dose.exerciseId)||{};
@@ -188,20 +257,26 @@
     });
     steps.push(timedStep(
       "cooldown","cooldown","Vuelta a la calma",
-      "Respiración tranquila y movilidad suave de las zonas trabajadas","RPE 1-2",cooldownMinutes*60
+      "Estiramientos suaves de las zonas trabajadas y respiración lenta","RPE 1-2",cooldownMinutes*60,
+      {movements:strengthMovements("cooldown",focus)}
     ));
     return steps;
   }
   function generatedCardioSteps(workout){
     const blocks=workout.generatedPrescription&&Array.isArray(workout.generatedPrescription.blocks)
       ?workout.generatedPrescription.blocks:[];
+    const sport=String(workout.sport||workout.kind||"").toLowerCase();
+    const easyVerb=sport==="swimming"?"Nado suave":sport==="cycling"?"Pedaleo suave":sport==="walking"?"Caminata suave":"Trote suave";
     return blocks.map((block,index)=>timedStep(
       `generated-${index+1}`,
       block.phase,
       block.label,
       block.target,
       block.intensity,
-      block.durationSeconds
+      block.durationSeconds,
+      block.phase==="warmup"||block.phase==="cooldown"
+        ?{movements:cardioMovements(block.phase,sport,easyVerb,String(block.target||"").trim()||"5 min")}
+        :undefined
     ));
   }
   function buildPrescription(input){
@@ -239,9 +314,11 @@
       const phase=phaseSettings(context.week,context.durationWeeks);
       const warmupMinutes=clamp(Math.round(number(context.sessionMinutes,60)*.12),5,10);
       const cooldownMinutes=clamp(Math.round(number(context.sessionMinutes,60)*.08),4,8);
+      const focus=sessionFocus(exercises);
       const steps=[timedStep(
         "warmup","warmup","Calentamiento",
-        "Movilidad dinámica y 1-2 series ligeras de los primeros movimientos","RPE 2-3",warmupMinutes*60
+        "Movilidad y una serie ligera para preparar las articulaciones","RPE 2-3",warmupMinutes*60,
+        {movements:strengthMovements("warmup",focus)}
       )];
       exercises.forEach((exercise,index)=>{
         const dose=strengthDose(exercise,phase);
@@ -257,7 +334,8 @@
       });
       steps.push(timedStep(
         "cooldown","cooldown","Vuelta a la calma",
-        "Respiración tranquila y movilidad suave de las zonas trabajadas","RPE 1-2",cooldownMinutes*60
+        "Estiramientos suaves de las zonas trabajadas y respiración lenta","RPE 1-2",cooldownMinutes*60,
+        {movements:strengthMovements("cooldown",focus)}
       ));
       return {
         version:VERSION,
@@ -415,6 +493,7 @@
   root.FITBUD_WORKOUT_PLAYER={
     VERSION,
     buildPrescription,
+    sessionFocus,
     createExecution,
     normalizeExecution,
     elapsedSeconds,

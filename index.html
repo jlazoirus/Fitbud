@@ -290,6 +290,13 @@
   .player-timer{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px;background:var(--black);border:1px solid var(--border);border-radius:var(--r-md);margin:12px 0}
   .workout-timer-value{font-family:var(--font-mono);font-size:44px;font-weight:700;letter-spacing:-.04em}
   .player-controls{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}
+  /* REQ-212: movimientos de calentamiento y vuelta a la calma */
+  .move-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;counter-reset:mv}
+  .move-list li{display:grid;grid-template-columns:22px 1fr;gap:8px;align-items:baseline;font-size:14px;line-height:1.35;counter-increment:mv}
+  .move-list li::before{content:counter(mv);font-family:var(--font-display);font-size:12px;color:var(--muted)}
+  .move-list .dose{display:block;color:var(--muted);font-size:13px}
+  .move-now{margin-top:12px;padding:14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1)}
+  .move-now h4{font-size:18px;margin:4px 0 2px;line-height:1.25}
   .player-controls .btn{min-height:48px;border-radius:var(--r-md);white-space:normal}
   .player-controls .primary{grid-column:1 / -1}
   .set-list{display:grid;gap:8px;margin-top:12px}
@@ -4987,6 +4994,7 @@ function finishTimedWorkoutStep(ds,skipped){
 function skipWorkoutTimer(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution||!execution.timer)return;
   if(execution.timer.kind==="step")return finishTimedWorkoutStep(ds,true);
+  if(execution.timer.kind==="move"){execution.timer=null;persistWorkoutExecution(ds,execution,true);return;}
   execution.timer=null;persistWorkoutExecution(ds,execution,true);toast("Descanso omitido");
 }
 // REQ-185: series prescritas sin marcar (las extra sin hacer no cuentan).
@@ -5222,17 +5230,71 @@ function workoutTimerTick(){
   workoutTimerCompleting=true;
   const kind=execution.timer.kind;
   if(kind==="step")finishTimedWorkoutStep(current,false);
+  else if(kind==="move"){execution.timer=null;persistWorkoutExecution(current,execution,true);toast("Tiempo cumplido");}
   else{
     execution.timer=null;persistWorkoutExecution(current,execution,true);toast("Descanso terminado");
   }
   setTimeout(()=>{workoutTimerCompleting=false;},250);
 }
+// REQ-212: el calentamiento y la vuelta a la calma dicen qué hacer; el
+// cronómetro es opcional (por movimiento) y "Ya calenté" marca el bloque.
+function renderMovementStep(ds,execution,step,stepIndex){
+  const moves=step.movements;
+  const warm=step.phase==="warmup";
+  const minutes=Math.max(1,Math.round((+step.durationSeconds||0)/60));
+  const head=`<div class="player-phase">${workoutPhaseLabel(step.phase)} · bloque ${stepIndex+1} de ${execution.steps.length}</div>
+    <h3>${esc(step.label)}</h3>
+    <div class="muted small">Unos ${minutes} min · esfuerzo suave (${esc(step.intensity)})</div>
+    ${step.coachNote?`<div class="alert violet" style="margin-top:10px">Indicación de tu coach: ${esc(step.coachNote)}</div>`:""}`;
+  const doneLabel=warm?"Ya calenté":"Ya terminé";
+  const guide=Number.isInteger(step.guideIndex)?Math.max(0,Math.min(moves.length-1,step.guideIndex)):null;
+  if(guide==null){
+    return `<div class="player-step">${head}
+      <ol class="move-list">${moves.map(m=>`<li><span><b>${esc(m.name)}</b><span class="dose">${esc(m.dose)}</span></span></li>`).join("")}</ol>
+      <div class="player-controls">
+        <button class="btn btn-accent" onclick="startMovementGuide('${ds}')">Guíame</button>
+        <button class="btn" onclick="completeWorkoutStep('${ds}')">${doneLabel}</button>
+      </div>
+      <button class="btn btn-sm" style="width:100%;margin-top:8px" onclick="skipWorkoutStep('${ds}')">Omitir bloque</button>
+    </div>`;
+  }
+  const move=moves[guide],last=guide===moves.length-1;
+  const moveTimer=execution.timer&&execution.timer.kind==="move"?renderWorkoutTimer(ds,execution,step):"";
+  return `<div class="player-step">${head}
+    <div class="move-now">
+      <div class="muted small">Movimiento ${guide+1} de ${moves.length}</div>
+      <h4>${esc(move.name)}</h4>
+      <div>${esc(move.dose)}</div>
+      ${moveTimer||(move.seconds?`<button class="btn btn-sm" style="width:100%;margin-top:10px" onclick="startMovementTimer('${ds}',${Math.round(move.seconds)})">Cronómetro de ${Math.round(move.seconds)} s (opcional)</button>`:"")}
+    </div>
+    <div class="player-controls">
+      <button class="btn" ${guide===0?"disabled":""} onclick="moveMovementGuide('${ds}',-1)">Anterior</button>
+      ${last?`<button class="btn btn-accent" onclick="completeWorkoutStep('${ds}')">${doneLabel}</button>`
+        :`<button class="btn btn-accent" onclick="moveMovementGuide('${ds}',1)">Siguiente</button>`}
+    </div>
+    <button class="btn btn-sm" style="width:100%;margin-top:8px" onclick="completeWorkoutStep('${ds}')">${doneLabel} sin terminar la guía</button>
+  </div>`;
+}
+function startMovementGuide(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step||!Array.isArray(step.movements))return;
+  step.guideIndex=0;execution.timer=null;
+  persistWorkoutExecution(ds,execution,true);
+}
+function moveMovementGuide(ds,delta){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step||!Array.isArray(step.movements))return;
+  step.guideIndex=Math.max(0,Math.min(step.movements.length-1,(Number(step.guideIndex)||0)+delta));
+  if(execution.timer&&execution.timer.kind==="move")execution.timer=null;
+  persistWorkoutExecution(ds,execution,true);
+}
+function startMovementTimer(ds,seconds){startWorkoutTimer(ds,seconds,"move");}
 function renderWorkoutTimer(ds,execution,step){
   const timer=execution.timer;
   if(!timer)return `<button class="btn btn-accent" style="width:100%;min-height:48px" onclick="startCurrentWorkoutStep('${ds}')">Iniciar bloque</button>`;
   const remaining=WORKOUT_PLAYER.timerRemaining(timer,Date.now());
   return `<div class="player-timer">
-    <div class="muted small">${timer.kind==="rest"?(timer.transition?"Descanso entre ejercicios":"Descanso"):"Tiempo del bloque"}</div>
+    <div class="muted small">${timer.kind==="rest"?(timer.transition?"Descanso entre ejercicios":"Descanso"):timer.kind==="move"?"Tiempo del movimiento":"Tiempo del bloque"}</div>
     <div class="workout-timer-value">${formatWorkoutTime(remaining)}</div>
     <div class="row wrap" style="justify-content:center">
       <button class="btn btn-sm" onclick="toggleWorkoutTimer('${ds}')">${timer.running?"Pausar":"Reanudar"}</button>
@@ -5283,6 +5345,7 @@ function renderActiveWorkoutStep(ds,execution){
   const step=currentWorkoutStep(execution);
   if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza la sesión para guardar el resultado.</div>';
   const stepIndex=execution.steps.indexOf(step);
+  if(step.type==="timed"&&Array.isArray(step.movements)&&step.movements.length)return renderMovementStep(ds,execution,step,stepIndex);
   if(step.type==="timed"){
     return `<div class="player-step">
       <div class="player-phase">${workoutPhaseLabel(step.phase)} · bloque ${stepIndex+1} de ${execution.steps.length}</div>
@@ -5392,7 +5455,8 @@ function workoutPlanSummaryHtml(prescription){
         <div class="plan-dose"><span>${step.prescribedSets} × ${esc(step.reps)}</span><span>Descanso ${esc(step.restLabel||formatRestShort(step.restSeconds))}</span><span>RPE ${esc(step.targetRpe)}/10</span></div></div></li>`;
     }
     const minutes=Math.max(1,Math.round((+step.durationSeconds||0)/60));
-    return `<li class="plan-row plan-timed"><span class="plan-n">·</span><div class="plan-main"><b>${esc(step.label)}</b><div class="plan-dose"><span>${minutes} min</span></div></div></li>`;
+    const moves=Array.isArray(step.movements)?step.movements.map(m=>m.name).join(" · "):"";
+    return `<li class="plan-row plan-timed"><span class="plan-n">·</span><div class="plan-main"><b>${esc(step.label)}</b><div class="plan-dose"><span>${minutes} min</span></div>${moves?`<div class="muted small" style="margin-top:2px">${esc(moves)}</div>`:""}</div></li>`;
   }).join("");
   const sets=steps.filter(step=>step.type==="strength").reduce((sum,step)=>sum+(+step.prescribedSets||0),0);
   return `<div class="plan-summary"><div class="muted small">Qué vas a hacer hoy · ${n} ejercicios · ${sets} series${prescription.durationLabel?` · ${esc(prescription.durationLabel)}`:prescription.estimatedMinutes?` · ~${prescription.estimatedMinutes} min`:""}</div><ol class="plan-list">${rows}</ol>

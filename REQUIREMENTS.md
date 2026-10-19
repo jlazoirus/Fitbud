@@ -73,7 +73,7 @@ Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la b
 - REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (P0; espera captura para reproducir)
 - REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1; implementado)
 - REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1; implementado)
-- REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1)
+- REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1; implementado)
 - REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1)
 - REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1)
 - REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar". (P2)
@@ -1484,49 +1484,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-211`).
 
 ## REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional
 
-**Estado: pendiente.**
+**Estado: implementado.** Calentamiento y vuelta a la calma con 4-6 movimientos concretos según la zona de la sesión; "Guíame" movimiento a movimiento con cronómetro opcional, o "Ya calenté".
 
-### Origen
-
-Feedback beta de Jonathan (2026-10-18): alguien ajeno al entrenamiento no sabe cómo calentar. El calentamiento y la vuelta a la calma deben decir exactamente qué hacer, y el cronómetro debería ser opcional: que la persona elija cómo hacerlo.
-
-### Problema
-
-Una persona sin experiencia ve "Calentamiento · Movilidad dinámica y series de aproximación" y una cuenta atrás de 5 a 10 minutos, pero no sabe qué movimientos hacer. La cuenta atrás se presenta como el camino principal.
-
-### Causa raíz
-
-- `workout-player.js:159-162` y `workout-player.js:240-245`: el calentamiento de fuerza es un único bloque con el texto "Movilidad dinámica y series de aproximación de los primeros movimientos" (o el `warmup` libre del coach, REQ-177). `workout-player.js:189-191` y `workout-player.js:259-261` hacen lo mismo con "Respiración tranquila y movilidad suave de las zonas trabajadas". No hay movimientos, repeticiones ni demostración.
-- `index.html:5254-5264` + `index.html:5200`: el bloque cronometrado muestra solo "Objetivo / Intensidad", y su botón principal es "Iniciar bloque" (cuenta atrás). "Marcar completado" queda como secundario, así que parece obligatorio usar el cronómetro.
-
-### Objetivo
-
-El usuario ve una lista corta de movimientos con dosis ("Círculos de cadera · 10 por lado") y demostración. Elige entre hacerlo guiado (con tiempo por movimiento) o marcarlo hecho.
-
-### Alcance
-
-1. Catálogo de movimientos de calentamiento y vuelta a la calma (en `exercise-catalog.js`, rol `warmup`/`cooldown`, con media si existe), elegidos por los grupos musculares y el patrón de la sesión (tren inferior, superior, cuerpo completo, cardio). De 4 a 6 movimientos, con dosis en reps o segundos.
-2. `generatedStrengthSteps()` y el cardio: el paso `warmup`/`cooldown` lleva `movements:[{slug,name,dose}]`. Si el coach trae `warmup` propio (REQ-177), se muestra como nota y se mantienen los movimientos concretos.
-3. Reproductor: dos acciones del mismo peso, "Guíame" (avanza movimiento a movimiento, con cuenta atrás opcional) y "Ya calenté" (marca hecho). Sin cuenta atrás automática.
-4. Resumen previo (REQ-174): el calentamiento lista sus movimientos.
-
-### Fuera de alcance
-
-- Grabar videos nuevos (reusar media del catálogo o la Free Exercise DB).
-
-### Riesgos
-
-- Modo suave (REQ-116): sin movimientos de impacto ni invertidos. Historial: las sesiones ya ejecutadas conservan su paso antiguo.
-
-### Criterios de aceptación
-
-- Una sesión de piernas muestra de 4 a 6 movimientos de calentamiento de tren inferior con dosis; una de tren superior, otros distintos.
-- Se puede completar el calentamiento sin iniciar ningún cronómetro.
-- `validate-training-plan.mjs` y `tests/e2e/entreno.spec.js` en verde.
-
-### Verificación sugerida
-
-- E2E nuevo: "Ya calenté" avanza sin timer; "Guíame" recorre los movimientos.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-212`).
 
 ## REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe
 

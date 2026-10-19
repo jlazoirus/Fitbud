@@ -9164,3 +9164,55 @@ Cada opción dice qué consigue y qué implica, en una línea, sin jerga.
 1. `GOAL_OPTIONS` (label + ayuda) en el paso 2 del onboarding (`#obGoalHelp`) y en el resumen de Perfil; valores internos intactos.
 2. `TRAINING_SAFETY_MODE_LABELS`/`TRAINING_SAFETY_MODE_HELP`: "Intensidad del entreno" con ayuda que cambia al elegir (`updateSafetyModeHelp()`) y modal `explainTrainingIntensity()`; avisos de edad sin "plan completo". SW v96.
 3. `validate-onboarding-copy.mjs`, `onboarding.spec.js` y `CONTEXT.md` actualizados.
+
+## REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): alguien ajeno al entrenamiento no sabe cómo calentar. El calentamiento y la vuelta a la calma deben decir exactamente qué hacer, y el cronómetro debería ser opcional: que la persona elija cómo hacerlo.
+
+### Problema
+
+Una persona sin experiencia ve "Calentamiento · Movilidad dinámica y series de aproximación" y una cuenta atrás de 5 a 10 minutos, pero no sabe qué movimientos hacer. La cuenta atrás se presenta como el camino principal.
+
+### Causa raíz
+
+- `workout-player.js:159-162` y `workout-player.js:240-245`: el calentamiento de fuerza es un único bloque con el texto "Movilidad dinámica y series de aproximación de los primeros movimientos" (o el `warmup` libre del coach, REQ-177). `workout-player.js:189-191` y `workout-player.js:259-261` hacen lo mismo con "Respiración tranquila y movilidad suave de las zonas trabajadas". No hay movimientos, repeticiones ni demostración.
+- `index.html:5254-5264` + `index.html:5200`: el bloque cronometrado muestra solo "Objetivo / Intensidad", y su botón principal es "Iniciar bloque" (cuenta atrás). "Marcar completado" queda como secundario, así que parece obligatorio usar el cronómetro.
+
+### Objetivo
+
+El usuario ve una lista corta de movimientos con dosis ("Círculos de cadera · 10 por lado") y demostración. Elige entre hacerlo guiado (con tiempo por movimiento) o marcarlo hecho.
+
+### Alcance
+
+1. Catálogo de movimientos de calentamiento y vuelta a la calma (en `exercise-catalog.js`, rol `warmup`/`cooldown`, con media si existe), elegidos por los grupos musculares y el patrón de la sesión (tren inferior, superior, cuerpo completo, cardio). De 4 a 6 movimientos, con dosis en reps o segundos.
+2. `generatedStrengthSteps()` y el cardio: el paso `warmup`/`cooldown` lleva `movements:[{slug,name,dose}]`. Si el coach trae `warmup` propio (REQ-177), se muestra como nota y se mantienen los movimientos concretos.
+3. Reproductor: dos acciones del mismo peso, "Guíame" (avanza movimiento a movimiento, con cuenta atrás opcional) y "Ya calenté" (marca hecho). Sin cuenta atrás automática.
+4. Resumen previo (REQ-174): el calentamiento lista sus movimientos.
+
+### Fuera de alcance
+
+- Grabar videos nuevos (reusar media del catálogo o la Free Exercise DB).
+
+### Riesgos
+
+- Modo suave (REQ-116): sin movimientos de impacto ni invertidos. Historial: las sesiones ya ejecutadas conservan su paso antiguo.
+
+### Criterios de aceptación
+
+- Una sesión de piernas muestra de 4 a 6 movimientos de calentamiento de tren inferior con dosis; una de tren superior, otros distintos.
+- Se puede completar el calentamiento sin iniciar ningún cronómetro.
+- `validate-training-plan.mjs` y `tests/e2e/entreno.spec.js` en verde.
+
+### Verificación sugerida
+
+- E2E nuevo: "Ya calenté" avanza sin timer; "Guíame" recorre los movimientos.
+
+### Implementación
+
+1. `workout-player.js`: `MOVES`, `sessionFocus()` (inferior/superior/completo por patrón y músculos), `strengthMovements()` y `cardioMovements()`; los pasos `warmup`/`cooldown` (plantilla, plan del coach y cardio) llevan `movements:[{name,dose,seconds?}]`. El calentamiento propio del coach (REQ-177) queda como `coachNote`. Sin movimientos de impacto ni invertidos.
+2. `index.html`: `renderMovementStep()` (lista, "Guíame"/"Ya calenté"/"Omitir bloque"; guía con Anterior/Siguiente y cronómetro opcional `kind:"move"` que no cierra el bloque); el resumen previo nombra los movimientos. SW v97.
+3. Pruebas: `validate-workout-player.mjs` (movimientos por zona) y `entreno.spec.js` ("Calentamiento guiado").
