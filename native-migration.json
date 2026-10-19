@@ -1,0 +1,1204 @@
+{
+  "version": 1,
+  "name": "evolv-native-migration",
+  "branch": "main",
+  "plan": "docs/native-migration/PLAN.md",
+  "backlog": "docs/native-migration/BACKLOG.md",
+  "runbook": "NATIVE_AGENT.md",
+  "statuses": [
+    "pendiente",
+    "en_curso",
+    "hecho",
+    "bloqueado"
+  ],
+  "claimStaleDays": 3,
+  "phases": {
+    "0": "Decisiones",
+    "1": "Núcleo compartido",
+    "2": "Backend para clientes nativos",
+    "3": "Fundación nativa",
+    "4": "Paridad por journey",
+    "5": "Valor nativo",
+    "6": "QA, beta y lanzamiento"
+  },
+  "tasks": [
+    {
+      "id": "NAT-H1",
+      "title": "Aprobar ADR-001: Expo / React Native en native/",
+      "phase": 0,
+      "track": "decision",
+      "human": true,
+      "deps": [],
+      "paths": [
+        "docs/native-migration/ADR-001-stack.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-H2",
+      "title": "Cuentas Apple Developer y Google Play; bundle id y Team ID",
+      "phase": 0,
+      "track": "decision",
+      "human": true,
+      "deps": [
+        "NAT-H1"
+      ],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-H3",
+      "title": "Modelo de cobro dentro de las apps (compra integrada vs. sin compra in-app)",
+      "phase": 0,
+      "track": "decision",
+      "human": true,
+      "deps": [],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-H4",
+      "title": "Revisión legal de privacidad para tiendas y excepción acotada a REQ-31",
+      "phase": 0,
+      "track": "decision",
+      "human": true,
+      "deps": [],
+      "paths": [
+        "docs/native-migration/decisions.md",
+        "PRIVACY.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-H5",
+      "title": "Credenciales Expo/EAS, Firebase (FCM) y llave APNs",
+      "phase": 0,
+      "track": "decision",
+      "human": true,
+      "deps": [
+        "NAT-H1",
+        "NAT-H2"
+      ],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-H6",
+      "title": "Aplicar en producción las migraciones SQL de la migración nativa",
+      "phase": 6,
+      "track": "decision",
+      "human": true,
+      "deps": [
+        "NAT-11"
+      ],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-H7",
+      "title": "Aprobar fichas de tienda, capturas, clasificación y formularios de privacidad",
+      "phase": 6,
+      "track": "decision",
+      "human": true,
+      "deps": [
+        "NAT-62",
+        "NAT-H4"
+      ],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-H8",
+      "title": "Go/no-go: envío a beta y a público; convivencia con la PWA",
+      "phase": 6,
+      "track": "decision",
+      "human": true,
+      "deps": [
+        "NAT-63",
+        "NAT-H7"
+      ],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-01",
+      "title": "Inventario del dominio que vive en index.html y plan de extracción",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [],
+      "paths": [
+        "docs/native-migration/core-inventory.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-02",
+      "title": "Validador de portabilidad de módulos puros (Node/Hermes, sin DOM)",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [],
+      "paths": [
+        "scripts/validate-shared-modules.mjs",
+        "scripts/release-gate.mjs"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-03",
+      "title": "Extraer modelo de día a js/day-model.js",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-01",
+        "NAT-02"
+      ],
+      "paths": [
+        "js/day-model.js",
+        "scripts/validate-day-model.mjs",
+        "index.html",
+        "service-worker.js",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-04",
+      "title": "Extraer calendario de ciclo y metas a js/plan-calendar.js",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-01",
+        "NAT-02"
+      ],
+      "paths": [
+        "js/plan-calendar.js",
+        "scripts/validate-plan-calendar.mjs",
+        "index.html",
+        "service-worker.js",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-05",
+      "title": "Extraer racha, adherencia y recap a js/progress-metrics.js",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-01",
+        "NAT-02"
+      ],
+      "paths": [
+        "js/progress-metrics.js",
+        "scripts/validate-progress-metrics.mjs",
+        "index.html",
+        "service-worker.js",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-06",
+      "title": "Extraer cola offline y sync de day_log/weight_log a js/sync-queue.js con storage inyectado",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-01",
+        "NAT-02"
+      ],
+      "paths": [
+        "js/sync-queue.js",
+        "scripts/validate-sync-queue.mjs",
+        "index.html",
+        "service-worker.js",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-07",
+      "title": "Extraer cliente de /api/* a js/api-client.js con baseUrl y token inyectados",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-01",
+        "NAT-02"
+      ],
+      "paths": [
+        "js/api-client.js",
+        "scripts/validate-api-client.mjs",
+        "index.html",
+        "service-worker.js",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-08",
+      "title": "Extraer modelo de perfil y onboarding a js/profile-model.js",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-01",
+        "NAT-02"
+      ],
+      "paths": [
+        "js/profile-model.js",
+        "scripts/validate-profile-model.mjs",
+        "index.html",
+        "service-worker.js",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-09",
+      "title": "Extraer orquestación de preparación de planes a js/plan-orchestrator.js",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-03",
+        "NAT-04",
+        "NAT-07",
+        "NAT-08"
+      ],
+      "paths": [
+        "js/plan-orchestrator.js",
+        "scripts/validate-plan-orchestrator.mjs",
+        "index.html",
+        "service-worker.js",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-10",
+      "title": "API lista para clientes nativos: cabeceras de cliente/versión, config nativa y analytics",
+      "phase": 2,
+      "track": "backend",
+      "human": false,
+      "deps": [],
+      "paths": [
+        "api/config.js",
+        "api/analytics.js",
+        "supabase/analytics.sql",
+        "scripts/test-native-api-headers.mjs",
+        "scripts/release-gate.mjs"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-11",
+      "title": "Push nativo: tokens de dispositivo, suscripción y envío vía Expo Push",
+      "phase": 2,
+      "track": "backend",
+      "human": false,
+      "deps": [],
+      "paths": [
+        "supabase/native_push_tokens.sql",
+        "supabase/schema.sql",
+        "api/push-subscribe.js",
+        "api/notify.js",
+        "scripts/test-native-push.mjs",
+        "scripts/release-gate.mjs"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-12",
+      "title": "Deep links y Universal/App Links para correos de auth",
+      "phase": 2,
+      "track": "backend",
+      "human": false,
+      "deps": [
+        "NAT-H2"
+      ],
+      "paths": [
+        ".well-known/**",
+        "vercel.json",
+        ".vercelignore",
+        "scripts/validate-deploy-allowlist.mjs",
+        "scripts/validate-native-links.mjs",
+        "scripts/release-gate.mjs"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-13",
+      "title": "Entitlements multi-origen y webhook de compras de tienda",
+      "phase": 2,
+      "track": "backend",
+      "human": false,
+      "deps": [
+        "NAT-H3"
+      ],
+      "paths": [
+        "supabase/native_entitlements.sql",
+        "api/store-webhook.js",
+        "api/entitlement.js",
+        "scripts/test-store-webhook.mjs",
+        "scripts/release-gate.mjs"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-20",
+      "title": "Scaffold de la app Expo en native/ con TS, expo-router, lint, tests y perfiles EAS",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-H1"
+      ],
+      "paths": [
+        "native/**"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-21",
+      "title": "Puente tipado hacia los módulos de dominio de la raíz",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20",
+        "NAT-02"
+      ],
+      "paths": [
+        "native/src/core/**",
+        "native/metro.config.js"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-22",
+      "title": "Design system Evolv nativo: tokens, tipografías y componentes base",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20"
+      ],
+      "paths": [
+        "native/src/ui/**",
+        "native/assets/fonts/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-23",
+      "title": "Auth y sesión: login, registro, recuperación, invitación y cierre de sesión",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20",
+        "NAT-21"
+      ],
+      "paths": [
+        "native/app/(auth)/**",
+        "native/src/features/auth/**",
+        "native/src/data/supabase.ts",
+        "native/src/data/session/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-24",
+      "title": "Capa de datos offline: repositorios, cola de sync y aislamiento por usuario",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-21",
+        "NAT-23",
+        "NAT-06",
+        "NAT-07"
+      ],
+      "paths": [
+        "native/src/data/**"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-25",
+      "title": "Shell de navegación, tabs y gating auth → consentimiento → onboarding → app",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-22",
+        "NAT-23"
+      ],
+      "paths": [
+        "native/app/_layout.tsx",
+        "native/app/(tabs)/_layout.tsx",
+        "native/src/navigation/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-26",
+      "title": "Telemetría y reporte de errores sin datos sensibles",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-25",
+        "NAT-10"
+      ],
+      "paths": [
+        "native/src/telemetry/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-27",
+      "title": "CI nativo en GitHub Actions (typecheck, lint, tests, validadores compartidos)",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20"
+      ],
+      "paths": [
+        ".github/workflows/native-ci.yml"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-28",
+      "title": "Validador REQ-31 para textos de la app nativa",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20"
+      ],
+      "paths": [
+        "scripts/validate-native-copy.mjs",
+        "scripts/release-gate.mjs"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-30",
+      "title": "Onboarding, consentimientos y evaluación de seguridad",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-25",
+        "NAT-24",
+        "NAT-08"
+      ],
+      "paths": [
+        "native/src/features/onboarding/**",
+        "native/app/(tabs)/onboarding/**",
+        "native/app/(onboarding)/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-31",
+      "title": "Preparación del primer ciclo (nutrición + entreno) con progreso y reintento",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-30",
+        "NAT-09"
+      ],
+      "paths": [
+        "native/src/features/first-cycle/**",
+        "native/app/(onboarding)/preparing.tsx"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-32",
+      "title": "Hoy: anillo de macros, comidas, entreno del día, racha y avisos",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-25",
+        "NAT-24",
+        "NAT-03",
+        "NAT-04",
+        "NAT-05"
+      ],
+      "paths": [
+        "native/src/features/hoy/**",
+        "native/app/(tabs)/hoy/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-33",
+      "title": "Nutrición del día: marcar, cambiar comida, rehacer opciones, extras, recientes/favoritas, alimento por gramos",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-32"
+      ],
+      "paths": [
+        "native/src/features/nutricion/**",
+        "native/app/(tabs)/nutricion/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-34",
+      "title": "Nutrición semanal: preparar semana, revisión, lista de compras y aplicar",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-33",
+        "NAT-09"
+      ],
+      "paths": [
+        "native/src/features/nutricion-semana/**",
+        "native/app/(tabs)/nutricion/semana*.tsx"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-35",
+      "title": "Estimar comida con foto y preguntas de aclaración",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-33"
+      ],
+      "paths": [
+        "native/src/features/foto-comida/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-36",
+      "title": "Dictado por voz para registrar comidas",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-33"
+      ],
+      "paths": [
+        "native/src/features/voz/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-37",
+      "title": "Entreno: plan semanal, detalle de sesión (series × reps) y demostraciones",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-25",
+        "NAT-24",
+        "NAT-04"
+      ],
+      "paths": [
+        "native/src/features/entreno/**",
+        "native/app/(tabs)/entreno/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-38",
+      "title": "Reproductor de entreno nativo: descansos, recuperación, segundo plano, keep-awake",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-37"
+      ],
+      "paths": [
+        "native/src/features/player/**",
+        "native/app/player/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-39",
+      "title": "Preparar, revisar y activar plan de entrenamiento; cambiar semana o sesión",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-37",
+        "NAT-09"
+      ],
+      "paths": [
+        "native/src/features/entreno-plan/**",
+        "native/app/(tabs)/entreno/plan*.tsx"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-40",
+      "title": "Progreso: peso, grasa, gráfico, racha, adherencia y check-in semanal",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-25",
+        "NAT-24",
+        "NAT-05"
+      ],
+      "paths": [
+        "native/src/features/progreso/**",
+        "native/app/(tabs)/progreso/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-41",
+      "title": "Cierre de ciclo con foto de progreso privada y siguiente desafío",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-40",
+        "NAT-30"
+      ],
+      "paths": [
+        "native/src/features/cierre-ciclo/**",
+        "native/app/cierre-ciclo/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-42",
+      "title": "Perfil: secciones, guardado con aviso de cambios, recalcular objetivos, cerrar sesión",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-30"
+      ],
+      "paths": [
+        "native/src/features/perfil/**",
+        "native/app/(tabs)/perfil/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-43",
+      "title": "Privacidad y cuenta: exportar datos, borrar cuenta, retirar consentimientos",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-42",
+        "NAT-10"
+      ],
+      "paths": [
+        "native/src/features/privacidad/**",
+        "native/app/(tabs)/perfil/privacidad*.tsx"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-44",
+      "title": "Notificaciones: permiso, registro de token, preferencias y apertura por deep link",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-11",
+        "NAT-42"
+      ],
+      "paths": [
+        "native/src/features/notificaciones/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-45",
+      "title": "Suscripción: estado del plan, compra integrada y restaurar compras",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-H3",
+        "NAT-13",
+        "NAT-42"
+      ],
+      "paths": [
+        "native/src/features/suscripcion/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-46",
+      "title": "Coach conversacional",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-32",
+        "NAT-07"
+      ],
+      "paths": [
+        "native/src/features/coach/**",
+        "native/app/coach/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-47",
+      "title": "Tour inicial y estados vacíos",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-32",
+        "NAT-33",
+        "NAT-37",
+        "NAT-40",
+        "NAT-42"
+      ],
+      "paths": [
+        "native/src/features/tour/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-48",
+      "title": "Accesibilidad: tamaños dinámicos, lectores de pantalla, movimiento reducido",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-47"
+      ],
+      "paths": [
+        "native/src/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-49",
+      "title": "Aviso de versión mínima y actualización",
+      "phase": 4,
+      "track": "feature",
+      "human": false,
+      "deps": [
+        "NAT-25",
+        "NAT-10"
+      ],
+      "paths": [
+        "native/src/features/version/**"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-50",
+      "title": "Apple Health / Health Connect: peso y entrenos",
+      "phase": 5,
+      "track": "plus",
+      "human": false,
+      "deps": [
+        "NAT-63",
+        "NAT-H4"
+      ],
+      "paths": [
+        "native/src/features/salud/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-51",
+      "title": "Widgets de racha y macros",
+      "phase": 5,
+      "track": "plus",
+      "human": false,
+      "deps": [
+        "NAT-63"
+      ],
+      "paths": [
+        "native/widgets/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-52",
+      "title": "Entreno en curso visible fuera de la app (Live Activity / notificación persistente)",
+      "phase": 5,
+      "track": "plus",
+      "human": false,
+      "deps": [
+        "NAT-63",
+        "NAT-38"
+      ],
+      "paths": [
+        "native/src/features/player-live/**",
+        "native/package.json",
+        "native/app.config.ts"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-60",
+      "title": "E2E nativo con Maestro y API simulada",
+      "phase": 6,
+      "track": "release",
+      "human": false,
+      "deps": [
+        "NAT-30",
+        "NAT-32",
+        "NAT-33",
+        "NAT-38"
+      ],
+      "paths": [
+        "native/e2e/**",
+        "native/scripts/mock-api.mjs",
+        ".github/workflows/native-ci.yml"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-61",
+      "title": "Convivencia web ↔ nativo con la misma cuenta",
+      "phase": 6,
+      "track": "release",
+      "human": false,
+      "deps": [
+        "NAT-24",
+        "NAT-33",
+        "NAT-38",
+        "NAT-40"
+      ],
+      "paths": [
+        "scripts/validate-cross-client-sync.mjs",
+        "docs/native-migration/cross-client-report.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-62",
+      "title": "Borrador de fichas de tienda y formularios de privacidad/salud",
+      "phase": 6,
+      "track": "release",
+      "human": false,
+      "deps": [],
+      "paths": [
+        "docs/native-migration/store-listing.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-63",
+      "title": "Preparar release beta: perfiles EAS, versionado, canal OTA y checklist",
+      "phase": 6,
+      "track": "release",
+      "human": false,
+      "deps": [
+        "NAT-H2",
+        "NAT-H5",
+        "NAT-H6",
+        "NAT-60",
+        "NAT-61",
+        "NAT-43"
+      ],
+      "paths": [
+        "native/eas.json",
+        "native/app.config.ts",
+        "docs/native-migration/release-checklist.md"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    }
+  ]
+}
