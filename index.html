@@ -1796,7 +1796,11 @@ function planVersionForDate(ds){
   const stored=storedId&&PLAN_VERSIONS.find(version=>String(version.id)===String(storedId));
   if(stored)return stored;
   const matches=PLAN_VERSIONS.filter(v=>validYmd(v.valid_from)&&ds>=v.valid_from&&(!validYmd(v.valid_to)||ds<=v.valid_to));
-  const pool=matches;
+  // REQ-224: una versión reemplazada nunca le gana a una vigente para el mismo
+  // día. Antes el orden por valid_from dejaba que un borrador archivado (que
+  // empezaba un día después) tomara los días nuevos en lugar del plan activo.
+  const live=matches.filter(v=>v.status!=="superseded");
+  const pool=live.length?live:matches;
   if(!pool.length)return null;
   const rank=status=>status==="active"?3:status==="draft"?2:status==="completed"?1:0;
   return pool.slice().sort((a,b)=>

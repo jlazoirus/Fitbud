@@ -1623,3 +1623,25 @@ Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningú
 ### Criterios de aceptación
 
 - `tests/e2e/portada.spec.js` y `tests/e2e/beta.spec.js`: ni la portada ni la postulación (incluida la meta descripción) mencionan Perú, Chile o México. ✓
+
+## REQ-224 - Fix Entreno: un borrador de plan archivado le gana al plan activo en los días nuevos
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de una usuaria (2026-10-19): la rutina que le cargó su coach no aparecía; el lunes mostraba la rutina genérica.
+
+### Causa raíz
+
+`planVersionForDate()` (`index.html`) ordenaba las versiones que cubren el día primero por `valid_from` y recién después por estado. Dos borradores generados el 13 y luego archivados (`superseded`, `valid_to` sin recortar) empezaban un día después que el plan activo, así que cada día nuevo sin ancla quedaba asignado a un borrador archivado.
+
+### Alcance
+
+1. `planVersionForDate()`: si alguna versión no reemplazada cubre el día, las reemplazadas quedan fuera; un día ya anclado (`planVersionId`) conserva su versión (historial inmutable).
+2. Datos: recorte de `valid_to` de los borradores archivados y re-anclaje de los días futuros sin actividad al plan activo.
+3. `scripts/validate-plan-version-for-date.mjs` en el release gate. `CACHE_NAME` v106.
+
+### Criterios de aceptación
+
+- El plan activo gana a un borrador archivado posterior; un día anclado conserva su versión; un día cubierto solo por una versión reemplazada la sigue usando. ✓
