@@ -33,6 +33,8 @@ La migración de la web/PWA a apps nativas iOS/Android (Expo / React Native en `
 
 Diferencias con los dos loops anteriores: **no usa** el lock `.git/fitbros-agent-loop.lock` y admite varios agentes a la vez; cada uno reclama una tarea con un commit en `origin/main` (gana el primer push) y escribe solo dentro de los `paths` de su tarea. El loop desarrollador no toma tareas NAT y el auditor no las modifica. Las tareas `NAT-Hx` son decisiones humanas: ningún agente las cierra.
 
+**Estado actual: en pausa (desde 2026-10-19)** hasta validar el producto con usuarios en la web. Mientras `native-migration.json` tenga `paused`, el selector devuelve `plan_paused` y ningún agente trabaja en este track.
+
 ## Memoria operativa entre corridas (continuidad, no fuente de verdad)
 
 Cada corrida autónoma arranca en frío: no hereda el historial conversacional de la anterior. Para preservar continuidad operativa entre corridas existe una **bitácora compartida fuera del repo**:

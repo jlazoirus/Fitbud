@@ -5,6 +5,12 @@
   "plan": "docs/native-migration/PLAN.md",
   "backlog": "docs/native-migration/BACKLOG.md",
   "runbook": "NATIVE_AGENT.md",
+  "paused": {
+    "since": "2026-10-19",
+    "by": "Jonathan",
+    "reason": "La ejecución de la migración nativa queda aplazada hasta validar el producto con usuarios en la web.",
+    "resumeWhen": "Decisión GO de la validación con usuarios (estrategia/01-Plan-de-Validacion.md §5) tomada sobre la PWA; la reanuda una persona con --resume --human."
+  },
   "statuses": [
     "pendiente",
     "en_curso",

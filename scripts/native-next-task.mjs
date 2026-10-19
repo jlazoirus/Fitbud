@@ -13,6 +13,8 @@
 //   node scripts/native-next-task.mjs --done NAT-xx [--human]
 //   node scripts/native-next-task.mjs --block NAT-xx --reason "<texto>"
 //   node scripts/native-next-task.mjs --stale               reclamos vencidos
+//   node scripts/native-next-task.mjs --pause --reason "<texto>" [--resume-when "<condición>"]
+//   node scripts/native-next-task.mjs --resume --human      solo una persona reanuda
 //   node scripts/native-next-task.mjs --self-test
 import fs from "node:fs";
 import path from "node:path";
@@ -90,6 +92,9 @@ function findCycle(tasks) {
 function validate(plan, backlogText) {
   const errors = [];
   if (!plan || !Array.isArray(plan.tasks) || !plan.tasks.length) return ["native-migration.json has no tasks"];
+  if (plan.paused != null && (typeof plan.paused !== "object" || !plan.paused.since || !plan.paused.reason)) {
+    errors.push("paused must be null or an object with since and reason");
+  }
   const statuses = new Set(plan.statuses || []);
   const ids = new Set();
   for (const task of plan.tasks) {
@@ -142,6 +147,7 @@ function busyGroups(plan) {
 
 function availability(plan, task) {
   const map = byId(plan);
+  if (plan.paused) return { ok: false, reason: "plan_paused" };
   if (task.status !== "pendiente") return { ok: false, reason: `status_${task.status}` };
   if (task.human) return { ok: false, reason: "human_decision" };
   const open = task.deps.filter((dep) => map.get(dep)?.status !== "hecho");
@@ -206,6 +212,7 @@ function cmdClaim(id) {
     }
   }
   const remote = remotePlan(local.branch) || local;
+  if (local.paused || remote.paused) fail("plan_paused", { paused: remote.paused || local.paused });
   const remoteTask = byId(remote).get(id);
   if (!remoteTask) fail("unknown_task", { id });
   const check = availability(remote, remoteTask);
@@ -258,11 +265,14 @@ function selfTest() {
   if (!validate(cyclic, null).some((e) => e.startsWith("dependency cycle"))) throw new Error("cycle not detected");
   const doneEarly = { ...base, tasks: [mk("NAT-01"), mk("NAT-02", ["NAT-01"], { status: "hecho" })] };
   if (!validate(doneEarly, null).some((e) => e.includes("hecho but dependencies"))) throw new Error("done-before-deps not detected");
+  const paused = { ...plan, paused: { since: "2026-01-01", reason: "x" } };
+  if (available(paused).length || availability(paused, byId(paused).get("NAT-01")).reason !== "plan_paused") throw new Error("pause not enforced");
+  if (!validate({ ...base, paused: { since: "2026-01-01" }, tasks: [mk("NAT-01")] }, null).some((e) => e.startsWith("paused"))) throw new Error("invalid pause not detected");
   const missingDoc = validate({ ...base, tasks: [mk("NAT-01")] }, "## NAT-02 — x\n");
   if (missingDoc.length !== 2) throw new Error(`backlog cross-check failed: ${missingDoc}`);
   const errors = validate(readPlan(), readBacklog(readPlan()));
   if (errors.length) throw new Error(`real plan invalid: ${errors.join("; ")}`);
-  return { action: "self_test_passed", checks: 9 };
+  return { action: "self_test_passed", checks: 11 };
 }
 
 function readBacklog(plan) {
@@ -292,7 +302,7 @@ if (has("--self-test")) {
   });
   const inProgress = plan.tasks.filter((t) => t.status === "en_curso").map((t) => ({ id: t.id, owner: t.owner, claimedAt: t.claimedAt }));
   const humanOpen = plan.tasks.filter((t) => t.human && t.status !== "hecho").map((t) => `${t.id} ${t.title}`);
-  output({ action: "status", phases, inProgress, humanDecisionsOpen: humanOpen });
+  output({ action: "status", paused: plan.paused || null, phases, inProgress, humanDecisionsOpen: humanOpen });
 } else if (has("--list")) {
   const tasks = has("--all") ? plan.tasks : available(plan);
   output({
@@ -301,7 +311,9 @@ if (has("--self-test")) {
   });
 } else if (has("--next")) {
   const candidates = available(plan).sort((a, b) => unblockScore(plan, b.id) - unblockScore(plan, a.id) || a.phase - b.phase || a.id.localeCompare(b.id));
-  if (!candidates.length) {
+  if (plan.paused) {
+    output({ action: "stop", reason: "plan_paused", paused: plan.paused });
+  } else if (!candidates.length) {
     const blockedByHumans = plan.tasks.filter((t) => t.human && t.status !== "hecho").map((t) => t.id);
     output({ action: plan.tasks.every((t) => t.status === "hecho") ? "complete" : "stop", reason: "no_available_task", humanDecisionsOpen: blockedByHumans });
   } else {
@@ -337,10 +349,24 @@ if (has("--self-test")) {
     t.note = reason;
   });
   output({ action: "blocked", id: task.id, note: task.note });
+} else if (has("--pause")) {
+  const reason = valueOf("--reason");
+  if (!reason) fail("missing_reason");
+  const next = readPlan();
+  next.paused = { since: new Date().toISOString().slice(0, 10), reason, ...(valueOf("--resume-when") ? { resumeWhen: valueOf("--resume-when") } : {}) };
+  writePlan(next);
+  output({ action: "paused", paused: next.paused, inProgress: next.tasks.filter((t) => t.status === "en_curso").map((t) => t.id) });
+} else if (has("--resume")) {
+  if (!has("--human")) fail("resume_requires_human", { hint: "Solo una persona reanuda la migración (usa --human)" });
+  const next = readPlan();
+  if (!next.paused) fail("not_paused");
+  next.paused = null;
+  writePlan(next);
+  output({ action: "resumed", available: available(next).map((t) => t.id) });
 } else if (has("--stale")) {
   const limit = plan.claimStaleDays * 86400000;
   const stale = plan.tasks.filter((t) => t.status === "en_curso" && Date.now() - Date.parse(t.claimedAt) > limit);
   output({ action: "stale", claimStaleDays: plan.claimStaleDays, tasks: stale.map((t) => ({ id: t.id, owner: t.owner, claimedAt: t.claimedAt })) });
 } else {
-  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 17).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  console.log(fs.readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 18).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
 }

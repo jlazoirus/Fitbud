@@ -1,5 +1,7 @@
 # Runbook — agentes de la migración nativa
 
+> **En pausa desde 2026-10-19.** La ejecución está aplazada hasta validar el producto con usuarios en la web (`docs/native-migration/PLAN.md`, aviso inicial). Si `node scripts/native-next-task.mjs --next` devuelve `reason: "plan_paused"`, **no trabajes en tareas NAT**: no reclames, no crees `native/` ni extraigas código de `index.html` por esta vía. Solo una persona reanuda con `--resume --human`.
+
 Este runbook gobierna a los agentes (Codex, Claude Code u otro) que trabajan en la migración de Evolv a apps nativas. A diferencia de los loops desarrollador y auditor (`AGENTS.md`), **varios agentes de migración pueden trabajar a la vez**: se coordinan por el estado de `native-migration.json` en `origin/main`, no por el lock local `.git/fitbros-agent-loop.lock`.
 
 Lectura obligatoria al empezar: `docs/native-migration/PLAN.md`, la sección de tu tarea en `docs/native-migration/BACKLOG.md`, `CONTEXT.md` y el código real que vas a tocar. `ADR-001-stack.md` si tocas `native/`.

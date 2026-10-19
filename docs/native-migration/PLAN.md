@@ -1,6 +1,8 @@
 # Plan de migración de Evolv (web/PWA) a apps nativas iOS y Android
 
-Fecha de creación: 2026-10-16. Estado: **propuesto — pendiente de aprobación humana (NAT-H1)**.
+Fecha de creación: 2026-10-16. Estado: **aplazado desde 2026-10-19** — plan aprobado como referencia, ejecución en pausa.
+
+> **Ejecución aplazada.** Por decisión de Jonathan (2026-10-19), la migración no se ejecuta hasta validar el producto con usuarios en la web/PWA. El foco actual es la validación descrita en `estrategia/01-Plan-de-Validacion.md`. Se reanuda solo con una decisión **GO** de esa validación (§5 de ese documento): entonces una persona ejecuta `node scripts/native-next-task.mjs --resume --human`, revisa que el plan siga vigente frente al código (`PLAN.md` §2 cita líneas de `index.html` que habrán cambiado) y arranca por las decisiones NAT-H1..H5. Mientras dure la pausa, `native-next-task.mjs` no ofrece ni deja reclamar tareas (`reason: "plan_paused"`), y lo que aprenda la validación (journeys que importan, disposición a pagar, plataforma de los usuarios) debe usarse para re-priorizar el backlog antes de reanudar.
 
 Este documento es el plan maestro. Las piezas operativas están en:
 
