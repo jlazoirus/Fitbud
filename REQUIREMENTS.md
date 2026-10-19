@@ -67,6 +67,18 @@ Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que 
 - REQ-187 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable). (P1; implementado)
 - REQ-188 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1; implementado)
 
+Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la beta primero (cobro), luego lo que confunde en el alta y el entreno, luego funciones nuevas:
+
+- REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días; cobro siempre en la web. (P0)
+- REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (P0; espera captura para reproducir)
+- REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1)
+- REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1)
+- REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1)
+- REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1)
+- REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1)
+- REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar". (P2)
+- REQ-216 - Modo conversacional (beta oculta). (P2; espera decisión de producto)
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -77,6 +89,8 @@ Pendiente no automatizable por agentes:
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
+- REQ-209 - Scroll/ancho: falta captura y dispositivo para reproducir.
+- REQ-216 - Modo conversacional: falta aprobar alcance de la fase 1 y presupuesto de pruebas.
 - REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
@@ -1123,41 +1137,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-167`).
 
 **Estado: implementado.**
 
-### Origen
-
-Feedback de Jonathan (2026-10-12) probando el plan Push/Legs/Pull cargado a una usuaria, con capturas de iPhone y escritorio.
-
-### Problema
-
-1. En móvil se cortaban las tarjetas de la dosis (descanso, RIR) y en escritorio se salían del borde de la tarjeta.
-2. "RPE" y "RIR" no se explican en ninguna parte.
-3. No se pueden registrar más series que las prescritas.
-4. Marcar una serie como hecha dependía de tocar un círculo con el número de serie; no se entendía que era un control.
-
-### Causa raíz
-
-1. `.scard .n` (24px) se declara después de `.player-dose .n` (16px) con igual especificidad y gana; además la grilla usaba `repeat(3,1fr)`, que no baja del ancho mínimo del contenido ("Controlado").
-2. Sin ayuda contextual.
-3. `normalizeStep()` (`workout-player.js`) recorta `sets` a `prescribedSets` en cada normalización.
-4. `renderStrengthSet()` reutilizaba el `.chk` circular de comidas con el número de serie como contenido.
-
-### Alcance
-
-1. `.player-dose` con `minmax(0,1fr)` y `.player-dose .scard .n` con mayor especificidad; 2 columnas bajo 380px.
-2. Tarjetas de esfuerzo `N/10 · esfuerzo (RPE) ⓘ` y `en reserva (RIR) ⓘ` tocables → `explainWorkoutEffort()`; la columna del set dice "Esfuerzo (RPE)".
-3. `step.extraSets` persistido (0–10) en `normalizeStep()`; botón "+ Añadir serie" y "Quitar" en la última serie extra sin completar.
-4. Fila de serie con título "Serie N" y botón explícito "Marcar hecha" → "✓ Hecha" (`aria-pressed`).
-
-### Fuera de alcance
-
-- Cambiar la prescripción del plan o el cálculo de carga sugerida.
-
-### Criterios de aceptación
-
-- A 375px ninguna tarjeta de dosis ni fila de serie se sale de la tarjeta del ejercicio y no hay scroll horizontal. ✓ (verificado con Playwright)
-- Añadir serie suma una fila que sobrevive a la normalización; quitarla solo es posible si es extra y no está hecha. ✓
-- El E2E de Entreno completa la sesión con el nuevo control. ✓
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-168`).
 
 ## REQ-169 - Fix nutrición: lo descartado en el borrador del día vuelve al regenerar
 
@@ -1175,249 +1155,55 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-170`).
 
 **Estado: implementado.**
 
-### Origen
-
-Bug C reportado por Jonathan (2026-10-12): tras varios intentos el día sigue sin alcanzar la meta de kcal.
-
-### Problema
-
-Con propuestas del coach solo el 66% de los días quedaba dentro de la tolerancia de kcal de `DIET_CONTRACT` (±max(50 kcal, 3%)); el 10% peor se desviaba más de 250 kcal.
-
-### Causa raíz
-
-`collectGlobalLines()` (`js/nutrition-domain.js`) solo tomaba como palancas las líneas de comidas que coinciden con un plato del catálogo; las propuestas del coach quedaban fijas. A la vez, el prompt le decía al coach que no ajustara gramos porque "el sistema ajusta las porciones". Nadie ajustaba.
-
-### Alcance
-
-1. `collectGlobalLines()` escala las líneas de propuestas sin plato (`proposal_recalculated`) entre 0.5× y 1.75× de lo propuesto, con los topes por categoría existentes.
-2. El prompt del día pide gramos cerca del presupuesto de cada slot y la suma a ±50 kcal de la meta.
-3. `scripts/validate-proposal-close.mjs` (gate): propuestas simuladas con nombre inventado y gramos ±30%; exige ≥90% de días en tolerancia de kcal sin reemplazar comidas propuestas. `scripts/seed-catalog.mjs` comparte el parser del seed con el canario.
-
-### Criterios de aceptación
-
-- Días en tolerancia de kcal con propuestas: 66.0% → 93.1%; |Δkcal| mediana 35 → 18, p90 253 → 47; 100% de propuestas conservadas. ✓
-- El canario determinista no cambia (289/378, 76.5%). ✓
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-171`).
 
 ## REQ-172 - Estimar macros de una comida con una foto, con preguntas de aclaración
 
 **Estado: implementado.**
 
-### Origen
-
-Pedido de Jonathan (2026-10-12): al agregar o editar una comida, tomar una foto, enviarla al coach para estimar los macros y que pregunte lo que necesite aclarar.
-
-### Alcance
-
-1. Editor de comidas (agregar y editar, `editorSheet()`): botón "📷 Estimar con foto" con `capture="environment"`; la foto se reduce en el teléfono a 1024 px JPEG (`mealPhotoToJpeg()`) y se muestra como vista previa.
-2. `photoEstimateRound()`: acción existente `meal_estimate` (sin migración ni cuota nueva; cada ronda consume una unidad) con la foto, la descripción y las respuestas previas. La respuesta trae siempre la mejor estimación y hasta 2 `preguntas` sobre lo que no se ve y cambia las kcal (porción, aceite, salsas, bebida). Máximo 3 rondas; las preguntas ya respondidas no se repiten. "Así está bien" acepta la estimación actual.
-3. El nombre se completa si está vacío o si lo puso una ronda anterior; lo que escribió el usuario se respeta.
-4. Proxy (`api/claude.js`): `imageInput()` acepta imagen solo en `meal_estimate`, tipos JPEG/PNG/WebP y ≤3 MB en base64, y la valida antes de reservar cuota; `userContent()` envía el bloque `image` antes del texto; `meal_estimate` pasa a structured outputs con `mealEstimateOutputSchema()`.
-5. La clave de reutilización incluye el hash de la foto y de las respuestas: una respuesta guardada nunca se sirve para otra foto.
-6. Privacidad: la foto no se guarda ni se registra; solo viaja en la consulta (`PRIVACY.md`).
-
-### Fuera de alcance
-
-- Guardar la foto junto a la comida o en el historial.
-- Estimar con foto desde el reemplazo de comidas del plan ("Cambiar comida").
-
-### Criterios de aceptación
-
-- Foto → estimación con pregunta → respuesta → estimación final que se guarda. ✓ (`tests/e2e/foto-comida.spec.js`)
-- Otras acciones rechazan imágenes; tipos y tamaño validados; validación antes de la cuota. ✓ (`scripts/validate-meal-photo-estimate.mjs`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-172`).
 
 ## REQ-173 - Fix PWA: los deploys no llegan a la app instalada si no cambia `CACHE_NAME`
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-12) no encontraba "Estimar con foto" tras el deploy de REQ-172.
-
-### Causa raíz
-
-El service worker sirve HTML y JS cache-first (REQ-150) y el navegador solo instala uno nuevo cuando cambia `service-worker.js`. Los deploys de REQ-167 a REQ-172 cambiaron `index.html`, `workout-player.js` y `js/nutrition-domain.js` sin subir `CACHE_NAME` (seguía en `fitbud-pwa-v71`), así que la PWA instalada siguió mostrando la versión anterior.
-
-### Alcance
-
-1. `CACHE_NAME` → `fitbud-pwa-v72`.
-2. `scripts/validate-sw-cache-bump.mjs` en el release gate: si cambió un archivo del `APP_SHELL` contra `origin/main` (o `--base <ref>`), `CACHE_NAME` debe ser distinto.
-
-### Criterios de aceptación
-
-- Con `--base 24e2607` y sin subir la versión, el validador falla nombrando los archivos; con `v72` pasa. ✓
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-173`).
 
 ## REQ-174 - Entreno: antes de empezar se ve qué se va a hacer (series × repeticiones)
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-12): antes de iniciar el entreno el resumen no dice qué se va a hacer ni cuántas series o repeticiones.
-
-### Problema
-
-La tarjeta de la sesión solo mostraba el nombre y un texto general; la "Vista previa de ejercicios" muestra técnica pero no la dosis. La dosis solo aparecía ejercicio por ejercicio dentro del reproductor.
-
-### Alcance
-
-1. `workoutPlanSummaryHtml(prescription)` en la tarjeta del entreno (sin sesión en curso): total de ejercicios, series y minutos; por ejercicio, series × repeticiones, descanso y RPE; calentamiento y vuelta a la calma con su duración; enlace "¿Qué es RPE?".
-2. `CACHE_NAME` → `fitbud-pwa-v73` (REQ-173).
-
-### Criterios de aceptación
-
-- El E2E de Entreno ve "Qué vas a hacer hoy · N ejercicios · N series" y la dosis "N × reps" antes de iniciar. ✓
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-174`).
 
 ## REQ-175 - Capa de espera que bloquea la app mientras el coach responde
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-12): mientras el coach genera (por ejemplo, el plan de entrenamiento), se puede cerrar el modal con la X; la generación sigue corriendo detrás y al volver a pedirla la pantalla no se actualiza ("Esta acción ya está en proceso"). Pidió un spinner que bloquee toda la pantalla hasta que responda.
-
-### Alcance
-
-1. `showCoachBusy()`/`hideCoachBusy()`: capa a pantalla completa (`#coach-busy`, z-index sobre el modal) con spinner y mensaje por acción (`coachBusyLabel()`: "Preparando tu plan…", "Estimando tu comida…"…).
-2. Ligada a la acción completa: `beginCoachAction()` la muestra y `endCoachAction()` la oculta solo si la acción estaba en curso; `callClaude()` también la sostiene. Cubre generaciones con varias consultas seguidas sin huecos.
-3. Escape no cierra el modal mientras el coach responde.
-4. Salvaguardas: tope de 90 s por intento en `coachProxyFetch()` (AbortController) y cierre automático de la capa a los 4 min con aviso, para que la app nunca quede bloqueada.
-
-### Criterios de aceptación
-
-- Durante "Preparar mi plan" la X del modal queda tapada, Escape no cierra y al responder el resultado sigue en el modal. ✓ (`tests/e2e/alta-y-espera.spec.js`)
-- Durante "Estimar macros" el botón Guardar queda tapado hasta la respuesta. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-175`).
 
 ## REQ-176 - Alta de usuarios sin depender del correo
 
 **Estado: implementado.**
 
-### Origen
-
-Alta fallida de una usuaria (2026-10-12): enlace de invitación consumido, "Auth session missing!" (REQ-167) y "email rate limit exceeded" del SMTP por defecto de Supabase.
-
-### Alcance
-
-1. `api/admin.js` acción `createUser`: crea la cuenta confirmada con contraseña temporal `xxxx-xxxx-xxxx` (aleatoria criptográfica, sin caracteres ambiguos), `user_metadata.must_change_password=true` y perfil activo; nunca pisa una cuenta existente (409).
-2. Panel admin "Crear cuenta": muestra la contraseña una sola vez y un mensaje listo para copiar o enviar por WhatsApp.
-3. Primer ingreso: `onAuth()` detecta `must_change_password` y muestra "Crea tu propia contraseña"; `updateUser` guarda la contraseña y limpia la marca con la misma sesión (sin enlaces de correo) y la app continúa.
-4. "Invitar por correo" se mantiene como alternativa.
-
-### Fuera de alcance (acción manual)
-
-- SMTP propio en Supabase (Auth → SMTP) y Redirect URLs de producción (REQ-60): necesitan credenciales del proveedor y el dashboard.
-
-### Criterios de aceptación
-
-- Una cuenta con `must_change_password` ve la pantalla de contraseña, la guarda y entra a la app. ✓ (E2E)
-- `scripts/validate-admin-create-user.mjs`: formato, aleatoriedad y cableado. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-176`).
 
 ## REQ-177 - Planes de un coach conservan sus textos: calentamiento por día, duración y descanso
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-12): la rutina cargada a una usuaria debe ser ejercicio por ejercicio igual a la del coach (LeoFitnessCoach).
-
-### Problema
-
-El plan guardaba duración y descanso como números (55 min, 105 s) y usaba un calentamiento genérico, así que no podía mostrar los rangos ("45–60 min", "90–120 s") ni el calentamiento específico de cada día.
-
-### Alcance
-
-1. Campos opcionales en `snapshot.trainingPlan`: `session.durationLabel`, `session.warmup`, `exercise.restLabel`.
-2. `workoutFromSession()` (`training-plan.js`) usa `durationLabel` en el detalle y los pasa a `generatedPrescription`; `generatedStrengthSteps()` (`workout-player.js`) usa `warmup` como objetivo del calentamiento y copia `restLabel` al paso; el temporizador sigue usando `restSeconds` (mínimo del rango).
-3. El reproductor y el resumen previo (REQ-174) muestran `restLabel` y `durationLabel` cuando existen.
-4. `scripts/validate-coach-plan-labels.mjs` en el release gate. `CACHE_NAME` v75.
-
-### Criterios de aceptación
-
-- Una sesión con textos del coach llega al reproductor con el mismo calentamiento, duración y descanso. ✓
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-177`).
 
 ## REQ-178 - Fix facturación: el historial de pagos muestra el cargo original en lugar del monto reembolsado en reembolsos parciales
 
 **Estado: implementado.**
-`moneyFromPayload` ahora recibe `event_type`; para `charge.refunded` prioriza `amount_refunded` sobre `amount` (el resto de tipos conserva el orden anterior). Test en `scripts/test-billing-history-api.mjs` cubre reembolso parcial, total y pago normal.
 
-### Origen
-
-Auditoría del journey `facturacion` (Perfil → Suscripción → "Historial de pagos"). Commit previo leído: `903acd2` (REQ-177). Partiendo de REQ-148 (un reembolso parcial de Stripe ya NO revoca el entitlement y queda auditado como evento `charge.refunded` visible al usuario), se revisó cómo se proyecta el monto de cada evento hacia la UI.
-
-### Problema
-
-Un reembolso parcial (p. ej. $7 sobre un cargo de $14) aparece en el historial del usuario como **"Reembolso registrado · USD 14.00"**: se muestra el cargo original completo, no los $7 realmente devueltos. Un reembolso total coincide por casualidad (el monto original y el reembolsado son iguales), así que el bug solo se manifiesta en reembolsos parciales — justo el caso que REQ-148 hizo visible al dejarlos como evento sin revocar acceso. El usuario ve un monto de reembolso inflado respecto a lo que se le devolvió.
-
-### Causa raíz
-
-`moneyFromPayload(payload)` en `api/entitlement.js:62-67`:
-
-```js
-const amount = firstFinite(obj.amount_total, obj.amount_paid, obj.amount, obj.amount_refunded);
-```
-
-`billing_events.payload` guarda el `event` completo de Stripe (`api/webhook.js:226`), así que para `charge.refunded` el `payload.data.object` es un **charge**: tiene `amount` (cargo original) y `amount_refunded` (lo reembolsado), pero NO `amount_total` ni `amount_paid` (esos viven en `checkout.session`). Como `amount` precede a `amount_refunded` en `firstFinite`, la proyección devuelve el cargo original (1400) antes de llegar al monto reembolsado (700). El orden de precedencia es fijo para todos los tipos de evento; `charge.refunded` necesita priorizar `amount_refunded`.
-
-### Objetivo
-
-En el historial de pagos, un evento de reembolso muestra el monto efectivamente reembolsado, de modo que un reembolso parcial de $7 se lea "USD 7.00" y no "USD 14.00".
-
-### Alcance
-
-1. En `moneyFromPayload`/`projectEvent` (`api/entitlement.js`), para `event_type === "charge.refunded"` resolver el monto priorizando `obj.amount_refunded` (cae a `amount` solo si falta). El resto de tipos (`checkout.session.completed`, `checkout.session.expired`, `payment_intent.payment_failed`, `charge.dispute.created`) conservan su orden actual.
-2. Cubrir el caso con un test del proyector (reembolso parcial → monto reembolsado; reembolso total → sigue correcto; pago normal → sin cambios).
-
-### Fuera de alcance
-
-- La lógica de revocación de `handleRefund` (REQ-148) no se toca: parcial sigue sin revocar.
-- El formateo de moneda del cliente (`billingAmountText`, `index.html`) ya es correcto; el defecto está en el valor proyectado por el servidor.
-- `billingEventLabel`/`billingStatusLabel` (etiquetas) no cambian.
-
-### Riesgos
-
-- Regresión en el monto de otros tipos de evento si el cambio no se acota a `charge.refunded`.
-- Reembolsos antiguos ya registrados conservan su payload; la corrección aplica al proyectar, así que el historial se corrige al releerse sin migrar datos.
-
-### Criterios de aceptación
-
-- Un `charge.refunded` con `amount:1400, amount_refunded:700` se proyecta con `amount_cents:700` (UI: "USD 7.00").
-- Un reembolso total (`amount==amount_refunded`) y un `checkout.session.completed` siguen mostrando el monto correcto.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Test del proyector de `billing-history` con los tres payloads (parcial, total, pago normal).
-- Manual: inyectar en `billingHistory` un evento `charge.refunded` con `amount_cents` derivado del reembolso real y confirmar en Perfil → Suscripción → "Historial de pagos" que el renglón muestra el monto reembolsado.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-178`).
 
 ## REQ-179 - Supabase no se pausa por inactividad: keep-alive en el cron diario
 
 **Estado: implementado.**
 
-### Origen
-
-2026-10-12: el proyecto de Supabase (plan gratuito) estaba pausado; login, sync y catálogo caídos en producción ("Load failed") hasta restaurarlo a mano.
-
-### Causa raíz
-
-El plan gratuito pausa el proyecto tras ~7 días sin actividad. El cron diario `/api/notify` sí consulta la base, pero corta antes en la autenticación: espera `x-vercel-cron: 1` o `Authorization: Bearer CRON_SECRET`, y Vercel identifica sus crons por `user-agent: vercel-cron/1.0` y solo envía `Authorization` si `CRON_SECRET` existe. Sin esa variable, el job devolvía 401 sin tocar la base.
-
-### Alcance
-
-1. `keepSupabaseAwake()` en `api/notify.js`: lectura mínima (`profiles?select=id&limit=1`, service role, no devuelve datos) al inicio de cada invocación, antes de autenticar; un fallo no rompe el handler.
-2. `scripts/validate-supabase-keepalive.mjs` en el release gate.
-
-### Fuera de alcance
-
-- Configurar `CRON_SECRET` en Vercel para que los recordatorios por correo/push (REQ-24/38) también corran; el keep-alive no depende de eso.
-
-### Criterios de aceptación
-
-- Una invocación de cron sin secreto responde 401 pero ejecuta la lectura mínima. ✓
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-179`).
 
 ## REQ-180 - Rebranding Fitbros → Evolv (dirección "Escala")
 
@@ -1434,67 +1220,14 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-181`).
 ## REQ-182 - Fix PWA: el gate de bump de caché no cubre `assets/icon-180.png` (apple-touch-icon cache-first fuera de `APP_SHELL`)
 
 **Estado: implementado.**
-`assets/icon-180.png` entró a `APP_SHELL` (`service-worker.js`); `CACHE_NAME` subió a `fitbud-pwa-v87`. El validador deriva su pathspec de `APP_SHELL`, así que ya vigila el ícono.
 
-### Origen
-
-Auditoría del journey `pwa` (rotación del auditor) sobre HEAD `1a93967`. Revisados `service-worker.js`, `scripts/validate-sw-cache-bump.mjs`, `index.html` (`<head>` PWA) y `manifest.webmanifest`. El rebrand REQ-180 regeneró los tres íconos (`icon-180/192/512`) el 2026-10-14.
-
-### Problema
-
-El service worker cachea cache-first **cualquier** recurso estático del mismo origen (`service-worker.js:49-60`), pero el gate que obliga a subir `CACHE_NAME` cuando cambia un recurso cache-first (REQ-173) solo vigila la lista `APP_SHELL`. `assets/icon-180.png` —el `apple-touch-icon` que `index.html:16` referencia en cada vista— es cache-first pero no está en `APP_SHELL` ni en la lista que vigila el validador. Si un deploy cambia solo ese ícono (p. ej. un retoque de marca posterior a REQ-180), `node scripts/validate-sw-cache-bump.mjs` reporta "sin cambios en el shell", el gate pasa sin exigir bump, y cada cliente que ya cacheó el ícono viejo lo sigue sirviendo indefinidamente (cacheFirst nunca revalida) hasta que un cambio no relacionado del `APP_SHELL` suba `CACHE_NAME`. En el rebrand REQ-180 el ícono se refrescó solo por casualidad —`index.html`/`service-worker.js` cambiaron en el mismo commit y forzaron el bump—; un cambio de ícono aislado se escaparía.
-
-### Causa raíz
-
-`APP_SHELL` (`service-worker.js:2-15`) incluye `icon-192`/`icon-512` pero omite `assets/icon-180.png`, aunque `index.html:16` lo carga como `apple-touch-icon`. El validador deriva su lista vigilada de `APP_SHELL` + `index.html` (`scripts/validate-sw-cache-bump.mjs:18-19`), así que un diff de `icon-180.png` nunca entra en su pathspec: es el único recurso estático de mismo origen que `index.html` referencia fuera del `APP_SHELL` (`config.js` es network-first y queda fuera a propósito).
-
-### Objetivo
-
-Que cambiar el ícono de la app obligue a subir `CACHE_NAME`, para que ningún cliente instalado quede con un `apple-touch-icon` obsoleto, y que el ícono quede disponible offline como el resto del shell.
-
-### Alcance
-
-1. Agregar `"./assets/icon-180.png"` a `APP_SHELL` en `service-worker.js` (lo precachea y, de paso, lo mete en la lista que el validador vigila).
-2. Subir `CACHE_NAME` por el cambio del shell.
-
-### Fuera de alcance
-
-- Rediseñar el ícono o la estrategia de caché; `config.js` (network-first) sigue fuera del `APP_SHELL` a propósito.
-- Separar `purpose: "any"` vs `maskable` en el manifest (discusión aparte).
-
-### Riesgos
-
-- Mínimos: una entrada más en el precache del SW. El propio `validate-sw-cache-bump.mjs` exigirá el bump de `CACHE_NAME` (ya incluido en el Alcance), así que no hay riesgo de olvidarlo.
-
-### Criterios de aceptación
-
-- `assets/icon-180.png` figura en `APP_SHELL`; un cambio aislado de ese ícono hace fallar `node scripts/validate-sw-cache-bump.mjs` mientras no se suba `CACHE_NAME`.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Reproducir el diff que corre el validador: `git diff --name-only <base> HEAD -- <lista APP_SHELL>`. Tras el fix el ícono aparece en el pathspec; antes no. Demostrado en la auditoría contra `06cd60f..9c2997b`: `icon-180.png` cambió en ese rango pero el pathspec del shell no lo veía (solo `icon-192`/`icon-512`).
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-182`).
 
 ## REQ-183 - Dominio propio: Evolv en evolvapp.club
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan compró `evolvapp.club` en Porkbun (2026-10-16) para la marca Evolv (REQ-180).
-
-### Alcance
-
-1. Porkbun DNS: `A @ → 216.198.79.1` y `CNAME www → *.vercel-dns-017.com`, sin los registros de parking.
-2. Vercel: `evolvapp.club` en Production y `www.evolvapp.club` con 308 al dominio raíz; `NOTIFY_APP_URL=https://evolvapp.club` (correos y retorno de checkout).
-3. Supabase Auth: Site URL `https://evolvapp.club` y `https://evolvapp.club/**` permitida (las URLs viejas siguen permitidas durante la transición).
-4. Código: URLs por defecto de `api/notify.js`, `api/checkout.js`, `og:url`, smoke test y documentación.
-5. Dominios viejos (`fitbros.vercel.app`, `fitbud-green.vercel.app`): no se redirigen por HTTP (la PWA instalada quedaría atascada en su caché, porque el service worker no puede actualizarse con un redirect). `legacyHostMigration()` manda a los visitantes sin sesión al dominio nuevo y, con sesión, muestra el aviso "Evolv se mudó a evolvapp.club".
-
-### Fuera de alcance
-
-- Webhook de Stripe (checkout deshabilitado); al activarlo, registrar `https://evolvapp.club/api/webhook`.
-- Dominio autenticado en Brevo (remitente `@evolvapp.club`).
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-183`).
 
 ## REQ-184 - Seguridad: el sitio público no publica los archivos internos del repositorio
 
@@ -1536,171 +1269,55 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-189`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-17): tras registrarse, el formulario quedaba visible con "Cuenta creada. Confirma tu correo…" en letra pequeña; confuso.
-
-### Alcance
-
-1. `doAuth()`: si `signUp` no devuelve sesión, guarda el correo y cambia a `_authMode="check"`.
-2. `renderConfirmEmail()`: pantalla sin inputs con el correo, consejos (spam, abrir en el mismo dispositivo, cuenta existente), "Ya confirmé, iniciar sesión" (precarga el correo), "Reenviar correo" (`supa.auth.resend`, espera de 60 s) y "Usar otro correo".
-3. E2E `tests/e2e/registro.spec.js`.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-190`).
 
 ## REQ-191 - Fix Perfil: el aviso de actividad ligera reaparece en cada visita
 
 **Estado: implementado.**
 
-### Origen
-
-Auditoría impeccable de UI (2026-10-16). Para un usuario "solo fuerza", `renderProfile()` llama a `showCardioNudge("profile")` y solo el botón "Continuar" marcaba `UI.cardioNudgeDismissed`; cerrar con ✕, Esc o tocando fuera pasaba por `closeModal()` sin marcarlo, así que el sheet tapaba Perfil en cada visita.
-
-### Alcance
-
-1. `modal(html, {onClose})`: `closeModal()` ejecuta el callback una vez, por cualquier vía de cierre.
-2. `showCardioNudge()` usa `onClose` para marcar el aviso como visto; "Continuar" sigue guardando la elección del checkbox.
-
-### Criterios de aceptación
-
-- Cerrar el aviso con ✕ o Esc y volver a Perfil (también tras recargar) no lo muestra de nuevo. ✓ (`tests/e2e/perfil.spec.js`)
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-191`).
 
 ## REQ-192 - Accesibilidad: campos con nombre, landmarks, FAQ, contraste de `--muted2` y movimiento reducido
 
 **Estado: implementado.**
 
-### Origen
-
-Auditoría impeccable de UI (2026-10-16): axe marcaba `select-name` (crítico) en el onboarding y `aria-prohibited-attr` en `.steps`; ninguna vista tenía `<main>` ni `h1`; la FAQ no exponía su estado; `--muted2` (`#5f5f58`, 2.6–3.0:1) seguía en texto real (etiquetas de macros, "/2200 kcal"), fuera del alcance de REQ-112.
-
-### Alcance
-
-1. 97 `<label>` seguidos de su control pasan a `for="id"`; los campos de serie de Entreno (sin id) reciben `aria-label` con el número de serie; `#coachInput` recibe `aria-label`.
-2. `.steps` del onboarding: `role="progressbar"` con `aria-valuenow`/`aria-valuemax`.
-3. `#app` es el único `<main>` (los `<main>` internos de onboarding/recap pasan a `div`); Hoy, Progreso, Perfil y las vistas con navegación de día (`dayHeaderNav`) tienen `h1`.
-4. FAQ de la portada: `aria-expanded` se actualiza al abrir/cerrar.
-5. `--muted2` → `#8f8f87` (≥4.5:1 sobre `--bg`, `--surf1` y `--surf2`).
-6. `prefers-reduced-motion`: `pulse` del micrófono, `bounce` del "escribiendo" y `a2hsIn` se sustituyen por estados estáticos.
-7. Orden de títulos sin saltos (`.agenda-title` y el nombre de cada ejercicio pasan a `h2`) y `#sync-badge` como `<aside aria-live>` dentro de un landmark: axe (WCAG 2.2 AA + best-practice) queda en 0 en Hoy, Nutrición, Entreno, Progreso, Perfil y onboarding.
-
-### Criterios de aceptación
-
-- `tests/e2e/accesibilidad.spec.js`: un `<main>` y un `h1` por tab, campos del onboarding asociados a su etiqueta, progreso anunciado y FAQ con `aria-expanded`. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-192`).
 
 ## REQ-193 - Táctil: todos los controles miden 44 px en pantallas táctiles
 
 **Estado: implementado.**
 
-### Origen
-
-Auditoría impeccable de UI (2026-10-16), medida con emulación táctil (`pointer:coarse`): la regla de 44 px de la auditoría de junio cubría `.btn-sm`, `.chip-check` y `.csec-h`, pero no `.btn` (35–39 px), los chips del coach (32), el check de comida (32), "Ver técnica" (34), "¿Qué es RPE?" (20), el botón de ayuda (40), el de enviar (42), los selects de disponibilidad de Perfil (40) ni el cierre de los sheets (36). En escritorio el badge de sincronización flotaba fuera de la columna de 560 px.
-
-### Alcance
-
-1. Bloque `@media(pointer:coarse)` al final del `<style>` (gana la cascada): `min-height:44px` en `.btn`, `.coach-chip`, campos y selects; `::after` con `inset:-7px` en `.chk`, `.demo-expand` y `.a2hs-x` para ampliar el área sin cambiar el tamaño visual; checkboxes de 20 px.
-2. Botón de enviar del coach: 44 px, `aria-label` e ícono SVG en lugar de "➤".
-3. `.sync-badge` se alinea al borde de la columna.
-
-### Criterios de aceptación
-
-- `tests/e2e/tactil.spec.js`: ningún control visible de las 5 tabs mide menos de 44×44 px en táctil (falla con el código anterior). ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-193`).
 
 ## REQ-194 - Textos: sin vocabulario interno, fechas consistentes y beta con ortografía completa
 
 **Estado: implementado.**
 
-### Origen
-
-Auditoría impeccable de UI (2026-10-16): Nutrición decía "llena los **slots**", "Macros calculados desde **tu base de datos**" y "prepara una opción con tu coach **o elige**" (frase cortada); `text-transform:capitalize` convertía "16 oct" en "16 Oct" en Nutrición/Entreno/Progreso mientras Hoy decía "16 oct"; el chip de check-in usaba el emoji 📋; `beta-reclutamiento.html` no tenía tildes ni "¿" ("Que te describe mejor?", "Pais", "despues").
-
-### Alcance
-
-1. Copy de Nutrición y `dbStatusNote()` en lenguaje del usuario; error de carga con recuperación ("Revisa tu conexión y vuelve a intentarlo").
-2. Sin `text-transform:capitalize` en `.dtitle .date` y `.wk-left .d`.
-3. Chip de check-in sin emoji.
-4. Beta: ortografía en textos visibles y placeholders; los `value` que se envían al API no cambian (no altera el scoring ni datos históricos).
-
-### Criterios de aceptación
-
-- `tests/e2e/textos.spec.js`: Nutrición sin "slots"/"base de datos"/"o elige", fecha "Viernes, 16 oct", y la beta con "¿Qué te describe mejor?". ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-194`).
 
 ## REQ-195 - Progreso y Nutrición: menos campos vacíos para el usuario nuevo
 
 **Estado: implementado.**
 
-### Origen
-
-Auditoría impeccable de UI (2026-10-16): Progreso mostraba S1–S10 con dos campos cada una (20 inputs vacíos) y "Ingresar mi peso" enfocaba siempre la semana 1; cada comida sin asignar de Nutrición mostraba "0 kcal · P 0 · C 0 · G 0 g" y su check no tenía nombre accesible.
-
-### Alcance
-
-1. `weightTableHtml()`: se ven las semanas hasta la actual (`currentWeightWeek()`) o la última con datos; las siguientes van en `<details class="wt-later">`. "Ingresar mi peso" enfoca la semana actual.
-2. Comida sin contenido: "Sin asignar" + una línea de ayuda, sin macros en cero.
-3. El check de cada comida tiene `aria-label`/`aria-pressed`.
-
-### Criterios de aceptación
-
-- `tests/e2e/progreso.spec.js`: semana siguiente oculta hasta abrir el plegable; el foco cae en la semana actual; comida vacía sin `.nums`. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-195`).
 
 ## REQ-196 - Marca: restos de color de Fitbros y tokens CSS sin definir
 
 **Estado: implementado.**
 
-### Origen
-
-Auditoría impeccable de UI (2026-10-16): los chips del coach usaban `var(--accent-text,#c4b5fd)` con la variable sin definir, así que se veían lila (marca anterior); `.alert.violet` tenía texto `#d8ccff`; también caían a su fallback o a nada `--white`, `--ok`, `--r` y `--accent-rgb` (violeta 139,92,246). El tour conservaba fondos violeta como fallback.
-
-### Alcance
-
-1. Chips, alertas "violet", `.chat-type.educativo`, `.setup-step` y flechas de día pasan a tokens Evolv definidos (`--purple-200`, `--accent-dim`, `--good`, `--txt`, `--r-md`).
-2. Tour: sin fallbacks violeta; botones de 44 px.
-3. `scripts/validate-css-tokens.mjs` (en el release gate) falla si `index.html` o `beta-reclutamiento.html` usan una `var(--x)` sin definir.
-4. Detector de impeccable (`impeccable detect index.html`): `.btn-accent` sin halo lima (`dark-glow`); el badge "Actualizar app" pasa de `div` lila de 10 px a `<button>` de 12 px con tokens azul señal y dentro de la columna.
-
-### Criterios de aceptación
-
-- `node scripts/validate-css-tokens.mjs` pasa ahora y falla con el `index.html` anterior (5 variables). ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-196`).
 
 ## REQ-197 - Rendimiento: la portada no espera a la config ni a Supabase, y supabase-js va fijado con SRI
 
 **Estado: implementado.**
 
-### Origen
-
-Auditoría impeccable (2026-10-16), medido en producción: LCP móvil de 3.4 s en frío. Para un visitante sin sesión, `boot()` esperaba `/api/config` → `supabase.auth.getSession()` antes de pintar la portada, y supabase-js se cargaba de forma bloqueante desde `@supabase/supabase-js@2` (versión flotante: hoy 2.118.0, publicada el día anterior; sin SRI).
-
-### Alcance
-
-1. `boot()`: sin sesión guardada (`hasStoredAuthSession()`) ni enlace de recuperación, pinta la portada antes de pedir la config; al confirmar "sin sesión" solo se actualizan los planes (`refreshLandingPlans()`), sin repintar ni perder la FAQ abierta. El catálogo se pide en paralelo desde el inicio.
-2. supabase-js `2.117.2` exacta, con `integrity` + `crossorigin` y `defer`; `supabaseLibReady()` la espera antes de `supaInit()`.
-3. `scripts/validate-cdn-pins.mjs` (release gate): scripts de CDN con versión exacta y SRI, y la copia de `tests/e2e/vendor/` igual al hash.
-
-### Fuera de alcance
-
-- Separar la portada de la app (el HTML de 207 KB brotli/750 KB sigue siendo el costo principal): requiere decidir rutas, PWA y service worker.
-
-### Criterios de aceptación
-
-- `navegacion.spec.js`: con `/api/config` colgada la portada se ve y la FAQ abierta sobrevive; con sesión guardada no se muestra la portada. ✓
-- 4G emulado + CPU ×4, local: 5.6 s → 5.1 s hasta el titular. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-197`).
 
 ## REQ-198 - Portada: rediseño "Escalera de días" dentro de la marca Escala
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-16), tras la auditoría impeccable: rediseñar la web pública para que refleje la marca y no parezca una landing genérica. La portada anterior era la plantilla de la categoría: etiqueta en mayúsculas sobre cada sección, grilla de tarjetas iguales con emoji (🥗🏋️🔄📈⚡) y un hueco en escritorio, brillos de acento y FAQ sin estado. Eligió la dirección "Escalera de días" y, como prueba, solo demostración del producto (sin testimonios ni cifras inventadas).
-
-### Alcance
-
-1. Misma marca (REQ-180/189): carbón + lima sólida, Unbounded + Manrope, chevrons. Sin brillos, degradados de acento ni emoji.
-2. Hero: titular de marca a gran tamaño + demo del día (marcada "Ejemplo") con tres imprevistos reales de la app ("Como fuera", "Solo tengo 20 min", "Entreno en casa") que cambian almuerzo o entreno.
-3. Cinco escalones en orden temporal (Hoy, En el entreno, Si el día se tuerce, Cada semana, Al cerrar el ciclo), cada uno con un fragmento de la UI real. En escritorio, una escalera fija que sube y se enciende peldaño a peldaño al bajar (`initLandingStair()`); en móvil, una escalera mini por escalón.
-4. Planes del catálogo con el destacado en campo lima; FAQ con `<details>`; cierre en campo lima a sangre completa. Copy existente y verdadero: no se añaden afirmaciones comerciales.
-
-### Criterios de aceptación
-
-- `tests/e2e/portada.spec.js`: la demo cambia y se revierte; sin emoji ni vocabulario de IA; la escalera se enciende y sigue a la vista. ✓
-- axe (WCAG 2.2 AA + best-practice) sin violaciones a 390 y 1440 px; sin scroll horizontal; controles ≥44 px. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-198`).
 
 ## REQ-199 - Beta: la página de reclutamiento pasa a la marca Escala
 
@@ -1900,3 +1517,411 @@ Los dos selectores de foto (`#f_photo` en el editor de comidas, REQ-172, y el de
 - Ningún `<input type="file">` de la app declara `capture`. ✓
 - En iPhone, "Estimar con foto" ofrece "Fototeca" y "Tomar foto" (verificación manual tras el deploy).
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback de Jonathan sobre el flujo de invitación beta (2026-10-18): se registró como usuario nuevo desde ese flujo y, al hablar con el coach, la app le pidió pagar. Un usuario beta no debe ver precios hasta cumplir tres meses.
+
+### Problema
+
+Hay al menos un camino por el que una cuenta beta acaba en el paywall con su tarjeta de precios (USD 14 / USD 36). Con REQ-203/205, el código de invitación (`scripts/invite-beta-tester.mjs`, 90 días, plan `quarterly`) crea un entitlement `origin:'coupon'` que ya evita el paywall, pero no todos los caminos de alta pasan por ese código, y las pantallas no distinguen "beta" de "cualquier acceso".
+
+### Causa raíz
+
+- `api/admin.js:864` (`createUser`) y `api/admin.js:885` (`inviteUser`) crean la cuenta sin acceso: esa persona cae en la semana gratis de REQ-117 y, al reutilizar un cambio, `api/claude.js:893` responde 402 `trialLimit`, que el cliente convierte en `showPaywall()` (`index.html:7103`, precios en `index.html:7127`).
+- `redeemPendingInvite()` (`index.html:7252`) deja el código para el próximo inicio de sesión si el canje falla con 401/404/5xx. Mientras tanto, la cuenta queda en trial y puede ver el paywall.
+- Aun con acceso beta activo, nada impide que una ruta futura muestre precios: `showPaywall()` no sabe si el usuario es beta.
+- Hay que confirmar cuál de estos caminos vio Jonathan (ver Fuera de alcance, paso manual 1).
+
+### Objetivo
+
+Toda cuenta beta (alta con código de invitación, o creada por el admin como beta) tiene acceso completo durante 90 días. Mientras dure, ninguna pantalla menciona precios, planes de pago ni "activa un plan".
+
+### Alcance
+
+1. Marca beta explícita: el código que emite `invite-beta-tester.mjs` y la cortesía beta producen un entitlement distinguible (p. ej. `notes`/`origin` = beta, sin romper el `check` de `supabase/coupon_codes.sql`; si requiere migración, idempotente y documentada como acción manual).
+2. Admin "Crear cuenta" e "Invitar por correo": casilla "Usuario beta (90 días sin cobro)", marcada por defecto. Si está marcada, el servidor da en la misma acción el acceso beta de 90 días (reusar la lógica de `grant`/`redeem` de `api/entitlement.js`, no duplicarla).
+3. Cliente: con acceso beta, Perfil → Mi suscripción muestra "Acceso beta · hasta <fecha>" sin botones de planes ni precios, y `showPaywall()` no se abre. Si alguna ruta lo pide, aviso neutro sin precios.
+4. Canje pendiente: si `redeemPendingInvite()` no pudo canjear, Perfil avisa "Tu invitación se activará al reconectar" en vez de ofrecer planes, y el canje se reintenta al volver la conexión, no solo en el próximo inicio de sesión.
+5. Últimos 7 días del acceso beta: aviso suave en Perfil ("Tu acceso beta termina el <fecha>"). Los precios solo aparecen tras el vencimiento (alineado con el cierre de `BETA_PROGRAM.md` §5).
+6. Invariante nueva en `AGENTS.md` y `CONTEXT.md` (Pagos): **el cobro siempre ocurre en la web** (`evolvapp.club`), también con app nativa. Una app nativa no ofrece compras dentro de la app: abre la web para pagar y lee el entitlement del servidor.
+
+### Fuera de alcance
+
+- Acciones manuales: (1) revisar en Supabase `user_entitlements` de la cuenta de prueba de Jonathan para confirmar si tenía acceso y con qué `origin`; (2) si no lo tenía, darle cortesía de 90 días desde Admin.
+- Cambiar las cuotas diarias del coach para cuentas con acceso.
+
+### Riesgos
+
+- Abuso: el acceso beta solo nace de un código o del admin; el registro abierto (`SIGNUP_MODE=open`) sigue con el trial.
+- Verificar que `trialFirstWeekOnly` (`index.html:9210`) no limite a una cuenta beta.
+
+### Criterios de aceptación
+
+- E2E: cuenta con acceso beta habla con el coach, rehace opciones y prepara las semanas 2..10 sin paywall; en las 5 tabs y en Perfil abierto no aparece "USD", "Ver planes", "Activa tu plan" ni "Renovar".
+- E2E: canje pendiente por error 5xx → Perfil muestra el aviso de invitación pendiente, no planes.
+- Admin crea una cuenta con la casilla beta → la cuenta nace con acceso de 90 días.
+- Sin acceso beta, el comportamiento actual (trial REQ-117) no cambia.
+- `AGENTS.md` y `CONTEXT.md` contienen la invariante de cobro en la web.
+
+### Verificación sugerida
+
+- `tests/e2e/invitacion.spec.js` + `tests/e2e/beta.spec.js` + `scripts/test-invite-signup-api.mjs` + `node scripts/release-gate.mjs`.
+
+## REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll
+
+**Estado: pendiente. Requiere acción humana: captura y dispositivo/navegador donde se ve, para reproducir; no implementable por el agente autónomo hasta tenerlos.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): "hay que arreglar el scroll horizontal; no coge todo el ancho de la pantalla y siempre hay una barra de scroll".
+
+### Problema
+
+No se pudo reproducir en Chromium móvil emulado (2026-10-18): Hoy, Nutrición, Entreno (también con el reproductor abierto), Progreso, Perfil con todos sus acordeones, los 4 pasos del onboarding, la portada y `beta-reclutamiento.html` (versión anterior al rediseño de REQ-199), a 360, 375 y 390 px, tienen `scrollWidth == clientWidth`, ningún elemento sobresale de `#app` y ningún contenedor tiene scroll horizontal propio.
+
+### Causa raíz (hipótesis a confirmar)
+
+- `index.html:76-77`: `body` es `height:100dvh; overflow:hidden` y el scroll vive en `#app` (`index.html:84-85`, `overflow-y:auto; max-width:560px`), no en el documento. En escritorio, y en navegadores con barras clásicas (Windows, o macOS con "mostrar barras siempre"), la app es una columna de 560 px con su propia barra vertical en medio de la pantalla. Eso encaja con "no coge todo el ancho" y "siempre hay una barra".
+- En iOS, `overflow-x:hidden` solo está en `body`/`#app` y no en `html`. Si algún contenido real (nombres largos de platos o ejercicios del coach, que los mocks no tienen) desborda, Safari permite arrastrar la página de lado.
+
+### Objetivo
+
+En cualquier dispositivo, la app ocupa el ancho disponible de forma intencional y no muestra barras de scroll que no aporten.
+
+### Alcance (una vez reproducido)
+
+1. Según la evidencia: o la barra de `#app` se estiliza/oculta (`scrollbar-gutter`, `scrollbar-width:thin`), o el scroll pasa al documento manteniendo la barra de tabs fija; en móvil, `overflow-x:clip` en `html` y corte de palabras largas (`overflow-wrap:anywhere`) en títulos de platos y ejercicios.
+2. E2E que falle con el código actual en el caso reproducido.
+
+### Criterios de aceptación
+
+- El caso de la captura deja de verse; sin regresión en `tactil.spec.js`, `accesibilidad.spec.js` y `portada.spec.js`.
+
+### Verificación sugerida
+
+- Jonathan: captura + modelo de teléfono/navegador (o "escritorio, Chrome en Windows").
+
+## REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): al crear la cuenta ya se pide peso y % de grasa, pero luego Progreso los vuelve a pedir para la semana 1.
+
+### Problema
+
+Un usuario nuevo escribe su peso y grasa en el alta y, al abrir Progreso, la tarjeta "Registra tu peso de la semana" y la fila S1 vacía le piden lo mismo otra vez.
+
+### Causa raíz
+
+- `saveOnboarding()` guarda `weightKg`, `bodyFatPct`, `cycleStartWeight` y `cycleStartBodyFat` en `profiles.prefs` (`index.html:3670`), pero no escribe la semana 1 de `S.weights`/`weight_log`.
+- `weightSetupCard()` (`index.html:5600`) se muestra mientras `lastWeighedWeek()===null`, y `weightTableHtml()` (`index.html:5725`) deja S1 vacía con "Ingresar mi peso".
+
+### Objetivo
+
+El dato del alta es el registro de la semana 1. Progreso lo muestra ya cargado y explica que la próxima medición es la de la semana 2.
+
+### Alcance
+
+1. Al terminar el onboarding inicial o un ciclo nuevo, si la semana 1 está vacía, escribirla con `setWeightEntry(1,{kg,bf})`, por la misma ruta que sincroniza `weight_log`. Nunca pisar un valor existente.
+2. Usuarios que ya tienen S1 vacía y `cycleStartWeight`: rellenar S1 al cargar Progreso, una vez, con la misma regla.
+3. Copy: con S1 cargada desde el alta, la tarjeta de configuración dice "Tu punto de partida: 75 kg (semana 1). Vuelve a pesarte el <día> para la semana 2", en vez de pedir el dato otra vez.
+
+### Fuera de alcance
+
+- Cambiar `WEIGHT_RANGES` o el check-in semanal.
+
+### Riesgos
+
+- Historial inmutable: solo se rellena un hueco y nunca se sobrescribe. Un usuario que borra S1 a propósito no debe verla reaparecer: la marca "rellenado una vez" vive en prefs.
+
+### Criterios de aceptación
+
+- E2E: onboarding con 75 kg / 18% → Progreso muestra S1 = 75 / 18 y no muestra "Registra tu peso de la semana" para S1.
+- Una S1 ya registrada con otro valor no cambia.
+
+### Verificación sugerida
+
+- `tests/e2e/progreso.spec.js` + `tests/e2e/onboarding.spec.js`.
+
+## REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18), sobre la configuración de la cuenta: "Mantener mi peso y mejorar mi cuerpo" no tiene lógica a primera vista, y "Ritmo del plan" con la opción "Plan completo" no se explica solo; hace falta una ayuda.
+
+### Problema
+
+En el paso 2 del onboarding, la opción del medio no dice que es recomposición. En el paso de entrenamiento, "Plan completo" frente a "Suave" no explica qué cambia, así que el usuario elige a ciegas.
+
+### Causa raíz
+
+- `index.html:3169`: el objetivo `mantenimiento` (que en realidad es recomposición: mismo peso, más músculo y menos grasa) se presenta como "Mantener mi peso y mejorar mi cuerpo", sin descripción. El copy viene de REQ-114 y lo fija `scripts/validate-onboarding-copy.mjs`.
+- `index.html:1072-1076` y `index.html:3036-3038`: "Ritmo del plan" ofrece "Según mi perfil (recomendado) / Suave / bajo impacto / Plan completo". La nota habla de "evaluación de seguridad en verde", sin decir qué cambia en la práctica (intensidad, series, tipo de ejercicios).
+
+### Objetivo
+
+Cada opción dice qué consigue y qué implica, en una línea, sin jerga.
+
+### Alcance
+
+1. Objetivo: tarjetas seleccionables (o `select` + descripción viva) con un título y una línea:
+   - "Bajar grasa": comes un poco menos de lo que gastas; bajas de peso de forma gradual.
+   - "Recomponer mi cuerpo": tu peso casi no cambia, pero ganas músculo y pierdes grasa.
+   - "Ganar músculo": comes un poco más de lo que gastas; subes de peso poco a poco.
+   Mismo copy en Perfil → Objetivo. Los valores internos (`deficit/mantenimiento/volumen`) no cambian.
+2. Ritmo del plan → "Intensidad del entreno", con descripción por opción:
+   - "Recomendado para ti": la elegimos según tu edad, experiencia y respuestas de salud.
+   - "Suave": menos series, esfuerzo moderado y ejercicios sencillos o de bajo impacto.
+   - "Completa": series y esfuerzo normales para tu nivel; disponible si tus respuestas de salud no muestran alertas.
+   Botón ⓘ (patrón de `explainWorkoutEffort()`) con el detalle; misma ayuda en Perfil (`trainingSafetyModeHtml("pf")`).
+3. Actualizar `scripts/validate-onboarding-copy.mjs` y `CONTEXT.md` (línea de REQ-114).
+
+### Fuera de alcance
+
+- Cambiar la lógica de `trainingSafetyRecommendation()` o los cálculos de macros.
+
+### Riesgos
+
+- REQ-31: el copy no menciona IA. Táctil: las tarjetas miden ≥44 px (REQ-193).
+
+### Criterios de aceptación
+
+- El onboarding muestra la descripción de la opción elegida en objetivo e intensidad; el ⓘ abre la explicación.
+- `validate-onboarding-copy.mjs` y `tests/e2e/onboarding.spec.js` en verde con el copy nuevo.
+
+### Verificación sugerida
+
+- Recorrer onboarding a 390 px; axe sin violaciones en el paso 2 y en el de entrenamiento.
+
+## REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): alguien ajeno al entrenamiento no sabe cómo calentar. El calentamiento y la vuelta a la calma deben decir exactamente qué hacer, y el cronómetro debería ser opcional: que la persona elija cómo hacerlo.
+
+### Problema
+
+Una persona sin experiencia ve "Calentamiento · Movilidad dinámica y series de aproximación" y una cuenta atrás de 5 a 10 minutos, pero no sabe qué movimientos hacer. La cuenta atrás se presenta como el camino principal.
+
+### Causa raíz
+
+- `workout-player.js:159-162` y `workout-player.js:240-245`: el calentamiento de fuerza es un único bloque con el texto "Movilidad dinámica y series de aproximación de los primeros movimientos" (o el `warmup` libre del coach, REQ-177). `workout-player.js:189-191` y `workout-player.js:259-261` hacen lo mismo con "Respiración tranquila y movilidad suave de las zonas trabajadas". No hay movimientos, repeticiones ni demostración.
+- `index.html:5254-5264` + `index.html:5200`: el bloque cronometrado muestra solo "Objetivo / Intensidad", y su botón principal es "Iniciar bloque" (cuenta atrás). "Marcar completado" queda como secundario, así que parece obligatorio usar el cronómetro.
+
+### Objetivo
+
+El usuario ve una lista corta de movimientos con dosis ("Círculos de cadera · 10 por lado") y demostración. Elige entre hacerlo guiado (con tiempo por movimiento) o marcarlo hecho.
+
+### Alcance
+
+1. Catálogo de movimientos de calentamiento y vuelta a la calma (en `exercise-catalog.js`, rol `warmup`/`cooldown`, con media si existe), elegidos por los grupos musculares y el patrón de la sesión (tren inferior, superior, cuerpo completo, cardio). De 4 a 6 movimientos, con dosis en reps o segundos.
+2. `generatedStrengthSteps()` y el cardio: el paso `warmup`/`cooldown` lleva `movements:[{slug,name,dose}]`. Si el coach trae `warmup` propio (REQ-177), se muestra como nota y se mantienen los movimientos concretos.
+3. Reproductor: dos acciones del mismo peso, "Guíame" (avanza movimiento a movimiento, con cuenta atrás opcional) y "Ya calenté" (marca hecho). Sin cuenta atrás automática.
+4. Resumen previo (REQ-174): el calentamiento lista sus movimientos.
+
+### Fuera de alcance
+
+- Grabar videos nuevos (reusar media del catálogo o la Free Exercise DB).
+
+### Riesgos
+
+- Modo suave (REQ-116): sin movimientos de impacto ni invertidos. Historial: las sesiones ya ejecutadas conservan su paso antiguo.
+
+### Criterios de aceptación
+
+- Una sesión de piernas muestra de 4 a 6 movimientos de calentamiento de tren inferior con dosis; una de tren superior, otros distintos.
+- Se puede completar el calentamiento sin iniciar ningún cronómetro.
+- `validate-training-plan.mjs` y `tests/e2e/entreno.spec.js` en verde.
+
+### Verificación sugerida
+
+- E2E nuevo: "Ya calenté" avanza sin timer; "Guíame" recorre los movimientos.
+
+## REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): el botón "Actualizar app" a veces tapa otros controles y no se entiende para qué sirve. La app debe actualizarse sin interferir con el uso diario.
+
+### Problema
+
+Tras un deploy aparece un botón flotante "Actualizar app" que tapa controles y no explica para qué sirve; tocarlo recarga la app en ese momento.
+
+### Causa raíz
+
+- `index.html:927` + `index.html:867`: `#update-badge` es un `position:fixed` a `bottom:70px`, a la izquierda de la columna, encima del contenido. Tapa controles del reproductor ("+ Añadir serie", "Omitir bloque") y de las tarjetas.
+- `index.html:12589-12595`: aparece en cuanto se instala un service worker nuevo, y `applyPendingAppUpdate()` hace `location.reload()` en ese momento, con el usuario a mitad de una tarea.
+
+### Objetivo
+
+Con una versión nueva instalada, la app se actualiza sola en un momento seguro, sin botón flotante.
+
+### Alcance
+
+1. Sin `#update-badge`. Con una actualización pendiente, recargar automáticamente cuando la app vuelve de segundo plano (`visibilitychange` → `visible`, tras más de 30 s oculta) o en la siguiente apertura, y solo si no hay un momento "ocupado": entreno `in_progress`, modal abierto, formulario de Perfil con cambios sin guardar (`pfGroupDirty`), coach respondiendo o cola de sync con pendientes.
+2. Si no hubo momento seguro en 24 h: línea discreta en Perfil → Cuenta ("Hay una versión nueva · Actualizar"), nunca flotante.
+3. Tras recargar por actualización: toast breve "App actualizada", una vez.
+
+### Fuera de alcance
+
+- Cambiar la estrategia de caché del service worker (REQ-173/182).
+
+### Riesgos
+
+- Perder estado: la recarga solo ocurre con la cola de sync vacía y sin entreno en curso.
+
+### Criterios de aceptación
+
+- E2E: con una actualización simulada y un entreno en curso no se recarga; al terminarlo y volver de segundo plano, sí.
+- No queda ningún elemento fijo nuevo sobre el contenido (`tactil.spec.js` y `accesibilidad.spec.js` en verde).
+
+### Verificación sugerida
+
+- Simular `notifyAppUpdateAvailable()` en E2E y despachar `visibilitychange`.
+
+## REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): tiene que haber una forma de reiniciar el plan de 10 semanas sin tocar la suscripción. Si pasan muchos días sin entrenar, la app debería sugerirlo, y si el usuario decide volver a empezar de cero, debe poder rehacer el plan de 4 o 10 semanas.
+
+### Problema
+
+Quien se atrasa o abandona unas semanas no puede volver a empezar: el plan sigue contando desde la fecha original hasta el recap final, y solo un admin puede reiniciar (borrando datos).
+
+### Causa raíz
+
+- El único camino a un ciclo nuevo es el recap de fin de ciclo: `startNextChallenge()` (`index.html:2658`) archiva el ciclo (`archiveCompletedCycle`, `index.html:10864`) y marca `onboardingPending:true`. Antes del final no hay acción de usuario. El reinicio de REQ-126 es solo de admin y borra datos.
+- Nada detecta la inactividad prolongada para ofrecer reiniciar.
+
+### Objetivo
+
+Perfil → Objetivo ofrece "Empezar de nuevo mi plan": el usuario elige 4 o 10 semanas, revisa sus datos precargados y arranca un ciclo nuevo desde hoy. El historial y la suscripción se conservan.
+
+### Alcance
+
+1. Acción "Empezar de nuevo" con confirmación que explica el impacto: "Tu historial se conserva; tu plan arranca hoy desde la semana 1".
+2. Reusar la ruta del recap: archivar el ciclo actual como **interrumpido** (sin exigir el resumen completo ni la foto), `onboardingPending:true` y onboarding con los datos actuales precargados y la duración elegible. `saveOnboarding()` ya prepara la primera semana (REQ-118).
+3. Sugerencia: con 14 días o más sin entreno registrado (y sin descanso planificado), tarjeta en Hoy: "Hace 2 semanas que no entrenas. ¿Retomamos donde ibas o empiezas de nuevo?", con "Retomar" (sigue el plan) y "Empezar de nuevo" (paso 1). Se puede descartar y no reaparece en 7 días.
+4. No toca entitlement, cortesía, beta ni trial: el trial no se renueva por empezar de nuevo.
+
+### Fuera de alcance
+
+- Borrar historial (sigue siendo acción de admin, REQ-126).
+
+### Riesgos
+
+- Historial inmutable: los `day_log` y `plan_versions` pasados quedan intactos; las versiones activas futuras pasan a `superseded`.
+- `trialStartedAt()` (`api/claude.js:197`) lee `onboardingCompletedAt`: un ciclo nuevo no debe reabrir el trial. Verificar que `get_or_create_coach_trial` es idempotente por usuario.
+
+### Criterios de aceptación
+
+- E2E: en la semana 5, "Empezar de nuevo" → 4 semanas → Hoy muestra la semana 1 desde hoy; Progreso conserva los pesos anteriores en el ciclo archivado.
+- Con 14 días sin entreno aparece la sugerencia y "Retomar" la oculta.
+
+### Verificación sugerida
+
+- `tests/e2e/ciclo-nuevo.spec.js` (nuevo) + `validate-training-plan.mjs`.
+
+## REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar"
+
+**Estado: pendiente.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): hace falta una lista de compra que separe lo que ya tienes en casa de lo que tienes que comprar, con la cantidad necesaria para la semana.
+
+### Problema
+
+El usuario no tiene dónde ver qué comprar para la semana después de aplicar el plan, ni puede descontar lo que ya tiene en casa.
+
+### Causa raíz
+
+- La lista existe solo dentro del modal de revisión de "Preparar semana" (`index.html:9992-9997`): un `<details>` de solo lectura que desaparece al aplicar. Se guarda en `snapshot.shoppingList` (`index.html:1795`), pero ninguna pantalla la vuelve a mostrar.
+- Se calcula sobre el plan propuesto: si después el usuario cambia una comida (override en `day_log`), la lista queda vieja.
+
+### Objetivo
+
+Una pantalla "Lista de compra" en Nutrición, siempre disponible para la semana activa, con cantidades para lo que queda de semana y dos estados por ingrediente.
+
+### Alcance
+
+1. Entrada en Nutrición ("Lista de compra · semana N") que abre una vista o sheet.
+2. Cantidades calculadas con `buildShoppingListFromNutritionPlan()` sobre las comidas **efectivas** de cada día (`mealValue()`: override > plan), por defecto de hoy al final de la semana, con opción "semana completa". Agrupar por categoría y redondear a unidades prácticas cuando el catálogo lo permita ("3 huevos", "1 kg de pollo"), conservando los gramos.
+3. Cada ingrediente se marca "Ya lo tengo" o "Por comprar" (por defecto). Dos secciones con contador ("Por comprar · 12"). Marcar no cambia el plan.
+4. Las marcas se guardan por usuario y semana (clave `version_key` del plan) en `profiles.prefs.shoppingChecks`, sincronizadas como el resto de prefs, sin migración. Se limpian las de semanas pasadas.
+5. Copiar/compartir la lista "Por comprar" como texto (Web Share API, o portapapeles como respaldo).
+
+### Fuera de alcance
+
+- Precios, tiendas o pedidos en línea. Despensa persistente entre semanas (candidato futuro).
+
+### Riesgos
+
+- Privacidad: la lista es dato personal; no va a analytics (solo el evento `shopping_list_opened` sin contenido).
+
+### Criterios de aceptación
+
+- E2E: cambiar una comida actualiza la cantidad del ingrediente afectado; marcar "Ya lo tengo" lo mueve de sección y sobrevive a recargar.
+- La vista funciona sin conexión con el último plan cacheado.
+
+### Verificación sugerida
+
+- `tests/e2e/lista-compra.spec.js` (nuevo) + `validate-nutrition-domain.mjs`.
+
+## REQ-216 - Modo conversacional (beta oculta): usar la app desde el chat
+
+**Estado: pendiente. Requiere decisión de producto (alcance de la fase 1, quién lo ve y presupuesto de llamadas pagadas para probarlo); no implementable por el agente autónomo hasta aprobarla.**
+
+### Origen
+
+Feedback de Jonathan (2026-10-18): llevar la interfaz a algo predominantemente agéntico. En el futuro no harían falta tantos controles: el uso es conversacional (qué entreno hoy y la rutina paso a paso; qué como; "estoy comiendo otra cosa" con una foto) y la conversación muestra controles y botones dentro del propio chat. El usuario debe poder elegir entre la interfaz normal y la conversacional, y la conversacional debe probarse bien primero, oculta o en beta, sin afectar lo que ya funciona.
+
+### Punto de partida en el código
+
+- REQ-21/REQ-42: el coach vive en Hoy (`renderHoy()`, `index.html:4419`) con contexto de macros, entreno y semana (`buildCoachContextText()`, `index.html:5859`).
+- `sendCoachMessage()` (`index.html:6244`) ya devuelve `propuesta` con acciones validadas (`COACH_ACTION_TYPES`, `index.html:5820`: descanso, registrar comida, cambiar plato, adaptar entreno, registrar peso).
+- REQ-172: estimar una comida con foto. REQ-41: ejecutor de acciones con guardrails.
+
+### Objetivo
+
+Un modo "Conversación" que se activa desde Perfil (solo para cuentas con la marca `labs.conversational`, que pone el admin). Usa los mismos datos y validaciones que la interfaz normal y permite volver a ella en un toque.
+
+### Alcance propuesto por fases (a aprobar)
+
+1. **Fase 1, shell y tarjetas:** marca por usuario; el modo reemplaza las tabs por un hilo con barra de entrada (texto, foto, voz). Al abrir, el coach saluda con el estado del día **sin llamada pagada** (agenda determinista de REQ-40) y tarjetas interactivas dentro del hilo: "Entreno de hoy" (abre el reproductor existente en línea), "Comidas de hoy" (marcar hecha / cambiar), "Registrar peso". Las acciones del coach se confirman con botones en la tarjeta, nunca en silencio.
+2. **Fase 2, intención libre:** "estoy comiendo otra cosa" + foto → `meal_estimate` → tarjeta con macros y "Registrar"; "solo tengo 20 min" → adaptar entreno con vista previa.
+3. **Fase 3, medir:** eventos de uso por modo (sin contenido) para comparar adherencia antes de abrirlo a más usuarios.
+
+### Fuera de alcance
+
+- Quitar la interfaz normal. Nuevas dependencias o framework.
+
+### Riesgos
+
+- Costo: cada mensaje libre es una llamada pagada; reusar las cuotas de `coach_conversation` y priorizar tarjetas deterministas.
+- REQ-31: el modo no menciona IA. Confirmación antes de modificar (principio 4). La degradación sin conexión vuelve a las tarjetas deterministas.
+
+### Criterios de aceptación (fase 1)
+
+- Sin la marca, nada cambia (E2E existentes en verde).
+- Con la marca: se puede completar el día (entreno + comidas + peso) solo desde el hilo, sin llamadas pagadas, con E2E y mocks.
+
+### Verificación sugerida
+
+- Prototipo navegable antes de implementar (`impeccable shape`), revisado por Jonathan.

@@ -8341,3 +8341,526 @@ Jonathan (2026-10-16): no le gusta el logo de la PWA; pide actualizar también e
 - Tras el deploy, el depurador de compartir de Facebook o una vista previa de WhatsApp muestran la imagen nueva (verificación manual: esas plataformas guardan la vista previa vieja en caché).
 - Portada y login muestran el nuevo `brandMark()`. ✓
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-168 - Reproductor de entreno usable en móvil: dosis sin desborde, RPE explicado, series añadibles y "serie hecha" explícita
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Jonathan (2026-10-12) probando el plan Push/Legs/Pull cargado a una usuaria, con capturas de iPhone y escritorio.
+
+### Problema
+
+1. En móvil se cortaban las tarjetas de la dosis (descanso, RIR) y en escritorio se salían del borde de la tarjeta.
+2. "RPE" y "RIR" no se explican en ninguna parte.
+3. No se pueden registrar más series que las prescritas.
+4. Marcar una serie como hecha dependía de tocar un círculo con el número de serie; no se entendía que era un control.
+
+### Causa raíz
+
+1. `.scard .n` (24px) se declara después de `.player-dose .n` (16px) con igual especificidad y gana; además la grilla usaba `repeat(3,1fr)`, que no baja del ancho mínimo del contenido ("Controlado").
+2. Sin ayuda contextual.
+3. `normalizeStep()` (`workout-player.js`) recorta `sets` a `prescribedSets` en cada normalización.
+4. `renderStrengthSet()` reutilizaba el `.chk` circular de comidas con el número de serie como contenido.
+
+### Alcance
+
+1. `.player-dose` con `minmax(0,1fr)` y `.player-dose .scard .n` con mayor especificidad; 2 columnas bajo 380px.
+2. Tarjetas de esfuerzo `N/10 · esfuerzo (RPE) ⓘ` y `en reserva (RIR) ⓘ` tocables → `explainWorkoutEffort()`; la columna del set dice "Esfuerzo (RPE)".
+3. `step.extraSets` persistido (0–10) en `normalizeStep()`; botón "+ Añadir serie" y "Quitar" en la última serie extra sin completar.
+4. Fila de serie con título "Serie N" y botón explícito "Marcar hecha" → "✓ Hecha" (`aria-pressed`).
+
+### Fuera de alcance
+
+- Cambiar la prescripción del plan o el cálculo de carga sugerida.
+
+### Criterios de aceptación
+
+- A 375px ninguna tarjeta de dosis ni fila de serie se sale de la tarjeta del ejercicio y no hay scroll horizontal. ✓ (verificado con Playwright)
+- Añadir serie suma una fila que sobrevive a la normalización; quitarla solo es posible si es extra y no está hecha. ✓
+- El E2E de Entreno completa la sesión con el nuevo control. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-171 - Fix nutrición: las calorías del día no convergen con comidas propuestas por el coach
+
+**Estado: implementado.**
+
+### Origen
+
+Bug C reportado por Jonathan (2026-10-12): tras varios intentos el día sigue sin alcanzar la meta de kcal.
+
+### Problema
+
+Con propuestas del coach solo el 66% de los días quedaba dentro de la tolerancia de kcal de `DIET_CONTRACT` (±max(50 kcal, 3%)); el 10% peor se desviaba más de 250 kcal.
+
+### Causa raíz
+
+`collectGlobalLines()` (`js/nutrition-domain.js`) solo tomaba como palancas las líneas de comidas que coinciden con un plato del catálogo; las propuestas del coach quedaban fijas. A la vez, el prompt le decía al coach que no ajustara gramos porque "el sistema ajusta las porciones". Nadie ajustaba.
+
+### Alcance
+
+1. `collectGlobalLines()` escala las líneas de propuestas sin plato (`proposal_recalculated`) entre 0.5× y 1.75× de lo propuesto, con los topes por categoría existentes.
+2. El prompt del día pide gramos cerca del presupuesto de cada slot y la suma a ±50 kcal de la meta.
+3. `scripts/validate-proposal-close.mjs` (gate): propuestas simuladas con nombre inventado y gramos ±30%; exige ≥90% de días en tolerancia de kcal sin reemplazar comidas propuestas. `scripts/seed-catalog.mjs` comparte el parser del seed con el canario.
+
+### Criterios de aceptación
+
+- Días en tolerancia de kcal con propuestas: 66.0% → 93.1%; |Δkcal| mediana 35 → 18, p90 253 → 47; 100% de propuestas conservadas. ✓
+- El canario determinista no cambia (289/378, 76.5%). ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-172 - Estimar macros de una comida con una foto, con preguntas de aclaración
+
+**Estado: implementado.**
+
+### Origen
+
+Pedido de Jonathan (2026-10-12): al agregar o editar una comida, tomar una foto, enviarla al coach para estimar los macros y que pregunte lo que necesite aclarar.
+
+### Alcance
+
+1. Editor de comidas (agregar y editar, `editorSheet()`): botón "📷 Estimar con foto" con `capture="environment"`; la foto se reduce en el teléfono a 1024 px JPEG (`mealPhotoToJpeg()`) y se muestra como vista previa.
+2. `photoEstimateRound()`: acción existente `meal_estimate` (sin migración ni cuota nueva; cada ronda consume una unidad) con la foto, la descripción y las respuestas previas. La respuesta trae siempre la mejor estimación y hasta 2 `preguntas` sobre lo que no se ve y cambia las kcal (porción, aceite, salsas, bebida). Máximo 3 rondas; las preguntas ya respondidas no se repiten. "Así está bien" acepta la estimación actual.
+3. El nombre se completa si está vacío o si lo puso una ronda anterior; lo que escribió el usuario se respeta.
+4. Proxy (`api/claude.js`): `imageInput()` acepta imagen solo en `meal_estimate`, tipos JPEG/PNG/WebP y ≤3 MB en base64, y la valida antes de reservar cuota; `userContent()` envía el bloque `image` antes del texto; `meal_estimate` pasa a structured outputs con `mealEstimateOutputSchema()`.
+5. La clave de reutilización incluye el hash de la foto y de las respuestas: una respuesta guardada nunca se sirve para otra foto.
+6. Privacidad: la foto no se guarda ni se registra; solo viaja en la consulta (`PRIVACY.md`).
+
+### Fuera de alcance
+
+- Guardar la foto junto a la comida o en el historial.
+- Estimar con foto desde el reemplazo de comidas del plan ("Cambiar comida").
+
+### Criterios de aceptación
+
+- Foto → estimación con pregunta → respuesta → estimación final que se guarda. ✓ (`tests/e2e/foto-comida.spec.js`)
+- Otras acciones rechazan imágenes; tipos y tamaño validados; validación antes de la cuota. ✓ (`scripts/validate-meal-photo-estimate.mjs`)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-173 - Fix PWA: los deploys no llegan a la app instalada si no cambia `CACHE_NAME`
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-12) no encontraba "Estimar con foto" tras el deploy de REQ-172.
+
+### Causa raíz
+
+El service worker sirve HTML y JS cache-first (REQ-150) y el navegador solo instala uno nuevo cuando cambia `service-worker.js`. Los deploys de REQ-167 a REQ-172 cambiaron `index.html`, `workout-player.js` y `js/nutrition-domain.js` sin subir `CACHE_NAME` (seguía en `fitbud-pwa-v71`), así que la PWA instalada siguió mostrando la versión anterior.
+
+### Alcance
+
+1. `CACHE_NAME` → `fitbud-pwa-v72`.
+2. `scripts/validate-sw-cache-bump.mjs` en el release gate: si cambió un archivo del `APP_SHELL` contra `origin/main` (o `--base <ref>`), `CACHE_NAME` debe ser distinto.
+
+### Criterios de aceptación
+
+- Con `--base 24e2607` y sin subir la versión, el validador falla nombrando los archivos; con `v72` pasa. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-174 - Entreno: antes de empezar se ve qué se va a hacer (series × repeticiones)
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-12): antes de iniciar el entreno el resumen no dice qué se va a hacer ni cuántas series o repeticiones.
+
+### Problema
+
+La tarjeta de la sesión solo mostraba el nombre y un texto general; la "Vista previa de ejercicios" muestra técnica pero no la dosis. La dosis solo aparecía ejercicio por ejercicio dentro del reproductor.
+
+### Alcance
+
+1. `workoutPlanSummaryHtml(prescription)` en la tarjeta del entreno (sin sesión en curso): total de ejercicios, series y minutos; por ejercicio, series × repeticiones, descanso y RPE; calentamiento y vuelta a la calma con su duración; enlace "¿Qué es RPE?".
+2. `CACHE_NAME` → `fitbud-pwa-v73` (REQ-173).
+
+### Criterios de aceptación
+
+- El E2E de Entreno ve "Qué vas a hacer hoy · N ejercicios · N series" y la dosis "N × reps" antes de iniciar. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-175 - Capa de espera que bloquea la app mientras el coach responde
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-12): mientras el coach genera (por ejemplo, el plan de entrenamiento), se puede cerrar el modal con la X; la generación sigue corriendo detrás y al volver a pedirla la pantalla no se actualiza ("Esta acción ya está en proceso"). Pidió un spinner que bloquee toda la pantalla hasta que responda.
+
+### Alcance
+
+1. `showCoachBusy()`/`hideCoachBusy()`: capa a pantalla completa (`#coach-busy`, z-index sobre el modal) con spinner y mensaje por acción (`coachBusyLabel()`: "Preparando tu plan…", "Estimando tu comida…"…).
+2. Ligada a la acción completa: `beginCoachAction()` la muestra y `endCoachAction()` la oculta solo si la acción estaba en curso; `callClaude()` también la sostiene. Cubre generaciones con varias consultas seguidas sin huecos.
+3. Escape no cierra el modal mientras el coach responde.
+4. Salvaguardas: tope de 90 s por intento en `coachProxyFetch()` (AbortController) y cierre automático de la capa a los 4 min con aviso, para que la app nunca quede bloqueada.
+
+### Criterios de aceptación
+
+- Durante "Preparar mi plan" la X del modal queda tapada, Escape no cierra y al responder el resultado sigue en el modal. ✓ (`tests/e2e/alta-y-espera.spec.js`)
+- Durante "Estimar macros" el botón Guardar queda tapado hasta la respuesta. ✓
+
+## REQ-176 - Alta de usuarios sin depender del correo
+
+**Estado: implementado.**
+
+### Origen
+
+Alta fallida de una usuaria (2026-10-12): enlace de invitación consumido, "Auth session missing!" (REQ-167) y "email rate limit exceeded" del SMTP por defecto de Supabase.
+
+### Alcance
+
+1. `api/admin.js` acción `createUser`: crea la cuenta confirmada con contraseña temporal `xxxx-xxxx-xxxx` (aleatoria criptográfica, sin caracteres ambiguos), `user_metadata.must_change_password=true` y perfil activo; nunca pisa una cuenta existente (409).
+2. Panel admin "Crear cuenta": muestra la contraseña una sola vez y un mensaje listo para copiar o enviar por WhatsApp.
+3. Primer ingreso: `onAuth()` detecta `must_change_password` y muestra "Crea tu propia contraseña"; `updateUser` guarda la contraseña y limpia la marca con la misma sesión (sin enlaces de correo) y la app continúa.
+4. "Invitar por correo" se mantiene como alternativa.
+
+### Fuera de alcance (acción manual)
+
+- SMTP propio en Supabase (Auth → SMTP) y Redirect URLs de producción (REQ-60): necesitan credenciales del proveedor y el dashboard.
+
+### Criterios de aceptación
+
+- Una cuenta con `must_change_password` ve la pantalla de contraseña, la guarda y entra a la app. ✓ (E2E)
+- `scripts/validate-admin-create-user.mjs`: formato, aleatoriedad y cableado. ✓
+
+## REQ-177 - Planes de un coach conservan sus textos: calentamiento por día, duración y descanso
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-12): la rutina cargada a una usuaria debe ser ejercicio por ejercicio igual a la del coach (LeoFitnessCoach).
+
+### Problema
+
+El plan guardaba duración y descanso como números (55 min, 105 s) y usaba un calentamiento genérico, así que no podía mostrar los rangos ("45–60 min", "90–120 s") ni el calentamiento específico de cada día.
+
+### Alcance
+
+1. Campos opcionales en `snapshot.trainingPlan`: `session.durationLabel`, `session.warmup`, `exercise.restLabel`.
+2. `workoutFromSession()` (`training-plan.js`) usa `durationLabel` en el detalle y los pasa a `generatedPrescription`; `generatedStrengthSteps()` (`workout-player.js`) usa `warmup` como objetivo del calentamiento y copia `restLabel` al paso; el temporizador sigue usando `restSeconds` (mínimo del rango).
+3. El reproductor y el resumen previo (REQ-174) muestran `restLabel` y `durationLabel` cuando existen.
+4. `scripts/validate-coach-plan-labels.mjs` en el release gate. `CACHE_NAME` v75.
+
+### Criterios de aceptación
+
+- Una sesión con textos del coach llega al reproductor con el mismo calentamiento, duración y descanso. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-178 - Fix facturación: el historial de pagos muestra el cargo original en lugar del monto reembolsado en reembolsos parciales
+
+**Estado: implementado.**
+`moneyFromPayload` ahora recibe `event_type`; para `charge.refunded` prioriza `amount_refunded` sobre `amount` (el resto de tipos conserva el orden anterior). Test en `scripts/test-billing-history-api.mjs` cubre reembolso parcial, total y pago normal.
+
+### Origen
+
+Auditoría del journey `facturacion` (Perfil → Suscripción → "Historial de pagos"). Commit previo leído: `903acd2` (REQ-177). Partiendo de REQ-148 (un reembolso parcial de Stripe ya NO revoca el entitlement y queda auditado como evento `charge.refunded` visible al usuario), se revisó cómo se proyecta el monto de cada evento hacia la UI.
+
+### Problema
+
+Un reembolso parcial (p. ej. $7 sobre un cargo de $14) aparece en el historial del usuario como **"Reembolso registrado · USD 14.00"**: se muestra el cargo original completo, no los $7 realmente devueltos. Un reembolso total coincide por casualidad (el monto original y el reembolsado son iguales), así que el bug solo se manifiesta en reembolsos parciales — justo el caso que REQ-148 hizo visible al dejarlos como evento sin revocar acceso. El usuario ve un monto de reembolso inflado respecto a lo que se le devolvió.
+
+### Causa raíz
+
+`moneyFromPayload(payload)` en `api/entitlement.js:62-67`:
+
+```js
+const amount = firstFinite(obj.amount_total, obj.amount_paid, obj.amount, obj.amount_refunded);
+```
+
+`billing_events.payload` guarda el `event` completo de Stripe (`api/webhook.js:226`), así que para `charge.refunded` el `payload.data.object` es un **charge**: tiene `amount` (cargo original) y `amount_refunded` (lo reembolsado), pero NO `amount_total` ni `amount_paid` (esos viven en `checkout.session`). Como `amount` precede a `amount_refunded` en `firstFinite`, la proyección devuelve el cargo original (1400) antes de llegar al monto reembolsado (700). El orden de precedencia es fijo para todos los tipos de evento; `charge.refunded` necesita priorizar `amount_refunded`.
+
+### Objetivo
+
+En el historial de pagos, un evento de reembolso muestra el monto efectivamente reembolsado, de modo que un reembolso parcial de $7 se lea "USD 7.00" y no "USD 14.00".
+
+### Alcance
+
+1. En `moneyFromPayload`/`projectEvent` (`api/entitlement.js`), para `event_type === "charge.refunded"` resolver el monto priorizando `obj.amount_refunded` (cae a `amount` solo si falta). El resto de tipos (`checkout.session.completed`, `checkout.session.expired`, `payment_intent.payment_failed`, `charge.dispute.created`) conservan su orden actual.
+2. Cubrir el caso con un test del proyector (reembolso parcial → monto reembolsado; reembolso total → sigue correcto; pago normal → sin cambios).
+
+### Fuera de alcance
+
+- La lógica de revocación de `handleRefund` (REQ-148) no se toca: parcial sigue sin revocar.
+- El formateo de moneda del cliente (`billingAmountText`, `index.html`) ya es correcto; el defecto está en el valor proyectado por el servidor.
+- `billingEventLabel`/`billingStatusLabel` (etiquetas) no cambian.
+
+### Riesgos
+
+- Regresión en el monto de otros tipos de evento si el cambio no se acota a `charge.refunded`.
+- Reembolsos antiguos ya registrados conservan su payload; la corrección aplica al proyectar, así que el historial se corrige al releerse sin migrar datos.
+
+### Criterios de aceptación
+
+- Un `charge.refunded` con `amount:1400, amount_refunded:700` se proyecta con `amount_cents:700` (UI: "USD 7.00").
+- Un reembolso total (`amount==amount_refunded`) y un `checkout.session.completed` siguen mostrando el monto correcto.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Test del proyector de `billing-history` con los tres payloads (parcial, total, pago normal).
+- Manual: inyectar en `billingHistory` un evento `charge.refunded` con `amount_cents` derivado del reembolso real y confirmar en Perfil → Suscripción → "Historial de pagos" que el renglón muestra el monto reembolsado.
+
+## REQ-179 - Supabase no se pausa por inactividad: keep-alive en el cron diario
+
+**Estado: implementado.**
+
+### Origen
+
+2026-10-12: el proyecto de Supabase (plan gratuito) estaba pausado; login, sync y catálogo caídos en producción ("Load failed") hasta restaurarlo a mano.
+
+### Causa raíz
+
+El plan gratuito pausa el proyecto tras ~7 días sin actividad. El cron diario `/api/notify` sí consulta la base, pero corta antes en la autenticación: espera `x-vercel-cron: 1` o `Authorization: Bearer CRON_SECRET`, y Vercel identifica sus crons por `user-agent: vercel-cron/1.0` y solo envía `Authorization` si `CRON_SECRET` existe. Sin esa variable, el job devolvía 401 sin tocar la base.
+
+### Alcance
+
+1. `keepSupabaseAwake()` en `api/notify.js`: lectura mínima (`profiles?select=id&limit=1`, service role, no devuelve datos) al inicio de cada invocación, antes de autenticar; un fallo no rompe el handler.
+2. `scripts/validate-supabase-keepalive.mjs` en el release gate.
+
+### Fuera de alcance
+
+- Configurar `CRON_SECRET` en Vercel para que los recordatorios por correo/push (REQ-24/38) también corran; el keep-alive no depende de eso.
+
+### Criterios de aceptación
+
+- Una invocación de cron sin secreto responde 401 pero ejecuta la lectura mínima. ✓
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-182 - Fix PWA: el gate de bump de caché no cubre `assets/icon-180.png` (apple-touch-icon cache-first fuera de `APP_SHELL`)
+
+**Estado: implementado.**
+`assets/icon-180.png` entró a `APP_SHELL` (`service-worker.js`); `CACHE_NAME` subió a `fitbud-pwa-v87`. El validador deriva su pathspec de `APP_SHELL`, así que ya vigila el ícono.
+
+### Origen
+
+Auditoría del journey `pwa` (rotación del auditor) sobre HEAD `1a93967`. Revisados `service-worker.js`, `scripts/validate-sw-cache-bump.mjs`, `index.html` (`<head>` PWA) y `manifest.webmanifest`. El rebrand REQ-180 regeneró los tres íconos (`icon-180/192/512`) el 2026-10-14.
+
+### Problema
+
+El service worker cachea cache-first **cualquier** recurso estático del mismo origen (`service-worker.js:49-60`), pero el gate que obliga a subir `CACHE_NAME` cuando cambia un recurso cache-first (REQ-173) solo vigila la lista `APP_SHELL`. `assets/icon-180.png` —el `apple-touch-icon` que `index.html:16` referencia en cada vista— es cache-first pero no está en `APP_SHELL` ni en la lista que vigila el validador. Si un deploy cambia solo ese ícono (p. ej. un retoque de marca posterior a REQ-180), `node scripts/validate-sw-cache-bump.mjs` reporta "sin cambios en el shell", el gate pasa sin exigir bump, y cada cliente que ya cacheó el ícono viejo lo sigue sirviendo indefinidamente (cacheFirst nunca revalida) hasta que un cambio no relacionado del `APP_SHELL` suba `CACHE_NAME`. En el rebrand REQ-180 el ícono se refrescó solo por casualidad —`index.html`/`service-worker.js` cambiaron en el mismo commit y forzaron el bump—; un cambio de ícono aislado se escaparía.
+
+### Causa raíz
+
+`APP_SHELL` (`service-worker.js:2-15`) incluye `icon-192`/`icon-512` pero omite `assets/icon-180.png`, aunque `index.html:16` lo carga como `apple-touch-icon`. El validador deriva su lista vigilada de `APP_SHELL` + `index.html` (`scripts/validate-sw-cache-bump.mjs:18-19`), así que un diff de `icon-180.png` nunca entra en su pathspec: es el único recurso estático de mismo origen que `index.html` referencia fuera del `APP_SHELL` (`config.js` es network-first y queda fuera a propósito).
+
+### Objetivo
+
+Que cambiar el ícono de la app obligue a subir `CACHE_NAME`, para que ningún cliente instalado quede con un `apple-touch-icon` obsoleto, y que el ícono quede disponible offline como el resto del shell.
+
+### Alcance
+
+1. Agregar `"./assets/icon-180.png"` a `APP_SHELL` en `service-worker.js` (lo precachea y, de paso, lo mete en la lista que el validador vigila).
+2. Subir `CACHE_NAME` por el cambio del shell.
+
+### Fuera de alcance
+
+- Rediseñar el ícono o la estrategia de caché; `config.js` (network-first) sigue fuera del `APP_SHELL` a propósito.
+- Separar `purpose: "any"` vs `maskable` en el manifest (discusión aparte).
+
+### Riesgos
+
+- Mínimos: una entrada más en el precache del SW. El propio `validate-sw-cache-bump.mjs` exigirá el bump de `CACHE_NAME` (ya incluido en el Alcance), así que no hay riesgo de olvidarlo.
+
+### Criterios de aceptación
+
+- `assets/icon-180.png` figura en `APP_SHELL`; un cambio aislado de ese ícono hace fallar `node scripts/validate-sw-cache-bump.mjs` mientras no se suba `CACHE_NAME`.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Reproducir el diff que corre el validador: `git diff --name-only <base> HEAD -- <lista APP_SHELL>`. Tras el fix el ícono aparece en el pathspec; antes no. Demostrado en la auditoría contra `06cd60f..9c2997b`: `icon-180.png` cambió en ese rango pero el pathspec del shell no lo veía (solo `icon-192`/`icon-512`).
+
+## REQ-183 - Dominio propio: Evolv en evolvapp.club
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan compró `evolvapp.club` en Porkbun (2026-10-16) para la marca Evolv (REQ-180).
+
+### Alcance
+
+1. Porkbun DNS: `A @ → 216.198.79.1` y `CNAME www → *.vercel-dns-017.com`, sin los registros de parking.
+2. Vercel: `evolvapp.club` en Production y `www.evolvapp.club` con 308 al dominio raíz; `NOTIFY_APP_URL=https://evolvapp.club` (correos y retorno de checkout).
+3. Supabase Auth: Site URL `https://evolvapp.club` y `https://evolvapp.club/**` permitida (las URLs viejas siguen permitidas durante la transición).
+4. Código: URLs por defecto de `api/notify.js`, `api/checkout.js`, `og:url`, smoke test y documentación.
+5. Dominios viejos (`fitbros.vercel.app`, `fitbud-green.vercel.app`): no se redirigen por HTTP (la PWA instalada quedaría atascada en su caché, porque el service worker no puede actualizarse con un redirect). `legacyHostMigration()` manda a los visitantes sin sesión al dominio nuevo y, con sesión, muestra el aviso "Evolv se mudó a evolvapp.club".
+
+### Fuera de alcance
+
+- Webhook de Stripe (checkout deshabilitado); al activarlo, registrar `https://evolvapp.club/api/webhook`.
+- Dominio autenticado en Brevo (remitente `@evolvapp.club`).
+
+## REQ-190 - Registro: pantalla "Revisa tu correo" en lugar del formulario con un aviso
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-17): tras registrarse, el formulario quedaba visible con "Cuenta creada. Confirma tu correo…" en letra pequeña; confuso.
+
+### Alcance
+
+1. `doAuth()`: si `signUp` no devuelve sesión, guarda el correo y cambia a `_authMode="check"`.
+2. `renderConfirmEmail()`: pantalla sin inputs con el correo, consejos (spam, abrir en el mismo dispositivo, cuenta existente), "Ya confirmé, iniciar sesión" (precarga el correo), "Reenviar correo" (`supa.auth.resend`, espera de 60 s) y "Usar otro correo".
+3. E2E `tests/e2e/registro.spec.js`.
+
+## REQ-191 - Fix Perfil: el aviso de actividad ligera reaparece en cada visita
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16). Para un usuario "solo fuerza", `renderProfile()` llama a `showCardioNudge("profile")` y solo el botón "Continuar" marcaba `UI.cardioNudgeDismissed`; cerrar con ✕, Esc o tocando fuera pasaba por `closeModal()` sin marcarlo, así que el sheet tapaba Perfil en cada visita.
+
+### Alcance
+
+1. `modal(html, {onClose})`: `closeModal()` ejecuta el callback una vez, por cualquier vía de cierre.
+2. `showCardioNudge()` usa `onClose` para marcar el aviso como visto; "Continuar" sigue guardando la elección del checkbox.
+
+### Criterios de aceptación
+
+- Cerrar el aviso con ✕ o Esc y volver a Perfil (también tras recargar) no lo muestra de nuevo. ✓ (`tests/e2e/perfil.spec.js`)
+
+## REQ-192 - Accesibilidad: campos con nombre, landmarks, FAQ, contraste de `--muted2` y movimiento reducido
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): axe marcaba `select-name` (crítico) en el onboarding y `aria-prohibited-attr` en `.steps`; ninguna vista tenía `<main>` ni `h1`; la FAQ no exponía su estado; `--muted2` (`#5f5f58`, 2.6–3.0:1) seguía en texto real (etiquetas de macros, "/2200 kcal"), fuera del alcance de REQ-112.
+
+### Alcance
+
+1. 97 `<label>` seguidos de su control pasan a `for="id"`; los campos de serie de Entreno (sin id) reciben `aria-label` con el número de serie; `#coachInput` recibe `aria-label`.
+2. `.steps` del onboarding: `role="progressbar"` con `aria-valuenow`/`aria-valuemax`.
+3. `#app` es el único `<main>` (los `<main>` internos de onboarding/recap pasan a `div`); Hoy, Progreso, Perfil y las vistas con navegación de día (`dayHeaderNav`) tienen `h1`.
+4. FAQ de la portada: `aria-expanded` se actualiza al abrir/cerrar.
+5. `--muted2` → `#8f8f87` (≥4.5:1 sobre `--bg`, `--surf1` y `--surf2`).
+6. `prefers-reduced-motion`: `pulse` del micrófono, `bounce` del "escribiendo" y `a2hsIn` se sustituyen por estados estáticos.
+7. Orden de títulos sin saltos (`.agenda-title` y el nombre de cada ejercicio pasan a `h2`) y `#sync-badge` como `<aside aria-live>` dentro de un landmark: axe (WCAG 2.2 AA + best-practice) queda en 0 en Hoy, Nutrición, Entreno, Progreso, Perfil y onboarding.
+
+### Criterios de aceptación
+
+- `tests/e2e/accesibilidad.spec.js`: un `<main>` y un `h1` por tab, campos del onboarding asociados a su etiqueta, progreso anunciado y FAQ con `aria-expanded`. ✓
+
+## REQ-193 - Táctil: todos los controles miden 44 px en pantallas táctiles
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16), medida con emulación táctil (`pointer:coarse`): la regla de 44 px de la auditoría de junio cubría `.btn-sm`, `.chip-check` y `.csec-h`, pero no `.btn` (35–39 px), los chips del coach (32), el check de comida (32), "Ver técnica" (34), "¿Qué es RPE?" (20), el botón de ayuda (40), el de enviar (42), los selects de disponibilidad de Perfil (40) ni el cierre de los sheets (36). En escritorio el badge de sincronización flotaba fuera de la columna de 560 px.
+
+### Alcance
+
+1. Bloque `@media(pointer:coarse)` al final del `<style>` (gana la cascada): `min-height:44px` en `.btn`, `.coach-chip`, campos y selects; `::after` con `inset:-7px` en `.chk`, `.demo-expand` y `.a2hs-x` para ampliar el área sin cambiar el tamaño visual; checkboxes de 20 px.
+2. Botón de enviar del coach: 44 px, `aria-label` e ícono SVG en lugar de "➤".
+3. `.sync-badge` se alinea al borde de la columna.
+
+### Criterios de aceptación
+
+- `tests/e2e/tactil.spec.js`: ningún control visible de las 5 tabs mide menos de 44×44 px en táctil (falla con el código anterior). ✓
+
+## REQ-194 - Textos: sin vocabulario interno, fechas consistentes y beta con ortografía completa
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): Nutrición decía "llena los **slots**", "Macros calculados desde **tu base de datos**" y "prepara una opción con tu coach **o elige**" (frase cortada); `text-transform:capitalize` convertía "16 oct" en "16 Oct" en Nutrición/Entreno/Progreso mientras Hoy decía "16 oct"; el chip de check-in usaba el emoji 📋; `beta-reclutamiento.html` no tenía tildes ni "¿" ("Que te describe mejor?", "Pais", "despues").
+
+### Alcance
+
+1. Copy de Nutrición y `dbStatusNote()` en lenguaje del usuario; error de carga con recuperación ("Revisa tu conexión y vuelve a intentarlo").
+2. Sin `text-transform:capitalize` en `.dtitle .date` y `.wk-left .d`.
+3. Chip de check-in sin emoji.
+4. Beta: ortografía en textos visibles y placeholders; los `value` que se envían al API no cambian (no altera el scoring ni datos históricos).
+
+### Criterios de aceptación
+
+- `tests/e2e/textos.spec.js`: Nutrición sin "slots"/"base de datos"/"o elige", fecha "Viernes, 16 oct", y la beta con "¿Qué te describe mejor?". ✓
+
+## REQ-195 - Progreso y Nutrición: menos campos vacíos para el usuario nuevo
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): Progreso mostraba S1–S10 con dos campos cada una (20 inputs vacíos) y "Ingresar mi peso" enfocaba siempre la semana 1; cada comida sin asignar de Nutrición mostraba "0 kcal · P 0 · C 0 · G 0 g" y su check no tenía nombre accesible.
+
+### Alcance
+
+1. `weightTableHtml()`: se ven las semanas hasta la actual (`currentWeightWeek()`) o la última con datos; las siguientes van en `<details class="wt-later">`. "Ingresar mi peso" enfoca la semana actual.
+2. Comida sin contenido: "Sin asignar" + una línea de ayuda, sin macros en cero.
+3. El check de cada comida tiene `aria-label`/`aria-pressed`.
+
+### Criterios de aceptación
+
+- `tests/e2e/progreso.spec.js`: semana siguiente oculta hasta abrir el plegable; el foco cae en la semana actual; comida vacía sin `.nums`. ✓
+
+## REQ-196 - Marca: restos de color de Fitbros y tokens CSS sin definir
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable de UI (2026-10-16): los chips del coach usaban `var(--accent-text,#c4b5fd)` con la variable sin definir, así que se veían lila (marca anterior); `.alert.violet` tenía texto `#d8ccff`; también caían a su fallback o a nada `--white`, `--ok`, `--r` y `--accent-rgb` (violeta 139,92,246). El tour conservaba fondos violeta como fallback.
+
+### Alcance
+
+1. Chips, alertas "violet", `.chat-type.educativo`, `.setup-step` y flechas de día pasan a tokens Evolv definidos (`--purple-200`, `--accent-dim`, `--good`, `--txt`, `--r-md`).
+2. Tour: sin fallbacks violeta; botones de 44 px.
+3. `scripts/validate-css-tokens.mjs` (en el release gate) falla si `index.html` o `beta-reclutamiento.html` usan una `var(--x)` sin definir.
+4. Detector de impeccable (`impeccable detect index.html`): `.btn-accent` sin halo lima (`dark-glow`); el badge "Actualizar app" pasa de `div` lila de 10 px a `<button>` de 12 px con tokens azul señal y dentro de la columna.
+
+### Criterios de aceptación
+
+- `node scripts/validate-css-tokens.mjs` pasa ahora y falla con el `index.html` anterior (5 variables). ✓
+
+## REQ-197 - Rendimiento: la portada no espera a la config ni a Supabase, y supabase-js va fijado con SRI
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría impeccable (2026-10-16), medido en producción: LCP móvil de 3.4 s en frío. Para un visitante sin sesión, `boot()` esperaba `/api/config` → `supabase.auth.getSession()` antes de pintar la portada, y supabase-js se cargaba de forma bloqueante desde `@supabase/supabase-js@2` (versión flotante: hoy 2.118.0, publicada el día anterior; sin SRI).
+
+### Alcance
+
+1. `boot()`: sin sesión guardada (`hasStoredAuthSession()`) ni enlace de recuperación, pinta la portada antes de pedir la config; al confirmar "sin sesión" solo se actualizan los planes (`refreshLandingPlans()`), sin repintar ni perder la FAQ abierta. El catálogo se pide en paralelo desde el inicio.
+2. supabase-js `2.117.2` exacta, con `integrity` + `crossorigin` y `defer`; `supabaseLibReady()` la espera antes de `supaInit()`.
+3. `scripts/validate-cdn-pins.mjs` (release gate): scripts de CDN con versión exacta y SRI, y la copia de `tests/e2e/vendor/` igual al hash.
+
+### Fuera de alcance
+
+- Separar la portada de la app (el HTML de 207 KB brotli/750 KB sigue siendo el costo principal): requiere decidir rutas, PWA y service worker.
+
+### Criterios de aceptación
+
+- `navegacion.spec.js`: con `/api/config` colgada la portada se ve y la FAQ abierta sobrevive; con sesión guardada no se muestra la portada. ✓
+- 4G emulado + CPU ×4, local: 5.6 s → 5.1 s hasta el titular. ✓
+
+## REQ-198 - Portada: rediseño "Escalera de días" dentro de la marca Escala
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-16), tras la auditoría impeccable: rediseñar la web pública para que refleje la marca y no parezca una landing genérica. La portada anterior era la plantilla de la categoría: etiqueta en mayúsculas sobre cada sección, grilla de tarjetas iguales con emoji (🥗🏋️🔄📈⚡) y un hueco en escritorio, brillos de acento y FAQ sin estado. Eligió la dirección "Escalera de días" y, como prueba, solo demostración del producto (sin testimonios ni cifras inventadas).
+
+### Alcance
+
+1. Misma marca (REQ-180/189): carbón + lima sólida, Unbounded + Manrope, chevrons. Sin brillos, degradados de acento ni emoji.
+2. Hero: titular de marca a gran tamaño + demo del día (marcada "Ejemplo") con tres imprevistos reales de la app ("Como fuera", "Solo tengo 20 min", "Entreno en casa") que cambian almuerzo o entreno.
+3. Cinco escalones en orden temporal (Hoy, En el entreno, Si el día se tuerce, Cada semana, Al cerrar el ciclo), cada uno con un fragmento de la UI real. En escritorio, una escalera fija que sube y se enciende peldaño a peldaño al bajar (`initLandingStair()`); en móvil, una escalera mini por escalón.
+4. Planes del catálogo con el destacado en campo lima; FAQ con `<details>`; cierre en campo lima a sangre completa. Copy existente y verdadero: no se añaden afirmaciones comerciales.
+
+### Criterios de aceptación
+
+- `tests/e2e/portada.spec.js`: la demo cambia y se revierte; sin emoji ni vocabulario de IA; la escalera se enciende y sigue a la vista. ✓
+- axe (WCAG 2.2 AA + best-practice) sin violaciones a 390 y 1440 px; sin scroll horizontal; controles ≥44 px. ✓
