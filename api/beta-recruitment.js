@@ -130,6 +130,8 @@ function scoreCandidate(data) {
 
 function parsePayload(body) {
   const name = clean(body.name, 90);
+  // REQ-225: la invitación llega por correo; se guarda en raw_payload (sin migración).
+  const email = clean(body.email, 254).toLowerCase();
   const { raw: whatsapp, digits: whatsappNormalized } = normalizeWhatsapp(body.whatsapp);
   const ageBand = clean(body.age, 20);
   const countryCity = clean(body.city, 120);
@@ -148,6 +150,7 @@ function parsePayload(body) {
   const errors = [];
   if (website) errors.push("No pudimos procesar tu postulación.");
   if (name.length < 2) errors.push("Escribe tu nombre.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Revisa tu correo: ahí te llegará la invitación.");
   if (whatsappNormalized.length < 8 || whatsappNormalized.length > 15) errors.push("Revisa tu número de WhatsApp: incluye el código de tu país (empieza con +).");
   if (!ageBand) errors.push("Elige tu rango de edad.");
   if (!countryCity) errors.push("Escribe tu país y ciudad.");
@@ -164,6 +167,7 @@ function parsePayload(body) {
     errors,
     data: {
       name,
+      email,
       whatsapp,
       whatsappNormalized,
       ageBand,
@@ -220,6 +224,7 @@ async function handlePost(req, res, e) {
     segment_scores: score.segmentScores,
     beta_eligible: score.betaEligible,
     raw_payload: {
+      email: data.email,
       goal: data.goal,
       stage: data.stage,
       recentAttempt: data.recentAttempt,

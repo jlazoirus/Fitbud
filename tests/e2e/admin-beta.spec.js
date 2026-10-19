@@ -1,5 +1,5 @@
-// REQ-218: el admin ve a los postulantes de la beta, acepta (90 días + mensaje
-// de WhatsApp listo) o descarta, sin salir de la app.
+// REQ-218/REQ-225: el admin ve a los postulantes de la beta y acepta (invitación
+// por correo con 90 días; enlace de respaldo si no hay correo) o descarta.
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, gotoApp, autoDismissNudges, profileFixture, collectConsoleErrors } from "./helpers.js";
 
@@ -52,7 +52,9 @@ test("REQ-218: aceptar a una postulante crea su acceso y deja el WhatsApp listo"
   await expect(page.getByRole("heading", { name: "Ana está dentro" })).toBeVisible();
   await expect(page.locator("#betaInviteMsg")).toHaveValue(/codigo=FIT-AB12-CD34/);
   await expect(page.getByRole("link", { name: "Enviar por WhatsApp" })).toHaveAttribute("href", /^https:\/\/wa\.me\/51999111222\?text=/);
-  expect(calls.filter((c) => c.action === "betaAccept")).toEqual([{ action: "betaAccept", id: 7 }]);
+  const accepts = calls.filter((c) => c.action === "betaAccept");
+  expect(accepts).toHaveLength(1);
+  expect(accepts[0]).toMatchObject({ action: "betaAccept", id: 7 });
   await expect(page.getByRole("button", { name: "Aceptados (1)" })).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -64,4 +66,37 @@ test("REQ-218: un usuario normal no entra a la pantalla de postulantes", async (
   await gotoApp(page);
   await page.evaluate(() => setView("adminBeta"));
   await expect(page.getByRole("heading", { name: "Postulantes beta" })).toHaveCount(0);
+});
+
+test("REQ-225: con correo, aceptar envía la invitación por correo y avisa de pendientes en Hoy", async ({ page, context }) => {
+  await installMocks(context, { tables: { profiles: { row: { ...profileFixture(), is_admin: true } } } });
+  await seedLoggedInUser(page);
+  await autoDismissNudges(page);
+  const calls = [];
+  let status = "new";
+  await page.route("**/api/admin", (route) => {
+    const body = JSON.parse(route.request().postData() || "{}");
+    calls.push(body);
+    const json = (data) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data) });
+    if (body.action === "betaApplicants") {
+      const rows = body.filter === "pending" && status === "new" ? [{ ...ANA, email: "ana@correo.test", status }] : [];
+      return json({ applicants: rows, counts: { pending: status === "new" ? 1 : 0, invited: status === "new" ? 0 : 1, closed: 0 } });
+    }
+    if (body.action === "betaAccept") {
+      status = "beta_invited";
+      return json({ mode: "email", email: "ana@correo.test", days: 90, betaError: "", applicant: { ...ANA, email: "ana@correo.test", status }, whatsappUrl: "https://wa.me/51999111222" });
+    }
+    return json({});
+  });
+  await gotoApp(page);
+  await expect(page.getByText("1 postulación espera tu revisión")).toBeVisible();
+  await page.getByRole("button", { name: "Revisar" }).click();
+  const card = page.locator("#betaList .meal").first();
+  await expect(card).toContainText("ana@correo.test");
+  await card.getByRole("button", { name: "Aceptar (90 días)" }).click();
+  await expect(page.getByRole("dialog")).toContainText("Le enviamos la invitación a ana@correo.test");
+  const accept = calls.find((c) => c.action === "betaAccept");
+  expect(accept).toMatchObject({ id: 7 });
+  expect(accept.redirectTo).toContain("/");
+  expect(accept.channel).toBeUndefined();
 });

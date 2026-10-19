@@ -26,6 +26,7 @@ test("REQ-201: postular muestra la confirmación sin segmento ni prioridad", asy
   await expect(page).toHaveURL(/#postular$/);
 
   await page.getByLabel("Nombre").fill("Ana Prueba");
+  await page.getByLabel("Correo").fill("Ana@Correo.test");
   await page.getByLabel("WhatsApp").fill("+51 999 111 222");
   await page.getByLabel("Edad").selectOption("25-34");
   await page.getByLabel("País / ciudad").fill("Santiago, Chile");
@@ -43,12 +44,12 @@ test("REQ-201: postular muestra la confirmación sin segmento ni prioridad", asy
   const done = page.locator("#done");
   await expect(done).toBeVisible();
   await expect(done.getByRole("heading")).toHaveText("¡Gracias, Ana! Ya tenemos tu postulación.");
-  await expect(done).toContainText("+51 999 111 222");
+  await expect(done).toContainText("ana@correo.test"); // REQ-225: la invitación llega por correo
   await expect(page.locator("#recruitForm")).toBeHidden();
   await expect(page.locator("body")).not.toContainText(/Prioridad|Principiante|Número de postulación/);
   await expect(done).toBeFocused();
   expect(await page.evaluate(() => localStorage.getItem("evolv_beta_draft"))).toBeNull();
-  expect(sent).toMatchObject({ goal: "Ganar musculo", availability: "interview_beta", source: "portada" });
+  expect(sent).toMatchObject({ email: "ana@correo.test", goal: "Ganar musculo", availability: "interview_beta", source: "portada" });
   expect(errors).toEqual([]);
 });
 
@@ -83,6 +84,7 @@ test("REQ-217: un error de la API se explica y lleva al campo", async ({ page, c
   }));
   await page.goto("/beta-reclutamiento.html");
   await page.getByLabel("Nombre").fill("Ana");
+  await page.getByLabel("Correo").fill("ana@correo.test");
   await page.getByLabel("WhatsApp").fill("12345678");
   await page.getByLabel("Edad").selectOption("25-34");
   await page.getByLabel("País / ciudad").fill("Lima");

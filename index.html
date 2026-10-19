@@ -4523,6 +4523,7 @@ function renderHoy(){
       <div class="avatar">${esc((name[0]||"F").toUpperCase())}</div>
     </div>
   </header>
+  ${adminBetaPendingCardHtml()}
   ${restartNudgeCard()}
   ${heroDash(ds,{compact:true})}
   ${homeAgendaHtml(ds)}
@@ -7051,7 +7052,7 @@ function renderProfile(){
   <summary onclick="return profileAccordionGuard(event,this)">Administración</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, alimentos, ejercicios y la configuración técnica.</div>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('adminBeta')">🌱 Postulantes beta</button>
+    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('adminBeta')">🌱 Postulantes beta${adminBetaPending?` · ${adminBetaPending} por revisar`:""}</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('foods')">🥗 Alimentos (catálogo)</button>
     <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('exercises')">🏋️ Ejercicios (catálogo)</button>
@@ -7815,7 +7816,7 @@ function landingModeHtml(slot){
     ?`<h2 id="l-cta-h">Sé de los primeros.</h2>
         <p>Buscamos personas que usen Evolv tres meses y nos digan qué mejorar. A cambio, acceso completo gratis y precio de fundador.</p>
         <a class="l-btn l-btn-ink l-btn-lg" href="beta-reclutamiento.html?source=portada-final">Postular a la beta</a>
-        <div class="l-cta-note">Postular toma 2 minutos · Te escribimos por WhatsApp</div>`
+        <div class="l-cta-note">Postular toma 2 minutos · Te respondemos por correo</div>`
     :`<h2 id="l-cta-h">Empieza hoy.</h2>
         <p>Tu plan de comidas y entrenos, armado con tu cuerpo y tus horarios, y ajustado cuando el día se tuerce.</p>
         ${signUp("l-btn-ink l-btn-lg","Empezar ahora")}
@@ -11232,6 +11233,7 @@ async function onAuth(){
     applyLabsParam(); // REQ-216: enlace secreto de funciones en prueba
     checkCheckoutReturn(); // REQ-26: manejar retorno de Stripe checkout
     trackEvent("session_start",{});
+    refreshAdminBetaPending(); // REQ-225: aviso de postulaciones nuevas (solo admin, no-await)
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
   }finally{_authBusy=false;}
 }
@@ -12140,6 +12142,23 @@ async function createAdminUser(){
    Aceptar crea un acceso de 90 días (plan completo y cuotas diarias del coach)
    y deja el mensaje de WhatsApp con el enlace que crea la cuenta y lo activa. */
 let adminBetaFilter="pending";
+let adminBetaPending=0;
+// REQ-225: el admin ve en Hoy y en Perfil cuántas postulaciones esperan revisión.
+async function refreshAdminBetaPending(){
+  if(!isAdmin())return;
+  try{
+    const out=await adminApi("betaApplicants",{filter:"pending"});
+    const n=(out.counts&&out.counts.pending)||0;
+    if(n!==adminBetaPending){adminBetaPending=n;if(view==="hoy"||view==="perfil")render();}
+  }catch(_){}
+}
+function adminBetaPendingCardHtml(){
+  if(!isAdmin()||!adminBetaPending)return "";
+  return `<div class="dash" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+    <div><b>${adminBetaPending} ${adminBetaPending===1?"postulación espera":"postulaciones esperan"} tu revisión</b><div class="muted small">Beta de fundadores</div></div>
+    <button class="btn btn-sm btn-accent" onclick="setView('adminBeta')">Revisar</button>
+  </div>`;
+}
 let adminBetaCache=[];
 const BETA_FILTER_LABELS={pending:"Por revisar",invited:"Aceptados",closed:"Descartados",all:"Todos"};
 const BETA_STATUS_LABELS={new:"Nueva",shortlisted:"Preseleccionada",contacted:"Contactada",interview_scheduled:"Llamada agendada",interviewed:"Entrevistada",beta_invited:"Aceptada",rejected:"Descartada",archived:"Archivada"};
@@ -12153,7 +12172,7 @@ async function renderAdminBeta(){
       <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
       <button class="btn btn-sm" onclick="loadAdminBeta()">Actualizar</button>
     </div>
-    <div class="ai-box" style="margin-bottom:14px">Al aceptar a alguien se crea su acceso de 90 días con el plan completo y las cuotas diarias del coach. Te dejamos el mensaje listo para enviarlo por WhatsApp; con ese enlace la persona crea su cuenta y el acceso se activa solo.</div>
+    <div class="ai-box" style="margin-bottom:14px">Al aceptar a alguien le llega un correo de invitación para crear su contraseña, y su cuenta nace con 90 días de plan completo y las cuotas diarias del coach. Si el correo no sale, te dejamos un enlace para copiar.</div>
     <div class="chips" role="group" aria-label="Filtrar postulantes" id="betaFilters" style="margin-bottom:14px"></div>
     <div id="betaList" class="muted small">Cargando postulantes…</div>`;
   await loadAdminBeta();
@@ -12165,6 +12184,7 @@ async function loadAdminBeta(){
     const out=await adminApi("betaApplicants",{filter:adminBetaFilter});
     adminBetaCache=out.applicants||[];
     const counts=out.counts||{};
+    adminBetaPending=counts.pending||0;
     const filters=$("#betaFilters");
     if(filters)filters.innerHTML=Object.entries(BETA_FILTER_LABELS).map(([key,label])=>{
       const n=key==="all"?(counts.pending||0)+(counts.invited||0)+(counts.closed||0):counts[key];
@@ -12184,12 +12204,12 @@ function adminBetaCardHtml(a){
   const caution=a.health==="caution"?'<span class="pill" style="background:var(--warn-dim);color:#fcd34d">lesión o indicación médica</span>':"";
   const actions=closed
     ?`<button class="btn btn-sm" onclick="adminBetaSetStatus(${a.id},'new',this)">Volver a revisar</button>`
-    :`<button class="btn btn-sm${invited?"":" btn-accent"}" onclick="adminBetaAccept(${a.id},this)">${invited?"Generar enlace nuevo":"Aceptar (90 días)"}</button>
+    :`<button class="btn btn-sm${invited?"":" btn-accent"}" onclick="adminBetaAccept(${a.id},this,${invited})">${invited?"Generar enlace nuevo":"Aceptar (90 días)"}</button>
       ${invited?"":`<button class="btn btn-sm" onclick="adminBetaSetStatus(${a.id},'rejected',this)">Descartar</button>`}`;
   return `<div class="meal">
     <div class="meal-head"><div>
       <div class="name">${esc(a.name||"Sin nombre")} <span class="pill">${esc(BETA_STATUS_LABELS[a.status]||a.status||"")}</span>${caution}</div>
-      <div class="nums muted">${esc(a.country_city||"")} · ${esc(a.age_band||"")} · postuló ${prettyDateTime(a.created_at)}${a.source?` · vino de ${esc(a.source)}`:""}</div>
+      <div class="nums muted">${a.email?esc(a.email)+" · ":""}${esc(a.country_city||"")} · ${esc(a.age_band||"")} · postuló ${prettyDateTime(a.created_at)}${a.source?` · vino de ${esc(a.source)}`:""}</div>
     </div></div>
     <div class="small" style="margin:8px 0 4px">${esc(BETA_GOAL_LABELS[a.goal]||a.goal||"")} · ${esc(BETA_STAGE_LABELS[a.stage]||a.stage||"")} · ${esc(BETA_AVAIL_LABELS[a.availability]||a.availability||"")}</div>
     ${pains.length?`<div class="muted small">Se le rompe: ${esc(pains.join(" · "))}</div>`:""}
@@ -12203,24 +12223,43 @@ function adminBetaCardHtml(a){
     </div>
   </div>`;
 }
-async function adminBetaAccept(id,btn){
-  if(btn){btn.disabled=true;btn.textContent="Creando acceso…";}
+// REQ-225: con correo la invitación sale sola; el enlace con código queda de
+// respaldo (sin correo, si el envío falla o para "Generar enlace nuevo").
+async function adminBetaAccept(id,btn,linkOnly){
+  const label=btn&&btn.textContent;
+  if(btn){btn.disabled=true;btn.textContent=linkOnly?"Generando…":"Enviando invitación…";}
   try{
-    const out=await adminApi("betaAccept",{id});
-    window._betaInviteMsg=out.message||"";
+    const out=await adminApi("betaAccept",{id,redirectTo:authRedirectUrl("invite"),channel:linkOnly?"link":undefined});
     const first=String((out.applicant&&out.applicant.name)||"").split(/\s+/)[0];
-    const until=prettyDateTime(out.validUntil).split(" ").slice(0,2).join(" ");
-    modal(`<h3>${first?esc(first)+" está dentro":"Postulante aceptado"}</h3>
-      <div class="muted small" style="margin-bottom:12px">Código ${esc(out.code)} · ${out.days} días de acceso completo · el enlace se puede activar hasta el ${esc(until)}.</div>
-      <div class="field"><label for="betaInviteMsg">Mensaje para enviar</label><textarea id="betaInviteMsg" rows="9" readonly>${esc(out.message||"")}</textarea></div>
-      <div class="row wrap" style="margin-top:12px">
-        ${out.whatsappUrl?`<a class="btn btn-accent" href="${esc(out.whatsappUrl)}" target="_blank" rel="noopener">Enviar por WhatsApp</a>`:""}
-        <button class="btn" onclick="copyBetaInvite()">Copiar mensaje</button>
-        <button class="btn" onclick="closeModal()">Listo</button>
-      </div>`);
+    const who=first?esc(first):"La persona";
+    if(out.mode==="email"||out.mode==="existing"){
+      modal(`<h3>${first?esc(first)+" está dentro":"Postulante aceptado"}</h3>
+        <p class="muted small">${out.mode==="email"
+          ?`Le enviamos la invitación a <b>${esc(out.email)}</b>. ${who} crea su contraseña desde ese correo y entra con ${out.days} días de plan completo.`
+          :`<b>${esc(out.email)}</b> ya tenía cuenta: su acceso de ${out.days} días ya está activo. Puede entrar con su contraseña de siempre.`}</p>
+        ${out.betaError?`<div class="ai-box" style="margin-top:10px">⚠️ ${esc(out.betaError)}</div>`:""}
+        <p class="muted small" style="margin-top:10px">Si no le llega en unos minutos, que revise spam o promociones. También puedes generarle un enlace desde "Aceptados".</p>
+        <div class="row wrap" style="margin-top:12px">
+          <button class="btn btn-accent" onclick="closeModal()">Listo</button>
+          ${out.whatsappUrl?`<a class="btn" href="${esc(out.whatsappUrl)}" target="_blank" rel="noopener">Escribirle por WhatsApp</a>`:""}
+        </div>`);
+    }else{
+      window._betaInviteMsg=out.message||"";
+      const until=prettyDateTime(out.validUntil).split(" ").slice(0,2).join(" ");
+      modal(`<h3>${first?esc(first)+" está dentro":"Postulante aceptado"}</h3>
+        ${out.emailError?`<div class="ai-box" style="margin-bottom:10px">⚠️ ${esc(out.emailError)} Envíale este enlace por el medio que prefieras.</div>`:""}
+        <div class="muted small" style="margin-bottom:12px">Código ${esc(out.code)} · ${out.days} días de acceso completo · el enlace se puede activar hasta el ${esc(until)}.</div>
+        <div class="field"><label for="betaInviteMsg">Mensaje con el enlace</label><textarea id="betaInviteMsg" rows="9" readonly>${esc(out.message||"")}</textarea></div>
+        <div class="row wrap" style="margin-top:12px">
+          <button class="btn btn-accent" onclick="copyBetaInvite()">Copiar mensaje</button>
+          ${out.email?`<a class="btn" href="mailto:${esc(out.email)}?subject=${encodeURIComponent("Tu acceso a la beta de Evolv")}&body=${encodeURIComponent(out.message||"")}">Enviar por correo</a>`:""}
+          ${out.whatsappUrl?`<a class="btn" href="${esc(out.whatsappUrl)}" target="_blank" rel="noopener">Enviar por WhatsApp</a>`:""}
+          <button class="btn" onclick="closeModal()">Listo</button>
+        </div>`);
+    }
     loadAdminBeta();
   }catch(e){
-    if(btn){btn.disabled=false;btn.textContent="Aceptar (90 días)";}
+    if(btn){btn.disabled=false;btn.textContent=label||"Aceptar (90 días)";}
     toast(String(e.message||e));
   }
 }

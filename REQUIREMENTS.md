@@ -1616,3 +1616,23 @@ Feedback de una usuaria (2026-10-19): la rutina que le cargó su coach no aparec
 ### Criterios de aceptación
 
 - El plan activo gana a un borrador archivado posterior; un día anclado conserva su versión; un día cubierto solo por una versión reemplazada la sigue usando. ✓
+
+## REQ-225 - Beta: la aprobación es web y por correo, sin WhatsApp en el flujo
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19): la inscripción debe ser automática; las postulaciones tienen que llegarle en la web y aprobarlas o rechazarlas sin pasar por WhatsApp, que queda para el feedback.
+
+### Alcance
+
+1. La postulación pide **Correo** (obligatorio; se guarda en `raw_payload.email`, sin migración). La confirmación y "Cómo funciona" dicen que la invitación llega por correo; la nota final de la portada dice "Te respondemos por correo".
+2. `api/admin.js` `betaAccept`: con correo, invitación de Supabase (`/auth/v1/invite`) y 90 días de acceso beta en la misma acción; si ya tenía cuenta, solo el acceso; si el envío falla o no hay correo, enlace con código de respaldo (REQ-218) con el motivo. `channel:"link"` fuerza el enlace ("Generar enlace nuevo").
+3. Admin: el correo en cada tarjeta, modal "Le enviamos la invitación a …" (WhatsApp opcional) y aviso en Hoy y en Perfil de las postulaciones por revisar. SW v107.
+4. `BETA_PROGRAM.md`: plantilla "Invite user" en español y SMTP propio para no chocar con el límite de envíos de Supabase (manual).
+
+### Criterios de aceptación
+
+- `scripts/test-admin-beta-api.mjs`: con correo invita y da 90 días sin código; cuenta existente solo recibe acceso; envío fallido cae al enlace. `test-beta-recruitment-api.mjs`: guarda el correo. ✓
+- `tests/e2e/admin-beta.spec.js`: Hoy avisa de 1 postulación, Aceptar envía la invitación por correo. `beta.spec.js`: la confirmación muestra el correo. ✓
