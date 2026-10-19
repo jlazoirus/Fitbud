@@ -2561,7 +2561,7 @@ function recapPhotoSection(photo){
     <div class="muted small" style="margin:5px 0 12px">Toma una foto de cuerpo entero, con luz uniforme y una postura natural. Será privada y solo visible en tu cuenta.</div>
     <label class="btn btn-accent" style="display:inline-flex;align-items:center;justify-content:center">
       ${recapPhotoFile?"Cambiar foto":"Tomar o elegir foto"}
-      <input type="file" accept="image/*" capture="environment" onchange="previewRecapPhoto(this)" style="display:none">
+      <input type="file" accept="image/*" onchange="previewRecapPhoto(this)" style="display:none">
     </label>
   </div>`;
 }
@@ -8546,7 +8546,7 @@ function editorSheet(title,pre){
       <button class="btn" style="flex:1" onclick="aiEstimate()">✨ Estimar macros</button>
       <button class="btn" style="flex:1" onclick="pickMealPhoto()">📷 Estimar con foto</button>
     </div>
-    <input id="f_photo" type="file" accept="image/*" capture="environment" hidden onchange="onMealPhotoSelected(this)">
+    <input id="f_photo" type="file" accept="image/*" hidden onchange="onMealPhotoSelected(this)">
     <img id="f_photo_preview" class="meal-photo-preview" alt="Foto de la comida" hidden>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
     <div id="aiOut"></div>
     <label class="qp-save-fav"><input type="checkbox" id="f_fav" ${pre.name&&isSavedMeal(pre.name)?"checked disabled":""}> Guardar en favoritas</label>

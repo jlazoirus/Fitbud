@@ -1868,3 +1868,35 @@ Un día de descanso solo mostraba "Descanso planificado" sin acciones, y un día
 - En un día de entreno se registra otro deporte y el día cuenta como entrenado. ✓
 - La fila de descanso no infla el contador de pendientes de Hoy. ✓
 - `node scripts/release-gate.mjs` pasa. ✓ (`tests/e2e/actividad-manual.spec.js`)
+
+## REQ-207 - Fix: "Estimar con foto" no deja elegir una foto de la galería
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19): al estimar una comida con foto, el móvil solo abre la cámara; no se puede elegir una foto ya hecha.
+
+### Causa raíz
+
+Los dos selectores de foto (`#f_photo` en el editor de comidas, REQ-172, y el de la foto del resumen de progreso) declaraban `capture="environment"`, que en iOS y Android abre directamente la cámara trasera y omite la fototeca. El resumen incluso dice "Tomar o elegir foto".
+
+### Alcance
+
+1. Quitar `capture` de ambos inputs (`accept="image/*"` se mantiene): el sistema muestra su menú nativo con fototeca, cámara y archivos.
+2. `tests/e2e/foto-comida.spec.js` y `scripts/validate-meal-photo-estimate.mjs` (que exigía `capture`) comprueban ahora que el input no fuerza la cámara.
+3. `CACHE_NAME` → `fitbud-pwa-v91`.
+
+### Fuera de alcance
+
+- Elegir varias fotos a la vez.
+
+### Riesgos
+
+- Ninguno: la cámara sigue disponible desde el mismo menú del sistema.
+
+### Criterios de aceptación
+
+- Ningún `<input type="file">` de la app declara `capture`. ✓
+- En iPhone, "Estimar con foto" ofrece "Fototeca" y "Tomar foto" (verificación manual tras el deploy).
+- `node scripts/release-gate.mjs` pasa. ✓

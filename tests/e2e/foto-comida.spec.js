@@ -29,6 +29,9 @@ test("foto → estimación con pregunta → respuesta → estimación final", as
   await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
   const overlay = page.locator("#overlay");
   await expect(overlay.getByRole("button", { name: /Estimar con foto/i })).toBeVisible();
+  // REQ-207: sin `capture`, el móvil deja elegir entre cámara y galería.
+  await expect(overlay.locator("#f_photo")).not.toHaveAttribute("capture", /.*/);
+  await expect(overlay.locator("#f_photo")).toHaveAttribute("accept", "image/*");
 
   await overlay.locator("#f_photo").setInputFiles({ name: "plato.png", mimeType: "image/png", buffer: PNG });
   await expect(overlay).toContainText("Supuse una porción mediana.");
