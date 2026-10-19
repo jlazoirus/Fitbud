@@ -659,6 +659,12 @@
   .coach-home-sep{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
   .coach-home-sep::before,.coach-home-sep::after{content:"";flex:1;height:1px;background:var(--border)}
   .coach-msgs-home{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
+  /* REQ-216: modo conversacional (beta oculta) */
+  .chat-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .chat-thread{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+  .chat-card{align-self:stretch;max-width:none;border:1px solid var(--border);border-radius:var(--r-lg);background:var(--surf1);padding:12px}
+  .chat-card .chat-card-h{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .chat-chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
   .coach-input-row{display:flex;gap:8px;padding:10px 14px 12px;background:var(--bg);border-top:1px solid var(--border);flex-shrink:0}
   .coach-input-row textarea{flex:1;resize:none;background:var(--surf1);border:1px solid var(--border-2);border-radius:var(--r-md);color:var(--txt);padding:10px 12px;font-size:14px;font-family:inherit;min-height:44px;max-height:120px;line-height:1.4}
   .coach-input-row textarea:focus{outline:none;border-color:var(--accent)}
@@ -3839,6 +3845,7 @@ function render(){
   if(onboardingActive)return renderOnboarding();
   if(privacyGateRequired())return renderPrivacyGate();
   if(planNeedsRecap()){ $("#tabs").innerHTML="";return renderPlanRecap(); }
+  if(chatModeActive())return renderChatMode();
   renderTabs();
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
@@ -4521,7 +4528,7 @@ function renderHoy(){
   ${coachSection}`;
   maybeStartFitbrosTour();
 }
-function renderCoach(){renderHoy();}
+function renderCoach(){chatModeActive()?renderChatMode():renderHoy();}
 
 /* ---------- NUTRICIÓN: detalle de comidas + coach ---------- */
 function renderNutrition(){
@@ -6574,6 +6581,8 @@ function applyCoachAction(msgId){
 }
 
 function scrollCoachToBottom(){
+  // REQ-216: en modo conversación el hilo vive en la columna (#app), no en una caja propia.
+  if(chatModeActive()){requestAnimationFrame(()=>{const app=$("#app");if(app)app.scrollTop=app.scrollHeight;});return;}
   requestAnimationFrame(()=>{
     const el=document.getElementById("coachMsgs");
     if(el)el.scrollTop=el.scrollHeight;
@@ -6581,6 +6590,123 @@ function scrollCoachToBottom(){
   });
 }
 
+/* ---- REQ-216: modo conversacional (beta oculta) ----
+   Se activa por cuenta con el enlace /?labs=conversacion y se elige en Perfil.
+   Mismos datos y validaciones que la vista normal: las tarjetas reutilizan el
+   reproductor, las comidas y el peso, se arman sin llamadas pagadas, y el texto
+   libre va al coach de siempre (con sus cuotas). /?labs=off lo desactiva. */
+const CHAT_TURNS_KEY="evolv_chat_turns_v1";
+function labsConversationalEnabled(){const l=(profile&&profile.prefs&&profile.prefs.labs)||{};return l.conversational===true;}
+function chatModeActive(){return !!(session&&labsConversationalEnabled()&&profile.prefs.uiMode==="chat");}
+async function applyLabsParam(){
+  let flag;
+  try{flag=new URLSearchParams(location.search).get("labs");}catch(e){return;}
+  if(flag!=="conversacion"&&flag!=="off")return;
+  try{const url=new URL(location.href);url.searchParams.delete("labs");history.replaceState(null,"",url.pathname+url.search+url.hash);}catch(e){}
+  if(!profile)return;
+  const on=flag==="conversacion";
+  const prefs={...(profile.prefs||{}),labs:{...((profile.prefs&&profile.prefs.labs)||{}),conversational:on},...(on?{}:{uiMode:"normal"})};
+  profile.prefs=prefs;render();
+  toast(on?"Modo conversación disponible en Perfil → Cuenta":"Modo conversación desactivado");
+  await saveProfilePrefs(prefs);
+}
+async function setUiMode(mode){
+  if(!profile)return;
+  const prefs={...(profile.prefs||{}),uiMode:mode==="chat"&&labsConversationalEnabled()?"chat":"normal"};
+  profile.prefs=prefs;
+  view=prefs.uiMode==="chat"?"hoy":"perfil";
+  render();scrollAppTop();
+  if(prefs.uiMode==="chat")scrollCoachToBottom();
+  await saveProfilePrefs(prefs);
+}
+function chatTurns(){
+  try{const all=JSON.parse(sessionStorage.getItem(CHAT_TURNS_KEY)||"{}");return all.ds===todayStr()&&Array.isArray(all.turns)?all.turns:[];}catch(e){return[];}
+}
+function saveChatTurns(turns){try{sessionStorage.setItem(CHAT_TURNS_KEY,JSON.stringify({ds:todayStr(),turns:turns.slice(-30)}));}catch(e){}}
+const CHAT_ASKS={
+  workout:{q:"¿Qué entreno hoy?",a:"Esto es lo que toca hoy. Puedes empezar desde aquí y seguir paso a paso."},
+  meals:{q:"¿Qué como hoy?",a:"Estas son tus comidas de hoy. Márcalas al comerlas o cámbialas si hoy comes otra cosa."},
+  weight:{q:"Quiero registrar mi peso",a:"Anota tu peso de esta semana."},
+};
+// Una pregunta frecuente se responde con su tarjeta, sin llamar al coach.
+function chatAsk(card){
+  const ask=CHAT_ASKS[card];if(!ask)return;
+  const turns=chatTurns().filter(turn=>turn.card!==card);
+  const ts=Date.now();
+  turns.push({role:"user",text:ask.q,ts},{role:"assistant",text:ask.a,card,ts:ts+1});
+  saveChatTurns(turns);
+  renderChatMode();scrollCoachToBottom();
+}
+function chatGreeting(ds){
+  const ew=effectiveWorkout(ds),prescription=workoutPrescription(ds);
+  const tot=dayTotals(ds),target=effectiveDayTarget();
+  const workout=prescription.sessionType==="rest"?"descanso":ew.workout.name;
+  return `Hoy toca ${workout}. Llevas ${Math.round(tot.t.kcal)} de ${target.kcal} kcal y ${Math.round(tot.t.p)} de ${target.p} g de proteína. ¿Por dónde empezamos?`;
+}
+function chatWorkoutCard(ds){
+  const ew=effectiveWorkout(ds),prescription=workoutPrescription(ds);
+  const execution=normalizedWorkoutExecution(ds),st=dayState(ds);
+  if(trainingSafetyHold())return `<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`;
+  if(prescription.sessionType==="rest")return `<div><b>Descanso planificado</b><div class="muted small">Recuperar también es parte del plan.</div></div>`;
+  if(execution)return renderWorkoutExecution(ds,execution);
+  if(st.workoutDone)return `<div><b>${esc(ew.workout.name)}</b><div class="muted small">Ya lo registraste hoy.</div></div>`;
+  return `<div><b>${esc(ew.workout.name)}</b><div class="muted small">${esc(ew.workout.detail||"")}</div></div>
+    ${workoutPlanSummaryHtml(prescription)}
+    <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="startWorkoutExecution('${ds}')" ${workoutContentIssues(ds).length?"disabled":""}>Empezar</button>`;
+}
+function chatMealsCard(ds){
+  const day=buildDay(ds);
+  if(!homeDayHasPreparedMeals(ds,day))return `<div class="muted small">Aún no hay comidas preparadas para hoy.</div><button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="homePrepareDay('${ds}')">Preparar mi día</button>`;
+  return day.meals.map(b=>mealCard(ds,b)).join("");
+}
+function chatWeightCard(){
+  const week=currentWeightWeek(),kg=wkg(week);
+  return `<div class="field" style="margin:0"><label for="chatWeight">Peso de la semana ${week} (kg)</label>
+    <div class="row" style="gap:8px"><input id="chatWeight" type="number" step="0.1" inputmode="decimal" value="${kg!=null?kg:""}" style="flex:1">
+    <button class="btn btn-accent" onclick="chatSaveWeight()">Guardar</button></div></div>`;
+}
+function chatSaveWeight(){
+  const kg=positiveWeight($("#chatWeight")&&$("#chatWeight").value);
+  if(kg==null){toast("Escribe tu peso en kilos");return;}
+  const week=currentWeightWeek(),bf=wbf(week);
+  S.weights[week]={kg,bf};save();pushWeight(week,kg,bf);
+  const turns=chatTurns();
+  turns.push({role:"assistant",text:`Anotado: ${kg} kg en la semana ${week}.`,ts:Date.now()});
+  saveChatTurns(turns);renderChatMode();scrollCoachToBottom();
+}
+function chatCardHtml(card,ds){
+  const title={workout:"Entreno de hoy",meals:"Comidas de hoy",weight:"Tu peso"}[card];
+  const body=card==="workout"?chatWorkoutCard(ds):card==="meals"?chatMealsCard(ds):chatWeightCard();
+  return `<div class="coach-msg chat-card" data-card="${card}"><div class="chat-card-h">${title}</div>${body}</div>`;
+}
+function renderChatMode(){
+  $("#tabs").innerHTML="";
+  const ds=todayStr();current=ds;
+  const canUse=aiAvailable()&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
+  const items=[...chatTurns().map(turn=>({...turn,local:true})),...loadCoachChat()].sort((a,b)=>(a.ts||0)-(b.ts||0));
+  const thread=items.map(item=>{
+    if(!item.local)return renderCoachMessage(item);
+    const bubble=`<div class="coach-msg ${item.role==="user"?"user":"coach"}"><div class="chat-bubble">${esc(item.text)}</div></div>`;
+    return bubble+(item.card?chatCardHtml(item.card,ds):"");
+  }).join("");
+  const chips=Object.entries(CHAT_ASKS).map(([card,ask])=>`<button class="coach-chip" onclick="chatAsk('${card}')">${esc(ask.q)}</button>`).join("");
+  $("#app").innerHTML=`<header class="shead chat-head">
+      <div><div class="shead-sub">Conversación · en prueba</div><h1>Hola, ${esc(profileName())}</h1></div>
+      <button class="btn btn-sm" onclick="setUiMode('normal')">Vista normal</button>
+    </header>
+    <div class="chat-thread" id="coachMsgs">
+      <div class="coach-msg coach"><div class="chat-bubble">${esc(chatGreeting(ds))}</div></div>
+      ${thread}
+      <div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="loading-row" style="padding:6px 2px"><div class="spinner"></div><span>Tu coach está escribiendo…</span></div></div></div>
+    </div>
+    <div class="chat-chips">${chips}</div>
+    ${canUse?`<div class="coach-input-row" style="margin:0 -14px;border-radius:0">
+      <textarea id="coachInput" aria-label="Escribe a tu coach" placeholder="Pregunta o cuéntale qué estás comiendo…" rows="1"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();coachSendFromInput();}"
+        oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
+      <button onclick="coachSendFromInput()" title="Enviar" aria-label="Enviar mensaje"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg></button>
+    </div>`:`<div class="muted small">Tu coach por escrito no está disponible ahora; las tarjetas de arriba siguen funcionando.</div>`}`;
+}
 function renderCoachMessage(m){
   if(m.role==="summary"){
     return `<div class="coach-msg summary"><div class="chat-bubble">${esc(m.text)}</div></div>`;
@@ -6934,6 +7060,9 @@ function renderProfile(){
   <summary onclick="return profileAccordionGuard(event,this)">Cuenta</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <div class="row between"><span class="muted small">${esc(email)}</span><span class="badge ${isAdmin()?'b-PESAS':'b-Libre'}">${isAdmin()?'Admin':'Usuario'}</span></div>
+    ${labsConversationalEnabled()?`<div style="margin-top:12px"><div class="muted small" style="margin-bottom:6px">Modo de la app (en prueba)</div><div class="row" style="gap:8px">
+      <button type="button" class="btn btn-sm" style="flex:1" aria-pressed="${!chatModeActive()}" onclick="setUiMode('normal')">Normal</button>
+      <button type="button" class="btn btn-sm" style="flex:1" aria-pressed="${chatModeActive()}" onclick="setUiMode('chat')">Conversación</button></div></div>`:""}
     ${appUpdateOfferedInProfile()?`<div class="row between" style="margin-top:12px;gap:8px;align-items:center"><span class="muted small">Hay una versión nueva de la app</span><button type="button" class="btn btn-sm" onclick="applyPendingAppUpdate()">Actualizar</button></div>`:""}
     <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="signOutUser(this)">Cerrar sesión</button>
   </div></div>
@@ -11096,6 +11225,7 @@ async function onAuth(){
     onboardingStep=1;reviewPromptShown=false;
     view="hoy";current=clampDate(todayStr());
     render();
+    applyLabsParam(); // REQ-216: enlace secreto de funciones en prueba
     checkCheckoutReturn(); // REQ-26: manejar retorno de Stripe checkout
     trackEvent("session_start",{});
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);

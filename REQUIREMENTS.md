@@ -77,7 +77,7 @@ Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la b
 - REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1; implementado)
 - REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1; implementado)
 - REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar". (P2; implementado)
-- REQ-216 - Modo conversacional (beta oculta). (P2; espera decisión de producto)
+- REQ-216 - Modo conversacional (beta oculta). (P2; fase 1 implementada)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -90,7 +90,6 @@ Pendiente no automatizable por agentes:
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
 - REQ-209 - Scroll/ancho: falta captura y dispositivo para reproducir.
-- REQ-216 - Modo conversacional: falta aprobar alcance de la fase 1 y presupuesto de pruebas.
 - REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
@@ -1508,45 +1507,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-215`).
 
 ## REQ-216 - Modo conversacional (beta oculta): usar la app desde el chat
 
-**Estado: pendiente. Requiere decisión de producto (alcance de la fase 1, quién lo ve y presupuesto de llamadas pagadas para probarlo); no implementable por el agente autónomo hasta aprobarla.**
+**Estado: implementado.** Fase 1 en prueba: el enlace `/?labs=conversacion` habilita en la cuenta un modo "Conversación" (Perfil → Cuenta) con un hilo donde se entrena paso a paso, se marcan o cambian comidas y se registra el peso con tarjetas sin llamadas pagadas; el texto libre va al coach de siempre. Fases 2 (foto e intención libre) y 3 (métricas por modo) quedan como candidatos.
 
-### Origen
-
-Feedback de Jonathan (2026-10-18): llevar la interfaz a algo predominantemente agéntico. En el futuro no harían falta tantos controles: el uso es conversacional (qué entreno hoy y la rutina paso a paso; qué como; "estoy comiendo otra cosa" con una foto) y la conversación muestra controles y botones dentro del propio chat. El usuario debe poder elegir entre la interfaz normal y la conversacional, y la conversacional debe probarse bien primero, oculta o en beta, sin afectar lo que ya funciona.
-
-### Punto de partida en el código
-
-- REQ-21/REQ-42: el coach vive en Hoy (`renderHoy()`, `index.html:4419`) con contexto de macros, entreno y semana (`buildCoachContextText()`, `index.html:5859`).
-- `sendCoachMessage()` (`index.html:6244`) ya devuelve `propuesta` con acciones validadas (`COACH_ACTION_TYPES`, `index.html:5820`: descanso, registrar comida, cambiar plato, adaptar entreno, registrar peso).
-- REQ-172: estimar una comida con foto. REQ-41: ejecutor de acciones con guardrails.
-
-### Objetivo
-
-Un modo "Conversación" que se activa desde Perfil (solo para cuentas con la marca `labs.conversational`, que pone el admin). Usa los mismos datos y validaciones que la interfaz normal y permite volver a ella en un toque.
-
-### Alcance propuesto por fases (a aprobar)
-
-1. **Fase 1, shell y tarjetas:** marca por usuario; el modo reemplaza las tabs por un hilo con barra de entrada (texto, foto, voz). Al abrir, el coach saluda con el estado del día **sin llamada pagada** (agenda determinista de REQ-40) y tarjetas interactivas dentro del hilo: "Entreno de hoy" (abre el reproductor existente en línea), "Comidas de hoy" (marcar hecha / cambiar), "Registrar peso". Las acciones del coach se confirman con botones en la tarjeta, nunca en silencio.
-2. **Fase 2, intención libre:** "estoy comiendo otra cosa" + foto → `meal_estimate` → tarjeta con macros y "Registrar"; "solo tengo 20 min" → adaptar entreno con vista previa.
-3. **Fase 3, medir:** eventos de uso por modo (sin contenido) para comparar adherencia antes de abrirlo a más usuarios.
-
-### Fuera de alcance
-
-- Quitar la interfaz normal. Nuevas dependencias o framework.
-
-### Riesgos
-
-- Costo: cada mensaje libre es una llamada pagada; reusar las cuotas de `coach_conversation` y priorizar tarjetas deterministas.
-- REQ-31: el modo no menciona IA. Confirmación antes de modificar (principio 4). La degradación sin conexión vuelve a las tarjetas deterministas.
-
-### Criterios de aceptación (fase 1)
-
-- Sin la marca, nada cambia (E2E existentes en verde).
-- Con la marca: se puede completar el día (entreno + comidas + peso) solo desde el hilo, sin llamadas pagadas, con E2E y mocks.
-
-### Verificación sugerida
-
-- Prototipo navegable antes de implementar (`impeccable shape`), revisado por Jonathan.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-216`).
 
 ## REQ-217 - Beta: la postulación cierra con una confirmación amable y sin callejones sin salida
 

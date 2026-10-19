@@ -9428,3 +9428,53 @@ Con `SIGNUP_MODE=open`, toda la portada ofrece registro directo (hero, nav y CTA
 1. `landingModeHtml(slot)` (`nav`, `hero`, `heroNote`, `sub`, `final`): beta cerrada → postular; registro abierto → "Empezar"/"Empezar ahora" (`showAuthFromLanding('up')`) y textos sin beta.
 2. Nodos marcados con `data-lmode`; `refreshLandingPlans()` los reescribe junto a `.l-plans` cuando cambia `landingRenderKey()` (que ya incluía el modo), sin repintar: se conservan el scroll y la FAQ abierta. SW v102.
 3. `tests/e2e/portada.spec.js`: con la config en `open` resuelta después del pintado, no queda ningún enlace a `beta-reclutamiento.html` ni la palabra beta, la FAQ sigue abierta y el CTA final abre el registro.
+
+## REQ-216 - Modo conversacional (beta oculta): usar la app desde el chat
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Jonathan (2026-10-18): llevar la interfaz a algo predominantemente agéntico. En el futuro no harían falta tantos controles: el uso es conversacional (qué entreno hoy y la rutina paso a paso; qué como; "estoy comiendo otra cosa" con una foto) y la conversación muestra controles y botones dentro del propio chat. El usuario debe poder elegir entre la interfaz normal y la conversacional, y la conversacional debe probarse bien primero, oculta o en beta, sin afectar lo que ya funciona.
+
+### Punto de partida en el código
+
+- REQ-21/REQ-42: el coach vive en Hoy (`renderHoy()`, `index.html:4419`) con contexto de macros, entreno y semana (`buildCoachContextText()`, `index.html:5859`).
+- `sendCoachMessage()` (`index.html:6244`) ya devuelve `propuesta` con acciones validadas (`COACH_ACTION_TYPES`, `index.html:5820`: descanso, registrar comida, cambiar plato, adaptar entreno, registrar peso).
+- REQ-172: estimar una comida con foto. REQ-41: ejecutor de acciones con guardrails.
+
+### Objetivo
+
+Un modo "Conversación" que se activa desde Perfil (solo para cuentas con la marca `labs.conversational`, que pone el admin). Usa los mismos datos y validaciones que la interfaz normal y permite volver a ella en un toque.
+
+### Alcance propuesto por fases (a aprobar)
+
+1. **Fase 1, shell y tarjetas:** marca por usuario; el modo reemplaza las tabs por un hilo con barra de entrada (texto, foto, voz). Al abrir, el coach saluda con el estado del día **sin llamada pagada** (agenda determinista de REQ-40) y tarjetas interactivas dentro del hilo: "Entreno de hoy" (abre el reproductor existente en línea), "Comidas de hoy" (marcar hecha / cambiar), "Registrar peso". Las acciones del coach se confirman con botones en la tarjeta, nunca en silencio.
+2. **Fase 2, intención libre:** "estoy comiendo otra cosa" + foto → `meal_estimate` → tarjeta con macros y "Registrar"; "solo tengo 20 min" → adaptar entreno con vista previa.
+3. **Fase 3, medir:** eventos de uso por modo (sin contenido) para comparar adherencia antes de abrirlo a más usuarios.
+
+### Fuera de alcance
+
+- Quitar la interfaz normal. Nuevas dependencias o framework.
+
+### Riesgos
+
+- Costo: cada mensaje libre es una llamada pagada; reusar las cuotas de `coach_conversation` y priorizar tarjetas deterministas.
+- REQ-31: el modo no menciona IA. Confirmación antes de modificar (principio 4). La degradación sin conexión vuelve a las tarjetas deterministas.
+
+### Criterios de aceptación (fase 1)
+
+- Sin la marca, nada cambia (E2E existentes en verde).
+- Con la marca: se puede completar el día (entreno + comidas + peso) solo desde el hilo, sin llamadas pagadas, con E2E y mocks.
+
+### Verificación sugerida
+
+- Prototipo navegable antes de implementar (`impeccable shape`), revisado por Jonathan.
+
+### Implementación
+
+Decisión (Jonathan, 2026-10-19: "sigue todo tú"): fase 1 oculta por enlace, sin admin.
+1. `applyLabsParam()` tras el inicio de sesión: `?labs=conversacion` guarda `prefs.labs.conversational`; `?labs=off` lo quita y vuelve a la vista normal; el parámetro se borra de la URL.
+2. Perfil → Cuenta muestra "Modo de la app (en prueba)" Normal/Conversación solo con la marca; `setUiMode()` guarda `prefs.uiMode`.
+3. `render()` → `renderChatMode()` sin tabs: saludo determinista (entreno de hoy + kcal/proteína), chips que responden con tarjetas (`chatAsk()`: entreno con `renderWorkoutExecution()`, comidas con `mealCard()`, peso con `chatSaveWeight()`), turnos locales del día en `sessionStorage` e hilo del coach (`loadCoachChat()`) intercalado; "Vista normal" siempre visible. SW v103.
+4. E2E `tests/e2e/conversacion.spec.js`: con la marca se hace el día desde el hilo sin llamadas al coach en las tarjetas; sin la marca no aparece.

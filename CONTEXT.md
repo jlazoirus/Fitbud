@@ -63,6 +63,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 - REQ-169/170/171: descartes de sesion (`prefsWithSessionRejections()`) bloquean en prompt y cierre; `slotMomentTextConflict()` filtra desayunos contundentes; `collectGlobalLines()` escala propuestas del coach.
 - REQ-172: "Estimar con foto": `meal_estimate` con bloque `image` y hasta 2 `preguntas`; la foto no se guarda.
 - REQ-180: marca Evolv (lima `--accent`, `--on-accent`, Unbounded/Manrope, `brandMark()`); ids `fitbros_*` intactos.
+- REQ-216: modo conversacional oculto (`/?labs=conversacion` → `prefs.labs`, `prefs.uiMode`, `renderChatMode()`).
 - REQ-143 sigue pausado, pero el "techo de catalogo 32-33%" que lo motivaba no existia (era el objetivo de cierre). Sus criterios requieren re-basarse contra 289/378. El hueco real son las 7 dimensiones en 0/7, todas de 2 comidas mas vegano/`sin_tofu`. REQ-147 cerrado por decision de Jonathan (2026-08-30).
 - La primera nutricion posterior al onboarding usa las preferencias guardadas antes de aplicar comidas: `validateGeneratedDay` bloquea patrón alimentario, alergias, sin lácteos y sin gluten con `foodTextConflictForProfile`; si la generación semanal no pasa, `prepareFirstWeekNutrition()` completa faltantes con `deterministicDaysForWeek()`.
 - En `Cambiar comida`, el usuario puede tocar `Rehacer opciones` hasta 4 veces por día; usa `meal_option` con lista cerrada de platos candidatos y fallback determinista del catálogo. `regenerateGenMeal()` comparte ese límite para una comida individual. La acción no vive en `Más opciones`: ese menú queda solo para acciones globales de nutrición.
@@ -84,7 +85,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 ## Pagos, notificaciones y analytics
 
 - Landing publica, catalogo de planes, paywall, Stripe Checkout, webhooks, entitlements, cupones y billing history estan implementados. Cobro real depende de variables y configuracion externa.
-- REQ-104: `checkoutAvailable()` lee `REMOTE.checkout.enabled` (`!!STRIPE_SECRET_KEY`); en false, `showPaywall` muestra "Disponible pronto" + canje de codigo. Planes de pago unico, sin renovacion.
+- REQ-104: sin `STRIPE_SECRET_KEY`, `showPaywall` muestra "Disponible pronto" + canje de codigo. Pago unico, sin renovacion.
 - **Cobro siempre en la web** (Stripe Checkout en `evolvapp.club`), tambien con app nativa: nada de compras dentro de la app. REQ-208: `noPricesMode()` (acceso beta/cupon/cortesia vigente o invitacion sin canjear) reemplaza el paywall por `showAccessNotice()` y Perfil no muestra precios; Admin "Crear cuenta"/"Invitar" con casilla beta da 90 dias de cortesia `quarterly`.
 - `api/notify.js`: cron diario (Vercel Hobby), correo via Resend y push via `web-push` con consentimiento.
 - `api/analytics.js` registra eventos permitidos por allowlist; no enviar datos de salud, alergias, fotos, prompts ni contenido de conversaciones.
