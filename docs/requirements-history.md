@@ -9216,3 +9216,53 @@ El usuario ve una lista corta de movimientos con dosis ("Círculos de cadera · 
 1. `workout-player.js`: `MOVES`, `sessionFocus()` (inferior/superior/completo por patrón y músculos), `strengthMovements()` y `cardioMovements()`; los pasos `warmup`/`cooldown` (plantilla, plan del coach y cardio) llevan `movements:[{name,dose,seconds?}]`. El calentamiento propio del coach (REQ-177) queda como `coachNote`. Sin movimientos de impacto ni invertidos.
 2. `index.html`: `renderMovementStep()` (lista, "Guíame"/"Ya calenté"/"Omitir bloque"; guía con Anterior/Siguiente y cronómetro opcional `kind:"move"` que no cierra el bloque); el resumen previo nombra los movimientos. SW v97.
 3. Pruebas: `validate-workout-player.mjs` (movimientos por zona) y `entreno.spec.js` ("Calentamiento guiado").
+
+## REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18): el botón "Actualizar app" a veces tapa otros controles y no se entiende para qué sirve. La app debe actualizarse sin interferir con el uso diario.
+
+### Problema
+
+Tras un deploy aparece un botón flotante "Actualizar app" que tapa controles y no explica para qué sirve; tocarlo recarga la app en ese momento.
+
+### Causa raíz
+
+- `index.html:927` + `index.html:867`: `#update-badge` es un `position:fixed` a `bottom:70px`, a la izquierda de la columna, encima del contenido. Tapa controles del reproductor ("+ Añadir serie", "Omitir bloque") y de las tarjetas.
+- `index.html:12589-12595`: aparece en cuanto se instala un service worker nuevo, y `applyPendingAppUpdate()` hace `location.reload()` en ese momento, con el usuario a mitad de una tarea.
+
+### Objetivo
+
+Con una versión nueva instalada, la app se actualiza sola en un momento seguro, sin botón flotante.
+
+### Alcance
+
+1. Sin `#update-badge`. Con una actualización pendiente, recargar automáticamente cuando la app vuelve de segundo plano (`visibilitychange` → `visible`, tras más de 30 s oculta) o en la siguiente apertura, y solo si no hay un momento "ocupado": entreno `in_progress`, modal abierto, formulario de Perfil con cambios sin guardar (`pfGroupDirty`), coach respondiendo o cola de sync con pendientes.
+2. Si no hubo momento seguro en 24 h: línea discreta en Perfil → Cuenta ("Hay una versión nueva · Actualizar"), nunca flotante.
+3. Tras recargar por actualización: toast breve "App actualizada", una vez.
+
+### Fuera de alcance
+
+- Cambiar la estrategia de caché del service worker (REQ-173/182).
+
+### Riesgos
+
+- Perder estado: la recarga solo ocurre con la cola de sync vacía y sin entreno en curso.
+
+### Criterios de aceptación
+
+- E2E: con una actualización simulada y un entreno en curso no se recarga; al terminarlo y volver de segundo plano, sí.
+- No queda ningún elemento fijo nuevo sobre el contenido (`tactil.spec.js` y `accesibilidad.spec.js` en verde).
+
+### Verificación sugerida
+
+- Simular `notifyAppUpdateAvailable()` en E2E y despachar `visibilitychange`.
+
+### Implementación
+
+1. `index.html`: se quita `#update-badge` y su CSS. `notifyAppUpdateAvailable()` marca la actualización (`evolv_update_pending_since`); `visibilitychange` recarga si la app estuvo ≥30 s oculta y `appBusyForUpdate()` es falso (modal abierto, coach respondiendo, Perfil con cambios sin guardar, cola de sync pendiente o entreno `in_progress`).
+2. `appUpdateOfferedInProfile()`: tras 24 h, línea "Hay una versión nueva de la app · Actualizar" en Perfil → Cuenta. Tras recargar, toast "App actualizada" una vez (`announceAppUpdated()`). SW v98.
+3. E2E `tests/e2e/actualizacion.spec.js` (3).

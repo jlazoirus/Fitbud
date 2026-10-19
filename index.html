@@ -871,8 +871,6 @@
   .sync-badge.attention{background:rgba(220,110,30,.14);border-color:rgba(220,110,30,.35);color:#f0a050;pointer-events:auto;cursor:pointer}
   .sync-badge.conflict{background:rgba(210,70,110,.16);border-color:rgba(210,70,110,.42);color:#fb7185;pointer-events:auto;cursor:pointer}
   /* Aviso de versión nueva de la app lista para usar (REQ-150) */
-  .update-badge{position:fixed;bottom:calc(70px + var(--safe-bottom));left:max(12px,calc((100vw - 560px) / 2 + 12px));z-index:150;font-family:var(--font-body);font-size:12px;font-weight:700;min-height:32px;padding:0 12px;border-radius:999px;border:1px solid rgba(58,123,255,.45);background:var(--terra-dim);color:var(--terra-200);cursor:pointer}
-  .update-badge::after{content:"";position:absolute;inset:-6px}
   /* Perfil: acordeón local y guardado flotante (REQ-105) */
   .pf-accordion-list{display:flex;flex-direction:column;gap:10px}
   .pf-accordion{margin:0}
@@ -931,7 +929,6 @@
 <div class="tabs" id="tabs"></div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <aside class="sync-badge" id="sync-badge" aria-live="polite" aria-label="Estado de sincronización" hidden></aside>
-<button class="update-badge" id="update-badge" hidden onclick="applyPendingAppUpdate()" aria-label="Actualizar la app a la última versión">Actualizar app</button>
 
 <script>
 "use strict";
@@ -6823,6 +6820,7 @@ function renderProfile(){
   <summary onclick="return profileAccordionGuard(event,this)">Cuenta</summary>
   <div class="pf-accordion-panel"><div class="dash">
     <div class="row between"><span class="muted small">${esc(email)}</span><span class="badge ${isAdmin()?'b-PESAS':'b-Libre'}">${isAdmin()?'Admin':'Usuario'}</span></div>
+    ${appUpdateOfferedInProfile()?`<div class="row between" style="margin-top:12px;gap:8px;align-items:center"><span class="muted small">Hay una versión nueva de la app</span><button type="button" class="btn btn-sm" onclick="applyPendingAppUpdate()">Actualizar</button></div>`:""}
     <button type="button" class="btn" style="width:100%;margin-top:12px" onclick="signOutUser(this)">Cerrar sesión</button>
   </div></div>
   </details>
@@ -12841,10 +12839,12 @@ function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;",
 
 /* ---------- init ---------- */
 // REQ-150: la instalación de un SW nuevo es atómica (mismo cache versionado
-// para HTML+JS), pero recargar solo puede interrumpir una acción en curso
-// (p. ej. mitad de un entreno). En vez de recargar sola, la app avisa con un
-// badge discreto y el usuario decide cuándo aplicar la versión nueva.
+// para HTML+JS), pero recargar puede interrumpir una acción en curso.
+// REQ-213: sin botón flotante; la app se recarga sola al volver de segundo
+// plano si no hay nada a medias, y si en 24 h no hubo ese momento lo ofrece en
+// Perfil → Cuenta.
 function registerServiceWorker(){
+  announceAppUpdated();
   if(!CONFIG.pwa.registerServiceWorker||!("serviceWorker" in navigator))return;
   const host=location.hostname;
   const secure=location.protocol==="https:"||host==="localhost"||host==="127.0.0.1"||host==="::1";
@@ -12866,12 +12866,45 @@ function registerServiceWorker(){
       .catch(e=>console.warn("No se pudo registrar el service worker",e));
   });
 }
+const APP_UPDATE_KEY="evolv_update_pending_since";
+const APP_UPDATED_FLAG="evolv_app_updated";
+const APP_UPDATE_HIDDEN_MS=30*1000;
+const APP_UPDATE_PROFILE_MS=24*3600*1000;
+let appUpdatePending=false,appHiddenAt=0;
 function notifyAppUpdateAvailable(){
-  const el=document.getElementById("update-badge");
-  if(el)el.hidden=false;
+  appUpdatePending=true;
+  try{if(!localStorage.getItem(APP_UPDATE_KEY))localStorage.setItem(APP_UPDATE_KEY,String(Date.now()));}catch(e){}
+}
+// Algo a medias que una recarga interrumpiría.
+function appBusyForUpdate(){
+  if(document.getElementById("overlay"))return true;
+  if(typeof coachActionsInFlight!=="undefined"&&coachActionsInFlight.size)return true;
+  if(["editable","privacy","notif"].some(group=>pfGroupDirty(group)))return true;
+  if(_getSyncQ().some(item=>item.status==="pending"))return true;
+  if(session&&[todayStr(),current].some(ds=>{const e=ds&&normalizedWorkoutExecution(ds);return !!(e&&e.status==="in_progress");}))return true;
+  return false;
+}
+function appUpdateOfferedInProfile(){
+  if(!appUpdatePending)return false;
+  try{return Date.now()-Number(localStorage.getItem(APP_UPDATE_KEY)||Date.now())>=APP_UPDATE_PROFILE_MS;}catch(e){return false;}
 }
 function applyPendingAppUpdate(){
+  try{localStorage.removeItem(APP_UPDATE_KEY);sessionStorage.setItem(APP_UPDATED_FLAG,"1");}catch(e){}
   location.reload();
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="hidden"){appHiddenAt=Date.now();return;}
+  const away=appHiddenAt&&Date.now()-appHiddenAt>=APP_UPDATE_HIDDEN_MS;
+  appHiddenAt=0;
+  if(appUpdatePending&&away&&!appBusyForUpdate())applyPendingAppUpdate();
+});
+function announceAppUpdated(){
+  try{
+    localStorage.removeItem(APP_UPDATE_KEY); // esta carga ya trae la versión más reciente
+    if(sessionStorage.getItem(APP_UPDATED_FLAG)!=="1")return;
+    sessionStorage.removeItem(APP_UPDATED_FLAG);
+  }catch(e){return;}
+  setTimeout(()=>toast("App actualizada"),600);
 }
 // Carga la base de datos si hay conexión, para que los macros del día salgan de la DB.
 function ensureDB(){if(supa&&!DB.loaded&&!DB.error)return dbLoad().then(render);return Promise.resolve();}

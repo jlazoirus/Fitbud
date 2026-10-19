@@ -74,7 +74,7 @@ Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la b
 - REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1; implementado)
 - REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1; implementado)
 - REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1; implementado)
-- REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1)
+- REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1; implementado)
 - REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1)
 - REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar". (P2)
 - REQ-216 - Modo conversacional (beta oculta). (P2; espera decisión de producto)
@@ -1490,47 +1490,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-212`).
 
 ## REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe
 
-**Estado: pendiente.**
+**Estado: implementado.** Sin botón flotante "Actualizar app": la versión nueva se aplica sola al volver de segundo plano si no hay nada a medias; tras 24 h sin momento seguro se ofrece en Perfil → Cuenta.
 
-### Origen
-
-Feedback beta de Jonathan (2026-10-18): el botón "Actualizar app" a veces tapa otros controles y no se entiende para qué sirve. La app debe actualizarse sin interferir con el uso diario.
-
-### Problema
-
-Tras un deploy aparece un botón flotante "Actualizar app" que tapa controles y no explica para qué sirve; tocarlo recarga la app en ese momento.
-
-### Causa raíz
-
-- `index.html:927` + `index.html:867`: `#update-badge` es un `position:fixed` a `bottom:70px`, a la izquierda de la columna, encima del contenido. Tapa controles del reproductor ("+ Añadir serie", "Omitir bloque") y de las tarjetas.
-- `index.html:12589-12595`: aparece en cuanto se instala un service worker nuevo, y `applyPendingAppUpdate()` hace `location.reload()` en ese momento, con el usuario a mitad de una tarea.
-
-### Objetivo
-
-Con una versión nueva instalada, la app se actualiza sola en un momento seguro, sin botón flotante.
-
-### Alcance
-
-1. Sin `#update-badge`. Con una actualización pendiente, recargar automáticamente cuando la app vuelve de segundo plano (`visibilitychange` → `visible`, tras más de 30 s oculta) o en la siguiente apertura, y solo si no hay un momento "ocupado": entreno `in_progress`, modal abierto, formulario de Perfil con cambios sin guardar (`pfGroupDirty`), coach respondiendo o cola de sync con pendientes.
-2. Si no hubo momento seguro en 24 h: línea discreta en Perfil → Cuenta ("Hay una versión nueva · Actualizar"), nunca flotante.
-3. Tras recargar por actualización: toast breve "App actualizada", una vez.
-
-### Fuera de alcance
-
-- Cambiar la estrategia de caché del service worker (REQ-173/182).
-
-### Riesgos
-
-- Perder estado: la recarga solo ocurre con la cola de sync vacía y sin entreno en curso.
-
-### Criterios de aceptación
-
-- E2E: con una actualización simulada y un entreno en curso no se recarga; al terminarlo y volver de segundo plano, sí.
-- No queda ningún elemento fijo nuevo sobre el contenido (`tactil.spec.js` y `accesibilidad.spec.js` en verde).
-
-### Verificación sugerida
-
-- Simular `notifyAppUpdateAvailable()` en E2E y despachar `visibilitychange`.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-213`).
 
 ## REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento
 
