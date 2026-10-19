@@ -6,6 +6,7 @@ import crypto from "node:crypto";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const BAN_DURATION = "876000h"; // 100 años; "none" levanta el bloqueo.
+const QUOTA_OVERRIDE_MAX = 10000; // por día y por acción; solo evita errores de tipeo (REQ-222)
 const COACH_ACTIONS = new Set([
   "diet_day",
   "diet_week",
@@ -631,10 +632,16 @@ async function setQuotaOverride(body, caller, e) {
   const action = String(body.quotaAction || "");
   const dailyLimit = body.dailyLimit === "" || body.dailyLimit == null ? null : Number.parseInt(body.dailyLimit, 10);
   const bonusUnits = Number.parseInt(body.bonusUnits, 10) || 0;
-  if (!UUID_RE.test(userId) || !COACH_ACTIONS.has(action)
-    || (dailyLimit != null && (!Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > 1000))
-    || bonusUnits < 0 || bonusUnits > 1000) {
-    const error = new Error("Usuario, acción y valores de cortesía válidos requeridos.");
+  // REQ-222: cada caso dice qué corregir; el tope solo evita errores de tipeo.
+  const invalid = !UUID_RE.test(userId) ? "Usuario no válido."
+    : !COACH_ACTIONS.has(action) ? "Elige una acción de la lista."
+    : dailyLimit != null && (!Number.isInteger(dailyLimit) || dailyLimit < 0 || dailyLimit > QUOTA_OVERRIDE_MAX)
+      ? `El límite diario va de 0 a ${QUOTA_OVERRIDE_MAX.toLocaleString("es-PE")} (o vacío para heredar la política).`
+    : bonusUnits < 0 || bonusUnits > QUOTA_OVERRIDE_MAX
+      ? `Las unidades extra van de 0 a ${QUOTA_OVERRIDE_MAX.toLocaleString("es-PE")}.`
+    : "";
+  if (invalid) {
+    const error = new Error(invalid);
     error.status = 400;
     throw error;
   }

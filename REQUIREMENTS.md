@@ -1589,3 +1589,20 @@ REQ-209 (feedback beta 2026-10-18: "no coge todo el ancho y siempre hay una barr
 ### Criterios de aceptación
 
 - `tests/e2e/ancho.spec.js`: a 360 px, un nombre de 120 caracteres no desborda Hoy ni Nutrición (antes: 658 px de desborde). ✓
+
+## REQ-222 - Fix admin: la cortesía de consumo rechazaba 3000 sin decir por qué
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19, captura): en "Consumo y cortesía" de un beta tester, límite 3000 y unidades extra 3000 en `coach_conversation` → "Usuario, acción y valores de cortesía válidos requeridos." y no guardaba. `api/admin.js` (`setQuotaOverride`) aceptaba como máximo 1000 en ambos campos con un único mensaje genérico; el selector mostraba la clave interna `coach_conversation`.
+
+### Alcance
+
+1. Tope por día y por acción a 10.000 (`QUOTA_OVERRIDE_MAX`, solo contra errores de tipeo); cada error dice qué campo y qué rango.
+2. Modal: ayuda "Por día y por acción, de 0 a 10.000", validación antes de enviar con foco en el campo, y "Conversación con el coach" en el selector. SW v104.
+
+### Criterios de aceptación
+
+- `scripts/test-coach-quota.mjs`: 3000/3000 en `coach_conversation` se guarda; 20000 responde 400 nombrando el campo y el rango. ✓

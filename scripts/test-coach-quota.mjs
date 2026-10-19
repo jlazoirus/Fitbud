@@ -411,6 +411,22 @@ await adminHandler({
 }, res);
 assert(res.statusCode === 200 && savedOverride.bonus_units === 2, "El admin debe otorgar cortesía por usuario.");
 
+// REQ-222: 3000 por día ya es válido (antes el tope de 1000 lo rechazaba sin decir por qué)
+res = capture();
+await adminHandler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "setQuotaOverride", userId: user.id, quotaAction: "coach_conversation", dailyLimit: "3000", bonusUnits: 3000 },
+}, res);
+assert(res.statusCode === 200 && savedOverride.daily_limit === 3000 && savedOverride.bonus_units === 3000, "Debe aceptar 3000 por día en coach_conversation.");
+res = capture();
+await adminHandler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "setQuotaOverride", userId: user.id, quotaAction: "coach_conversation", dailyLimit: "", bonusUnits: 20000 },
+}, res);
+assert(res.statusCode === 400 && /unidades extra van de 0 a 10/.test(res.body.error), "Fuera de rango: el error nombra el campo y el rango.");
+
 global.fetch = async (url) => {
   const value = String(url);
   if (value.endsWith("/auth/v1/user")) return response(200, admin);
