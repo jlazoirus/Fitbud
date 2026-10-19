@@ -72,7 +72,8 @@
     --safe-left:env(safe-area-inset-left,0px);
   }
   *{box-sizing:border-box}
-  html{height:100%;background:var(--black)}
+  /* REQ-221: nada puede arrastrar la página de lado (iOS ignora overflow-x en body) */
+  html{height:100%;background:var(--black);overflow-x:clip}
   body{
     font-family:var(--font-body);background:var(--black);color:var(--txt);margin:0;padding:0;height:100vh;height:100dvh;overflow:hidden;
     display:flex;flex-direction:column;
@@ -89,6 +90,8 @@
             calc(20px + var(--safe-bottom))
             max(14px,var(--safe-left));
   }
+  /* REQ-221: en escritorio con barras clásicas, la barra de la columna es fina y discreta */
+  #app{scrollbar-width:thin;scrollbar-color:var(--border-2) transparent}
   #app.landing-host{max-width:none;padding:0}
   h1,h2{margin:0;font-family:var(--font-display);letter-spacing:-.02em}
   h3{margin:0;font-family:var(--font-body);letter-spacing:-.02em}
@@ -195,6 +198,9 @@
   .meal.skipped{opacity:.6;border-style:dashed}
   .meal .slot{font-family:var(--font-body);font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
   .meal .name{font-family:var(--font-body);font-weight:600;font-size:16px;margin:3px 0 5px;line-height:1.25}
+  /* REQ-221: nombres largos (platos o ejercicios del coach) se cortan en vez de desbordar */
+  #app{overflow-wrap:break-word}
+  #app h1,#app h2,#app h3,#app h4,.meal .name,.agenda-name,.agenda-meta,.plan-main b,.cl-title,.shop-item .n,.chat-bubble{overflow-wrap:anywhere}
   .meal .nums{font-size:12px;color:var(--muted);font-family:var(--font-mono)}
   .meal .nums b{color:var(--txt);font-weight:500}
   .meal-empty-hint{font-size:13px;color:var(--muted);line-height:1.4}

@@ -70,7 +70,7 @@ Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que 
 Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la beta primero (cobro), luego lo que confunde en el alta y el entreno, luego funciones nuevas:
 
 - REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días; cobro siempre en la web. (P0; implementado)
-- REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (P0; espera captura para reproducir)
+- REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (P0; espera captura para reproducir; mitigación en REQ-221)
 - REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1; implementado)
 - REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1; implementado)
 - REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1; implementado)
@@ -1652,3 +1652,21 @@ Con `SIGNUP_MODE=open`, toda la portada ofrece registro directo (hero, nav y CTA
 ### Criterios de aceptación
 
 - `tactil.spec.js` pasa y el release gate queda en verde. ✓
+
+## REQ-221 - Mitigación de REQ-209: nada desborda la columna y la barra de escritorio es discreta
+
+**Estado: implementado.**
+
+### Origen
+
+REQ-209 (feedback beta 2026-10-18: "no coge todo el ancho y siempre hay una barra de scroll") no se reprodujo en Chromium móvil (360-414 px) ni en producción (`evolvapp.club/beta` a 375 px). Mientras llega la captura, se cierran las causas plausibles. Una prueba encontró una real: con un nombre de plato sin espacios, la tarjeta "Próxima comida" de Hoy (`.agenda-name`) se estiraba a 936 px dentro de la columna.
+
+### Alcance
+
+1. `html{overflow-x:clip}`: iOS no deja arrastrar la página de lado.
+2. `#app` con barra fina (`scrollbar-width:thin`), para escritorio con barras clásicas.
+3. `overflow-wrap:break-word` en `#app` y `anywhere` en títulos, nombres de comida/agenda/ejercicio, lista de compra y chat. SW v101.
+
+### Criterios de aceptación
+
+- `tests/e2e/ancho.spec.js`: a 360 px, un nombre de 120 caracteres no desborda Hoy ni Nutrición (antes: 658 px de desborde). ✓
