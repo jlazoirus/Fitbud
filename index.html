@@ -1070,10 +1070,22 @@ const SAFETY_QUESTIONS=[
   ["clinician_restriction","¿Un profesional te indicó limitar o evitar el ejercicio?"],
   ["acute_injury","¿Tienes una lesión aguda o dolor que empeora al moverte?"],
 ];
+// REQ-211: cada intensidad dice qué cambia en la práctica.
 const TRAINING_SAFETY_MODE_LABELS={
-  auto:"Según mi perfil (recomendado)",
-  gentle:"Suave / bajo impacto",
-  full:"Plan completo",
+  auto:"Recomendada para ti",
+  gentle:"Suave",
+  full:"Completa",
+};
+const TRAINING_SAFETY_MODE_HELP={
+  auto:"La elegimos según tu edad, tu experiencia y tus respuestas de salud.",
+  gentle:"Menos series, esfuerzo moderado y ejercicios sencillos o de bajo impacto.",
+  full:"Series y esfuerzo normales para tu nivel; disponible si tus respuestas de salud no muestran alertas.",
+};
+// REQ-211: el objetivo se entiende sin conocer los nombres técnicos (los valores internos no cambian).
+const GOAL_OPTIONS={
+  deficit:{label:"Bajar grasa",help:"Comes un poco menos de lo que gastas y bajas de peso de forma gradual."},
+  mantenimiento:{label:"Recomponer mi cuerpo",help:"Tu peso casi no cambia, pero ganas músculo y pierdes grasa."},
+  volumen:{label:"Ganar músculo",help:"Comes un poco más de lo que gastas y subes de peso poco a poco."},
 };
 // REQ-120: normaliza la lista de platos bloqueados ({key,name}), deduplicada por key.
 function normalizedBlockedDishes(value){
@@ -1267,7 +1279,7 @@ function trainingSafetyRecommendation(prefs){
       active:true,
       kind:"age55",
       title:"Caminar también cuenta como plan",
-      body:"Te recomendamos empezar con bajo impacto: caminatas o cardio ligero, movilidad y fuerza mínima opcional. Puedes elegir plan completo si te sientes listo y tu evaluación está en verde.",
+      body:"Te recomendamos empezar con bajo impacto: caminatas o cardio ligero, movilidad y fuerza mínima opcional. Puedes elegir intensidad completa si te sientes listo y tus respuestas de salud no muestran alertas.",
     };
   }
   if(Number.isFinite(age)&&age>=50){
@@ -1275,7 +1287,7 @@ function trainingSafetyRecommendation(prefs){
       active:true,
       kind:"age50",
       title:"Empieza con bajo impacto",
-      body:"Te conviene iniciar con volumen moderado, fuerza ligera y progresión gradual. Puedes mantener el plan completo si prefieres una carga normal.",
+      body:"Te conviene iniciar con volumen moderado, fuerza ligera y progresión gradual. Puedes elegir intensidad completa si prefieres una carga normal.",
     };
   }
   if(Number.isFinite(age)&&age>=18&&age<=21){
@@ -1283,7 +1295,7 @@ function trainingSafetyRecommendation(prefs){
       active:true,
       kind:"young",
       title:"Construye técnica primero",
-      body:"Te sugerimos empezar conservador, con técnica estable y progresión gradual. Puedes elegir plan completo si ya entrenas con constancia.",
+      body:"Te sugerimos empezar conservador, con técnica estable y progresión gradual. Puedes elegir intensidad completa si ya entrenas con constancia.",
     };
   }
   return {active:false,kind:"standard",title:"",body:""};
@@ -3039,12 +3051,22 @@ function safetySelect(id,value){
     <option value="yes" ${value==="yes"?"selected":""}>Sí</option>
   </select>`;
 }
+function updateSafetyModeHelp(prefix){
+  const select=$("#"+prefix+"_safety_mode"),help=$("#"+prefix+"_safety_help");
+  if(select&&help)help.textContent=TRAINING_SAFETY_MODE_HELP[normalizedTrainingSafetyMode(select.value)];
+}
+function explainTrainingIntensity(){
+  modal(`<h3>Intensidad del entreno</h3>
+    <p class="muted small">Cambia cuántas series haces, qué tan cerca del límite trabajas y qué ejercicios te proponemos. Puedes cambiarla cuando quieras en Perfil.</p>
+    ${Object.entries(TRAINING_SAFETY_MODE_LABELS).map(([value,label])=>`<div style="margin:10px 0"><b>${esc(label)}</b><div class="muted small">${esc(TRAINING_SAFETY_MODE_HELP[value])}</div></div>`).join("")}
+    <button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="closeModal()">Entendido</button>`);
+}
 function trainingSafetyModeHtml(prefix,d){
   const mode=normalizedTrainingSafetyMode(d&&d.trainingSafetyMode);
   const rec=trainingSafetyRecommendation(d||{});
-  const select=`<div class="field" style="grid-column:1 / -1"><label for="${prefix}_safety_mode">Ritmo del plan</label><select id="${prefix}_safety_mode" onchange="${prefix==="ob"?"updateOnboardingTrainingChoice()":"updateTrainingSummary()"}">
+  const select=`<div class="field" style="grid-column:1 / -1"><div class="row between" style="align-items:center;gap:8px"><label for="${prefix}_safety_mode">Intensidad del entreno</label><button type="button" class="link-btn" style="font-size:13px" onclick="explainTrainingIntensity()">¿Qué cambia?</button></div><select id="${prefix}_safety_mode" onchange="updateSafetyModeHelp('${prefix}');${prefix==="ob"?"updateOnboardingTrainingChoice()":"updateTrainingSummary()"}">
     ${Object.entries(TRAINING_SAFETY_MODE_LABELS).map(([value,label])=>`<option value="${value}" ${mode===value?"selected":""}>${label}</option>`).join("")}
-  </select><div class="field-note">El modo recomendado baja intensidad y prioriza opciones estables; el plan completo queda disponible si tu evaluación de seguridad está en verde.</div></div>`;
+  </select><div class="field-note" id="${prefix}_safety_help">${esc(TRAINING_SAFETY_MODE_HELP[mode])}</div></div>`;
   if(!rec.active)return select;
   return `${select}<div class="alert violet" style="grid-column:1 / -1"><b>${esc(rec.title)}</b><br>${esc(rec.body)}</div>`;
 }
@@ -3174,10 +3196,8 @@ function renderOnboarding(){
       <p class="onboarding-copy">Calculamos una referencia inicial a partir de tus datos. Puedes ajustarla si quieres.</p>
       <div class="dash">
         <div class="field" style="margin-top:0"><label for="ob_goal">Objetivo principal</label><select id="ob_goal" onchange="onboardingGoalChanged(this.value)">
-          <option value="deficit" ${sel(d.goal,"deficit")}>Perder grasa</option>
-          <option value="mantenimiento" ${sel(d.goal,"mantenimiento")}>Mantener mi peso y mejorar mi cuerpo</option>
-          <option value="volumen" ${sel(d.goal,"volumen")}>Ganar masa muscular</option>
-        </select></div>
+          ${Object.entries(GOAL_OPTIONS).map(([value,o])=>`<option value="${value}" ${sel(d.goal,value)}>${o.label}</option>`).join("")}
+        </select><div class="field-note" id="obGoalHelp">${esc((GOAL_OPTIONS[d.goal]||GOAL_OPTIONS.deficit).help)}</div></div>
         <div class="ai-box"><b>Tu referencia: ${d.calorieTarget||"—"} kcal · ${d.proteinTarget||"—"} g proteína.</b> Ajustada a tu objetivo y tus datos personales.
           <div style="margin-top:8px"><button type="button" class="btn btn-sm" onclick="openMacroFormulaInfo()">¿Cómo lo calculamos?</button></div>
         </div>
@@ -6554,7 +6574,7 @@ function renderProfile(){
           <div class="scard"><div class="n">${macros.c} g</div><div class="l">carbohidratos</div></div>
           <div class="scard"><div class="n">${macros.f} g</div><div class="l">grasas</div></div>
         </div>
-        <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${p.goal==="volumen"?"ganar masa":p.goal==="mantenimiento"?"mantener mi peso y mejorar mi cuerpo":"pérdida de grasa"}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
+        <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${esc((GOAL_OPTIONS[p.goal]||GOAL_OPTIONS.deficit).label.toLowerCase())}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
         <button class="btn" style="width:100%" onclick="startOnboarding()">Recalcular objetivos y preferencias</button>
       </div>
     </div>

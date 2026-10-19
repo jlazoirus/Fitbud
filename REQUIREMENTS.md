@@ -72,7 +72,7 @@ Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la b
 - REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días; cobro siempre en la web. (P0; implementado)
 - REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (P0; espera captura para reproducir)
 - REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1; implementado)
-- REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1)
+- REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1; implementado)
 - REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1)
 - REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1)
 - REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1)
@@ -1478,55 +1478,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-210`).
 
 ## REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera
 
-**Estado: pendiente.**
+**Estado: implementado.** Objetivo como "Bajar grasa / Recomponer mi cuerpo / Ganar músculo" con una línea de ayuda; "Intensidad del entreno" (Recomendada para ti / Suave / Completa) con ayuda viva y "¿Qué cambia?".
 
-### Origen
-
-Feedback beta de Jonathan (2026-10-18), sobre la configuración de la cuenta: "Mantener mi peso y mejorar mi cuerpo" no tiene lógica a primera vista, y "Ritmo del plan" con la opción "Plan completo" no se explica solo; hace falta una ayuda.
-
-### Problema
-
-En el paso 2 del onboarding, la opción del medio no dice que es recomposición. En el paso de entrenamiento, "Plan completo" frente a "Suave" no explica qué cambia, así que el usuario elige a ciegas.
-
-### Causa raíz
-
-- `index.html:3169`: el objetivo `mantenimiento` (que en realidad es recomposición: mismo peso, más músculo y menos grasa) se presenta como "Mantener mi peso y mejorar mi cuerpo", sin descripción. El copy viene de REQ-114 y lo fija `scripts/validate-onboarding-copy.mjs`.
-- `index.html:1072-1076` y `index.html:3036-3038`: "Ritmo del plan" ofrece "Según mi perfil (recomendado) / Suave / bajo impacto / Plan completo". La nota habla de "evaluación de seguridad en verde", sin decir qué cambia en la práctica (intensidad, series, tipo de ejercicios).
-
-### Objetivo
-
-Cada opción dice qué consigue y qué implica, en una línea, sin jerga.
-
-### Alcance
-
-1. Objetivo: tarjetas seleccionables (o `select` + descripción viva) con un título y una línea:
-   - "Bajar grasa": comes un poco menos de lo que gastas; bajas de peso de forma gradual.
-   - "Recomponer mi cuerpo": tu peso casi no cambia, pero ganas músculo y pierdes grasa.
-   - "Ganar músculo": comes un poco más de lo que gastas; subes de peso poco a poco.
-   Mismo copy en Perfil → Objetivo. Los valores internos (`deficit/mantenimiento/volumen`) no cambian.
-2. Ritmo del plan → "Intensidad del entreno", con descripción por opción:
-   - "Recomendado para ti": la elegimos según tu edad, experiencia y respuestas de salud.
-   - "Suave": menos series, esfuerzo moderado y ejercicios sencillos o de bajo impacto.
-   - "Completa": series y esfuerzo normales para tu nivel; disponible si tus respuestas de salud no muestran alertas.
-   Botón ⓘ (patrón de `explainWorkoutEffort()`) con el detalle; misma ayuda en Perfil (`trainingSafetyModeHtml("pf")`).
-3. Actualizar `scripts/validate-onboarding-copy.mjs` y `CONTEXT.md` (línea de REQ-114).
-
-### Fuera de alcance
-
-- Cambiar la lógica de `trainingSafetyRecommendation()` o los cálculos de macros.
-
-### Riesgos
-
-- REQ-31: el copy no menciona IA. Táctil: las tarjetas miden ≥44 px (REQ-193).
-
-### Criterios de aceptación
-
-- El onboarding muestra la descripción de la opción elegida en objetivo e intensidad; el ⓘ abre la explicación.
-- `validate-onboarding-copy.mjs` y `tests/e2e/onboarding.spec.js` en verde con el copy nuevo.
-
-### Verificación sugerida
-
-- Recorrer onboarding a 390 px; axe sin violaciones en el paso 2 y en el de entrenamiento.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-211`).
 
 ## REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional
 

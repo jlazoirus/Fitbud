@@ -6,9 +6,14 @@ import { readFileSync } from "node:fs";
 const index = readFileSync("index.html", "utf8");
 const pure = readFileSync("js/nutrition-pure.js", "utf8");
 
-assert.ok(index.includes('value="mantenimiento"'), "El valor interno mantenimiento debe conservarse.");
-assert.ok(index.includes(">Mantener mi peso y mejorar mi cuerpo<"), "El objetivo de mantenimiento debe tener copy claro.");
-assert.ok(!index.includes("Mantener peso y recomponer"), "No debe volver el label anterior de mantenimiento.");
+assert.ok(index.includes('mantenimiento:{label:') && index.includes('value="${value}" ${sel(d.goal,value)}'), "El valor interno mantenimiento debe conservarse.");
+// REQ-211: el objetivo de mantenimiento es recomposición y cada opción explica qué consigue.
+assert.ok(index.includes('mantenimiento:{label:"Recomponer mi cuerpo",help:"Tu peso casi no cambia, pero ganas músculo y pierdes grasa."}'), "El objetivo de mantenimiento debe explicarse como recomposición.");
+assert.ok(!index.includes("Mantener mi peso y mejorar mi cuerpo") && !index.includes("Mantener peso y recomponer"), "No deben volver los labels anteriores de mantenimiento.");
+assert.ok(index.includes('<div class="field-note" id="obGoalHelp">'), "El onboarding muestra la explicación del objetivo elegido.");
+assert.ok(index.includes(">Intensidad del entreno</label>") && !index.includes("Ritmo del plan"), "La intensidad reemplaza al ritmo del plan.");
+assert.ok(index.includes('full:"Completa"') && !index.includes('full:"Plan completo"'), "La intensidad completa no se llama plan completo.");
+assert.ok(index.includes("function explainTrainingIntensity()"), "La intensidad tiene una explicación de las tres opciones.");
 
 assert.ok(index.includes('["omnivoro","Como de todo"]'), "El valor omnivoro debe mostrarse como Como de todo.");
 assert.ok(index.includes("Como de todo no puede combinarse"), "La validación debe usar el label visible nuevo.");

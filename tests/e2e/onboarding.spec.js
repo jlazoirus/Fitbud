@@ -52,7 +52,9 @@ test.describe("Onboarding", () => {
     await page.getByRole("button", { name: "Continuar" }).click();
 
     // Paso 2: macros calculados. La fórmula (Mifflin-St Jeor) vive en el tooltip "¿Cómo lo calculamos?" (REQ-103).
-    await expect(page.locator("#ob_goal")).toContainText("Mantener mi peso y mejorar mi cuerpo");
+    // REQ-211: cada objetivo dice qué consigue
+    await expect(page.locator("#ob_goal")).toContainText("Recomponer mi cuerpo");
+    await expect(page.locator("#obGoalHelp")).toContainText("Comes un poco menos de lo que gastas");
     await page.getByRole("button", { name: "¿Cómo lo calculamos?" }).click();
     const formulaModal = page.locator("#overlay");
     await expect(formulaModal).toContainText(/Mifflin-St Jeor/i);
@@ -182,9 +184,14 @@ test.describe("Onboarding", () => {
 
       const app = await reachTrainingStep(page, scenario.age);
       await expect(app).toContainText(scenario.text);
-      await expect(page.locator("#ob_safety_mode")).toContainText("Plan completo");
+      await expect(page.locator("#ob_safety_mode")).toContainText("Completa");
       await page.selectOption("#ob_safety_mode", "full");
       await expect(page.locator("#ob_safety_mode")).toHaveValue("full");
+      // REQ-211: la opción elegida explica qué cambia, y "¿Qué cambia?" detalla las tres
+      await expect(page.locator("#ob_safety_help")).toContainText("Series y esfuerzo normales");
+      await page.getByRole("button", { name: "¿Qué cambia?" }).click();
+      await expect(page.locator("#overlay")).toContainText("Menos series, esfuerzo moderado");
+      await page.locator("#overlay").getByRole("button", { name: "Entendido" }).click();
       if (scenario.age >= 55) {
         await expect(page.locator("#ob_sport")).toContainText("Caminar");
         await expect(page.locator("#ob_strength")).toContainText("No quiero fuerza por ahora");

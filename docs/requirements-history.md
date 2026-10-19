@@ -9106,3 +9106,61 @@ El dato del alta es el registro de la semana 1. Progreso lo muestra ya cargado y
 2. `backfillStartWeightOnce()` tras `pullWeights()` al iniciar sesión: cuentas previas con `cycleStartWeight` y sin marca del ciclo; guarda la marca para que una S1 borrada no reaparezca.
 3. `startWeightNoteCard()` en Progreso con solo S1: "Tu punto de partida: 80 kg · 20% de grasa" y la fecha de la semana 2. SW v95.
 4. E2E `tests/e2e/peso-inicial.spec.js` (3) + asserts en `onboarding.spec.js`.
+
+## REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback beta de Jonathan (2026-10-18), sobre la configuración de la cuenta: "Mantener mi peso y mejorar mi cuerpo" no tiene lógica a primera vista, y "Ritmo del plan" con la opción "Plan completo" no se explica solo; hace falta una ayuda.
+
+### Problema
+
+En el paso 2 del onboarding, la opción del medio no dice que es recomposición. En el paso de entrenamiento, "Plan completo" frente a "Suave" no explica qué cambia, así que el usuario elige a ciegas.
+
+### Causa raíz
+
+- `index.html:3169`: el objetivo `mantenimiento` (que en realidad es recomposición: mismo peso, más músculo y menos grasa) se presenta como "Mantener mi peso y mejorar mi cuerpo", sin descripción. El copy viene de REQ-114 y lo fija `scripts/validate-onboarding-copy.mjs`.
+- `index.html:1072-1076` y `index.html:3036-3038`: "Ritmo del plan" ofrece "Según mi perfil (recomendado) / Suave / bajo impacto / Plan completo". La nota habla de "evaluación de seguridad en verde", sin decir qué cambia en la práctica (intensidad, series, tipo de ejercicios).
+
+### Objetivo
+
+Cada opción dice qué consigue y qué implica, en una línea, sin jerga.
+
+### Alcance
+
+1. Objetivo: tarjetas seleccionables (o `select` + descripción viva) con un título y una línea:
+   - "Bajar grasa": comes un poco menos de lo que gastas; bajas de peso de forma gradual.
+   - "Recomponer mi cuerpo": tu peso casi no cambia, pero ganas músculo y pierdes grasa.
+   - "Ganar músculo": comes un poco más de lo que gastas; subes de peso poco a poco.
+   Mismo copy en Perfil → Objetivo. Los valores internos (`deficit/mantenimiento/volumen`) no cambian.
+2. Ritmo del plan → "Intensidad del entreno", con descripción por opción:
+   - "Recomendado para ti": la elegimos según tu edad, experiencia y respuestas de salud.
+   - "Suave": menos series, esfuerzo moderado y ejercicios sencillos o de bajo impacto.
+   - "Completa": series y esfuerzo normales para tu nivel; disponible si tus respuestas de salud no muestran alertas.
+   Botón ⓘ (patrón de `explainWorkoutEffort()`) con el detalle; misma ayuda en Perfil (`trainingSafetyModeHtml("pf")`).
+3. Actualizar `scripts/validate-onboarding-copy.mjs` y `CONTEXT.md` (línea de REQ-114).
+
+### Fuera de alcance
+
+- Cambiar la lógica de `trainingSafetyRecommendation()` o los cálculos de macros.
+
+### Riesgos
+
+- REQ-31: el copy no menciona IA. Táctil: las tarjetas miden ≥44 px (REQ-193).
+
+### Criterios de aceptación
+
+- El onboarding muestra la descripción de la opción elegida en objetivo e intensidad; el ⓘ abre la explicación.
+- `validate-onboarding-copy.mjs` y `tests/e2e/onboarding.spec.js` en verde con el copy nuevo.
+
+### Verificación sugerida
+
+- Recorrer onboarding a 390 px; axe sin violaciones en el paso 2 y en el de entrenamiento.
+
+### Implementación
+
+1. `GOAL_OPTIONS` (label + ayuda) en el paso 2 del onboarding (`#obGoalHelp`) y en el resumen de Perfil; valores internos intactos.
+2. `TRAINING_SAFETY_MODE_LABELS`/`TRAINING_SAFETY_MODE_HELP`: "Intensidad del entreno" con ayuda que cambia al elegir (`updateSafetyModeHelp()`) y modal `explainTrainingIntensity()`; avisos de edad sin "plan completo". SW v96.
+3. `validate-onboarding-copy.mjs`, `onboarding.spec.js` y `CONTEXT.md` actualizados.
