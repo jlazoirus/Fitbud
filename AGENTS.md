@@ -98,6 +98,7 @@ El selector del auditor rota el journey automáticamente (estado en `.git/fitbro
 - **Historial inmutable:** ajustar el futuro no reescribe lo ya ejecutado.
 - **Sin build step ni framework ni dependencias runtime nuevas** salvo que el REQ lo exija y exista patrón aprobado.
 - **No ejecutar migraciones de producción** automáticamente; las migraciones SQL son idempotentes y con RLS.
+- **Cobro siempre en la web:** el pago ocurre en `evolvapp.club` (Stripe Checkout), también cuando exista app nativa; la app nativa no ofrece compras dentro de la app, abre la web y lee el entitlement del servidor. Un usuario beta no ve precios mientras dure su acceso (REQ-208).
 - **Un commit y un push por corrida.** Si el worktree deja de estar limpio por otra sesión, detenerse sin sobrescribir.
 
 ## Diseño de interfaz: skill impeccable

@@ -153,6 +153,43 @@ async function upsertProfileStatus(user, active, e) {
   return data;
 }
 
+// REQ-208: una cuenta creada como beta nace con 90 días de acceso completo
+// (cortesía del plan trimestral), igual que aceptar una postulación (REQ-218).
+// Sin esto caía en la semana gratis y el coach le mostraba precios.
+const BETA_ACCESS_DAYS = 90;
+async function grantBetaAccess(userId, caller, e) {
+  const now = new Date();
+  const response = await fetch(e.url + "/rest/v1/user_entitlements", {
+    method: "POST",
+    headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=representation" }),
+    body: JSON.stringify({
+      user_id: userId,
+      plan_id: "quarterly",
+      status: "courtesy",
+      starts_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + BETA_ACCESS_DAYS * 86400000).toISOString(),
+      origin: "admin_courtesy",
+      notes: "Beta de fundadores (" + BETA_ACCESS_DAYS + " días)",
+      granted_by: caller,
+    }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo dar el acceso beta."));
+  return Array.isArray(data) ? data[0] : data;
+}
+
+// La cuenta ya existe: si el acceso falla, se informa al admin (que puede dar
+// cortesía a mano) en lugar de deshacer el alta.
+async function betaAccessFor(body, userId, caller, e) {
+  if (body.beta !== true || !userId) return {};
+  try {
+    const entitlement = await grantBetaAccess(userId, caller, e);
+    return { betaAccess: { expires_at: entitlement && entitlement.expires_at } };
+  } catch (error) {
+    return { betaError: "No se pudo dar el acceso beta (" + String(error.message || error) + "). Dale cortesía de 90 días desde la lista." };
+  }
+}
+
 async function resetTestProfile(user, e) {
   const response = await fetch(e.url + "/rest/v1/profiles?on_conflict=id", {
     method: "POST",
@@ -1048,7 +1085,8 @@ export default async function handler(req, res) {
         created_by: caller,
       });
       if (created && created.id) await upsertProfileStatus({ id: created.id, email }, true, e);
-      res.status(200).json({ ok: true, user: { id: created && created.id, email }, tempPassword: password });
+      const beta = await betaAccessFor(body, created && created.id, caller, e);
+      res.status(200).json({ ok: true, user: { id: created && created.id, email }, tempPassword: password, ...beta });
       return;
     }
 
@@ -1066,9 +1104,11 @@ export default async function handler(req, res) {
       const redirectTo = safeRedirect(req, body.redirectTo);
       const invited = await inviteAuthUser(email, redirectTo, caller, e);
       if (invited && invited.id) await upsertProfileStatus({ id: invited.id, email }, true, e);
+      const beta = await betaAccessFor(body, invited && invited.id, caller, e);
       res.status(200).json({
         ok: true,
         user: invited && invited.id ? { id: invited.id, email } : { email },
+        ...beta,
       });
       return;
     }

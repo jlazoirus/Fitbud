@@ -1012,6 +1012,7 @@ function coachUnavailable(context){
 }
 function coachErrorMessage(error){
   const message=String(error&&error.message||"").trim();
+  if(error&&(error.trialLimit||error.paywall)&&noPricesMode())return accessNoticeText();
   if(error&&error.trialLimit)return message||"Estás en tu semana gratis. Ya usaste tus cambios incluidos; activa un plan para seguir personalizando.";
   if(error&&error.paywall)return "Activa tu plan para continuar.";
   if(typeof isAdmin==="function"&&isAdmin())return message||"No se pudo completar la acción.";
@@ -2308,6 +2309,14 @@ function hasEntitlement(){
   if(!entitlementChecked)return true;                 // setup pendiente → permisivo
   return entitlement!==null||hasActivePremiumTrial();
 }
+// REQ-208: acceso sin cobro (beta, cupón o cortesía) o invitación aún sin
+// canjear: mientras dure, la app no muestra precios ni "activa tu plan".
+function freeAccessActive(){
+  if(!entitlement||entitlement.origin==="checkout")return false;
+  const exp=new Date(entitlement.expires_at).getTime();
+  return !Number.isFinite(exp)||exp>Date.now();
+}
+function noPricesMode(){return freeAccessActive()||(!entitlement&&!!pendingInviteCode());}
 function hasActivePremiumTrial(){
   if(!premiumTrial||premiumTrial.status!=="active")return false;
   const exp=new Date(premiumTrial.expires_at).getTime();
@@ -7102,7 +7111,20 @@ function showAuthFromLanding(mode){
 
 
 /* ---- Paywall y estado de suscripción (REQ-25) ---- */
+function accessNoticeText(){
+  if(!entitlement&&pendingInviteCode())return "Estamos activando tu invitación a la beta. Vuelve a intentarlo en un momento.";
+  return "Tu acceso está activo. No pudimos completar esta acción ahora; vuelve a intentarlo en unos minutos.";
+}
+// REQ-208: con acceso sin cobro o invitación pendiente no se muestran precios.
+function showAccessNotice(){
+  const pending=!entitlement&&!!pendingInviteCode();
+  modal(`<h3>${pending?"Tu invitación se está activando":"Tu acceso está activo"}</h3>
+    <div class="paywall-msg">${esc(accessNoticeText())}</div>
+    ${pending?`<button class="btn btn-accent" style="width:100%" onclick="closeModal();redeemPendingInvite()">Activar ahora</button>`
+      :`<button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`}`);
+}
 function showPaywall(context){
+  if(noPricesMode()){showAccessNotice();return;}
   trackEvent("paywall_shown",{context:context||"generic"});
   const plans=activeCatalogPlans();
   const expired=entitlementExpired;
@@ -7251,6 +7273,8 @@ function captureInviteCode(){
 function pendingInviteCode(){try{return localStorage.getItem(INVITE_CODE_KEY)||"";}catch(e){return "";}}
 function clearInviteCode(){try{localStorage.removeItem(INVITE_CODE_KEY);}catch(e){}}
 let _inviteRedeeming=false;
+// REQ-208: un canje que falló por red se reintenta al volver la conexión, no solo al iniciar sesión.
+window.addEventListener("online",()=>{if(session)redeemPendingInvite();});
 async function redeemPendingInvite(){
   const code=pendingInviteCode();
   const token=session&&session.access_token;
@@ -7357,9 +7381,20 @@ function subscriptionStatusHtml(){
     const expTs=new Date(entitlement.expires_at).getTime();
     const daysLeft=Math.max(0,Math.ceil((expTs-Date.now())/86400000));
     const isCheckout=entitlement.origin==="checkout";
-    const origin=entitlement.status==="courtesy"||(entitlement.origin||"").includes("courtesy")?"Acceso de cortesía":
-      entitlement.origin==="coupon"?"Acceso gratuito":
+    const free=freeAccessActive();
+    const origin=entitlement.origin==="coupon"||entitlement.origin==="admin_courtesy"?"Acceso beta":
+      entitlement.status==="courtesy"||(entitlement.origin||"").includes("courtesy")?"Acceso de cortesía":
       isCheckout?"Suscripción activa":"Plan activo";
+    const untilText=prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ");
+    if(free){
+      // REQ-208: sin nombre de plan de pago, sin cuenta regresiva en rojo ni historial de pagos.
+      return`<div class="row between" style="margin-bottom:8px">
+        <span><b>${esc(origin)}</b></span>
+        <span class="badge b-PESAS">Activo</span>
+      </div>
+      <div class="muted small">Acceso completo hasta ${esc(untilText)}.</div>
+      ${daysLeft<=7?`<div class="ai-box" style="margin-top:10px">Tu ${origin==="Acceso beta"?"acceso beta":"acceso"} termina el ${esc(untilText)}. Tu historial y progreso se conservan.</div>`:""}`;
+    }
     const planName=planDisplayName(entitlement.plan_id);
     const renewBtn=isCheckout&&daysLeft<=14
       ?`<button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="showPaywall('profile')">Renovar plan</button>`:"";
@@ -7370,6 +7405,14 @@ function subscriptionStatusHtml(){
     <div class="muted small">Válido hasta ${prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ")}${daysLeft<=7?` · <b style="color:var(--bad)">${daysLeft} días restantes</b>`:""}</div>
     ${renewBtn}
     ${billingHistorySectionHtml()}`;
+  }
+  if(pendingInviteCode()){
+    // REQ-208: el canje falló por red o sesión; se reintenta solo y aquí no se ofrecen planes.
+    return`<div class="row between" style="margin-bottom:8px">
+      <span><b>Invitación a la beta</b></span><span class="badge b-Libre">Pendiente</span>
+    </div>
+    <div class="muted small" style="margin-bottom:12px">Tu invitación se activa sola al recuperar la conexión. Si no, actívala aquí.</div>
+    <button class="btn btn-accent" style="width:100%" onclick="redeemPendingInvite()">Activar mi invitación</button>`;
   }
   if(hasActivePremiumTrial()){
     const expDate=prettyDateTime(premiumTrial.expires_at).split(" ").slice(0,2).join(" ");
@@ -11585,8 +11628,18 @@ function openAdminCreateUser(){
   modal(`<h3>Crear cuenta</h3>
     <p class="muted small">La cuenta queda activa con una contraseña temporal. En su primer ingreso, Evolv le pide crear su propia contraseña.</p>
     <div class="field"><label for="adminCreateEmail">Correo</label><input id="adminCreateEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
+    ${adminBetaCheckboxHtml("adminCreateBeta")}
     <button id="adminCreateBtn" class="btn btn-accent" style="width:100%" onclick="createAdminUser()">Crear cuenta</button>
     <div id="adminCreateOut" class="muted small" style="margin-top:10px"></div>`);
+}
+// REQ-208: la cuenta nace con 90 días de acceso completo (sin precios ni cobro).
+function adminBetaCheckboxHtml(id){
+  return `<label class="row" style="gap:10px;align-items:center;margin:4px 0 12px;min-height:44px"><input id="${id}" type="checkbox" checked> <span>Usuario beta (90 días sin cobro)</span></label>`;
+}
+function adminBetaResultHtml(result){
+  if(result&&result.betaAccess&&result.betaAccess.expires_at)return `<div class="muted small" style="margin-top:8px">Acceso beta activo hasta ${esc(prettyDateTime(result.betaAccess.expires_at).split(" ").slice(0,2).join(" "))}.</div>`;
+  if(result&&result.betaError)return `<div class="alert" style="margin-top:8px">⚠️ ${esc(result.betaError)}</div>`;
+  return "";
 }
 function adminWelcomeMessage(email,password){
   return `¡Hola! Ya tienes tu cuenta en Evolv.\n\nEntra en ${location.origin}/\nCorreo: ${email}\nContraseña temporal: ${password}\n\nAl entrar te pedirá crear tu propia contraseña.`;
@@ -11597,12 +11650,12 @@ async function createAdminUser(){
   if(!email||!email.includes("@")){if(out)out.textContent="Escribe un correo válido.";return;}
   if(btn){btn.disabled=true;btn.textContent="Creando…";}
   try{
-    const result=await adminApi("createUser",{email});
+    const result=await adminApi("createUser",{email,beta:!!($("#adminCreateBeta")&&$("#adminCreateBeta").checked)});
     window._adminWelcome=adminWelcomeMessage(email,result.tempPassword);
     if(btn)btn.remove();
     out.innerHTML=`<div class="ai-box"><b>Cuenta creada.</b> Esta contraseña solo se muestra ahora:
       <div class="temp-pass">${esc(result.tempPassword)}</div>
-      <pre class="welcome-msg">${esc(window._adminWelcome)}</pre></div>
+      <pre class="welcome-msg">${esc(window._adminWelcome)}</pre>${adminBetaResultHtml(result)}</div>
       <div class="row" style="gap:8px;margin-top:8px">
         <button class="btn btn-accent" style="flex:1" onclick="copyAdminWelcome()">Copiar mensaje</button>
         <a class="btn" style="flex:1;text-align:center" href="https://wa.me/?text=${encodeURIComponent(window._adminWelcome)}" target="_blank" rel="noopener">WhatsApp</a>
@@ -11724,6 +11777,7 @@ function openAdminInviteUser(){
   modal(`<h3>Invitar usuario</h3>
     <p class="muted small">El correo permite activar la cuenta y crear contraseña. Si el correo ya existe, usa el reset de contraseña desde la lista.</p>
     <div class="field"><label for="adminInviteEmail">Correo</label><input id="adminInviteEmail" type="email" autocomplete="off" placeholder="usuario@correo.com"></div>
+    ${adminBetaCheckboxHtml("adminInviteBeta")}
     <button id="adminInviteBtn" class="btn btn-accent" style="width:100%" onclick="sendAdminInvite()">Enviar invitación</button>
     <div id="adminInviteOut" class="muted small" style="margin-top:10px"></div>`);
 }
@@ -11733,9 +11787,10 @@ async function sendAdminInvite(){
   if(!email||!email.includes("@")){if(out)out.textContent="Escribe un correo válido.";return;}
   if(btn){btn.disabled=true;btn.textContent="Enviando…";}
   try{
-    await adminApi("inviteUser",{email,redirectTo:authRedirectUrl("invite")});
+    const result=await adminApi("inviteUser",{email,redirectTo:authRedirectUrl("invite"),beta:!!($("#adminInviteBeta")&&$("#adminInviteBeta").checked)});
     closeModal();
-    toast("Invitación enviada");
+    if(result&&result.betaError)toast(result.betaError);
+    else toast(result&&result.betaAccess?"Invitación enviada con acceso beta de 90 días":"Invitación enviada");
     renderAdminUsers();
   }catch(e){
     if(out)out.textContent="⚠️ "+e.message;

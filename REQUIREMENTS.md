@@ -69,7 +69,7 @@ Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que 
 
 Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la beta primero (cobro), luego lo que confunde en el alta y el entreno, luego funciones nuevas:
 
-- REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días; cobro siempre en la web. (P0)
+- REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días; cobro siempre en la web. (P0; implementado)
 - REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (P0; espera captura para reproducir)
 - REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1)
 - REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1)
@@ -1432,57 +1432,9 @@ Los dos selectores de foto (`#f_photo` en el editor de comidas, REQ-172, y el de
 
 ## REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días
 
-**Estado: pendiente.**
+**Estado: implementado.** Acceso beta sin precios (paywall → aviso neutro, Perfil "Acceso beta"), casilla beta de 90 días en Admin, reintento del canje de invitación e invariante de cobro en la web.
 
-### Origen
-
-Feedback de Jonathan sobre el flujo de invitación beta (2026-10-18): se registró como usuario nuevo desde ese flujo y, al hablar con el coach, la app le pidió pagar. Un usuario beta no debe ver precios hasta cumplir tres meses.
-
-### Problema
-
-Hay al menos un camino por el que una cuenta beta acaba en el paywall con su tarjeta de precios (USD 14 / USD 36). Con REQ-203/205, el código de invitación (`scripts/invite-beta-tester.mjs`, 90 días, plan `quarterly`) crea un entitlement `origin:'coupon'` que ya evita el paywall, pero no todos los caminos de alta pasan por ese código, y las pantallas no distinguen "beta" de "cualquier acceso".
-
-### Causa raíz
-
-- `api/admin.js:864` (`createUser`) y `api/admin.js:885` (`inviteUser`) crean la cuenta sin acceso: esa persona cae en la semana gratis de REQ-117 y, al reutilizar un cambio, `api/claude.js:893` responde 402 `trialLimit`, que el cliente convierte en `showPaywall()` (`index.html:7103`, precios en `index.html:7127`).
-- `redeemPendingInvite()` (`index.html:7252`) deja el código para el próximo inicio de sesión si el canje falla con 401/404/5xx. Mientras tanto, la cuenta queda en trial y puede ver el paywall.
-- Aun con acceso beta activo, nada impide que una ruta futura muestre precios: `showPaywall()` no sabe si el usuario es beta.
-- Hay que confirmar cuál de estos caminos vio Jonathan (ver Fuera de alcance, paso manual 1).
-
-### Objetivo
-
-Toda cuenta beta (alta con código de invitación, o creada por el admin como beta) tiene acceso completo durante 90 días. Mientras dure, ninguna pantalla menciona precios, planes de pago ni "activa un plan".
-
-### Alcance
-
-1. Marca beta explícita: el código que emite `invite-beta-tester.mjs` y la cortesía beta producen un entitlement distinguible (p. ej. `notes`/`origin` = beta, sin romper el `check` de `supabase/coupon_codes.sql`; si requiere migración, idempotente y documentada como acción manual).
-2. Admin "Crear cuenta" e "Invitar por correo": casilla "Usuario beta (90 días sin cobro)", marcada por defecto. Si está marcada, el servidor da en la misma acción el acceso beta de 90 días (reusar la lógica de `grant`/`redeem` de `api/entitlement.js`, no duplicarla).
-3. Cliente: con acceso beta, Perfil → Mi suscripción muestra "Acceso beta · hasta <fecha>" sin botones de planes ni precios, y `showPaywall()` no se abre. Si alguna ruta lo pide, aviso neutro sin precios.
-4. Canje pendiente: si `redeemPendingInvite()` no pudo canjear, Perfil avisa "Tu invitación se activará al reconectar" en vez de ofrecer planes, y el canje se reintenta al volver la conexión, no solo en el próximo inicio de sesión.
-5. Últimos 7 días del acceso beta: aviso suave en Perfil ("Tu acceso beta termina el <fecha>"). Los precios solo aparecen tras el vencimiento (alineado con el cierre de `BETA_PROGRAM.md` §5).
-6. Invariante nueva en `AGENTS.md` y `CONTEXT.md` (Pagos): **el cobro siempre ocurre en la web** (`evolvapp.club`), también con app nativa. Una app nativa no ofrece compras dentro de la app: abre la web para pagar y lee el entitlement del servidor.
-
-### Fuera de alcance
-
-- Acciones manuales: (1) revisar en Supabase `user_entitlements` de la cuenta de prueba de Jonathan para confirmar si tenía acceso y con qué `origin`; (2) si no lo tenía, darle cortesía de 90 días desde Admin.
-- Cambiar las cuotas diarias del coach para cuentas con acceso.
-
-### Riesgos
-
-- Abuso: el acceso beta solo nace de un código o del admin; el registro abierto (`SIGNUP_MODE=open`) sigue con el trial.
-- Verificar que `trialFirstWeekOnly` (`index.html:9210`) no limite a una cuenta beta.
-
-### Criterios de aceptación
-
-- E2E: cuenta con acceso beta habla con el coach, rehace opciones y prepara las semanas 2..10 sin paywall; en las 5 tabs y en Perfil abierto no aparece "USD", "Ver planes", "Activa tu plan" ni "Renovar".
-- E2E: canje pendiente por error 5xx → Perfil muestra el aviso de invitación pendiente, no planes.
-- Admin crea una cuenta con la casilla beta → la cuenta nace con acceso de 90 días.
-- Sin acceso beta, el comportamiento actual (trial REQ-117) no cambia.
-- `AGENTS.md` y `CONTEXT.md` contienen la invariante de cobro en la web.
-
-### Verificación sugerida
-
-- `tests/e2e/invitacion.spec.js` + `tests/e2e/beta.spec.js` + `scripts/test-invite-signup-api.mjs` + `node scripts/release-gate.mjs`.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-208`).
 
 ## REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll
 
