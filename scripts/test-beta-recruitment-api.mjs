@@ -74,6 +74,7 @@ await handler({
   headers: {},
   body: {
     name: "Ana Test",
+    email: "Ana@Correo.test",
     whatsapp: "+51 999 888 777",
     age: "25-34",
     city: "Lima, Peru",
@@ -92,6 +93,7 @@ await handler({
 assert(res.statusCode === 200 && res.body.ok === true, "Debe guardar una postulacion valida.");
 assert(res.body.submission.id === 12, "Debe devolver el id guardado.");
 assert(requests.some((item) => item.url.includes("on_conflict=whatsapp_normalized")), "Debe deduplicar por WhatsApp normalizado.");
+assert(requests.some((item) => item.body && JSON.parse(item.body).raw_payload?.email === "ana@correo.test"), "REQ-225: guarda el correo normalizado para la invitación.");
 
 res = capture();
 await handler({
@@ -99,6 +101,7 @@ await handler({
   headers: {},
   body: {
     name: "Bot",
+    email: "Ana@Correo.test",
     whatsapp: "+51 999 888 777",
     website: "https://spam.example",
   },
@@ -111,6 +114,7 @@ await handler({
   headers: {},
   body: {
     name: "Ana",
+    email: "ana@correo.test",
     whatsapp: "123",
     age: "25-34",
     city: "Lima",

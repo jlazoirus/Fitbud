@@ -419,8 +419,8 @@
       <h2 class="sec-h" id="how-h">Cómo funciona</h2>
       <ol class="steps">
         <li><span class="step-n" aria-hidden="true">1</span><b>Postulas</b><span>Este formulario, en 2 minutos.</span></li>
-        <li><span class="step-n" aria-hidden="true">2</span><b>Te escribimos</b><span>Si encajas, por WhatsApp, para coordinar una llamada corta.</span></li>
-        <li><span class="step-n" aria-hidden="true">3</span><b>Recibes tu enlace</b><span>Creas tu cuenta con él y tus tres meses se activan solos.</span></li>
+        <li><span class="step-n" aria-hidden="true">2</span><b>Revisamos tu postulación</b><span>Por grupos pequeños; si quedas, te avisamos por correo.</span></li>
+        <li><span class="step-n" aria-hidden="true">3</span><b>Te llega tu invitación</b><span>Un correo para crear tu contraseña, con tus tres meses ya activos.</span></li>
         <li><span class="step-n" aria-hidden="true">4</span><b>Decides al final</b><span>Te avisamos antes de que terminen y eliges si sigues con tu precio de fundador.</span></li>
       </ol>
     </section>
@@ -441,9 +441,14 @@
                 <input id="name" name="name" autocomplete="name" maxlength="90" required>
               </div>
               <div>
+                <label for="email">Correo</label>
+                <input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" required placeholder="tu@correo.com" aria-describedby="emailHint">
+                <p class="field-hint" id="emailHint">Si quedas en el grupo, aquí te llega la invitación para crear tu cuenta.</p>
+              </div>
+              <div>
                 <label for="whatsapp">WhatsApp</label>
                 <input id="whatsapp" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+ código de país y número" aria-describedby="whatsappHint">
-                <p class="field-hint" id="whatsappHint">Con el código de tu país (empieza con +). Solo lo usamos para escribirte sobre la beta.</p>
+                <p class="field-hint" id="whatsappHint">Con el código de tu país (empieza con +). Lo usamos para la llamada inicial y el feedback de la beta.</p>
               </div>
               <div>
                 <label for="age">Edad</label>
@@ -583,11 +588,11 @@
         <div id="done" class="done" hidden tabindex="-1" aria-labelledby="doneTitle">
           <svg width="44" height="44" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#1e1e1e"/><g transform="translate(0 35)" fill="none" stroke="#d6ff3a" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"><path d="M146 352 L256 262 L366 352" stroke-opacity=".35"/><path d="M146 266 L256 176 L366 266" stroke-opacity=".65"/><path d="M146 180 L256 90 L366 180"/></g></svg>
           <h2 class="sec-h" id="doneTitle">¡Gracias! Ya tenemos tu postulación.</h2>
-          <p class="lead" id="doneLead">Vamos a revisarla con calma. Si quedas en el grupo, te escribimos por WhatsApp con tu acceso de tres meses.</p>
+          <p class="lead" id="doneLead">Vamos a revisarla con calma. Si quedas en el grupo, te llega un correo para crear tu cuenta, con tus tres meses ya activos.</p>
           <ol class="done-steps">
             <li class="ok"><b>Postulación recibida</b><span>Tus respuestas ya están con nosotros.</span></li>
             <li class="now"><b>La revisamos</b><span>Armamos grupos pequeños para poder hablar con cada persona.</span></li>
-            <li><b>Te escribimos por WhatsApp</b><span>Con tu enlace de acceso, si quedas en el grupo.</span></li>
+            <li><b>Te llega un correo</b><span>Con tu invitación para crear tu cuenta, si quedas en el grupo.</span></li>
           </ol>
           <p class="field-hint">Mientras tanto no necesitas hacer nada; si no entras en este grupo, tu postulación queda para el siguiente.</p>
         </div>
@@ -686,6 +691,7 @@
       const fd = new FormData(form);
       return {
         name: clean(fd.get("name")),
+        email: clean(fd.get("email")).toLowerCase(),
         whatsapp: clean(fd.get("whatsapp")),
         age: clean(fd.get("age")),
         city: clean(fd.get("city")),
@@ -708,7 +714,7 @@
       clearDraft();
       const first = (data.name || "").split(" ")[0];
       document.getElementById("doneTitle").textContent = (first ? "¡Gracias, " + first + "!" : "¡Gracias!") + " Ya tenemos tu postulación.";
-      document.getElementById("doneLead").textContent = "Vamos a revisarla con calma. Si quedas en el grupo, te escribimos por WhatsApp al " + data.whatsapp + " con tu acceso de tres meses.";
+      document.getElementById("doneLead").textContent = "Vamos a revisarla con calma. Si quedas en el grupo, te llega un correo a " + data.email + " para crear tu cuenta, con tus tres meses ya activos.";
       form.hidden = true;
       document.querySelectorAll("#postular > .sec-h, #postular > .lead").forEach((el) => { el.hidden = true; });
       done.hidden = false;
@@ -718,7 +724,7 @@
 
     // Los mensajes de la API ya vienen en lenguaje de persona; si nombran un campo, se lleva el foco ahí.
     const ERROR_FIELDS = [
-      [/WhatsApp/, "whatsapp"], [/nombre/, "name"], [/edad/, "age"], [/país/, "city"],
+      [/WhatsApp/, "whatsapp"], [/correo/, "email"], [/nombre/, "name"], [/edad/, "age"], [/país/, "city"],
       [/describe/, "stage"], [/objetivo/, "goal"], [/6 meses/, "recentAttempt"],
       [/Dónde se rompe/, "pains"], [/última vez/, "story"], [/inviertes/, "investment"],
       [/disponibilidad/, "availability"], [/seguridad/, "health"],

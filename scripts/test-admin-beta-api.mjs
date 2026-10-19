@@ -24,6 +24,10 @@ const ADMIN_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 let isAdmin = true;
 let codeInserts = [];
 let patches = [];
+let authUsers = [];
+let invites = [];
+let inviteFails = false;
+let entitlements = [];
 const ana = { id: 7, name: "Ana Pérez", whatsapp: "+51 999 111 222", status: "new", review_notes: null };
 
 global.fetch = async (url, options = {}) => {
@@ -45,6 +49,14 @@ global.fetch = async (url, options = {}) => {
     patches.push(body);
     return response(200, [{ ...ana, ...body }]);
   }
+  if (value.includes("/auth/v1/admin/users?page=")) return response(200, { users: authUsers });
+  if (value.includes("/auth/v1/invite") && method === "POST") {
+    if (inviteFails) return response(429, { msg: "Email rate limit exceeded" });
+    invites.push({ url: value, body });
+    return response(200, { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", email: body.email });
+  }
+  if (value.includes("/rest/v1/profiles?on_conflict=id") && method === "POST") return response(200, [body]);
+  if (value.endsWith("/rest/v1/user_entitlements") && method === "POST") { entitlements.push(body); return response(201, [body]); }
   if (value.endsWith("/rest/v1/redemption_codes") && method === "POST") {
     assert(options.headers.Authorization === "Bearer service", "El código se crea con service role.");
     codeInserts.push(body);
@@ -84,8 +96,32 @@ assert(res.statusCode === 200 && patches.at(-1).status === "rejected", "Descarta
 res = await call({ action: "betaSetStatus", id: 7, status: "beta_invited" });
 assert(res.statusCode === 400, "beta_invited solo se pone aceptando (con código).");
 
+// REQ-225: con correo, aceptar invita por correo y da 90 días; sin WhatsApp en el flujo
+ana.raw_payload = { email: "ana@correo.test" };
+codeInserts = []; patches = [];
+res = await call({ action: "betaAccept", id: 7 });
+assert(res.statusCode === 200 && res.body.mode === "email" && res.body.email === "ana@correo.test", "Con correo: modo email.");
+assert(invites.length === 1 && invites[0].body.email === "ana@correo.test", "Envía la invitación de Supabase al correo.");
+assert(entitlements.length === 1 && entitlements[0].plan_id === "quarterly" && entitlements[0].status === "courtesy", "Da los 90 días de acceso beta.");
+assert(codeInserts.length === 0, "Con correo no hace falta código.");
+assert(patches[0].status === "beta_invited" && /invitación enviada a ana@correo.test/.test(patches[0].review_notes), "Marca aceptada con nota del correo.");
+assert(res.body.applicant.email === "ana@correo.test" && !("raw_payload" in res.body.applicant), "Devuelve el correo sin el raw_payload.");
+
+authUsers = [{ id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", email: "ana@correo.test" }];
+invites = []; entitlements = [];
+res = await call({ action: "betaAccept", id: 7 });
+assert(res.body.mode === "existing" && invites.length === 0 && entitlements[0].user_id === "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "Si ya tenía cuenta, solo recibe el acceso.");
+
+authUsers = []; inviteFails = true; codeInserts = [];
+res = await call({ action: "betaAccept", id: 7 });
+assert(res.statusCode === 200 && res.body.mode === "link" && /No se pudo enviar el correo/.test(res.body.emailError) && codeInserts.length === 1, "Si el correo no sale, cae al enlace con código.");
+inviteFails = false;
+
+res = await call({ action: "betaApplicants", filter: "pending" });
+assert(res.body.applicants[0].email === "ana@correo.test", "La lista muestra el correo.");
+
 isAdmin = false;
 res = await call({ action: "betaAccept", id: 7 });
 assert(res.statusCode === 403, "Un usuario normal no puede aceptar postulantes.");
 
-console.log("API admin beta: lista, aceptar (código de 90 días + WhatsApp), estados y permisos verificados con mocks.");
+console.log("API admin beta: lista, aceptar por correo (o enlace de respaldo) con 90 días, estados y permisos verificados con mocks.");

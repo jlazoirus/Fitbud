@@ -54,7 +54,11 @@ Criterios para el primer grupo (15-20 personas):
 
 ## 3. Aceptar e invitar
 
-**Desde la app:** en Postulantes beta, botón **Aceptar (90 días)**. Se crea el código (plan completo con las cuotas diarias del coach, activable 30 días), la postulación pasa a "Aceptada" con nota y fecha, y aparece el mensaje listo con **Enviar por WhatsApp** y **Copiar mensaje**. "Descartar" la saca de la lista sin avisarle; "Volver a revisar" la recupera. A quien ya aceptaste puedes generarle un enlace nuevo si el anterior venció.
+**Desde la app (REQ-225):** cuando alguien postula, ves en Hoy "N postulaciones esperan tu revisión" (y en Perfil → Administración). En Postulantes beta, **Aceptar (90 días)** le envía un correo de invitación de Supabase para crear su contraseña; su cuenta nace con 90 días de plan completo y las cuotas diarias del coach. Si ya tenía cuenta, solo recibe el acceso. Si el correo no sale (o la postulación es antigua y no tiene correo), aparece un enlace con código para copiar y enviar por correo o WhatsApp. "Descartar" la saca de la lista sin avisarle; "Volver a revisar" la recupera; a quien ya aceptaste puedes "Generar enlace nuevo". WhatsApp queda solo para la llamada inicial y el feedback.
+
+**Correo de invitación (una vez, en Supabase):**
+- Authentication → Email Templates → **Invite user**: asunto "Tu acceso a la beta de Evolv" y un cuerpo en español ("Entraste a la beta de fundadores. Crea tu contraseña aquí: {{ .ConfirmationURL }}").
+- El correo propio de Supabase tiene un límite bajo de envíos por hora y remitente genérico. Para aceptar a varias personas seguidas, configura SMTP propio en Project Settings → Auth → SMTP (por ejemplo Resend o el correo de tu dominio). Si se pasa el límite, la app te da el enlace de respaldo.
 
 Desde la terminal:
 

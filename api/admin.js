@@ -777,8 +777,18 @@ const BETA_SELECT = [
   "id", "created_at", "name", "whatsapp", "age_band", "country_city", "source",
   "stage", "goal", "recent_attempt", "tools", "pains", "story", "investment",
   "availability", "health", "segment", "priority", "priority_score",
-  "beta_eligible", "status", "review_notes", "contacted_at",
+  "beta_eligible", "status", "review_notes", "contacted_at", "raw_payload",
 ].join(",");
+// REQ-225: el correo de la postulación vive en raw_payload (sin migración).
+function betaEmail(sub) {
+  const email = String((sub && sub.raw_payload && sub.raw_payload.email) || "").trim().toLowerCase();
+  return EMAIL_RE.test(email) ? email : "";
+}
+function betaOut(sub) {
+  if (!sub) return sub;
+  const { raw_payload: _raw, ...rest } = sub;
+  return Object.assign(rest, { email: betaEmail(sub) });
+}
 const BETA_FILTERS = {
   pending: "&status=in.(new,shortlisted,contacted,interview_scheduled,interviewed)",
   invited: "&status=eq.beta_invited",
@@ -860,16 +870,59 @@ async function listBetaApplicants(e, filter) {
       else counts.pending += 1;
     }
   }
-  return { applicants: Array.isArray(rows) ? rows : [], counts };
+  return { applicants: Array.isArray(rows) ? rows.map(betaOut) : [], counts };
 }
 
-async function acceptBetaApplicant(e, caller, body) {
+async function acceptBetaApplicant(e, caller, body, req) {
   const id = betaId(body.id);
   if (!id) return { status: 400, data: { error: "Postulación inválida." } };
   const days = body.days === undefined ? 90 : Number(body.days);
   if (!Number.isInteger(days) || days < 1 || days > 365) return { status: 400, data: { error: "Días de acceso inválidos." } };
   const sub = await betaSubmission(e, id);
   if (!sub) return { status: 404, data: { error: "No existe esa postulación." } };
+  const phone = String(sub.whatsapp || "").replace(/\D/g, "");
+
+  // REQ-225: con correo, aceptar crea la cuenta por invitación de Supabase (le
+  // llega un correo para poner su contraseña) y le da los 90 días al instante.
+  // Si ya tenía cuenta, solo recibe el acceso. Si el correo no sale (p. ej.
+  // límite de envíos), se cae al enlace con código de REQ-218 para copiarlo.
+  const email = betaEmail(sub);
+  let emailError = "";
+  if (email && body.channel !== "link") {
+    try {
+      const existing = await authUserByEmail(email, e);
+      let userId = existing && existing.id;
+      if (!userId) {
+        const invited = await inviteAuthUser(email, safeRedirect(req, body.redirectTo), caller, e);
+        userId = invited && invited.id;
+        if (userId) await upsertProfileStatus({ id: userId, email }, true, e);
+      }
+      let betaError = "";
+      if (userId) {
+        try { await grantBetaAccess(userId, caller, e); }
+        catch (error) { betaError = "La cuenta quedó creada, pero no se pudo dar el acceso beta. Dale cortesía de 90 días desde Usuarios."; }
+      }
+      const note = `${new Date().toISOString().slice(0, 10)}: aceptado en la beta; ${existing ? "ya tenía cuenta, se le dio el acceso" : "invitación enviada a " + email} (${BETA_ACCESS_DAYS} días).`;
+      const updated = await betaPatch(e, id, {
+        status: "beta_invited",
+        contacted_at: new Date().toISOString(),
+        review_notes: sub.review_notes ? sub.review_notes + "\n" + note : note,
+      });
+      return {
+        status: 200,
+        data: {
+          mode: existing ? "existing" : "email",
+          email,
+          days: BETA_ACCESS_DAYS,
+          betaError,
+          applicant: betaOut(updated || Object.assign({}, sub, { status: "beta_invited" })),
+          whatsappUrl: phone ? "https://wa.me/" + phone : "",
+        },
+      };
+    } catch (error) {
+      emailError = "No se pudo enviar el correo (" + String((error && error.message) || error) + ").";
+    }
+  }
 
   const validUntil = new Date(Date.now() + 30 * 86400000).toISOString();
   let code = "";
@@ -895,11 +948,13 @@ async function acceptBetaApplicant(e, caller, body) {
     review_notes: sub.review_notes ? sub.review_notes + "\n" + note : note,
   });
   const message = betaInviteMessage({ name: sub.name, code, days, validUntil, appUrl: process.env.APP_URL || "https://evolvapp.club" });
-  const phone = String(sub.whatsapp || "").replace(/\D/g, "");
   return {
     status: 200,
     data: {
-      applicant: updated || Object.assign({}, sub, { status: "beta_invited" }),
+      mode: "link",
+      email,
+      emailError,
+      applicant: betaOut(updated || Object.assign({}, sub, { status: "beta_invited" })),
       code,
       days,
       validUntil,
@@ -916,7 +971,7 @@ async function setBetaApplicantStatus(e, body) {
   if (!id || !BETA_SET_STATUS.has(status)) return { status: 400, data: { error: "Cambio de estado inválido." } };
   const updated = await betaPatch(e, id, { status });
   if (!updated) return { status: 404, data: { error: "No existe esa postulación." } };
-  return { status: 200, data: { applicant: updated } };
+  return { status: 200, data: { applicant: betaOut(updated) } };
 }
 
 export default async function handler(req, res) {
@@ -960,7 +1015,7 @@ export default async function handler(req, res) {
     }
 
     if (body.action === "betaAccept") {
-      const out = await acceptBetaApplicant(e, caller, body);
+      const out = await acceptBetaApplicant(e, caller, body, req);
       res.status(out.status).json(out.data);
       return;
     }
