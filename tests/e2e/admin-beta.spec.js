@@ -100,3 +100,13 @@ test("REQ-225: con correo, aceptar envía la invitación por correo y avisa de p
   expect(accept.redirectTo).toContain("/");
   expect(accept.channel).toBeUndefined();
 });
+
+test("REQ-226: el enlace del correo de aviso abre Postulantes beta al admin", async ({ page, context }) => {
+  await installMocks(context, { tables: { profiles: { row: { ...profileFixture(), is_admin: true } } } });
+  await seedLoggedInUser(page);
+  await autoDismissNudges(page);
+  await page.route("**/api/admin", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ applicants: [], counts: { pending: 0, invited: 0, closed: 0 } }) }));
+  await page.goto("/index.html?ver=postulantes");
+  await expect(page.getByRole("heading", { name: "Postulantes beta" })).toBeVisible();
+  expect(new URL(page.url()).search).toBe("");
+});

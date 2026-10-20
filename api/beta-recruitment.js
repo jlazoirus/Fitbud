@@ -186,6 +186,76 @@ function parsePayload(body) {
   };
 }
 
+// ── Aviso al admin por correo (REQ-226) ───────────────────────────────────────
+// Reusa la conexión de Resend de los recordatorios (api/notify.js): RESEND_API_KEY
+// y NOTIFY_FROM_EMAIL. Destinatarios: BETA_NOTIFY_EMAIL (coma-separados) o, si no
+// está, los correos de los perfiles admin activos. Nunca bloquea la postulación:
+// cualquier fallo se ignora y la persona ve su confirmación igual.
+
+const NOTIFY_TIMEOUT_MS = 4000;
+
+function escHtml(value) {
+  return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function adminRecipients(e) {
+  const configured = String(process.env.BETA_NOTIFY_EMAIL || "").split(",").map((v) => v.trim()).filter(Boolean);
+  if (configured.length) return configured;
+  const r = await fetch(e.url + "/rest/v1/profiles?is_admin=eq.true&active=eq.true&select=email", { headers: serviceHeaders(e) });
+  const rows = await responseJson(r);
+  return r.ok && Array.isArray(rows) ? rows.map((row) => String(row.email || "").trim()).filter(Boolean) : [];
+}
+
+const STAGE_LABELS = { beginner: "Quiere empezar", returning: "Está retomando", consistent: "Con cierta constancia", advanced: "Entrena en serio" };
+const AVAILABILITY_LABELS = { interview_beta: "Llamada y beta de 3 meses", interview: "Solo la llamada", later: "Más adelante" };
+
+export function newApplicantEmail(data, score, appUrl) {
+  const pains = (data.pains || []).join(" · ");
+  const rows = [
+    ["Correo", data.email], ["WhatsApp", data.whatsapp], ["Edad", data.ageBand], ["País / ciudad", data.countryCity],
+    ["Objetivo", data.goal], ["Momento", STAGE_LABELS[data.stage] || data.stage], ["Disponibilidad", AVAILABILITY_LABELS[data.availability] || data.availability],
+    ["Dónde se rompe", pains], ["Prioridad sugerida", score.priority + " · " + score.segment],
+  ];
+  const caution = data.health === "caution"
+    ? '<p style="background:#fff7e6;border-radius:8px;padding:10px 12px;margin:0 0 16px">Marcó lesión o indicación médica: conviene la llamada antes de darle el entrenamiento.</p>' : "";
+  const link = appUrl.replace(/\/$/, "") + "/?ver=postulantes";
+  return {
+    subject: "Nueva postulación a la beta: " + data.name,
+    html: `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nueva postulación</title></head>
+<body style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#1a1a1a;background:#fff">
+  <p style="font-size:18px;font-weight:700;margin:0 0 6px">${escHtml(data.name)} postuló a la beta</p>
+  <p style="color:#555;margin:0 0 18px">Revísala y apruébala o descártala desde la app.</p>
+  ${caution}
+  <table style="border-collapse:collapse;width:100%;font-size:14px;margin:0 0 16px">${rows.map(([k, v]) => `<tr><td style="padding:6px 8px 6px 0;color:#666;vertical-align:top;white-space:nowrap">${escHtml(k)}</td><td style="padding:6px 0">${escHtml(v)}</td></tr>`).join("")}</table>
+  <p style="font-size:14px;color:#333;margin:0 0 22px;white-space:pre-wrap"><b>Su historia:</b> ${escHtml(data.story)}</p>
+  <a href="${escHtml(link)}" style="display:inline-block;background:#101010;color:#d6ff3a;text-decoration:none;font-weight:700;padding:12px 20px;border-radius:999px">Revisar postulaciones</a>
+</body></html>`,
+  };
+}
+
+async function notifyAdmins(e, data, score, row) {
+  const key = process.env.RESEND_API_KEY || "";
+  if (!key) return "sin_resend";
+  // Solo postulaciones nuevas: una re-postulación con el mismo WhatsApp actualiza la fila y no avisa otra vez.
+  if (row && row.created_at && row.updated_at && Math.abs(Date.parse(row.updated_at) - Date.parse(row.created_at)) > 5000) return "repetida";
+  const to = await adminRecipients(e);
+  if (!to.length) return "sin_destinatarios";
+  const mail = newApplicantEmail(data, score, process.env.NOTIFY_APP_URL || "https://evolvapp.club");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NOTIFY_TIMEOUT_MS);
+  try {
+    const r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + key, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: process.env.NOTIFY_FROM_EMAIL || "recordatorios@fitbros.app", to, subject: mail.subject, html: mail.html, reply_to: data.email || undefined }),
+      signal: controller.signal,
+    });
+    return r.ok ? "enviado" : "error_resend_" + r.status;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function handlePost(req, res, e) {
   let body;
   try {
@@ -261,6 +331,7 @@ async function handlePost(req, res, e) {
   }
 
   const row = Array.isArray(payload) ? payload[0] : payload;
+  try { await notifyAdmins(e, data, score, row); } catch (_) { /* el aviso nunca bloquea la postulación */ }
   res.status(200).json({
     ok: true,
     submission: {
