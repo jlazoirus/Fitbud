@@ -407,6 +407,10 @@
   .opt:active{transform:scale(.99);border-color:var(--accent)}
   .opt .o-meta{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)}
   .estimate-applied{margin-top:8px;font-weight:700;font-size:14px}
+  .nut-tools{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin:18px 0 8px}
+  .nut-tool{display:inline-flex;align-items:center;gap:6px}
+  .nut-tool:only-child{margin-left:auto}
+  .nut-tool-count{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-mono)}
   .field-updated{animation:field-updated 1.6s ease-out}
   @keyframes field-updated{from{box-shadow:0 0 0 2px var(--accent)}to{box-shadow:0 0 0 2px transparent}}
   @media (prefers-reduced-motion:reduce){.field-updated{animation:none;box-shadow:0 0 0 2px var(--accent)}}
@@ -3903,6 +3907,7 @@ const TAB_ICONS={
   settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
   chevron:'<path d="M9 6l6 6-6 6"/>',
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.3 11.2a1 1 0 0 0 1 .8h9.4a1 1 0 0 0 1-.8l1.7-7.7H6.1"/>',
   refresh:'<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
   eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   eyeOff:'<path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-4.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.1 4.2"/><path d="M6.1 6.6C3.5 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.2-1"/>',
@@ -4561,8 +4566,12 @@ function renderNutrition(){
     <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
   </section>`:"";
   // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
-  const moreBtn=`<div class="row" style="justify-content:flex-end;margin:0 0 6px">
-    <button class="btn btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
+  // REQ-231: la lista de compra (de la semana, no del día) va en esta fila, con la misma forma.
+  const shopWeek=shoppingWeek();
+  const shopPending=shopWeek?shoppingPendingCount():0;
+  const moreBtn=`<div class="nut-tools">
+    ${shopWeek?`<button class="btn btn-sm nut-tool" id="shopToolBtn" onclick="openShoppingList()">${shoppingToolInner(shopPending)}</button>`:""}
+    <button class="btn btn-sm nut-tool" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
   </div>`;
   // REQ-124: anillo/resumen -> comidas del día (+ extras interoperadas) -> más opciones (al final).
   $("#app").innerHTML=`
@@ -4572,7 +4581,6 @@ function renderNutrition(){
   ${section("nut.plan","Comidas del día",
     itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
     `${orderedItems.length}`)}
-  <button class="btn" style="width:100%;margin:0 0 10px" onclick="openShoppingList()">Lista de compra · semana ${shoppingWeek()?shoppingWeek().num:""}</button>
   ${moreBtn}
   `;
 }
@@ -4586,6 +4594,23 @@ function shoppingWeek(){
   return weekOf(today,planPrefsForDate(today))||weekOf(today)||null;
 }
 function shoppingKey(name){return String(name||"").trim().toLowerCase();}
+// REQ-231: botón compacto de la fila de herramientas de Nutrición.
+function shoppingToolInner(pending){
+  return `${miniIcon("cart")}Lista de compra${pending?`<span class="nut-tool-count" aria-label="${pending} por comprar">${pending}</span>`:""}`;
+}
+function refreshShoppingTool(){
+  const btn=document.getElementById("shopToolBtn");
+  if(btn)btn.innerHTML=shoppingToolInner(shoppingPendingCount());
+}
+// REQ-231: cuántos ingredientes quedan por comprar (lo que queda de semana).
+function shoppingPendingCount(){
+  try{
+    const {week,items}=shoppingList("rest");
+    if(!week)return 0;
+    const {have}=shoppingChecksForWeek(week);
+    return items.filter(i=>!have.has(i.key)).length;
+  }catch(_){return 0;}
+}
 function shoppingList(scope){
   const w=shoppingWeek();
   if(!w)return {week:null,items:[]};
@@ -4656,6 +4681,7 @@ async function toggleShoppingHave(key){
   const prefs={...(profile.prefs||{}),shoppingChecks:{key:weekKey,have:[...have]}};
   profile.prefs=prefs;
   openShoppingList();
+  refreshShoppingTool();
   const input=[...document.querySelectorAll("#shopSheet input[data-key]")].find(el=>el.dataset.key===key);
   if(input)input.focus({preventScroll:true});
   await saveProfilePrefs(prefs);

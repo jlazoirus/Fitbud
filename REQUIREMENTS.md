@@ -1808,3 +1808,34 @@ Jonathan (2026-10-20), con captura: "No cambia con los valores estimados". La es
 
 - Tras estimar, la caja muestra "Aplicado: 780 kcal · P 24 g · C 90 g · G 34 g" y los campos llevan `.field-updated`. ✓ (`tests/e2e/foto-comida.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-231 - Nutrición: la lista de compra va con las herramientas, no como una acción del día
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura: el botón "Lista de compra · semana 1" no tiene sentido en ese lugar ni con esa forma.
+
+### Problema
+
+REQ-215 puso la lista de compra como botón de ancho completo justo debajo de "+ Agregar comida / snack", con la misma forma: parecía una acción más de las comidas del día, cuando es una herramienta de la semana. Además, "semana N" no aporta nada y no se ve cuánto queda por comprar.
+
+### Alcance
+
+1. La lista de compra pasa a la fila de herramientas de Nutrición (`.nut-tools`, separada de las comidas), junto a "Más opciones", como botón compacto con icono de carrito y el número de ingredientes por comprar de lo que queda de semana (`shoppingPendingCount()`).
+2. El número se actualiza al marcar "ya lo tengo" sin reabrir (`refreshShoppingTool()`); sin semana activa no se muestra.
+3. `CACHE_NAME` → `fitbud-pwa-v113`.
+
+### Fuera de alcance
+
+- Cambiar el contenido de la hoja de la lista (REQ-215).
+
+### Riesgos
+
+- Ninguno sobre datos: solo cambia dónde y cómo se abre.
+
+### Criterios de aceptación
+
+- El botón vive en `.nut-tools`, muestra lo que queda por comprar y baja en 1 al marcar un ingrediente. ✓ (`tests/e2e/lista-compra.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
