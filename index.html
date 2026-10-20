@@ -339,6 +339,12 @@
   .plan-main b{display:block;font-size:14px;overflow-wrap:anywhere}
   .plan-dose{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin-top:2px}
   .plan-dose span:first-child{color:var(--txt);font-weight:700}
+  .plan-dose .plan-last{color:var(--txt)}
+  /* REQ-232: lo registrado la última vez en el ejercicio */
+  .last-perf{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;margin-top:8px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf3);font-size:13px;color:var(--muted)}
+  .last-perf-h{flex-basis:100%;font-size:12px}
+  .last-perf b{color:var(--txt);font-size:15px}
+  .last-perf-hint{margin-top:6px}
   .plan-timed{background:transparent}
   .link-btn{background:none;border:none;padding:0;color:var(--purple-200);text-decoration:underline;font:inherit;cursor:pointer}
   .set-row{background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
@@ -5041,6 +5047,47 @@ function workoutVariationLabel(step,exercise){
   if(step.exerciseSlug!==step.originalExerciseSlug)return "Ejercicio sustituido conservando series y objetivo";
   return "";
 }
+// REQ-232: lo registrado la última vez en este ejercicio, para elegir la carga
+// de hoy sin tener que recordarla ("3 × 8 · 40 kg", "40 kg × 8, 42,5 kg × 7").
+function workoutLoadLabel(load){
+  const text=String(load||"").trim();
+  return /^\d+([.,]\d+)?$/.test(text)?`${text} kg`:text;
+}
+function lastWorkoutPerformance(ds,exerciseSlug){
+  return WORKOUT_PLAYER.lastPerformance(S.days,exerciseSlug,ds);
+}
+function lastPerformanceSummary(perf){
+  if(!perf||!perf.sets.length)return "";
+  const sets=perf.sets,unit=perf.unit==="seg"?" s":"";
+  const reps=set=>set.reps==null?"":`${set.reps}${unit}`;
+  const same=sets.every(set=>set.reps===sets[0].reps&&set.load===sets[0].load);
+  if(same)return [sets[0].reps==null?`${seriesCount(sets.length)}`:`${sets.length} × ${reps(sets[0])}`,workoutLoadLabel(sets[0].load)].filter(Boolean).join(" · ");
+  return sets.map(set=>[workoutLoadLabel(set.load),reps(set)].filter(Boolean).join(" × ")).filter(Boolean).join(", ");
+}
+function lastPerformanceRpe(perf){
+  const rpes=perf.sets.map(set=>set.rpe).filter(Number.isFinite);
+  if(!rpes.length)return "";
+  const min=Math.min(...rpes),max=Math.max(...rpes);
+  return min===max?`RPE ${min}`:`RPE ${min}-${max}`;
+}
+function lastPerformanceHtml(ds,step,exercise){
+  const perf=lastWorkoutPerformance(ds,step.exerciseSlug);
+  const bodyweight=exercise&&exercise.discipline==="bodyweight";
+  if(!perf){
+    return bodyweight?"":'<div class="muted small last-perf-hint">Anota la carga de cada serie: la próxima vez verás aquí con cuánto lo hiciste.</div>';
+  }
+  const d=parseYmd(perf.date);
+  const when=`${DOW[d.getDay()].slice(0,3).toLowerCase()} ${d.getDate()} ${MON[d.getMonth()]}`;
+  const variation=perf.variation&&perf.variation!==(step.variation||"")?(perf.variation==="progression"?" · en progresión":" · versión más fácil"):"";
+  const rpe=lastPerformanceRpe(perf);
+  const noLoad=!bodyweight&&perf.sets.every(set=>!set.load);
+  return `<div class="last-perf"><span class="last-perf-h">Última vez · ${esc(when)}${esc(variation)}</span><b>${esc(lastPerformanceSummary(perf))}</b>${rpe?`<span>${esc(rpe)}</span>`:""}${noLoad?'<span class="last-perf-note">Sin carga anotada</span>':""}</div>`;
+}
+function lastLoadLabel(ds,exerciseSlug){
+  const perf=lastWorkoutPerformance(ds,exerciseSlug);
+  const loads=perf?perf.sets.map(set=>set.load).filter(Boolean):[];
+  return loads.length?workoutLoadLabel(loads[loads.length-1]):"";
+}
 function currentWorkoutStep(execution){
   if(!execution||!execution.steps.length)return null;
   return execution.steps[Math.min(execution.steps.length-1,Math.max(0,execution.currentStep||0))]||null;
@@ -5524,6 +5571,7 @@ function renderActiveWorkoutStep(ds,execution){
       <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué son las repeticiones en reserva RIR"><div class="n">${step.targetRir}</div><div class="l">en reserva (RIR) ⓘ</div></button>
     </div>
     <div class="muted small"><b style="color:var(--txt)">Carga sugerida:</b> ${esc(step.suggestedLoad)}</div>
+    ${lastPerformanceHtml(ds,step,exercise)}
     ${variation?`<div class="alert violet" style="margin-top:10px">${esc(variation)}</div>`:""}
     ${execution.timer&&execution.timer.kind==="rest"?renderWorkoutTimer(ds,execution,step):""}
     <div class="set-list">${step.sets.map((set,index)=>renderStrengthSet(ds,step,stepIndex,set,index)).join("")}</div>
@@ -5594,7 +5642,7 @@ function formatRestShort(seconds){
   const m=Math.floor(s/60),r=s%60;
   return r?`${m} min ${r} s`:`${m} min`;
 }
-function workoutPlanSummaryHtml(prescription){
+function workoutPlanSummaryHtml(prescription,ds){
   const steps=(prescription&&prescription.steps)||[];
   if(!steps.some(step=>step.type==="strength"))return"";
   let n=0;
@@ -5603,8 +5651,9 @@ function workoutPlanSummaryHtml(prescription){
       n++;
       const exercise=exerciseBySlug(step.exerciseSlug,true);
       const name=exercise?exercise.name:step.label;
+      const lastLoad=ds?lastLoadLabel(ds,step.exerciseSlug):"";
       return `<li class="plan-row"><span class="plan-n">${n}</span><div class="plan-main"><b>${esc(name)}</b>
-        <div class="plan-dose"><span>${step.prescribedSets} × ${esc(step.reps)}</span><span>Descanso ${esc(step.restLabel||formatRestShort(step.restSeconds))}</span><span>RPE ${esc(step.targetRpe)}/10</span></div></div></li>`;
+        <div class="plan-dose"><span>${step.prescribedSets} × ${esc(step.reps)}</span><span>Descanso ${esc(step.restLabel||formatRestShort(step.restSeconds))}</span><span>RPE ${esc(step.targetRpe)}/10</span>${lastLoad?`<span class="plan-last">Última vez ${esc(lastLoad)}</span>`:""}</div></div></li>`;
     }
     const minutes=Math.max(1,Math.round((+step.durationSeconds||0)/60));
     const moves=Array.isArray(step.movements)?step.movements.map(m=>m.name).join(" · "):"";
@@ -5661,7 +5710,7 @@ function renderWorkout(){
         ${workoutStatusHtml(ds,execution)}
       </div>
     </div>
-    ${!execution&&!restDay?workoutPlanSummaryHtml(prescription):""}
+    ${!execution&&!restDay?workoutPlanSummaryHtml(prescription,ds):""}
     <div class="meal-actions">
       ${contentIssues.length?'<div class="alert">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción antes de iniciarla.</div>':""}
       ${!execution&&!st.workoutDone&&!restDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>`:""}
@@ -6713,7 +6762,7 @@ function chatWorkoutCard(ds){
   if(execution)return renderWorkoutExecution(ds,execution);
   if(st.workoutDone)return `<div><b>${esc(ew.workout.name)}</b><div class="muted small">Ya lo registraste hoy.</div></div>`;
   return `<div><b>${esc(ew.workout.name)}</b><div class="muted small">${esc(ew.workout.detail||"")}</div></div>
-    ${workoutPlanSummaryHtml(prescription)}
+    ${workoutPlanSummaryHtml(prescription,ds)}
     <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="startWorkoutExecution('${ds}')" ${workoutContentIssues(ds).length?"disabled":""}>Empezar</button>`;
 }
 function chatMealsCard(ds){

@@ -482,6 +482,27 @@
     });
     return {completedSets,totalSets};
   }
+  // REQ-232: lo que el usuario registró la última vez en este ejercicio
+  // (series hechas de la sesión más reciente antes de `beforeDs`), para saber
+  // con qué carga empezar hoy.
+  function lastPerformance(days,exerciseSlug,beforeDs){
+    if(!days||!exerciseSlug)return null;
+    const dates=Object.keys(days).filter(ds=>!beforeDs||ds<beforeDs).sort().reverse();
+    for(const ds of dates){
+      const execution=days[ds]&&days[ds].workoutExecution;
+      const steps=execution&&Array.isArray(execution.steps)?execution.steps:[];
+      const step=steps.find(item=>item&&item.type==="strength"&&item.exerciseSlug===exerciseSlug&&
+        Array.isArray(item.sets)&&item.sets.some(set=>set&&set.done));
+      if(!step)continue;
+      const sets=step.sets.filter(set=>set&&set.done).map(set=>({
+        reps:set.reps==null?null:number(set.reps,null),
+        load:String(set.load==null?"":set.load).trim(),
+        rpe:set.rpe==null?null:number(set.rpe,null),
+      }));
+      return {date:ds,variation:step.variation||"",unit:step.unit||"reps",sets};
+    }
+    return null;
+  }
   function outcome(execution){
     if(!execution)return "pending";
     if(execution.status==="completed")return "completed";
@@ -500,6 +521,7 @@
     timerRemaining,
     progress,
     strengthTotals,
+    lastPerformance,
     outcome,
   };
 })(typeof window!=="undefined"?window:globalThis);
