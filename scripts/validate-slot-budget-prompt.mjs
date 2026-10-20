@@ -55,7 +55,7 @@ assert.ok(
   "generateOneDay debe incluir arquetipos por momento del día."
 );
 assert.ok(
-  generateOneDay.includes("slotDishReferenceLines(slotTargets,prefs)") &&
+  generateOneDay.includes("slotDishReferenceLines(slotTargets,prefs,ds)") &&
     generateOneDay.includes("Referencia de platos compatibles por slot"),
   "generateOneDay debe usar una referencia filtrada por slot."
 );

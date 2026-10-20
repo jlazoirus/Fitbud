@@ -6129,7 +6129,14 @@ function coachLikesLine(prefs){
   const p=prefs||{};
   const cuisines=Array.isArray(p.preferredCuisines)?p.preferredCuisines.map(c=>CUISINE_LABELS[c]||c):[];
   const likes=[p.preferredIngredients,p.preferredDishes,cuisines.join(", ")].filter(Boolean).join("; ");
-  return likes?`\nGustos del usuario (prioriza cuando encajen con las metas): ${likes}.`:"";
+  return (likes?`\nGustos del usuario (prioriza cuando encajen con las metas): ${likes}.`:"")+coachCuisineVarietyLine(p);
+}
+// Sin esta regla el coach cae por defecto en comida mexicana/tex-mex aunque el
+// usuario no la haya elegido. Si la eligió (mexicana o latinoamericana), no se limita.
+function coachCuisineVarietyLine(prefs){
+  const chosen=Array.isArray(prefs&&prefs.preferredCuisines)?prefs.preferredCuisines:[];
+  if(chosen.includes("mexican")||chosen.includes("latin"))return"";
+  return `\nVariedad de cocina: no asumas comida mexicana ni tex-mex por defecto. Alterna estilos (casera/criolla, mediterránea, asiática, a la plancha o al horno) y usa como máximo una comida de estilo mexicano (tacos, tortillas, burritos, quesadillas, enchiladas, nachos) por día.`;
 }
 // REQ-120: nombres de platos rechazados explícitamente; refuerzo por si el nombre no matchea el catálogo.
 function coachBlockedDishesLine(prefs){
@@ -6248,14 +6255,34 @@ function promptCompatibleDishesForSlot(slotId,prefs){
   }
   return (DB.dishes||[]).filter(d=>dishSupportsSlot(d,slotId)&&!coachDishBlockedByProfile(d).blocked);
 }
-function slotDishReferenceLines(slotTargets,prefs){
+// Antes la referencia eran los 12 platos más cercanos en kcal: idéntica para todo
+// usuario con metas parecidas (y casi la mitad mexicana en almuerzo), así que el
+// coach proponía lo mismo a todos. Ahora toma los 24 más cercanos, rota el orden
+// por usuario+fecha y limita a 3 los platos de cada cocina que el usuario no eligió.
+function slotDishReferenceLines(slotTargets,prefs,ds){
   if(!DB.loaded)return"(base de datos no conectada)";
+  const nd=window.FITBUD_NUTRITION_DOMAIN;
+  const preferred=nd&&nd.preferredCuisineTags?nd.preferredCuisineTags(prefs):[];
+  const seed=(uid()||"")+"|"+(ds||"");
   return (slotTargets||[]).map(slot=>{
     const targetKcal=Number(slot&&slot.target&&slot.target.kcal)||0;
-    const candidates=promptCompatibleDishesForSlot(slot.id,prefs)
+    const kcalGap=item=>Math.abs((item.m.kcal||0)-targetKcal);
+    const near=promptCompatibleDishesForSlot(slot.id,prefs)
       .map(d=>({d,m:dishMacros(d.id)}))
-      .sort((a,b)=>Math.abs((a.m.kcal||0)-targetKcal)-Math.abs((b.m.kcal||0)-targetKcal))
-      .slice(0,12)
+      .sort((a,b)=>kcalGap(a)-kcalGap(b))
+      .slice(0,24)
+      .map(item=>({...item,rot:hashText(seed+"|"+slot.id+"|"+item.d.id)}))
+      .sort((a,b)=>a.rot<b.rot?-1:a.rot>b.rot?1:0);
+    const perCuisine=new Map(),picked=[];
+    near.forEach(item=>{
+      if(picked.length>=12)return;
+      const tags=nd&&nd.cuisineTagsForDish?nd.cuisineTagsForDish(item.d):[];
+      if(tags.some(tag=>!preferred.includes(tag)&&(perCuisine.get(tag)||0)>=3))return;
+      tags.forEach(tag=>perCuisine.set(tag,(perCuisine.get(tag)||0)+1));
+      picked.push(item);
+    });
+    const candidates=picked
+      .sort((a,b)=>kcalGap(a)-kcalGap(b))
       .map(({d,m})=>`${d.name} [${dishSlotMeta(d)}] ${m.kcal}kcal P${m.p}/C${m.c}/G${m.f}`);
     return `${slot.id}: ${candidates.length?candidates.join("; "):"(sin platos de referencia para este slot; crea una opción simple compatible)"}`;
   }).join("\n");
@@ -9065,7 +9092,8 @@ function coachHardRestrictions(){
 // REQ-132: bump a 8 — el prompt y los pools consumen metadata de forma/peso por slot.
 // REQ-136: bump a 9 — el hash de catálogo incluye cuisine_tags para preferencias de cocina.
 // REQ-169/170/171: bump a 10 — descartes de la sesión, desayuno reforzado y meta ±50 kcal en el prompt.
-const COACH_PROMPT_VERSION=10;
+// Bump a 11 — referencia de platos rotada por usuario y regla de variedad de cocina.
+const COACH_PROMPT_VERSION=11;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -9284,6 +9312,7 @@ function finalizeDayWithGate(ds,day,target,prefs,proposalComidas,extra){
     proposal:proposalComidas||[],
     lockedMeals:opts.lockedMeals||lockedMealsForDay(ds,day),
     date:ds,
+    varietySeed:uid()||"",
     workoutContext:opts.workoutContext,
     prevDayUsed:recentDishSlugs(ds,1),
     recentUsed:recentDishSlugs(ds,3),
@@ -10018,7 +10047,7 @@ async function generateOneDay(ds,coachRequest){
   const slotBudgetLine=slotBudgetPromptLine(slotTargets);
   const slotArchetypesLine=slotArchetypePromptLines(slotTargets);
   // REQ-131: referencia filtrada por slot, no lista mezclada de cualquier momento.
-  const dishList=slotDishReferenceLines(slotTargets,prefs);
+  const dishList=slotDishReferenceLines(slotTargets,prefs,ds);
   const recent=recentMealNames(ds,5);
   const lp=(profile&&profile.prefs&&profile.prefs.learnedPatterns)||null;
   const learnedLine=lp&&lp.topIngredients&&lp.topIngredients.length?`\nEl usuario suele disfrutar ingredientes como: ${lp.topIngredients.join(", ")}. Incorpóralos cuando encajen con las metas.`:"";
@@ -10146,7 +10175,7 @@ function generateDeterministicWeek(w,days){
   if(!nd||!nd.planNutritionWeek||!DB.loaded)return null;
   const target=effectiveDayTarget();
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const result=nd.planNutritionWeek({prefs,dayTarget:target,catalog:DB,numDays:days.length,startDate:days[0]});
+  const result=nd.planNutritionWeek({prefs,dayTarget:target,catalog:DB,numDays:days.length,startDate:days[0],varietySeed:uid()||""});
   if(!result||!result.days||!result.days.length)return null;
   // Mapear días del plan a fechas reales de la semana y cerrar cada día por
   // finalizeNutritionDay() (REQ-138) para aplicar el cierre global de macros.
