@@ -1655,3 +1655,62 @@ Jonathan (2026-10-20): "me envías a mí también el mail cuando alguien se post
 
 - `scripts/test-beta-recruitment-api.mjs`: nueva → 1 correo a admins con escape, enlace y aviso de salud; repetida → ninguno; Resend caído → la postulación responde 200; `BETA_NOTIFY_EMAIL` define destinatarios. ✓
 - `tests/e2e/admin-beta.spec.js`: `/?ver=postulantes` abre la pantalla al admin. ✓
+
+## REQ-227 - Fix onboarding: editar un macro en "Ajustar valores" y continuar guarda una meta donde kcal ≠ suma de macros
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **onboarding** (commit previo leído: `7619516` Merge REQ-226). Recorrido funcional del paso 2 "Define tu objetivo y tus macros" sirviendo la app en local (`python3 -m http.server 8923`) y accionando el flujo real en el navegador. Archivos revisados: `index.html` (onboarding, `readOnboardingStep`, `validateOnboardingStep`, `effectiveDayTarget`, `profileMacroTargetsFromPrefs`), `js/nutrition-pure.js` (`calculateMacroTargets`).
+
+### Problema
+
+En el paso 2, el bloque colapsable "Ajustar valores (opcional)" expone cuatro inputs independientes (Calorías, Proteína, Carbohidratos, Grasas). El botón "Recalcular valores" vuelve a derivar los cuatro desde la fórmula (y pisa cualquier edición), por lo que un usuario que solo quiere **ajustar un valor** (p. ej. subir proteína de 120 a 180 g, o bajar sus calorías) edita ese campo y pulsa **"Continuar"**, no "Recalcular". Al hacerlo, la meta queda con `kcal ≠ proteína·4 + carbos·4 + grasa·9`, y así se persiste en el perfil y se muestra.
+
+Reproducción concreta (verificada en navegador):
+1. Paso 1 con datos válidos (mujer, 30, 165 cm, 60 kg, actividad moderada) → la fórmula calcula **1740 kcal · P 120 · C 207 · G 48** (coherente: 120·4+207·4+48·9 = 1740).
+2. Paso 2 → abrir "Ajustar valores", cambiar **solo** Calorías a `1200` (dejando P/C/G), pulsar "Continuar".
+3. Paso 4 "Casi listo" → el resumen "Tu referencia diaria" muestra **"1200 kcal · P 120 g · C 207 g · G 48 g"**, cuando esos macros suman 1740 kcal. La meta guardada queda `calorieTarget:1200` con macros de 1740.
+
+Impacto en el usuario: la meta del día (`effectiveDayTarget`) toma `calorieTarget` como presupuesto de kcal del anillo, pero los macros objetivo (y el día generado que los persigue) suman otra cosa. El usuario ve un anillo de calorías con una meta (1200) que **nunca** cuadra con sus metas de macros (1740): o sobrepasa las kcal cumpliendo macros, o se queda corto en macros cumpliendo kcal, de forma permanente, y la adherencia en Progreso queda sesgada. Rompe el invariante "kcal = suma de macros" que REQ-77 fijó para las metas calculadas y que el check-in semanal (`applyWeeklyCheckinProposal`) preserva deliberadamente escalando carbos/grasa.
+
+### Causa raíz
+
+- `readOnboardingStep()` paso 2 (`index.html:3340`) lee los cuatro campos como valores independientes: `d.calorieTarget=+$("#ob_kcal").value; d.proteinTarget=+$("#ob_protein").value; ...` sin reconciliar.
+- `validateOnboardingStep()` paso 2 (`index.html:3384`) solo exige que los cuatro sean finitos y `>0`; no verifica coherencia `kcal ≈ Σ macros`.
+- `onboardingNext()` (`index.html:3401`) solo recalcula al salir del **paso 1** (`if(onboardingStep===1)applyCalculatedMacros()`); una edición manual en el paso 2 pasa sin tocar.
+- `effectiveDayTarget()` / `profileMacroTargetsFromPrefs()` (`index.html:1673,1678`) construyen la meta como `{kcal:+calorieTarget, p,c,f}` directo desde prefs, así que la incoherencia se propaga a la meta del día.
+- `calculateMacroTargets()` (`js/nutrition-pure.js:286`) sí garantiza `kcal = p·4+c·4+f·9`, pero solo se invoca al calcular/recalcular, no al editar un campo suelto.
+
+### Objetivo
+
+Que después del onboarding la meta nutricional guardada siempre cumpla `kcal = proteína·4 + carbos·4 + grasa·9` (dentro de la tolerancia `TARGET_KCAL_DELTA`), sin importar si el usuario ajustó un valor a mano, y que lo mostrado coincida con lo que se persigue.
+
+### Alcance
+
+1. Al leer/validar el paso 2 (o al guardar en `saveOnboarding`), reconciliar la meta para que `kcal = Σ macros`. Opción recomendada (coherente con el check-in semanal `applyWeeklyCheckinProposal`): si el usuario editó **kcal**, mantener proteína y re-escalar carbos/grasa al nuevo presupuesto; si editó un **macro**, recomputar `calorieTarget` como `p·4+c·4+f·9`. Elegir una sola regla clara y aplicarla de forma determinista.
+2. Dar feedback visible cuando los cuatro campos no cuadran (p. ej. recalcular el campo dependiente en vivo, o un aviso "ajustamos tus calorías para que cuadren con tus macros").
+
+### Fuera de alcance
+
+- La fórmula de cálculo (`calculateMacroTargets`) y la lógica de `goal`/`activity` — no se tocan.
+- La edición de macros en Perfil y el check-in semanal — ya preservan el invariante; este REQ es solo el paso 2 del onboarding.
+- Cambiar el diseño del colapsable "Ajustar valores" o quitar la edición manual.
+
+### Riesgos
+
+- Elegir una regla de reconciliación que sorprenda al usuario (p. ej. que al subir proteína le bajen los carbos sin avisar). Mitigar con el feedback del punto 2.
+- Regresión en `hasCompleteOnboarding()` / generación de la primera semana si la reconciliación deja algún macro en 0; respetar pisos `cFloor`/`fFloor` como hace `calculateMacroTargets`.
+
+### Criterios de aceptación
+
+- Tras editar solo las calorías (o solo un macro) y pulsar "Continuar", la meta guardada cumple `|calorieTarget − (p·4+c·4+f·9)| ≤ TARGET_KCAL_DELTA` y el resumen "Tu referencia diaria" muestra valores coherentes.
+- El usuario puede seguir ajustando un valor a mano; el sistema reconcilia los demás de forma determinista y, si corresponde, lo avisa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Reproducir los pasos de arriba y confirmar que "Tu referencia diaria" ya no muestra `1200 kcal` con macros que suman 1740.
+- Prueba unitaria/vm sobre el helper de reconciliación: entradas `{kcal:1200,p:120,c:207,f:48}` → salida con `kcal = Σ macros`.
+- Evidencia funcional de esta auditoría: captura `scratchpad/req227-onboarding-kcal-mismatch.jpg` ("Tu referencia diaria: 1200 kcal · P 120 g · C 207 g · G 48 g").
