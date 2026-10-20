@@ -527,6 +527,38 @@ test.describe("Bloques opcionales", () => {
   });
 });
 
+// REQ-236 (Jonathan): la tarjeta "3-1-1 tempo" no se entendía.
+test.describe("Tempo", () => {
+  test("la tarjeta dice qué es cada número y al tocarla lo explica", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+
+    const card = app.getByRole("button", { name: /^Qué significa el ritmo / });
+    const tempo = (await card.locator(".n").innerText()).trim();
+    expect(tempo).toMatch(/^\d+-\d+-\d+$/);
+    await expect(card.locator(".l")).toHaveText("baja · pausa · sube ⓘ");
+    await card.click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay.locator("h3")).toHaveText("Ritmo de cada repetición");
+    const [down, , up] = tempo.split("-");
+    await expect(overlay).toContainText(`${down} s bajando el peso`);
+    await expect(overlay).toContainText(`${up} s subiendo`);
+    await overlay.getByRole("button", { name: "Entendido" }).click();
+
+    expect(await page.evaluate(() => [tempoPhases("Controlado"), tempoPhases("2-0-1-1")])).toEqual([
+      null, { down: 2, pause: 0, up: 1, top: 1 },
+    ]);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 // REQ-212: el calentamiento dice qué movimientos hacer y el cronómetro es opcional.
 test.describe("Calentamiento guiado", () => {
   test("lista movimientos concretos, 'Ya calenté' avanza sin cronómetro y 'Guíame' los recorre", async ({ page, context }) => {

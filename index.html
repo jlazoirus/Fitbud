@@ -357,6 +357,7 @@
   .last-perf b{color:var(--txt);font-size:15px}
   .last-perf-hint{margin-top:6px}
   .plan-timed{background:transparent}
+  .tempo-list{margin:6px 0 10px;padding-left:18px;display:grid;gap:6px;font-size:14px;line-height:1.4}
   .plan-opt{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:1px}
   .link-btn{background:none;border:none;padding:0;color:var(--purple-200);text-decoration:underline;font:inherit;cursor:pointer}
   .set-row{background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
@@ -5643,6 +5644,29 @@ function explainWorkoutEffort(){
     <p class="exercise-copy">Usa el objetivo para elegir la carga. Al terminar cada serie, anota el RPE que sentiste.</p>
     <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`);
 }
+// REQ-236: el tempo "3-1-1" son los segundos de cada fase de la repetición:
+// bajar (o soltar el peso de vuelta) · pausa · subir (empujar o tirar).
+function tempoPhases(tempo){
+  const m=String(tempo||"").trim().match(/^(\d+)\s*-\s*(\d+)\s*-\s*(\d+)(?:\s*-\s*(\d+))?$/);
+  return m?{down:+m[1],pause:+m[2],up:+m[3],top:m[4]==null?null:+m[4]}:null;
+}
+function explainWorkoutTempo(ds){
+  const step=currentWorkoutStep(normalizedWorkoutExecution(ds));
+  const tempo=step&&step.tempo;
+  const t=tempoPhases(tempo);
+  const sec=n=>`${n} s`;
+  const body=t?`<p class="exercise-copy"><b>${esc(tempo)}</b> son los segundos que dura cada parte de una repetición:</p>
+    <ul class="tempo-list">
+      <li><b>${sec(t.down)}</b> bajando el peso, despacio y controlado. En remos y jalones, al dejar volver el peso.</li>
+      <li><b>${t.pause?sec(t.pause):"Sin"}</b> ${t.pause?"de pausa abajo, sin rebotar.":"pausa: cambia de dirección sin rebotar."}</li>
+      <li><b>${sec(t.up)}</b> subiendo: empuja o tira con fuerza.</li>
+      ${t.top!=null?`<li><b>${t.top?sec(t.top):"Sin"}</b> ${t.top?"de pausa arriba antes de la siguiente.":"pausa arriba: sigue con la siguiente."}</li>`:""}
+    </ul>
+    <p class="exercise-copy">Cuenta mentalmente. Bajar lento hace el ejercicio más efectivo y cuida las articulaciones.</p>`
+    :`<p class="exercise-copy"><b>${esc(tempo||"Controlado")}</b>: sube y baja sin rebotes ni impulso, con la bajada un poco más lenta que la subida.</p>`;
+  modal(`<h3>Ritmo de cada repetición</h3>${body}
+    <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`);
+}
 function renderActiveWorkoutStep(ds,execution){
   const step=currentWorkoutStep(execution);
   if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza la sesión para guardar el resultado.</div>';
@@ -5670,7 +5694,7 @@ function renderActiveWorkoutStep(ds,execution){
       <div class="scard"><div class="n">${step.prescribedSets}</div><div class="l">series</div></div>
       <div class="scard"><div class="n">${esc(step.reps)}</div><div class="l">reps objetivo</div></div>
       <div class="scard"><div class="n">${esc(step.restLabel||`${step.restSeconds}s`)}</div><div class="l">descanso</div></div>
-      <div class="scard"><div class="n">${esc(step.tempo)}</div><div class="l">tempo</div></div>
+      <button class="scard scard-info" onclick="explainWorkoutTempo('${ds}')" aria-label="Qué significa el ritmo ${esc(step.tempo)}"><div class="n">${esc(step.tempo)}</div><div class="l">${tempoPhases(step.tempo)?"baja · pausa · sube":"ritmo"} ⓘ</div></button>
       <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué es el esfuerzo RPE"><div class="n">${step.targetRpe}/10</div><div class="l">esfuerzo (RPE) ⓘ</div></button>
       <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué son las repeticiones en reserva RIR"><div class="n">${step.targetRir}</div><div class="l">en reserva (RIR) ⓘ</div></button>
     </div>
