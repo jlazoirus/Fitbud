@@ -1778,3 +1778,33 @@ Jonathan (2026-10-20), con captura: al editar el almuerzo del plan ("Tacos de fr
 
 - Editar una comida del plan y estimar con foto de otro plato no envía el nombre planeado y deja el nombre y los macros de la foto; lo escrito por el usuario sí se envía. ✓ (`tests/e2e/foto-comida.spec.js`; falla contra el código previo)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-230 - Estimar macros: se ve qué valores se aplicaron
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura: "No cambia con los valores estimados". La estimación había escrito 520 / 18 / 58 / 22 sobre 520 / 18 / 62 / 20 del plan: los valores sí cambiaron, pero tan poco que parecía que no.
+
+### Problema
+
+`renderPhotoEstimate()` y `aiEstimate()` escribían los macros en los campos sin ninguna señal; la caja de resultado solo mostraba la nota. Si la estimación se parece a lo que ya había (en este caso porque el modelo se anclaba al nombre del plan, corregido en REQ-229), no hay forma de saber que se aplicó.
+
+### Alcance
+
+1. `applyEstimatedMacros()` (foto y texto): escribe los cuatro valores, los resalta un momento (`.field-updated`, estático con `prefers-reduced-motion`) y añade "Aplicado: N kcal · P g · C g · G g" a la caja de resultado.
+2. `CACHE_NAME` → `fitbud-pwa-v112`.
+
+### Fuera de alcance
+
+- Mostrar la diferencia con los valores anteriores.
+
+### Riesgos
+
+- Ninguno: solo presentación.
+
+### Criterios de aceptación
+
+- Tras estimar, la caja muestra "Aplicado: 780 kcal · P 24 g · C 90 g · G 34 g" y los campos llevan `.field-updated`. ✓ (`tests/e2e/foto-comida.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓

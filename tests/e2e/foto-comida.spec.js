@@ -122,6 +122,9 @@ test("comida del plan + foto de otro plato → estima lo que se ve, no lo planea
   await overlay.locator("#f_photo").setInputFiles({ name: "pasta.png", mimeType: "image/png", buffer: PNG });
 
   await expect(overlay.locator("#f_kcal")).toHaveValue("780");
+  // REQ-230: se ve qué se aplicó y los campos cambiados se resaltan.
+  await expect(overlay.locator("#aiOut .estimate-applied")).toHaveText("Aplicado: 780 kcal · P 24 g · C 90 g · G 34 g");
+  await expect(overlay.locator("#f_kcal")).toHaveClass(/field-updated/);
   // El nombre planeado (sin tocar) se reemplaza por lo que se ve.
   await expect(overlay.locator("#f_name")).toHaveValue("Espagueti Alfredo");
   expect(coachCalls[0].userText).not.toContain("Tacos");
