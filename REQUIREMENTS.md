@@ -1746,3 +1746,96 @@ Jonathan (2026-10-20), con captura: tras elegir una foto de la galería (REQ-207
 
 - Un 503 muestra "mucha demanda" con "Reintentar"; un 500 desconocido muestra "(código 500)"; reintentar con la misma foto estima y usa la misma ronda (`photo-1`). ✓ (`tests/e2e/foto-comida.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-229 - Fix: "Estimar con foto" estima el plato planeado en vez del que se ve
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura: al editar el almuerzo del plan ("Tacos de frijol negro y queso fresco") y estimar con una foto de espagueti Alfredo, la app responde "Estimado como 3 tacos de tortilla de maíz…", pregunta por los frijoles y deja el nombre de los tacos.
+
+### Causa raíz
+
+`openEditor('meal')` precarga el nombre del plato planeado en "Descripción". `photoEstimateRound()` enviaba ese texto como "El usuario la describe así", y el modelo lo priorizó sobre la imagen. `renderPhotoEstimate()` solo reemplazaba el nombre si estaba vacío o lo había puesto una ronda anterior, así que el nombre planeado quedaba. Además, la clave de reutilización no incluía la descripción, así que la respuesta errónea podía volver a servirse para la misma foto.
+
+### Alcance
+
+1. `window._editor.planName` guarda el nombre precargado de una comida del plan; mientras no se toque, no se envía como descripción (el prompt pide identificar el plato por la foto) y se reemplaza por el nombre estimado.
+2. Si el usuario escribe una descripción, se envía con la instrucción de que, si no coincide con la foto, manda la foto.
+3. La descripción entra en la clave de reutilización (`photo:<foto>:<respuestas>:<descripción>`); `validate-meal-photo-estimate.mjs` lo exige.
+4. `CACHE_NAME` → `fitbud-pwa-v111`.
+
+### Fuera de alcance
+
+- Detectar con la imagen si la foto corresponde a la comida planeada.
+
+### Riesgos
+
+- Ninguno sobre datos: cambia solo qué texto acompaña a la foto y cuándo se reemplaza el nombre.
+
+### Criterios de aceptación
+
+- Editar una comida del plan y estimar con foto de otro plato no envía el nombre planeado y deja el nombre y los macros de la foto; lo escrito por el usuario sí se envía. ✓ (`tests/e2e/foto-comida.spec.js`; falla contra el código previo)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-230 - Estimar macros: se ve qué valores se aplicaron
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura: "No cambia con los valores estimados". La estimación había escrito 520 / 18 / 58 / 22 sobre 520 / 18 / 62 / 20 del plan: los valores sí cambiaron, pero tan poco que parecía que no.
+
+### Problema
+
+`renderPhotoEstimate()` y `aiEstimate()` escribían los macros en los campos sin ninguna señal; la caja de resultado solo mostraba la nota. Si la estimación se parece a lo que ya había (en este caso porque el modelo se anclaba al nombre del plan, corregido en REQ-229), no hay forma de saber que se aplicó.
+
+### Alcance
+
+1. `applyEstimatedMacros()` (foto y texto): escribe los cuatro valores, los resalta un momento (`.field-updated`, estático con `prefers-reduced-motion`) y añade "Aplicado: N kcal · P g · C g · G g" a la caja de resultado.
+2. `CACHE_NAME` → `fitbud-pwa-v112`.
+
+### Fuera de alcance
+
+- Mostrar la diferencia con los valores anteriores.
+
+### Riesgos
+
+- Ninguno: solo presentación.
+
+### Criterios de aceptación
+
+- Tras estimar, la caja muestra "Aplicado: 780 kcal · P 24 g · C 90 g · G 34 g" y los campos llevan `.field-updated`. ✓ (`tests/e2e/foto-comida.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-231 - Nutrición: la lista de compra va con las herramientas, no como una acción del día
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura: el botón "Lista de compra · semana 1" no tiene sentido en ese lugar ni con esa forma.
+
+### Problema
+
+REQ-215 puso la lista de compra como botón de ancho completo justo debajo de "+ Agregar comida / snack", con la misma forma: parecía una acción más de las comidas del día, cuando es una herramienta de la semana. Además, "semana N" no aporta nada y no se ve cuánto queda por comprar.
+
+### Alcance
+
+1. La lista de compra pasa a la fila de herramientas de Nutrición (`.nut-tools`, separada de las comidas), junto a "Más opciones", como botón compacto con icono de carrito y el número de ingredientes por comprar de lo que queda de semana (`shoppingPendingCount()`).
+2. El número se actualiza al marcar "ya lo tengo" sin reabrir (`refreshShoppingTool()`); sin semana activa no se muestra.
+3. `CACHE_NAME` → `fitbud-pwa-v113`.
+
+### Fuera de alcance
+
+- Cambiar el contenido de la hoja de la lista (REQ-215).
+
+### Riesgos
+
+- Ninguno sobre datos: solo cambia dónde y cómo se abre.
+
+### Criterios de aceptación
+
+- El botón vive en `.nut-tools`, muestra lo que queda por comprar y baja en 1 al marcar un ingrediente. ✓ (`tests/e2e/lista-compra.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓

@@ -406,6 +406,14 @@
   .opt{width:100%;text-align:left;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:13px;margin-bottom:8px;font-size:14px;line-height:1.3;transition:.15s}
   .opt:active{transform:scale(.99);border-color:var(--accent)}
   .opt .o-meta{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)}
+  .estimate-applied{margin-top:8px;font-weight:700;font-size:14px}
+  .nut-tools{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin:18px 0 8px}
+  .nut-tool{display:inline-flex;align-items:center;gap:6px}
+  .nut-tool:only-child{margin-left:auto}
+  .nut-tool-count{min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-mono)}
+  .field-updated{animation:field-updated 1.6s ease-out}
+  @keyframes field-updated{from{box-shadow:0 0 0 2px var(--accent)}to{box-shadow:0 0 0 2px transparent}}
+  @media (prefers-reduced-motion:reduce){.field-updated{animation:none;box-shadow:0 0 0 2px var(--accent)}}
   .qp{margin-bottom:12px}
   .qp-tabs{display:flex;gap:6px;margin-bottom:8px}
   .qp-tab{flex:1;padding:8px 6px;border-radius:999px;border:1px solid var(--border-2);background:var(--surf2);font-size:13px;font-weight:500}
@@ -3899,6 +3907,7 @@ const TAB_ICONS={
   settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
   chevron:'<path d="M9 6l6 6-6 6"/>',
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.3 11.2a1 1 0 0 0 1 .8h9.4a1 1 0 0 0 1-.8l1.7-7.7H6.1"/>',
   refresh:'<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
   eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   eyeOff:'<path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-4.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.1 4.2"/><path d="M6.1 6.6C3.5 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.2-1"/>',
@@ -4557,8 +4566,12 @@ function renderNutrition(){
     <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
   </section>`:"";
   // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
-  const moreBtn=`<div class="row" style="justify-content:flex-end;margin:0 0 6px">
-    <button class="btn btn-sm" style="display:inline-flex;align-items:center;gap:6px" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
+  // REQ-231: la lista de compra (de la semana, no del día) va en esta fila, con la misma forma.
+  const shopWeek=shoppingWeek();
+  const shopPending=shopWeek?shoppingPendingCount():0;
+  const moreBtn=`<div class="nut-tools">
+    ${shopWeek?`<button class="btn btn-sm nut-tool" id="shopToolBtn" onclick="openShoppingList()">${shoppingToolInner(shopPending)}</button>`:""}
+    <button class="btn btn-sm nut-tool" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
   </div>`;
   // REQ-124: anillo/resumen -> comidas del día (+ extras interoperadas) -> más opciones (al final).
   $("#app").innerHTML=`
@@ -4568,7 +4581,6 @@ function renderNutrition(){
   ${section("nut.plan","Comidas del día",
     itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
     `${orderedItems.length}`)}
-  <button class="btn" style="width:100%;margin:0 0 10px" onclick="openShoppingList()">Lista de compra · semana ${shoppingWeek()?shoppingWeek().num:""}</button>
   ${moreBtn}
   `;
 }
@@ -4582,6 +4594,23 @@ function shoppingWeek(){
   return weekOf(today,planPrefsForDate(today))||weekOf(today)||null;
 }
 function shoppingKey(name){return String(name||"").trim().toLowerCase();}
+// REQ-231: botón compacto de la fila de herramientas de Nutrición.
+function shoppingToolInner(pending){
+  return `${miniIcon("cart")}Lista de compra${pending?`<span class="nut-tool-count" aria-label="${pending} por comprar">${pending}</span>`:""}`;
+}
+function refreshShoppingTool(){
+  const btn=document.getElementById("shopToolBtn");
+  if(btn)btn.innerHTML=shoppingToolInner(shoppingPendingCount());
+}
+// REQ-231: cuántos ingredientes quedan por comprar (lo que queda de semana).
+function shoppingPendingCount(){
+  try{
+    const {week,items}=shoppingList("rest");
+    if(!week)return 0;
+    const {have}=shoppingChecksForWeek(week);
+    return items.filter(i=>!have.has(i.key)).length;
+  }catch(_){return 0;}
+}
 function shoppingList(scope){
   const w=shoppingWeek();
   if(!w)return {week:null,items:[]};
@@ -4652,6 +4681,7 @@ async function toggleShoppingHave(key){
   const prefs={...(profile.prefs||{}),shoppingChecks:{key:weekKey,have:[...have]}};
   profile.prefs=prefs;
   openShoppingList();
+  refreshShoppingTool();
   const input=[...document.querySelectorAll("#shopSheet input[data-key]")].find(el=>el.dataset.key===key);
   if(input)input.focus({preventScroll:true});
   await saveProfilePrefs(prefs);
@@ -8835,7 +8865,8 @@ function openEditor(kind,ds,id){
   let pre={name:"",kcal:"",p:"",c:"",f:""};
   let title="Agregar comida / snack";
   if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f};title="Editar — "+base.slot;}
-  window._editor={kind,ds,id,extraIdx:null};
+  // REQ-229: el nombre precargado de una comida del plan es lo planeado, no lo que comió.
+  window._editor={kind,ds,id,extraIdx:null,planName:kind==="meal"?String(pre.name||""):""};
   editorSheet(title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
@@ -9787,8 +9818,8 @@ async function aiEstimate(){
     const quota=coachQuota("meal_estimate",requestId,"estimate",fallback,{},hashText(name.toLowerCase()));
     const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". Responde SOLO JSON: {"kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve"}`,400,quota);
     const j=parseJSON(txt);
-    $("#f_kcal").value=Math.round(j.kcal);$("#f_p").value=Math.round(j.proteina_g);$("#f_c").value=Math.round(j.carbohidratos_g);$("#f_f").value=Math.round(j.grasa_g);
-    out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}</div>`;
+    const applied=applyEstimatedMacros(j);
+    out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}${applied}</div>`;
   }catch(e){out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
   finally{endCoachAction(actionKey);}
 }
@@ -9835,17 +9866,21 @@ async function photoEstimateRound(retry){
   const out=$("#aiOut");if(out)out.innerHTML=`<div class="ai-box">Mirando tu comida…</div>`;
   try{
     st.round++;
-    const desc=$("#f_name")?$("#f_name").value.trim():"";
+    // REQ-229: solo cuenta como descripción lo que escribió el usuario; el nombre
+    // del plato planeado (sin tocar) o el que puso una ronda anterior no.
+    const rawDesc=$("#f_name")?$("#f_name").value.trim():"";
+    const planName=window._editor&&window._editor.planName||"";
+    const desc=rawDesc&&rawDesc!==planName.trim()&&rawDesc!==st.autoName?rawDesc:"";
     const qa=st.answers.map(a=>`- ${a.q} → ${a.a||"(no sabe)"}`).join("\n");
     const canAsk=st.round<MEAL_PHOTO_MAX_ROUNDS;
-    const prompt=`Estima kcal y macros de la comida de la foto.${desc?` El usuario la describe así: "${desc}".`:""}
+    const prompt=`Estima kcal y macros de la comida de la foto.${desc?` El usuario la describe así: "${desc}". Si esa descripción no coincide con lo que se ve, manda la foto: estima lo que se ve.`:" Identifica el plato por lo que se ve en la foto."}
 ${qa?`Aclaraciones del usuario:\n${qa}\n`:""}Calcula la porción que se ve; usa el plato, los cubiertos o las manos como referencia de tamaño.
 ${canAsk?`Si algo que no se ve cambia mucho las kcal (cantidad real, aceite o fritura, salsas, bebida, ingredientes escondidos), incluye hasta 2 preguntas cortas y concretas en "preguntas". No repitas preguntas ya respondidas. Si la foto basta, deja "preguntas" vacío.`:`No hagas más preguntas: deja "preguntas" vacío y da tu estimación final.`}
 Entrega siempre tu mejor estimación actual. "nombre": nombre corto y descriptivo del plato. "nota": una frase con lo que supusiste.
 Responde SOLO JSON: {"nombre":"...","kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0,"nota":"...","preguntas":[]}`;
     const fallback=JSON.stringify({nombre:"",kcal:0,proteina_g:0,carbohidratos_g:0,grasa_g:0,nota:"No pudimos analizar la foto ahora. Describe la comida o ingresa los macros.",preguntas:[]});
     // La foto va en la clave: una respuesta guardada solo se reutiliza para la misma foto y respuestas.
-    const quota=coachQuota("meal_estimate",requestId,"photo-"+st.round,fallback,{},`photo:${st.hash}:${hashText(qa)}`);
+    const quota=coachQuota("meal_estimate",requestId,"photo-"+st.round,fallback,{},`photo:${st.hash}:${hashText(qa)}:${hashText(desc)}`);
     const j=parseJSON(await callClaude(prompt,700,quota,{image:st.image}));
     renderPhotoEstimate(j,canAsk);
   }catch(e){renderPhotoEstimateError(e);}
@@ -9870,21 +9905,33 @@ function renderPhotoEstimateError(e){
   out.innerHTML=`<div class="ai-box">⚠️ ${esc(photoEstimateErrorMessage(e))}</div>
     <button class="btn btn-sm" style="margin-top:8px" onclick="photoEstimateRound(true)">Reintentar</button>`;
 }
+// REQ-230: aplica la estimación a los campos, los resalta y devuelve la línea
+// "Aplicado: …" para que se vea qué cambió aunque se parezca a lo anterior.
+function applyEstimatedMacros(j){
+  const vals={f_kcal:Math.round(+j.kcal||0),f_p:Math.round(+j.proteina_g||0),f_c:Math.round(+j.carbohidratos_g||0),f_f:Math.round(+j.grasa_g||0)};
+  Object.entries(vals).forEach(([id,v])=>{
+    const el=$("#"+id);if(!el)return;
+    el.value=v;el.classList.remove("field-updated");void el.offsetWidth;el.classList.add("field-updated");
+  });
+  return `<div class="estimate-applied">Aplicado: ${vals.f_kcal} kcal · P ${vals.f_p} g · C ${vals.f_c} g · G ${vals.f_f} g</div>`;
+}
 function renderPhotoEstimate(j,canAsk){
   const st=window._photoEstimate;const out=$("#aiOut");if(!st||!out)return;
   const kcal=Math.round(+j.kcal||0);
+  let applied="";
   if(kcal>0){
-    $("#f_kcal").value=kcal;$("#f_p").value=Math.round(+j.proteina_g||0);$("#f_c").value=Math.round(+j.carbohidratos_g||0);$("#f_f").value=Math.round(+j.grasa_g||0);
+    applied=applyEstimatedMacros(j);
     // El nombre se completa si está vacío o si lo puso una ronda anterior; lo que escribió el usuario se respeta.
     const name=$("#f_name");
-    if(name&&j.nombre&&(!name.value.trim()||name.value===st.autoName)){name.value=coachCopy(String(j.nombre).trim());st.autoName=name.value;}
+    const planName=window._editor&&window._editor.planName||"";
+    if(name&&j.nombre&&(!name.value.trim()||name.value===st.autoName||(planName&&name.value.trim()===planName.trim()))){name.value=coachCopy(String(j.nombre).trim());st.autoName=name.value;}
   }
   const asked=new Set(st.answers.map(a=>coachKey(a.q)));
   st.questions=canAsk&&Array.isArray(j.preguntas)
     ?j.preguntas.map(q=>coachCopy(String(q||"").trim())).filter(q=>q&&!asked.has(coachKey(q))).slice(0,2)
     :[];
   const note=coachCopy(String(j.nota||"").trim())||"Estimado. Revisa y ajusta si quieres.";
-  out.innerHTML=`<div class="ai-box">${kcal>0?"✓ ":""}${esc(note)}</div>${st.questions.length?`<div class="photo-questions">
+  out.innerHTML=`<div class="ai-box">${kcal>0?"✓ ":""}${esc(note)}${applied}</div>${st.questions.length?`<div class="photo-questions">
       <div class="muted small">Para afinar la estimación:</div>
       ${st.questions.map((q,i)=>`<div class="field" style="margin:0"><label for="pq_${i}">${esc(q)}</label><input id="pq_${i}" type="text" autocomplete="off" placeholder="Tu respuesta"></div>`).join("")}
       <div class="row" style="gap:8px"><button class="btn btn-accent btn-sm" onclick="answerPhotoQuestions()">Responder y recalcular</button><button class="btn btn-sm" onclick="skipPhotoQuestions()">Así está bien</button></div>

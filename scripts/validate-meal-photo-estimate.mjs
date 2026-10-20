@@ -43,7 +43,8 @@ assert.ok(editor.includes('id="f_photo" type="file" accept="image/*"'), "el edit
 assert.ok(!/capture=/.test(editor), "el selector de foto no fuerza la cámara");
 assert.ok(editor.includes("pickMealPhoto()"), "botón Estimar con foto");
 assert.ok(html.includes("...(image?{image}:{})"), "callClaude envía la imagen al proxy");
-assert.ok(html.includes("`photo:${st.hash}:${hashText(qa)}`"), "la reutilización de respuestas depende de la foto y las respuestas");
+// REQ-229: también de la descripción, para no reutilizar una estimación hecha con otro texto.
+assert.ok(html.includes("`photo:${st.hash}:${hashText(qa)}:${hashText(desc)}`"), "la reutilización de respuestas depende de la foto, las respuestas y la descripción");
 assert.ok(html.includes("MEAL_PHOTO_MAX_PX=1024") && html.includes('toDataURL("image/jpeg",0.82)'), "la foto se reduce antes de enviarse");
 assert.ok(/st\.round<MEAL_PHOTO_MAX_ROUNDS/.test(html), "las preguntas tienen un tope de rondas");
 console.log("  Cliente: cámara en el editor, reducción, rondas acotadas y clave por foto");

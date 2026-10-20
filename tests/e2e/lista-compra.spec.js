@@ -22,16 +22,21 @@ test("arma la lista de la semana, mueve lo que ya tengo y lo recuerda al reabrir
     await page.getByRole("button", { name: "Aplicar al día" }).click();
     await expect(page.locator("#overlay")).toHaveCount(0);
   }
+  // REQ-231: la lista vive en la fila de herramientas, con lo que queda por comprar.
+  const tool = page.locator(".nut-tools #shopToolBtn");
+  await expect(tool).toBeVisible();
   const sheet = await openList(page);
   await expect(sheet).toContainText(/Por comprar · \d+/);
   const items = sheet.locator(".shop-item");
   const total = await items.count();
   expect(total).toBeGreaterThan(0);
+  await expect(tool.locator(".nut-tool-count")).toHaveText(String(total));
   const first = items.first();
   const name = (await first.locator(".n").innerText()).trim();
   await first.locator("input").click(); // click, no check(): el ítem cambia de sección al marcarlo
   await expect(sheet).toContainText(`Ya lo tengo · 1`);
   await expect(sheet).toContainText(`Por comprar · ${total - 1}`);
+  await expect(tool.locator(".nut-tool-count")).toHaveText(String(total - 1)); // se actualiza sin reabrir
   await expect.poll(() => {
     const c = calls.filter((x) => x.table === "profiles" && x.method === "POST").at(-1);
     const prefs = c && (Array.isArray(c.payload) ? c.payload[0] : c.payload).prefs;
