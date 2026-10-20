@@ -1746,3 +1746,35 @@ Jonathan (2026-10-20), con captura: tras elegir una foto de la galería (REQ-207
 
 - Un 503 muestra "mucha demanda" con "Reintentar"; un 500 desconocido muestra "(código 500)"; reintentar con la misma foto estima y usa la misma ronda (`photo-1`). ✓ (`tests/e2e/foto-comida.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-229 - Fix: "Estimar con foto" estima el plato planeado en vez del que se ve
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura: al editar el almuerzo del plan ("Tacos de frijol negro y queso fresco") y estimar con una foto de espagueti Alfredo, la app responde "Estimado como 3 tacos de tortilla de maíz…", pregunta por los frijoles y deja el nombre de los tacos.
+
+### Causa raíz
+
+`openEditor('meal')` precarga el nombre del plato planeado en "Descripción". `photoEstimateRound()` enviaba ese texto como "El usuario la describe así", y el modelo lo priorizó sobre la imagen. `renderPhotoEstimate()` solo reemplazaba el nombre si estaba vacío o lo había puesto una ronda anterior, así que el nombre planeado quedaba. Además, la clave de reutilización no incluía la descripción, así que la respuesta errónea podía volver a servirse para la misma foto.
+
+### Alcance
+
+1. `window._editor.planName` guarda el nombre precargado de una comida del plan; mientras no se toque, no se envía como descripción (el prompt pide identificar el plato por la foto) y se reemplaza por el nombre estimado.
+2. Si el usuario escribe una descripción, se envía con la instrucción de que, si no coincide con la foto, manda la foto.
+3. La descripción entra en la clave de reutilización (`photo:<foto>:<respuestas>:<descripción>`); `validate-meal-photo-estimate.mjs` lo exige.
+4. `CACHE_NAME` → `fitbud-pwa-v111`.
+
+### Fuera de alcance
+
+- Detectar con la imagen si la foto corresponde a la comida planeada.
+
+### Riesgos
+
+- Ninguno sobre datos: cambia solo qué texto acompaña a la foto y cuándo se reemplaza el nombre.
+
+### Criterios de aceptación
+
+- Editar una comida del plan y estimar con foto de otro plato no envía el nombre planeado y deja el nombre y los macros de la foto; lo escrito por el usuario sí se envía. ✓ (`tests/e2e/foto-comida.spec.js`; falla contra el código previo)
+- `node scripts/release-gate.mjs` pasa. ✓

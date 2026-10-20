@@ -1,6 +1,6 @@
 // REQ-172: estimar los macros de una comida con una foto, con preguntas de aclaración.
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, todayYmd, USER_ID } from "./helpers.js";
 
 // PNG de 2×2 px; la app lo convierte a JPEG antes de enviarlo.
 const PNG = Buffer.from(
@@ -95,4 +95,44 @@ test("foto → fallo con motivo claro → reintentar con la misma foto", async (
   // Los reintentos usan la misma foto y no gastan rondas de preguntas.
   expect(coachCalls.every((c) => c.image.data === coachCalls[0].image.data)).toBe(true);
   expect(coachCalls.map((c) => c.quota.partKey)).toEqual(["photo-1", "photo-1", "photo-1"]);
+});
+
+// REQ-229: al editar una comida del plan, el nombre planeado no es lo que comió:
+// no se envía como descripción y la foto manda (nombre y macros salen de la foto).
+test("comida del plan + foto de otro plato → estima lo que se ve, no lo planeado", async ({ page, context }) => {
+  const planned = { done: false, ovr: { name: "Tacos de frijol negro y queso fresco", kcal: 520, p: 18, c: 62, f: 20 } };
+  await installMocks(context, { tables: { day_log: { rows: [{
+    user_id: USER_ID, log_date: todayYmd(), plan_version_id: null, updated_at: new Date().toISOString(),
+    state: { meals: { almuerzo: planned }, extras: [], workoutDone: false },
+  }] } } });
+  const coachCalls = [];
+  await context.route("**/api/claude", (route) => {
+    coachCalls.push(JSON.parse(route.request().postData() || "{}"));
+    const reply = { nombre: "Espagueti Alfredo", kcal: 780, proteina_g: 24, carbohidratos_g: 90, grasa_g: 34, nota: "Porción grande con salsa cremosa.", preguntas: [] };
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: JSON.stringify(reply) }) });
+  });
+  await seedLoggedInUser(page);
+  await autoDismissNudges(page);
+  const errors = collectConsoleErrors(page);
+  await gotoApp(page);
+
+  await page.evaluate(() => openEditor("meal", todayStr(), "almuerzo"));
+  const overlay = page.locator("#overlay");
+  await expect(overlay.locator("#f_name")).toHaveValue("Tacos de frijol negro y queso fresco");
+  await overlay.locator("#f_photo").setInputFiles({ name: "pasta.png", mimeType: "image/png", buffer: PNG });
+
+  await expect(overlay.locator("#f_kcal")).toHaveValue("780");
+  // El nombre planeado (sin tocar) se reemplaza por lo que se ve.
+  await expect(overlay.locator("#f_name")).toHaveValue("Espagueti Alfredo");
+  expect(coachCalls[0].userText).not.toContain("Tacos");
+  expect(coachCalls[0].userText).toContain("Identifica el plato por lo que se ve en la foto");
+
+  // Lo que escribe el usuario sí se envía, pero la foto manda si no coincide.
+  await overlay.locator("#f_name").fill("Pasta alfredo con parmesano");
+  await overlay.locator("#f_photo").setInputFiles({ name: "pasta2.png", mimeType: "image/png", buffer: Buffer.concat([PNG, Buffer.from([0])]) });
+  await expect.poll(() => coachCalls.length).toBe(2);
+  expect(coachCalls[1].userText).toContain('El usuario la describe así: "Pasta alfredo con parmesano"');
+  expect(coachCalls[1].userText).toContain("manda la foto");
+  await expect(overlay.locator("#f_name")).toHaveValue("Pasta alfredo con parmesano");
+  expect(errors).toEqual([]);
 });

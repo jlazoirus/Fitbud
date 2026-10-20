@@ -8835,7 +8835,8 @@ function openEditor(kind,ds,id){
   let pre={name:"",kcal:"",p:"",c:"",f:""};
   let title="Agregar comida / snack";
   if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f};title="Editar — "+base.slot;}
-  window._editor={kind,ds,id,extraIdx:null};
+  // REQ-229: el nombre precargado de una comida del plan es lo planeado, no lo que comió.
+  window._editor={kind,ds,id,extraIdx:null,planName:kind==="meal"?String(pre.name||""):""};
   editorSheet(title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
@@ -9835,17 +9836,21 @@ async function photoEstimateRound(retry){
   const out=$("#aiOut");if(out)out.innerHTML=`<div class="ai-box">Mirando tu comida…</div>`;
   try{
     st.round++;
-    const desc=$("#f_name")?$("#f_name").value.trim():"";
+    // REQ-229: solo cuenta como descripción lo que escribió el usuario; el nombre
+    // del plato planeado (sin tocar) o el que puso una ronda anterior no.
+    const rawDesc=$("#f_name")?$("#f_name").value.trim():"";
+    const planName=window._editor&&window._editor.planName||"";
+    const desc=rawDesc&&rawDesc!==planName.trim()&&rawDesc!==st.autoName?rawDesc:"";
     const qa=st.answers.map(a=>`- ${a.q} → ${a.a||"(no sabe)"}`).join("\n");
     const canAsk=st.round<MEAL_PHOTO_MAX_ROUNDS;
-    const prompt=`Estima kcal y macros de la comida de la foto.${desc?` El usuario la describe así: "${desc}".`:""}
+    const prompt=`Estima kcal y macros de la comida de la foto.${desc?` El usuario la describe así: "${desc}". Si esa descripción no coincide con lo que se ve, manda la foto: estima lo que se ve.`:" Identifica el plato por lo que se ve en la foto."}
 ${qa?`Aclaraciones del usuario:\n${qa}\n`:""}Calcula la porción que se ve; usa el plato, los cubiertos o las manos como referencia de tamaño.
 ${canAsk?`Si algo que no se ve cambia mucho las kcal (cantidad real, aceite o fritura, salsas, bebida, ingredientes escondidos), incluye hasta 2 preguntas cortas y concretas en "preguntas". No repitas preguntas ya respondidas. Si la foto basta, deja "preguntas" vacío.`:`No hagas más preguntas: deja "preguntas" vacío y da tu estimación final.`}
 Entrega siempre tu mejor estimación actual. "nombre": nombre corto y descriptivo del plato. "nota": una frase con lo que supusiste.
 Responde SOLO JSON: {"nombre":"...","kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0,"nota":"...","preguntas":[]}`;
     const fallback=JSON.stringify({nombre:"",kcal:0,proteina_g:0,carbohidratos_g:0,grasa_g:0,nota:"No pudimos analizar la foto ahora. Describe la comida o ingresa los macros.",preguntas:[]});
     // La foto va en la clave: una respuesta guardada solo se reutiliza para la misma foto y respuestas.
-    const quota=coachQuota("meal_estimate",requestId,"photo-"+st.round,fallback,{},`photo:${st.hash}:${hashText(qa)}`);
+    const quota=coachQuota("meal_estimate",requestId,"photo-"+st.round,fallback,{},`photo:${st.hash}:${hashText(qa)}:${hashText(desc)}`);
     const j=parseJSON(await callClaude(prompt,700,quota,{image:st.image}));
     renderPhotoEstimate(j,canAsk);
   }catch(e){renderPhotoEstimateError(e);}
@@ -9877,7 +9882,8 @@ function renderPhotoEstimate(j,canAsk){
     $("#f_kcal").value=kcal;$("#f_p").value=Math.round(+j.proteina_g||0);$("#f_c").value=Math.round(+j.carbohidratos_g||0);$("#f_f").value=Math.round(+j.grasa_g||0);
     // El nombre se completa si está vacío o si lo puso una ronda anterior; lo que escribió el usuario se respeta.
     const name=$("#f_name");
-    if(name&&j.nombre&&(!name.value.trim()||name.value===st.autoName)){name.value=coachCopy(String(j.nombre).trim());st.autoName=name.value;}
+    const planName=window._editor&&window._editor.planName||"";
+    if(name&&j.nombre&&(!name.value.trim()||name.value===st.autoName||(planName&&name.value.trim()===planName.trim()))){name.value=coachCopy(String(j.nombre).trim());st.autoName=name.value;}
   }
   const asked=new Set(st.answers.map(a=>coachKey(a.q)));
   st.questions=canAsk&&Array.isArray(j.preguntas)
