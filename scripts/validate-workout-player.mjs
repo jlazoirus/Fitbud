@@ -56,7 +56,7 @@ assert.equal(player.timerRemaining(execution.timer,started+30000),60);
 execution.steps[0].status="done";
 execution.steps[1].sets[0].done=true;
 execution.steps[1].status="done";
-assert.deepEqual(player.progress(execution),{completed:2,skipped:0,total:5,remaining:3});
+assert.deepEqual(player.progress(execution),{completed:2,skipped:0,declined:0,total:5,remaining:3});
 assert.deepEqual(player.strengthTotals(execution),{completedSets:1,totalSets:12});
 // REQ-185: las series extra solo cuentan si se hicieron.
 execution.steps[1].sets.push({done:false},{done:true});
@@ -136,4 +136,30 @@ console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporiza
   assert.equal(player.lastPerformance(days,"back-squat","2026-10-06"),null,"Nada anterior a la primera sesión");
   assert.equal(player.lastPerformance(null,"back-squat","2026-10-20"),null);
   console.log("REQ-232: última carga registrada por ejercicio.");
+}
+
+// REQ-235: calentamiento y vuelta a la calma son opcionales; "Ahora no" no cuenta como omitido.
+{
+  const prescription=player.buildPrescription({
+    workout:{id:"fullA",kind:"Gimnasio",name:"Gimnasio · Full body A"},
+    exercises:["back-squat","bench-press"].map(slug=>catalog.find(item=>item.slug===slug)),
+    context:{week:1,durationWeeks:10,sessionMinutes:60},
+  });
+  const execution=player.createExecution(prescription,Date.now());
+  const [warm,...rest]=execution.steps,cool=rest.at(-1);
+  assert.equal(warm.optional,true,"El calentamiento es opcional");
+  assert.equal(cool.optional,true,"La vuelta a la calma es opcional");
+  assert.ok(execution.steps.filter(step=>step.type==="strength").every(step=>!step.optional),"Los ejercicios no son opcionales");
+  assert.equal(warm.optIn,false,"Nadie lo eligió todavía");
+  warm.status="declined";
+  const again=player.normalizeExecution(execution,prescription,Date.now());
+  assert.equal(again.steps[0].status,"declined","'declined' se conserva");
+  assert.equal(again.currentStep,1,"Se pasa al primer ejercicio");
+  const progress=player.progress(again);
+  assert.equal(progress.total,execution.steps.length-1,"Un bloque rechazado no cuenta en el total");
+  assert.equal(progress.skipped,0,"Ni como omitido");
+  assert.equal(progress.declined,1);
+  const forged=player.normalizeExecution({...execution,steps:execution.steps.map((step,i)=>i===1?{...step,status:"declined"}:step)},prescription,Date.now());
+  assert.equal(forged.steps[1].status,"pending","Un ejercicio no puede quedar 'declined'");
+  console.log("REQ-235: calentamiento y vuelta a la calma opcionales.");
 }

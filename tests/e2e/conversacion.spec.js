@@ -30,6 +30,7 @@ test("con el enlace de prueba: entreno, peso y comidas desde el hilo, y vuelta a
   const workout = app.locator('.chat-card[data-card="workout"]');
   await workout.getByRole("button", { name: "Empezar" }).click();
   await expect(workout).toContainText("Calentamiento");
+  await workout.getByRole("button", { name: "Sí, calentar" }).click();
   await workout.getByRole("button", { name: "Ya calenté" }).click();
   await expect(workout.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
 

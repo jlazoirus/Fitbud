@@ -401,7 +401,12 @@
       step.originalExerciseSlug=String(step.originalExerciseSlug||prescribed.originalExerciseSlug||prescribed.exerciseSlug);
       step.variation=step.variation||"standard";
     }
-    step.status=step.status==="done"||step.status==="skipped"?step.status:"pending";
+    // REQ-235: calentamiento y vuelta a la calma son opcionales: se ofrecen y
+    // solo se hacen si el usuario los elige (optIn); "Ahora no" los deja
+    // "declined", que no cuenta como bloque omitido ni impide completar.
+    step.optional=prescribed.type==="timed"&&(prescribed.phase==="warmup"||prescribed.phase==="cooldown");
+    step.optIn=step.optional&&step.optIn===true;
+    step.status=step.status==="done"||step.status==="skipped"||(step.optional&&step.status==="declined")?step.status:"pending";
     return step;
   }
   function normalizeExecution(saved,prescription,now){
@@ -463,10 +468,11 @@
     return Math.max(0,Math.round(number(timer.remainingSeconds,0)));
   }
   function progress(execution){
-    const steps=execution&&Array.isArray(execution.steps)?execution.steps:[];
+    const all=execution&&Array.isArray(execution.steps)?execution.steps:[];
+    const steps=all.filter(step=>step.status!=="declined");
     const completed=steps.filter(step=>step.status==="done").length;
     const skipped=steps.filter(step=>step.status==="skipped").length;
-    return {completed,skipped,total:steps.length,remaining:Math.max(0,steps.length-completed-skipped)};
+    return {completed,skipped,declined:all.length-steps.length,total:steps.length,remaining:Math.max(0,steps.length-completed-skipped)};
   }
   function strengthTotals(execution){
     const steps=execution&&Array.isArray(execution.steps)?execution.steps:[];
