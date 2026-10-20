@@ -1905,3 +1905,37 @@ La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombr
 
 - Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-234 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando inicias el entrenamiento comienza en seco de frente; debería haber una cuenta atrás que te avise con 3 segundos de anticipación que ya va a comenzar".
+
+### Problema
+
+`startWorkoutExecution()` creaba la ejecución y empezaba a correr el reloj de la sesión en el mismo toque de "Iniciar sesión guiada", sin margen para dejar el teléfono y ponerse en posición.
+
+### Alcance
+
+1. "Iniciar sesión guiada" (y "Empezar" en el modo conversacional) abre una cuenta atrás a pantalla completa: "Prepárate", 3 · 2 · 1 con un pitido corto y vibración (si el dispositivo la soporta) en cada número, y "Empiezas con: <primer bloque>". Al llegar a 0 suena un pitido más largo, se crea la sesión y arranca el reloj (`beginWorkoutExecution()`).
+2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
+3. Con `prefers-reduced-motion` el número cambia sin animación.
+4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
+5. `CACHE_NAME` → `fitbud-pwa-v116`.
+
+### Fuera de alcance
+
+- Cuenta atrás al terminar descansos o antes de bloques con cronómetro.
+- Preferencia para desactivar el sonido.
+
+### Riesgos
+
+- iOS no implementa `navigator.vibrate`; el pitido depende de que el teléfono no esté en silencio. El aviso visual siempre está.
+
+### Criterios de aceptación
+
+- Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
+- `node scripts/release-gate.mjs` pasa. ✓

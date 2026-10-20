@@ -470,3 +470,9 @@ export async function gotoApp(page) {
     { timeout: 15_000 },
   );
 }
+
+/** REQ-234: inicia la sesión guiada saltando la cuenta atrás de 3 s ("Empezar ya"). */
+export async function startGuidedSession(page) {
+  await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+  await page.locator("#workoutCountdown").getByRole("button", { name: "Empezar ya" }).click();
+}
