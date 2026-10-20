@@ -1636,3 +1636,22 @@ Jonathan (2026-10-19): la inscripción debe ser automática; las postulaciones t
 
 - `scripts/test-admin-beta-api.mjs`: con correo invita y da 90 días sin código; cuenta existente solo recibe acceso; envío fallido cae al enlace. `test-beta-recruitment-api.mjs`: guarda el correo. ✓
 - `tests/e2e/admin-beta.spec.js`: Hoy avisa de 1 postulación, Aceptar envía la invitación por correo. `beta.spec.js`: la confirmación muestra el correo. ✓
+
+## REQ-226 - Beta: aviso por correo al admin con cada postulación nueva
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20): "me envías a mí también el mail cuando alguien se postula", con lo que la app ya tenga conectado.
+
+### Alcance
+
+1. `api/beta-recruitment.js`: tras guardar una postulación nueva, correo vía Resend con la conexión de los recordatorios (`RESEND_API_KEY`, `NOTIFY_FROM_EMAIL`, `NOTIFY_APP_URL`). Destinatarios: `BETA_NOTIFY_EMAIL` o los admins activos. Asunto con el nombre, datos clave, historia, aviso de salud, `reply_to` del postulante y botón a `/?ver=postulantes`. Escapa lo escrito por el postulante; tope de 4 s; un fallo nunca bloquea la postulación; una re-postulación con el mismo WhatsApp no avisa otra vez.
+2. `index.html`: `/?ver=postulantes` abre Postulantes beta al admin y limpia la URL. SW v108.
+3. `BETA_PROGRAM.md`: variables y comportamiento.
+
+### Criterios de aceptación
+
+- `scripts/test-beta-recruitment-api.mjs`: nueva → 1 correo a admins con escape, enlace y aviso de salud; repetida → ninguno; Resend caído → la postulación responde 200; `BETA_NOTIFY_EMAIL` define destinatarios. ✓
+- `tests/e2e/admin-beta.spec.js`: `/?ver=postulantes` abre la pantalla al admin. ✓

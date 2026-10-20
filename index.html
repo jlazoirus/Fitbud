@@ -11234,6 +11234,7 @@ async function onAuth(){
     checkCheckoutReturn(); // REQ-26: manejar retorno de Stripe checkout
     trackEvent("session_start",{});
     refreshAdminBetaPending(); // REQ-225: aviso de postulaciones nuevas (solo admin, no-await)
+    openAdminBetaFromLink(); // REQ-226: el botón del correo de aviso abre Postulantes beta
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
   }finally{_authBusy=false;}
 }
@@ -12150,6 +12151,16 @@ async function refreshAdminBetaPending(){
     const out=await adminApi("betaApplicants",{filter:"pending"});
     const n=(out.counts&&out.counts.pending)||0;
     if(n!==adminBetaPending){adminBetaPending=n;if(view==="hoy"||view==="perfil")render();}
+  }catch(_){}
+}
+function openAdminBetaFromLink(){
+  try{
+    const params=new URLSearchParams(location.search);
+    if(params.get("ver")!=="postulantes")return;
+    params.delete("ver");
+    const qs=params.toString();
+    history.replaceState(history.state,"",location.pathname+(qs?"?"+qs:"")+location.hash);
+    if(isAdmin())setView("adminBeta");
   }catch(_){}
 }
 function adminBetaPendingCardHtml(){

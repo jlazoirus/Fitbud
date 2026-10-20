@@ -130,4 +130,54 @@ await handler({
 }, res);
 assert(res.statusCode === 400 && String(res.body.error).includes("WhatsApp"), "Debe validar WhatsApp.");
 
-console.log("API beta-recruitment: captura, scoring y validaciones verificados con mocks.");
+// REQ-226: aviso al admin por correo con Resend (misma conexión que api/notify.js)
+const validBody = {
+  name: "Ana <Test>", email: "ana@correo.test", whatsapp: "+51 999 888 777", age: "25-34", city: "Lima",
+  stage: "beginner", goal: "Bajar grasa", recentAttempt: "yes", tools: [], pains: ["Me abruma decidir o empezar"],
+  story: "Dejé el gym cuando cambió mi horario de trabajo.", investment: "time", availability: "interview_beta", health: "caution",
+};
+let mails = [];
+let resendStatus = 200;
+let rowCreatedAt = null;
+const baseFetch = global.fetch;
+global.fetch = async (url, options = {}) => {
+  const value = String(url);
+  if (value === "https://api.resend.com/emails") {
+    mails.push({ auth: options.headers.Authorization, body: JSON.parse(options.body) });
+    return response(resendStatus, { id: "m1" });
+  }
+  if (value.includes("/rest/v1/profiles?is_admin=eq.true")) return response(200, [{ email: "admin@evolv.test" }]);
+  if (value.includes("/rest/v1/beta_recruitment_submissions") && options.method === "POST" && rowCreatedAt) {
+    return response(201, [{ id: 13, created_at: rowCreatedAt, updated_at: new Date().toISOString(), status: "new" }]);
+  }
+  return baseFetch(url, options);
+};
+process.env.RESEND_API_KEY = "re_test";
+process.env.NOTIFY_FROM_EMAIL = "Evolv <hola@evolv.test>";
+delete process.env.BETA_NOTIFY_EMAIL;
+
+rowCreatedAt = new Date().toISOString();
+res = capture();
+await handler({ method: "POST", headers: {}, body: validBody }, res);
+assert(res.statusCode === 200 && mails.length === 1, "Postulación nueva: avisa por correo.");
+const mail = mails[0].body;
+assert(mails[0].auth === "Bearer re_test" && mail.from === "Evolv <hola@evolv.test>", "Usa la conexión de Resend de la app.");
+assert(JSON.stringify(mail.to) === JSON.stringify(["admin@evolv.test"]), "Sin BETA_NOTIFY_EMAIL va a los admins activos.");
+assert(mail.subject === "Nueva postulación a la beta: Ana <Test>" && mail.reply_to === "ana@correo.test", "Asunto con el nombre y respuesta directa al postulante.");
+assert(mail.html.includes("Ana &lt;Test&gt;") && !mail.html.includes("<Test>"), "El correo escapa lo que escribe el postulante.");
+assert(mail.html.includes("/?ver=postulantes") && mail.html.includes("lesión o indicación médica"), "Lleva el enlace a revisar y el aviso de salud.");
+
+mails = [];
+rowCreatedAt = "2026-01-01T00:00:00Z";
+res = capture();
+await handler({ method: "POST", headers: {}, body: validBody }, res);
+assert(res.statusCode === 200 && mails.length === 0, "Re-postulación con el mismo WhatsApp: no vuelve a avisar.");
+
+mails = []; resendStatus = 500; rowCreatedAt = new Date().toISOString();
+process.env.BETA_NOTIFY_EMAIL = "yo@evolv.test, socio@evolv.test";
+res = capture();
+await handler({ method: "POST", headers: {}, body: validBody }, res);
+assert(res.statusCode === 200 && res.body.ok === true, "Si Resend falla, la postulación se guarda igual.");
+assert(JSON.stringify(mails[0].body.to) === JSON.stringify(["yo@evolv.test", "socio@evolv.test"]), "BETA_NOTIFY_EMAIL define los destinatarios.");
+
+console.log("API beta-recruitment: captura, scoring, validaciones y aviso por correo al admin verificados con mocks.");
