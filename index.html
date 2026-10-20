@@ -195,6 +195,7 @@
   .csec.collapsed .csec-body{display:none}
   .meal{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:10px;transition:.2s}
   .meal.done{border-color:var(--border-acc);background:var(--accent-dim)}
+  .meal-tap{cursor:pointer}
   .meal.skipped{opacity:.6;border-style:dashed}
   .meal .slot{font-family:var(--font-body);font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
   .meal .name{font-family:var(--font-body);font-weight:600;font-size:16px;margin:3px 0 5px;line-height:1.25}
@@ -5778,7 +5779,7 @@ function mealCard(ds,b,order){
       ${r.lines.map(l=>`<div class="r-row"><span>${esc(l.name)}</span><span class="g">${l.grams} g</span></div>`).join("")}
       <div class="r-foot">${r.lines.length} ingredientes · ${r.generated?"opción de tu coach":"macros calculados desde la receta"}</div>
     </div>`:"";
-  return `<div class="meal ${ms.done?'done':''}">
+  return `<div class="meal meal-tap ${ms.done?'done':''}" onclick="mealCardTap(event,'${ds}','${b.id}')">
     <div class="meal-head">
       <button class="chk ${ms.done?'on':''}" aria-label="${esc(b.slot)}: ${ms.done?'hecha, tocar para desmarcar':'marcar como hecha'}" aria-pressed="${ms.done?'true':'false'}" ${!ms.done&&!mealHasContent(v)?'disabled title="Prepara una opción antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
       <div>
@@ -5794,11 +5795,16 @@ function mealCard(ds,b,order){
     <div class="meal-actions">
       <button class="btn btn-sm" onclick="openChangeMeal('${ds}','${b.id}')" ${ms.done?"disabled title=\"Desmarca la comida si necesitas cambiarla\"":""}>Otra opción</button>
       ${ms.ovr?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
-      <button class="btn btn-sm" onclick="openMealMore('${ds}','${b.id}')">···</button>
+      <button class="btn btn-sm" aria-label="Más opciones de ${esc(b.slot)}" onclick="openMealMore('${ds}','${b.id}')">···</button>
     </div>
     ${recipeHtml}
     ${reorderHtml}
   </div>`;
+}
+// REQ-233: tocar la tarjeta (fuera de sus botones) abre el mismo menú que "···".
+function mealCardTap(event,ds,id){
+  if(event.target.closest("button,a,input,select,textarea,label,.recipe"))return;
+  openMealMore(ds,id);
 }
 function toggleRecipe(btn){
   const card=btn.closest(".meal");if(!card)return;
