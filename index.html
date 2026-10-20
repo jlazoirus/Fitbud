@@ -2350,7 +2350,7 @@ function hasEntitlement(){
   if(!entitlementChecked)return true;                 // setup pendiente → permisivo
   return entitlement!==null||hasActivePremiumTrial();
 }
-// REQ-208: acceso sin cobro (beta, cupón o cortesía) o invitación aún sin
+// REQ-228: acceso sin cobro (beta, cupón o cortesía) o invitación aún sin
 // canjear: mientras dure, la app no muestra precios ni "activa tu plan".
 function freeAccessActive(){
   if(!entitlement||entitlement.origin==="checkout")return false;
@@ -7486,7 +7486,7 @@ function accessNoticeText(){
   if(!entitlement&&pendingInviteCode())return "Estamos activando tu invitación a la beta. Vuelve a intentarlo en un momento.";
   return "Tu acceso está activo. No pudimos completar esta acción ahora; vuelve a intentarlo en unos minutos.";
 }
-// REQ-208: con acceso sin cobro o invitación pendiente no se muestran precios.
+// REQ-228: con acceso sin cobro o invitación pendiente no se muestran precios.
 function showAccessNotice(){
   const pending=!entitlement&&!!pendingInviteCode();
   modal(`<h3>${pending?"Tu invitación se está activando":"Tu acceso está activo"}</h3>
@@ -7644,7 +7644,7 @@ function captureInviteCode(){
 function pendingInviteCode(){try{return localStorage.getItem(INVITE_CODE_KEY)||"";}catch(e){return "";}}
 function clearInviteCode(){try{localStorage.removeItem(INVITE_CODE_KEY);}catch(e){}}
 let _inviteRedeeming=false;
-// REQ-208: un canje que falló por red se reintenta al volver la conexión, no solo al iniciar sesión.
+// REQ-228: un canje que falló por red se reintenta al volver la conexión, no solo al iniciar sesión.
 window.addEventListener("online",()=>{if(session)redeemPendingInvite();});
 async function redeemPendingInvite(){
   const code=pendingInviteCode();
@@ -7758,7 +7758,7 @@ function subscriptionStatusHtml(){
       isCheckout?"Suscripción activa":"Plan activo";
     const untilText=prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ");
     if(free){
-      // REQ-208: sin nombre de plan de pago, sin cuenta regresiva en rojo ni historial de pagos.
+      // REQ-228: sin nombre de plan de pago, sin cuenta regresiva en rojo ni historial de pagos.
       return`<div class="row between" style="margin-bottom:8px">
         <span><b>${esc(origin)}</b></span>
         <span class="badge b-PESAS">Activo</span>
@@ -7778,7 +7778,7 @@ function subscriptionStatusHtml(){
     ${billingHistorySectionHtml()}`;
   }
   if(pendingInviteCode()){
-    // REQ-208: el canje falló por red o sesión; se reintenta solo y aquí no se ofrecen planes.
+    // REQ-228: el canje falló por red o sesión; se reintenta solo y aquí no se ofrecen planes.
     return`<div class="row between" style="margin-bottom:8px">
       <span><b>Invitación a la beta</b></span><span class="badge b-Libre">Pendiente</span>
     </div>
@@ -9161,7 +9161,7 @@ async function coachProxyFetch(payload){
         throw err;
       }
       if(res.status===404)throw new Error("El proxy /api/claude no está disponible. Despliega en Vercel o usa una configuración local de desarrollo.");
-      if(!res.ok)throw new Error(data.error||("Error "+res.status));
+      if(!res.ok){const err=new Error(data.error||("Error "+res.status));err.status=res.status;throw err;}
       return data;
     }catch(e){
       lastError=e;
@@ -9827,8 +9827,9 @@ async function onMealPhotoSelected(input){
     await photoEstimateRound();
   }catch(e){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message||"No pudimos leer la foto.")}</div>`;}
 }
-async function photoEstimateRound(){
+async function photoEstimateRound(retry){
   const st=window._photoEstimate;if(!st)return;
+  if(retry)st.round=Math.max(0,st.round-1); // reintentar no gasta una ronda de preguntas
   const actionKey="meal_estimate";
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const out=$("#aiOut");if(out)out.innerHTML=`<div class="ai-box">Mirando tu comida…</div>`;
@@ -9847,8 +9848,27 @@ Responde SOLO JSON: {"nombre":"...","kcal":0,"proteina_g":0,"carbohidratos_g":0,
     const quota=coachQuota("meal_estimate",requestId,"photo-"+st.round,fallback,{},`photo:${st.hash}:${hashText(qa)}`);
     const j=parseJSON(await callClaude(prompt,700,quota,{image:st.image}));
     renderPhotoEstimate(j,canAsk);
-  }catch(e){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
+  }catch(e){renderPhotoEstimateError(e);}
   finally{endCoachAction(actionKey);}
+}
+// REQ-228: el error de la foto dice qué pasó (sin hablar de tecnología) y deja
+// reintentar con la misma foto; un motivo no reconocido muestra su código.
+function photoEstimateErrorMessage(e){
+  const message=String(e&&e.message||"");
+  const status=Number(e&&e.status)||0;
+  if(e&&(e.paywall||e.trialLimit))return coachErrorMessage(e);
+  if(/tard[oó] demasiado/i.test(message)||status===504)return "El análisis de la foto tardó demasiado. Inténtalo de nuevo.";
+  if(/imagen|formato/i.test(message)||status===413)return "No pudimos leer esta foto. Prueba con otra o con una captura de pantalla.";
+  if(status===429||status===503||status===529||/overloaded|rate/i.test(message))return "Ahora mismo hay mucha demanda. Inténtalo en un minuto.";
+  if(status===422)return "No pudimos estimar esta foto. Prueba con otra foto o describe la comida.";
+  if(/fetch|network|load failed|conexi/i.test(message))return "No hay conexión. Revisa tu internet e inténtalo de nuevo.";
+  const generic=coachErrorMessage(e);
+  return status?`${generic} (código ${status})`:generic;
+}
+function renderPhotoEstimateError(e){
+  const out=$("#aiOut");if(!out)return;
+  out.innerHTML=`<div class="ai-box">⚠️ ${esc(photoEstimateErrorMessage(e))}</div>
+    <button class="btn btn-sm" style="margin-top:8px" onclick="photoEstimateRound(true)">Reintentar</button>`;
 }
 function renderPhotoEstimate(j,canAsk){
   const st=window._photoEstimate;const out=$("#aiOut");if(!st||!out)return;
@@ -12134,7 +12154,7 @@ function openAdminCreateUser(){
     <button id="adminCreateBtn" class="btn btn-accent" style="width:100%" onclick="createAdminUser()">Crear cuenta</button>
     <div id="adminCreateOut" class="muted small" style="margin-top:10px"></div>`);
 }
-// REQ-208: la cuenta nace con 90 días de acceso completo (sin precios ni cobro).
+// REQ-228: la cuenta nace con 90 días de acceso completo (sin precios ni cobro).
 function adminBetaCheckboxHtml(id){
   return `<label class="row" style="gap:10px;align-items:center;margin:4px 0 12px;min-height:44px"><input id="${id}" type="checkbox" checked> <span>Usuario beta (90 días sin cobro)</span></label>`;
 }
