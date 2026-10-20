@@ -9,6 +9,12 @@
   // ── Vocabulario canónico de slots de comida ─────────────────────────────────
   const MEAL_SLOT_VOCAB=new Set(["desayuno","media_manana","almuerzo","merienda","snack","cena","recena"]);
   const CUISINE_TAG_VOCAB=new Set(["criolla","mediterranea","mexicana","asiatica"]);
+  // El perfil guarda las claves de CUISINE_LABELS (nutrition-pure.js), no los tags
+  // del catálogo: sin este puente "mexican"/"peruvian" no coincidían con ningún plato.
+  const CUISINE_PREF_ALIASES={
+    peruvian:["criolla"],mediterranean:["mediterranea"],italian:["mediterranea"],
+    asian:["asiatica"],mexican:["mexicana"],latin:["criolla","mexicana"],latinoamericana:["criolla","mexicana"],
+  };
 
   // ── Tolerancias explícitas por nivel ────────────────────────────────────────
   // TARGET_KCAL_DELTA : targets calculados (calculateMacroTargets) — garantía post-REQ-77.
@@ -324,7 +330,27 @@
   }
 
   function preferredCuisineTags(prefs){
-    return [...new Set(asArray(prefs&&prefs.preferredCuisines).map(normalizeCuisineTag).filter(Boolean))];
+    const tags=[];
+    asArray(prefs&&prefs.preferredCuisines).forEach(value=>{
+      const alias=CUISINE_PREF_ALIASES[solverKey(value).replace(/_/g,"")];
+      if(alias)tags.push(...alias);
+      else{const tag=normalizeCuisineTag(value);if(tag)tags.push(tag);}
+    });
+    return [...new Set(tags)];
+  }
+
+  // Penalización suave por repetir una cocina que el usuario no eligió: evita
+  // que un día (o una semana) quede dominado por la cocina con más platos que
+  // cuadran macros (p. ej. tacos/burritos en almuerzo). Las cocinas preferidas
+  // no se penalizan: si el usuario pide mexicana, puede repetirla.
+  function cuisineRepeatPenalty(dish,preferred,dayCuisines,recentCuisines){
+    let penalty=0;
+    cuisineTagsForDish(dish).forEach(tag=>{
+      if(preferred.includes(tag))return;
+      const p=(dayCuisines.get(tag)||0)*0.08+Math.min(0.08,(recentCuisines.get(tag)||0)*0.02);
+      if(p>penalty)penalty=p;
+    });
+    return penalty;
   }
 
   // Ajuste suave de score (no bloqueante): platos con ingredientes/nombres que
@@ -660,6 +686,10 @@
     for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}
     return ((h>>>0)%1000)/1000;
   }
+  // Peso del desempate de variedad. Con 0.03 casi nunca superaba la diferencia
+  // de score entre platos vecinos y todos los usuarios con metas parecidas
+  // recibían el mismo plato; globalClosePass() cierra luego los macros del día.
+  const VARIETY_JITTER_WEIGHT=0.10;
 
   // kcal base de un plato con sus gramajes de receta (proxy barato para pre-rankear).
   function dishBaseKcal(dish,catalog,maps){
@@ -683,6 +713,17 @@
     const catalog=ctx&&ctx.catalog||{};
     const maps=catalogMaps(catalog);
     const dateSeed=ctx&&ctx.date?String(ctx.date):"";
+    // varietySeed (id de usuario) separa los planes de usuarios distintos el
+    // mismo día; sin él, la semilla era solo la fecha y todos veían lo mismo.
+    const varietySeed=ctx&&ctx.varietySeed?String(ctx.varietySeed):"";
+    const jitterSeed=varietySeed?varietySeed+"|"+dateSeed:dateSeed;
+    const preferredCuisines=preferredCuisineTags(prefs);
+    const dishBySlug=new Map((Array.isArray(catalog.dishes)?catalog.dishes:[]).map(dish=>[slugFor(dish),dish]));
+    const recentCuisines=new Map(),dayCuisines=new Map();
+    const recentForCuisine=ctx&&ctx.recentUsed instanceof Set?ctx.recentUsed:new Set();
+    recentForCuisine.forEach(slug=>{
+      cuisineTagsForDish(dishBySlug.get(slug)).forEach(tag=>recentCuisines.set(tag,(recentCuisines.get(tag)||0)+1));
+    });
     const used=new Set(),comidas=[],diagnostics=[],causes=[];
     slots.forEach(slot=>{
       const candidates=compatibleDishesForSlot(slot.id,prefs,catalog);
@@ -715,9 +756,10 @@
         const reuse=used.has(slug)?0.18:0;
         const yesterday=(!reuse&&prevDayUsed.size&&prevDayUsed.has(slug))?0.10:0;
         const recent=(!reuse&&!yesterday&&recentUsed.size&&recentUsed.has(slug))?0.06:0;
-        const jitter=dateSeed?seededJitter(dateSeed+"|"+slot.id+"|"+slug)*0.03:0;
+        const jitter=jitterSeed?seededJitter(jitterSeed+"|"+slot.id+"|"+slug)*VARIETY_JITTER_WEIGHT:0;
         const prefAdj=preferenceScoreAdjustment(dish,prefs,catalog,maps);
-        const score=solved.score+reuse+yesterday+recent+jitter+prefAdj;
+        const cuisineAdj=cuisineRepeatPenalty(dish,preferredCuisines,dayCuisines,recentCuisines);
+        const score=solved.score+reuse+yesterday+recent+jitter+prefAdj+cuisineAdj;
         if(!best||score<best.rankScore)best={...solved,rankScore:score};
       });
       if(!best){
@@ -725,6 +767,7 @@
         return;
       }
       used.add(slugFor(best.dish));
+      cuisineTagsForDish(best.dish).forEach(tag=>dayCuisines.set(tag,(dayCuisines.get(tag)||0)+1));
       comidas.push({
         slot_id:slot.id,
         nombre:best.dish.name,
@@ -1360,6 +1403,7 @@
       slots,
       workoutContext:ctx&&ctx.workoutContext,
       date:ctx&&ctx.date,
+      varietySeed:ctx&&ctx.varietySeed,
       prevDayUsed:ctx&&ctx.prevDayUsed,
       recentUsed:ctx&&ctx.recentUsed,
     });
@@ -1467,7 +1511,7 @@
   }
 
   // ── Planner semanal determinista ─────────────────────────────────────────────
-  // ctx: {prefs, dayTarget, catalog, numDays?=7, workoutContext?}
+  // ctx: {prefs, dayTarget, catalog, numDays?=7, workoutContext?, varietySeed?}
   // Usa planDeterministicNutritionDay para cada día, pasando prevDayUsed para
   // penalizar (no bloquear) repetición de platos entre días consecutivos.
   function planNutritionWeek(ctx){
@@ -1484,6 +1528,7 @@
       const result=planDeterministicNutritionDay({
         prefs,dayTarget,catalog,workoutContext,prevDayUsed,recentUsed,
         date:weekSeed?weekSeed+"+"+i:"",
+        varietySeed:ctx&&ctx.varietySeed,
       });
       prevDayUsed=new Set((result.comidas||[]).map(c=>c.dishSlug||"").filter(Boolean));
       prevDayUsed.forEach(slug=>recentUsed.add(slug));

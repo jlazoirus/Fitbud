@@ -60,6 +60,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 - REQ-138 conecto `generateOneDay()`, `deterministicDayPayload()`, `generateDeterministicWeek()`, `regenerateDayInWeekDraft()` y `regenerateGenMeal()` a `finalizeDayWithGate()` → `finalizeNutritionDay()`; `prepareFirstWeekNutrition()` lo hereda y `lockedMealsForDay()` protege comidas `done=true`. El "ok" visible usa `finalizedDayIsComplete()` (slots cubiertos), no `DIET_CONTRACT`. Validador: `validate-nutrition-finalize-wiring.mjs`. Reemplazos: REQ-142.
 - REQ-139 activo `runtimeActive=true`: `dietContractNoticeText()` agrega aviso suave no bloqueante en revision y al aplicar. Validador: `validate-diet-contract-runtime-notice.mjs`.
 - REQ-166: `globalClosePass()` puntua con `scoreDayAgainstContract()` (desvio en tolerancias de `DIET_CONTRACT`, al cuadrado), no con `scoreMacros()`, que sigue eligiendo el plato por comida. Canario 289/378 (76.5%). El objetivo debe ser continuo: uno escalonado deja al hill-climbing sin gradiente.
+- Variedad: semilla usuario+fecha (`varietySeed`) y `cuisineRepeatPenalty()`; test `validate-meal-variety.mjs`.
 - REQ-169/170/171: descartes de sesion (`prefsWithSessionRejections()`) bloquean en prompt y cierre; `slotMomentTextConflict()` filtra desayunos contundentes; `collectGlobalLines()` escala propuestas del coach.
 - REQ-172: "Estimar con foto": `meal_estimate` con bloque `image` y hasta 2 `preguntas`; la foto no se guarda.
 - REQ-180: marca Evolv (lima `--accent`, `--on-accent`, Unbounded/Manrope, `brandMark()`); ids `fitbros_*` intactos.
