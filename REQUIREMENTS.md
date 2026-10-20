@@ -1714,3 +1714,35 @@ Que después del onboarding la meta nutricional guardada siempre cumpla `kcal = 
 - Reproducir los pasos de arriba y confirmar que "Tu referencia diaria" ya no muestra `1200 kcal` con macros que suman 1740.
 - Prueba unitaria/vm sobre el helper de reconciliación: entradas `{kcal:1200,p:120,c:207,f:48}` → salida con `kcal = Σ macros`.
 - Evidencia funcional de esta auditoría: captura `scratchpad/req227-onboarding-kcal-mismatch.jpg` ("Tu referencia diaria: 1200 kcal · P 120 g · C 207 g · G 48 g").
+
+## REQ-228 - Fix: "Estimar con foto" falla con un mensaje genérico y sin forma de reintentar
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura: tras elegir una foto de la galería (REQ-207), el análisis responde "Tu coach no pudo completar esta acción. Intenta de nuevo." y no hay forma de saber por qué ni de reintentar sin volver a elegir la foto.
+
+### Problema
+
+`photoEstimateRound()` mostraba `coachErrorMessage(e)`, que para usuarios no admin reduce cualquier fallo (proveedor saturado, tiempo agotado, foto ilegible, error del servidor) al mismo texto genérico, y el `status` HTTP se perdía en `coachProxyFetch()`. El handler del servidor se verificó en local con Supabase y el proveedor simulados (200 con la foto de la captura), así que la causa está en producción y no se podía diagnosticar desde la UI.
+
+### Alcance
+
+1. `coachProxyFetch()` conserva `err.status`.
+2. `photoEstimateErrorMessage()`: mensajes concretos sin mencionar tecnología (tardó demasiado, no pudimos leer la foto, mucha demanda, no pudimos estimarla, sin conexión); un motivo no reconocido muestra "(código N)".
+3. Botón "Reintentar" con la misma foto; reintentar no consume una ronda de preguntas.
+4. `CACHE_NAME` → `fitbud-pwa-v110`.
+
+### Fuera de alcance
+
+- Corregir la causa de producción: queda pendiente de leer el código/mensaje que ahora se muestra o los logs de `/api/claude` en Vercel.
+
+### Riesgos
+
+- Ninguno sobre datos: solo cambia el texto del error y añade el reintento.
+
+### Criterios de aceptación
+
+- Un 503 muestra "mucha demanda" con "Reintentar"; un 500 desconocido muestra "(código 500)"; reintentar con la misma foto estima y usa la misma ronda (`photo-1`). ✓ (`tests/e2e/foto-comida.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓

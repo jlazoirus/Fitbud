@@ -60,3 +60,39 @@ test("foto → estimación con pregunta → respuesta → estimación final", as
   await expect(page.locator("#app")).toContainText("Lomo con papas al horno");
   expect(errors).toEqual([]);
 });
+
+// REQ-228: si el análisis falla, el mensaje dice qué pasó y se puede reintentar con la misma foto.
+test("foto → fallo con motivo claro → reintentar con la misma foto", async ({ page, context }) => {
+  await installMocks(context);
+  const responses = [
+    { status: 503, body: { error: "Overloaded" } },
+    { status: 500, body: { error: "fallo raro" } },
+    { status: 200, body: { text: JSON.stringify({ nombre: "Espagueti con salsa", kcal: 650, proteina_g: 20, carbohidratos_g: 85, grasa_g: 24, nota: "Porción mediana.", preguntas: [] }) } },
+  ];
+  const coachCalls = [];
+  await context.route("**/api/claude", (route) => {
+    coachCalls.push(JSON.parse(route.request().postData() || "{}"));
+    const r = responses[Math.min(coachCalls.length - 1, responses.length - 1)];
+    return route.fulfill({ status: r.status, contentType: "application/json", body: JSON.stringify(r.body) });
+  });
+  await seedLoggedInUser(page);
+  await autoDismissNudges(page);
+  await gotoApp(page);
+
+  await page.locator("#tabs").getByText("Nutrición").click();
+  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  const overlay = page.locator("#overlay");
+  await overlay.locator("#f_photo").setInputFiles({ name: "plato.png", mimeType: "image/png", buffer: PNG });
+
+  await expect(overlay.locator("#aiOut")).toContainText("Ahora mismo hay mucha demanda");
+  await overlay.getByRole("button", { name: "Reintentar" }).click();
+  // Un motivo no reconocido muestra su código para poder diagnosticarlo.
+  await expect(overlay.locator("#aiOut")).toContainText("(código 500)");
+  await overlay.getByRole("button", { name: "Reintentar" }).click();
+  await expect(overlay.locator("#f_kcal")).toHaveValue("650");
+  await expect(overlay.locator("#aiOut")).toContainText("Porción mediana.");
+
+  // Los reintentos usan la misma foto y no gastan rondas de preguntas.
+  expect(coachCalls.every((c) => c.image.data === coachCalls[0].image.data)).toBe(true);
+  expect(coachCalls.map((c) => c.quota.partKey)).toEqual(["photo-1", "photo-1", "photo-1"]);
+});
