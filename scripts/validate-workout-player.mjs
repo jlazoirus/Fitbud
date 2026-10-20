@@ -115,3 +115,25 @@ console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporiza
   assert.ok(run.steps[0].movements.length>=3&&run.steps.at(-1).movements.length>=3,"El cardio también lista movimientos");
   console.log("REQ-212: calentamiento y vuelta a la calma con movimientos por zona.");
 }
+
+// REQ-232: la última vez que se hizo el ejercicio, para elegir la carga de hoy.
+{
+  const set=(reps,load,rpe,done=true)=>({done,reps,load,rpe,completedAt:null});
+  const days={
+    "2026-10-06":{workoutExecution:{steps:[{type:"strength",exerciseSlug:"back-squat",unit:"reps",sets:[set(8,"35",7),set(8,"35",7)]}]}},
+    "2026-10-13":{workoutExecution:{steps:[
+      {type:"timed",label:"Calentamiento"},
+      {type:"strength",exerciseSlug:"back-squat",unit:"reps",variation:"progression",sets:[set(8,"40",8),set(7," 42.5 ",9),set(null,"",null,false)]},
+    ]}},
+    "2026-10-16":{workoutExecution:{steps:[{type:"strength",exerciseSlug:"back-squat",sets:[set(null,"",null,false)]}]}},
+    "2026-10-20":{workoutExecution:{steps:[{type:"strength",exerciseSlug:"back-squat",sets:[set(10,"50",8)]}]}},
+  };
+  const last=player.lastPerformance(days,"back-squat","2026-10-20");
+  assert.equal(last.date,"2026-10-13","Toma la sesión anterior más reciente con series hechas, no la de hoy ni una sin series");
+  assert.equal(last.variation,"progression");
+  assert.deepEqual(last.sets,[{reps:8,load:"40",rpe:8},{reps:7,load:"42.5",rpe:9}],"Solo las series hechas, con la carga tal como se anotó");
+  assert.equal(player.lastPerformance(days,"bench-press","2026-10-20"),null,"Sin historial del ejercicio no hay dato");
+  assert.equal(player.lastPerformance(days,"back-squat","2026-10-06"),null,"Nada anterior a la primera sesión");
+  assert.equal(player.lastPerformance(null,"back-squat","2026-10-20"),null);
+  console.log("REQ-232: última carga registrada por ejercicio.");
+}

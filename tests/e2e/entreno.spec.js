@@ -388,6 +388,55 @@ test.describe("Entreno", () => {
   });
 });
 
+// REQ-232 (feedback de Claudia): al hacer un ejercicio se ve con qué carga se
+// hizo la última vez, sin tener que recordarlo.
+test.describe("Última carga", () => {
+  test("el ejercicio muestra lo registrado la semana pasada y el resumen previo la carga", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await expect(app).toContainText(/Qué vas a hacer hoy/);
+
+    // La semana pasada hizo el primer ejercicio de hoy con 40 y 42,5 kg.
+    const slug = await page.evaluate(() => {
+      const step = workoutPrescription(current).steps.find((item) => item.type === "strength");
+      const past = addDays(current, -7);
+      S.days[past] = { ...(S.days[past] || {}), workoutExecution: { status: "completed", steps: [{
+        type: "strength", exerciseSlug: step.exerciseSlug, unit: step.unit,
+        sets: [{ done: true, reps: 8, load: "40", rpe: 8 }, { done: true, reps: 7, load: "42.5", rpe: 9 }],
+      }] } };
+      render();
+      return step.exerciseSlug;
+    });
+    expect(slug).toBeTruthy();
+    await expect(app.locator(".plan-last").first()).toHaveText("Última vez 42.5 kg");
+
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
+    const last = app.locator(".last-perf");
+    await expect(last).toContainText(/Última vez · \w{3} \d+ \w{3}/);
+    await expect(last.locator("b")).toHaveText("40 kg × 8, 42.5 kg × 7");
+    await expect(last).toContainText("RPE 8-9");
+
+    // Hoy registra 45 kg; el siguiente ejercicio (sin historial) invita a anotar la carga.
+    await app.locator('input[aria-label^="Carga o asistencia, serie 1"]').fill("45");
+    await app.locator('input[aria-label^="Carga o asistencia, serie 1"]').blur();
+    expect(await page.evaluate(() => normalizedWorkoutExecution(current).steps.find((s) => s.type === "strength").sets[0].load)).toBe("45");
+    const first = (await app.locator(".player-step > h3").innerText()).trim();
+    const pending = app.locator("button.set-done:not(.on)");
+    while (await pending.count()) await pending.first().click();
+    await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
+    await expect(app.locator(".player-step > h3")).not.toHaveText(first);
+    await expect(app.locator(".player-step")).not.toContainText("Última vez");
+    await expect(app.locator(".last-perf-hint")).toBeVisible();
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 // REQ-212: el calentamiento dice qué movimientos hacer y el cronómetro es opcional.
 test.describe("Calentamiento guiado", () => {
   test("lista movimientos concretos, 'Ya calenté' avanza sin cronómetro y 'Guíame' los recorre", async ({ page, context }) => {

@@ -1839,3 +1839,38 @@ REQ-215 puso la lista de compra como botón de ancho completo justo debajo de "+
 
 - El botón vive en `.nut-tools`, muestra lo que queda por comprar y baja en 1 al marcar un ingrediente. ✓ (`tests/e2e/lista-compra.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-232 - Entreno: cada ejercicio muestra con qué carga lo hiciste la última vez
+
+**Estado: implementado.**
+
+### Origen
+
+Claudia (usuaria beta, 2026-10-19), con captura del reproductor: "para planes de x semanas, que te indique aquí debajo de la carga sugerida el histórico de cuántos kg de carga hiciste la última semana en ese ejercicio, para tener el peso identificado en la app. O que te dé ese dato cuando presionas Usar progresión".
+
+### Problema
+
+El reproductor guarda la carga de cada serie (`set.load`) en `day_log.state.workoutExecution`, pero nunca la vuelve a mostrar: bajo "Carga sugerida" solo aparece el texto genérico "Carga controlable que deje N repeticiones en reserva". Para progresar semana a semana hay que recordar de memoria (o en otra app) con cuánto se hizo el ejercicio.
+
+### Alcance
+
+1. `FITBUD_WORKOUT_PLAYER.lastPerformance(days, exerciseSlug, beforeDs)` (puro): la sesión anterior más reciente con series hechas de ese ejercicio — fecha, variación y series (reps, carga tal como se anotó, RPE).
+2. En el reproductor, bajo "Carga sugerida": "Última vez · mar 13 oct" con las series ("3 × 8 · 40 kg" si todas iguales, "40 kg × 8, 42.5 kg × 7" si no) y el rango de RPE; indica si aquella vez fue en progresión o versión más fácil, y "Sin carga anotada" si no se registró peso. Sin historial (y no es de peso corporal), una línea invita a anotar la carga para verla la próxima vez.
+3. En "Qué vas a hacer hoy" (antes de empezar), cada ejercicio con historial muestra "Última vez N kg" (la carga de la última serie).
+4. `CACHE_NAME` → `fitbud-pwa-v114`.
+
+### Fuera de alcance
+
+- Autocompletar la carga de hoy con la de la última vez (al marcar una serie sin carga, sigue quedando vacía).
+- Historial de ciclos anteriores: se busca en los días cargados (`pullAllDays()` baja el ciclo activo).
+- Proponer un incremento de carga concreto en kg.
+
+### Riesgos
+
+- Ninguno sobre datos: solo lectura de lo ya registrado, privado del usuario y fuera de analytics.
+
+### Criterios de aceptación
+
+- `lastPerformance` toma la sesión anterior más reciente con series hechas, ignora hoy y sesiones sin series. ✓ (`scripts/validate-workout-player.mjs`)
+- Con 40 kg × 8 y 42.5 kg × 7 hace una semana, el reproductor muestra "40 kg × 8, 42.5 kg × 7 · RPE 8-9" y el resumen previo "Última vez 42.5 kg"; un ejercicio sin historial muestra la invitación a anotar. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
+- `node scripts/release-gate.mjs` pasa. ✓
