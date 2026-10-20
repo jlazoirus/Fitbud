@@ -70,4 +70,37 @@ test.describe("Nutrición", () => {
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  // REQ-233 (Jonathan): tocar la tarjeta de una comida abre el mismo menú que "···";
+  // sus botones siguen haciendo lo suyo.
+  test("tocar la tarjeta de una comida abre su menú de opciones", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    const overlay = page.locator("#overlay");
+    await overlay.getByRole("button", { name: /Aplicar al día/i }).click({ timeout: 15_000 });
+    await page.locator("#tabs").getByText("Nutrición").click();
+    const app = page.locator("#app");
+    const card = app.locator(".meal.meal-tap").filter({ hasText: "Bowl proteico de la mañana" });
+
+    // Tocar el nombre abre el menú de esa comida.
+    await card.locator(".name").click();
+    await expect(overlay).toContainText("Editar valores / comida personalizada");
+    await expect(overlay.locator("h3")).toHaveText(await card.locator(".slot").innerText(), { ignoreCase: true });
+    await overlay.getByRole("button", { name: "Cerrar", exact: true }).last().click();
+    await expect(page.getByText("Editar valores / comida personalizada")).toHaveCount(0);
+
+    // Marcarla como hecha no abre el menú.
+    await card.locator("button.chk").click();
+    await expect(card).toHaveClass(/done/);
+    await expect(page.getByText("Editar valores / comida personalizada")).toHaveCount(0);
+
+    // "···" sigue abriéndolo y tiene nombre accesible.
+    await card.getByRole("button", { name: /^Más opciones de / }).click();
+    await expect(overlay).toContainText("Editar valores / comida personalizada");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });

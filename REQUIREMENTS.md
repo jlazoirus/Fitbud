@@ -1874,3 +1874,34 @@ El reproductor guarda la carga de cada serie (`set.load`) en `day_log.state.work
 - `lastPerformance` toma la sesión anterior más reciente con series hechas, ignora hoy y sesiones sin series. ✓ (`scripts/validate-workout-player.mjs`)
 - Con 40 kg × 8 y 42.5 kg × 7 hace una semana, el reproductor muestra "40 kg × 8, 42.5 kg × 7 · RPE 8-9" y el resumen previo "Última vez 42.5 kg"; un ejercicio sin historial muestra la invitación a anotar. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-233 - Nutrición: tocar la tarjeta de una comida abre su menú de opciones
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
+
+### Problema
+
+La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
+
+### Alcance
+
+1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
+2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
+3. `CACHE_NAME` → `fitbud-pwa-v115`.
+
+### Fuera de alcance
+
+- Tarjetas de extras y comidas saltadas (no tienen menú "···").
+
+### Riesgos
+
+- Ninguno sobre datos: solo abre un menú existente.
+
+### Criterios de aceptación
+
+- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
