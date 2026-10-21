@@ -573,6 +573,63 @@ test.describe("Sesión en curso", () => {
   });
 });
 
+// REQ-241 (Jonathan): "Usar progresión" no cambiaba el ejercicio. Ahora pasa a
+// otro ejercicio del catálogo (título e imagen), a una variante con nombre
+// propio, o explica que solo toca subir la carga.
+test.describe("Progresiones", () => {
+  test("otro ejercicio, variante y solo carga", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+    const setCurrent = (slug) => page.evaluate((s) => {
+      const ex = normalizedWorkoutExecution(current);
+      const step = currentWorkoutStep(ex);
+      Object.assign(step, { exerciseSlug: s, originalExerciseSlug: s, variation: "standard" });
+      persistWorkoutExecution(current, ex, true);
+    }, slug);
+    const title = app.locator(".player-title h3");
+    const currentSlug = () => page.evaluate(() => currentWorkoutStep(normalizedWorkoutExecution(current)).exerciseSlug);
+
+    // Otro ejercicio: Remo sentado → versión más fácil = Remo con banda (cambia título e imagen).
+    await setCurrent("seated-cable-row");
+    await expect(title).toHaveText("Remo sentado en polea");
+    await app.getByRole("button", { name: "Usar versión más fácil" }).click();
+    await expect(title).toHaveText("Remo con banda");
+    expect(await currentSlug()).toBe("band-row");
+    await expect(app.locator(".player-step .alert")).toContainText("en lugar de Remo sentado en polea");
+    await expect(app.getByRole("button", { name: "Usar progresión" })).toHaveCount(0);
+    await app.getByRole("button", { name: "Volver a Remo sentado en polea" }).click();
+    await expect(title).toHaveText("Remo sentado en polea");
+    expect(await currentSlug()).toBe("seated-cable-row");
+
+    // Variante: Press de banca → "con pausa en el pecho" (mismo ejercicio, título nuevo).
+    await setCurrent("bench-press");
+    await app.getByRole("button", { name: "Usar progresión" }).click();
+    await expect(title).toHaveText("Press de banca con pausa en el pecho");
+    expect(await currentSlug()).toBe("bench-press");
+    await app.getByRole("button", { name: "Volver a Press de banca" }).click();
+    await expect(title).toHaveText("Press de banca");
+
+    // Solo carga: Sentadilla búlgara → "Subir la carga" explica y no cambia nada.
+    await setCurrent("bulgarian-split-squat");
+    await expect(app.getByRole("button", { name: "Usar progresión" })).toHaveCount(0);
+    await app.getByRole("button", { name: "Subir la carga" }).click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay.locator("h3")).toHaveText("Cómo progresar");
+    await expect(overlay).toContainText("Sentadilla búlgara con más carga");
+    await overlay.getByRole("button", { name: "Entendido" }).click();
+    await expect(title).toHaveText("Sentadilla búlgara");
+    expect(await currentSlug()).toBe("bulgarian-split-squat");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 // REQ-240 (Jonathan): la demostración al final de las series quedaba escondida;
 // se abre desde un botón junto al nombre del ejercicio.
 test.describe("Cómo se hace", () => {
