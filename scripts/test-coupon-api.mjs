@@ -99,6 +99,7 @@ global.fetch = async (url, options = {}) => {
       duration_days: 7,
     }]);
   }
+  if (value.includes("/rest/v1/beta_recruitment_submissions?status=eq.beta_invited")) return response(200, []);
   throw new Error("Ruta no simulada: " + value);
 };
 
@@ -137,5 +138,6 @@ await handler({
 assert(res.statusCode === 200, "Usuario autenticado debe canjear un código válido.");
 assert(res.body.entitlement.origin === "coupon", "El entitlement debe tener origen coupon.");
 assert(res.body.entitlement.duration_days === 7, "Debe devolver la duración real del código.");
+assert(!requests.some(item => item.url.includes("coach_quota_overrides")), "Un cupón que no es de la beta no cambia las cuotas (REQ-248).");
 
 console.log("API coupon (vía entitlement): generación admin, bloqueo no-admin y canje seguro verificados con mocks.");

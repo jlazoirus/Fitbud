@@ -5494,7 +5494,7 @@ function openPendingSetsPrompt(ds,step,pending){
 function skipWorkoutStep(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step)return;
-  // REQ-248: omitir un calentamiento o vuelta a la calma es como "Ahora no".
+  // REQ-249: omitir un calentamiento o vuelta a la calma es como "Ahora no".
   step.status=step.optional?"declined":"skipped";step.completedAt=new Date().toISOString();execution.timer=null;
   const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
   if(next>=0)execution.currentStep=next;
@@ -5665,7 +5665,7 @@ function reviewPendingWorkoutSets(ds){
   pending.forEach(item=>{execution.steps[item.stepIndex].status="pending";});
   resumePartialWorkout(ds,execution);
 }
-// REQ-248: una sesión guardada parcial a la que no le falta nada (solo se
+// REQ-249: una sesión guardada parcial a la que no le falta nada (solo se
 // saltó el calentamiento o la vuelta a la calma, que son opcionales) se marca
 // completada sin reabrirla.
 function markWorkoutCompleted(ds){
@@ -12677,7 +12677,7 @@ async function createAdminUser(){
   }
 }
 /* ---- Postulantes de la beta (REQ-218) ----
-   Aceptar crea un acceso de 90 días (plan completo y cuotas diarias del coach)
+   Aceptar crea un acceso de 90 días (plan completo y coach sin tope de uso, REQ-248)
    y deja el mensaje de WhatsApp con el enlace que crea la cuenta y lo activa. */
 let adminBetaFilter="pending";
 let adminBetaPending=0;
@@ -12720,7 +12720,7 @@ async function renderAdminBeta(){
       <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
       <button class="btn btn-sm" onclick="loadAdminBeta()">Actualizar</button>
     </div>
-    <div class="ai-box" style="margin-bottom:14px">Al aceptar a alguien le llega un correo de invitación para crear su contraseña, y su cuenta nace con 90 días de plan completo y las cuotas diarias del coach. Si el correo no sale, te dejamos un enlace para copiar.</div>
+    <div class="ai-box" style="margin-bottom:14px">Al aceptar a alguien le llega un correo de invitación para crear su contraseña, y su cuenta nace con 90 días de plan completo y el coach sin tope de uso. Si el correo no sale, te dejamos un enlace para copiar.</div>
     <div class="chips" role="group" aria-label="Filtrar postulantes" id="betaFilters" style="margin-bottom:14px"></div>
     <div id="betaList" class="muted small">Cargando postulantes…</div>`;
   await loadAdminBeta();

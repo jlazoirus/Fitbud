@@ -406,7 +406,7 @@
     // "declined", que no cuenta como bloque omitido ni impide completar.
     step.optional=prescribed.type==="timed"&&(prescribed.phase==="warmup"||prescribed.phase==="cooldown");
     step.optIn=step.optional&&step.optIn===true;
-    // REQ-248: un opcional omitido después de elegirlo tampoco es un bloque
+    // REQ-249: un opcional omitido después de elegirlo tampoco es un bloque
     // que falte: queda "declined" y no deja la sesión como parcial.
     if(step.optional&&step.status==="skipped")step.status="declined";
     step.status=step.status==="done"||step.status==="skipped"||(step.optional&&step.status==="declined")?step.status:"pending";

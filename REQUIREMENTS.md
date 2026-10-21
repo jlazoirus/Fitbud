@@ -1602,34 +1602,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-237`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar macros" de "Sopa ramen vegetariana" muestra "Tu coach no pudo completar esta acción. Intenta de nuevo." y bajo los botones se ve una caja vacía con el texto "Foto de la comida".
-
-### Problema
-
-1. `.meal-photo-preview{display:block}` anula el atributo `hidden` del `<img>` de la vista previa: sin foto se ve una imagen rota con su texto alternativo.
-2. `aiEstimate()` (texto) reduce cualquier fallo al mensaje genérico y no ofrece reintentar; REQ-228 solo lo resolvió para la foto. El handler de `/api/claude`, ejecutado en local con Supabase y el proveedor simulados, responde 200 para el texto: la causa está en producción y no se ve desde la UI.
-
-### Alcance
-
-1. `.meal-photo-preview[hidden]{display:none}`.
-2. `estimateErrorMessage(e, photo)` (antes `photoEstimateErrorMessage`) sirve a foto y texto: demora, mucha demanda, no se pudo estimar (con consejo para el texto), sin conexión, y "(código N)" si el motivo no se reconoce.
-3. "Estimar macros" muestra ese mensaje y "Reintentar" (no con el aviso de plan).
-4. `CACHE_NAME` → `fitbud-pwa-v120`.
-
-### Fuera de alcance
-
-- La causa de producción: leer el código que ahora se muestra (o el mensaje completo, con una cuenta admin) o los logs de `/api/claude` en Vercel.
-
-### Riesgos
-
-- Ninguno sobre datos: solo presentación y reintento.
-
-### Criterios de aceptación
-
-- Sin foto, la vista previa no se ve; un 500 muestra "(código 500)", un 422 pide describir mejor y "Reintentar" estima. ✓ (`tests/e2e/foto-comida.spec.js`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
 
 ## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
 
@@ -1926,7 +1899,37 @@ El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (
 - Ningún sustituto ni versión más fácil/progresión del catálogo cambia de músculo principal. ✓ (`scripts/validate-exercises.mjs`)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-248 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
+## REQ-248 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
+
+**Estado: implementado.**
+
+### Origen
+
+Pedido del dueño (2026-10-21): los postulantes aprobados deben tener consumo ilimitado y acceso completo por 90 días.
+
+### Problema y causa raíz
+
+`grantBetaAccess()` (`api/admin.js`) daba el `user_entitlements` de 90 días pero no tocaba `coach_quota_overrides`: la beta quedaba con las cuotas `default` (p. ej. 1 dieta semanal y 20 conversaciones al día). El canje del código (`api/entitlement.js`) tampoco.
+
+### Alcance
+
+1. `grantBetaAccess()` crea un override por acción del coach con `daily_limit = QUOTA_OVERRIDE_MAX` (10.000) que vence con el acceso. Cubre aceptar por correo, cuenta existente y crear/invitar cuenta beta.
+2. `invite-signup` y `redeem`: si el código está en el `review_notes` de una postulación `beta_invited`, crea los mismos overrides; un cupón cualquiera no.
+3. Si fallan, el acceso queda y el admin ve `betaError`; el canje nunca se bloquea. Sin migración SQL.
+4. Textos del admin y `BETA_PROGRAM.md` actualizados; `CACHE_NAME` → `fitbud-pwa-v130`.
+5. Datos: el único aceptado en producción ya tiene los overrides hasta 2027-01-19.
+
+### Riesgos
+
+Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostrando el uso por persona.
+
+### Criterios de aceptación
+
+- Aceptar o crear cuenta beta: 8 overrides de 10.000/día que vencen con el acceso. ✓ (`scripts/test-admin-beta-api.mjs`, `scripts/test-admin-beta-signup.mjs`)
+- Canjear el código de una postulación aceptada crea los overrides; un cupón normal no. ✓ (`scripts/test-invite-signup-api.mjs`, `scripts/test-coupon-api.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-249 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
 
 **Estado: implementado.**
 
@@ -1943,7 +1946,7 @@ REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahor
 1. Omitir un bloque opcional lo deja `declined`, igual que "Ahora no".
 2. `normalizeStep()` (`workout-player.js`) convierte en `declined` un opcional `skipped`, así las sesiones en curso o guardadas antes del arreglo dejan de contarlo como omitido.
 3. Una sesión guardada parcial a la que no le falta nada (sin bloques omitidos, sin series sin marcar, sin dolor) muestra "Marcar como completada", que la cierra completada sin reabrirla.
-4. `CACHE_NAME` → `fitbud-pwa-v130`.
+4. `CACHE_NAME` → `fitbud-pwa-v131`.
 
 ### Fuera de alcance
 
