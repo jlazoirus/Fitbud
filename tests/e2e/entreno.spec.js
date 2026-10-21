@@ -527,6 +527,52 @@ test.describe("Bloques opcionales", () => {
   });
 });
 
+// REQ-238 (Jonathan): con la sesión en curso, el aviso, el plan y la tarjeta del
+// entrenamiento solo ocupan espacio: van juntos en un desplegable cerrado.
+test.describe("Sesión en curso", () => {
+  test("el reproductor va primero y el resto queda en 'Plan y detalles de hoy'", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    // Antes de empezar se ve todo, como siempre.
+    await expect(app.getByText("Señales para detenerte:")).toBeVisible();
+    await expect(app.getByRole("button", { name: "Preparar mi plan" })).toBeVisible();
+
+    await startGuidedSession(page);
+    const details = app.locator("details.wk-context");
+    await expect(details).toHaveCount(1);
+    await expect(details).not.toHaveAttribute("open", /.*/);
+    await expect(app.getByText("Señales para detenerte:")).toBeHidden();
+    await expect(app.getByRole("button", { name: "Preparar mi plan" })).toBeHidden();
+    await expect(app.getByRole("button", { name: "Cambiar entrenamiento" })).toBeHidden();
+    // El reproductor queda justo después de la cabecera del día, antes del desplegable.
+    const order = await page.evaluate(() => {
+      const overview = document.querySelector("#app .player-overview");
+      const ctx = document.querySelector("#app details.wk-context");
+      return !!(overview && ctx && (overview.compareDocumentPosition(ctx) & Node.DOCUMENT_POSITION_FOLLOWING));
+    });
+    expect(order).toBe(true);
+
+    // Abrirlo muestra lo de siempre y sigue abierto tras una acción del reproductor.
+    await details.locator("summary").click();
+    await expect(app.getByText("Señales para detenerte:")).toBeVisible();
+    await expect(app.getByRole("button", { name: "Preparar mi plan" })).toBeVisible();
+    await page.getByRole("button", { name: "Ahora no" }).click();
+    await expect(app.locator("details.wk-context")).toHaveAttribute("open", "");
+
+    // Al descartar la sesión todo vuelve a su lugar.
+    page.once("dialog", (d) => d.accept());
+    await page.getByRole("button", { name: "Descartar" }).click();
+    await expect(app.locator("details.wk-context")).toHaveCount(0);
+    await expect(app.getByText("Señales para detenerte:")).toBeVisible();
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 // REQ-236 (Jonathan): la tarjeta "3-1-1 tempo" no se entendía.
 test.describe("Tempo", () => {
   test("la tarjeta dice qué es cada número y al tocarla lo explica", async ({ page, context }) => {

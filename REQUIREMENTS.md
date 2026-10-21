@@ -1798,3 +1798,34 @@ Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar
 
 - Sin foto, la vista previa no se ve; un 500 muestra "(código 500)", un 422 pide describir mejor y "Reintentar" estima. ✓ (`tests/e2e/foto-comida.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-238 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de Entreno con la sesión en curso: el aviso "Señales para detenerte", la tarjeta del plan ("Correr + Gimnasio · Preparar mi plan · Configurar") y la del entrenamiento ("Push B · cambiado · Cambiar entrenamiento") "no tienen sentido una vez iniciado: solo ocupan espacio y confunden; deberían estar colapsados o juntos en un botón".
+
+### Problema
+
+`renderWorkout()` pintaba siempre esas tres piezas antes del reproductor, aunque con la sesión en curso sus acciones están deshabilitadas o no aplican, y el reproductor quedaba abajo.
+
+### Alcance
+
+1. Con la ejecución `in_progress` o `paused`, el reproductor va justo después de la cabecera del día y el aviso, el plan y la tarjeta del entrenamiento quedan en `<details class="wk-context">` "Plan y detalles de hoy" (con el nombre de la sesión), cerrado por defecto; si se abre, sigue abierto entre acciones del reproductor.
+2. La pausa por seguridad (`trainingSafetyHold()`) sigue siempre a la vista. Antes de empezar y con la sesión cerrada (completada o parcial) no cambia nada.
+3. `CACHE_NAME` → `fitbud-pwa-v120`.
+
+### Fuera de alcance
+
+- "Actividad registrada" y "Resumen", que siguen debajo.
+
+### Riesgos
+
+- Ninguno sobre datos: solo cambia el orden y la visibilidad.
+
+### Criterios de aceptación
+
+- Con la sesión en curso, el desplegable existe cerrado después del reproductor, oculta el aviso, "Preparar mi plan" y "Cambiar entrenamiento", sigue abierto tras "Ahora no" y desaparece al descartar. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓

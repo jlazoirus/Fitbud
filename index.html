@@ -357,6 +357,13 @@
   .last-perf b{color:var(--txt);font-size:15px}
   .last-perf-hint{margin-top:6px}
   .plan-timed{background:transparent}
+  .wk-context{margin:0 0 14px}
+  .wk-context>summary{display:flex;align-items:center;gap:8px;min-height:48px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1);color:var(--txt);font-weight:700;font-size:14px;cursor:pointer;list-style:none}
+  .wk-context>summary::-webkit-details-marker{display:none}
+  .wk-context>summary::after{content:'+';margin-left:auto;font-size:20px;font-weight:600;line-height:1;color:var(--muted)}
+  .wk-context[open]>summary::after{content:'−'}
+  .wk-context-sub{color:var(--muted);font-weight:500;font-size:13px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wk-context-body{margin-top:10px}
   .tempo-list{margin:6px 0 10px;padding-left:18px;display:grid;gap:6px;font-size:14px;line-height:1.4}
   .plan-opt{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:1px}
   .link-btn{background:none;border:none;padding:0;color:var(--purple-200);text-decoration:underline;font:inherit;cursor:pointer}
@@ -5794,6 +5801,7 @@ function workoutPlanSummaryHtml(prescription,ds){
     ${n>1?`<div class="muted small plan-between-rest">Entre ejercicios: ${formatRestShort(betweenExerciseRestSeconds())} de descanso</div>`:""}
     <button class="link-btn small" onclick="explainWorkoutEffort()">¿Qué es RPE?</button></div>`;
 }
+let wkContextOpen=false;
 function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
   const training=trainingPrefs();
@@ -5815,11 +5823,7 @@ function renderWorkout(){
       <div class="agenda-sub">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción abajo antes de iniciarla.</div>
     </div></div>
   </section>`:"";
-  $("#app").innerHTML=`
-  ${dayHeaderNav(ds)}
-  ${safetyNotice}
-  ${emptyWkHtml}
-  <div class="dash" style="padding:12px 14px">
+  const planCardHtml=`<div class="dash" style="padding:12px 14px">
     <div class="row between">
       <div>
         <div class="muted small">Plan combinado · ${training.days} días/semana · ${PLAN_DURATION_WEEKS} semanas${location?` · ${TRAINING_LOCATION_LABELS[location]}`:""}</div>
@@ -5831,8 +5835,8 @@ function renderWorkout(){
         <button class="btn btn-sm" onclick="setView('perfil')">Configurar</button>
       </div>
     </div>
-  </div>
-  ${section("wk.entreno","Entrenamiento",`<div class="workout">
+  </div>`;
+  const workoutCardHtml=section("wk.entreno","Entrenamiento",`<div class="workout">
     <div class="meal-head">
       <div>
         <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}</div>
@@ -5850,7 +5854,31 @@ function renderWorkout(){
       ${ew.overridden&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
       ${!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar hoy:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','casa')">En casa</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','equipo')">Sin equipo</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
-  </div>`)}
+  </div>`);
+  // REQ-238: con la sesión en curso, el reproductor va primero y el aviso, el
+  // plan y la tarjeta del entrenamiento quedan juntos en un desplegable cerrado.
+  // La pausa por seguridad sigue siempre a la vista.
+  const sessionActive=!!execution&&(execution.status==="in_progress"||execution.status==="paused");
+  if(sessionActive){
+    $("#app").innerHTML=`
+  ${dayHeaderNav(ds)}
+  ${trainingSafetyHold()?safetyNotice:""}
+  ${renderWorkoutExecution(ds,execution)}
+  <details class="wk-context" ${wkContextOpen?"open":""} ontoggle="wkContextOpen=this.open">
+    <summary>Plan y detalles de hoy<span class="wk-context-sub">${esc(ew.workout.name)}</span></summary>
+    <div class="wk-context-body">${trainingSafetyHold()?"":safetyNotice}${planCardHtml}${workoutCardHtml}</div>
+  </details>
+  ${manualActivityBlock(ds,restDay)}
+  ${daySummary(ds)}
+  `;
+    return;
+  }
+  $("#app").innerHTML=`
+  ${dayHeaderNav(ds)}
+  ${safetyNotice}
+  ${emptyWkHtml}
+  ${planCardHtml}
+  ${workoutCardHtml}
   ${manualActivityBlock(ds,restDay)}
   ${execution?renderWorkoutExecution(ds,execution):""}
   ${!execution&&exerciseArray(ew.workout.exerciseIds).length?section("wk.ejercicios","Vista previa de ejercicios",workoutExercisesHtml(ew.workout),`${exerciseArray(ew.workout.exerciseIds).length}`):""}
