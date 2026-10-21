@@ -388,7 +388,7 @@ test.describe("Entreno", () => {
   });
 });
 
-// REQ-234 (Jonathan): la sesión no arranca en seco; 3, 2, 1 antes de que corra el reloj.
+// REQ-235 (Jonathan): la sesión no arranca en seco; 3, 2, 1 antes de que corra el reloj.
 test.describe("Cuenta atrás", () => {
   test("al iniciar hay 3 s de aviso, se puede cancelar o saltar", async ({ page, context }) => {
     await installMocks(context);

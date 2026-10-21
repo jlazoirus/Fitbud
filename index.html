@@ -195,7 +195,7 @@
   .csec.collapsed .csec-body{display:none}
   .meal{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:10px;transition:.2s}
   .meal.done{border-color:var(--border-acc);background:var(--accent-dim)}
-  /* REQ-234: cuenta atrás antes de empezar la sesión */
+  /* REQ-235: cuenta atrás antes de empezar la sesión */
   .countdown{position:fixed;inset:0;z-index:150;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 16px calc(24px + var(--safe-bottom,0px));background:rgba(5,5,9,.9);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);text-align:center}
   .countdown-label{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
   .countdown-n{font-family:var(--font-display);font-size:136px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
@@ -3362,8 +3362,13 @@ function readOnboardingStep(){
     d.heightCm=+$("#ob_height").value;d.weightKg=+$("#ob_weight").value;
     d.bodyFatPct=$("#ob_bf").value?+$("#ob_bf").value:"";d.activityLevel=$("#ob_activity").value;
   }else if(onboardingStep===2){
+    const prevMacros={calorieTarget:d.calorieTarget,proteinTarget:d.proteinTarget,carbTarget:d.carbTarget,fatTarget:d.fatTarget};
     d.goal=$("#ob_goal").value;d.calorieTarget=+$("#ob_kcal").value;d.proteinTarget=+$("#ob_protein").value;
     d.carbTarget=+$("#ob_carbs").value;d.fatTarget=+$("#ob_fat").value;
+    const reconciled=reconcileOnboardingMacros(prevMacros,d);
+    d.calorieTarget=reconciled.calorieTarget;d.carbTarget=reconciled.carbTarget;d.fatTarget=reconciled.fatTarget;
+    if(reconciled.adjusted==="kcal")toast("Ajustamos tus calorías para que cuadren con tus macros");
+    else if(reconciled.adjusted==="macros")toast("Ajustamos tus carbohidratos y grasas a tu nuevo presupuesto");
   }else if(onboardingStep===3){
     d.primarySport=$("#ob_sport")?$("#ob_sport").value:"walking";
     d.strengthPlace=normalizeStrengthPlace($("#ob_strength")&&$("#ob_strength").value);
@@ -3422,6 +3427,34 @@ function applyCalculatedMacros(){
   onboardingDraft.calorieTarget=result.kcal;onboardingDraft.proteinTarget=result.p;
   onboardingDraft.carbTarget=result.c;onboardingDraft.fatTarget=result.f;
   onboardingDraft.maintenanceCalories=result.maintenance;onboardingDraft.macroMethod=result.method;
+}
+// REQ-227: "Ajustar valores" del paso 2 expone kcal/P/C/G por separado; editar solo uno
+// y pulsar "Continuar" (no "Recalcular") dejaba kcal != suma de macros. Reconcilia
+// determinista: si el usuario tocó un macro, kcal se deriva de p·4+c·4+f·9 (mismo
+// invariante que calculateMacroTargets); si solo tocó kcal, la proteína queda fija y
+// carbohidratos/grasa escalan al nuevo presupuesto (mismo patrón que
+// applyWeeklyCheckinProposal), con los pisos de calculateMacroTargets (carb 50g/grasa 45g).
+function reconcileOnboardingMacros(prev,next){
+  const n={calorieTarget:next.calorieTarget,proteinTarget:next.proteinTarget,carbTarget:next.carbTarget,fatTarget:next.fatTarget};
+  if(![n.calorieTarget,n.proteinTarget,n.carbTarget,n.fatTarget].every(Number.isFinite))return{...n,adjusted:""};
+  const macrosChanged=n.proteinTarget!==prev.proteinTarget||n.carbTarget!==prev.carbTarget||n.fatTarget!==prev.fatTarget;
+  const kcalChanged=n.calorieTarget!==prev.calorieTarget;
+  if(macrosChanged){
+    const kcal=Math.round(n.proteinTarget*4+n.carbTarget*4+n.fatTarget*9);
+    return{...n,calorieTarget:kcal,adjusted:kcal!==n.calorieTarget||kcalChanged?"kcal":""};
+  }
+  if(kcalChanged){
+    const cFloor=50,fFloor=45;
+    const protKcal=Math.max(0,prev.proteinTarget)*4;
+    const oldRem=Math.max(0,prev.calorieTarget-protKcal);
+    const newRem=Math.max(0,n.calorieTarget-protKcal);
+    const ratio=oldRem>0?newRem/oldRem:1;
+    const carbTarget=Math.max(cFloor,Math.round(prev.carbTarget*ratio));
+    const fatTarget=Math.max(fFloor,Math.round(prev.fatTarget*ratio));
+    const kcal=Math.round(n.proteinTarget*4+carbTarget*4+fatTarget*9);
+    return{...n,calorieTarget:kcal,carbTarget,fatTarget,adjusted:(carbTarget!==prev.carbTarget||fatTarget!==prev.fatTarget||kcal!==n.calorieTarget)?"macros":""};
+  }
+  return{...n,adjusted:""};
 }
 function onboardingNext(){
   readOnboardingStep();
@@ -5142,7 +5175,7 @@ function beginWorkoutExecution(ds){
   st.workoutDone=false;
   commitDay(ds);render();toast("Sesión iniciada");
 }
-// REQ-234: la sesión no arranca en seco: 3, 2, 1 con pitido y vibración antes
+// REQ-235: la sesión no arranca en seco: 3, 2, 1 con pitido y vibración antes
 // de que empiece a correr el reloj. "Empezar ya" la salta; "Cancelar" no crea nada.
 let workoutCountdown=null;
 function countdownBeep(final){
