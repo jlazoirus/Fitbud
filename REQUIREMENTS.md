@@ -1744,3 +1744,38 @@ Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando ini
 
 - Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del calentamiento en el reproductor: "No debe asignarte el bloque de calentamiento ni enfriamiento por defecto; debería preguntarte si quieres hacer ese bloque y solo mostrarlo si lo eliges, diciéndote que es opcional".
+
+### Problema
+
+Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba como bloque omitido y dejaba la sesión parcial.
+
+### Alcance
+
+1. `workout-player.js`: bloques `warmup`/`cooldown` con `optional:true`, `optIn` si se eligen y estado `declined` ("Ahora no"), que `progress()` no cuenta en el total ni como omitido.
+2. Reproductor: un bloque opcional no elegido muestra solo la pregunta ("¿Quieres calentar antes de empezar?" / "¿Quieres cerrar con unos minutos suaves?"), duración y "Es opcional", con "Sí, calentar"/"Sí, hacerlo" y "Ahora no"; los movimientos aparecen solo si se elige.
+3. Una sesión con todo hecho salvo bloques rechazados se cierra **completada** (`workoutFullyCompleted`).
+4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-235) ya no anuncia el calentamiento.
+5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v118`.
+
+### Fuera de alcance
+
+- Recordar la elección entre sesiones o una preferencia en Perfil.
+- Volver a ofrecer un bloque después de "Ahora no".
+
+### Riesgos
+
+- Ninguno sobre datos: las sesiones guardadas no cambian.
+
+### Criterios de aceptación
+
+- `optional`/`declined`/`progress` cubiertos en `scripts/validate-workout-player.mjs`. ✓
+- "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
