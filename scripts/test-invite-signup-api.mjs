@@ -20,7 +20,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "service";
 const handler = await importHandler("api/entitlement.js");
 const NEW_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
-let codeRow, createStatus, redeemOk, calls;
+let codeRow, createStatus, redeemOk, calls, betaInvited, overrides;
 global.fetch = async (url, options = {}) => {
   const value = String(url);
   const method = options.method || "GET";
@@ -41,12 +41,20 @@ global.fetch = async (url, options = {}) => {
       : response(400, { message: "Este código ya fue utilizado." });
   }
   if (value.endsWith("/auth/v1/admin/users/" + NEW_ID) && method === "DELETE") return response(200, {});
+  if (value.includes("/rest/v1/beta_recruitment_submissions?status=eq.beta_invited&review_notes=ilike.")) {
+    assert(decodeURIComponent(value).includes("*FIT-AB12-CD34*"), "Busca la postulación aceptada por su código.");
+    return response(200, betaInvited ? [{ id: 7 }] : []);
+  }
+  if (value.includes("/rest/v1/coach_quota_overrides?on_conflict=user_id,action") && method === "POST") {
+    overrides = JSON.parse(options.body);
+    return response(201, null);
+  }
   throw new Error("fetch inesperado: " + method + " " + value);
 };
 
 async function signup(body, setup) {
   codeRow = { code: "FIT-AB12-CD34", redeemed_by: null, valid_until: null };
-  createStatus = 200; redeemOk = true; calls = [];
+  createStatus = 200; redeemOk = true; calls = []; betaInvited = false; overrides = null;
   if (setup) setup();
   const res = capture();
   await handler({ method: "POST", headers: {}, body: { action: "invite-signup", code: "fit ab12 cd34", email: " Ana@Correo.test ", password: "ClaveSegura2026", ...body } }, res);
@@ -55,7 +63,15 @@ async function signup(body, setup) {
 
 let res = await signup({});
 assert(res.statusCode === 201 && res.body.ok && res.body.entitlement.duration_days === 90, "Código válido: crea la cuenta y devuelve 90 días.");
-assert(calls.length === 3, "Valida, crea y canjea (3 llamadas): " + calls.join(", "));
+assert(calls.length === 4 && overrides === null, "Valida, crea, canjea y busca si es beta (4 llamadas); un código cualquiera no toca cuotas: " + calls.join(", "));
+
+// REQ-248: el código de una postulación aceptada deja al coach sin tope hasta que vence el acceso.
+res = await signup({}, () => { betaInvited = true; });
+assert(res.statusCode === 201, "Código beta: crea la cuenta.");
+assert(Array.isArray(overrides) && overrides.length === 8, "Código beta: un override por cada acción del coach.");
+assert(overrides.every((o) => o.user_id === NEW_ID && o.daily_limit === 10000 && o.enabled === true && o.bonus_units === 0 && o.expires_at === "2027-01-16T00:00:00Z"),
+  "Código beta: tope máximo que vence con el acceso de 90 días.");
+assert(new Set(overrides.map((o) => o.action)).size === 8 && overrides.some((o) => o.action === "coach_conversation"), "Cubre todas las acciones, incluida la conversación.");
 
 res = await signup({}, () => { codeRow = null; });
 assert(res.statusCode === 400 && res.body.error === "Código no válido." && calls.length === 1, "Código inexistente: no crea cuenta.");
