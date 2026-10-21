@@ -1619,67 +1619,15 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-236`).
 
 ## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
 
-**Estado: implementado.**
+**Estado: implementado.** La tarjeta del tempo es un botón: dice "baja · pausa · sube ⓘ" (o "ritmo ⓘ") y explica el ritmo de cada repetición.
 
-### Origen
-
-Jonathan (2026-10-20), con captura de la tarjeta "3-1-1 · tempo" del reproductor: "No se entiende qué es esto".
-
-### Problema
-
-La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar que son segundos por fase ni en qué orden. RPE y RIR ya tenían ⓘ con explicación; el tempo no.
-
-### Alcance
-
-1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
-2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
-3. `CACHE_NAME` → `fitbud-pwa-v119`.
-
-### Fuera de alcance
-
-- Cambiar los tempos que prescribe el plan.
-
-### Riesgos
-
-- Ninguno: solo presentación.
-
-### Criterios de aceptación
-
-- La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-237`).
 
 ## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
-**Estado: implementado.**
+**Estado: implementado.** "Estimar macros" (texto y foto) dice por qué falló, con "(código N)" si el motivo no se reconoce, y ofrece "Reintentar"; sin foto ya no se ve la vista previa rota.
 
-### Origen
-
-Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar macros" de "Sopa ramen vegetariana" muestra "Tu coach no pudo completar esta acción. Intenta de nuevo." y bajo los botones se ve una caja vacía con el texto "Foto de la comida".
-
-### Problema
-
-1. `.meal-photo-preview{display:block}` anula el atributo `hidden` del `<img>` de la vista previa: sin foto se ve una imagen rota con su texto alternativo.
-2. `aiEstimate()` (texto) reduce cualquier fallo al mensaje genérico y no ofrece reintentar; REQ-228 solo lo resolvió para la foto. El handler de `/api/claude`, ejecutado en local con Supabase y el proveedor simulados, responde 200 para el texto: la causa está en producción y no se ve desde la UI.
-
-### Alcance
-
-1. `.meal-photo-preview[hidden]{display:none}`.
-2. `estimateErrorMessage(e, photo)` (antes `photoEstimateErrorMessage`) sirve a foto y texto: demora, mucha demanda, no se pudo estimar (con consejo para el texto), sin conexión, y "(código N)" si el motivo no se reconoce.
-3. "Estimar macros" muestra ese mensaje y "Reintentar" (no con el aviso de plan).
-4. `CACHE_NAME` → `fitbud-pwa-v120`.
-
-### Fuera de alcance
-
-- La causa de producción: leer el código que ahora se muestra (o el mensaje completo, con una cuenta admin) o los logs de `/api/claude` en Vercel.
-
-### Riesgos
-
-- Ninguno sobre datos: solo presentación y reintento.
-
-### Criterios de aceptación
-
-- Sin foto, la vista previa no se ve; un 500 muestra "(código 500)", un 422 pide describir mejor y "Reintentar" estima. ✓ (`tests/e2e/foto-comida.spec.js`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
 
 ## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
 
@@ -2004,4 +1952,34 @@ Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostran
 
 - Aceptar o crear cuenta beta: 8 overrides de 10.000/día que vencen con el acceso. ✓ (`scripts/test-admin-beta-api.mjs`, `scripts/test-admin-beta-signup.mjs`)
 - Canjear el código de una postulación aceptada crea los overrides; un cupón normal no. ✓ (`scripts/test-invite-signup-api.mjs`, `scripts/test-coupon-api.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apretados". En "Próxima comida" y "Entrenamiento pendiente", "Ver detalle" y "Adaptar" llegan al borde derecho de su tarjeta.
+
+### Causa raíz
+
+`homeAgendaItemHtml()` (`index.html`) ponía el tipo de la fila como clase suelta (`agenda-item meal`, `agenda-item workout`). `.meal` y `.workout` son las tarjetas globales de comida y entreno (fondo, borde, radio), así que cada fila se volvía una tarjeta dentro de la tarjeta de la agenda; pero `.agenda-item{padding:13px 0}` les quita el relleno lateral y los botones (`flex:1 1 128px`) llenan el ancho hasta el borde. Medido a 390 px: "Ver detalle" termina a 0 px del borde.
+
+### Alcance
+
+1. La clase del tipo va con prefijo (`kind-meal`, `kind-workout`, `kind-resume`, `kind-rest`) y los selectores de icono se ajustan: la agenda vuelve a ser la lista con separadores que define su CSS, con los botones a 16 px del borde de la tarjeta.
+2. `CACHE_NAME` → `fitbud-pwa-v131`.
+
+### Fuera de alcance
+
+- Cambiar el diseño de la agenda.
+
+### Riesgos
+
+- Las filas ya no tienen fondo propio (el entreno pierde su degradado azul); el icono conserva su color por tipo.
+
+### Criterios de aceptación
+
+- A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
 - `node scripts/release-gate.mjs` pasa.

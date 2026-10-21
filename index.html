@@ -626,9 +626,9 @@
   .agenda-item{display:grid;grid-template-columns:38px 1fr;gap:12px;padding:13px 0;border-top:1px solid var(--border)}
   .agenda-item:first-child{border-top:0;padding-top:4px}
   .agenda-icon{width:38px;height:38px;border-radius:var(--r-md);display:grid;place-items:center;background:var(--surf2);border:1px solid var(--border);font-size:18px;line-height:1}
-  .agenda-item.meal .agenda-icon{background:rgba(58,123,255,.12);border-color:var(--terra-dim)}
-  .agenda-item.workout .agenda-icon,.agenda-item.resume .agenda-icon{background:var(--accent-dim);border-color:var(--border-acc)}
-  .agenda-item.done .agenda-icon{background:rgba(16,185,129,.10);border-color:rgba(16,185,129,.28)}
+  .agenda-item.kind-meal .agenda-icon{background:rgba(58,123,255,.12);border-color:var(--terra-dim)}
+  .agenda-item.kind-workout .agenda-icon,.agenda-item.kind-resume .agenda-icon{background:var(--accent-dim);border-color:var(--border-acc)}
+  .agenda-item.kind-done .agenda-icon{background:rgba(16,185,129,.10);border-color:rgba(16,185,129,.28)}
   .agenda-label{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase;margin-bottom:2px}
   .agenda-name{font-size:15px;font-weight:800;color:var(--txt);line-height:1.25}
   .agenda-meta{font-size:12px;color:var(--muted);line-height:1.38;margin-top:3px}
@@ -4470,8 +4470,10 @@ function homeAgendaData(ds){
   const pendingCount=items.filter(i=>i.actions&&i.kind!=="rest").length;
   return {state:"agenda",day,st,ew,workoutOutcome,doneMeals,totMeals,items,pendingCount};
 }
+// REQ-249: el tipo va con prefijo; "meal"/"workout" a secas son las tarjetas
+// globales y metían un borde sin relleno lateral que pegaba los botones al borde.
 function homeAgendaItemHtml(item){
-  return `<div class="agenda-item ${esc(item.kind)}">
+  return `<div class="agenda-item kind-${esc(item.kind)}">
     <div class="agenda-icon">${esc(item.icon)}</div>
     <div>
       <div class="agenda-label">${esc(item.label)}</div>
