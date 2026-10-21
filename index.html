@@ -195,6 +195,16 @@
   .csec.collapsed .csec-body{display:none}
   .meal{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:10px;transition:.2s}
   .meal.done{border-color:var(--border-acc);background:var(--accent-dim)}
+  /* REQ-235: cuenta atrás antes de empezar la sesión */
+  .countdown{position:fixed;inset:0;z-index:150;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 16px calc(24px + var(--safe-bottom,0px));background:rgba(5,5,9,.9);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);text-align:center}
+  .countdown-label{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .countdown-n{font-family:var(--font-display);font-size:136px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
+  .countdown-n.tick{animation:countdownTick .9s ease-out}
+  @keyframes countdownTick{from{transform:scale(1.25);opacity:.4}to{transform:scale(1);opacity:1}}
+  @media(prefers-reduced-motion:reduce){.countdown-n.tick{animation:none}}
+  .countdown-next{font-size:15px;color:var(--txt);max-width:320px;overflow-wrap:anywhere}
+  .countdown-actions{display:flex;gap:10px;margin-top:18px}
+  .countdown-actions .btn{min-height:48px;min-width:132px}
   .meal-tap{cursor:pointer}
   .meal.skipped{opacity:.6;border-style:dashed}
   .meal .slot{font-family:var(--font-body);font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
@@ -5155,9 +5165,71 @@ function startWorkoutExecution(ds){
   const st=dayState(ds);
   if(st.workoutDone&&!st.workoutExecution){toast("Este día ya figura como completado en el historial anterior");return;}
   if(st.workoutExecution){toast("Este día ya tiene una sesión registrada");return;}
-  st.workoutExecution=WORKOUT_PLAYER.createExecution(prescription,Date.now());
+  const first=prescription.steps&&prescription.steps[0];
+  openWorkoutCountdown(ds,first?(exerciseBySlug(first.exerciseSlug,true)||{}).name||first.label:"");
+}
+function beginWorkoutExecution(ds){
+  const st=dayState(ds);
+  if(st.workoutExecution)return;
+  st.workoutExecution=WORKOUT_PLAYER.createExecution(workoutPrescription(ds),Date.now());
   st.workoutDone=false;
   commitDay(ds);render();toast("Sesión iniciada");
+}
+// REQ-235: la sesión no arranca en seco: 3, 2, 1 con pitido y vibración antes
+// de que empiece a correr el reloj. "Empezar ya" la salta; "Cancelar" no crea nada.
+let workoutCountdown=null;
+function countdownBeep(final){
+  const audio=workoutCountdown&&workoutCountdown.audio;if(!audio)return;
+  try{
+    const osc=audio.createOscillator(),gain=audio.createGain(),t=audio.currentTime,len=final?.35:.12;
+    osc.frequency.value=final?1320:880;
+    gain.gain.setValueAtTime(.18,t);gain.gain.exponentialRampToValueAtTime(.001,t+len);
+    osc.connect(gain);gain.connect(audio.destination);osc.start(t);osc.stop(t+len);
+  }catch(_){}
+  try{if(navigator.vibrate)navigator.vibrate(final?250:80);}catch(_){}
+}
+function openWorkoutCountdown(ds,firstLabel){
+  closeWorkoutCountdown();
+  let audio=null;
+  try{const AC=window.AudioContext||window.webkitAudioContext;if(AC)audio=new AC();}catch(_){}
+  const el=document.createElement("div");
+  el.id="workoutCountdown";el.className="countdown";
+  el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-label","Cuenta atrás para empezar la sesión");
+  el.innerHTML=`<div class="countdown-label">Prepárate</div>
+    <div class="countdown-n" aria-live="assertive">3</div>
+    ${firstLabel?`<div class="countdown-next">Empiezas con: ${esc(firstLabel)}</div>`:""}
+    <div class="countdown-actions">
+      <button class="btn" onclick="closeWorkoutCountdown()">Cancelar</button>
+      <button class="btn btn-accent" onclick="finishWorkoutCountdown()">Empezar ya</button>
+    </div>`;
+  document.body.appendChild(el);
+  workoutCountdown={ds,n:3,audio,timer:null};
+  document.addEventListener("keydown",workoutCountdownKey);
+  setTimeout(()=>{const btn=el.querySelector(".btn-accent");if(btn)btn.focus();},0);
+  workoutCountdownTick();
+}
+function workoutCountdownTick(){
+  const cd=workoutCountdown;if(!cd)return;
+  if(cd.n<=0){finishWorkoutCountdown();return;}
+  const n=document.querySelector("#workoutCountdown .countdown-n");
+  if(n){n.textContent=cd.n;n.classList.remove("tick");void n.offsetWidth;n.classList.add("tick");}
+  countdownBeep(false);
+  cd.n--;
+  cd.timer=setTimeout(workoutCountdownTick,1000);
+}
+function workoutCountdownKey(e){if(e.key==="Escape")closeWorkoutCountdown();}
+function closeWorkoutCountdown(){
+  const cd=workoutCountdown;workoutCountdown=null;
+  document.removeEventListener("keydown",workoutCountdownKey);
+  if(cd){clearTimeout(cd.timer);if(cd.audio)setTimeout(()=>{try{cd.audio.close();}catch(_){}},500);}
+  const el=$("#workoutCountdown");if(el)el.remove();
+  return cd;
+}
+function finishWorkoutCountdown(){
+  if(!workoutCountdown)return;
+  countdownBeep(true);
+  const cd=closeWorkoutCountdown();
+  beginWorkoutExecution(cd.ds);
 }
 function pauseResumeWorkoutExecution(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;

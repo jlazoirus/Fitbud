@@ -1361,72 +1361,15 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-205`).
 
 ## REQ-206 - Entreno: registrar a mano lo entrenado (también en días de descanso) con estimación de calorías
 
-**Estado: implementado.**
+**Estado: implementado.** Registrar a mano lo entrenado (también en días de descanso) en `dayState(ds).manualActivities`, con kcal estimadas por MET × kg × horas; editar y quitar desde Entreno y "Entrené igual" en Hoy.
 
-### Origen
-
-Feedback de Claudia (beta, 2026-10-18): aunque tenga día de descanso, si no le apetece descansar quiere añadir que hoy entrenó, qué hizo y que la app le estime cuánto gastó según el deporte.
-
-### Problema
-
-Un día de descanso solo mostraba "Descanso planificado" sin acciones, y un día de entreno solo admitía la sesión guiada del plan. No había forma de registrar otra actividad ni de saber su gasto.
-
-### Alcance
-
-1. `dayState(ds).manualActivities` (`{id,sport,minutes,intensity,notes,kcal,weightKg,loggedAt}`), sincronizado con el resto de `day_log.state` sin migración (el merge de `sync-conflicts.js` ya conserva campos nuevos); `validateDayLogState()` exige que sea array si existe.
-2. Estimación determinista, sin llamadas externas: `kcal = MET × kg × horas`, redondeada a 5, con 16 deportes y tres intensidades (MET aproximados del Compendio de Actividades Físicas). Peso: el último registrado, el del perfil o 70 kg de referencia (la app lo avisa).
-3. Entreno: sección "Actividad registrada" con "Hoy entrené igual: registrar actividad" (descanso) o "＋ Registrar otra actividad" (día de entreno); editar y quitar. Modal con deporte, minutos, intensidad, detalle opcional y estimación en vivo.
-4. Hoy: la fila de descanso de la agenda ofrece "Entrené igual" sin contar como pendiente, y la tarjeta de descanso de la acción del día "Hoy entrené igual"; con actividad registrada ambas lo resumen.
-5. Una actividad registrada cuenta como día entrenado: `workoutOutcomeForState()` la trata como completada y `trainingDayResult()` devuelve `done` también en descanso. Solo hoy o días pasados; no con la pausa por seguridad activa.
-6. `CACHE_NAME` → `fitbud-pwa-v90`.
-
-### Fuera de alcance
-
-- Sumar las calorías gastadas al objetivo de comida del día.
-- Importar actividades de relojes o apps de salud.
-
-### Riesgos
-
-- La estimación MET es aproximada (±20-30%); la UI la presenta como "≈ … kcal gastadas" y estimación.
-
-### Criterios de aceptación
-
-- En un día de descanso se registra "Pádel 60 min moderada" y la app estima ≈ 450 kcal con 75 kg; el día pasa a contar como entrenado y al quitarla vuelve a descanso. ✓
-- En un día de entreno se registra otro deporte y el día cuenta como entrenado. ✓
-- La fila de descanso no infla el contador de pendientes de Hoy. ✓
-- `node scripts/release-gate.mjs` pasa. ✓ (`tests/e2e/actividad-manual.spec.js`)
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-206`).
 
 ## REQ-207 - Fix: "Estimar con foto" no deja elegir una foto de la galería
 
-**Estado: implementado.**
+**Estado: implementado.** "Estimar con foto" deja elegir de la galería: los inputs ya no llevan `capture`.
 
-### Origen
-
-Jonathan (2026-10-19): al estimar una comida con foto, el móvil solo abre la cámara; no se puede elegir una foto ya hecha.
-
-### Causa raíz
-
-Los dos selectores de foto (`#f_photo` en el editor de comidas, REQ-172, y el de la foto del resumen de progreso) declaraban `capture="environment"`, que en iOS y Android abre directamente la cámara trasera y omite la fototeca. El resumen incluso dice "Tomar o elegir foto".
-
-### Alcance
-
-1. Quitar `capture` de ambos inputs (`accept="image/*"` se mantiene): el sistema muestra su menú nativo con fototeca, cámara y archivos.
-2. `tests/e2e/foto-comida.spec.js` y `scripts/validate-meal-photo-estimate.mjs` (que exigía `capture`) comprueban ahora que el input no fuerza la cámara.
-3. `CACHE_NAME` → `fitbud-pwa-v91`.
-
-### Fuera de alcance
-
-- Elegir varias fotos a la vez.
-
-### Riesgos
-
-- Ninguno: la cámara sigue disponible desde el mismo menú del sistema.
-
-### Criterios de aceptación
-
-- Ningún `<input type="file">` de la app declara `capture`. ✓
-- En iPhone, "Estimar con foto" ofrece "Fototeca" y "Tomar foto" (verificación manual tras el deploy).
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-207`).
 
 ## REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días
 
@@ -1484,42 +1427,15 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-216`).
 
 ## REQ-217 - Beta: la postulación cierra con una confirmación amable y sin callejones sin salida
 
-**Estado: implementado.**
+**Estado: implementado.** La postulación beta cierra con un panel de agradecimiento y pasos, validación igual a la API, errores claros con foco en el campo y borrador local.
 
-### Origen
-
-Jonathan (2026-10-19): quien postula tiene que saber, de forma amable, que sus datos llegaron, que se revisarán y que se le escribirá si queda. La crítica de impeccable (19/36) encontró además: tras enviar, el formulario seguía visible y se podía volver a enviar; la API rechazaba "Dónde se rompe" vacío y casos de menos de 20 caracteres que el navegador dejaba pasar, con mensajes sin tildes ("WhatsApp invalido.") y un "intenta más tarde" engañoso; "Limpiar" borraba todo junto al botón de enviar; recargar perdía lo escrito; elegir una cuarta fricción desmarcaba otra.
-
-### Alcance
-
-1. Al enviar, el formulario se reemplaza por un panel "¡Gracias, {nombre}! Ya tenemos tu postulación." con el número de WhatsApp al que se le escribirá y tres pasos (recibida → la revisamos → te escribimos). Recibe el foco. Ya no muestra el número de postulación.
-2. Validación igual a la API: al menos una fricción (contador "n de 3"), historia de 20 a 1400 caracteres, WhatsApp de 8 a 15 dígitos con código de país, `maxlength` en nombre y ciudad. La cuarta fricción no se marca y se avisa.
-3. `api/beta-recruitment.js`: mensajes en español claro con tildes; los 500 no exponen texto interno. Si el error nombra un campo, la página lleva el foco ahí.
-4. Borrador en `localStorage` (con try/catch) que se borra al enviar; sin botón "Limpiar"; el aviso de salud pasa arriba de la historia.
-
-### Criterios de aceptación
-
-- `tests/e2e/beta.spec.js`: envío completo muestra el panel y oculta el formulario; sin fricción no se envía; la cuarta fricción no desmarca otra; el borrador sobrevive a recargar; un 400 de WhatsApp se explica y enfoca el campo. ✓
-- impeccable sin hallazgos; axe sin violaciones en el panel. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-217`).
 
 ## REQ-218 - Admin: pantalla "Postulantes beta" para revisar, aceptar con 90 días y avisar por WhatsApp
 
-**Estado: implementado.**
+**Estado: implementado.** Admin → "Postulantes beta": filtros, aceptar con 90 días (código `quarterly`), descartar o volver a revisar, y mensaje listo para enviar.
 
-### Origen
-
-Jonathan (2026-10-19): necesita ver a los postulantes y aceptarlos de forma clara, y que al aceptarlos se les asignen por defecto los 3 meses gratis con las cuotas del coach. Hasta ahora solo existían scripts de terminal (REQ-203).
-
-### Alcance
-
-1. `api/admin.js` (solo admin activo): `betaApplicants` (filtros por revisar / aceptados / descartados / todos, con conteos), `betaAccept` (código de 90 días del plan `quarterly`, activable 30 días, auditado con el admin; postulación en `beta_invited` con nota; devuelve mensaje, enlace `/?codigo=` y `wa.me`) y `betaSetStatus` (`new`, `shortlisted`, `rejected`, `archived`; `beta_invited` solo se pone aceptando).
-2. `index.html`: Perfil → Administración → "Postulantes beta" (vista `adminBeta`, solo admin). Tarjetas con datos legibles, historia plegable, aviso de lesión, "Aceptar (90 días)", "Descartar", "Volver a revisar", "Generar enlace nuevo" y "Abrir WhatsApp". Al aceptar, modal con el mensaje, "Enviar por WhatsApp" y "Copiar mensaje". SW v92.
-3. `BETA_PROGRAM.md`: revisar y aceptar desde la app; la terminal queda como alternativa.
-
-### Criterios de aceptación
-
-- `scripts/test-admin-beta-api.mjs` (gate): conteos, código de 90 días `quarterly` auditado, `beta_invited` con nota, mensaje y `wa.me` correctos, ids inválidos, estados no permitidos y 403 para no admin. ✓
-- `tests/e2e/admin-beta.spec.js`: el admin acepta y ve el mensaje con el enlace; un usuario normal no entra a la vista. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-218`).
 
 ## REQ-219 - Portada: los CTA del hero, la navegación y el subtítulo no respetan `SIGNUP_MODE=open`
 
@@ -1545,21 +1461,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-219`).
 
 ## REQ-221 - Mitigación de REQ-209: nada desborda la columna y la barra de escritorio es discreta
 
-**Estado: implementado.**
+**Estado: implementado.** Mitigación de REQ-209: `html{overflow-x:clip}`, barra fina en `#app` y cortes de palabra en títulos y nombres largos.
 
-### Origen
-
-REQ-209 (feedback beta 2026-10-18: "no coge todo el ancho y siempre hay una barra de scroll") no se reprodujo en Chromium móvil (360-414 px) ni en producción (`evolvapp.club/beta` a 375 px). Mientras llega la captura, se cierran las causas plausibles. Una prueba encontró una real: con un nombre de plato sin espacios, la tarjeta "Próxima comida" de Hoy (`.agenda-name`) se estiraba a 936 px dentro de la columna.
-
-### Alcance
-
-1. `html{overflow-x:clip}`: iOS no deja arrastrar la página de lado.
-2. `#app` con barra fina (`scrollbar-width:thin`), para escritorio con barras clásicas.
-3. `overflow-wrap:break-word` en `#app` y `anywhere` en títulos, nombres de comida/agenda/ejercicio, lista de compra y chat. SW v101.
-
-### Criterios de aceptación
-
-- `tests/e2e/ancho.spec.js`: a 360 px, un nombre de 120 caracteres no desborda Hoy ni Nutrición (antes: 658 px de desborde). ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-221`).
 
 ## REQ-222 - Fix admin: la cortesía de consumo rechazaba 3000 sin decir por qué
 
@@ -1597,64 +1501,21 @@ Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningú
 
 ## REQ-224 - Fix Entreno: un borrador de plan archivado le gana al plan activo en los días nuevos
 
-**Estado: implementado.**
+**Estado: implementado.** `planVersionForDate()` ignora versiones reemplazadas si una vigente cubre el día; los días anclados conservan su versión. Validador en el release gate.
 
-### Origen
-
-Feedback de una usuaria (2026-10-19): la rutina que le cargó su coach no aparecía; el lunes mostraba la rutina genérica.
-
-### Causa raíz
-
-`planVersionForDate()` (`index.html`) ordenaba las versiones que cubren el día primero por `valid_from` y recién después por estado. Dos borradores generados el 13 y luego archivados (`superseded`, `valid_to` sin recortar) empezaban un día después que el plan activo, así que cada día nuevo sin ancla quedaba asignado a un borrador archivado.
-
-### Alcance
-
-1. `planVersionForDate()`: si alguna versión no reemplazada cubre el día, las reemplazadas quedan fuera; un día ya anclado (`planVersionId`) conserva su versión (historial inmutable).
-2. Datos: recorte de `valid_to` de los borradores archivados y re-anclaje de los días futuros sin actividad al plan activo.
-3. `scripts/validate-plan-version-for-date.mjs` en el release gate. `CACHE_NAME` v106.
-
-### Criterios de aceptación
-
-- El plan activo gana a un borrador archivado posterior; un día anclado conserva su versión; un día cubierto solo por una versión reemplazada la sigue usando. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-224`).
 
 ## REQ-225 - Beta: la aprobación es web y por correo, sin WhatsApp en el flujo
 
-**Estado: implementado.**
+**Estado: implementado.** La postulación pide correo; aceptar envía la invitación de Supabase con 90 días de beta (enlace con código como respaldo). Sin WhatsApp en el flujo.
 
-### Origen
-
-Jonathan (2026-10-19): la inscripción debe ser automática; las postulaciones tienen que llegarle en la web y aprobarlas o rechazarlas sin pasar por WhatsApp, que queda para el feedback.
-
-### Alcance
-
-1. La postulación pide **Correo** (obligatorio; se guarda en `raw_payload.email`, sin migración). La confirmación y "Cómo funciona" dicen que la invitación llega por correo; la nota final de la portada dice "Te respondemos por correo".
-2. `api/admin.js` `betaAccept`: con correo, invitación de Supabase (`/auth/v1/invite`) y 90 días de acceso beta en la misma acción; si ya tenía cuenta, solo el acceso; si el envío falla o no hay correo, enlace con código de respaldo (REQ-218) con el motivo. `channel:"link"` fuerza el enlace ("Generar enlace nuevo").
-3. Admin: el correo en cada tarjeta, modal "Le enviamos la invitación a …" (WhatsApp opcional) y aviso en Hoy y en Perfil de las postulaciones por revisar. SW v107.
-4. `BETA_PROGRAM.md`: plantilla "Invite user" en español y SMTP propio para no chocar con el límite de envíos de Supabase (manual).
-
-### Criterios de aceptación
-
-- `scripts/test-admin-beta-api.mjs`: con correo invita y da 90 días sin código; cuenta existente solo recibe acceso; envío fallido cae al enlace. `test-beta-recruitment-api.mjs`: guarda el correo. ✓
-- `tests/e2e/admin-beta.spec.js`: Hoy avisa de 1 postulación, Aceptar envía la invitación por correo. `beta.spec.js`: la confirmación muestra el correo. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-225`).
 
 ## REQ-226 - Beta: aviso por correo al admin con cada postulación nueva
 
-**Estado: implementado.**
+**Estado: implementado.** Cada postulación nueva avisa por correo (Resend) a `BETA_NOTIFY_EMAIL` o a los admins, con enlace `/?ver=postulantes`; un fallo no bloquea la postulación.
 
-### Origen
-
-Jonathan (2026-10-20): "me envías a mí también el mail cuando alguien se postula", con lo que la app ya tenga conectado.
-
-### Alcance
-
-1. `api/beta-recruitment.js`: tras guardar una postulación nueva, correo vía Resend con la conexión de los recordatorios (`RESEND_API_KEY`, `NOTIFY_FROM_EMAIL`, `NOTIFY_APP_URL`). Destinatarios: `BETA_NOTIFY_EMAIL` o los admins activos. Asunto con el nombre, datos clave, historia, aviso de salud, `reply_to` del postulante y botón a `/?ver=postulantes`. Escapa lo escrito por el postulante; tope de 4 s; un fallo nunca bloquea la postulación; una re-postulación con el mismo WhatsApp no avisa otra vez.
-2. `index.html`: `/?ver=postulantes` abre Postulantes beta al admin y limpia la URL. SW v108.
-3. `BETA_PROGRAM.md`: variables y comportamiento.
-
-### Criterios de aceptación
-
-- `scripts/test-beta-recruitment-api.mjs`: nueva → 1 correo a admins con escape, enlace y aviso de salud; repetida → ninguno; Resend caído → la postulación responde 200; `BETA_NOTIFY_EMAIL` define destinatarios. ✓
-- `tests/e2e/admin-beta.spec.js`: `/?ver=postulantes` abre la pantalla al admin. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-226`).
 
 ## REQ-227 - Fix onboarding: editar un macro en "Ajustar valores" y continuar guarda una meta donde kcal ≠ suma de macros
 
@@ -1718,128 +1579,27 @@ Que después del onboarding la meta nutricional guardada siempre cumpla `kcal = 
 
 ## REQ-228 - Fix: "Estimar con foto" falla con un mensaje genérico y sin forma de reintentar
 
-**Estado: implementado.**
+**Estado: implementado.** "Estimar con foto" muestra el motivo concreto del fallo (`photoEstimateErrorMessage()`) y un botón "Reintentar" con la misma foto.
 
-### Origen
-
-Jonathan (2026-10-20), con captura: tras elegir una foto de la galería (REQ-207), el análisis responde "Tu coach no pudo completar esta acción. Intenta de nuevo." y no hay forma de saber por qué ni de reintentar sin volver a elegir la foto.
-
-### Problema
-
-`photoEstimateRound()` mostraba `coachErrorMessage(e)`, que para usuarios no admin reduce cualquier fallo (proveedor saturado, tiempo agotado, foto ilegible, error del servidor) al mismo texto genérico, y el `status` HTTP se perdía en `coachProxyFetch()`. El handler del servidor se verificó en local con Supabase y el proveedor simulados (200 con la foto de la captura), así que la causa está en producción y no se podía diagnosticar desde la UI.
-
-### Alcance
-
-1. `coachProxyFetch()` conserva `err.status`.
-2. `photoEstimateErrorMessage()`: mensajes concretos sin mencionar tecnología (tardó demasiado, no pudimos leer la foto, mucha demanda, no pudimos estimarla, sin conexión); un motivo no reconocido muestra "(código N)".
-3. Botón "Reintentar" con la misma foto; reintentar no consume una ronda de preguntas.
-4. `CACHE_NAME` → `fitbud-pwa-v110`.
-
-### Fuera de alcance
-
-- Corregir la causa de producción: queda pendiente de leer el código/mensaje que ahora se muestra o los logs de `/api/claude` en Vercel.
-
-### Riesgos
-
-- Ninguno sobre datos: solo cambia el texto del error y añade el reintento.
-
-### Criterios de aceptación
-
-- Un 503 muestra "mucha demanda" con "Reintentar"; un 500 desconocido muestra "(código 500)"; reintentar con la misma foto estima y usa la misma ronda (`photo-1`). ✓ (`tests/e2e/foto-comida.spec.js`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-228`).
 
 ## REQ-229 - Fix: "Estimar con foto" estima el plato planeado en vez del que se ve
 
-**Estado: implementado.**
+**Estado: implementado.** "Estimar con foto" identifica el plato por la foto: el nombre precargado del plan no se envía como descripción, y la descripción entra en la clave de reutilización.
 
-### Origen
-
-Jonathan (2026-10-20), con captura: al editar el almuerzo del plan ("Tacos de frijol negro y queso fresco") y estimar con una foto de espagueti Alfredo, la app responde "Estimado como 3 tacos de tortilla de maíz…", pregunta por los frijoles y deja el nombre de los tacos.
-
-### Causa raíz
-
-`openEditor('meal')` precarga el nombre del plato planeado en "Descripción". `photoEstimateRound()` enviaba ese texto como "El usuario la describe así", y el modelo lo priorizó sobre la imagen. `renderPhotoEstimate()` solo reemplazaba el nombre si estaba vacío o lo había puesto una ronda anterior, así que el nombre planeado quedaba. Además, la clave de reutilización no incluía la descripción, así que la respuesta errónea podía volver a servirse para la misma foto.
-
-### Alcance
-
-1. `window._editor.planName` guarda el nombre precargado de una comida del plan; mientras no se toque, no se envía como descripción (el prompt pide identificar el plato por la foto) y se reemplaza por el nombre estimado.
-2. Si el usuario escribe una descripción, se envía con la instrucción de que, si no coincide con la foto, manda la foto.
-3. La descripción entra en la clave de reutilización (`photo:<foto>:<respuestas>:<descripción>`); `validate-meal-photo-estimate.mjs` lo exige.
-4. `CACHE_NAME` → `fitbud-pwa-v111`.
-
-### Fuera de alcance
-
-- Detectar con la imagen si la foto corresponde a la comida planeada.
-
-### Riesgos
-
-- Ninguno sobre datos: cambia solo qué texto acompaña a la foto y cuándo se reemplaza el nombre.
-
-### Criterios de aceptación
-
-- Editar una comida del plan y estimar con foto de otro plato no envía el nombre planeado y deja el nombre y los macros de la foto; lo escrito por el usuario sí se envía. ✓ (`tests/e2e/foto-comida.spec.js`; falla contra el código previo)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-229`).
 
 ## REQ-230 - Estimar macros: se ve qué valores se aplicaron
 
-**Estado: implementado.**
+**Estado: implementado.** Al estimar macros se resaltan los campos y se muestra "Aplicado: N kcal · P · C · G" (`applyEstimatedMacros()`).
 
-### Origen
-
-Jonathan (2026-10-20), con captura: "No cambia con los valores estimados". La estimación había escrito 520 / 18 / 58 / 22 sobre 520 / 18 / 62 / 20 del plan: los valores sí cambiaron, pero tan poco que parecía que no.
-
-### Problema
-
-`renderPhotoEstimate()` y `aiEstimate()` escribían los macros en los campos sin ninguna señal; la caja de resultado solo mostraba la nota. Si la estimación se parece a lo que ya había (en este caso porque el modelo se anclaba al nombre del plan, corregido en REQ-229), no hay forma de saber que se aplicó.
-
-### Alcance
-
-1. `applyEstimatedMacros()` (foto y texto): escribe los cuatro valores, los resalta un momento (`.field-updated`, estático con `prefers-reduced-motion`) y añade "Aplicado: N kcal · P g · C g · G g" a la caja de resultado.
-2. `CACHE_NAME` → `fitbud-pwa-v112`.
-
-### Fuera de alcance
-
-- Mostrar la diferencia con los valores anteriores.
-
-### Riesgos
-
-- Ninguno: solo presentación.
-
-### Criterios de aceptación
-
-- Tras estimar, la caja muestra "Aplicado: 780 kcal · P 24 g · C 90 g · G 34 g" y los campos llevan `.field-updated`. ✓ (`tests/e2e/foto-comida.spec.js`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-230`).
 
 ## REQ-231 - Nutrición: la lista de compra va con las herramientas, no como una acción del día
 
-**Estado: implementado.**
+**Estado: implementado.** La lista de compra pasa a la fila de herramientas de Nutrición, con el número de ingredientes por comprar.
 
-### Origen
-
-Jonathan (2026-10-20), con captura: el botón "Lista de compra · semana 1" no tiene sentido en ese lugar ni con esa forma.
-
-### Problema
-
-REQ-215 puso la lista de compra como botón de ancho completo justo debajo de "+ Agregar comida / snack", con la misma forma: parecía una acción más de las comidas del día, cuando es una herramienta de la semana. Además, "semana N" no aporta nada y no se ve cuánto queda por comprar.
-
-### Alcance
-
-1. La lista de compra pasa a la fila de herramientas de Nutrición (`.nut-tools`, separada de las comidas), junto a "Más opciones", como botón compacto con icono de carrito y el número de ingredientes por comprar de lo que queda de semana (`shoppingPendingCount()`).
-2. El número se actualiza al marcar "ya lo tengo" sin reabrir (`refreshShoppingTool()`); sin semana activa no se muestra.
-3. `CACHE_NAME` → `fitbud-pwa-v113`.
-
-### Fuera de alcance
-
-- Cambiar el contenido de la hoja de la lista (REQ-215).
-
-### Riesgos
-
-- Ninguno sobre datos: solo cambia dónde y cómo se abre.
-
-### Criterios de aceptación
-
-- El botón vive en `.nut-tools`, muestra lo que queda por comprar y baja en 1 al marcar un ingrediente. ✓ (`tests/e2e/lista-compra.spec.js`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-231`).
 
 ## REQ-232 - Entreno: cada ejercicio muestra con qué carga lo hiciste la última vez
 
@@ -1950,3 +1710,37 @@ Que un ajuste de check-in, comunicado como futuro, no altere retroactivamente la
 ### Verificación sugerida
 
 - E2E: preparar y registrar hoy, aceptar un ajuste de −200 kcal, confirmar que `dayTotals(hoy).target` y `buildDay(ayer).target` no cambian y que Home no vira a "meta alcanzada".
+
+## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando inicias el entrenamiento comienza en seco de frente; debería haber una cuenta atrás que te avise con 3 segundos de anticipación que ya va a comenzar".
+
+### Problema
+
+`startWorkoutExecution()` creaba la ejecución y empezaba a correr el reloj de la sesión en el mismo toque de "Iniciar sesión guiada", sin margen para dejar el teléfono y ponerse en posición.
+
+### Alcance
+
+1. "Iniciar sesión guiada" (y "Empezar" en el modo conversacional) abre una cuenta atrás a pantalla completa: "Prepárate", 3 · 2 · 1 con un pitido corto y vibración (si el dispositivo la soporta) en cada número, y "Empiezas con: <primer bloque>". Al llegar a 0 suena un pitido más largo, se crea la sesión y arranca el reloj (`beginWorkoutExecution()`).
+2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
+3. Con `prefers-reduced-motion` el número cambia sin animación.
+4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
+5. `CACHE_NAME` → `fitbud-pwa-v117`.
+
+### Fuera de alcance
+
+- Cuenta atrás al terminar descansos o antes de bloques con cronómetro.
+- Preferencia para desactivar el sonido.
+
+### Riesgos
+
+- iOS no implementa `navigator.vibrate`; el pitido depende de que el teléfono no esté en silencio. El aviso visual siempre está.
+
+### Criterios de aceptación
+
+- Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
+- `node scripts/release-gate.mjs` pasa. ✓

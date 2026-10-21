@@ -4,7 +4,7 @@
 // El plan decide la sesión del día (y puede incluir bloque de cardio), así que
 // el test lee el total de bloques de la UI y completa los que haya.
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, startGuidedSession } from "./helpers.js";
 
 test.describe("Entreno", () => {
   test("sesión guiada completa: todos los bloques registrados y cierre guardado", async ({ page, context }) => {
@@ -25,7 +25,7 @@ test.describe("Entreno", () => {
     await expect(app.locator(".plan-row:not(.plan-timed) .plan-dose").first()).toContainText(/\d+ × /);
 
     // Arrancar el reproductor
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
     await expect(app).toContainText(/0\/\d+ bloques/);
 
     // REQ-92: la sesión empieza con calentamiento y el total de bloques cubre
@@ -87,7 +87,7 @@ test.describe("Entreno", () => {
 
     await gotoApp(page);
     await page.locator("#tabs").getByText("Entreno").click();
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
     await expect(page.locator("#app")).toContainText(/0\/\d+ bloques/);
 
     // Simula que la app se va a segundo plano (pantalla bloqueada / cambio de
@@ -133,7 +133,7 @@ test.describe("Entreno", () => {
     await page.locator("#tabs").getByText("Entreno").click();
 
     const app = page.locator("#app");
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
     await expect(app).toContainText(/0\/\d+ bloques/);
 
     // Omite UN bloque (calentamiento, siempre el primero) y ABANDONA — nunca
@@ -157,7 +157,7 @@ test.describe("Entreno", () => {
   // ejercicio de fuerza y una serie extra sin hacer en el segundo.
   async function runSessionLeavingOneSet(page) {
     const app = page.locator("#app");
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
     const text = await app.innerText();
     const total = Number((text.match(/0\/(\d+) bloques/) || [])[1]);
     let strength = 0;
@@ -255,7 +255,7 @@ test.describe("Entreno", () => {
     await gotoApp(page);
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
     await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
     await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
 
@@ -295,7 +295,7 @@ test.describe("Entreno", () => {
     await gotoApp(page);
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
     await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
     await page.locator("#app button.set-done").first().click();
     await expect(app.locator(".workout-timer-value")).toBeVisible();
@@ -328,7 +328,7 @@ test.describe("Entreno", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
     await expect(app).toContainText("Entre ejercicios: 2 min de descanso");
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
     await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
 
     const series = page.locator('#app button.set-done[aria-label^="Serie"]');
@@ -388,6 +388,55 @@ test.describe("Entreno", () => {
   });
 });
 
+// REQ-235 (Jonathan): la sesión no arranca en seco; 3, 2, 1 antes de que corra el reloj.
+test.describe("Cuenta atrás", () => {
+  test("al iniciar hay 3 s de aviso, se puede cancelar o saltar", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    const start = page.getByRole("button", { name: "Iniciar sesión guiada" }).last();
+    const countdown = page.locator("#workoutCountdown");
+    const hasExecution = () => page.evaluate(() => !!dayState(current).workoutExecution);
+
+    // Cancelar no crea la sesión.
+    await start.click();
+    await expect(countdown).toBeVisible();
+    await expect(countdown).toContainText("Prepárate");
+    await expect(countdown).toContainText("Empiezas con: Calentamiento");
+    await expect(countdown.locator(".countdown-n")).toHaveText("3");
+    expect(await hasExecution()).toBe(false);
+    await countdown.getByRole("button", { name: "Cancelar" }).click();
+    await expect(countdown).toHaveCount(0);
+    await page.waitForTimeout(3500);
+    expect(await hasExecution()).toBe(false);
+
+    // Dejarla correr: 3, 2, 1 y recién entonces arranca el reloj.
+    await start.click();
+    const t0 = Date.now();
+    await expect(countdown.locator(".countdown-n")).toHaveText("2");
+    await expect(countdown.locator(".countdown-n")).toHaveText("1");
+    expect(await hasExecution()).toBe(false);
+    await expect(countdown).toHaveCount(0, { timeout: 3000 });
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(2500);
+    await expect(app).toContainText(/0\/\d+ bloques/);
+    await expect(app.locator(".player-clock")).toHaveText(/^00:0[0-2]$/);
+
+    // "Empezar ya" la salta.
+    page.once("dialog", (d) => d.accept());
+    await page.getByRole("button", { name: "Descartar" }).click();
+    await expect(start).toBeVisible();
+    await start.click();
+    await countdown.getByRole("button", { name: "Empezar ya" }).click();
+    await expect(countdown).toHaveCount(0);
+    await expect(app).toContainText(/0\/\d+ bloques/);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 // REQ-232 (feedback de Claudia): al hacer un ejercicio se ve con qué carga se
 // hizo la última vez, sin tener que recordarlo.
 test.describe("Última carga", () => {
@@ -415,7 +464,7 @@ test.describe("Última carga", () => {
     expect(slug).toBeTruthy();
     await expect(app.locator(".plan-last").first()).toHaveText("Última vez 42.5 kg");
 
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
     await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
     const last = app.locator(".last-perf");
     await expect(last).toContainText(/Última vez · \w{3} \d+ \w{3}/);
@@ -449,7 +498,7 @@ test.describe("Calentamiento guiado", () => {
     const app = page.locator("#app");
     // El resumen previo (REQ-174) nombra los movimientos del calentamiento
     await expect(app.locator(".plan-timed").first()).toContainText(/Círculos|Marcha/);
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+    await startGuidedSession(page);
 
     const moves = app.locator(".move-list li");
     expect(await moves.count()).toBeGreaterThanOrEqual(4);
