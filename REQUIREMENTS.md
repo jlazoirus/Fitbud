@@ -1049,7 +1049,7 @@ Lo que queda es un hueco de catálogo **real y ahora sí medible**: las 7 dimens
 
 ## REQ-155 - Fix reproductor de entreno: "duración real" cuenta el tiempo con la app cerrada
 
-**Estado: implementado.**
+**Estado: implementado.** Reemplazado por REQ-244: el tiempo en segundo plano vuelve a contar; solo una ausencia de más de una hora pausa la sesión.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-155`).
 
@@ -1559,36 +1559,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-231`).
 
 **Estado: implementado.**
 
-### Origen
-
-Claudia (usuaria beta, 2026-10-19), con captura del reproductor: "para planes de x semanas, que te indique aquí debajo de la carga sugerida el histórico de cuántos kg de carga hiciste la última semana en ese ejercicio, para tener el peso identificado en la app. O que te dé ese dato cuando presionas Usar progresión".
-
-### Problema
-
-El reproductor guarda la carga de cada serie (`set.load`) en `day_log.state.workoutExecution`, pero nunca la vuelve a mostrar: bajo "Carga sugerida" solo aparece el texto genérico "Carga controlable que deje N repeticiones en reserva". Para progresar semana a semana hay que recordar de memoria (o en otra app) con cuánto se hizo el ejercicio.
-
-### Alcance
-
-1. `FITBUD_WORKOUT_PLAYER.lastPerformance(days, exerciseSlug, beforeDs)` (puro): la sesión anterior más reciente con series hechas de ese ejercicio — fecha, variación y series (reps, carga tal como se anotó, RPE).
-2. En el reproductor, bajo "Carga sugerida": "Última vez · mar 13 oct" con las series ("3 × 8 · 40 kg" si todas iguales, "40 kg × 8, 42.5 kg × 7" si no) y el rango de RPE; indica si aquella vez fue en progresión o versión más fácil, y "Sin carga anotada" si no se registró peso. Sin historial (y no es de peso corporal), una línea invita a anotar la carga para verla la próxima vez.
-3. En "Qué vas a hacer hoy" (antes de empezar), cada ejercicio con historial muestra "Última vez N kg" (la carga de la última serie).
-4. `CACHE_NAME` → `fitbud-pwa-v114`.
-
-### Fuera de alcance
-
-- Autocompletar la carga de hoy con la de la última vez (al marcar una serie sin carga, sigue quedando vacía).
-- Historial de ciclos anteriores: se busca en los días cargados (`pullAllDays()` baja el ciclo activo).
-- Proponer un incremento de carga concreto en kg.
-
-### Riesgos
-
-- Ninguno sobre datos: solo lectura de lo ya registrado, privado del usuario y fuera de analytics.
-
-### Criterios de aceptación
-
-- `lastPerformance` toma la sesión anterior más reciente con series hechas, ignora hoy y sesiones sin series. ✓ (`scripts/validate-workout-player.mjs`)
-- Con 40 kg × 8 y 42.5 kg × 7 hace una semana, el reproductor muestra "40 kg × 8, 42.5 kg × 7 · RPE 8-9" y el resumen previo "Última vez 42.5 kg"; un ejercicio sin historial muestra la invitación a anotar. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-232`).
 
 ## REQ-233 - Nutrición: tocar la tarjeta de una comida abre su menú de opciones
 
@@ -1969,3 +1940,43 @@ Al elegir una reciente o favorita con porción ×0,5/×1,5/×2 y guardar, lo reg
 - Registrar "Shake proteina" 300 kcal y luego desde Recientes ×2: el día suma 300 + 600 y Recientes sigue mostrando 300 kcal · P 24 · C 36 · G 3. ✓ (`tests/e2e/comidas-guardadas.spec.js`; falla sin el arreglo con 600 · P 48 · C 72 · G 6)
 - Guardar en favoritas con ×1,5 guarda la porción base. ✓ (`tests/e2e/comidas-guardadas.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-244 - Entreno: la duración cuenta de inicio a fin, también con la app en segundo plano
+
+**Estado: implementado.**
+
+### Origen
+
+Claudia (usuaria beta, 2026-10-21), con captura del resumen "Sesión parcial · 34:54 duración real": "la duración del entrenamiento no se actualiza en segundo plano. Cuando sales de la app y vuelves a entrar no contabiliza ese tiempo. Debería aparecer tiempo de duración total del entrenamiento (incluyendo descansos etc). Se me ocurre que en realidad calcule el tiempo desde que inicias el entrenamiento hasta que finalizas la sesión completa".
+
+### Problema
+
+REQ-155 congeló el cronómetro al pasar la app a segundo plano para que una sesión olvidada no sumara horas. El efecto en el uso normal es el contrario: en el gimnasio se bloquea la pantalla o se cambia de app en cada descanso, y todo ese tiempo desaparece de la duración. Una sesión de una hora puede mostrar 35 minutos.
+
+### Causa raíz
+
+`freezeInProgressWorkouts()` (`index.html`, listeners `visibilitychange`/`pagehide`) ejecutaba `captureWorkoutElapsed()` y dejaba `resumedAt` en `null` cada vez que la app se ocultaba; al volver, `normalizeExecution()` reanudaba desde "ahora", así que el hueco nunca se sumaba.
+
+### Alcance
+
+1. Al ocultarse la app ya no se congela el cronómetro: se anota `workoutExecution.awayAt` y la duración sigue corriendo desde `resumedAt`.
+2. `FITBUD_WORKOUT_PLAYER.returnFromAway(execution, now)` (puro), invocado al volver (`visibilitychange`, `pageshow`) y al reabrir la app tras cargar los días: si la ausencia fue de hasta `AWAY_LIMIT_SECONDS` (1 h), cuenta entera; si fue mayor (sesión olvidada), la sesión queda en pausa con la duración y el descanso congelados en `awayAt`, y un aviso lo explica.
+3. La pausa manual sigue congelando el tiempo como hoy.
+4. El resumen dice "duración total" en vez de "duración real".
+5. `CACHE_NAME` → `fitbud-pwa-v126`.
+
+### Fuera de alcance
+
+- Editar a mano la duración de una sesión ya guardada.
+- Sesiones guardadas antes de este cambio: conservan la duración con la que se guardaron (historial inmutable).
+
+### Riesgos
+
+- Si el sistema mata la app sin emitir `visibilitychange`/`pagehide`, no hay `awayAt` y el tiempo cuenta entero hasta volver. Es el mismo evento del que dependía REQ-155.
+- Una ausencia legítima de más de una hora (por ejemplo, una clase sin mirar el móvil) se pierde; reanudar sigue sumando desde ese momento.
+
+### Criterios de aceptación
+
+- 15 min fuera de la app sin pausar: el cronómetro y la duración los incluyen. ✓ (`tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`)
+- 3 h fuera: la sesión queda en pausa con la duración que tenía al salir y el botón "Reanudar sesión" visible. ✓ (mismas pruebas)
+- `node scripts/release-gate.mjs` pasa. ✓

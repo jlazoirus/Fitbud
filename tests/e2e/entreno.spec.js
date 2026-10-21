@@ -79,7 +79,7 @@ test.describe("Entreno", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  test("REQ-155: el cronómetro no cuenta el tiempo con la app en segundo plano", async ({ page, context }) => {
+  test("REQ-244: la duración cuenta el tiempo en segundo plano; una sesión olvidada queda en pausa", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -88,37 +88,46 @@ test.describe("Entreno", () => {
     await gotoApp(page);
     await page.locator("#tabs").getByText("Entreno").click();
     await startGuidedSession(page);
-    await expect(page.locator("#app")).toContainText(/0\/\d+ bloques/);
+    const app = page.locator("#app");
+    await expect(app).toContainText(/0\/\d+ bloques/);
 
-    // Simula que la app se va a segundo plano (pantalla bloqueada / cambio de
-    // app) SIN que el usuario haya pausado manualmente — dispara el listener
-    // real de visibilitychange (no una versión simulada de la función).
-    await page.evaluate(() => {
-      Object.defineProperty(document, "hidden", { value: true, configurable: true });
+    // Sale de la app sin pausar: dispara los listeners reales de visibilitychange.
+    const setHidden = (hidden) => page.evaluate((h) => {
+      Object.defineProperty(document, "hidden", { value: h, configurable: true });
       document.dispatchEvent(new Event("visibilitychange"));
-    });
-
-    const frozen = await page.evaluate(() => {
+    }, hidden);
+    // Retrocede los instantes guardados para simular minutos u horas fuera.
+    const shift = (field, ms) => page.evaluate(([f, d]) => {
       const execution = S.days[todayStr()].workoutExecution;
-      return { resumedAt: execution.resumedAt, elapsedSeconds: execution.elapsedSeconds };
-    });
-    expect(frozen.resumedAt, "al ocultarse, resumedAt debe quedar en null (pausa implícita)").toBeNull();
-    expect(frozen.elapsedSeconds, "recién iniciada, el tiempo congelado debe ser casi 0").toBeLessThan(30);
-
-    // Con resumedAt en null, elapsedSeconds() no debe sumar nada aunque "ahora"
-    // esté 2 horas en el futuro (simula la app cerrada ese tiempo real).
-    const afterTwoHours = await page.evaluate(() => {
+      execution[f] = new Date(Date.parse(execution[f]) - d).toISOString();
+    }, [field, ms]);
+    const read = () => page.evaluate(() => {
       const execution = S.days[todayStr()].workoutExecution;
-      return WORKOUT_PLAYER.elapsedSeconds(execution, Date.now() + 2 * 3600 * 1000);
+      return { status: execution.status, awayAt: execution.awayAt, elapsed: WORKOUT_PLAYER.elapsedSeconds(execution, Date.now()) };
     });
-    expect(afterTwoHours).toBe(frozen.elapsedSeconds);
-    expect(afterTwoHours, "no debe acercarse a las 2h (7200s) que antes se contaban de más").toBeLessThan(30);
 
-    // Al volver (cualquier interacción re-normaliza la ejecución), el
-    // cronómetro retoma desde AHORA, no desde el hueco de 2 horas.
-    const resumedAt = await page.evaluate(() => normalizedWorkoutExecution(todayStr()).resumedAt);
-    expect(resumedAt).toBeTruthy();
-    expect(Date.now() - Date.parse(resumedAt)).toBeLessThan(10_000);
+    // 1) 15 minutos fuera (descanso mirando el móvil, otra app): cuentan.
+    await setHidden(true);
+    expect((await read()).awayAt, "al salir se anota cuándo").toBeTruthy();
+    await shift("resumedAt", 15 * 60 * 1000);
+    await shift("awayAt", 15 * 60 * 1000);
+    await setHidden(false);
+    let state = await read();
+    expect(state.status).toBe("in_progress");
+    expect(state.awayAt).toBeNull();
+    expect(state.elapsed).toBeGreaterThanOrEqual(15 * 60);
+    await expect(app.locator(".player-clock")).toContainText(/^15:0\d$/);
+
+    // 2) Se olvida la sesión 3 horas: al volver queda en pausa donde se dejó.
+    await setHidden(true);
+    await shift("resumedAt", 3 * 3600 * 1000);
+    await shift("awayAt", 3 * 3600 * 1000);
+    await setHidden(false);
+    state = await read();
+    expect(state.status).toBe("paused");
+    expect(state.elapsed, "no suma las 3 horas fuera").toBeLessThan(16 * 60);
+    expect(state.elapsed).toBeGreaterThanOrEqual(15 * 60);
+    await expect(page.getByRole("button", { name: /Reanudar/ }).first()).toBeVisible();
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });

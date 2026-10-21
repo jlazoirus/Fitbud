@@ -424,6 +424,7 @@
     execution.status=["in_progress","paused","completed","partial"].includes(saved.status)?saved.status:"in_progress";
     execution.elapsedSeconds=Math.max(0,Math.round(number(saved.elapsedSeconds,0)));
     execution.resumedAt=execution.status==="in_progress"?(saved.resumedAt||iso(now)):null;
+    execution.awayAt=execution.status==="in_progress"&&saved.awayAt?saved.awayAt:null;
     execution.currentStep=Math.round(clamp(saved.currentStep,0,Math.max(0,execution.steps.length-1)));
     if(execution.status==="in_progress"||execution.status==="paused"){
       const next=execution.steps.findIndex(step=>step.status==="pending");
@@ -459,6 +460,27 @@
       elapsed+=Math.max(0,(new Date(now==null?Date.now():now)-new Date(execution.resumedAt))/1000);
     }
     return Math.round(elapsed);
+  }
+  // REQ-244: la duración corre de inicio a fin, también con la app en segundo
+  // plano. Solo una ausencia más larga que AWAY_LIMIT_SECONDS (sesión olvidada)
+  // deja la sesión en pausa en el momento en que se salió de la app.
+  const AWAY_LIMIT_SECONDS=60*60;
+  function returnFromAway(execution,now){
+    if(!execution||!execution.awayAt)return "none";
+    const awayAt=execution.awayAt;
+    execution.awayAt=null;
+    if(execution.status!=="in_progress")return "none";
+    const gap=(new Date(now==null?Date.now():now)-new Date(awayAt))/1000;
+    if(!(gap>AWAY_LIMIT_SECONDS))return "counted";
+    execution.elapsedSeconds=elapsedSeconds(execution,awayAt);
+    execution.resumedAt=null;
+    execution.status="paused";
+    if(execution.timer){
+      execution.timer.remainingSeconds=timerRemaining(execution.timer,awayAt);
+      execution.timer.running=false;
+      execution.timer.endsAt=null;
+    }
+    return "paused";
   }
   function timerRemaining(timer,now){
     if(!timer)return 0;
@@ -524,6 +546,8 @@
     createExecution,
     normalizeExecution,
     elapsedSeconds,
+    AWAY_LIMIT_SECONDS,
+    returnFromAway,
     timerRemaining,
     progress,
     strengthTotals,
