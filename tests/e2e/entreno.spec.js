@@ -639,7 +639,7 @@ test.describe("Progresiones", () => {
   });
 });
 
-// REQ-246 (Jonathan): "Sustituir" proponía cualquier ejercicio del mismo patrón
+// REQ-247 (Jonathan): "Sustituir" proponía cualquier ejercicio del mismo patrón
 // ("pull": dominadas para un face pull, jalón para un remo). Ahora solo los que
 // trabajan el mismo músculo principal.
 test.describe("Sustituir ejercicio", () => {

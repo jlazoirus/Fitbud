@@ -5577,7 +5577,7 @@ function openExerciseSubstitution(ds){
   const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
   const currentExercise=exerciseBySlug(step.exerciseSlug,true);
   if(!currentExercise){toast("No se pudo resolver el ejercicio actual");return;}
-  // REQ-246: solo ejercicios con el mismo músculo principal, no el mismo patrón.
+  // REQ-247: solo ejercicios con el mismo músculo principal, no el mismo patrón.
   const muscle=EXERCISE_SUBSTITUTION.primaryMuscle(currentExercise);
   const candidates=EXERCISE_SUBSTITUTION.candidates(currentExercise,exerciseCatalog(false))
     .filter(ex=>exerciseCompatibleForWorkout(ex,ds));
@@ -10238,7 +10238,8 @@ async function aiEstimate(){
   try{
     const fallback=JSON.stringify({kcal:500,proteina_g:25,carbohidratos_g:55,grasa_g:20,nota:"Estimación de referencia. Ajusta la porción si conoces la receta."});
     const quota=coachQuota("meal_estimate",requestId,"estimate",fallback,{},hashText(name.toLowerCase()));
-    const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". Responde SOLO JSON: {"kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve"}`,400,quota);
+    // REQ-246: misma forma que el schema del servidor; aquí no se muestran preguntas.
+    const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". No hagas preguntas: deja "preguntas" vacío y da tu mejor estimación. Responde SOLO JSON: {"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve","preguntas":[]}`,400,quota);
     const j=parseJSON(txt);
     const applied=applyEstimatedMacros(j);
     out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}${applied}</div>`;

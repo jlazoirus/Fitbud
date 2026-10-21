@@ -628,7 +628,9 @@ function validateCoachOutput(action, text, validation) {
   if (action === "meal_estimate") {
     if (![data.kcal, data.proteina_g, data.carbohidratos_g, data.grasa_g].every(finiteNumber)) return false;
     if (data.preguntas == null) return true;
-    return Array.isArray(data.preguntas) && data.preguntas.length <= 3
+    // REQ-246: el schema no puede topar las preguntas y el cliente muestra como
+    // mucho 2; que el modelo traiga mas no invalida los macros.
+    return Array.isArray(data.preguntas)
       && data.preguntas.every(q => typeof q === "string" && q.length <= 300);
   }
   if (action === "macro_review") {

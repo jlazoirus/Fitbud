@@ -61,7 +61,7 @@ for(const exercise of catalog.filter(item=>!["walking","running","cycling","swim
 }
 for(const slug of Object.keys(variants))if(!bySlug.has(slug))errors.push(`Variantes para slug inexistente: ${slug}`);
 
-// REQ-246: cada ejercicio de fuerza tiene músculo principal, y tanto los
+// REQ-247: cada ejercicio de fuerza tiene músculo principal, y tanto los
 // sustitutos como las versiones más fácil/progresión trabajan ese mismo músculo.
 const substitution=context.globalThis.FITBUD_EXERCISE_SUBSTITUTION;
 const strength=catalog.filter(item=>!["walking","running","cycling","swimming"].includes(item.discipline));
