@@ -1619,34 +1619,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-236`).
 
 ## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
 
-**Estado: implementado.**
+**Estado: implementado.** La tarjeta del tempo es un botón: dice "baja · pausa · sube ⓘ" (o "ritmo ⓘ") y explica el ritmo de cada repetición.
 
-### Origen
-
-Jonathan (2026-10-20), con captura de la tarjeta "3-1-1 · tempo" del reproductor: "No se entiende qué es esto".
-
-### Problema
-
-La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar que son segundos por fase ni en qué orden. RPE y RIR ya tenían ⓘ con explicación; el tempo no.
-
-### Alcance
-
-1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
-2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
-3. `CACHE_NAME` → `fitbud-pwa-v119`.
-
-### Fuera de alcance
-
-- Cambiar los tempos que prescribe el plan.
-
-### Riesgos
-
-- Ninguno: solo presentación.
-
-### Criterios de aceptación
-
-- La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-237`).
 
 ## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
@@ -1949,7 +1924,37 @@ El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (
 - Ningún sustituto ni versión más fácil/progresión del catálogo cambia de músculo principal. ✓ (`scripts/validate-exercises.mjs`)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-248 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
+## REQ-248 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
+
+**Estado: implementado.**
+
+### Origen
+
+Pedido del dueño (2026-10-21): los postulantes aprobados deben tener consumo ilimitado y acceso completo por 90 días.
+
+### Problema y causa raíz
+
+`grantBetaAccess()` (`api/admin.js`) daba el `user_entitlements` de 90 días pero no tocaba `coach_quota_overrides`: la beta quedaba con las cuotas `default` (p. ej. 1 dieta semanal y 20 conversaciones al día). El canje del código (`api/entitlement.js`) tampoco.
+
+### Alcance
+
+1. `grantBetaAccess()` crea un override por acción del coach con `daily_limit = QUOTA_OVERRIDE_MAX` (10.000) que vence con el acceso. Cubre aceptar por correo, cuenta existente y crear/invitar cuenta beta.
+2. `invite-signup` y `redeem`: si el código está en el `review_notes` de una postulación `beta_invited`, crea los mismos overrides; un cupón cualquiera no.
+3. Si fallan, el acceso queda y el admin ve `betaError`; el canje nunca se bloquea. Sin migración SQL.
+4. Textos del admin y `BETA_PROGRAM.md` actualizados; `CACHE_NAME` → `fitbud-pwa-v130`.
+5. Datos: el único aceptado en producción ya tiene los overrides hasta 2027-01-19.
+
+### Riesgos
+
+Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostrando el uso por persona.
+
+### Criterios de aceptación
+
+- Aceptar o crear cuenta beta: 8 overrides de 10.000/día que vencen con el acceso. ✓ (`scripts/test-admin-beta-api.mjs`, `scripts/test-admin-beta-signup.mjs`)
+- Canjear el código de una postulación aceptada crea los overrides; un cupón normal no. ✓ (`scripts/test-invite-signup-api.mjs`, `scripts/test-coupon-api.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
 
 **Estado: implementado.**
 
@@ -1964,7 +1969,7 @@ Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apr
 ### Alcance
 
 1. La clase del tipo va con prefijo (`kind-meal`, `kind-workout`, `kind-resume`, `kind-rest`) y los selectores de icono se ajustan: la agenda vuelve a ser la lista con separadores que define su CSS, con los botones a 16 px del borde de la tarjeta.
-2. `CACHE_NAME` → `fitbud-pwa-v130`.
+2. `CACHE_NAME` → `fitbud-pwa-v131`.
 
 ### Fuera de alcance
 

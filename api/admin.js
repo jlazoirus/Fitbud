@@ -176,8 +176,38 @@ async function grantBetaAccess(userId, caller, e) {
   });
   const data = await responseJson(response);
   if (!response.ok) throw new Error(apiError(data, "No se pudo dar el acceso beta."));
-  return Array.isArray(data) ? data[0] : data;
+  const entitlement = Array.isArray(data) ? data[0] : data;
+  // REQ-248: la beta no tiene tope de uso del coach mientras dure el acceso.
+  // Si falla, el acceso queda dado y el admin lo ve (quotaError).
+  try { await grantBetaUnlimitedQuota(userId, entitlement && entitlement.expires_at, caller, e); }
+  catch (error) { return Object.assign({}, entitlement, { quotaError: String(error.message || error) }); }
+  return entitlement;
 }
+
+// REQ-248: un override por acción con el máximo diario permitido, que vence
+// junto con el acceso beta; al vencer, vuelven las cuotas de su plan.
+async function grantBetaUnlimitedQuota(userId, expiresAt, caller, e) {
+  if (!expiresAt) throw new Error("Falta la fecha de fin del acceso.");
+  const now = new Date().toISOString();
+  const rows = [...COACH_ACTIONS].map((action) => ({
+    user_id: userId,
+    action,
+    daily_limit: QUOTA_OVERRIDE_MAX,
+    bonus_units: 0,
+    enabled: true,
+    expires_at: expiresAt,
+    updated_by: caller,
+    updated_at: now,
+  }));
+  const response = await fetch(e.url + "/rest/v1/coach_quota_overrides?on_conflict=user_id,action", {
+    method: "POST",
+    headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }),
+    body: JSON.stringify(rows),
+  });
+  if (!response.ok) throw new Error(apiError(await responseJson(response), "No se pudo quitar el tope del coach."));
+}
+
+const BETA_QUOTA_ERROR = "Tiene el acceso, pero no se pudo quitar el tope de uso del coach. Ajústalo desde Usuarios → Consumo y cortesía.";
 
 // La cuenta ya existe: si el acceso falla, se informa al admin (que puede dar
 // cortesía a mano) en lugar de deshacer el alta.
@@ -185,7 +215,9 @@ async function betaAccessFor(body, userId, caller, e) {
   if (body.beta !== true || !userId) return {};
   try {
     const entitlement = await grantBetaAccess(userId, caller, e);
-    return { betaAccess: { expires_at: entitlement && entitlement.expires_at } };
+    const out = { betaAccess: { expires_at: entitlement && entitlement.expires_at } };
+    if (entitlement && entitlement.quotaError) out.betaError = BETA_QUOTA_ERROR;
+    return out;
   } catch (error) {
     return { betaError: "No se pudo dar el acceso beta (" + String(error.message || error) + "). Dale cortesía de 90 días desde la lista." };
   }
@@ -771,7 +803,7 @@ function safeRedirect(req, candidate) {
 // ── Postulantes de la beta (REQ-218) ─────────────────────────────────────────
 // Aceptar = crear un código de 90 días (plan quarterly) y dejar listo el
 // mensaje de WhatsApp con el enlace /?codigo=…; la persona crea su cuenta con
-// él y el acceso completo (con las cuotas diarias del coach) se activa solo.
+// él y el acceso completo (sin tope de uso del coach, REQ-248) se activa solo.
 
 const BETA_SELECT = [
   "id", "created_at", "name", "whatsapp", "age_band", "country_city", "source",
@@ -899,8 +931,10 @@ async function acceptBetaApplicant(e, caller, body, req) {
       }
       let betaError = "";
       if (userId) {
-        try { await grantBetaAccess(userId, caller, e); }
-        catch (error) { betaError = "La cuenta quedó creada, pero no se pudo dar el acceso beta. Dale cortesía de 90 días desde Usuarios."; }
+        try {
+          const entitlement = await grantBetaAccess(userId, caller, e);
+          if (entitlement && entitlement.quotaError) betaError = BETA_QUOTA_ERROR;
+        } catch (error) { betaError = "La cuenta quedó creada, pero no se pudo dar el acceso beta. Dale cortesía de 90 días desde Usuarios."; }
       }
       const note = `${new Date().toISOString().slice(0, 10)}: aceptado en la beta; ${existing ? "ya tenía cuenta, se le dio el acceso" : "invitación enviada a " + email} (${BETA_ACCESS_DAYS} días).`;
       const updated = await betaPatch(e, id, {

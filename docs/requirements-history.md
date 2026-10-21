@@ -10114,3 +10114,34 @@ Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar
 
 - Sin foto, la vista previa no se ve; un 500 muestra "(código 500)", un 422 pide describir mejor y "Reintentar" estima. ✓ (`tests/e2e/foto-comida.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura de la tarjeta "3-1-1 · tempo" del reproductor: "No se entiende qué es esto".
+
+### Problema
+
+La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar que son segundos por fase ni en qué orden. RPE y RIR ya tenían ⓘ con explicación; el tempo no.
+
+### Alcance
+
+1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
+2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
+3. `CACHE_NAME` → `fitbud-pwa-v119`.
+
+### Fuera de alcance
+
+- Cambiar los tempos que prescribe el plan.
+
+### Riesgos
+
+- Ninguno: solo presentación.
+
+### Criterios de aceptación
+
+- La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
