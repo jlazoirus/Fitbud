@@ -26,16 +26,15 @@ function extractFunctionSource(src, name) {
   return src.slice(start, i);
 }
 
-// 1. workoutSchedule recibe lightCardioEnabled y sustituye los slots de deporte
-//    (calidad/facil/técnica) por descanso cuando no tienen una sesión real detrás:
-//    "other" nunca tiene sesión real en esos roles, y "strength_only" solo tiene
-//    una ("facil") cuando lightCardioEnabled está activo — nunca debe dejar un id
-//    planificado sin sesión real.
+// 1. workoutSchedule recibe lightCardioEnabled y nunca deja un id planificado sin
+//    sesión real: "strength_only" solo tiene una ("facil") cuando lightCardioEnabled
+//    está activo y sus demás slots de deporte pasan a descanso; "other" (REQ-246)
+//    convierte todos sus slots de deporte en "facil", el día de tu deporte.
 const schedule = extractFunctionSource(html, "workoutSchedule");
 assert.ok(/lightCardioEnabled/.test(schedule), "workoutSchedule debe recibir el parámetro lightCardioEnabled.");
-assert.ok(/primary==="other"\|\|primary==="strength_only"/.test(schedule),
-  "workoutSchedule debe distinguir 'other' y 'strength_only' como deportes sin plantilla real.");
-assert.ok(/strength_only"&&lightCardioEnabled/.test(schedule),
+assert.ok(/primary==="other"\)\{\s*sessions=sessions\.map\(id=>sportIds\.has\(id\)\?"facil":id\)/.test(schedule),
+  "workoutSchedule debe convertir los slots de deporte de 'other' en el día de tu deporte (facil).");
+assert.ok(/primary==="strength_only"\)\{\s*const realSportIds=lightCardioEnabled\?new Set\(\["facil"\]\)/.test(schedule),
   "workoutSchedule debe tratar 'facil' como sesión real solo cuando strength_only tiene lightCardioEnabled activo.");
 assert.ok(/sportIds\.has\(id\)&&!realSportIds\.has\(id\)\)\?"descanso":id/.test(schedule),
   "workoutSchedule debe sustituir por descanso los slots de deporte sin sesión real.");

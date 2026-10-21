@@ -36,10 +36,10 @@ function roleForToday(dow, overrides = {}) {
     prefs.primarySport,
   );
 
-  if (prefs.primarySport === "other" || prefs.primarySport === "strength_only") {
-    const realSportIds = prefs.primarySport === "strength_only" && prefs.lightCardioEnabled
-      ? new Set(["facil"])
-      : new Set();
+  if (prefs.primarySport === "other") {
+    sessions = sessions.map((id) => (sportIds.has(id) ? "facil" : id));
+  } else if (prefs.primarySport === "strength_only") {
+    const realSportIds = prefs.lightCardioEnabled ? new Set(["facil"]) : new Set();
     sessions = sessions.map((id) => (sportIds.has(id) && !realSportIds.has(id) ? "descanso" : id));
   }
 

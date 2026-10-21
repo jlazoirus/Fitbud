@@ -1,7 +1,7 @@
 // REQ-206: registrar a mano lo que entrenaste (también en un día de descanso),
 // con estimación de calorías determinista (MET × kg × horas; 0 llamadas pagadas).
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, todayYmd, USER_ID } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, todayYmd, USER_ID, trainingDaysIncludingToday } from "./helpers.js";
 
 // Día de hoy ya preparado (comidas pendientes) para que Hoy muestre la agenda.
 const meal = (name) => ({ done: false, ovr: { name, kcal: 600, p: 40, c: 60, f: 20 } });
@@ -99,6 +99,50 @@ test.describe("Actividad registrada a mano", () => {
     await overlay.getByRole("button", { name: "Guardar actividad" }).click();
     await expect(page.locator("#app .activity-row")).toContainText("30 min · Intensa · ≈ 430 kcal");
     expect(await page.evaluate(() => trainingDayResult(todayStr()))).toBe("done");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+  test("REQ-246: con \"Otra actividad\" el día de tu deporte se registra y no es un descanso", async ({ page, context }) => {
+    // Como Diego: otro deporte + gimnasio, 4 días; hoy en exterior (su pádel), el resto en gimnasio.
+    const today = new Date().getDay();
+    const days = trainingDaysIncludingToday();
+    const prefs = completePrefs({
+      primarySport: "other", trainingPriority: "composition", trainingExperience: "beginner",
+      trainingDays: days, trainingLocations: Object.fromEntries(days.map((d) => [d, d === today ? "outdoor" : "gym"])),
+    });
+    await installMocks(context, { prefs });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    // Antes: los días de deporte de "other" pasaban a "Descanso total".
+    const week = await page.evaluate(() => {
+      const out = [];
+      for (let i = 0; i < 7; i++) out.push(effectiveWorkout(addDays(todayStr(), i)).workout.name);
+      return out;
+    });
+    expect(week.filter((n) => n === "Día de tu deporte")).toHaveLength(2);
+    expect(week.filter((n) => n.startsWith("Gimnasio"))).toHaveLength(2);
+    expect(week[0]).toBe("Día de tu deporte");
+    // Sin registrar no cuenta como sesión perdida.
+    expect(await page.evaluate(() => trainingDayResult(todayStr()))).toBe("rest");
+
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await expect(app).toContainText("Día de tu deporte");
+    await expect(app).not.toContainText("Descanso total");
+    await expect(page.getByRole("button", { name: "Iniciar sesión guiada" })).toHaveCount(0);
+    await expect(app).toContainText("Si hoy no la haces, no cuenta como sesión perdida.");
+    await page.getByRole("button", { name: "Registrar mi actividad" }).click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay.locator("#ma_sport")).toHaveValue("other");
+    await overlay.locator("#ma_sport").selectOption("padel");
+    await overlay.getByRole("button", { name: "Guardar actividad" }).click();
+    await expect(app.locator(".activity-row")).toContainText("Pádel / tenis");
+    await expect(page.getByRole("button", { name: "Registrar mi actividad" })).toHaveCount(0);
+    expect(await page.evaluate(() => trainingDayResult(todayStr()))).toBe("done");
+    // La próxima vez propone lo último que registraste.
+    await page.evaluate(() => openManualActivity(todayStr()));
+    await expect(overlay.locator("#ma_sport")).toHaveValue("padel");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });

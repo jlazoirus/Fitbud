@@ -9962,3 +9962,232 @@ Si la subida de un día falla (token vencido al volver la PWA del fondo, red dé
 - Con la subida de ayer fallida y el primer reintento de hoy también fallando, ayer muestra desayuno y almuerzo registrados y marcados; al completar la cena, lo que sube conserva los tres y la cola queda vacía. ✓ (`tests/e2e/dia-sin-subir.spec.js`; falla sin el arreglo)
 - Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando inicias el entrenamiento comienza en seco de frente; debería haber una cuenta atrás que te avise con 3 segundos de anticipación que ya va a comenzar".
+
+### Problema
+
+`startWorkoutExecution()` creaba la ejecución y empezaba a correr el reloj de la sesión en el mismo toque de "Iniciar sesión guiada", sin margen para dejar el teléfono y ponerse en posición.
+
+### Alcance
+
+1. "Iniciar sesión guiada" (y "Empezar" en el modo conversacional) abre una cuenta atrás a pantalla completa: "Prepárate", 3 · 2 · 1 con un pitido corto y vibración (si el dispositivo la soporta) en cada número, y "Empiezas con: <primer bloque>". Al llegar a 0 suena un pitido más largo, se crea la sesión y arranca el reloj (`beginWorkoutExecution()`).
+2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
+3. Con `prefers-reduced-motion` el número cambia sin animación.
+4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
+5. `CACHE_NAME` → `fitbud-pwa-v117`.
+
+### Fuera de alcance
+
+- Cuenta atrás al terminar descansos o antes de bloques con cronómetro.
+- Preferencia para desactivar el sonido.
+
+### Riesgos
+
+- iOS no implementa `navigator.vibrate`; el pitido depende de que el teléfono no esté en silencio. El aviso visual siempre está.
+
+### Criterios de aceptación
+
+- Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del calentamiento en el reproductor: "No debe asignarte el bloque de calentamiento ni enfriamiento por defecto; debería preguntarte si quieres hacer ese bloque y solo mostrarlo si lo eliges, diciéndote que es opcional".
+
+### Problema
+
+Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba como bloque omitido y dejaba la sesión parcial.
+
+### Alcance
+
+1. `workout-player.js`: bloques `warmup`/`cooldown` con `optional:true`, `optIn` si se eligen y estado `declined` ("Ahora no"), que `progress()` no cuenta en el total ni como omitido.
+2. Reproductor: un bloque opcional no elegido muestra solo la pregunta ("¿Quieres calentar antes de empezar?" / "¿Quieres cerrar con unos minutos suaves?"), duración y "Es opcional", con "Sí, calentar"/"Sí, hacerlo" y "Ahora no"; los movimientos aparecen solo si se elige.
+3. Una sesión con todo hecho salvo bloques rechazados se cierra **completada** (`workoutFullyCompleted`).
+4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-235) ya no anuncia el calentamiento.
+5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v118`.
+
+### Fuera de alcance
+
+- Recordar la elección entre sesiones o una preferencia en Perfil.
+- Volver a ofrecer un bloque después de "Ahora no".
+
+### Riesgos
+
+- Ninguno sobre datos: las sesiones guardadas no cambian.
+
+### Criterios de aceptación
+
+- `optional`/`declined`/`progress` cubiertos en `scripts/validate-workout-player.mjs`. ✓
+- "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura de la tarjeta "3-1-1 · tempo" del reproductor: "No se entiende qué es esto".
+
+### Problema
+
+La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar que son segundos por fase ni en qué orden. RPE y RIR ya tenían ⓘ con explicación; el tempo no.
+
+### Alcance
+
+1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
+2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
+3. `CACHE_NAME` → `fitbud-pwa-v119`.
+
+### Fuera de alcance
+
+- Cambiar los tempos que prescribe el plan.
+
+### Riesgos
+
+- Ninguno: solo presentación.
+
+### Criterios de aceptación
+
+- La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar macros" de "Sopa ramen vegetariana" muestra "Tu coach no pudo completar esta acción. Intenta de nuevo." y bajo los botones se ve una caja vacía con el texto "Foto de la comida".
+
+### Problema
+
+1. `.meal-photo-preview{display:block}` anula el atributo `hidden` del `<img>` de la vista previa: sin foto se ve una imagen rota con su texto alternativo.
+2. `aiEstimate()` (texto) reduce cualquier fallo al mensaje genérico y no ofrece reintentar; REQ-228 solo lo resolvió para la foto. El handler de `/api/claude`, ejecutado en local con Supabase y el proveedor simulados, responde 200 para el texto: la causa está en producción y no se ve desde la UI.
+
+### Alcance
+
+1. `.meal-photo-preview[hidden]{display:none}`.
+2. `estimateErrorMessage(e, photo)` (antes `photoEstimateErrorMessage`) sirve a foto y texto: demora, mucha demanda, no se pudo estimar (con consejo para el texto), sin conexión, y "(código N)" si el motivo no se reconoce.
+3. "Estimar macros" muestra ese mensaje y "Reintentar" (no con el aviso de plan).
+4. `CACHE_NAME` → `fitbud-pwa-v120`.
+
+### Fuera de alcance
+
+- La causa de producción: leer el código que ahora se muestra (o el mensaje completo, con una cuenta admin) o los logs de `/api/claude` en Vercel.
+
+### Riesgos
+
+- Ninguno sobre datos: solo presentación y reintento.
+
+### Criterios de aceptación
+
+- Sin foto, la vista previa no se ve; un 500 muestra "(código 500)", un 422 pide describir mejor y "Reintentar" estima. ✓ (`tests/e2e/foto-comida.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de Entreno con la sesión en curso: el aviso "Señales para detenerte", la tarjeta del plan ("Correr + Gimnasio · Preparar mi plan · Configurar") y la del entrenamiento ("Push B · cambiado · Cambiar entrenamiento") "no tienen sentido una vez iniciado: solo ocupan espacio y confunden; deberían estar colapsados o juntos en un botón".
+
+### Problema
+
+`renderWorkout()` pintaba siempre esas tres piezas antes del reproductor, aunque con la sesión en curso sus acciones están deshabilitadas o no aplican, y el reproductor quedaba abajo.
+
+### Alcance
+
+1. Con la ejecución `in_progress` o `paused`, el reproductor va justo después de la cabecera del día y el aviso, el plan y la tarjeta del entrenamiento quedan en `<details class="wk-context">` "Plan y detalles de hoy" (con el nombre de la sesión), cerrado por defecto; si se abre, sigue abierto entre acciones del reproductor.
+2. La pausa por seguridad (`trainingSafetyHold()`) sigue siempre a la vista. Antes de empezar y con la sesión cerrada (completada o parcial) no cambia nada.
+3. `CACHE_NAME` → `fitbud-pwa-v121`.
+
+### Fuera de alcance
+
+- "Actividad registrada" y "Resumen", que siguen debajo.
+
+### Riesgos
+
+- Ninguno sobre datos: solo cambia el orden y la visibilidad.
+
+### Criterios de aceptación
+
+- Con la sesión en curso, el desplegable existe cerrado después del reproductor, oculta el aviso, "Preparar mi plan" y "Cambiar entrenamiento", sigue abierto tras "Ahora no" y desaparece al descartar. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-240 - Entreno: la demostración y los pasos se abren desde junto al nombre del ejercicio
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del reproductor: la demostración del ejercicio y su paso a paso aparecen al final, después de las series y de "Usar versión más fácil / progresión / Sustituir", "y solo lo esconde para el usuario; debería haber arriba, junto al nombre, un botón que abra el pop-up".
+
+### Problema
+
+`renderActiveWorkoutStep()` incrustaba `exerciseCard()` (vídeo/animación + "Ver técnica" + "Pausar") al final del bloque: para verla había que bajar más allá de todas las series.
+
+### Alcance
+
+1. Junto al nombre (`.player-title`), un botón "▶ Cómo se hace" abre `openExerciseGuide()`: demostración, inicio, pasos, respiración, errores comunes, versión más fácil/difícil y señales para detenerse.
+2. Se quita la tarjeta incrustada del reproductor; la "Vista previa de ejercicios" antes de empezar no cambia.
+3. `CACHE_NAME` → `fitbud-pwa-v122`.
+
+### Fuera de alcance
+
+- Cambiar el contenido del pop-up de técnica.
+
+### Riesgos
+
+- Ninguno sobre datos: solo presentación.
+
+### Criterios de aceptación
+
+- El reproductor no incrusta `.exercise-card`; el botón junto al nombre abre el pop-up con el mismo nombre, la demostración y los pasos. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-241 - Entreno: "Usar progresión" cambia de verdad el ejercicio (o dice que solo toca subir la carga)
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de "Fondos asistidos": "Usar progresión" no cambia el ejercicio; debería cambiar el título y la imagen. Pide revisar que las progresiones de todos los ejercicios tengan sentido, inventariar los que no la tengan y evaluar si la progresión es únicamente subir el peso.
+
+### Problema
+
+`setWorkoutVariation()` solo guardaba `step.variation` y mostraba el texto libre del catálogo ("Progresión: Fondos con menor asistencia"); el ejercicio, el título y la imagen seguían igual. Las progresiones eran texto, sin distinguir otro ejercicio, variante o solo carga, y algunas eran solo carga o duración aunque el catálogo tiene un ejercicio más difícil del mismo patrón.
+
+### Alcance
+
+1. `FITBUD_EXERCISE_VARIANTS` (`exercise-catalog.js`, por slug, vale con catálogo local o de Supabase): versión más fácil y progresión de los 42 ejercicios de fuerza, de tipo `exercise` (otro ejercicio del mismo patrón), `variant` (mismo ejercicio, otra ejecución) o `load`.
+2. Reproductor: `exercise` cambia `exerciseSlug` (título, imagen, "Cómo se hace" y última carga del nuevo) si encaja con el lugar y las limitaciones; `variant` cambia el título; "Volver a …" deshace. `load` muestra "Subir la carga"/"Bajar la carga" con la pauta y la carga de la última vez, sin cambiar nada. El pop-up de técnica usa los mismos nombres.
+3. Progresiones que eran solo carga o duración y pasan a otro ejercicio: Zancada → Sentadilla búlgara, Flexión → Flexión con pies elevados, Plancha frontal → Plancha con toque de hombro, Flexión con pies elevados → Flexión arquero.
+4. Inventario en `docs/exercise-progressions.md`: 10 progresiones a otro ejercicio, 28 variantes, 4 solo carga (Sentadilla búlgara, Peso muerto a una pierna, Subida al banco, Dominada con lastre); resistencia progresa por volumen. `validate-exercises.mjs` exige la entrada completa, destinos existentes del mismo patrón y en el sentido de nivel correcto; corrige `hammer-curl` (`substitute_slugs` era texto).
+5. `CACHE_NAME` → `fitbud-pwa-v123`.
+
+### Fuera de alcance
+
+- Imágenes propias para las variantes (usan la del ejercicio base).
+- Cambiar el texto de `regression`/`progression` en la tabla `exercises`.
+
+### Riesgos
+
+- Ninguno sobre datos: las sesiones guardadas conservan su `variation`; las nuevas guardan además el ejercicio de origen.
+
+### Criterios de aceptación
+
+- Remo sentado → "Usar versión más fácil" pasa a Remo con banda (slug, título) y "Volver a…" lo deshace; Press de banca → "Usar progresión" titula "Press de banca con pausa en el pecho"; Sentadilla búlgara muestra "Subir la carga" y no cambia el ejercicio. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/validate-exercises.mjs` y `node scripts/release-gate.mjs` pasan. ✓
