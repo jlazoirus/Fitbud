@@ -1289,6 +1289,7 @@ function trainingPrefs(){
 }
 const LOCAL_EXERCISES=Array.isArray(window.FITBUD_EXERCISES)?window.FITBUD_EXERCISES:[];
 const EXERCISE_VARIANTS=window.FITBUD_EXERCISE_VARIANTS||{};
+const EXERCISE_SUBSTITUTION=window.FITBUD_EXERCISE_SUBSTITUTION;
 const WORKOUT_EXERCISE_IDS=window.FITBUD_WORKOUT_EXERCISES||{};
 const WORKOUT_PLAYER=window.FITBUD_WORKOUT_PLAYER;
 const TRAINING_PLAN=window.FITBUD_TRAINING_PLAN;
@@ -4469,7 +4470,7 @@ function homeAgendaData(ds){
   const pendingCount=items.filter(i=>i.actions&&i.kind!=="rest").length;
   return {state:"agenda",day,st,ew,workoutOutcome,doneMeals,totMeals,items,pendingCount};
 }
-// REQ-247: el tipo va con prefijo; "meal"/"workout" a secas son las tarjetas
+// REQ-248: el tipo va con prefijo; "meal"/"workout" a secas son las tarjetas
 // globales y metían un borde sin relleno lateral que pegaba los botones al borde.
 function homeAgendaItemHtml(item){
   return `<div class="agenda-item kind-${esc(item.kind)}">
@@ -5578,17 +5579,15 @@ function openExerciseSubstitution(ds){
   const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
   const currentExercise=exerciseBySlug(step.exerciseSlug,true);
   if(!currentExercise){toast("No se pudo resolver el ejercicio actual");return;}
-  const direct=exerciseArray(currentExercise&&currentExercise.substitute_slugs);
-  const samePattern=exerciseCatalog(false).filter(ex=>ex.movement_pattern===currentExercise.movement_pattern).map(ex=>ex.slug);
-  const candidates=[...new Set(direct.concat(samePattern))]
-    .filter(slug=>slug!==step.exerciseSlug)
-    .map(slug=>exerciseBySlug(slug))
+  // REQ-247: solo ejercicios con el mismo músculo principal, no el mismo patrón.
+  const muscle=EXERCISE_SUBSTITUTION.primaryMuscle(currentExercise);
+  const candidates=EXERCISE_SUBSTITUTION.candidates(currentExercise,exerciseCatalog(false))
     .filter(ex=>exerciseCompatibleForWorkout(ex,ds));
   const body=candidates.length?candidates.map(ex=>`<button class="opt" onclick="applyExerciseSubstitution('${ds}','${esc(ex.slug)}')">
-      <b>${esc(ex.name)}</b><div class="o-meta">${esc(ex.regression)} · mismo patrón: ${esc(ex.movement_pattern)}</div>
-    </button>`).join(""):'<div class="alert">No hay una sustitución compatible con tu lugar y limitaciones actuales.</div>';
+      <b>${esc(ex.name)}</b><div class="o-meta">Músculo principal: ${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}</div>
+    </button>`).join(""):`<div class="alert">No hay otro ejercicio para ${esc(muscle?muscle.toLowerCase():"este músculo")} compatible con tu lugar y limitaciones de hoy.</div>`;
   modal(`<h3>Sustituir ejercicio</h3>
-    <p class="muted small">Se conservan las series, repeticiones y el objetivo del movimiento.</p>${body}`);
+    <p class="muted small">Opciones que trabajan el mismo músculo principal${muscle?` (${esc(muscle.toLowerCase())})`:""}. Se conservan las series, repeticiones y el objetivo.</p>${body}`);
 }
 function applyExerciseSubstitution(ds,slug){
   const exercise=exerciseBySlug(slug);if(!exercise||!exerciseCompatibleForWorkout(exercise,ds))return;
