@@ -139,3 +139,42 @@ test("comida del plan + foto de otro plato → estima lo que se ve, no lo planea
   await expect(overlay.locator("#f_name")).toHaveValue("Pasta alfredo con parmesano");
   expect(errors).toEqual([]);
 });
+
+// REQ-238: sin foto no se ve la caja rota "Foto de la comida", y "Estimar macros"
+// por texto dice qué falló (con código) y deja reintentar, como la foto.
+test("estimar por texto → fallo con motivo y código → reintentar", async ({ page, context }) => {
+  await installMocks(context);
+  const responses = [
+    { status: 500, body: { error: "fallo raro" } },
+    { status: 422, body: { error: "La opcion preparada no paso las validaciones." } },
+    { status: 200, body: { text: JSON.stringify({ nombre: "Sopa ramen vegetariana", kcal: 520, proteina_g: 18, carbohidratos_g: 78, grasa_g: 14, nota: "Tazón mediano.", preguntas: [] }) } },
+  ];
+  const coachCalls = [];
+  await context.route("**/api/claude", (route) => {
+    coachCalls.push(JSON.parse(route.request().postData() || "{}"));
+    const r = responses[Math.min(coachCalls.length - 1, responses.length - 1)];
+    return route.fulfill({ status: r.status, contentType: "application/json", body: JSON.stringify(r.body) });
+  });
+  await seedLoggedInUser(page);
+  await autoDismissNudges(page);
+  const errors = collectConsoleErrors(page);
+  await gotoApp(page);
+
+  await page.locator("#tabs").getByText("Nutrición").click();
+  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  const overlay = page.locator("#overlay");
+  await expect(overlay.locator("#f_photo_preview")).toBeHidden();
+  await expect(overlay.getByAltText("Foto de la comida")).toBeHidden();
+
+  await overlay.locator("#f_name").fill("Sopa ramen vegetariana");
+  await overlay.getByRole("button", { name: /Estimar macros/i }).click();
+  await expect(overlay.locator("#aiOut")).toContainText("(código 500)");
+  await overlay.getByRole("button", { name: "Reintentar" }).click();
+  await expect(overlay.locator("#aiOut")).toContainText("Descríbela con más detalle");
+  await overlay.getByRole("button", { name: "Reintentar" }).click();
+  await expect(overlay.locator("#f_kcal")).toHaveValue("520");
+  await expect(overlay.locator("#aiOut")).toContainText("Tazón mediano.");
+  await expect(overlay.getByRole("button", { name: "Reintentar" })).toHaveCount(0);
+  expect(coachCalls.every((c) => c.quota.action === "meal_estimate" && !c.image)).toBe(true);
+  expect(errors.filter((e) => !/status of (500|422)/.test(e))).toEqual([]);
+});

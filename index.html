@@ -457,6 +457,7 @@
   .closebar button{background:var(--surf3);width:36px;height:36px;border-radius:999px;font-size:16px;color:var(--muted)}
   .ai-box{background:var(--accent-dim);border:1px solid var(--border-acc);border-radius:var(--r-md);padding:12px;font-size:14px;margin-top:10px;white-space:pre-wrap;line-height:1.5}
   .meal-photo-preview{display:block;width:100%;max-height:220px;object-fit:cover;border-radius:var(--r-md);margin-top:10px}
+  .meal-photo-preview[hidden]{display:none} /* REQ-238: sin foto no se ve una caja rota */
   .photo-questions{display:grid;gap:8px;margin-top:10px}
   .mic{background:var(--surf3);border:1px solid var(--border-2);width:48px;height:48px;border-radius:var(--r-sm);font-size:20px}
   .mic.live{background:var(--bad);border-color:var(--bad);animation:pulse 1s infinite}
@@ -10036,7 +10037,11 @@ async function aiEstimate(){
     const j=parseJSON(txt);
     const applied=applyEstimatedMacros(j);
     out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}${applied}</div>`;
-  }catch(e){out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>`;}
+  }catch(e){
+    // REQ-238: como la foto (REQ-228), dice qué pasó, con código si no se reconoce, y deja reintentar.
+    out.innerHTML=`<div class="ai-box">⚠️ ${esc(estimateErrorMessage(e,false))}</div>
+      ${e&&(e.paywall||e.trialLimit)?"":`<button class="btn btn-sm" style="margin-top:8px" onclick="aiEstimate()">Reintentar</button>`}`;
+  }
   finally{endCoachAction(actionKey);}
 }
 
@@ -10102,23 +10107,24 @@ Responde SOLO JSON: {"nombre":"...","kcal":0,"proteina_g":0,"carbohidratos_g":0,
   }catch(e){renderPhotoEstimateError(e);}
   finally{endCoachAction(actionKey);}
 }
-// REQ-228: el error de la foto dice qué pasó (sin hablar de tecnología) y deja
-// reintentar con la misma foto; un motivo no reconocido muestra su código.
-function photoEstimateErrorMessage(e){
+// REQ-228: el error de la estimación dice qué pasó (sin hablar de tecnología) y
+// deja reintentar; un motivo no reconocido muestra su código. REQ-238: también
+// para "Estimar macros" por texto (photo=false).
+function estimateErrorMessage(e,photo){
   const message=String(e&&e.message||"");
   const status=Number(e&&e.status)||0;
   if(e&&(e.paywall||e.trialLimit))return coachErrorMessage(e);
-  if(/tard[oó] demasiado/i.test(message)||status===504)return "El análisis de la foto tardó demasiado. Inténtalo de nuevo.";
-  if(/imagen|formato/i.test(message)||status===413)return "No pudimos leer esta foto. Prueba con otra o con una captura de pantalla.";
+  if(/tard[oó] demasiado/i.test(message)||status===504)return photo?"El análisis de la foto tardó demasiado. Inténtalo de nuevo.":"La estimación tardó demasiado. Inténtalo de nuevo.";
+  if(photo&&(/imagen|formato/i.test(message)||status===413))return "No pudimos leer esta foto. Prueba con otra o con una captura de pantalla.";
   if(status===429||status===503||status===529||/overloaded|rate/i.test(message))return "Ahora mismo hay mucha demanda. Inténtalo en un minuto.";
-  if(status===422)return "No pudimos estimar esta foto. Prueba con otra foto o describe la comida.";
+  if(status===422)return photo?"No pudimos estimar esta foto. Prueba con otra foto o describe la comida.":"No pudimos estimar esta comida. Descríbela con más detalle (cantidad, cómo se preparó) o ingresa los macros.";
   if(/fetch|network|load failed|conexi/i.test(message))return "No hay conexión. Revisa tu internet e inténtalo de nuevo.";
   const generic=coachErrorMessage(e);
   return status?`${generic} (código ${status})`:generic;
 }
 function renderPhotoEstimateError(e){
   const out=$("#aiOut");if(!out)return;
-  out.innerHTML=`<div class="ai-box">⚠️ ${esc(photoEstimateErrorMessage(e))}</div>
+  out.innerHTML=`<div class="ai-box">⚠️ ${esc(estimateErrorMessage(e,true))}</div>
     <button class="btn btn-sm" style="margin-top:8px" onclick="photoEstimateRound(true)">Reintentar</button>`;
 }
 // REQ-230: aplica la estimación a los campos, los resalta y devuelve la línea
