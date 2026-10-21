@@ -39,6 +39,29 @@ function visit(node,label){
 }
 visit(workouts,"workouts");
 
+// REQ-240: cada ejercicio de fuerza dice qué hacen "versión más fácil" y
+// "progresión": otro ejercicio del mismo patrón (más fácil o más difícil según
+// el nivel), una variante con nombre propio o solo la carga.
+const variants=context.globalThis.FITBUD_EXERCISE_VARIANTS||{};
+const LEVEL={beginner:0,intermediate:1,advanced:2};
+const bySlug=new Map(catalog.map(exercise=>[exercise.slug,exercise]));
+for(const exercise of catalog.filter(item=>!["walking","running","cycling","swimming"].includes(item.discipline))){
+  const entry=variants[exercise.slug];
+  if(!entry){errors.push(`${exercise.slug}: sin versión más fácil ni progresión definidas`);continue;}
+  for(const direction of ["regression","progression"]){
+    const v=entry[direction];
+    if(!v||!["exercise","variant","load"].includes(v.kind)||!String(v.name||"").trim()){errors.push(`${exercise.slug}.${direction}: tipo o nombre inválido`);continue;}
+    if(v.kind!=="exercise")continue;
+    const target=bySlug.get(v.to);
+    if(!target||target.slug===exercise.slug){errors.push(`${exercise.slug}.${direction}: destino inexistente ${v.to}`);continue;}
+    if(target.movement_pattern!==exercise.movement_pattern)errors.push(`${exercise.slug}.${direction}: ${v.to} es de otro patrón`);
+    const delta=(LEVEL[target.level]||0)-(LEVEL[exercise.level]||0);
+    if(direction==="progression"?delta<0:delta>0)errors.push(`${exercise.slug}.${direction}: ${v.to} va en sentido contrario de nivel`);
+  }
+}
+for(const slug of Object.keys(variants))if(!bySlug.has(slug))errors.push(`Variantes para slug inexistente: ${slug}`);
+for(const exercise of catalog)if(!Array.isArray(exercise.substitute_slugs))errors.push(`${exercise.slug}: substitute_slugs no es lista`);
+
 const sql=fs.readFileSync(path.join(root,"supabase","exercises.sql"),"utf8");
 for(const slug of ids){
   if(!sql.includes(`'${slug}'`))errors.push(`SQL no incluye ${slug}`);

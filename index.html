@@ -1286,6 +1286,7 @@ function trainingPrefs(){
   return trainingPrefsFromPrefs((profile&&profile.prefs)||{});
 }
 const LOCAL_EXERCISES=Array.isArray(window.FITBUD_EXERCISES)?window.FITBUD_EXERCISES:[];
+const EXERCISE_VARIANTS=window.FITBUD_EXERCISE_VARIANTS||{};
 const WORKOUT_EXERCISE_IDS=window.FITBUD_WORKOUT_EXERCISES||{};
 const WORKOUT_PLAYER=window.FITBUD_WORKOUT_PLAYER;
 const TRAINING_PLAN=window.FITBUD_TRAINING_PLAN;
@@ -4832,7 +4833,7 @@ function openExerciseGuide(slug){
     <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
     <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
     ${errors.length?`<div class="exercise-copy"><b>Errores comunes:</b> ${esc(errors.join(" · "))}</div>`:""}
-    <div class="exercise-copy"><b>Más fácil:</b> ${esc(exercise.regression)}<br><b>Más difícil:</b> ${esc(exercise.progression)}</div>
+    <div class="exercise-copy"><b>Más fácil:</b> ${esc((exerciseVariant(exercise,"regression")||{}).name||"")}<br><b>Más difícil:</b> ${esc((exerciseVariant(exercise,"progression")||{}).name||"")}</div>
     ${signals.length?`<div class="exercise-safety"><b>Detente si:</b> ${esc(signals.join(" · "))}</div>`:""}`);
 }
 function toggleExerciseMotion(button){
@@ -5064,7 +5065,26 @@ function formatWorkoutTime(seconds){
 function workoutPhaseLabel(phase){
   return {warmup:"Calentamiento",main:"Bloque principal",recovery:"Recuperación",cooldown:"Vuelta a la calma"}[phase]||"Sesión";
 }
+// REQ-240: versión más fácil / progresión de un ejercicio: otro ejercicio del
+// catálogo (cambia título e imagen), una variante del mismo o solo la carga.
+function exerciseVariant(exercise,direction){
+  if(!exercise)return null;
+  const mapped=EXERCISE_VARIANTS[exercise.slug]&&EXERCISE_VARIANTS[exercise.slug][direction];
+  if(mapped)return mapped;
+  const text=String(exercise[direction]||"").trim();
+  return text?{kind:"variant",name:text}:null;
+}
+function workoutStepTitle(step,exercise){
+  if(step.variationKind==="variant"&&step.variationName)return step.variationName;
+  return exercise?exercise.name:step.label;
+}
 function workoutVariationLabel(step,exercise){
+  if(step.variation&&step.variation!=="standard"&&step.variationName){
+    const label=step.variation==="regression"?"Versión más fácil":"Progresión";
+    const from=step.variationFromSlug&&exerciseBySlug(step.variationFromSlug,true);
+    if(step.variationKind==="exercise")return `${label}: ${step.variationName}${from?` en lugar de ${from.name}`:""}. Mismas series y repeticiones objetivo.`;
+    return `${label} del mismo ejercicio. Mismas series y repeticiones objetivo.`;
+  }
   if(step.variation==="regression")return exercise&&exercise.regression?`Versión más fácil: ${exercise.regression}`:"Versión más fácil";
   if(step.variation==="progression")return exercise&&exercise.progression?`Progresión: ${exercise.progression}`:"Progresión";
   if(step.exerciseSlug!==step.originalExerciseSlug)return "Ejercicio sustituido conservando series y objetivo";
@@ -5371,9 +5391,43 @@ function toggleWorkoutSet(ds,stepIndex,setIndex){
 function setWorkoutVariation(ds,variation){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
-  step.variation=variation;
+  const exercise=exerciseBySlug(step.exerciseSlug,true);
+  const v=exerciseVariant(exercise,variation);if(!v)return;
+  if(v.kind==="load"){explainLoadVariation(ds,variation,v,exercise);return;}
+  if(v.kind==="exercise"){
+    const target=exerciseBySlug(v.to,true);
+    if(!target||!exerciseCompatibleForWorkout(target,ds)){toast(`${v.name} no encaja con tu lugar o tus limitaciones de hoy`);return;}
+    step.variationFromSlug=step.exerciseSlug;
+    step.exerciseSlug=target.slug;
+  }else step.variationFromSlug=step.exerciseSlug;
+  step.variation=variation;step.variationName=v.name;step.variationKind=v.kind;
   persistWorkoutExecution(ds,execution,true);
-  toast(variation==="regression"?"Versión más fácil seleccionada":"Progresión seleccionada");
+  toast(`${variation==="regression"?"Versión más fácil":"Progresión"}: ${v.name}`);
+}
+function clearWorkoutVariation(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
+  if(step.variationFromSlug)step.exerciseSlug=step.variationFromSlug;
+  step.variation="standard";
+  delete step.variationFromSlug;delete step.variationName;delete step.variationKind;
+  persistWorkoutExecution(ds,execution,true);
+}
+// La progresión de algunos ejercicios es solo la carga: no hay otro ejercicio
+// al que pasar, así que se explica cómo subirla (con lo de la última vez, REQ-232).
+function explainLoadVariation(ds,variation,v,exercise){
+  const last=exercise?lastLoadLabel(ds,exercise.slug):"";
+  const step=currentWorkoutStep(normalizedWorkoutExecution(ds));
+  const rpe=step&&step.targetRpe;
+  modal(variation==="progression"
+    ?`<h3>Cómo progresar</h3>
+      <p class="exercise-copy">En ${esc(exercise?exercise.name:"este ejercicio")} la progresión es subir la carga: <b>${esc(v.name)}</b>. No cambia el ejercicio.</p>
+      ${last?`<p class="exercise-copy">La última vez: <b>${esc(last)}</b>.</p>`:""}
+      <p class="exercise-copy">Cuando completes todas las series en el rango de repeticiones${rpe?` sin pasar de RPE ${esc(rpe)}`:""}, sube un poco: 2,5–5 kg, el siguiente lastre o un escalón más alto.</p>
+      <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`
+    :`<h3>Hacerlo más fácil</h3>
+      <p class="exercise-copy">En ${esc(exercise?exercise.name:"este ejercicio")} la versión más fácil es bajar la carga: <b>${esc(v.name)}</b>. Mantén la técnica y el esfuerzo objetivo.</p>
+      ${last?`<p class="exercise-copy">La última vez: <b>${esc(last)}</b>.</p>`:""}
+      <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`);
 }
 function exerciseCompatibleForWorkout(exercise,ds){
   if(!exercise||exercise.active===false)return false;
@@ -5408,7 +5462,7 @@ function applyExerciseSubstitution(ds,slug){
   const exercise=exerciseBySlug(slug);if(!exercise||!exerciseCompatibleForWorkout(exercise,ds))return;
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
-  step.exerciseSlug=slug;step.label=exercise.name;step.variation="substitution";
+  step.exerciseSlug=slug;step.label=exercise.name;step.variation="substitution";delete step.variationFromSlug;delete step.variationName;delete step.variationKind;
   persistWorkoutExecution(ds,execution,false);closeModal();render();toast("Ejercicio sustituido");
 }
 function workoutFullyCompleted(execution){
@@ -5677,6 +5731,15 @@ function explainWorkoutTempo(ds){
   modal(`<h3>Ritmo de cada repetición</h3>${body}
     <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`);
 }
+function workoutVariationButtons(ds,step,exercise){
+  if(step.variation&&step.variation!=="standard"&&step.variationName){
+    const from=step.variationFromSlug&&exerciseBySlug(step.variationFromSlug,true);
+    return `<button class="btn btn-sm" onclick="clearWorkoutVariation('${ds}')">Volver a ${esc(from?from.name:"la versión del plan")}</button>`;
+  }
+  const easier=exerciseVariant(exercise,"regression"),harder=exerciseVariant(exercise,"progression");
+  return `${easier?`<button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','regression')">${easier.kind==="load"?"Bajar la carga":"Usar versión más fácil"}</button>`:""}
+      ${harder?`<button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','progression')">${harder.kind==="load"?"Subir la carga":"Usar progresión"}</button>`:""}`;
+}
 function renderActiveWorkoutStep(ds,execution){
   const step=currentWorkoutStep(execution);
   if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza la sesión para guardar el resultado.</div>';
@@ -5699,7 +5762,7 @@ function renderActiveWorkoutStep(ds,execution){
   const variation=workoutVariationLabel(step,exercise);
   return `<div class="player-step">
     <div class="player-phase">${workoutPhaseLabel(step.phase)} · ejercicio ${stepIndex} de ${execution.steps.length-2}</div>
-    <div class="player-title"><h3>${esc(exercise?exercise.name:step.label)}</h3>${exercise?`<button class="btn btn-sm player-howto" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Cómo se hace ${esc(exercise.name)}: demostración y pasos">▶ Cómo se hace</button>`:""}</div>
+    <div class="player-title"><h3>${esc(workoutStepTitle(step,exercise))}</h3>${exercise?`<button class="btn btn-sm player-howto" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Cómo se hace ${esc(exercise.name)}: demostración y pasos">▶ Cómo se hace</button>`:""}</div>
     <div class="player-dose">
       <div class="scard"><div class="n">${step.prescribedSets}</div><div class="l">series</div></div>
       <div class="scard"><div class="n">${esc(step.reps)}</div><div class="l">reps objetivo</div></div>
@@ -5714,9 +5777,7 @@ function renderActiveWorkoutStep(ds,execution){
     ${execution.timer&&execution.timer.kind==="rest"?renderWorkoutTimer(ds,execution,step):""}
     <div class="set-list">${step.sets.map((set,index)=>renderStrengthSet(ds,step,stepIndex,set,index)).join("")}</div>
     <button class="btn set-add" onclick="addWorkoutSet('${ds}',${stepIndex})">+ Añadir serie</button>
-    <div class="row wrap" style="margin-top:12px">
-      <button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','regression')">Usar versión más fácil</button>
-      <button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','progression')">Usar progresión</button>
+    <div class="row wrap" style="margin-top:12px">${workoutVariationButtons(ds,step,exercise)}
       <button class="btn btn-sm" onclick="openExerciseSubstitution('${ds}')">Sustituir</button>
     </div>
     <div class="player-controls">
