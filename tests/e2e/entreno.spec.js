@@ -136,7 +136,7 @@ test.describe("Entreno", () => {
     await startGuidedSession(page);
     await expect(app).toContainText(/0\/\d+ bloques/);
 
-    // Omite UN bloque (calentamiento, siempre el primero; REQ-235: tras elegir
+    // Omite UN bloque (calentamiento, siempre el primero; REQ-236: tras elegir
     // hacerlo) y ABANDONA — nunca "Finalizar y guardar sesión" ni "Terminar parcialmente".
     await page.getByRole("button", { name: "Sí, calentar" }).click();
     await page.getByRole("button", { name: "Omitir bloque" }).click();
@@ -389,7 +389,7 @@ test.describe("Entreno", () => {
   });
 });
 
-// REQ-234 (Jonathan): la sesión no arranca en seco; 3, 2, 1 antes de que corra el reloj.
+// REQ-235 (Jonathan): la sesión no arranca en seco; 3, 2, 1 antes de que corra el reloj.
 test.describe("Cuenta atrás", () => {
   test("al iniciar hay 3 s de aviso, se puede cancelar o saltar", async ({ page, context }) => {
     await installMocks(context);
@@ -407,7 +407,7 @@ test.describe("Cuenta atrás", () => {
     await start.click();
     await expect(countdown).toBeVisible();
     await expect(countdown).toContainText("Prepárate");
-    // REQ-235: el calentamiento es opcional y se pregunta después; no se anuncia.
+    // REQ-236: el calentamiento es opcional y se pregunta después; no se anuncia.
     await expect(countdown).not.toContainText("Empiezas con");
     await expect(countdown.locator(".countdown-n")).toHaveText("3");
     expect(await hasExecution()).toBe(false);
@@ -488,7 +488,7 @@ test.describe("Última carga", () => {
   });
 });
 
-// REQ-235 (Jonathan): calentamiento y vuelta a la calma no se asignan por defecto.
+// REQ-236 (Jonathan): calentamiento y vuelta a la calma no se asignan por defecto.
 test.describe("Bloques opcionales", () => {
   test("'Ahora no' salta calentamiento y vuelta a la calma y la sesión queda completada", async ({ page, context }) => {
     await installMocks(context);
@@ -527,7 +527,7 @@ test.describe("Bloques opcionales", () => {
   });
 });
 
-// REQ-238 (Jonathan): con la sesión en curso, el aviso, el plan y la tarjeta del
+// REQ-239 (Jonathan): con la sesión en curso, el aviso, el plan y la tarjeta del
 // entrenamiento solo ocupan espacio: van juntos en un desplegable cerrado.
 test.describe("Sesión en curso", () => {
   test("el reproductor va primero y el resto queda en 'Plan y detalles de hoy'", async ({ page, context }) => {
@@ -573,7 +573,7 @@ test.describe("Sesión en curso", () => {
   });
 });
 
-// REQ-236 (Jonathan): la tarjeta "3-1-1 tempo" no se entendía.
+// REQ-237 (Jonathan): la tarjeta "3-1-1 tempo" no se entendía.
 test.describe("Tempo", () => {
   test("la tarjeta dice qué es cada número y al tocarla lo explica", async ({ page, context }) => {
     await installMocks(context);
@@ -620,7 +620,7 @@ test.describe("Calentamiento guiado", () => {
     await expect(app.locator(".plan-timed").first()).toContainText("opcional");
     await startGuidedSession(page);
 
-    // REQ-235: primero pregunta; la lista solo aparece si eliges calentar.
+    // REQ-236: primero pregunta; la lista solo aparece si eliges calentar.
     await expect(app.locator(".optional-offer")).toContainText("¿Quieres calentar antes de empezar?");
     await expect(app.locator(".optional-offer")).toContainText("Es opcional");
     await expect(app.locator(".move-list")).toHaveCount(0);

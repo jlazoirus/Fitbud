@@ -195,7 +195,7 @@
   .csec.collapsed .csec-body{display:none}
   .meal{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:14px 16px;margin-bottom:10px;transition:.2s}
   .meal.done{border-color:var(--border-acc);background:var(--accent-dim)}
-  /* REQ-234: cuenta atrás antes de empezar la sesión */
+  /* REQ-235: cuenta atrás antes de empezar la sesión */
   .countdown{position:fixed;inset:0;z-index:150;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px 16px calc(24px + var(--safe-bottom,0px));background:rgba(5,5,9,.9);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);text-align:center}
   .countdown-label{font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
   .countdown-n{font-family:var(--font-display);font-size:136px;line-height:1;color:var(--accent);font-variant-numeric:tabular-nums}
@@ -464,7 +464,7 @@
   .closebar button{background:var(--surf3);width:36px;height:36px;border-radius:999px;font-size:16px;color:var(--muted)}
   .ai-box{background:var(--accent-dim);border:1px solid var(--border-acc);border-radius:var(--r-md);padding:12px;font-size:14px;margin-top:10px;white-space:pre-wrap;line-height:1.5}
   .meal-photo-preview{display:block;width:100%;max-height:220px;object-fit:cover;border-radius:var(--r-md);margin-top:10px}
-  .meal-photo-preview[hidden]{display:none} /* REQ-237: sin foto no se ve una caja rota */
+  .meal-photo-preview[hidden]{display:none} /* REQ-238: sin foto no se ve una caja rota */
   .photo-questions{display:grid;gap:8px;margin-top:10px}
   .mic{background:var(--surf3);border:1px solid var(--border-2);width:48px;height:48px;border-radius:var(--r-sm);font-size:20px}
   .mic.live{background:var(--bad);border-color:var(--bad);animation:pulse 1s infinite}
@@ -3372,8 +3372,13 @@ function readOnboardingStep(){
     d.heightCm=+$("#ob_height").value;d.weightKg=+$("#ob_weight").value;
     d.bodyFatPct=$("#ob_bf").value?+$("#ob_bf").value:"";d.activityLevel=$("#ob_activity").value;
   }else if(onboardingStep===2){
+    const prevMacros={calorieTarget:d.calorieTarget,proteinTarget:d.proteinTarget,carbTarget:d.carbTarget,fatTarget:d.fatTarget};
     d.goal=$("#ob_goal").value;d.calorieTarget=+$("#ob_kcal").value;d.proteinTarget=+$("#ob_protein").value;
     d.carbTarget=+$("#ob_carbs").value;d.fatTarget=+$("#ob_fat").value;
+    const reconciled=reconcileOnboardingMacros(prevMacros,d);
+    d.calorieTarget=reconciled.calorieTarget;d.carbTarget=reconciled.carbTarget;d.fatTarget=reconciled.fatTarget;
+    if(reconciled.adjusted==="kcal")toast("Ajustamos tus calorías para que cuadren con tus macros");
+    else if(reconciled.adjusted==="macros")toast("Ajustamos tus carbohidratos y grasas a tu nuevo presupuesto");
   }else if(onboardingStep===3){
     d.primarySport=$("#ob_sport")?$("#ob_sport").value:"walking";
     d.strengthPlace=normalizeStrengthPlace($("#ob_strength")&&$("#ob_strength").value);
@@ -3432,6 +3437,34 @@ function applyCalculatedMacros(){
   onboardingDraft.calorieTarget=result.kcal;onboardingDraft.proteinTarget=result.p;
   onboardingDraft.carbTarget=result.c;onboardingDraft.fatTarget=result.f;
   onboardingDraft.maintenanceCalories=result.maintenance;onboardingDraft.macroMethod=result.method;
+}
+// REQ-227: "Ajustar valores" del paso 2 expone kcal/P/C/G por separado; editar solo uno
+// y pulsar "Continuar" (no "Recalcular") dejaba kcal != suma de macros. Reconcilia
+// determinista: si el usuario tocó un macro, kcal se deriva de p·4+c·4+f·9 (mismo
+// invariante que calculateMacroTargets); si solo tocó kcal, la proteína queda fija y
+// carbohidratos/grasa escalan al nuevo presupuesto (mismo patrón que
+// applyWeeklyCheckinProposal), con los pisos de calculateMacroTargets (carb 50g/grasa 45g).
+function reconcileOnboardingMacros(prev,next){
+  const n={calorieTarget:next.calorieTarget,proteinTarget:next.proteinTarget,carbTarget:next.carbTarget,fatTarget:next.fatTarget};
+  if(![n.calorieTarget,n.proteinTarget,n.carbTarget,n.fatTarget].every(Number.isFinite))return{...n,adjusted:""};
+  const macrosChanged=n.proteinTarget!==prev.proteinTarget||n.carbTarget!==prev.carbTarget||n.fatTarget!==prev.fatTarget;
+  const kcalChanged=n.calorieTarget!==prev.calorieTarget;
+  if(macrosChanged){
+    const kcal=Math.round(n.proteinTarget*4+n.carbTarget*4+n.fatTarget*9);
+    return{...n,calorieTarget:kcal,adjusted:kcal!==n.calorieTarget||kcalChanged?"kcal":""};
+  }
+  if(kcalChanged){
+    const cFloor=50,fFloor=45;
+    const protKcal=Math.max(0,prev.proteinTarget)*4;
+    const oldRem=Math.max(0,prev.calorieTarget-protKcal);
+    const newRem=Math.max(0,n.calorieTarget-protKcal);
+    const ratio=oldRem>0?newRem/oldRem:1;
+    const carbTarget=Math.max(cFloor,Math.round(prev.carbTarget*ratio));
+    const fatTarget=Math.max(fFloor,Math.round(prev.fatTarget*ratio));
+    const kcal=Math.round(n.proteinTarget*4+carbTarget*4+fatTarget*9);
+    return{...n,calorieTarget:kcal,carbTarget,fatTarget,adjusted:(carbTarget!==prev.carbTarget||fatTarget!==prev.fatTarget||kcal!==n.calorieTarget)?"macros":""};
+  }
+  return{...n,adjusted:""};
 }
 function onboardingNext(){
   readOnboardingStep();
@@ -5143,7 +5176,7 @@ function startWorkoutExecution(ds){
   if(st.workoutDone&&!st.workoutExecution){toast("Este día ya figura como completado en el historial anterior");return;}
   if(st.workoutExecution){toast("Este día ya tiene una sesión registrada");return;}
   const first=prescription.steps&&prescription.steps[0];
-  // REQ-235: si abre con el calentamiento opcional, después se pregunta; no se anuncia.
+  // REQ-236: si abre con el calentamiento opcional, después se pregunta; no se anuncia.
   const optionalFirst=first&&first.type==="timed"&&first.phase==="warmup";
   openWorkoutCountdown(ds,first&&!optionalFirst?(exerciseBySlug(first.exerciseSlug,true)||{}).name||first.label:"");
 }
@@ -5154,7 +5187,7 @@ function beginWorkoutExecution(ds){
   st.workoutDone=false;
   commitDay(ds);render();toast("Sesión iniciada");
 }
-// REQ-234: la sesión no arranca en seco: 3, 2, 1 con pitido y vibración antes
+// REQ-235: la sesión no arranca en seco: 3, 2, 1 con pitido y vibración antes
 // de que empiece a correr el reloj. "Empezar ya" la salta; "Cancelar" no crea nada.
 let workoutCountdown=null;
 function countdownBeep(final){
@@ -5559,7 +5592,7 @@ function renderMovementStep(ds,execution,step,stepIndex){
     <button class="btn btn-sm" style="width:100%;margin-top:8px" onclick="completeWorkoutStep('${ds}')">${doneLabel} sin terminar la guía</button>
   </div>`;
 }
-// REQ-235: el calentamiento y la vuelta a la calma no se asignan por defecto:
+// REQ-236: el calentamiento y la vuelta a la calma no se asignan por defecto:
 // se ofrecen como opcionales y solo se muestran si el usuario los elige.
 function renderOptionalStepOffer(ds,step){
   const warm=step.phase==="warmup";
@@ -5652,7 +5685,7 @@ function explainWorkoutEffort(){
     <p class="exercise-copy">Usa el objetivo para elegir la carga. Al terminar cada serie, anota el RPE que sentiste.</p>
     <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`);
 }
-// REQ-236: el tempo "3-1-1" son los segundos de cada fase de la repetición:
+// REQ-237: el tempo "3-1-1" son los segundos de cada fase de la repetición:
 // bajar (o soltar el peso de vuelta) · pausa · subir (empujar o tirar).
 function tempoPhases(tempo){
   const m=String(tempo||"").trim().match(/^(\d+)\s*-\s*(\d+)\s*-\s*(\d+)(?:\s*-\s*(\d+))?$/);
@@ -5855,7 +5888,7 @@ function renderWorkout(){
       ${!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar hoy:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','casa')">En casa</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','equipo')">Sin equipo</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
   </div>`);
-  // REQ-238: con la sesión en curso, el reproductor va primero y el aviso, el
+  // REQ-239: con la sesión en curso, el reproductor va primero y el aviso, el
   // plan y la tarjeta del entrenamiento quedan juntos en un desplegable cerrado.
   // La pausa por seguridad sigue siempre a la vista.
   const sessionActive=!!execution&&(execution.status==="in_progress"||execution.status==="paused");
@@ -10033,7 +10066,7 @@ async function aiEstimate(){
     const applied=applyEstimatedMacros(j);
     out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}${applied}</div>`;
   }catch(e){
-    // REQ-237: como la foto (REQ-228), dice qué pasó, con código si no se reconoce, y deja reintentar.
+    // REQ-238: como la foto (REQ-228), dice qué pasó, con código si no se reconoce, y deja reintentar.
     out.innerHTML=`<div class="ai-box">⚠️ ${esc(estimateErrorMessage(e,false))}</div>
       ${e&&(e.paywall||e.trialLimit)?"":`<button class="btn btn-sm" style="margin-top:8px" onclick="aiEstimate()">Reintentar</button>`}`;
   }
@@ -10103,7 +10136,7 @@ Responde SOLO JSON: {"nombre":"...","kcal":0,"proteina_g":0,"carbohidratos_g":0,
   finally{endCoachAction(actionKey);}
 }
 // REQ-228: el error de la estimación dice qué pasó (sin hablar de tecnología) y
-// deja reintentar; un motivo no reconocido muestra su código. REQ-237: también
+// deja reintentar; un motivo no reconocido muestra su código. REQ-238: también
 // para "Estimar macros" por texto (photo=false).
 function estimateErrorMessage(e,photo){
   const message=String(e&&e.message||"");
