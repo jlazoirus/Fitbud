@@ -28,6 +28,7 @@ let authUsers = [];
 let invites = [];
 let inviteFails = false;
 let entitlements = [];
+let overrides = [];
 const ana = { id: 7, name: "Ana Pérez", whatsapp: "+51 999 111 222", status: "new", review_notes: null };
 
 global.fetch = async (url, options = {}) => {
@@ -57,6 +58,7 @@ global.fetch = async (url, options = {}) => {
   }
   if (value.includes("/rest/v1/profiles?on_conflict=id") && method === "POST") return response(200, [body]);
   if (value.endsWith("/rest/v1/user_entitlements") && method === "POST") { entitlements.push(body); return response(201, [body]); }
+  if (value.includes("/rest/v1/coach_quota_overrides?on_conflict=user_id,action") && method === "POST") { overrides.push(body); return response(201, null); }
   if (value.endsWith("/rest/v1/redemption_codes") && method === "POST") {
     assert(options.headers.Authorization === "Bearer service", "El código se crea con service role.");
     codeInserts.push(body);
@@ -104,6 +106,9 @@ assert(res.statusCode === 200 && res.body.mode === "email" && res.body.email ===
 assert(invites.length === 1 && invites[0].body.email === "ana@correo.test", "Envía la invitación de Supabase al correo.");
 assert(entitlements.length === 1 && entitlements[0].plan_id === "quarterly" && entitlements[0].status === "courtesy", "Da los 90 días de acceso beta.");
 assert(codeInserts.length === 0, "Con correo no hace falta código.");
+assert(overrides.length === 1 && overrides[0].length === 8 && overrides[0].every((o) => o.daily_limit === 10000 && o.enabled === true && o.expires_at === entitlements[0].expires_at),
+  "REQ-245: aceptar deja el coach sin tope hasta que vence el acceso.");
+assert(!res.body.betaError, "Sin errores de acceso ni de cuotas.");
 assert(patches[0].status === "beta_invited" && /invitación enviada a ana@correo.test/.test(patches[0].review_notes), "Marca aceptada con nota del correo.");
 assert(res.body.applicant.email === "ana@correo.test" && !("raw_payload" in res.body.applicant), "Devuelve el correo sin el raw_payload.");
 

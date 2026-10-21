@@ -214,6 +214,39 @@ function couponError(data) {
   return "No pudimos canjear el código. Intenta de nuevo.";
 }
 
+// ── beta de fundadores sin tope de uso del coach (REQ-245) ───────────────────
+// El código de una postulación aceptada solo queda en su nota (review_notes,
+// "aceptado en la beta con FIT-…"). Al canjearlo, cada acción del coach recibe
+// el máximo diario permitido hasta que vence ese acceso. Nunca bloquea el canje.
+
+const COACH_ACTIONS = [
+  "diet_day", "diet_week", "meal_option", "meal_estimate",
+  "macro_review", "training_plan", "training_replacement", "coach_conversation",
+];
+const BETA_DAILY_LIMIT = 10000; // = QUOTA_OVERRIDE_MAX de api/admin.js
+
+async function grantBetaQuotaIfInvited(e, code, userId, ent) {
+  if (!userId || !ent || !ent.expires_at) return;
+  try {
+    const br = await fetch(
+      e.url + "/rest/v1/beta_recruitment_submissions?status=eq.beta_invited&review_notes=ilike."
+        + encodeURIComponent("*" + code + "*") + "&select=id&limit=1",
+      { headers: svcHeaders(e) }
+    );
+    const rows = await rj(br);
+    if (!br.ok || !Array.isArray(rows) || !rows.length) return;
+    const now = new Date().toISOString();
+    await fetch(e.url + "/rest/v1/coach_quota_overrides?on_conflict=user_id,action", {
+      method: "POST",
+      headers: svcHeaders(e, { "content-type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify(COACH_ACTIONS.map((action) => ({
+        user_id: userId, action, daily_limit: BETA_DAILY_LIMIT, bonus_units: 0,
+        enabled: true, expires_at: ent.expires_at, updated_at: now,
+      }))),
+    });
+  } catch (_) { /* el acceso ya quedó dado; el admin puede ajustar cuotas a mano */ }
+}
+
 // ── registro por invitación (REQ-205) ────────────────────────────────────────
 // En la beta cerrada las altas públicas de Supabase están desactivadas: la
 // cuenta se crea aquí con service role solo si el código existe, no se usó y
@@ -291,6 +324,7 @@ async function inviteSignup(e, body, res) {
     return;
   }
   const ent = Array.isArray(redeemed) ? redeemed[0] : redeemed;
+  await grantBetaQuotaIfInvited(e, code, userId, ent);
   res.status(201).json({ ok: true, entitlement: entitlementOut(ent || {}) });
 }
 
@@ -533,6 +567,7 @@ export default async function handler(req, res) {
         return;
       }
       const row = Array.isArray(data) ? data[0] : data;
+      await grantBetaQuotaIfInvited(e, code, auth.user.id, row);
       res.status(200).json({ entitlement: entitlementOut(row || {}) });
       return;
     }

@@ -23,6 +23,8 @@ const ADMIN_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const NEW_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 let grants = [];
 let failGrant = false;
+let overrides = [];
+let failQuota = false;
 
 global.fetch = async (url, options = {}) => {
   const value = String(url);
@@ -40,6 +42,11 @@ global.fetch = async (url, options = {}) => {
     grants.push(body);
     return response(201, [body]);
   }
+  if (value.includes("/rest/v1/coach_quota_overrides?on_conflict=user_id,action") && method === "POST") {
+    if (failQuota) return response(500, { message: "tabla no disponible" });
+    overrides.push(body);
+    return response(201, null);
+  }
   throw new Error("Ruta no simulada: " + method + " " + value);
 };
 
@@ -56,12 +63,20 @@ assert(g && g.user_id === NEW_ID && g.plan_id === "quarterly" && g.status === "c
 const days = (Date.parse(g.expires_at) - Date.parse(g.starts_at)) / 86400000;
 assert(Math.round(days) === 90, "El acceso dura 90 días: " + days);
 assert(res.body.betaAccess && res.body.betaAccess.expires_at === g.expires_at, "Devuelve la fecha de fin al admin.");
+assert(overrides.length === 1 && overrides[0].every((o) => o.user_id === NEW_ID && o.daily_limit === 10000 && o.expires_at === g.expires_at && o.updated_by === ADMIN_ID),
+  "REQ-245: la cuenta beta no tiene tope de uso del coach hasta que vence el acceso.");
+assert(!res.body.betaError, "Sin error cuando todo sale bien.");
 
 res = await call({ action: "createUser", email: "beto@correo.com" });
 assert(res.statusCode === 200 && grants.length === 1 && !res.body.betaAccess, "Sin la casilla no se crea acceso.");
 
 res = await call({ action: "inviteUser", email: "caro@correo.com", beta: true, redirectTo: "https://evolvapp.club/" });
 assert(res.statusCode === 200 && grants.length === 2 && res.body.betaAccess, "Invitar por correo también da el acceso beta.");
+
+failQuota = true;
+res = await call({ action: "createUser", email: "eva@correo.com", beta: true });
+assert(res.statusCode === 200 && res.body.betaAccess && /tope de uso del coach/.test(res.body.betaError || ""), "Si las cuotas fallan, el acceso queda y el admin ve el aviso.");
+failQuota = false;
 
 failGrant = true;
 res = await call({ action: "createUser", email: "dani@correo.com", beta: true });

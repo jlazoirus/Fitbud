@@ -1980,3 +1980,33 @@ REQ-155 congeló el cronómetro al pasar la app a segundo plano para que una ses
 - 15 min fuera de la app sin pausar: el cronómetro y la duración los incluyen. ✓ (`tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`)
 - 3 h fuera: la sesión queda en pausa con la duración que tenía al salir y el botón "Reanudar sesión" visible. ✓ (mismas pruebas)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-245 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
+
+**Estado: implementado.**
+
+### Origen
+
+Pedido del dueño (2026-10-21): los postulantes aprobados deben tener consumo ilimitado y acceso completo por 90 días.
+
+### Problema y causa raíz
+
+`grantBetaAccess()` (`api/admin.js`) daba el `user_entitlements` de 90 días pero no tocaba `coach_quota_overrides`: la beta quedaba con las cuotas `default` (p. ej. 1 dieta semanal y 20 conversaciones al día). El canje del código (`api/entitlement.js`) tampoco.
+
+### Alcance
+
+1. `grantBetaAccess()` crea un override por acción del coach con `daily_limit = QUOTA_OVERRIDE_MAX` (10.000) que vence con el acceso. Cubre aceptar por correo, cuenta existente y crear/invitar cuenta beta.
+2. `invite-signup` y `redeem`: si el código está en el `review_notes` de una postulación `beta_invited`, crea los mismos overrides; un cupón cualquiera no.
+3. Si fallan, el acceso queda y el admin ve `betaError`; el canje nunca se bloquea. Sin migración SQL.
+4. Textos del admin y `BETA_PROGRAM.md` actualizados; `CACHE_NAME` → `fitbud-pwa-v127`.
+5. Datos: el único aceptado en producción ya tiene los overrides hasta 2027-01-19.
+
+### Riesgos
+
+Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostrando el uso por persona.
+
+### Criterios de aceptación
+
+- Aceptar o crear cuenta beta: 8 overrides de 10.000/día que vencen con el acceso. ✓ (`scripts/test-admin-beta-api.mjs`, `scripts/test-admin-beta-signup.mjs`)
+- Canjear el código de una postulación aceptada crea los overrides; un cupón normal no. ✓ (`scripts/test-invite-signup-api.mjs`, `scripts/test-coupon-api.mjs`)
+- `node scripts/release-gate.mjs` pasa.
