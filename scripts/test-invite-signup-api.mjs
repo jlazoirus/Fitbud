@@ -65,7 +65,7 @@ let res = await signup({});
 assert(res.statusCode === 201 && res.body.ok && res.body.entitlement.duration_days === 90, "Código válido: crea la cuenta y devuelve 90 días.");
 assert(calls.length === 4 && overrides === null, "Valida, crea, canjea y busca si es beta (4 llamadas); un código cualquiera no toca cuotas: " + calls.join(", "));
 
-// REQ-245: el código de una postulación aceptada deja al coach sin tope hasta que vence el acceso.
+// REQ-246: el código de una postulación aceptada deja al coach sin tope hasta que vence el acceso.
 res = await signup({}, () => { betaInvited = true; });
 assert(res.statusCode === 201, "Código beta: crea la cuenta.");
 assert(Array.isArray(overrides) && overrides.length === 8, "Código beta: un override por cada acción del coach.");
