@@ -138,7 +138,7 @@ console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporiza
   console.log("REQ-232: última carga registrada por ejercicio.");
 }
 
-// REQ-235: calentamiento y vuelta a la calma son opcionales; "Ahora no" no cuenta como omitido.
+// REQ-236: calentamiento y vuelta a la calma son opcionales; "Ahora no" no cuenta como omitido.
 {
   const prescription=player.buildPrescription({
     workout:{id:"fullA",kind:"Gimnasio",name:"Gimnasio · Full body A"},
@@ -161,5 +161,5 @@ console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporiza
   assert.equal(progress.declined,1);
   const forged=player.normalizeExecution({...execution,steps:execution.steps.map((step,i)=>i===1?{...step,status:"declined"}:step)},prescription,Date.now());
   assert.equal(forged.steps[1].status,"pending","Un ejercicio no puede quedar 'declined'");
-  console.log("REQ-235: calentamiento y vuelta a la calma opcionales.");
+  console.log("REQ-236: calentamiento y vuelta a la calma opcionales.");
 }

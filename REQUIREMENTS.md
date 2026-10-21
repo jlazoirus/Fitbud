@@ -1519,7 +1519,8 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-226`).
 
 ## REQ-227 - Fix onboarding: editar un macro en "Ajustar valores" y continuar guarda una meta donde kcal ≠ suma de macros
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`reconcileOnboardingMacros()` (index.html) reconcilia en `readOnboardingStep()` paso 2: si el usuario editó un macro, kcal se recalcula como p·4+c·4+f·9; si editó solo kcal, proteína queda fija y carbos/grasa escalan proporcionalmente (mismo patrón que `applyWeeklyCheckinProposal`), con piso de 50g carbos/45g grasa. Toast avisa cuál lado se ajustó. Test: `scripts/validate-onboarding-macro-reconcile.mjs`.
 
 ### Origen
 
@@ -1666,7 +1667,51 @@ La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombr
 - Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
 
-## REQ-234 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
+## REQ-234 - El check-in semanal re-puntúa días ya ejecutados y contradice su copy "para la próxima semana"
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey **home** (commit previo leído: `16fb94c` REQ-227). Verificación funcional en navegador real (Playwright + fixtures E2E, 0 llamadas pagadas): preparar hoy, registrar sus comidas, y aceptar el check-in semanal que la portada ofrece.
+
+### Problema
+
+Con el banner "Check-in · Semana N" visible en Home, aceptar un ajuste (p. ej. −200 kcal) cambia **de inmediato** la meta del día en curso. Captura `home-before`: "CONSUMO DE HOY 2184/2200 kcal · 16 restantes, Carb 219/220, Grasa 66/65" (en objetivo). Tras aceptar → `home-after`: mismo consumo 2184 pero "2184/**2000** kcal · **meta alcanzada**, Carb 219/**204**, Grasa 66/**60**" (ahora excedido), con el toast "Ajuste aplicado **para la próxima semana**". El usuario comió exactamente el plan que la app le preparó y Home lo reporta como pasado/excedido. Peor: también re-puntúa días YA ejecutados — `buildDay("2026-10-20").target` pasó de `{2200,160,220,65}` a `{2000,160,204,60}` tras el check-in, reescribiendo cómo se muestra la adherencia de ayer. Viola el invariante "ajustar el futuro no reescribe lo ya ejecutado".
+
+### Causa raíz
+
+`applyWeeklyCheckinProposal()` (`index.html:13357-13373`) escribe `prefs.calorieTarget/carbTarget/fatTarget` con `saveProfilePrefs` y anuncia "para la próxima semana". Pero `buildDay(ds)` (`index.html:1983`) fija `target:effectiveDayTarget()` **sin pasar `ds`**, y `effectiveDayTarget()` (`index.html:1693-1695`) siempre lee `profile.prefs` vigente. Así la meta de TODO día (pasado, hoy, futuro) sigue a las prefs vivas, mientras las comidas quedan congeladas (snapshot/override) a la meta anterior.
+
+### Objetivo
+
+Que un ajuste de check-in, comunicado como futuro, no altere retroactivamente la meta ni la adherencia mostrada de días ya ejecutados ni del día en curso ya prescrito; y que el copy coincida con cuándo surte efecto.
+
+### Alcance
+
+1. Hacer que el ajuste del check-in surta efecto desde el inicio de la próxima semana del plan no iniciada (o re-anclar/re-preparar explícitamente los días aún no ejecutados), en vez de mutar la meta global al instante.
+2. Alinear el copy del banner/toast con el momento real en que aplica.
+
+### Fuera de alcance
+
+- No cambiar el comportamiento de REQ-69 (editar macros en Perfil sí refleja en el día): este REQ es solo el flujo de check-in y su promesa temporal.
+- El motor de análisis (REQ-160/165) y los límites `CHECKIN_MAX_KCAL_ADJUST`/`MIN`.
+
+### Riesgos
+
+- Tocar la fecha efectiva del ajuste puede interactuar con `plan_versions`/snapshot nutricional; mantener idempotencia y no reescribir días cerrados.
+
+### Criterios de aceptación
+
+- Aceptar un check-in no cambia `buildDay(ds).target` de ningún `ds < inicioDeLaSemanaEfectiva`; el día en curso ya prescrito no pasa a "meta alcanzada"/excedido por el solo hecho de aceptar.
+- El copy refleja el momento real de aplicación.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E: preparar y registrar hoy, aceptar un ajuste de −200 kcal, confirmar que `dayTotals(hoy).target` y `buildDay(ayer).target` no cambian y que Home no vira a "meta alcanzada".
+
+## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
 
 **Estado: implementado.**
 
@@ -1684,7 +1729,7 @@ Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando ini
 2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
 3. Con `prefers-reduced-motion` el número cambia sin animación.
 4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
-5. `CACHE_NAME` → `fitbud-pwa-v116`.
+5. `CACHE_NAME` → `fitbud-pwa-v117`.
 
 ### Fuera de alcance
 
@@ -1700,7 +1745,7 @@ Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando ini
 - Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
 - `node scripts/release-gate.mjs` pasa. ✓
 
-## REQ-235 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
+## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
 
 **Estado: implementado.**
 
@@ -1717,8 +1762,8 @@ Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba
 1. `workout-player.js`: bloques `warmup`/`cooldown` con `optional:true`, `optIn` si se eligen y estado `declined` ("Ahora no"), que `progress()` no cuenta en el total ni como omitido.
 2. Reproductor: un bloque opcional no elegido muestra solo la pregunta ("¿Quieres calentar antes de empezar?" / "¿Quieres cerrar con unos minutos suaves?"), duración y "Es opcional", con "Sí, calentar"/"Sí, hacerlo" y "Ahora no"; los movimientos aparecen solo si se elige.
 3. Una sesión con todo hecho salvo bloques rechazados se cierra **completada** (`workoutFullyCompleted`).
-4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-234) ya no anuncia el calentamiento.
-5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v117`.
+4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-235) ya no anuncia el calentamiento.
+5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v118`.
 
 ### Fuera de alcance
 
@@ -1735,7 +1780,7 @@ Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba
 - "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
 
-## REQ-236 - Entreno: la tarjeta del tempo dice qué es y lo explica
+## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
 
 **Estado: implementado.**
 
@@ -1751,7 +1796,7 @@ La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar qu
 
 1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
 2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
-3. `CACHE_NAME` → `fitbud-pwa-v118`.
+3. `CACHE_NAME` → `fitbud-pwa-v119`.
 
 ### Fuera de alcance
 
@@ -1766,7 +1811,7 @@ La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar qu
 - La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
 
-## REQ-237 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
+## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
 **Estado: implementado.**
 
@@ -1784,7 +1829,7 @@ Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar
 1. `.meal-photo-preview[hidden]{display:none}`.
 2. `estimateErrorMessage(e, photo)` (antes `photoEstimateErrorMessage`) sirve a foto y texto: demora, mucha demanda, no se pudo estimar (con consejo para el texto), sin conexión, y "(código N)" si el motivo no se reconoce.
 3. "Estimar macros" muestra ese mensaje y "Reintentar" (no con el aviso de plan).
-4. `CACHE_NAME` → `fitbud-pwa-v119`.
+4. `CACHE_NAME` → `fitbud-pwa-v120`.
 
 ### Fuera de alcance
 
