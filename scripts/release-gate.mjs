@@ -128,6 +128,7 @@ run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
 run("validate-password-toggle.mjs", "node scripts/validate-password-toggle.mjs");
 run("validate-onboarding-copy.mjs", "node scripts/validate-onboarding-copy.mjs");
 run("validate-onboarding-first-week.mjs", "node scripts/validate-onboarding-first-week.mjs");
+run("validate-onboarding-macro-reconcile.mjs", "node scripts/validate-onboarding-macro-reconcile.mjs");
 run("validate-training-onboarding-decisions.mjs", "node scripts/validate-training-onboarding-decisions.mjs");
 run("validate-training-safety-mode.mjs", "node scripts/validate-training-safety-mode.mjs");
 run("validate-splits.mjs", "node scripts/validate-splits.mjs");
