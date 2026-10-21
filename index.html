@@ -9190,10 +9190,15 @@ function openEditor(kind,ds,id){
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
 /* REQ-188: reutilizar comidas ya registradas o favoritas y sumar alimentos sueltos por gramos. */
+// REQ-243: lo registrado con porción ×0,5–×2 guarda `portion`; Recientes y Favoritas muestran una porción.
+function perPortion(v){
+  const k=+(v&&v.portion);
+  return k>0&&k!==1?{name:v.name,kcal:v.kcal/k,p:v.p/k,c:v.c/k,f:v.f/k}:v;
+}
 function recentCustomMeals(limit){
   const out=[],seen=new Set();
   const push=v=>{
-    const entry=mealMacrosEntry(v),key=entry&&catalogSlug(entry.name);
+    const entry=mealMacrosEntry(perPortion(v)),key=entry&&catalogSlug(entry.name);
     if(entry&&key&&entry.kcal>0&&!seen.has(key)){seen.add(key);out.push(entry);}
   };
   Object.keys(S.days||{}).sort().reverse().forEach(ds=>{
@@ -9337,13 +9342,22 @@ function editorSheet(title,pre){
   renderQuickPicks();
 }
 function readEditor(){return{name:$("#f_name").value.trim(),kcal:+$("#f_kcal").value||0,p:+$("#f_p").value||0,c:+$("#f_c").value||0,f:+$("#f_f").value||0};}
+// Porción con la que se guarda: la elegida sobre una reciente/favorita, o la que ya tenía lo editado.
+function editorPortion(v,prev){
+  const qp=window._qp,same=x=>x&&catalogSlug(x.name)===catalogSlug(v.name);
+  if(qp&&qp.base)return same(qp.base)?qp.portion:1;
+  return same(prev)&&+prev.portion>0?+prev.portion:1;
+}
 function saveEditor(){
   const e=window._editor;const v=readEditor();
   if(!v.name){toast("Pon una descripción");return;}
+  const prev=e.kind==="meal"?mealState(e.ds,e.id).ovr:e.kind==="extra"&&e.extraIdx!=null?dayState(e.ds).extras[e.extraIdx]:null;
+  const portion=editorPortion(v,prev);
+  if(portion!==1)v.portion=portion;
   const fav=$("#f_fav");
-  if(fav&&fav.checked&&!fav.disabled&&!isSavedMeal(v.name))toggleSavedMeal(v);
-  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f};}
-  else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null)d.extras[e.extraIdx]=Object.assign(d.extras[e.extraIdx],v);else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
+  if(fav&&fav.checked&&!fav.disabled&&!isSavedMeal(v.name))toggleSavedMeal(perPortion(v));
+  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f},portion!==1?{portion}:{});}
+  else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null){d.extras[e.extraIdx]=Object.assign(d.extras[e.extraIdx],v);if(portion===1)delete d.extras[e.extraIdx].portion;}else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");
 }
 

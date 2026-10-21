@@ -83,6 +83,10 @@ Feedback Sathya (beta, 2026-10-21, iPhone):
 
 - REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado. (P0; implementado)
 
+Feedback Jonathan (2026-10-21, iPhone):
+
+- REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes. (P1; implementado)
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -1927,4 +1931,41 @@ Si la subida de un día falla (token vencido al volver la PWA del fondo, red dé
 
 - Con la subida de ayer fallida y el primer reintento de hoy también fallando, ayer muestra desayuno y almuerzo registrados y marcados; al completar la cena, lo que sube conserva los tres y la cola queda vacía. ✓ (`tests/e2e/dia-sin-subir.spec.js`; falla sin el arreglo)
 - Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Jonathan (2026-10-21, iPhone): "Acabo de agregar un shake de proteína y cuando seleccioné la porción le puse ×2; cuando volví a agregar otra comida el shake de proteína tiene sus valores de macros duplicados. Eso no debe pasar." Captura: Recientes muestra "Shake proteina 600 kcal · P 48 · C 72 · G 6".
+
+### Problema
+
+Al elegir una reciente o favorita con porción ×0,5/×1,5/×2 y guardar, lo registrado conserva el mismo nombre con los macros ya escalados. Recientes muestra la última vez que se registró cada nombre, así que la "porción" pasa a ser la ×2; volver a elegirla con ×2 da ×4. "Guardar en favoritas" en ese momento también guardaba la porción escalada.
+
+### Causa raíz
+
+- `saveEditor()` (`index.html`) guardaba `{name,kcal,p,c,f}` ya multiplicados por `qp.portion` sin registrar la porción.
+- `recentCustomMeals()` deduplica por nombre quedándose con el registro más reciente, sea cual sea su porción.
+
+### Alcance
+
+1. `saveEditor()` guarda `portion` (≠1) en el extra o en `ms.ovr` cuando se eligió una porción sobre una reciente/favorita del mismo nombre; editar algo ya registrado sin tocar la porción la conserva, y renombrarlo o volver a ×1 la quita. Los macros del día siguen siendo los consumidos.
+2. `perPortion()`: Recientes y "Guardar en favoritas" usan los macros divididos por `portion` (una porción).
+3. `CACHE_NAME` → `fitbud-pwa-v125`.
+
+### Fuera de alcance
+
+- Corregir lo ya registrado antes del arreglo: no guardó la porción, así que esa reciente seguirá mostrando los macros escalados hasta que se registre de nuevo con ×1 (o desde Favoritas).
+
+### Riesgos
+
+- Ninguno sobre datos: `portion` es un campo nuevo opcional en `day_log.state`; los registros sin él se leen igual que antes.
+
+### Criterios de aceptación
+
+- Registrar "Shake proteina" 300 kcal y luego desde Recientes ×2: el día suma 300 + 600 y Recientes sigue mostrando 300 kcal · P 24 · C 36 · G 3. ✓ (`tests/e2e/comidas-guardadas.spec.js`; falla sin el arreglo con 600 · P 48 · C 72 · G 6)
+- Guardar en favoritas con ×1,5 guarda la porción base. ✓ (`tests/e2e/comidas-guardadas.spec.js`)
 - `node scripts/release-gate.mjs` pasa.

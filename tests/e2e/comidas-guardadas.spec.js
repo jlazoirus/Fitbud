@@ -46,21 +46,60 @@ test.describe("Comidas guardadas", () => {
     // Registrada hoy con los macros escalados…
     const today = await page.evaluate(() => dayState(todayStr()).extras.map((e) => ({ name: e.name, kcal: e.kcal })));
     expect(today).toContainEqual({ name: "Bowl de yogur con avena", kcal: 630 });
-    // …y guardada en favoritas del perfil (privado, sin migración).
+    // …y guardada en favoritas del perfil (privado, sin migración) como una porción (REQ-243).
     await expect
       .poll(() => {
         const saved = calls.filter((c) => c.table === "profiles" && c.payload && c.payload.prefs).map((c) => c.payload.prefs.savedMeals);
         return saved.at(-1);
       })
-      .toEqual([{ name: "Bowl de yogur con avena", kcal: 630, p: 45, c: 75, f: 15 }]);
+      .toEqual([{ name: "Bowl de yogur con avena", kcal: 420, p: 30, c: 50, f: 10 }]);
 
-    // Al reabrir, aparece en Favoritas con la estrella encendida; se puede quitar.
+    // Al reabrir, Recientes sigue mostrando una porción, no la ×1,5 de hoy (REQ-243).
     await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+    await expect(overlay.locator(".qp-pick", { hasText: "Bowl de yogur con avena" })).toContainText("420 kcal · P 30 · C 50 · G 10");
+    // Aparece en Favoritas con la estrella encendida; se puede quitar.
     await overlay.locator('.qp-tab[data-tab="fav"]').click();
     const star = overlay.getByRole("button", { name: "Quitar de favoritas: Bowl de yogur con avena" });
     await expect(star).toHaveAttribute("aria-pressed", "true");
     await star.click();
     await expect(overlay.locator("#qpList")).toContainText("Aún no tienes favoritas");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("REQ-243: registrar ×2 no duplica los macros de la reciente ni de lo que se vuelva a registrar", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+
+    let overlay = await openAddMeal(page);
+    await overlay.locator('.qp-tab[data-tab="food"]').click();
+    await overlay.locator("#f_name").fill("Shake proteina");
+    for (const [id, v] of [["#f_kcal", "300"], ["#f_p", "24"], ["#f_c", "36"], ["#f_f", "3"]]) await overlay.locator(id).fill(v);
+    await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
+
+    // Segundo shake del día, desde Recientes con ×2.
+    overlay = await openAddMeal(page);
+    await overlay.locator(".qp-pick", { hasText: "Shake proteina" }).click();
+    await overlay.getByRole("button", { name: "×2" }).click();
+    await expect(overlay.locator("#f_kcal")).toHaveValue("600");
+    await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
+    const kcals = await page.evaluate(() => dayState(todayStr()).extras.map((e) => e.kcal));
+    expect(kcals).toEqual([300, 600]);
+
+    // La reciente sigue siendo una porción y al tocarla precarga 300, no 600.
+    overlay = await openAddMeal(page);
+    const recent = overlay.locator(".qp-pick", { hasText: "Shake proteina" });
+    await expect(recent).toContainText("300 kcal · P 24 · C 36 · G 3");
+    await recent.click();
+    await expect(overlay.locator("#f_kcal")).toHaveValue("300");
+    await expect(overlay.locator("#f_p")).toHaveValue("24");
+
+    // Editar el extra ×2 sin tocar la porción la conserva; renombrarlo la quita.
+    await page.evaluate(() => { closeModal(); editExtra(todayStr(), 1); });
+    await page.locator("#overlay").getByRole("button", { name: "Guardar", exact: true }).click();
+    expect(await page.evaluate(() => dayState(todayStr()).extras[1].portion)).toBe(2);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
