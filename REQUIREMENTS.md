@@ -1658,7 +1658,8 @@ Jonathan (2026-10-20): "me envías a mí también el mail cuando alguien se post
 
 ## REQ-227 - Fix onboarding: editar un macro en "Ajustar valores" y continuar guarda una meta donde kcal ≠ suma de macros
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`reconcileOnboardingMacros()` (index.html) reconcilia en `readOnboardingStep()` paso 2: si el usuario editó un macro, kcal se recalcula como p·4+c·4+f·9; si editó solo kcal, proteína queda fija y carbos/grasa escalan proporcionalmente (mismo patrón que `applyWeeklyCheckinProposal`), con piso de 50g carbos/45g grasa. Toast avisa cuál lado se ajustó. Test: `scripts/validate-onboarding-macro-reconcile.mjs`.
 
 ### Origen
 
