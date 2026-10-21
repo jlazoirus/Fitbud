@@ -75,7 +75,7 @@ test.describe("Onboarding", () => {
 
     // Paso 3: semana de entrenamiento (caminata, sin fuerza por ahora, 10 semanas, ≥3 días)
     await expect(app).toContainText("Ciclo de seguimiento");
-    await expect(app).toContainText("¿Practicas alguna actividad física?");
+    await expect(app).toContainText("¿Haces otro deporte además de la fuerza?");
     await expect(page.locator("#ob_sport")).toContainText("Caminar");
     await expect(page.locator("#ob_strength")).toContainText("No quiero fuerza por ahora");
     await expect(page.locator("#ob_duration")).toContainText("10 semanas · recomendado");

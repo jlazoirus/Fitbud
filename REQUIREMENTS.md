@@ -91,6 +91,7 @@ Feedback Jonathan (2026-10-21, iPhone):
 Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/Recordatorios y audio sobre la próxima comida):
 
 - REQ-246 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total". (P0; implementado)
+- REQ-247 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente. (P1; implementado)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -1830,7 +1831,7 @@ Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana re
 
 ### Fuera de alcance
 
-- Elegir qué se hace cada día (fuerza o deporte) en vez del lugar: ver el REQ siguiente de esta serie.
+- Cómo se explica la pregunta del deporte y cómo se cambia un día por otro deporte: REQ-247.
 - El plan personalizado ("Preparar mi plan") no admite el tipo de sesión "other" (`training-plan.js`, `SESSION_TYPES`); estos usuarios siguen con la semana tipo.
 
 ### Riesgos
@@ -1840,4 +1841,46 @@ Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana re
 ### Criterios de aceptación
 
 - "Otra actividad" + gimnasio, 4 días: la semana muestra 2 sesiones de gimnasio y 2 "Día de tu deporte", ninguna "Descanso total"; sin registrar, el día cuenta como descanso; "Registrar mi actividad" → Pádel lo marca como entrenado y la próxima vez propone Pádel. ✓ (`tests/e2e/actividad-manual.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-247 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo eso de actividad física principal", "Eso de elegir qué hacer en cada día también siento que te limita mucho a elegir" y "¿Qué pasa si un lunes no voy al gym y juego pádel?".
+
+### Problema
+
+- "Actividad física principal" no dice qué es ni qué cambia: Diego juega pádel, que no está en la lista, y eligió "Otra actividad" sin saber qué haría el plan con eso.
+- "Días disponibles y lugar real" se lee como una agenda fija: nada dice que cualquier día se puede cambiar.
+- Registrar otro deporte en un día de fuerza ya era posible (REQ-206, "＋ Registrar otra actividad" al final de Entreno), pero no aparece entre las opciones de "Adaptar hoy" ni explica qué pasa con la sesión que tocaba.
+
+### Causa raíz
+
+- Copy de `index.html`: label `pf_sport` "Actividad física principal" y `ob_sport` "¿Practicas alguna actividad física?", opción "Otra actividad", sin nota de ayuda; label "Días disponibles y lugar real".
+- "Adaptar hoy" en `renderWorkout()` solo ofrece Solo 20 min / En casa / Sin equipo / Me perdí la sesión.
+
+### Alcance
+
+1. Onboarding y Perfil preguntan lo mismo: "¿Haces otro deporte además de la fuerza?", con opciones Caminar, Correr, Bicicleta, Natación, "Otro deporte" y "Ninguno, solo fuerza". `SPORT_LABELS.other` → "Otro deporte".
+2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
+3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
+4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
+5. `CACHE_NAME` → `fitbud-pwa-v129`.
+
+### Fuera de alcance
+
+- Elegir qué se hace cada día (fuerza o deporte) en vez del lugar, o mover la sesión de fuerza perdida a otro día: el lugar sigue orientando la plantilla (exterior/piscina → deporte) y "Me perdí la sesión" ya ofrece recuperarla.
+- Añadir pádel, fútbol u otros deportes con plan guiado propio.
+
+### Riesgos
+
+- Ninguno sobre datos: solo copy y un acceso nuevo a un flujo existente; los valores guardados (`primarySport`) no cambian.
+
+### Criterios de aceptación
+
+- Perfil muestra la nueva pregunta y la nota cambia al elegir otra opción; la semana tipo explica que no es una obligación. ✓ (`tests/e2e/actividad-manual.spec.js`)
+- En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
 - `node scripts/release-gate.mjs` pasa.

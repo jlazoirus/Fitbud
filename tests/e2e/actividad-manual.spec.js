@@ -145,4 +145,43 @@ test.describe("Actividad registrada a mano", () => {
     await expect(overlay.locator("#ma_sport")).toHaveValue("padel");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+  test("REQ-247: la pregunta del deporte se explica y \"Hice otro deporte\" reemplaza la sesión de fuerza", async ({ page, context }) => {
+    // 3 de fuerza + 1 de deporte; el día de deporte va en exterior para que hoy sea de fuerza.
+    const today = new Date().getDay();
+    const days = trainingDaysIncludingToday();
+    const sportDay = days.filter((d) => d !== today).pop();
+    const prefs = completePrefs({
+      primarySport: "other", trainingPriority: "strength",
+      trainingDays: days, trainingLocations: Object.fromEntries(days.map((d) => [d, d === sportDay ? "outdoor" : "gym"])),
+    });
+    await installMocks(context, { prefs });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    page.on("dialog", (dialog) => dialog.accept());
+
+    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#pfSecEntreno > summary").click();
+    await expect(page.locator('label[for="pf_sport"]')).toHaveText("¿Haces otro deporte además de la fuerza?");
+    await expect(page.locator("#pf_sport option:checked")).toHaveText("Otro deporte");
+    await expect(page.locator("#pf_sport_help")).toContainText("quedan para tu deporte");
+    await page.selectOption("#pf_sport", "running");
+    await expect(page.locator("#pf_sport_help")).toHaveText("Tu semana suma sesiones guiadas de correr entre las de fuerza.");
+    await expect(page.locator("#pfSecEntreno")).toContainText("Es tu semana de referencia, no una obligación");
+
+    // Hoy toca fuerza: juega pádel en su lugar.
+    await page.locator("#tabs").getByText("Entreno").click();
+    const sesion = await page.evaluate(() => effectiveWorkout(todayStr()).workout.name);
+    expect(sesion).toMatch(/^Gimnasio/);
+    await page.getByRole("button", { name: "Hice otro deporte" }).click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay).toContainText(`Cuenta como día entrenado en lugar de ${sesion}. Tu plan sigue igual desde la próxima sesión.`);
+    await expect(overlay.locator("#ma_sport")).toHaveValue("other");
+    await overlay.locator("#ma_sport").selectOption("padel");
+    await overlay.getByRole("button", { name: "Guardar actividad" }).click();
+    await expect(page.locator("#app .activity-row")).toContainText("Pádel / tenis");
+    expect(await page.evaluate(() => trainingDayResult(todayStr()))).toBe("done");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
