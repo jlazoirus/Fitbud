@@ -2109,6 +2109,16 @@ function _hasPendingDay(ds){
 function _hasPendingWeight(week){
   return _getSyncQ().some(x=>x.uid===uid()&&x.entity==="weight_log"&&x.entityKey==="w"+week&&["pending","failed","conflict"].includes(x.status));
 }
+// REQ-242: lo que todavía no subió solo vive en la cola. Al vaciar la caché
+// local (inicio de sesión) se repone desde ahí: si no, el día queda vacío
+// hasta que la subida funcione y, si el usuario lo vuelve a editar, esa copia
+// vacía pisa en la cola y en el servidor lo que había registrado.
+function restorePendingFromQueue(){
+  _getSyncQ().filter(x=>x.uid===uid()&&x.payload&&["pending","failed","conflict"].includes(x.status)).forEach(x=>{
+    if(x.entity==="day_log"&&x.payload.state)S.days[x.entityKey]=JSON.parse(JSON.stringify(x.payload.state));
+    else if(x.entity==="weight_log"&&x.payload.kg!=null)S.weights[x.payload.week]={kg:Number(x.payload.kg),bf:(x.payload.bf_pct==null?null:Number(x.payload.bf_pct))};
+  });
+}
 function _markSyncConflict(item,remotePayload,conflicts){
   const q=_getSyncQ();const i=q.findIndex(x=>x.id===item.id);
   if(i===-1)return;
@@ -2206,7 +2216,9 @@ async function drainSyncQueue(){
   _drainBusy=true;
   try{
     const q=_getSyncQ();
-    const pending=q.filter(x=>x.uid===uid()&&x.status==="pending");
+    // REQ-242: lo que agotó sus intentos también se reintenta al reconectar o
+    // abrir la app; si no, queda sin subir para siempre.
+    const pending=q.filter(x=>x.uid===uid()&&(x.status==="pending"||x.status==="failed"));
     for(const item of pending){
       try{
         if(!session||!session.access_token){await refreshAuth();if(!session)break;}
@@ -11607,7 +11619,7 @@ async function onAuth(){
     entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
     billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
     loadEntitlement().then(()=>{if(session){render();redeemPendingInvite();}}); // no-await: no debe bloquear el arranque (REQ-25)
-    S.days={};S.weights={};save();   // descarta caché de otra sesión; la DB manda
+    S.days={};S.weights={};restorePendingFromQueue();save();   // descarta caché de otra sesión; la DB manda salvo lo pendiente de subir (REQ-242)
     if(!isActive()){
       onboardingActive=false;onboardingDraft=null;view="hoy";render();
       return;

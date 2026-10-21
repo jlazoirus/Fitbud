@@ -79,6 +79,10 @@ Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la b
 - REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar". (P2; implementado)
 - REQ-216 - Modo conversacional (beta oculta). (P2; fase 1 implementada)
 
+Feedback Sathya (beta, 2026-10-21, iPhone):
+
+- REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado. (P0; implementado)
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -1519,63 +1523,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-226`).
 
 ## REQ-227 - Fix onboarding: editar un macro en "Ajustar valores" y continuar guarda una meta donde kcal ≠ suma de macros
 
-**Estado: implementado.**
-`reconcileOnboardingMacros()` (index.html) reconcilia en `readOnboardingStep()` paso 2: si el usuario editó un macro, kcal se recalcula como p·4+c·4+f·9; si editó solo kcal, proteína queda fija y carbos/grasa escalan proporcionalmente (mismo patrón que `applyWeeklyCheckinProposal`), con piso de 50g carbos/45g grasa. Toast avisa cuál lado se ajustó. Test: `scripts/validate-onboarding-macro-reconcile.mjs`.
+**Estado: implementado.** `reconcileOnboardingMacros()` reconcilia el paso 2 del onboarding: si se editó un macro, kcal = p·4+c·4+f·9; si solo kcal, proteína fija y carbos/grasa escalan (piso 50 g/45 g), con aviso. Test: `scripts/validate-onboarding-macro-reconcile.mjs`.
 
-### Origen
-
-Auditoría del journey **onboarding** (commit previo leído: `7619516` Merge REQ-226). Recorrido funcional del paso 2 "Define tu objetivo y tus macros" sirviendo la app en local (`python3 -m http.server 8923`) y accionando el flujo real en el navegador. Archivos revisados: `index.html` (onboarding, `readOnboardingStep`, `validateOnboardingStep`, `effectiveDayTarget`, `profileMacroTargetsFromPrefs`), `js/nutrition-pure.js` (`calculateMacroTargets`).
-
-### Problema
-
-En el paso 2, el bloque colapsable "Ajustar valores (opcional)" expone cuatro inputs independientes (Calorías, Proteína, Carbohidratos, Grasas). El botón "Recalcular valores" vuelve a derivar los cuatro desde la fórmula (y pisa cualquier edición), por lo que un usuario que solo quiere **ajustar un valor** (p. ej. subir proteína de 120 a 180 g, o bajar sus calorías) edita ese campo y pulsa **"Continuar"**, no "Recalcular". Al hacerlo, la meta queda con `kcal ≠ proteína·4 + carbos·4 + grasa·9`, y así se persiste en el perfil y se muestra.
-
-Reproducción concreta (verificada en navegador):
-1. Paso 1 con datos válidos (mujer, 30, 165 cm, 60 kg, actividad moderada) → la fórmula calcula **1740 kcal · P 120 · C 207 · G 48** (coherente: 120·4+207·4+48·9 = 1740).
-2. Paso 2 → abrir "Ajustar valores", cambiar **solo** Calorías a `1200` (dejando P/C/G), pulsar "Continuar".
-3. Paso 4 "Casi listo" → el resumen "Tu referencia diaria" muestra **"1200 kcal · P 120 g · C 207 g · G 48 g"**, cuando esos macros suman 1740 kcal. La meta guardada queda `calorieTarget:1200` con macros de 1740.
-
-Impacto en el usuario: la meta del día (`effectiveDayTarget`) toma `calorieTarget` como presupuesto de kcal del anillo, pero los macros objetivo (y el día generado que los persigue) suman otra cosa. El usuario ve un anillo de calorías con una meta (1200) que **nunca** cuadra con sus metas de macros (1740): o sobrepasa las kcal cumpliendo macros, o se queda corto en macros cumpliendo kcal, de forma permanente, y la adherencia en Progreso queda sesgada. Rompe el invariante "kcal = suma de macros" que REQ-77 fijó para las metas calculadas y que el check-in semanal (`applyWeeklyCheckinProposal`) preserva deliberadamente escalando carbos/grasa.
-
-### Causa raíz
-
-- `readOnboardingStep()` paso 2 (`index.html:3340`) lee los cuatro campos como valores independientes: `d.calorieTarget=+$("#ob_kcal").value; d.proteinTarget=+$("#ob_protein").value; ...` sin reconciliar.
-- `validateOnboardingStep()` paso 2 (`index.html:3384`) solo exige que los cuatro sean finitos y `>0`; no verifica coherencia `kcal ≈ Σ macros`.
-- `onboardingNext()` (`index.html:3401`) solo recalcula al salir del **paso 1** (`if(onboardingStep===1)applyCalculatedMacros()`); una edición manual en el paso 2 pasa sin tocar.
-- `effectiveDayTarget()` / `profileMacroTargetsFromPrefs()` (`index.html:1673,1678`) construyen la meta como `{kcal:+calorieTarget, p,c,f}` directo desde prefs, así que la incoherencia se propaga a la meta del día.
-- `calculateMacroTargets()` (`js/nutrition-pure.js:286`) sí garantiza `kcal = p·4+c·4+f·9`, pero solo se invoca al calcular/recalcular, no al editar un campo suelto.
-
-### Objetivo
-
-Que después del onboarding la meta nutricional guardada siempre cumpla `kcal = proteína·4 + carbos·4 + grasa·9` (dentro de la tolerancia `TARGET_KCAL_DELTA`), sin importar si el usuario ajustó un valor a mano, y que lo mostrado coincida con lo que se persigue.
-
-### Alcance
-
-1. Al leer/validar el paso 2 (o al guardar en `saveOnboarding`), reconciliar la meta para que `kcal = Σ macros`. Opción recomendada (coherente con el check-in semanal `applyWeeklyCheckinProposal`): si el usuario editó **kcal**, mantener proteína y re-escalar carbos/grasa al nuevo presupuesto; si editó un **macro**, recomputar `calorieTarget` como `p·4+c·4+f·9`. Elegir una sola regla clara y aplicarla de forma determinista.
-2. Dar feedback visible cuando los cuatro campos no cuadran (p. ej. recalcular el campo dependiente en vivo, o un aviso "ajustamos tus calorías para que cuadren con tus macros").
-
-### Fuera de alcance
-
-- La fórmula de cálculo (`calculateMacroTargets`) y la lógica de `goal`/`activity` — no se tocan.
-- La edición de macros en Perfil y el check-in semanal — ya preservan el invariante; este REQ es solo el paso 2 del onboarding.
-- Cambiar el diseño del colapsable "Ajustar valores" o quitar la edición manual.
-
-### Riesgos
-
-- Elegir una regla de reconciliación que sorprenda al usuario (p. ej. que al subir proteína le bajen los carbos sin avisar). Mitigar con el feedback del punto 2.
-- Regresión en `hasCompleteOnboarding()` / generación de la primera semana si la reconciliación deja algún macro en 0; respetar pisos `cFloor`/`fFloor` como hace `calculateMacroTargets`.
-
-### Criterios de aceptación
-
-- Tras editar solo las calorías (o solo un macro) y pulsar "Continuar", la meta guardada cumple `|calorieTarget − (p·4+c·4+f·9)| ≤ TARGET_KCAL_DELTA` y el resumen "Tu referencia diaria" muestra valores coherentes.
-- El usuario puede seguir ajustando un valor a mano; el sistema reconcilia los demás de forma determinista y, si corresponde, lo avisa.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Reproducir los pasos de arriba y confirmar que "Tu referencia diaria" ya no muestra `1200 kcal` con macros que suman 1740.
-- Prueba unitaria/vm sobre el helper de reconciliación: entradas `{kcal:1200,p:120,c:207,f:48}` → salida con `kcal = Σ macros`.
-- Evidencia funcional de esta auditoría: captura `scratchpad/req227-onboarding-kcal-mismatch.jpg` ("Tu referencia diaria: 1200 kcal · P 120 g · C 207 g · G 48 g").
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-227`).
 
 ## REQ-228 - Fix: "Estimar con foto" falla con un mensaje genérico y sin forma de reintentar
 
@@ -1939,3 +1889,42 @@ Jonathan (2026-10-21), con captura de "Fondos asistidos": "Usar progresión" no 
 
 - Remo sentado → "Usar versión más fácil" pasa a Remo con banda (slug, título) y "Volver a…" lo deshace; Press de banca → "Usar progresión" titula "Press de banca con pausa en el pecho"; Sentadilla búlgara muestra "Subir la carga" y no cambia el ejercicio. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/validate-exercises.mjs` y `node scripts/release-gate.mjs` pasan. ✓
+
+## REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Sathya (beta, 2026-10-21, iPhone): "Ayer no me gustaron las comidas que me sugirió la aplicación, entonces puse lo que de verdad comí (seis huevos con pan con queso y un café) y sí me apareció esa comida editada y me permitía hacerle check, igual con el almuerzo. Hoy quise ver la información de ayer porque me quedó pendiente poner la cena y no se guardaron los datos que había ingresado."
+
+### Problema
+
+Si la subida de un día falla (token vencido al volver la PWA del fondo, red débil), el cambio queda en la cola offline. Al abrir la app al día siguiente ese día aparece "Sin asignar", y si el usuario lo completa (la cena), esa copia vacía reemplaza al cambio pendiente y sube: desayuno y almuerzo se pierden. Reproducido en Chromium móvil con fixtures (0 llamadas pagadas).
+
+### Causa raíz
+
+- `onAuth()` (`index.html`) vacía `S.days`/`S.weights` en cada arranque ("la DB manda"), y `pullAllDays()`/`pullDay()` omiten a propósito los días con cambios pendientes en la cola. Resultado: lo pendiente solo vivía en la cola y la pantalla quedaba vacía hasta que `drainSyncQueue()` lograra subirlo.
+- `enqueueMutation()` deduplica por día y reemplaza el payload pendiente con el nuevo, armado sobre el día vacío.
+- `drainSyncQueue()` solo reintentaba `pending`: un cambio que agotó sus 3 intentos (`failed`) no volvía a subir nunca, aunque el aviso dice "vuelve a conectarte para reintentarlo".
+
+### Alcance
+
+1. `restorePendingFromQueue()`: tras vaciar la caché en `onAuth()`, repone desde la cola del usuario actual (pending, failed o conflicto) el estado de esos días y pesos. La cola de otros usuarios no se toca (REQ-156).
+2. `drainSyncQueue()` reintenta también los cambios `failed` al abrir la app o reconectar.
+3. `CACHE_NAME` → `fitbud-pwa-v124`.
+
+### Fuera de alcance
+
+- Por qué falló la subida en el caso de Sathya (no hay telemetría de errores de sync). Los datos del 20 oct que nunca llegaron al servidor solo existen en la cola de su iPhone: al abrir la versión nueva se reponen y suben solos, salvo que ya haya completado ese día (en ese caso la copia vacía ya pisó la cola y no se pueden recuperar).
+- El texto "CONSUMO DE HOY" que se ve al mirar un día pasado.
+
+### Riesgos
+
+- Un día en conflicto muestra la versión de este dispositivo hasta que el usuario elija en "Revisar"; antes se veía vacío.
+
+### Criterios de aceptación
+
+- Con la subida de ayer fallida y el primer reintento de hoy también fallando, ayer muestra desayuno y almuerzo registrados y marcados; al completar la cena, lo que sube conserva los tres y la cola queda vacía. ✓ (`tests/e2e/dia-sin-subir.spec.js`; falla sin el arreglo)
+- Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
