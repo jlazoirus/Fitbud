@@ -207,6 +207,37 @@ async function grantBetaUnlimitedQuota(userId, expiresAt, caller, e) {
   if (!response.ok) throw new Error(apiError(await responseJson(response), "No se pudo quitar el tope del coach."));
 }
 
+// REQ-250: lo que ya respondió en la postulación llega al onboarding para no
+// pedírselo otra vez. Solo nombre, objetivo y experiencia tienen equivalente
+// exacto (la edad es un rango; la salud se pregunta con detalle en la app).
+// Nunca toca un perfil con el onboarding hecho ni marca el onboarding como hecho.
+const BETA_GOAL_TO_PREF = { "Bajar grasa": "deficit", "Ganar musculo": "volumen", "Mejorar rendimiento": "mantenimiento" };
+const BETA_STAGE_TO_EXPERIENCE = { beginner: "beginner", returning: "beginner", consistent: "intermediate", advanced: "advanced" };
+export function betaProfileSeed(sub) {
+  const seed = {};
+  const name = String((sub && sub.name) || "").trim().slice(0, 90);
+  if (name) seed.name = name;
+  if (BETA_GOAL_TO_PREF[sub && sub.goal]) seed.goal = BETA_GOAL_TO_PREF[sub.goal];
+  if (BETA_STAGE_TO_EXPERIENCE[sub && sub.stage]) seed.trainingExperience = BETA_STAGE_TO_EXPERIENCE[sub.stage];
+  return seed;
+}
+async function seedProfileFromApplication(userId, sub, e) {
+  const seed = betaProfileSeed(sub);
+  if (!userId || !Object.keys(seed).length) return false;
+  const response = await fetch(e.url + "/rest/v1/profiles?id=eq." + encodeURIComponent(userId) + "&select=prefs", { headers: serviceHeaders(e) });
+  const rows = await responseJson(response);
+  if (!response.ok || !Array.isArray(rows) || !rows.length) return false;
+  const prefs = rows[0].prefs && typeof rows[0].prefs === "object" ? rows[0].prefs : {};
+  if (prefs.onboardingCompletedAt) return false;
+  const next = Object.assign({}, prefs, seed, prefs.name ? { name: prefs.name } : {});
+  const patch = await fetch(e.url + "/rest/v1/profiles?id=eq." + encodeURIComponent(userId), {
+    method: "PATCH",
+    headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=minimal" }),
+    body: JSON.stringify({ prefs: next, updated_at: new Date().toISOString() }),
+  });
+  return patch.ok;
+}
+
 const BETA_QUOTA_ERROR = "Tiene el acceso, pero no se pudo quitar el tope de uso del coach. Ajústalo desde Usuarios → Consumo y cortesía.";
 
 // La cuenta ya existe: si el acceso falla, se informa al admin (que puede dar
@@ -936,6 +967,8 @@ async function acceptBetaApplicant(e, caller, body, req) {
           if (entitlement && entitlement.quotaError) betaError = BETA_QUOTA_ERROR;
         } catch (error) { betaError = "La cuenta quedó creada, pero no se pudo dar el acceso beta. Dale cortesía de 90 días desde Usuarios."; }
       }
+      // El perfil se rellena aparte: si falla, solo tendrá que escribirlo en el onboarding.
+      try { await seedProfileFromApplication(userId, sub, e); } catch (_) { /* no bloquea la aceptación */ }
       const note = `${new Date().toISOString().slice(0, 10)}: aceptado en la beta; ${existing ? "ya tenía cuenta, se le dio el acceso" : "invitación enviada a " + email} (${BETA_ACCESS_DAYS} días).`;
       const updated = await betaPatch(e, id, {
         status: "beta_invited",
