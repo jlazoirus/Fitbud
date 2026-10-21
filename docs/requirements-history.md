@@ -9924,6 +9924,45 @@ El reproductor guarda la carga de cada serie (`set.load`) en `day_log.state.work
 - Con 40 kg × 8 y 42.5 kg × 7 hace una semana, el reproductor muestra "40 kg × 8, 42.5 kg × 7 · RPE 8-9" y el resumen previo "Última vez 42.5 kg"; un ejercicio sin historial muestra la invitación a anotar. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
 - `node scripts/release-gate.mjs` pasa. ✓
 
+## REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Sathya (beta, 2026-10-21, iPhone): "Ayer no me gustaron las comidas que me sugirió la aplicación, entonces puse lo que de verdad comí (seis huevos con pan con queso y un café) y sí me apareció esa comida editada y me permitía hacerle check, igual con el almuerzo. Hoy quise ver la información de ayer porque me quedó pendiente poner la cena y no se guardaron los datos que había ingresado."
+
+### Problema
+
+Si la subida de un día falla (token vencido al volver la PWA del fondo, red débil), el cambio queda en la cola offline. Al abrir la app al día siguiente ese día aparece "Sin asignar", y si el usuario lo completa (la cena), esa copia vacía reemplaza al cambio pendiente y sube: desayuno y almuerzo se pierden. Reproducido en Chromium móvil con fixtures (0 llamadas pagadas).
+
+### Causa raíz
+
+- `onAuth()` (`index.html`) vacía `S.days`/`S.weights` en cada arranque ("la DB manda"), y `pullAllDays()`/`pullDay()` omiten a propósito los días con cambios pendientes en la cola. Resultado: lo pendiente solo vivía en la cola y la pantalla quedaba vacía hasta que `drainSyncQueue()` lograra subirlo.
+- `enqueueMutation()` deduplica por día y reemplaza el payload pendiente con el nuevo, armado sobre el día vacío.
+- `drainSyncQueue()` solo reintentaba `pending`: un cambio que agotó sus 3 intentos (`failed`) no volvía a subir nunca, aunque el aviso dice "vuelve a conectarte para reintentarlo".
+
+### Alcance
+
+1. `restorePendingFromQueue()`: tras vaciar la caché en `onAuth()`, repone desde la cola del usuario actual (pending, failed o conflicto) el estado de esos días y pesos. La cola de otros usuarios no se toca (REQ-156).
+2. `drainSyncQueue()` reintenta también los cambios `failed` al abrir la app o reconectar.
+3. `CACHE_NAME` → `fitbud-pwa-v124`.
+
+### Fuera de alcance
+
+- Por qué falló la subida en el caso de Sathya (no hay telemetría de errores de sync). Los datos del 20 oct que nunca llegaron al servidor solo existen en la cola de su iPhone: al abrir la versión nueva se reponen y suben solos, salvo que ya haya completado ese día (en ese caso la copia vacía ya pisó la cola y no se pueden recuperar).
+- El texto "CONSUMO DE HOY" que se ve al mirar un día pasado.
+
+### Riesgos
+
+- Un día en conflicto muestra la versión de este dispositivo hasta que el usuario elija en "Revisar"; antes se veía vacío.
+
+### Criterios de aceptación
+
+- Con la subida de ayer fallida y el primer reintento de hoy también fallando, ayer muestra desayuno y almuerzo registrados y marcados; al completar la cena, lo que sube conserva los tres y la cola queda vacía. ✓ (`tests/e2e/dia-sin-subir.spec.js`; falla sin el arreglo)
+- Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
+
 ## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
 
 **Estado: implementado.**

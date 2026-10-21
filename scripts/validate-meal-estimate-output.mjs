@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REQ-245 — "Estimar macros" (texto) fallaba en producción con 422: el schema de
+// REQ-246 — "Estimar macros" (texto) fallaba en producción con 422: el schema de
 // meal_estimate exige "preguntas" sin tope, el prompt de texto no las pedía y el
 // modelo a veces devolvía 4 o más; el validador las rechazaba (máx. 3) y el
 // usuario veía "Tu coach no pudo completar esta acción". Las preguntas no
