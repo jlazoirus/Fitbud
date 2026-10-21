@@ -162,7 +162,7 @@ console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporiza
   const forged=player.normalizeExecution({...execution,steps:execution.steps.map((step,i)=>i===1?{...step,status:"declined"}:step)},prescription,Date.now());
   assert.equal(forged.steps[1].status,"pending","Un ejercicio no puede quedar 'declined'");
   console.log("REQ-236: calentamiento y vuelta a la calma opcionales.");
-  // REQ-249: elegido y luego omitido, tampoco cuenta como bloque omitido.
+  // REQ-250: elegido y luego omitido, tampoco cuenta como bloque omitido.
   const chosen=player.normalizeExecution({...execution,steps:execution.steps.map((step,i)=>i===0?{...step,optIn:true,status:"skipped"}:i===1?{...step,status:"skipped"}:step)},prescription,Date.now());
   assert.equal(chosen.steps[0].status,"declined","Un opcional omitido queda 'declined'");
   assert.equal(chosen.steps[1].status,"skipped","Un ejercicio omitido sigue siendo omitido");

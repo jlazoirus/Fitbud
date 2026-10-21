@@ -10082,35 +10082,37 @@ Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningú
 
 - `tests/e2e/portada.spec.js` y `tests/e2e/beta.spec.js`: ni la portada ni la postulación (incluida la meta descripción) mencionan Perú, Chile o México. ✓
 
-## REQ-233 - Nutrición: tocar la tarjeta de una comida abre su menú de opciones
+## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
 **Estado: implementado.**
 
 ### Origen
 
-Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
+Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar macros" de "Sopa ramen vegetariana" muestra "Tu coach no pudo completar esta acción. Intenta de nuevo." y bajo los botones se ve una caja vacía con el texto "Foto de la comida".
 
 ### Problema
 
-La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
+1. `.meal-photo-preview{display:block}` anula el atributo `hidden` del `<img>` de la vista previa: sin foto se ve una imagen rota con su texto alternativo.
+2. `aiEstimate()` (texto) reduce cualquier fallo al mensaje genérico y no ofrece reintentar; REQ-228 solo lo resolvió para la foto. El handler de `/api/claude`, ejecutado en local con Supabase y el proveedor simulados, responde 200 para el texto: la causa está en producción y no se ve desde la UI.
 
 ### Alcance
 
-1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
-2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
-3. `CACHE_NAME` → `fitbud-pwa-v115`.
+1. `.meal-photo-preview[hidden]{display:none}`.
+2. `estimateErrorMessage(e, photo)` (antes `photoEstimateErrorMessage`) sirve a foto y texto: demora, mucha demanda, no se pudo estimar (con consejo para el texto), sin conexión, y "(código N)" si el motivo no se reconoce.
+3. "Estimar macros" muestra ese mensaje y "Reintentar" (no con el aviso de plan).
+4. `CACHE_NAME` → `fitbud-pwa-v120`.
 
 ### Fuera de alcance
 
-- Tarjetas de extras y comidas saltadas (no tienen menú "···").
+- La causa de producción: leer el código que ahora se muestra (o el mensaje completo, con una cuenta admin) o los logs de `/api/claude` en Vercel.
 
 ### Riesgos
 
-- Ninguno sobre datos: solo abre un menú existente.
+- Ninguno sobre datos: solo presentación y reintento.
 
 ### Criterios de aceptación
 
-- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
+- Sin foto, la vista previa no se ve; un 500 muestra "(código 500)", un 422 pide describir mejor y "Reintentar" estima. ✓ (`tests/e2e/foto-comida.spec.js`)
 - `node scripts/release-gate.mjs` pasa. ✓
 
 ## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
@@ -10144,35 +10146,64 @@ La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar qu
 - La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
 
-## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
+## REQ-233 - Nutrición: tocar la tarjeta de una comida abre su menú de opciones
 
 **Estado: implementado.**
 
 ### Origen
 
-Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar macros" de "Sopa ramen vegetariana" muestra "Tu coach no pudo completar esta acción. Intenta de nuevo." y bajo los botones se ve una caja vacía con el texto "Foto de la comida".
+Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
 
 ### Problema
 
-1. `.meal-photo-preview{display:block}` anula el atributo `hidden` del `<img>` de la vista previa: sin foto se ve una imagen rota con su texto alternativo.
-2. `aiEstimate()` (texto) reduce cualquier fallo al mensaje genérico y no ofrece reintentar; REQ-228 solo lo resolvió para la foto. El handler de `/api/claude`, ejecutado en local con Supabase y el proveedor simulados, responde 200 para el texto: la causa está en producción y no se ve desde la UI.
+La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
 
 ### Alcance
 
-1. `.meal-photo-preview[hidden]{display:none}`.
-2. `estimateErrorMessage(e, photo)` (antes `photoEstimateErrorMessage`) sirve a foto y texto: demora, mucha demanda, no se pudo estimar (con consejo para el texto), sin conexión, y "(código N)" si el motivo no se reconoce.
-3. "Estimar macros" muestra ese mensaje y "Reintentar" (no con el aviso de plan).
-4. `CACHE_NAME` → `fitbud-pwa-v120`.
+1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
+2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
+3. `CACHE_NAME` → `fitbud-pwa-v115`.
 
 ### Fuera de alcance
 
-- La causa de producción: leer el código que ahora se muestra (o el mensaje completo, con una cuenta admin) o los logs de `/api/claude` en Vercel.
+- Tarjetas de extras y comidas saltadas (no tienen menú "···").
 
 ### Riesgos
 
-- Ninguno sobre datos: solo presentación y reintento.
+- Ninguno sobre datos: solo abre un menú existente.
 
 ### Criterios de aceptación
 
-- Sin foto, la vista previa no se ve; un 500 muestra "(código 500)", un 422 pide describir mejor y "Reintentar" estima. ✓ (`tests/e2e/foto-comida.spec.js`)
+- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de Entreno con la sesión en curso: el aviso "Señales para detenerte", la tarjeta del plan ("Correr + Gimnasio · Preparar mi plan · Configurar") y la del entrenamiento ("Push B · cambiado · Cambiar entrenamiento") "no tienen sentido una vez iniciado: solo ocupan espacio y confunden; deberían estar colapsados o juntos en un botón".
+
+### Problema
+
+`renderWorkout()` pintaba siempre esas tres piezas antes del reproductor, aunque con la sesión en curso sus acciones están deshabilitadas o no aplican, y el reproductor quedaba abajo.
+
+### Alcance
+
+1. Con la ejecución `in_progress` o `paused`, el reproductor va justo después de la cabecera del día y el aviso, el plan y la tarjeta del entrenamiento quedan en `<details class="wk-context">` "Plan y detalles de hoy" (con el nombre de la sesión), cerrado por defecto; si se abre, sigue abierto entre acciones del reproductor.
+2. La pausa por seguridad (`trainingSafetyHold()`) sigue siempre a la vista. Antes de empezar y con la sesión cerrada (completada o parcial) no cambia nada.
+3. `CACHE_NAME` → `fitbud-pwa-v121`.
+
+### Fuera de alcance
+
+- "Actividad registrada" y "Resumen", que siguen debajo.
+
+### Riesgos
+
+- Ninguno sobre datos: solo cambia el orden y la visibilidad.
+
+### Criterios de aceptación
+
+- Con la sesión en curso, el desplegable existe cerrado después del reproductor, oculta el aviso, "Preparar mi plan" y "Cambiar entrenamiento", sigue abierto tras "Ahora no" y desaparece al descartar. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓

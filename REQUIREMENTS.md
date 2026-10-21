@@ -1594,13 +1594,13 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-236`).
 
 ## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
 
-**Estado: implementado.**
+**Estado: implementado.** La tarjeta del tempo es un botón: dice "baja · pausa · sube ⓘ" (o "ritmo ⓘ") y explica el ritmo de cada repetición.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-237`).
 
 ## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
-**Estado: implementado.**
+**Estado: implementado.** "Estimar macros" (texto y foto) dice por qué falló, con "(código N)" si el motivo no se reconoce, y ofrece "Reintentar"; sin foto ya no se ve la vista previa rota.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
 
@@ -1608,32 +1608,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-21), con captura de Entreno con la sesión en curso: el aviso "Señales para detenerte", la tarjeta del plan ("Correr + Gimnasio · Preparar mi plan · Configurar") y la del entrenamiento ("Push B · cambiado · Cambiar entrenamiento") "no tienen sentido una vez iniciado: solo ocupan espacio y confunden; deberían estar colapsados o juntos en un botón".
-
-### Problema
-
-`renderWorkout()` pintaba siempre esas tres piezas antes del reproductor, aunque con la sesión en curso sus acciones están deshabilitadas o no aplican, y el reproductor quedaba abajo.
-
-### Alcance
-
-1. Con la ejecución `in_progress` o `paused`, el reproductor va justo después de la cabecera del día y el aviso, el plan y la tarjeta del entrenamiento quedan en `<details class="wk-context">` "Plan y detalles de hoy" (con el nombre de la sesión), cerrado por defecto; si se abre, sigue abierto entre acciones del reproductor.
-2. La pausa por seguridad (`trainingSafetyHold()`) sigue siempre a la vista. Antes de empezar y con la sesión cerrada (completada o parcial) no cambia nada.
-3. `CACHE_NAME` → `fitbud-pwa-v121`.
-
-### Fuera de alcance
-
-- "Actividad registrada" y "Resumen", que siguen debajo.
-
-### Riesgos
-
-- Ninguno sobre datos: solo cambia el orden y la visibilidad.
-
-### Criterios de aceptación
-
-- Con la sesión en curso, el desplegable existe cerrado después del reproductor, oculta el aviso, "Preparar mi plan" y "Cambiar entrenamiento", sigue abierto tras "Ahora no" y desaparece al descartar. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-239`).
 
 ## REQ-240 - Entreno: la demostración y los pasos se abren desde junto al nombre del ejercicio
 
@@ -1929,7 +1904,37 @@ Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostran
 - Canjear el código de una postulación aceptada crea los overrides; un cupón normal no. ✓ (`scripts/test-invite-signup-api.mjs`, `scripts/test-coupon-api.mjs`)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-249 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
+## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apretados". En "Próxima comida" y "Entrenamiento pendiente", "Ver detalle" y "Adaptar" llegan al borde derecho de su tarjeta.
+
+### Causa raíz
+
+`homeAgendaItemHtml()` (`index.html`) ponía el tipo de la fila como clase suelta (`agenda-item meal`, `agenda-item workout`). `.meal` y `.workout` son las tarjetas globales de comida y entreno (fondo, borde, radio), así que cada fila se volvía una tarjeta dentro de la tarjeta de la agenda; pero `.agenda-item{padding:13px 0}` les quita el relleno lateral y los botones (`flex:1 1 128px`) llenan el ancho hasta el borde. Medido a 390 px: "Ver detalle" termina a 0 px del borde.
+
+### Alcance
+
+1. La clase del tipo va con prefijo (`kind-meal`, `kind-workout`, `kind-resume`, `kind-rest`) y los selectores de icono se ajustan: la agenda vuelve a ser la lista con separadores que define su CSS, con los botones a 16 px del borde de la tarjeta.
+2. `CACHE_NAME` → `fitbud-pwa-v131`.
+
+### Fuera de alcance
+
+- Cambiar el diseño de la agenda.
+
+### Riesgos
+
+- Las filas ya no tienen fondo propio (el entreno pierde su degradado azul); el icono conserva su color por tipo.
+
+### Criterios de aceptación
+
+- A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-250 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
 
 **Estado: implementado.**
 
@@ -1946,7 +1951,7 @@ REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahor
 1. Omitir un bloque opcional lo deja `declined`, igual que "Ahora no".
 2. `normalizeStep()` (`workout-player.js`) convierte en `declined` un opcional `skipped`, así las sesiones en curso o guardadas antes del arreglo dejan de contarlo como omitido.
 3. Una sesión guardada parcial a la que no le falta nada (sin bloques omitidos, sin series sin marcar, sin dolor) muestra "Marcar como completada", que la cierra completada sin reabrirla.
-4. `CACHE_NAME` → `fitbud-pwa-v131`.
+4. `CACHE_NAME` → `fitbud-pwa-v132`.
 
 ### Fuera de alcance
 

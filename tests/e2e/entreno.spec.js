@@ -535,7 +535,7 @@ test.describe("Bloques opcionales", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  // REQ-249 (Jonathan): elegir el calentamiento y luego "Omitir bloque" dejaba
+  // REQ-250 (Jonathan): elegir el calentamiento y luego "Omitir bloque" dejaba
   // la sesión "parcial" con 16/16 series hechas.
   test("omitir un calentamiento ya elegido no deja la sesión parcial; una guardada así se corrige", async ({ page, context }) => {
     await installMocks(context);
