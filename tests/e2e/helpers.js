@@ -471,14 +471,14 @@ export async function gotoApp(page) {
   );
 }
 
-/** REQ-234: inicia la sesión guiada saltando la cuenta atrás de 3 s ("Empezar ya"). */
+/** REQ-235: inicia la sesión guiada saltando la cuenta atrás de 3 s ("Empezar ya"). */
 export async function startGuidedSession(page) {
   await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
   await page.locator("#workoutCountdown").getByRole("button", { name: "Empezar ya" }).click();
 }
 
 /**
- * Completa el bloque de tiempo actual como usuario. REQ-235: si es el
+ * Completa el bloque de tiempo actual como usuario. REQ-236: si es el
  * calentamiento o la vuelta a la calma (opcionales), primero acepta hacerlo.
  */
 export async function completeTimedBlock(page) {

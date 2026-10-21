@@ -140,7 +140,7 @@ test("comida del plan + foto de otro plato → estima lo que se ve, no lo planea
   expect(errors).toEqual([]);
 });
 
-// REQ-237: sin foto no se ve la caja rota "Foto de la comida", y "Estimar macros"
+// REQ-238: sin foto no se ve la caja rota "Foto de la comida", y "Estimar macros"
 // por texto dice qué falló (con código) y deja reintentar, como la foto.
 test("estimar por texto → fallo con motivo y código → reintentar", async ({ page, context }) => {
   await installMocks(context);

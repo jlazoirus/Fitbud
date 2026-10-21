@@ -39,7 +39,7 @@ function visit(node,label){
 }
 visit(workouts,"workouts");
 
-// REQ-240: cada ejercicio de fuerza dice qué hacen "versión más fácil" y
+// REQ-241: cada ejercicio de fuerza dice qué hacen "versión más fácil" y
 // "progresión": otro ejercicio del mismo patrón (más fácil o más difícil según
 // el nivel), una variante con nombre propio o solo la carga.
 const variants=context.globalThis.FITBUD_EXERCISE_VARIANTS||{};

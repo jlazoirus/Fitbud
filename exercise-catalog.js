@@ -229,7 +229,7 @@
   }));
 
   root.FITBUD_EXERCISES=strength.concat(endurance);
-  // REQ-240: qué hacen "Usar versión más fácil" y "Usar progresión" en cada
+  // REQ-241: qué hacen "Usar versión más fácil" y "Usar progresión" en cada
   // ejercicio de fuerza. Vive aquí (por slug) y no en la tabla para que valga
   // igual con el catálogo local que con el de Supabase.
   //   exercise → se cambia a otro ejercicio del catálogo (título e imagen nuevos)

@@ -1,4 +1,4 @@
-# Inventario de progresiones de ejercicios (REQ-240)
+# Inventario de progresiones de ejercicios (REQ-241)
 
 Generado desde `FITBUD_EXERCISE_VARIANTS` (`exercise-catalog.js`) y el catálogo (54 ejercicios: 42 de fuerza y 12 de resistencia). Lo valida `scripts/validate-exercises.mjs`.
 
