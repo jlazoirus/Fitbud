@@ -10081,3 +10081,65 @@ Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningú
 ### Criterios de aceptación
 
 - `tests/e2e/portada.spec.js` y `tests/e2e/beta.spec.js`: ni la portada ni la postulación (incluida la meta descripción) mencionan Perú, Chile o México. ✓
+
+## REQ-233 - Nutrición: tocar la tarjeta de una comida abre su menú de opciones
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
+
+### Problema
+
+La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
+
+### Alcance
+
+1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
+2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
+3. `CACHE_NAME` → `fitbud-pwa-v115`.
+
+### Fuera de alcance
+
+- Tarjetas de extras y comidas saltadas (no tienen menú "···").
+
+### Riesgos
+
+- Ninguno sobre datos: solo abre un menú existente.
+
+### Criterios de aceptación
+
+- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura de la tarjeta "3-1-1 · tempo" del reproductor: "No se entiende qué es esto".
+
+### Problema
+
+La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar que son segundos por fase ni en qué orden. RPE y RIR ya tenían ⓘ con explicación; el tempo no.
+
+### Alcance
+
+1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
+2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
+3. `CACHE_NAME` → `fitbud-pwa-v119`.
+
+### Fuera de alcance
+
+- Cambiar los tempos que prescribe el plan.
+
+### Riesgos
+
+- Ninguno: solo presentación.
+
+### Criterios de aceptación
+
+- La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓

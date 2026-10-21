@@ -1534,32 +1534,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-232`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
-
-### Problema
-
-La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
-
-### Alcance
-
-1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
-2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
-3. `CACHE_NAME` → `fitbud-pwa-v115`.
-
-### Fuera de alcance
-
-- Tarjetas de extras y comidas saltadas (no tienen menú "···").
-
-### Riesgos
-
-- Ninguno sobre datos: solo abre un menú existente.
-
-### Criterios de aceptación
-
-- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-233`).
 
 ## REQ-234 - El check-in semanal re-puntúa días ya ejecutados y contradice su copy "para la próxima semana"
 
@@ -1621,32 +1596,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-236`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-20), con captura de la tarjeta "3-1-1 · tempo" del reproductor: "No se entiende qué es esto".
-
-### Problema
-
-La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar que son segundos por fase ni en qué orden. RPE y RIR ya tenían ⓘ con explicación; el tempo no.
-
-### Alcance
-
-1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
-2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
-3. `CACHE_NAME` → `fitbud-pwa-v119`.
-
-### Fuera de alcance
-
-- Cambiar los tempos que prescribe el plan.
-
-### Riesgos
-
-- Ninguno: solo presentación.
-
-### Criterios de aceptación
-
-- La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-237`).
 
 ## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
@@ -1974,4 +1924,34 @@ El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (
 
 - Remo sentado en polea → solo Remo con banda; Face pull → sin opciones y el aviso nombra el deltoides posterior. ✓ (`tests/e2e/entreno.spec.js`)
 - Ningún sustituto ni versión más fácil/progresión del catálogo cambia de músculo principal. ✓ (`scripts/validate-exercises.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-248 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del resultado "Sesión parcial · 6/7 bloques completados · 16/16 series registradas · 1 bloque omitido": "Hice toda la sesión y lo único que pasé si no me equivoco son los calentamientos; no debería decir parcial, debería ser completada".
+
+### Causa raíz
+
+REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahora no" los deja `declined`. Si el usuario elegía hacerlos y luego tocaba "Omitir bloque" (o "Omitir" en su cronómetro), `skipWorkoutStep()`/`finishTimedWorkoutStep()` (`index.html`) los marcaban `skipped`, que cuenta como bloque omitido y hace que `workoutFullyCompleted()` guarde la sesión como parcial.
+
+### Alcance
+
+1. Omitir un bloque opcional lo deja `declined`, igual que "Ahora no".
+2. `normalizeStep()` (`workout-player.js`) convierte en `declined` un opcional `skipped`, así las sesiones en curso o guardadas antes del arreglo dejan de contarlo como omitido.
+3. Una sesión guardada parcial a la que no le falta nada (sin bloques omitidos, sin series sin marcar, sin dolor) muestra "Marcar como completada", que la cierra completada sin reabrirla.
+4. `CACHE_NAME` → `fitbud-pwa-v130`.
+
+### Fuera de alcance
+
+- Omitir un ejercicio o un bloque de cardio sigue dejando la sesión parcial.
+- No se reclasifica sola ninguna sesión guardada: el cambio a completada lo decide el usuario.
+
+### Criterios de aceptación
+
+- Elegir el calentamiento y la vuelta a la calma y omitirlos, con todas las series hechas, guarda "Sesión completada" con 0 bloques omitidos. ✓ (`tests/e2e/entreno.spec.js`)
+- Una sesión guardada parcial con el calentamiento `skipped` muestra 0 omitidos y "Marcar como completada"; al tocarlo queda completada y cuenta como entreno hecho. ✓ (misma prueba, `scripts/validate-workout-player.mjs`)
 - `node scripts/release-gate.mjs` pasa.

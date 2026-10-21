@@ -534,6 +534,56 @@ test.describe("Bloques opcionales", () => {
     await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  // REQ-248 (Jonathan): elegir el calentamiento y luego "Omitir bloque" dejaba
+  // la sesión "parcial" con 16/16 series hechas.
+  test("omitir un calentamiento ya elegido no deja la sesión parcial; una guardada así se corrige", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+
+    await page.getByRole("button", { name: "Sí, calentar" }).click();
+    await page.getByRole("button", { name: "Omitir bloque" }).click();
+    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+    for (;;) {
+      const siguiente = page.getByRole("button", { name: "Siguiente ejercicio" });
+      if (!(await siguiente.isVisible().catch(() => false))) break;
+      const pending = app.locator("button.set-done:not(.on)");
+      while (await pending.count()) await pending.first().click();
+      await siguiente.click();
+    }
+    await page.getByRole("button", { name: "Sí, hacerlo" }).click();
+    await page.getByRole("button", { name: "Omitir bloque" }).click();
+    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay.locator("h3")).toHaveText("Finalizar sesión");
+    await overlay.locator("#finishPain").selectOption({ label: "No" });
+    await overlay.locator("#finishDifficulty").selectOption({ label: "Adecuada" });
+    await overlay.getByRole("button", { name: "Guardar resultado" }).click();
+    await expect(app).toContainText("Sesión completada");
+    await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
+
+    // Una sesión guardada antes del arreglo: calentamiento "skipped" y parcial.
+    await page.evaluate(() => {
+      const st = dayState(current);
+      st.workoutExecution.steps[0].status = "skipped";
+      st.workoutExecution.status = "partial";
+      st.workoutDone = false;
+      commitDay(current); render();
+    });
+    await expect(app).toContainText("Sesión parcial");
+    await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
+    await app.getByRole("button", { name: "Marcar como completada" }).click();
+    await expect(app).toContainText("Sesión completada");
+    expect(await page.evaluate(() => dayState(current).workoutDone)).toBe(true);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
 
 // REQ-239 (Jonathan): con la sesión en curso, el aviso, el plan y la tarjeta del
