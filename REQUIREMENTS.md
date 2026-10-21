@@ -86,6 +86,7 @@ Feedback Sathya (beta, 2026-10-21, iPhone):
 Feedback Jonathan (2026-10-21, iPhone):
 
 - REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes. (P1; implementado)
+- REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir. (P1; implementado)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -1814,42 +1815,9 @@ Jonathan (2026-10-21), con captura de "Fondos asistidos": "Usar progresión" no 
 
 ## REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado
 
-**Estado: implementado.**
+**Estado: implementado.** Tras vaciar la caché en `onAuth()`, `restorePendingFromQueue()` repone desde la cola los días y pesos que aún no subieron, y `drainSyncQueue()` reintenta también los `failed`. Prueba: `tests/e2e/dia-sin-subir.spec.js`.
 
-### Origen
-
-Feedback de Sathya (beta, 2026-10-21, iPhone): "Ayer no me gustaron las comidas que me sugirió la aplicación, entonces puse lo que de verdad comí (seis huevos con pan con queso y un café) y sí me apareció esa comida editada y me permitía hacerle check, igual con el almuerzo. Hoy quise ver la información de ayer porque me quedó pendiente poner la cena y no se guardaron los datos que había ingresado."
-
-### Problema
-
-Si la subida de un día falla (token vencido al volver la PWA del fondo, red débil), el cambio queda en la cola offline. Al abrir la app al día siguiente ese día aparece "Sin asignar", y si el usuario lo completa (la cena), esa copia vacía reemplaza al cambio pendiente y sube: desayuno y almuerzo se pierden. Reproducido en Chromium móvil con fixtures (0 llamadas pagadas).
-
-### Causa raíz
-
-- `onAuth()` (`index.html`) vacía `S.days`/`S.weights` en cada arranque ("la DB manda"), y `pullAllDays()`/`pullDay()` omiten a propósito los días con cambios pendientes en la cola. Resultado: lo pendiente solo vivía en la cola y la pantalla quedaba vacía hasta que `drainSyncQueue()` lograra subirlo.
-- `enqueueMutation()` deduplica por día y reemplaza el payload pendiente con el nuevo, armado sobre el día vacío.
-- `drainSyncQueue()` solo reintentaba `pending`: un cambio que agotó sus 3 intentos (`failed`) no volvía a subir nunca, aunque el aviso dice "vuelve a conectarte para reintentarlo".
-
-### Alcance
-
-1. `restorePendingFromQueue()`: tras vaciar la caché en `onAuth()`, repone desde la cola del usuario actual (pending, failed o conflicto) el estado de esos días y pesos. La cola de otros usuarios no se toca (REQ-156).
-2. `drainSyncQueue()` reintenta también los cambios `failed` al abrir la app o reconectar.
-3. `CACHE_NAME` → `fitbud-pwa-v124`.
-
-### Fuera de alcance
-
-- Por qué falló la subida en el caso de Sathya (no hay telemetría de errores de sync). Los datos del 20 oct que nunca llegaron al servidor solo existen en la cola de su iPhone: al abrir la versión nueva se reponen y suben solos, salvo que ya haya completado ese día (en ese caso la copia vacía ya pisó la cola y no se pueden recuperar).
-- El texto "CONSUMO DE HOY" que se ve al mirar un día pasado.
-
-### Riesgos
-
-- Un día en conflicto muestra la versión de este dispositivo hasta que el usuario elija en "Revisar"; antes se veía vacío.
-
-### Criterios de aceptación
-
-- Con la subida de ayer fallida y el primer reintento de hoy también fallando, ayer muestra desayuno y almuerzo registrados y marcados; al completar la cena, lo que sube conserva los tres y la cola queda vacía. ✓ (`tests/e2e/dia-sin-subir.spec.js`; falla sin el arreglo)
-- Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
-- `node scripts/release-gate.mjs` pasa.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-242`).
 
 ## REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes
 
@@ -1928,7 +1896,44 @@ REQ-155 congeló el cronómetro al pasar la app a segundo plano para que una ses
 - 3 h fuera: la sesión queda en pausa con la duración que tenía al salir y el botón "Reanudar sesión" visible. ✓ (mismas pruebas)
 - `node scripts/release-gate.mjs` pasa. ✓
 
-## REQ-245 - Entreno: "Sustituir" solo propone ejercicios del mismo músculo principal
+## REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21, iPhone), con captura del reproductor en "Curl de bíceps": "Así como tienes el siguiente ejercicio, deberías poder tener algo que te lleve al ejercicio anterior para ver si simplemente quiero revisar, pero deberíamos mantener la funcionalidad de siguiente ejercicio y omitir".
+
+### Problema
+
+El reproductor solo avanza: "Omitir ejercicio" y "Siguiente ejercicio". Una vez pasado un ejercicio no hay forma de ver qué se registró ni de retomar uno omitido.
+
+### Causa raíz
+
+`normalizeExecution()` (`workout-player.js`) recoloca `currentStep` en el primer bloque pendiente en cada acción, así que el reproductor no tiene noción de "ver otro bloque" que no sea el pendiente.
+
+### Alcance
+
+1. `workoutExecution.reviewStep`: índice del bloque que se revisa, aparte de `currentStep`. Solo apunta a bloques hechos u omitidos; mirar no cambia el estado de ningún bloque ni el avance.
+2. "← Ejercicio anterior" bajo el bloque en curso (y en el cierre, con todo registrado) cuando hay un bloque anterior registrado.
+3. Vista de revisión: título, "Registraste N series" con carga × reps · RPE de cada una, o "Lo omitiste."; "← Anterior" / "Siguiente →" entre los ya registrados y "Volver al ejercicio en curso" (o "al cierre de la sesión"). Sin Omitir ni Siguiente ejercicio, que modifican el registro.
+4. Un ejercicio omitido se puede retomar con "Hacerlo ahora".
+5. "Siguiente ejercicio" y "Omitir ejercicio" no cambian. `CACHE_NAME` → `fitbud-pwa-v128`.
+
+### Fuera de alcance
+
+- Corregir series de un ejercicio ya completado desde la revisión.
+
+### Riesgos
+
+- Ninguno sobre datos: la revisión es de solo lectura; "Hacerlo ahora" solo devuelve a pendiente un bloque omitido.
+
+### Criterios de aceptación
+
+- Tras el primer ejercicio, "← Ejercicio anterior" muestra lo registrado (40 kg), sin Omitir ni Siguiente ejercicio, y el avance no cambia; "Volver al ejercicio en curso" vuelve al segundo con sus botones. Omitido → "Lo omitiste." y "Hacerlo ahora" lo retoma; el registro del primero queda intacto. ✓ (`tests/e2e/entreno.spec.js`, captura 390 px revisada)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-246 - Entreno: "Sustituir" solo propone ejercicios del mismo músculo principal
 
 **Estado: implementado.**
 
@@ -1950,7 +1955,7 @@ El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (
 2. Espalda se separa en dorsal ancho (jalón, dominadas) y espalda media (remos); hombro en hombros (press), deltoides lateral (elevación lateral) y deltoides posterior (face pull).
 3. El modal dice qué músculo se conserva, cada opción muestra "Músculo principal: …" y, si no hay ninguna compatible con el lugar y las limitaciones del día, lo dice con el músculo.
 4. `scripts/validate-exercises.mjs` exige músculo principal en cada ejercicio de fuerza, que ningún sustituto ni versión más fácil/progresión cambie de músculo, y fija casos concretos (face pull, remo, jalón, curl, tríceps, rumano, elevación lateral).
-5. `CACHE_NAME` → `fitbud-pwa-v127`.
+5. `CACHE_NAME` → `fitbud-pwa-v128`.
 
 ### Fuera de alcance
 

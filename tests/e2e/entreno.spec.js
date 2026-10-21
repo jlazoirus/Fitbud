@@ -639,7 +639,7 @@ test.describe("Progresiones", () => {
   });
 });
 
-// REQ-245 (Jonathan): "Sustituir" proponía cualquier ejercicio del mismo patrón
+// REQ-246 (Jonathan): "Sustituir" proponía cualquier ejercicio del mismo patrón
 // ("pull": dominadas para un face pull, jalón para un remo). Ahora solo los que
 // trabajan el mismo músculo principal.
 test.describe("Sustituir ejercicio", () => {
@@ -776,5 +776,76 @@ test.describe("Calentamiento guiado", () => {
     await expect(app).toContainText(/1\/\d+ bloques/);
     await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
     expect(errors).toEqual([]);
+  });
+});
+
+// Jonathan (2026-10-21): además de "Siguiente ejercicio" y "Omitir", poder volver
+// al ejercicio anterior para revisarlo, sin cambiar lo registrado ni el avance.
+test.describe("Ejercicio anterior", () => {
+  test("se revisa el anterior sin tocar lo registrado y se vuelve al ejercicio en curso", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+    // Sin nada registrado antes, no hay a dónde volver.
+    await expect(page.getByRole("button", { name: "← Ejercicio anterior" })).toHaveCount(0);
+
+    // Primer ejercicio: anota la carga, marca sus series y avanza.
+    const first = (await app.locator(".player-step h3").innerText()).trim();
+    await app.locator('input[aria-label^="Carga"]').first().fill("40");
+    await app.locator('input[aria-label^="Carga"]').first().dispatchEvent("change");
+    const pending = app.locator("button.set-done:not(.on)");
+    const sets = await pending.count();
+    while (await pending.count()) await pending.first().click();
+    await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
+    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+    const second = (await app.locator(".player-step h3").innerText()).trim();
+    expect(second).not.toBe(first);
+
+    // Volver al anterior: se ve lo registrado, sin Omitir ni Siguiente ejercicio.
+    await page.getByRole("button", { name: "← Ejercicio anterior" }).click();
+    const review = app.locator(".player-step.reviewing");
+    await expect(review.locator("h3")).toHaveText(first);
+    await expect(review).toContainText(`Registraste ${sets} series`);
+    await expect(review.locator(".review-sets li").first()).toContainText("40 kg");
+    await expect(page.getByRole("button", { name: "Omitir ejercicio" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toHaveCount(0);
+    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+
+    // Volver al ejercicio en curso: sigue donde iba, con Omitir y Siguiente.
+    await page.getByRole("button", { name: "Volver al ejercicio en curso" }).click();
+    await expect(app.locator(".player-step h3")).toHaveText(second);
+    await expect(page.getByRole("button", { name: "Omitir ejercicio" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
+
+    // Omitir el segundo, revisarlo y retomarlo.
+    await page.getByRole("button", { name: "Omitir ejercicio" }).click();
+    await page.getByRole("button", { name: "← Ejercicio anterior" }).click();
+    await expect(review.locator("h3")).toHaveText(second);
+    await expect(review).toContainText("Lo omitiste.");
+    await review.getByRole("button", { name: "← Anterior" }).click();
+    await expect(review.locator("h3")).toHaveText(first);
+    await review.getByRole("button", { name: "Siguiente →" }).click();
+    await expect(review.locator("h3")).toHaveText(second);
+    await review.getByRole("button", { name: "Hacerlo ahora" }).click();
+    await expect(app.locator(".player-step h3")).toHaveText(second);
+    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+    await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
+
+    // El registro del primero quedó intacto.
+    const firstSets = await page.evaluate(() => {
+      const ex = normalizedWorkoutExecution(todayStr());
+      const step = ex.steps.find((s) => s.type === "strength" && s.status === "done");
+      return step.sets.filter((s) => s.done).map((s) => s.load);
+    });
+    expect(firstSets[0]).toBe("40");
+    expect(firstSets.length).toBe(sets);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });

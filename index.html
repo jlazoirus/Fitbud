@@ -325,6 +325,8 @@
   .shop-item.have .n{color:var(--muted);text-decoration:line-through}
   .player-controls .btn{min-height:48px;border-radius:var(--r-md);white-space:normal}
   .player-controls .primary{grid-column:1 / -1}
+  .player-back{width:100%;margin:-4px 0 12px}
+  .review-sets{margin:10px 0 0;padding-left:20px;display:grid;gap:4px;font-size:14px}
   .set-list{display:grid;gap:8px;margin-top:12px}
   .coach-busy{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(5,5,9,.6);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
   .coach-busy[hidden]{display:none}
@@ -5190,6 +5192,89 @@ function nextWorkoutStepIndex(execution,from){
   }
   return -1;
 }
+// Revisar un ejercicio anterior es solo mirar: reviewStep apunta al bloque que
+// se ve y no cambia currentStep (el primer pendiente) ni lo ya registrado.
+function reviewableWorkoutStep(step){return !!step&&(step.status==="done"||step.status==="skipped");}
+function reviewedWorkoutStepIndex(execution){
+  const i=execution&&execution.reviewStep;
+  return Number.isInteger(i)&&reviewableWorkoutStep(execution.steps[i])?i:null;
+}
+function previousReviewableStepIndex(execution,from){
+  for(let index=Math.min(execution.steps.length,Number(from)||0)-1;index>=0;index--){
+    if(reviewableWorkoutStep(execution.steps[index]))return index;
+  }
+  return -1;
+}
+// Hasta dónde se puede avanzar revisando: antes del bloque en curso (o hasta
+// el final si ya no queda ninguno pendiente).
+function nextReviewableStepIndex(execution,from){
+  const hasPending=execution.steps.some(step=>step.status==="pending");
+  const limit=hasPending?(execution.currentStep||0):execution.steps.length;
+  for(let index=(Number(from)||0)+1;index<limit;index++){
+    if(reviewableWorkoutStep(execution.steps[index]))return index;
+  }
+  return -1;
+}
+function reviewPreviousWorkoutStep(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const reviewing=reviewedWorkoutStepIndex(execution);
+  const from=reviewing!=null?reviewing:(execution.steps.some(step=>step.status==="pending")?(execution.currentStep||0):execution.steps.length);
+  const prev=previousReviewableStepIndex(execution,from);
+  if(prev<0){toast("No hay un ejercicio anterior registrado");return;}
+  execution.reviewStep=prev;
+  persistWorkoutExecution(ds,execution,true);
+}
+function reviewNextWorkoutStep(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  const reviewing=reviewedWorkoutStepIndex(execution);
+  const next=reviewing==null?-1:nextReviewableStepIndex(execution,reviewing);
+  execution.reviewStep=next>=0?next:null;
+  persistWorkoutExecution(ds,execution,true);
+}
+function exitWorkoutReview(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return;
+  execution.reviewStep=null;
+  persistWorkoutExecution(ds,execution,true);
+}
+// Un ejercicio omitido se puede retomar desde la revisión.
+function reopenWorkoutStep(ds,stepIndex){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
+  const step=execution.steps[stepIndex];if(!step||step.status!=="skipped")return;
+  step.status="pending";step.completedAt=null;
+  execution.reviewStep=null;execution.timer=null;
+  execution.currentStep=stepIndex;
+  persistWorkoutExecution(ds,execution,true);
+}
+function renderReviewedWorkoutStep(ds,execution,stepIndex){
+  const step=execution.steps[stepIndex];
+  const exercise=step.type==="strength"?exerciseBySlug(step.exerciseSlug,true):null;
+  const title=exercise?workoutStepTitle(step,exercise):step.label;
+  const position=step.type==="strength"?`ejercicio ${stepIndex} de ${execution.steps.length-2}`:`bloque ${stepIndex+1} de ${execution.steps.length}`;
+  const done=step.status==="done";
+  const sets=step.type==="strength"?step.sets.filter(set=>set.done):[];
+  const unit=step.unit==="seg"?" s":" reps";
+  const setsHtml=done&&sets.length?`<ol class="review-sets">${sets.map(set=>`<li>${esc([workoutLoadLabel(set.load),set.reps==null?"":`${set.reps}${unit}`].filter(Boolean).join(" × ")||"Hecha")}${set.rpe!=null?` <span class="muted">· RPE ${esc(set.rpe)}</span>`:""}</li>`).join("")}</ol>`:"";
+  const hasPending=execution.steps.some(item=>item.status==="pending");
+  const canPrev=previousReviewableStepIndex(execution,stepIndex)>=0;
+  const canNext=nextReviewableStepIndex(execution,stepIndex)>=0;
+  return `<div class="player-step reviewing">
+    <div class="player-phase">Revisando · ${position}</div>
+    <h3>${esc(title)}</h3>
+    <div class="alert violet" style="margin-top:10px">${done?(sets.length?`Registraste ${seriesCount(sets.length)}.`:"Bloque completado."):"Lo omitiste."}</div>
+    ${setsHtml}
+    ${!done&&step.type==="strength"&&execution.status==="in_progress"?`<button class="btn" style="width:100%;margin-top:10px" onclick="reopenWorkoutStep('${ds}',${stepIndex})">Hacerlo ahora</button>`:""}
+    <div class="player-controls">
+      <button class="btn" ${canPrev?"":"disabled"} onclick="reviewPreviousWorkoutStep('${ds}')">← Anterior</button>
+      <button class="btn" ${canNext?"":"disabled"} onclick="reviewNextWorkoutStep('${ds}')">Siguiente →</button>
+      <button class="btn btn-accent primary" onclick="exitWorkoutReview('${ds}')">${hasPending?"Volver al ejercicio en curso":"Volver al cierre de la sesión"}</button>
+    </div>
+  </div>`;
+}
+function workoutBackButton(ds,execution){
+  const from=execution.steps.some(step=>step.status==="pending")?(execution.currentStep||0):execution.steps.length;
+  return previousReviewableStepIndex(execution,from)>=0
+    ?`<button class="btn btn-sm player-back" onclick="reviewPreviousWorkoutStep('${ds}')">← Ejercicio anterior</button>`:"";
+}
 function captureWorkoutElapsed(execution){
   execution.elapsedSeconds=WORKOUT_PLAYER.elapsedSeconds(execution,Date.now());
   execution.resumedAt=null;
@@ -5492,7 +5577,7 @@ function openExerciseSubstitution(ds){
   const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
   const currentExercise=exerciseBySlug(step.exerciseSlug,true);
   if(!currentExercise){toast("No se pudo resolver el ejercicio actual");return;}
-  // REQ-245: solo ejercicios con el mismo músculo principal, no el mismo patrón.
+  // REQ-246: solo ejercicios con el mismo músculo principal, no el mismo patrón.
   const muscle=EXERCISE_SUBSTITUTION.primaryMuscle(currentExercise);
   const candidates=EXERCISE_SUBSTITUTION.candidates(currentExercise,exerciseCatalog(false))
     .filter(ex=>exerciseCompatibleForWorkout(ex,ds));
@@ -5785,6 +5870,11 @@ function workoutVariationButtons(ds,step,exercise){
       ${harder?`<button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','progression')">${harder.kind==="load"?"Subir la carga":"Usar progresión"}</button>`:""}`;
 }
 function renderActiveWorkoutStep(ds,execution){
+  const reviewing=reviewedWorkoutStepIndex(execution);
+  if(reviewing!=null)return renderReviewedWorkoutStep(ds,execution,reviewing);
+  return renderCurrentWorkoutStep(ds,execution)+workoutBackButton(ds,execution);
+}
+function renderCurrentWorkoutStep(ds,execution){
   const step=currentWorkoutStep(execution);
   if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza la sesión para guardar el resultado.</div>';
   const stepIndex=execution.steps.indexOf(step);
@@ -5867,8 +5957,8 @@ function renderWorkoutExecution(ds,execution){
       <button class="btn btn-sm" onclick="discardWorkoutExecution('${ds}')">Descartar</button>
     </div>
   </div>
-  ${execution.status==="paused"?'<div class="alert violet">La sesión está pausada. Reanúdala para continuar con temporizadores y registro.</div>':progress.remaining?renderActiveWorkoutStep(ds,execution):'<div class="alert violet">Todos los bloques están registrados. Revisa el cierre antes de guardar la sesión.</div>'}
-  ${progress.remaining===0?`<button class="btn btn-accent" style="width:100%;min-height:50px" onclick="openFinishWorkout('${ds}',false)">Finalizar y guardar sesión</button>`:""}`;
+  ${execution.status==="paused"?'<div class="alert violet">La sesión está pausada. Reanúdala para continuar con temporizadores y registro.</div>':progress.remaining||reviewedWorkoutStepIndex(execution)!=null?renderActiveWorkoutStep(ds,execution):'<div class="alert violet">Todos los bloques están registrados. Revisa el cierre antes de guardar la sesión.</div>'+workoutBackButton(ds,execution)}
+  ${progress.remaining===0&&reviewedWorkoutStepIndex(execution)==null?`<button class="btn btn-accent" style="width:100%;min-height:50px" onclick="openFinishWorkout('${ds}',false)">Finalizar y guardar sesión</button>`:""}`;
 }
 
 /* ---------- ENTRENO: detalle del entrenamiento del día ---------- */

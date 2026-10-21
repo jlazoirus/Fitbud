@@ -282,7 +282,7 @@
     "archer-push-up":{regression:variant("Flexión arquero con apoyo"),progression:variant("Flexión a un brazo asistida")},
     "nordic-hamstring-curl":{regression:variant("Curl nórdico parcial"),progression:variant("Curl nórdico completo con pausa")},
   };
-  // REQ-245: "Sustituir ejercicio" solo propone ejercicios que trabajan el
+  // REQ-246: "Sustituir ejercicio" solo propone ejercicios que trabajan el
   // mismo músculo principal. El patrón no basta: "pull" junta jalón, remo y
   // face pull, que cargan músculos distintos. Por slug, como las variantes, para
   // que valga con el catálogo local y con el de Supabase; un ejercicio sin
