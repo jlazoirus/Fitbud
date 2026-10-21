@@ -1928,3 +1928,41 @@ Si la subida de un día falla (token vencido al volver la PWA del fondo, red dé
 - Con la subida de ayer fallida y el primer reintento de hoy también fallando, ayer muestra desayuno y almuerzo registrados y marcados; al completar la cena, lo que sube conserva los tres y la cola queda vacía. ✓ (`tests/e2e/dia-sin-subir.spec.js`; falla sin el arreglo)
 - Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-243 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
+
+**Estado: implementado.**
+
+### Origen
+
+Causa de producción que REQ-228 y REQ-238 dejaron fuera de alcance. Jonathan (2026-10-21): "Estimar macros" de "Sopa ramen vegetariana" responde "Tu coach no pudo completar esta acción. Intenta de nuevo."; antes (2026-10-20) lo mismo en el editor tras usar la foto.
+
+### Problema
+
+En `coach_usage` (Supabase de producción) los 12 fallos de `meal_estimate` desde el 2026-10-12 son `refunded` con `error_code = invalid_provider_output`, parte `estimate` (la estimación por texto: ~1045 tokens de entrada, sin imagen). Entre ellos los del reporte: 2026-10-21 01:20:14 y 01:30:43 UTC (20:20 y 20:30 del 20 en Perú) y 2026-10-20 18:46:20 UTC. Ninguna estimación con foto falló y no hay ningún `provider_<status>`: la clave, el saldo, el modelo y structured outputs funcionan. El servidor responde 422 y, antes de REQ-238, el cliente lo mostraba como el mensaje genérico. Son 12 de 49 estimaciones por texto desde el 2026-10-12 (~24 %); las 9 con foto pasaron.
+
+### Causa raíz
+
+- `mealEstimateOutputSchema()` (`api/claude.js`) exige `preguntas` sin tope (structured outputs no limita el largo de una lista) y el prompt de `aiEstimate()` (`index.html`) ni siquiera las pedía: el modelo las inventa. Todas las estimaciones por texto que pasaron traen exactamente 3 (o 0).
+- `validateCoachOutput()` rechazaba `preguntas.length > 3`: cuando el modelo trae 4 o más, una estimación con macros válidos se descarta, se devuelve la cuota y el usuario ve el error. Las respuestas fallidas tienen más tokens de salida (165-318) que las que pasan.
+
+### Alcance
+
+1. `validateCoachOutput()` para `meal_estimate` ya no limita cuántas preguntas trae; sigue exigiendo macros numéricos y preguntas de texto (el cliente muestra como mucho 2 y solo en la foto).
+2. El prompt de "Estimar macros" pide la forma del schema con `"preguntas":[]` y dice que no haga preguntas.
+3. `CACHE_NAME` → `fitbud-pwa-v125`.
+
+### Fuera de alcance
+
+- `training_plan`: sus 8 llamadas en producción (2026-06-24 a 2026-10-20) terminaron en `invalid_provider_output` con exactamente 2048 tokens de salida, el tope que pide el cliente: el JSON llega cortado y la ruta determinista lo tapa. Va en un REQ propio.
+- Registrar en los logs de `/api/claude` el motivo de cada `invalid_provider_output`.
+
+### Riesgos
+
+- Ninguno sobre datos: solo se aceptan respuestas que antes se descartaban con macros válidos.
+
+### Criterios de aceptación
+
+- Una estimación con 4 u 8 preguntas se acepta; kcal no numérica, preguntas que no son lista o que no son texto, y texto que no es JSON se siguen rechazando. ✓ (`scripts/validate-meal-estimate-output.mjs`; falla sin el arreglo)
+- El prompt de texto pide `"preguntas":[]`. ✓ (`scripts/validate-meal-estimate-output.mjs`)
+- `node scripts/release-gate.mjs` pasa. ✓ (validadores; E2E 100/101 con 1 flaky de `dia-sin-subir.spec.js` que pasa al reintento)

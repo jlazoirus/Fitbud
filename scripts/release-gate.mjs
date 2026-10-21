@@ -83,6 +83,7 @@ run("validate-global-close-objective.mjs", "node scripts/validate-global-close-o
 run("validate-proposal-close.mjs", "node scripts/validate-proposal-close.mjs");
 run("validate-session-rejections.mjs", "node scripts/validate-session-rejections.mjs");
 run("validate-meal-photo-estimate.mjs", "node scripts/validate-meal-photo-estimate.mjs");
+run("validate-meal-estimate-output.mjs", "node scripts/validate-meal-estimate-output.mjs");
 run("validate-sw-cache-bump.mjs", "node scripts/validate-sw-cache-bump.mjs");
 run("validate-admin-create-user.mjs", "node scripts/validate-admin-create-user.mjs");
 run("validate-supabase-keepalive.mjs", "node scripts/validate-supabase-keepalive.mjs");
