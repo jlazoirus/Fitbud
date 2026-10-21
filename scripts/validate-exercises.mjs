@@ -60,6 +60,36 @@ for(const exercise of catalog.filter(item=>!["walking","running","cycling","swim
   }
 }
 for(const slug of Object.keys(variants))if(!bySlug.has(slug))errors.push(`Variantes para slug inexistente: ${slug}`);
+
+// REQ-245: cada ejercicio de fuerza tiene músculo principal, y tanto los
+// sustitutos como las versiones más fácil/progresión trabajan ese mismo músculo.
+const substitution=context.globalThis.FITBUD_EXERCISE_SUBSTITUTION;
+const strength=catalog.filter(item=>!["walking","running","cycling","swimming"].includes(item.discipline));
+for(const exercise of strength){
+  if(!substitution.primaryMuscles[exercise.slug]){errors.push(`${exercise.slug}: sin músculo principal`);continue;}
+  const muscle=substitution.primaryMuscle(exercise);
+  for(const candidate of substitution.candidates(exercise,catalog)){
+    if(substitution.primaryMuscle(candidate)!==muscle)errors.push(`${exercise.slug}: sustituto ${candidate.slug} trabaja otro músculo`);
+  }
+  for(const direction of ["regression","progression"]){
+    const v=(variants[exercise.slug]||{})[direction];
+    if(v&&v.kind==="exercise"&&bySlug.has(v.to)&&substitution.primaryMuscle(bySlug.get(v.to))!==muscle)errors.push(`${exercise.slug}.${direction}: ${v.to} trabaja otro músculo`);
+  }
+}
+for(const slug of Object.keys(substitution.primaryMuscles))if(!bySlug.has(slug))errors.push(`Músculo principal para slug inexistente: ${slug}`);
+const names=slug=>substitution.candidates(bySlug.get(slug),catalog).map(exercise=>exercise.slug);
+const expect=(slug,includes,excludes)=>{
+  const got=names(slug);
+  includes.forEach(item=>{if(!got.includes(item))errors.push(`${slug}: debería poder sustituirse por ${item}`);});
+  excludes.forEach(item=>{if(got.includes(item))errors.push(`${slug}: no debe sustituirse por ${item}`);});
+};
+expect("face-pull",[],["pull-up","assisted-pull-up","band-row","lat-pulldown","seated-cable-row"]);
+expect("seated-cable-row",["band-row"],["lat-pulldown","assisted-pull-up","pull-up","face-pull"]);
+expect("lat-pulldown",["assisted-pull-up","pull-up"],["band-row","seated-cable-row","face-pull"]);
+expect("biceps-curl",["hammer-curl"],["band-row"]);
+expect("triceps-pushdown",["diamond-push-up"],["assisted-dip","push-up"]);
+expect("romanian-deadlift",["single-leg-rdl"],["barbell-hip-thrust"]);
+expect("lateral-raise",[],["overhead-press"]);
 for(const exercise of catalog)if(!Array.isArray(exercise.substitute_slugs))errors.push(`${exercise.slug}: substitute_slugs no es lista`);
 
 const sql=fs.readFileSync(path.join(root,"supabase","exercises.sql"),"utf8");

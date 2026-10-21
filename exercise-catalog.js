@@ -282,6 +282,52 @@
     "archer-push-up":{regression:variant("Flexión arquero con apoyo"),progression:variant("Flexión a un brazo asistida")},
     "nordic-hamstring-curl":{regression:variant("Curl nórdico parcial"),progression:variant("Curl nórdico completo con pausa")},
   };
+  // REQ-245: "Sustituir ejercicio" solo propone ejercicios que trabajan el
+  // mismo músculo principal. El patrón no basta: "pull" junta jalón, remo y
+  // face pull, que cargan músculos distintos. Por slug, como las variantes, para
+  // que valga con el catálogo local y con el de Supabase; un ejercicio sin
+  // entrada (creado desde admin) usa el primero de su lista de músculos.
+  const PRIMARY_MUSCLE={
+    "back-squat":"Cuádriceps","front-squat":"Cuádriceps","tempo-squat":"Cuádriceps","leg-press":"Cuádriceps",
+    "bulgarian-split-squat":"Cuádriceps","walking-lunge":"Cuádriceps","step-up":"Cuádriceps",
+    "romanian-deadlift":"Isquiotibiales","single-leg-rdl":"Isquiotibiales","leg-curl":"Isquiotibiales",
+    "slider-leg-curl":"Isquiotibiales","nordic-hamstring-curl":"Isquiotibiales",
+    "barbell-hip-thrust":"Glúteos","glute-bridge":"Glúteos","single-leg-glute-bridge":"Glúteos",
+    "standing-calf-raise":"Pantorrillas",
+    "bench-press":"Pecho","incline-dumbbell-press":"Pecho","cable-fly":"Pecho","push-up":"Pecho",
+    "incline-push-up":"Pecho","decline-push-up":"Pecho","archer-push-up":"Pecho","assisted-dip":"Pecho",
+    "triceps-pushdown":"Tríceps","diamond-push-up":"Tríceps",
+    "overhead-press":"Hombros","pike-push-up":"Hombros",
+    "lateral-raise":"Deltoides lateral",
+    "face-pull":"Deltoides posterior",
+    "lat-pulldown":"Dorsal ancho","pull-up":"Dorsal ancho","assisted-pull-up":"Dorsal ancho","weighted-pull-up":"Dorsal ancho",
+    "seated-cable-row":"Espalda media","band-row":"Espalda media",
+    "biceps-curl":"Bíceps","hammer-curl":"Bíceps",
+    "front-plank":"Core","side-plank":"Core","dead-bug":"Core","shoulder-tap-plank":"Core",
+  };
+  const list=value=>{
+    if(Array.isArray(value))return value;
+    try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[];}catch(e){return [];}
+  };
+  function primaryMuscle(exercise){
+    if(!exercise)return "";
+    const muscle=PRIMARY_MUSCLE[exercise.slug]||list(exercise.muscles)[0]||"";
+    return String(muscle).trim();
+  }
+  // Sustitutos directos primero y luego el resto del catálogo, siempre con el
+  // mismo músculo principal que el ejercicio actual.
+  function substituteCandidates(current,catalog){
+    const target=primaryMuscle(current).toLowerCase();
+    if(!target)return [];
+    const items=(catalog||[]).filter(exercise=>exercise&&exercise.active!==false);
+    const bySlug=new Map(items.map(exercise=>[exercise.slug,exercise]));
+    const slugs=[...new Set(list(current.substitute_slugs).concat(items.map(exercise=>exercise.slug)))];
+    return slugs
+      .filter(slug=>slug!==current.slug)
+      .map(slug=>bySlug.get(slug))
+      .filter(exercise=>exercise&&primaryMuscle(exercise).toLowerCase()===target);
+  }
+  root.FITBUD_EXERCISE_SUBSTITUTION={primaryMuscles:PRIMARY_MUSCLE,primaryMuscle,candidates:substituteCandidates};
   root.FITBUD_WORKOUT_EXERCISES={
     gym:{
       fullA:["back-squat","bench-press","seated-cable-row","romanian-deadlift","dead-bug"],
