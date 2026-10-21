@@ -1,4 +1,4 @@
-// REQ-235 (feedback Sathya, beta): lo registrado ayer cuya subida falló no
+// REQ-242 (feedback Sathya, beta): lo registrado ayer cuya subida falló no
 // desaparece al abrir la app al día siguiente, ni se pisa al completar el día.
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, daysFromToday } from "./helpers.js";

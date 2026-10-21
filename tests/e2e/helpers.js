@@ -470,3 +470,19 @@ export async function gotoApp(page) {
     { timeout: 15_000 },
   );
 }
+
+/** REQ-235: inicia la sesión guiada saltando la cuenta atrás de 3 s ("Empezar ya"). */
+export async function startGuidedSession(page) {
+  await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+  await page.locator("#workoutCountdown").getByRole("button", { name: "Empezar ya" }).click();
+}
+
+/**
+ * Completa el bloque de tiempo actual como usuario. REQ-236: si es el
+ * calentamiento o la vuelta a la calma (opcionales), primero acepta hacerlo.
+ */
+export async function completeTimedBlock(page) {
+  const yes = page.getByRole("button", { name: /^Sí, (calentar|hacerlo)$/ });
+  if (await yes.isVisible().catch(() => false)) await yes.click();
+  await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
+}

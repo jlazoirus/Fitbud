@@ -1,7 +1,7 @@
 // REQ-213: una versión nueva se aplica sola al volver de segundo plano, nunca
 // a mitad de un entreno, y sin botón flotante sobre el contenido.
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, gotoApp, autoDismissNudges, collectConsoleErrors } from "./helpers.js";
+import { installMocks, seedLoggedInUser, gotoApp, autoDismissNudges, collectConsoleErrors, startGuidedSession } from "./helpers.js";
 
 async function backFromBackground(page) {
   await page.evaluate(() => {
@@ -32,7 +32,7 @@ test("a mitad de un entreno no se recarga", async ({ page, context }) => {
   await autoDismissNudges(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Entreno").click();
-  await page.getByRole("button", { name: "Iniciar sesión guiada" }).last().click();
+  await startGuidedSession(page);
   await page.evaluate(() => { window.__antes = true; notifyAppUpdateAvailable(); });
   await backFromBackground(page);
   await page.waitForTimeout(500);

@@ -192,7 +192,7 @@
     ["lateral-raise","Elevación lateral",["elevaciones laterales"],"gym","isolation",["dumbbells"],["gym"],["hombros"],"Elevación con poco rango","Elevación con pausa arriba",["overhead-press"],"intermediate"],
     ["cable-fly","Apertura en polea",["cruces en polea"],"gym","push",["cable"],["gym"],["pecho","hombros"],"Apertura con rango corto","Apertura con pausa al centro",["bench-press","incline-dumbbell-press"],"intermediate"],
     ["face-pull","Face pull",["jalón a la cara"],"gym","pull",["cable"],["gym"],["hombros posteriores","trapecios"],"Face pull con poco peso","Face pull con rotación externa",["seated-cable-row"],"intermediate"],
-    ["hammer-curl","Curl martillo",["curl neutro"],"gym","isolation",["dumbbells"],["gym"],["bíceps","antebrazo"],"Curl martillo ligero","Curl inclinado","[\"biceps-curl\"]","intermediate"],
+    ["hammer-curl","Curl martillo",["curl neutro"],"gym","isolation",["dumbbells"],["gym"],["bíceps","antebrazo"],"Curl martillo ligero","Curl inclinado",["biceps-curl"],"intermediate"],
     ["diamond-push-up","Flexión diamante",["flexión tríceps"],"bodyweight","push",[],["home","gym"],["tríceps","pecho"],"Flexión diamante con rodillas","Flexión diamante con pausa",["push-up","assisted-dip"],"intermediate"],
     ["pull-up","Dominada",["dominadas","chin-up"],"bodyweight","pull",["pullup_bar"],["gym","outdoor"],["espalda","bíceps"],"Dominada asistida con banda","Dominada con lastre",["assisted-pull-up","lat-pulldown"],"intermediate"],
     ["decline-push-up","Flexión con pies elevados",["flexión declinada"],"bodyweight","push",["bench_or_chair"],["home","gym"],["pecho","tríceps"],"Flexión con pies a media altura","Flexión con lastre en espalda",["push-up","bench-press"],"intermediate"],
@@ -229,6 +229,59 @@
   }));
 
   root.FITBUD_EXERCISES=strength.concat(endurance);
+  // REQ-241: qué hacen "Usar versión más fácil" y "Usar progresión" en cada
+  // ejercicio de fuerza. Vive aquí (por slug) y no en la tabla para que valga
+  // igual con el catálogo local que con el de Supabase.
+  //   exercise → se cambia a otro ejercicio del catálogo (título e imagen nuevos)
+  //   variant  → mismo ejercicio con otra ejecución (pausa, una pierna, menos asistencia)
+  //   load     → solo cambia la carga: no hay otro ejercicio, se da la pauta
+  const toEx=(to,name)=>({kind:"exercise",to,name});
+  const variant=name=>({kind:"variant",name});
+  const load=name=>({kind:"load",name});
+  root.FITBUD_EXERCISE_VARIANTS={
+    "back-squat":{regression:variant("Sentadilla a caja"),progression:toEx("front-squat","Sentadilla frontal")},
+    "bench-press":{regression:variant("Press de banca con mancuernas ligeras"),progression:variant("Press de banca con pausa en el pecho")},
+    "seated-cable-row":{regression:toEx("band-row","Remo con banda"),progression:variant("Remo sentado con pausa")},
+    "romanian-deadlift":{regression:variant("Bisagra con palo"),progression:toEx("single-leg-rdl","Peso muerto a una pierna")},
+    "barbell-hip-thrust":{regression:toEx("glute-bridge","Puente de glúteo"),progression:variant("Hip thrust con pausa arriba")},
+    "incline-dumbbell-press":{regression:load("Usa mancuernas más ligeras"),progression:variant("Press inclinado alternado")},
+    "lat-pulldown":{regression:variant("Jalón con banda"),progression:toEx("assisted-pull-up","Dominada asistida")},
+    "bulgarian-split-squat":{regression:toEx("walking-lunge","Zancada"),progression:load("Sentadilla búlgara con más carga")},
+    "overhead-press":{regression:variant("Press militar sentado"),progression:variant("Press militar de pie con pausa")},
+    "walking-lunge":{regression:variant("Zancada con apoyo"),progression:toEx("bulgarian-split-squat","Sentadilla búlgara")},
+    "standing-calf-raise":{regression:variant("Elevación de gemelos con apoyo"),progression:variant("Elevación de gemelos a una pierna")},
+    "assisted-dip":{regression:toEx("incline-push-up","Flexión inclinada"),progression:variant("Fondos con menos asistencia")},
+    "biceps-curl":{regression:variant("Curl con banda ligera"),progression:variant("Curl alternado controlado")},
+    "triceps-pushdown":{regression:variant("Extensión de tríceps con banda"),progression:variant("Extensión de tríceps a un brazo")},
+    "leg-press":{regression:variant("Prensa con rango corto"),progression:variant("Prensa a una pierna")},
+    "leg-curl":{regression:variant("Curl femoral con rango corto"),progression:variant("Curl femoral a una pierna")},
+    "tempo-squat":{regression:variant("Sentarse y levantarse de una silla"),progression:variant("Sentadilla con pausa abajo")},
+    "push-up":{regression:toEx("incline-push-up","Flexión inclinada"),progression:toEx("decline-push-up","Flexión con pies elevados")},
+    "incline-push-up":{regression:variant("Flexión contra la pared"),progression:toEx("push-up","Flexión de brazos")},
+    "band-row":{regression:load("Usa una banda más suave"),progression:variant("Remo invertido")},
+    "glute-bridge":{regression:variant("Puente de glúteo con rango corto"),progression:toEx("single-leg-glute-bridge","Puente de glúteo a una pierna")},
+    "single-leg-glute-bridge":{regression:toEx("glute-bridge","Puente de glúteo"),progression:variant("Puente a una pierna con pausa arriba")},
+    "front-plank":{regression:variant("Plancha con rodillas apoyadas"),progression:toEx("shoulder-tap-plank","Plancha con toque de hombro")},
+    "side-plank":{regression:variant("Plancha lateral con rodillas"),progression:variant("Plancha lateral con pierna elevada")},
+    "dead-bug":{regression:variant("Dead bug moviendo solo brazos o piernas"),progression:variant("Dead bug con brazo y pierna opuestos")},
+    "pike-push-up":{regression:variant("Pike push-up con manos elevadas"),progression:variant("Pike push-up con pies elevados")},
+    "single-leg-rdl":{regression:variant("Peso muerto a una pierna con apoyo"),progression:load("Peso muerto a una pierna con carga")},
+    "assisted-pull-up":{regression:variant("Jalón con banda"),progression:variant("Dominada con menos asistencia")},
+    "shoulder-tap-plank":{regression:toEx("front-plank","Plancha frontal"),progression:variant("Toques de hombro más lentos")},
+    "step-up":{regression:variant("Subida a un escalón bajo con apoyo"),progression:load("Escalón más alto o con carga")},
+    "slider-leg-curl":{regression:variant("Curl deslizante con una pierna por vez"),progression:variant("Curl deslizante completo con cadera elevada")},
+    "lateral-raise":{regression:variant("Elevación lateral con poco rango"),progression:variant("Elevación lateral con pausa arriba")},
+    "cable-fly":{regression:variant("Apertura en polea con rango corto"),progression:variant("Apertura en polea con pausa al centro")},
+    "face-pull":{regression:load("Usa menos peso"),progression:variant("Face pull con rotación externa")},
+    "hammer-curl":{regression:load("Usa mancuernas más ligeras"),progression:variant("Curl inclinado")},
+    "diamond-push-up":{regression:variant("Flexión diamante con rodillas"),progression:variant("Flexión diamante con pausa")},
+    "pull-up":{regression:toEx("assisted-pull-up","Dominada asistida"),progression:toEx("weighted-pull-up","Dominada con lastre")},
+    "decline-push-up":{regression:toEx("push-up","Flexión de brazos"),progression:toEx("archer-push-up","Flexión arquero")},
+    "weighted-pull-up":{regression:toEx("pull-up","Dominada"),progression:load("Dominada con más lastre")},
+    "front-squat":{regression:variant("Sentadilla goblet"),progression:variant("Sentadilla frontal con pausa")},
+    "archer-push-up":{regression:variant("Flexión arquero con apoyo"),progression:variant("Flexión a un brazo asistida")},
+    "nordic-hamstring-curl":{regression:variant("Curl nórdico parcial"),progression:variant("Curl nórdico completo con pausa")},
+  };
   root.FITBUD_WORKOUT_EXERCISES={
     gym:{
       fullA:["back-squat","bench-press","seated-cable-row","romanian-deadlift","dead-bug"],
