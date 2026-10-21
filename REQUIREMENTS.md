@@ -1874,3 +1874,34 @@ Jonathan (2026-10-21), con captura de Entreno con la sesión en curso: el aviso 
 
 - Con la sesión en curso, el desplegable existe cerrado después del reproductor, oculta el aviso, "Preparar mi plan" y "Cambiar entrenamiento", sigue abierto tras "Ahora no" y desaparece al descartar. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-240 - Entreno: la demostración y los pasos se abren desde junto al nombre del ejercicio
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del reproductor: la demostración del ejercicio y su paso a paso aparecen al final, después de las series y de "Usar versión más fácil / progresión / Sustituir", "y solo lo esconde para el usuario; debería haber arriba, junto al nombre, un botón que abra el pop-up".
+
+### Problema
+
+`renderActiveWorkoutStep()` incrustaba `exerciseCard()` (vídeo/animación + "Ver técnica" + "Pausar") al final del bloque: para verla había que bajar más allá de todas las series.
+
+### Alcance
+
+1. Junto al nombre (`.player-title`), un botón "▶ Cómo se hace" abre `openExerciseGuide()`: demostración, inicio, pasos, respiración, errores comunes, versión más fácil/difícil y señales para detenerse.
+2. Se quita la tarjeta incrustada del reproductor; la "Vista previa de ejercicios" antes de empezar no cambia.
+3. `CACHE_NAME` → `fitbud-pwa-v122`.
+
+### Fuera de alcance
+
+- Cambiar el contenido del pop-up de técnica.
+
+### Riesgos
+
+- Ninguno sobre datos: solo presentación.
+
+### Criterios de aceptación
+
+- El reproductor no incrusta `.exercise-card`; el botón junto al nombre abre el pop-up con el mismo nombre, la demostración y los pasos. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓

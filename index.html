@@ -386,8 +386,10 @@
   .player-status.partial i{background:var(--warn)}
   .player-status.in_progress i{background:var(--accent)}
   .player-status.paused i{background:var(--terra-300)}
-  .player-active-exercise{margin-top:12px}
-  .player-active-exercise .exercise-card{border-color:var(--border-acc)}
+  /* REQ-240: la demostración y los pasos se abren desde junto al nombre */
+  .player-title{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .player-title h3{min-width:0;overflow-wrap:anywhere}
+  .player-howto{flex:none;margin-top:4px;white-space:nowrap}
   @media(prefers-reduced-motion:reduce){
     .demo-athlete,.demo-crank{animation:none!important}
   }
@@ -5730,7 +5732,7 @@ function renderActiveWorkoutStep(ds,execution){
   const variation=workoutVariationLabel(step,exercise);
   return `<div class="player-step">
     <div class="player-phase">${workoutPhaseLabel(step.phase)} · ejercicio ${stepIndex} de ${execution.steps.length-2}</div>
-    <h3>${esc(exercise?exercise.name:step.label)}</h3>
+    <div class="player-title"><h3>${esc(exercise?exercise.name:step.label)}</h3>${exercise?`<button class="btn btn-sm player-howto" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Cómo se hace ${esc(exercise.name)}: demostración y pasos">▶ Cómo se hace</button>`:""}</div>
     <div class="player-dose">
       <div class="scard"><div class="n">${step.prescribedSets}</div><div class="l">series</div></div>
       <div class="scard"><div class="n">${esc(step.reps)}</div><div class="l">reps objetivo</div></div>
@@ -5750,7 +5752,6 @@ function renderActiveWorkoutStep(ds,execution){
       <button class="btn btn-sm" onclick="setWorkoutVariation('${ds}','progression')">Usar progresión</button>
       <button class="btn btn-sm" onclick="openExerciseSubstitution('${ds}')">Sustituir</button>
     </div>
-    ${exercise?`<div class="player-active-exercise">${exerciseCard(exercise,false)}</div>`:""}
     <div class="player-controls">
       <button class="btn" onclick="skipWorkoutStep('${ds}')">Omitir ejercicio</button>
       <button class="btn btn-accent" onclick="completeWorkoutStep('${ds}')">Siguiente ejercicio</button>

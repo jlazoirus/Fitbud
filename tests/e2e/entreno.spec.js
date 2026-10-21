@@ -170,7 +170,7 @@ test.describe("Entreno", () => {
         const series = page.locator('#app button.set-done[aria-label^="Serie"]');
         const n = await series.count();
         if (strength === 1) {
-          firstExercise = (await app.locator(".player-step > h3").first().innerText()).trim();
+          firstExercise = (await app.locator(".player-step h3").first().innerText()).trim();
           for (let s = 0; s < n - 1; s++) await series.nth(s).click();
           await siguiente.click();
           const overlay = page.locator("#overlay");
@@ -343,11 +343,11 @@ test.describe("Entreno", () => {
     // Última serie: arranca el descanso entre ejercicios con 2:00.
     await expect(timerBox).toContainText("Descanso entre ejercicios");
     await expect(timerValue).toHaveText(/^(02:00|01:5\d)$/);
-    const ejercicio1 = (await app.locator(".player-step > h3").first().innerText()).trim();
+    const ejercicio1 = (await app.locator(".player-step h3").first().innerText()).trim();
 
     // Pasa al siguiente ejercicio y el descanso sigue corriendo (no se reinicia).
     await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
-    await expect(app.locator(".player-step > h3").first()).not.toHaveText(ejercicio1);
+    await expect(app.locator(".player-step h3").first()).not.toHaveText(ejercicio1);
     await expect(timerBox).toContainText("Descanso entre ejercicios");
     await page.waitForTimeout(1500);
     await expect(timerValue).toHaveText(/^01:5\d$/);
@@ -477,11 +477,11 @@ test.describe("Última carga", () => {
     await app.locator('input[aria-label^="Carga o asistencia, serie 1"]').fill("45");
     await app.locator('input[aria-label^="Carga o asistencia, serie 1"]').blur();
     expect(await page.evaluate(() => normalizedWorkoutExecution(current).steps.find((s) => s.type === "strength").sets[0].load)).toBe("45");
-    const first = (await app.locator(".player-step > h3").innerText()).trim();
+    const first = (await app.locator(".player-step h3").innerText()).trim();
     const pending = app.locator("button.set-done:not(.on)");
     while (await pending.count()) await pending.first().click();
     await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
-    await expect(app.locator(".player-step > h3")).not.toHaveText(first);
+    await expect(app.locator(".player-step h3")).not.toHaveText(first);
     await expect(app.locator(".player-step")).not.toContainText("Última vez");
     await expect(app.locator(".last-perf-hint")).toBeVisible();
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
@@ -569,6 +569,34 @@ test.describe("Sesión en curso", () => {
     await page.getByRole("button", { name: "Descartar" }).click();
     await expect(app.locator("details.wk-context")).toHaveCount(0);
     await expect(app.getByText("Señales para detenerte:")).toBeVisible();
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
+// REQ-240 (Jonathan): la demostración al final de las series quedaba escondida;
+// se abre desde un botón junto al nombre del ejercicio.
+test.describe("Cómo se hace", () => {
+  test("el botón junto al nombre abre la demostración y los pasos", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+
+    const step = app.locator(".player-step");
+    const name = (await step.locator(".player-title h3").innerText()).trim();
+    await expect(step.locator(".exercise-card")).toHaveCount(0);
+    const howto = step.locator(".player-title").getByRole("button", { name: `Cómo se hace ${name}: demostración y pasos` });
+    await expect(howto).toBeVisible();
+    await howto.click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay.locator("h3")).toHaveText(name);
+    await expect(overlay.locator(".guide-demo")).toHaveCount(1);
+    expect(await overlay.locator(".exercise-steps li").count()).toBeGreaterThan(1);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
