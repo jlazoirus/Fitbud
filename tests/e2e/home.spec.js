@@ -92,7 +92,7 @@ test.describe("Nutrición — comidas sin asignar (REQ-161)", () => {
   });
 });
 
-test.describe("Home — agenda (REQ-245)", () => {
+test.describe("Home — agenda (REQ-247)", () => {
   test("los botones de 'Lo que sigue hoy' no quedan pegados al borde de su tarjeta", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);

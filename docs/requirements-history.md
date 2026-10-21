@@ -9923,3 +9923,111 @@ El reproductor guarda la carga de cada serie (`set.load`) en `day_log.state.work
 - `lastPerformance` toma la sesión anterior más reciente con series hechas, ignora hoy y sesiones sin series. ✓ (`scripts/validate-workout-player.mjs`)
 - Con 40 kg × 8 y 42.5 kg × 7 hace una semana, el reproductor muestra "40 kg × 8, 42.5 kg × 7 · RPE 8-9" y el resumen previo "Última vez 42.5 kg"; un ejercicio sin historial muestra la invitación a anotar. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Sathya (beta, 2026-10-21, iPhone): "Ayer no me gustaron las comidas que me sugirió la aplicación, entonces puse lo que de verdad comí (seis huevos con pan con queso y un café) y sí me apareció esa comida editada y me permitía hacerle check, igual con el almuerzo. Hoy quise ver la información de ayer porque me quedó pendiente poner la cena y no se guardaron los datos que había ingresado."
+
+### Problema
+
+Si la subida de un día falla (token vencido al volver la PWA del fondo, red débil), el cambio queda en la cola offline. Al abrir la app al día siguiente ese día aparece "Sin asignar", y si el usuario lo completa (la cena), esa copia vacía reemplaza al cambio pendiente y sube: desayuno y almuerzo se pierden. Reproducido en Chromium móvil con fixtures (0 llamadas pagadas).
+
+### Causa raíz
+
+- `onAuth()` (`index.html`) vacía `S.days`/`S.weights` en cada arranque ("la DB manda"), y `pullAllDays()`/`pullDay()` omiten a propósito los días con cambios pendientes en la cola. Resultado: lo pendiente solo vivía en la cola y la pantalla quedaba vacía hasta que `drainSyncQueue()` lograra subirlo.
+- `enqueueMutation()` deduplica por día y reemplaza el payload pendiente con el nuevo, armado sobre el día vacío.
+- `drainSyncQueue()` solo reintentaba `pending`: un cambio que agotó sus 3 intentos (`failed`) no volvía a subir nunca, aunque el aviso dice "vuelve a conectarte para reintentarlo".
+
+### Alcance
+
+1. `restorePendingFromQueue()`: tras vaciar la caché en `onAuth()`, repone desde la cola del usuario actual (pending, failed o conflicto) el estado de esos días y pesos. La cola de otros usuarios no se toca (REQ-156).
+2. `drainSyncQueue()` reintenta también los cambios `failed` al abrir la app o reconectar.
+3. `CACHE_NAME` → `fitbud-pwa-v124`.
+
+### Fuera de alcance
+
+- Por qué falló la subida en el caso de Sathya (no hay telemetría de errores de sync). Los datos del 20 oct que nunca llegaron al servidor solo existen en la cola de su iPhone: al abrir la versión nueva se reponen y suben solos, salvo que ya haya completado ese día (en ese caso la copia vacía ya pisó la cola y no se pueden recuperar).
+- El texto "CONSUMO DE HOY" que se ve al mirar un día pasado.
+
+### Riesgos
+
+- Un día en conflicto muestra la versión de este dispositivo hasta que el usuario elija en "Revisar"; antes se veía vacío.
+
+### Criterios de aceptación
+
+- Con la subida de ayer fallida y el primer reintento de hoy también fallando, ayer muestra desayuno y almuerzo registrados y marcados; al completar la cena, lo que sube conserva los tres y la cola queda vacía. ✓ (`tests/e2e/dia-sin-subir.spec.js`; falla sin el arreglo)
+- Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando inicias el entrenamiento comienza en seco de frente; debería haber una cuenta atrás que te avise con 3 segundos de anticipación que ya va a comenzar".
+
+### Problema
+
+`startWorkoutExecution()` creaba la ejecución y empezaba a correr el reloj de la sesión en el mismo toque de "Iniciar sesión guiada", sin margen para dejar el teléfono y ponerse en posición.
+
+### Alcance
+
+1. "Iniciar sesión guiada" (y "Empezar" en el modo conversacional) abre una cuenta atrás a pantalla completa: "Prepárate", 3 · 2 · 1 con un pitido corto y vibración (si el dispositivo la soporta) en cada número, y "Empiezas con: <primer bloque>". Al llegar a 0 suena un pitido más largo, se crea la sesión y arranca el reloj (`beginWorkoutExecution()`).
+2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
+3. Con `prefers-reduced-motion` el número cambia sin animación.
+4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
+5. `CACHE_NAME` → `fitbud-pwa-v117`.
+
+### Fuera de alcance
+
+- Cuenta atrás al terminar descansos o antes de bloques con cronómetro.
+- Preferencia para desactivar el sonido.
+
+### Riesgos
+
+- iOS no implementa `navigator.vibrate`; el pitido depende de que el teléfono no esté en silencio. El aviso visual siempre está.
+
+### Criterios de aceptación
+
+- Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del calentamiento en el reproductor: "No debe asignarte el bloque de calentamiento ni enfriamiento por defecto; debería preguntarte si quieres hacer ese bloque y solo mostrarlo si lo eliges, diciéndote que es opcional".
+
+### Problema
+
+Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba como bloque omitido y dejaba la sesión parcial.
+
+### Alcance
+
+1. `workout-player.js`: bloques `warmup`/`cooldown` con `optional:true`, `optIn` si se eligen y estado `declined` ("Ahora no"), que `progress()` no cuenta en el total ni como omitido.
+2. Reproductor: un bloque opcional no elegido muestra solo la pregunta ("¿Quieres calentar antes de empezar?" / "¿Quieres cerrar con unos minutos suaves?"), duración y "Es opcional", con "Sí, calentar"/"Sí, hacerlo" y "Ahora no"; los movimientos aparecen solo si se elige.
+3. Una sesión con todo hecho salvo bloques rechazados se cierra **completada** (`workoutFullyCompleted`).
+4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-235) ya no anuncia el calentamiento.
+5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v118`.
+
+### Fuera de alcance
+
+- Recordar la elección entre sesiones o una preferencia en Perfil.
+- Volver a ofrecer un bloque después de "Ahora no".
+
+### Riesgos
+
+- Ninguno sobre datos: las sesiones guardadas no cambian.
+
+### Criterios de aceptación
+
+- `optional`/`declined`/`progress` cubiertos en `scripts/validate-workout-player.mjs`. ✓
+- "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
