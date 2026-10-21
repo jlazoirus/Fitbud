@@ -469,7 +469,7 @@ test.describe("Última carga", () => {
     await startGuidedSession(page);
     await completeTimedBlock(page);
     const last = app.locator(".last-perf");
-    await expect(last).toContainText(/Última vez · \w{3} \d+ \w{3}/);
+    await expect(last).toContainText(/Última vez · \S{3} \d+ \S{3}/);
     await expect(last.locator("b")).toHaveText("40 kg × 8, 42.5 kg × 7");
     await expect(last).toContainText("RPE 8-9");
 
