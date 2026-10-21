@@ -91,3 +91,34 @@ test.describe("Nutrición — comidas sin asignar (REQ-161)", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
+
+test.describe("Home — agenda (REQ-245)", () => {
+  test("los botones de 'Lo que sigue hoy' no quedan pegados al borde de su tarjeta", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
+    await overlay.getByRole("button", { name: /Aplicar al día/i }).click();
+    await page.locator("#tabs").getByText("Hoy").click();
+    await expect(page.locator(".agenda-item .agenda-actions .btn").first()).toBeVisible();
+
+    // Para cada botón, el contenedor con borde más cercano debe dejarle aire a la
+    // derecha. Antes, la fila heredaba la tarjeta global .meal/.workout (borde)
+    // con relleno lateral 0 y "Ver detalle"/"Adaptar" tocaban el borde.
+    const gaps = await page.evaluate(() => [...document.querySelectorAll(".agenda-item .agenda-actions .btn")].map((btn) => {
+      let box = btn.parentElement;
+      while (box && parseFloat(getComputedStyle(box).borderRightWidth) === 0) box = box.parentElement;
+      const inner = box.getBoundingClientRect().right - parseFloat(getComputedStyle(box).borderRightWidth);
+      return { text: btn.textContent.trim(), gap: Math.round(inner - btn.getBoundingClientRect().right) };
+    }));
+    expect(gaps.length).toBeGreaterThan(0);
+    for (const { text, gap } of gaps) expect(gap, `"${text}" queda a ${gap}px del borde`).toBeGreaterThanOrEqual(12);
+
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
