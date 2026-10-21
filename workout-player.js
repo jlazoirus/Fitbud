@@ -401,7 +401,7 @@
       step.originalExerciseSlug=String(step.originalExerciseSlug||prescribed.originalExerciseSlug||prescribed.exerciseSlug);
       step.variation=step.variation||"standard";
     }
-    // REQ-235: calentamiento y vuelta a la calma son opcionales: se ofrecen y
+    // REQ-236: calentamiento y vuelta a la calma son opcionales: se ofrecen y
     // solo se hacen si el usuario los elige (optIn); "Ahora no" los deja
     // "declined", que no cuenta como bloque omitido ni impide completar.
     step.optional=prescribed.type==="timed"&&(prescribed.phase==="warmup"||prescribed.phase==="cooldown");
