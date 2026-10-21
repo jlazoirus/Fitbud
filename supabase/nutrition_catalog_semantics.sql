@@ -102,6 +102,29 @@ set cuisine_tags = case
 end
 where coalesce(array_length(cuisine_tags, 1), 0) = 0;
 
+-- Platos de cocina reconocible que el backfill por nombre no detecta.
+-- Aplicado en producción el 2026-10-20; solo toca platos aún sin etiqueta.
+update dishes d
+set cuisine_tags = array[v.tag]
+from (values
+  ('Cena mediterránea de anchoas con pan sin gluten y aceitunas', 'mediterranea'),
+  ('Bowl de betarraga, garbanzos y queso feta', 'mediterranea'),
+  ('Bowl griego', 'mediterranea'),
+  ('Pulpo a la parrilla con papas doradas', 'mediterranea'),
+  ('Bacalao al horno con papas y coliflor', 'mediterranea'),
+  ('Ensalada de atún con garbanzos y limón', 'mediterranea'),
+  ('Pasta integral con atún y tomate', 'mediterranea'),
+  ('Pasta de legumbres con tomate y espinaca', 'mediterranea'),
+  ('Sardinas con ensalada y papa', 'mediterranea'),
+  ('Snack sin gluten de pan multigrano con jamón serrano', 'mediterranea'),
+  ('Tostadas mexicanas de tomatillo y huevo', 'mexicana'),
+  ('Bowl de pollo, arroz y frijoles negros', 'mexicana'),
+  ('Salteado de setas shiitake y tofu', 'asiatica'),
+  ('Tofu con hongos portobello y salsa de soya', 'asiatica')
+) as v(name, tag)
+where d.name = v.name
+  and coalesce(array_length(d.cuisine_tags, 1), 0) = 0;
+
 update dishes
 set
   prep_minutes = case
