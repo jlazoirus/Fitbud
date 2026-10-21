@@ -83,6 +83,10 @@ Feedback Sathya (beta, 2026-10-21, iPhone):
 
 - REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado. (P0; implementado)
 
+Feedback Jonathan (2026-10-21, iPhone):
+
+- REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes. (P1; implementado)
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -1045,7 +1049,7 @@ Lo que queda es un hueco de catálogo **real y ahora sí medible**: las 7 dimens
 
 ## REQ-155 - Fix reproductor de entreno: "duración real" cuenta el tiempo con la app cerrada
 
-**Estado: implementado.**
+**Estado: implementado.** Reemplazado por REQ-244: el tiempo en segundo plano vuelve a contar; solo una ausencia de más de una hora pausa la sesión.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-155`).
 
@@ -1555,36 +1559,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-231`).
 
 **Estado: implementado.**
 
-### Origen
-
-Claudia (usuaria beta, 2026-10-19), con captura del reproductor: "para planes de x semanas, que te indique aquí debajo de la carga sugerida el histórico de cuántos kg de carga hiciste la última semana en ese ejercicio, para tener el peso identificado en la app. O que te dé ese dato cuando presionas Usar progresión".
-
-### Problema
-
-El reproductor guarda la carga de cada serie (`set.load`) en `day_log.state.workoutExecution`, pero nunca la vuelve a mostrar: bajo "Carga sugerida" solo aparece el texto genérico "Carga controlable que deje N repeticiones en reserva". Para progresar semana a semana hay que recordar de memoria (o en otra app) con cuánto se hizo el ejercicio.
-
-### Alcance
-
-1. `FITBUD_WORKOUT_PLAYER.lastPerformance(days, exerciseSlug, beforeDs)` (puro): la sesión anterior más reciente con series hechas de ese ejercicio — fecha, variación y series (reps, carga tal como se anotó, RPE).
-2. En el reproductor, bajo "Carga sugerida": "Última vez · mar 13 oct" con las series ("3 × 8 · 40 kg" si todas iguales, "40 kg × 8, 42.5 kg × 7" si no) y el rango de RPE; indica si aquella vez fue en progresión o versión más fácil, y "Sin carga anotada" si no se registró peso. Sin historial (y no es de peso corporal), una línea invita a anotar la carga para verla la próxima vez.
-3. En "Qué vas a hacer hoy" (antes de empezar), cada ejercicio con historial muestra "Última vez N kg" (la carga de la última serie).
-4. `CACHE_NAME` → `fitbud-pwa-v114`.
-
-### Fuera de alcance
-
-- Autocompletar la carga de hoy con la de la última vez (al marcar una serie sin carga, sigue quedando vacía).
-- Historial de ciclos anteriores: se busca en los días cargados (`pullAllDays()` baja el ciclo activo).
-- Proponer un incremento de carga concreto en kg.
-
-### Riesgos
-
-- Ninguno sobre datos: solo lectura de lo ya registrado, privado del usuario y fuera de analytics.
-
-### Criterios de aceptación
-
-- `lastPerformance` toma la sesión anterior más reciente con series hechas, ignora hoy y sesiones sin series. ✓ (`scripts/validate-workout-player.mjs`)
-- Con 40 kg × 8 y 42.5 kg × 7 hace una semana, el reproductor muestra "40 kg × 8, 42.5 kg × 7 · RPE 8-9" y el resumen previo "Última vez 42.5 kg"; un ejercicio sin historial muestra la invitación a anotar. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-232`).
 
 ## REQ-233 - Nutrición: tocar la tarjeta de una comida abre su menú de opciones
 
@@ -1663,72 +1638,15 @@ Que un ajuste de check-in, comunicado como futuro, no altere retroactivamente la
 
 ## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
 
-**Estado: implementado.**
+**Estado: implementado.** La sesión guiada arranca con una cuenta atrás de 3 segundos antes del primer bloque.
 
-### Origen
-
-Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando inicias el entrenamiento comienza en seco de frente; debería haber una cuenta atrás que te avise con 3 segundos de anticipación que ya va a comenzar".
-
-### Problema
-
-`startWorkoutExecution()` creaba la ejecución y empezaba a correr el reloj de la sesión en el mismo toque de "Iniciar sesión guiada", sin margen para dejar el teléfono y ponerse en posición.
-
-### Alcance
-
-1. "Iniciar sesión guiada" (y "Empezar" en el modo conversacional) abre una cuenta atrás a pantalla completa: "Prepárate", 3 · 2 · 1 con un pitido corto y vibración (si el dispositivo la soporta) en cada número, y "Empiezas con: <primer bloque>". Al llegar a 0 suena un pitido más largo, se crea la sesión y arranca el reloj (`beginWorkoutExecution()`).
-2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
-3. Con `prefers-reduced-motion` el número cambia sin animación.
-4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
-5. `CACHE_NAME` → `fitbud-pwa-v117`.
-
-### Fuera de alcance
-
-- Cuenta atrás al terminar descansos o antes de bloques con cronómetro.
-- Preferencia para desactivar el sonido.
-
-### Riesgos
-
-- iOS no implementa `navigator.vibrate`; el pitido depende de que el teléfono no esté en silencio. El aviso visual siempre está.
-
-### Criterios de aceptación
-
-- Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-235`).
 
 ## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
 
-**Estado: implementado.**
+**Estado: implementado.** Calentamiento y vuelta a la calma son opcionales: el reproductor pregunta si hacerlos.
 
-### Origen
-
-Jonathan (2026-10-20), con captura del calentamiento en el reproductor: "No debe asignarte el bloque de calentamiento ni enfriamiento por defecto; debería preguntarte si quieres hacer ese bloque y solo mostrarlo si lo eliges, diciéndote que es opcional".
-
-### Problema
-
-Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba como bloque omitido y dejaba la sesión parcial.
-
-### Alcance
-
-1. `workout-player.js`: bloques `warmup`/`cooldown` con `optional:true`, `optIn` si se eligen y estado `declined` ("Ahora no"), que `progress()` no cuenta en el total ni como omitido.
-2. Reproductor: un bloque opcional no elegido muestra solo la pregunta ("¿Quieres calentar antes de empezar?" / "¿Quieres cerrar con unos minutos suaves?"), duración y "Es opcional", con "Sí, calentar"/"Sí, hacerlo" y "Ahora no"; los movimientos aparecen solo si se elige.
-3. Una sesión con todo hecho salvo bloques rechazados se cierra **completada** (`workoutFullyCompleted`).
-4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-235) ya no anuncia el calentamiento.
-5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v118`.
-
-### Fuera de alcance
-
-- Recordar la elección entre sesiones o una preferencia en Perfil.
-- Volver a ofrecer un bloque después de "Ahora no".
-
-### Riesgos
-
-- Ninguno sobre datos: las sesiones guardadas no cambian.
-
-### Criterios de aceptación
-
-- `optional`/`declined`/`progress` cubiertos en `scripts/validate-workout-player.mjs`. ✓
-- "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-236`).
 
 ## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
 
@@ -1929,7 +1847,84 @@ Si la subida de un día falla (token vencido al volver la PWA del fondo, red dé
 - Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-243 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
+## REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Jonathan (2026-10-21, iPhone): "Acabo de agregar un shake de proteína y cuando seleccioné la porción le puse ×2; cuando volví a agregar otra comida el shake de proteína tiene sus valores de macros duplicados. Eso no debe pasar." Captura: Recientes muestra "Shake proteina 600 kcal · P 48 · C 72 · G 6".
+
+### Problema
+
+Al elegir una reciente o favorita con porción ×0,5/×1,5/×2 y guardar, lo registrado conserva el mismo nombre con los macros ya escalados. Recientes muestra la última vez que se registró cada nombre, así que la "porción" pasa a ser la ×2; volver a elegirla con ×2 da ×4. "Guardar en favoritas" en ese momento también guardaba la porción escalada.
+
+### Causa raíz
+
+- `saveEditor()` (`index.html`) guardaba `{name,kcal,p,c,f}` ya multiplicados por `qp.portion` sin registrar la porción.
+- `recentCustomMeals()` deduplica por nombre quedándose con el registro más reciente, sea cual sea su porción.
+
+### Alcance
+
+1. `saveEditor()` guarda `portion` (≠1) en el extra o en `ms.ovr` cuando se eligió una porción sobre una reciente/favorita del mismo nombre; editar algo ya registrado sin tocar la porción la conserva, y renombrarlo o volver a ×1 la quita. Los macros del día siguen siendo los consumidos.
+2. `perPortion()`: Recientes y "Guardar en favoritas" usan los macros divididos por `portion` (una porción).
+3. `CACHE_NAME` → `fitbud-pwa-v125`.
+
+### Fuera de alcance
+
+- Corregir lo ya registrado antes del arreglo: no guardó la porción, así que esa reciente seguirá mostrando los macros escalados hasta que se registre de nuevo con ×1 (o desde Favoritas).
+
+### Riesgos
+
+- Ninguno sobre datos: `portion` es un campo nuevo opcional en `day_log.state`; los registros sin él se leen igual que antes.
+
+### Criterios de aceptación
+
+- Registrar "Shake proteina" 300 kcal y luego desde Recientes ×2: el día suma 300 + 600 y Recientes sigue mostrando 300 kcal · P 24 · C 36 · G 3. ✓ (`tests/e2e/comidas-guardadas.spec.js`; falla sin el arreglo con 600 · P 48 · C 72 · G 6)
+- Guardar en favoritas con ×1,5 guarda la porción base. ✓ (`tests/e2e/comidas-guardadas.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-244 - Entreno: la duración cuenta de inicio a fin, también con la app en segundo plano
+
+**Estado: implementado.**
+
+### Origen
+
+Claudia (usuaria beta, 2026-10-21), con captura del resumen "Sesión parcial · 34:54 duración real": "la duración del entrenamiento no se actualiza en segundo plano. Cuando sales de la app y vuelves a entrar no contabiliza ese tiempo. Debería aparecer tiempo de duración total del entrenamiento (incluyendo descansos etc). Se me ocurre que en realidad calcule el tiempo desde que inicias el entrenamiento hasta que finalizas la sesión completa".
+
+### Problema
+
+REQ-155 congeló el cronómetro al pasar la app a segundo plano para que una sesión olvidada no sumara horas. El efecto en el uso normal es el contrario: en el gimnasio se bloquea la pantalla o se cambia de app en cada descanso, y todo ese tiempo desaparece de la duración. Una sesión de una hora puede mostrar 35 minutos.
+
+### Causa raíz
+
+`freezeInProgressWorkouts()` (`index.html`, listeners `visibilitychange`/`pagehide`) ejecutaba `captureWorkoutElapsed()` y dejaba `resumedAt` en `null` cada vez que la app se ocultaba; al volver, `normalizeExecution()` reanudaba desde "ahora", así que el hueco nunca se sumaba.
+
+### Alcance
+
+1. Al ocultarse la app ya no se congela el cronómetro: se anota `workoutExecution.awayAt` y la duración sigue corriendo desde `resumedAt`.
+2. `FITBUD_WORKOUT_PLAYER.returnFromAway(execution, now)` (puro), invocado al volver (`visibilitychange`, `pageshow`) y al reabrir la app tras cargar los días: si la ausencia fue de hasta `AWAY_LIMIT_SECONDS` (1 h), cuenta entera; si fue mayor (sesión olvidada), la sesión queda en pausa con la duración y el descanso congelados en `awayAt`, y un aviso lo explica.
+3. La pausa manual sigue congelando el tiempo como hoy.
+4. El resumen dice "duración total" en vez de "duración real".
+5. `CACHE_NAME` → `fitbud-pwa-v126`.
+
+### Fuera de alcance
+
+- Editar a mano la duración de una sesión ya guardada.
+- Sesiones guardadas antes de este cambio: conservan la duración con la que se guardaron (historial inmutable).
+
+### Riesgos
+
+- Si el sistema mata la app sin emitir `visibilitychange`/`pagehide`, no hay `awayAt` y el tiempo cuenta entero hasta volver. Es el mismo evento del que dependía REQ-155.
+- Una ausencia legítima de más de una hora (por ejemplo, una clase sin mirar el móvil) se pierde; reanudar sigue sumando desde ese momento.
+
+### Criterios de aceptación
+
+- 15 min fuera de la app sin pausar: el cronómetro y la duración los incluyen. ✓ (`tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`)
+- 3 h fuera: la sesión queda en pausa con la duración que tenía al salir y el botón "Reanudar sesión" visible. ✓ (mismas pruebas)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-245 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
 
 **Estado: implementado.**
 
@@ -1950,7 +1945,7 @@ En `coach_usage` (Supabase de producción) los 12 fallos de `meal_estimate` desd
 
 1. `validateCoachOutput()` para `meal_estimate` ya no limita cuántas preguntas trae; sigue exigiendo macros numéricos y preguntas de texto (el cliente muestra como mucho 2 y solo en la foto).
 2. El prompt de "Estimar macros" pide la forma del schema con `"preguntas":[]` y dice que no haga preguntas.
-3. `CACHE_NAME` → `fitbud-pwa-v125`.
+3. `CACHE_NAME` → `fitbud-pwa-v128`.
 
 ### Fuera de alcance
 

@@ -163,3 +163,33 @@ console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporiza
   assert.equal(forged.steps[1].status,"pending","Un ejercicio no puede quedar 'declined'");
   console.log("REQ-236: calentamiento y vuelta a la calma opcionales.");
 }
+
+{
+  // REQ-244: la duración corre de inicio a fin, también en segundo plano;
+  // una ausencia de más de una hora deja la sesión en pausa al salir.
+  const t0=Date.parse("2026-10-21T18:00:00.000Z");
+  const min=60000;
+  const short=player.createExecution(strength,t0);
+  short.awayAt=new Date(t0+10*min).toISOString();
+  assert.equal(player.returnFromAway(short,t0+25*min),"counted");
+  assert.equal(short.awayAt,null);
+  assert.equal(short.status,"in_progress");
+  assert.equal(player.elapsedSeconds(short,t0+30*min),30*60,"Los 15 min fuera de la app cuentan");
+
+  const forgotten=player.createExecution(strength,t0);
+  forgotten.awayAt=new Date(t0+20*min).toISOString();
+  forgotten.timer={kind:"rest",running:true,endsAt:new Date(t0+21*min).toISOString(),remainingSeconds:90};
+  assert.equal(player.returnFromAway(forgotten,t0+5*60*min),"paused");
+  assert.equal(forgotten.status,"paused");
+  assert.equal(forgotten.resumedAt,null);
+  assert.equal(player.elapsedSeconds(forgotten,t0+6*60*min),20*60,"Una sesión olvidada se congela donde se dejó");
+  assert.equal(forgotten.timer.running,false);
+  assert.equal(forgotten.timer.remainingSeconds,60);
+
+  assert.equal(player.returnFromAway(player.createExecution(strength,t0),t0+min),"none");
+  const kept=player.normalizeExecution(JSON.parse(JSON.stringify(short)),strength,t0+31*min);
+  assert.equal(kept.awayAt,null);
+  const away=player.createExecution(strength,t0);away.awayAt=new Date(t0).toISOString();
+  assert.equal(player.normalizeExecution(JSON.parse(JSON.stringify(away)),strength,t0+min).awayAt,away.awayAt,"normalizeExecution conserva awayAt");
+  console.log("REQ-244: duración total con la app en segundo plano.");
+}

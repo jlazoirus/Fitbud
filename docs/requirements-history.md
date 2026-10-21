@@ -9888,3 +9888,107 @@ Que después del onboarding la meta nutricional guardada siempre cumpla `kcal = 
 - Reproducir los pasos de arriba y confirmar que "Tu referencia diaria" ya no muestra `1200 kcal` con macros que suman 1740.
 - Prueba unitaria/vm sobre el helper de reconciliación: entradas `{kcal:1200,p:120,c:207,f:48}` → salida con `kcal = Σ macros`.
 - Evidencia funcional de esta auditoría: captura `scratchpad/req227-onboarding-kcal-mismatch.jpg` ("Tu referencia diaria: 1200 kcal · P 120 g · C 207 g · G 48 g").
+
+## REQ-232 - Entreno: cada ejercicio muestra con qué carga lo hiciste la última vez
+
+**Estado: implementado.**
+
+### Origen
+
+Claudia (usuaria beta, 2026-10-19), con captura del reproductor: "para planes de x semanas, que te indique aquí debajo de la carga sugerida el histórico de cuántos kg de carga hiciste la última semana en ese ejercicio, para tener el peso identificado en la app. O que te dé ese dato cuando presionas Usar progresión".
+
+### Problema
+
+El reproductor guarda la carga de cada serie (`set.load`) en `day_log.state.workoutExecution`, pero nunca la vuelve a mostrar: bajo "Carga sugerida" solo aparece el texto genérico "Carga controlable que deje N repeticiones en reserva". Para progresar semana a semana hay que recordar de memoria (o en otra app) con cuánto se hizo el ejercicio.
+
+### Alcance
+
+1. `FITBUD_WORKOUT_PLAYER.lastPerformance(days, exerciseSlug, beforeDs)` (puro): la sesión anterior más reciente con series hechas de ese ejercicio — fecha, variación y series (reps, carga tal como se anotó, RPE).
+2. En el reproductor, bajo "Carga sugerida": "Última vez · mar 13 oct" con las series ("3 × 8 · 40 kg" si todas iguales, "40 kg × 8, 42.5 kg × 7" si no) y el rango de RPE; indica si aquella vez fue en progresión o versión más fácil, y "Sin carga anotada" si no se registró peso. Sin historial (y no es de peso corporal), una línea invita a anotar la carga para verla la próxima vez.
+3. En "Qué vas a hacer hoy" (antes de empezar), cada ejercicio con historial muestra "Última vez N kg" (la carga de la última serie).
+4. `CACHE_NAME` → `fitbud-pwa-v114`.
+
+### Fuera de alcance
+
+- Autocompletar la carga de hoy con la de la última vez (al marcar una serie sin carga, sigue quedando vacía).
+- Historial de ciclos anteriores: se busca en los días cargados (`pullAllDays()` baja el ciclo activo).
+- Proponer un incremento de carga concreto en kg.
+
+### Riesgos
+
+- Ninguno sobre datos: solo lectura de lo ya registrado, privado del usuario y fuera de analytics.
+
+### Criterios de aceptación
+
+- `lastPerformance` toma la sesión anterior más reciente con series hechas, ignora hoy y sesiones sin series. ✓ (`scripts/validate-workout-player.mjs`)
+- Con 40 kg × 8 y 42.5 kg × 7 hace una semana, el reproductor muestra "40 kg × 8, 42.5 kg × 7 · RPE 8-9" y el resumen previo "Última vez 42.5 kg"; un ejercicio sin historial muestra la invitación a anotar. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando inicias el entrenamiento comienza en seco de frente; debería haber una cuenta atrás que te avise con 3 segundos de anticipación que ya va a comenzar".
+
+### Problema
+
+`startWorkoutExecution()` creaba la ejecución y empezaba a correr el reloj de la sesión en el mismo toque de "Iniciar sesión guiada", sin margen para dejar el teléfono y ponerse en posición.
+
+### Alcance
+
+1. "Iniciar sesión guiada" (y "Empezar" en el modo conversacional) abre una cuenta atrás a pantalla completa: "Prepárate", 3 · 2 · 1 con un pitido corto y vibración (si el dispositivo la soporta) en cada número, y "Empiezas con: <primer bloque>". Al llegar a 0 suena un pitido más largo, se crea la sesión y arranca el reloj (`beginWorkoutExecution()`).
+2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
+3. Con `prefers-reduced-motion` el número cambia sin animación.
+4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
+5. `CACHE_NAME` → `fitbud-pwa-v117`.
+
+### Fuera de alcance
+
+- Cuenta atrás al terminar descansos o antes de bloques con cronómetro.
+- Preferencia para desactivar el sonido.
+
+### Riesgos
+
+- iOS no implementa `navigator.vibrate`; el pitido depende de que el teléfono no esté en silencio. El aviso visual siempre está.
+
+### Criterios de aceptación
+
+- Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del calentamiento en el reproductor: "No debe asignarte el bloque de calentamiento ni enfriamiento por defecto; debería preguntarte si quieres hacer ese bloque y solo mostrarlo si lo eliges, diciéndote que es opcional".
+
+### Problema
+
+Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba como bloque omitido y dejaba la sesión parcial.
+
+### Alcance
+
+1. `workout-player.js`: bloques `warmup`/`cooldown` con `optional:true`, `optIn` si se eligen y estado `declined` ("Ahora no"), que `progress()` no cuenta en el total ni como omitido.
+2. Reproductor: un bloque opcional no elegido muestra solo la pregunta ("¿Quieres calentar antes de empezar?" / "¿Quieres cerrar con unos minutos suaves?"), duración y "Es opcional", con "Sí, calentar"/"Sí, hacerlo" y "Ahora no"; los movimientos aparecen solo si se elige.
+3. Una sesión con todo hecho salvo bloques rechazados se cierra **completada** (`workoutFullyCompleted`).
+4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-235) ya no anuncia el calentamiento.
+5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v118`.
+
+### Fuera de alcance
+
+- Recordar la elección entre sesiones o una preferencia en Perfil.
+- Volver a ofrecer un bloque después de "Ahora no".
+
+### Riesgos
+
+- Ninguno sobre datos: las sesiones guardadas no cambian.
+
+### Criterios de aceptación
+
+- `optional`/`declined`/`progress` cubiertos en `scripts/validate-workout-player.mjs`. ✓
+- "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
