@@ -64,7 +64,7 @@ const days = (Date.parse(g.expires_at) - Date.parse(g.starts_at)) / 86400000;
 assert(Math.round(days) === 90, "El acceso dura 90 días: " + days);
 assert(res.body.betaAccess && res.body.betaAccess.expires_at === g.expires_at, "Devuelve la fecha de fin al admin.");
 assert(overrides.length === 1 && overrides[0].every((o) => o.user_id === NEW_ID && o.daily_limit === 10000 && o.expires_at === g.expires_at && o.updated_by === ADMIN_ID),
-  "REQ-246: la cuenta beta no tiene tope de uso del coach hasta que vence el acceso.");
+  "REQ-248: la cuenta beta no tiene tope de uso del coach hasta que vence el acceso.");
 assert(!res.body.betaError, "Sin error cuando todo sale bien.");
 
 res = await call({ action: "createUser", email: "beto@correo.com" });

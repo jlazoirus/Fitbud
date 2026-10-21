@@ -177,14 +177,14 @@ async function grantBetaAccess(userId, caller, e) {
   const data = await responseJson(response);
   if (!response.ok) throw new Error(apiError(data, "No se pudo dar el acceso beta."));
   const entitlement = Array.isArray(data) ? data[0] : data;
-  // REQ-246: la beta no tiene tope de uso del coach mientras dure el acceso.
+  // REQ-248: la beta no tiene tope de uso del coach mientras dure el acceso.
   // Si falla, el acceso queda dado y el admin lo ve (quotaError).
   try { await grantBetaUnlimitedQuota(userId, entitlement && entitlement.expires_at, caller, e); }
   catch (error) { return Object.assign({}, entitlement, { quotaError: String(error.message || error) }); }
   return entitlement;
 }
 
-// REQ-246: un override por acción con el máximo diario permitido, que vence
+// REQ-248: un override por acción con el máximo diario permitido, que vence
 // junto con el acceso beta; al vencer, vuelven las cuotas de su plan.
 async function grantBetaUnlimitedQuota(userId, expiresAt, caller, e) {
   if (!expiresAt) throw new Error("Falta la fecha de fin del acceso.");
@@ -803,7 +803,7 @@ function safeRedirect(req, candidate) {
 // ── Postulantes de la beta (REQ-218) ─────────────────────────────────────────
 // Aceptar = crear un código de 90 días (plan quarterly) y dejar listo el
 // mensaje de WhatsApp con el enlace /?codigo=…; la persona crea su cuenta con
-// él y el acceso completo (sin tope de uso del coach, REQ-246) se activa solo.
+// él y el acceso completo (sin tope de uso del coach, REQ-248) se activa solo.
 
 const BETA_SELECT = [
   "id", "created_at", "name", "whatsapp", "age_band", "country_city", "source",

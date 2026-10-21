@@ -9962,3 +9962,122 @@ Si la subida de un día falla (token vencido al volver la PWA del fondo, red dé
 - Con la subida de ayer fallida y el primer reintento de hoy también fallando, ayer muestra desayuno y almuerzo registrados y marcados; al completar la cena, lo que sube conserva los tres y la cola queda vacía. ✓ (`tests/e2e/dia-sin-subir.spec.js`; falla sin el arreglo)
 - Un cambio `failed` en la cola se sube al abrir la app y el día se ve. ✓ (`tests/e2e/dia-sin-subir.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando inicias el entrenamiento comienza en seco de frente; debería haber una cuenta atrás que te avise con 3 segundos de anticipación que ya va a comenzar".
+
+### Problema
+
+`startWorkoutExecution()` creaba la ejecución y empezaba a correr el reloj de la sesión en el mismo toque de "Iniciar sesión guiada", sin margen para dejar el teléfono y ponerse en posición.
+
+### Alcance
+
+1. "Iniciar sesión guiada" (y "Empezar" en el modo conversacional) abre una cuenta atrás a pantalla completa: "Prepárate", 3 · 2 · 1 con un pitido corto y vibración (si el dispositivo la soporta) en cada número, y "Empiezas con: <primer bloque>". Al llegar a 0 suena un pitido más largo, se crea la sesión y arranca el reloj (`beginWorkoutExecution()`).
+2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
+3. Con `prefers-reduced-motion` el número cambia sin animación.
+4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
+5. `CACHE_NAME` → `fitbud-pwa-v117`.
+
+### Fuera de alcance
+
+- Cuenta atrás al terminar descansos o antes de bloques con cronómetro.
+- Preferencia para desactivar el sonido.
+
+### Riesgos
+
+- iOS no implementa `navigator.vibrate`; el pitido depende de que el teléfono no esté en silencio. El aviso visual siempre está.
+
+### Criterios de aceptación
+
+- Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura del calentamiento en el reproductor: "No debe asignarte el bloque de calentamiento ni enfriamiento por defecto; debería preguntarte si quieres hacer ese bloque y solo mostrarlo si lo eliges, diciéndote que es opcional".
+
+### Problema
+
+Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba como bloque omitido y dejaba la sesión parcial.
+
+### Alcance
+
+1. `workout-player.js`: bloques `warmup`/`cooldown` con `optional:true`, `optIn` si se eligen y estado `declined` ("Ahora no"), que `progress()` no cuenta en el total ni como omitido.
+2. Reproductor: un bloque opcional no elegido muestra solo la pregunta ("¿Quieres calentar antes de empezar?" / "¿Quieres cerrar con unos minutos suaves?"), duración y "Es opcional", con "Sí, calentar"/"Sí, hacerlo" y "Ahora no"; los movimientos aparecen solo si se elige.
+3. Una sesión con todo hecho salvo bloques rechazados se cierra **completada** (`workoutFullyCompleted`).
+4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-235) ya no anuncia el calentamiento.
+5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v118`.
+
+### Fuera de alcance
+
+- Recordar la elección entre sesiones o una preferencia en Perfil.
+- Volver a ofrecer un bloque después de "Ahora no".
+
+### Riesgos
+
+- Ninguno sobre datos: las sesiones guardadas no cambian.
+
+### Criterios de aceptación
+
+- `optional`/`declined`/`progress` cubiertos en `scripts/validate-workout-player.mjs`. ✓
+- "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-220 - Fix táctil: "¿Qué es RPE?" medía 42 px y dejaba el release gate en rojo
+
+**Estado: implementado.**
+
+### Origen
+
+`tests/e2e/tactil.spec.js` (REQ-193) fallaba en `main` desde 2026-10-18: el enlace "¿Qué es RPE?" del resumen de Entreno (`.link-btn.small`) medía 100×42 px en táctil. El gate quedaba en rojo para todos los loops.
+
+### Alcance
+
+1. `@media(pointer:coarse)`: `.link-btn` con `min-height:44px` y `box-sizing:border-box`, sin cambiar su aspecto. SW v93.
+
+### Criterios de aceptación
+
+- `tactil.spec.js` pasa y el release gate queda en verde. ✓
+
+## REQ-222 - Fix admin: la cortesía de consumo rechazaba 3000 sin decir por qué
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19, captura): en "Consumo y cortesía" de un beta tester, límite 3000 y unidades extra 3000 en `coach_conversation` → "Usuario, acción y valores de cortesía válidos requeridos." y no guardaba. `api/admin.js` (`setQuotaOverride`) aceptaba como máximo 1000 en ambos campos con un único mensaje genérico; el selector mostraba la clave interna `coach_conversation`.
+
+### Alcance
+
+1. Tope por día y por acción a 10.000 (`QUOTA_OVERRIDE_MAX`, solo contra errores de tipeo); cada error dice qué campo y qué rango.
+2. Modal: ayuda "Por día y por acción, de 0 a 10.000", validación antes de enviar con foco en el campo, y "Conversación con el coach" en el selector. SW v104.
+
+### Criterios de aceptación
+
+- `scripts/test-coach-quota.mjs`: 3000/3000 en `coach_conversation` se guarda; 20000 responde 400 nombrando el campo y el rango. ✓
+
+## REQ-223 - Textos: la beta no se limita a países
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningún texto". La portada decía "Beta de fundadores en Perú, Chile y México" y la postulación repetía los países en la nota del hero, las meta descripciones, la ayuda de WhatsApp (+51, +56, +52) y los ejemplos ("Lima, Perú", "+51 999 999 999").
+
+### Alcance
+
+1. `index.html` (nota del hero en modo invitación) y `beta-reclutamiento.html` (meta, nota del hero, ayuda y ejemplos de WhatsApp y ciudad) sin países; los ejemplos pasan a "+ código de país y número" y "Ciudad, país".
+2. `api/beta-recruitment.js`: el error de WhatsApp pide el código del país sin ejemplo de un país. SW v105.
+
+### Criterios de aceptación
+
+- `tests/e2e/portada.spec.js` y `tests/e2e/beta.spec.js`: ni la portada ni la postulación (incluida la meta descripción) mencionan Perú, Chile o México. ✓

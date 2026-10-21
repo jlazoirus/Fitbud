@@ -214,7 +214,7 @@ function couponError(data) {
   return "No pudimos canjear el código. Intenta de nuevo.";
 }
 
-// ── beta de fundadores sin tope de uso del coach (REQ-246) ───────────────────
+// ── beta de fundadores sin tope de uso del coach (REQ-248) ───────────────────
 // El código de una postulación aceptada solo queda en su nota (review_notes,
 // "aceptado en la beta con FIT-…"). Al canjearlo, cada acción del coach recibe
 // el máximo diario permitido hasta que vence ese acceso. Nunca bloquea el canje.

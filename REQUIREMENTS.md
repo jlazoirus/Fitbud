@@ -1456,17 +1456,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-219`).
 
 **Estado: implementado.**
 
-### Origen
-
-`tests/e2e/tactil.spec.js` (REQ-193) fallaba en `main` desde 2026-10-18: el enlace "¿Qué es RPE?" del resumen de Entreno (`.link-btn.small`) medía 100×42 px en táctil. El gate quedaba en rojo para todos los loops.
-
-### Alcance
-
-1. `@media(pointer:coarse)`: `.link-btn` con `min-height:44px` y `box-sizing:border-box`, sin cambiar su aspecto. SW v93.
-
-### Criterios de aceptación
-
-- `tactil.spec.js` pasa y el release gate queda en verde. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-220`).
 
 ## REQ-221 - Mitigación de REQ-209: nada desborda la columna y la barra de escritorio es discreta
 
@@ -1478,35 +1468,13 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-221`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-19, captura): en "Consumo y cortesía" de un beta tester, límite 3000 y unidades extra 3000 en `coach_conversation` → "Usuario, acción y valores de cortesía válidos requeridos." y no guardaba. `api/admin.js` (`setQuotaOverride`) aceptaba como máximo 1000 en ambos campos con un único mensaje genérico; el selector mostraba la clave interna `coach_conversation`.
-
-### Alcance
-
-1. Tope por día y por acción a 10.000 (`QUOTA_OVERRIDE_MAX`, solo contra errores de tipeo); cada error dice qué campo y qué rango.
-2. Modal: ayuda "Por día y por acción, de 0 a 10.000", validación antes de enviar con foco en el campo, y "Conversación con el coach" en el selector. SW v104.
-
-### Criterios de aceptación
-
-- `scripts/test-coach-quota.mjs`: 3000/3000 en `coach_conversation` se guarda; 20000 responde 400 nombrando el campo y el rango. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-222`).
 
 ## REQ-223 - Textos: la beta no se limita a países
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningún texto". La portada decía "Beta de fundadores en Perú, Chile y México" y la postulación repetía los países en la nota del hero, las meta descripciones, la ayuda de WhatsApp (+51, +56, +52) y los ejemplos ("Lima, Perú", "+51 999 999 999").
-
-### Alcance
-
-1. `index.html` (nota del hero en modo invitación) y `beta-reclutamiento.html` (meta, nota del hero, ayuda y ejemplos de WhatsApp y ciudad) sin países; los ejemplos pasan a "+ código de país y número" y "Ciudad, país".
-2. `api/beta-recruitment.js`: el error de WhatsApp pide el código del país sin ejemplo de un país. SW v105.
-
-### Criterios de aceptación
-
-- `tests/e2e/portada.spec.js` y `tests/e2e/beta.spec.js`: ni la portada ni la postulación (incluida la meta descripción) mencionan Perú, Chile o México. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-223`).
 
 ## REQ-224 - Fix Entreno: un borrador de plan archivado le gana al plan activo en los días nuevos
 
@@ -1639,72 +1607,15 @@ Que un ajuste de check-in, comunicado como futuro, no altere retroactivamente la
 
 ## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
 
-**Estado: implementado.**
+**Estado: implementado.** La sesión guiada arranca con una cuenta atrás de 3 segundos antes del primer bloque.
 
-### Origen
-
-Jonathan (2026-10-20), con captura del reproductor recién iniciado: "Cuando inicias el entrenamiento comienza en seco de frente; debería haber una cuenta atrás que te avise con 3 segundos de anticipación que ya va a comenzar".
-
-### Problema
-
-`startWorkoutExecution()` creaba la ejecución y empezaba a correr el reloj de la sesión en el mismo toque de "Iniciar sesión guiada", sin margen para dejar el teléfono y ponerse en posición.
-
-### Alcance
-
-1. "Iniciar sesión guiada" (y "Empezar" en el modo conversacional) abre una cuenta atrás a pantalla completa: "Prepárate", 3 · 2 · 1 con un pitido corto y vibración (si el dispositivo la soporta) en cada número, y "Empiezas con: <primer bloque>". Al llegar a 0 suena un pitido más largo, se crea la sesión y arranca el reloj (`beginWorkoutExecution()`).
-2. "Cancelar" (o Escape) cierra sin crear nada; "Empezar ya" la salta.
-3. Con `prefers-reduced-motion` el número cambia sin animación.
-4. `tests/e2e/helpers.js`: `startGuidedSession()` inicia saltando la cuenta atrás para las pruebas que no la ejercitan.
-5. `CACHE_NAME` → `fitbud-pwa-v117`.
-
-### Fuera de alcance
-
-- Cuenta atrás al terminar descansos o antes de bloques con cronómetro.
-- Preferencia para desactivar el sonido.
-
-### Riesgos
-
-- iOS no implementa `navigator.vibrate`; el pitido depende de que el teléfono no esté en silencio. El aviso visual siempre está.
-
-### Criterios de aceptación
-
-- Tras tocar "Iniciar sesión guiada" no hay sesión durante ~3 s y se ven 3, 2, 1; al terminar el reloj marca 00:00; "Cancelar" no crea sesión; "Empezar ya" la crea al instante. ✓ (`tests/e2e/entreno.spec.js`, captura 375px revisada)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-235`).
 
 ## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
 
-**Estado: implementado.**
+**Estado: implementado.** Calentamiento y vuelta a la calma son opcionales: el reproductor pregunta si hacerlos.
 
-### Origen
-
-Jonathan (2026-10-20), con captura del calentamiento en el reproductor: "No debe asignarte el bloque de calentamiento ni enfriamiento por defecto; debería preguntarte si quieres hacer ese bloque y solo mostrarlo si lo eliges, diciéndote que es opcional".
-
-### Problema
-
-Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba como bloque omitido y dejaba la sesión parcial.
-
-### Alcance
-
-1. `workout-player.js`: bloques `warmup`/`cooldown` con `optional:true`, `optIn` si se eligen y estado `declined` ("Ahora no"), que `progress()` no cuenta en el total ni como omitido.
-2. Reproductor: un bloque opcional no elegido muestra solo la pregunta ("¿Quieres calentar antes de empezar?" / "¿Quieres cerrar con unos minutos suaves?"), duración y "Es opcional", con "Sí, calentar"/"Sí, hacerlo" y "Ahora no"; los movimientos aparecen solo si se elige.
-3. Una sesión con todo hecho salvo bloques rechazados se cierra **completada** (`workoutFullyCompleted`).
-4. "Qué vas a hacer hoy" marca Calentamiento y Vuelta a la calma como "opcional"; la cuenta atrás (REQ-235) ya no anuncia el calentamiento.
-5. Aplica a fuerza y cardio. `CACHE_NAME` → `fitbud-pwa-v118`.
-
-### Fuera de alcance
-
-- Recordar la elección entre sesiones o una preferencia en Perfil.
-- Volver a ofrecer un bloque después de "Ahora no".
-
-### Riesgos
-
-- Ninguno sobre datos: las sesiones guardadas no cambian.
-
-### Criterios de aceptación
-
-- `optional`/`declined`/`progress` cubiertos en `scripts/validate-workout-player.mjs`. ✓
-- "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-236`).
 
 ## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
 
@@ -1986,7 +1897,86 @@ El reproductor solo avanza: "Omitir ejercicio" y "Siguiente ejercicio". Una vez 
 - Tras el primer ejercicio, "← Ejercicio anterior" muestra lo registrado (40 kg), sin Omitir ni Siguiente ejercicio, y el avance no cambia; "Volver al ejercicio en curso" vuelve al segundo con sus botones. Omitido → "Lo omitiste." y "Hacerlo ahora" lo retoma; el registro del primero queda intacto. ✓ (`tests/e2e/entreno.spec.js`, captura 390 px revisada)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-246 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
+## REQ-246 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
+
+**Estado: implementado.**
+
+### Origen
+
+Causa de producción que REQ-228 y REQ-238 dejaron fuera de alcance. Jonathan (2026-10-21): "Estimar macros" de "Sopa ramen vegetariana" responde "Tu coach no pudo completar esta acción. Intenta de nuevo."; antes (2026-10-20) lo mismo en el editor tras usar la foto.
+
+### Problema
+
+En `coach_usage` (Supabase de producción) los 12 fallos de `meal_estimate` desde el 2026-10-12 son `refunded` con `error_code = invalid_provider_output`, parte `estimate` (la estimación por texto: ~1045 tokens de entrada, sin imagen). Entre ellos los del reporte: 2026-10-21 01:20:14 y 01:30:43 UTC (20:20 y 20:30 del 20 en Perú) y 2026-10-20 18:46:20 UTC. Ninguna estimación con foto falló y no hay ningún `provider_<status>`: la clave, el saldo, el modelo y structured outputs funcionan. El servidor responde 422 y, antes de REQ-238, el cliente lo mostraba como el mensaje genérico. Son 12 de 49 estimaciones por texto desde el 2026-10-12 (~24 %); las 9 con foto pasaron.
+
+### Causa raíz
+
+- `mealEstimateOutputSchema()` (`api/claude.js`) exige `preguntas` sin tope (structured outputs no limita el largo de una lista) y el prompt de `aiEstimate()` (`index.html`) ni siquiera las pedía: el modelo las inventa. Todas las estimaciones por texto que pasaron traen exactamente 3 (o 0).
+- `validateCoachOutput()` rechazaba `preguntas.length > 3`: cuando el modelo trae 4 o más, una estimación con macros válidos se descarta, se devuelve la cuota y el usuario ve el error. Las respuestas fallidas tienen más tokens de salida (165-318) que las que pasan.
+
+### Alcance
+
+1. `validateCoachOutput()` para `meal_estimate` ya no limita cuántas preguntas trae; sigue exigiendo macros numéricos y preguntas de texto (el cliente muestra como mucho 2 y solo en la foto).
+2. El prompt de "Estimar macros" pide la forma del schema con `"preguntas":[]` y dice que no haga preguntas.
+3. `CACHE_NAME` → `fitbud-pwa-v128`.
+
+### Fuera de alcance
+
+- `training_plan`: sus 8 llamadas en producción (2026-06-24 a 2026-10-20) terminaron en `invalid_provider_output` con exactamente 2048 tokens de salida, el tope que pide el cliente: el JSON llega cortado y la ruta determinista lo tapa. Va en un REQ propio.
+- Registrar en los logs de `/api/claude` el motivo de cada `invalid_provider_output`.
+
+### Riesgos
+
+- Ninguno sobre datos: solo se aceptan respuestas que antes se descartaban con macros válidos.
+
+### Criterios de aceptación
+
+- Una estimación con 4 u 8 preguntas se acepta; kcal no numérica, preguntas que no son lista o que no son texto, y texto que no es JSON se siguen rechazando. ✓ (`scripts/validate-meal-estimate-output.mjs`; falla sin el arreglo)
+- El prompt de texto pide `"preguntas":[]`. ✓ (`scripts/validate-meal-estimate-output.mjs`)
+- `node scripts/release-gate.mjs` pasa. ✓ (validadores; E2E 100/101 con 1 flaky de `dia-sin-subir.spec.js` que pasa al reintento)
+
+## REQ-247 - Entreno: "Sustituir" solo propone ejercicios del mismo músculo principal
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del modal "Sustituir ejercicio" sobre un jalón que proponía Dominada, Dominada asistida y Remo con banda: "Tienes que asegurarte que todos los ejercicios de sustitución de verdad sustituyen el músculo principal [...] ya me ha pasado otras veces en otro tipo de músculos y ejercicios".
+
+### Problema
+
+El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (deltoides posterior) proponía dominadas y remos; para un remo, jalón y dominada asistida; para un curl de bíceps, remo con banda; para la extensión de tríceps, fondos y flexiones; para el peso muerto rumano, hip thrust. Además mostraba el patrón en inglés ("mismo patrón: pull") y la versión más fácil del candidato como si fuera su descripción.
+
+### Causa raíz
+
+`openExerciseSubstitution()` (`index.html`) juntaba `substitute_slugs` con todo el catálogo del mismo `movement_pattern`. El patrón agrupa por mecánica (todo "pull" junto: jalón, remo, face pull), no por músculo, y los `substitute_slugs` del catálogo incluían cruces entre músculos.
+
+### Alcance
+
+1. `exercise-catalog.js`: músculo principal por slug para los 42 ejercicios de fuerza (`FITBUD_EXERCISE_SUBSTITUTION.primaryMuscles`) y `candidates(actual, catálogo)`, puro: sustitutos directos primero y luego el resto del catálogo, siempre con el mismo músculo principal. Un ejercicio sin entrada (creado desde admin) usa el primero de su lista de músculos. Vale igual con el catálogo local y con el de Supabase.
+2. Espalda se separa en dorsal ancho (jalón, dominadas) y espalda media (remos); hombro en hombros (press), deltoides lateral (elevación lateral) y deltoides posterior (face pull).
+3. El modal dice qué músculo se conserva, cada opción muestra "Músculo principal: …" y, si no hay ninguna compatible con el lugar y las limitaciones del día, lo dice con el músculo.
+4. `scripts/validate-exercises.mjs` exige músculo principal en cada ejercicio de fuerza, que ningún sustituto ni versión más fácil/progresión cambie de músculo, y fija casos concretos (face pull, remo, jalón, curl, tríceps, rumano, elevación lateral).
+5. `CACHE_NAME` → `fitbud-pwa-v129`.
+
+### Fuera de alcance
+
+- Añadir ejercicios nuevos para los músculos que hoy no tienen sustituto en el catálogo (face pull, elevación lateral, gemelos): el modal lo dice en vez de proponer otro músculo.
+- Limpiar los `substitute_slugs` cruzados en `supabase/exercises.sql`: el filtro los descarta en la app.
+- Sustituciones ya guardadas en el historial (historial inmutable).
+
+### Riesgos
+
+- Jalón y dominadas comparten músculo principal (dorsal ancho) y siguen proponiéndose entre sí; el remo deja de aparecer para el jalón.
+- Menos opciones en ejercicios aislados: preferible a cambiar el músculo de la sesión.
+
+### Criterios de aceptación
+
+- Remo sentado en polea → solo Remo con banda; Face pull → sin opciones y el aviso nombra el deltoides posterior. ✓ (`tests/e2e/entreno.spec.js`)
+- Ningún sustituto ni versión más fácil/progresión del catálogo cambia de músculo principal. ✓ (`scripts/validate-exercises.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-248 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
 
 **Estado: implementado.**
 
@@ -2003,7 +1993,7 @@ Pedido del dueño (2026-10-21): los postulantes aprobados deben tener consumo il
 1. `grantBetaAccess()` crea un override por acción del coach con `daily_limit = QUOTA_OVERRIDE_MAX` (10.000) que vence con el acceso. Cubre aceptar por correo, cuenta existente y crear/invitar cuenta beta.
 2. `invite-signup` y `redeem`: si el código está en el `review_notes` de una postulación `beta_invited`, crea los mismos overrides; un cupón cualquiera no.
 3. Si fallan, el acceso queda y el admin ve `betaError`; el canje nunca se bloquea. Sin migración SQL.
-4. Textos del admin y `BETA_PROGRAM.md` actualizados; `CACHE_NAME` → `fitbud-pwa-v128`.
+4. Textos del admin y `BETA_PROGRAM.md` actualizados; `CACHE_NAME` → `fitbud-pwa-v130`.
 5. Datos: el único aceptado en producción ya tiene los overrides hasta 2027-01-19.
 
 ### Riesgos

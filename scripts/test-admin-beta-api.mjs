@@ -107,7 +107,7 @@ assert(invites.length === 1 && invites[0].body.email === "ana@correo.test", "Env
 assert(entitlements.length === 1 && entitlements[0].plan_id === "quarterly" && entitlements[0].status === "courtesy", "Da los 90 días de acceso beta.");
 assert(codeInserts.length === 0, "Con correo no hace falta código.");
 assert(overrides.length === 1 && overrides[0].length === 8 && overrides[0].every((o) => o.daily_limit === 10000 && o.enabled === true && o.expires_at === entitlements[0].expires_at),
-  "REQ-246: aceptar deja el coach sin tope hasta que vence el acceso.");
+  "REQ-248: aceptar deja el coach sin tope hasta que vence el acceso.");
 assert(!res.body.betaError, "Sin errores de acceso ni de cuotas.");
 assert(patches[0].status === "beta_invited" && /invitación enviada a ana@correo.test/.test(patches[0].review_notes), "Marca aceptada con nota del correo.");
 assert(res.body.applicant.email === "ana@correo.test" && !("raw_payload" in res.body.applicant), "Devuelve el correo sin el raw_payload.");
