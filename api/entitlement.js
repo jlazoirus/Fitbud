@@ -225,16 +225,43 @@ const COACH_ACTIONS = [
 ];
 const BETA_DAILY_LIMIT = 10000; // = QUOTA_OVERRIDE_MAX de api/admin.js
 
-async function grantBetaQuotaIfInvited(e, code, userId, ent) {
+// REQ-251: lo que ya respondió en la postulación (nombre, objetivo, experiencia)
+// llega al onboarding; igual que api/admin.js, sin tocar un onboarding hecho.
+const BETA_GOAL_TO_PREF = { "Bajar grasa": "deficit", "Ganar musculo": "volumen", "Mejorar rendimiento": "mantenimiento" };
+const BETA_STAGE_TO_EXPERIENCE = { beginner: "beginner", returning: "beginner", consistent: "intermediate", advanced: "advanced" };
+
+async function seedProfileFromApplication(e, userId, sub) {
+  const seed = {};
+  const name = String(sub.name || "").trim().slice(0, 90);
+  if (name) seed.name = name;
+  if (BETA_GOAL_TO_PREF[sub.goal]) seed.goal = BETA_GOAL_TO_PREF[sub.goal];
+  if (BETA_STAGE_TO_EXPERIENCE[sub.stage]) seed.trainingExperience = BETA_STAGE_TO_EXPERIENCE[sub.stage];
+  if (!Object.keys(seed).length) return;
+  const pr = await fetch(e.url + "/rest/v1/profiles?id=eq." + encodeURIComponent(userId) + "&select=prefs", { headers: svcHeaders(e) });
+  const rows = await rj(pr);
+  const exists = pr.ok && Array.isArray(rows) && rows.length > 0;
+  const prefs = exists && rows[0].prefs && typeof rows[0].prefs === "object" ? rows[0].prefs : {};
+  if (prefs.onboardingCompletedAt) return;
+  const next = Object.assign({}, prefs, seed, prefs.name ? { name: prefs.name } : {});
+  await fetch(e.url + "/rest/v1/profiles?on_conflict=id", {
+    method: "POST",
+    headers: svcHeaders(e, { "content-type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }),
+    body: JSON.stringify({ id: userId, prefs: next, updated_at: new Date().toISOString() }),
+  });
+}
+
+async function applyBetaInvite(e, code, userId, ent) {
   if (!userId || !ent || !ent.expires_at) return;
+  let sub = null;
   try {
     const br = await fetch(
       e.url + "/rest/v1/beta_recruitment_submissions?status=eq.beta_invited&review_notes=ilike."
-        + encodeURIComponent("*" + code + "*") + "&select=id&limit=1",
+        + encodeURIComponent("*" + code + "*") + "&select=id,name,goal,stage&limit=1",
       { headers: svcHeaders(e) }
     );
     const rows = await rj(br);
     if (!br.ok || !Array.isArray(rows) || !rows.length) return;
+    sub = rows[0];
     const now = new Date().toISOString();
     await fetch(e.url + "/rest/v1/coach_quota_overrides?on_conflict=user_id,action", {
       method: "POST",
@@ -245,6 +272,9 @@ async function grantBetaQuotaIfInvited(e, code, userId, ent) {
       }))),
     });
   } catch (_) { /* el acceso ya quedó dado; el admin puede ajustar cuotas a mano */ }
+  if (sub) {
+    try { await seedProfileFromApplication(e, userId, sub); } catch (_) { /* solo tendrá que escribirlo en el onboarding */ }
+  }
 }
 
 // ── registro por invitación (REQ-205) ────────────────────────────────────────
@@ -324,7 +354,7 @@ async function inviteSignup(e, body, res) {
     return;
   }
   const ent = Array.isArray(redeemed) ? redeemed[0] : redeemed;
-  await grantBetaQuotaIfInvited(e, code, userId, ent);
+  await applyBetaInvite(e, code, userId, ent);
   res.status(201).json({ ok: true, entitlement: entitlementOut(ent || {}) });
 }
 
@@ -567,7 +597,7 @@ export default async function handler(req, res) {
         return;
       }
       const row = Array.isArray(data) ? data[0] : data;
-      await grantBetaQuotaIfInvited(e, code, auth.user.id, row);
+      await applyBetaInvite(e, code, auth.user.id, row);
       res.status(200).json({ entitlement: entitlementOut(row || {}) });
       return;
     }
