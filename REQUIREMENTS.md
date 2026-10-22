@@ -90,10 +90,10 @@ Feedback Jonathan (2026-10-21, iPhone):
 
 Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/Recordatorios y audio sobre la próxima comida):
 
-- REQ-246 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total". (P0; implementado)
-- REQ-247 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente. (P1; implementado)
-- REQ-248 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
-- REQ-249 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
+- REQ-250 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total". (P0; implementado)
+- REQ-251 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente. (P1; implementado)
+- REQ-252 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
+- REQ-253 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -105,8 +105,8 @@ Pendiente no automatizable por agentes:
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
-- REQ-248 - Decidir el nivel de cocina en el catálogo y si se amplían almuerzos/cenas "sin cocinar" (feedback Diego).
-- REQ-249 - Decidir si los recordatorios llegan por WhatsApp: proveedor y presupuesto (feedback Diego).
+- REQ-252 - Decidir el nivel de cocina en el catálogo y si se amplían almuerzos/cenas "sin cocinar" (feedback Diego).
+- REQ-253 - Decidir si los recordatorios llegan por WhatsApp: proveedor y presupuesto (feedback Diego).
 - REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
@@ -1465,17 +1465,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-219`).
 
 **Estado: implementado.**
 
-### Origen
-
-`tests/e2e/tactil.spec.js` (REQ-193) fallaba en `main` desde 2026-10-18: el enlace "¿Qué es RPE?" del resumen de Entreno (`.link-btn.small`) medía 100×42 px en táctil. El gate quedaba en rojo para todos los loops.
-
-### Alcance
-
-1. `@media(pointer:coarse)`: `.link-btn` con `min-height:44px` y `box-sizing:border-box`, sin cambiar su aspecto. SW v93.
-
-### Criterios de aceptación
-
-- `tactil.spec.js` pasa y el release gate queda en verde. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-220`).
 
 ## REQ-221 - Mitigación de REQ-209: nada desborda la columna y la barra de escritorio es discreta
 
@@ -1487,35 +1477,13 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-221`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-19, captura): en "Consumo y cortesía" de un beta tester, límite 3000 y unidades extra 3000 en `coach_conversation` → "Usuario, acción y valores de cortesía válidos requeridos." y no guardaba. `api/admin.js` (`setQuotaOverride`) aceptaba como máximo 1000 en ambos campos con un único mensaje genérico; el selector mostraba la clave interna `coach_conversation`.
-
-### Alcance
-
-1. Tope por día y por acción a 10.000 (`QUOTA_OVERRIDE_MAX`, solo contra errores de tipeo); cada error dice qué campo y qué rango.
-2. Modal: ayuda "Por día y por acción, de 0 a 10.000", validación antes de enviar con foco en el campo, y "Conversación con el coach" en el selector. SW v104.
-
-### Criterios de aceptación
-
-- `scripts/test-coach-quota.mjs`: 3000/3000 en `coach_conversation` se guarda; 20000 responde 400 nombrando el campo y el rango. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-222`).
 
 ## REQ-223 - Textos: la beta no se limita a países
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningún texto". La portada decía "Beta de fundadores en Perú, Chile y México" y la postulación repetía los países en la nota del hero, las meta descripciones, la ayuda de WhatsApp (+51, +56, +52) y los ejemplos ("Lima, Perú", "+51 999 999 999").
-
-### Alcance
-
-1. `index.html` (nota del hero en modo invitación) y `beta-reclutamiento.html` (meta, nota del hero, ayuda y ejemplos de WhatsApp y ciudad) sin países; los ejemplos pasan a "+ código de país y número" y "Ciudad, país".
-2. `api/beta-recruitment.js`: el error de WhatsApp pide el código del país sin ejemplo de un país. SW v105.
-
-### Criterios de aceptación
-
-- `tests/e2e/portada.spec.js` y `tests/e2e/beta.spec.js`: ni la portada ni la postulación (incluida la meta descripción) mencionan Perú, Chile o México. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-223`).
 
 ## REQ-224 - Fix Entreno: un borrador de plan archivado le gana al plan activo en los días nuevos
 
@@ -1648,25 +1616,25 @@ Que un ajuste de check-in, comunicado como futuro, no altere retroactivamente la
 
 ## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
 
-**Estado: implementado.** "Iniciar sesión guiada" abre una cuenta atrás 3 · 2 · 1 (pitido y vibración) antes de crear la sesión y arrancar el reloj; "Cancelar" no crea nada y "Empezar ya" la salta. Prueba: `tests/e2e/entreno.spec.js`.
+**Estado: implementado.** La sesión guiada arranca con una cuenta atrás de 3 segundos antes del primer bloque.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-235`).
 
 ## REQ-236 - Entreno: calentamiento y vuelta a la calma son opcionales y se preguntan
 
-**Estado: implementado.** Calentamiento y vuelta a la calma son opcionales (`optional`/`optIn`/`declined` en `workout-player.js`): el reproductor pregunta si hacerlos y un bloque rechazado no cuenta ni deja la sesión parcial. Prueba: `scripts/validate-workout-player.mjs`, `tests/e2e/entreno.spec.js`.
+**Estado: implementado.** Calentamiento y vuelta a la calma son opcionales: el reproductor pregunta si hacerlos.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-236`).
 
 ## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
 
-**Estado: implementado.** La tarjeta del tempo dice "baja · pausa · sube ⓘ" (o "ritmo ⓘ") y `explainWorkoutTempo()` explica los segundos de cada fase. Prueba: `tests/e2e/entreno.spec.js`.
+**Estado: implementado.** La tarjeta del tempo es un botón: dice "baja · pausa · sube ⓘ" (o "ritmo ⓘ") y explica el ritmo de cada repetición.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-237`).
 
 ## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
-**Estado: implementado.** `.meal-photo-preview[hidden]` ya no muestra una imagen rota y `estimateErrorMessage()` da el motivo (demora, demanda, conexión o código) con "Reintentar" al estimar por texto y por foto. Prueba: `tests/e2e/foto-comida.spec.js`.
+**Estado: implementado.** "Estimar macros" (texto y foto) dice por qué falló, con "(código N)" si el motivo no se reconoce, y ofrece "Reintentar"; sin foto ya no se ve la vista previa rota.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
 
@@ -1712,7 +1680,79 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-244`).
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-245`).
 
-## REQ-246 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total"
+## REQ-246 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
+
+**Estado: implementado.** `validateCoachOutput()` para `meal_estimate` ya no limita cuántas preguntas trae el coach (seguía rechazando con 422) y el prompt de "Estimar macros" pide `"preguntas":[]`. Prueba: `scripts/validate-meal-estimate-output.mjs`.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-246`).
+
+## REQ-247 - Entreno: "Sustituir" solo propone ejercicios del mismo músculo principal
+
+**Estado: implementado.** "Sustituir" solo propone ejercicios con el mismo músculo principal (`FITBUD_EXERCISE_SUBSTITUTION`, `exercise-catalog.js`): sustitutos directos primero y luego el resto del catálogo; el modal dice qué músculo conserva. Prueba: `scripts/validate-exercises.mjs`, `tests/e2e/entreno.spec.js`.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-247`).
+
+## REQ-248 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
+
+**Estado: implementado.**
+
+### Origen
+
+Pedido del dueño (2026-10-21): los postulantes aprobados deben tener consumo ilimitado y acceso completo por 90 días.
+
+### Problema y causa raíz
+
+`grantBetaAccess()` (`api/admin.js`) daba el `user_entitlements` de 90 días pero no tocaba `coach_quota_overrides`: la beta quedaba con las cuotas `default` (p. ej. 1 dieta semanal y 20 conversaciones al día). El canje del código (`api/entitlement.js`) tampoco.
+
+### Alcance
+
+1. `grantBetaAccess()` crea un override por acción del coach con `daily_limit = QUOTA_OVERRIDE_MAX` (10.000) que vence con el acceso. Cubre aceptar por correo, cuenta existente y crear/invitar cuenta beta.
+2. `invite-signup` y `redeem`: si el código está en el `review_notes` de una postulación `beta_invited`, crea los mismos overrides; un cupón cualquiera no.
+3. Si fallan, el acceso queda y el admin ve `betaError`; el canje nunca se bloquea. Sin migración SQL.
+4. Textos del admin y `BETA_PROGRAM.md` actualizados; `CACHE_NAME` → `fitbud-pwa-v130`.
+5. Datos: el único aceptado en producción ya tiene los overrides hasta 2027-01-19.
+
+### Riesgos
+
+Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostrando el uso por persona.
+
+### Criterios de aceptación
+
+- Aceptar o crear cuenta beta: 8 overrides de 10.000/día que vencen con el acceso. ✓ (`scripts/test-admin-beta-api.mjs`, `scripts/test-admin-beta-signup.mjs`)
+- Canjear el código de una postulación aceptada crea los overrides; un cupón normal no. ✓ (`scripts/test-invite-signup-api.mjs`, `scripts/test-coupon-api.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apretados". En "Próxima comida" y "Entrenamiento pendiente", "Ver detalle" y "Adaptar" llegan al borde derecho de su tarjeta.
+
+### Causa raíz
+
+`homeAgendaItemHtml()` (`index.html`) ponía el tipo de la fila como clase suelta (`agenda-item meal`, `agenda-item workout`). `.meal` y `.workout` son las tarjetas globales de comida y entreno (fondo, borde, radio), así que cada fila se volvía una tarjeta dentro de la tarjeta de la agenda; pero `.agenda-item{padding:13px 0}` les quita el relleno lateral y los botones (`flex:1 1 128px`) llenan el ancho hasta el borde. Medido a 390 px: "Ver detalle" termina a 0 px del borde.
+
+### Alcance
+
+1. La clase del tipo va con prefijo (`kind-meal`, `kind-workout`, `kind-resume`, `kind-rest`) y los selectores de icono se ajustan: la agenda vuelve a ser la lista con separadores que define su CSS, con los botones a 16 px del borde de la tarjeta.
+2. `CACHE_NAME` → `fitbud-pwa-v131`.
+
+### Fuera de alcance
+
+- Cambiar el diseño de la agenda.
+
+### Riesgos
+
+- Las filas ya no tienen fondo propio (el entreno pierde su degradado azul); el icono conserva su color por tipo.
+
+### Criterios de aceptación
+
+- A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-250 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total"
 
 **Estado: implementado.**
 
@@ -1735,11 +1775,11 @@ Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana re
 3. Entreno, en un día `freeActivity`: en vez de "Iniciar sesión guiada" (no hay ejercicios) o del texto de descanso, "Registrar mi actividad" abre el registro manual de REQ-206 y avisa "Si hoy no la haces, no cuenta como sesión perdida."; sin los atajos "Adaptar hoy" (Solo 20 min, En casa…), que no aplican. Hoy ofrece "Registrar mi actividad" en vez de "Iniciar"/"Adaptar".
 4. `trainingDayResult()`: un día `freeActivity` sin registrar cuenta como descanso para la racha (no la rompe); registrado, como entrenado.
 5. El registro en un día de tu deporte propone el último deporte que registraste (p. ej. pádel) o "Otra actividad".
-6. `CACHE_NAME` → `fitbud-pwa-v128`.
+6. `CACHE_NAME` → `fitbud-pwa-v132`.
 
 ### Fuera de alcance
 
-- Cómo se explica la pregunta del deporte y cómo se cambia un día por otro deporte: REQ-247.
+- Cómo se explica la pregunta del deporte y cómo se cambia un día por otro deporte: REQ-251.
 - El plan personalizado ("Preparar mi plan") no admite el tipo de sesión "other" (`training-plan.js`, `SESSION_TYPES`); estos usuarios siguen con la semana tipo.
 
 ### Riesgos
@@ -1751,7 +1791,7 @@ Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana re
 - "Otra actividad" + gimnasio, 4 días: la semana muestra 2 sesiones de gimnasio y 2 "Día de tu deporte", ninguna "Descanso total"; sin registrar, el día cuenta como descanso; "Registrar mi actividad" → Pádel lo marca como entrenado y la próxima vez propone Pádel. ✓ (`tests/e2e/actividad-manual.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-247 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
+## REQ-251 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
 
 **Estado: implementado.**
 
@@ -1776,7 +1816,7 @@ Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo e
 2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
 3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
 4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
-5. `CACHE_NAME` → `fitbud-pwa-v129`.
+5. `CACHE_NAME` → `fitbud-pwa-v132` (junto con REQ-250).
 
 ### Fuera de alcance
 
@@ -1793,7 +1833,7 @@ Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo e
 - En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-248 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
+## REQ-252 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
 
 **Estado: pendiente — requiere acción humana:** aprobar la ampliación del catálogo y curar el nivel de cocina de cada plato antes de que un agente pueda implementar el filtro.
 
@@ -1848,7 +1888,7 @@ Una persona que marca "No cocino" o "Lo básico" recibe platos que puede armar s
 
 - ¿Se aprueba ampliar el catálogo con almuerzos/cenas "sin cocinar" (choca con la pausa de REQ-143)?
 
-## REQ-249 - Recordatorios por WhatsApp
+## REQ-253 - Recordatorios por WhatsApp
 
 **Estado: pendiente — requiere acción humana:** elegir canal, proveedor y presupuesto mensual.
 

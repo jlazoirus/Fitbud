@@ -626,9 +626,9 @@
   .agenda-item{display:grid;grid-template-columns:38px 1fr;gap:12px;padding:13px 0;border-top:1px solid var(--border)}
   .agenda-item:first-child{border-top:0;padding-top:4px}
   .agenda-icon{width:38px;height:38px;border-radius:var(--r-md);display:grid;place-items:center;background:var(--surf2);border:1px solid var(--border);font-size:18px;line-height:1}
-  .agenda-item.meal .agenda-icon{background:rgba(58,123,255,.12);border-color:var(--terra-dim)}
-  .agenda-item.workout .agenda-icon,.agenda-item.resume .agenda-icon{background:var(--accent-dim);border-color:var(--border-acc)}
-  .agenda-item.done .agenda-icon{background:rgba(16,185,129,.10);border-color:rgba(16,185,129,.28)}
+  .agenda-item.kind-meal .agenda-icon{background:rgba(58,123,255,.12);border-color:var(--terra-dim)}
+  .agenda-item.kind-workout .agenda-icon,.agenda-item.kind-resume .agenda-icon{background:var(--accent-dim);border-color:var(--border-acc)}
+  .agenda-item.kind-done .agenda-icon{background:rgba(16,185,129,.10);border-color:rgba(16,185,129,.28)}
   .agenda-label{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase;margin-bottom:2px}
   .agenda-name{font-size:15px;font-weight:800;color:var(--txt);line-height:1.25}
   .agenda-meta{font-size:12px;color:var(--muted);line-height:1.38;margin-top:3px}
@@ -1289,6 +1289,7 @@ function trainingPrefs(){
 }
 const LOCAL_EXERCISES=Array.isArray(window.FITBUD_EXERCISES)?window.FITBUD_EXERCISES:[];
 const EXERCISE_VARIANTS=window.FITBUD_EXERCISE_VARIANTS||{};
+const EXERCISE_SUBSTITUTION=window.FITBUD_EXERCISE_SUBSTITUTION;
 const WORKOUT_EXERCISE_IDS=window.FITBUD_WORKOUT_EXERCISES||{};
 const WORKOUT_PLAYER=window.FITBUD_WORKOUT_PLAYER;
 const TRAINING_PLAN=window.FITBUD_TRAINING_PLAN;
@@ -1301,7 +1302,7 @@ const TRAINING_ACTIVITY_OPTIONS=[
   ["other","Otro deporte"],
   ["strength_only","Ninguno, solo fuerza"],
 ];
-// REQ-247: qué cambia en tu semana según el deporte que elijas.
+// REQ-251: qué cambia en tu semana según el deporte que elijas.
 function primarySportHelp(value){
   if(value==="other")return "Pádel, fútbol u otro: los días que no son de fuerza quedan para tu deporte; lo juegas y lo registras en Entreno.";
   if(value==="strength_only")return "Tu semana es solo fuerza; los demás días son descanso.";
@@ -1430,7 +1431,7 @@ function workoutSchedule(days,dayIds,priority,locations,primary,experience,worko
   // Fix: "strength_only" solo tiene una sesión real ("facil", como "Actividad ligera
   // libre") cuando lightCardioEnabled está activo; sus demás slots de deporte pasan a
   // descanso, o workoutById devuelve null y renderWorkout falla.
-  // REQ-246: "other" tiene una sola sesión real, "facil" (el día de tu deporte); antes
+  // REQ-250: "other" tiene una sola sesión real, "facil" (el día de tu deporte); antes
   // esos días pasaban a "Descanso total" aunque el usuario los había elegido.
   if(primary==="other"){
     sessions=sessions.map(id=>sportIds.has(id)?"facil":id);
@@ -4495,8 +4496,10 @@ function homeAgendaData(ds){
   const pendingCount=items.filter(i=>i.actions&&i.kind!=="rest").length;
   return {state:"agenda",day,st,ew,workoutOutcome,doneMeals,totMeals,items,pendingCount};
 }
+// REQ-249: el tipo va con prefijo; "meal"/"workout" a secas son las tarjetas
+// globales y metían un borde sin relleno lateral que pegaba los botones al borde.
 function homeAgendaItemHtml(item){
-  return `<div class="agenda-item ${esc(item.kind)}">
+  return `<div class="agenda-item kind-${esc(item.kind)}">
     <div class="agenda-icon">${esc(item.icon)}</div>
     <div>
       <div class="agenda-label">${esc(item.label)}</div>
@@ -5060,12 +5063,12 @@ function workoutStatusLabel(outcome){
   }[outcome]||"Pendiente";
 }
 function canLogManualActivity(ds){return ds<=todayStr()&&!trainingSafetyHold();}
-// REQ-246: día sin sesión guiada (tu deporte o actividad ligera libre): se registra a mano.
+// REQ-250: día sin sesión guiada (tu deporte o actividad ligera libre): se registra a mano.
 function isFreeActivityWorkout(workout){return !!(workout&&workout.freeActivity);}
 function activityContextNote(ds){
   const ew=effectiveWorkout(ds);
   if(ew.workout.id==="descanso"||isFreeActivityWorkout(ew.workout))return "Cuenta como día entrenado, aunque hoy tocara descanso.";
-  // REQ-247: registrar otro deporte en un día de fuerza lo reemplaza; el plan no se corre.
+  // REQ-251: registrar otro deporte en un día de fuerza lo reemplaza; el plan no se corre.
   return `Cuenta como día entrenado en lugar de ${esc(ew.workout.name)}. Tu plan sigue igual desde la próxima sesión.`;
 }
 function lastManualActivitySport(){
@@ -5091,7 +5094,7 @@ function openManualActivity(ds,index){
   if(!canLogManualActivity(ds)){toast("No se puede registrar actividad en este día");return;}
   const prev=index!=null?manualActivities(S.days[ds])[index]:null;
   const primary=profile&&profile.prefs&&profile.prefs.primarySport;
-  // REQ-246/247: en el día de tu deporte, o en lugar de la sesión de fuerza, se propone
+  // REQ-250/251: en el día de tu deporte, o en lugar de la sesión de fuerza, se propone
   // lo último que registraste (p. ej. pádel); en un descanso, tu actividad o fuerza.
   const workout=effectiveWorkout(ds).workout;
   const instead=workout.id!=="descanso";
@@ -5625,17 +5628,15 @@ function openExerciseSubstitution(ds){
   const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
   const currentExercise=exerciseBySlug(step.exerciseSlug,true);
   if(!currentExercise){toast("No se pudo resolver el ejercicio actual");return;}
-  const direct=exerciseArray(currentExercise&&currentExercise.substitute_slugs);
-  const samePattern=exerciseCatalog(false).filter(ex=>ex.movement_pattern===currentExercise.movement_pattern).map(ex=>ex.slug);
-  const candidates=[...new Set(direct.concat(samePattern))]
-    .filter(slug=>slug!==step.exerciseSlug)
-    .map(slug=>exerciseBySlug(slug))
+  // REQ-247: solo ejercicios con el mismo músculo principal, no el mismo patrón.
+  const muscle=EXERCISE_SUBSTITUTION.primaryMuscle(currentExercise);
+  const candidates=EXERCISE_SUBSTITUTION.candidates(currentExercise,exerciseCatalog(false))
     .filter(ex=>exerciseCompatibleForWorkout(ex,ds));
   const body=candidates.length?candidates.map(ex=>`<button class="opt" onclick="applyExerciseSubstitution('${ds}','${esc(ex.slug)}')">
-      <b>${esc(ex.name)}</b><div class="o-meta">${esc(ex.regression)} · mismo patrón: ${esc(ex.movement_pattern)}</div>
-    </button>`).join(""):'<div class="alert">No hay una sustitución compatible con tu lugar y limitaciones actuales.</div>';
+      <b>${esc(ex.name)}</b><div class="o-meta">Músculo principal: ${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}</div>
+    </button>`).join(""):`<div class="alert">No hay otro ejercicio para ${esc(muscle?muscle.toLowerCase():"este músculo")} compatible con tu lugar y limitaciones de hoy.</div>`;
   modal(`<h3>Sustituir ejercicio</h3>
-    <p class="muted small">Se conservan las series, repeticiones y el objetivo del movimiento.</p>${body}`);
+    <p class="muted small">Opciones que trabajan el mismo músculo principal${muscle?` (${esc(muscle.toLowerCase())})`:""}. Se conservan las series, repeticiones y el objetivo.</p>${body}`);
 }
 function applyExerciseSubstitution(ds,slug){
   const exercise=exerciseBySlug(slug);if(!exercise||!exerciseCompatibleForWorkout(exercise,ds))return;
@@ -10293,7 +10294,8 @@ async function aiEstimate(){
   try{
     const fallback=JSON.stringify({kcal:500,proteina_g:25,carbohidratos_g:55,grasa_g:20,nota:"Estimación de referencia. Ajusta la porción si conoces la receta."});
     const quota=coachQuota("meal_estimate",requestId,"estimate",fallback,{},hashText(name.toLowerCase()));
-    const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". Responde SOLO JSON: {"kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve"}`,400,quota);
+    // REQ-246: misma forma que el schema del servidor; aquí no se muestran preguntas.
+    const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". No hagas preguntas: deja "preguntas" vacío y da tu mejor estimación. Responde SOLO JSON: {"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve","preguntas":[]}`,400,quota);
     const j=parseJSON(txt);
     const applied=applyEstimatedMacros(j);
     out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}${applied}</div>`;
@@ -11491,7 +11493,7 @@ function trainingDayResult(ds){
   const isRest=ew.workout&&ew.workout.id==="descanso";
   const st=S.days[ds]||{};
   // REQ-206: descanso planificado, pero entrenó igual → cuenta como entrenado.
-  // REQ-246: un día de actividad libre sin registrar tampoco rompe la racha.
+  // REQ-250: un día de actividad libre sin registrar tampoco rompe la racha.
   if(isRest||isFreeActivityWorkout(ew.workout))return manualActivities(st).length?"done":"rest";
   // REQ-163: una sesión in_progress/paused (bloques omitidos, series sueltas)
   // no es un cierre real — solo un resultado TERMINAL (completed/partial) o
@@ -12720,7 +12722,7 @@ async function createAdminUser(){
   }
 }
 /* ---- Postulantes de la beta (REQ-218) ----
-   Aceptar crea un acceso de 90 días (plan completo y cuotas diarias del coach)
+   Aceptar crea un acceso de 90 días (plan completo y coach sin tope de uso, REQ-248)
    y deja el mensaje de WhatsApp con el enlace que crea la cuenta y lo activa. */
 let adminBetaFilter="pending";
 let adminBetaPending=0;
@@ -12763,7 +12765,7 @@ async function renderAdminBeta(){
       <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
       <button class="btn btn-sm" onclick="loadAdminBeta()">Actualizar</button>
     </div>
-    <div class="ai-box" style="margin-bottom:14px">Al aceptar a alguien le llega un correo de invitación para crear su contraseña, y su cuenta nace con 90 días de plan completo y las cuotas diarias del coach. Si el correo no sale, te dejamos un enlace para copiar.</div>
+    <div class="ai-box" style="margin-bottom:14px">Al aceptar a alguien le llega un correo de invitación para crear su contraseña, y su cuenta nace con 90 días de plan completo y el coach sin tope de uso. Si el correo no sale, te dejamos un enlace para copiar.</div>
     <div class="chips" role="group" aria-label="Filtrar postulantes" id="betaFilters" style="margin-bottom:14px"></div>
     <div id="betaList" class="muted small">Cargando postulantes…</div>`;
   await loadAdminBeta();

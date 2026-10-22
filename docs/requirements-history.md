@@ -10032,36 +10032,55 @@ Calentamiento (REQ-212) y vuelta a la calma eran obligatorios: omitirlos contaba
 - "Ahora no" en ambos bloques: el total baja, no hay bloques omitidos y la sesión se guarda completada; "Sí, calentar" muestra la lista de REQ-212. ✓ (`tests/e2e/entreno.spec.js`, `conversacion.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
 
-## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
+## REQ-220 - Fix táctil: "¿Qué es RPE?" medía 42 px y dejaba el release gate en rojo
 
 **Estado: implementado.**
 
 ### Origen
 
-Jonathan (2026-10-20), con captura de la tarjeta "3-1-1 · tempo" del reproductor: "No se entiende qué es esto".
-
-### Problema
-
-La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar que son segundos por fase ni en qué orden. RPE y RIR ya tenían ⓘ con explicación; el tempo no.
+`tests/e2e/tactil.spec.js` (REQ-193) fallaba en `main` desde 2026-10-18: el enlace "¿Qué es RPE?" del resumen de Entreno (`.link-btn.small`) medía 100×42 px en táctil. El gate quedaba en rojo para todos los loops.
 
 ### Alcance
 
-1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
-2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
-3. `CACHE_NAME` → `fitbud-pwa-v119`.
-
-### Fuera de alcance
-
-- Cambiar los tempos que prescribe el plan.
-
-### Riesgos
-
-- Ninguno: solo presentación.
+1. `@media(pointer:coarse)`: `.link-btn` con `min-height:44px` y `box-sizing:border-box`, sin cambiar su aspecto. SW v93.
 
 ### Criterios de aceptación
 
-- La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+- `tactil.spec.js` pasa y el release gate queda en verde. ✓
+
+## REQ-222 - Fix admin: la cortesía de consumo rechazaba 3000 sin decir por qué
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19, captura): en "Consumo y cortesía" de un beta tester, límite 3000 y unidades extra 3000 en `coach_conversation` → "Usuario, acción y valores de cortesía válidos requeridos." y no guardaba. `api/admin.js` (`setQuotaOverride`) aceptaba como máximo 1000 en ambos campos con un único mensaje genérico; el selector mostraba la clave interna `coach_conversation`.
+
+### Alcance
+
+1. Tope por día y por acción a 10.000 (`QUOTA_OVERRIDE_MAX`, solo contra errores de tipeo); cada error dice qué campo y qué rango.
+2. Modal: ayuda "Por día y por acción, de 0 a 10.000", validación antes de enviar con foco en el campo, y "Conversación con el coach" en el selector. SW v104.
+
+### Criterios de aceptación
+
+- `scripts/test-coach-quota.mjs`: 3000/3000 en `coach_conversation` se guarda; 20000 responde 400 nombrando el campo y el rango. ✓
+
+## REQ-223 - Textos: la beta no se limita a países
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-19, captura de la portada): "no debe limitar países en ningún texto". La portada decía "Beta de fundadores en Perú, Chile y México" y la postulación repetía los países en la nota del hero, las meta descripciones, la ayuda de WhatsApp (+51, +56, +52) y los ejemplos ("Lima, Perú", "+51 999 999 999").
+
+### Alcance
+
+1. `index.html` (nota del hero en modo invitación) y `beta-reclutamiento.html` (meta, nota del hero, ayuda y ejemplos de WhatsApp y ciudad) sin países; los ejemplos pasan a "+ código de país y número" y "Ciudad, país".
+2. `api/beta-recruitment.js`: el error de WhatsApp pide el código del país sin ejemplo de un país. SW v105.
+
+### Criterios de aceptación
+
+- `tests/e2e/portada.spec.js` y `tests/e2e/beta.spec.js`: ni la portada ni la postulación (incluida la meta descripción) mencionan Perú, Chile o México. ✓
 
 ## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
@@ -10094,6 +10113,37 @@ Jonathan (2026-10-21), con captura del editor de comida: "No funciona". "Estimar
 ### Criterios de aceptación
 
 - Sin foto, la vista previa no se ve; un 500 muestra "(código 500)", un 422 pide describir mejor y "Reintentar" estima. ✓ (`tests/e2e/foto-comida.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-237 - Entreno: la tarjeta del tempo dice qué es y lo explica
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura de la tarjeta "3-1-1 · tempo" del reproductor: "No se entiende qué es esto".
+
+### Problema
+
+La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar que son segundos por fase ni en qué orden. RPE y RIR ya tenían ⓘ con explicación; el tempo no.
+
+### Alcance
+
+1. La tarjeta pasa a ser botón (`.scard-info`, como RPE/RIR): con formato numérico la etiqueta dice "baja · pausa · sube ⓘ"; con texto ("Controlado") dice "ritmo ⓘ".
+2. `explainWorkoutTempo()` abre "Ritmo de cada repetición": segundos bajando (o soltando, en remos y jalones), pausa y subida, más la pausa arriba si hay un cuarto número; para "Controlado", sin rebotes y con la bajada más lenta. `tempoPhases()` lee el formato.
+3. `CACHE_NAME` → `fitbud-pwa-v119`.
+
+### Fuera de alcance
+
+- Cambiar los tempos que prescribe el plan.
+
+### Riesgos
+
+- Ninguno: solo presentación.
+
+### Criterios de aceptación
+
+- La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
 
 ## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
@@ -10304,4 +10354,83 @@ El reproductor solo avanza: "Omitir ejercicio" y "Siguiente ejercicio". Una vez 
 ### Criterios de aceptación
 
 - Tras el primer ejercicio, "← Ejercicio anterior" muestra lo registrado (40 kg), sin Omitir ni Siguiente ejercicio, y el avance no cambia; "Volver al ejercicio en curso" vuelve al segundo con sus botones. Omitido → "Lo omitiste." y "Hacerlo ahora" lo retoma; el registro del primero queda intacto. ✓ (`tests/e2e/entreno.spec.js`, captura 390 px revisada)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-246 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
+
+**Estado: implementado.**
+
+### Origen
+
+Causa de producción que REQ-228 y REQ-238 dejaron fuera de alcance. Jonathan (2026-10-21): "Estimar macros" de "Sopa ramen vegetariana" responde "Tu coach no pudo completar esta acción. Intenta de nuevo."; antes (2026-10-20) lo mismo en el editor tras usar la foto.
+
+### Problema
+
+En `coach_usage` (Supabase de producción) los 12 fallos de `meal_estimate` desde el 2026-10-12 son `refunded` con `error_code = invalid_provider_output`, parte `estimate` (la estimación por texto: ~1045 tokens de entrada, sin imagen). Entre ellos los del reporte: 2026-10-21 01:20:14 y 01:30:43 UTC (20:20 y 20:30 del 20 en Perú) y 2026-10-20 18:46:20 UTC. Ninguna estimación con foto falló y no hay ningún `provider_<status>`: la clave, el saldo, el modelo y structured outputs funcionan. El servidor responde 422 y, antes de REQ-238, el cliente lo mostraba como el mensaje genérico. Son 12 de 49 estimaciones por texto desde el 2026-10-12 (~24 %); las 9 con foto pasaron.
+
+### Causa raíz
+
+- `mealEstimateOutputSchema()` (`api/claude.js`) exige `preguntas` sin tope (structured outputs no limita el largo de una lista) y el prompt de `aiEstimate()` (`index.html`) ni siquiera las pedía: el modelo las inventa. Todas las estimaciones por texto que pasaron traen exactamente 3 (o 0).
+- `validateCoachOutput()` rechazaba `preguntas.length > 3`: cuando el modelo trae 4 o más, una estimación con macros válidos se descarta, se devuelve la cuota y el usuario ve el error. Las respuestas fallidas tienen más tokens de salida (165-318) que las que pasan.
+
+### Alcance
+
+1. `validateCoachOutput()` para `meal_estimate` ya no limita cuántas preguntas trae; sigue exigiendo macros numéricos y preguntas de texto (el cliente muestra como mucho 2 y solo en la foto).
+2. El prompt de "Estimar macros" pide la forma del schema con `"preguntas":[]` y dice que no haga preguntas.
+3. `CACHE_NAME` → `fitbud-pwa-v128`.
+
+### Fuera de alcance
+
+- `training_plan`: sus 8 llamadas en producción (2026-06-24 a 2026-10-20) terminaron en `invalid_provider_output` con exactamente 2048 tokens de salida, el tope que pide el cliente: el JSON llega cortado y la ruta determinista lo tapa. Va en un REQ propio.
+- Registrar en los logs de `/api/claude` el motivo de cada `invalid_provider_output`.
+
+### Riesgos
+
+- Ninguno sobre datos: solo se aceptan respuestas que antes se descartaban con macros válidos.
+
+### Criterios de aceptación
+
+- Una estimación con 4 u 8 preguntas se acepta; kcal no numérica, preguntas que no son lista o que no son texto, y texto que no es JSON se siguen rechazando. ✓ (`scripts/validate-meal-estimate-output.mjs`; falla sin el arreglo)
+- El prompt de texto pide `"preguntas":[]`. ✓ (`scripts/validate-meal-estimate-output.mjs`)
+- `node scripts/release-gate.mjs` pasa. ✓ (validadores; E2E 100/101 con 1 flaky de `dia-sin-subir.spec.js` que pasa al reintento)
+
+## REQ-247 - Entreno: "Sustituir" solo propone ejercicios del mismo músculo principal
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del modal "Sustituir ejercicio" sobre un jalón que proponía Dominada, Dominada asistida y Remo con banda: "Tienes que asegurarte que todos los ejercicios de sustitución de verdad sustituyen el músculo principal [...] ya me ha pasado otras veces en otro tipo de músculos y ejercicios".
+
+### Problema
+
+El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (deltoides posterior) proponía dominadas y remos; para un remo, jalón y dominada asistida; para un curl de bíceps, remo con banda; para la extensión de tríceps, fondos y flexiones; para el peso muerto rumano, hip thrust. Además mostraba el patrón en inglés ("mismo patrón: pull") y la versión más fácil del candidato como si fuera su descripción.
+
+### Causa raíz
+
+`openExerciseSubstitution()` (`index.html`) juntaba `substitute_slugs` con todo el catálogo del mismo `movement_pattern`. El patrón agrupa por mecánica (todo "pull" junto: jalón, remo, face pull), no por músculo, y los `substitute_slugs` del catálogo incluían cruces entre músculos.
+
+### Alcance
+
+1. `exercise-catalog.js`: músculo principal por slug para los 42 ejercicios de fuerza (`FITBUD_EXERCISE_SUBSTITUTION.primaryMuscles`) y `candidates(actual, catálogo)`, puro: sustitutos directos primero y luego el resto del catálogo, siempre con el mismo músculo principal. Un ejercicio sin entrada (creado desde admin) usa el primero de su lista de músculos. Vale igual con el catálogo local y con el de Supabase.
+2. Espalda se separa en dorsal ancho (jalón, dominadas) y espalda media (remos); hombro en hombros (press), deltoides lateral (elevación lateral) y deltoides posterior (face pull).
+3. El modal dice qué músculo se conserva, cada opción muestra "Músculo principal: …" y, si no hay ninguna compatible con el lugar y las limitaciones del día, lo dice con el músculo.
+4. `scripts/validate-exercises.mjs` exige músculo principal en cada ejercicio de fuerza, que ningún sustituto ni versión más fácil/progresión cambie de músculo, y fija casos concretos (face pull, remo, jalón, curl, tríceps, rumano, elevación lateral).
+5. `CACHE_NAME` → `fitbud-pwa-v129`.
+
+### Fuera de alcance
+
+- Añadir ejercicios nuevos para los músculos que hoy no tienen sustituto en el catálogo (face pull, elevación lateral, gemelos): el modal lo dice en vez de proponer otro músculo.
+- Limpiar los `substitute_slugs` cruzados en `supabase/exercises.sql`: el filtro los descarta en la app.
+- Sustituciones ya guardadas en el historial (historial inmutable).
+
+### Riesgos
+
+- Jalón y dominadas comparten músculo principal (dorsal ancho) y siguen proponiéndose entre sí; el remo deja de aparecer para el jalón.
+- Menos opciones en ejercicios aislados: preferible a cambiar el músculo de la sesión.
+
+### Criterios de aceptación
+
+- Remo sentado en polea → solo Remo con banda; Face pull → sin opciones y el aviso nombra el deltoides posterior. ✓ (`tests/e2e/entreno.spec.js`)
+- Ningún sustituto ni versión más fácil/progresión del catálogo cambia de músculo principal. ✓ (`scripts/validate-exercises.mjs`)
 - `node scripts/release-gate.mjs` pasa.

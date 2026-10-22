@@ -639,6 +639,46 @@ test.describe("Progresiones", () => {
   });
 });
 
+// REQ-247 (Jonathan): "Sustituir" proponía cualquier ejercicio del mismo patrón
+// ("pull": dominadas para un face pull, jalón para un remo). Ahora solo los que
+// trabajan el mismo músculo principal.
+test.describe("Sustituir ejercicio", () => {
+  test("solo propone ejercicios del mismo músculo principal", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+    const setCurrent = (slug) => page.evaluate((s) => {
+      const ex = normalizedWorkoutExecution(current);
+      const step = currentWorkoutStep(ex);
+      Object.assign(step, { exerciseSlug: s, originalExerciseSlug: s, variation: "standard" });
+      persistWorkoutExecution(current, ex, true);
+    }, slug);
+    const overlay = page.locator("#overlay");
+    const options = overlay.locator("button.opt b");
+
+    await setCurrent("seated-cable-row");
+    await app.getByRole("button", { name: "Sustituir", exact: true }).click();
+    await expect(overlay).toContainText("mismo músculo principal (espalda media)");
+    await expect(options).toHaveText(["Remo con banda"]);
+    await expect(overlay.locator("button.opt").first()).toContainText("Músculo principal: Espalda media");
+    await overlay.locator("button.opt").first().click();
+    await expect(app.locator(".player-title h3")).toHaveText("Remo con banda");
+
+    await setCurrent("face-pull");
+    await app.getByRole("button", { name: "Sustituir", exact: true }).click();
+    await expect(overlay).toContainText("deltoides posterior");
+    await expect(options).toHaveCount(0);
+    await expect(overlay.locator(".alert")).toContainText("No hay otro ejercicio para deltoides posterior");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 // REQ-240 (Jonathan): la demostración al final de las series quedaba escondida;
 // se abre desde un botón junto al nombre del ejercicio.
 test.describe("Cómo se hace", () => {
