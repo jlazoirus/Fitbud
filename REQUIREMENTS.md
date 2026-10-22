@@ -95,6 +95,8 @@ Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/R
 - REQ-254 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
 - REQ-255 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
 
+- REQ-258 - Home: día cerrado muestra mañana. (Jonathan; implementado)
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -1990,3 +1992,9 @@ Revisión de producción de REQ-246 (2026-10-21). En `coach_usage` las 8 llamada
 
 - Para semanas de 4 y 6 sesiones (fuerza y carrera), `maxTokens` ≥ caracteres del JSON con sangría / 2,5, y el prompt pide una sola línea. ✓ (`tests/e2e/entreno.spec.js`; falla sin el arreglo: 2048 < 2170)
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-258 - Home: con el día cerrado, Hoy resume el día y muestra lo que toca mañana
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Día cerrado: Hoy oculta "Consumo de hoy" y muestra hoy en una línea, qué toca mañana (`homeTomorrowData()`) y "Ver mañana". ✓ `tests/e2e/home.spec.js`.

@@ -122,3 +122,45 @@ test.describe("Home — agenda (REQ-249)", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
+
+test.describe("Home — día cerrado (REQ-258)", () => {
+  test("con comidas y entreno hechos, Hoy resume el día en una línea y muestra lo que toca mañana", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
+    await overlay.getByRole("button", { name: /Aplicar al día/i }).click();
+
+    // Cierra el día por los mismos caminos que los botones: todas las comidas y el entreno.
+    await page.evaluate(() => {
+      const ds = todayStr();
+      buildDay(ds).meals.forEach((m) => { if (!mealState(ds, m.id).done) toggleMeal(ds, m.id); });
+      dayState(ds).workoutDone = true;
+    });
+    await page.locator("#tabs").getByText("Hoy").click();
+
+    const card = page.locator(".agenda-state.done");
+    await expect(card).toContainText("Todo listo por hoy");
+    await expect(card.locator(".agenda-sub")).toContainText(/3\/3 comidas · \d+ kcal · (entreno completado|descanso planificado)/);
+    // El consumo detallado de hoy ya no ocupa la pantalla.
+    await expect(page.locator(".mini-macro-dash")).toHaveCount(0);
+
+    // Mañana en resumen: qué entreno toca y si las comidas están listas.
+    const tomorrow = await page.evaluate(() => addDays(todayStr(), 1));
+    const tomorrowLabel = await page.evaluate((ds) => prettyDate(ds), tomorrow);
+    await expect(card.locator(".agenda-next-head")).toHaveText(`Mañana · ${tomorrowLabel}`);
+    await expect(card.locator(".agenda-next .agenda-item")).toHaveCount(2);
+    await expect(card.locator(".agenda-next")).toContainText("Aún por preparar");
+
+    // "Ver mañana" abre el día siguiente.
+    await card.getByRole("button", { name: "Ver mañana" }).click();
+    await expect.poll(() => page.evaluate(() => ({ current, view }))).toEqual({ current: tomorrow, view: "nutricion" });
+
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
