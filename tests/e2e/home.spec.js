@@ -123,7 +123,7 @@ test.describe("Home — agenda (REQ-249)", () => {
   });
 });
 
-test.describe("Home — día cerrado (REQ-257)", () => {
+test.describe("Home — día cerrado (REQ-258)", () => {
   test("con comidas y entreno hechos, Hoy resume el día en una línea y muestra lo que toca mañana", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);

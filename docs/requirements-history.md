@@ -10466,7 +10466,37 @@ El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (
 - Ningún sustituto ni versión más fácil/progresión del catálogo cambia de músculo principal. ✓ (`scripts/validate-exercises.mjs`)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-257 - Home: con el día cerrado, Hoy resume el día y muestra lo que toca mañana
+## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apretados". En "Próxima comida" y "Entrenamiento pendiente", "Ver detalle" y "Adaptar" llegan al borde derecho de su tarjeta.
+
+### Causa raíz
+
+`homeAgendaItemHtml()` (`index.html`) ponía el tipo de la fila como clase suelta (`agenda-item meal`, `agenda-item workout`). `.meal` y `.workout` son las tarjetas globales de comida y entreno (fondo, borde, radio), así que cada fila se volvía una tarjeta dentro de la tarjeta de la agenda; pero `.agenda-item{padding:13px 0}` les quita el relleno lateral y los botones (`flex:1 1 128px`) llenan el ancho hasta el borde. Medido a 390 px: "Ver detalle" termina a 0 px del borde.
+
+### Alcance
+
+1. La clase del tipo va con prefijo (`kind-meal`, `kind-workout`, `kind-resume`, `kind-rest`) y los selectores de icono se ajustan: la agenda vuelve a ser la lista con separadores que define su CSS, con los botones a 16 px del borde de la tarjeta.
+2. `CACHE_NAME` → `fitbud-pwa-v131`.
+
+### Fuera de alcance
+
+- Cambiar el diseño de la agenda.
+
+### Riesgos
+
+- Las filas ya no tienen fondo propio (el entreno pierde su degradado azul); el icono conserva su color por tipo.
+
+### Criterios de aceptación
+
+- A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-258 - Home: con el día cerrado, Hoy resume el día y muestra lo que toca mañana
 
 **Estado: implementado.**
 
@@ -10483,7 +10513,7 @@ Con el día cerrado (`homeAgendaData()` → `state:"done"`), `renderHoy()` (`ind
 1. Con el día cerrado, Hoy oculta "Consumo de hoy".
 2. La tarjeta pasa a "Todo listo por hoy" con hoy en una línea (`5/5 comidas · 1495 kcal · entreno completado`) y un bloque "Mañana · <fecha>" con dos filas: el entreno que toca (o "Descanso planificado") y si las comidas están listas ("5 comidas listas" / "Aún por preparar").
 3. "Ver mañana" abre Nutrición en el día siguiente (`goDay`); se mantiene "Ver progreso". Si mañana queda fuera del plan, no hay bloque ni botón.
-4. `CACHE_NAME` → `fitbud-pwa-v134`.
+4. `CACHE_NAME` → `fitbud-pwa-v135`.
 
 ### Fuera de alcance
 
