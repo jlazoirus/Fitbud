@@ -88,6 +88,13 @@ Feedback Jonathan (2026-10-21, iPhone):
 - REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes. (P1; implementado)
 - REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir. (P1; implementado)
 
+Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/Recordatorios y audio sobre la próxima comida):
+
+- REQ-252 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total". (P0; implementado)
+- REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente. (P1; implementado)
+- REQ-254 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
+- REQ-255 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -98,6 +105,8 @@ Pendiente no automatizable por agentes:
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
+- REQ-254 - Decidir el nivel de cocina en el catálogo y si se amplían almuerzos/cenas "sin cocinar" (feedback Diego).
+- REQ-255 - Decidir si los recordatorios llegan por WhatsApp: proveedor y presupuesto (feedback Diego).
 - REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
@@ -1612,68 +1621,15 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-239`).
 
 ## REQ-240 - Entreno: la demostración y los pasos se abren desde junto al nombre del ejercicio
 
-**Estado: implementado.**
+**Estado: implementado.** Junto al nombre del ejercicio, "▶ Cómo se hace" abre `openExerciseGuide()` (demostración, pasos, respiración, errores y señales para detenerse) en vez de la tarjeta incrustada del reproductor. Prueba: `tests/e2e/entreno.spec.js`.
 
-### Origen
-
-Jonathan (2026-10-21), con captura del reproductor: la demostración del ejercicio y su paso a paso aparecen al final, después de las series y de "Usar versión más fácil / progresión / Sustituir", "y solo lo esconde para el usuario; debería haber arriba, junto al nombre, un botón que abra el pop-up".
-
-### Problema
-
-`renderActiveWorkoutStep()` incrustaba `exerciseCard()` (vídeo/animación + "Ver técnica" + "Pausar") al final del bloque: para verla había que bajar más allá de todas las series.
-
-### Alcance
-
-1. Junto al nombre (`.player-title`), un botón "▶ Cómo se hace" abre `openExerciseGuide()`: demostración, inicio, pasos, respiración, errores comunes, versión más fácil/difícil y señales para detenerse.
-2. Se quita la tarjeta incrustada del reproductor; la "Vista previa de ejercicios" antes de empezar no cambia.
-3. `CACHE_NAME` → `fitbud-pwa-v122`.
-
-### Fuera de alcance
-
-- Cambiar el contenido del pop-up de técnica.
-
-### Riesgos
-
-- Ninguno sobre datos: solo presentación.
-
-### Criterios de aceptación
-
-- El reproductor no incrusta `.exercise-card`; el botón junto al nombre abre el pop-up con el mismo nombre, la demostración y los pasos. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-240`).
 
 ## REQ-241 - Entreno: "Usar progresión" cambia de verdad el ejercicio (o dice que solo toca subir la carga)
 
-**Estado: implementado.**
+**Estado: implementado.** `FITBUD_EXERCISE_VARIANTS` define versión más fácil y progresión de los 42 ejercicios de fuerza (`exercise`, `variant` o `load`): cambiar de ejercicio cambia título, imagen y guía; "solo carga" lo dice sin cambiar nada. Inventario en `docs/exercise-progressions.md`. Prueba: `tests/e2e/entreno.spec.js`.
 
-### Origen
-
-Jonathan (2026-10-21), con captura de "Fondos asistidos": "Usar progresión" no cambia el ejercicio; debería cambiar el título y la imagen. Pide revisar que las progresiones de todos los ejercicios tengan sentido, inventariar los que no la tengan y evaluar si la progresión es únicamente subir el peso.
-
-### Problema
-
-`setWorkoutVariation()` solo guardaba `step.variation` y mostraba el texto libre del catálogo ("Progresión: Fondos con menor asistencia"); el ejercicio, el título y la imagen seguían igual. Las progresiones eran texto, sin distinguir otro ejercicio, variante o solo carga, y algunas eran solo carga o duración aunque el catálogo tiene un ejercicio más difícil del mismo patrón.
-
-### Alcance
-
-1. `FITBUD_EXERCISE_VARIANTS` (`exercise-catalog.js`, por slug, vale con catálogo local o de Supabase): versión más fácil y progresión de los 42 ejercicios de fuerza, de tipo `exercise` (otro ejercicio del mismo patrón), `variant` (mismo ejercicio, otra ejecución) o `load`.
-2. Reproductor: `exercise` cambia `exerciseSlug` (título, imagen, "Cómo se hace" y última carga del nuevo) si encaja con el lugar y las limitaciones; `variant` cambia el título; "Volver a …" deshace. `load` muestra "Subir la carga"/"Bajar la carga" con la pauta y la carga de la última vez, sin cambiar nada. El pop-up de técnica usa los mismos nombres.
-3. Progresiones que eran solo carga o duración y pasan a otro ejercicio: Zancada → Sentadilla búlgara, Flexión → Flexión con pies elevados, Plancha frontal → Plancha con toque de hombro, Flexión con pies elevados → Flexión arquero.
-4. Inventario en `docs/exercise-progressions.md`: 10 progresiones a otro ejercicio, 28 variantes, 4 solo carga (Sentadilla búlgara, Peso muerto a una pierna, Subida al banco, Dominada con lastre); resistencia progresa por volumen. `validate-exercises.mjs` exige la entrada completa, destinos existentes del mismo patrón y en el sentido de nivel correcto; corrige `hammer-curl` (`substitute_slugs` era texto).
-5. `CACHE_NAME` → `fitbud-pwa-v123`.
-
-### Fuera de alcance
-
-- Imágenes propias para las variantes (usan la del ejercicio base).
-- Cambiar el texto de `regression`/`progression` en la tabla `exercises`.
-
-### Riesgos
-
-- Ninguno sobre datos: las sesiones guardadas conservan su `variation`; las nuevas guardan además el ejercicio de origen.
-
-### Criterios de aceptación
-
-- Remo sentado → "Usar versión más fácil" pasa a Remo con banda (slug, título) y "Volver a…" lo deshace; Press de banca → "Usar progresión" titula "Press de banca con pausa en el pecho"; Sentadilla búlgara muestra "Subir la carga" y no cambia el ejercicio. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/validate-exercises.mjs` y `node scripts/release-gate.mjs` pasan. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-241`).
 
 ## REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado
 
@@ -1683,196 +1639,33 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-242`).
 
 ## REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes
 
-**Estado: implementado.**
+**Estado: implementado.** `saveEditor()` guarda `portion` al registrar una reciente o favorita con porción ×0,5–×2, y Recientes y "Guardar en favoritas" usan los macros de una porción (`perPortion()`). Prueba: `tests/e2e/comidas-guardadas.spec.js`.
 
-### Origen
-
-Feedback de Jonathan (2026-10-21, iPhone): "Acabo de agregar un shake de proteína y cuando seleccioné la porción le puse ×2; cuando volví a agregar otra comida el shake de proteína tiene sus valores de macros duplicados. Eso no debe pasar." Captura: Recientes muestra "Shake proteina 600 kcal · P 48 · C 72 · G 6".
-
-### Problema
-
-Al elegir una reciente o favorita con porción ×0,5/×1,5/×2 y guardar, lo registrado conserva el mismo nombre con los macros ya escalados. Recientes muestra la última vez que se registró cada nombre, así que la "porción" pasa a ser la ×2; volver a elegirla con ×2 da ×4. "Guardar en favoritas" en ese momento también guardaba la porción escalada.
-
-### Causa raíz
-
-- `saveEditor()` (`index.html`) guardaba `{name,kcal,p,c,f}` ya multiplicados por `qp.portion` sin registrar la porción.
-- `recentCustomMeals()` deduplica por nombre quedándose con el registro más reciente, sea cual sea su porción.
-
-### Alcance
-
-1. `saveEditor()` guarda `portion` (≠1) en el extra o en `ms.ovr` cuando se eligió una porción sobre una reciente/favorita del mismo nombre; editar algo ya registrado sin tocar la porción la conserva, y renombrarlo o volver a ×1 la quita. Los macros del día siguen siendo los consumidos.
-2. `perPortion()`: Recientes y "Guardar en favoritas" usan los macros divididos por `portion` (una porción).
-3. `CACHE_NAME` → `fitbud-pwa-v125`.
-
-### Fuera de alcance
-
-- Corregir lo ya registrado antes del arreglo: no guardó la porción, así que esa reciente seguirá mostrando los macros escalados hasta que se registre de nuevo con ×1 (o desde Favoritas).
-
-### Riesgos
-
-- Ninguno sobre datos: `portion` es un campo nuevo opcional en `day_log.state`; los registros sin él se leen igual que antes.
-
-### Criterios de aceptación
-
-- Registrar "Shake proteina" 300 kcal y luego desde Recientes ×2: el día suma 300 + 600 y Recientes sigue mostrando 300 kcal · P 24 · C 36 · G 3. ✓ (`tests/e2e/comidas-guardadas.spec.js`; falla sin el arreglo con 600 · P 48 · C 72 · G 6)
-- Guardar en favoritas con ×1,5 guarda la porción base. ✓ (`tests/e2e/comidas-guardadas.spec.js`)
-- `node scripts/release-gate.mjs` pasa.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-243`).
 
 ## REQ-244 - Entreno: la duración cuenta de inicio a fin, también con la app en segundo plano
 
-**Estado: implementado.**
+**Estado: implementado.** Al ocultarse la app el cronómetro sigue (`awayAt`); al volver, `returnFromAway()` cuenta la ausencia entera hasta 1 h y, si fue mayor, deja la sesión en pausa con la duración de cuando saliste. El resumen dice "duración total". Prueba: `scripts/validate-workout-player.mjs`, `tests/e2e/entreno.spec.js`.
 
-### Origen
-
-Claudia (usuaria beta, 2026-10-21), con captura del resumen "Sesión parcial · 34:54 duración real": "la duración del entrenamiento no se actualiza en segundo plano. Cuando sales de la app y vuelves a entrar no contabiliza ese tiempo. Debería aparecer tiempo de duración total del entrenamiento (incluyendo descansos etc). Se me ocurre que en realidad calcule el tiempo desde que inicias el entrenamiento hasta que finalizas la sesión completa".
-
-### Problema
-
-REQ-155 congeló el cronómetro al pasar la app a segundo plano para que una sesión olvidada no sumara horas. El efecto en el uso normal es el contrario: en el gimnasio se bloquea la pantalla o se cambia de app en cada descanso, y todo ese tiempo desaparece de la duración. Una sesión de una hora puede mostrar 35 minutos.
-
-### Causa raíz
-
-`freezeInProgressWorkouts()` (`index.html`, listeners `visibilitychange`/`pagehide`) ejecutaba `captureWorkoutElapsed()` y dejaba `resumedAt` en `null` cada vez que la app se ocultaba; al volver, `normalizeExecution()` reanudaba desde "ahora", así que el hueco nunca se sumaba.
-
-### Alcance
-
-1. Al ocultarse la app ya no se congela el cronómetro: se anota `workoutExecution.awayAt` y la duración sigue corriendo desde `resumedAt`.
-2. `FITBUD_WORKOUT_PLAYER.returnFromAway(execution, now)` (puro), invocado al volver (`visibilitychange`, `pageshow`) y al reabrir la app tras cargar los días: si la ausencia fue de hasta `AWAY_LIMIT_SECONDS` (1 h), cuenta entera; si fue mayor (sesión olvidada), la sesión queda en pausa con la duración y el descanso congelados en `awayAt`, y un aviso lo explica.
-3. La pausa manual sigue congelando el tiempo como hoy.
-4. El resumen dice "duración total" en vez de "duración real".
-5. `CACHE_NAME` → `fitbud-pwa-v126`.
-
-### Fuera de alcance
-
-- Editar a mano la duración de una sesión ya guardada.
-- Sesiones guardadas antes de este cambio: conservan la duración con la que se guardaron (historial inmutable).
-
-### Riesgos
-
-- Si el sistema mata la app sin emitir `visibilitychange`/`pagehide`, no hay `awayAt` y el tiempo cuenta entero hasta volver. Es el mismo evento del que dependía REQ-155.
-- Una ausencia legítima de más de una hora (por ejemplo, una clase sin mirar el móvil) se pierde; reanudar sigue sumando desde ese momento.
-
-### Criterios de aceptación
-
-- 15 min fuera de la app sin pausar: el cronómetro y la duración los incluyen. ✓ (`tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`)
-- 3 h fuera: la sesión queda en pausa con la duración que tenía al salir y el botón "Reanudar sesión" visible. ✓ (mismas pruebas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-244`).
 
 ## REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir
 
-**Estado: implementado.**
+**Estado: implementado.** "← Ejercicio anterior" abre una revisión de solo lectura de los bloques ya registrados (`workoutExecution.reviewStep`), con "Hacerlo ahora" para retomar uno omitido; Siguiente y Omitir no cambian. Prueba: `tests/e2e/entreno.spec.js`.
 
-### Origen
-
-Jonathan (2026-10-21, iPhone), con captura del reproductor en "Curl de bíceps": "Así como tienes el siguiente ejercicio, deberías poder tener algo que te lleve al ejercicio anterior para ver si simplemente quiero revisar, pero deberíamos mantener la funcionalidad de siguiente ejercicio y omitir".
-
-### Problema
-
-El reproductor solo avanza: "Omitir ejercicio" y "Siguiente ejercicio". Una vez pasado un ejercicio no hay forma de ver qué se registró ni de retomar uno omitido.
-
-### Causa raíz
-
-`normalizeExecution()` (`workout-player.js`) recoloca `currentStep` en el primer bloque pendiente en cada acción, así que el reproductor no tiene noción de "ver otro bloque" que no sea el pendiente.
-
-### Alcance
-
-1. `workoutExecution.reviewStep`: índice del bloque que se revisa, aparte de `currentStep`. Solo apunta a bloques hechos u omitidos; mirar no cambia el estado de ningún bloque ni el avance.
-2. "← Ejercicio anterior" bajo el bloque en curso (y en el cierre, con todo registrado) cuando hay un bloque anterior registrado.
-3. Vista de revisión: título, "Registraste N series" con carga × reps · RPE de cada una, o "Lo omitiste."; "← Anterior" / "Siguiente →" entre los ya registrados y "Volver al ejercicio en curso" (o "al cierre de la sesión"). Sin Omitir ni Siguiente ejercicio, que modifican el registro.
-4. Un ejercicio omitido se puede retomar con "Hacerlo ahora".
-5. "Siguiente ejercicio" y "Omitir ejercicio" no cambian. `CACHE_NAME` → `fitbud-pwa-v127`.
-
-### Fuera de alcance
-
-- Corregir series de un ejercicio ya completado desde la revisión.
-
-### Riesgos
-
-- Ninguno sobre datos: la revisión es de solo lectura; "Hacerlo ahora" solo devuelve a pendiente un bloque omitido.
-
-### Criterios de aceptación
-
-- Tras el primer ejercicio, "← Ejercicio anterior" muestra lo registrado (40 kg), sin Omitir ni Siguiente ejercicio, y el avance no cambia; "Volver al ejercicio en curso" vuelve al segundo con sus botones. Omitido → "Lo omitiste." y "Hacerlo ahora" lo retoma; el registro del primero queda intacto. ✓ (`tests/e2e/entreno.spec.js`, captura 390 px revisada)
-- `node scripts/release-gate.mjs` pasa.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-245`).
 
 ## REQ-246 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
 
-**Estado: implementado.**
+**Estado: implementado.** `validateCoachOutput()` para `meal_estimate` ya no limita cuántas preguntas trae el coach (seguía rechazando con 422) y el prompt de "Estimar macros" pide `"preguntas":[]`. Prueba: `scripts/validate-meal-estimate-output.mjs`.
 
-### Origen
-
-Causa de producción que REQ-228 y REQ-238 dejaron fuera de alcance. Jonathan (2026-10-21): "Estimar macros" de "Sopa ramen vegetariana" responde "Tu coach no pudo completar esta acción. Intenta de nuevo."; antes (2026-10-20) lo mismo en el editor tras usar la foto.
-
-### Problema
-
-En `coach_usage` (Supabase de producción) los 12 fallos de `meal_estimate` desde el 2026-10-12 son `refunded` con `error_code = invalid_provider_output`, parte `estimate` (la estimación por texto: ~1045 tokens de entrada, sin imagen). Entre ellos los del reporte: 2026-10-21 01:20:14 y 01:30:43 UTC (20:20 y 20:30 del 20 en Perú) y 2026-10-20 18:46:20 UTC. Ninguna estimación con foto falló y no hay ningún `provider_<status>`: la clave, el saldo, el modelo y structured outputs funcionan. El servidor responde 422 y, antes de REQ-238, el cliente lo mostraba como el mensaje genérico. Son 12 de 49 estimaciones por texto desde el 2026-10-12 (~24 %); las 9 con foto pasaron.
-
-### Causa raíz
-
-- `mealEstimateOutputSchema()` (`api/claude.js`) exige `preguntas` sin tope (structured outputs no limita el largo de una lista) y el prompt de `aiEstimate()` (`index.html`) ni siquiera las pedía: el modelo las inventa. Todas las estimaciones por texto que pasaron traen exactamente 3 (o 0).
-- `validateCoachOutput()` rechazaba `preguntas.length > 3`: cuando el modelo trae 4 o más, una estimación con macros válidos se descarta, se devuelve la cuota y el usuario ve el error. Las respuestas fallidas tienen más tokens de salida (165-318) que las que pasan.
-
-### Alcance
-
-1. `validateCoachOutput()` para `meal_estimate` ya no limita cuántas preguntas trae; sigue exigiendo macros numéricos y preguntas de texto (el cliente muestra como mucho 2 y solo en la foto).
-2. El prompt de "Estimar macros" pide la forma del schema con `"preguntas":[]` y dice que no haga preguntas.
-3. `CACHE_NAME` → `fitbud-pwa-v128`.
-
-### Fuera de alcance
-
-- `training_plan`: sus 8 llamadas en producción (2026-06-24 a 2026-10-20) terminaron en `invalid_provider_output` con exactamente 2048 tokens de salida, el tope que pide el cliente: el JSON llega cortado y la ruta determinista lo tapa. Va en un REQ propio.
-- Registrar en los logs de `/api/claude` el motivo de cada `invalid_provider_output`.
-
-### Riesgos
-
-- Ninguno sobre datos: solo se aceptan respuestas que antes se descartaban con macros válidos.
-
-### Criterios de aceptación
-
-- Una estimación con 4 u 8 preguntas se acepta; kcal no numérica, preguntas que no son lista o que no son texto, y texto que no es JSON se siguen rechazando. ✓ (`scripts/validate-meal-estimate-output.mjs`; falla sin el arreglo)
-- El prompt de texto pide `"preguntas":[]`. ✓ (`scripts/validate-meal-estimate-output.mjs`)
-- `node scripts/release-gate.mjs` pasa. ✓ (validadores; E2E 100/101 con 1 flaky de `dia-sin-subir.spec.js` que pasa al reintento)
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-246`).
 
 ## REQ-247 - Entreno: "Sustituir" solo propone ejercicios del mismo músculo principal
 
-**Estado: implementado.**
+**Estado: implementado.** "Sustituir" solo propone ejercicios con el mismo músculo principal (`FITBUD_EXERCISE_SUBSTITUTION`, `exercise-catalog.js`): sustitutos directos primero y luego el resto del catálogo; el modal dice qué músculo conserva. Prueba: `scripts/validate-exercises.mjs`, `tests/e2e/entreno.spec.js`.
 
-### Origen
-
-Jonathan (2026-10-21), con captura del modal "Sustituir ejercicio" sobre un jalón que proponía Dominada, Dominada asistida y Remo con banda: "Tienes que asegurarte que todos los ejercicios de sustitución de verdad sustituyen el músculo principal [...] ya me ha pasado otras veces en otro tipo de músculos y ejercicios".
-
-### Problema
-
-El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (deltoides posterior) proponía dominadas y remos; para un remo, jalón y dominada asistida; para un curl de bíceps, remo con banda; para la extensión de tríceps, fondos y flexiones; para el peso muerto rumano, hip thrust. Además mostraba el patrón en inglés ("mismo patrón: pull") y la versión más fácil del candidato como si fuera su descripción.
-
-### Causa raíz
-
-`openExerciseSubstitution()` (`index.html`) juntaba `substitute_slugs` con todo el catálogo del mismo `movement_pattern`. El patrón agrupa por mecánica (todo "pull" junto: jalón, remo, face pull), no por músculo, y los `substitute_slugs` del catálogo incluían cruces entre músculos.
-
-### Alcance
-
-1. `exercise-catalog.js`: músculo principal por slug para los 42 ejercicios de fuerza (`FITBUD_EXERCISE_SUBSTITUTION.primaryMuscles`) y `candidates(actual, catálogo)`, puro: sustitutos directos primero y luego el resto del catálogo, siempre con el mismo músculo principal. Un ejercicio sin entrada (creado desde admin) usa el primero de su lista de músculos. Vale igual con el catálogo local y con el de Supabase.
-2. Espalda se separa en dorsal ancho (jalón, dominadas) y espalda media (remos); hombro en hombros (press), deltoides lateral (elevación lateral) y deltoides posterior (face pull).
-3. El modal dice qué músculo se conserva, cada opción muestra "Músculo principal: …" y, si no hay ninguna compatible con el lugar y las limitaciones del día, lo dice con el músculo.
-4. `scripts/validate-exercises.mjs` exige músculo principal en cada ejercicio de fuerza, que ningún sustituto ni versión más fácil/progresión cambie de músculo, y fija casos concretos (face pull, remo, jalón, curl, tríceps, rumano, elevación lateral).
-5. `CACHE_NAME` → `fitbud-pwa-v129`.
-
-### Fuera de alcance
-
-- Añadir ejercicios nuevos para los músculos que hoy no tienen sustituto en el catálogo (face pull, elevación lateral, gemelos): el modal lo dice en vez de proponer otro músculo.
-- Limpiar los `substitute_slugs` cruzados en `supabase/exercises.sql`: el filtro los descarta en la app.
-- Sustituciones ya guardadas en el historial (historial inmutable).
-
-### Riesgos
-
-- Jalón y dominadas comparten músculo principal (dorsal ancho) y siguen proponiéndose entre sí; el remo deja de aparecer para el jalón.
-- Menos opciones en ejercicios aislados: preferible a cambiar el músculo de la sesión.
-
-### Criterios de aceptación
-
-- Remo sentado en polea → solo Remo con banda; Face pull → sin opciones y el aviso nombra el deltoides posterior. ✓ (`tests/e2e/entreno.spec.js`)
-- Ningún sustituto ni versión más fácil/progresión del catálogo cambia de músculo principal. ✓ (`scripts/validate-exercises.mjs`)
-- `node scripts/release-gate.mjs` pasa.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-247`).
 
 ## REQ-248 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
 
@@ -1971,3 +1764,178 @@ REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahor
 Pedido del dueño: no volver a pedir lo que ya llenó al postular. Al aceptar (`api/admin.js`) o al canjear el código de una postulación (`api/entitlement.js`), `prefs` recibe `name`, `goal` (Bajar grasa → `deficit`, Ganar músculo → `volumen`, Mejorar rendimiento → `mantenimiento`) y `trainingExperience` (según `stage`). No toca perfiles con `onboardingCompletedAt`, respeta un nombre ya puesto y no marca el onboarding como hecho. Edad (rango) y salud no se copian: el onboarding las pide con detalle.
 
 - ✓ `scripts/test-admin-beta-api.mjs`, `scripts/test-invite-signup-api.mjs`; `node scripts/release-gate.mjs` pasa.
+
+## REQ-252 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total"
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-10-21, iPhone), con capturas de Perfil → Entrenamiento ("Otra actividad" + "Fuerza en gimnasio", lunes a jueves, el jueves en "Exterior"): "Eso de elegir qué hacer en cada día te limita mucho a elegir" y "¿qué pasa si un lunes no voy al gym y juego pádel?".
+
+### Problema
+
+Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana reserva días para el deporte, pero la app los mostraba como "Descanso total": Diego elige 4 días y solo ve 2 sesiones de gimnasio; el día que dejó en "Exterior" para su deporte aparece como descanso. Lo que elige por día no se refleja en el plan. En producción, 3 de 13 perfiles tienen "Otra actividad" y ninguno tiene plan generado, así que todos usan esta semana tipo.
+
+### Causa raíz
+
+- `workoutSchedule()` (`index.html`) sustituía por `"descanso"` todos los slots de deporte cuando `primary==="other"`, porque `sportSessions()` no tenía una sesión real para "other" (un placeholder sin nombre que `workoutOptions()` descarta).
+
+### Alcance
+
+1. `sportSessions()`: "other" tiene una sesión real, `facil` → "Día de tu deporte" ("Juega tu deporte (pádel, fútbol…) o haz 30-45 min de actividad a tu elección, y regístralo para que cuente."), sin ejercicios y marcada `freeActivity`. "Actividad ligera libre" (solo fuerza con actividad ligera) también queda marcada `freeActivity`.
+2. `workoutSchedule()`: con "other", los slots de deporte pasan a `facil` en vez de `descanso`. "strength_only" no cambia.
+3. Entreno, en un día `freeActivity`: en vez de "Iniciar sesión guiada" (no hay ejercicios) o del texto de descanso, "Registrar mi actividad" abre el registro manual de REQ-206 y avisa "Si hoy no la haces, no cuenta como sesión perdida."; sin los atajos "Adaptar hoy" (Solo 20 min, En casa…), que no aplican. Hoy ofrece "Registrar mi actividad" en vez de "Iniciar"/"Adaptar".
+4. `trainingDayResult()`: un día `freeActivity` sin registrar cuenta como descanso para la racha (no la rompe); registrado, como entrenado.
+5. El registro en un día de tu deporte propone el último deporte que registraste (p. ej. pádel) o "Otra actividad".
+6. `CACHE_NAME` → `fitbud-pwa-v133`.
+
+### Fuera de alcance
+
+- Cómo se explica la pregunta del deporte y cómo se cambia un día por otro deporte: REQ-253.
+- El plan personalizado ("Preparar mi plan") no admite el tipo de sesión "other" (`training-plan.js`, `SESSION_TYPES`); estos usuarios siguen con la semana tipo.
+
+### Riesgos
+
+- Usuarios con "Otra actividad" ven cambiar sus días de deporte de "Descanso total" a "Día de tu deporte". El historial no cambia: los días ya registrados conservan lo ejecutado, y un día de deporte sin registrar no penaliza la racha, igual que el descanso.
+
+### Criterios de aceptación
+
+- "Otra actividad" + gimnasio, 4 días: la semana muestra 2 sesiones de gimnasio y 2 "Día de tu deporte", ninguna "Descanso total"; sin registrar, el día cuenta como descanso; "Registrar mi actividad" → Pádel lo marca como entrenado y la próxima vez propone Pádel. ✓ (`tests/e2e/actividad-manual.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo eso de actividad física principal", "Eso de elegir qué hacer en cada día también siento que te limita mucho a elegir" y "¿Qué pasa si un lunes no voy al gym y juego pádel?".
+
+### Problema
+
+- "Actividad física principal" no dice qué es ni qué cambia: Diego juega pádel, que no está en la lista, y eligió "Otra actividad" sin saber qué haría el plan con eso.
+- "Días disponibles y lugar real" se lee como una agenda fija: nada dice que cualquier día se puede cambiar.
+- Registrar otro deporte en un día de fuerza ya era posible (REQ-206, "＋ Registrar otra actividad" al final de Entreno), pero no aparece entre las opciones de "Adaptar hoy" ni explica qué pasa con la sesión que tocaba.
+
+### Causa raíz
+
+- Copy de `index.html`: label `pf_sport` "Actividad física principal" y `ob_sport` "¿Practicas alguna actividad física?", opción "Otra actividad", sin nota de ayuda; label "Días disponibles y lugar real".
+- "Adaptar hoy" en `renderWorkout()` solo ofrece Solo 20 min / En casa / Sin equipo / Me perdí la sesión.
+
+### Alcance
+
+1. Onboarding y Perfil preguntan lo mismo: "¿Haces otro deporte además de la fuerza?", con opciones Caminar, Correr, Bicicleta, Natación, "Otro deporte" y "Ninguno, solo fuerza". `SPORT_LABELS.other` → "Otro deporte".
+2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
+3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
+4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
+5. `CACHE_NAME` → `fitbud-pwa-v133` (junto con REQ-252).
+
+### Fuera de alcance
+
+- Elegir qué se hace cada día (fuerza o deporte) en vez del lugar, o mover la sesión de fuerza perdida a otro día: el lugar sigue orientando la plantilla (exterior/piscina → deporte) y "Me perdí la sesión" ya ofrece recuperarla.
+- Añadir pádel, fútbol u otros deportes con plan guiado propio.
+
+### Riesgos
+
+- Ninguno sobre datos: solo copy y un acceso nuevo a un flujo existente; los valores guardados (`primarySport`) no cambian.
+
+### Criterios de aceptación
+
+- Perfil muestra la nueva pregunta y la nota cambia al elegir otra opción; la semana tipo explica que no es una obligación. ✓ (`tests/e2e/actividad-manual.spec.js`)
+- En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-254 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
+
+**Estado: pendiente — requiere acción humana:** aprobar la ampliación del catálogo y curar el nivel de cocina de cada plato antes de que un agente pueda implementar el filtro.
+
+### Origen
+
+Diego (beta, 2026-10-21, audio): "Justo ahora ya terminé todo y me sale como próxima comida tacos de no sé qué con frijol, pero yo no sé hacer ni tacos ni el frijol. Estaría bueno que afines eso para la gente que no sabe cocinar o que no cocina."
+
+### Problema
+
+Quien no cocina recibe platos que piden cocinar de verdad (tacos con frijoles, seco con frijoles, enchiladas). El perfil solo pregunta "Minutos para cocinar" y ese dato no cambia lo que propone el plan.
+
+### Causa raíz
+
+- `planDeterministicNutritionDay()` y `compatibleDishesForSlot()` (`js/nutrition-domain.js`) no leen `prefs.cookingMinutes` ni `dishes.prep_minutes`/`dishes.needs_kitchen`; solo el texto del coach (`index.html`, "Tiempo por comida: ≤N min") lo menciona.
+- Los datos del catálogo no sirven para filtrar: `prep_minutes` es un valor por franja, no por plato (consulta a producción 2026-10-21, 180 platos: todo almuerzo = 30, toda cena = 20, todo desayuno = 15), y `needs_kitchen` es `true` en todos los almuerzos y cenas. Filtrar hoy por "≤15 min" dejaría sin almuerzo ni cena.
+- No existe una preferencia de "nivel en la cocina": "Minutos para cocinar" mezcla tiempo y habilidad.
+
+### Objetivo
+
+Una persona que marca "No cocino" o "Lo básico" recibe platos que puede armar sin saber cocinar (comprar listo + ensamblar, microondas, una sartén), y sigue cuadrando macros.
+
+### Alcance propuesto
+
+1. Preferencia nueva en onboarding y Perfil → Comidas: "¿Cuánto cocinas?" — "No cocino (armo o caliento)" / "Lo básico (una sartén, hervir)" / "Me gusta cocinar". Por defecto "Lo básico" para perfiles existentes.
+2. Catálogo: columna `cooking_level` (`none`/`basic`/`cook`) en `dishes`, migración idempotente; curar los 180 platos a mano (y corregir `prep_minutes` por plato). Acción manual: ejecutar la migración en producción.
+3. Ampliar almuerzos y cenas de nivel `none`/`basic` (hoy no hay ninguno): pollo rostizado + arroz listo + ensalada, wraps de atún o pavo, bowls con legumbre en lata, tortilla francesa con pan, etc.
+4. `compatibleDishesForSlot()` excluye platos por encima del nivel elegido; si una franja queda sin candidatos, cae al nivel siguiente y lo dice ("Hoy no encontramos algo más simple para la cena").
+5. En "Cambiar comida", un filtro rápido "Más fácil de preparar".
+
+### Fuera de alcance
+
+- Videos de recetas.
+- Reescribir los platos ya planificados de días pasados (historial inmutable).
+
+### Riesgos
+
+- Menos candidatos por franja empeora el cuadre de macros (canario `DIET_CONTRACT`, ver REQ-143/REQ-147): medir antes y después.
+- El paso 2 es trabajo de contenido, no automatizable sin revisión humana del etiquetado.
+
+### Criterios de aceptación
+
+- Con "No cocino", una semana generada no incluye platos `cook`; con "Me gusta cocinar", no cambia nada.
+- Con "No cocino", ninguna franja queda vacía; si se relaja el nivel, se avisa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Canario `DIET_CONTRACT` antes y después con perfiles "No cocino" / "Lo básico" / "Me gusta cocinar".
+- E2E: perfil "No cocino", preparar la semana y comprobar que ningún plato es `cook`.
+
+### Decisión pendiente (Jonathan)
+
+- ¿Se aprueba ampliar el catálogo con almuerzos/cenas "sin cocinar" (choca con la pausa de REQ-143)?
+
+## REQ-255 - Recordatorios por WhatsApp
+
+**Estado: pendiente — requiere acción humana:** elegir canal, proveedor y presupuesto mensual.
+
+### Origen
+
+Diego (beta, 2026-10-21), sobre Perfil → Recordatorios: "Esto también está chévere, pero no veo mi correo; sería cool que sea al WhatsApp."
+
+### Problema
+
+El único recordatorio fuera de la app es por correo (REQ-24) y muchos usuarios no revisan su correo. Los avisos del dispositivo (push, REQ-38) existen, pero en iPhone solo funcionan con la app instalada en la pantalla de inicio y viven en otra sección plegada ("Avisos del dispositivo"), aparte de Recordatorios: quien abre Recordatorios solo ve el correo.
+
+### Causa raíz
+
+- `api/notify.js` solo envía correo (Resend) y push VAPID; no hay canal WhatsApp.
+- REQ-225 sacó WhatsApp del flujo beta a propósito; la postulación beta sí guarda el número (`beta_applications.whatsapp`), pero no hay consentimiento para recordatorios ni número verificado en el perfil.
+
+### Opciones
+
+1. **WhatsApp Business Cloud API (Meta) directo:** plantilla "utility" aprobada por Meta, número de empresa verificado, costo por mensaje según país (Perú/LatAm: centavos de dólar por conversación de utilidad). Requiere guardar el teléfono con consentimiento explícito y baja con "STOP".
+2. **Vía proveedor (Twilio, 360dialog):** misma plantilla y aprobación de Meta, más margen del proveedor; integración más simple.
+3. **Sin WhatsApp por ahora:** hacer visible el push. En Recordatorios, ofrecer "Avisos en este teléfono" junto al correo y explicar en iPhone "Añade la app a tu pantalla de inicio para recibir avisos".
+
+### Alcance (si se aprueba la opción 1 o 2)
+
+1. Perfil → Recordatorios: canal "WhatsApp" con número (prefijo de país) y verificación por código; consentimiento y aviso de privacidad actualizados.
+2. `api/notify.js`: envío por plantilla con el mismo criterio que el correo (solo si hay pendiente, nunca dos veces el mismo día), límite diario y registro de envíos sin contenido personal.
+3. Baja con un toque (responder "STOP" o desde Perfil).
+
+### Riesgos
+
+- Costo por mensaje y dependencia de la aprobación de plantillas de Meta.
+- El teléfono es dato personal: RLS, no va a analytics, se borra con la cuenta.
+- Lenguaje REQ-31 en la plantilla.
+
+### Decisión pendiente (Jonathan)
+
+- ¿WhatsApp (opción 1 o 2, con presupuesto mensual) o primero la opción 3?
