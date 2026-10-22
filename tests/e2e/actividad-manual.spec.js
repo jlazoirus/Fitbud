@@ -101,7 +101,7 @@ test.describe("Actividad registrada a mano", () => {
     expect(await page.evaluate(() => trainingDayResult(todayStr()))).toBe("done");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
-  test("REQ-250: con \"Otra actividad\" el día de tu deporte se registra y no es un descanso", async ({ page, context }) => {
+  test("REQ-251: con \"Otra actividad\" el día de tu deporte se registra y no es un descanso", async ({ page, context }) => {
     // Como Diego: otro deporte + gimnasio, 4 días; hoy en exterior (su pádel), el resto en gimnasio.
     const today = new Date().getDay();
     const days = trainingDaysIncludingToday();
@@ -145,7 +145,7 @@ test.describe("Actividad registrada a mano", () => {
     await expect(overlay.locator("#ma_sport")).toHaveValue("padel");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
-  test("REQ-251: la pregunta del deporte se explica y \"Hice otro deporte\" reemplaza la sesión de fuerza", async ({ page, context }) => {
+  test("REQ-252: la pregunta del deporte se explica y \"Hice otro deporte\" reemplaza la sesión de fuerza", async ({ page, context }) => {
     // 3 de fuerza + 1 de deporte; el día de deporte va en exterior para que hoy sea de fuerza.
     const today = new Date().getDay();
     const days = trainingDaysIncludingToday();

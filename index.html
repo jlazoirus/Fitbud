@@ -1302,7 +1302,7 @@ const TRAINING_ACTIVITY_OPTIONS=[
   ["other","Otro deporte"],
   ["strength_only","Ninguno, solo fuerza"],
 ];
-// REQ-251: qué cambia en tu semana según el deporte que elijas.
+// REQ-252: qué cambia en tu semana según el deporte que elijas.
 function primarySportHelp(value){
   if(value==="other")return "Pádel, fútbol u otro: los días que no son de fuerza quedan para tu deporte; lo juegas y lo registras en Entreno.";
   if(value==="strength_only")return "Tu semana es solo fuerza; los demás días son descanso.";
@@ -1431,7 +1431,7 @@ function workoutSchedule(days,dayIds,priority,locations,primary,experience,worko
   // Fix: "strength_only" solo tiene una sesión real ("facil", como "Actividad ligera
   // libre") cuando lightCardioEnabled está activo; sus demás slots de deporte pasan a
   // descanso, o workoutById devuelve null y renderWorkout falla.
-  // REQ-250: "other" tiene una sola sesión real, "facil" (el día de tu deporte); antes
+  // REQ-251: "other" tiene una sola sesión real, "facil" (el día de tu deporte); antes
   // esos días pasaban a "Descanso total" aunque el usuario los había elegido.
   if(primary==="other"){
     sessions=sessions.map(id=>sportIds.has(id)?"facil":id);
@@ -5063,12 +5063,12 @@ function workoutStatusLabel(outcome){
   }[outcome]||"Pendiente";
 }
 function canLogManualActivity(ds){return ds<=todayStr()&&!trainingSafetyHold();}
-// REQ-250: día sin sesión guiada (tu deporte o actividad ligera libre): se registra a mano.
+// REQ-251: día sin sesión guiada (tu deporte o actividad ligera libre): se registra a mano.
 function isFreeActivityWorkout(workout){return !!(workout&&workout.freeActivity);}
 function activityContextNote(ds){
   const ew=effectiveWorkout(ds);
   if(ew.workout.id==="descanso"||isFreeActivityWorkout(ew.workout))return "Cuenta como día entrenado, aunque hoy tocara descanso.";
-  // REQ-251: registrar otro deporte en un día de fuerza lo reemplaza; el plan no se corre.
+  // REQ-252: registrar otro deporte en un día de fuerza lo reemplaza; el plan no se corre.
   return `Cuenta como día entrenado en lugar de ${esc(ew.workout.name)}. Tu plan sigue igual desde la próxima sesión.`;
 }
 function lastManualActivitySport(){
@@ -5094,7 +5094,7 @@ function openManualActivity(ds,index){
   if(!canLogManualActivity(ds)){toast("No se puede registrar actividad en este día");return;}
   const prev=index!=null?manualActivities(S.days[ds])[index]:null;
   const primary=profile&&profile.prefs&&profile.prefs.primarySport;
-  // REQ-250/251: en el día de tu deporte, o en lugar de la sesión de fuerza, se propone
+  // REQ-251/252: en el día de tu deporte, o en lugar de la sesión de fuerza, se propone
   // lo último que registraste (p. ej. pádel); en un descanso, tu actividad o fuerza.
   const workout=effectiveWorkout(ds).workout;
   const instead=workout.id!=="descanso";
@@ -5471,7 +5471,7 @@ function addWorkoutTimer(ds,seconds){
 function finishTimedWorkoutStep(ds,skipped){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step)return;
-  step.status=skipped?"skipped":"done";
+  step.status=skipped?(step.optional?"declined":"skipped"):"done";
   step.completedAt=new Date().toISOString();
   execution.timer=null;
   const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
@@ -5545,7 +5545,8 @@ function openPendingSetsPrompt(ds,step,pending){
 function skipWorkoutStep(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step)return;
-  step.status="skipped";step.completedAt=new Date().toISOString();execution.timer=null;
+  // REQ-250: omitir un calentamiento o vuelta a la calma es como "Ahora no".
+  step.status=step.optional?"declined":"skipped";step.completedAt=new Date().toISOString();execution.timer=null;
   const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
@@ -5714,6 +5715,16 @@ function reviewPendingWorkoutSets(ds){
   const pending=pendingPrescribedSets(execution);if(!pending.length)return;
   pending.forEach(item=>{execution.steps[item.stepIndex].status="pending";});
   resumePartialWorkout(ds,execution);
+}
+// REQ-250: una sesión guardada parcial a la que no le falta nada (solo se
+// saltó el calentamiento o la vuelta a la calma, que son opcionales) se marca
+// completada sin reabrirla.
+function markWorkoutCompleted(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview||execution.pain!=="none")return;
+  const progress=WORKOUT_PLAYER.progress(execution);
+  if(progress.remaining||progress.skipped||pendingPrescribedSets(execution).length)return;
+  execution.status="completed";
+  persistWorkoutExecution(ds,execution,false);render();toast("Sesión completada");
 }
 function resumePartialWorkout(ds,reviewed){
   const execution=reviewed||normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
@@ -5992,6 +6003,7 @@ function renderWorkoutExecution(ds,execution){
       <div class="muted small">${esc(painLabels[execution.pain]||"Cierre sin respuesta")} · ${esc(difficultyLabels[execution.difficulty]||"Dificultad sin respuesta")}</div>
       ${execution.notes?`<div class="exercise-copy"><b>Notas:</b> ${esc(execution.notes)}</div>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&progress.remaining?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="resumePartialWorkout('${ds}')">Continuar sesión</button>`:""}
+      ${execution.status==="partial"&&!execution.needsReview&&execution.pain==="none"&&!progress.remaining&&!progress.skipped&&!pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="markWorkoutCompleted('${ds}')">Marcar como completada</button>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&!progress.remaining&&ds===todayStr()&&pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="reviewPendingWorkoutSets('${ds}')">Marcar ${seriesCount(pendingSets.length)} sin registrar</button>`:""}
     </div>`;
   }
@@ -11493,7 +11505,7 @@ function trainingDayResult(ds){
   const isRest=ew.workout&&ew.workout.id==="descanso";
   const st=S.days[ds]||{};
   // REQ-206: descanso planificado, pero entrenó igual → cuenta como entrenado.
-  // REQ-250: un día de actividad libre sin registrar tampoco rompe la racha.
+  // REQ-251: un día de actividad libre sin registrar tampoco rompe la racha.
   if(isRest||isFreeActivityWorkout(ew.workout))return manualActivities(st).length?"done":"rest";
   // REQ-163: una sesión in_progress/paused (bloques omitidos, series sueltas)
   // no es un cierre real — solo un resultado TERMINAL (completed/partial) o

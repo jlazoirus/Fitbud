@@ -28,7 +28,7 @@ function extractFunctionSource(src, name) {
 
 // 1. workoutSchedule recibe lightCardioEnabled y nunca deja un id planificado sin
 //    sesión real: "strength_only" solo tiene una ("facil") cuando lightCardioEnabled
-//    está activo y sus demás slots de deporte pasan a descanso; "other" (REQ-250)
+//    está activo y sus demás slots de deporte pasan a descanso; "other" (REQ-251)
 //    convierte todos sus slots de deporte en "facil", el día de tu deporte.
 const schedule = extractFunctionSource(html, "workoutSchedule");
 assert.ok(/lightCardioEnabled/.test(schedule), "workoutSchedule debe recibir el parámetro lightCardioEnabled.");

@@ -90,10 +90,10 @@ Feedback Jonathan (2026-10-21, iPhone):
 
 Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/Recordatorios y audio sobre la próxima comida):
 
-- REQ-250 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total". (P0; implementado)
-- REQ-251 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente. (P1; implementado)
-- REQ-252 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
-- REQ-253 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
+- REQ-251 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total". (P0; implementado)
+- REQ-252 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente. (P1; implementado)
+- REQ-253 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
+- REQ-254 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -105,8 +105,8 @@ Pendiente no automatizable por agentes:
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-70 - Validacion de negocio y beta con usuarios reales.
-- REQ-252 - Decidir el nivel de cocina en el catálogo y si se amplían almuerzos/cenas "sin cocinar" (feedback Diego).
-- REQ-253 - Decidir si los recordatorios llegan por WhatsApp: proveedor y presupuesto (feedback Diego).
+- REQ-253 - Decidir el nivel de cocina en el catálogo y si se amplían almuerzos/cenas "sin cocinar" (feedback Diego).
+- REQ-254 - Decidir si los recordatorios llegan por WhatsApp: proveedor y presupuesto (feedback Diego).
 - REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
@@ -1543,32 +1543,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-232`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
-
-### Problema
-
-La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
-
-### Alcance
-
-1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
-2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
-3. `CACHE_NAME` → `fitbud-pwa-v115`.
-
-### Fuera de alcance
-
-- Tarjetas de extras y comidas saltadas (no tienen menú "···").
-
-### Riesgos
-
-- Ninguno sobre datos: solo abre un menú existente.
-
-### Criterios de aceptación
-
-- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-233`).
 
 ## REQ-234 - El check-in semanal re-puntúa días ya ejecutados y contradice su copy "para la próxima semana"
 
@@ -1640,7 +1615,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
 
 ## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
 
-**Estado: implementado.** Con la sesión en curso o en pausa, el reproductor va primero y el aviso, el plan y la tarjeta del entrenamiento quedan en el desplegable cerrado "Plan y detalles de hoy" (`.wk-context`); la pausa por seguridad sigue a la vista. Prueba: `tests/e2e/entreno.spec.js`.
+**Estado: implementado.**
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-239`).
 
@@ -1752,7 +1727,37 @@ Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apr
 - A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-250 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total"
+## REQ-250 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del resultado "Sesión parcial · 6/7 bloques completados · 16/16 series registradas · 1 bloque omitido": "Hice toda la sesión y lo único que pasé si no me equivoco son los calentamientos; no debería decir parcial, debería ser completada".
+
+### Causa raíz
+
+REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahora no" los deja `declined`. Si el usuario elegía hacerlos y luego tocaba "Omitir bloque" (o "Omitir" en su cronómetro), `skipWorkoutStep()`/`finishTimedWorkoutStep()` (`index.html`) los marcaban `skipped`, que cuenta como bloque omitido y hace que `workoutFullyCompleted()` guarde la sesión como parcial.
+
+### Alcance
+
+1. Omitir un bloque opcional lo deja `declined`, igual que "Ahora no".
+2. `normalizeStep()` (`workout-player.js`) convierte en `declined` un opcional `skipped`, así las sesiones en curso o guardadas antes del arreglo dejan de contarlo como omitido.
+3. Una sesión guardada parcial a la que no le falta nada (sin bloques omitidos, sin series sin marcar, sin dolor) muestra "Marcar como completada", que la cierra completada sin reabrirla.
+4. `CACHE_NAME` → `fitbud-pwa-v132`.
+
+### Fuera de alcance
+
+- Omitir un ejercicio o un bloque de cardio sigue dejando la sesión parcial.
+- No se reclasifica sola ninguna sesión guardada: el cambio a completada lo decide el usuario.
+
+### Criterios de aceptación
+
+- Elegir el calentamiento y la vuelta a la calma y omitirlos, con todas las series hechas, guarda "Sesión completada" con 0 bloques omitidos. ✓ (`tests/e2e/entreno.spec.js`)
+- Una sesión guardada parcial con el calentamiento `skipped` muestra 0 omitidos y "Marcar como completada"; al tocarlo queda completada y cuenta como entreno hecho. ✓ (misma prueba, `scripts/validate-workout-player.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-251 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total"
 
 **Estado: implementado.**
 
@@ -1775,11 +1780,11 @@ Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana re
 3. Entreno, en un día `freeActivity`: en vez de "Iniciar sesión guiada" (no hay ejercicios) o del texto de descanso, "Registrar mi actividad" abre el registro manual de REQ-206 y avisa "Si hoy no la haces, no cuenta como sesión perdida."; sin los atajos "Adaptar hoy" (Solo 20 min, En casa…), que no aplican. Hoy ofrece "Registrar mi actividad" en vez de "Iniciar"/"Adaptar".
 4. `trainingDayResult()`: un día `freeActivity` sin registrar cuenta como descanso para la racha (no la rompe); registrado, como entrenado.
 5. El registro en un día de tu deporte propone el último deporte que registraste (p. ej. pádel) o "Otra actividad".
-6. `CACHE_NAME` → `fitbud-pwa-v132`.
+6. `CACHE_NAME` → `fitbud-pwa-v133`.
 
 ### Fuera de alcance
 
-- Cómo se explica la pregunta del deporte y cómo se cambia un día por otro deporte: REQ-251.
+- Cómo se explica la pregunta del deporte y cómo se cambia un día por otro deporte: REQ-252.
 - El plan personalizado ("Preparar mi plan") no admite el tipo de sesión "other" (`training-plan.js`, `SESSION_TYPES`); estos usuarios siguen con la semana tipo.
 
 ### Riesgos
@@ -1791,7 +1796,7 @@ Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana re
 - "Otra actividad" + gimnasio, 4 días: la semana muestra 2 sesiones de gimnasio y 2 "Día de tu deporte", ninguna "Descanso total"; sin registrar, el día cuenta como descanso; "Registrar mi actividad" → Pádel lo marca como entrenado y la próxima vez propone Pádel. ✓ (`tests/e2e/actividad-manual.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-251 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
+## REQ-252 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
 
 **Estado: implementado.**
 
@@ -1816,7 +1821,7 @@ Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo e
 2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
 3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
 4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
-5. `CACHE_NAME` → `fitbud-pwa-v132` (junto con REQ-250).
+5. `CACHE_NAME` → `fitbud-pwa-v133` (junto con REQ-251).
 
 ### Fuera de alcance
 
@@ -1833,7 +1838,7 @@ Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo e
 - En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-252 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
+## REQ-253 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
 
 **Estado: pendiente — requiere acción humana:** aprobar la ampliación del catálogo y curar el nivel de cocina de cada plato antes de que un agente pueda implementar el filtro.
 
@@ -1888,7 +1893,7 @@ Una persona que marca "No cocino" o "Lo básico" recibe platos que puede armar s
 
 - ¿Se aprueba ampliar el catálogo con almuerzos/cenas "sin cocinar" (choca con la pausa de REQ-143)?
 
-## REQ-253 - Recordatorios por WhatsApp
+## REQ-254 - Recordatorios por WhatsApp
 
 **Estado: pendiente — requiere acción humana:** elegir canal, proveedor y presupuesto mensual.
 

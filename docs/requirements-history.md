@@ -10146,6 +10146,37 @@ La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar qu
 - La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
 
+## REQ-233 - Nutrición: tocar la tarjeta de una comida abre su menú de opciones
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
+
+### Problema
+
+La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
+
+### Alcance
+
+1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
+2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
+3. `CACHE_NAME` → `fitbud-pwa-v115`.
+
+### Fuera de alcance
+
+- Tarjetas de extras y comidas saltadas (no tienen menú "···").
+
+### Riesgos
+
+- Ninguno sobre datos: solo abre un menú existente.
+
+### Criterios de aceptación
+
+- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
+
 ## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
 
 **Estado: implementado.**

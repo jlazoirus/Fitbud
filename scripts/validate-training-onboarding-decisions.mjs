@@ -11,7 +11,7 @@ const workoutPlayer = readFileSync("workout-player.js", "utf8");
 const catalog = readFileSync("exercise-catalog.js", "utf8");
 const exerciseSql = readFileSync("supabase/exercises.sql", "utf8");
 
-// REQ-251: "Actividad física principal" no se entendía; onboarding y Perfil usan la misma pregunta.
+// REQ-252: "Actividad física principal" no se entendía; onboarding y Perfil usan la misma pregunta.
 assert.ok(index.includes('<label for="ob_sport">¿Haces otro deporte además de la fuerza?</label>'), "Onboarding debe preguntar por otro deporte, no por cardio.");
 assert.ok(index.includes('<label for="pf_sport">¿Haces otro deporte además de la fuerza?</label>'), "Perfil debe editar el otro deporte con la misma pregunta.");
 assert.ok(!index.includes("Actividad física principal"), "No debe volver el label Actividad física principal.");
