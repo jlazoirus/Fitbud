@@ -20,7 +20,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "service";
 const handler = await importHandler("api/entitlement.js");
 const NEW_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
-let codeRow, createStatus, redeemOk, calls, betaInvited, overrides;
+let codeRow, createStatus, redeemOk, calls, betaInvited, overrides, profilePrefs, profileWrite;
 global.fetch = async (url, options = {}) => {
   const value = String(url);
   const method = options.method || "GET";
@@ -43,8 +43,11 @@ global.fetch = async (url, options = {}) => {
   if (value.endsWith("/auth/v1/admin/users/" + NEW_ID) && method === "DELETE") return response(200, {});
   if (value.includes("/rest/v1/beta_recruitment_submissions?status=eq.beta_invited&review_notes=ilike.")) {
     assert(decodeURIComponent(value).includes("*FIT-AB12-CD34*"), "Busca la postulación aceptada por su código.");
-    return response(200, betaInvited ? [{ id: 7 }] : []);
+    assert(value.includes("select=id,name,goal,stage"), "Trae lo que respondió en la postulación.");
+    return response(200, betaInvited ? [{ id: 7, name: "Ana", goal: "Bajar grasa", stage: "returning" }] : []);
   }
+  if (value.endsWith("/rest/v1/profiles?id=eq." + NEW_ID + "&select=prefs")) return response(200, [{ prefs: profilePrefs }]);
+  if (value.endsWith("/rest/v1/profiles?on_conflict=id") && method === "POST") { profileWrite = JSON.parse(options.body); return response(201, null); }
   if (value.includes("/rest/v1/coach_quota_overrides?on_conflict=user_id,action") && method === "POST") {
     overrides = JSON.parse(options.body);
     return response(201, null);
@@ -54,7 +57,7 @@ global.fetch = async (url, options = {}) => {
 
 async function signup(body, setup) {
   codeRow = { code: "FIT-AB12-CD34", redeemed_by: null, valid_until: null };
-  createStatus = 200; redeemOk = true; calls = []; betaInvited = false; overrides = null;
+  createStatus = 200; redeemOk = true; calls = []; betaInvited = false; overrides = null; profilePrefs = {}; profileWrite = null;
   if (setup) setup();
   const res = capture();
   await handler({ method: "POST", headers: {}, body: { action: "invite-signup", code: "fit ab12 cd34", email: " Ana@Correo.test ", password: "ClaveSegura2026", ...body } }, res);
@@ -72,6 +75,11 @@ assert(Array.isArray(overrides) && overrides.length === 8, "Código beta: un ove
 assert(overrides.every((o) => o.user_id === NEW_ID && o.daily_limit === 10000 && o.enabled === true && o.bonus_units === 0 && o.expires_at === "2027-01-16T00:00:00Z"),
   "Código beta: tope máximo que vence con el acceso de 90 días.");
 assert(new Set(overrides.map((o) => o.action)).size === 8 && overrides.some((o) => o.action === "coach_conversation"), "Cubre todas las acciones, incluida la conversación.");
+// REQ-251: con el código de una postulación, su perfil llega con lo que ya respondió.
+assert(profileWrite && profileWrite.id === NEW_ID && profileWrite.prefs.name === "Ana" && profileWrite.prefs.goal === "deficit" && profileWrite.prefs.trainingExperience === "beginner" && !profileWrite.prefs.onboardingCompletedAt,
+  "Rellena nombre, objetivo y experiencia sin dar el onboarding por hecho: " + JSON.stringify(profileWrite));
+res = await signup({}, () => { betaInvited = true; profilePrefs = { onboardingCompletedAt: "2026-10-01T00:00:00Z", goal: "volumen" }; });
+assert(res.statusCode === 201 && profileWrite === null, "Con el onboarding hecho no toca el perfil.");
 
 res = await signup({}, () => { codeRow = null; });
 assert(res.statusCode === 400 && res.body.error === "Código no válido." && calls.length === 1, "Código inexistente: no crea cuenta.");
