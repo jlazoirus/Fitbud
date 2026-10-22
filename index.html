@@ -10056,10 +10056,13 @@ La fase obligatoria es "${expected.phase}". Usa progresión prudente para la exp
 ${gentle?"Modo suave obligatorio: baja volumen e intensidad, prioriza ejercicios estables y no uses movimientos invertidos, dominadas ni pike push-ups.":""}
 En fuerza incluye 2-8 ejercicios con series, repeticiones, descanso, RPE, RIR y tempo.
 En deporte incluye un ejercicio del catálogo y bloques ordenados de calentamiento, trabajo, recuperaciones si aplican y vuelta a la calma.
-No inventes ejercicios ni cambies los días disponibles. Responde SOLO JSON válido:
+No inventes ejercicios ni cambies los días disponibles. Responde SOLO JSON válido en una sola línea, sin sangría ni saltos de línea:
 {"week":${expected.week},"phase":"${expected.phase}","reason":"breve","sessions":[{"date":"YYYY-MM-DD","weekday":1,"location":"gym","role":"fullA","type":"strength","name":"...","objective":"...","duration_minutes":60,"intensity":"RPE 6","exercises":[{"exercise_id":"back-squat","sets":3,"reps":"8-10","rest_seconds":120,"target_rpe":6,"target_rir":3,"tempo":"3-1-1"}],"blocks":[]}]}
 Contexto estructurado: ${JSON.stringify(context)}`;
 }
+// REQ-251: con 2048 tokens la semana llegaba cortada (en producción, siempre) y
+// caía a la alternativa validada; 4096 es el tope del proxy.
+const TRAINING_WEEK_MAX_TOKENS=4096;
 async function generateTrainingWeek(expected,prefs,request){
   const fallbackRaw=deterministicTrainingWeekPayload(expected,prefs);
   const validation=trainingPlanValidationConfig(expected,prefs);
@@ -10069,7 +10072,7 @@ async function generateTrainingWeek(expected,prefs,request){
   }
   const fallback=JSON.stringify(fallbackRaw);
   const quota=coachQuota(request.action,request.requestId,request.partKey,fallback,validation,`training-week-${expected.week}-${expected.sessions.map(s=>s.date).join(":")}`);
-  const txt=await callClaude(trainingWeekPrompt(expected,prefs),2048,quota);
+  const txt=await callClaude(trainingWeekPrompt(expected,prefs),TRAINING_WEEK_MAX_TOKENS,quota);
   const parsed=parseJSON(txt);
   return TRAINING_PLAN.normalizeWeek(parsed,{
     ...validation,durationWeeks:resolvedPlanDuration(prefs),sessions:expected.sessions,blockedTerms:trainingBlockedTerms(prefs),

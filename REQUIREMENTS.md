@@ -1643,37 +1643,9 @@ Jonathan (2026-10-21), con captura del reproductor: la demostración del ejercic
 
 ## REQ-241 - Entreno: "Usar progresión" cambia de verdad el ejercicio (o dice que solo toca subir la carga)
 
-**Estado: implementado.**
+**Estado: implementado.** "Usar progresión" y "Versión más fácil" cambian de verdad el ejercicio (título, imagen, "Cómo se hace" y última carga) según `FITBUD_EXERCISE_VARIANTS`, o dicen que solo toca subir la carga; inventario en `docs/exercise-progressions.md`.
 
-### Origen
-
-Jonathan (2026-10-21), con captura de "Fondos asistidos": "Usar progresión" no cambia el ejercicio; debería cambiar el título y la imagen. Pide revisar que las progresiones de todos los ejercicios tengan sentido, inventariar los que no la tengan y evaluar si la progresión es únicamente subir el peso.
-
-### Problema
-
-`setWorkoutVariation()` solo guardaba `step.variation` y mostraba el texto libre del catálogo ("Progresión: Fondos con menor asistencia"); el ejercicio, el título y la imagen seguían igual. Las progresiones eran texto, sin distinguir otro ejercicio, variante o solo carga, y algunas eran solo carga o duración aunque el catálogo tiene un ejercicio más difícil del mismo patrón.
-
-### Alcance
-
-1. `FITBUD_EXERCISE_VARIANTS` (`exercise-catalog.js`, por slug, vale con catálogo local o de Supabase): versión más fácil y progresión de los 42 ejercicios de fuerza, de tipo `exercise` (otro ejercicio del mismo patrón), `variant` (mismo ejercicio, otra ejecución) o `load`.
-2. Reproductor: `exercise` cambia `exerciseSlug` (título, imagen, "Cómo se hace" y última carga del nuevo) si encaja con el lugar y las limitaciones; `variant` cambia el título; "Volver a …" deshace. `load` muestra "Subir la carga"/"Bajar la carga" con la pauta y la carga de la última vez, sin cambiar nada. El pop-up de técnica usa los mismos nombres.
-3. Progresiones que eran solo carga o duración y pasan a otro ejercicio: Zancada → Sentadilla búlgara, Flexión → Flexión con pies elevados, Plancha frontal → Plancha con toque de hombro, Flexión con pies elevados → Flexión arquero.
-4. Inventario en `docs/exercise-progressions.md`: 10 progresiones a otro ejercicio, 28 variantes, 4 solo carga (Sentadilla búlgara, Peso muerto a una pierna, Subida al banco, Dominada con lastre); resistencia progresa por volumen. `validate-exercises.mjs` exige la entrada completa, destinos existentes del mismo patrón y en el sentido de nivel correcto; corrige `hammer-curl` (`substitute_slugs` era texto).
-5. `CACHE_NAME` → `fitbud-pwa-v123`.
-
-### Fuera de alcance
-
-- Imágenes propias para las variantes (usan la del ejercicio base).
-- Cambiar el texto de `regression`/`progression` en la tabla `exercises`.
-
-### Riesgos
-
-- Ninguno sobre datos: las sesiones guardadas conservan su `variation`; las nuevas guardan además el ejercicio de origen.
-
-### Criterios de aceptación
-
-- Remo sentado → "Usar versión más fácil" pasa a Remo con banda (slug, título) y "Volver a…" lo deshace; Press de banca → "Usar progresión" titula "Press de banca con pausa en el pecho"; Sentadilla búlgara muestra "Subir la carga" y no cambia el ejercicio. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/validate-exercises.mjs` y `node scripts/release-gate.mjs` pasan. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-241`).
 
 ## REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado
 
@@ -1962,4 +1934,36 @@ REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahor
 
 - Elegir el calentamiento y la vuelta a la calma y omitirlos, con todas las series hechas, guarda "Sesión completada" con 0 bloques omitidos. ✓ (`tests/e2e/entreno.spec.js`)
 - Una sesión guardada parcial con el calentamiento `skipped` muestra 0 omitidos y "Marcar como completada"; al tocarlo queda completada y cuenta como entreno hecho. ✓ (misma prueba, `scripts/validate-workout-player.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-251 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de producción de REQ-246 (2026-10-21). En `coach_usage` las 8 llamadas `training_plan` (2026-06-24 a 2026-10-20) son `refunded` / `invalid_provider_output` con **exactamente 2048 tokens de salida**; ninguna se completó. La app usa entonces la alternativa validada para todas las semanas ("Se usó la alternativa validada en: semana 1, …") y nadie lo nota.
+
+### Causa raíz
+
+`generateTrainingWeek()` (`index.html`) pide la semana con `maxTokens` 2048 y el prompt no pide JSON compacto: el modelo lo escribe con sangría. Una semana de 4 sesiones de fuerza ocupa ~5.400 caracteres con sangría (~3.250 compacta); una de 6 con carrera, ~7.800. No cabe: el JSON llega cortado, `validateCoachOutput()` lo rechaza (422) y, desde ese fallo, `generateTrainingPlan()` usa la alternativa para el resto de semanas.
+
+### Alcance
+
+1. `TRAINING_WEEK_MAX_TOKENS` = 4096 (el tope del proxy) para cada semana.
+2. El prompt pide el JSON en una sola línea, sin sangría ni saltos de línea.
+3. `CACHE_NAME` → `fitbud-pwa-v133`.
+
+### Fuera de alcance
+
+- Structured outputs para `training_plan` y registrar `stop_reason` del proveedor.
+- Si, ya completa, la semana pasa las demás reglas de `validateTrainingPlanWeek()`: no se puede comprobar sin llamar al proveedor; se verá en `coach_usage`.
+
+### Riesgos
+
+- Una semana completa tarda más en generarse (antes ~18 s hasta el corte); el cliente espera hasta 90 s por intento.
+
+### Criterios de aceptación
+
+- Para semanas de 4 y 6 sesiones (fuerza y carrera), `maxTokens` ≥ caracteres del JSON con sangría / 2,5, y el prompt pide una sola línea. ✓ (`tests/e2e/entreno.spec.js`; falla sin el arreglo: 2048 < 2170)
 - `node scripts/release-gate.mjs` pasa.

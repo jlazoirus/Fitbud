@@ -899,3 +899,42 @@ test.describe("Ejercicio anterior", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
+
+test.describe("Plan de entrenamiento con el coach (REQ-251)", () => {
+  test("el tope de tokens alcanza para la semana más larga y se pide JSON en una línea", async ({ page, context }) => {
+    const { calls } = await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    await gotoApp(page);
+
+    // En producción las 8 semanas pedidas terminaron con exactamente 2048 tokens
+    // de salida (JSON cortado), incluida una de 4 sesiones de fuerza cuyo JSON con
+    // sangría ocupa ~5.400 caracteres: 2048 tokens no alcanzan ni a 2,7 caracteres
+    // por token. Se exige margen para ~2,5 caracteres por token.
+    const weeks = await page.evaluate(async () => {
+      const base = migrateProfilePrefs((profile && profile.prefs) || {});
+      const variants = [
+        {},
+        { trainingDays: [1, 2, 3, 4, 5, 6], sessionMinutes: 90 },
+        { trainingDays: [1, 2, 3, 4, 5, 6], sessionMinutes: 90, primarySport: "running", strengthMode: "gym" },
+      ];
+      const out = [];
+      for (const variant of variants) {
+        const prefs = { ...base, ...variant };
+        const expected = trainingExpectedWeeks(prefs)[0];
+        const pretty = JSON.stringify(deterministicTrainingWeekPayload(expected, prefs), null, 2).length;
+        try {
+          await generateTrainingWeek(expected, prefs, { action: "training_plan", requestId: crypto.randomUUID(), partKey: `week-${expected.week}` });
+        } catch (_) { /* el mock no devuelve una semana: solo interesa lo enviado */ }
+        out.push({ sessions: expected.sessions.length, pretty });
+      }
+      return out;
+    });
+    const sent = calls.filter((c) => c.table === "/api/claude" && c.payload?.quota?.action === "training_plan").map((c) => c.payload);
+    expect(sent).toHaveLength(weeks.length);
+    weeks.forEach((week, i) => {
+      expect(sent[i].maxTokens, `semana de ${week.sessions} sesiones (${week.pretty} caracteres con sangría)`).toBeGreaterThanOrEqual(Math.ceil(week.pretty / 2.5));
+      expect(sent[i].userText).toContain("en una sola línea, sin sangría");
+    });
+  });
+});
