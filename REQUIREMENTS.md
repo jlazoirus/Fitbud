@@ -1699,33 +1699,9 @@ Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostran
 
 ## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
 
-**Estado: implementado.**
+**Estado: implementado.** Las filas de "Lo que sigue hoy" usan clases `kind-*` en vez de `meal`/`workout` (las tarjetas globales), así que ya no son tarjetas sin relleno lateral y los botones quedan a 16 px del borde. Test: `tests/e2e/home.spec.js`.
 
-### Origen
-
-Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apretados". En "Próxima comida" y "Entrenamiento pendiente", "Ver detalle" y "Adaptar" llegan al borde derecho de su tarjeta.
-
-### Causa raíz
-
-`homeAgendaItemHtml()` (`index.html`) ponía el tipo de la fila como clase suelta (`agenda-item meal`, `agenda-item workout`). `.meal` y `.workout` son las tarjetas globales de comida y entreno (fondo, borde, radio), así que cada fila se volvía una tarjeta dentro de la tarjeta de la agenda; pero `.agenda-item{padding:13px 0}` les quita el relleno lateral y los botones (`flex:1 1 128px`) llenan el ancho hasta el borde. Medido a 390 px: "Ver detalle" termina a 0 px del borde.
-
-### Alcance
-
-1. La clase del tipo va con prefijo (`kind-meal`, `kind-workout`, `kind-resume`, `kind-rest`) y los selectores de icono se ajustan: la agenda vuelve a ser la lista con separadores que define su CSS, con los botones a 16 px del borde de la tarjeta.
-2. `CACHE_NAME` → `fitbud-pwa-v131`.
-
-### Fuera de alcance
-
-- Cambiar el diseño de la agenda.
-
-### Riesgos
-
-- Las filas ya no tienen fondo propio (el entreno pierde su degradado azul); el icono conserva su color por tipo.
-
-### Criterios de aceptación
-
-- A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
-- `node scripts/release-gate.mjs` pasa.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-249`).
 
 ## REQ-250 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
 
@@ -1982,3 +1958,35 @@ Re-preparar no descarta una comida elegida o editada a mano, aunque no esté mar
 ### Verificación sugerida
 
 - E2E: preparar día, editar desayuno a 777 kcal sin tildar, "Volver a preparar"; el slot sigue en 777.
+
+## REQ-257 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de producción de REQ-246 (2026-10-21). En `coach_usage` las 8 llamadas `training_plan` (2026-06-24 a 2026-10-20) son `refunded` / `invalid_provider_output` con **exactamente 2048 tokens de salida**; ninguna se completó. La app usa entonces la alternativa validada para todas las semanas ("Se usó la alternativa validada en: semana 1, …") y nadie lo nota.
+
+### Causa raíz
+
+`generateTrainingWeek()` (`index.html`) pide la semana con `maxTokens` 2048 y el prompt no pide JSON compacto: el modelo lo escribe con sangría. Una semana de 4 sesiones de fuerza ocupa ~5.400 caracteres con sangría (~3.250 compacta); una de 6 con carrera, ~7.800. No cabe: el JSON llega cortado, `validateCoachOutput()` lo rechaza (422) y, desde ese fallo, `generateTrainingPlan()` usa la alternativa para el resto de semanas.
+
+### Alcance
+
+1. `TRAINING_WEEK_MAX_TOKENS` = 4096 (el tope del proxy) para cada semana.
+2. El prompt pide el JSON en una sola línea, sin sangría ni saltos de línea.
+3. `CACHE_NAME` → `fitbud-pwa-v134`.
+
+### Fuera de alcance
+
+- Structured outputs para `training_plan` y registrar `stop_reason` del proveedor.
+- Si, ya completa, la semana pasa las demás reglas de `validateTrainingPlanWeek()`: no se puede comprobar sin llamar al proveedor; se verá en `coach_usage`.
+
+### Riesgos
+
+- Una semana completa tarda más en generarse (antes ~18 s hasta el corte); el cliente espera hasta 90 s por intento.
+
+### Criterios de aceptación
+
+- Para semanas de 4 y 6 sesiones (fuerza y carrera), `maxTokens` ≥ caracteres del JSON con sangría / 2,5, y el prompt pide una sola línea. ✓ (`tests/e2e/entreno.spec.js`; falla sin el arreglo: 2048 < 2170)
+- `node scripts/release-gate.mjs` pasa.
