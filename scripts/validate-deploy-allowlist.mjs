@@ -70,6 +70,8 @@ for (const page of ["index.html", "beta-reclutamiento.html"]) {
     required.add(ref.replace(/[?#].*$/, "").replace(/^\.?\//, "") || "index.html");
   }
 }
+// Fotos de ejercicios servidas desde el propio deploy (REQ-259).
+for (const [, ref] of read("exercise-catalog.js").matchAll(/"(assets\/[^"]+)"/g)) required.add(ref);
 const shell = read("service-worker.js").match(/const APP_SHELL = \[([\s\S]*?)\];/);
 assert.ok(shell, "service-worker.js debe declarar APP_SHELL");
 for (const [, ref] of shell[1].matchAll(/"\.\/([^"]*)"/g)) required.add(ref || "index.html");

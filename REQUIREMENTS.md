@@ -1963,38 +1963,18 @@ Re-preparar no descarta una comida elegida o editada a mano, aunque no esté mar
 
 ## REQ-257 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
-
-Revisión de producción de REQ-246 (2026-10-21). En `coach_usage` las 8 llamadas `training_plan` (2026-06-24 a 2026-10-20) son `refunded` / `invalid_provider_output` con **exactamente 2048 tokens de salida**; ninguna se completó. La app usa entonces la alternativa validada para todas las semanas ("Se usó la alternativa validada en: semana 1, …") y nadie lo nota.
-
-### Causa raíz
-
-`generateTrainingWeek()` (`index.html`) pide la semana con `maxTokens` 2048 y el prompt no pide JSON compacto: el modelo lo escribe con sangría. Una semana de 4 sesiones de fuerza ocupa ~5.400 caracteres con sangría (~3.250 compacta); una de 6 con carrera, ~7.800. No cabe: el JSON llega cortado, `validateCoachOutput()` lo rechaza (422) y, desde ese fallo, `generateTrainingPlan()` usa la alternativa para el resto de semanas.
-
-### Alcance
-
-1. `TRAINING_WEEK_MAX_TOKENS` = 4096 (el tope del proxy) para cada semana.
-2. El prompt pide el JSON en una sola línea, sin sangría ni saltos de línea.
-3. `CACHE_NAME` → `fitbud-pwa-v134`.
-
-### Fuera de alcance
-
-- Structured outputs para `training_plan` y registrar `stop_reason` del proveedor.
-- Si, ya completa, la semana pasa las demás reglas de `validateTrainingPlanWeek()`: no se puede comprobar sin llamar al proveedor; se verá en `coach_usage`.
-
-### Riesgos
-
-- Una semana completa tarda más en generarse (antes ~18 s hasta el corte); el cliente espera hasta 90 s por intento.
-
-### Criterios de aceptación
-
-- Para semanas de 4 y 6 sesiones (fuerza y carrera), `maxTokens` ≥ caracteres del JSON con sangría / 2,5, y el prompt pide una sola línea. ✓ (`tests/e2e/entreno.spec.js`; falla sin el arreglo: 2048 < 2170)
-- `node scripts/release-gate.mjs` pasa.
+Cada semana del plan del coach pide `TRAINING_WEEK_MAX_TOKENS` = 4096 y JSON en una sola línea: con 2048 llegaba cortada y siempre se usaba la alternativa. ✓ `tests/e2e/entreno.spec.js`.
 
 ## REQ-258 - Home: con el día cerrado, Hoy resume el día y muestra lo que toca mañana
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Día cerrado: Hoy oculta "Consumo de hoy" y muestra hoy en una línea, qué toca mañana (`homeTomorrowData()`) y "Ver mañana". ✓ `tests/e2e/home.spec.js`.
+
+## REQ-259 - Entreno: caminata, running, bici y natación con foto real en vez del dibujo
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Los 12 ejercicios de resistencia muestran una foto por disciplina (`assets/exercise-media/`) desde `exercise-catalog.js`; `exerciseMediaSources()` la usa también si la fila de Supabase no trae media. SQL opcional: `supabase/exercise-media-endurance.sql`.
