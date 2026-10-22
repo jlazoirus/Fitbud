@@ -10523,4 +10523,4 @@ Con el día cerrado (`homeAgendaData()` → `state:"done"`), `renderHoy()` (`ind
 ### Criterios de aceptación
 
 - Con todas las comidas y el entreno hechos, Hoy no muestra "Consumo de hoy", resume el día en una línea y muestra el entreno y las comidas de mañana; "Ver mañana" deja `current` en mañana. ✓ (`tests/e2e/home.spec.js`)
-- `node scripts/release-gate.mjs` pasa (E2E: 110/110).
+- `node scripts/release-gate.mjs` pasa (E2E: 111/111).

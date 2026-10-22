@@ -95,9 +95,7 @@ Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/R
 - REQ-254 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
 - REQ-255 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
 
-Feedback Jonathan (2026-10-22, iPhone):
-
-- REQ-258 - Home: con el día cerrado, Hoy resume el día y muestra lo que toca mañana. (P1; implementado)
+- REQ-258 - Home: día cerrado muestra mañana. (Jonathan; implementado)
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -1999,6 +1997,4 @@ Revisión de producción de REQ-246 (2026-10-21). En `coach_usage` las 8 llamada
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Pedido de Jonathan (captura con 5/5 comidas y entreno hecho, "MAÑANA" sobre "Consumo de hoy"). Con `homeAgendaData()` en `done`, `renderHoy()` oculta `miniMacroDash`; la tarjeta dice "Todo listo por hoy" con hoy en una línea y un bloque "Mañana · <fecha>" (entreno que toca y si las comidas están listas, `homeTomorrowData()`). "Ver mañana" abre ese día (`goDay`). `CACHE_NAME` → `fitbud-pwa-v135`.
-
-- ✓ `tests/e2e/home.spec.js`; `node scripts/release-gate.mjs` pasa (E2E: 110/110).
+Día cerrado: Hoy oculta "Consumo de hoy" y muestra hoy en una línea, qué toca mañana (`homeTomorrowData()`) y "Ver mañana". ✓ `tests/e2e/home.spec.js`.
