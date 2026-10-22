@@ -10145,3 +10145,65 @@ La dosis mostraba el tempo como "3-1-1" con la etiqueta "tempo", sin explicar qu
 
 - La tarjeta muestra "baja · pausa · sube ⓘ" y al tocarla explica "3 s bajando el peso" y "1 s subiendo"; `tempoPhases("Controlado")` es `null`. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-233 - Nutrición: tocar la tarjeta de una comida abre su menú de opciones
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
+
+### Problema
+
+La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
+
+### Alcance
+
+1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
+2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
+3. `CACHE_NAME` → `fitbud-pwa-v115`.
+
+### Fuera de alcance
+
+- Tarjetas de extras y comidas saltadas (no tienen menú "···").
+
+### Riesgos
+
+- Ninguno sobre datos: solo abre un menú existente.
+
+### Criterios de aceptación
+
+- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura de Entreno con la sesión en curso: el aviso "Señales para detenerte", la tarjeta del plan ("Correr + Gimnasio · Preparar mi plan · Configurar") y la del entrenamiento ("Push B · cambiado · Cambiar entrenamiento") "no tienen sentido una vez iniciado: solo ocupan espacio y confunden; deberían estar colapsados o juntos en un botón".
+
+### Problema
+
+`renderWorkout()` pintaba siempre esas tres piezas antes del reproductor, aunque con la sesión en curso sus acciones están deshabilitadas o no aplican, y el reproductor quedaba abajo.
+
+### Alcance
+
+1. Con la ejecución `in_progress` o `paused`, el reproductor va justo después de la cabecera del día y el aviso, el plan y la tarjeta del entrenamiento quedan en `<details class="wk-context">` "Plan y detalles de hoy" (con el nombre de la sesión), cerrado por defecto; si se abre, sigue abierto entre acciones del reproductor.
+2. La pausa por seguridad (`trainingSafetyHold()`) sigue siempre a la vista. Antes de empezar y con la sesión cerrada (completada o parcial) no cambia nada.
+3. `CACHE_NAME` → `fitbud-pwa-v121`.
+
+### Fuera de alcance
+
+- "Actividad registrada" y "Resumen", que siguen debajo.
+
+### Riesgos
+
+- Ninguno sobre datos: solo cambia el orden y la visibilidad.
+
+### Criterios de aceptación
+
+- Con la sesión en curso, el desplegable existe cerrado después del reproductor, oculta el aviso, "Preparar mi plan" y "Cambiar entrenamiento", sigue abierto tras "Ahora no" y desaparece al descartar. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓

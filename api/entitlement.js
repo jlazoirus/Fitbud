@@ -225,7 +225,7 @@ const COACH_ACTIONS = [
 ];
 const BETA_DAILY_LIMIT = 10000; // = QUOTA_OVERRIDE_MAX de api/admin.js
 
-// REQ-250: lo que ya respondió en la postulación (nombre, objetivo, experiencia)
+// REQ-251: lo que ya respondió en la postulación (nombre, objetivo, experiencia)
 // llega al onboarding; igual que api/admin.js, sin tocar un onboarding hecho.
 const BETA_GOAL_TO_PREF = { "Bajar grasa": "deficit", "Ganar musculo": "volumen", "Mejorar rendimiento": "mantenimiento" };
 const BETA_STAGE_TO_EXPERIENCE = { beginner: "beginner", returning: "beginner", consistent: "intermediate", advanced: "advanced" };

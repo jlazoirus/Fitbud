@@ -1534,32 +1534,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-232`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-20), con captura de Nutrición: "Cuando le das click dentro del card se debería abrir el menú de 3 puntos".
-
-### Problema
-
-La tarjeta de comida (`mealCard()`) solo reacciona a sus botones: tocar el nombre, los macros o el fondo no hace nada, y lo que el usuario espera al tocar una comida (ver la receta, editarla, saltarla, bloquear el plato) vive escondido en un "···" pequeño sin nombre accesible.
-
-### Alcance
-
-1. Tocar la tarjeta fuera de sus controles (`mealCardTap()`) abre `openMealMore()`, el mismo menú que "···". Los botones (marcar hecha, "Otra opción", "Volver al plan", "···", subir/bajar) y la receta siguen haciendo lo suyo.
-2. "···" lleva `aria-label="Más opciones de <momento>"`; la tarjeta muestra cursor de puntero.
-3. `CACHE_NAME` → `fitbud-pwa-v115`.
-
-### Fuera de alcance
-
-- Tarjetas de extras y comidas saltadas (no tienen menú "···").
-
-### Riesgos
-
-- Ninguno sobre datos: solo abre un menú existente.
-
-### Criterios de aceptación
-
-- Tocar el nombre de una comida abre su menú; marcarla como hecha no lo abre; "···" sigue abriéndolo. ✓ (`tests/e2e/nutricion.spec.js`)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-233`).
 
 ## REQ-234 - El check-in semanal re-puntúa días ya ejecutados y contradice su copy "para la próxima semana"
 
@@ -1633,32 +1608,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
 
 **Estado: implementado.**
 
-### Origen
-
-Jonathan (2026-10-21), con captura de Entreno con la sesión en curso: el aviso "Señales para detenerte", la tarjeta del plan ("Correr + Gimnasio · Preparar mi plan · Configurar") y la del entrenamiento ("Push B · cambiado · Cambiar entrenamiento") "no tienen sentido una vez iniciado: solo ocupan espacio y confunden; deberían estar colapsados o juntos en un botón".
-
-### Problema
-
-`renderWorkout()` pintaba siempre esas tres piezas antes del reproductor, aunque con la sesión en curso sus acciones están deshabilitadas o no aplican, y el reproductor quedaba abajo.
-
-### Alcance
-
-1. Con la ejecución `in_progress` o `paused`, el reproductor va justo después de la cabecera del día y el aviso, el plan y la tarjeta del entrenamiento quedan en `<details class="wk-context">` "Plan y detalles de hoy" (con el nombre de la sesión), cerrado por defecto; si se abre, sigue abierto entre acciones del reproductor.
-2. La pausa por seguridad (`trainingSafetyHold()`) sigue siempre a la vista. Antes de empezar y con la sesión cerrada (completada o parcial) no cambia nada.
-3. `CACHE_NAME` → `fitbud-pwa-v121`.
-
-### Fuera de alcance
-
-- "Actividad registrada" y "Resumen", que siguen debajo.
-
-### Riesgos
-
-- Ninguno sobre datos: solo cambia el orden y la visibilidad.
-
-### Criterios de aceptación
-
-- Con la sesión en curso, el desplegable existe cerrado después del reproductor, oculta el aviso, "Preparar mi plan" y "Cambiar entrenamiento", sigue abierto tras "Ahora no" y desaparece al descartar. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
-- `node scripts/release-gate.mjs` pasa. ✓
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-239`).
 
 ## REQ-240 - Entreno: la demostración y los pasos se abren desde junto al nombre del ejercicio
 
@@ -1984,7 +1934,37 @@ Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apr
 - A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
 - `node scripts/release-gate.mjs` pasa.
 
-## REQ-250 - Beta: el perfil llega con lo que ya respondió en la postulación
+## REQ-250 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del resultado "Sesión parcial · 6/7 bloques completados · 16/16 series registradas · 1 bloque omitido": "Hice toda la sesión y lo único que pasé si no me equivoco son los calentamientos; no debería decir parcial, debería ser completada".
+
+### Causa raíz
+
+REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahora no" los deja `declined`. Si el usuario elegía hacerlos y luego tocaba "Omitir bloque" (o "Omitir" en su cronómetro), `skipWorkoutStep()`/`finishTimedWorkoutStep()` (`index.html`) los marcaban `skipped`, que cuenta como bloque omitido y hace que `workoutFullyCompleted()` guarde la sesión como parcial.
+
+### Alcance
+
+1. Omitir un bloque opcional lo deja `declined`, igual que "Ahora no".
+2. `normalizeStep()` (`workout-player.js`) convierte en `declined` un opcional `skipped`, así las sesiones en curso o guardadas antes del arreglo dejan de contarlo como omitido.
+3. Una sesión guardada parcial a la que no le falta nada (sin bloques omitidos, sin series sin marcar, sin dolor) muestra "Marcar como completada", que la cierra completada sin reabrirla.
+4. `CACHE_NAME` → `fitbud-pwa-v132`.
+
+### Fuera de alcance
+
+- Omitir un ejercicio o un bloque de cardio sigue dejando la sesión parcial.
+- No se reclasifica sola ninguna sesión guardada: el cambio a completada lo decide el usuario.
+
+### Criterios de aceptación
+
+- Elegir el calentamiento y la vuelta a la calma y omitirlos, con todas las series hechas, guarda "Sesión completada" con 0 bloques omitidos. ✓ (`tests/e2e/entreno.spec.js`)
+- Una sesión guardada parcial con el calentamiento `skipped` muestra 0 omitidos y "Marcar como completada"; al tocarlo queda completada y cuenta como entreno hecho. ✓ (misma prueba, `scripts/validate-workout-player.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-251 - Beta: el perfil llega con lo que ya respondió en la postulación
 
 **Estado: implementado.**
 

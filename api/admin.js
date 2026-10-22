@@ -207,7 +207,7 @@ async function grantBetaUnlimitedQuota(userId, expiresAt, caller, e) {
   if (!response.ok) throw new Error(apiError(await responseJson(response), "No se pudo quitar el tope del coach."));
 }
 
-// REQ-250: lo que ya respondió en la postulación llega al onboarding para no
+// REQ-251: lo que ya respondió en la postulación llega al onboarding para no
 // pedírselo otra vez. Solo nombre, objetivo y experiencia tienen equivalente
 // exacto (la edad es un rango; la salud se pregunta con detalle en la app).
 // Nunca toca un perfil con el onboarding hecho ni marca el onboarding como hecho.

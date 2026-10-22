@@ -201,7 +201,7 @@ test.describe("Onboarding", () => {
     });
   }
 
-  // REQ-250: un postulante aceptado llega con nombre, objetivo y experiencia de su postulación.
+  // REQ-251: un postulante aceptado llega con nombre, objetivo y experiencia de su postulación.
   test("postulante beta: el onboarding trae lo que ya respondió al postular", async ({ page, context }) => {
     await installMocks(context, { tables: { profiles: { row: profileFixture({ name: "Ana", goal: "volumen", trainingExperience: "intermediate" }) } } });
     await seedLoggedInUser(page);

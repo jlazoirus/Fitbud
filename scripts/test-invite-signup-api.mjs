@@ -75,7 +75,7 @@ assert(Array.isArray(overrides) && overrides.length === 8, "Código beta: un ove
 assert(overrides.every((o) => o.user_id === NEW_ID && o.daily_limit === 10000 && o.enabled === true && o.bonus_units === 0 && o.expires_at === "2027-01-16T00:00:00Z"),
   "Código beta: tope máximo que vence con el acceso de 90 días.");
 assert(new Set(overrides.map((o) => o.action)).size === 8 && overrides.some((o) => o.action === "coach_conversation"), "Cubre todas las acciones, incluida la conversación.");
-// REQ-250: con el código de una postulación, su perfil llega con lo que ya respondió.
+// REQ-251: con el código de una postulación, su perfil llega con lo que ya respondió.
 assert(profileWrite && profileWrite.id === NEW_ID && profileWrite.prefs.name === "Ana" && profileWrite.prefs.goal === "deficit" && profileWrite.prefs.trainingExperience === "beginner" && !profileWrite.prefs.onboardingCompletedAt,
   "Rellena nombre, objetivo y experiencia sin dar el onboarding por hecho: " + JSON.stringify(profileWrite));
 res = await signup({}, () => { betaInvited = true; profilePrefs = { onboardingCompletedAt: "2026-10-01T00:00:00Z", goal: "volumen" }; });

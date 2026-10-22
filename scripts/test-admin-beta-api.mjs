@@ -113,7 +113,7 @@ assert(codeInserts.length === 0, "Con correo no hace falta código.");
 assert(overrides.length === 1 && overrides[0].length === 8 && overrides[0].every((o) => o.daily_limit === 10000 && o.enabled === true && o.expires_at === entitlements[0].expires_at),
   "REQ-248: aceptar deja el coach sin tope hasta que vence el acceso.");
 assert(!res.body.betaError, "Sin errores de acceso ni de cuotas.");
-// REQ-250: lo que respondió en la postulación queda en su perfil para el onboarding.
+// REQ-251: lo que respondió en la postulación queda en su perfil para el onboarding.
 assert(profilePatches.length === 1 && profilePatches[0].url.endsWith("id=eq.dddddddd-dddd-4ddd-8ddd-dddddddddddd"), "Rellena el perfil de la cuenta invitada.");
 const seeded = profilePatches[0].body.prefs;
 assert(seeded.name === "Ana Pérez" && seeded.goal === "volumen" && seeded.trainingExperience === "intermediate", "Nombre, objetivo y experiencia desde la postulación: " + JSON.stringify(seeded));
@@ -126,7 +126,7 @@ invites = []; entitlements = [];
 res = await call({ action: "betaAccept", id: 7 });
 assert(res.body.mode === "existing" && invites.length === 0 && entitlements[0].user_id === "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "Si ya tenía cuenta, solo recibe el acceso.");
 
-// REQ-250: si ya hizo el onboarding no se toca su perfil; si tenía nombre propio, se respeta.
+// REQ-251: si ya hizo el onboarding no se toca su perfil; si tenía nombre propio, se respeta.
 profilePatches = []; profilePrefs = { name: "Anita", goal: "deficit", onboardingCompletedAt: "2026-10-01T00:00:00Z" };
 res = await call({ action: "betaAccept", id: 7 });
 assert(res.statusCode === 200 && profilePatches.length === 0, "Con el onboarding hecho no reescribe el perfil.");
