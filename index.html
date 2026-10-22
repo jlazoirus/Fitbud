@@ -637,15 +637,12 @@
   .agenda-state{background:linear-gradient(160deg,var(--accent-dim),var(--surf1));border-color:var(--border-acc)}
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
-  .agenda-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
-  .agenda-summary div{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
-  .agenda-summary b{display:block;font-family:var(--font-body);font-size:19px;line-height:1}
-  .agenda-summary span{display:block;color:var(--muted);font-size:11px;margin-top:4px}
+  .agenda-next{margin-top:12px}
+  .agenda-next-head{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase}
   @media(max-width:380px){
     .agenda-head{flex-direction:column}
     .agenda-count{align-self:flex-start}
     .agenda-actions .btn{flex-basis:100%}
-    .agenda-summary{grid-template-columns:1fr}
   }
   .home-quick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
   .hq-btn{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px 8px;text-align:center;cursor:pointer;transition:.15s;display:flex;flex-direction:column;align-items:center;gap:5px}
@@ -4483,6 +4480,24 @@ function homeAgendaItemHtml(item){
     </div>
   </div>`;
 }
+// REQ-252: resumen de mañana para el día cerrado: qué entreno toca y si las
+// comidas ya están listas. Sin detalle; el detalle vive en "Ver mañana".
+function homeTomorrowData(ds){
+  const next=addDays(ds,1);
+  if(next>END)return null;
+  const ew=effectiveWorkout(next);
+  const rest=!ew.workout||ew.workout.id==="descanso";
+  const day=buildDay(next);
+  const prepared=homeDayHasPreparedMeals(next,day);
+  return {ds:next,items:[
+    {kind:rest?"rest":"workout",icon:rest?"○":"◉",label:"Entreno",title:rest?"Descanso planificado":(ew.workout.name||"Sesión del día")},
+    {kind:"meal",icon:"●",label:"Comidas",title:prepared?`${day.meals.length} comida${day.meals.length===1?"":"s"} lista${day.meals.length===1?"":"s"}`:"Aún por preparar"}
+  ]};
+}
+function homeOpenTomorrow(ds){
+  homeTrackAction(ds,"open_tomorrow");
+  goDay(ds);
+}
 function homeAgendaHtml(ds){
   const data=homeAgendaData(ds);
   const note=homeCacheNoticeHtml();
@@ -4501,24 +4516,28 @@ function homeAgendaHtml(ds){
     </section>`;
   }
   if(data.state==="done"){
+    // REQ-252: con el día cerrado, hoy va en una línea y la tarjeta mira a mañana.
     const workoutLabel=data.ew.workout&&data.ew.workout.id==="descanso"
       ?"descanso planificado"
-      :workoutStatusLabel(data.workoutOutcome).toLowerCase();
+      :"entreno "+workoutStatusLabel(data.workoutOutcome).toLowerCase();
+    const todaySummary=[`${data.doneMeals}/${data.totMeals} comidas`,`${dayTotals(ds).t.kcal} kcal`,workoutLabel].join(" · ");
+    const next=homeTomorrowData(ds);
+    const nextHtml=next?`<div class="agenda-next">
+        <div class="agenda-next-head">Mañana · ${esc(prettyDate(next.ds))}</div>
+        <div class="agenda-list">${next.items.map(homeAgendaItemHtml).join("")}</div>
+      </div>`:"";
     return `<section class="agenda-card agenda-state done">
       <div class="agenda-head">
         <div>
           <div class="agenda-kicker">Día cerrado</div>
-          <h2 class="agenda-title">Todo lo importante de hoy está cubierto</h2>
-          <div class="agenda-sub">Puedes revisar progreso o dejar notas adicionales desde las vistas de detalle.</div>
+          <h2 class="agenda-title">Todo listo por hoy</h2>
+          <div class="agenda-sub">${esc(todaySummary)}</div>
         </div>
         <span class="agenda-count">Racha ${streak()}</span>
       </div>
       ${note}
-      <div class="agenda-summary">
-        <div><b>${data.doneMeals}/${data.totMeals}</b><span>comidas registradas</span></div>
-        <div><b>${esc(workoutLabel)}</b><span>entrenamiento</span></div>
-      </div>
-      <div class="agenda-actions"><button class="btn" onclick="setView('progreso')">Ver progreso</button></div>
+      ${nextHtml}
+      <div class="agenda-actions">${next?`<button class="btn btn-accent" onclick="homeOpenTomorrow('${next.ds}')">Ver mañana</button>`:""}<button class="btn" onclick="setView('progreso')">Ver progreso</button></div>
     </section>`;
   }
   return `<section class="agenda-card">
@@ -4579,6 +4598,8 @@ function renderHoy(){
   checkAndSaveMilestones();
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
   const checkinDue=weeklyCheckinDue();
+  // REQ-252: con el día cerrado, el consumo detallado de hoy deja paso a mañana.
+  const dayClosed=homeAgendaData(ds).state==="done";
   const hasAI=aiAvailable();
   const canUse=hasAI&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
   const msgs=loadCoachChat();
@@ -4614,7 +4635,7 @@ function renderHoy(){
   </header>
   ${adminBetaPendingCardHtml()}
   ${restartNudgeCard()}
-  ${heroDash(ds,{compact:true})}
+  ${dayClosed?"":heroDash(ds,{compact:true})}
   ${homeAgendaHtml(ds)}
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
