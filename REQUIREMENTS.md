@@ -1699,33 +1699,9 @@ Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostran
 
 ## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
 
-**Estado: implementado.**
+**Estado: implementado.** Las filas de "Lo que sigue hoy" usan clases `kind-*` en vez de `meal`/`workout` (las tarjetas globales), así que ya no son tarjetas sin relleno lateral y los botones quedan a 16 px del borde. Test: `tests/e2e/home.spec.js`.
 
-### Origen
-
-Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apretados". En "Próxima comida" y "Entrenamiento pendiente", "Ver detalle" y "Adaptar" llegan al borde derecho de su tarjeta.
-
-### Causa raíz
-
-`homeAgendaItemHtml()` (`index.html`) ponía el tipo de la fila como clase suelta (`agenda-item meal`, `agenda-item workout`). `.meal` y `.workout` son las tarjetas globales de comida y entreno (fondo, borde, radio), así que cada fila se volvía una tarjeta dentro de la tarjeta de la agenda; pero `.agenda-item{padding:13px 0}` les quita el relleno lateral y los botones (`flex:1 1 128px`) llenan el ancho hasta el borde. Medido a 390 px: "Ver detalle" termina a 0 px del borde.
-
-### Alcance
-
-1. La clase del tipo va con prefijo (`kind-meal`, `kind-workout`, `kind-resume`, `kind-rest`) y los selectores de icono se ajustan: la agenda vuelve a ser la lista con separadores que define su CSS, con los botones a 16 px del borde de la tarjeta.
-2. `CACHE_NAME` → `fitbud-pwa-v131`.
-
-### Fuera de alcance
-
-- Cambiar el diseño de la agenda.
-
-### Riesgos
-
-- Las filas ya no tienen fondo propio (el entreno pierde su degradado azul); el icono conserva su color por tipo.
-
-### Criterios de aceptación
-
-- A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
-- `node scripts/release-gate.mjs` pasa.
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-249`).
 
 ## REQ-250 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
 
@@ -1940,7 +1916,50 @@ El único recordatorio fuera de la app es por correo (REQ-24) y muchos usuarios 
 
 - ¿WhatsApp (opción 1 o 2, con presupuesto mensual) o primero la opción 3?
 
-## REQ-256 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
+## REQ-256 - Fix Nutrición: "Volver a preparar este día" pisa comidas personalizadas sin marcar como hechas
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey `nutrición` (commit previo `4e31c77`).
+
+### Problema
+
+Con el día preparado, el usuario edita un slot ("Personalizada / editar valores") o lo cambia ("Otra opción") sin marcarlo hecho. "Más opciones → Volver a preparar este día" lo devuelve a la comida generada y el dato se pierde en silencio. El toast "Lo que ya registraste hoy no cambia" solo aparece si había una comida marcada hecha.
+
+### Causa raíz
+
+`applyDayComidas` (`index.html:10827`) conserva solo `ms.done` (`if(ms.done){preserved++;return;} ms.ovr={…}`); cualquier otro `ms.ovr` se pisa. Entra por `openNutritionMoreMenu` (`index.html:4788`) → `homePrepareDay` → `applyGeneratedDay`/`applyDeterministicDay` → `applyDayComidas`. La preservación de REQ-119 (solo `done=true`) quedó incompleta.
+
+### Objetivo
+
+Re-preparar no descarta una comida elegida o editada a mano, aunque no esté marcada como hecha.
+
+### Alcance
+
+1. `applyDayComidas` conserva también slots con override del usuario, no solo `done`.
+2. Marcar ese override (p. ej. `userSet:true` en `saveEditor`/`applyChangeMeal`).
+3. El toast no debe prometer una preservación que no ocurre.
+
+### Fuera de alcance
+
+- Días pasados y extras (no se pisan).
+
+### Riesgos
+
+- "Otra opción" también usa `gen:true`; hace falta una marca propia para distinguirlo de lo generado.
+
+### Criterios de aceptación
+
+- Editar un slot sin marcarlo hecho y "Volver a preparar" conserva el valor; una comida marcada hecha se sigue conservando.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- E2E: preparar día, editar desayuno a 777 kcal sin tildar, "Volver a preparar"; el slot sigue en 777.
+
+## REQ-257 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
 
 **Estado: implementado.**
 

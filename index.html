@@ -10114,7 +10114,7 @@ No inventes ejercicios ni cambies los días disponibles. Responde SOLO JSON vál
 {"week":${expected.week},"phase":"${expected.phase}","reason":"breve","sessions":[{"date":"YYYY-MM-DD","weekday":1,"location":"gym","role":"fullA","type":"strength","name":"...","objective":"...","duration_minutes":60,"intensity":"RPE 6","exercises":[{"exercise_id":"back-squat","sets":3,"reps":"8-10","rest_seconds":120,"target_rpe":6,"target_rir":3,"tempo":"3-1-1"}],"blocks":[]}]}
 Contexto estructurado: ${JSON.stringify(context)}`;
 }
-// REQ-256: con 2048 tokens la semana llegaba cortada (en producción, siempre) y
+// REQ-257: con 2048 tokens la semana llegaba cortada (en producción, siempre) y
 // caía a la alternativa validada; 4096 es el tope del proxy.
 const TRAINING_WEEK_MAX_TOKENS=4096;
 async function generateTrainingWeek(expected,prefs,request){
