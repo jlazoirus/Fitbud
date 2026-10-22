@@ -1299,9 +1299,20 @@ const TRAINING_ACTIVITY_OPTIONS=[
   ["running","Correr"],
   ["cycling","Bicicleta"],
   ["swimming","Natación"],
-  ["other","Otra actividad"],
-  ["strength_only","Ninguna por ahora"],
+  ["other","Otro deporte"],
+  ["strength_only","Ninguno, solo fuerza"],
 ];
+// REQ-253: qué cambia en tu semana según el deporte que elijas.
+function primarySportHelp(value){
+  if(value==="other")return "Pádel, fútbol u otro: los días que no son de fuerza quedan para tu deporte; lo juegas y lo registras en Entreno.";
+  if(value==="strength_only")return "Tu semana es solo fuerza; los demás días son descanso.";
+  const label=SPORT_LABELS[value];
+  return label?`Tu semana suma sesiones guiadas de ${label.toLowerCase()} entre las de fuerza.`:"";
+}
+function updateSportHelp(prefix){
+  const el=$("#"+prefix+"_sport"),help=$("#"+prefix+"_sport_help");
+  if(el&&help)help.textContent=primarySportHelp(el.value);
+}
 const STRENGTH_CHOICE_OPTIONS=[
   ["gym","Fuerza en gimnasio"],
   ["home","Fuerza en casa"],
@@ -1417,13 +1428,15 @@ function workoutSchedule(days,dayIds,priority,locations,primary,experience,worko
   const selected=normalizedTrainingDays(dayIds,days);
   let sessions=trainingTemplateForModes(selected.length,priority,experience,workoutSplit,strength,primary);
   const sportIds=new Set(["calidad","facil","tecnica"]);
-  // Fix: "other" nunca tiene sesiones reales de "facil/calidad/técnica" (sportSessions()
-  // devuelve un placeholder sin nombre) y "strength_only" solo tiene una real ("facil",
-  // como "Actividad ligera libre") cuando lightCardioEnabled está activo. La plantilla de
-  // días puede asignar igual esos slots, así que hay que sustituir por descanso cualquier
-  // slot de deporte sin sesión real, o workoutById devuelve null y renderWorkout falla.
-  if(primary==="other"||primary==="strength_only"){
-    const realSportIds=(primary==="strength_only"&&lightCardioEnabled)?new Set(["facil"]):new Set();
+  // Fix: "strength_only" solo tiene una sesión real ("facil", como "Actividad ligera
+  // libre") cuando lightCardioEnabled está activo; sus demás slots de deporte pasan a
+  // descanso, o workoutById devuelve null y renderWorkout falla.
+  // REQ-252: "other" tiene una sola sesión real, "facil" (el día de tu deporte); antes
+  // esos días pasaban a "Descanso total" aunque el usuario los había elegido.
+  if(primary==="other"){
+    sessions=sessions.map(id=>sportIds.has(id)?"facil":id);
+  }else if(primary==="strength_only"){
+    const realSportIds=lightCardioEnabled?new Set(["facil"]):new Set();
     sessions=sessions.map(id=>(sportIds.has(id)&&!realSportIds.has(id))?"descanso":id);
   }
   const remaining=sessions.slice();
@@ -1603,12 +1616,20 @@ function sportSessions(primary,ds,prefs){
       endurance:{id:"facil",...empty},
       technique:{id:"tecnica",...empty},
     };
+    if(primary==="other"){
+      sessions.endurance={
+        id:"facil",kind:sportKind,
+        name:"Día de tu deporte",
+        detail:"Juega tu deporte (pádel, fútbol…) o haz 30-45 min de actividad a tu elección, y regístralo para que cuente.",
+        exerciseIds:[],sport:"other",phaseIndex:phase,freeActivity:true,
+      };
+    }
     if(primary==="strength_only"&&ctx.lightCardioEnabled){
       sessions.endurance={
         id:"facil",kind:sportKind,
         name:"Actividad ligera libre",
         detail:"30-45 min de actividad moderada a tu elección (caminata rápida, bicicleta suave, baile libre, etc.).",
-        exerciseIds:[],sport:"strength_only",phaseIndex:phase,
+        exerciseIds:[],sport:"strength_only",phaseIndex:phase,freeActivity:true,
       };
     }
     return sessions;
@@ -3304,10 +3325,11 @@ function renderOnboarding(){
       <div class="dash">
         <div class="onboarding-grid training-choice-grid">
           <div class="field" style="margin-top:0">
-            <label for="ob_sport">¿Practicas alguna actividad física?</label>
+            <label for="ob_sport">¿Haces otro deporte además de la fuerza?</label>
             <select id="ob_sport" onchange="updateOnboardingTrainingChoice()">
               ${TRAINING_ACTIVITY_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(d.primarySport,v)}>${l}</option>`).join("")}
             </select>
+            <div class="field-note" id="ob_sport_help">${esc(primarySportHelp(d.primarySport))}</div>
           </div>
           <div class="field" style="margin-top:0"><label for="ob_strength">¿Dónde quieres entrenar fuerza?</label><select id="ob_strength" onchange="updateOnboardingStrengthChoice()">
             ${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(strengthChoice,v)}>${l}</option>`).join("")}
@@ -4268,7 +4290,9 @@ function nextDailyAction(ds){
       eyebrow:"Entrenamiento de hoy",
       title:esc(ew.workout.name),
       detail:esc(ew.workout.detail||""),
-      cta:`<div class="row" style="gap:8px"><button class="btn btn-accent" style="flex:1;min-height:44px" onclick="setView('entreno')">Iniciar sesión</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Adaptar</button></div>`,
+      cta:isFreeActivityWorkout(ew.workout)
+        ?`<button class="btn btn-accent" style="width:100%;min-height:44px" onclick="openManualActivity('${ds}')">Registrar mi actividad</button>`
+        :`<div class="row" style="gap:8px"><button class="btn btn-accent" style="flex:1;min-height:44px" onclick="setView('entreno')">Iniciar sesión</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Adaptar</button></div>`,
       reason:"Comidas del día registradas"};
   }
 
@@ -4450,7 +4474,9 @@ function homeAgendaData(ds){
       label:"Entrenamiento pendiente",
       title:ew.workout&&ew.workout.name?ew.workout.name:"Sesión de hoy",
       meta:ew.workout&&ew.workout.detail?ew.workout.detail:"Sigue la sesión guiada de hoy.",
-      actions:`<button class="btn btn-accent" onclick="homeOpenWorkout('${ds}','workout_start')">Iniciar</button><button class="btn" onclick="homeAdaptWorkout('${ds}')">Adaptar</button>`
+      actions:isFreeActivityWorkout(ew.workout)
+        ?`<button class="btn btn-accent" onclick="openManualActivity('${ds}')">Registrar</button><button class="btn" onclick="homeOpenWorkout('${ds}','workout_start')">Ver detalle</button>`
+        :`<button class="btn btn-accent" onclick="homeOpenWorkout('${ds}','workout_start')">Iniciar</button><button class="btn" onclick="homeAdaptWorkout('${ds}')">Adaptar</button>`
     });
   }else if(restDay&&pendingMeals.length){
     items.push({
@@ -4556,7 +4582,7 @@ function buildContextualChips(ds){
   }
   if(workoutPending){
     chips.push("¿Cómo hago el entrenamiento de hoy?");
-    chips.push("Adapta el entreno de hoy por falta de tiempo");
+    if(!isFreeActivityWorkout(ew.workout))chips.push("Adapta el entreno de hoy por falta de tiempo");
   }
   if(!workoutPending&&workoutOutcome==="missed"){
     chips.push("Perdí la sesión de hoy — ¿qué hago?");
@@ -5037,6 +5063,22 @@ function workoutStatusLabel(outcome){
   }[outcome]||"Pendiente";
 }
 function canLogManualActivity(ds){return ds<=todayStr()&&!trainingSafetyHold();}
+// REQ-252: día sin sesión guiada (tu deporte o actividad ligera libre): se registra a mano.
+function isFreeActivityWorkout(workout){return !!(workout&&workout.freeActivity);}
+function activityContextNote(ds){
+  const ew=effectiveWorkout(ds);
+  if(ew.workout.id==="descanso"||isFreeActivityWorkout(ew.workout))return "Cuenta como día entrenado, aunque hoy tocara descanso.";
+  // REQ-253: registrar otro deporte en un día de fuerza lo reemplaza; el plan no se corre.
+  return `Cuenta como día entrenado en lugar de ${esc(ew.workout.name)}. Tu plan sigue igual desde la próxima sesión.`;
+}
+function lastManualActivitySport(){
+  const days=Object.keys(S.days||{}).sort().reverse();
+  for(const ds of days){
+    const list=manualActivities(S.days[ds]);
+    if(list.length)return list[list.length-1].sport;
+  }
+  return "";
+}
 function manualActivityBlock(ds,restDay){
   const list=manualActivities(S.days[ds]);
   if(!list.length&&!canLogManualActivity(ds))return "";
@@ -5052,10 +5094,17 @@ function openManualActivity(ds,index){
   if(!canLogManualActivity(ds)){toast("No se puede registrar actividad en este día");return;}
   const prev=index!=null?manualActivities(S.days[ds])[index]:null;
   const primary=profile&&profile.prefs&&profile.prefs.primarySport;
-  const sport=prev?prev.sport:(MANUAL_ACTIVITY_SPORTS.some(s=>s[0]===primary)&&primary!=="other"?primary:"strength");
+  // REQ-252/253: en el día de tu deporte, o en lugar de la sesión de fuerza, se propone
+  // lo último que registraste (p. ej. pádel); en un descanso, tu actividad o fuerza.
+  const workout=effectiveWorkout(ds).workout;
+  const instead=workout.id!=="descanso";
+  const last=instead?lastManualActivitySport():"";
+  const fallback=MANUAL_ACTIVITY_SPORTS.some(s=>s[0]===primary)&&primary!=="other"?primary
+    :instead?(primary==="strength_only"&&isFreeActivityWorkout(workout)?"walking":"other"):"strength";
+  const sport=prev?prev.sport:(last&&last!=="strength"?last:fallback);
   const w=activityWeightKg();
   modal(`<h3>${prev?"Editar actividad":"Registrar actividad"}</h3>
-    <p class="muted small">Cuenta como día entrenado, aunque hoy tocara descanso.</p>
+    <p class="muted small">${activityContextNote(ds)}</p>
     <div class="field"><label for="ma_sport">¿Qué hiciste?</label><select id="ma_sport" onchange="updateManualActivityEstimate()">
       ${MANUAL_ACTIVITY_SPORTS.map(([id,label])=>`<option value="${id}" ${id===sport?"selected":""}>${esc(label)}</option>`).join("")}
     </select></div>
@@ -6019,7 +6068,8 @@ function renderWorkout(){
   const location=training.locations[parseYmd(ds).getDay()];
   const prescription=workoutPrescription(ds);
   const execution=normalizedWorkoutExecution(ds);
-  const restDay=prescription.sessionType==="rest"&&!trainingSafetyHold();
+  const freeDay=isFreeActivityWorkout(ew.workout)&&!trainingSafetyHold();
+  const restDay=prescription.sessionType==="rest"&&!freeDay&&!trainingSafetyHold();
   const contentIssues=workoutContentIssues(ds);
   const safetyNotice=trainingSafetyHold()
     ? `<div class="alert"><b>Entrenamiento pausado por seguridad.</b><br>No inicies esta rutina hasta recibir orientación de un profesional. Nutrición, historial y exportación siguen disponibles.</div>`
@@ -6054,15 +6104,17 @@ function renderWorkout(){
         ${workoutStatusHtml(ds,execution)}
       </div>
     </div>
-    ${!execution&&!restDay?workoutPlanSummaryHtml(prescription,ds):""}
+    ${!execution&&!restDay&&!freeDay?workoutPlanSummaryHtml(prescription,ds):""}
     <div class="meal-actions">
       ${contentIssues.length?'<div class="alert">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción antes de iniciarla.</div>':""}
-      ${!execution&&!st.workoutDone&&!restDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>`:""}
+      ${!execution&&!st.workoutDone&&!restDay&&!freeDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>`:""}
+      ${freeDay&&!execution&&!manualActivities(st).length&&canLogManualActivity(ds)?`<button class="btn btn-accent" onclick="openManualActivity('${ds}')">Registrar mi actividad</button>`:""}
+      ${freeDay&&!manualActivities(st).length?`<span class="muted small" style="width:100%">Si hoy no la haces, no cuenta como sesión perdida.</span>`:""}
       ${!execution&&st.workoutDone?'<span class="muted small">Completado con el registro anterior; las series no estaban disponibles.</span>':""}
       ${restDay?`<span class="muted small">${manualActivities(st).length?"Descanso planificado, pero entrenaste igual: cuenta como día entrenado.":"Descanso planificado: no cuenta como sesión incompleta."}</span>`:""}
       <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()||execution||st.workoutDone?"disabled":""}>Cambiar entrenamiento</button>
       ${ew.overridden&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
-      ${!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar hoy:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','casa')">En casa</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','equipo')">Sin equipo</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
+      ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar hoy:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','casa')">En casa</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','equipo')">Sin equipo</button><button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
   </div>`);
   // REQ-239: con la sesión en curso, el reproductor va primero y el aviso, el
@@ -6089,7 +6141,7 @@ function renderWorkout(){
   ${emptyWkHtml}
   ${planCardHtml}
   ${workoutCardHtml}
-  ${manualActivityBlock(ds,restDay)}
+  ${freeDay&&!manualActivities(st).length?"":manualActivityBlock(ds,restDay)}
   ${execution?renderWorkoutExecution(ds,execution):""}
   ${!execution&&exerciseArray(ew.workout.exerciseIds).length?section("wk.ejercicios","Vista previa de ejercicios",workoutExercisesHtml(ew.workout),`${exerciseArray(ew.workout.exerciseIds).length}`):""}
   ${daySummary(ds)}
@@ -7415,10 +7467,11 @@ function renderProfile(){
     <div class="muted small" style="margin-bottom:10px">El plan usa tus días y lugares reales. Cambiar disponibilidad ajusta las próximas sesiones sin borrar lo que ya registraste.</div>
     <div class="onboarding-grid">
       <div class="field">
-        <label for="pf_sport">Actividad física principal</label>
+        <label for="pf_sport">¿Haces otro deporte además de la fuerza?</label>
         <select id="pf_sport" onchange="updatePfSportSelector()">
           ${TRAINING_ACTIVITY_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(p.primarySport,v)}>${l}</option>`).join("")}
         </select>
+        <div class="field-note" id="pf_sport_help">${esc(primarySportHelp(p.primarySport))}</div>
       </div>
       <div class="field"><label for="pf_strength">¿Dónde quieres entrenar fuerza?</label><select id="pf_strength" onchange="updatePfStrengthChoice()">
         ${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(strengthChoice,v)}>${l}</option>`).join("")}
@@ -7446,9 +7499,9 @@ function renderProfile(){
         ${Object.entries(TRAINING_TIME_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.preferredTrainingTime,v)}>${l}</option>`).join("")}
       </select></div>
     </div>
-    <label class="muted small">Días disponibles y lugar real</label>
+    <label class="muted small">Tu semana tipo: días y lugar</label>
     ${trainingAvailabilityHtml("pf",p)}
-    <div class="field-note">Recomendamos entre 3 y 6 días para combinar fuerza, tu disciplina y al menos un día de descanso.</div>
+    <div class="field-note">Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio). Recomendamos entre 3 y 6 días con al menos uno de descanso.</div>
     <div class="field"><label for="pf_duration">Ciclo de seguimiento</label><select id="pf_duration" onchange="updateTrainingSummary()">
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado. Al cambiarlo se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
@@ -7597,6 +7650,7 @@ function updatePfStrengthChoice(){
   updateTrainingSummary();
 }
 function updatePfSportSelector(){
+  updateSportHelp("pf");
   updateTrainingLocationDefaults("pf");
   updateTrainingSummary();
 }
@@ -10060,7 +10114,7 @@ No inventes ejercicios ni cambies los días disponibles. Responde SOLO JSON vál
 {"week":${expected.week},"phase":"${expected.phase}","reason":"breve","sessions":[{"date":"YYYY-MM-DD","weekday":1,"location":"gym","role":"fullA","type":"strength","name":"...","objective":"...","duration_minutes":60,"intensity":"RPE 6","exercises":[{"exercise_id":"back-squat","sets":3,"reps":"8-10","rest_seconds":120,"target_rpe":6,"target_rir":3,"tempo":"3-1-1"}],"blocks":[]}]}
 Contexto estructurado: ${JSON.stringify(context)}`;
 }
-// REQ-251: con 2048 tokens la semana llegaba cortada (en producción, siempre) y
+// REQ-256: con 2048 tokens la semana llegaba cortada (en producción, siempre) y
 // caía a la alternativa validada; 4096 es el tope del proxy.
 const TRAINING_WEEK_MAX_TOKENS=4096;
 async function generateTrainingWeek(expected,prefs,request){
@@ -11454,7 +11508,8 @@ function trainingDayResult(ds){
   const isRest=ew.workout&&ew.workout.id==="descanso";
   const st=S.days[ds]||{};
   // REQ-206: descanso planificado, pero entrenó igual → cuenta como entrenado.
-  if(isRest)return manualActivities(st).length?"done":"rest";
+  // REQ-252: un día de actividad libre sin registrar tampoco rompe la racha.
+  if(isRest||isFreeActivityWorkout(ew.workout))return manualActivities(st).length?"done":"rest";
   // REQ-163: una sesión in_progress/paused (bloques omitidos, series sueltas)
   // no es un cierre real — solo un resultado TERMINAL (completed/partial) o
   // el legado st.workoutDone cuentan para la racha. workoutHasRecordedActivity()

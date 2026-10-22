@@ -27,7 +27,7 @@
   const BASE_SLOTS=MEAL_SLOT_TEMPLATES[4].map(([id,slot])=>({id,slot}));
 
   // ── Constantes de perfil ────────────────────────────────────────────────────
-  const SPORT_LABELS={walking:"Caminar",running:"Correr",cycling:"Bicicleta",swimming:"Natación",other:"Otra actividad",strength_only:"Ninguna actividad"};
+  const SPORT_LABELS={walking:"Caminar",running:"Correr",cycling:"Bicicleta",swimming:"Natación",other:"Otro deporte",strength_only:"Ninguna actividad"};
   const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Casa o aire libre",none:"Sin fuerza por ahora"};
   const PROFILE_SCHEMA_VERSION=3;
   const PROFILE_REVIEW_DAYS=28;

@@ -75,7 +75,7 @@ test.describe("Onboarding", () => {
 
     // Paso 3: semana de entrenamiento (caminata, sin fuerza por ahora, 10 semanas, ≥3 días)
     await expect(app).toContainText("Ciclo de seguimiento");
-    await expect(app).toContainText("¿Practicas alguna actividad física?");
+    await expect(app).toContainText("¿Haces otro deporte además de la fuerza?");
     await expect(page.locator("#ob_sport")).toContainText("Caminar");
     await expect(page.locator("#ob_strength")).toContainText("No quiero fuerza por ahora");
     await expect(page.locator("#ob_duration")).toContainText("10 semanas · recomendado");
@@ -200,4 +200,22 @@ test.describe("Onboarding", () => {
       expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
     });
   }
+
+  // REQ-251: un postulante aceptado llega con nombre, objetivo y experiencia de su postulación.
+  test("postulante beta: el onboarding trae lo que ya respondió al postular", async ({ page, context }) => {
+    await installMocks(context, { tables: { profiles: { row: profileFixture({ name: "Ana", goal: "volumen", trainingExperience: "intermediate" }) } } });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    await gotoApp(page);
+    await expect(page.locator("#app")).toContainText(/punto de partida/i);
+    await expect(page.locator("#ob_name")).toHaveValue("Ana");
+    await page.selectOption("#ob_sex", "female");
+    await page.fill("#ob_age", "28");
+    await page.fill("#ob_height", "165");
+    await page.fill("#ob_weight", "62");
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await expect(page.locator("#ob_goal")).toHaveValue("volumen");
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await expect(page.locator("#ob_experience")).toHaveValue("intermediate");
+  });
 });

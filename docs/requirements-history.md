@@ -10208,6 +10208,37 @@ Jonathan (2026-10-21), con captura de Entreno con la sesión en curso: el aviso 
 - Con la sesión en curso, el desplegable existe cerrado después del reproductor, oculta el aviso, "Preparar mi plan" y "Cambiar entrenamiento", sigue abierto tras "Ahora no" y desaparece al descartar. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/release-gate.mjs` pasa. ✓
 
+## REQ-240 - Entreno: la demostración y los pasos se abren desde junto al nombre del ejercicio
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del reproductor: la demostración del ejercicio y su paso a paso aparecen al final, después de las series y de "Usar versión más fácil / progresión / Sustituir", "y solo lo esconde para el usuario; debería haber arriba, junto al nombre, un botón que abra el pop-up".
+
+### Problema
+
+`renderActiveWorkoutStep()` incrustaba `exerciseCard()` (vídeo/animación + "Ver técnica" + "Pausar") al final del bloque: para verla había que bajar más allá de todas las series.
+
+### Alcance
+
+1. Junto al nombre (`.player-title`), un botón "▶ Cómo se hace" abre `openExerciseGuide()`: demostración, inicio, pasos, respiración, errores comunes, versión más fácil/difícil y señales para detenerse.
+2. Se quita la tarjeta incrustada del reproductor; la "Vista previa de ejercicios" antes de empezar no cambia.
+3. `CACHE_NAME` → `fitbud-pwa-v122`.
+
+### Fuera de alcance
+
+- Cambiar el contenido del pop-up de técnica.
+
+### Riesgos
+
+- Ninguno sobre datos: solo presentación.
+
+### Criterios de aceptación
+
+- El reproductor no incrusta `.exercise-card`; el botón junto al nombre abre el pop-up con el mismo nombre, la demostración y los pasos. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
+- `node scripts/release-gate.mjs` pasa. ✓
+
 ## REQ-241 - Entreno: "Usar progresión" cambia de verdad el ejercicio (o dice que solo toca subir la carga)
 
 **Estado: implementado.**
@@ -10241,3 +10272,196 @@ Jonathan (2026-10-21), con captura de "Fondos asistidos": "Usar progresión" no 
 
 - Remo sentado → "Usar versión más fácil" pasa a Remo con banda (slug, título) y "Volver a…" lo deshace; Press de banca → "Usar progresión" titula "Press de banca con pausa en el pecho"; Sentadilla búlgara muestra "Subir la carga" y no cambia el ejercicio. ✓ (`tests/e2e/entreno.spec.js`, capturas 375px revisadas)
 - `node scripts/validate-exercises.mjs` y `node scripts/release-gate.mjs` pasan. ✓
+
+## REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes
+
+**Estado: implementado.**
+
+### Origen
+
+Feedback de Jonathan (2026-10-21, iPhone): "Acabo de agregar un shake de proteína y cuando seleccioné la porción le puse ×2; cuando volví a agregar otra comida el shake de proteína tiene sus valores de macros duplicados. Eso no debe pasar." Captura: Recientes muestra "Shake proteina 600 kcal · P 48 · C 72 · G 6".
+
+### Problema
+
+Al elegir una reciente o favorita con porción ×0,5/×1,5/×2 y guardar, lo registrado conserva el mismo nombre con los macros ya escalados. Recientes muestra la última vez que se registró cada nombre, así que la "porción" pasa a ser la ×2; volver a elegirla con ×2 da ×4. "Guardar en favoritas" en ese momento también guardaba la porción escalada.
+
+### Causa raíz
+
+- `saveEditor()` (`index.html`) guardaba `{name,kcal,p,c,f}` ya multiplicados por `qp.portion` sin registrar la porción.
+- `recentCustomMeals()` deduplica por nombre quedándose con el registro más reciente, sea cual sea su porción.
+
+### Alcance
+
+1. `saveEditor()` guarda `portion` (≠1) en el extra o en `ms.ovr` cuando se eligió una porción sobre una reciente/favorita del mismo nombre; editar algo ya registrado sin tocar la porción la conserva, y renombrarlo o volver a ×1 la quita. Los macros del día siguen siendo los consumidos.
+2. `perPortion()`: Recientes y "Guardar en favoritas" usan los macros divididos por `portion` (una porción).
+3. `CACHE_NAME` → `fitbud-pwa-v125`.
+
+### Fuera de alcance
+
+- Corregir lo ya registrado antes del arreglo: no guardó la porción, así que esa reciente seguirá mostrando los macros escalados hasta que se registre de nuevo con ×1 (o desde Favoritas).
+
+### Riesgos
+
+- Ninguno sobre datos: `portion` es un campo nuevo opcional en `day_log.state`; los registros sin él se leen igual que antes.
+
+### Criterios de aceptación
+
+- Registrar "Shake proteina" 300 kcal y luego desde Recientes ×2: el día suma 300 + 600 y Recientes sigue mostrando 300 kcal · P 24 · C 36 · G 3. ✓ (`tests/e2e/comidas-guardadas.spec.js`; falla sin el arreglo con 600 · P 48 · C 72 · G 6)
+- Guardar en favoritas con ×1,5 guarda la porción base. ✓ (`tests/e2e/comidas-guardadas.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-244 - Entreno: la duración cuenta de inicio a fin, también con la app en segundo plano
+
+**Estado: implementado.**
+
+### Origen
+
+Claudia (usuaria beta, 2026-10-21), con captura del resumen "Sesión parcial · 34:54 duración real": "la duración del entrenamiento no se actualiza en segundo plano. Cuando sales de la app y vuelves a entrar no contabiliza ese tiempo. Debería aparecer tiempo de duración total del entrenamiento (incluyendo descansos etc). Se me ocurre que en realidad calcule el tiempo desde que inicias el entrenamiento hasta que finalizas la sesión completa".
+
+### Problema
+
+REQ-155 congeló el cronómetro al pasar la app a segundo plano para que una sesión olvidada no sumara horas. El efecto en el uso normal es el contrario: en el gimnasio se bloquea la pantalla o se cambia de app en cada descanso, y todo ese tiempo desaparece de la duración. Una sesión de una hora puede mostrar 35 minutos.
+
+### Causa raíz
+
+`freezeInProgressWorkouts()` (`index.html`, listeners `visibilitychange`/`pagehide`) ejecutaba `captureWorkoutElapsed()` y dejaba `resumedAt` en `null` cada vez que la app se ocultaba; al volver, `normalizeExecution()` reanudaba desde "ahora", así que el hueco nunca se sumaba.
+
+### Alcance
+
+1. Al ocultarse la app ya no se congela el cronómetro: se anota `workoutExecution.awayAt` y la duración sigue corriendo desde `resumedAt`.
+2. `FITBUD_WORKOUT_PLAYER.returnFromAway(execution, now)` (puro), invocado al volver (`visibilitychange`, `pageshow`) y al reabrir la app tras cargar los días: si la ausencia fue de hasta `AWAY_LIMIT_SECONDS` (1 h), cuenta entera; si fue mayor (sesión olvidada), la sesión queda en pausa con la duración y el descanso congelados en `awayAt`, y un aviso lo explica.
+3. La pausa manual sigue congelando el tiempo como hoy.
+4. El resumen dice "duración total" en vez de "duración real".
+5. `CACHE_NAME` → `fitbud-pwa-v126`.
+
+### Fuera de alcance
+
+- Editar a mano la duración de una sesión ya guardada.
+- Sesiones guardadas antes de este cambio: conservan la duración con la que se guardaron (historial inmutable).
+
+### Riesgos
+
+- Si el sistema mata la app sin emitir `visibilitychange`/`pagehide`, no hay `awayAt` y el tiempo cuenta entero hasta volver. Es el mismo evento del que dependía REQ-155.
+- Una ausencia legítima de más de una hora (por ejemplo, una clase sin mirar el móvil) se pierde; reanudar sigue sumando desde ese momento.
+
+### Criterios de aceptación
+
+- 15 min fuera de la app sin pausar: el cronómetro y la duración los incluyen. ✓ (`tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`)
+- 3 h fuera: la sesión queda en pausa con la duración que tenía al salir y el botón "Reanudar sesión" visible. ✓ (mismas pruebas)
+- `node scripts/release-gate.mjs` pasa. ✓
+
+## REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21, iPhone), con captura del reproductor en "Curl de bíceps": "Así como tienes el siguiente ejercicio, deberías poder tener algo que te lleve al ejercicio anterior para ver si simplemente quiero revisar, pero deberíamos mantener la funcionalidad de siguiente ejercicio y omitir".
+
+### Problema
+
+El reproductor solo avanza: "Omitir ejercicio" y "Siguiente ejercicio". Una vez pasado un ejercicio no hay forma de ver qué se registró ni de retomar uno omitido.
+
+### Causa raíz
+
+`normalizeExecution()` (`workout-player.js`) recoloca `currentStep` en el primer bloque pendiente en cada acción, así que el reproductor no tiene noción de "ver otro bloque" que no sea el pendiente.
+
+### Alcance
+
+1. `workoutExecution.reviewStep`: índice del bloque que se revisa, aparte de `currentStep`. Solo apunta a bloques hechos u omitidos; mirar no cambia el estado de ningún bloque ni el avance.
+2. "← Ejercicio anterior" bajo el bloque en curso (y en el cierre, con todo registrado) cuando hay un bloque anterior registrado.
+3. Vista de revisión: título, "Registraste N series" con carga × reps · RPE de cada una, o "Lo omitiste."; "← Anterior" / "Siguiente →" entre los ya registrados y "Volver al ejercicio en curso" (o "al cierre de la sesión"). Sin Omitir ni Siguiente ejercicio, que modifican el registro.
+4. Un ejercicio omitido se puede retomar con "Hacerlo ahora".
+5. "Siguiente ejercicio" y "Omitir ejercicio" no cambian. `CACHE_NAME` → `fitbud-pwa-v127`.
+
+### Fuera de alcance
+
+- Corregir series de un ejercicio ya completado desde la revisión.
+
+### Riesgos
+
+- Ninguno sobre datos: la revisión es de solo lectura; "Hacerlo ahora" solo devuelve a pendiente un bloque omitido.
+
+### Criterios de aceptación
+
+- Tras el primer ejercicio, "← Ejercicio anterior" muestra lo registrado (40 kg), sin Omitir ni Siguiente ejercicio, y el avance no cambia; "Volver al ejercicio en curso" vuelve al segundo con sus botones. Omitido → "Lo omitiste." y "Hacerlo ahora" lo retoma; el registro del primero queda intacto. ✓ (`tests/e2e/entreno.spec.js`, captura 390 px revisada)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-246 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
+
+**Estado: implementado.**
+
+### Origen
+
+Causa de producción que REQ-228 y REQ-238 dejaron fuera de alcance. Jonathan (2026-10-21): "Estimar macros" de "Sopa ramen vegetariana" responde "Tu coach no pudo completar esta acción. Intenta de nuevo."; antes (2026-10-20) lo mismo en el editor tras usar la foto.
+
+### Problema
+
+En `coach_usage` (Supabase de producción) los 12 fallos de `meal_estimate` desde el 2026-10-12 son `refunded` con `error_code = invalid_provider_output`, parte `estimate` (la estimación por texto: ~1045 tokens de entrada, sin imagen). Entre ellos los del reporte: 2026-10-21 01:20:14 y 01:30:43 UTC (20:20 y 20:30 del 20 en Perú) y 2026-10-20 18:46:20 UTC. Ninguna estimación con foto falló y no hay ningún `provider_<status>`: la clave, el saldo, el modelo y structured outputs funcionan. El servidor responde 422 y, antes de REQ-238, el cliente lo mostraba como el mensaje genérico. Son 12 de 49 estimaciones por texto desde el 2026-10-12 (~24 %); las 9 con foto pasaron.
+
+### Causa raíz
+
+- `mealEstimateOutputSchema()` (`api/claude.js`) exige `preguntas` sin tope (structured outputs no limita el largo de una lista) y el prompt de `aiEstimate()` (`index.html`) ni siquiera las pedía: el modelo las inventa. Todas las estimaciones por texto que pasaron traen exactamente 3 (o 0).
+- `validateCoachOutput()` rechazaba `preguntas.length > 3`: cuando el modelo trae 4 o más, una estimación con macros válidos se descarta, se devuelve la cuota y el usuario ve el error. Las respuestas fallidas tienen más tokens de salida (165-318) que las que pasan.
+
+### Alcance
+
+1. `validateCoachOutput()` para `meal_estimate` ya no limita cuántas preguntas trae; sigue exigiendo macros numéricos y preguntas de texto (el cliente muestra como mucho 2 y solo en la foto).
+2. El prompt de "Estimar macros" pide la forma del schema con `"preguntas":[]` y dice que no haga preguntas.
+3. `CACHE_NAME` → `fitbud-pwa-v128`.
+
+### Fuera de alcance
+
+- `training_plan`: sus 8 llamadas en producción (2026-06-24 a 2026-10-20) terminaron en `invalid_provider_output` con exactamente 2048 tokens de salida, el tope que pide el cliente: el JSON llega cortado y la ruta determinista lo tapa. Va en un REQ propio.
+- Registrar en los logs de `/api/claude` el motivo de cada `invalid_provider_output`.
+
+### Riesgos
+
+- Ninguno sobre datos: solo se aceptan respuestas que antes se descartaban con macros válidos.
+
+### Criterios de aceptación
+
+- Una estimación con 4 u 8 preguntas se acepta; kcal no numérica, preguntas que no son lista o que no son texto, y texto que no es JSON se siguen rechazando. ✓ (`scripts/validate-meal-estimate-output.mjs`; falla sin el arreglo)
+- El prompt de texto pide `"preguntas":[]`. ✓ (`scripts/validate-meal-estimate-output.mjs`)
+- `node scripts/release-gate.mjs` pasa. ✓ (validadores; E2E 100/101 con 1 flaky de `dia-sin-subir.spec.js` que pasa al reintento)
+
+## REQ-247 - Entreno: "Sustituir" solo propone ejercicios del mismo músculo principal
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del modal "Sustituir ejercicio" sobre un jalón que proponía Dominada, Dominada asistida y Remo con banda: "Tienes que asegurarte que todos los ejercicios de sustitución de verdad sustituyen el músculo principal [...] ya me ha pasado otras veces en otro tipo de músculos y ejercicios".
+
+### Problema
+
+El modal mezclaba ejercicios que cargan músculos distintos: para un face pull (deltoides posterior) proponía dominadas y remos; para un remo, jalón y dominada asistida; para un curl de bíceps, remo con banda; para la extensión de tríceps, fondos y flexiones; para el peso muerto rumano, hip thrust. Además mostraba el patrón en inglés ("mismo patrón: pull") y la versión más fácil del candidato como si fuera su descripción.
+
+### Causa raíz
+
+`openExerciseSubstitution()` (`index.html`) juntaba `substitute_slugs` con todo el catálogo del mismo `movement_pattern`. El patrón agrupa por mecánica (todo "pull" junto: jalón, remo, face pull), no por músculo, y los `substitute_slugs` del catálogo incluían cruces entre músculos.
+
+### Alcance
+
+1. `exercise-catalog.js`: músculo principal por slug para los 42 ejercicios de fuerza (`FITBUD_EXERCISE_SUBSTITUTION.primaryMuscles`) y `candidates(actual, catálogo)`, puro: sustitutos directos primero y luego el resto del catálogo, siempre con el mismo músculo principal. Un ejercicio sin entrada (creado desde admin) usa el primero de su lista de músculos. Vale igual con el catálogo local y con el de Supabase.
+2. Espalda se separa en dorsal ancho (jalón, dominadas) y espalda media (remos); hombro en hombros (press), deltoides lateral (elevación lateral) y deltoides posterior (face pull).
+3. El modal dice qué músculo se conserva, cada opción muestra "Músculo principal: …" y, si no hay ninguna compatible con el lugar y las limitaciones del día, lo dice con el músculo.
+4. `scripts/validate-exercises.mjs` exige músculo principal en cada ejercicio de fuerza, que ningún sustituto ni versión más fácil/progresión cambie de músculo, y fija casos concretos (face pull, remo, jalón, curl, tríceps, rumano, elevación lateral).
+5. `CACHE_NAME` → `fitbud-pwa-v129`.
+
+### Fuera de alcance
+
+- Añadir ejercicios nuevos para los músculos que hoy no tienen sustituto en el catálogo (face pull, elevación lateral, gemelos): el modal lo dice en vez de proponer otro músculo.
+- Limpiar los `substitute_slugs` cruzados en `supabase/exercises.sql`: el filtro los descarta en la app.
+- Sustituciones ya guardadas en el historial (historial inmutable).
+
+### Riesgos
+
+- Jalón y dominadas comparten músculo principal (dorsal ancho) y siguen proponiéndose entre sí; el remo deja de aparecer para el jalón.
+- Menos opciones en ejercicios aislados: preferible a cambiar el músculo de la sesión.
+
+### Criterios de aceptación
+
+- Remo sentado en polea → solo Remo con banda; Face pull → sin opciones y el aviso nombra el deltoides posterior. ✓ (`tests/e2e/entreno.spec.js`)
+- Ningún sustituto ni versión más fácil/progresión del catálogo cambia de músculo principal. ✓ (`scripts/validate-exercises.mjs`)
+- `node scripts/release-gate.mjs` pasa.

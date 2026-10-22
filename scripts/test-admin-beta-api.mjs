@@ -29,7 +29,9 @@ let invites = [];
 let inviteFails = false;
 let entitlements = [];
 let overrides = [];
-const ana = { id: 7, name: "Ana Pérez", whatsapp: "+51 999 111 222", status: "new", review_notes: null };
+let profilePrefs = {};
+let profilePatches = [];
+const ana = { id: 7, name: "Ana Pérez", whatsapp: "+51 999 111 222", status: "new", review_notes: null, goal: "Ganar musculo", stage: "consistent" };
 
 global.fetch = async (url, options = {}) => {
   const value = String(url);
@@ -57,6 +59,8 @@ global.fetch = async (url, options = {}) => {
     return response(200, { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", email: body.email });
   }
   if (value.includes("/rest/v1/profiles?on_conflict=id") && method === "POST") return response(200, [body]);
+  if (/\/rest\/v1\/profiles\?id=eq\.[0-9a-f-]+&select=prefs$/.test(value) && method === "GET") return response(200, [{ prefs: profilePrefs }]);
+  if (/\/rest\/v1\/profiles\?id=eq\.[0-9a-f-]+$/.test(value) && method === "PATCH") { profilePatches.push({ url: value, body }); return response(204, null); }
   if (value.endsWith("/rest/v1/user_entitlements") && method === "POST") { entitlements.push(body); return response(201, [body]); }
   if (value.includes("/rest/v1/coach_quota_overrides?on_conflict=user_id,action") && method === "POST") { overrides.push(body); return response(201, null); }
   if (value.endsWith("/rest/v1/redemption_codes") && method === "POST") {
@@ -109,6 +113,11 @@ assert(codeInserts.length === 0, "Con correo no hace falta código.");
 assert(overrides.length === 1 && overrides[0].length === 8 && overrides[0].every((o) => o.daily_limit === 10000 && o.enabled === true && o.expires_at === entitlements[0].expires_at),
   "REQ-248: aceptar deja el coach sin tope hasta que vence el acceso.");
 assert(!res.body.betaError, "Sin errores de acceso ni de cuotas.");
+// REQ-251: lo que respondió en la postulación queda en su perfil para el onboarding.
+assert(profilePatches.length === 1 && profilePatches[0].url.endsWith("id=eq.dddddddd-dddd-4ddd-8ddd-dddddddddddd"), "Rellena el perfil de la cuenta invitada.");
+const seeded = profilePatches[0].body.prefs;
+assert(seeded.name === "Ana Pérez" && seeded.goal === "volumen" && seeded.trainingExperience === "intermediate", "Nombre, objetivo y experiencia desde la postulación: " + JSON.stringify(seeded));
+assert(!seeded.onboardingCompletedAt, "No marca el onboarding como hecho: lo revisa y completa ella.");
 assert(patches[0].status === "beta_invited" && /invitación enviada a ana@correo.test/.test(patches[0].review_notes), "Marca aceptada con nota del correo.");
 assert(res.body.applicant.email === "ana@correo.test" && !("raw_payload" in res.body.applicant), "Devuelve el correo sin el raw_payload.");
 
@@ -116,6 +125,16 @@ authUsers = [{ id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", email: "ana@correo.te
 invites = []; entitlements = [];
 res = await call({ action: "betaAccept", id: 7 });
 assert(res.body.mode === "existing" && invites.length === 0 && entitlements[0].user_id === "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "Si ya tenía cuenta, solo recibe el acceso.");
+
+// REQ-251: si ya hizo el onboarding no se toca su perfil; si tenía nombre propio, se respeta.
+profilePatches = []; profilePrefs = { name: "Anita", goal: "deficit", onboardingCompletedAt: "2026-10-01T00:00:00Z" };
+res = await call({ action: "betaAccept", id: 7 });
+assert(res.statusCode === 200 && profilePatches.length === 0, "Con el onboarding hecho no reescribe el perfil.");
+profilePatches = []; profilePrefs = { name: "Anita", sessionMinutes: 45 };
+res = await call({ action: "betaAccept", id: 7 });
+assert(profilePatches.length === 1 && profilePatches[0].body.prefs.name === "Anita" && profilePatches[0].body.prefs.sessionMinutes === 45 && profilePatches[0].body.prefs.goal === "volumen",
+  "Conserva lo que ya tenía y completa lo que falta.");
+profilePrefs = {};
 
 authUsers = []; inviteFails = true; codeInserts = [];
 res = await call({ action: "betaAccept", id: 7 });

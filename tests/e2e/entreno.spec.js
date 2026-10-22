@@ -900,7 +900,7 @@ test.describe("Ejercicio anterior", () => {
   });
 });
 
-test.describe("Plan de entrenamiento con el coach (REQ-251)", () => {
+test.describe("Plan de entrenamiento con el coach (REQ-256)", () => {
   test("el tope de tokens alcanza para la semana más larga y se pide JSON en una línea", async ({ page, context }) => {
     const { calls } = await installMocks(context);
     await seedLoggedInUser(page);
