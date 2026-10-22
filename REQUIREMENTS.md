@@ -1989,29 +1989,8 @@ Re-preparar no descarta una comida elegida o editada a mano, aunque no esté mar
 
 ## REQ-257 - Home: con el día cerrado, Hoy resume el día y muestra lo que toca mañana
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
+Pedido de Jonathan (captura con 5/5 comidas y entreno hecho, "MAÑANA" sobre "Consumo de hoy"). Con `homeAgendaData()` en `done`, `renderHoy()` oculta `miniMacroDash`; la tarjeta dice "Todo listo por hoy" con hoy en una línea y un bloque "Mañana · <fecha>" (entreno que toca y si las comidas están listas, `homeTomorrowData()`). "Ver mañana" abre ese día (`goDay`). `CACHE_NAME` → `fitbud-pwa-v134`.
 
-Jonathan (2026-10-22), con captura de Hoy con 5/5 comidas y el entreno hecho, "MAÑANA" escrito sobre "Consumo de hoy": "Si ya terminé de entrenar y mis comidas, lo lógico sería que me diga que ya está todo listo y qué toca mañana, en resumen, no a detalle, o que pueda ir al próximo día".
-
-### Causa raíz
-
-Con el día cerrado (`homeAgendaData()` → `state:"done"`), `renderHoy()` (`index.html`) seguía mostrando el consumo detallado de hoy (`miniMacroDash`) y la tarjeta "Día cerrado" repetía las comidas y el entreno en dos casillas, con "Ver progreso" como única salida. Nada decía qué toca mañana ni llevaba a ese día.
-
-### Alcance
-
-1. Con el día cerrado, Hoy oculta "Consumo de hoy".
-2. La tarjeta pasa a "Todo listo por hoy" con hoy en una línea (`5/5 comidas · 1495 kcal · entreno completado`) y un bloque "Mañana · <fecha>" con dos filas: el entreno que toca (o "Descanso planificado") y si las comidas están listas ("5 comidas listas" / "Aún por preparar").
-3. "Ver mañana" abre Nutrición en el día siguiente (`goDay`); se mantiene "Ver progreso". Si mañana queda fuera del plan, no hay bloque ni botón.
-4. `CACHE_NAME` → `fitbud-pwa-v134`.
-
-### Fuera de alcance
-
-- Preparar mañana desde Hoy: se hace desde el día siguiente, como hasta ahora.
-- Los chips del coach con el día cerrado.
-
-### Criterios de aceptación
-
-- Con todas las comidas y el entreno hechos, Hoy no muestra "Consumo de hoy", resume el día en una línea y muestra el entreno y las comidas de mañana; "Ver mañana" deja `current` en mañana. ✓ (`tests/e2e/home.spec.js`)
-- `node scripts/release-gate.mjs` pasa (E2E: 110/110).
+- ✓ `tests/e2e/home.spec.js`; `node scripts/release-gate.mjs` pasa (E2E: 110/110).
