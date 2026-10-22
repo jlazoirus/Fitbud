@@ -10496,6 +10496,38 @@ Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apr
 - A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
 - `node scripts/release-gate.mjs` pasa.
 
+## REQ-257 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de producción de REQ-246 (2026-10-21). En `coach_usage` las 8 llamadas `training_plan` (2026-06-24 a 2026-10-20) son `refunded` / `invalid_provider_output` con **exactamente 2048 tokens de salida**; ninguna se completó. La app usa entonces la alternativa validada para todas las semanas ("Se usó la alternativa validada en: semana 1, …") y nadie lo nota.
+
+### Causa raíz
+
+`generateTrainingWeek()` (`index.html`) pide la semana con `maxTokens` 2048 y el prompt no pide JSON compacto: el modelo lo escribe con sangría. Una semana de 4 sesiones de fuerza ocupa ~5.400 caracteres con sangría (~3.250 compacta); una de 6 con carrera, ~7.800. No cabe: el JSON llega cortado, `validateCoachOutput()` lo rechaza (422) y, desde ese fallo, `generateTrainingPlan()` usa la alternativa para el resto de semanas.
+
+### Alcance
+
+1. `TRAINING_WEEK_MAX_TOKENS` = 4096 (el tope del proxy) para cada semana.
+2. El prompt pide el JSON en una sola línea, sin sangría ni saltos de línea.
+3. `CACHE_NAME` → `fitbud-pwa-v134`.
+
+### Fuera de alcance
+
+- Structured outputs para `training_plan` y registrar `stop_reason` del proveedor.
+- Si, ya completa, la semana pasa las demás reglas de `validateTrainingPlanWeek()`: no se puede comprobar sin llamar al proveedor; se verá en `coach_usage`.
+
+### Riesgos
+
+- Una semana completa tarda más en generarse (antes ~18 s hasta el corte); el cliente espera hasta 90 s por intento.
+
+### Criterios de aceptación
+
+- Para semanas de 4 y 6 sesiones (fuerza y carrera), `maxTokens` ≥ caracteres del JSON con sangría / 2,5, y el prompt pide una sola línea. ✓ (`tests/e2e/entreno.spec.js`; falla sin el arreglo: 2048 < 2170)
+- `node scripts/release-gate.mjs` pasa.
+
 ## REQ-258 - Home: con el día cerrado, Hoy resume el día y muestra lo que toca mañana
 
 **Estado: implementado.**
@@ -10524,3 +10556,36 @@ Con el día cerrado (`homeAgendaData()` → `state:"done"`), `renderHoy()` (`ind
 
 - Con todas las comidas y el entreno hechos, Hoy no muestra "Consumo de hoy", resume el día en una línea y muestra el entreno y las comidas de mañana; "Ver mañana" deja `current` en mañana. ✓ (`tests/e2e/home.spec.js`)
 - `node scripts/release-gate.mjs` pasa (E2E: 111/111).
+
+## REQ-259 - Entreno: caminata, running, bici y natación con foto real en vez del dibujo
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-22): "las imágenes de los otros deportes nunca se hicieron, se dejaron unas cosas horribles como placeholders".
+
+### Causa raíz
+
+REQ-15 subió fotos de Free Exercise DB solo para los 42 ejercicios de fuerza (`supabase/exercise-media.sql`). Los 12 de resistencia (`walk-*`, `run-*`, `cycle-*`, `swim-*`) quedaron con `media_type` `inline_svg` y caían a `exerciseDemoSvg()`: un monigote de palitos; caminata y running ni siquiera tenían figura propia (`run` cae a la figura genérica de pie).
+
+### Alcance
+
+1. Una foto por disciplina en `assets/exercise-media/` (850 px, como las de fuerza):
+   - `walking.jpg`, `running.jpg`, `cycling.jpg`: Free Exercise DB (`Walking_Treadmill/0`, `Trail_Running_Walking/1`, `Bicycling_Stationary/0`), dominio público (Unlicense). Una sola foto: en cardio los dos cuadros del dataset cambian el ángulo de cámara, no la fase del movimiento.
+   - `swimming.jpg`: Free Exercise DB no tiene natación. `DoD_Warrior_Games_2016_160611-A-OF234-296.jpg` (U.S. Army, Wikimedia Commons), dominio público.
+2. `exercise-catalog.js`: los ejercicios de resistencia llevan `media_type: "image"`, `media_url`/`poster_url` y fuente/licencia.
+3. `exerciseMediaSources()` (`index.html`): si el registro no trae `media_url`, `poster_url` ni `frames` (filas de Supabase de resistencia), usa la media del catálogo local por `slug`. Así se ve sin tocar producción.
+4. `supabase/exercise-media-endurance.sql` (opcional, idempotente): deja la tabla y la admin al día.
+5. `validate-deploy-allowlist.mjs` cuenta como runtime los `assets/` que referencia `exercise-catalog.js`.
+6. `CACHE_NAME` → `fitbud-pwa-v136`.
+
+### Fuera de alcance
+
+- Fotos de fuerza en modo local (sin Supabase): siguen con el dibujo, como antes.
+- Actividades manuales (`MANUAL_ACTIVITY_SPORTS`): no muestran imagen.
+
+### Criterios de aceptación
+
+- Caminata, running, bici y natación muestran foto en la tarjeta y en "Ver técnica", con catálogo local y con filas de Supabase sin media. ✓ (verificado con capturas)
+- `node scripts/release-gate.mjs` pasa; suite E2E 111/111.

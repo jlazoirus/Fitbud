@@ -4886,6 +4886,9 @@ function exerciseDemoSvg(exercise){
 }
 // Normaliza la media disponible de un ejercicio a una forma consistente (REQ-15).
 function exerciseMediaSources(exercise){
+  // REQ-259: si la fila de Supabase no trae media, se usa la del catálogo local.
+  const hasMedia=exercise&&(exercise.media_url||exercise.poster_url||exerciseArray(exercise.frames).length);
+  if(exercise&&!hasMedia)exercise=LOCAL_EXERCISES.find(ex=>ex.slug===exercise.slug)||exercise;
   const mediaType=String(exercise&&exercise.media_type||"").toLowerCase();
   const frames=exerciseArray(exercise&&exercise.frames).map(f=>String(f||"").trim()).filter(Boolean);
   const url=String(exercise&&exercise.media_url||"").trim();

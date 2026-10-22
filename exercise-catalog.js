@@ -227,6 +227,19 @@
     muscles:row[2]==="swimming"?["cuerpo completo"]:["piernas","sistema cardiovascular"],
     regression:row[4],progression:row[5],substitutes:row[6],
   }));
+  // REQ-259: foto real por disciplina, como los ejercicios de fuerza (antes
+  // caían al dibujo SVG). Se sirve desde assets/ del propio deploy, sin hotlinks.
+  const FREE_EXERCISE_DB={source_name:"Free Exercise DB",license_name:"Public Domain (Unlicense)",attribution:"Free Exercise DB (yuhonas) — dominio público"};
+  const ENDURANCE_MEDIA={
+    walking:["assets/exercise-media/walking.jpg",FREE_EXERCISE_DB],
+    running:["assets/exercise-media/running.jpg",FREE_EXERCISE_DB],
+    cycling:["assets/exercise-media/cycling.jpg",FREE_EXERCISE_DB],
+    swimming:["assets/exercise-media/swimming.jpg",{source_name:"DoD Warrior Games 2016 (U.S. Army)",license_name:"Public Domain (obra del Gobierno de EE. UU.)",attribution:"U.S. Army vía Wikimedia Commons — dominio público"}],
+  };
+  endurance.forEach(ex=>{
+    const [url,source]=ENDURANCE_MEDIA[ex.discipline];
+    Object.assign(ex,source,{media_type:"image",media_url:url,poster_url:url});
+  });
 
   root.FITBUD_EXERCISES=strength.concat(endurance);
   // REQ-241: qué hacen "Usar versión más fácil" y "Usar progresión" en cada
