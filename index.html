@@ -5422,7 +5422,7 @@ function addWorkoutTimer(ds,seconds){
 function finishTimedWorkoutStep(ds,skipped){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step)return;
-  step.status=skipped?"skipped":"done";
+  step.status=skipped?(step.optional?"declined":"skipped"):"done";
   step.completedAt=new Date().toISOString();
   execution.timer=null;
   const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
@@ -5496,7 +5496,8 @@ function openPendingSetsPrompt(ds,step,pending){
 function skipWorkoutStep(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step)return;
-  step.status="skipped";step.completedAt=new Date().toISOString();execution.timer=null;
+  // REQ-250: omitir un calentamiento o vuelta a la calma es como "Ahora no".
+  step.status=step.optional?"declined":"skipped";step.completedAt=new Date().toISOString();execution.timer=null;
   const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
@@ -5665,6 +5666,16 @@ function reviewPendingWorkoutSets(ds){
   const pending=pendingPrescribedSets(execution);if(!pending.length)return;
   pending.forEach(item=>{execution.steps[item.stepIndex].status="pending";});
   resumePartialWorkout(ds,execution);
+}
+// REQ-250: una sesión guardada parcial a la que no le falta nada (solo se
+// saltó el calentamiento o la vuelta a la calma, que son opcionales) se marca
+// completada sin reabrirla.
+function markWorkoutCompleted(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview||execution.pain!=="none")return;
+  const progress=WORKOUT_PLAYER.progress(execution);
+  if(progress.remaining||progress.skipped||pendingPrescribedSets(execution).length)return;
+  execution.status="completed";
+  persistWorkoutExecution(ds,execution,false);render();toast("Sesión completada");
 }
 function resumePartialWorkout(ds,reviewed){
   const execution=reviewed||normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
@@ -5943,6 +5954,7 @@ function renderWorkoutExecution(ds,execution){
       <div class="muted small">${esc(painLabels[execution.pain]||"Cierre sin respuesta")} · ${esc(difficultyLabels[execution.difficulty]||"Dificultad sin respuesta")}</div>
       ${execution.notes?`<div class="exercise-copy"><b>Notas:</b> ${esc(execution.notes)}</div>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&progress.remaining?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="resumePartialWorkout('${ds}')">Continuar sesión</button>`:""}
+      ${execution.status==="partial"&&!execution.needsReview&&execution.pain==="none"&&!progress.remaining&&!progress.skipped&&!pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="markWorkoutCompleted('${ds}')">Marcar como completada</button>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&!progress.remaining&&ds===todayStr()&&pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="reviewPendingWorkoutSets('${ds}')">Marcar ${seriesCount(pendingSets.length)} sin registrar</button>`:""}
     </div>`;
   }
