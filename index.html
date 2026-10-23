@@ -4622,6 +4622,7 @@ function renderHoy(){
   const ds=current;
   const name=profileName(); const stk=streak();
   checkAndSaveMilestones();
+  applyDueCheckinAdjustment(); // REQ-234: aplica el ajuste diferido si ya empezó su semana
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
   const checkinDue=weeklyCheckinDue();
   // REQ-258: con el día cerrado, el consumo detallado de hoy deja paso a mañana.
@@ -13784,21 +13785,33 @@ function submitWeeklyCheckin(){
     <h3 id="sheet-title">Ajuste · Semana ${due.num+1}</h3>
     <p class="muted small">${esc(proposal.reason)}</p>
     ${safeNote}${keepBlock}${calorieBlock}${intensityNote}
-    <div class="muted small" style="margin-top:12px">Ajuste máximo: ±${CHECKIN_MAX_KCAL_ADJUST} kcal/día. Aplica desde mañana y no modifica días ya registrados.</div>
+    <div class="muted small" style="margin-top:12px">Ajuste máximo: ±${CHECKIN_MAX_KCAL_ADJUST} kcal/día. Empieza con tu próxima semana; no cambia la meta de esta semana ni de lo ya registrado.</div>
     <div class="row" style="gap:8px;margin-top:16px;flex-wrap:wrap">
       ${!proposal.keep?`<button class="btn btn-accent" style="flex:1" onclick="applyWeeklyCheckinProposal('${due.key}')">Aplicar ajuste</button>`:""}
       <button class="btn${proposal.keep?" btn-accent":""}" style="${proposal.keep?"flex:1":""}" onclick="declineWeeklyCheckinProposal('${due.key}')">${proposal.keep?"Entendido":"Mantener el plan actual"}</button>
     </div>`;
 }
 
-// Aplica el ajuste de macros al perfil y guarda el check-in.
+// REQ-234: fecha en que empieza la próxima semana del plan que todavía no
+// arrancó (no la semana en curso), para que el ajuste del check-in no
+// reescriba la meta de días ya prescritos/ejecutados.
+function nextCheckinEffectiveDate(){
+  const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
+  const calendar=planCalendarForPrefs(prefs);
+  const today=todayStr();
+  const currentWeek=calendar.weeks.find(w=>today>=w.start&&today<=w.end);
+  return currentWeek?addDays(currentWeek.end,1):addDays(today,1);
+}
+// Aplica el ajuste de macros al perfil (en diferido) y guarda el check-in.
 async function applyWeeklyCheckinProposal(weekKey){
   const d=window._ciData;if(!d)return;
   const prefs=migrateProfilePrefs({...((profile&&profile.prefs)||{})});
   if(d.proposal.calorieAdjust!==0){
-    prefs.calorieTarget=d.newKcal;
-    prefs.carbTarget=d.newCarb;
-    prefs.fatTarget=d.newFat;
+    // No se mutan calorieTarget/carbTarget/fatTarget al instante (eso
+    // reescribiría de inmediato la meta de hoy y de días ya prescritos).
+    // Queda pendiente y applyDueCheckinAdjustment() lo aplica a las prefs
+    // vivas recién cuando empiece la semana aún no iniciada.
+    prefs.pendingCheckinAdjustment={kcal:d.newKcal,carb:d.newCarb,fat:d.newFat,wk:weekKey,effectiveFrom:nextCheckinEffectiveDate()};
   }
   const checkin={wk:weekKey,num:d.due.num,start:d.due.start,end:d.due.end,
     at:new Date().toISOString(),answers:d.answers,proposal:d.proposal,accepted:true,skipped:false};
@@ -13808,7 +13821,18 @@ async function applyWeeklyCheckinProposal(weekKey){
   const result=await saveProfilePrefs(prefs,{source:"checkin",reason:"check-in semanal "+weekKey});
   closeModal();
   if(result&&result.error){toast("No se pudo guardar el ajuste");return;}
-  render();toast("Ajuste aplicado para la próxima semana");
+  render();toast("Ajuste guardado: se aplicará cuando empiece tu próxima semana");
+}
+// REQ-234: aplica a las prefs vivas el ajuste de check-in diferido, solo
+// cuando ya llegó su fecha efectiva. Antes de eso, calorieTarget/carbTarget/
+// fatTarget siguen igual y ningún día (pasado, hoy o ya prescrito) cambia de meta.
+async function applyDueCheckinAdjustment(){
+  const pending=profile&&profile.prefs&&profile.prefs.pendingCheckinAdjustment;
+  if(!pending||!pending.effectiveFrom||todayStr()<pending.effectiveFrom)return;
+  const prefs={...profile.prefs,calorieTarget:pending.kcal,carbTarget:pending.carb,fatTarget:pending.fat};
+  delete prefs.pendingCheckinAdjustment;
+  profile.prefs=prefs; // refleja ya mismo en memoria; evita relanzar el guardado en el próximo render
+  try{await saveProfilePrefs(prefs,{source:"checkin",reason:"check-in diferido "+(pending.wk||"")});}catch(e){/* best-effort; se reintenta en el próximo render */}
 }
 
 // Guarda el check-in sin aplicar cambios de macros.

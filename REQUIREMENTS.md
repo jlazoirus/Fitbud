@@ -1549,47 +1549,12 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-233`).
 
 ## REQ-234 - El check-in semanal re-puntúa días ya ejecutados y contradice su copy "para la próxima semana"
 
-**Estado: pendiente.**
+**Estado: implementado.**
+El ajuste del check-in ya no muta `calorieTarget/carbTarget/fatTarget` al aceptar (eso re-puntuaba de inmediato hoy y días ya ejecutados). Queda como `pendingCheckinAdjustment` y recién se aplica a las prefs vivas cuando empieza la próxima semana no iniciada; no se tocó el wiring de REQ-69 (`buildDay`/`effectiveDayTarget()` sigue leyendo siempre el perfil vigente). Copy del modal/toast alineado con ese momento real. `CACHE_NAME` → `fitbud-pwa-v137`.
 
-### Origen
+- ✓ `node scripts/validate-macro-target-wiring.mjs`; `node scripts/release-gate.mjs` pasa (111 E2E, incl. 1 flake preexistente no relacionado en `entreno.spec.js` que pasa al reintentar).
 
-Auditoría del journey **home** (commit previo leído: `16fb94c` REQ-227). Verificación funcional en navegador real (Playwright + fixtures E2E, 0 llamadas pagadas): preparar hoy, registrar sus comidas, y aceptar el check-in semanal que la portada ofrece.
-
-### Problema
-
-Con el banner "Check-in · Semana N" visible en Home, aceptar un ajuste (p. ej. −200 kcal) cambia **de inmediato** la meta del día en curso. Captura `home-before`: "CONSUMO DE HOY 2184/2200 kcal · 16 restantes, Carb 219/220, Grasa 66/65" (en objetivo). Tras aceptar → `home-after`: mismo consumo 2184 pero "2184/**2000** kcal · **meta alcanzada**, Carb 219/**204**, Grasa 66/**60**" (ahora excedido), con el toast "Ajuste aplicado **para la próxima semana**". El usuario comió exactamente el plan que la app le preparó y Home lo reporta como pasado/excedido. Peor: también re-puntúa días YA ejecutados — `buildDay("2026-10-20").target` pasó de `{2200,160,220,65}` a `{2000,160,204,60}` tras el check-in, reescribiendo cómo se muestra la adherencia de ayer. Viola el invariante "ajustar el futuro no reescribe lo ya ejecutado".
-
-### Causa raíz
-
-`applyWeeklyCheckinProposal()` (`index.html:13357-13373`) escribe `prefs.calorieTarget/carbTarget/fatTarget` con `saveProfilePrefs` y anuncia "para la próxima semana". Pero `buildDay(ds)` (`index.html:1983`) fija `target:effectiveDayTarget()` **sin pasar `ds`**, y `effectiveDayTarget()` (`index.html:1693-1695`) siempre lee `profile.prefs` vigente. Así la meta de TODO día (pasado, hoy, futuro) sigue a las prefs vivas, mientras las comidas quedan congeladas (snapshot/override) a la meta anterior.
-
-### Objetivo
-
-Que un ajuste de check-in, comunicado como futuro, no altere retroactivamente la meta ni la adherencia mostrada de días ya ejecutados ni del día en curso ya prescrito; y que el copy coincida con cuándo surte efecto.
-
-### Alcance
-
-1. Hacer que el ajuste del check-in surta efecto desde el inicio de la próxima semana del plan no iniciada (o re-anclar/re-preparar explícitamente los días aún no ejecutados), en vez de mutar la meta global al instante.
-2. Alinear el copy del banner/toast con el momento real en que aplica.
-
-### Fuera de alcance
-
-- No cambiar el comportamiento de REQ-69 (editar macros en Perfil sí refleja en el día): este REQ es solo el flujo de check-in y su promesa temporal.
-- El motor de análisis (REQ-160/165) y los límites `CHECKIN_MAX_KCAL_ADJUST`/`MIN`.
-
-### Riesgos
-
-- Tocar la fecha efectiva del ajuste puede interactuar con `plan_versions`/snapshot nutricional; mantener idempotencia y no reescribir días cerrados.
-
-### Criterios de aceptación
-
-- Aceptar un check-in no cambia `buildDay(ds).target` de ningún `ds < inicioDeLaSemanaEfectiva`; el día en curso ya prescrito no pasa a "meta alcanzada"/excedido por el solo hecho de aceptar.
-- El copy refleja el momento real de aplicación.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E: preparar y registrar hoy, aceptar un ajuste de −200 kcal, confirmar que `dayTotals(hoy).target` y `buildDay(ayer).target` no cambian y que Home no vira a "meta alcanzada".
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-234`).
 
 ## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
 
