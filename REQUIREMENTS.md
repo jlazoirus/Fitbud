@@ -1984,3 +1984,9 @@ Los 12 ejercicios de resistencia muestran una foto por disciplina (`assets/exerc
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Feedback Sathya (beta). "Hacer otro ejercicio primero" elige un ejercicio pendiente posterior; el actual queda pendiente con sus series y se vuelve a él al terminar (`nextWorkoutStepIndex` = primer pendiente). ✓ `tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`.
+
+## REQ-261 - Entreno: sustituir un ejercicio por uno buscado en el catálogo
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Feedback Sathya. "Sustituir" tiene buscador (nombre, alias o músculo; `FITBUD_EXERCISE_SUBSTITUTION.search`) sobre todo el catálogo de fuerza, filtrado por lesiones (`exerciseSafeForLimits`). ✓ `tests/e2e/entreno.spec.js`, `scripts/validate-exercises.mjs`.

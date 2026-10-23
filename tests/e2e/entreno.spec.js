@@ -727,6 +727,49 @@ test.describe("Sustituir ejercicio", () => {
     await expect(overlay.locator(".alert")).toContainText("No hay otro ejercicio para deltoides posterior");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  // Sathya (beta, 2026-10-23): cambiar un ejercicio por uno concreto que
+  // estés buscando en la base (REQ-261).
+  test("el buscador encuentra cualquier ejercicio del catálogo y lo pone en lugar del actual", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+    await page.evaluate(() => {
+      const ex = normalizedWorkoutExecution(current);
+      Object.assign(currentWorkoutStep(ex), { exerciseSlug: "seated-cable-row", originalExerciseSlug: "seated-cable-row", variation: "standard" });
+      persistWorkoutExecution(current, ex, true);
+    });
+    const overlay = page.locator("#overlay");
+    const search = overlay.getByRole("searchbox", { name: "Buscar ejercicio" });
+
+    // Otro músculo, sin tildes: "press banca" encuentra Press de banca.
+    await app.getByRole("button", { name: "Sustituir", exact: true }).click();
+    await search.fill("press banca");
+    await expect(overlay.locator("#exercise-sub-suggestions")).toBeHidden();
+    await expect(overlay.locator("#exercise-search-results button.opt b")).toHaveText(["Press de banca"]);
+    await expect(overlay.locator("#exercise-search-results button.opt").first()).toContainText("Pecho · Gimnasio");
+    await search.fill("zzz");
+    await expect(overlay).toContainText("No encontramos “zzz”");
+    await search.fill("");
+    await expect(overlay.locator("#exercise-sub-suggestions")).toBeVisible();
+    await search.fill("press banca");
+    await overlay.locator("#exercise-search-results button.opt").first().click();
+    await expect(app.locator(".player-title h3")).toHaveText("Press de banca");
+
+    // De repeticiones a segundos: la plancha pasa a contarse en segundos.
+    await app.getByRole("button", { name: "Sustituir", exact: true }).click();
+    await search.fill("plancha frontal");
+    await overlay.locator("#exercise-search-results button.opt").first().click();
+    await expect(app.locator(".player-title h3")).toHaveText("Plancha frontal");
+    await expect(app.locator(".player-dose")).toContainText("30-45 s");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
 
 // REQ-240 (Jonathan): la demostración al final de las series quedaba escondida;

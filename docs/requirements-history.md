@@ -10625,3 +10625,32 @@ En el gimnasio la máquina o el banco del ejercicio actual puede estar ocupado. 
 
 - Con una serie marcada en el primer ejercicio, "Hacer otro ejercicio primero" → elegir uno posterior: se muestra ese, el progreso no cambia y se avisa del pendiente. Al terminarlo vuelve al primero con su serie marcada; el hecho fuera de orden se puede revisar. ✓ `tests/e2e/entreno.spec.js` ("Hacer otro ejercicio primero").
 - `normalizeExecution()` mantiene el ejercicio elegido mientras está pendiente y, hecho, vuelve al primero pendiente. ✓ `scripts/validate-workout-player.mjs`.
+
+## REQ-261 - Entreno: sustituir un ejercicio por uno buscado en el catálogo
+
+**Estado: implementado.**
+
+### Origen
+
+Sathya (beta, 2026-10-23): "debe permitirte cambiar un ejercicio por uno específico que tú estés buscando dentro de la base o de un listado".
+
+### Problema
+
+"Sustituir" solo ofrecía ejercicios con el mismo músculo principal (REQ-247) y compatibles con el lugar del día. Quien quería un ejercicio concreto (otra máquina, el que conoce) no podía elegirlo; con algunos músculos (deltoides posterior) la lista salía vacía.
+
+### Alcance
+
+1. `searchExercises(query, catalog)` en `exercise-catalog.js` (exportado como `FITBUD_EXERCISE_SUBSTITUTION.search`): busca en nombre, alias y músculos, sin tildes ni mayúsculas, solo ejercicios de fuerza (`gym`, `strength`, `bodyweight`). Orden: nombre que empieza por lo buscado, músculo principal, nombre que lo contiene, alias, resto.
+2. El modal "Sustituir" abre con el buscador arriba; con texto, las sugerencias del mismo músculo se ocultan y se ven los resultados (nombre, músculo principal y dónde se hace).
+3. `exerciseSafeForLimits()` separa de `exerciseCompatibleForWorkout()` el filtro de lesiones, limitaciones y movimientos a evitar. El buscador aplica solo ese filtro: un ejercicio de otro lugar se puede elegir (se indica el lugar). Si todo lo que coincide choca con el perfil, se dice.
+4. Si el nuevo ejercicio cuenta en otra unidad (segundos ↔ repeticiones), toma reps, ritmo y unidad de su dosis de catálogo (`WORKOUT_PLAYER.exerciseDose`); series y esfuerzo se conservan.
+
+### Fuera de alcance
+
+- Buscar por equipamiento (el catálogo lo guarda en inglés).
+- Cambiar el ejercicio en el plan de semanas futuras.
+
+### Criterios de aceptación
+
+- "press banca" encuentra Press de banca desde Remo sentado en polea y lo sustituye; "zzz" dice que no hay resultados; con el campo vacío vuelven las sugerencias. Plancha frontal en lugar de Press de banca pasa a "30-45 s". ✓ `tests/e2e/entreno.spec.js`.
+- El buscador no devuelve ejercicios de resistencia y encuentra sin tildes. ✓ `scripts/validate-exercises.mjs`.

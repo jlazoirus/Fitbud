@@ -387,6 +387,11 @@
       steps:[],
     };
   }
+  // REQ-261: dosis del catálogo para un ejercicio elegido por el usuario,
+  // según la fase de la semana del plan.
+  function exerciseDose(exercise,context){
+    return strengthDose(exercise,phaseSettings(context&&context.week,context&&context.durationWeeks));
+  }
   function emptySet(){
     return {done:false,reps:null,load:"",rpe:null,completedAt:null};
   }
@@ -549,6 +554,7 @@
     VERSION,
     buildPrescription,
     sessionFocus,
+    exerciseDose,
     createExecution,
     normalizeExecution,
     elapsedSeconds,

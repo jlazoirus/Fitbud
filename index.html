@@ -436,6 +436,9 @@
   .opt{width:100%;text-align:left;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-md);padding:13px;margin-bottom:8px;font-size:14px;line-height:1.3;transition:.15s}
   .opt:active{transform:scale(.99);border-color:var(--accent)}
   .opt .o-meta{font-size:12px;color:var(--muted);margin-top:4px;font-family:var(--font-mono)}
+  .exercise-search{width:100%;min-height:44px;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:11px;font-size:16px;font-family:inherit;margin:2px 0 12px}
+  .exercise-search:focus{outline:none;border-color:var(--accent)}
+  .exercise-search-empty{margin-bottom:12px}
   .estimate-applied{margin-top:8px;font-weight:700;font-size:14px}
   .nut-tools{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin:18px 0 8px}
   .nut-tool{display:inline-flex;align-items:center;gap:6px}
@@ -4995,16 +4998,14 @@ function workoutPrescription(ds){
     if(template&&template.exerciseIds&&template.exerciseIds.length)prescribedIds=exerciseArray(template.exerciseIds);
   }
   const exercises=prescribedIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
-  const prefs=trainingPrefsFromPrefs(planPrefsForDate(ds));
-  return WORKOUT_PLAYER.buildPrescription({
-    workout:ew.workout,
-    exercises,
-    context:{
-      week:trainingWeek(ds,planPrefsForDate(ds)),
-      durationWeeks:resolvedPlanDuration(planPrefsForDate(ds)),
-      sessionMinutes:prefs.sessionMinutes,
-    },
-  });
+  return WORKOUT_PLAYER.buildPrescription({workout:ew.workout,exercises,context:workoutPlayerContext(ds)});
+}
+function workoutPlayerContext(ds){
+  return {
+    week:trainingWeek(ds,planPrefsForDate(ds)),
+    durationWeeks:resolvedPlanDuration(planPrefsForDate(ds)),
+    sessionMinutes:trainingPrefsFromPrefs(planPrefsForDate(ds)).sessionMinutes,
+  };
 }
 function workoutContentIssues(ds){
   const workout=effectiveWorkout(ds).workout;
@@ -5661,11 +5662,17 @@ function explainLoadVariation(ds,variation,v,exercise){
       <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`);
 }
 function exerciseCompatibleForWorkout(exercise,ds){
+  if(!exerciseSafeForLimits(exercise,ds))return false;
+  const location=trainingPrefsFromPrefs(planPrefsForDate(ds)).locations[parseYmd(ds).getDay()];
+  const places=exerciseArray(exercise.places);
+  return !(location&&places.length&&!places.includes(location));
+}
+// REQ-261: lesiones, limitaciones y movimientos a evitar del perfil. El
+// buscador solo aplica este filtro: el usuario elige el ejercicio aunque sea
+// de otro lugar (se le indica dónde se hace).
+function exerciseSafeForLimits(exercise,ds){
   if(!exercise||exercise.active===false)return false;
   const training=trainingPrefsFromPrefs(planPrefsForDate(ds));
-  const location=training.locations[parseYmd(ds).getDay()];
-  const places=exerciseArray(exercise.places);
-  if(location&&places.length&&!places.includes(location))return false;
   const blocked=[training.injuries,training.limitations,training.avoidMovements].filter(Boolean).join(" ").toLowerCase();
   if(!blocked)return true;
   const contraindications=exerciseArray(exercise.contraindications).join(" ").toLowerCase();
@@ -5685,12 +5692,50 @@ function openExerciseSubstitution(ds){
       <b>${esc(ex.name)}</b><div class="o-meta">Músculo principal: ${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}</div>
     </button>`).join(""):`<div class="alert">No hay otro ejercicio para ${esc(muscle?muscle.toLowerCase():"este músculo")} compatible con tu lugar y limitaciones de hoy.</div>`;
   modal(`<h3>Sustituir ejercicio</h3>
-    <p class="muted small">Opciones que trabajan el mismo músculo principal${muscle?` (${esc(muscle.toLowerCase())})`:""}. Se conservan las series, repeticiones y el objetivo.</p>${body}`);
+    ${exerciseSearchBox(ds,"sub")}
+    <div id="exercise-sub-suggestions">
+    <p class="muted small">Opciones que trabajan el mismo músculo principal${muscle?` (${esc(muscle.toLowerCase())})`:""}. Se conservan las series, repeticiones y el objetivo.</p>${body}
+    </div>`);
+}
+// REQ-261 (feedback Sathya): buscar un ejercicio concreto en todo el catálogo.
+// mode "sub" sustituye el ejercicio en curso.
+function exerciseSearchBox(ds,mode){
+  return `<input class="exercise-search" type="search" aria-label="Buscar ejercicio" placeholder="Busca por nombre o músculo: press, glúteo…" autocomplete="off" oninput="renderExerciseSearchResults('${ds}','${mode}',this.value)">
+    <div id="exercise-search-results" aria-live="polite">${mode==="sub"?"":exerciseSearchResultsHtml(ds,mode,"")}</div>`;
+}
+function exerciseSearchResultsHtml(ds,mode,query){
+  const execution=normalizedWorkoutExecution(ds);if(!execution)return "";
+  const step=currentWorkoutStep(execution);
+  const inSession=new Set(execution.steps.filter(item=>item.type==="strength").map(item=>item.exerciseSlug));
+  const found=EXERCISE_SUBSTITUTION.search(query,exerciseCatalog(false))
+    .filter(ex=>mode==="add"?!inSession.has(ex.slug):ex.slug!==(step&&step.exerciseSlug));
+  const safe=found.filter(ex=>exerciseSafeForLimits(ex,ds));
+  if(!safe.length){
+    return `<div class="muted small exercise-search-empty">${found.length?"Lo que coincide no es recomendable con las lesiones o limitaciones de tu perfil.":`No encontramos “${esc(query)}”. Prueba con otro nombre o un músculo.`}</div>`;
+  }
+  const action=mode==="add"?"addWorkoutExercise":"applyExerciseSubstitution";
+  return safe.slice(0,30).map(ex=>{
+    const places=exerciseArray(ex.places).map(place=>TRAINING_LOCATION_LABELS[place]).filter(Boolean).join(" · ");
+    return `<button class="opt" onclick="${action}('${ds}','${esc(ex.slug)}')">
+      <b>${esc(ex.name)}</b><div class="o-meta">${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}${places?` · ${esc(places)}`:""}</div>
+    </button>`;
+  }).join("");
+}
+function renderExerciseSearchResults(ds,mode,query){
+  const box=document.getElementById("exercise-search-results");if(!box)return;
+  const q=String(query||"").trim();
+  const suggestions=document.getElementById("exercise-sub-suggestions");
+  if(suggestions)suggestions.hidden=!!q;
+  box.innerHTML=mode==="sub"&&!q?"":exerciseSearchResultsHtml(ds,mode,q);
 }
 function applyExerciseSubstitution(ds,slug){
-  const exercise=exerciseBySlug(slug);if(!exercise||!exerciseCompatibleForWorkout(exercise,ds))return;
+  const exercise=exerciseBySlug(slug);if(!exercise||!exerciseSafeForLimits(exercise,ds))return;
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
+  // Si cambia la unidad (segundos ↔ repeticiones), las repeticiones y el ritmo
+  // pasan a los del nuevo ejercicio; series y esfuerzo se conservan.
+  const dose=WORKOUT_PLAYER.exerciseDose(exercise,workoutPlayerContext(ds));
+  if(dose.unit!==(step.unit||"reps"))Object.assign(step,{reps:dose.reps,defaultReps:dose.defaultReps,unit:dose.unit,tempo:dose.tempo,restLabel:""});
   step.exerciseSlug=slug;step.label=exercise.name;step.variation="substitution";delete step.variationFromSlug;delete step.variationName;delete step.variationKind;
   persistWorkoutExecution(ds,execution,false);closeModal();render();toast("Ejercicio sustituido");
 }

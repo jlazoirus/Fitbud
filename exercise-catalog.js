@@ -340,7 +340,29 @@
       .map(slug=>bySlug.get(slug))
       .filter(exercise=>exercise&&primaryMuscle(exercise).toLowerCase()===target);
   }
-  root.FITBUD_EXERCISE_SUBSTITUTION={primaryMuscles:PRIMARY_MUSCLE,primaryMuscle,candidates:substituteCandidates};
+  // REQ-261: buscador del catálogo de fuerza por nombre, alias o músculo, sin
+  // distinguir tildes ni mayúsculas. Primero los que empiezan por lo buscado y
+  // los de ese músculo principal.
+  const fold=value=>String(value||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+  const STRENGTH_DISCIPLINES=new Set(["gym","strength","bodyweight"]);
+  function searchExercises(query,catalog){
+    const terms=fold(query).split(/\s+/).filter(Boolean);
+    const q=terms.join(" ");
+    return (catalog||[])
+      .filter(exercise=>exercise&&exercise.active!==false&&STRENGTH_DISCIPLINES.has(exercise.discipline))
+      .map(exercise=>{
+        const name=fold(exercise.name),aliases=list(exercise.aliases).map(fold).join(" ");
+        const muscles=[primaryMuscle(exercise)].concat(list(exercise.muscles)).map(fold).join(" ");
+        const haystack=`${name} ${aliases} ${muscles}`;
+        if(!terms.every(term=>haystack.includes(term)))return null;
+        const score=!q||name.startsWith(q)?0:fold(primaryMuscle(exercise)).startsWith(q)?1:name.includes(q)?2:aliases.includes(q)?3:4;
+        return {exercise,score};
+      })
+      .filter(Boolean)
+      .sort((a,b)=>a.score-b.score||String(a.exercise.name).localeCompare(String(b.exercise.name),"es"))
+      .map(item=>item.exercise);
+  }
+  root.FITBUD_EXERCISE_SUBSTITUTION={primaryMuscles:PRIMARY_MUSCLE,primaryMuscle,candidates:substituteCandidates,search:searchExercises};
   root.FITBUD_WORKOUT_EXERCISES={
     gym:{
       fullA:["back-squat","bench-press","seated-cable-row","romanian-deadlift","dead-bug"],
