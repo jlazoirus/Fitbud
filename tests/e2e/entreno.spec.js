@@ -727,6 +727,49 @@ test.describe("Sustituir ejercicio", () => {
     await expect(overlay.locator(".alert")).toContainText("No hay otro ejercicio para deltoides posterior");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  // Sathya (beta, 2026-10-23): cambiar un ejercicio por uno concreto que
+  // estés buscando en la base (REQ-261).
+  test("el buscador encuentra cualquier ejercicio del catálogo y lo pone en lugar del actual", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+    await page.evaluate(() => {
+      const ex = normalizedWorkoutExecution(current);
+      Object.assign(currentWorkoutStep(ex), { exerciseSlug: "seated-cable-row", originalExerciseSlug: "seated-cable-row", variation: "standard" });
+      persistWorkoutExecution(current, ex, true);
+    });
+    const overlay = page.locator("#overlay");
+    const search = overlay.getByRole("searchbox", { name: "Buscar ejercicio" });
+
+    // Otro músculo, sin tildes: "press banca" encuentra Press de banca.
+    await app.getByRole("button", { name: "Sustituir", exact: true }).click();
+    await search.fill("press banca");
+    await expect(overlay.locator("#exercise-sub-suggestions")).toBeHidden();
+    await expect(overlay.locator("#exercise-search-results button.opt b")).toHaveText(["Press de banca"]);
+    await expect(overlay.locator("#exercise-search-results button.opt").first()).toContainText("Pecho · Gimnasio");
+    await search.fill("zzz");
+    await expect(overlay).toContainText("No encontramos “zzz”");
+    await search.fill("");
+    await expect(overlay.locator("#exercise-sub-suggestions")).toBeVisible();
+    await search.fill("press banca");
+    await overlay.locator("#exercise-search-results button.opt").first().click();
+    await expect(app.locator(".player-title h3")).toHaveText("Press de banca");
+
+    // De repeticiones a segundos: la plancha pasa a contarse en segundos.
+    await app.getByRole("button", { name: "Sustituir", exact: true }).click();
+    await search.fill("plancha frontal");
+    await overlay.locator("#exercise-search-results button.opt").first().click();
+    await expect(app.locator(".player-title h3")).toHaveText("Plancha frontal");
+    await expect(app.locator(".player-dose")).toContainText("30-45 s");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
 
 // REQ-240 (Jonathan): la demostración al final de las series quedaba escondida;
@@ -896,6 +939,111 @@ test.describe("Ejercicio anterior", () => {
     });
     expect(firstSets[0]).toBe("40");
     expect(firstSets.length).toBe(sets);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
+// Sathya (beta, 2026-10-23): "Permitir que te deje hacer un ejercicio que esté
+// más adelante, sin que tengas que completar el ejercicio actual, después puedes
+// terminar el ejercicio pendiente" (REQ-260).
+test.describe("Hacer otro ejercicio primero", () => {
+  test("se pasa a uno posterior y se vuelve al pendiente con sus series intactas", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+
+    // Primer ejercicio: marca una serie y pasa a otro sin terminarlo.
+    const first = (await app.locator(".player-step h3").innerText()).trim();
+    await app.locator("button.set-done:not(.on)").first().click();
+    await page.getByRole("button", { name: "Hacer otro ejercicio primero" }).click();
+    const picker = page.locator("#overlay");
+    await expect(picker).toContainText(`${first} queda pendiente con 1 serie ya marcada`);
+    const options = picker.locator("button.opt");
+    expect(await options.count()).toBeGreaterThanOrEqual(2);
+    const later = (await options.nth(1).locator("b").innerText()).trim();
+    await options.nth(1).click();
+
+    // Ahora está en el elegido; el primero sigue pendiente y se avisa.
+    await expect(app.locator(".player-step h3")).toHaveText(later);
+    await expect(app.locator(".postponed-note")).toContainText(first);
+    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+
+    // Al terminar el elegido, vuelve al pendiente con su serie marcada.
+    const pending = app.locator("button.set-done:not(.on)");
+    while (await pending.count()) await pending.first().click();
+    await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
+    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+    await expect(app.locator(".player-step h3")).toHaveText(first);
+    await expect(app.locator("button.set-done.on")).toHaveCount(1);
+    await expect(app.locator(".postponed-note")).toHaveCount(0);
+
+    // El hecho fuera de orden se puede revisar.
+    await page.getByRole("button", { name: "← Ejercicio anterior" }).click();
+    await expect(app.locator(".player-step.reviewing h3")).toHaveText(later);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
+// Sathya (beta, 2026-10-23): "añadir un ejercicio al entrenamiento dejándote
+// buscar en una base con algún tipo de buscador" (REQ-262).
+test.describe("Añadir ejercicio", () => {
+  test("se busca, se suma antes de la vuelta a la calma y, sin series, se puede quitar", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+    const first = (await app.locator(".player-step h3").innerText()).trim();
+    const overlay = page.locator("#overlay");
+
+    // Sin escribir se ve el catálogo; al buscar se filtra.
+    await page.getByRole("button", { name: "+ Añadir ejercicio" }).click();
+    expect(await overlay.locator("#exercise-search-results button.opt").count()).toBeGreaterThan(10);
+    await overlay.getByRole("searchbox", { name: "Buscar ejercicio" }).fill("curl martillo");
+    await expect(overlay.locator("#exercise-search-results button.opt b")).toHaveText(["Curl martillo"]);
+    await overlay.locator("#exercise-search-results button.opt").first().click();
+    await expect(overlay).toHaveCount(0);
+
+    // Suma un bloque, sigue en el ejercicio en curso y queda antes de la vuelta a la calma.
+    await expect(app).toContainText(new RegExp(`0\\/${total} bloques`));
+    await expect(app.locator(".player-step h3")).toHaveText(first);
+    const added = await page.evaluate(() => {
+      const ex = normalizedWorkoutExecution(current);
+      const i = ex.steps.findIndex((s) => s.added);
+      return { i, last: ex.steps.length - 1, slug: ex.steps[i].exerciseSlug, cooldown: ex.steps.at(-1).phase };
+    });
+    expect(added).toEqual({ i: added.last - 1, last: added.last, slug: "hammer-curl", cooldown: "cooldown" });
+
+    // Ir a él: se ve como añadido y, sin series hechas, se puede quitar.
+    await page.getByRole("button", { name: "Hacer otro ejercicio primero" }).click();
+    await overlay.locator("button.opt").last().click();
+    await expect(app.locator(".player-step h3")).toHaveText("Curl martillo");
+    await expect(app.locator(".player-phase")).toContainText("Añadido por ti");
+    await page.getByRole("button", { name: "Quitar ejercicio" }).click();
+    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+    await expect(app.locator(".player-step h3")).toHaveText(first);
+
+    // Con una serie hecha ya es parte de la sesión: se omite, no se quita.
+    await page.getByRole("button", { name: "+ Añadir ejercicio" }).click();
+    await overlay.getByRole("searchbox", { name: "Buscar ejercicio" }).fill("curl martillo");
+    await overlay.locator("#exercise-search-results button.opt").first().click();
+    await page.getByRole("button", { name: "Hacer otro ejercicio primero" }).click();
+    await overlay.locator("button.opt").last().click();
+    await app.locator("button.set-done:not(.on)").first().click();
+    await expect(page.getByRole("button", { name: "Omitir ejercicio" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Quitar ejercicio" })).toHaveCount(0);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });

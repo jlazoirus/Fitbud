@@ -90,6 +90,13 @@ expect("biceps-curl",["hammer-curl"],["band-row"]);
 expect("triceps-pushdown",["diamond-push-up"],["assisted-dip","push-up"]);
 expect("romanian-deadlift",["single-leg-rdl"],["barbell-hip-thrust"]);
 expect("lateral-raise",[],["overhead-press"]);
+// REQ-261: el buscador encuentra por nombre, alias o músculo, sin tildes, y
+// nunca devuelve ejercicios de resistencia (caminar, correr…).
+const search=query=>substitution.search(query,catalog).map(exercise=>exercise.slug);
+if(search("press banca").join()!=="bench-press")errors.push(`Buscar "press banca": ${search("press banca").join()}`);
+if(search("GLUTEO")[0]!=="barbell-hip-thrust"&&search("GLUTEO")[0]!=="glute-bridge")errors.push(`Buscar "GLUTEO" no empieza por un ejercicio de glúteo: ${search("GLUTEO")[0]}`);
+if(search("caminata").length)errors.push(`Buscar "caminata" devuelve ejercicios de resistencia`);
+if(search("").some(slug=>!["gym","strength","bodyweight"].includes(bySlug.get(slug).discipline)))errors.push("El buscador incluye ejercicios que no son de fuerza");
 for(const exercise of catalog)if(!Array.isArray(exercise.substitute_slugs))errors.push(`${exercise.slug}: substitute_slugs no es lista`);
 
 const sql=fs.readFileSync(path.join(root,"supabase","exercises.sql"),"utf8");

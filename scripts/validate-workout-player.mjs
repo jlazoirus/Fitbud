@@ -198,3 +198,40 @@ console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporiza
   assert.equal(player.normalizeExecution(JSON.parse(JSON.stringify(away)),strength,t0+min).awayAt,away.awayAt,"normalizeExecution conserva awayAt");
   console.log("REQ-244: duración total con la app en segundo plano.");
 }
+
+{
+  // REQ-260: el usuario puede pasar a un ejercicio posterior; mientras siga
+  // pendiente, normalizeExecution no lo devuelve al primero pendiente.
+  const execution=player.createExecution(strength,Date.now());
+  const indexes=execution.steps.map((step,index)=>step.type==="strength"?index:-1).filter(index=>index>=0);
+  assert.ok(indexes.length>=3,"La sesión de prueba tiene al menos 3 ejercicios");
+  execution.steps[0].status="declined";
+  execution.currentStep=indexes[2];
+  const jumped=player.normalizeExecution(JSON.parse(JSON.stringify(execution)),strength,Date.now());
+  assert.equal(jumped.currentStep,indexes[2],"Se queda en el ejercicio elegido");
+  jumped.steps[indexes[2]].status="done";
+  const back=player.normalizeExecution(JSON.parse(JSON.stringify(jumped)),strength,Date.now());
+  assert.equal(back.currentStep,indexes[0],"Hecho el elegido, vuelve al primero pendiente");
+  console.log("REQ-260: hacer antes un ejercicio posterior y volver al pendiente.");
+}
+
+{
+  // REQ-262: un ejercicio añadido se conserva al normalizar, va antes de la
+  // vuelta a la calma y cuenta para completar la sesión.
+  const execution=player.createExecution(strength,Date.now());
+  const exercise=catalog.find(item=>item.slug==="biceps-curl");
+  const step=player.addedStrengthStep(exercise,{week:3,durationWeeks:10},"added-1");
+  assert.equal(step.added,true);
+  assert.equal(step.prescribedSets,4,"Dosis de la fase (semana 3 de 10: 4 series)");
+  execution.steps.splice(execution.steps.length-1,0,step);
+  const again=player.normalizeExecution(JSON.parse(JSON.stringify(execution)),strength,Date.now());
+  assert.equal(again.steps.length,strength.steps.length+1,"El añadido se conserva");
+  const index=again.steps.findIndex(item=>item.id==="added-1");
+  assert.equal(index,again.steps.length-2,"Va antes de la vuelta a la calma");
+  assert.equal(again.steps.at(-1).phase,"cooldown");
+  assert.equal(again.steps[index].sets.length,4,"Con sus series vacías");
+  assert.equal(player.progress(again).total,player.progress(player.createExecution(strength,Date.now())).total+1,"Cuenta como bloque");
+  const forged=player.normalizeExecution({...execution,steps:execution.steps.concat([{id:"x",type:"timed",added:true}])},strength,Date.now());
+  assert.equal(forged.steps.length,strength.steps.length+1,"Solo se conservan ejercicios de fuerza añadidos");
+  console.log("REQ-262: ejercicio añadido a la sesión en curso.");
+}

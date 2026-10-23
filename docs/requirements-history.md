@@ -10642,3 +10642,98 @@ Dado que `buildDay`/`effectiveDayTarget()` deben seguir leyendo siempre `profile
 - `node scripts/audit-secrets.mjs`, `node scripts/audit-html.mjs`: OK.
 - `node scripts/release-gate.mjs`: 97/99 (+ E2E) en verde; el resto del gate (97 checks no-E2E) en verde desde el primer intento.
 - No se agregó prueba E2E dedicada (la suite no tenía ninguna de check-in); queda como deuda de cobertura si se reporta otra regresión en este flujo.
+
+## REQ-260 - Entreno: hacer antes un ejercicio posterior y volver al pendiente
+
+**Estado: implementado.**
+
+### Origen
+
+Sathya (beta, 2026-10-23): "Permitir que te deje hacer un ejercicio que esté más adelante, sin que tengas que completar el ejercicio actual, después puedes terminar el ejercicio pendiente."
+
+### Problema
+
+En el gimnasio la máquina o el banco del ejercicio actual puede estar ocupado. El reproductor solo ofrecía "Siguiente ejercicio" (exige al menos una serie) u "Omitir ejercicio", que lo marca como omitido: para retomarlo había que encontrarlo con "← Ejercicio anterior" → "Hacerlo ahora", y si no, la sesión quedaba parcial.
+
+### Causa raíz
+
+- `normalizeExecution()` (`workout-player.js`) devolvía `currentStep` al primer bloque pendiente en cada render: no se podía estar en un ejercicio posterior con uno anterior pendiente.
+- `nextWorkoutStepIndex()` (`index.html`) buscaba desde el bloque siguiente al actual y solo al final volvía a los anteriores.
+
+### Alcance
+
+1. Botón "Hacer otro ejercicio primero" en un ejercicio de fuerza con otros pendientes: abre la lista de ejercicios de fuerza pendientes (posición, series × reps y series ya marcadas). Al elegir uno (`jumpToWorkoutStep`), el actual queda pendiente con sus series; un descanso en curso sigue corriendo.
+2. `normalizeExecution()` conserva `currentStep` mientras ese bloque siga pendiente.
+3. `nextWorkoutStepIndex(execution, except)` devuelve el primer pendiente en orden: al terminar el elegido se vuelve al que quedó pendiente. Sin saltos, el orden es el mismo de antes.
+4. Aviso "Te queda pendiente X. Vuelves al terminar este." en el ejercicio elegido.
+5. La revisión ("← Ejercicio anterior", "Siguiente →") recorre todos los bloques registrados, también los hechos después del bloque en curso.
+6. `CACHE_NAME` → `fitbud-pwa-v138` (`main` ya usaba v137 por REQ-234).
+
+### Fuera de alcance
+
+- Reordenar el plan guardado o el resumen previo: el orden del plan no cambia.
+- Saltar bloques de cardio por intervalos o el calentamiento/vuelta a la calma opcionales.
+
+### Criterios de aceptación
+
+- Con una serie marcada en el primer ejercicio, "Hacer otro ejercicio primero" → elegir uno posterior: se muestra ese, el progreso no cambia y se avisa del pendiente. Al terminarlo vuelve al primero con su serie marcada; el hecho fuera de orden se puede revisar. ✓ `tests/e2e/entreno.spec.js` ("Hacer otro ejercicio primero").
+- `normalizeExecution()` mantiene el ejercicio elegido mientras está pendiente y, hecho, vuelve al primero pendiente. ✓ `scripts/validate-workout-player.mjs`.
+
+## REQ-261 - Entreno: sustituir un ejercicio por uno buscado en el catálogo
+
+**Estado: implementado.**
+
+### Origen
+
+Sathya (beta, 2026-10-23): "debe permitirte cambiar un ejercicio por uno específico que tú estés buscando dentro de la base o de un listado".
+
+### Problema
+
+"Sustituir" solo ofrecía ejercicios con el mismo músculo principal (REQ-247) y compatibles con el lugar del día. Quien quería un ejercicio concreto (otra máquina, el que conoce) no podía elegirlo; con algunos músculos (deltoides posterior) la lista salía vacía.
+
+### Alcance
+
+1. `searchExercises(query, catalog)` en `exercise-catalog.js` (exportado como `FITBUD_EXERCISE_SUBSTITUTION.search`): busca en nombre, alias y músculos, sin tildes ni mayúsculas, solo ejercicios de fuerza (`gym`, `strength`, `bodyweight`). Orden: nombre que empieza por lo buscado, músculo principal, nombre que lo contiene, alias, resto.
+2. El modal "Sustituir" abre con el buscador arriba; con texto, las sugerencias del mismo músculo se ocultan y se ven los resultados (nombre, músculo principal y dónde se hace).
+3. `exerciseSafeForLimits()` separa de `exerciseCompatibleForWorkout()` el filtro de lesiones, limitaciones y movimientos a evitar. El buscador aplica solo ese filtro: un ejercicio de otro lugar se puede elegir (se indica el lugar). Si todo lo que coincide choca con el perfil, se dice.
+4. Si el nuevo ejercicio cuenta en otra unidad (segundos ↔ repeticiones), toma reps, ritmo y unidad de su dosis de catálogo (`WORKOUT_PLAYER.exerciseDose`); series y esfuerzo se conservan.
+
+### Fuera de alcance
+
+- Buscar por equipamiento (el catálogo lo guarda en inglés).
+- Cambiar el ejercicio en el plan de semanas futuras.
+
+### Criterios de aceptación
+
+- "press banca" encuentra Press de banca desde Remo sentado en polea y lo sustituye; "zzz" dice que no hay resultados; con el campo vacío vuelven las sugerencias. Plancha frontal en lugar de Press de banca pasa a "30-45 s". ✓ `tests/e2e/entreno.spec.js`.
+- El buscador no devuelve ejercicios de resistencia y encuentra sin tildes. ✓ `scripts/validate-exercises.mjs`.
+
+## REQ-262 - Entreno: añadir un ejercicio a la sesión desde un buscador
+
+**Estado: implementado.**
+
+### Origen
+
+Sathya (beta, 2026-10-23): "E incluso añadir un ejercicio al entrenamiento dejándote buscar en una base con algún tipo de buscador."
+
+### Problema
+
+La sesión solo tenía los ejercicios del plan: se podía sustituir, omitir o añadir series, pero no sumar un ejercicio. `normalizeExecution()` reconstruía los pasos desde la prescripción y descartaba cualquier otro.
+
+### Alcance
+
+1. Botón "+ Añadir ejercicio" en la sesión de fuerza en curso. Abre el buscador de REQ-261 en modo "add": sin texto lista todo el catálogo de fuerza (sin los que ya están en la sesión ni los que chocan con lesiones o limitaciones).
+2. `WORKOUT_PLAYER.addedStrengthStep(exercise, context, id)`: paso de fuerza con `added: true`, etiqueta "Añadido por ti" y la dosis de catálogo de la fase actual (`exerciseDose`).
+3. `normalizeExecution()` conserva los pasos añadidos (solo de fuerza y con `exerciseSlug`; series entre 1 y 10) antes de la vuelta a la calma. El respaldo por índice ya no confunde un añadido con un paso del plan.
+4. Si quedaban ejercicios, el usuario sigue en el actual y el añadido queda en la cola (puede ir a él con "Hacer otro ejercicio primero", REQ-260). Si no quedaba ninguno, el añadido pasa a ser el actual.
+5. Un añadido sin series hechas muestra "Quitar ejercicio" en vez de "Omitir ejercicio" y se borra de la sesión (no cuenta como omitido). Con una serie hecha ya es parte de la sesión y cuenta para completarla.
+
+### Fuera de alcance
+
+- Añadirlo al plan de semanas futuras o al resumen previo "Qué vas a hacer hoy".
+- Añadir bloques de cardio o en sesiones de cardio.
+
+### Criterios de aceptación
+
+- "+ Añadir ejercicio" → "curl martillo" → se suma un bloque, el usuario sigue en el ejercicio en curso y el añadido queda antes de la vuelta a la calma. Sin series se quita y vuelve el total; con una serie hecha solo se puede omitir. ✓ `tests/e2e/entreno.spec.js` ("Añadir ejercicio").
+- El añadido se conserva al normalizar, con sus series, y cuenta en el progreso; un paso añadido que no es de fuerza se descarta. ✓ `scripts/validate-workout-player.mjs`.
