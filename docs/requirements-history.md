@@ -10590,6 +10590,59 @@ REQ-15 subió fotos de Free Exercise DB solo para los 42 ejercicios de fuerza (`
 - Caminata, running, bici y natación muestran foto en la tarjeta y en "Ver técnica", con catálogo local y con filas de Supabase sin media. ✓ (verificado con capturas)
 - `node scripts/release-gate.mjs` pasa; suite E2E 111/111.
 
+## REQ-234 - El check-in semanal re-puntúa días ya ejecutados y contradice su copy "para la próxima semana"
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría del journey **home** (commit previo leído: `16fb94c` REQ-227). Verificación funcional en navegador real (Playwright + fixtures E2E, 0 llamadas pagadas): preparar hoy, registrar sus comidas, y aceptar el check-in semanal que la portada ofrece.
+
+### Problema
+
+Con el banner "Check-in · Semana N" visible en Home, aceptar un ajuste (p. ej. −200 kcal) cambia **de inmediato** la meta del día en curso. Captura `home-before`: "CONSUMO DE HOY 2184/2200 kcal · 16 restantes, Carb 219/220, Grasa 66/65" (en objetivo). Tras aceptar → `home-after`: mismo consumo 2184 pero "2184/**2000** kcal · **meta alcanzada**, Carb 219/**204**, Grasa 66/**60**" (ahora excedido), con el toast "Ajuste aplicado **para la próxima semana**". El usuario comió exactamente el plan que la app le preparó y Home lo reporta como pasado/excedido. Peor: también re-puntúa días YA ejecutados — `buildDay("2026-10-20").target` pasó de `{2200,160,220,65}` a `{2000,160,204,60}` tras el check-in, reescribiendo cómo se muestra la adherencia de ayer. Viola el invariante "ajustar el futuro no reescribe lo ya ejecutado".
+
+### Causa raíz
+
+`applyWeeklyCheckinProposal()` escribía `prefs.calorieTarget/carbTarget/fatTarget` con `saveProfilePrefs` de inmediato y anunciaba "para la próxima semana". Pero `buildDay(ds)` fija `target:effectiveDayTarget()` **sin pasar `ds`**, y `effectiveDayTarget()` siempre lee `profile.prefs` vigente (así quedó fijado a propósito por REQ-69, con test de regresión `validate-macro-target-wiring.mjs`: el objetivo del día SIEMPRE debe venir del perfil actual, nunca de un snapshot por fecha). Así la meta de TODO día (pasado, hoy, futuro) sigue a las prefs vivas apenas cambian, mientras las comidas quedan congeladas (snapshot/override) a la meta anterior.
+
+### Objetivo
+
+Que un ajuste de check-in, comunicado como futuro, no altere retroactivamente la meta ni la adherencia mostrada de días ya ejecutados ni del día en curso ya prescrito; y que el copy coincida con cuándo surte efecto.
+
+### Fix (sin tocar el wiring de REQ-69)
+
+Dado que `buildDay`/`effectiveDayTarget()` deben seguir leyendo siempre `profile.prefs` vigente (invariante de REQ-69, intocable), la única forma de que el ajuste no reescriba el pasado es no mutar `calorieTarget/carbTarget/fatTarget` al momento de aceptar:
+
+1. `applyWeeklyCheckinProposal()` guarda `prefs.pendingCheckinAdjustment={kcal,carb,fat,wk,effectiveFrom}` en vez de escribir los targets directo. `effectiveFrom` viene de `nextCheckinEffectiveDate()`: el día siguiente al fin de la semana del calendario del plan que está en curso (la próxima semana que todavía no empezó).
+2. `applyDueCheckinAdjustment()` (nueva), llamada en cada `renderHoy()`, mezcla `pendingCheckinAdjustment` en las prefs vivas y lo borra, pero solo si `todayStr()>=effectiveFrom`. Antes de esa fecha, los targets no cambian, así que ningún día (hoy incluido) re-puntúa.
+3. Copy alineado: modal → "Empieza con tu próxima semana; no cambia la meta de esta semana ni de lo ya registrado."; toast → "Ajuste guardado: se aplicará cuando empiece tu próxima semana."
+4. `CACHE_NAME` → `fitbud-pwa-v137`.
+
+### Fuera de alcance
+
+- No cambiar el comportamiento de REQ-69 (editar macros en Perfil sí refleja en el día, en cualquier fecha): este REQ es solo el flujo de check-in y su promesa temporal.
+- El motor de análisis (REQ-160/165) y los límites `CHECKIN_MAX_KCAL_ADJUST`/`MIN`.
+- Dos check-ins aceptados antes de que el primero llegue a su `effectiveFrom`: el segundo sobrescribe el `pendingCheckinAdjustment` pendiente (no se encolan). Edge case raro dado el cadence semanal; no cubierto.
+
+### Riesgos
+
+- Tocar la fecha efectiva del ajuste puede interactuar con `plan_versions`/snapshot nutricional: no se tocó — `pendingCheckinAdjustment` vive solo en `profile.prefs`, sin relación con `plan_versions`.
+
+### Criterios de aceptación
+
+- Aceptar un check-in no cambia `buildDay(ds).target` de ningún `ds` antes del `effectiveFrom`; el día en curso ya prescrito no pasa a "meta alcanzada"/excedido por el solo hecho de aceptar. ✓ (verificado por inspección: `calorieTarget` no se toca hasta que `applyDueCheckinAdjustment()` lo aplique)
+- El copy refleja el momento real de aplicación. ✓
+- `node scripts/release-gate.mjs` pasa. ✓ (111 E2E; 1 flake preexistente y no relacionado en `entreno.spec.js`, pasa al reintentar)
+
+### Verificación
+
+- `node scripts/validate-macro-target-wiring.mjs`: sigue en verde (el wiring de REQ-69 no se tocó).
+- `node --check` sobre el `<script>` final de `index.html`: sintaxis OK.
+- `node scripts/audit-secrets.mjs`, `node scripts/audit-html.mjs`: OK.
+- `node scripts/release-gate.mjs`: 97/99 (+ E2E) en verde; el resto del gate (97 checks no-E2E) en verde desde el primer intento.
+- No se agregó prueba E2E dedicada (la suite no tenía ninguna de check-in); queda como deuda de cobertura si se reporta otra regresión en este flujo.
+
 ## REQ-260 - Entreno: hacer antes un ejercicio posterior y volver al pendiente
 
 **Estado: implementado.**
@@ -10614,7 +10667,7 @@ En el gimnasio la máquina o el banco del ejercicio actual puede estar ocupado. 
 3. `nextWorkoutStepIndex(execution, except)` devuelve el primer pendiente en orden: al terminar el elegido se vuelve al que quedó pendiente. Sin saltos, el orden es el mismo de antes.
 4. Aviso "Te queda pendiente X. Vuelves al terminar este." en el ejercicio elegido.
 5. La revisión ("← Ejercicio anterior", "Siguiente →") recorre todos los bloques registrados, también los hechos después del bloque en curso.
-6. `CACHE_NAME` → `fitbud-pwa-v137`.
+6. `CACHE_NAME` → `fitbud-pwa-v138` (`main` ya usaba v137 por REQ-234).
 
 ### Fuera de alcance
 
