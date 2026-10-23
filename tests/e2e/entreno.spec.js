@@ -991,6 +991,63 @@ test.describe("Hacer otro ejercicio primero", () => {
   });
 });
 
+// Sathya (beta, 2026-10-23): "añadir un ejercicio al entrenamiento dejándote
+// buscar en una base con algún tipo de buscador" (REQ-262).
+test.describe("Añadir ejercicio", () => {
+  test("se busca, se suma antes de la vuelta a la calma y, sin series, se puede quitar", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+    const first = (await app.locator(".player-step h3").innerText()).trim();
+    const overlay = page.locator("#overlay");
+
+    // Sin escribir se ve el catálogo; al buscar se filtra.
+    await page.getByRole("button", { name: "+ Añadir ejercicio" }).click();
+    expect(await overlay.locator("#exercise-search-results button.opt").count()).toBeGreaterThan(10);
+    await overlay.getByRole("searchbox", { name: "Buscar ejercicio" }).fill("curl martillo");
+    await expect(overlay.locator("#exercise-search-results button.opt b")).toHaveText(["Curl martillo"]);
+    await overlay.locator("#exercise-search-results button.opt").first().click();
+    await expect(overlay).toHaveCount(0);
+
+    // Suma un bloque, sigue en el ejercicio en curso y queda antes de la vuelta a la calma.
+    await expect(app).toContainText(new RegExp(`0\\/${total} bloques`));
+    await expect(app.locator(".player-step h3")).toHaveText(first);
+    const added = await page.evaluate(() => {
+      const ex = normalizedWorkoutExecution(current);
+      const i = ex.steps.findIndex((s) => s.added);
+      return { i, last: ex.steps.length - 1, slug: ex.steps[i].exerciseSlug, cooldown: ex.steps.at(-1).phase };
+    });
+    expect(added).toEqual({ i: added.last - 1, last: added.last, slug: "hammer-curl", cooldown: "cooldown" });
+
+    // Ir a él: se ve como añadido y, sin series hechas, se puede quitar.
+    await page.getByRole("button", { name: "Hacer otro ejercicio primero" }).click();
+    await overlay.locator("button.opt").last().click();
+    await expect(app.locator(".player-step h3")).toHaveText("Curl martillo");
+    await expect(app.locator(".player-phase")).toContainText("Añadido por ti");
+    await page.getByRole("button", { name: "Quitar ejercicio" }).click();
+    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+    await expect(app.locator(".player-step h3")).toHaveText(first);
+
+    // Con una serie hecha ya es parte de la sesión: se omite, no se quita.
+    await page.getByRole("button", { name: "+ Añadir ejercicio" }).click();
+    await overlay.getByRole("searchbox", { name: "Buscar ejercicio" }).fill("curl martillo");
+    await overlay.locator("#exercise-search-results button.opt").first().click();
+    await page.getByRole("button", { name: "Hacer otro ejercicio primero" }).click();
+    await overlay.locator("button.opt").last().click();
+    await app.locator("button.set-done:not(.on)").first().click();
+    await expect(page.getByRole("button", { name: "Omitir ejercicio" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Quitar ejercicio" })).toHaveCount(0);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 test.describe("Plan de entrenamiento con el coach (REQ-257)", () => {
   test("el tope de tokens alcanza para la semana más larga y se pide JSON en una línea", async ({ page, context }) => {
     const { calls } = await installMocks(context);

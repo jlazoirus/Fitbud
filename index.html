@@ -5562,6 +5562,14 @@ function openPendingSetsPrompt(ds,step,pending){
 function skipWorkoutStep(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=currentWorkoutStep(execution);if(!step)return;
+  // REQ-262: un ejercicio añadido sin series hechas se quita, no queda omitido.
+  if(removableAddedStep(step)){
+    execution.steps.splice(execution.steps.indexOf(step),1);
+    if(execution.timer&&execution.timer.kind!=="rest")execution.timer=null;
+    const next=nextWorkoutStepIndex(execution,-1);
+    execution.currentStep=next>=0?next:Math.max(0,execution.steps.length-1);
+    persistWorkoutExecution(ds,execution,true);toast("Ejercicio quitado de la sesión");return;
+  }
   // REQ-250: omitir un calentamiento o vuelta a la calma es como "Ahora no".
   step.status=step.optional?"declined":"skipped";step.completedAt=new Date().toISOString();execution.timer=null;
   const next=nextWorkoutStepIndex(execution,execution.currentStep);
@@ -5599,6 +5607,32 @@ function jumpToWorkoutStep(ds,stepIndex){
   // Un descanso en curso sigue corriendo; otro cronómetro no aplica al ejercicio elegido.
   if(execution.timer&&execution.timer.kind!=="rest")execution.timer=null;
   persistWorkoutExecution(ds,execution,true);
+}
+// REQ-262 (feedback Sathya): añadir un ejercicio del catálogo a la sesión en
+// curso. Va antes de la vuelta a la calma, con la dosis de la fase; el plan no cambia.
+function removableAddedStep(step){return !!step&&step.added===true&&step.type==="strength"&&!step.sets.some(set=>set.done);}
+function openAddWorkoutExercise(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress"||execution.sessionType!=="strength")return;
+  modal(`<h3>Añadir un ejercicio</h3>
+    <p class="muted small">Se suma a la sesión de hoy antes de la vuelta a la calma, con las series de tu fase actual. Tu plan no cambia.</p>
+    ${exerciseSearchBox(ds,"add")}`);
+}
+function addWorkoutExercise(ds,slug){
+  const exercise=exerciseBySlug(slug);if(!exercise||!exerciseSafeForLimits(exercise,ds))return;
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress"||execution.sessionType!=="strength")return;
+  if(execution.steps.some(step=>step.type==="strength"&&step.exerciseSlug===slug)){toast("Ese ejercicio ya está en la sesión");return;}
+  const id=`added-${Date.now().toString(36)}`;
+  const at=execution.steps.length&&execution.steps[execution.steps.length-1].phase==="cooldown"?execution.steps.length-1:execution.steps.length;
+  const current=currentWorkoutStep(execution);
+  // Si ya no quedaba ningún ejercicio (solo la vuelta a la calma o nada), el añadido pasa a ser el actual.
+  const startNow=!current||current.status!=="pending"||current.phase==="cooldown";
+  execution.steps.splice(at,0,WORKOUT_PLAYER.addedStrengthStep(exercise,workoutPlayerContext(ds),id));
+  execution.reviewStep=null;
+  if(startNow)execution.currentStep=at;
+  else if(execution.currentStep>=at)execution.currentStep++;
+  closeModal();
+  persistWorkoutExecution(ds,execution,true);
+  toast(startNow?`Añadido: ${exercise.name}`:`Añadido: ${exercise.name}. Va antes de la vuelta a la calma.`);
 }
 function saveWorkoutSetField(ds,stepIndex,setIndex,field,value){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
@@ -5700,7 +5734,7 @@ function openExerciseSubstitution(ds){
 // REQ-261 (feedback Sathya): buscar un ejercicio concreto en todo el catálogo.
 // mode "sub" sustituye el ejercicio en curso.
 function exerciseSearchBox(ds,mode){
-  return `<input class="exercise-search" type="search" aria-label="Buscar ejercicio" placeholder="Busca por nombre o músculo: press, glúteo…" autocomplete="off" oninput="renderExerciseSearchResults('${ds}','${mode}',this.value)">
+  return `<input class="exercise-search" type="search" aria-label="Buscar ejercicio" placeholder="Nombre o músculo: press, glúteo…" autocomplete="off" oninput="renderExerciseSearchResults('${ds}','${mode}',this.value)">
     <div id="exercise-search-results" aria-live="polite">${mode==="sub"?"":exerciseSearchResultsHtml(ds,mode,"")}</div>`;
 }
 function exerciseSearchResultsHtml(ds,mode,query){
@@ -5714,7 +5748,7 @@ function exerciseSearchResultsHtml(ds,mode,query){
     return `<div class="muted small exercise-search-empty">${found.length?"Lo que coincide no es recomendable con las lesiones o limitaciones de tu perfil.":`No encontramos “${esc(query)}”. Prueba con otro nombre o un músculo.`}</div>`;
   }
   const action=mode==="add"?"addWorkoutExercise":"applyExerciseSubstitution";
-  return safe.slice(0,30).map(ex=>{
+  return safe.map(ex=>{
     const places=exerciseArray(ex.places).map(place=>TRAINING_LOCATION_LABELS[place]).filter(Boolean).join(" · ");
     return `<button class="opt" onclick="${action}('${ds}','${esc(ex.slug)}')">
       <b>${esc(ex.name)}</b><div class="o-meta">${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}${places?` · ${esc(places)}`:""}</div>
@@ -6052,7 +6086,7 @@ function renderCurrentWorkoutStep(ds,execution){
   const others=pendingStrengthStepIndexes(execution,stepIndex);
   const postponed=others.filter(index=>index<stepIndex).map(index=>workoutStepName(execution.steps[index]));
   return `<div class="player-step">
-    <div class="player-phase">${workoutPhaseLabel(step.phase)} · ejercicio ${stepIndex} de ${execution.steps.length-2}</div>
+    <div class="player-phase">${step.added?"Añadido por ti":workoutPhaseLabel(step.phase)} · ejercicio ${stepIndex} de ${execution.steps.length-2}</div>
     <div class="player-title"><h3>${esc(workoutStepTitle(step,exercise))}</h3>${exercise?`<button class="btn btn-sm player-howto" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Cómo se hace ${esc(exercise.name)}: demostración y pasos">▶ Cómo se hace</button>`:""}</div>
     <div class="player-dose">
       <div class="scard"><div class="n">${step.prescribedSets}</div><div class="l">series</div></div>
@@ -6073,7 +6107,7 @@ function renderCurrentWorkoutStep(ds,execution){
       <button class="btn btn-sm" onclick="openExerciseSubstitution('${ds}')">Sustituir</button>
     </div>
     <div class="player-controls">
-      <button class="btn" onclick="skipWorkoutStep('${ds}')">Omitir ejercicio</button>
+      <button class="btn" onclick="skipWorkoutStep('${ds}')">${removableAddedStep(step)?"Quitar ejercicio":"Omitir ejercicio"}</button>
       <button class="btn btn-accent" onclick="completeWorkoutStep('${ds}')">Siguiente ejercicio</button>
     </div>
     ${others.length&&execution.status==="in_progress"?`<button class="btn btn-sm" style="width:100%;margin-top:8px" onclick="openWorkoutStepPicker('${ds}')">Hacer otro ejercicio primero</button>`:""}
@@ -6113,6 +6147,7 @@ function renderWorkoutExecution(ds,execution){
     <div class="muted small" style="margin-top:8px">Duración estimada: ${execution.estimatedMinutes} min · el progreso se guarda después de cada acción.</div>
     <div class="row wrap" style="margin-top:12px">
       <button class="btn btn-sm" onclick="pauseResumeWorkoutExecution('${ds}')">${execution.status==="paused"?"Reanudar sesión":"Pausar sesión"}</button>
+      ${execution.sessionType==="strength"&&execution.status==="in_progress"?`<button class="btn btn-sm" onclick="openAddWorkoutExercise('${ds}')">+ Añadir ejercicio</button>`:""}
       <button class="btn btn-sm" onclick="openFinishWorkout('${ds}',true)">Terminar parcialmente</button>
       <button class="btn btn-sm" onclick="discardWorkoutExecution('${ds}')">Descartar</button>
     </div>

@@ -392,6 +392,22 @@
   function exerciseDose(exercise,context){
     return strengthDose(exercise,phaseSettings(context&&context.week,context&&context.durationWeeks));
   }
+  // REQ-262: ejercicio que el usuario añade a la sesión en curso, con la
+  // dosis de catálogo de la fase actual. No cambia el plan.
+  function addedStrengthStep(exercise,context,id){
+    return Object.assign({
+      id:String(id),
+      type:"strength",
+      phase:"main",
+      label:exercise.name,
+      exerciseSlug:exercise.slug,
+      originalExerciseSlug:exercise.slug,
+      phaseLabel:"Añadido por ti",
+      added:true,
+      status:"pending",
+      sets:[],
+    },exerciseDose(exercise,context));
+  }
   function emptySet(){
     return {done:false,reps:null,load:"",rpe:null,completedAt:null};
   }
@@ -428,7 +444,15 @@
       estimatedMinutes:prescription.estimatedMinutes,
     });
     const previous=Array.isArray(saved.steps)?saved.steps:[];
-    execution.steps=prescription.steps.map((step,index)=>normalizeStep(previous.find(item=>item&&item.id===step.id)||previous[index],step));
+    const prescribedIds=new Set(prescription.steps.map(step=>step.id));
+    const steps=prescription.steps.map((step,index)=>normalizeStep(previous.find(item=>item&&item.id===step.id)||(previous[index]&&!previous[index].added?previous[index]:null),step));
+    // REQ-262: los ejercicios añadidos por el usuario se conservan, antes de
+    // la vuelta a la calma.
+    const added=previous.filter(item=>item&&item.added===true&&item.type==="strength"&&item.exerciseSlug&&!prescribedIds.has(item.id))
+      .map(item=>Object.assign({},item,{prescribedSets:Math.round(clamp(item.prescribedSets,1,10))}))
+      .map(item=>normalizeStep(item,item));
+    const tail=steps.length&&steps[steps.length-1].phase==="cooldown"?steps.length-1:steps.length;
+    execution.steps=steps.slice(0,tail).concat(added,steps.slice(tail));
     execution.status=["in_progress","paused","completed","partial"].includes(saved.status)?saved.status:"in_progress";
     execution.elapsedSeconds=Math.max(0,Math.round(number(saved.elapsedSeconds,0)));
     execution.resumedAt=execution.status==="in_progress"?(saved.resumedAt||iso(now)):null;
@@ -555,6 +579,7 @@
     buildPrescription,
     sessionFocus,
     exerciseDose,
+    addedStrengthStep,
     createExecution,
     normalizeExecution,
     elapsedSeconds,

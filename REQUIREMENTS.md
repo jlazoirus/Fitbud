@@ -1990,3 +1990,9 @@ Feedback Sathya (beta). "Hacer otro ejercicio primero" elige un ejercicio pendie
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Feedback Sathya. "Sustituir" tiene buscador (nombre, alias o músculo; `FITBUD_EXERCISE_SUBSTITUTION.search`) sobre todo el catálogo de fuerza, filtrado por lesiones (`exerciseSafeForLimits`). ✓ `tests/e2e/entreno.spec.js`, `scripts/validate-exercises.mjs`.
+
+## REQ-262 - Entreno: añadir un ejercicio a la sesión desde un buscador
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de la vuelta a la calma con la dosis de la fase (`addedStrengthStep`); sin series hechas se quita. ✓ `tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`.

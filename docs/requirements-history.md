@@ -10654,3 +10654,33 @@ Sathya (beta, 2026-10-23): "debe permitirte cambiar un ejercicio por uno especí
 
 - "press banca" encuentra Press de banca desde Remo sentado en polea y lo sustituye; "zzz" dice que no hay resultados; con el campo vacío vuelven las sugerencias. Plancha frontal en lugar de Press de banca pasa a "30-45 s". ✓ `tests/e2e/entreno.spec.js`.
 - El buscador no devuelve ejercicios de resistencia y encuentra sin tildes. ✓ `scripts/validate-exercises.mjs`.
+
+## REQ-262 - Entreno: añadir un ejercicio a la sesión desde un buscador
+
+**Estado: implementado.**
+
+### Origen
+
+Sathya (beta, 2026-10-23): "E incluso añadir un ejercicio al entrenamiento dejándote buscar en una base con algún tipo de buscador."
+
+### Problema
+
+La sesión solo tenía los ejercicios del plan: se podía sustituir, omitir o añadir series, pero no sumar un ejercicio. `normalizeExecution()` reconstruía los pasos desde la prescripción y descartaba cualquier otro.
+
+### Alcance
+
+1. Botón "+ Añadir ejercicio" en la sesión de fuerza en curso. Abre el buscador de REQ-261 en modo "add": sin texto lista todo el catálogo de fuerza (sin los que ya están en la sesión ni los que chocan con lesiones o limitaciones).
+2. `WORKOUT_PLAYER.addedStrengthStep(exercise, context, id)`: paso de fuerza con `added: true`, etiqueta "Añadido por ti" y la dosis de catálogo de la fase actual (`exerciseDose`).
+3. `normalizeExecution()` conserva los pasos añadidos (solo de fuerza y con `exerciseSlug`; series entre 1 y 10) antes de la vuelta a la calma. El respaldo por índice ya no confunde un añadido con un paso del plan.
+4. Si quedaban ejercicios, el usuario sigue en el actual y el añadido queda en la cola (puede ir a él con "Hacer otro ejercicio primero", REQ-260). Si no quedaba ninguno, el añadido pasa a ser el actual.
+5. Un añadido sin series hechas muestra "Quitar ejercicio" en vez de "Omitir ejercicio" y se borra de la sesión (no cuenta como omitido). Con una serie hecha ya es parte de la sesión y cuenta para completarla.
+
+### Fuera de alcance
+
+- Añadirlo al plan de semanas futuras o al resumen previo "Qué vas a hacer hoy".
+- Añadir bloques de cardio o en sesiones de cardio.
+
+### Criterios de aceptación
+
+- "+ Añadir ejercicio" → "curl martillo" → se suma un bloque, el usuario sigue en el ejercicio en curso y el añadido queda antes de la vuelta a la calma. Sin series se quita y vuelve el total; con una serie hecha solo se puede omitir. ✓ `tests/e2e/entreno.spec.js` ("Añadir ejercicio").
+- El añadido se conserva al normalizar, con sus series, y cuenta en el progreso; un paso añadido que no es de fuerza se descarta. ✓ `scripts/validate-workout-player.mjs`.
