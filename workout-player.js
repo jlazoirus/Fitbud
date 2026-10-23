@@ -429,7 +429,10 @@
     execution.resumedAt=execution.status==="in_progress"?(saved.resumedAt||iso(now)):null;
     execution.awayAt=execution.status==="in_progress"&&saved.awayAt?saved.awayAt:null;
     execution.currentStep=Math.round(clamp(saved.currentStep,0,Math.max(0,execution.steps.length-1)));
-    if(execution.status==="in_progress"||execution.status==="paused"){
+    // REQ-260: si el usuario pasó antes a un ejercicio posterior, se queda en
+    // ese mientras siga pendiente; si no, va al primer pendiente.
+    const current=execution.steps[execution.currentStep];
+    if((execution.status==="in_progress"||execution.status==="paused")&&!(current&&current.status==="pending")){
       const next=execution.steps.findIndex(step=>step.status==="pending");
       execution.currentStep=next>=0?next:Math.max(0,execution.steps.length-1);
     }

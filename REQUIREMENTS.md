@@ -1978,3 +1978,9 @@ Día cerrado: Hoy oculta "Consumo de hoy" y muestra hoy en una línea, qué toca
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Los 12 ejercicios de resistencia muestran una foto por disciplina (`assets/exercise-media/`) desde `exercise-catalog.js`; `exerciseMediaSources()` la usa también si la fila de Supabase no trae media. SQL opcional: `supabase/exercise-media-endurance.sql`.
+
+## REQ-260 - Entreno: hacer antes un ejercicio posterior y volver al pendiente
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Feedback Sathya (beta). "Hacer otro ejercicio primero" elige un ejercicio pendiente posterior; el actual queda pendiente con sus series y se vuelve a él al terminar (`nextWorkoutStepIndex` = primer pendiente). ✓ `tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`.

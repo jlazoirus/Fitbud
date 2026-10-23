@@ -900,6 +900,54 @@ test.describe("Ejercicio anterior", () => {
   });
 });
 
+// Sathya (beta, 2026-10-23): "Permitir que te deje hacer un ejercicio que esté
+// más adelante, sin que tengas que completar el ejercicio actual, después puedes
+// terminar el ejercicio pendiente" (REQ-260).
+test.describe("Hacer otro ejercicio primero", () => {
+  test("se pasa a uno posterior y se vuelve al pendiente con sus series intactas", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await startGuidedSession(page);
+    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    await page.getByRole("button", { name: "Ahora no" }).click();
+
+    // Primer ejercicio: marca una serie y pasa a otro sin terminarlo.
+    const first = (await app.locator(".player-step h3").innerText()).trim();
+    await app.locator("button.set-done:not(.on)").first().click();
+    await page.getByRole("button", { name: "Hacer otro ejercicio primero" }).click();
+    const picker = page.locator("#overlay");
+    await expect(picker).toContainText(`${first} queda pendiente con 1 serie ya marcada`);
+    const options = picker.locator("button.opt");
+    expect(await options.count()).toBeGreaterThanOrEqual(2);
+    const later = (await options.nth(1).locator("b").innerText()).trim();
+    await options.nth(1).click();
+
+    // Ahora está en el elegido; el primero sigue pendiente y se avisa.
+    await expect(app.locator(".player-step h3")).toHaveText(later);
+    await expect(app.locator(".postponed-note")).toContainText(first);
+    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+
+    // Al terminar el elegido, vuelve al pendiente con su serie marcada.
+    const pending = app.locator("button.set-done:not(.on)");
+    while (await pending.count()) await pending.first().click();
+    await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
+    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+    await expect(app.locator(".player-step h3")).toHaveText(first);
+    await expect(app.locator("button.set-done.on")).toHaveCount(1);
+    await expect(app.locator(".postponed-note")).toHaveCount(0);
+
+    // El hecho fuera de orden se puede revisar.
+    await page.getByRole("button", { name: "← Ejercicio anterior" }).click();
+    await expect(app.locator(".player-step.reviewing h3")).toHaveText(later);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 test.describe("Plan de entrenamiento con el coach (REQ-257)", () => {
   test("el tope de tokens alcanza para la semana más larga y se pide JSON en una línea", async ({ page, context }) => {
     const { calls } = await installMocks(context);

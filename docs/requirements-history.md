@@ -10589,3 +10589,39 @@ REQ-15 subió fotos de Free Exercise DB solo para los 42 ejercicios de fuerza (`
 
 - Caminata, running, bici y natación muestran foto en la tarjeta y en "Ver técnica", con catálogo local y con filas de Supabase sin media. ✓ (verificado con capturas)
 - `node scripts/release-gate.mjs` pasa; suite E2E 111/111.
+
+## REQ-260 - Entreno: hacer antes un ejercicio posterior y volver al pendiente
+
+**Estado: implementado.**
+
+### Origen
+
+Sathya (beta, 2026-10-23): "Permitir que te deje hacer un ejercicio que esté más adelante, sin que tengas que completar el ejercicio actual, después puedes terminar el ejercicio pendiente."
+
+### Problema
+
+En el gimnasio la máquina o el banco del ejercicio actual puede estar ocupado. El reproductor solo ofrecía "Siguiente ejercicio" (exige al menos una serie) u "Omitir ejercicio", que lo marca como omitido: para retomarlo había que encontrarlo con "← Ejercicio anterior" → "Hacerlo ahora", y si no, la sesión quedaba parcial.
+
+### Causa raíz
+
+- `normalizeExecution()` (`workout-player.js`) devolvía `currentStep` al primer bloque pendiente en cada render: no se podía estar en un ejercicio posterior con uno anterior pendiente.
+- `nextWorkoutStepIndex()` (`index.html`) buscaba desde el bloque siguiente al actual y solo al final volvía a los anteriores.
+
+### Alcance
+
+1. Botón "Hacer otro ejercicio primero" en un ejercicio de fuerza con otros pendientes: abre la lista de ejercicios de fuerza pendientes (posición, series × reps y series ya marcadas). Al elegir uno (`jumpToWorkoutStep`), el actual queda pendiente con sus series; un descanso en curso sigue corriendo.
+2. `normalizeExecution()` conserva `currentStep` mientras ese bloque siga pendiente.
+3. `nextWorkoutStepIndex(execution, except)` devuelve el primer pendiente en orden: al terminar el elegido se vuelve al que quedó pendiente. Sin saltos, el orden es el mismo de antes.
+4. Aviso "Te queda pendiente X. Vuelves al terminar este." en el ejercicio elegido.
+5. La revisión ("← Ejercicio anterior", "Siguiente →") recorre todos los bloques registrados, también los hechos después del bloque en curso.
+6. `CACHE_NAME` → `fitbud-pwa-v137`.
+
+### Fuera de alcance
+
+- Reordenar el plan guardado o el resumen previo: el orden del plan no cambia.
+- Saltar bloques de cardio por intervalos o el calentamiento/vuelta a la calma opcionales.
+
+### Criterios de aceptación
+
+- Con una serie marcada en el primer ejercicio, "Hacer otro ejercicio primero" → elegir uno posterior: se muestra ese, el progreso no cambia y se avisa del pendiente. Al terminarlo vuelve al primero con su serie marcada; el hecho fuera de orden se puede revisar. ✓ `tests/e2e/entreno.spec.js` ("Hacer otro ejercicio primero").
+- `normalizeExecution()` mantiene el ejercicio elegido mientras está pendiente y, hecho, vuelve al primero pendiente. ✓ `scripts/validate-workout-player.mjs`.

@@ -5258,14 +5258,10 @@ function currentWorkoutStep(execution){
   if(!execution||!execution.steps.length)return null;
   return execution.steps[Math.min(execution.steps.length-1,Math.max(0,execution.currentStep||0))]||null;
 }
-function nextWorkoutStepIndex(execution,from){
-  for(let index=Math.max(0,Number(from)||0);index<execution.steps.length;index++){
-    if(execution.steps[index].status==="pending")return index;
-  }
-  for(let index=0;index<Math.max(0,Number(from)||0);index++){
-    if(execution.steps[index].status==="pending")return index;
-  }
-  return -1;
+// REQ-260: lo siguiente es el primer bloque pendiente en orden (salvo `except`):
+// si el usuario hizo antes un ejercicio posterior, vuelve al que dejó pendiente.
+function nextWorkoutStepIndex(execution,except){
+  return execution.steps.findIndex((step,index)=>index!==except&&step.status==="pending");
 }
 // Revisar un ejercicio anterior es solo mirar: reviewStep apunta al bloque que
 // se ve y no cambia currentStep (el primer pendiente) ni lo ya registrado.
@@ -5280,12 +5276,10 @@ function previousReviewableStepIndex(execution,from){
   }
   return -1;
 }
-// Hasta dónde se puede avanzar revisando: antes del bloque en curso (o hasta
-// el final si ya no queda ninguno pendiente).
+// REQ-260: con ejercicios hechos fuera de orden puede haber registrados
+// después del bloque en curso; la revisión recorre todos los registrados.
 function nextReviewableStepIndex(execution,from){
-  const hasPending=execution.steps.some(step=>step.status==="pending");
-  const limit=hasPending?(execution.currentStep||0):execution.steps.length;
-  for(let index=(Number(from)||0)+1;index<limit;index++){
+  for(let index=(Number(from)||0)+1;index<execution.steps.length;index++){
     if(reviewableWorkoutStep(execution.steps[index]))return index;
   }
   return -1;
@@ -5293,8 +5287,7 @@ function nextReviewableStepIndex(execution,from){
 function reviewPreviousWorkoutStep(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const reviewing=reviewedWorkoutStepIndex(execution);
-  const from=reviewing!=null?reviewing:(execution.steps.some(step=>step.status==="pending")?(execution.currentStep||0):execution.steps.length);
-  const prev=previousReviewableStepIndex(execution,from);
+  const prev=previousReviewableStepIndex(execution,reviewing!=null?reviewing:execution.steps.length);
   if(prev<0){toast("No hay un ejercicio anterior registrado");return;}
   execution.reviewStep=prev;
   persistWorkoutExecution(ds,execution,true);
@@ -5346,8 +5339,7 @@ function renderReviewedWorkoutStep(ds,execution,stepIndex){
   </div>`;
 }
 function workoutBackButton(ds,execution){
-  const from=execution.steps.some(step=>step.status==="pending")?(execution.currentStep||0):execution.steps.length;
-  return previousReviewableStepIndex(execution,from)>=0
+  return previousReviewableStepIndex(execution,execution.steps.length)>=0
     ?`<button class="btn btn-sm player-back" onclick="reviewPreviousWorkoutStep('${ds}')">← Ejercicio anterior</button>`:"";
 }
 function captureWorkoutElapsed(execution){
@@ -5498,7 +5490,7 @@ function finishTimedWorkoutStep(ds,skipped){
   step.status=skipped?(step.optional?"declined":"skipped"):"done";
   step.completedAt=new Date().toISOString();
   execution.timer=null;
-  const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
+  const next=nextWorkoutStepIndex(execution,execution.currentStep);
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
   if(next<0)toast("Todos los bloques están registrados. Finaliza la sesión.");
@@ -5542,7 +5534,7 @@ function completeWorkoutStep(ds,mode){
     if(!completed){toast("Registra al menos una serie antes de avanzar");return;}
   }
   step.status="done";step.completedAt=new Date().toISOString();
-  const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
+  const next=nextWorkoutStepIndex(execution,execution.currentStep);
   // REQ-187: entre dos ejercicios de fuerza corre el descanso entre ejercicios;
   // si ya arrancó con la última serie, se conserva (no se reinicia).
   const toStrength=step.type==="strength"&&next>=0&&execution.steps[next].type==="strength";
@@ -5571,8 +5563,40 @@ function skipWorkoutStep(ds){
   const step=currentWorkoutStep(execution);if(!step)return;
   // REQ-250: omitir un calentamiento o vuelta a la calma es como "Ahora no".
   step.status=step.optional?"declined":"skipped";step.completedAt=new Date().toISOString();execution.timer=null;
-  const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
+  const next=nextWorkoutStepIndex(execution,execution.currentStep);
   if(next>=0)execution.currentStep=next;
+  persistWorkoutExecution(ds,execution,true);
+}
+// REQ-260 (feedback Sathya): pasar a un ejercicio posterior sin terminar el
+// actual (máquina ocupada, por ejemplo). El actual queda pendiente con las
+// series ya marcadas y se vuelve a él al terminar el elegido.
+function pendingStrengthStepIndexes(execution,except){
+  return execution.steps.map((step,index)=>index).filter(index=>index!==except&&execution.steps[index].type==="strength"&&execution.steps[index].status==="pending");
+}
+function workoutStepName(step){return workoutStepTitle(step,exerciseBySlug(step.exerciseSlug,true));}
+function openWorkoutStepPicker(ds){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
+  const step=currentWorkoutStep(execution);if(!step||step.type!=="strength")return;
+  const targets=pendingStrengthStepIndexes(execution,execution.steps.indexOf(step));
+  if(!targets.length){toast("No quedan otros ejercicios pendientes");return;}
+  const done=step.sets.filter(set=>set.done).length;
+  modal(`<h3>¿Qué ejercicio haces ahora?</h3>
+    <p class="muted small">${esc(workoutStepName(step))} queda pendiente${done?` con ${seriesCount(done)} ya ${done===1?"marcada":"marcadas"}`:""}. Vuelves a él al terminar el que elijas.</p>
+    ${targets.map(index=>{
+      const target=execution.steps[index];
+      const started=target.sets.filter(set=>set.done).length;
+      return `<button class="opt" onclick="closeModal();jumpToWorkoutStep('${ds}',${index})">
+        <b>${esc(workoutStepName(target))}</b><div class="o-meta">Ejercicio ${index} de ${execution.steps.length-2} · ${target.prescribedSets} × ${esc(target.reps)}${started?` · ${seriesCount(started)} ya ${started===1?"marcada":"marcadas"}`:""}</div>
+      </button>`;}).join("")}
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Seguir con ${esc(workoutStepName(step))}</button>`);
+}
+function jumpToWorkoutStep(ds,stepIndex){
+  const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress")return;
+  const step=execution.steps[stepIndex];
+  if(!step||step.type!=="strength"||step.status!=="pending"||stepIndex===execution.currentStep)return;
+  execution.currentStep=stepIndex;execution.reviewStep=null;
+  // Un descanso en curso sigue corriendo; otro cronómetro no aplica al ejercicio elegido.
+  if(execution.timer&&execution.timer.kind!=="rest")execution.timer=null;
   persistWorkoutExecution(ds,execution,true);
 }
 function saveWorkoutSetField(ds,stepIndex,setIndex,field,value){
@@ -5591,7 +5615,7 @@ function toggleWorkoutSet(ds,stepIndex,setIndex){
   if(step.sets.some(item=>!item.done))startWorkoutTimer(ds,step.restSeconds,"rest");
   else{
     // REQ-187: última serie hecha y sigue otro ejercicio de fuerza → descanso entre ejercicios.
-    const next=nextWorkoutStepIndex(execution,stepIndex+1);
+    const next=nextWorkoutStepIndex(execution,stepIndex);
     if(next>=0&&next!==stepIndex&&execution.steps[next].type==="strength")startWorkoutTimer(ds,betweenExerciseRestSeconds(),"rest",true);
   }
 }
@@ -5754,7 +5778,7 @@ function resumePartialWorkout(ds,reviewed){
   const execution=reviewed||normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
   execution.status="in_progress";execution.completedAt=null;execution.resumedAt=new Date().toISOString();
   execution.pain="";execution.difficulty="";
-  const next=nextWorkoutStepIndex(execution,0);
+  const next=nextWorkoutStepIndex(execution,-1);
   execution.currentStep=next>=0?next:Math.max(0,execution.steps.length-1);
   persistWorkoutExecution(ds,execution,true);
 }
@@ -5852,7 +5876,7 @@ function chooseOptionalWorkoutStep(ds,yes){
   if(yes)step.optIn=true;
   else{
     step.status="declined";execution.timer=null;
-    const next=nextWorkoutStepIndex(execution,(execution.currentStep||0)+1);
+    const next=nextWorkoutStepIndex(execution,execution.currentStep);
     if(next>=0)execution.currentStep=next;
   }
   persistWorkoutExecution(ds,execution,true);
@@ -5980,6 +6004,8 @@ function renderCurrentWorkoutStep(ds,execution){
   }
   const exercise=exerciseBySlug(step.exerciseSlug,true);
   const variation=workoutVariationLabel(step,exercise);
+  const others=pendingStrengthStepIndexes(execution,stepIndex);
+  const postponed=others.filter(index=>index<stepIndex).map(index=>workoutStepName(execution.steps[index]));
   return `<div class="player-step">
     <div class="player-phase">${workoutPhaseLabel(step.phase)} · ejercicio ${stepIndex} de ${execution.steps.length-2}</div>
     <div class="player-title"><h3>${esc(workoutStepTitle(step,exercise))}</h3>${exercise?`<button class="btn btn-sm player-howto" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Cómo se hace ${esc(exercise.name)}: demostración y pasos">▶ Cómo se hace</button>`:""}</div>
@@ -5992,6 +6018,7 @@ function renderCurrentWorkoutStep(ds,execution){
       <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué son las repeticiones en reserva RIR"><div class="n">${step.targetRir}</div><div class="l">en reserva (RIR) ⓘ</div></button>
     </div>
     <div class="muted small"><b style="color:var(--txt)">Carga sugerida:</b> ${esc(step.suggestedLoad)}</div>
+    ${postponed.length?`<div class="alert violet postponed-note" style="margin-top:10px">${postponed.length===1?"Te queda pendiente":"Te quedan pendientes"} <b>${esc(postponed.length>1?`${postponed.slice(0,-1).join(", ")} y ${postponed.at(-1)}`:postponed[0])}</b>. Vuelves al terminar este.</div>`:""}
     ${lastPerformanceHtml(ds,step,exercise)}
     ${variation?`<div class="alert violet" style="margin-top:10px">${esc(variation)}</div>`:""}
     ${execution.timer&&execution.timer.kind==="rest"?renderWorkoutTimer(ds,execution,step):""}
@@ -6004,6 +6031,7 @@ function renderCurrentWorkoutStep(ds,execution){
       <button class="btn" onclick="skipWorkoutStep('${ds}')">Omitir ejercicio</button>
       <button class="btn btn-accent" onclick="completeWorkoutStep('${ds}')">Siguiente ejercicio</button>
     </div>
+    ${others.length&&execution.status==="in_progress"?`<button class="btn btn-sm" style="width:100%;margin-top:8px" onclick="openWorkoutStepPicker('${ds}')">Hacer otro ejercicio primero</button>`:""}
   </div>`;
 }
 function renderWorkoutExecution(ds,execution){

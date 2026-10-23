@@ -198,3 +198,19 @@ console.log("Reproductor validado: fuerza, cardio, plan personalizado, temporiza
   assert.equal(player.normalizeExecution(JSON.parse(JSON.stringify(away)),strength,t0+min).awayAt,away.awayAt,"normalizeExecution conserva awayAt");
   console.log("REQ-244: duración total con la app en segundo plano.");
 }
+
+{
+  // REQ-260: el usuario puede pasar a un ejercicio posterior; mientras siga
+  // pendiente, normalizeExecution no lo devuelve al primero pendiente.
+  const execution=player.createExecution(strength,Date.now());
+  const indexes=execution.steps.map((step,index)=>step.type==="strength"?index:-1).filter(index=>index>=0);
+  assert.ok(indexes.length>=3,"La sesión de prueba tiene al menos 3 ejercicios");
+  execution.steps[0].status="declined";
+  execution.currentStep=indexes[2];
+  const jumped=player.normalizeExecution(JSON.parse(JSON.stringify(execution)),strength,Date.now());
+  assert.equal(jumped.currentStep,indexes[2],"Se queda en el ejercicio elegido");
+  jumped.steps[indexes[2]].status="done";
+  const back=player.normalizeExecution(JSON.parse(JSON.stringify(jumped)),strength,Date.now());
+  assert.equal(back.currentStep,indexes[0],"Hecho el elegido, vuelve al primero pendiente");
+  console.log("REQ-260: hacer antes un ejercicio posterior y volver al pendiente.");
+}
