@@ -13,6 +13,9 @@
 // vercel.json define: { "crons": [{ "path": "/api/notify", "schedule": "0 8 * * *" }] }
 // Limitación Vercel Hobby: mínimo un disparo diario; granularidad horaria requiere plan Pro.
 // Vercel envía Authorization: Bearer CRON_SECRET en cada invocación automática del cron.
+// REQ-264: ese cron diario (03:00 en Lima) solo mantiene despierto Supabase. El
+// envío lo dispara cada hora .github/workflows/notify-hourly.yml con el mismo
+// CRON_SECRET (secreto del repo en GitHub).
 // Lenguaje REQ-31: todos los textos hablan de "tu plan"/"tu racha"; sin mención de IA.
 //
 // Push VAPID (REQ-38) — variables de entorno adicionales requeridas en Vercel:
@@ -118,6 +121,13 @@ function dayOfWeekInTz(tz) {
   return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(w.value);
 }
 
+// REQ-264: se envía en el primer disparo a la hora elegida o después, dentro
+// del mismo día local. Un disparo horario que llega tarde (GitHub Actions puede
+// demorarse) no pierde el aviso; la idempotencia por día evita repetirlo.
+function isNotifyTime(notifyHour, tz) {
+  return currentHourInTz(tz) >= (notifyHour ?? 20);
+}
+
 // ── Verificar actividad pendiente del día ─────────────────────────────────────
 
 async function checkPending(userId, dateStr, e) {
@@ -221,12 +231,11 @@ async function runJob(e, dryRun) {
   for (const pref of prefs) {
     const { user_id, timezone, notify_hour, enabled_days, notify_nutrition, notify_training, unsubscribe_token } = pref;
     const tz = safeTimezone(timezone || "UTC");
-    const nowHour = currentHourInTz(tz);
     const nowDow = dayOfWeekInTz(tz);
     const dateStr = todayInTz(tz);
 
-    // 2. ¿Es la hora configurada del usuario?
-    if (nowHour !== (notify_hour ?? 20)) continue;
+    // 2. ¿Ya llegó la hora configurada del usuario?
+    if (!isNotifyTime(notify_hour, tz)) continue;
 
     // 3. ¿Día habilitado?
     const days = Array.isArray(enabled_days) ? enabled_days.map(Number) : [0,1,2,3,4,5,6];
@@ -325,11 +334,10 @@ async function runJob(e, dryRun) {
     for (const pref of pushPrefs) {
       const { user_id, timezone, notify_hour, enabled_days } = pref;
       const tz = safeTimezone(timezone || "UTC");
-      const nowHour = currentHourInTz(tz);
       const nowDow  = dayOfWeekInTz(tz);
       const dateStr = todayInTz(tz);
 
-      if (nowHour !== (notify_hour ?? 20)) continue;
+      if (!isNotifyTime(notify_hour, tz)) continue;
       const days = Array.isArray(enabled_days) ? enabled_days.map(Number) : [0,1,2,3,4,5,6];
       if (!days.includes(nowDow)) continue;
 

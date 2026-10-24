@@ -10781,3 +10781,37 @@ Re-preparar no descarta una comida elegida o editada a mano, aunque no esté mar
 ### Verificación
 
 E2E nuevo en `tests/e2e/nutricion.spec.js`: preparar día (mock del coach aplica "Bowl proteico de la mañana" en desayuno) → editar desayuno a "Dos huevos con pan" / 777 kcal sin marcarlo hecho → "Más opciones de nutrición" → "Volver a preparar este día" → "Aplicar al día" (el mock vuelve a proponer "Bowl proteico de la mañana" en el borrador, como antes del fix) → el desayuno aplicado sigue siendo "Dos huevos con pan" / 777 kcal, "Bowl proteico de la mañana" no aparece en ninguna tarjeta. Pasa junto con las otras 3 pruebas de `nutricion.spec.js`. `node --check` sobre el `<script>` final de `index.html` OK. `git diff --check` limpio.
+
+## REQ-264 - Fix: los recordatorios por correo y push nunca se enviaban
+
+**Estado: implementado — requiere acción humana:** crear el secreto `CRON_SECRET` en GitHub (Settings → Secrets and variables → Actions) con el mismo valor que la variable `CRON_SECRET` de Vercel.
+
+### Origen
+
+Jonathan (2026-10-24): "Creo que las notificaciones no están funcionando".
+
+### Evidencia
+
+- `notification_log` en producción está vacía: nunca se intentó un envío, ni de correo ni de push.
+- `notification_preferences`: 2 usuarios con avisos activos (1 correo, 2 push), ambos `America/Lima`, hora 20.
+- `GET https://evolvapp.club/api/notify` sin secreto responde `401` con `keepAlive: true`: el endpoint y Supabase funcionan.
+
+### Causa raíz
+
+`vercel.json` dispara `/api/notify` una vez al día a las 08:00 UTC (límite del plan Hobby: un cron diario). `runJob()` (`api/notify.js`) solo enviaba si `currentHourInTz(tz) === notify_hour`. En Lima eso es a las 03:00, y Perfil → Recordatorios solo ofrece de 17:00 a 23:00 (`NOTIF_HOURS`): la condición no se cumplía nunca. Lo mismo para el push de racha.
+
+### Alcance
+
+1. `.github/workflows/notify-hourly.yml`: cada hora (minuto 7) llama a `/api/notify` con `Authorization: Bearer CRON_SECRET`. URL configurable con la variable de repo `NOTIFY_URL` (por defecto `https://evolvapp.club/api/notify`). El log del job muestra solo conteos, nunca usuarios ni correos. Falla visible si falta el secreto o el endpoint no responde 200.
+2. `isNotifyTime()`: se envía en el primer disparo a la hora elegida o después, dentro del mismo día local. Un disparo que llega tarde no pierde el aviso; la idempotencia por día (`notification_log`) evita repetirlo. Aplica a correo y push.
+3. El cron diario de Vercel se mantiene: sigue haciendo el keep-alive de Supabase (REQ-178/179) y, a las 03:00 de Lima, no envía nada.
+
+### Fuera de alcance
+
+- WhatsApp (REQ-255).
+- Verificar en Vercel `RESEND_API_KEY`, `NOTIFY_FROM_EMAIL` y las claves VAPID: sin acceso desde el agente. Si faltan, el job registra el error en `notification_log` (correo) o no intenta el push (`vapidReady` falso).
+
+### Criterios de aceptación
+
+- Con la hora elegida ya pasada hoy, el disparo envía; justo a la hora, envía; antes, no; ya enviado hoy, no repite. ✓ `scripts/validate-notify-schedule.mjs` (falla con el código anterior), en el release gate.
+- Tras crear el secreto, "Run workflow" del workflow responde 200 y, a la hora elegida, `notification_log` registra el envío.

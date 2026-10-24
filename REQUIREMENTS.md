@@ -1967,3 +1967,9 @@ Durante el ciclo activo, la "Adherencia a comidas" debe reflejar el porcentaje d
 ### Verificación sugerida
 
 - E2E (reusar `tests/e2e/progreso.spec.js`): sembrar un ciclo con `planStartDate` a −9 días, marcar todas las comidas de START..hoy como hechas y afirmar que la tarjeta "Adherencia a comidas" muestra 100%. Evidencia de la auditoría: con `completePrefs()` (ciclo 10 sem, START hoy−9), `cycleSummary()` devuelve `plannedMeals:210, doneMeals:30, mealAdherence:14` mientras la adherencia real de los 10 días transcurridos es 30/30 = 100%.
+
+## REQ-264 - Fix: los recordatorios por correo y push nunca se enviaban
+
+**Estado: implementado — requiere acción humana:** secreto `CRON_SECRET` en GitHub (mismo valor que en Vercel).
+
+El cron diario (03:00 en Lima) nunca coincidía con la hora elegida (17–23). `.github/workflows/notify-hourly.yml` llama cada hora a `/api/notify`, que envía desde la hora elegida (`isNotifyTime`), una vez por día. ✓ `scripts/validate-notify-schedule.mjs`.

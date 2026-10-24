@@ -87,6 +87,7 @@ run("validate-meal-estimate-output.mjs", "node scripts/validate-meal-estimate-ou
 run("validate-sw-cache-bump.mjs", "node scripts/validate-sw-cache-bump.mjs");
 run("validate-admin-create-user.mjs", "node scripts/validate-admin-create-user.mjs");
 run("validate-supabase-keepalive.mjs", "node scripts/validate-supabase-keepalive.mjs");
+run("validate-notify-schedule.mjs", "node scripts/validate-notify-schedule.mjs");
 run("validate-deploy-allowlist.mjs", "node scripts/validate-deploy-allowlist.mjs");
 run("validate-coach-plan-labels.mjs", "node scripts/validate-coach-plan-labels.mjs");
 run("validate-plan-version-for-date.mjs", "node scripts/validate-plan-version-for-date.mjs");

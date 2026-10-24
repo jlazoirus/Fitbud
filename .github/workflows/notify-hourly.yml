@@ -1,0 +1,35 @@
+# REQ-264 — Dispara cada hora los recordatorios (correo y push) de api/notify.js.
+# El cron de Vercel (plan Hobby) solo corre una vez al día, así que el envío a
+# la hora que elige cada usuario depende de este workflow.
+# Requiere el secreto del repo CRON_SECRET con el mismo valor que en Vercel.
+name: Recordatorios cada hora
+
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Llamar a /api/notify
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          NOTIFY_URL: ${{ vars.NOTIFY_URL || 'https://evolvapp.club/api/notify' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secreto CRON_SECRET (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          status=$(curl -sS -o response.json -w "%{http_code}" --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" "$NOTIFY_URL")
+          # Solo conteos: el log del job no debe exponer usuarios ni correos.
+          node -e 'const r=JSON.parse(require("fs").readFileSync("response.json","utf8"));console.log(JSON.stringify({ok:r.ok,error:r.error,processed:r.processed,sent:r.sent,skipped:r.skipped,errors:r.errors,push:r.push}))' || cat response.json
+          if [ "$status" != "200" ]; then
+            echo "::error::/api/notify respondió HTTP $status"
+            exit 1
+          fi
