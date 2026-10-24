@@ -8476,11 +8476,11 @@ function landingModeHtml(slot){
   const signUp=(cls,label)=>`<button class="l-btn ${cls}" onclick="showAuthFromLanding('up')">${label}</button>`;
   if(slot==="nav")return invite?`<a class="l-btn l-btn-lime" href="beta-reclutamiento.html?source=portada-nav">Postular</a>`:signUp("l-btn-lime","Empezar");
   if(slot==="hero")return invite?`<a class="l-btn l-btn-lime l-btn-lg" href="beta-reclutamiento.html?source=portada">Postular a la beta</a>`:signUp("l-btn-lime l-btn-lg","Empezar ahora");
-  if(slot==="heroNote")return invite?"Beta de fundadores · Tres meses gratis, sin tarjeta":"Tu plan listo en minutos · Pagas solo el período que eliges";
-  if(slot==="sub")return invite?"Precios al abrir los planes. Quienes entren a la beta tendrán precio de fundador.":"Pagas solo el período que eliges. Sin permanencia.";
+  if(slot==="heroNote")return invite?"Beta":"Tu plan listo en minutos · Pagas solo el período que eliges";
+  if(slot==="sub")return invite?"Los planes se abren al terminar la beta.":"Pagas solo el período que eliges. Sin permanencia.";
   if(slot==="final")return invite
     ?`<h2 id="l-cta-h">Sé de los primeros.</h2>
-        <p>Buscamos personas que usen Evolv tres meses y nos digan qué mejorar. A cambio, acceso completo gratis y precio de fundador.</p>
+        <p>Buscamos personas que usen Evolv tres meses y nos digan qué mejorar. A cambio, acceso completo durante la beta.</p>
         <a class="l-btn l-btn-ink l-btn-lg" href="beta-reclutamiento.html?source=portada-final">Postular a la beta</a>
         <div class="l-cta-note">Postular toma 2 minutos · Te respondemos por correo</div>`
     :`<h2 id="l-cta-h">Empieza hoy.</h2>
@@ -12900,7 +12900,7 @@ function openAdminBetaFromLink(){
 function adminBetaPendingCardHtml(){
   if(!isAdmin()||!adminBetaPending)return "";
   return `<div class="dash" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
-    <div><b>${adminBetaPending} ${adminBetaPending===1?"postulación espera":"postulaciones esperan"} tu revisión</b><div class="muted small">Beta de fundadores</div></div>
+    <div><b>${adminBetaPending} ${adminBetaPending===1?"postulación espera":"postulaciones esperan"} tu revisión</b><div class="muted small">Beta</div></div>
     <button class="btn btn-sm btn-accent" onclick="setView('adminBeta')">Revisar</button>
   </div>`;
 }
