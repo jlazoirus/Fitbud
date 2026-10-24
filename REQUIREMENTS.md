@@ -1885,46 +1885,9 @@ El único recordatorio fuera de la app es por correo (REQ-24) y muchos usuarios 
 
 ## REQ-256 - Fix Nutrición: "Volver a preparar este día" pisa comidas personalizadas sin marcar como hechas
 
-**Estado: pendiente.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
-
-Auditoría del journey `nutrición` (commit previo `4e31c77`).
-
-### Problema
-
-Con el día preparado, el usuario edita un slot ("Personalizada / editar valores") o lo cambia ("Otra opción") sin marcarlo hecho. "Más opciones → Volver a preparar este día" lo devuelve a la comida generada y el dato se pierde en silencio. El toast "Lo que ya registraste hoy no cambia" solo aparece si había una comida marcada hecha.
-
-### Causa raíz
-
-`applyDayComidas` (`index.html:10827`) conserva solo `ms.done` (`if(ms.done){preserved++;return;} ms.ovr={…}`); cualquier otro `ms.ovr` se pisa. Entra por `openNutritionMoreMenu` (`index.html:4788`) → `homePrepareDay` → `applyGeneratedDay`/`applyDeterministicDay` → `applyDayComidas`. La preservación de REQ-119 (solo `done=true`) quedó incompleta.
-
-### Objetivo
-
-Re-preparar no descarta una comida elegida o editada a mano, aunque no esté marcada como hecha.
-
-### Alcance
-
-1. `applyDayComidas` conserva también slots con override del usuario, no solo `done`.
-2. Marcar ese override (p. ej. `userSet:true` en `saveEditor`/`applyChangeMeal`).
-3. El toast no debe prometer una preservación que no ocurre.
-
-### Fuera de alcance
-
-- Días pasados y extras (no se pisan).
-
-### Riesgos
-
-- "Otra opción" también usa `gen:true`; hace falta una marca propia para distinguirlo de lo generado.
-
-### Criterios de aceptación
-
-- Editar un slot sin marcarlo hecho y "Volver a preparar" conserva el valor; una comida marcada hecha se sigue conservando.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E: preparar día, editar desayuno a 777 kcal sin tildar, "Volver a preparar"; el slot sigue en 777.
+`applyDayComidas` solo preservaba `ms.done`; editar o cambiar una comida sin marcarla hecha se perdía al re-preparar. Nueva marca `ovr.userSet` (en `saveEditor`, `applyChangeMeal`, `applyReplace` y la acción del coach `cambiar_plato`) que `applyDayComidas` también preserva. ✓ `tests/e2e/nutricion.spec.js`.
 
 ## REQ-257 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
 

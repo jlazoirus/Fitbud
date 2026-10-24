@@ -103,4 +103,43 @@ test.describe("Nutrición", () => {
     await expect(overlay).toContainText("Editar valores / comida personalizada");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  // REQ-256: editar una comida a mano sin marcarla hecha y "Volver a preparar
+  // este día" no debe pisar la edición en silencio (antes solo se conservaban
+  // las comidas marcadas como hechas).
+  test("editar una comida sin marcarla hecha se conserva al volver a preparar el día", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+
+    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    const overlay = page.locator("#overlay");
+    await overlay.getByRole("button", { name: /Aplicar al día/i }).click({ timeout: 15_000 });
+
+    await page.locator("#tabs").getByText("Nutrición").click();
+    const app = page.locator("#app");
+    const card = app.locator(".meal.meal-tap").filter({ hasText: "Bowl proteico de la mañana" });
+
+    // Editar el desayuno a mano, sin marcarlo como hecho.
+    await card.getByRole("button", { name: /^Más opciones de / }).click();
+    await overlay.getByRole("button", { name: /Editar valores \/ comida personalizada/ }).click();
+    await page.locator("#f_name").fill("Dos huevos con pan");
+    await page.locator("#f_kcal").fill("777");
+    await overlay.getByRole("button", { name: "Guardar" }).click();
+    await expect(app).toContainText("Dos huevos con pan");
+    await expect(app).toContainText("777");
+
+    // Volver a preparar el día: la edición manual sigue en pie.
+    await page.getByRole("button", { name: "Más opciones de nutrición" }).click();
+    await overlay.getByRole("button", { name: "Volver a preparar este día" }).click();
+    await overlay.getByRole("button", { name: /Aplicar al día/i }).click({ timeout: 15_000 });
+
+    await expect(app).toContainText("Dos huevos con pan");
+    await expect(app).toContainText("777");
+    await expect(app.locator(".meal.meal-tap", { hasText: "Bowl proteico de la mañana" })).toHaveCount(0);
+
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });

@@ -35,9 +35,11 @@ assert.ok(verMatch, "Debe existir const COACH_PROMPT_VERSION.");
 assert.ok(Number(verMatch[1]) >= 8, `COACH_PROMPT_VERSION debe ser >= 8 tras REQ-132 (actual: ${verMatch[1]}).`);
 console.log(`  Test 2 pasado: COACH_PROMPT_VERSION=${verMatch[1]} (>=8)`);
 
-// 3. applyDayComidas nunca reescribe una comida ya registrada (done=true).
+// 3. applyDayComidas nunca reescribe una comida ya registrada (done=true) ni
+//    una elegida/editada a mano por el usuario (ovr.userSet, REQ-256).
 const applyDay = extractFunctionSource(html, "applyDayComidas");
-assert.ok(/if\s*\(\s*ms\.done\s*\)/.test(applyDay), "applyDayComidas debe saltar comidas con ms.done=true.");
+assert.ok(/if\s*\(\s*ms\.done\b/.test(applyDay), "applyDayComidas debe saltar comidas con ms.done=true.");
+assert.ok(/ms\.ovr\s*&&\s*ms\.ovr\.userSet/.test(applyDay), "applyDayComidas debe saltar también overrides con userSet=true (REQ-256).");
 assert.ok(/preserved/.test(applyDay), "applyDayComidas debe contar cuántas comidas se preservaron.");
 console.log("  Test 3 pasado: applyDayComidas preserva comidas ya registradas");
 

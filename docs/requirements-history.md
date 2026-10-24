@@ -10737,3 +10737,47 @@ La sesión solo tenía los ejercicios del plan: se podía sustituir, omitir o a�
 
 - "+ Añadir ejercicio" → "curl martillo" → se suma un bloque, el usuario sigue en el ejercicio en curso y el añadido queda antes de la vuelta a la calma. Sin series se quita y vuelve el total; con una serie hecha solo se puede omitir. ✓ `tests/e2e/entreno.spec.js` ("Añadir ejercicio").
 - El añadido se conserva al normalizar, con sus series, y cuenta en el progreso; un paso añadido que no es de fuerza se descarta. ✓ `scripts/validate-workout-player.mjs`.
+
+## REQ-256 - Fix Nutrición: "Volver a preparar este día" pisa comidas personalizadas sin marcar como hechas
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría del journey `nutrición` (commit previo `4e31c77`).
+
+### Problema
+
+Con el día preparado, el usuario edita un slot ("Personalizada / editar valores") o lo cambia ("Otra opción") sin marcarlo hecho. "Más opciones → Volver a preparar este día" lo devuelve a la comida generada y el dato se pierde en silencio. El toast "Lo que ya registraste hoy no cambia" solo aparecía si había una comida marcada hecha.
+
+### Causa raíz
+
+`applyDayComidas` (`index.html`) conservaba solo `ms.done` (`if(ms.done){preserved++;return;} ms.ovr={…}`); cualquier otro `ms.ovr` se pisaba. Entra por `openNutritionMoreMenu` → `homePrepareDay` → `applyGeneratedDay`/`applyDeterministicDay` → `applyDayComidas`. La preservación de REQ-119 (solo `done=true`) quedó incompleta.
+
+### Objetivo
+
+Re-preparar no descarta una comida elegida o editada a mano, aunque no esté marcada como hecha.
+
+### Alcance implementado
+
+1. Nueva marca `ovr.userSet:true` en los cuatro puntos donde el usuario elige o edita una comida a mano: `saveEditor` (editar valores/personalizada), `applyChangeMeal` (botón "Otra opción", solo en el slot elegido — las comidas futuras que el motor rebalancea automáticamente NO llevan `userSet`, son una propuesta del motor), `applyReplace` (menú "Adaptar": sin cocina / comer fuera / falta un ingrediente) y la acción del coach conversacional `cambiar_plato`.
+2. `applyDayComidas` preserva el slot cuando `ms.done` **o** `ms.ovr.userSet` es verdadero, no solo `done`. El comentario de la función se actualizó para documentar ambos casos.
+3. El toast de preservación ("Lo que ya registraste o personalizaste {hoy} no cambia") pasa a decir también "personalizaste", ya que ahora preserva ediciones manuales además de lo ya registrado — antes el texto solo describía el caso `done`.
+
+### Fuera de alcance
+
+- Días pasados y extras (ya no se pisaban).
+- Las comidas futuras rebalanceadas automáticamente por el motor tras un "Otra opción" (`nutritionPlan:true`, sin `userSet`): siguen sin marca de usuario a propósito, son una propuesta del motor y pueden seguir ajustándose con normalidad.
+
+### Riesgos
+
+- "Otra opción" (`applyChangeMeal`) ya usaba `gen:true` para el slot elegido; se le agregó `userSet:true` además, sin quitar `gen` (algunos lectores de `ovr.gen` como `homeDayHasPreparedMeals`/`weekHasGeneratedPlan` siguen funcionando igual).
+
+### Criterios de aceptación
+
+- Editar un slot sin marcarlo hecho y "Volver a preparar" conserva el valor; una comida marcada hecha se sigue conservando. ✓ `tests/e2e/nutricion.spec.js` ("editar una comida sin marcarla hecha se conserva al volver a preparar el día").
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación
+
+E2E nuevo en `tests/e2e/nutricion.spec.js`: preparar día (mock del coach aplica "Bowl proteico de la mañana" en desayuno) → editar desayuno a "Dos huevos con pan" / 777 kcal sin marcarlo hecho → "Más opciones de nutrición" → "Volver a preparar este día" → "Aplicar al día" (el mock vuelve a proponer "Bowl proteico de la mañana" en el borrador, como antes del fix) → el desayuno aplicado sigue siendo "Dos huevos con pan" / 777 kcal, "Bowl proteico de la mañana" no aparece en ninguna tarjeta. Pasa junto con las otras 3 pruebas de `nutricion.spec.js`. `node --check` sobre el `<script>` final de `index.html` OK. `git diff --check` limpio.

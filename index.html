@@ -4383,7 +4383,7 @@ async function applyDeterministicDay(ds){
       const preserved=applyDayComidas(ds,det.comidas);
       homeTrackAction(ds,"prepare_day_deterministic");
       render();scrollAppTop();
-      const preservedNote=preserved?` Lo que ya registraste hoy no cambia.`:"";
+      const preservedNote=preserved?` Lo que ya registraste o personalizaste hoy no cambia.`:"";
       // REQ-139: aviso suave, solo cuando el día quedó completo (no compite con el mensaje de "opción viable").
       const contractNote=det.ok!==false?dietContractNoticeText(det.totals,det.target):"";
       toast((det.ok===false?"Listo: preparamos la opción más viable para hoy.":"Tu día está listo con tus metas de hoy.")+(contractNote?" "+contractNote:"")+preservedNote);
@@ -7224,7 +7224,7 @@ function applyCoachAction(msgId){
   }else if(a.tipo==="cambiar_plato"){
     const ms=mealState(ds,decision.meal.id);
     const prev=ms.ovr?ms.ovr.name:null;
-    ms.ovr={name:decision.dish.name,dishName:decision.dish.name};
+    ms.ovr={name:decision.dish.name,dishName:decision.dish.name,userSet:true};
     addContingencyEntry(ds,{type:"coach_meal_change",id:decision.meal.id,reason:"coach_action",chosen:decision.dish.name,prev});
     commitDay(ds);
     toast("Comida actualizada");
@@ -9037,7 +9037,7 @@ function openReplace(ds,id,reason){
 function applyReplace(ds,id,i,reason){
   const{options}=window._replaceOpts;const o=options[i];const ms=mealState(ds,id);
   const prev=ms.ovr?ms.ovr.name:null;
-  ms.ovr={name:o.name,dishName:o.dishName||null};
+  ms.ovr={name:o.name,dishName:o.dishName||null,userSet:true};
   if(reason)ms.ovr.contingencyReason=reason;
   addContingencyEntry(ds,{type:"meal_replace",id,reason:reason||null,chosen:o.name,prev});
   const scope=(document.querySelector("input[name='replScope']:checked")||{}).value||"day";
@@ -9324,7 +9324,7 @@ function applyChangeMeal(i){
   const ranked_item=ranked&&ranked[i];
   const o=ranked_item?{name:ranked_item.dish.name,dishName:ranked_item.dish.name}:options[i];
   if(!o)return;
-  const newOvr={name:o.name,dishName:o.dishName||null,gen:true};
+  const newOvr={name:o.name,dishName:o.dishName||null,gen:true,userSet:true};
   if(reason)newOvr.contingencyReason=reason;
   if(ranked_item&&ranked_item.macros){
     newOvr.kcal=ranked_item.macros.kcal;
@@ -9647,7 +9647,7 @@ function saveEditor(){
   if(portion!==1)v.portion=portion;
   const fav=$("#f_fav");
   if(fav&&fav.checked&&!fav.disabled&&!isSavedMeal(v.name))toggleSavedMeal(perPortion(v));
-  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f},portion!==1?{portion}:{});}
+  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},portion!==1?{portion}:{});}
   else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null){d.extras[e.extraIdx]=Object.assign(d.extras[e.extraIdx],v);if(portion===1)delete d.extras[e.extraIdx].portion;}else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");
 }
@@ -11014,12 +11014,15 @@ function genReviewHtml(res,target){
 }
 // Aplica las comidas generadas como override por slot (plan del usuario, vía day_log).
 // REQ-121: nunca reescribe una comida ya registrada (done=true) — solo el futuro cambia.
-// Devuelve cuántas comidas se preservaron por estar ya hechas, para poder avisar al usuario.
+// REQ-256: tampoco reescribe una comida que el usuario eligió o editó a mano
+// (ms.ovr.userSet, de saveEditor/applyChangeMeal) aunque no esté marcada hecha.
+// Devuelve cuántas comidas se preservaron (hechas o elegidas por el usuario),
+// para poder avisar al usuario.
 function applyDayComidas(ds,comidas){
   let preserved=0;
   (comidas||[]).forEach(c=>{
     const ms=mealState(ds,c.slot_id); if(!ms)return;
-    if(ms.done){preserved++;return;}
+    if(ms.done||(ms.ovr&&ms.ovr.userSet)){preserved++;return;}
     ms.ovr={name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,gen:true,...(c.dishSlug?{dishSlug:c.dishSlug}:{})};
   });
   commitDay(ds);
@@ -11087,7 +11090,7 @@ function applyGeneratedDay(){
     commitDay(g.ds);
   }
   window._genDay=null;window._genDayGapSnack=null;closeModal();render();
-  toast("Día aplicado a tu plan"+(preserved?". Lo que ya registraste no cambia.":"")+(contractNote?" "+contractNote:""));
+  toast("Día aplicado a tu plan"+(preserved?". Lo que ya registraste o personalizaste no cambia.":"")+(contractNote?" "+contractNote:""));
 }
 // --- Revisión de semana: borrador → confirmar → aplicar ---
 function genWeekReviewHtml(){
