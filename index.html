@@ -1126,7 +1126,7 @@ const CONSENT_POLICY_VERSION="2026-06-15-v2";
 const SAFETY_SCREENING_VERSION="2026-06-15";
 const MINIMUM_AGE=18;
 // Clave pública VAPID para Web Push (REQ-38). No es secreta; la privada vive solo en el servidor.
-const VAPID_PUBLIC_KEY="BG6yyBKh5oUpZSu2OzOoxpn3THiWvZ3S8t528rEDRxn9-MKMz2UR16QkvoiYTHTgyXqDRGZiJOzgEh8tnqMp0_E";
+const VAPID_PUBLIC_KEY="BHWBAWEp03r3-nwiNPaBIDA7R30G4sSj_Xkq3L_hEy4jfcT76kymwpHFDbQhuF2V41OFpOdcz0-P80MwqEQNkAc";
 const REQUIRED_CONSENTS=["body_progress","automated_coach"];
 const SAFETY_QUESTIONS=[
   ["chest_pain","¿Tienes dolor de pecho durante la actividad o en reposo?"],
@@ -8034,7 +8034,7 @@ async function requestPushPermission(btn){
   }
 }
 
-async function subscribePush(){
+async function subscribePush(quiet){
   if(!("serviceWorker" in navigator)||!("PushManager" in window))return;
   const reg=await navigator.serviceWorker.ready;
   const sub=await reg.pushManager.subscribe({
@@ -8050,7 +8050,28 @@ async function subscribePush(){
     body:JSON.stringify(subJson),
   });
   if(!r.ok)throw new Error("No se pudo guardar la suscripción");
-  await _savePushOptInDb(true);
+  if(!quiet)await _savePushOptInDb(true);
+}
+// REQ-265: la clave VAPID cambió (la privada de la anterior nunca estuvo en el
+// servidor). Una suscripción hecha con otra clave no recibe avisos: si el
+// usuario los tiene activos, se renueva al entrar, sin preguntarle de nuevo.
+function pushKeyOf(sub){
+  const key=sub&&sub.options&&sub.options.applicationServerKey;
+  if(!key)return "";
+  return btoa(String.fromCharCode(...new Uint8Array(key))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+async function refreshPushSubscriptionKey(){
+  if(!("Notification" in window)||!("serviceWorker" in navigator)||!("PushManager" in window))return;
+  if(Notification.permission!=="granted"||!supa||!uid())return;
+  try{
+    notifPrefsCache=null;await loadNotifPrefs(); // las de este usuario, no las de una sesión anterior
+    if(!(notifPrefsCache&&notifPrefsCache.push_opt_in))return;
+    const reg=await navigator.serviceWorker.ready;
+    const sub=await reg.pushManager.getSubscription();
+    if(sub&&pushKeyOf(sub)===VAPID_PUBLIC_KEY)return;
+    if(sub)await sub.unsubscribe();
+    await subscribePush(true);
+  }catch(_){/* best-effort: se reintenta en el próximo inicio */}
 }
 
 async function savePushOptIn(checkbox){
@@ -11970,6 +11991,7 @@ async function onAuth(){
     refreshAdminBetaPending(); // REQ-225: aviso de postulaciones nuevas (solo admin, no-await)
     openAdminBetaFromLink(); // REQ-226: el botón del correo de aviso abre Postulantes beta
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
+    refreshPushSubscriptionKey(); // REQ-265: no-await
   }finally{_authBusy=false;}
 }
 async function dbLoad(){

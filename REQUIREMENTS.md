@@ -1973,3 +1973,9 @@ Durante el ciclo activo, la "Adherencia a comidas" debe reflejar el porcentaje d
 **Estado: implementado — requiere acción humana:** secreto `CRON_SECRET` en GitHub (mismo valor que en Vercel).
 
 El cron diario (03:00 en Lima) nunca coincidía con la hora elegida (17–23). `.github/workflows/notify-hourly.yml` llama cada hora a `/api/notify`, que envía desde la hora elegida (`isNotifyTime`), una vez por día. ✓ `scripts/validate-notify-schedule.mjs`.
+
+## REQ-265 - Fix: los avisos push no tenían clave privada VAPID
+
+**Estado: implementado — requiere acción humana:** `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel.
+
+Clave pública nueva en `index.html` y `api/notify.js`; al entrar, `refreshPushSubscriptionKey()` renueva suscripciones con otra clave. ✓ `scripts/validate-vapid-key.mjs`.

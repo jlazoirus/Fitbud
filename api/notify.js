@@ -27,7 +27,7 @@ import webpush from "web-push";
 
 const VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
-  "BG6yyBKh5oUpZSu2OzOoxpn3THiWvZ3S8t528rEDRxn9-MKMz2UR16QkvoiYTHTgyXqDRGZiJOzgEh8tnqMp0_E";
+  "BHWBAWEp03r3-nwiNPaBIDA7R30G4sSj_Xkq3L_hEy4jfcT76kymwpHFDbQhuF2V41OFpOdcz0-P80MwqEQNkAc";
 
 let vapidReady = false;
 try {

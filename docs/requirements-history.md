@@ -10815,3 +10815,31 @@ Jonathan (2026-10-24): "Creo que las notificaciones no están funcionando".
 
 - Con la hora elegida ya pasada hoy, el disparo envía; justo a la hora, envía; antes, no; ya enviado hoy, no repite. ✓ `scripts/validate-notify-schedule.mjs` (falla con el código anterior), en el release gate.
 - Tras crear el secreto, "Run workflow" del workflow responde 200 y, a la hora elegida, `notification_log` registra el envío.
+
+## REQ-265 - Fix: los avisos push no tenían clave privada VAPID
+
+**Estado: implementado — requiere acción humana:** crear en Vercel (Production) `VAPID_PRIVATE_KEY` (generada para este cambio y entregada fuera del repo) y `VAPID_SUBJECT` (`mailto:` del responsable), y volver a desplegar.
+
+### Origen
+
+Jonathan (2026-10-24), al revisar las variables de Vercel para REQ-264: "Las de vapid no existen".
+
+### Causa raíz
+
+REQ-38 embebió la clave pública `BG6yy…` en `index.html` y como respaldo en `api/notify.js`, pero `VAPID_PRIVATE_KEY` nunca se configuró en Vercel y la privada correspondiente no está en ningún lado. Sin ella, `vapidReady` es falso y el job nunca intenta el push; tampoco se puede firmar para las 2 suscripciones existentes, hechas con esa clave.
+
+### Alcance
+
+1. Par VAPID nuevo: la pública reemplaza a la anterior en `index.html` y `api/notify.js`. La privada no entra al repo.
+2. `refreshPushSubscriptionKey()` (no-await en `onAuth()`): con permiso concedido y `push_opt_in` activo, si la suscripción del dispositivo usa otra clave (`pushKeyOf()`), la anula y se suscribe de nuevo con la actual (`subscribePush(true)`, sin toast). Lee las preferencias frescas del usuario que entra.
+3. `scripts/validate-vapid-key.mjs` en el release gate: misma clave en cliente y servidor, punto P-256 de 65 bytes y no la anterior.
+4. `CACHE_NAME` → `fitbud-pwa-v140`.
+
+### Fuera de alcance
+
+- Borrar las filas viejas de `push_subscriptions`: el job registra `push_error` en ellas hasta que el usuario vuelva a entrar (entonces se agrega la nueva y la vieja deja de importar). Limpieza opcional a mano en Supabase.
+
+### Criterios de aceptación
+
+- Cliente y servidor usan la misma clave nueva, válida. ✓ `scripts/validate-vapid-key.mjs`.
+- Con las variables en Vercel, un usuario con avisos activos que vuelve a entrar queda suscrito con la clave nueva y recibe el aviso a su hora (REQ-264).
