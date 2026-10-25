@@ -7677,6 +7677,15 @@ Una comida sin contenido no debe contar como cumplida (ni en "N/N comidas" ni en
 
 - Repetir el flujo del Origen: tras marcar los slots vacíos, Home no debe mostrar "3/3 comidas" ni "🔥 1", y la agenda no debe contradecir al anillo.
 
+
+### Detalle preservado del ledger al preparar el backlog MFP (24 oct 2026)
+
+**Estado: implementado.**
+
+`mealHasContent(v)` (`index.html`) centraliza el criterio de "contenido real" (nombre o algún macro), igual que ya exigía `homeDayHasPreparedMeals`. `toggleMeal()` ignora el intento de marcar como hecha una comida sin contenido (toast explicativo); el botón `.chk` en `mealCard()` sale `disabled` en ese caso. `dayTotals()` y `nutritionDayDone()` solo cuentan como cumplida la comida `done` que además tenga contenido real, como defensa adicional si `done:true` llegara por otra vía. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/home.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix); ajustado el fixture de `tests/e2e/racha.spec.js` (REQ-146) para que sus días "cumplidos" simulen comidas con contenido real, ya que antes se apoyaba en el comportamiento que este REQ corrige.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-161`).
+
 ## REQ-162 - Fix Nutrición: la tarjeta y la suma del día muestran la receta base del catálogo, no los macros materializados del plan
 
 **Estado: implementado.**
@@ -7723,6 +7732,15 @@ Que una comida del plan muestre y sume los macros y gramos que el plan materiali
 
 - Repro de runtime (0 pagadas): con `DB.loaded` y un plato cuya receta base ≠ macros del snapshot, `mealValue({src:"nutritionPlan",dishName,kcal:495},{})` debe devolver 495 (`src:"nutritionPlan"`), no `{kcal:165,src:"db"}`.
 
+
+### Detalle preservado del ledger al preparar el backlog MFP (24 oct 2026)
+
+**Estado: implementado.**
+
+`mealValue()` y `mealRecipe()` (`index.html`) ahora priorizan `base.src==="nutritionPlan"` (con `base.kcal>0`/`base.ingredientes`) sobre la resolución por `dishName` en el catálogo, siempre que no haya un override que cambie de plato (`!o||o.dishName==null`) — si el usuario reemplazó la comida (REQ-154), esa ruta sigue ganando. Sin snapshot materializado, la resolución por catálogo sigue funcionando igual que antes (compatibilidad). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-nutritionplan-priority.mjs` (4 casos: snapshot gana al catálogo en macros e ingredientes, un reemplazo explícito sigue ganando al snapshot, y sin snapshot la compatibilidad con catálogo no se rompe; confirmado que el caso principal falla exactamente como describe el REQ —165 vs 495 kcal— contra el código sin el fix).
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-162`).
+
 ## REQ-163 - Fix Entreno: una sesión abandonada en curso cuenta como entreno "hecho" e infla la racha
 
 **Estado: implementado.**
@@ -7768,6 +7786,15 @@ Que un día de entreno solo cuente como "hecho" para la racha cuando la sesión 
 
 - E2E: iniciar sesión, "Omitir bloque", no finalizar; comprobar `trainingDayResult(hoy)==="missed"` y `streakStats().trainCur` sin cambio, mientras la tarjeta sigue mostrando "En curso".
 
+
+### Detalle preservado del ledger al preparar el backlog MFP (24 oct 2026)
+
+**Estado: implementado.**
+
+`trainingDayResult()` (`index.html`) ya no cuenta "done" por `workoutHasRecordedActivity()` (cualquier bloque omitido o serie marcada, sin exigir cierre); ahora exige un resultado TERMINAL vía `workoutOutcomeForState(st)` (`completed`/`partial`) o el legado `st.workoutDone`. `workoutHasRecordedActivity()` no se tocó (otros usos, p. ej. protección de días en REQ-126, siguen queriendo detectar cualquier actividad). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/entreno.spec.js` (inicia sesión, omite un bloque y abandona sin finalizar; confirmado que el test falla exactamente como describe el REQ —"done" en vez de "missed"— contra el código sin el fix).
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-163`).
+
 ## REQ-165 - Fix check-in semanal: las escalas sin responder se leen como el peor valor y disparan ajustes falsos
 
 **Estado: implementado.**
@@ -7812,6 +7839,15 @@ Una escala sin responder no debe contar como valor extremo ni generar mensajes/a
 ### Verificación sugerida
 
 - Arnés determinista (0 llamadas): `analyzeCheckinAnswers` con escalas en `null` vs marcadas altas; assertar mismos `calorieAdjust`/`details` salvo por lo realmente respondido.
+
+
+### Detalle preservado del ledger al preparar el backlog MFP (24 oct 2026)
+
+**Estado: implementado.**
+
+`analyzeCheckinAnswers()` (`index.html`) neutraliza `answers.energy`/`answers.sleep` con `||3` (punto medio) en la rama de hambre/energía, igual que ya hacían nutrición/dificultad/recuperación — antes, `null<=2` evaluaba `true` y una escala nunca respondida se leía como "energía/sueño bajos", disparando mensajes y ajustes de calorías sobre datos inexistentes (incluso con `keep:true`). `hunger` no se tocó (su comparación `>=4` ya era segura ante `null`). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-checkin-goal-mapping.mjs` (3 casos nuevos: check-in vacío → sin razón fantasma; hambre alta + energía/sueño sin responder = mismo ajuste que con energía/sueño altos; energía/sueño realmente bajos siguen generando el aviso; confirmado que fallan exactamente como describe el REQ contra el código sin el fix).
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-165`).
 
 ## REQ-166 - La pasada global de cierre optimiza el contrato, no `scoreMacros()`
 
@@ -10842,3 +10878,179 @@ El constructor del catálogo asignaba beginner a toda fila sin nivel. 31 fichas 
 ### Operación
 
 La corrección cliente funciona al desplegar sin una migración de producción. El SQL incremental es opcional para alinear las filas del servidor. Historial, registros, cargas utilizadas y resultados anteriores se conservan.
+## REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo eso de actividad física principal", "Eso de elegir qué hacer en cada día también siento que te limita mucho a elegir" y "¿Qué pasa si un lunes no voy al gym y juego pádel?".
+
+### Problema
+
+- "Actividad física principal" no dice qué es ni qué cambia: Diego juega pádel, que no está en la lista, y eligió "Otra actividad" sin saber qué haría el plan con eso.
+- "Días disponibles y lugar real" se lee como una agenda fija: nada dice que cualquier día se puede cambiar.
+- Registrar otro deporte en un día de fuerza ya era posible (REQ-206, "＋ Registrar otra actividad" al final de Entreno), pero no aparece entre las opciones de "Adaptar hoy" ni explica qué pasa con la sesión que tocaba.
+
+### Causa raíz
+
+- Copy de `index.html`: label `pf_sport` "Actividad física principal" y `ob_sport` "¿Practicas alguna actividad física?", opción "Otra actividad", sin nota de ayuda; label "Días disponibles y lugar real".
+- "Adaptar hoy" en `renderWorkout()` solo ofrece Solo 20 min / En casa / Sin equipo / Me perdí la sesión.
+
+### Alcance
+
+1. Onboarding y Perfil preguntan lo mismo: "¿Haces otro deporte además de la fuerza?", con opciones Caminar, Correr, Bicicleta, Natación, "Otro deporte" y "Ninguno, solo fuerza". `SPORT_LABELS.other` → "Otro deporte".
+2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
+3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
+4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
+5. `CACHE_NAME` → `fitbud-pwa-v133` (junto con REQ-252).
+
+### Fuera de alcance
+
+- Elegir qué se hace cada día (fuerza o deporte) en vez del lugar, o mover la sesión de fuerza perdida a otro día: el lugar sigue orientando la plantilla (exterior/piscina → deporte) y "Me perdí la sesión" ya ofrece recuperarla.
+- Añadir pádel, fútbol u otros deportes con plan guiado propio.
+
+### Riesgos
+
+- Ninguno sobre datos: solo copy y un acceso nuevo a un flujo existente; los valores guardados (`primarySport`) no cambian.
+
+### Criterios de aceptación
+
+- Perfil muestra la nueva pregunta y la nota cambia al elegir otra opción; la semana tipo explica que no es una obligación. ✓ (`tests/e2e/actividad-manual.spec.js`)
+- En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-252 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total"
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-10-21, iPhone), con capturas de Perfil → Entrenamiento ("Otra actividad" + "Fuerza en gimnasio", lunes a jueves, el jueves en "Exterior"): "Eso de elegir qué hacer en cada día te limita mucho a elegir" y "¿qué pasa si un lunes no voy al gym y juego pádel?".
+
+### Problema
+
+Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana reserva días para el deporte, pero la app los mostraba como "Descanso total": Diego elige 4 días y solo ve 2 sesiones de gimnasio; el día que dejó en "Exterior" para su deporte aparece como descanso. Lo que elige por día no se refleja en el plan. En producción, 3 de 13 perfiles tienen "Otra actividad" y ninguno tiene plan generado, así que todos usan esta semana tipo.
+
+### Causa raíz
+
+- `workoutSchedule()` (`index.html`) sustituía por `"descanso"` todos los slots de deporte cuando `primary==="other"`, porque `sportSessions()` no tenía una sesión real para "other" (un placeholder sin nombre que `workoutOptions()` descarta).
+
+### Alcance
+
+1. `sportSessions()`: "other" tiene una sesión real, `facil` → "Día de tu deporte" ("Juega tu deporte (pádel, fútbol…) o haz 30-45 min de actividad a tu elección, y regístralo para que cuente."), sin ejercicios y marcada `freeActivity`. "Actividad ligera libre" (solo fuerza con actividad ligera) también queda marcada `freeActivity`.
+2. `workoutSchedule()`: con "other", los slots de deporte pasan a `facil` en vez de `descanso`. "strength_only" no cambia.
+3. Entreno, en un día `freeActivity`: en vez de "Iniciar sesión guiada" (no hay ejercicios) o del texto de descanso, "Registrar mi actividad" abre el registro manual de REQ-206 y avisa "Si hoy no la haces, no cuenta como sesión perdida."; sin los atajos "Adaptar hoy" (Solo 20 min, En casa…), que no aplican. Hoy ofrece "Registrar mi actividad" en vez de "Iniciar"/"Adaptar".
+4. `trainingDayResult()`: un día `freeActivity` sin registrar cuenta como descanso para la racha (no la rompe); registrado, como entrenado.
+5. El registro en un día de tu deporte propone el último deporte que registraste (p. ej. pádel) o "Otra actividad".
+6. `CACHE_NAME` → `fitbud-pwa-v133`.
+
+### Fuera de alcance
+
+- Cómo se explica la pregunta del deporte y cómo se cambia un día por otro deporte: REQ-253.
+- El plan personalizado ("Preparar mi plan") no admite el tipo de sesión "other" (`training-plan.js`, `SESSION_TYPES`); estos usuarios siguen con la semana tipo.
+
+### Riesgos
+
+- Usuarios con "Otra actividad" ven cambiar sus días de deporte de "Descanso total" a "Día de tu deporte". El historial no cambia: los días ya registrados conservan lo ejecutado, y un día de deporte sin registrar no penaliza la racha, igual que el descanso.
+
+### Criterios de aceptación
+
+- "Otra actividad" + gimnasio, 4 días: la semana muestra 2 sesiones de gimnasio y 2 "Día de tu deporte", ninguna "Descanso total"; sin registrar, el día cuenta como descanso; "Registrar mi actividad" → Pádel lo marca como entrenado y la próxima vez propone Pádel. ✓ (`tests/e2e/actividad-manual.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-250 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-21), con captura del resultado "Sesión parcial · 6/7 bloques completados · 16/16 series registradas · 1 bloque omitido": "Hice toda la sesión y lo único que pasé si no me equivoco son los calentamientos; no debería decir parcial, debería ser completada".
+
+### Causa raíz
+
+REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahora no" los deja `declined`. Si el usuario elegía hacerlos y luego tocaba "Omitir bloque" (o "Omitir" en su cronómetro), `skipWorkoutStep()`/`finishTimedWorkoutStep()` (`index.html`) los marcaban `skipped`, que cuenta como bloque omitido y hace que `workoutFullyCompleted()` guarde la sesión como parcial.
+
+### Alcance
+
+1. Omitir un bloque opcional lo deja `declined`, igual que "Ahora no".
+2. `normalizeStep()` (`workout-player.js`) convierte en `declined` un opcional `skipped`, así las sesiones en curso o guardadas antes del arreglo dejan de contarlo como omitido.
+3. Una sesión guardada parcial a la que no le falta nada (sin bloques omitidos, sin series sin marcar, sin dolor) muestra "Marcar como completada", que la cierra completada sin reabrirla.
+4. `CACHE_NAME` → `fitbud-pwa-v132`.
+
+### Fuera de alcance
+
+- Omitir un ejercicio o un bloque de cardio sigue dejando la sesión parcial.
+- No se reclasifica sola ninguna sesión guardada: el cambio a completada lo decide el usuario.
+
+### Criterios de aceptación
+
+- Elegir el calentamiento y la vuelta a la calma y omitirlos, con todas las series hechas, guarda "Sesión completada" con 0 bloques omitidos. ✓ (`tests/e2e/entreno.spec.js`)
+- Una sesión guardada parcial con el calentamiento `skipped` muestra 0 omitidos y "Marcar como completada"; al tocarlo queda completada y cuenta como entreno hecho. ✓ (misma prueba, `scripts/validate-workout-player.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-248 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
+
+**Estado: implementado.**
+
+### Origen
+
+Pedido del dueño (2026-10-21): los postulantes aprobados deben tener consumo ilimitado y acceso completo por 90 días.
+
+### Problema y causa raíz
+
+`grantBetaAccess()` (`api/admin.js`) daba el `user_entitlements` de 90 días pero no tocaba `coach_quota_overrides`: la beta quedaba con las cuotas `default` (p. ej. 1 dieta semanal y 20 conversaciones al día). El canje del código (`api/entitlement.js`) tampoco.
+
+### Alcance
+
+1. `grantBetaAccess()` crea un override por acción del coach con `daily_limit = QUOTA_OVERRIDE_MAX` (10.000) que vence con el acceso. Cubre aceptar por correo, cuenta existente y crear/invitar cuenta beta.
+2. `invite-signup` y `redeem`: si el código está en el `review_notes` de una postulación `beta_invited`, crea los mismos overrides; un cupón cualquiera no.
+3. Si fallan, el acceso queda y el admin ve `betaError`; el canje nunca se bloquea. Sin migración SQL.
+4. Textos del admin y `BETA_PROGRAM.md` actualizados; `CACHE_NAME` → `fitbud-pwa-v130`.
+5. Datos: el único aceptado en producción ya tiene los overrides hasta 2027-01-19.
+
+### Riesgos
+
+Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostrando el uso por persona.
+
+### Criterios de aceptación
+
+- Aceptar o crear cuenta beta: 8 overrides de 10.000/día que vencen con el acceso. ✓ (`scripts/test-admin-beta-api.mjs`, `scripts/test-admin-beta-signup.mjs`)
+- Canjear el código de una postulación aceptada crea los overrides; un cupón normal no. ✓ (`scripts/test-invite-signup-api.mjs`, `scripts/test-coupon-api.mjs`)
+- `node scripts/release-gate.mjs` pasa.
+
+## REQ-149 - Fix admin: "Regenerar plan · Solo nutrición" archiva también el entrenamiento futuro
+
+**Estado: implementado.**
+`fetchActivePlanVersion()` (`api/admin.js`) ahora trae `snapshot`; `applyResetPlan(scope="nutrition")` sigue archivando (`superseded`) la fila activa combinada, pero si `snapshot.trainingPlan` tiene contenido real (`planVersionHasTrainingContent()`), `insertTrainingOnlyVersion()` inserta una nueva fila activa (mismo `cycle_number`, próximo `version_number`) que conserva `trainingPlan` intacto con `nutritionPlan:null` desde `fromDate` — el entrenamiento futuro no pierde su prescripción y la nutrición sí cae a generación fresca, que es el efecto deseado. La fila vieja se supersede ANTES del insert, así nunca hay dos filas activas a la vez para `plan_versions_one_active_idx`. `previewResetPlan()` expone `willPreserveTraining` (sin filtrar el `snapshot` completo hacia el cliente) y el copy del modal admin distingue "se conserva el entrenamiento" de "se archiva el plan de nutrición". `scope="training"`/`"both"` sin cambios. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-admin-reset.mjs` (2 casos nuevos: preview y apply sobre fila combinada).
+
+## REQ-150 - PWA sirve HTML nuevo con JS del cache viejo tras un deploy (versión mezclada)
+
+**Estado: implementado.**
+`service-worker.js`: la navegación ahora usa `cacheFirst(request,"./index.html")` en vez de `networkFirst` — se sirve desde la MISMA `CACHE_NAME` que los `.js` (`cacheFirst` sin cambios), así que HTML y JS siempre son de la misma generación; la versión nueva llega completa recién cuando el SW nuevo instala y activa (atómico vía `cache.addAll`). `CACHE_NAME` subido a `v69`. `registerServiceWorker()` (`index.html`) escucha `updatefound`/`statechange` y, cuando detecta una instalación real (no la primera) vía `navigator.serviceWorker.controller` ya presente, muestra un badge discreto ("↻ Actualizar", sin vocabulario técnico) en vez de recargar sola — recargar automáticamente podía interrumpir una acción en curso. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-service-worker-cache.mjs` (ejecuta el SW real en `node:vm` con `caches`/`fetch` simulados).
+
+## REQ-126 - Admin: resetear futuro y regenerar nutrición/entrenamiento para cualquier usuario
+
+**Estado: implementado.** `api/admin.js` agrega `previewResetPlan`/`applyResetPlan` (alcance nutrition/training/both) y `resetUserToOnboarding`; los días con comida registrada o entreno hecho quedan protegidos, aplicar solo reescribe `day_log.state` de días no protegidos y archiva la versión de plan activa. Panel admin con "Regenerar plan" (vista previa obligatoria) y "Reiniciar usuario" (doble confirmación), bloqueados para la propia cuenta y otros admins. Detalle en el commit. **Infra pendiente:** `supabase/admin_reset.sql` (tabla `admin_actions_log`) requiere aplicarse manualmente en Supabase. Verificado con `scripts/test-admin-reset.mjs`.
+
+Pendiente de infraestructura (no ejecutable por el agente): aplicar `supabase/admin_reset.sql` en el proyecto de Supabase de producción para que `admin_actions_log` exista antes de usar estas acciones (la auditoría falla en silencio — no bloquea la operación principal — si la tabla no existe todavía). Detalle histórico: commit de implementación de REQ-126.
+
+## REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo del canario `DIET_CONTRACT`
+
+**Estado: implementado.** Cerrado con decisión de producto (Jonathan, 2026-08-30): no había techo de catálogo; el ~32-33% del canario `DIET_CONTRACT` venía de que `globalClosePass()` optimizaba `scoreMacros()` (asimétrico) mientras el contrato exige tolerancias duras y simétricas (100% de los fallos de carbohidratos eran por exceso). Se autorizó una cuarta opción —corregir la función objetivo del cierre sin tocar la selección de platos (REQ-143 intacto)— implementada en REQ-166 (canario 32.3%→76.5%, 38/54 dimensiones, sin regresiones). Aprendizajes para futuras corridas: ampliar el pre-rankeo 48→200 no mueve el canario (medido y descartado, no reintentar); la etiqueta `catalog_gap` era un diagnóstico incorrecto y costó dos sesiones de lotes de catálogo. Detalle completo en git (commit de REQ-166) y en REQ-143.
+
+## REQ-153 - Fix Home: las sugerencias del coach ignoran comidas saltadas (y la pausa por seguridad) y contradicen la agenda
+
+**Estado: implementado.**
+`buildContextualChips(ds)` (`index.html`) ahora excluye comidas `.skipped` de `pendingMeals` (igual que `homeAgendaData`, REQ-125) y agrega `!trainingSafetyHold()` a `workoutPending`, así los chips nunca sugieren una comida recién saltada ni el entrenamiento mientras hay una pausa por seguridad activa — mismo criterio que ya usa la agenda, sin tocar `COACH_SUGGESTIONS`/`nextDailyAction` (fuera de alcance). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/home.spec.js` (nuevo; confirmado que ambos casos fallan exactamente como describe el REQ contra el código sin el fix y pasan con él).
+
+## REQ-120 - Nutrición: "No me gusta este plato" bloquea futuras sugerencias hasta editar Perfil
+
+**Estado: implementado.** `profile.prefs.blockedDishes` guarda `{key,name}` por plato bloqueado; el planificador determinista y todas las rutas de IA (`dishDietAllowed`, `coachDishBlockedByProfile`, reemplazos y validación de acciones del coach) los excluyen, con refuerzo por prompt. Acción "🚫 No me gusta este plato" desde la comida aplicada y el borrador generado; Perfil > Comidas permite "Volver a sugerir". Días ejecutados no se tocan. Detalle en el commit. Verificado con `scripts/validate-blocked-dishes.mjs` y la suite E2E.
+
+_Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
+
+## REQ-152 - Fix onboarding: "Mantenerlo por ahora" en el aviso de revisión de 4 semanas lanza ReferenceError y no cierra ni guarda
+
+**Estado: implementado.**
+`keepCurrentProfile()` (`index.html`) ya no referencia `calendarChanged`/`planEndDate` (variables locales de `saveOnboarding()`/`saveProfile()`, fuera de su ámbito, causaban `ReferenceError` bajo `"use strict"` antes del `await`): usa `reason:"Preferencias guardadas"` fijo (este flujo nunca cambia el calendario) y `validTo` de `prefs.planEndDate` ya guardado, o `planEndFor(prefs.planStartDate,resolvedPlanDuration(prefs))` si faltara. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/onboarding.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix y pasa con él).

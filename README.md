@@ -4,6 +4,8 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 
 **🔗 En vivo:** https://evolvapp.club/ (desplegado en Vercel; las credenciales viven como variables de entorno en Vercel, no en este repo).
 
+El [plan de mejoras frente a MyFitnessPal](docs/competitive/2026-10-22-myfitnesspal/README.md) reúne fuentes oficiales, matriz actualizada y **nueve requerimientos pendientes (REQ-265..273)** con dependencias y pruebas. El plan vigente no depende de entrevistas; consultar el backlog y revalidar el código al tomar cada REQ.
+
 ## Qué hace
 
 - **Vista HOY** según la fecha real: comidas del plan, entrenamiento y metas del día.
