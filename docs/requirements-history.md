@@ -10781,3 +10781,31 @@ Re-preparar no descarta una comida elegida o editada a mano, aunque no esté mar
 ### Verificación
 
 E2E nuevo en `tests/e2e/nutricion.spec.js`: preparar día (mock del coach aplica "Bowl proteico de la mañana" en desayuno) → editar desayuno a "Dos huevos con pan" / 777 kcal sin marcarlo hecho → "Más opciones de nutrición" → "Volver a preparar este día" → "Aplicar al día" (el mock vuelve a proponer "Bowl proteico de la mañana" en el borrador, como antes del fix) → el desayuno aplicado sigue siendo "Dos huevos con pan" / 777 kcal, "Bowl proteico de la mañana" no aparece en ninguna tarjeta. Pasa junto con las otras 3 pruebas de `nutricion.spec.js`. `node --check` sobre el `<script>` final de `index.html` OK. `git diff --check` limpio.
+
+## REQ-263 - Fix Progreso: la "Adherencia a comidas" del ciclo activo se diluye con los días futuros
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría del journey **progreso** (commit previo leído: `ef55f45` REQ-256). Al recorrer Progreso con un ciclo en curso, la tarjeta "Adherencia a comidas" (sección "Tus números") muestra un porcentaje mucho menor que la adherencia real del usuario.
+
+### Problema
+
+Un usuario que marcó **todas** las comidas de **todos** los días transcurridos del ciclo (adherencia real 100% hasta hoy) ve "14%" en la tarjeta. El número contradice lo que el usuario hizo y es desmotivante justo donde Progreso busca reforzar el hábito. Además contradice el propio criterio de REQ-44 ("10 días registrados + 2 fallidos → ~83%", es decir adherencia acumulada sobre días transcurridos, no sobre el ciclo completo).
+
+### Causa raíz
+
+`cycleSummary(untilDs)` (`index.html:2636`): sin argumento, `last=END` (`index.html:2638`), así que el bucle `while(ds<=last)` (`index.html:2640`) recorre **todo** el ciclo —incluidos los días futuros— y acumula `plannedMeals+=day.meals.length` (`index.html:2648`) de cada día futuro (`buildDay` siempre devuelve slots, con kcal:0, incluso para días sin registrar). `progressStats()` (`index.html:6516`) llamaba `cycleSummary()` sin argumento y mostraba `cs.mealAdherence` como la tarjeta del ciclo en curso. El recap de cierre llama `cycleSummary()` cuando `today>=END`, así que ahí el conteo completo ya era correcto; el bug era solo en la vista en curso.
+
+### Fix
+
+`progressStats()` ahora llama `cycleSummary(todayStr())`, que ya soportaba acotar `last` a un `untilDs<END` (REQ-214). El recap de cierre (`renderPlanRecap`, `startNextChallenge`, `confirmRestartPlan`) sigue llamando `cycleSummary()`/`cycleSummary(until)` sin cambios: su conteo full-cycle (o hasta el día de interrupción) es correcto y no se tocó.
+
+### Verificación
+
+Nuevo test E2E en `tests/e2e/progreso.spec.js` ("REQ-263"): con `completePrefs()` (ciclo 10 semanas, START hoy−9), siembra `ovr`+`done:true` en todas las comidas de START..hoy (contenido custom para pasar `mealHasContent()`) y confirma que la tarjeta "Adherencia a comidas" muestra "100%". Revertir el fix (volver a `cycleSummary()` sin argumento) reproduce exactamente el "14%" que documentó la auditoría, confirmando que el test cubre la regresión. `node --check` sobre el `<script>` final de `index.html` OK. `git diff --check` limpio. `node scripts/release-gate.mjs`: 98/99 antes del commit (el único rojo es "Sin modificaciones no intencionadas", que solo detecta cambios sin commitear — se resuelve al commitear). `CACHE_NAME` v139→v140 (index.html es parte de `APP_SHELL`).
+
+### Operación manual pendiente
+
+Ninguna.

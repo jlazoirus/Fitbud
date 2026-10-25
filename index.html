@@ -6520,7 +6520,7 @@ function progressStats(){
   const lastWk=lastWeighedWeek();
   const curKg=lastWk!=null?wkg(lastWk):null;
   const stk=streak();
-  const cs=cycleSummary();
+  const cs=cycleSummary(todayStr());
   const adherenceTxt=cs.plannedMeals>0?`${cs.mealAdherence}%`:`—`;
   return `<div class="summary" style="grid-template-columns:repeat(2,1fr)">
     <div class="scard"><div class="n" style="color:var(--good)">${curKg!=null?curKg.toFixed(1):"—"}</div><div class="l">Peso actual (kg)</div></div>
