@@ -154,11 +154,65 @@
     return parts.join(" · ");
   }
 
+  // ── REQ-268: composición por ingredientes ──────────────────────────────────
+  // Una línea guarda su propia base (snapshot): reabrir no depende del catálogo.
+  //   {name, unit: 100g|100ml|portion, amount, base:{kcal,p,c,f}, ref?}
+  // amount son gramos/ml (100g/100ml) o porciones (portion). Los totales se
+  // suman con precisión completa y solo se redondean al guardar/mostrar.
+  const COMPONENTS_MAX=30;
+  const COMPONENT_AMOUNT_MAX={"100g":2000,"100ml":2000,portion:20};
+  function normalizeComponent(c){
+    if(!c||typeof c!=="object")return null;
+    const name=cleanText(c.name,160);
+    const unit=NUTRITION_UNITS.includes(c.unit)?c.unit:"100g";
+    const amount=Number(c.amount);
+    const base=cleanMacros(c.base);
+    if(!name||!base||!Number.isFinite(amount)||amount<=0||amount>COMPONENT_AMOUNT_MAX[unit])return null;
+    const out={name,unit,amount:Math.round(amount*1000)/1000,base};
+    if(c.ref&&typeof c.ref==="object"&&NUTRITION_REF_KINDS.includes(c.ref.kind)){
+      const ref={kind:c.ref.kind};
+      const id=cleanText(c.ref.id,64);if(id)ref.id=id;
+      const version=Number(c.ref.version);if(Number.isInteger(version)&&version>0)ref.version=version;
+      out.ref=ref;
+    }
+    return out;
+  }
+  function normalizeComponents(list){
+    return (Array.isArray(list)?list:[]).map(normalizeComponent).filter(Boolean).slice(0,COMPONENTS_MAX);
+  }
+  function componentFactor(c){return c.unit==="portion"?c.amount:c.amount/100;}
+  function componentValues(c){
+    const k=componentFactor(c);
+    return {kcal:c.base.kcal*k,p:c.base.p*k,c:c.base.c*k,f:c.base.f*k};
+  }
+  function componentsTotals(list){
+    const t={kcal:0,p:0,c:0,f:0};
+    normalizeComponents(list).forEach(c=>{const v=componentValues(c);t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;});
+    return t;
+  }
+  function componentAmountLabel(c){
+    if(c.unit==="portion")return c.amount===1?"1 porción":`${fmtQty(c.amount)} porciones`;
+    return `${fmtQty(c.amount)} ${c.unit==="100ml"?"ml":"g"}`;
+  }
+  function componentsName(list){
+    return normalizeComponents(list).map(c=>c.unit==="portion"&&c.amount===1?c.name:`${c.name} ${componentAmountLabel(c)}`).join(" + ").slice(0,MEAL_NAME_MAX);
+  }
+  // Origen que resulta de las líneas: todo catálogo → catalog; todo propio → food.
+  function componentsSource(list){
+    const kinds=new Set(normalizeComponents(list).map(c=>c.ref&&c.ref.kind||"manual"));
+    if(kinds.size===1&&kinds.has("ingredient"))return "catalog";
+    if(kinds.size===1&&kinds.has("food"))return "food";
+    if(kinds.size===1&&kinds.has("recipe"))return "recipe";
+    return "manual";
+  }
+
   const api={
     MEAL_VALUE_LIMITS,MEAL_NAME_MAX,
     parseNutrientInput,roundTenth,validateMealValues,
     NUTRITION_META_VERSION,normalizeNutritionMeta,nutritionMetaFor,finalizeNutritionMeta,
     metaComputedValues,sameMacros,nutritionMetaLabel,
+    COMPONENTS_MAX,COMPONENT_AMOUNT_MAX,normalizeComponent,normalizeComponents,componentValues,componentsTotals,
+    componentAmountLabel,componentsName,componentsSource,
   };
   root.FITBUD_MEAL_LOG=api;
   Object.keys(api).forEach(key=>{root[key]=api[key];});

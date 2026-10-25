@@ -88,4 +88,26 @@ const merged = sc.mergeDayLogStates({ meals: {}, extras: [] }, { meals: {}, extr
 assert.deepEqual(merged.merged.extras[0].nutritionMeta, n(fav), "merge offline conserva nutritionMeta");
 console.log("  REQ-267: contrato nutritionMeta, legacy en lectura, corrección con base y merge offline");
 
+// ── REQ-268: composición ─────────────────────────────────────────────────────
+const avena = { kcal: 389, p: 16.9, c: 66, f: 6.9 };
+const lines = g.normalizeComponents([
+  { name: "Avena", unit: "100g", amount: 33.5, base: avena, ref: { kind: "ingredient", id: "7" } },
+  { name: "Avena", unit: "100g", amount: 0.5, base: avena, ref: { kind: "ingredient", id: "7" } },
+  { name: "Roto", unit: "100g", amount: -1, base: avena },
+  { name: "", unit: "100g", amount: 10, base: avena },
+  { name: "Sin base", unit: "100g", amount: 10 },
+]);
+assert.equal(lines.length, 2, "líneas inválidas se descartan");
+const tot = g.componentsTotals(lines);
+assert.ok(Math.abs(tot.kcal - 389 * 0.34) < 1e-9, "33,5 g + 0,5 g = 34 g exactos, sin redondear cada línea");
+assert.equal(g.componentsName(lines), "Avena 33,5 g + Avena 0,5 g");
+assert.equal(g.componentsSource(lines), "catalog");
+assert.equal(g.componentsSource([...lines, { name: "Yogur", unit: "portion", amount: 2, base: { kcal: 90, p: 5, c: 10, f: 2 } }]), "manual");
+const portion = g.normalizeComponent({ name: "Yogur", unit: "portion", amount: 2, base: { kcal: 90, p: 5, c: 10, f: 2 } });
+assert.deepEqual(g.componentValues(portion), { kcal: 180, p: 10, c: 20, f: 4 });
+assert.equal(g.componentAmountLabel(portion), "2 porciones");
+assert.equal(g.normalizeComponent({ name: "X", unit: "100g", amount: 2500, base: avena }), null, "más de 2000 g se rechaza");
+assert.equal(g.normalizeComponents(Array.from({ length: 40 }, () => lines[0])).length, 30, "máximo 30 líneas");
+console.log("  REQ-268: líneas con base propia, precisión completa y límites");
+
 console.log("test-meal-log: OK");

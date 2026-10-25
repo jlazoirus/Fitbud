@@ -1896,7 +1896,7 @@ Roundtrip, fuente editada, favoritas ×2, dos cuentas y merge offline; inspecci�
 
 ## REQ-268 - Registro: editar ingredientes y gramos decimales sin perder el cálculo
 
-**Estado: pendiente.** Prioridad P1. Dependencias: REQ-267. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-267. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Probe `ingredient-snapshot`; `addFoodToEditor()` redondea gramos y concatena texto.
@@ -1921,6 +1921,11 @@ Doble suma, pérdida de precisión, crudo/cocido ambiguo y componentes obsoletos
 
 ### Verificación sugerida
 Cálculo puro, E2E de composición/reapertura/corrección, compras, offline y cancelación.
+
+### Implementación
+- `js/meal-log.js`: líneas `{name, unit 100g|100ml|portion, amount, base, ref}` con base propia (snapshot), máx. 30 líneas y 2000 g/ml o 20 porciones; `componentsTotals` suma con precisión completa; nombre automático `componentsName`; origen `componentsSource`.
+- Editor: «Alimento» añade una línea (gramos con coma), cada línea se edita o se quita y recalcula; lo ya elegido/escrito pasa a ser la primera línea por porción. Guardar persiste `components` y totales a una décima; cambiar totales a mano marca `corrected`. Comidas del plan con receta del catálogo: «Ajustar ingredientes de la receta». `mealRecipe()` usa las líneas (tarjeta, detalle y lista de compra). Reabrir no depende del catálogo; entradas antiguas sin líneas siguen manuales. Nada se escribe en el catálogo global.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/composicion.spec.js`.
 
 ## REQ-269 - Nutrición: registrar una sustitución o un adicional de forma explícita
 
