@@ -1458,7 +1458,62 @@ function generatedWorkoutForDate(ds){
   const plan=generatedTrainingPlanForDate(ds);
   const session=TRAINING_PLAN&&plan?TRAINING_PLAN.sessionForDate(plan,ds):null;
   const prefs=planPrefsForDate(ds);
-  return session?TRAINING_PLAN.workoutFromSession(session,prefs.strengthMode):null;
+  if(!session)return null;
+  const workout=TRAINING_PLAN.workoutFromSession(session,prefs.strengthMode);
+  if(!workoutContentCanUpdate(ds))return workout;
+  if(session.type!=="strength"){
+    const ids=compatibleCardioExerciseIds(session.type,session.role,prefs);
+    if(workout.exerciseIds.some(id=>!ids.includes(id))){
+      const easy=sportSessions(session.type,ds,prefs).endurance;
+      return {...easy,id:workout.id,role:session.role,cardioRole:"facil"};
+    }
+    return workout;
+  }
+  const selection=compatibleStrengthExerciseSelection(workout.exerciseIds,ds,prefs,prefs.strengthMode);
+  const exercises=selection.map(({slug,index})=>{
+    const source=session.exercises[index];
+    if(slug===source.exerciseId)return {...source};
+    const dose=WORKOUT_PLAYER.exerciseDose(exerciseBySlug(slug,true),{week:trainingWeek(ds,prefs),durationWeeks:resolvedPlanDuration(prefs)});
+    return {...source,exerciseId:slug,reps:dose.reps,tempo:dose.tempo,restSeconds:dose.restSeconds,restLabel:""};
+  });
+  return {...workout,exerciseIds:selection.map(item=>item.slug),generatedPrescription:{...workout.generatedPrescription,exercises}};
+}
+// Correcciones de contenido solo para sesiones pendientes: nunca reescribir lo
+// ya iniciado, registrado o pasado, ni los snapshots persistidos del plan.
+function workoutContentCanUpdate(ds){
+  const st=S&&S.days&&S.days[ds];
+  return ds>=todayStr()&&!(st&&(st.workoutExecution||st.workoutDone||manualActivities(st).length));
+}
+function compatibleStrengthExerciseSelection(ids,ds,prefs,mode){
+  const catalog=exerciseCatalog(false);
+  const bySlug=new Map(catalog.map(exercise=>[exercise.slug,exercise]));
+  const disciplines=mode==="bodyweight"?new Set(["bodyweight","strength"]):new Set(["gym","strength","bodyweight"]);
+  const allowed=catalog.filter(exercise=>disciplines.has(exercise.discipline)
+    &&exerciseLevelAllowed(exercise,prefs.trainingExperience)
+    &&!exerciseConflictsWithProfile(exercise,prefs)
+    &&!(isGentleTrainingPlan(prefs)&&exerciseBlockedByGentleMode(exercise)));
+  const allowedIds=new Set(allowed.map(exercise=>exercise.slug));
+  const reserved=new Set(ids.filter(id=>allowedIds.has(id)));
+  const used=new Set();
+  return ids.flatMap((id,index)=>{
+    const source=bySlug.get(id);
+    const available=allowed.filter(exercise=>!used.has(exercise.slug)&&!reserved.has(exercise.slug));
+    const muscle=source&&EXERCISE_SUBSTITUTION.primaryMuscle(source);
+    const replacement=allowedIds.has(id)&&!used.has(id)?source
+      :available.find(exercise=>muscle&&EXERCISE_SUBSTITUTION.primaryMuscle(exercise)===muscle)
+        ||available.find(exercise=>source&&exercise.movement_pattern===source.movement_pattern);
+    if(!replacement)return [];
+    used.add(replacement.slug);
+    return [{slug:replacement.slug,index}];
+  });
+}
+function compatibleCardioExerciseIds(primary,role,prefs,catalog){
+  const items=catalog||exerciseCatalog(false);
+  const ids=WORKOUT_EXERCISE_IDS[primary]||{};
+  const allowed=items.filter(exercise=>exercise.discipline===primary&&exerciseLevelAllowed(exercise,prefs.trainingExperience));
+  const allowedIds=new Set(allowed.map(exercise=>exercise.slug));
+  const selected=(ids[role]||[]).filter(id=>allowedIds.has(id));
+  return selected.length?selected:(ids.facil||[]).filter(id=>allowedIds.has(id));
 }
 function plannedWorkoutId(ds,prefs){
   if(!prefs){
@@ -1644,6 +1699,13 @@ function sportSessions(primary,ds,prefs){
   sessions.quality.exerciseIds=ids.calidad||[];
   sessions.endurance.exerciseIds=ids.facil||[];
   sessions.technique.exerciseIds=ids.tecnica||[];
+  if(workoutContentCanUpdate(ds))Object.values(sessions).forEach(session=>{
+    const compatible=compatibleCardioExerciseIds(primary,session.id,ctx);
+    if(session.exerciseIds.some(id=>!compatible.includes(id))){
+      Object.assign(session,{name:p.enduranceName,detail:p.endurance[phase],cardioRole:"facil"});
+    }
+    session.exerciseIds=compatible;
+  });
   Object.values(sessions).forEach(session=>{
     session.sport=primary;
     session.phaseIndex=phase;
@@ -1685,7 +1747,10 @@ function strengthSessions(mode,ds,prefs){
   const sessions=mode==="bodyweight"?bodyweight:gym;
   const ids=WORKOUT_EXERCISE_IDS[mode==="bodyweight"?"bodyweight":"gym"]||{};
   Object.entries(sessions).forEach(([key,session])=>{
-    session.exerciseIds=ids[key]||[];
+    const original=ids[key]||[];
+    const ctx=prefs||planPrefsForDate(ds);
+    session.exerciseIds=workoutContentCanUpdate(ds)
+      ?compatibleStrengthExerciseSelection(original,ds,ctx,mode).map(item=>item.slug):original;
     session.strengthMode=mode;
     session.detail=`${session.exerciseIds.length} ejercicios guiados con demostración, instrucciones y alternativas. ${progress}`;
   });
@@ -4853,13 +4918,13 @@ function exerciseArray(value){
 }
 function exerciseCatalog(includeInactive){
   const source=(DB.exerciseReady&&Array.isArray(DB.exercises)&&DB.exercises.length)?DB.exercises:LOCAL_EXERCISES;
-  return source.filter(ex=>includeInactive||ex.active!==false);
+  return source.filter(ex=>ex&&(includeInactive||ex.active!==false)).map(ex=>window.FITBUD_EXERCISE_CONTENT.normalize(ex));
 }
 function exerciseBySlug(slug,includeInactive){
   return exerciseCatalog(includeInactive).find(ex=>ex.slug===slug)||null;
 }
 function exerciseLevelLabel(level){
-  return TRAINING_EXPERIENCE_LABELS[level]||"Principiante";
+  return TRAINING_EXPERIENCE_LABELS[level]||"Nivel por revisar";
 }
 const EXERCISE_DISCIPLINE_LABELS={
   gym:"Gimnasio",bodyweight:"Peso corporal",strength:"Fuerza",
@@ -4992,6 +5057,13 @@ function workoutExercisesHtml(workout){
 function workoutPrescription(ds){
   const ew=effectiveWorkout(ds);
   const workout=ew.workout;
+  const saved=S.days[ds]&&S.days[ds].workoutExecution;
+  // La sesión conserva la prescripción con la que empezó, incluso cuando el
+  // catálogo obliga a adaptar un plan antiguo antes de iniciarlo.
+  if(saved&&saved.contentPrescription&&saved.workoutId===(workout&&workout.id)
+    &&saved.contentPrescription.workoutId===saved.workoutId){
+    return JSON.parse(JSON.stringify(saved.contentPrescription));
+  }
   let prescribedIds=exerciseArray(workout&&workout.exerciseIds);
   // REQ-92: plan generado con exercises:[] → usar template estático del rol como respaldo
   if(workout&&workout.generated&&!prescribedIds.length&&workout.role){
@@ -4999,7 +5071,13 @@ function workoutPrescription(ds){
     if(template&&template.exerciseIds&&template.exerciseIds.length)prescribedIds=exerciseArray(template.exerciseIds);
   }
   const exercises=prescribedIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
-  return WORKOUT_PLAYER.buildPrescription({workout:ew.workout,exercises,context:workoutPlayerContext(ds)});
+  return buildWorkoutPrescription(workout,exercises,workoutPlayerContext(ds));
+}
+function buildWorkoutPrescription(workout,exercises,context){
+  const input=workout&&workout.cardioRole?{...workout,id:workout.cardioRole}:workout;
+  const prescription=WORKOUT_PLAYER.buildPrescription({workout:input,exercises,context});
+  if(workout&&workout.cardioRole)prescription.workoutId=workout.id;
+  return prescription;
 }
 function workoutPlayerContext(ds){
   return {
@@ -5372,7 +5450,9 @@ function startWorkoutExecution(ds){
 function beginWorkoutExecution(ds){
   const st=dayState(ds);
   if(st.workoutExecution)return;
-  st.workoutExecution=WORKOUT_PLAYER.createExecution(workoutPrescription(ds),Date.now());
+  const prescription=workoutPrescription(ds);
+  st.workoutExecution=WORKOUT_PLAYER.createExecution(prescription,Date.now());
+  st.workoutExecution.contentPrescription=JSON.parse(JSON.stringify(prescription));
   st.workoutDone=false;
   commitDay(ds);render();toast("Sesión iniciada");
 }
@@ -5724,7 +5804,7 @@ function openExerciseSubstitution(ds){
   const candidates=EXERCISE_SUBSTITUTION.candidates(currentExercise,exerciseCatalog(false))
     .filter(ex=>exerciseCompatibleForWorkout(ex,ds));
   const body=candidates.length?candidates.map(ex=>`<button class="opt" onclick="applyExerciseSubstitution('${ds}','${esc(ex.slug)}')">
-      <b>${esc(ex.name)}</b><div class="o-meta">Músculo principal: ${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}</div>
+      <b>${esc(ex.name)}</b><div class="o-meta">${esc(exerciseLevelLabel(ex.level))} · Músculo principal: ${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}</div>
     </button>`).join(""):`<div class="alert">No hay otro ejercicio para ${esc(muscle?muscle.toLowerCase():"este músculo")} compatible con tu lugar y limitaciones de hoy.</div>`;
   modal(`<h3>Sustituir ejercicio</h3>
     ${exerciseSearchBox(ds,"sub")}
@@ -5752,7 +5832,7 @@ function exerciseSearchResultsHtml(ds,mode,query){
   return safe.map(ex=>{
     const places=exerciseArray(ex.places).map(place=>TRAINING_LOCATION_LABELS[place]).filter(Boolean).join(" · ");
     return `<button class="opt" onclick="${action}('${ds}','${esc(ex.slug)}')">
-      <b>${esc(ex.name)}</b><div class="o-meta">${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}${places?` · ${esc(places)}`:""}</div>
+      <b>${esc(ex.name)}</b><div class="o-meta">${esc(exerciseLevelLabel(ex.level))} · ${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}${places?` · ${esc(places)}`:""}</div>
     </button>`;
   }).join("");
 }
@@ -9776,7 +9856,7 @@ function coachCompatibilityContext(action){
       dishes:hashText((DB.dishes||[]).map(d=>[
         d.id,d.name,(catalogArray(d.compatible_slots)||[]).join(","),(catalogArray(d.cuisine_tags)||[]).join(","),d.meal_weight||"",d.meal_form||"",
       ].join(":")).join("|")),
-      exercises:hashText((DB.exercises||[]).map(e=>e.slug+":"+(e.active!==false)).join("|")),
+      exercises:hashText(activeTrainingCatalog().map(e=>e.slug+":"+(e.active!==false)+":"+e.level).join("|")),
     },
   };
 }
@@ -10058,8 +10138,7 @@ function validMealSuggestions(value){
 }
 
 function activeTrainingCatalog(){
-  const source=DB.loaded&&Array.isArray(DB.exercises)&&DB.exercises.length?DB.exercises:LOCAL_EXERCISES;
-  return source.filter(exercise=>exercise&&exercise.active!==false&&exercise.slug);
+  return exerciseCatalog(false).filter(exercise=>exercise.slug);
 }
 function trainingEquipmentSupports(requirement,prefs){
   const selected=new Set(prefs.equipment||[]);
@@ -10092,18 +10171,22 @@ function allowedLevelsForExperience(experience){
   if(experience==="intermediate")return new Set(["beginner","intermediate"]);
   return new Set(["beginner"]);
 }
+function exerciseLevelAllowed(exercise,experience){
+  if(!exercise||!["beginner","intermediate","advanced"].includes(exercise.level))return false;
+  const allowed=allowedLevelsForExperience(experience);
+  return !allowed||allowed.has(exercise.level);
+}
 function allowedExercisesForSession(spec,prefs,catalog){
   const strength=spec.type==="strength";
   const cardioRoleIds=!strength&&WORKOUT_EXERCISE_IDS[prefs.primarySport]
-    ?new Set(WORKOUT_EXERCISE_IDS[prefs.primarySport][spec.role]||[]):null;
-  const allowedLevels=allowedLevelsForExperience(prefs.trainingExperience);
+    ?new Set(compatibleCardioExerciseIds(prefs.primarySport,spec.role,prefs,catalog)):null;
   return catalog.filter(exercise=>{
+    if(!exerciseLevelAllowed(exercise,prefs.trainingExperience))return false;
     if(exerciseConflictsWithProfile(exercise,prefs))return false;
     if(isGentleTrainingPlan(prefs)&&exerciseBlockedByGentleMode(exercise))return false;
     const places=exerciseArray(exercise.places);
     if(places.length&&!places.includes(spec.location))return false;
     if(strength){
-      if(allowedLevels&&!allowedLevels.has(exercise.level||"beginner"))return false;
       const disciplines=prefs.strengthMode==="bodyweight"
         ?new Set(["bodyweight","strength"])
         :new Set(["gym","strength","bodyweight"]);
@@ -10178,21 +10261,22 @@ function deterministicTrainingWeekPayload(expected,prefs){
   const planPrefs={...prefs,primarySport:effectiveTrainingPrimarySport(prefs)};
   const gentle=isGentleTrainingPlan(prefs);
   const sessions=expected.sessions.map(spec=>{
-    const workout=workoutById(spec.date,spec.role,planPrefs);
+    let workout=workoutById(spec.date,spec.role,planPrefs);
     const strength=spec.type==="strength";
     // REQ-92: filtrar ejercicios del template por los permitidos; si quedan < 2, suplementar
     // desde spec.allowedExerciseIds para que el fallback nunca produzca exercises:[]
     let exerciseIds=exerciseArray(workout&&workout.exerciseIds).filter(id=>(spec.allowedExerciseIds||[]).includes(id));
+    if(!strength&&!exerciseIds.length){
+      exerciseIds=(spec.allowedExerciseIds||[]).slice(0,1);
+      const easy=sportSessions(spec.type,spec.date,planPrefs).endurance;
+      workout={...workout,name:easy.name,detail:easy.detail,cardioRole:"facil"};
+    }
     if(strength&&exerciseIds.length<2){
       const extra=(spec.allowedExerciseIds||[]).filter(id=>!exerciseIds.includes(id));
       exerciseIds=[...exerciseIds,...extra].slice(0,6);
     }
     const exercises=exerciseIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
-    const prescription=WORKOUT_PLAYER.buildPrescription({
-      workout,
-      exercises,
-      context:{week:expected.week,durationWeeks:resolvedPlanDuration(prefs),sessionMinutes:prefs.sessionMinutes},
-    });
+    const prescription=buildWorkoutPrescription(workout,exercises,{week:expected.week,durationWeeks:resolvedPlanDuration(prefs),sessionMinutes:prefs.sessionMinutes});
     const prescribed=strength
       ?prescription.steps.filter(step=>step.type==="strength").map(step=>({
         exercise_id:step.exerciseSlug,sets:step.prescribedSets,reps:step.reps,
@@ -10208,7 +10292,7 @@ function deterministicTrainingWeekPayload(expected,prefs){
     return {
       date:spec.date,weekday:spec.weekday,location:spec.location,role:spec.role,type:spec.type,
       name:workout.name,objective:prescription.objective,duration_minutes:Math.min(prefs.sessionMinutes,prescription.estimatedMinutes),
-      intensity:strength?`RPE ${dose.rpe}`:(gentle?(spec.role==="calidad"?"RPE 5":spec.role==="tecnica"?"RPE 3-4":"RPE 2-4"):(spec.role==="calidad"?"RPE 7":spec.role==="tecnica"?"RPE 5":"RPE 3-5")),
+      intensity:strength?`RPE ${dose.rpe}`:workout.cardioRole==="facil"?"RPE 3-5":(gentle?(spec.role==="calidad"?"RPE 5":spec.role==="tecnica"?"RPE 3-4":"RPE 2-4"):(spec.role==="calidad"?"RPE 7":spec.role==="tecnica"?"RPE 5":"RPE 3-5")),
       exercises:prescribed,blocks,
     };
   });

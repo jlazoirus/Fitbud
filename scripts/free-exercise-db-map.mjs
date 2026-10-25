@@ -12,8 +12,9 @@
 //      y genera supabase/exercise-media.sql.
 //
 // `q`  = términos en inglés para sugerir candidatos si `id` falla.
-// `id` = id exacto del dataset (carpeta de imágenes). null = sin demo
-//        (el ejercicio conserva el SVG procedimental como fallback).
+// `id` = id exacto del dataset (carpeta de imágenes). null = no importar.
+//        `curated_svg` conserva una demostración propia de la variante exacta.
+//        No usar proxies de otro ejercicio aunque trabajen el mismo músculo.
 //
 // Los slugs que NO aparezcan aquí también se omiten (SVG). Running,
 // cycling y natación no existen en Free Exercise DB: se dejan fuera.
@@ -28,10 +29,10 @@ export default {
   "barbell-hip-thrust":      { q: "barbell hip thrust glute bridge", id: "Barbell_Hip_Thrust" },
   "incline-dumbbell-press":  { q: "incline dumbbell press", id: "Incline_Dumbbell_Press" },
   "lat-pulldown":            { q: "wide grip lat pulldown", id: "Wide-Grip_Lat_Pulldown" },
-  "bulgarian-split-squat":   { q: "split squat rear foot elevated dumbbell", id: "Split_Squat_with_Dumbbells" },
+  "bulgarian-split-squat":   { q: "bodyweight rear foot elevated split squat", id: null, curated_svg: "assets/exercise-media/bulgarian-split-squat.svg" }, // Pie posterior elevado, sin mancuernas.
   "overhead-press":          { q: "standing military press shoulder", id: "Standing_Military_Press" },
-  "walking-lunge":           { q: "dumbbell walking lunges", id: "Dumbbell_Lunges" },
-  "standing-calf-raise":     { q: "standing calf raises", id: "Standing_Calf_Raises" },
+  "walking-lunge":           { q: "bodyweight walking lunge", id: null, curated_svg: "assets/exercise-media/walking-lunge.svg" }, // Zancada caminando sin mancuernas.
+  "standing-calf-raise":     { q: "bodyweight standing calf raise", id: null, curated_svg: "assets/exercise-media/standing-calf-raise.svg" }, // Variante sin máquina ni carga.
   "assisted-dip":            { q: "bench dips triceps", id: "Bench_Dips" },
   "biceps-curl":             { q: "dumbbell bicep curl", id: "Dumbbell_Bicep_Curl" },
   "triceps-pushdown":        { q: "triceps pushdown rope cable", id: "Triceps_Pushdown" },
@@ -52,17 +53,17 @@ export default {
   "diamond-push-up":         { q: "close grip push up triceps", id: "Push-Ups_-_Close_Triceps_Position" },
   "pull-up":                 { q: "pullups pull up", id: "Pullups" },
   "assisted-pull-up":        { q: "assisted pull up machine band", id: "Band_Assisted_Pull-Up" },
-  "band-row":                { q: "resistance band row standing", id: "Inverted_Row" }, // proxy mismo músculo (remo invertido)
+  "band-row":                { q: "resistance band row standing", id: null, curated_svg: "assets/exercise-media/band-row.svg" }, // Banda; no sustituir por un remo invertido bajo barra.
   "glute-bridge":            { q: "butt lift bridge glute", id: "Butt_Lift_Bridge" },
   "single-leg-glute-bridge": { q: "single leg glute bridge", id: "Single_Leg_Glute_Bridge" },
   "front-plank":             { q: "plank core", id: "Plank" },
   "side-plank":              { q: "side bridge plank", id: "Side_Bridge" },
   "dead-bug":                { q: "dead bug core", id: "Dead_Bug" },
-  "pike-push-up":            { q: "pike push up shoulders", id: "Handstand_Push-Ups" }, // proxy mismo músculo (empuje vertical hombros)
-  "single-leg-rdl":          { q: "single leg romanian deadlift", id: "Kettlebell_One-Legged_Deadlift" },
-  "shoulder-tap-plank":      { q: "plank shoulder tap", id: "Mountain_Climbers" }, // proxy mismo músculo (core + hombros en plancha)
-  "step-up":                 { q: "dumbbell step ups", id: "Dumbbell_Step_Ups" },
-  "slider-leg-curl":         { q: "sliding leg curl hamstring", id: "Ball_Leg_Curl" },
-  "archer-push-up":          { q: "archer push up", id: "Plyo_Push-up" }, // proxy mismo músculo (empuje pecho/tríceps avanzado)
+  "pike-push-up":            { q: "pike push up shoulders", id: null, curated_svg: "assets/exercise-media/pike-push-up.svg" }, // Pies al suelo; una flexión de pino no es un pike.
+  "single-leg-rdl":          { q: "single leg romanian deadlift", id: null, curated_svg: "assets/exercise-media/single-leg-rdl.svg" }, // Variante sin carga; no usar kettlebell.
+  "shoulder-tap-plank":      { q: "plank shoulder tap", id: null, curated_svg: "assets/exercise-media/shoulder-tap-plank.svg" }, // Toque de hombro; no sustituir por escaladores.
+  "step-up":                 { q: "bodyweight step ups", id: null, curated_svg: "assets/exercise-media/step-up.svg" }, // Variante sin carga; no usar mancuernas.
+  "slider-leg-curl":         { q: "sliding leg curl hamstring", id: null, curated_svg: "assets/exercise-media/slider-leg-curl.svg" }, // Deslizadores o toalla; no usar pelota.
+  "archer-push-up":          { q: "archer push up", id: null, curated_svg: "assets/exercise-media/archer-push-up.svg" }, // Desplazamiento lateral; no sustituir por flexión pliométrica.
   "nordic-hamstring-curl":   { q: "natural glute ham raise nordic", id: "Natural_Glute_Ham_Raise" },
 };

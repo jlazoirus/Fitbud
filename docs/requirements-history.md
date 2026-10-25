@@ -10809,3 +10809,36 @@ Nuevo test E2E en `tests/e2e/progreso.spec.js` ("REQ-263"): con `completePrefs()
 ### Operación manual pendiente
 
 Ninguna.
+
+
+## REQ-264 - Entreno: revisar todos los niveles y corregir demos de variantes distintas
+
+**Estado: implementado.**
+
+### Origen y problema
+
+Jonathan, 2026-10-24: captura de Pike push-up con la etiqueta Principiante y una demostración de flexión en parada de manos. Pide revisar todos los ejercicios.
+
+### Causa raíz
+
+El constructor del catálogo asignaba beginner a toda fila sin nivel. 31 fichas originales de fuerza y los 12 bloques de resistencia heredaban ese valor. Supabase reemplazaba el catálogo empaquetado, así que corregir el archivo local no corregía las filas remotas. Además, el mapeo de demos usaba otros ejercicios del mismo músculo como proxies: pike → handstand, remo con banda → invertido, toques de hombro → escaladores y arquero → pliométricas. Las plantillas estáticas no filtraban experiencia.
+
+### Alcance implementado
+
+- Revisión individual de las 54 fichas empaquetadas y de las 16 fichas adicionales encontradas por lectura del catálogo real de producción (67 filas remotas, 51 compartidas): unión de 70 ejercicios, 34 principiantes, 32 intermedios y 4 avanzados. `docs/exercise-levels.md` fija criterio, variante exacta, razón individual y fuentes primarias; la carga y la dosis son distintas del nivel técnico.
+- Nivel explícito obligatorio para cada ficha local; registro revisado adicional para los 16 slugs remotos. Normalización sin mutaciones en los catálogos de visualización y generación: niveles conocidos prevalecen sobre datos antiguos; los ejercicios propios conservan sus datos. Un nivel ausente o inválido se muestra como Nivel por revisar y queda fuera de generación automática.
+- Diez SVG propios con posiciones exactas reemplazan demos distintas o cargadas de ejercicios sin carga. Pike muestra pies en el suelo y cadera elevada, con técnica específica; no una parada de manos. Se retiran proxies del mapa de ingestión y SQL de media. No se consumen llamadas pagadas.
+- Plantillas y planes guardados de hoy/futuro todavía sin ejecución usan ejercicios compatibles con la experiencia; se conservan ejercicios iniciados, sesiones registradas y fechas pasadas. Los snapshots no se escriben ni se migran. Cardio principiante usa el bloque fácil cuando el intervalo supera su nivel. Las búsquedas manuales siguen disponibles e informan el nivel.
+- Al sustituir un ejercicio pendiente, repeticiones, tempo y descanso corresponden al destino; se conservan series y objetivos de esfuerzo.
+- Al iniciar una sesión nueva se guarda una copia de su prescripción efectiva en `workoutExecution.contentPrescription`: las adaptaciones conservan ejercicios y bloques al continuar o recargar. Las ejecuciones anteriores sin esa copia mantienen su recuperación previa.
+- El hash de compatibilidad incluye niveles para evitar reutilizar planes con clasificaciones obsoletas. Cache PWA v141. SQL base actualizado; parche incremental opcional `supabase/exercise-levels.sql`, idempotente y sin cambios de permisos ni tablas. No se ejecutó SQL de producción.
+
+### Criterios y verificación
+
+- Cobertura de los 70 slugs revisados, enum válido, paridad de SQL e inventario, filas antiguas corregidas sin mutación y media propia existente: `scripts/validate-exercises.mjs`.
+- E2E: Supabase antiguo muestra Pike intermedio con la demo correcta; variante remota asistida también intermedia; Full Body principiante conserva al menos tres ejercicios; generación y cardio respetan nivel; planes pendientes se adaptan sin modificar snapshots ni registros; búsqueda manual informa nivel y el hash cambia si cambia nivel. Inicio real por cuenta atrás y recarga desde `day_log` conservan la sesión de fuerza adaptada (cuatro ejercicios y una sola vuelta a la calma) y el cardio fácil.
+- Validadores de splits, planes, reproductor, migraciones, documentación y release gate.
+
+### Operación
+
+La corrección cliente funciona al desplegar sin una migración de producción. El SQL incremental es opcional para alinear las filas del servidor. Historial, registros, cargas utilizadas y resultados anteriores se conservan.

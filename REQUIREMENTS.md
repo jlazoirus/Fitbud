@@ -1930,3 +1930,9 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 `progressStats()` acotaba `cycleSummary()` al ciclo completo (incluidos días futuros sin registrar), diluyendo la adherencia real a ~14% con 100% de cumplimiento hasta hoy. Ahora llama `cycleSummary(todayStr())`. ✓ `tests/e2e/progreso.spec.js`.
+
+## REQ-264 - Entreno: revisar todos los niveles y corregir demos de variantes distintas
+
+**Estado: implementado.** Revisión de Jonathan (2026-10-24): Pike push-up aparecía como principiante con una parada de manos. Inventario completo: 54 fichas locales y 16 adicionales de producción, 70 ejercicios únicos; criterio y razones en `docs/exercise-levels.md`.
+
+Niveles explícitos y corrección de filas remotas antiguas sin modificar la base; diez demostraciones propias exactas; rutinas automáticas respetan experiencia y los planes pendientes se adaptan al leerlos, preservando ejecuciones/historial. Búsqueda manual muestra el nivel. Sin nivel válido no entra al plan. SQL opcional `supabase/exercise-levels.sql`; ninguna migración de producción ejecutada. Verificación: `scripts/validate-exercises.mjs`, `tests/e2e/exercise-levels.spec.js`, release gate. Detalle en `docs/requirements-history.md`.

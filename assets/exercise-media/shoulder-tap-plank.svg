@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 272" role="img" aria-labelledby="title desc">
+  <title id="title">Plancha alta con toque de hombro</title>
+  <desc id="desc">Vista lateral en dos posiciones. La persona mantiene manos y puntas de los pies en el suelo y el cuerpo alineado. Eleva una mano y toca el hombro opuesto mientras el otro brazo sostiene el peso. Las piernas permanecen extendidas; no es un escalador.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1l7 4-7 4" fill="none" stroke="#c6f36a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>
+    .limb,.torso,.far,.prop,.floor,.arrow,.band{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .limb{stroke:#e4ebdf;stroke-width:9}.torso{stroke:#e4ebdf;stroke-width:13}
+    .far{stroke:#738372;stroke-width:8}.head{fill:#e4ebdf}.joint{fill:#c6f36a}
+    .prop{stroke:#9eaf9a;stroke-width:5}.floor{stroke:#46513f;stroke-width:2}
+    .arrow{stroke:#c6f36a;stroke-width:2.5}.band{stroke:#c6f36a;stroke-width:4}
+    .label{font:600 14px system-ui,sans-serif;fill:#c6f36a}.cue{font:14px system-ui,sans-serif;fill:#b9c5b3}
+  </style>
+  <rect width="640" height="272" fill="#171b16"/>
+  <path d="M320 48v181" stroke="#36402f"/>
+  <g transform="translate(0 0)"><text class="label" x="28" y="31">1 · Plancha alta</text><path class="floor" d="M28 224H292"/><path class="far" d="M113 139L126 224"/><path class="far" d="M190 174L267 224"/><path class="torso" d="M105 134L188 174"/><path class="limb" d="M188 174L258 220"/><path class="limb" d="M105 134L96 224"/><path class="limb" d="M91 224h18"/><path class="limb" d="M253 224h18"/><path class="limb" d="M105 134L94 128"/><circle class="head" cx="81" cy="121" r="11"/><circle class="joint" cx="188" cy="174" r="4"/></g>
+  <g transform="translate(320 0)"><text class="label" x="28" y="31">2 · Toca el hombro opuesto</text><path class="floor" d="M28 224H292"/><path class="far" d="M105 134L96 224"/><path class="far" d="M190 174L267 224"/><path class="torso" d="M105 134L188 174"/><path class="limb" d="M188 174L258 220"/><path class="limb" d="M113 139L151 174 104 143"/><path class="limb" d="M91 224h18"/><path class="limb" d="M253 224h18"/><path class="limb" d="M105 134L94 128"/><circle class="head" cx="81" cy="121" r="11"/><circle class="joint" cx="104" cy="143" r="4"/><path class="arrow" d="M160 185Q172 151 142 139" marker-end="url(#arrow)"/></g>
+  <text class="cue" x="320" y="254" text-anchor="middle">Alterna las manos · Mantén la pelvis estable</text>
+</svg>

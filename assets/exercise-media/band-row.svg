@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 272" role="img" aria-labelledby="title desc">
+  <title id="title">Remo sentado con banda: brazos extendidos y tracción</title>
+  <desc id="desc">Vista lateral. La persona se sienta en el suelo con una banda de resistencia alrededor de los pies. Lleva los codos atrás y las manos hacia el abdomen manteniendo el tronco estable; no hay barra ni remo invertido.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1l7 4-7 4" fill="none" stroke="#c6f36a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>
+    .limb,.torso,.far,.prop,.floor,.arrow,.band{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .limb{stroke:#e4ebdf;stroke-width:9}.torso{stroke:#e4ebdf;stroke-width:13}
+    .far{stroke:#738372;stroke-width:8}.head{fill:#e4ebdf}.joint{fill:#c6f36a}
+    .prop{stroke:#9eaf9a;stroke-width:5}.floor{stroke:#46513f;stroke-width:2}
+    .arrow{stroke:#c6f36a;stroke-width:2.5}.band{stroke:#c6f36a;stroke-width:4}
+    .label{font:600 14px system-ui,sans-serif;fill:#c6f36a}.cue{font:14px system-ui,sans-serif;fill:#b9c5b3}
+  </style>
+  <rect width="640" height="272" fill="#171b16"/>
+  <path d="M320 48v181" stroke="#36402f"/>
+  <g transform="translate(0 0)"><text class="label" x="28" y="31">1 · Brazos extendidos</text><path class="floor" d="M28 224H292"/><path class="far" d="M222 201L174 193 121 219"/><path class="band" d="M114 209Q109 222 124 222L145 157"/><path class="torso" d="M222 117L226 205"/><path class="limb" d="M226 205L174 197 121 219"/><path class="limb" d="M222 123L182 140 145 157"/><path class="limb" d="M121 219L114 207"/><circle class="head" cx="222" cy="91" r="11"/><path class="limb" d="M222 104v13"/><circle class="joint" cx="145" cy="157" r="4"/></g>
+  <g transform="translate(320 0)"><text class="label" x="28" y="31">2 · Lleva los codos atrás</text><path class="floor" d="M28 224H292"/><path class="far" d="M222 201L174 193 121 219"/><path class="band" d="M114 209Q109 222 124 222L197 163"/><path class="torso" d="M222 117L226 205"/><path class="limb" d="M226 205L174 197 121 219"/><path class="limb" d="M222 123L251 163 197 163"/><path class="limb" d="M121 219L114 207"/><circle class="head" cx="222" cy="91" r="11"/><path class="limb" d="M222 104v13"/><circle class="joint" cx="197" cy="163" r="4"/><path class="arrow" d="M166 145h32" marker-end="url(#arrow)"/></g>
+  <text class="cue" x="320" y="254" text-anchor="middle">Banda alrededor de los pies · Tronco estable</text>
+</svg>
