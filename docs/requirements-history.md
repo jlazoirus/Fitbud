@@ -10496,6 +10496,48 @@ Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apr
 - A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
 - `node scripts/release-gate.mjs` pasa.
 
+## REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo eso de actividad física principal", "Eso de elegir qué hacer en cada día también siento que te limita mucho a elegir" y "¿Qué pasa si un lunes no voy al gym y juego pádel?".
+
+### Problema
+
+- "Actividad física principal" no dice qué es ni qué cambia: Diego juega pádel, que no está en la lista, y eligió "Otra actividad" sin saber qué haría el plan con eso.
+- "Días disponibles y lugar real" se lee como una agenda fija: nada dice que cualquier día se puede cambiar.
+- Registrar otro deporte en un día de fuerza ya era posible (REQ-206, "＋ Registrar otra actividad" al final de Entreno), pero no aparece entre las opciones de "Adaptar hoy" ni explica qué pasa con la sesión que tocaba.
+
+### Causa raíz
+
+- Copy de `index.html`: label `pf_sport` "Actividad física principal" y `ob_sport` "¿Practicas alguna actividad física?", opción "Otra actividad", sin nota de ayuda; label "Días disponibles y lugar real".
+- "Adaptar hoy" en `renderWorkout()` solo ofrece Solo 20 min / En casa / Sin equipo / Me perdí la sesión.
+
+### Alcance
+
+1. Onboarding y Perfil preguntan lo mismo: "¿Haces otro deporte además de la fuerza?", con opciones Caminar, Correr, Bicicleta, Natación, "Otro deporte" y "Ninguno, solo fuerza". `SPORT_LABELS.other` → "Otro deporte".
+2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
+3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
+4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
+5. `CACHE_NAME` → `fitbud-pwa-v133` (junto con REQ-252).
+
+### Fuera de alcance
+
+- Elegir qué se hace cada día (fuerza o deporte) en vez del lugar, o mover la sesión de fuerza perdida a otro día: el lugar sigue orientando la plantilla (exterior/piscina → deporte) y "Me perdí la sesión" ya ofrece recuperarla.
+- Añadir pádel, fútbol u otros deportes con plan guiado propio.
+
+### Riesgos
+
+- Ninguno sobre datos: solo copy y un acceso nuevo a un flujo existente; los valores guardados (`primarySport`) no cambian.
+
+### Criterios de aceptación
+
+- Perfil muestra la nueva pregunta y la nota cambia al elegir otra opción; la semana tipo explica que no es una obligación. ✓ (`tests/e2e/actividad-manual.spec.js`)
+- En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
+- `node scripts/release-gate.mjs` pasa.
+
 ## REQ-257 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
 
 **Estado: implementado.**
@@ -10843,7 +10885,7 @@ El constructor del catálogo asignaba beginner a toda fila sin nivel. 31 fichas 
 
 La corrección cliente funciona al desplegar sin una migración de producción. El SQL incremental es opcional para alinear las filas del servidor. Historial, registros, cargas utilizadas y resultados anteriores se conservan.
 
-## REQ-265 - Fix: los recordatorios por correo y push nunca se enviaban
+## REQ-266 - Fix: los recordatorios por correo y push nunca se enviaban
 
 **Estado: implementado — requiere acción humana:** crear el secreto `CRON_SECRET` en GitHub (Settings → Secrets and variables → Actions) con el mismo valor que la variable `CRON_SECRET` de Vercel.
 
@@ -10877,13 +10919,13 @@ Jonathan (2026-10-24): "Creo que las notificaciones no están funcionando".
 - Con la hora elegida ya pasada hoy, el disparo envía; justo a la hora, envía; antes, no; ya enviado hoy, no repite. ✓ `scripts/validate-notify-schedule.mjs` (falla con el código anterior), en el release gate.
 - Tras crear el secreto, "Run workflow" del workflow responde 200 y, a la hora elegida, `notification_log` registra el envío.
 
-## REQ-266 - Fix: los avisos push no tenían clave privada VAPID
+## REQ-267 - Fix: los avisos push no tenían clave privada VAPID
 
 **Estado: implementado — requiere acción humana:** crear en Vercel (Production) `VAPID_PRIVATE_KEY` (generada para este cambio y entregada fuera del repo) y `VAPID_SUBJECT` (`mailto:` del responsable), y volver a desplegar.
 
 ### Origen
 
-Jonathan (2026-10-24), al revisar las variables de Vercel para REQ-265: "Las de vapid no existen".
+Jonathan (2026-10-24), al revisar las variables de Vercel para REQ-266: "Las de vapid no existen".
 
 ### Causa raíz
 
@@ -10903,4 +10945,4 @@ REQ-38 embebió la clave pública `BG6yy…` en `index.html` y como respaldo en 
 ### Criterios de aceptación
 
 - Cliente y servidor usan la misma clave nueva, válida. ✓ `scripts/validate-vapid-key.mjs`.
-- Con las variables en Vercel, un usuario con avisos activos que vuelve a entrar queda suscrito con la clave nueva y recibe el aviso a su hora (REQ-265).
+- Con las variables en Vercel, un usuario con avisos activos que vuelve a entrar queda suscrito con la clave nueva y recibe el aviso a su hora (REQ-266).

@@ -1749,45 +1749,9 @@ Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana re
 
 ## REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
-
-Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo eso de actividad física principal", "Eso de elegir qué hacer en cada día también siento que te limita mucho a elegir" y "¿Qué pasa si un lunes no voy al gym y juego pádel?".
-
-### Problema
-
-- "Actividad física principal" no dice qué es ni qué cambia: Diego juega pádel, que no está en la lista, y eligió "Otra actividad" sin saber qué haría el plan con eso.
-- "Días disponibles y lugar real" se lee como una agenda fija: nada dice que cualquier día se puede cambiar.
-- Registrar otro deporte en un día de fuerza ya era posible (REQ-206, "＋ Registrar otra actividad" al final de Entreno), pero no aparece entre las opciones de "Adaptar hoy" ni explica qué pasa con la sesión que tocaba.
-
-### Causa raíz
-
-- Copy de `index.html`: label `pf_sport` "Actividad física principal" y `ob_sport` "¿Practicas alguna actividad física?", opción "Otra actividad", sin nota de ayuda; label "Días disponibles y lugar real".
-- "Adaptar hoy" en `renderWorkout()` solo ofrece Solo 20 min / En casa / Sin equipo / Me perdí la sesión.
-
-### Alcance
-
-1. Onboarding y Perfil preguntan lo mismo: "¿Haces otro deporte además de la fuerza?", con opciones Caminar, Correr, Bicicleta, Natación, "Otro deporte" y "Ninguno, solo fuerza". `SPORT_LABELS.other` → "Otro deporte".
-2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
-3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
-4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
-5. `CACHE_NAME` → `fitbud-pwa-v133` (junto con REQ-252).
-
-### Fuera de alcance
-
-- Elegir qué se hace cada día (fuerza o deporte) en vez del lugar, o mover la sesión de fuerza perdida a otro día: el lugar sigue orientando la plantilla (exterior/piscina → deporte) y "Me perdí la sesión" ya ofrece recuperarla.
-- Añadir pádel, fútbol u otros deportes con plan guiado propio.
-
-### Riesgos
-
-- Ninguno sobre datos: solo copy y un acceso nuevo a un flujo existente; los valores guardados (`primarySport`) no cambian.
-
-### Criterios de aceptación
-
-- Perfil muestra la nueva pregunta y la nota cambia al elegir otra opción; la semana tipo explica que no es una obligación. ✓ (`tests/e2e/actividad-manual.spec.js`)
-- En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
-- `node scripts/release-gate.mjs` pasa.
+Feedback Diego. Perfil explica qué es la actividad principal y que la semana tipo no obliga; "Adaptar hoy" ofrece "Hice otro deporte", que reemplaza la sesión del día. ✓ `tests/e2e/actividad-manual.spec.js`.
 
 ## REQ-254 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
 
@@ -1937,13 +1901,59 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 
 Niveles explícitos y corrección de filas remotas antiguas sin modificar la base; diez demostraciones propias exactas; rutinas automáticas respetan experiencia y los planes pendientes se adaptan al leerlos, preservando ejecuciones/historial. Búsqueda manual muestra el nivel. Sin nivel válido no entra al plan. SQL opcional `supabase/exercise-levels.sql`; ninguna migración de producción ejecutada. Verificación: `scripts/validate-exercises.mjs`, `tests/e2e/exercise-levels.spec.js`, release gate. Detalle en `docs/requirements-history.md`.
 
-## REQ-265 - Fix: los recordatorios por correo y push nunca se enviaban
+## REQ-265 - Fix recordatorios: el cron marca "entrenamiento pendiente" en días de descanso
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey de retención (recordatorios REQ-24 y push de racha REQ-38). El criterio de "descanso" de `checkPending()` en `api/notify.js` no coincide con la forma del dato que escribe `index.html`.
+
+### Problema
+
+El recordatorio diario de entrenamiento se dispara también en días de **descanso planificado** del split y en días marcados como descanso ("Día marcado como descanso planificado"). Como `notify_training` está activo por defecto (`index.html:8028`), un usuario que entrena 3 días/semana recibe hasta 4 avisos falsos de "Tienes entrenamiento pendiente para hoy" por semana. Contradice el criterio propio de REQ-38 ("solo cuando hay algo pendiente… sin castigar descansos planificados", `docs/requirements-history.md:2030`) y empuja a desactivar notificaciones — daño directo a retención.
+
+### Causa raíz
+
+`checkPending()` (`api/notify.js:134-137`) decide el descanso solo con `override.type === "rest" || override.type === "missed_converted_rest"`, esperando un objeto. Pero el cliente escribe `workoutOverride` siempre como **string**: `st.workoutOverride="descanso"` (`index.html:7295` y `:9548`) o un id de entreno (`:6524`, `:9530`). `"descanso".type` es `undefined`, así que `isRestDay` es siempre `false` y `trainingPending = !workoutDone`. Además `"missed_converted_rest"` no existe en ningún otro archivo: es una forma que nadie produce. El cron tampoco consulta el plan/split (no lee `plan_versions` ni `plannedWorkoutId`), así que no detecta un descanso planificado sin override.
+
+### Objetivo
+
+Que el recordatorio de entrenamiento NO se envíe en días de descanso (planificados o marcados por el usuario); solo cuando hay una sesión realmente prescrita y sin cerrar.
+
+### Alcance
+
+1. En `checkPending()`, reconocer el descanso con la forma real del dato: `workoutOverride === "descanso"` (string).
+2. Detectar el descanso planificado del split cuando no hay override (replicar `plannedWorkoutId`/schedule con las prefs del usuario, o persistir el tipo de día en `day_log` para que el cron lo lea).
+
+### Fuera de alcance
+
+- Rediseñar `workoutOverride` a objeto; el cliente lo usa como string en todos los flujos.
+- Recordatorio de nutrición (su criterio `mealIds` no depende de esto).
+
+### Riesgos
+
+- Si solo se arregla el string pero no el descanso planificado sin override, persiste el falso positivo mayoritario.
+- Cambiar la firma de `workoutOverride` rompería lectura del cliente; mantener compatibilidad con string.
+
+### Criterios de aceptación
+
+- En día de descanso (planificado o `workoutOverride==="descanso"`) sin sesión cerrada, `checkPending().training === false`.
+- En día con sesión prescrita y sin cerrar, sigue siendo `true`.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Fixture de `checkPending()` con cuatro estados: descanso planificado sin override, `workoutOverride:"descanso"`, entreno sin cerrar, entreno cerrado.
+- Repro de esta auditoría: la lógica de `:134-137` sobre `{workoutOverride:"descanso"}` da `pending=true` hoy (debe ser `false`).
+
+## REQ-266 - Fix: los recordatorios por correo y push nunca se enviaban
 
 **Estado: implementado — requiere acción humana:** secreto `CRON_SECRET` en GitHub (mismo valor que en Vercel).
 
 El cron diario (03:00 en Lima) nunca coincidía con la hora elegida (17–23). `.github/workflows/notify-hourly.yml` llama cada hora a `/api/notify`, que envía desde la hora elegida (`isNotifyTime`), una vez por día. ✓ `scripts/validate-notify-schedule.mjs`.
 
-## REQ-266 - Fix: los avisos push no tenían clave privada VAPID
+## REQ-267 - Fix: los avisos push no tenían clave privada VAPID
 
 **Estado: implementado — requiere acción humana:** `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel.
 
