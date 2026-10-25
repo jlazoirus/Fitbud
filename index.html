@@ -466,6 +466,10 @@
   .qp-portion-row .muted{margin-right:4px}
   .qp-portion.on{background:var(--accent);border-color:var(--accent);color:#0b0b0b}
   .qp-save-fav{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px}
+  .field-errors{margin-top:10px;padding:8px 10px;border-radius:var(--r-sm);background:var(--bad-dim);color:var(--txt);font-size:13px}
+  .field-errors ul{margin:0;padding-left:18px}
+  input[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--bad)}
+  .partial-macros{margin-top:6px}
   .qp-save-fav input{accent-color:var(--accent);width:17px;height:17px}
   .closebar{display:flex;justify-content:flex-end;margin-bottom:4px}
   .closebar button{background:var(--surf3);width:36px;height:36px;border-radius:999px;font-size:16px;color:var(--muted)}
@@ -976,6 +980,8 @@
 <script src="js/nutrition-pure.js"></script>
 <!-- Dominio nutricional puro: tolerancias, macros de recetas, restricciones, slots, validadores. -->
 <script src="js/nutrition-domain.js"></script>
+<!-- REQ-266..273: registro nutricional puro (validación, origen, composición, alimentos y recetas propios). -->
+<script src="js/meal-log.js"></script>
 <!-- Contratos de dominio: validadores sin DOM para perfil, macros, día, entitlement, sync y coach. -->
 <script src="domain-contracts.js"></script>
 <!-- Motor puro de resolución de conflictos offline. -->
@@ -1168,8 +1174,11 @@ function normalizedBlockedDishes(value){
 const SAVED_MEALS_MAX=50;
 function mealMacrosEntry(v){
   const name=String(v&&v.name||"").trim().slice(0,160);
-  const num=x=>Math.max(0,Math.min(5000,Math.round(Number(x)||0)));
-  return name?{name,kcal:num(v.kcal),p:num(v.p),c:num(v.c),f:num(v.f)}:null;
+  // REQ-266: décimas, nunca negativos; los macros desconocidos se conservan como tales.
+  const num=(x,k)=>Math.max(0,Math.min(MEAL_VALUE_LIMITS[k],roundTenth(Number(x)||0)));
+  if(!name)return null;
+  const unknown=!!(v&&v.macrosUnknown);
+  return Object.assign({name,kcal:num(v.kcal,"kcal"),p:unknown?0:num(v.p,"p"),c:unknown?0:num(v.c,"c"),f:unknown?0:num(v.f,"f")},unknown?{macrosUnknown:true}:{});
 }
 function normalizedSavedMeals(list){
   const out=[],seen=new Set();
@@ -2616,7 +2625,7 @@ function mealValue(base,ms){
   const name=o&&o.name!=null?o.name:base.name;
   // 1. Override manual del usuario (custom kcal o dishName explícito)
   if(o&&o.kcal!=null&&o.dishName==null){
-    return{name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"custom"};
+    return Object.assign({name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"custom"},o.macrosUnknown?{macrosUnknown:true}:{});
   }
   // 1b. Reemplazo materializado (REQ-83/131/142, "Cambiar comida"/rebalanceo
   // de futuras): el candidato ya trae sus propios macros sobre la porción
@@ -2649,10 +2658,13 @@ function dayTotals(ds){
   const day=buildDay(ds); const st=dayState(ds);
   // REQ-125: una comida saltada no cuenta como pendiente ni como consumida.
   const skippedCount=day.meals.filter(b=>st.meals[b.id]&&st.meals[b.id].skipped).length;
-  let t={kcal:0,p:0,c:0,f:0}, doneMeals=0, totMeals=day.meals.length-skippedCount+st.extras.length;
-  day.meals.forEach(b=>{const ms=st.meals[b.id];if(ms&&ms.done){const v=mealValue(b,ms);if(mealHasContent(v)){t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;doneMeals++;}}});
-  st.extras.forEach(e=>{if(e.done){t.kcal+=+e.kcal||0;t.p+=+e.p||0;t.c+=+e.c||0;t.f+=+e.f||0;doneMeals++;}});
-  return {t,doneMeals,totMeals,target:day.target};
+  let t={kcal:0,p:0,c:0,f:0}, doneMeals=0, totMeals=day.meals.length-skippedCount+st.extras.length, partial=0;
+  day.meals.forEach(b=>{const ms=st.meals[b.id];if(ms&&ms.done){const v=mealValue(b,ms);if(mealHasContent(v)){t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;doneMeals++;if(v.macrosUnknown)partial++;}}});
+  st.extras.forEach(e=>{if(e.done){t.kcal+=+e.kcal||0;t.p+=+e.p||0;t.c+=+e.c||0;t.f+=+e.f||0;doneMeals++;if(e.macrosUnknown)partial++;}});
+  // REQ-266/268: se suma con la precisión guardada y se redondea solo al final.
+  t={kcal:Math.round(t.kcal),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f)};
+  // REQ-266: `partial` cuenta comidas registradas solo con calorías (macros incompletos).
+  return {t,doneMeals,totMeals,target:day.target,partial};
 }
 
 /* ---------- ESTADO DE NAVEGACIÓN ---------- */
@@ -4239,7 +4251,7 @@ function miniMacroMeter(label,v,g,fillClass,key){
   </div>`;
 }
 function miniMacroDash(ds){
-  const {t,target,doneMeals,totMeals}=dayTotals(ds);
+  const {t,target,doneMeals,totMeals,partial}=dayTotals(ds);
   const isToday=ds===todayStr();
   const rem=Math.max(0,target.kcal-t.kcal);
   const protColor=paceClass(t.p,target.p,isToday);
@@ -4257,10 +4269,11 @@ function miniMacroDash(ds){
       ${miniMacroMeter("Carbohidratos",t.c,target.c,"fill-carb","c")}
       ${miniMacroMeter("Grasas",t.f,target.f,"fill-fat","f")}
     </div>
+    ${partialMacrosNote(partial)}
   </div>`;
 }
 function heroDash(ds,opts){
-  const {t,target,doneMeals,totMeals}=dayTotals(ds);
+  const {t,target,doneMeals,totMeals,partial}=dayTotals(ds);
   if(opts&&opts.compact){
     return miniMacroDash(ds);
   }
@@ -4285,6 +4298,7 @@ function heroDash(ds,opts){
         <span class="muted small"><b style="color:var(--txt)">${t.kcal}</b> / ${target.kcal} kcal · <b style="color:var(--txt)">${doneMeals}/${totMeals}</b> comidas</span>
         <span class="muted small">${rem>0?rem+" restantes":"meta alcanzada"}</span>
       </div>
+      ${partialMacrosNote(partial)}
     </div>
   </div>`;
 }
@@ -6418,7 +6432,7 @@ function mealCard(ds,b,order){
         <div class="slot">${b.slot}</div>
         ${mealHasContent(v)
           ?`<div class="name">${v.name?esc(v.name):'<span class="muted">Comida sin nombre</span>'}</div>
-        <div class="nums"><b>${v.kcal}</b> kcal · P <b>${v.p}</b> · C <b>${v.c}</b> · G <b>${v.f}</b> g</div>`
+        ${mealNumsHtml(v)}`
           // REQ-195: un hueco vacío no muestra "0 kcal · P 0 · C 0 · G 0 g"
           :`<div class="name muted">Sin asignar</div>
         <div class="meal-empty-hint">Prepara tu día o toca «Otra opción».</div>`}
@@ -6444,6 +6458,16 @@ function toggleRecipe(btn){
   const open=r.classList.toggle("open");
   btn.textContent=open?"Ocultar receta":"Ver receta";
 }
+// REQ-266: kcal y macros redondeados para mostrar; solo calorías no aparenta macros en cero.
+function mealNumsHtml(v){
+  const r=x=>Math.round(+x||0);
+  return v&&v.macrosUnknown
+    ?`<div class="nums"><b>${r(v.kcal)}</b> kcal · <span class="muted">macros no informados</span></div>`
+    :`<div class="nums"><b>${r(v.kcal)}</b> kcal · P <b>${r(v.p)}</b> · C <b>${r(v.c)}</b> · G <b>${r(v.f)}</b> g</div>`;
+}
+function partialMacrosNote(partial){
+  return partial?`<div class="muted small partial-macros">Macros parciales: ${partial===1?"1 comida registrada":partial+" comidas registradas"} solo con calorías.</div>`:"";
+}
 function extraCard(ds,e,i,order){
   const key=order&&order.key||("extra:idx:"+i);
   const reorderHtml=order?reorderControlsHtml(ds,key,order.canUp,order.canDown):"";
@@ -6453,7 +6477,7 @@ function extraCard(ds,e,i,order){
       <div>
         <div class="slot">Extra</div>
         <div class="name">${esc(e.name)}</div>
-        <div class="nums"><b>${e.kcal}</b> kcal · P <b>${e.p}</b> · C <b>${e.c}</b> · G <b>${e.f}</b> g</div>
+        ${mealNumsHtml(e)}
       </div>
     </div>
     <div class="meal-actions">
@@ -9554,7 +9578,7 @@ function openEditor(kind,ds,id){
   ds=ds||current;
   let pre={name:"",kcal:"",p:"",c:"",f:""};
   let title="Agregar comida / snack";
-  if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f};title="Editar — "+base.slot;}
+  if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,macrosUnknown:v.macrosUnknown};title="Editar — "+base.slot;}
   // REQ-229: el nombre precargado de una comida del plan es lo planeado, no lo que comió.
   window._editor={kind,ds,id,extraIdx:null,planName:kind==="meal"?String(pre.name||""):""};
   editorSheet(title,pre);
@@ -9639,8 +9663,42 @@ async function toggleQuickPickFavorite(i){
 }
 function setEditorValues(v){
   $("#f_name").value=v.name;
-  [["kcal","f_kcal"],["p","f_p"],["c","f_c"],["f","f_f"]].forEach(([k,id])=>{$("#"+id).value=Math.round(v[k]||0);});
+  setKcalOnlyMode(!!v.macrosUnknown);
+  [["kcal","f_kcal"],["p","f_p"],["c","f_c"],["f","f_f"]].forEach(([k,id])=>{$("#"+id).value=v.macrosUnknown&&k!=="kcal"?"":formatEditorNumber(v[k]);});
+  clearEditorErrors();
 }
+// REQ-266: el editor muestra hasta una décima con coma; un campo vacío sigue vacío.
+function formatEditorNumber(n){
+  if(n===""||n==null||!Number.isFinite(Number(n)))return "";
+  return String(roundTenth(n)).replace(".",",");
+}
+// REQ-266: "Solo conozco las calorías" deja los macros como desconocidos, no como cero.
+function setKcalOnlyMode(on){
+  const box=$("#f_kcalOnly");if(box)box.checked=!!on;
+  ["f_p","f_c","f_f"].forEach(id=>{
+    const el=$("#"+id);if(!el)return;
+    el.disabled=!!on;
+    if(on){el.value="";el.placeholder="—";el.removeAttribute("aria-invalid");}else el.placeholder="";
+  });
+  const errs=window._editor&&window._editor.errors;
+  if(on&&errs){["p","c","f"].forEach(k=>delete errs[k]);renderEditorErrors(errs);}
+}
+function editorMode(){const box=$("#f_kcalOnly");return box&&box.checked?"kcal_only":"full";}
+const EDITOR_FIELD_IDS={name:"f_name",kcal:"f_kcal",p:"f_p",c:"f_c",f:"f_f"};
+function renderEditorErrors(errors){
+  const box=$("#f_errors");
+  Object.entries(EDITOR_FIELD_IDS).forEach(([k,id])=>{
+    const el=$("#"+id);if(!el)return;
+    if(errors&&errors[k]){el.setAttribute("aria-invalid","true");el.setAttribute("aria-describedby","f_errors");}
+    else{el.removeAttribute("aria-invalid");el.removeAttribute("aria-describedby");}
+  });
+  if(!box)return;
+  const labels={name:"Descripción",kcal:"kcal",p:"Proteína",c:"Carbohidratos",f:"Grasa"};
+  const list=Object.keys(EDITOR_FIELD_IDS).filter(k=>errors&&errors[k]);
+  box.innerHTML=list.length?`<ul>${list.map(k=>`<li><b>${labels[k]}:</b> ${esc(errors[k])}</li>`).join("")}</ul>`:"";
+  box.hidden=!list.length;
+}
+function clearEditorErrors(){if(window._editor)window._editor.errors=null;renderEditorErrors(null);}
 function applyQuickPick(i){
   const qp=window._qp,item=qp&&qp.items&&qp.items[i];if(!item)return;
   qp.base=mealMacrosEntry(item);qp.portion=1;
@@ -9655,14 +9713,15 @@ function setQuickPickPortion(factor){
   const qp=window._qp;if(!qp||!qp.base)return;
   qp.portion=factor;
   const b=qp.base;
-  setEditorValues({name:b.name,kcal:b.kcal*factor,p:b.p*factor,c:b.c*factor,f:b.f*factor});
+  setEditorValues({name:b.name,kcal:b.kcal*factor,p:b.p*factor,c:b.c*factor,f:b.f*factor,macrosUnknown:b.macrosUnknown});
   renderPortionChips();
 }
 function addFoodToEditor(i){
   const qp=window._qp,ing=qp&&qp.items&&qp.items[i];if(!ing)return;
   const grams=Math.round(Number($("#qpGrams"+i).value)||0);
   if(grams<=0||grams>2000){toast("Indica los gramos (1–2000)");return;}
-  const k=grams/100,cur=readEditor();
+  const k=grams/100,raw=readEditor(),num=x=>{const r=parseNutrientInput(x);return r.ok?r.value:0;};
+  const cur={name:raw.name,kcal:num(raw.kcal),p:num(raw.p),c:num(raw.c),f:num(raw.f)};
   const part=`${ing.name} ${grams} g`;
   // Sumar: varios alimentos sueltos forman una comida.
   setEditorValues({
@@ -9696,11 +9755,13 @@ function editorSheet(title,pre){
       <button class="mic" id="micBtn" onclick="toggleMic()" title="${aiOn?'Dictar':'El dictado no está disponible ahora'}">🎤</button></div>
     </div>
     <div class="grid4">
-      <div class="field"><label for="f_kcal">kcal</label><input id="f_kcal" type="number" inputmode="numeric" value="${pre.kcal}"></div>
-      <div class="field"><label for="f_p">Prot g</label><input id="f_p" type="number" inputmode="numeric" value="${pre.p}"></div>
-      <div class="field"><label for="f_c">Carb g</label><input id="f_c" type="number" inputmode="numeric" value="${pre.c}"></div>
-      <div class="field"><label for="f_f">Grasa g</label><input id="f_f" type="number" inputmode="numeric" value="${pre.f}"></div>
+      <div class="field"><label for="f_kcal">kcal</label><input id="f_kcal" type="text" inputmode="decimal" autocomplete="off" value="${formatEditorNumber(pre.kcal)}"></div>
+      <div class="field"><label for="f_p">Prot g</label><input id="f_p" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.p)}"></div>
+      <div class="field"><label for="f_c">Carb g</label><input id="f_c" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.c)}"></div>
+      <div class="field"><label for="f_f">Grasa g</label><input id="f_f" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.f)}"></div>
     </div>
+    <label class="qp-save-fav"><input type="checkbox" id="f_kcalOnly" onchange="setKcalOnlyMode(this.checked)"> Solo conozco las calorías</label>
+    <div id="f_errors" class="field-errors" role="alert" hidden></div>
     ${aiOn?`<div class="row" style="gap:8px">
       <button class="btn" style="flex:1" onclick="aiEstimate()">✨ Estimar macros</button>
       <button class="btn" style="flex:1" onclick="pickMealPhoto()">📷 Estimar con foto</button>
@@ -9710,9 +9771,11 @@ function editorSheet(title,pre){
     <div id="aiOut"></div>
     <label class="qp-save-fav"><input type="checkbox" id="f_fav" ${pre.name&&isSavedMeal(pre.name)?"checked disabled":""}> Guardar en favoritas</label>
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
+  if(pre.macrosUnknown)setKcalOnlyMode(true);
   renderQuickPicks();
 }
-function readEditor(){return{name:$("#f_name").value.trim(),kcal:+$("#f_kcal").value||0,p:+$("#f_p").value||0,c:+$("#f_c").value||0,f:+$("#f_f").value||0};}
+// REQ-266: lee el texto tal cual; validateMealValues decide (vacío ≠ 0, sin negativos).
+function readEditor(){return{name:$("#f_name").value.trim(),kcal:$("#f_kcal").value,p:$("#f_p").value,c:$("#f_c").value,f:$("#f_f").value};}
 // Porción con la que se guarda: la elegida sobre una reciente/favorita, o la que ya tenía lo editado.
 function editorPortion(v,prev){
   const qp=window._qp,same=x=>x&&catalogSlug(x.name)===catalogSlug(v.name);
@@ -9720,15 +9783,24 @@ function editorPortion(v,prev){
   return same(prev)&&+prev.portion>0?+prev.portion:1;
 }
 function saveEditor(){
-  const e=window._editor;const v=readEditor();
-  if(!v.name){toast("Pon una descripción");return;}
+  const e=window._editor;if(!e||e.saving)return;
+  // REQ-266: validar antes de tocar el día, las favoritas o la cola; un error conserva el formulario.
+  const check=validateMealValues(readEditor(),{mode:editorMode()});
+  if(!check.ok){
+    e.errors=check.errors;renderEditorErrors(check.errors);
+    const first=Object.keys(EDITOR_FIELD_IDS).find(k=>check.errors[k]);
+    const el=first&&$("#"+EDITOR_FIELD_IDS[first]);if(el)el.focus();
+    return;
+  }
+  e.saving=true;
+  const v=check.value;
   const prev=e.kind==="meal"?mealState(e.ds,e.id).ovr:e.kind==="extra"&&e.extraIdx!=null?dayState(e.ds).extras[e.extraIdx]:null;
   const portion=editorPortion(v,prev);
   if(portion!==1)v.portion=portion;
   const fav=$("#f_fav");
   if(fav&&fav.checked&&!fav.disabled&&!isSavedMeal(v.name))toggleSavedMeal(perPortion(v));
-  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},portion!==1?{portion}:{});}
-  else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null){d.extras[e.extraIdx]=Object.assign(d.extras[e.extraIdx],v);if(portion===1)delete d.extras[e.extraIdx].portion;}else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
+  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},portion!==1?{portion}:{},v.macrosUnknown?{macrosUnknown:true}:{});}
+  else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null){const x=Object.assign(d.extras[e.extraIdx],v);if(portion===1)delete x.portion;if(!v.macrosUnknown)delete x.macrosUnknown;}else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");
 }
 
@@ -10641,6 +10713,8 @@ function renderPhotoEstimateError(e){
 // "Aplicado: …" para que se vea qué cambió aunque se parezca a lo anterior.
 function applyEstimatedMacros(j){
   const vals={f_kcal:Math.round(+j.kcal||0),f_p:Math.round(+j.proteina_g||0),f_c:Math.round(+j.carbohidratos_g||0),f_f:Math.round(+j.grasa_g||0)};
+  // REQ-266: una estimación trae los cuatro valores: sale del modo solo calorías.
+  setKcalOnlyMode(false);clearEditorErrors();
   Object.entries(vals).forEach(([id,v])=>{
     const el=$("#"+id);if(!el)return;
     el.value=v;el.classList.remove("field-updated");void el.offsetWidth;el.classList.add("field-updated");

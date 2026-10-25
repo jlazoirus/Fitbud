@@ -1830,7 +1830,7 @@ Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; 
 
 ## REQ-266 - Registro: validar valores nutricionales y distinguir desconocidos de ceros
 
-**Estado: pendiente.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Probe `negative-manual`; `readEditor()` y `saveEditor()` solo validan nombre.
@@ -1855,6 +1855,11 @@ Negativo/vacío inválido no escribe día/perfil/cola; cero explícito se admite
 
 ### Verificación sugerida
 Pruebas puras de parseo y E2E de negativos/vacíos/decimales/cero/solo calorías/doble envío.
+
+### Implementación
+- Nuevo módulo puro `js/meal-log.js` (shell PWA): `parseNutrientInput` (coma/punto, vacío ≠ 0, sin negativos, exponentes ni infinitos) y `validateMealValues` (modo completo con cuatro campos o `kcal_only`; límites 5000 kcal, 500 g P/G, 1000 g C; una décima). No exige 4/4/9.
+- Editor: campos de texto `inputmode="decimal"`, casilla «Solo conozco las calorías», errores por campo (`#f_errors`, `aria-invalid`, foco). `saveEditor` valida antes de tocar día/favoritas/cola y tiene guardia de doble envío. `macrosUnknown:true` se conserva en `mealMacrosEntry`/`mealValue`; tarjetas muestran «macros no informados» y `dayTotals` redondea al final y cuenta `partial` («Macros parciales»). Registros antiguos no se reinterpretan.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/registro-valores.spec.js`.
 
 ## REQ-267 - Registro: conservar procedencia y snapshot nutricional
 

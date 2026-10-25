@@ -60,7 +60,7 @@ if (modifiedLines.length) {
 
 // ── Sintaxis de módulos JS ────────────────────────────────────────────────────
 console.log("\n[ Sintaxis de módulos JS ]");
-for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
+for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "js/meal-log.js", "domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
   if (existsSync(join(ROOT, file))) {
     run(`node --check ${file}`, `node --check "${join(ROOT, file)}"`);
   }
@@ -69,6 +69,7 @@ for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "domain-co
 // ── Validadores de dominio ───────────────────────────────────────────────────
 console.log("\n[ Validadores de dominio ]");
 run("test-nutrition-pure.mjs", "node scripts/test-nutrition-pure.mjs");
+run("test-meal-log.mjs", "node scripts/test-meal-log.mjs");
 run("validate-contracts.mjs", "node scripts/validate-contracts.mjs");
 run("validate-exercises.mjs", "node scripts/validate-exercises.mjs");
 run("validate-workout-player.mjs", "node scripts/validate-workout-player.mjs");

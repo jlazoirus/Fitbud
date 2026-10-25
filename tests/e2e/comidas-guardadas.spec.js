@@ -24,6 +24,8 @@ async function openAddMeal(page) {
   return page.locator("#overlay");
 }
 
+const tenth = (n) => String(Math.round(n * 10) / 10).replace(".", ",");
+
 test.describe("Comidas guardadas", () => {
   test("una comida de ayer se reutiliza desde Recientes, con porción, y se guarda en favoritas", async ({ page, context }) => {
     const { calls } = await installMocks(context, { tables: { day_log: { rows: [yesterdayWithSnack()] } } });
@@ -121,14 +123,14 @@ test.describe("Comidas guardadas", () => {
     await overlay.locator("#qpGrams0").fill("60");
     await overlay.getByRole("button", { name: "Añadir" }).first().click();
     await expect(overlay.locator("#f_name")).toHaveValue("Avena 60 g");
-    await expect(overlay.locator("#f_kcal")).toHaveValue(String(Math.round(389 * 0.6)));
-    await expect(overlay.locator("#f_p")).toHaveValue(String(Math.round(16.9 * 0.6)));
+    await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(389 * 0.6)); // REQ-266: una décima, con coma
+    await expect(overlay.locator("#f_p")).toHaveValue(tenth(16.9 * 0.6));
 
     await overlay.locator("#qpSearch").fill("platano"); // sin tilde también encuentra "Plátano"
     await overlay.locator("#qpGrams0").fill("120");
     await overlay.getByRole("button", { name: "Añadir" }).first().click();
     await expect(overlay.locator("#f_name")).toHaveValue("Avena 60 g + Plátano 120 g");
-    await expect(overlay.locator("#f_kcal")).toHaveValue(String(Math.round(389 * 0.6 + 89 * 1.2)));
+    await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(389 * 0.6 + 89 * 1.2));
     await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
 
     const today = await page.evaluate(() => dayState(todayStr()).extras.map((e) => e.name));
