@@ -16,6 +16,9 @@ export default defineConfig({
   workers: 1, // la app usa localStorage compartido por origen; en serie es determinista
   reporter: [["list"]],
   use: {
+    launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+      ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH }
+      : {},
     baseURL: "http://127.0.0.1:8923",
     viewport: { width: 390, height: 844 }, // móvil: el formato real de la PWA
     locale: "es-PE",

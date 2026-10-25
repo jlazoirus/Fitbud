@@ -1,5 +1,6 @@
 // Proxy serverless del coach (Vercel).
 // La credencial del proveedor y la service role viven exclusivamente aqui.
+import { createHash } from "node:crypto";
 const ALLOWED_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-sonnet-5"];
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const PROMPT_VERSION = "v1";
@@ -29,8 +30,6 @@ const STRUCTURED_OUTPUT_ACTIONS = new Set(["diet_day", "diet_week", "meal_option
 // el cliente la reduce a ~1024 px, asi que 3 MB de base64 es holgado y deja la
 // peticion bajo el limite de cuerpo de Vercel (4.5 MB).
 const IMAGE_ACTIONS = new Set(["meal_estimate"]);
-// REQ-268: acciones cuyo resultado describe algo concreto del usuario; sin
-// generacion compatible se informa el fallo en vez de servir una plantilla.
 const NO_TEMPLATE_ACTIONS = new Set(["meal_estimate"]);
 const IMAGE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BASE64 = 3_000_000;
@@ -270,6 +269,45 @@ function imageInput(body, action) {
     throw new Error("Imagen invalida o demasiado grande.");
   }
   return { mediaType, data };
+}
+
+// REQ-278: una estimación solo se reutiliza para la misma entrada real y
+// política. El namespace nuevo excluye resultados/plantillas del contrato viejo.
+function estimateContextKey(body, quota, image) {
+  const digest = createHash("sha256").update(JSON.stringify([
+    "meal-estimate-v2", PROMPT_VERSION, resolveModel(body, quota.action).model,
+    quota.contextKey, String(body.userText || ""), String(body.system || ""),
+    image ? [image.mediaType, createHash("sha256").update(image.data).digest("hex")] : null,
+  ])).digest("hex");
+  return "estimate-v2-" + digest;
+}
+
+function estimateUnavailable(res) {
+  return res.status(422).json({
+    code: "no_compatible_result",
+    error: "No pudimos estimar esta comida ahora. Inténtalo de nuevo o ingresa los valores que conoces.",
+  });
+}
+
+function coachResult(quota, text, source) {
+  return Object.assign({ text }, quota.action === "meal_estimate"
+    ? { origin: source === "generated" ? "fresh" : "reused", ...(source === "reused" ? { reused: true } : {}) } : {});
+}
+
+async function compatibleStoredEstimate(e, userId, quota, part) {
+  if (!part || !/^[1-9]\d*$/.test(String(part.result_id || ""))
+      || !validateCoachOutput(quota.action, part.response_text, quota.validation)) return false;
+  try {
+    const query = new URLSearchParams({
+      id: "eq." + part.result_id, user_id: "eq." + userId, action: "eq.meal_estimate",
+      context_key: "eq." + quota.contextKey, status: "eq.active",
+      select: "id,response_text", limit: "1",
+    });
+    const response = await fetch(e.url + "/rest/v1/coach_option_pool?" + query, { headers: serviceHeaders(e) });
+    const rows = await responseJson(response);
+    return response.ok && Array.isArray(rows) && rows.some(row =>
+      String(row.id) === String(part.result_id) && row.response_text === part.response_text);
+  } catch (_) { return false; }
 }
 
 function parseJsonText(text) {
@@ -629,7 +667,6 @@ function validateCoachOutput(action, text, validation) {
   if (action === "diet_day" || action === "diet_week") return validateDietDay(data, validation);
   if (action === "meal_option") return validateMealOptions(data, validation);
   if (action === "meal_estimate") {
-    // REQ-268: macros finitos y no negativos; un negativo no es una estimacion.
     if (![data.kcal, data.proteina_g, data.carbohidratos_g, data.grasa_g].every(v => finiteNumber(v) && Number(v) >= 0)) return false;
     if (data.preguntas == null) return true;
     // REQ-246: el schema no puede topar las preguntas y el cliente muestra como
@@ -869,7 +906,11 @@ export default async function handler(req, res) {
   try {
     body = bodyObject(req);
     quota = quotaInput(body);
-    imageInput(body, quota.action);
+    const image = imageInput(body, quota.action);
+    if (quota.action === "meal_estimate") {
+      quota.contextKey = estimateContextKey(body, quota, image);
+      quota.fallbackText = ""; // Nunca aceptar nutrientes de una plantilla del cliente.
+    }
   } catch (error) {
     res.status(400).json({ error: String((error && error.message) || error) });
     return;
@@ -911,7 +952,11 @@ export default async function handler(req, res) {
     if (!part) throw new Error("No se pudo registrar la parte solicitada.");
     if (!part.claimed) {
       if (part.part_status === "completed" && part.response_text) {
-        res.status(200).json({ text: part.response_text });
+        if (quota.action === "meal_estimate" && !await compatibleStoredEstimate(e, auth.user.id, quota, part)) {
+          estimateUnavailable(res);
+          return;
+        }
+        res.status(200).json(coachResult(quota, part.response_text, "reused"));
         return;
       }
       if (part.part_status === "failed") {
@@ -920,7 +965,11 @@ export default async function handler(req, res) {
       }
       part = await waitForPart(e, reservation.usage_id, quota.partKey);
       if (part && part.part_status === "completed" && part.response_text) {
-        res.status(200).json({ text: part.response_text });
+        if (quota.action === "meal_estimate" && !await compatibleStoredEstimate(e, auth.user.id, quota, part)) {
+          estimateUnavailable(res);
+          return;
+        }
+        res.status(200).json(coachResult(quota, part.response_text, "reused"));
         return;
       }
       res.status(409).json({ error: "La misma accion sigue en proceso." });
@@ -928,10 +977,7 @@ export default async function handler(req, res) {
     }
 
     if (reservation.mode === "reuse") {
-      // REQ-268: una estimacion de comida solo se reutiliza si salio de una
-      // generacion real del mismo contexto; una plantilla generica nunca vale.
-      const templateAllowed = !NO_TEMPLATE_ACTIONS.has(quota.action);
-      if (templateAllowed && !validateCoachOutput(quota.action, quota.fallbackText, quota.validation)) {
+      if (!NO_TEMPLATE_ACTIONS.has(quota.action) && !validateCoachOutput(quota.action, quota.fallbackText, quota.validation)) {
         await failPart(e, reservation.usage_id, quota.partKey, "invalid_template");
         res.status(422).json({ error: "No existe una alternativa compatible para esta configuracion." });
         return;
@@ -942,16 +988,21 @@ export default async function handler(req, res) {
           p_usage_id: reservation.usage_id,
           p_part_key: quota.partKey,
           p_context_key: quota.contextKey,
-          p_fallback_text: templateAllowed ? quota.fallbackText : "",
+          p_fallback_text: quota.fallbackText,
           p_metadata: { policy_enabled: reservation.policy_enabled !== false },
         }));
       } catch (error) {
-        if (templateAllowed || !/compatible_fallback_required/.test(String(error && error.message))) throw error;
-        selected = null;
-      }
-      if (!templateAllowed && (!selected || selected.selected_origin === "template")) {
+        if (quota.action !== "meal_estimate" || !/compatible_fallback_required/.test(String(error.message))) throw error;
         await failPart(e, reservation.usage_id, quota.partKey, "no_compatible_result");
-        res.status(422).json({ error: "No hay una estimacion compatible para esta comida.", code: "no_compatible_result" });
+        estimateUnavailable(res);
+        return;
+      }
+      if (quota.action === "meal_estimate" && (selected?.selected_origin !== "user_pool"
+          || !await compatibleStoredEstimate(e, auth.user.id, quota, {
+            result_id: selected.selected_result_id, response_text: selected.selected_text,
+          }))) {
+        await failPart(e, reservation.usage_id, quota.partKey, "no_compatible_result");
+        estimateUnavailable(res);
         return;
       }
       if (!selected || !selected.selected_text || !validateCoachOutput(quota.action, selected.selected_text, quota.validation)) {
@@ -1017,7 +1068,7 @@ export default async function handler(req, res) {
       p_estimated_cost: estimateCostUsd(generated.model, generated.inputTokens, generated.outputTokens),
       p_prompt_version: PROMPT_VERSION,
     }));
-    const response = { text: generated.text };
+    const response = coachResult(quota, generated.text, "generated");
     if (auth.profile.is_admin) {
       response.adminDiagnostic = {
         origin: "fresh",
