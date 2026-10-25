@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 272" role="img" aria-labelledby="title desc">
+  <title id="title">Flexión arquero vista desde arriba</title>
+  <desc id="desc">Vista superior. En el inicio las manos están muy separadas y el cuerpo alineado. En la segunda posición el pecho se desplaza hacia una mano: ese codo se flexiona y el brazo contrario permanece extendido. No se salta ni se despegan las manos.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1l7 4-7 4" fill="none" stroke="#c6f36a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>
+    .limb,.torso,.far,.prop,.floor,.arrow,.band{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .limb{stroke:#e4ebdf;stroke-width:9}.torso{stroke:#e4ebdf;stroke-width:13}
+    .far{stroke:#738372;stroke-width:8}.head{fill:#e4ebdf}.joint{fill:#c6f36a}
+    .prop{stroke:#9eaf9a;stroke-width:5}.floor{stroke:#46513f;stroke-width:2}
+    .arrow{stroke:#c6f36a;stroke-width:2.5}.band{stroke:#c6f36a;stroke-width:4}
+    .label{font:600 14px system-ui,sans-serif;fill:#c6f36a}.cue{font:14px system-ui,sans-serif;fill:#b9c5b3}
+  </style>
+  <rect width="640" height="272" fill="#171b16"/>
+  <path d="M320 48v181" stroke="#36402f"/>
+  <g transform="translate(0 0)"><text class="label" x="28" y="31">1 · Manos separadas</text><path class="far" d="M160 175L143 220"/><path class="torso" d="M141 111H179"/><path class="limb" d="M141 111L101 111 58 111"/><path class="limb" d="M179 111L220 111 263 111"/><path class="torso" d="M160 111L160 175"/><path class="limb" d="M160 175L179 220"/><circle class="head" cx="160" cy="83" r="11"/><path class="limb" d="M160 96v15"/><circle class="joint" cx="58" cy="111" r="4"/><circle class="joint" cx="263" cy="111" r="4"/></g>
+  <g transform="translate(320 0)"><text class="label" x="28" y="31">2 · Baja hacia una mano</text><path class="far" d="M145 175L143 220"/><path class="limb" d="M113 111L79 142 58 111"/><path class="limb" d="M133 111L198 111 263 111"/><path class="torso" d="M123 115L145 175"/><path class="limb" d="M145 175L179 220"/><circle class="head" cx="113" cy="83" r="11"/><path class="limb" d="M114 96L123 115"/><circle class="joint" cx="58" cy="111" r="4"/><circle class="joint" cx="263" cy="111" r="4"/><path class="arrow" d="M160 70h-30" marker-end="url(#arrow)"/></g>
+  <text class="cue" x="320" y="254" text-anchor="middle">Vista superior · Un codo flexiona y el otro brazo queda extendido</text>
+</svg>

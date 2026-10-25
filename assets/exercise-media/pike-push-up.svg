@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 272" role="img" aria-labelledby="title desc">
+  <title id="title">Pike push-up: inicio y descenso con los pies en el suelo</title>
+  <desc id="desc">Vista lateral en dos posiciones. Las manos y las puntas de los pies permanecen en el suelo. La cadera está elevada formando una V invertida. Los codos se flexionan y la cabeza baja entre las manos, sin ponerse de cabeza ni apoyar los pies en una pared.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1l7 4-7 4" fill="none" stroke="#c6f36a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>
+    .limb,.torso,.far,.prop,.floor,.arrow,.band{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .limb{stroke:#e4ebdf;stroke-width:9}.torso{stroke:#e4ebdf;stroke-width:13}
+    .far{stroke:#738372;stroke-width:8}.head{fill:#e4ebdf}.joint{fill:#c6f36a}
+    .prop{stroke:#9eaf9a;stroke-width:5}.floor{stroke:#46513f;stroke-width:2}
+    .arrow{stroke:#c6f36a;stroke-width:2.5}.band{stroke:#c6f36a;stroke-width:4}
+    .label{font:600 14px system-ui,sans-serif;fill:#c6f36a}.cue{font:14px system-ui,sans-serif;fill:#b9c5b3}
+  </style>
+  <rect width="640" height="272" fill="#171b16"/>
+  <path d="M320 48v181" stroke="#36402f"/>
+  <g transform="translate(0 0)"><text class="label" x="28" y="31">1 · Cadera elevada</text><path class="floor" d="M28 224H292"/><path class="far" d="M188 86L223 157 259 224"/><path class="torso" d="M116 140L188 86"/><path class="limb" d="M116 140L96 181 75 224"/><path class="limb" d="M188 86L216 153 251 224"/><path class="limb" d="M69 224h18"/><path class="limb" d="M247 224h18"/><path class="limb" d="M116 140L107 154"/><circle class="head" cx="103" cy="163" r="11"/><circle class="joint" cx="188" cy="86" r="4"/></g>
+  <g transform="translate(320 0)"><text class="label" x="28" y="31">2 · Acerca la cabeza al suelo</text><path class="floor" d="M28 224H292"/><path class="far" d="M184 94L222 157 259 224"/><path class="torso" d="M108 182L184 94"/><path class="limb" d="M108 182L60 171 75 224"/><path class="limb" d="M184 94L215 154 251 224"/><path class="limb" d="M69 224h18"/><path class="limb" d="M247 224h18"/><path class="limb" d="M108 182L106 191"/><circle class="head" cx="105" cy="204" r="11"/><circle class="joint" cx="184" cy="94" r="4"/><path class="arrow" d="M137 175v37" marker-end="url(#arrow)"/></g>
+  <text class="cue" x="320" y="254" text-anchor="middle">Pies apoyados · Cadera alta · Descenso controlado</text>
+</svg>

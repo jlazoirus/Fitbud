@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import vm from "node:vm";
 import {fileURLToPath} from "node:url";
+import mediaMap from "./free-exercise-db-map.mjs";
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 const context={globalThis:{}};
@@ -17,10 +18,12 @@ const required=[
 ];
 const errors=[];
 const ids=new Set();
+const validLevels=new Set(["beginner","intermediate","advanced"]);
 
 for(const exercise of catalog){
   if(ids.has(exercise.slug))errors.push(`Slug duplicado: ${exercise.slug}`);
   ids.add(exercise.slug);
+  if(!validLevels.has(exercise.level))errors.push(`${exercise.slug}: nivel inválido o sin revisar`);
   for(const key of required){
     const value=exercise[key];
     if(value==null||value===""||(Array.isArray(value)&&!value.length))errors.push(`${exercise.slug}: falta ${key}`);
@@ -100,12 +103,47 @@ if(search("").some(slug=>!["gym","strength","bodyweight"].includes(bySlug.get(sl
 for(const exercise of catalog)if(!Array.isArray(exercise.substitute_slugs))errors.push(`${exercise.slug}: substitute_slugs no es lista`);
 
 const sql=fs.readFileSync(path.join(root,"supabase","exercises.sql"),"utf8");
+const levelSql=fs.readFileSync(path.join(root,"supabase","exercise-levels.sql"),"utf8");
+const levelDoc=fs.readFileSync(path.join(root,"docs","exercise-levels.md"),"utf8");
+const reviewedLevels=context.globalThis.FITBUD_REVIEWED_EXERCISE_LEVELS;
 for(const slug of ids){
   if(!sql.includes(`'${slug}'`))errors.push(`SQL no incluye ${slug}`);
+  const ex=bySlug.get(slug);
+  const row=sql.split("\n").find(line=>line.trim().startsWith(`'${slug}',`));
+  if(!row||!row.endsWith(`'${ex.level}',`))errors.push(`${slug}: nivel SQL base difiere del catálogo`);
+  if(!levelSql.includes(`('${slug}', '${ex.level}')`))errors.push(`${slug}: falta nivel revisado en SQL incremental`);
+  if(!levelDoc.includes(`\`${slug}\``))errors.push(`${slug}: falta justificación del nivel revisado`);
+}
+for(const [slug,level] of Object.entries(reviewedLevels)){
+  if(!validLevels.has(level))errors.push(`${slug}: revisión con nivel inválido`);
+  if(!levelSql.includes(`('${slug}', '${level}')`))errors.push(`${slug}: SQL incremental no coincide con revisión`);
+  if(!levelDoc.includes(`\`${slug}\``))errors.push(`${slug}: falta justificación del nivel revisado`);
+  if(context.globalThis.FITBUD_EXERCISE_CONTENT.normalize({slug,level:"beginner"}).level!==level)errors.push(`${slug}: no corrige nivel remoto antiguo`);
+}
+
+// REQ-264: el contenido revisado corrige filas antiguas sin mutar la BD ni
+// convertir ejercicios propios sin nivel en ejercicios para principiantes.
+const normalize=context.globalThis.FITBUD_EXERCISE_CONTENT.normalize;
+const stale={...bySlug.get("pike-push-up"),level:"beginner",active:false,
+  media_type:"image_sequence",media_url:"https://example.test/handstand.gif",
+  frames:["handstand-0.jpg","handstand-1.jpg"],poster_url:"handstand.jpg"};
+const original=JSON.stringify(stale),reviewed=normalize(stale);
+if(reviewed.level!=="intermediate"||reviewed.active!==false)errors.push("Pike: no aplica nivel revisado o pisa estado administrativo");
+if(JSON.stringify(stale)!==original)errors.push("La revisión muta la fila original");
+if(reviewed.media_url!=="assets/exercise-media/pike-push-up.svg"||reviewed.frames.length)errors.push("Pike: conserva la demo antigua de handstand");
+const custom={slug:"custom-exercise",name:"Ejercicio propio",level:"advanced",active:false};
+if(JSON.stringify(normalize(custom))!==JSON.stringify(custom))errors.push("La revisión modifica un ejercicio propio");
+if(normalize({slug:"unknown"}).level)errors.push("Ejercicio sin revisar hereda nivel por defecto");
+for(const ex of catalog.filter(ex=>/assets\/exercise-media\/.+\.svg$/.test(ex.media_url||""))){
+  if(mediaMap[ex.slug]?.id!==null)errors.push(`${ex.slug}: se puede reingerir una demo incorrecta`);
+  const asset=path.join(root,ex.media_url);
+  if(!fs.existsSync(asset)){errors.push(`${ex.slug}: falta demo revisada`);continue;}
+  const svg=fs.readFileSync(asset,"utf8");
+  if(!svg.includes("<title")||!svg.includes("<svg"))errors.push(`${ex.slug}: demo SVG sin título accesible`);
 }
 
 if(errors.length){
   console.error(errors.join("\n"));
   process.exit(1);
 }
-console.log(`Catálogo válido: ${catalog.length} ejercicios y todas las rutinas usan IDs existentes.`);
+console.log(`Catálogo válido: ${catalog.length} fichas, ${Object.keys(reviewedLevels).length} niveles revisados y todas las rutinas usan IDs existentes.`);

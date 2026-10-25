@@ -1927,43 +1927,58 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 
 ## REQ-263 - Fix Progreso: la "Adherencia a comidas" del ciclo activo se diluye con los días futuros
 
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+`progressStats()` acotaba `cycleSummary()` al ciclo completo (incluidos días futuros sin registrar), diluyendo la adherencia real a ~14% con 100% de cumplimiento hasta hoy. Ahora llama `cycleSummary(todayStr())`. ✓ `tests/e2e/progreso.spec.js`.
+
+## REQ-264 - Entreno: revisar todos los niveles y corregir demos de variantes distintas
+
+**Estado: implementado.** Revisión de Jonathan (2026-10-24): Pike push-up aparecía como principiante con una parada de manos. Inventario completo: 54 fichas locales y 16 adicionales de producción, 70 ejercicios únicos; criterio y razones en `docs/exercise-levels.md`.
+
+Niveles explícitos y corrección de filas remotas antiguas sin modificar la base; diez demostraciones propias exactas; rutinas automáticas respetan experiencia y los planes pendientes se adaptan al leerlos, preservando ejecuciones/historial. Búsqueda manual muestra el nivel. Sin nivel válido no entra al plan. SQL opcional `supabase/exercise-levels.sql`; ninguna migración de producción ejecutada. Verificación: `scripts/validate-exercises.mjs`, `tests/e2e/exercise-levels.spec.js`, release gate. Detalle en `docs/requirements-history.md`.
+
+## REQ-265 - Fix recordatorios: el cron marca "entrenamiento pendiente" en días de descanso
+
 **Estado: pendiente.**
 
 ### Origen
 
-Auditoría del journey **progreso** (commit previo leído: `ef55f45` REQ-256). Al recorrer Progreso con un ciclo en curso, la tarjeta "Adherencia a comidas" (sección "Tus números") muestra un porcentaje mucho menor que la adherencia real del usuario.
+Auditoría del journey de retención (recordatorios REQ-24 y push de racha REQ-38). El criterio de "descanso" de `checkPending()` en `api/notify.js` no coincide con la forma del dato que escribe `index.html`.
 
 ### Problema
 
-Un usuario que marcó **todas** las comidas de **todos** los días transcurridos del ciclo (adherencia real 100% hasta hoy) ve "14%" en la tarjeta. El número contradice lo que el usuario hizo y es desmotivante justo donde Progreso busca reforzar el hábito. Además contradice el propio criterio de REQ-44 ("10 días registrados + 2 fallidos → ~83%", es decir adherencia acumulada sobre días transcurridos, no sobre el ciclo completo).
+El recordatorio diario de entrenamiento se dispara también en días de **descanso planificado** del split y en días marcados como descanso ("Día marcado como descanso planificado"). Como `notify_training` está activo por defecto (`index.html:8028`), un usuario que entrena 3 días/semana recibe hasta 4 avisos falsos de "Tienes entrenamiento pendiente para hoy" por semana. Contradice el criterio propio de REQ-38 ("solo cuando hay algo pendiente… sin castigar descansos planificados", `docs/requirements-history.md:2030`) y empuja a desactivar notificaciones — daño directo a retención.
 
 ### Causa raíz
 
-`cycleSummary(untilDs)` (`index.html:2636`): sin argumento, `last=END` (`index.html:2638`), así que el bucle `while(ds<=last)` (`index.html:2640`) recorre **todo** el ciclo —incluidos los días futuros— y acumula `plannedMeals+=day.meals.length` (`index.html:2648`) de cada día futuro (`buildDay` siempre devuelve slots, con kcal:0, incluso para días sin registrar). `progressStats()` (`index.html:6516`) llama `cycleSummary()` sin argumento (`index.html:6523`) y muestra `cs.mealAdherence` (`index.html:6524`, `6529`) como la tarjeta del ciclo en curso. El recap de cierre llama `cycleSummary()` cuando `today>=END`, así que ahí el conteo completo es correcto; el bug es solo en la vista en curso.
+`checkPending()` (`api/notify.js:134-137`) decide el descanso solo con `override.type === "rest" || override.type === "missed_converted_rest"`, esperando un objeto. Pero el cliente escribe `workoutOverride` siempre como **string**: `st.workoutOverride="descanso"` (`index.html:7295` y `:9548`) o un id de entreno (`:6524`, `:9530`). `"descanso".type` es `undefined`, así que `isRestDay` es siempre `false` y `trainingPending = !workoutDone`. Además `"missed_converted_rest"` no existe en ningún otro archivo: es una forma que nadie produce. El cron tampoco consulta el plan/split (no lee `plan_versions` ni `plannedWorkoutId`), así que no detecta un descanso planificado sin override.
 
 ### Objetivo
 
-Durante el ciclo activo, la "Adherencia a comidas" debe reflejar el porcentaje de comidas registradas sobre las **planificadas hasta hoy** (días transcurridos), no sobre el ciclo entero.
+Que el recordatorio de entrenamiento NO se envíe en días de descanso (planificados o marcados por el usuario); solo cuando hay una sesión realmente prescrita y sin cerrar.
 
 ### Alcance
 
-1. En `progressStats()`, calcular la adherencia del ciclo en curso acotando el denominador a los días transcurridos (p. ej. `cycleSummary(todayStr())`, que ya soporta `untilDs<END`).
+1. En `checkPending()`, reconocer el descanso con la forma real del dato: `workoutOverride === "descanso"` (string).
+2. Detectar el descanso planificado del split cuando no hay override (replicar `plannedWorkoutId`/schedule con las prefs del usuario, o persistir el tipo de día en `day_log` para que el cron lo lea).
 
 ### Fuera de alcance
 
-- El recap de cierre (`renderPlanRecap`/`cycleSummary()` al terminar): su conteo full-cycle es correcto y no debe cambiar.
-- La racha y demás tarjetas: siguen midiendo lo suyo.
+- Rediseñar `workoutOverride` a objeto; el cliente lo usa como string en todos los flujos.
+- Recordatorio de nutrición (su criterio `mealIds` no depende de esto).
 
 ### Riesgos
 
-- `cycleSummary(untilDs)` también calcula `workouts`, `bestStreak`, `weightChange`: acotar a hoy no los altera (los días futuros aportan 0), pero verificar que ningún otro llamador dependa del conteo full-cycle en curso.
+- Si solo se arregla el string pero no el descanso planificado sin override, persiste el falso positivo mayoritario.
+- Cambiar la firma de `workoutOverride` rompería lectura del cliente; mantener compatibilidad con string.
 
 ### Criterios de aceptación
 
-- Con todas las comidas de los días transcurridos marcadas hechas en un ciclo en curso, la tarjeta muestra ~100% (no 14%).
-- El recap de cierre no cambia su cálculo.
+- En día de descanso (planificado o `workoutOverride==="descanso"`) sin sesión cerrada, `checkPending().training === false`.
+- En día con sesión prescrita y sin cerrar, sigue siendo `true`.
 - `node scripts/release-gate.mjs` pasa.
 
 ### Verificación sugerida
 
-- E2E (reusar `tests/e2e/progreso.spec.js`): sembrar un ciclo con `planStartDate` a −9 días, marcar todas las comidas de START..hoy como hechas y afirmar que la tarjeta "Adherencia a comidas" muestra 100%. Evidencia de la auditoría: con `completePrefs()` (ciclo 10 sem, START hoy−9), `cycleSummary()` devuelve `plannedMeals:210, doneMeals:30, mealAdherence:14` mientras la adherencia real de los 10 días transcurridos es 30/30 = 100%.
+- Fixture de `checkPending()` con cuatro estados: descanso planificado sin override, `workoutOverride:"descanso"`, entreno sin cerrar, entreno cerrado.
+- Repro de esta auditoría: la lógica de `:134-137` sobre `{workoutOverride:"descanso"}` da `pending=true` hoy (debe ser `false`).

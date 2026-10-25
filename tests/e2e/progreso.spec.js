@@ -101,4 +101,38 @@ test.describe("Progreso", () => {
     await expect(firstMeal.locator(".nums")).toHaveCount(0);
     await expect(firstMeal.getByRole("button", { name: /marcar como hecha/ })).toBeDisabled();
   });
+
+  test("REQ-263: la adherencia a comidas del ciclo activo no se diluye con los días futuros", async ({ page, context }) => {
+    await installMocks(context); // completePrefs(): ciclo de 10 semanas, START = hoy-9
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+
+    await gotoApp(page);
+
+    // Marca hechas TODAS las comidas de todos los días transcurridos (START..hoy),
+    // asignándoles contenido (custom) para que mealHasContent() las acepte sin
+    // pasar por el generador del coach: adherencia real = 100% de lo planificado
+    // hasta hoy.
+    await page.evaluate(() => {
+      let ds = START;
+      const today = todayStr();
+      while (ds <= today) {
+        buildDay(ds).meals.forEach((m) => {
+          const ms = mealState(ds, m.id);
+          ms.ovr = { name: "Comida de prueba", kcal: 500, p: 30, c: 50, f: 15 };
+          ms.done = true;
+        });
+        commitDay(ds);
+        ds = addDays(ds, 1);
+      }
+      render();
+    });
+
+    await page.locator("#tabs").getByText("Progreso").click();
+    const adherenceCard = page.locator(".scard", { hasText: "Adherencia a comidas" }).locator(".n");
+    await expect(adherenceCard).toHaveText("100%");
+
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });

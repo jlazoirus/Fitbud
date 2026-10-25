@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 272" role="img" aria-labelledby="title desc">
+  <title id="title">Zancada caminando sin carga</title>
+  <desc id="desc">Vista lateral. La persona da un paso hacia delante y baja hasta flexionar ambas rodillas, sin apoyar la rodilla posterior en el suelo. Se incorpora empujando con el pie delantero y avanza alternando las piernas. No hay mancuernas.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1l7 4-7 4" fill="none" stroke="#c6f36a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>
+    .limb,.torso,.far,.prop,.floor,.arrow,.band{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .limb{stroke:#e4ebdf;stroke-width:9}.torso{stroke:#e4ebdf;stroke-width:13}
+    .far{stroke:#738372;stroke-width:8}.head{fill:#e4ebdf}.joint{fill:#c6f36a}
+    .prop{stroke:#9eaf9a;stroke-width:5}.floor{stroke:#46513f;stroke-width:2}
+    .arrow{stroke:#c6f36a;stroke-width:2.5}.band{stroke:#c6f36a;stroke-width:4}
+    .label{font:600 14px system-ui,sans-serif;fill:#c6f36a}.cue{font:14px system-ui,sans-serif;fill:#b9c5b3}
+  </style>
+  <rect width="640" height="272" fill="#171b16"/>
+  <path d="M320 48v181" stroke="#36402f"/>
+  <g transform="translate(0 0)"><text class="label" x="28" y="31">1 · Da un paso hacia delante</text><path class="floor" d="M28 224H292"/><path class="far" d="M134 144L114 188 93 224"/><path class="torso" d="M134 89L134 144"/><path class="limb" d="M134 144L184 171 222 224"/><path class="limb" d="M217 224h18"/><path class="limb" d="M88 224h18"/><path class="limb" d="M134 98L114 123 123 151"/><circle class="head" cx="134" cy="63" r="11"/><path class="limb" d="M134 76v13"/><circle class="joint" cx="184" cy="171" r="4"/><path class="arrow" d="M205 124h38" marker-end="url(#arrow)"/></g>
+  <g transform="translate(320 0)"><text class="label" x="28" y="31">2 · Baja con control</text><path class="floor" d="M28 224H292"/><path class="far" d="M145 170L119 216 76 224"/><path class="torso" d="M145 116L145 170"/><path class="limb" d="M145 170L211 170 214 224"/><path class="limb" d="M209 224h18"/><path class="limb" d="M71 224h18"/><path class="limb" d="M145 124L123 143 134 171"/><circle class="head" cx="145" cy="90" r="11"/><path class="limb" d="M145 103v13"/><circle class="joint" cx="211" cy="170" r="4"/><path class="arrow" d="M255 140v40" marker-end="url(#arrow)"/></g>
+  <text class="cue" x="320" y="254" text-anchor="middle">Avanza alternando las piernas · Sin carga</text>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 272" role="img" aria-labelledby="title desc">
+  <title id="title">Elevación de gemelos de pie sin máquina</title>
+  <desc id="desc">Vista lateral. La persona permanece erguida con las rodillas suaves. Desde el pie apoyado eleva los talones y queda sobre el antepié. Luego baja con control. No se usa máquina ni carga externa.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1l7 4-7 4" fill="none" stroke="#c6f36a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>
+    .limb,.torso,.far,.prop,.floor,.arrow,.band{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .limb{stroke:#e4ebdf;stroke-width:9}.torso{stroke:#e4ebdf;stroke-width:13}
+    .far{stroke:#738372;stroke-width:8}.head{fill:#e4ebdf}.joint{fill:#c6f36a}
+    .prop{stroke:#9eaf9a;stroke-width:5}.floor{stroke:#46513f;stroke-width:2}
+    .arrow{stroke:#c6f36a;stroke-width:2.5}.band{stroke:#c6f36a;stroke-width:4}
+    .label{font:600 14px system-ui,sans-serif;fill:#c6f36a}.cue{font:14px system-ui,sans-serif;fill:#b9c5b3}
+  </style>
+  <rect width="640" height="272" fill="#171b16"/>
+  <path d="M320 48v181" stroke="#36402f"/>
+  <g transform="translate(0 0)"><text class="label" x="28" y="31">1 · Talones apoyados</text><path class="floor" d="M28 224H292"/><path class="far" d="M157 144L153 183 150 219"/><path class="torso" d="M158 88L158 144"/><path class="limb" d="M158 144L158 184 158 216"/><path class="limb" d="M158 216L146 224h33"/><path class="limb" d="M163 94L184 126 176 158"/><circle class="head" cx="158" cy="62" r="11"/><path class="limb" d="M158 75v13"/><circle class="joint" cx="158" cy="216" r="4"/></g>
+  <g transform="translate(320 0)"><text class="label" x="28" y="31">2 · Eleva los talones</text><path class="floor" d="M28 224H292"/><path class="far" d="M157 131L153 171 150 206"/><path class="torso" d="M158 75L158 131"/><path class="limb" d="M158 131L158 171 158 204"/><path class="limb" d="M158 204L146 209 178 224"/><path class="limb" d="M163 81L184 113 176 145"/><circle class="head" cx="158" cy="49" r="11"/><path class="limb" d="M158 62v13"/><circle class="joint" cx="158" cy="204" r="4"/><path class="arrow" d="M209 218v-34" marker-end="url(#arrow)"/></g>
+  <text class="cue" x="320" y="254" text-anchor="middle">Sube sobre el antepié · Baja despacio · Sin carga</text>
+</svg>

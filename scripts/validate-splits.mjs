@@ -119,7 +119,9 @@ assert.equal(allowedLevelsForExperience("advanced"), null);
 const slugs = new Set(catalog.map(e => e.slug));
 const bySlug = Object.fromEntries(catalog.map(e => [e.slug, e]));
 
-const intermediateSlugs = ["lateral-raise","cable-fly","face-pull","hammer-curl","diamond-push-up","pull-up","decline-push-up"];
+const intermediateSlugs = ["back-squat","bench-press","romanian-deadlift","barbell-hip-thrust","bulgarian-split-squat","overhead-press","walking-lunge","assisted-dip","push-up","single-leg-glute-bridge","side-plank","pike-push-up","single-leg-rdl","assisted-pull-up","shoulder-tap-plank","slider-leg-curl","cable-fly","face-pull","diamond-push-up","pull-up","decline-push-up","run-intervals","cycle-intervals","swim-intervals"];
+const beginnerSlugs = ["lateral-raise","hammer-curl","incline-push-up","band-row","glute-bridge"];
+for (const slug of beginnerSlugs) assert.equal(bySlug[slug]?.level,"beginner",`${slug} debe ser nivel beginner`);
 const advancedSlugs = ["weighted-pull-up","front-squat","archer-push-up","nordic-hamstring-curl"];
 
 for (const slug of intermediateSlugs) {
