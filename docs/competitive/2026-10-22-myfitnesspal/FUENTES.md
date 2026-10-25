@@ -2,6 +2,8 @@
 
 Fecha del informe: 22 de octubre de 2026, America/Lima.
 
+**Registro histórico.** El acceso externo se recuperó y se leyeron catorce artículos oficiales en la actualización del 24 de octubre: [fuentes verificadas](FUENTES-VERIFICADAS.md). El protocolo de entrevistas/cuentas de esta versión queda sustituido por el [plan vigente sin entrevistas](PLAN.md). Las restricciones de acceso siguientes describen aquella ejecución, no la situación actual.
+
 ## Convenciones
 
 - **E**: comprobado en el código de Evolv; cuando se indica, también en navegador local con fixtures. No significa validado en producción.

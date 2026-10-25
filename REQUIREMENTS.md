@@ -52,6 +52,8 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 
 ## Secuencia activa
 
+**Paquete MyFitnessPal aprobado (24 oct 2026): REQ-265..273, en orden.** Especificaciones en `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`. No depende de entrevistas/reclutamiento. El selector descubre estos pendientes; revalidar contra código al tomar cada uno.
+
 Automatizable por el agente desarrollador:
 
 REQ-81..84 (planner determinista, versionado en `plan_versions`, reemplazos con rebalanceo, coach auxiliar validado) ya implementados — detalle en `docs/requirements-history.md`.
@@ -872,9 +874,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-118`).
 
 ## REQ-120 - Nutrición: "No me gusta este plato" bloquea futuras sugerencias hasta editar Perfil
 
-**Estado: implementado.** `profile.prefs.blockedDishes` guarda `{key,name}` por plato bloqueado; el planificador determinista y todas las rutas de IA (`dishDietAllowed`, `coachDishBlockedByProfile`, reemplazos y validación de acciones del coach) los excluyen, con refuerzo por prompt. Acción "🚫 No me gusta este plato" desde la comida aplicada y el borrador generado; Perfil > Comidas permite "Volver a sugerir". Días ejecutados no se tocan. Detalle en el commit. Verificado con `scripts/validate-blocked-dishes.mjs` y la suite E2E.
-
-_Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-120`).
 
 ## REQ-121 - Nutrición: cambios de preferencias regeneran solo futuro y se respetan de inmediato
 
@@ -908,9 +908,7 @@ _Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Ca
 
 ## REQ-126 - Admin: resetear futuro y regenerar nutrición/entrenamiento para cualquier usuario
 
-**Estado: implementado.** `api/admin.js` agrega `previewResetPlan`/`applyResetPlan` (alcance nutrition/training/both) y `resetUserToOnboarding`; los días con comida registrada o entreno hecho quedan protegidos, aplicar solo reescribe `day_log.state` de días no protegidos y archiva la versión de plan activa. Panel admin con "Regenerar plan" (vista previa obligatoria) y "Reiniciar usuario" (doble confirmación), bloqueados para la propia cuenta y otros admins. Detalle en el commit. **Infra pendiente:** `supabase/admin_reset.sql` (tabla `admin_actions_log`) requiere aplicarse manualmente en Supabase. Verificado con `scripts/test-admin-reset.mjs`.
-
-Pendiente de infraestructura (no ejecutable por el agente): aplicar `supabase/admin_reset.sql` en el proyecto de Supabase de producción para que `admin_actions_log` exista antes de usar estas acciones (la auditoría falla en silencio — no bloquea la operación principal — si la tabla no existe todavía). Detalle histórico: commit de implementación de REQ-126.
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-126`).
 
 ## REQ-127 - Personalizar remitente y asunto de los correos de autenticacion de Supabase (branding Fitbud)
 
@@ -1022,7 +1020,7 @@ Lo que queda es un hueco de catálogo **real y ahora sí medible**: las 7 dimens
 
 ## REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo del canario `DIET_CONTRACT`
 
-**Estado: implementado.** Cerrado con decisión de producto (Jonathan, 2026-08-30): no había techo de catálogo; el ~32-33% del canario `DIET_CONTRACT` venía de que `globalClosePass()` optimizaba `scoreMacros()` (asimétrico) mientras el contrato exige tolerancias duras y simétricas (100% de los fallos de carbohidratos eran por exceso). Se autorizó una cuarta opción —corregir la función objetivo del cierre sin tocar la selección de platos (REQ-143 intacto)— implementada en REQ-166 (canario 32.3%→76.5%, 38/54 dimensiones, sin regresiones). Aprendizajes para futuras corridas: ampliar el pre-rankeo 48→200 no mueve el canario (medido y descartado, no reintentar); la etiqueta `catalog_gap` era un diagnóstico incorrecto y costó dos sesiones de lotes de catálogo. Detalle completo en git (commit de REQ-166) y en REQ-143.
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-147`).
 
 ## REQ-148 - Fix billing: un reembolso parcial de Stripe revoca todo el entitlement pagado
 
@@ -1031,13 +1029,11 @@ Lo que queda es un hueco de catálogo **real y ahora sí medible**: las 7 dimens
 
 ## REQ-149 - Fix admin: "Regenerar plan · Solo nutrición" archiva también el entrenamiento futuro
 
-**Estado: implementado.**
-`fetchActivePlanVersion()` (`api/admin.js`) ahora trae `snapshot`; `applyResetPlan(scope="nutrition")` sigue archivando (`superseded`) la fila activa combinada, pero si `snapshot.trainingPlan` tiene contenido real (`planVersionHasTrainingContent()`), `insertTrainingOnlyVersion()` inserta una nueva fila activa (mismo `cycle_number`, próximo `version_number`) que conserva `trainingPlan` intacto con `nutritionPlan:null` desde `fromDate` — el entrenamiento futuro no pierde su prescripción y la nutrición sí cae a generación fresca, que es el efecto deseado. La fila vieja se supersede ANTES del insert, así nunca hay dos filas activas a la vez para `plan_versions_one_active_idx`. `previewResetPlan()` expone `willPreserveTraining` (sin filtrar el `snapshot` completo hacia el cliente) y el copy del modal admin distingue "se conserva el entrenamiento" de "se archiva el plan de nutrición". `scope="training"`/`"both"` sin cambios. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-admin-reset.mjs` (2 casos nuevos: preview y apply sobre fila combinada).
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-149`).
 
 ## REQ-150 - PWA sirve HTML nuevo con JS del cache viejo tras un deploy (versión mezclada)
 
-**Estado: implementado.**
-`service-worker.js`: la navegación ahora usa `cacheFirst(request,"./index.html")` en vez de `networkFirst` — se sirve desde la MISMA `CACHE_NAME` que los `.js` (`cacheFirst` sin cambios), así que HTML y JS siempre son de la misma generación; la versión nueva llega completa recién cuando el SW nuevo instala y activa (atómico vía `cache.addAll`). `CACHE_NAME` subido a `v69`. `registerServiceWorker()` (`index.html`) escucha `updatefound`/`statechange` y, cuando detecta una instalación real (no la primera) vía `navigator.serviceWorker.controller` ya presente, muestra un badge discreto ("↻ Actualizar", sin vocabulario técnico) en vez de recargar sola — recargar automáticamente podía interrumpir una acción en curso. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-service-worker-cache.mjs` (ejecuta el SW real en `node:vm` con `caches`/`fetch` simulados).
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-150`).
 
 ## REQ-151 - Landing muestra la sección "Planes" vacía cuando el catálogo carga después del primer render
 
@@ -1046,13 +1042,11 @@ Lo que queda es un hueco de catálogo **real y ahora sí medible**: las 7 dimens
 
 ## REQ-152 - Fix onboarding: "Mantenerlo por ahora" en el aviso de revisión de 4 semanas lanza ReferenceError y no cierra ni guarda
 
-**Estado: implementado.**
-`keepCurrentProfile()` (`index.html`) ya no referencia `calendarChanged`/`planEndDate` (variables locales de `saveOnboarding()`/`saveProfile()`, fuera de su ámbito, causaban `ReferenceError` bajo `"use strict"` antes del `await`): usa `reason:"Preferencias guardadas"` fijo (este flujo nunca cambia el calendario) y `validTo` de `prefs.planEndDate` ya guardado, o `planEndFor(prefs.planStartDate,resolvedPlanDuration(prefs))` si faltara. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/onboarding.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix y pasa con él).
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-152`).
 
 ## REQ-153 - Fix Home: las sugerencias del coach ignoran comidas saltadas (y la pausa por seguridad) y contradicen la agenda
 
-**Estado: implementado.**
-`buildContextualChips(ds)` (`index.html`) ahora excluye comidas `.skipped` de `pendingMeals` (igual que `homeAgendaData`, REQ-125) y agrega `!trainingSafetyHold()` a `workoutPending`, así los chips nunca sugieren una comida recién saltada ni el entrenamiento mientras hay una pausa por seguridad activa — mismo criterio que ya usa la agenda, sin tocar `COACH_SUGGESTIONS`/`nextDailyAction` (fuera de alcance). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/home.spec.js` (nuevo; confirmado que ambos casos fallan exactamente como describe el REQ contra el código sin el fix y pasan con él).
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-153`).
 
 ## REQ-154 - Fix Nutrición: "Cambiar comida" guarda la porción escalada pero la tarjeta muestra (y suma) los macros de la receta base
 
@@ -1097,27 +1091,15 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-160`).
 
 ## REQ-161 - Fix Home: marcar comidas "Sin asignar" (0 kcal) como hechas infla el contador y la racha
 
-**Estado: implementado.**
-
-`mealHasContent(v)` (`index.html`) centraliza el criterio de "contenido real" (nombre o algún macro), igual que ya exigía `homeDayHasPreparedMeals`. `toggleMeal()` ignora el intento de marcar como hecha una comida sin contenido (toast explicativo); el botón `.chk` en `mealCard()` sale `disabled` en ese caso. `dayTotals()` y `nutritionDayDone()` solo cuentan como cumplida la comida `done` que además tenga contenido real, como defensa adicional si `done:true` llegara por otra vía. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/home.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix); ajustado el fixture de `tests/e2e/racha.spec.js` (REQ-146) para que sus días "cumplidos" simulen comidas con contenido real, ya que antes se apoyaba en el comportamiento que este REQ corrige.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-161`).
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-161`).
 
 ## REQ-162 - Fix Nutrición: la tarjeta y la suma del día muestran la receta base del catálogo, no los macros materializados del plan
 
-**Estado: implementado.**
-
-`mealValue()` y `mealRecipe()` (`index.html`) ahora priorizan `base.src==="nutritionPlan"` (con `base.kcal>0`/`base.ingredientes`) sobre la resolución por `dishName` en el catálogo, siempre que no haya un override que cambie de plato (`!o||o.dishName==null`) — si el usuario reemplazó la comida (REQ-154), esa ruta sigue ganando. Sin snapshot materializado, la resolución por catálogo sigue funcionando igual que antes (compatibilidad). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-nutritionplan-priority.mjs` (4 casos: snapshot gana al catálogo en macros e ingredientes, un reemplazo explícito sigue ganando al snapshot, y sin snapshot la compatibilidad con catálogo no se rompe; confirmado que el caso principal falla exactamente como describe el REQ —165 vs 495 kcal— contra el código sin el fix).
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-162`).
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-162`).
 
 ## REQ-163 - Fix Entreno: una sesión abandonada en curso cuenta como entreno "hecho" e infla la racha
 
-**Estado: implementado.**
-
-`trainingDayResult()` (`index.html`) ya no cuenta "done" por `workoutHasRecordedActivity()` (cualquier bloque omitido o serie marcada, sin exigir cierre); ahora exige un resultado TERMINAL vía `workoutOutcomeForState(st)` (`completed`/`partial`) o el legado `st.workoutDone`. `workoutHasRecordedActivity()` no se tocó (otros usos, p. ej. protección de días en REQ-126, siguen queriendo detectar cualquier actividad). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/entreno.spec.js` (inicia sesión, omite un bloque y abandona sin finalizar; confirmado que el test falla exactamente como describe el REQ —"done" en vez de "missed"— contra el código sin el fix).
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-163`).
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-163`).
 
 ## REQ-164 - Fix Progreso: la variación de peso on-target se pinta como advertencia en metas de volumen/mantenimiento
 
@@ -1129,11 +1111,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-164`).
 
 ## REQ-165 - Fix check-in semanal: las escalas sin responder se leen como el peor valor y disparan ajustes falsos
 
-**Estado: implementado.**
-
-`analyzeCheckinAnswers()` (`index.html`) neutraliza `answers.energy`/`answers.sleep` con `||3` (punto medio) en la rama de hambre/energía, igual que ya hacían nutrición/dificultad/recuperación — antes, `null<=2` evaluaba `true` y una escala nunca respondida se leía como "energía/sueño bajos", disparando mensajes y ajustes de calorías sobre datos inexistentes (incluso con `keep:true`). `hunger` no se tocó (su comparación `>=4` ya era segura ante `null`). Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-checkin-goal-mapping.mjs` (3 casos nuevos: check-in vacío → sin razón fantasma; hambre alta + energía/sueño sin responder = mismo ajuste que con energía/sueño altos; energía/sueño realmente bajos siguen generando el aviso; confirmado que fallan exactamente como describe el REQ contra el código sin el fix).
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-165`).
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-165`).
 
 ## REQ-166 - La pasada global de cierre optimiza el contrato, no `scoreMacros()`
 
@@ -1636,33 +1614,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-247`).
 
 ## REQ-248 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
 
-**Estado: implementado.**
-
-### Origen
-
-Pedido del dueño (2026-10-21): los postulantes aprobados deben tener consumo ilimitado y acceso completo por 90 días.
-
-### Problema y causa raíz
-
-`grantBetaAccess()` (`api/admin.js`) daba el `user_entitlements` de 90 días pero no tocaba `coach_quota_overrides`: la beta quedaba con las cuotas `default` (p. ej. 1 dieta semanal y 20 conversaciones al día). El canje del código (`api/entitlement.js`) tampoco.
-
-### Alcance
-
-1. `grantBetaAccess()` crea un override por acción del coach con `daily_limit = QUOTA_OVERRIDE_MAX` (10.000) que vence con el acceso. Cubre aceptar por correo, cuenta existente y crear/invitar cuenta beta.
-2. `invite-signup` y `redeem`: si el código está en el `review_notes` de una postulación `beta_invited`, crea los mismos overrides; un cupón cualquiera no.
-3. Si fallan, el acceso queda y el admin ve `betaError`; el canje nunca se bloquea. Sin migración SQL.
-4. Textos del admin y `BETA_PROGRAM.md` actualizados; `CACHE_NAME` → `fitbud-pwa-v130`.
-5. Datos: el único aceptado en producción ya tiene los overrides hasta 2027-01-19.
-
-### Riesgos
-
-Costo del proveedor sin tope por usuario beta; el panel de consumo sigue mostrando el uso por persona.
-
-### Criterios de aceptación
-
-- Aceptar o crear cuenta beta: 8 overrides de 10.000/día que vencen con el acceso. ✓ (`scripts/test-admin-beta-api.mjs`, `scripts/test-admin-beta-signup.mjs`)
-- Canjear el código de una postulación aceptada crea los overrides; un cupón normal no. ✓ (`scripts/test-invite-signup-api.mjs`, `scripts/test-coupon-api.mjs`)
-- `node scripts/release-gate.mjs` pasa.
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-248`).
 
 ## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
 
@@ -1672,33 +1624,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-249`).
 
 ## REQ-250 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
 
-**Estado: implementado.**
-
-### Origen
-
-Jonathan (2026-10-21), con captura del resultado "Sesión parcial · 6/7 bloques completados · 16/16 series registradas · 1 bloque omitido": "Hice toda la sesión y lo único que pasé si no me equivoco son los calentamientos; no debería decir parcial, debería ser completada".
-
-### Causa raíz
-
-REQ-236 hizo opcionales el calentamiento y la vuelta a la calma, pero solo "Ahora no" los deja `declined`. Si el usuario elegía hacerlos y luego tocaba "Omitir bloque" (o "Omitir" en su cronómetro), `skipWorkoutStep()`/`finishTimedWorkoutStep()` (`index.html`) los marcaban `skipped`, que cuenta como bloque omitido y hace que `workoutFullyCompleted()` guarde la sesión como parcial.
-
-### Alcance
-
-1. Omitir un bloque opcional lo deja `declined`, igual que "Ahora no".
-2. `normalizeStep()` (`workout-player.js`) convierte en `declined` un opcional `skipped`, así las sesiones en curso o guardadas antes del arreglo dejan de contarlo como omitido.
-3. Una sesión guardada parcial a la que no le falta nada (sin bloques omitidos, sin series sin marcar, sin dolor) muestra "Marcar como completada", que la cierra completada sin reabrirla.
-4. `CACHE_NAME` → `fitbud-pwa-v132`.
-
-### Fuera de alcance
-
-- Omitir un ejercicio o un bloque de cardio sigue dejando la sesión parcial.
-- No se reclasifica sola ninguna sesión guardada: el cambio a completada lo decide el usuario.
-
-### Criterios de aceptación
-
-- Elegir el calentamiento y la vuelta a la calma y omitirlos, con todas las series hechas, guarda "Sesión completada" con 0 bloques omitidos. ✓ (`tests/e2e/entreno.spec.js`)
-- Una sesión guardada parcial con el calentamiento `skipped` muestra 0 omitidos y "Marcar como completada"; al tocarlo queda completada y cuenta como entreno hecho. ✓ (misma prueba, `scripts/validate-workout-player.mjs`)
-- `node scripts/release-gate.mjs` pasa.
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-250`).
 
 ## REQ-251 - Beta: el perfil llega con lo que ya respondió en la postulación
 
@@ -1710,84 +1636,11 @@ Pedido del dueño: no volver a pedir lo que ya llenó al postular. Al aceptar (`
 
 ## REQ-252 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total"
 
-**Estado: implementado.**
-
-### Origen
-
-Diego (beta, 2026-10-21, iPhone), con capturas de Perfil → Entrenamiento ("Otra actividad" + "Fuerza en gimnasio", lunes a jueves, el jueves en "Exterior"): "Eso de elegir qué hacer en cada día te limita mucho a elegir" y "¿qué pasa si un lunes no voy al gym y juego pádel?".
-
-### Problema
-
-Con "Otra actividad" (pádel, fútbol…) y fuerza, la plantilla de la semana reserva días para el deporte, pero la app los mostraba como "Descanso total": Diego elige 4 días y solo ve 2 sesiones de gimnasio; el día que dejó en "Exterior" para su deporte aparece como descanso. Lo que elige por día no se refleja en el plan. En producción, 3 de 13 perfiles tienen "Otra actividad" y ninguno tiene plan generado, así que todos usan esta semana tipo.
-
-### Causa raíz
-
-- `workoutSchedule()` (`index.html`) sustituía por `"descanso"` todos los slots de deporte cuando `primary==="other"`, porque `sportSessions()` no tenía una sesión real para "other" (un placeholder sin nombre que `workoutOptions()` descarta).
-
-### Alcance
-
-1. `sportSessions()`: "other" tiene una sesión real, `facil` → "Día de tu deporte" ("Juega tu deporte (pádel, fútbol…) o haz 30-45 min de actividad a tu elección, y regístralo para que cuente."), sin ejercicios y marcada `freeActivity`. "Actividad ligera libre" (solo fuerza con actividad ligera) también queda marcada `freeActivity`.
-2. `workoutSchedule()`: con "other", los slots de deporte pasan a `facil` en vez de `descanso`. "strength_only" no cambia.
-3. Entreno, en un día `freeActivity`: en vez de "Iniciar sesión guiada" (no hay ejercicios) o del texto de descanso, "Registrar mi actividad" abre el registro manual de REQ-206 y avisa "Si hoy no la haces, no cuenta como sesión perdida."; sin los atajos "Adaptar hoy" (Solo 20 min, En casa…), que no aplican. Hoy ofrece "Registrar mi actividad" en vez de "Iniciar"/"Adaptar".
-4. `trainingDayResult()`: un día `freeActivity` sin registrar cuenta como descanso para la racha (no la rompe); registrado, como entrenado.
-5. El registro en un día de tu deporte propone el último deporte que registraste (p. ej. pádel) o "Otra actividad".
-6. `CACHE_NAME` → `fitbud-pwa-v133`.
-
-### Fuera de alcance
-
-- Cómo se explica la pregunta del deporte y cómo se cambia un día por otro deporte: REQ-253.
-- El plan personalizado ("Preparar mi plan") no admite el tipo de sesión "other" (`training-plan.js`, `SESSION_TYPES`); estos usuarios siguen con la semana tipo.
-
-### Riesgos
-
-- Usuarios con "Otra actividad" ven cambiar sus días de deporte de "Descanso total" a "Día de tu deporte". El historial no cambia: los días ya registrados conservan lo ejecutado, y un día de deporte sin registrar no penaliza la racha, igual que el descanso.
-
-### Criterios de aceptación
-
-- "Otra actividad" + gimnasio, 4 días: la semana muestra 2 sesiones de gimnasio y 2 "Día de tu deporte", ninguna "Descanso total"; sin registrar, el día cuenta como descanso; "Registrar mi actividad" → Pádel lo marca como entrenado y la próxima vez propone Pádel. ✓ (`tests/e2e/actividad-manual.spec.js`)
-- `node scripts/release-gate.mjs` pasa.
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-252`).
 
 ## REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
 
-**Estado: implementado.**
-
-### Origen
-
-Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo eso de actividad física principal", "Eso de elegir qué hacer en cada día también siento que te limita mucho a elegir" y "¿Qué pasa si un lunes no voy al gym y juego pádel?".
-
-### Problema
-
-- "Actividad física principal" no dice qué es ni qué cambia: Diego juega pádel, que no está en la lista, y eligió "Otra actividad" sin saber qué haría el plan con eso.
-- "Días disponibles y lugar real" se lee como una agenda fija: nada dice que cualquier día se puede cambiar.
-- Registrar otro deporte en un día de fuerza ya era posible (REQ-206, "＋ Registrar otra actividad" al final de Entreno), pero no aparece entre las opciones de "Adaptar hoy" ni explica qué pasa con la sesión que tocaba.
-
-### Causa raíz
-
-- Copy de `index.html`: label `pf_sport` "Actividad física principal" y `ob_sport` "¿Practicas alguna actividad física?", opción "Otra actividad", sin nota de ayuda; label "Días disponibles y lugar real".
-- "Adaptar hoy" en `renderWorkout()` solo ofrece Solo 20 min / En casa / Sin equipo / Me perdí la sesión.
-
-### Alcance
-
-1. Onboarding y Perfil preguntan lo mismo: "¿Haces otro deporte además de la fuerza?", con opciones Caminar, Correr, Bicicleta, Natación, "Otro deporte" y "Ninguno, solo fuerza". `SPORT_LABELS.other` → "Otro deporte".
-2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
-3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
-4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
-5. `CACHE_NAME` → `fitbud-pwa-v133` (junto con REQ-252).
-
-### Fuera de alcance
-
-- Elegir qué se hace cada día (fuerza o deporte) en vez del lugar, o mover la sesión de fuerza perdida a otro día: el lugar sigue orientando la plantilla (exterior/piscina → deporte) y "Me perdí la sesión" ya ofrece recuperarla.
-- Añadir pádel, fútbol u otros deportes con plan guiado propio.
-
-### Riesgos
-
-- Ninguno sobre datos: solo copy y un acceso nuevo a un flujo existente; los valores guardados (`primarySport`) no cambian.
-
-### Criterios de aceptación
-
-- Perfil muestra la nueva pregunta y la nota cambia al elegir otra opción; la semana tipo explica que no es una obligación. ✓ (`tests/e2e/actividad-manual.spec.js`)
-- En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
-- `node scripts/release-gate.mjs` pasa.
+**Estado: implementado.** Detalle y verificación en `docs/requirements-history.md` (buscar `## REQ-253`).
 
 ## REQ-254 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
 
@@ -1936,3 +1789,255 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 **Estado: implementado.**
 
 Solicitud directa: compartir el análisis guardado localmente. Publica `docs/competitive/2026-10-22-myfitnesspal/README.md`, matriz de 48 dimensiones y propuestas MFP-00..17; añade entradas desde AGENTS, README y estrategia. Conserva evidencia del checkout anterior, declara diferencias con main y verificación externa pendiente. No incorpora las propuestas al selector ni reactiva el track nativo.
+
+## REQ-265 - Estimación: no aplicar plantillas genéricas como macros de una comida
+
+**Estado: pendiente.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Solicitud directa; contraste MFP sin entrevistas. Probe `fallback-template` y `aiEstimate()`/rama reuse de `api/claude.js`.
+
+### Problema
+La plantilla 500/25/55/20 puede aplicarse a cualquier descripción como resultado específico.
+
+### Objetivo
+Reutilizar solo resultados compatibles o explicar el fallo conservando los campos.
+
+### Alcance
+Cliente, contrato de respuesta y fallback de meal_estimate; conservar reutilización válida y límites existentes.
+
+### Fuera de alcance
+Pricing, nuevas cuotas y otras acciones del coach.
+
+### Riesgos
+Confundir fallo con cero o romper reutilización válida; no reutilizar entre usuarios o contextos distintos.
+
+### Criterios de aceptación
+Sin resultado compatible no cambia macros ni anuncia estimación aplicada. Reutilización exacta funciona. Error conserva formulario; foto distinta no usa otro resultado.
+
+### Verificación sugerida
+Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; E2E de conservación de valores.
+
+## REQ-266 - Registro: validar valores nutricionales y distinguir desconocidos de ceros
+
+**Estado: pendiente.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Probe `negative-manual`; `readEditor()` y `saveEditor()` solo validan nombre.
+
+### Problema
+Se guardan kcal/proteína negativas; vacío o NaN se convierte en cero sin decisión del usuario.
+
+### Objetivo
+Guardar solo datos válidos y representar información incompleta explícitamente.
+
+### Alcance
+Parseo finito no negativo, coma/punto, errores por campo; modo completo con cuatro campos y modo explícito Solo calorías con macros desconocidos/totales parciales.
+
+### Fuera de alcance
+Reinterpretar ceros históricos y exigir igualdad exacta 4/4/9.
+
+### Riesgos
+Perder valores, cambiar totales antiguos o guardar favoritas inválidas.
+
+### Criterios de aceptación
+Negativo/vacío inválido no escribe día/perfil/cola; cero explícito se admite. Solo calorías conserva kcal e indica macros desconocidos. Legado conserva números y formulario conserva correcciones.
+
+### Verificación sugerida
+Pruebas puras de parseo y E2E de negativos/vacíos/decimales/cero/solo calorías/doble envío.
+
+## REQ-267 - Registro: conservar procedencia y snapshot nutricional
+
+**Estado: pendiente.** Prioridad P1. Dependencias: REQ-265 y REQ-266. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+`saveEditor()`, `applyEstimatedMacros()`, `mealMacrosEntry()` y `normalizedSavedMeals()`; metadatos no persistidos.
+
+### Problema
+Los totales pierden origen y supuestos al guardar o reutilizar una comida.
+
+### Objetivo
+Explicar los datos del registro y mantener historia independiente de la fuente.
+
+### Alcance
+Contrato versionado de origen manual/catálogo/estimación/receta/legacy, referencia opcional, base/porción y snapshot; lectura, corrección, recientes, favoritas y sync.
+
+### Fuera de alcance
+Guardar fotos/prompts o inferir datos antiguos.
+
+### Riesgos
+Escalar dos veces, perder metadata o compartir referencias privadas entre cuentas.
+
+### Criterios de aceptación
+Guardar/reabrir/reutilizar preserva origen; editar fuente no cambia pasado. ×2 conserva base; corrección manual se identifica. Legado legible sin backfill inventado.
+
+### Verificación sugerida
+Roundtrip, fuente editada, favoritas ×2, dos cuentas y merge offline; inspección de detalle accesible.
+
+## REQ-268 - Registro: editar ingredientes y gramos decimales sin perder el cálculo
+
+**Estado: pendiente.** Prioridad P1. Dependencias: REQ-267. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Probe `ingredient-snapshot`; `addFoodToEditor()` redondea gramos y concatena texto.
+
+### Problema
+33,5 g se guarda como 34 g y las líneas no se pueden corregir después.
+
+### Objetivo
+Componer una comida editable con totales derivados de cantidades reales.
+
+### Alcance
+Componentes con base nutricional capturada; añadir/editar/quitar, gramos decimales y redondeo solo visible; integrarlos en ficha y compras actuales cuando existen.
+
+### Fuera de alcance
+Extraer ingredientes de texto antiguo o alterar catálogo global.
+
+### Riesgos
+Doble suma, pérdida de precisión, crudo/cocido ambiguo y componentes obsoletos.
+
+### Criterios de aceptación
+33,5+0,5 g mantiene precisión interna; editar/quitar recalcula. Recarga conserva líneas y snapshot; compras refleja componentes reales. Legado sin líneas sigue editable manualmente.
+
+### Verificación sugerida
+Cálculo puro, E2E de composición/reapertura/corrección, compras, offline y cancelación.
+
+## REQ-269 - Nutrición: registrar una sustitución o un adicional de forma explícita
+
+**Estado: pendiente.** Prioridad P1. Dependencias: REQ-267. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+`openEditor(extra)`, `saveEditor()` y `openMealMore()`; flujo libre siempre añade un extra.
+
+### Problema
+Registrar algo comido en lugar del almuerzo puede acabar como consumo adicional.
+
+### Objetivo
+Expresar intención y modificar el total exactamente una vez.
+
+### Alcance
+Elegir Además de lo previsto o En lugar de, fecha/comida, preview/confirmación y deshacer propio con control de cambios posteriores.
+
+### Fuera de alcance
+Regenerar semana o compensar automáticamente calorías.
+
+### Riesgos
+Duplicar consumo, reescribir otro día o deshacer cambios ajenos.
+
+### Criterios de aceptación
+Pendiente/hecha/saltada tienen resultado explícito; cancelar no escribe. Sustituir cambia solo la elegida y no añade extra duplicado; reintento idempotente y deshacer seguro.
+
+### Verificación sugerida
+E2E de tres estados, adicional, cancelación, fecha, reintento, totales e historial.
+
+## REQ-270 - Nutrición: copiar comida o selección del día a otra fecha
+
+**Estado: pendiente.** Prioridad P1. Dependencias: REQ-267 y REQ-269. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Fuentes oficiales S05/S06; búsqueda de código distingue recientes/propagación de un flujo general de copia.
+
+### Problema
+No hay preview de copia de entradas/selección a otro día con control de consumo y destino.
+
+### Objetivo
+Repetir comidas sin reescribir números ni modificar la fuente.
+
+### Alcance
+Selección de comida/día, una fecha destino del ciclo, preview y modo adicional/sustitución; nuevas identidades y snapshot; preservar fuente.
+
+### Fuera de alcance
+Copia masiva a siete días, cambio de ciclo y prescripción automática.
+
+### Riesgos
+Heredar done, duplicar al reintentar o sobreescribir destino.
+
+### Criterios de aceptación
+Futuro queda pendiente; hoy/pasado exige decisión de consumo. Destino con datos no se pisa silenciosamente; cancelar no escribe. Copia/edición no altera origen ni racha antes de consumir.
+
+### Verificación sugerida
+E2E de destino ocupado/vacío, futuro, misma fecha, cancelación, receta versionada e idempotencia.
+
+## REQ-271 - Nutrición: biblioteca privada de alimentos desde etiqueta
+
+**Estado: pendiente.** Prioridad P1. Dependencias: REQ-266, REQ-267 y REQ-268. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Fuentes S02/S09/S12; `renderQuickPicks()` solo busca DB.ingredients y favoritas no tienen unidad base.
+
+### Problema
+Un producto local no catalogado debe registrarse por totales cada vez que cambia la cantidad.
+
+### Objetivo
+Crear producto propio reutilizable por su base y porción declaradas.
+
+### Alcance
+Hasta 100 fichas privadas en profiles.prefs: nombre/marca, base 100 g/100 ml/porción, nutrientes y equivalencia conocida; integración en buscador existente.
+
+### Fuera de alcance
+Proveedor, OCR, catálogo público y certificación de alérgenos.
+
+### Riesgos
+Confundir ml/g, variantes o editar historia consumida; preservar otras preferencias y privacidad.
+
+### Criterios de aceptación
+Ficha por 125 g escala correctamente; unidad sin masa no convierte a gramos. Editar no cambia consumos previos; búsqueda incluye marca; otra cuenta no accede y recarga conserva.
+
+### Verificación sugerida
+Cálculo por base/unidad, límites, E2E alta/búsqueda/registro/corrección, conflicto y dos cuentas.
+
+## REQ-272 - Nutrición: recetas propias con rendimiento y registro por porción
+
+**Estado: pendiente.** Prioridad P1. Dependencias: REQ-268 y REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Fuentes S07/S08; Evolv tiene recetas curadas pero no biblioteca privada con rendimiento editable.
+
+### Problema
+Favoritas por totales no permiten recalcular una receta al cambiar ingredientes o porciones.
+
+### Objetivo
+Guardar receta, cocinar una cantidad y registrar solo lo consumido.
+
+### Alcance
+Hasta 50 recetas privadas/30 líneas, ingredientes existentes/propios, pasos opcionales, rendimiento por porciones o peso final conocido; snapshots versionados.
+
+### Fuera de alcance
+Inferir rendimiento cocido, importar URLs, compartir públicamente o incluirla en solver global.
+
+### Riesgos
+Cambiar pasado, dividir por cero, desconocidos tratados como ceros o pérdida entre dispositivos.
+
+### Criterios de aceptación
+Cuatro porciones registra una cuarta parte; 150 g usa peso final conocido. Guardar no consume; editar/eliminar fuente conserva consumos. Cantidades inválidas no escriben.
+
+### Verificación sugerida
+Pruebas de fracciones/rendimiento, E2E crear/guardar/registrar/editar, legado, sync y aislamiento.
+
+## REQ-273 - Nutrición: productos propios por código y escaneo progresivo
+
+**Estado: pendiente.** Prioridad P2. Dependencias: REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Fuentes S09/S10; no hay código de producto en el registro actual.
+
+### Problema
+Identificar de nuevo un producto ya creado exige buscar por nombre.
+
+### Objetivo
+Resolver producto propio por GTIN, sin inventar nutrientes ni depender de un proveedor.
+
+### Alcance
+GTIN-8/12/13/14 válido, búsqueda escrita y captura si cámara/BarcodeDetector soportados; corrección privada y confirmación de etiqueta/cantidad.
+
+### Fuera de alcance
+Proveedor externo, lector universal, librería runtime y garantía de escaneo en iOS.
+
+### Riesgos
+Perder ceros, confundir presentación, permiso denegado o contaminar catálogo compartido.
+
+### Criterios de aceptación
+Código propio válido abre ficha; desconocido ofrece alta manual. Sin cámara/API sigue disponible entrada escrita. No registra automáticamente ni modifica coincidencias de otras cuentas.
+
+### Verificación sugerida
+Checksum/normalización, capacidades/permiso simulados, E2E escrito/válido/desconocido/offline y confirmación.

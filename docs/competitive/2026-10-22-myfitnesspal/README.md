@@ -1,38 +1,34 @@
-# MyFitnessPal frente a Evolv: análisis y plan de valor
+# MyFitnessPal frente a Evolv: análisis y requerimientos
 
-**22 de octubre de 2026 · Mercado de trabajo: Perú y usuarios de habla española en LatAm.**
+**Actualización: 24 de octubre de 2026 · Trabajo autorizado sin entrevistas ni reclutamiento.**
 
-**Publicación compartida: 24 de octubre de 2026.** Esta entrega documental parte de `origin/main` en `62c7860`. El análisis y las capturas corresponden al checkout `df27422` del 22 de octubre, que tenía cambios locales distintos de esa rama. No describen el estado actual de `main`. Antes de implementar MFP-00..17, contrastar cada propuesta con el código, `REQUIREMENTS.md` y el backlog nativo vigentes; algunas brechas o decisiones pueden haber cambiado. La migración nativa está pausada en la base de publicación y este informe no la reactiva.
+Se contrastó el plan con `origin/main` `62c7860`, se leyeron 14 artículos oficiales actuales de MyFitnessPal, se ejecutaron seis E2E de Evolv y tres reproducciones en Chromium con fixtures. El resultado es un paquete de **nueve REQ pendientes, REQ-265..273**, con alcance, dependencias, aceptación y pruebas. No son funcionalidades terminadas.
 
-Conclusión: Evolv puede aportar más valor a quien necesita decidir qué comer y cómo entrenar, pero todavía deja demasiado trabajo al registrar alimentos fuera del plan. La prioridad es combinar su planificación y ejecución guiada con un registro cotidiano rápido y datos trazables. La superioridad debe demostrarse por tareas y segmentos; no se deduce contando funciones.
+## Empezar aquí
 
-## Lectura
+1. [Plan de implementación vigente](PLAN.md): decisiones, secuencia y verificación sin entrevistas.
+2. [Backlog detallado](BACKLOG.md): cada REQ, sus casos y lo excluido; el estado operativo vive en `REQUIREMENTS.md` de la raíz.
+3. [Fuentes verificadas](FUENTES-VERIFICADAS.md): catorce artículos oficiales, límites de país/plataforma y evidencia de Evolv.
+4. [Matriz actualizada de 48 dimensiones](matriz-actualizada-2026-10-24.csv): fuente y estado de revalidación por fila; lo no revalidado está identificado y no genera un REQ nuevo.
 
-1. [Análisis funcional, usabilidad y brechas](ANALISIS.md): capacidades, experiencia por tarea, ventajas, riesgos y comparación con límites explícitos.
-2. [Plan de mejora y backlog ejecutable](PLAN.md): prioridades, criterios de aceptación, dependencias, entregas de 90 días, métricas y validación.
-3. [Registro de fuentes y verificación pendiente](FUENTES.md): qué se comprobó, qué procede de conocimiento histórico y qué necesita acceso externo.
-4. [Matriz de 48 dimensiones en CSV](matriz.csv): inventario para próximas sesiones.
-5. [Evidencia de navegador](evidence/journeys.json): 14 capturas, móvil y escritorio, seis registros de recorridos/observaciones con fixtures.
+El primer trabajo es **REQ-265: eliminar la estimación genérica aplicada como resultado**. Luego REQ-266 valida valores, REQ-267 preserva procedencia y REQ-268 permite editar ingredientes. Continúan sustitución, copia, alimentos propios, recetas y GTIN. El selector existente descubre pendientes no listados por orden numérico; la cola estará disponible al integrarse en `main`.
 
-## Alcance y nivel de certeza
+## Qué cambió respecto al informe inicial
 
-Este es un análisis amplio de producto y una evaluación heurística por tareas, con revisión de código y navegador de Evolv. **La investigación contemporánea de MyFitnessPal está incompleta**: el proxy rechazó `www.myfitnesspal.com` con HTTP 403; no hay herramienta de búsqueda web ni una cuenta de MyFitnessPal disponible. Sus funciones históricas se usan como referencia provisional, no como prueba de su oferta, interfaz, precios o límites actuales. No se realizó una prueba de su app nativa.
+- Recientes/favoritas, buscador de ingredientes, compras con checklist, reenvío de confirmación y última carga de fuerza ya existen en `main`: se retiraron del trabajo nuevo.
+- MFP sí documenta planificación/compras en Premium+, con límites de país e inglés, y creación de alimentos/recetas en Free. No se sostiene la tesis de que solo registra o no tenga rutinas.
+- Entrevistas, reclutamiento y métricas de retención dejan de ser puertas previas de implementación. Se decide con documentación, código y tareas reproducibles; una validación de funcionamiento no se presenta como prueba de demanda ni resultado clínico.
+- La creación masiva de propuestas MFP-00..17 se sustituye por nueve requerimientos acotados y autorizados. El resto queda fuera del paquete activo.
 
-Se guardó un borrador de red que permite `www.myfitnesspal.com`, `support.myfitnesspal.com`, `blog.myfitnesspal.com`, `apps.apple.com` y `play.google.com`. El guardado fue confirmado y requiere revisar, guardar y publicar el entorno para activarlo. No se amplió la política efectiva de esta ejecución. Para completar el benchmark, seguir [FUENTES.md](FUENTES.md).
+## Evidencia actual y límites
 
-Evolv se revisó en el commit de aplicación `df27422`, sin datos ni servicios de producción. El navegador usa fixtures existentes; las capturas no demuestran el estado del despliegue, entregabilidad de emails, checkout, calidad del proveedor de estimación ni retención real. No se ejecutó el comando formal `impeccable critique`: se emplearon los criterios de interacción y carga cognitiva de Impeccable para este trabajo de planificación competitiva.
+- [Seis E2E aprobados sin reintentos](evidence/2026-10-24/baseline-checks.json): comidas guardadas, compras y confirmación de correo.
+- [Tres reproducciones](evidence/2026-10-24/probes.json) con capturas: negativos guardados, ingredientes reducidos a texto/totales y efecto de la plantilla de 500 kcal. La última usa una respuesta del servidor simulada con la plantilla real del código; no mide incidencias en producción.
+- [Registro de fuentes oficiales](evidence/2026-10-24/official-sources.json): URLs consultadas, fechas de actualización, método y resúmenes propios. No se inició sesión ni probó la app nativa de MFP. Se reconstruyeron sus flujos desde la ayuda; no se inventan tiempos de personas ni precios.
+- `verify-current.mjs` permite repetir los probes sobre la base declarada, con servidor en 127.0.0.1:8923 y Chromium local. Todo usa fixtures, no cuentas o servicios de producción. Si el código cambia, escribir evidencia nueva en otra carpeta fechada.
 
-## Comprobaciones realizadas
+## Histórico y continuidad
 
-- 14 capturas: 390 × 844 y 1440 × 900; sin desbordamiento horizontal del documento en los estados capturados.
-- Registro manual de snack, preparación/aplicación de día, registro de comida, navegación, entrada a entrenamiento guiado y revisión del acceso a compras.
-- 11 pruebas E2E de nutrición, foto, entrenamiento y onboarding: aprobadas sin reintentos. Resumen en [evidence/checks.json](evidence/checks.json).
-- Son evidencias de funcionamiento local; no constituyen un estudio de usabilidad con personas.
+El [análisis del 22 de octubre](ANALISIS.md), la [matriz original](matriz.csv), el [registro de fuentes inicial](FUENTES.md), `capture.mjs` y las capturas iniciales describen `df27422`, un checkout distinto del `main` contrastado. Sus 11 E2E/14 capturas son históricos; no son resultados de esta actualización. Las decisiones vigentes están en PLAN/BACKLOG y los nuevos REQ.
 
-## Continuidad para otras sesiones
-
-Los identificadores `MFP-00` a `MFP-17` son propuestas de este plan, **no REQ funcionales aprobados ni entradas del selector automático**. La solicitud autoriza el análisis y la planificación, no ejecutar todo el roadmap. REQ-264 registra únicamente la publicación de este entregable documental; se evita el REQ-202 usado en el checkout privado, porque ese número ya corresponde a otro trabajo en `main`. Al implementar una propuesta, convertirla en un REQ aislado, confirmar decisiones y dependencias pendientes, preservar historial/RLS y hacer su propio commit.
-
-El primer paquete recomendado es MFP-01/02/03/04: desbloquear acceso, medir el recorrido, asegurar la procedencia de los registros y hacer reutilizables las comidas habituales. La investigación externa MFP-00 puede avanzar en paralelo.
-
-`capture.mjs` conserva el recorrido utilizado en el checkout original, con Chromium local y fixtures. Para ejecutar una captura nueva sobre `main`, revisar primero sus selectores y helpers contra la versión actual; no se ha validado el script sobre la base de publicación. Servir la raíz con `python3 -m http.server 8923 --bind 127.0.0.1`, adaptar el recorrido y escribir nuevos resultados en otra carpeta fechada, conservando esta evidencia histórica. Detener el servidor de revisión al terminar. Los 11 E2E y los validadores documentados en el informe corresponden a la ejecución del 22 de octubre; no se afirman como resultados de la publicación actual.
+REQ-264 registra la publicación compartida del informe. REQ-265..273 son pendientes funcionales, uno por implementación/commit. Al tomar uno, revalidar su necesidad, revisar dependencias y respetar lock, privacidad, historial y los contratos existentes. Este paquete no reanuda el track nativo pausado ni introduce proveedores, pagos o migraciones de producción como prerrequisito.

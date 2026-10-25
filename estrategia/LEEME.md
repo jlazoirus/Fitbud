@@ -1,6 +1,6 @@
 # Fitbros — Plan de Startup (empieza aquí)
 
-Referencia compartida: [MyFitnessPal frente a Evolv — análisis y plan del 22 oct 2026](../docs/competitive/2026-10-22-myfitnesspal/README.md). Contiene propuestas y evidencia de un checkout anterior; revisar su nota de publicación y contrastar con `main` antes de ejecutar mejoras.
+Referencia compartida: [MyFitnessPal frente a Evolv — plan actualizado el 24 oct 2026](../docs/competitive/2026-10-22-myfitnesspal/README.md). Ya incorpora fuentes oficiales y nueve requerimientos pendientes (REQ-265..273), sin entrevistas como condición. El diagnóstico original se conserva como histórico; para implementar usar el backlog vigente.
 
 Carpeta de estrategia para construir Fitbros como negocio, partiendo del producto que ya existe (desplegado en https://fitbud-green.vercel.app/). Creado el 19 jun 2026 a partir del repo `jlazoirus/Fitbud`.
 

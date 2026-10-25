@@ -37,7 +37,7 @@ Diferencias con los dos loops anteriores: **no usa** el lock `.git/fitbros-agent
 
 ## Análisis competitivo y propuestas de producto
 
-El [análisis de MyFitnessPal frente a Evolv](docs/competitive/2026-10-22-myfitnesspal/README.md) reúne la matriz funcional, evidencia local, límites de investigación y un [plan priorizado](docs/competitive/2026-10-22-myfitnesspal/PLAN.md). Sus tareas `MFP-00..17` son propuestas: contrastarlas con el código y `REQUIREMENTS.md` vigentes antes de convertirlas en trabajo. El snapshot analizado difiere de `main`; no implica activar toda la cola ni reanudar la migración nativa pausada.
+El [plan vigente de mejoras frente a MyFitnessPal](docs/competitive/2026-10-22-myfitnesspal/README.md) incorpora fuentes oficiales y contraste con `main`. El usuario autorizó **REQ-265..273** en `REQUIREMENTS.md`: pendientes funcionales ordenados, con [alcance y dependencias](docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md), sin entrevistas/reclutamiento como condición. El selector descubre estos REQ. Revalidar código al tomar cada uno y usar el lock del desarrollador; este paquete no reactiva la migración nativa. Las propuestas MFP-00..17 y el snapshot inicial quedan como histórico.
 
 ## Memoria operativa entre corridas (continuidad, no fuente de verdad)
 
