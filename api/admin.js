@@ -867,23 +867,47 @@ function betaInviteCode() {
   return "FIT-" + body.slice(0, 4) + "-" + body.slice(4);
 }
 
-export function betaInviteMessage({ name, code, days, validUntil, appUrl }) {
+function betaGreeting(name) {
   const first = String(name || "").trim().split(/\s+/)[0] || "";
+  return `Hola${first ? " " + first : ""}, ¡ya estás en la beta de Evolv! Muchas gracias por sumarte, te doy la bienvenida.`;
+}
+function betaAccessLength(days) {
+  return days % 30 === 0 && days >= 60 ? `${days / 30} meses` : `${days} días`;
+}
+const BETA_SIGN_OFF = "Cualquier duda o problema, escríbeme por aquí.";
+
+export function betaInviteMessage({ name, code, days, validUntil, appUrl }) {
   const link = appUrl.replace(/\/$/, "") + "/?codigo=" + code;
   const until = new Date(validUntil).toLocaleDateString("es-PE", { day: "numeric", month: "long", timeZone: "America/Lima" });
-  const length = days % 30 === 0 && days >= 60 ? `${days / 30} meses` : `${days} días`;
   return {
     link,
     text: [
-      `Hola${first ? " " + first : ""}, te escribimos de Evolv. Gracias por postular a la beta de fundadores: entraste al grupo.`,
+      betaGreeting(name),
       "",
-      `Este es tu acceso completo por ${length}, sin costo: ${link}`,
+      `Este es tu enlace: ${link}`,
       "",
-      `Ábrelo en el teléfono donde vas a usar Evolv y crea tu cuenta; el acceso se activa solo. Si te pide el código de invitación, es ${code}.`,
+      `Ábrelo en el teléfono donde vas a usar Evolv y crea tu cuenta; tus ${betaAccessLength(days)} de acceso completo, sin costo, se activan solos. Si te pide un código de invitación, es ${code}. El enlace se puede activar hasta el ${until}.`,
       "",
-      `El enlace se puede activar hasta el ${until}. ¿Te acomoda una llamada de 15 minutos esta semana para conocer tu caso?`,
+      BETA_SIGN_OFF,
     ].join("\n"),
   };
+}
+
+// Mensaje de WhatsApp cuando la invitación salió por correo (o ya tenía cuenta).
+export function betaWelcomeMessage({ name, email, days, existing, appUrl }) {
+  const link = appUrl.replace(/\/$/, "");
+  const access = `Tienes ${betaAccessLength(days)} de acceso completo, sin costo.`;
+  return [
+    betaGreeting(name),
+    "",
+    existing
+      ? `Como ya tenías cuenta con ${email}, tu acceso ya está activo: entra con tu correo y tu contraseña de siempre. ${access}`
+      : `Te acabo de enviar un correo a ${email} para que crees tu cuenta. Búscalo (si no aparece, revisa spam o promociones), abre el enlace y crea tu contraseña. ${access}`,
+    "",
+    `La app: ${link}`,
+    "",
+    BETA_SIGN_OFF,
+  ].join("\n");
 }
 
 async function betaSubmission(e, id) {
@@ -975,6 +999,9 @@ async function acceptBetaApplicant(e, caller, body, req) {
         contacted_at: new Date().toISOString(),
         review_notes: sub.review_notes ? sub.review_notes + "\n" + note : note,
       });
+      const message = betaWelcomeMessage({
+        name: sub.name, email, days: BETA_ACCESS_DAYS, existing: !!existing, appUrl: process.env.APP_URL || "https://evolvapp.club",
+      });
       return {
         status: 200,
         data: {
@@ -983,7 +1010,8 @@ async function acceptBetaApplicant(e, caller, body, req) {
           days: BETA_ACCESS_DAYS,
           betaError,
           applicant: betaOut(updated || Object.assign({}, sub, { status: "beta_invited" })),
-          whatsappUrl: phone ? "https://wa.me/" + phone : "",
+          message,
+          whatsappUrl: phone ? "https://wa.me/" + phone + "?text=" + encodeURIComponent(message) : "",
         },
       };
     } catch (error) {
