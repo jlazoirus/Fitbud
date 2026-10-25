@@ -165,4 +165,22 @@ assert.deepEqual(g.mergeCustomRecipes([recipe], [r2], []).map((r) => r.version),
 assert.deepEqual(g.mergeCustomRecipes([recipe], [], ["rtest01"]), []);
 console.log("  REQ-272: validación, rendimiento por porción/peso final y fusión");
 
+// ── REQ-273: GTIN ─────────────────────────────────────────────────────────────
+assert.deepEqual(g.parseGtin("4006381333931"), { ok: true, value: "4006381333931" }, "EAN-13 válido");
+assert.equal(g.parseGtin("036000291452").ok, true, "UPC-A (GTIN-12)");
+assert.equal(g.parseGtin("96385074").ok, true, "EAN-8");
+assert.equal(g.parseGtin("00012345600012").ok, true, "GTIN-14");
+assert.equal(g.parseGtin("4006381333932").error, "check", "dígito de control");
+assert.equal(g.parseGtin("12345").error, "length");
+assert.equal(g.parseGtin("40063813339a1").error, "format");
+assert.equal(g.parseGtin("").empty, true);
+assert.equal(g.normalizeGtin(" 0036000-291452 "), "0036000291452", "conserva ceros, quita espacios y guiones");
+assert.ok(g.sameGtin("036000291452", "0036000291452"), "UPC-A leído como EAN-13 es la misma presentación");
+assert.ok(!g.sameGtin("4006381333931", "96385074"));
+assert.ok(!g.sameGtin("", ""), "vacío nunca coincide");
+assert.equal(vf({ name: "Y", unit: "100g", kcal: "1", p: "1", c: "1", f: "1", gtin: "4006381333931" }).value.gtin, "4006381333931");
+assert.ok(vf({ name: "Y", unit: "100g", kcal: "1", p: "1", c: "1", f: "1", gtin: "4006381333932" }).errors.gtin);
+assert.equal(g.normalizeCustomFood({ ...fA, gtin: "bad" }).gtin, undefined, "un código inválido no se guarda");
+console.log("  REQ-273: GTIN-8/12/13/14, dígito de control, ceros y presentaciones");
+
 console.log("test-meal-log: OK");

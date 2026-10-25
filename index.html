@@ -482,6 +482,9 @@
   .qp-create{margin-top:8px}
   .qp-list.qp-list-form{max-height:none;overflow:visible}
   .cf-form{padding:4px 0}
+  .qp-scan-row{margin:6px 0}
+  .scan{display:flex;flex-direction:column;gap:6px;margin:6px 0}
+  .scan video{width:100%;max-height:220px;object-fit:cover;border-radius:var(--r-md);background:var(--surf3)}
   .qp-unit{flex:0 0 auto;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:6px 4px;font-family:inherit;font-size:14px}
   .copy-list{margin:6px 0;padding-left:18px;font-size:14px}
   .components{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r-md)}
@@ -9141,7 +9144,7 @@ function modal(html,opts){
 function closeModal(){
   const onClose=_modalOnClose;_modalOnClose=null;
   document.removeEventListener("keydown",_modalKeyHandler);
-  const o=$("#overlay");if(o)o.remove();stopMic();
+  const o=$("#overlay");if(o)o.remove();stopMic();stopBarcodeScan();
   if(_modalTrigger&&typeof _modalTrigger.focus==="function")try{_modalTrigger.focus();}catch(_){}
   _modalTrigger=null;
   if(onClose)try{onClose();}catch(_){}
@@ -9706,7 +9709,7 @@ function quickPickTab(tab){
 function quickPickSearch(value){const qp=window._qp;if(!qp)return;qp.query=value;renderQuickPicks();}
 function renderQuickPicks(){
   const qp=window._qp,box=$("#qpList");if(!qp||!box)return;
-  if(qp.tab!=="food")box.classList.remove("qp-list-form");
+  if(qp.tab!=="food"){box.classList.remove("qp-list-form");const row=$("#qpScanRow");if(row)row.innerHTML="";stopBarcodeScan();}
   document.querySelectorAll(".qp-tab").forEach(b=>{const on=b.dataset.tab===qp.tab;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on?"true":"false");});
   const search=$("#qpSearch");
   if(search)search.placeholder=qp.tab==="food"?"Busca un alimento: avena, pollo…":"Buscar";
@@ -9716,6 +9719,18 @@ function renderQuickPicks(){
     box.classList.toggle("qp-list-form",!!qp.foodForm);
     if(qp.foodForm){box.innerHTML=customFoodFormHtml(qp.foodForm);if(!qp.foodForm.focused){qp.foodForm.focused=true;box.scrollIntoView({block:"start"});const f=$("#cf_name");if(f)f.focus({preventScroll:true});}return;}
     const mine=customFoods();
+    renderScanRow();
+    // REQ-273: un número de 8+ dígitos se busca como código entre tus alimentos (sin servicios externos).
+    const code=String(qp.query||"").replace(/[\s-]/g,"");
+    if(/^\d{8,}$/.test(code)){
+      const g=parseGtin(code);
+      qp.custom=g.ok?mine.filter(f=>sameGtin(f.gtin,g.value)):[];qp.recipes=[];qp.items=[];
+      box.innerHTML=qp.custom.length
+        ?`<div class="qp-sub muted small">Tus alimentos con el código ${esc(code)}</div>${qp.custom.map(customFoodRowHtml).join("")}<div class="muted small">Confirma que coincide con la etiqueta y la cantidad antes de añadir.</div>`
+        :g.ok?`<div class="muted small">Este código no está en tus alimentos. Puedes crearlo con los datos de la etiqueta.</div><button class="btn btn-sm qp-create" onclick="openCustomFoodForm(null,'${esc(g.value)}')">＋ Crear alimento con este código</button>`
+        :`<div class="field-errors" role="alert">${esc(gtinErrorText(g.error))}</div>`;
+      return;
+    }
     qp.custom=(q?mine.filter(f=>catalogSlug(customFoodLabel(f)).includes(q)):mine).slice(0,q?8:5);
     const foods=DB.loaded?(DB.ingredients||[]):[];
     qp.items=q?foods.filter(i=>catalogSlug(i.name).includes(q)).slice(0,8):[];
@@ -9960,12 +9975,12 @@ function addCustomFoodToEditor(j){
   const line=normalizeComponent({name:customFoodLabel(f),unit:f.unit,amount:r.value,base:f.base,ref:{kind:"food",id:f.id,version:f.version}});
   if(line&&addEditorComponent(line))toast(`${line.name} añadido`);
 }
-function openCustomFoodForm(id){
+function openCustomFoodForm(id,gtin){
   const qp=window._qp;if(!qp)return;
   const f=id?customFoods().find(x=>x.id===id):null;
   const search=$("#qpSearch");
-  qp.foodForm=f?{id:f.id,name:f.name,brand:f.brand||"",unit:f.unit,kcal:formatEditorNumber(f.base.kcal),p:formatEditorNumber(f.base.p),c:formatEditorNumber(f.base.c),f:formatEditorNumber(f.base.f),portionLabel:f.portion&&f.portion.label||"",portionAmount:f.portion&&f.portion.amount?formatEditorNumber(f.portion.amount):"",version:f.version}
-    :{name:search?search.value.trim():"",brand:"",unit:"100g",kcal:"",p:"",c:"",f:"",portionLabel:"",portionAmount:""};
+  qp.foodForm=f?{id:f.id,name:f.name,brand:f.brand||"",unit:f.unit,kcal:formatEditorNumber(f.base.kcal),p:formatEditorNumber(f.base.p),c:formatEditorNumber(f.base.c),f:formatEditorNumber(f.base.f),portionLabel:f.portion&&f.portion.label||"",portionAmount:f.portion&&f.portion.amount?formatEditorNumber(f.portion.amount):"",gtin:f.gtin||"",version:f.version}
+    :{name:gtin?"":search?search.value.trim():"",brand:"",unit:"100g",kcal:"",p:"",c:"",f:"",portionLabel:"",portionAmount:"",gtin:gtin||""};
   renderQuickPicks();
 }
 function customFoodFormHtml(ff){
@@ -9973,7 +9988,7 @@ function customFoodFormHtml(ff){
   const unitOpt=(val,label)=>`<option value="${val}" ${ff.unit===val?"selected":""}>${label}</option>`;
   const errs=ff.errors||{};
   const inv=k=>errs[k]?' aria-invalid="true" aria-describedby="cf_errors"':"";
-  const labels={name:"Nombre",brand:"Marca",unit:"Valores por",kcal:"kcal",p:"Proteína",c:"Carbohidratos",f:"Grasa",portionLabel:"Porción",portionAmount:"Cantidad de la porción"};
+  const labels={name:"Nombre",brand:"Marca",unit:"Valores por",kcal:"kcal",p:"Proteína",c:"Carbohidratos",f:"Grasa",portionLabel:"Porción",portionAmount:"Cantidad de la porción",gtin:"Código de barras"};
   const errList=Object.keys(labels).filter(k=>errs[k]);
   const isPortion=ff.unit==="portion";
   return `<div class="cf-form">
@@ -9989,6 +10004,7 @@ function customFoodFormHtml(ff){
       <div class="field" style="flex:2"><label for="cf_portionLabel">${isPortion?"Porción de la etiqueta":"Porción (opcional)"}</label><input id="cf_portionLabel" maxlength="40" autocomplete="off" placeholder="${isPortion?"Ej. 1 barra":"Ej. 1 pote"}" value="${v("portionLabel")}"${inv("portionLabel")}></div>
       ${isPortion?"":`<div class="field" style="flex:1"><label for="cf_portionAmount">${ff.unit==="100ml"?"ml":"g"}</label><input id="cf_portionAmount" type="text" inputmode="decimal" autocomplete="off" value="${v("portionAmount")}"${inv("portionAmount")}></div>`}
     </div>
+    <div class="field"><label for="cf_gtin">Código de barras (opcional)</label><input id="cf_gtin" inputmode="numeric" autocomplete="off" maxlength="20" value="${v("gtin")}"${inv("gtin")}></div>
     <div id="cf_errors" class="field-errors" role="alert" ${errList.length?"":"hidden"}>${errList.length?`<ul>${errList.map(k=>`<li><b>${labels[k]}:</b> ${esc(errs[k])}</li>`).join("")}</ul>`:""}</div>
     <div class="row" style="gap:8px;margin-top:10px">
       <button class="btn btn-accent btn-sm" onclick="saveCustomFoodForm()">Guardar alimento</button>
@@ -9999,7 +10015,7 @@ function customFoodFormHtml(ff){
 }
 function readCustomFoodForm(){
   const qp=window._qp,ff=qp&&qp.foodForm;if(!ff)return null;
-  ["name","brand","kcal","p","c","f","portionLabel","portionAmount"].forEach(k=>{const el=$("#cf_"+k);if(el)ff[k]=el.value;});
+  ["name","brand","kcal","p","c","f","portionLabel","portionAmount","gtin"].forEach(k=>{const el=$("#cf_"+k);if(el)ff[k]=el.value;});
   const unit=$("#cf_unit");if(unit)ff.unit=unit.value;
   return ff;
 }
@@ -10011,6 +10027,9 @@ async function saveCustomFoodForm(){
   const check=validateCustomFoodInput(ff);
   if(!check.ok){ff.errors=check.errors;renderQuickPicks();return;}
   const mine=customFoods();
+  // REQ-273: un código identifica una sola presentación entre tus alimentos.
+  const dup=check.value.gtin&&mine.find(x=>x.id!==ff.id&&sameGtin(x.gtin,check.value.gtin));
+  if(dup){ff.errors={gtin:`Ese código ya está en «${customFoodLabel(dup)}». Cada tamaño o presentación tiene su propio código.`};renderQuickPicks();return;}
   if(!ff.id&&mine.length>=CUSTOM_FOODS_MAX){ff.errors={name:`Puedes guardar hasta ${CUSTOM_FOODS_MAX} alimentos propios.`};renderQuickPicks();return;}
   const food=Object.assign({},check.value,{id:ff.id||customFoodId(),version:ff.id?(+ff.version||1)+1:1,updatedAt:new Date().toISOString()});
   ff.busy=true;
@@ -10207,6 +10226,67 @@ function addRecipeToEditor(j){
   const line=normalizeComponent({name:r.name,unit,amount:amt.value,base,ref:{kind:"recipe",id:r.id,version:r.version}});
   if(line&&addEditorComponent(line))toast(`${line.name} ${componentAmountLabel(line)} añadido`);
 }
+/* REQ-273: escaneo progresivo. Solo si el navegador trae BarcodeDetector y cámara
+   en contexto seguro; si no, se escribe el código. Sin librerías ni servicios externos. */
+const SCAN_FORMATS=["ean_13","ean_8","upc_a","itf"];
+function barcodeScanSupported(){
+  return typeof window.BarcodeDetector==="function"&&!!window.isSecureContext
+    &&!!(navigator.mediaDevices&&typeof navigator.mediaDevices.getUserMedia==="function");
+}
+function renderScanRow(){
+  const row=$("#qpScanRow");if(!row)return;
+  row.innerHTML=barcodeScanSupported()
+    ?`<button class="btn btn-sm" onclick="startBarcodeScan()">📷 Escanear código de barras</button>`
+    :`<span class="muted small">También puedes escribir el número del código de barras.</span>`;
+}
+function scanMessage(text){const box=$("#qpScan");if(box)box.innerHTML=`<div class="muted small scan-msg" role="status">${esc(text)}</div>`;}
+async function startBarcodeScan(){
+  if(window._scan)return;
+  if(!barcodeScanSupported()){scanMessage("Este navegador no puede leer códigos con la cámara. Escribe el número del código.");return;}
+  let formats=SCAN_FORMATS;
+  try{const sup=await window.BarcodeDetector.getSupportedFormats();if(Array.isArray(sup))formats=SCAN_FORMATS.filter(f=>sup.includes(f));}catch(_){}
+  if(!formats.length){scanMessage("Este navegador no lee este tipo de código. Escribe el número del código.");return;}
+  let stream;
+  try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});}
+  catch(_){scanMessage("No pudimos usar la cámara (sin permiso o sin cámara). Escribe el número del código.");return;}
+  const box=$("#qpScan");
+  if(!box){stream.getTracks().forEach(t=>t.stop());return;}
+  window._scan={stream,detector:new window.BarcodeDetector({formats}),active:true,timer:null};
+  box.innerHTML=`<div class="scan"><video id="qpScanVideo" playsinline muted autoplay aria-label="Vista de la cámara"></video>
+    <div class="muted small">Apunta al código de barras de la etiqueta.</div>
+    <button class="btn btn-sm" onclick="stopBarcodeScan(true)">Cancelar</button></div>`;
+  const video=$("#qpScanVideo");video.srcObject=stream;
+  try{await video.play();}catch(_){}
+  scanLoop();
+}
+async function scanLoop(){
+  const sc=window._scan;if(!sc||!sc.active)return;
+  const video=$("#qpScanVideo");if(!video){stopBarcodeScan();return;}
+  try{
+    const found=await sc.detector.detect(video);
+    if(!window._scan||!window._scan.active)return;
+    const codes=[...new Set((found||[]).map(b=>normalizeGtin(b&&b.rawValue)).filter(Boolean))];
+    if(codes.length===1){stopBarcodeScan();applyScannedCode(codes[0]);return;}
+    if(codes.length>1){
+      stopBarcodeScan();
+      const box=$("#qpScan");
+      if(box)box.innerHTML=`<div class="muted small">Se leyeron varios códigos. Elige el del producto:</div>${codes.map(c=>`<button class="btn btn-sm" style="margin:4px 4px 0 0" onclick="applyScannedCode('${c}')">${c}</button>`).join("")}`;
+      return;
+    }
+  }catch(_){}
+  sc.timer=setTimeout(scanLoop,250);
+}
+function stopBarcodeScan(clear){
+  const sc=window._scan;
+  if(sc){sc.active=false;clearTimeout(sc.timer);try{sc.stream.getTracks().forEach(t=>t.stop());}catch(_){}window._scan=null;}
+  if(clear){const box=$("#qpScan");if(box)box.innerHTML="";}
+}
+function applyScannedCode(code){
+  const qp=window._qp;const box=$("#qpScan");if(box)box.innerHTML="";
+  const search=$("#qpSearch");if(search)search.value=code;
+  if(qp){qp.query=code;renderQuickPicks();}
+  toast("Código leído: confirma el producto y la cantidad");
+}
 function quickPicksHtml(){
   const hasRecent=recentCustomMeals(1).length,hasFav=savedMeals().length;
   window._qp={tab:hasRecent?"recent":hasFav?"fav":"food",query:"",items:[],base:null,portion:1};
@@ -10217,6 +10297,8 @@ function quickPicksHtml(){
       <button class="qp-tab" data-tab="food" onclick="quickPickTab('food')">Alimento</button>
     </div>
     <input id="qpSearch" class="qp-search" type="search" autocomplete="off" oninput="quickPickSearch(this.value)">
+    <div id="qpScanRow" class="qp-scan-row"></div>
+    <div id="qpScan"></div>
     <div id="qpList" class="qp-list"></div>
     <div id="qpPortion" class="qp-portion-row"></div>
   </div>`;

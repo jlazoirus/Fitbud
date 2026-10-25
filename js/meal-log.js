@@ -274,8 +274,12 @@
       else if(r.value>COMPONENT_AMOUNT_MAX[unit])errors.portionAmount=`Máximo ${COMPONENT_AMOUNT_MAX[unit]} ${unit==="100ml"?"ml":"g"}.`;
       if(!errors.portionLabel&&!errors.portionAmount)portion={label,amount:roundTenth(r.value)};
     }
+    // REQ-273: código opcional de la presentación (identifica tamaño/marca concreta).
+    let gtin="";
+    const g=parseGtin(input&&input.gtin);
+    if(!g.empty){if(g.ok)gtin=g.value;else errors.gtin=gtinErrorText(g.error);}
     const ok=!Object.keys(errors).length;
-    const value=ok?Object.assign({name,unit,base},brand?{brand}:{},portion?{portion}:{}):null;
+    const value=ok?Object.assign({name,unit,base},brand?{brand}:{},portion?{portion}:{},gtin?{gtin}:{}):null;
     return {ok,value,errors};
   }
   function normalizeCustomFood(f){
@@ -295,6 +299,7 @@
       else if(label&&Number.isFinite(amount)&&amount>0&&amount<=COMPONENT_AMOUNT_MAX[unit])out.portion={label,amount:roundTenth(amount)};
     }
     if(unit==="portion"&&!out.portion)out.portion={label:"1 porción"};
+    const gtin=normalizeGtin(f.gtin);if(gtin)out.gtin=gtin;
     const version=Number(f.version);out.version=Number.isInteger(version)&&version>0?version:1;
     const at=Date.parse(f.updatedAt);if(Number.isFinite(at))out.updatedAt=new Date(at).toISOString();
     return out;
@@ -312,6 +317,32 @@
   function mergeCustomFoods(serverList,localList,deletedIds){return mergeById(serverList,localList,deletedIds,normalizedCustomFoods,CUSTOM_FOODS_MAX);}
   function customFoodLabel(f){return f.brand?`${f.name} (${f.brand})`:f.name;}
   function customFoodBaseLabel(f){return f.unit==="portion"?`por ${f.portion&&f.portion.label||"porción"}`:`por 100 ${f.unit==="100ml"?"ml":"g"}`;}
+
+  // ── REQ-273: código de producto (GTIN) ─────────────────────────────────────
+  // GTIN-8/12/13/14 con dígito de control (módulo 10 GS1). Se guarda como texto
+  // tal como se leyó (con ceros a la izquierda); para comparar presentaciones se
+  // rellena a 14 dígitos, así un UPC-A leído como EAN-13 es el mismo producto.
+  function gtinCheckDigitOk(digits){
+    let sum=0;
+    for(let i=digits.length-2,k=0;i>=0;i--,k++)sum+=Number(digits[i])*(k%2===0?3:1);
+    return (10-sum%10)%10===Number(digits[digits.length-1]);
+  }
+  function parseGtin(raw){
+    const text=String(raw==null?"":raw).replace(/[\s-]/g,"");
+    if(!text)return {ok:false,empty:true,error:"empty"};
+    if(!/^\d+$/.test(text))return {ok:false,error:"format"};
+    if(![8,12,13,14].includes(text.length))return {ok:false,error:"length"};
+    if(!gtinCheckDigitOk(text))return {ok:false,error:"check"};
+    return {ok:true,value:text};
+  }
+  function normalizeGtin(raw){const r=parseGtin(raw);return r.ok?r.value:"";}
+  function gtinKey(code){const v=normalizeGtin(code);return v?v.padStart(14,"0"):"";}
+  function sameGtin(a,b){const ka=gtinKey(a);return !!ka&&ka===gtinKey(b);}
+  function gtinErrorText(error){
+    return error==="check"?"Revisa el código: el último dígito no coincide (dígito de control)."
+      :error==="length"?"Un código de barras tiene 8, 12, 13 o 14 dígitos."
+      :"Escribe solo los números del código de barras.";
+  }
 
   // ── REQ-272: recetas propias con rendimiento ───────────────────────────────
   // prefs.customRecipes (máx. 50): {id, name, lines (≤30 de catálogo o alimentos
@@ -408,6 +439,7 @@
     copyEntrySnapshot,
     CUSTOM_FOODS_MAX,CUSTOM_FOOD_DELETED_MAX,validateCustomFoodInput,normalizeCustomFood,normalizedCustomFoods,
     mergeCustomFoods,customFoodLabel,customFoodBaseLabel,
+    parseGtin,normalizeGtin,gtinKey,sameGtin,gtinErrorText,
     RECIPES_MAX,RECIPE_LINES_MAX,validateRecipeInput,normalizeCustomRecipe,normalizedCustomRecipes,recipeBase,mergeCustomRecipes,
   };
   root.FITBUD_MEAL_LOG=api;

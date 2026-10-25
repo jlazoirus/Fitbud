@@ -2061,7 +2061,7 @@ Pruebas de fracciones/rendimiento, E2E crear/guardar/registrar/editar, legado, s
 
 ## REQ-273 - Nutrición: productos propios por código y escaneo progresivo
 
-**Estado: pendiente.** Prioridad P2. Dependencias: REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P2. Dependencias: REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Fuentes S09/S10; no hay código de producto en el registro actual.
@@ -2086,3 +2086,8 @@ Código propio válido abre ficha; desconocido ofrece alta manual. Sin cámara/A
 
 ### Verificación sugerida
 Checksum/normalización, capacidades/permiso simulados, E2E escrito/válido/desconocido/offline y confirmación.
+
+### Implementación
+- `parseGtin`/`sameGtin`: GTIN-8/12/13/14 con dígito de control GS1; se guarda tal como se leyó (ceros incluidos) y se compara rellenado a 14 dígitos. Alimento propio con «Código de barras (opcional)»; un código no se repite entre presentaciones.
+- En «Alimento», un número de 8+ dígitos busca por código entre tus alimentos: si coincide pide confirmar etiqueta y cantidad; si es desconocido ofrece «Crear alimento con este código» (nunca registra solo); si es inválido lo explica. «Escanear» solo aparece con `BarcodeDetector`, cámara y contexto seguro; si no (p. ej. iOS), se escribe el código. Varios códigos se eligen; cancelar o cerrar apaga la cámara. Sin red externa ni librerías.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/codigo-barras.spec.js` (detector simulado; no es una prueba física en iPhone).
