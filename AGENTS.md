@@ -35,6 +35,10 @@ Diferencias con los dos loops anteriores: **no usa** el lock `.git/fitbros-agent
 
 **Estado actual: en pausa (desde 2026-10-19)** hasta validar el producto con usuarios en la web. Mientras `native-migration.json` tenga `paused`, el selector devuelve `plan_paused` y ningún agente trabaja en este track.
 
+## Análisis competitivo y propuestas de producto
+
+El [análisis de MyFitnessPal frente a Evolv](docs/competitive/2026-10-22-myfitnesspal/README.md) reúne la matriz funcional, evidencia local, límites de investigación y un [plan priorizado](docs/competitive/2026-10-22-myfitnesspal/PLAN.md). Sus tareas `MFP-00..17` son propuestas: contrastarlas con el código y `REQUIREMENTS.md` vigentes antes de convertirlas en trabajo. El snapshot analizado difiere de `main`; no implica activar toda la cola ni reanudar la migración nativa pausada.
+
 ## Memoria operativa entre corridas (continuidad, no fuente de verdad)
 
 Cada corrida autónoma arranca en frío: no hereda el historial conversacional de la anterior. Para preservar continuidad operativa entre corridas existe una **bitácora compartida fuera del repo**:

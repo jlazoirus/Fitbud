@@ -1930,3 +1930,9 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 `progressStats()` acotaba `cycleSummary()` al ciclo completo (incluidos días futuros sin registrar), diluyendo la adherencia real a ~14% con 100% de cumplimiento hasta hoy. Ahora llama `cycleSummary(todayStr())`. ✓ `tests/e2e/progreso.spec.js`.
+
+## REQ-264 - Publicar análisis MyFitnessPal para continuidad entre agentes
+
+**Estado: implementado.**
+
+Solicitud directa: compartir el análisis guardado localmente. Publica `docs/competitive/2026-10-22-myfitnesspal/README.md`, matriz de 48 dimensiones y propuestas MFP-00..17; añade entradas desde AGENTS, README y estrategia. Conserva evidencia del checkout anterior, declara diferencias con main y verificación externa pendiente. No incorpora las propuestas al selector ni reactiva el track nativo.

@@ -4,6 +4,8 @@ Tracker web/PWA de ciclos personalizados de nutrición y entrenamiento de **4 o 
 
 **🔗 En vivo:** https://evolvapp.club/ (desplegado en Vercel; las credenciales viven como variables de entorno en Vercel, no en este repo).
 
+El [análisis de MyFitnessPal y plan de mejora de Evolv](docs/competitive/2026-10-22-myfitnesspal/README.md) está disponible para todas las sesiones: 48 dimensiones, evidencia histórica y 18 iniciativas propuestas con criterios de aceptación. Consultar su alcance y revalidar contra el código actual antes de implementar.
+
 ## Qué hace
 
 - **Vista HOY** según la fecha real: comidas del plan, entrenamiento y metas del día.
