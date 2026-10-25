@@ -2028,7 +2028,7 @@ Cálculo por base/unidad, límites, E2E alta/búsqueda/registro/corrección, con
 
 ## REQ-272 - Nutrición: recetas propias con rendimiento y registro por porción
 
-**Estado: pendiente.** Prioridad P1. Dependencias: REQ-268 y REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-268 y REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Fuentes S07/S08; Evolv tiene recetas curadas pero no biblioteca privada con rendimiento editable.
@@ -2053,6 +2053,11 @@ Cuatro porciones registra una cuarta parte; 150 g usa peso final conocido. Guard
 
 ### Verificación sugerida
 Pruebas de fracciones/rendimiento, E2E crear/guardar/registrar/editar, legado, sync y aislamiento.
+
+### Implementación
+- `prefs.customRecipes` (máx. 50): hasta 30 líneas del catálogo o alimentos propios, pasos opcionales y rendimiento indicado por el usuario (porciones y/o peso final cocinado); nunca se infiere del crudo. `recipeBase` da la base por porción o por 100 g cocinada; fusión por id/versión con lápidas (`persistLibraryOp` compartido con REQ-271).
+- «Mis recetas» (Más opciones): crear, editar (versión +1) y eliminar con vista previa por porción/100 g; guardar no registra nada. En «Alimento», «Tus recetas» se registran por porciones o gramos como línea `ref:{kind:"recipe",id,version}` con snapshot: cambiar rendimiento o eliminar no reescribe consumos. No entra al solver ni se comparte.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/recetas.spec.js`.
 
 ## REQ-273 - Nutrición: productos propios por código y escaneo progresivo
 

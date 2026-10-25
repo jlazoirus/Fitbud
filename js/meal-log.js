@@ -309,20 +309,94 @@
   }
   // Fusión entre dispositivos: unión por id, gana la versión más alta (o la más
   // reciente si empatan) y los borrados (lápidas) no resucitan.
-  function mergeCustomFoods(serverList,localList,deletedIds){
-    const deleted=new Set((Array.isArray(deletedIds)?deletedIds:[]).map(String));
-    const byId=new Map();
-    const take=f=>{
-      if(!f||deleted.has(f.id))return;
-      const prev=byId.get(f.id);
-      if(!prev||f.version>prev.version||(f.version===prev.version&&(Date.parse(f.updatedAt)||0)>(Date.parse(prev.updatedAt)||0)))byId.set(f.id,f);
-    };
-    normalizedCustomFoods(serverList).forEach(take);
-    normalizedCustomFoods(localList).forEach(take);
-    return [...byId.values()].slice(0,CUSTOM_FOODS_MAX);
-  }
+  function mergeCustomFoods(serverList,localList,deletedIds){return mergeById(serverList,localList,deletedIds,normalizedCustomFoods,CUSTOM_FOODS_MAX);}
   function customFoodLabel(f){return f.brand?`${f.name} (${f.brand})`:f.name;}
   function customFoodBaseLabel(f){return f.unit==="portion"?`por ${f.portion&&f.portion.label||"porción"}`:`por 100 ${f.unit==="100ml"?"ml":"g"}`;}
+
+  // ── REQ-272: recetas propias con rendimiento ───────────────────────────────
+  // prefs.customRecipes (máx. 50): {id, name, lines (≤30 de catálogo o alimentos
+  // propios), steps?, yield:{servings?, weight?}, version, updatedAt}. El
+  // rendimiento lo indica el usuario (porciones y/o peso final cocinado); nunca
+  // se infiere del peso crudo. Registrar una parte guarda la base de esa versión.
+  const RECIPES_MAX=50;
+  const RECIPE_LINES_MAX=30;
+  const RECIPE_STEPS_MAX=2000;
+  const RECIPE_SERVINGS_MAX=50;
+  const RECIPE_WEIGHT_MAX=20000;
+  function recipeLines(list){
+    return normalizeComponents(list).filter(c=>c.ref&&(c.ref.kind==="ingredient"||c.ref.kind==="food")).slice(0,RECIPE_LINES_MAX);
+  }
+  function normalizeRecipeYield(y){
+    const out={};
+    const s=Number(y&&y.servings),w=Number(y&&y.weight);
+    if(Number.isFinite(s)&&s>0&&s<=RECIPE_SERVINGS_MAX)out.servings=roundTenth(s);
+    if(Number.isFinite(w)&&w>0&&w<=RECIPE_WEIGHT_MAX)out.weight=roundTenth(w);
+    return out;
+  }
+  function validateRecipeInput(input){
+    const errors={};
+    const name=cleanText(input&&input.name,200);
+    if(!name)errors.name="Pon el nombre de la receta.";
+    else if(name.length>MEAL_NAME_MAX)errors.name=`Usa hasta ${MEAL_NAME_MAX} caracteres.`;
+    const raw=Array.isArray(input&&input.lines)?input.lines:[];
+    const lines=recipeLines(raw);
+    if(!lines.length)errors.lines="Añade al menos un ingrediente.";
+    else if(raw.length>RECIPE_LINES_MAX)errors.lines=`Hasta ${RECIPE_LINES_MAX} ingredientes por receta.`;
+    const yld={};
+    const sRaw=String(input&&input.servings==null?"":input.servings).trim();
+    const wRaw=String(input&&input.weight==null?"":input.weight).trim();
+    if(sRaw){const r=parseNutrientInput(sRaw);if(!r.ok||r.value<=0||r.value>RECIPE_SERVINGS_MAX)errors.servings=`Indica entre 0,1 y ${RECIPE_SERVINGS_MAX} porciones.`;else yld.servings=roundTenth(r.value);}
+    if(wRaw){const r=parseNutrientInput(wRaw);if(!r.ok||r.value<=0||r.value>RECIPE_WEIGHT_MAX)errors.weight=`Indica el peso final en gramos (hasta ${RECIPE_WEIGHT_MAX}).`;else yld.weight=roundTenth(r.value);}
+    if(!sRaw&&!wRaw)errors.servings="Indica cuántas porciones rinde o cuánto pesa ya cocinada.";
+    const steps=String(input&&input.steps==null?"":input.steps).trim();
+    if(steps.length>RECIPE_STEPS_MAX)errors.steps=`Usa hasta ${RECIPE_STEPS_MAX} caracteres.`;
+    const ok=!Object.keys(errors).length;
+    return {ok,value:ok?Object.assign({name,lines,yield:yld},steps?{steps}:{}):null,errors};
+  }
+  function normalizeCustomRecipe(r){
+    if(!r||typeof r!=="object")return null;
+    const id=cleanText(r.id,64);
+    if(!/^[a-z0-9_-]{4,64}$/i.test(id))return null;
+    const name=cleanText(r.name,MEAL_NAME_MAX);
+    const lines=recipeLines(r.lines);
+    const yld=normalizeRecipeYield(r.yield);
+    if(!name||!lines.length||(!yld.servings&&!yld.weight))return null;
+    const out={id,name,lines,yield:yld};
+    const steps=String(r.steps==null?"":r.steps).replace(/\u0000/g,"").trim().slice(0,RECIPE_STEPS_MAX);
+    if(steps)out.steps=steps;
+    const version=Number(r.version);out.version=Number.isInteger(version)&&version>0?version:1;
+    const at=Date.parse(r.updatedAt);if(Number.isFinite(at))out.updatedAt=new Date(at).toISOString();
+    return out;
+  }
+  function normalizedCustomRecipes(list){
+    const out=[],seen=new Set();
+    (Array.isArray(list)?list:[]).forEach(item=>{
+      const r=normalizeCustomRecipe(item);
+      if(r&&!seen.has(r.id)&&out.length<RECIPES_MAX){seen.add(r.id);out.push(r);}
+    });
+    return out;
+  }
+  // Base para registrar una parte: por porción o por 100 g del peso final.
+  function recipeBase(recipe,unit){
+    const r=normalizeCustomRecipe(recipe);if(!r)return null;
+    const t=componentsTotals(r.lines);
+    const div=unit==="portion"?r.yield.servings:unit==="100g"?r.yield.weight/100:null;
+    if(!div)return null;
+    return {kcal:t.kcal/div,p:t.p/div,c:t.c/div,f:t.f/div};
+  }
+  function mergeById(serverList,localList,deletedIds,normalizeList,max){
+    const deleted=new Set((Array.isArray(deletedIds)?deletedIds:[]).map(String));
+    const byId=new Map();
+    const take=x=>{
+      if(!x||deleted.has(x.id))return;
+      const prev=byId.get(x.id);
+      if(!prev||x.version>prev.version||(x.version===prev.version&&(Date.parse(x.updatedAt)||0)>(Date.parse(prev.updatedAt)||0)))byId.set(x.id,x);
+    };
+    normalizeList(serverList).forEach(take);
+    normalizeList(localList).forEach(take);
+    return [...byId.values()].slice(0,max);
+  }
+  function mergeCustomRecipes(serverList,localList,deletedIds){return mergeById(serverList,localList,deletedIds,normalizedCustomRecipes,RECIPES_MAX);}
 
   const api={
     MEAL_VALUE_LIMITS,MEAL_NAME_MAX,
@@ -334,6 +408,7 @@
     copyEntrySnapshot,
     CUSTOM_FOODS_MAX,CUSTOM_FOOD_DELETED_MAX,validateCustomFoodInput,normalizeCustomFood,normalizedCustomFoods,
     mergeCustomFoods,customFoodLabel,customFoodBaseLabel,
+    RECIPES_MAX,RECIPE_LINES_MAX,validateRecipeInput,normalizeCustomRecipe,normalizedCustomRecipes,recipeBase,mergeCustomRecipes,
   };
   root.FITBUD_MEAL_LOG=api;
   Object.keys(api).forEach(key=>{root[key]=api[key];});

@@ -144,4 +144,25 @@ assert.equal(g.normalizedCustomFoods(Array.from({ length: 120 }, (_, i) => ({ ..
 assert.equal(g.normalizeCustomFood({ ...fA, id: "a b" }), null, "id inválido");
 console.log("  REQ-271: validación de etiqueta, porción sin peso, límites y fusión entre dispositivos");
 
+// ── REQ-272: recetas ──────────────────────────────────────────────────────────
+const arroz = { name: "Arroz", unit: "100g", amount: 400, base: { kcal: 130, p: 2.7, c: 28, f: 0.3 }, ref: { kind: "ingredient", id: "6" } };
+const pollo = { name: "Pollo", unit: "100g", amount: 600, base: { kcal: 165, p: 31, c: 0, f: 3.6 }, ref: { kind: "ingredient", id: "1" } };
+let rv = g.validateRecipeInput({ name: "Arroz con pollo", lines: [arroz, pollo], servings: "4", weight: "1200", steps: "Cocer." });
+assert.equal(rv.ok, true);
+assert.deepEqual(rv.value.yield, { servings: 4, weight: 1200 });
+assert.ok(g.validateRecipeInput({ name: "X", lines: [arroz] }).errors.servings, "exige rendimiento");
+assert.ok(g.validateRecipeInput({ name: "X", lines: [], servings: "2" }).errors.lines, "exige ingredientes");
+assert.ok(g.validateRecipeInput({ name: "X", lines: [{ ...arroz, ref: undefined }], servings: "2" }).errors.lines, "solo catálogo o alimentos propios");
+assert.ok(g.validateRecipeInput({ name: "X", lines: Array.from({ length: 31 }, () => arroz), servings: "2" }).errors.lines, "máximo 30 líneas");
+assert.ok(g.validateRecipeInput({ name: "X", lines: [arroz], servings: "0" }).errors.servings);
+const recipe = { id: "rtest01", version: 1, ...rv.value };
+const perServing = g.recipeBase(recipe, "portion");
+assert.ok(Math.abs(perServing.kcal - (520 + 990) / 4) < 1e-6, "por porción = total / porciones");
+assert.ok(Math.abs(g.recipeBase(recipe, "100g").kcal - 1510 / 12) < 1e-6, "por 100 g del peso final cocinado, no del crudo");
+assert.equal(g.recipeBase({ ...recipe, yield: { servings: 4 } }, "100g"), null, "sin peso final no se registra por gramos");
+const r2 = { ...recipe, version: 2, yield: { servings: 2 } };
+assert.deepEqual(g.mergeCustomRecipes([recipe], [r2], []).map((r) => r.version), [2]);
+assert.deepEqual(g.mergeCustomRecipes([recipe], [], ["rtest01"]), []);
+console.log("  REQ-272: validación, rendimiento por porción/peso final y fusión");
+
 console.log("test-meal-log: OK");
