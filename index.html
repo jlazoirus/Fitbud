@@ -476,6 +476,8 @@
   .intent-opt{display:flex;align-items:center;gap:8px;min-height:44px;font-size:14px}
   .intent-opt input{accent-color:var(--accent);width:18px;height:18px}
   #f_impact{margin-top:6px}
+  .copy-preview{margin-top:10px}
+  .copy-list{margin:6px 0;padding-left:18px;font-size:14px}
   .components{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r-md)}
   .comp-head{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;margin-bottom:6px}
   .comp-total{margin-top:6px}
@@ -4096,6 +4098,7 @@ const TAB_ICONS={
   chevron:'<path d="M9 6l6 6-6 6"/>',
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.3 11.2a1 1 0 0 0 1 .8h9.4a1 1 0 0 0 1-.8l1.7-7.7H6.1"/>',
+  copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
   refresh:'<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
   eye:'<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
   eyeOff:'<path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 12 15a3 3 0 0 0 2.4-4.8"/><path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.1 4.2"/><path d="M6.1 6.6C3.5 8.4 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.2-1"/>',
@@ -4927,6 +4930,7 @@ function openNutritionMoreMenu(){
   const items=[
     // REQ-121: no ofrecer "volver a preparar" en días pasados; ya están ejecutados/cerrados.
     (prepared&&ds>=todayStr())?item("refresh","Volver a preparar este día","homePrepareDay(current)"):"",
+    item("copy","Copiar comidas a otro día","openCopyMeals(current)"),
     item("progreso","Revisar mis macros","aiReview()"),
     item("week",hasPlan?"Preparar otra semana":"Preparar semana","aiGenerateWeek()"),
   ].filter(Boolean).join("");
@@ -9531,6 +9535,7 @@ function openMealMore(ds,id){
     ${originHtml}
     ${canUndoSubst(ms)?`<button class="opt" onclick="undoMealSubstitution('${ds}','${id}')">↩ Deshacer la sustitución<div class="o-meta">Vuelve a como estaba antes de registrar «${esc(ms.ovr.name)}».</div></button>`:""}
     <button class="opt" onclick="closeModal();openEditor('meal','${ds}','${id}')">✎ Editar valores / comida personalizada</button>
+    ${mealHasContent(v)?`<button class="opt" onclick="closeModal();openCopyMeals('${ds}','meal:${id}')">⧉ Copiar a otro día</button>`:""}
     ${v.name?`<button class="opt" onclick="blockCurrentMealDish('${ds}','${id}')">🚫 No me gusta este plato — no lo sugieras más</button>`:""}
     ${!ms.done?`<button class="opt" onclick="skipMeal('${ds}','${id}')">⏭ Saltar esta comida — no la haré hoy</button>`:""}
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cerrar</button>`);
@@ -10003,6 +10008,98 @@ function undoMealSubstitution(ds,id){
   delete ms.subst;
   addContingencyEntry(ds,{type:"meal_revert",id,reason:"undo_logged_instead",prev:null,revertedSlots:[]});
   commitDay(ds);closeModal();render();toast("Sustitución deshecha");
+}
+/* REQ-270: copiar una comida o las entradas de un día a otra fecha del ciclo, con
+   vista previa. El origen no cambia; las copias tienen identidad nueva y
+   procedencia. El futuro queda planificado; hoy/pasado exige elegir si se comió. */
+function copyableEntries(ds){
+  const day=buildDay(ds),st=dayState(ds),out=[];
+  day.meals.forEach(b=>{
+    const ms=st.meals[b.id]||{};if(ms.skipped)return;
+    const v=mealValue(b,ms);if(!mealHasContent(v)||!v.name)return;
+    const o=ms.ovr;
+    const entry=Object.assign({},v,o&&o.kcal!=null&&o.dishName==null?{components:o.components,nutritionMeta:o.nutritionMeta}:{nutritionMeta:{source:"recipe",ref:{kind:"recipe",name:v.name},base:{kcal:v.kcal,p:v.p,c:v.c,f:v.f,unit:"portion"},qty:1}});
+    out.push({key:"meal:"+b.id,slotId:b.id,label:b.slot,entry,done:!!ms.done});
+  });
+  st.extras.forEach((e,i)=>{if(mealHasContent(e)&&e.name)out.push({key:"extra:"+i,slotId:null,label:"Extra",entry:e,done:!!e.done});});
+  return out;
+}
+function openCopyMeals(ds,preKey){
+  const items=copyableEntries(ds);
+  if(!items.length){toast("Este día no tiene comidas para copiar");return;}
+  const tomorrow=addDays(ds,1);
+  window._copy={from:ds,items,sel:new Set(preKey?[preKey]:items.map(i=>i.key)),to:tomorrow<=END?tomorrow:(ds>START?addDays(ds,-1):ds),mode:"extra",eaten:null};
+  modal(`<h3>Copiar comidas</h3>
+    <p class="muted small">Desde ${esc(prettyDate(ds).toLowerCase())}. Lo copiado es independiente: editarlo no cambia el original.</p>
+    <fieldset class="log-intent"><legend>Qué copiar</legend>
+      ${items.map(i=>`<label class="intent-opt"><input type="checkbox" data-key="${esc(i.key)}" ${window._copy.sel.has(i.key)?"checked":""} onchange="toggleCopyItem(this.dataset.key,this.checked)"> <span><b>${esc(i.label)}</b> — ${esc(i.entry.name)} · ${Math.round(+i.entry.kcal||0)} kcal</span></label>`).join("")}
+    </fieldset>
+    <div class="field"><label for="copyTo">Copiar al día</label><input id="copyTo" type="date" min="${START}" max="${END}" value="${window._copy.to}" onchange="setCopyDate(this.value)"></div>
+    <fieldset class="log-intent"><legend>Cómo se registra</legend>
+      <label class="intent-opt"><input type="radio" name="copyMode" value="extra" checked onchange="setCopyMode('extra')"> Además de lo previsto</label>
+      <label class="intent-opt"><input type="radio" name="copyMode" value="replace" onchange="setCopyMode('replace')"> En lugar de la misma comida de ese día</label>
+    </fieldset>
+    <div id="copyEaten"></div>
+    <div id="copyPreview" class="copy-preview" aria-live="polite"></div>
+    <button class="btn btn-accent" id="copyConfirm" style="width:100%;margin-top:12px" onclick="confirmCopyMeals()">Copiar</button>`);
+  renderCopyPreview();
+}
+function toggleCopyItem(key,on){const c=window._copy;if(!c)return;if(on)c.sel.add(key);else c.sel.delete(key);renderCopyPreview();}
+function setCopyDate(ds){const c=window._copy;if(!c)return;if(ds&&ds>=START&&ds<=END){c.to=ds;c.eaten=null;}else{const el=$("#copyTo");if(el)el.value=c.to;}renderCopyPreview();}
+function setCopyMode(mode){const c=window._copy;if(!c)return;c.mode=mode==="replace"?"replace":"extra";renderCopyPreview();}
+function setCopyEaten(v){const c=window._copy;if(!c)return;c.eaten=v;renderCopyPreview();}
+// Plan de la copia: qué se agrega o reemplaza en el destino. Puro respecto del estado.
+function copyPlan(){
+  const c=window._copy;const destDay=buildDay(c.to);
+  return c.items.filter(i=>c.sel.has(i.key)).map(i=>{
+    const target=c.mode==="replace"&&i.slotId&&destDay.meals.find(m=>m.id===i.slotId);
+    return {item:i,target:target||null};
+  });
+}
+function renderCopyPreview(){
+  const c=window._copy,box=$("#copyPreview");if(!c||!box)return;
+  const future=c.to>todayStr();
+  const eatenBox=$("#copyEaten");
+  if(eatenBox)eatenBox.innerHTML=future
+    ?`<div class="muted small">Es un día futuro: lo copiado queda planificado, sin marcar como comido.</div>`
+    :`<fieldset class="log-intent"><legend>¿Ya lo comiste ese día?</legend>
+        <label class="intent-opt"><input type="radio" name="copyEaten" ${c.eaten===true?"checked":""} onchange="setCopyEaten(true)"> Sí, ya me lo comí</label>
+        <label class="intent-opt"><input type="radio" name="copyEaten" ${c.eaten===false?"checked":""} onchange="setCopyEaten(false)"> No, déjalo planificado</label>
+      </fieldset>`;
+  const btn=$("#copyConfirm");
+  const plan=copyPlan();
+  let msg="";
+  if(c.to===c.from)msg="Elige otro día: para repetir algo hoy usa «Recientes» al agregar una comida.";
+  else if(!plan.length)msg="Elige al menos una comida.";
+  else if(!future&&c.eaten==null)msg="Indica si ya lo comiste ese día.";
+  const dest=dayState(c.to),destDay=buildDay(c.to);
+  const doneCount=destDay.meals.filter(b=>(dest.meals[b.id]||{}).done).length+dest.extras.filter(e=>e.done).length;
+  const kcal=plan.reduce((a,p)=>a+(+p.item.entry.kcal||0),0);
+  const rows=plan.map(p=>{
+    if(p.target){const v=mealValue(p.target,mealState(c.to,p.target.id));return `<li>${esc(p.item.entry.name)} → reemplaza ${esc(p.target.slot)}${v.name?` (${esc(v.name)})`:""}</li>`;}
+    return `<li>${esc(p.item.entry.name)} → ${c.mode==="replace"&&p.item.slotId?"como extra (ese día no tiene esa comida)":"como extra"}</li>`;
+  }).join("");
+  box.innerHTML=`<div class="muted small"><b>Vista previa · ${esc(prettyDate(c.to))}</b>${doneCount?` · ese día ya tiene ${doneCount} registrada${doneCount>1?"s":""}`:""}</div>
+    ${rows?`<ul class="copy-list">${rows}</ul><div class="muted small">${Math.round(kcal)} kcal en total${future||c.eaten===false?" · planificado, no cuenta hasta que lo marques":c.eaten?" · cuenta como comido":""}</div>`:""}
+    ${msg?`<div class="field-errors" role="alert">${esc(msg)}</div>`:""}`;
+  if(btn)btn.disabled=!!msg;
+}
+function confirmCopyMeals(){
+  const c=window._copy;if(!c||c.busy)return;
+  const future=c.to>todayStr();
+  if(c.to===c.from||(!future&&c.eaten==null)){renderCopyPreview();return;}
+  const plan=copyPlan();if(!plan.length)return;
+  c.busy=true;
+  const eaten=future?false:!!c.eaten;
+  const d=dayState(c.to);let n=0;
+  plan.forEach(p=>{
+    const snap=copyEntrySnapshot(p.item.entry,{date:c.from,key:p.item.key});if(!snap)return;
+    if(p.target){applyMealSubstitution(c.to,p.target.id,snap,eaten);const ms=mealState(c.to,p.target.id);ms.ovr.copiedFrom=snap.copiedFrom;ms.subst.sig=substSignature(ms);}
+    else d.extras.push(Object.assign(snap,{done:eaten,oid:nextExtraOid(d)}));
+    n++;
+  });
+  commitDay(c.to);closeModal();render();
+  toast(`${n} comida${n>1?"s":""} copiada${n>1?"s":""} al ${prettyDate(c.to).toLowerCase()}`);
 }
 function editorSheet(title,pre){
   const aiOn=aiAvailable();

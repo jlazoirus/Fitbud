@@ -206,6 +206,24 @@
     return "manual";
   }
 
+  // ── REQ-270: copiar comidas entre días ──────────────────────────────────────
+  // Copia el snapshot (valores, líneas y origen) con identidad nueva: nunca
+  // arrastra ids de sync, orden, estado hecho/saltado ni el deshacer del origen.
+  function copyEntrySnapshot(entry,from){
+    if(!entry||typeof entry!=="object")return null;
+    const name=cleanText(entry.name,MEAL_NAME_MAX);
+    const vals=cleanMacros(entry,entry.macrosUnknown);
+    if(!name||!vals)return null;
+    const out={name,kcal:vals.kcal,p:vals.p,c:vals.c,f:vals.f};
+    if(entry.macrosUnknown)out.macrosUnknown=true;
+    const components=normalizeComponents(entry.components);
+    if(components.length)out.components=components;
+    const meta=normalizeNutritionMeta(entry.nutritionMeta);
+    if(meta)out.nutritionMeta=meta;
+    if(from&&from.date)out.copiedFrom={date:cleanText(from.date,10),key:cleanText(from.key,40)};
+    return out;
+  }
+
   const api={
     MEAL_VALUE_LIMITS,MEAL_NAME_MAX,
     parseNutrientInput,roundTenth,validateMealValues,
@@ -213,6 +231,7 @@
     metaComputedValues,sameMacros,nutritionMetaLabel,
     COMPONENTS_MAX,COMPONENT_AMOUNT_MAX,normalizeComponent,normalizeComponents,componentValues,componentsTotals,
     componentAmountLabel,componentsName,componentsSource,
+    copyEntrySnapshot,
   };
   root.FITBUD_MEAL_LOG=api;
   Object.keys(api).forEach(key=>{root[key]=api[key];});

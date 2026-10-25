@@ -1962,7 +1962,7 @@ E2E de tres estados, adicional, cancelación, fecha, reintento, totales e histor
 
 ## REQ-270 - Nutrición: copiar comida o selección del día a otra fecha
 
-**Estado: pendiente.** Prioridad P1. Dependencias: REQ-267 y REQ-269. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-267 y REQ-269. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Fuentes oficiales S05/S06; búsqueda de código distingue recientes/propagación de un flujo general de copia.
@@ -1987,6 +1987,11 @@ Futuro queda pendiente; hoy/pasado exige decisión de consumo. Destino con datos
 
 ### Verificación sugerida
 E2E de destino ocupado/vacío, futuro, misma fecha, cancelación, receta versionada e idempotencia.
+
+### Implementación
+- «⧉ Copiar a otro día» (menú «···» de la comida) y «Copiar comidas a otro día» (Más opciones): elegir entradas, día del ciclo y modo adicional o «en lugar de la misma comida»; vista previa con destino, reemplazos y kcal. Hoy/pasado exige elegir si se comió; el futuro queda planificado. Misma fecha, origen vacío o sin selección no copian.
+- `copyEntrySnapshot` copia valores, líneas y origen con `copiedFrom`, sin ids de sync, estado ni deshacer del origen; extras con `oid` nuevo; los reemplazos usan `applyMealSubstitution` (deshacibles). Un solo `commitDay` por copia. Lote de varios días queda fuera.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/copiar-comidas.spec.js`.
 
 ## REQ-271 - Nutrición: biblioteca privada de alimentos desde etiqueta
 

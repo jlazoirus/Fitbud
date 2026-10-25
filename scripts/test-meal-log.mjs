@@ -110,4 +110,15 @@ assert.equal(g.normalizeComponent({ name: "X", unit: "100g", amount: 2500, base:
 assert.equal(g.normalizeComponents(Array.from({ length: 40 }, () => lines[0])).length, 30, "máximo 30 líneas");
 console.log("  REQ-268: líneas con base propia, precisión completa y límites");
 
+// ── REQ-270: copia ────────────────────────────────────────────────────────────
+const src = { name: "Café", kcal: 120, p: 6, c: 10, f: 6, done: true, skipped: false, oid: 3, _syncId: "s1", subst: { prev: {} }, portion: 2,
+  components: [{ name: "Leche", unit: "100ml", amount: 200, base: { kcal: 60, p: 3, c: 5, f: 3 } }], nutritionMeta: { source: "manual" } };
+const copy = g.copyEntrySnapshot(src, { date: "2026-10-24", key: "extra:0" });
+assert.deepEqual(Object.keys(copy).sort(), ["c", "components", "copiedFrom", "f", "kcal", "name", "nutritionMeta", "p"], "solo snapshot + procedencia");
+copy.components[0].amount = 999;
+assert.equal(src.components[0].amount, 200, "editar la copia no toca el origen");
+assert.equal(g.copyEntrySnapshot({ name: "", kcal: 1 }), null);
+assert.equal(g.copyEntrySnapshot({ name: "X", kcal: -1, p: 0, c: 0, f: 0 }), null);
+console.log("  REQ-270: copia con identidad nueva, procedencia y sin estado del origen");
+
 console.log("test-meal-log: OK");
