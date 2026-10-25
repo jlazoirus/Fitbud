@@ -84,7 +84,7 @@ test("REQ-225: con correo, aceptar envía la invitación por correo y avisa de p
     }
     if (body.action === "betaAccept") {
       status = "beta_invited";
-      return json({ mode: "email", email: "ana@correo.test", days: 90, betaError: "", applicant: { ...ANA, email: "ana@correo.test", status }, whatsappUrl: "https://wa.me/51999111222" });
+      return json({ mode: "email", email: "ana@correo.test", days: 90, betaError: "", applicant: { ...ANA, email: "ana@correo.test", status }, message: "Hola Ana, ¡ya estás en la beta de Evolv! Te acabo de enviar un correo a ana@correo.test", whatsappUrl: "https://wa.me/51999111222?text=Hola%20Ana" });
     }
     return json({});
   });
@@ -95,6 +95,8 @@ test("REQ-225: con correo, aceptar envía la invitación por correo y avisa de p
   await expect(card).toContainText("ana@correo.test");
   await card.getByRole("button", { name: "Aceptar (90 días)" }).click();
   await expect(page.getByRole("dialog")).toContainText("Le enviamos la invitación a ana@correo.test");
+  await expect(page.locator("#betaInviteMsg")).toHaveValue(/Te acabo de enviar un correo a ana@correo\.test/);
+  await expect(page.getByRole("link", { name: "Enviar por WhatsApp" })).toHaveAttribute("href", /^https:\/\/wa\.me\/51999111222\?text=/);
   const accept = calls.find((c) => c.action === "betaAccept");
   expect(accept).toMatchObject({ id: 7 });
   expect(accept.redirectTo).toContain("/");

@@ -113,6 +113,10 @@ assert(codeInserts.length === 0, "Con correo no hace falta código.");
 assert(overrides.length === 1 && overrides[0].length === 8 && overrides[0].every((o) => o.daily_limit === 10000 && o.enabled === true && o.expires_at === entitlements[0].expires_at),
   "REQ-248: aceptar deja el coach sin tope hasta que vence el acceso.");
 assert(!res.body.betaError, "Sin errores de acceso ni de cuotas.");
+assert(res.body.message.startsWith("Hola Ana,") && res.body.message.includes("ana@correo.test") && /spam/.test(res.body.message)
+  && res.body.message.includes("https://evolvapp.club") && /escríbeme/.test(res.body.message), "Con correo: mensaje de bienvenida con correo, enlace y contacto.");
+assert(res.body.whatsappUrl === "https://wa.me/51999111222?text=" + encodeURIComponent(res.body.message), "Con correo: WhatsApp con el mensaje listo.");
+assert(!/\b(IA|prompt|tokens?|modelo)\b/i.test(res.body.message), "El mensaje de bienvenida no usa vocabulario interno (REQ-31).");
 // REQ-251: lo que respondió en la postulación queda en su perfil para el onboarding.
 assert(profilePatches.length === 1 && profilePatches[0].url.endsWith("id=eq.dddddddd-dddd-4ddd-8ddd-dddddddddddd"), "Rellena el perfil de la cuenta invitada.");
 const seeded = profilePatches[0].body.prefs;
@@ -125,6 +129,7 @@ authUsers = [{ id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", email: "ana@correo.te
 invites = []; entitlements = [];
 res = await call({ action: "betaAccept", id: 7 });
 assert(res.body.mode === "existing" && invites.length === 0 && entitlements[0].user_id === "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", "Si ya tenía cuenta, solo recibe el acceso.");
+assert(/ya tenías cuenta/.test(res.body.message) && !/Te acabo de enviar/.test(res.body.message), "Si ya tenía cuenta, el mensaje no le pide buscar un correo.");
 
 // REQ-251: si ya hizo el onboarding no se toca su perfil; si tenía nombre propio, se respeta.
 profilePatches = []; profilePrefs = { name: "Anita", goal: "deficit", onboardingCompletedAt: "2026-10-01T00:00:00Z" };

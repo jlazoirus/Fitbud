@@ -10532,6 +10532,48 @@ Jonathan (2026-10-21), con captura de Hoy en iPhone: "Los botones se ven muy apr
 - A 390 px, cada botón de la agenda queda a ≥ 12 px del borde de su contenedor. ✓ (`tests/e2e/home.spec.js`; falla sin el arreglo con "Ver detalle" a 0 px)
 - `node scripts/release-gate.mjs` pasa.
 
+## REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-10-21, iPhone), sobre Perfil → Entrenamiento: "No entiendo eso de actividad física principal", "Eso de elegir qué hacer en cada día también siento que te limita mucho a elegir" y "¿Qué pasa si un lunes no voy al gym y juego pádel?".
+
+### Problema
+
+- "Actividad física principal" no dice qué es ni qué cambia: Diego juega pádel, que no está en la lista, y eligió "Otra actividad" sin saber qué haría el plan con eso.
+- "Días disponibles y lugar real" se lee como una agenda fija: nada dice que cualquier día se puede cambiar.
+- Registrar otro deporte en un día de fuerza ya era posible (REQ-206, "＋ Registrar otra actividad" al final de Entreno), pero no aparece entre las opciones de "Adaptar hoy" ni explica qué pasa con la sesión que tocaba.
+
+### Causa raíz
+
+- Copy de `index.html`: label `pf_sport` "Actividad física principal" y `ob_sport` "¿Practicas alguna actividad física?", opción "Otra actividad", sin nota de ayuda; label "Días disponibles y lugar real".
+- "Adaptar hoy" en `renderWorkout()` solo ofrece Solo 20 min / En casa / Sin equipo / Me perdí la sesión.
+
+### Alcance
+
+1. Onboarding y Perfil preguntan lo mismo: "¿Haces otro deporte además de la fuerza?", con opciones Caminar, Correr, Bicicleta, Natación, "Otro deporte" y "Ninguno, solo fuerza". `SPORT_LABELS.other` → "Otro deporte".
+2. Nota bajo la pregunta que cambia con la opción (`primarySportHelp()`): qué suma a la semana (sesiones guiadas, días de tu deporte para pádel o fútbol, o solo fuerza).
+3. Perfil: "Tu semana tipo: días y lugar" con la nota "Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio)."
+4. Entreno → "Adaptar hoy": botón "Hice otro deporte" que abre el registro de actividad. En un día con sesión, el modal dice "Cuenta como día entrenado en lugar de <sesión>. Tu plan sigue igual desde la próxima sesión." y propone el último deporte registrado (o "Otra actividad"), no "Fuerza / gimnasio".
+5. `CACHE_NAME` → `fitbud-pwa-v133` (junto con REQ-252).
+
+### Fuera de alcance
+
+- Elegir qué se hace cada día (fuerza o deporte) en vez del lugar, o mover la sesión de fuerza perdida a otro día: el lugar sigue orientando la plantilla (exterior/piscina → deporte) y "Me perdí la sesión" ya ofrece recuperarla.
+- Añadir pádel, fútbol u otros deportes con plan guiado propio.
+
+### Riesgos
+
+- Ninguno sobre datos: solo copy y un acceso nuevo a un flujo existente; los valores guardados (`primarySport`) no cambian.
+
+### Criterios de aceptación
+
+- Perfil muestra la nueva pregunta y la nota cambia al elegir otra opción; la semana tipo explica que no es una obligación. ✓ (`tests/e2e/actividad-manual.spec.js`)
+- En un día de fuerza, "Hice otro deporte" → Pádel marca el día como entrenado y el modal explica que reemplaza la sesión. ✓ (`tests/e2e/actividad-manual.spec.js`, capturas 390 px revisadas)
+- `node scripts/release-gate.mjs` pasa.
+
 ## REQ-257 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
 
 **Estado: implementado.**
@@ -11054,3 +11096,65 @@ _Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Ca
 
 **Estado: implementado.**
 `keepCurrentProfile()` (`index.html`) ya no referencia `calendarChanged`/`planEndDate` (variables locales de `saveOnboarding()`/`saveProfile()`, fuera de su ámbito, causaban `ReferenceError` bajo `"use strict"` antes del `await`): usa `reason:"Preferencias guardadas"` fijo (este flujo nunca cambia el calendario) y `validTo` de `prefs.planEndDate` ya guardado, o `planEndFor(prefs.planStartDate,resolvedPlanDuration(prefs))` si faltara. Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/onboarding.spec.js` (confirmado que el test falla exactamente como describe el REQ contra el código sin el fix y pasa con él).
+
+## REQ-266 - Fix: los recordatorios por correo y push nunca se enviaban
+
+**Estado: implementado — requiere acción humana:** crear el secreto `CRON_SECRET` en GitHub (Settings → Secrets and variables → Actions) con el mismo valor que la variable `CRON_SECRET` de Vercel.
+
+### Origen
+
+Jonathan (2026-10-24): "Creo que las notificaciones no están funcionando".
+
+### Evidencia
+
+- `notification_log` en producción está vacía: nunca se intentó un envío, ni de correo ni de push.
+- `notification_preferences`: 2 usuarios con avisos activos (1 correo, 2 push), ambos `America/Lima`, hora 20.
+- `GET https://evolvapp.club/api/notify` sin secreto responde `401` con `keepAlive: true`: el endpoint y Supabase funcionan.
+
+### Causa raíz
+
+`vercel.json` dispara `/api/notify` una vez al día a las 08:00 UTC (límite del plan Hobby: un cron diario). `runJob()` (`api/notify.js`) solo enviaba si `currentHourInTz(tz) === notify_hour`. En Lima eso es a las 03:00, y Perfil → Recordatorios solo ofrece de 17:00 a 23:00 (`NOTIF_HOURS`): la condición no se cumplía nunca. Lo mismo para el push de racha.
+
+### Alcance
+
+1. `.github/workflows/notify-hourly.yml`: cada hora (minuto 7) llama a `/api/notify` con `Authorization: Bearer CRON_SECRET`. URL configurable con la variable de repo `NOTIFY_URL` (por defecto `https://evolvapp.club/api/notify`). El log del job muestra solo conteos, nunca usuarios ni correos. Falla visible si falta el secreto o el endpoint no responde 200.
+2. `isNotifyTime()`: se envía en el primer disparo a la hora elegida o después, dentro del mismo día local. Un disparo que llega tarde no pierde el aviso; la idempotencia por día (`notification_log`) evita repetirlo. Aplica a correo y push.
+3. El cron diario de Vercel se mantiene: sigue haciendo el keep-alive de Supabase (REQ-178/179) y, a las 03:00 de Lima, no envía nada.
+
+### Fuera de alcance
+
+- WhatsApp (REQ-255).
+- Verificar en Vercel `RESEND_API_KEY`, `NOTIFY_FROM_EMAIL` y las claves VAPID: sin acceso desde el agente. Si faltan, el job registra el error en `notification_log` (correo) o no intenta el push (`vapidReady` falso).
+
+### Criterios de aceptación
+
+- Con la hora elegida ya pasada hoy, el disparo envía; justo a la hora, envía; antes, no; ya enviado hoy, no repite. ✓ `scripts/validate-notify-schedule.mjs` (falla con el código anterior), en el release gate.
+- Tras crear el secreto, "Run workflow" del workflow responde 200 y, a la hora elegida, `notification_log` registra el envío.
+
+## REQ-267 - Fix: los avisos push no tenían clave privada VAPID
+
+**Estado: implementado — requiere acción humana:** crear en Vercel (Production) `VAPID_PRIVATE_KEY` (generada para este cambio y entregada fuera del repo) y `VAPID_SUBJECT` (`mailto:` del responsable), y volver a desplegar.
+
+### Origen
+
+Jonathan (2026-10-24), al revisar las variables de Vercel para REQ-266: "Las de vapid no existen".
+
+### Causa raíz
+
+REQ-38 embebió la clave pública `BG6yy…` en `index.html` y como respaldo en `api/notify.js`, pero `VAPID_PRIVATE_KEY` nunca se configuró en Vercel y la privada correspondiente no está en ningún lado. Sin ella, `vapidReady` es falso y el job nunca intenta el push; tampoco se puede firmar para las 2 suscripciones existentes, hechas con esa clave.
+
+### Alcance
+
+1. Par VAPID nuevo: la pública reemplaza a la anterior en `index.html` y `api/notify.js`. La privada no entra al repo.
+2. `refreshPushSubscriptionKey()` (no-await en `onAuth()`): con permiso concedido y `push_opt_in` activo, si la suscripción del dispositivo usa otra clave (`pushKeyOf()`), la anula y se suscribe de nuevo con la actual (`subscribePush(true)`, sin toast). Lee las preferencias frescas del usuario que entra.
+3. `scripts/validate-vapid-key.mjs` en el release gate: misma clave en cliente y servidor, punto P-256 de 65 bytes y no la anterior.
+4. `CACHE_NAME` → `fitbud-pwa-v142` (`main` ya usaba v141 por REQ-264).
+
+### Fuera de alcance
+
+- Borrar las filas viejas de `push_subscriptions`: el job registra `push_error` en ellas hasta que el usuario vuelva a entrar (entonces se agrega la nueva y la vieja deja de importar). Limpieza opcional a mano en Supabase.
+
+### Criterios de aceptación
+
+- Cliente y servidor usan la misma clave nueva, válida. ✓ `scripts/validate-vapid-key.mjs`.
+- Con las variables en Vercel, un usuario con avisos activos que vuelve a entrar queda suscrito con la clave nueva y recibe el aviso a su hora (REQ-266).
