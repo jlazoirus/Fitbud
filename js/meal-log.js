@@ -224,6 +224,106 @@
     return out;
   }
 
+  // ── REQ-271: alimentos propios desde la etiqueta ───────────────────────────
+  // Biblioteca privada en profiles.prefs.customFoods (máx. 100):
+  //   {id, name, brand?, unit: 100g|100ml|portion, base:{kcal,p,c,f},
+  //    portion?:{label, amount}, version, updatedAt}
+  // unit "portion" = valores por una porción declarada sin peso conocido: se
+  // registra por porciones, nunca se convierte a gramos. `portion` en 100g/100ml
+  // es una equivalencia opcional ("1 pote = 125 g") solo si el usuario la conoce.
+  const CUSTOM_FOODS_MAX=100;
+  const CUSTOM_FOOD_DELETED_MAX=200;
+  const CUSTOM_FOOD_LIMITS={
+    "100g":{kcal:900,macro:100,sum:100},
+    "100ml":{kcal:1500,macro:150,sum:150},
+    portion:{kcal:MEAL_VALUE_LIMITS.kcal,macro:MEAL_VALUE_LIMITS.c,sum:null},
+  };
+  function validateCustomFoodInput(input){
+    const errors={};
+    const name=cleanText(input&&input.name,200);
+    if(!name)errors.name="Pon el nombre del alimento.";
+    else if(name.length>MEAL_NAME_MAX)errors.name=`Usa hasta ${MEAL_NAME_MAX} caracteres.`;
+    const brand=cleanText(input&&input.brand,120);
+    if(brand.length>80)errors.brand="Usa hasta 80 caracteres.";
+    const unit=NUTRITION_UNITS.includes(input&&input.unit)?input.unit:null;
+    if(!unit)errors.unit="Elige por qué cantidad son los valores.";
+    const lim=CUSTOM_FOOD_LIMITS[unit||"100g"];
+    const base={};
+    [["kcal","kcal"],["p","proteína"],["c","carbohidratos"],["f","grasa"]].forEach(([k,label])=>{
+      const r=parseNutrientInput(input&&input[k]);
+      const max=k==="kcal"?lim.kcal:lim.macro;
+      if(r.empty)errors[k]=`Indica ${label} como figura en la etiqueta (0 si no tiene).`;
+      else if(r.error==="negative")errors[k]="No puede ser negativo.";
+      else if(!r.ok)errors[k]="Escribe un número (usa coma o punto para decimales).";
+      else if(r.value>max)errors[k]=`Revisa el valor: máximo ${max}${k==="kcal"?" kcal":" g"}.`;
+      else base[k]=roundTenth(r.value);
+    });
+    if(lim.sum&&!errors.p&&!errors.c&&!errors.f&&base.p+base.c+base.f>lim.sum)errors.f=`Proteína, carbohidratos y grasa suman más de ${lim.sum} g por 100 ${unit==="100ml"?"ml":"g"}.`;
+    let portion=null;
+    const label=cleanText(input&&input.portionLabel,60);
+    const amountRaw=input&&input.portionAmount;
+    if(unit==="portion"){
+      if(!label)errors.portionLabel="Describe la porción de la etiqueta (ej. 1 barra).";
+      else if(label.length>40)errors.portionLabel="Usa hasta 40 caracteres.";
+      else portion={label};
+    }else if(label||String(amountRaw==null?"":amountRaw).trim()){
+      const r=parseNutrientInput(amountRaw);
+      if(!label)errors.portionLabel="Describe la porción (ej. 1 pote) o deja ambos campos vacíos.";
+      else if(label.length>40)errors.portionLabel="Usa hasta 40 caracteres.";
+      if(!r.ok||r.value<=0)errors.portionAmount=`Indica cuántos ${unit==="100ml"?"ml":"g"} tiene la porción, o deja ambos campos vacíos.`;
+      else if(r.value>COMPONENT_AMOUNT_MAX[unit])errors.portionAmount=`Máximo ${COMPONENT_AMOUNT_MAX[unit]} ${unit==="100ml"?"ml":"g"}.`;
+      if(!errors.portionLabel&&!errors.portionAmount)portion={label,amount:roundTenth(r.value)};
+    }
+    const ok=!Object.keys(errors).length;
+    const value=ok?Object.assign({name,unit,base},brand?{brand}:{},portion?{portion}:{}):null;
+    return {ok,value,errors};
+  }
+  function normalizeCustomFood(f){
+    if(!f||typeof f!=="object")return null;
+    const id=cleanText(f.id,64);
+    if(!/^[a-z0-9_-]{4,64}$/i.test(id))return null;
+    const name=cleanText(f.name,MEAL_NAME_MAX);
+    const unit=NUTRITION_UNITS.includes(f.unit)?f.unit:null;
+    const base=cleanMacros(f.base);
+    if(!name||!unit||!base)return null;
+    const out={id,name,unit,base:{kcal:roundTenth(base.kcal),p:roundTenth(base.p),c:roundTenth(base.c),f:roundTenth(base.f)}};
+    const brand=cleanText(f.brand,80);if(brand)out.brand=brand;
+    if(f.portion&&typeof f.portion==="object"){
+      const label=cleanText(f.portion.label,40);
+      const amount=Number(f.portion.amount);
+      if(label&&unit==="portion")out.portion={label};
+      else if(label&&Number.isFinite(amount)&&amount>0&&amount<=COMPONENT_AMOUNT_MAX[unit])out.portion={label,amount:roundTenth(amount)};
+    }
+    if(unit==="portion"&&!out.portion)out.portion={label:"1 porción"};
+    const version=Number(f.version);out.version=Number.isInteger(version)&&version>0?version:1;
+    const at=Date.parse(f.updatedAt);if(Number.isFinite(at))out.updatedAt=new Date(at).toISOString();
+    return out;
+  }
+  function normalizedCustomFoods(list){
+    const out=[],seen=new Set();
+    (Array.isArray(list)?list:[]).forEach(item=>{
+      const f=normalizeCustomFood(item);
+      if(f&&!seen.has(f.id)&&out.length<CUSTOM_FOODS_MAX){seen.add(f.id);out.push(f);}
+    });
+    return out;
+  }
+  // Fusión entre dispositivos: unión por id, gana la versión más alta (o la más
+  // reciente si empatan) y los borrados (lápidas) no resucitan.
+  function mergeCustomFoods(serverList,localList,deletedIds){
+    const deleted=new Set((Array.isArray(deletedIds)?deletedIds:[]).map(String));
+    const byId=new Map();
+    const take=f=>{
+      if(!f||deleted.has(f.id))return;
+      const prev=byId.get(f.id);
+      if(!prev||f.version>prev.version||(f.version===prev.version&&(Date.parse(f.updatedAt)||0)>(Date.parse(prev.updatedAt)||0)))byId.set(f.id,f);
+    };
+    normalizedCustomFoods(serverList).forEach(take);
+    normalizedCustomFoods(localList).forEach(take);
+    return [...byId.values()].slice(0,CUSTOM_FOODS_MAX);
+  }
+  function customFoodLabel(f){return f.brand?`${f.name} (${f.brand})`:f.name;}
+  function customFoodBaseLabel(f){return f.unit==="portion"?`por ${f.portion&&f.portion.label||"porción"}`:`por 100 ${f.unit==="100ml"?"ml":"g"}`;}
+
   const api={
     MEAL_VALUE_LIMITS,MEAL_NAME_MAX,
     parseNutrientInput,roundTenth,validateMealValues,
@@ -232,6 +332,8 @@
     COMPONENTS_MAX,COMPONENT_AMOUNT_MAX,normalizeComponent,normalizeComponents,componentValues,componentsTotals,
     componentAmountLabel,componentsName,componentsSource,
     copyEntrySnapshot,
+    CUSTOM_FOODS_MAX,CUSTOM_FOOD_DELETED_MAX,validateCustomFoodInput,normalizeCustomFood,normalizedCustomFoods,
+    mergeCustomFoods,customFoodLabel,customFoodBaseLabel,
   };
   root.FITBUD_MEAL_LOG=api;
   Object.keys(api).forEach(key=>{root[key]=api[key];});

@@ -1995,7 +1995,7 @@ E2E de destino ocupado/vacío, futuro, misma fecha, cancelación, receta version
 
 ## REQ-271 - Nutrición: biblioteca privada de alimentos desde etiqueta
 
-**Estado: pendiente.** Prioridad P1. Dependencias: REQ-266, REQ-267 y REQ-268. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-266, REQ-267 y REQ-268. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Fuentes S02/S09/S12; `renderQuickPicks()` solo busca DB.ingredients y favoritas no tienen unidad base.
@@ -2020,6 +2020,11 @@ Ficha por 125 g escala correctamente; unidad sin masa no convierte a gramos. Edi
 
 ### Verificación sugerida
 Cálculo por base/unidad, límites, E2E alta/búsqueda/registro/corrección, conflicto y dos cuentas.
+
+### Implementación
+- `prefs.customFoods` (máx. 100; nombre ≤160, marca ≤80): valores por 100 g, 100 ml o porción declarada sin peso (se registra por porciones, nunca en gramos) y equivalencia opcional «1 pote = 125 g». `validateCustomFoodInput` exige los cuatro valores con límites plausibles; `mergeCustomFoods` fusiona por id/versión con lápidas (`customFoodsDeleted`).
+- La pestaña «Alimento» muestra «Tus alimentos» (etiqueta «Tuyo») antes del catálogo, «＋ Crear alimento propio» (precarga la búsqueda), editar (versión +1) y eliminar. Registrar crea una línea `ref:{kind:"food",id,version}` con snapshot. Guardar relee el perfil y aplica la operación; sin conexión, error sin cambios. Sin OCR ni proveedor; el catálogo global no cambia.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/alimentos-propios.spec.js`.
 
 ## REQ-272 - Nutrición: recetas propias con rendimiento y registro por porción
 

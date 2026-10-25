@@ -477,6 +477,11 @@
   .intent-opt input{accent-color:var(--accent);width:18px;height:18px}
   #f_impact{margin-top:6px}
   .copy-preview{margin-top:10px}
+  .qp-sub{margin:8px 0 4px}
+  .qp-tag{display:inline-block;font-size:11px;font-weight:700;padding:1px 6px;border-radius:999px;background:var(--surf3);color:var(--muted);vertical-align:middle}
+  .qp-create{margin-top:8px}
+  .qp-list.qp-list-form{max-height:none;overflow:visible}
+  .cf-form{padding:4px 0}
   .copy-list{margin:6px 0;padding-left:18px;font-size:14px}
   .components{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r-md)}
   .comp-head{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;margin-bottom:6px}
@@ -1245,6 +1250,9 @@ function migrateProfilePrefs(source){
     sessionMinutes:Math.min(180,Math.max(20,Number.parseInt(p.sessionMinutes,10)||60)),
     betweenExerciseRestSeconds:normalizedBetweenExerciseRest(p.betweenExerciseRestSeconds),
     ...(p.savedMeals!=null?{savedMeals:normalizedSavedMeals(p.savedMeals)}:{}),
+    // REQ-271: biblioteca privada de alimentos propios + lápidas de borrados.
+    ...(p.customFoods!=null?{customFoods:normalizedCustomFoods(p.customFoods)}:{}),
+    ...(p.customFoodsDeleted!=null?{customFoodsDeleted:(Array.isArray(p.customFoodsDeleted)?p.customFoodsDeleted:[]).map(String).filter(x=>/^[a-z0-9_-]{4,64}$/i.test(x)).slice(-CUSTOM_FOOD_DELETED_MAX)}:{}),
     equipment:normalizedList(p.equipment,Object.keys(EQUIPMENT_LABELS)),
     trainingExperience:trainingExperienceNorm,
     workoutSplit:workoutSplitNorm,
@@ -9685,7 +9693,7 @@ async function toggleSavedMeal(entry){
 }
 function quickPickTab(tab){
   const qp=window._qp;if(!qp)return;
-  qp.tab=tab;qp.query="";
+  qp.tab=tab;qp.query="";qp.foodForm=null;
   const search=$("#qpSearch");if(search)search.value="";
   if(tab==="food"){if(qp.base)qp.lastPick={base:qp.base,portion:qp.portion};qp.base=null;renderPortionChips();}
   renderQuickPicks();
@@ -9693,20 +9701,30 @@ function quickPickTab(tab){
 function quickPickSearch(value){const qp=window._qp;if(!qp)return;qp.query=value;renderQuickPicks();}
 function renderQuickPicks(){
   const qp=window._qp,box=$("#qpList");if(!qp||!box)return;
+  if(qp.tab!=="food")box.classList.remove("qp-list-form");
   document.querySelectorAll(".qp-tab").forEach(b=>{const on=b.dataset.tab===qp.tab;b.classList.toggle("on",on);b.setAttribute("aria-pressed",on?"true":"false");});
   const search=$("#qpSearch");
   if(search)search.placeholder=qp.tab==="food"?"Busca un alimento: avena, pollo…":"Buscar";
   const q=catalogSlug(qp.query||"");
   if(qp.tab==="food"){
+    // REQ-271: el mismo buscador muestra primero tus alimentos (privados) y luego el catálogo.
+    box.classList.toggle("qp-list-form",!!qp.foodForm);
+    if(qp.foodForm){box.innerHTML=customFoodFormHtml(qp.foodForm);if(!qp.foodForm.focused){qp.foodForm.focused=true;box.scrollIntoView({block:"start"});const f=$("#cf_name");if(f)f.focus({preventScroll:true});}return;}
+    const mine=customFoods();
+    qp.custom=(q?mine.filter(f=>catalogSlug(customFoodLabel(f)).includes(q)):mine).slice(0,q?8:5);
     const foods=DB.loaded?(DB.ingredients||[]):[];
-    if(!foods.length){box.innerHTML='<div class="muted small">El catálogo de alimentos no está disponible ahora.</div>';return;}
-    if(!q){box.innerHTML='<div class="muted small">Escribe para buscar y elige los gramos.</div>';return;}
-    qp.items=foods.filter(i=>catalogSlug(i.name).includes(q)).slice(0,8);
-    box.innerHTML=qp.items.length?qp.items.map((ing,i)=>`<div class="qp-item qp-food">
+    qp.items=q?foods.filter(i=>catalogSlug(i.name).includes(q)).slice(0,8):[];
+    const create=`<button class="btn btn-sm qp-create" onclick="openCustomFoodForm()">＋ Crear alimento propio</button>`;
+    const customHtml=qp.custom.length?`<div class="qp-sub muted small">Tus alimentos</div>${qp.custom.map(customFoodRowHtml).join("")}`:"";
+    let msg="";
+    if(!q)msg=mine.length?"":"Escribe para buscar y elige los gramos.";
+    else if(!foods.length&&!qp.custom.length)msg="El catálogo de alimentos no está disponible ahora.";
+    else if(!qp.items.length&&!qp.custom.length)msg="No encontramos ese alimento. Puedes crearlo con los datos de la etiqueta.";
+    box.innerHTML=customHtml+(qp.items.length&&qp.custom.length?`<div class="qp-sub muted small">Catálogo</div>`:"")+qp.items.map((ing,i)=>`<div class="qp-item qp-food">
         <div class="qp-main"><b>${esc(ing.name)}</b><div class="o-meta">${Math.round(+ing.kcal||0)} kcal · P ${Math.round(+ing.protein_g||0)} · C ${Math.round(+ing.carbs_g||0)} · G ${Math.round(+ing.fat_g||0)} por 100 g</div></div>
         <input class="qp-grams" id="qpGrams${i}" type="text" inputmode="decimal" autocomplete="off" value="100" aria-label="Gramos de ${esc(ing.name)}"><span class="muted small">g</span>
         <button class="btn btn-sm" onclick="addFoodToEditor(${i})">Añadir</button>
-      </div>`).join(""):'<div class="muted small">No encontramos ese alimento en el catálogo.</div>';
+      </div>`).join("")+(msg?`<div class="muted small">${msg}</div>`:"")+create;
     return;
   }
   const source=qp.tab==="fav"?savedMeals():recentCustomMeals(20);
@@ -9910,6 +9928,117 @@ function loadRecipeComponents(){
   e.components=list;e.autoName=null;
   applyEditorComponents();
   const btn=$("#f_loadRecipe");if(btn)btn.remove();
+}
+/* REQ-271: alimentos propios (privados) creados desde la etiqueta. */
+function customFoods(){return normalizedCustomFoods(profile&&profile.prefs&&profile.prefs.customFoods);}
+function customFoodRowHtml(f,j){
+  const unit=f.unit==="portion"?"porc.":f.unit==="100ml"?"ml":"g";
+  const amount=f.unit==="portion"?1:f.portion&&f.portion.amount||100;
+  const equiv=f.unit!=="portion"&&f.portion?` · ${esc(f.portion.label)} = ${formatEditorNumber(f.portion.amount)} ${unit}`:"";
+  return `<div class="qp-item qp-food">
+    <div class="qp-main"><b>${esc(f.name)}</b><div class="o-meta"><span class="qp-tag">Tuyo</span>${f.brand?` ${esc(f.brand)} ·`:""} ${Math.round(f.base.kcal)} kcal · P ${formatEditorNumber(f.base.p)} · C ${formatEditorNumber(f.base.c)} · G ${formatEditorNumber(f.base.f)} ${esc(customFoodBaseLabel(f))}${equiv}</div></div>
+    <input class="qp-grams" id="cfAmt${j}" type="text" inputmode="decimal" autocomplete="off" value="${formatEditorNumber(amount)}" aria-label="Cantidad de ${esc(customFoodLabel(f))} (${f.unit==="portion"?"porciones":unit})"><span class="muted small">${unit}</span>
+    <button class="btn btn-sm" onclick="addCustomFoodToEditor(${j})">Añadir</button>
+    <button class="btn btn-sm" aria-label="Editar ${esc(customFoodLabel(f))}" onclick="openCustomFoodForm('${esc(f.id)}')">✎</button>
+  </div>`;
+}
+function addCustomFoodToEditor(j){
+  const qp=window._qp,f=qp&&qp.custom&&qp.custom[j];if(!f)return;
+  const r=parseNutrientInput(($("#cfAmt"+j)||{}).value);
+  const max=COMPONENT_AMOUNT_MAX[f.unit];
+  if(!r.ok||r.value<=0||r.value>max){toast(f.unit==="portion"?"Indica las porciones (más de 0 y hasta 20)":`Indica la cantidad (más de 0 y hasta ${max})`);return;}
+  if(editorMode()==="kcal_only"){toast("Quita «Solo conozco las calorías» para sumar alimentos");return;}
+  const line=normalizeComponent({name:customFoodLabel(f),unit:f.unit,amount:r.value,base:f.base,ref:{kind:"food",id:f.id,version:f.version}});
+  if(line&&addEditorComponent(line))toast(`${line.name} añadido`);
+}
+function openCustomFoodForm(id){
+  const qp=window._qp;if(!qp)return;
+  const f=id?customFoods().find(x=>x.id===id):null;
+  const search=$("#qpSearch");
+  qp.foodForm=f?{id:f.id,name:f.name,brand:f.brand||"",unit:f.unit,kcal:formatEditorNumber(f.base.kcal),p:formatEditorNumber(f.base.p),c:formatEditorNumber(f.base.c),f:formatEditorNumber(f.base.f),portionLabel:f.portion&&f.portion.label||"",portionAmount:f.portion&&f.portion.amount?formatEditorNumber(f.portion.amount):"",version:f.version}
+    :{name:search?search.value.trim():"",brand:"",unit:"100g",kcal:"",p:"",c:"",f:"",portionLabel:"",portionAmount:""};
+  renderQuickPicks();
+}
+function customFoodFormHtml(ff){
+  const v=k=>esc(ff[k]==null?"":String(ff[k]));
+  const unitOpt=(val,label)=>`<option value="${val}" ${ff.unit===val?"selected":""}>${label}</option>`;
+  const errs=ff.errors||{};
+  const inv=k=>errs[k]?' aria-invalid="true" aria-describedby="cf_errors"':"";
+  const labels={name:"Nombre",brand:"Marca",unit:"Valores por",kcal:"kcal",p:"Proteína",c:"Carbohidratos",f:"Grasa",portionLabel:"Porción",portionAmount:"Cantidad de la porción"};
+  const errList=Object.keys(labels).filter(k=>errs[k]);
+  const isPortion=ff.unit==="portion";
+  return `<div class="cf-form">
+    <div class="qp-sub"><b>${ff.id?"Editar alimento":"Nuevo alimento"}</b></div>
+    <p class="muted small">Copia los valores de la etiqueta. Es privado y solo lo ves tú; no confirma información de alérgenos.</p>
+    <div class="field"><label for="cf_name">Nombre</label><input id="cf_name" maxlength="160" autocomplete="off" value="${v("name")}"${inv("name")}></div>
+    <div class="field"><label for="cf_brand">Marca (opcional)</label><input id="cf_brand" maxlength="80" autocomplete="off" value="${v("brand")}"${inv("brand")}></div>
+    <div class="field"><label for="cf_unit">Valores por</label><select id="cf_unit" onchange="customFoodFormChange('unit',this.value)">${unitOpt("100g","100 g")}${unitOpt("100ml","100 ml")}${unitOpt("portion","Porción declarada (sin peso)")}</select></div>
+    <div class="grid4">
+      ${[["kcal","kcal"],["p","Prot g"],["c","Carb g"],["f","Grasa g"]].map(([k,l])=>`<div class="field"><label for="cf_${k}">${l}</label><input id="cf_${k}" type="text" inputmode="decimal" autocomplete="off" value="${v(k)}"${inv(k)}></div>`).join("")}
+    </div>
+    <div class="row" style="gap:8px">
+      <div class="field" style="flex:2"><label for="cf_portionLabel">${isPortion?"Porción de la etiqueta":"Porción (opcional)"}</label><input id="cf_portionLabel" maxlength="40" autocomplete="off" placeholder="${isPortion?"Ej. 1 barra":"Ej. 1 pote"}" value="${v("portionLabel")}"${inv("portionLabel")}></div>
+      ${isPortion?"":`<div class="field" style="flex:1"><label for="cf_portionAmount">${ff.unit==="100ml"?"ml":"g"}</label><input id="cf_portionAmount" type="text" inputmode="decimal" autocomplete="off" value="${v("portionAmount")}"${inv("portionAmount")}></div>`}
+    </div>
+    <div id="cf_errors" class="field-errors" role="alert" ${errList.length?"":"hidden"}>${errList.length?`<ul>${errList.map(k=>`<li><b>${labels[k]}:</b> ${esc(errs[k])}</li>`).join("")}</ul>`:""}</div>
+    <div class="row" style="gap:8px;margin-top:10px">
+      <button class="btn btn-accent btn-sm" onclick="saveCustomFoodForm()">Guardar alimento</button>
+      <button class="btn btn-sm" onclick="closeCustomFoodForm()">Cancelar</button>
+      ${ff.id?`<button class="btn btn-sm" onclick="deleteCustomFood('${esc(ff.id)}')">Eliminar</button>`:""}
+    </div>
+  </div>`;
+}
+function readCustomFoodForm(){
+  const qp=window._qp,ff=qp&&qp.foodForm;if(!ff)return null;
+  ["name","brand","kcal","p","c","f","portionLabel","portionAmount"].forEach(k=>{const el=$("#cf_"+k);if(el)ff[k]=el.value;});
+  const unit=$("#cf_unit");if(unit)ff.unit=unit.value;
+  return ff;
+}
+function customFoodFormChange(key,value){const ff=readCustomFoodForm();if(!ff)return;ff[key]=value;if(key==="unit"&&value==="portion")ff.portionAmount="";renderQuickPicks();}
+function closeCustomFoodForm(){const qp=window._qp;if(!qp)return;qp.foodForm=null;renderQuickPicks();}
+function customFoodId(){return "f"+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+async function saveCustomFoodForm(){
+  const ff=readCustomFoodForm();if(!ff||ff.busy)return;
+  const check=validateCustomFoodInput(ff);
+  if(!check.ok){ff.errors=check.errors;renderQuickPicks();return;}
+  const mine=customFoods();
+  if(!ff.id&&mine.length>=CUSTOM_FOODS_MAX){ff.errors={name:`Puedes guardar hasta ${CUSTOM_FOODS_MAX} alimentos propios.`};renderQuickPicks();return;}
+  const food=Object.assign({},check.value,{id:ff.id||customFoodId(),version:ff.id?(+ff.version||1)+1:1,updatedAt:new Date().toISOString()});
+  ff.busy=true;
+  const ok=await persistCustomFoodOp({upsert:food});
+  ff.busy=false;
+  if(!ok){ff.errors={name:"No se pudo guardar. Revisa tu conexión e inténtalo de nuevo."};renderQuickPicks();return;}
+  const qp=window._qp;qp.foodForm=null;
+  const search=$("#qpSearch");if(search){search.value=food.name;qp.query=food.name;}
+  renderQuickPicks();toast(ff.id?"Alimento actualizado":"Alimento guardado");
+}
+async function deleteCustomFood(id){
+  if(!confirm("¿Eliminar este alimento? Lo ya registrado no cambia."))return;
+  const ok=await persistCustomFoodOp({remove:id});
+  if(!ok){toast("No se pudo eliminar. Inténtalo de nuevo.");return;}
+  closeCustomFoodForm();toast("Alimento eliminado");
+}
+// Aplica la operación sobre la versión más reciente del perfil para no perder lo
+// creado en otro dispositivo; lo ya registrado conserva su snapshot.
+async function persistCustomFoodOp(op){
+  if(!supa||!uid())return false;
+  let server=null;
+  try{
+    const r=await supa.from("profiles").select("prefs").eq("id",uid()).maybeSingle();
+    if(r.error)return false;
+    server=r.data&&r.data.prefs||{};
+  }catch(_){return false;}
+  const local=(profile&&profile.prefs)||{};
+  const deleted=[...new Set([].concat(server.customFoodsDeleted||[],local.customFoodsDeleted||[],op.remove?[op.remove]:[]).map(String))].slice(-CUSTOM_FOOD_DELETED_MAX);
+  let list=mergeCustomFoods(server.customFoods,local.customFoods,deleted);
+  if(op.upsert){
+    list=list.filter(f=>f.id!==op.upsert.id);
+    if(list.length>=CUSTOM_FOODS_MAX)return false;
+    list.unshift(op.upsert);
+  }
+  const prefs={...local,customFoods:list,customFoodsDeleted:deleted};
+  const result=await saveProfilePrefs(prefs,{skipPlanVersion:true});
+  return !(result&&result.error);
 }
 function quickPicksHtml(){
   const hasRecent=recentCustomMeals(1).length,hasFav=savedMeals().length;

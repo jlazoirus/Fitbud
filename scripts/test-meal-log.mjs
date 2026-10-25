@@ -121,4 +121,27 @@ assert.equal(g.copyEntrySnapshot({ name: "", kcal: 1 }), null);
 assert.equal(g.copyEntrySnapshot({ name: "X", kcal: -1, p: 0, c: 0, f: 0 }), null);
 console.log("  REQ-270: copia con identidad nueva, procedencia y sin estado del origen");
 
+// ── REQ-271: alimentos propios ────────────────────────────────────────────────
+const vf = g.validateCustomFoodInput;
+let fr = vf({ name: "Yogur", brand: "Gloria", unit: "100g", kcal: "59", p: "10", c: "3,6", f: "0,4", portionLabel: "1 pote", portionAmount: "125" });
+assert.deepEqual(fr.value, { name: "Yogur", unit: "100g", base: { kcal: 59, p: 10, c: 3.6, f: 0.4 }, brand: "Gloria", portion: { label: "1 pote", amount: 125 } });
+fr = vf({ name: "Barra", unit: "portion", kcal: "120", p: "2", c: "20", f: "3", portionLabel: "1 barra", portionAmount: "40" });
+assert.deepEqual(fr.value.portion, { label: "1 barra" }, "por porción no guarda gramos aunque se escriban");
+assert.ok(vf({ name: "Barra", unit: "portion", kcal: "1", p: "1", c: "1", f: "1" }).errors.portionLabel, "por porción exige describirla");
+assert.ok(vf({ name: "X", unit: "100g", kcal: "950", p: "1", c: "1", f: "1" }).errors.kcal, "más de 900 kcal/100 g no es plausible");
+assert.ok(vf({ name: "X", unit: "100g", kcal: "500", p: "50", c: "40", f: "20" }).errors.f, "macros que suman más de 100 g/100 g");
+assert.ok(vf({ name: "X", unit: "100g", kcal: "5", p: "", c: "1", f: "1" }).errors.p, "vacío no es cero");
+assert.ok(vf({ name: "X", unit: "100g", kcal: "5", p: "1", c: "1", f: "1", portionLabel: "1 vaso" }).errors.portionAmount, "equivalencia a medias");
+assert.ok(vf({ name: "", unit: "kg", kcal: "5", p: "1", c: "1", f: "1" }).errors.unit);
+const fA = { id: "faaaa1", name: "A", unit: "100g", base: { kcal: 1, p: 0, c: 0, f: 0 }, version: 1, updatedAt: "2026-10-01T00:00:00Z" };
+const fA2 = { ...fA, version: 2, base: { kcal: 2, p: 0, c: 0, f: 0 } };
+const fB = { ...fA, id: "fbbbb1", name: "B" };
+let merged2 = g.mergeCustomFoods([fA2, fB], [fA], []);
+assert.deepEqual(merged2.map((f) => [f.id, f.version]), [["faaaa1", 2], ["fbbbb1", 1]], "gana la versión más alta y no se pierde lo del otro dispositivo");
+merged2 = g.mergeCustomFoods([fA, fB], [fB], ["faaaa1"]);
+assert.deepEqual(merged2.map((f) => f.id), ["fbbbb1"], "un borrado no resucita");
+assert.equal(g.normalizedCustomFoods(Array.from({ length: 120 }, (_, i) => ({ ...fA, id: "f" + String(i).padStart(5, "0") }))).length, 100, "máximo 100 alimentos");
+assert.equal(g.normalizeCustomFood({ ...fA, id: "a b" }), null, "id inválido");
+console.log("  REQ-271: validación de etiqueta, porción sin peso, límites y fusión entre dispositivos");
+
 console.log("test-meal-log: OK");
