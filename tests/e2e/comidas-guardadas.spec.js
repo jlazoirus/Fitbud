@@ -24,6 +24,8 @@ async function openAddMeal(page) {
   return page.locator("#overlay");
 }
 
+const tenth = (n) => String(Math.round(n * 10) / 10).replace(".", ",");
+
 test.describe("Comidas guardadas", () => {
   test("una comida de ayer se reutiliza desde Recientes, con porción, y se guarda en favoritas", async ({ page, context }) => {
     const { calls } = await installMocks(context, { tables: { day_log: { rows: [yesterdayWithSnack()] } } });
@@ -52,7 +54,11 @@ test.describe("Comidas guardadas", () => {
         const saved = calls.filter((c) => c.table === "profiles" && c.payload && c.payload.prefs).map((c) => c.payload.prefs.savedMeals);
         return saved.at(-1);
       })
-      .toEqual([{ name: "Bowl de yogur con avena", kcal: 420, p: 30, c: 50, f: 10 }]);
+      .toEqual([{
+        name: "Bowl de yogur con avena", kcal: 420, p: 30, c: 50, f: 10,
+        // REQ-270: la favorita conserva su snapshot: viene de una reciente sin origen guardado, una porción.
+        nutritionMeta: { v: 1, source: "legacy", ref: { kind: "recent", name: "Bowl de yogur con avena" }, base: { kcal: 420, p: 30, c: 50, f: 10, unit: "portion" }, qty: 1 },
+      }]);
 
     // Al reabrir, Recientes sigue mostrando una porción, no la ×1,5 de hoy (REQ-243).
     await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
@@ -121,14 +127,14 @@ test.describe("Comidas guardadas", () => {
     await overlay.locator("#qpGrams0").fill("60");
     await overlay.getByRole("button", { name: "Añadir" }).first().click();
     await expect(overlay.locator("#f_name")).toHaveValue("Avena 60 g");
-    await expect(overlay.locator("#f_kcal")).toHaveValue(String(Math.round(389 * 0.6)));
-    await expect(overlay.locator("#f_p")).toHaveValue(String(Math.round(16.9 * 0.6)));
+    await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(389 * 0.6)); // REQ-269: una décima, con coma
+    await expect(overlay.locator("#f_p")).toHaveValue(tenth(16.9 * 0.6));
 
     await overlay.locator("#qpSearch").fill("platano"); // sin tilde también encuentra "Plátano"
     await overlay.locator("#qpGrams0").fill("120");
     await overlay.getByRole("button", { name: "Añadir" }).first().click();
     await expect(overlay.locator("#f_name")).toHaveValue("Avena 60 g + Plátano 120 g");
-    await expect(overlay.locator("#f_kcal")).toHaveValue(String(Math.round(389 * 0.6 + 89 * 1.2)));
+    await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(389 * 0.6 + 89 * 1.2));
     await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
 
     const today = await page.evaluate(() => dayState(todayStr()).extras.map((e) => e.name));

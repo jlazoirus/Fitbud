@@ -29,6 +29,9 @@ const STRUCTURED_OUTPUT_ACTIONS = new Set(["diet_day", "diet_week", "meal_option
 // el cliente la reduce a ~1024 px, asi que 3 MB de base64 es holgado y deja la
 // peticion bajo el limite de cuerpo de Vercel (4.5 MB).
 const IMAGE_ACTIONS = new Set(["meal_estimate"]);
+// REQ-268: acciones cuyo resultado describe algo concreto del usuario; sin
+// generacion compatible se informa el fallo en vez de servir una plantilla.
+const NO_TEMPLATE_ACTIONS = new Set(["meal_estimate"]);
 const IMAGE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_IMAGE_BASE64 = 3_000_000;
 const CONSENT_POLICY_VERSION = "2026-06-15-v2";
@@ -626,7 +629,8 @@ function validateCoachOutput(action, text, validation) {
   if (action === "diet_day" || action === "diet_week") return validateDietDay(data, validation);
   if (action === "meal_option") return validateMealOptions(data, validation);
   if (action === "meal_estimate") {
-    if (![data.kcal, data.proteina_g, data.carbohidratos_g, data.grasa_g].every(finiteNumber)) return false;
+    // REQ-268: macros finitos y no negativos; un negativo no es una estimacion.
+    if (![data.kcal, data.proteina_g, data.carbohidratos_g, data.grasa_g].every(v => finiteNumber(v) && Number(v) >= 0)) return false;
     if (data.preguntas == null) return true;
     // REQ-246: el schema no puede topar las preguntas y el cliente muestra como
     // mucho 2; que el modelo traiga mas no invalida los macros.
@@ -924,18 +928,32 @@ export default async function handler(req, res) {
     }
 
     if (reservation.mode === "reuse") {
-      if (!validateCoachOutput(quota.action, quota.fallbackText, quota.validation)) {
+      // REQ-268: una estimacion de comida solo se reutiliza si salio de una
+      // generacion real del mismo contexto; una plantilla generica nunca vale.
+      const templateAllowed = !NO_TEMPLATE_ACTIONS.has(quota.action);
+      if (templateAllowed && !validateCoachOutput(quota.action, quota.fallbackText, quota.validation)) {
         await failPart(e, reservation.usage_id, quota.partKey, "invalid_template");
         res.status(422).json({ error: "No existe una alternativa compatible para esta configuracion." });
         return;
       }
-      const selected = firstRow(await rpc(e, "select_reusable_coach_part", {
-        p_usage_id: reservation.usage_id,
-        p_part_key: quota.partKey,
-        p_context_key: quota.contextKey,
-        p_fallback_text: quota.fallbackText,
-        p_metadata: { policy_enabled: reservation.policy_enabled !== false },
-      }));
+      let selected;
+      try {
+        selected = firstRow(await rpc(e, "select_reusable_coach_part", {
+          p_usage_id: reservation.usage_id,
+          p_part_key: quota.partKey,
+          p_context_key: quota.contextKey,
+          p_fallback_text: templateAllowed ? quota.fallbackText : "",
+          p_metadata: { policy_enabled: reservation.policy_enabled !== false },
+        }));
+      } catch (error) {
+        if (templateAllowed || !/compatible_fallback_required/.test(String(error && error.message))) throw error;
+        selected = null;
+      }
+      if (!templateAllowed && (!selected || selected.selected_origin === "template")) {
+        await failPart(e, reservation.usage_id, quota.partKey, "no_compatible_result");
+        res.status(422).json({ error: "No hay una estimacion compatible para esta comida.", code: "no_compatible_result" });
+        return;
+      }
       if (!selected || !selected.selected_text || !validateCoachOutput(quota.action, selected.selected_text, quota.validation)) {
         res.status(422).json({ error: "No existe una alternativa compatible para esta configuracion." });
         return;
@@ -943,7 +961,7 @@ export default async function handler(req, res) {
       // REQ-123: el cliente necesita saber que esto no es una generacion nueva
       // (se agoto el cupo de "frescas" del dia) para poder avisar al usuario en
       // vez de dejar que un boton de "otra opcion" parezca no hacer nada.
-      const response = { text: selected.selected_text, reused: true };
+      const response = { text: selected.selected_text, reused: true, origin: selected.selected_origin === "template" ? "template" : "reused" };
       if (auth.profile.is_admin) {
         response.adminDiagnostic = {
           origin: selected.selected_origin,

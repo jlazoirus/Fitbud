@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-22T21:17:11.400Z",
+  "type": "selected existing E2E with fixtures",
+  "stats": {
+    "startTime": "2026-10-22T21:17:11.400Z",
+    "duration": 12473.866,
+    "expected": 11,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "suites": [
+    "nutricion.spec.js",
+    "foto-comida.spec.js",
+    "entreno.spec.js",
+    "onboarding.spec.js"
+  ],
+  "command": "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test tests/e2e/nutricion.spec.js tests/e2e/foto-comida.spec.js tests/e2e/entreno.spec.js tests/e2e/onboarding.spec.js --reporter=json",
+  "production_validated": false
+}

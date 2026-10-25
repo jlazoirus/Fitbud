@@ -1,0 +1,543 @@
+{
+  "date": "2026-10-22T21:16:13.563Z",
+  "environment": "local con fixtures, no producción",
+  "screens": [
+    {
+      "name": "mobile-hoy",
+      "text": "Jueves, 22 oct\nHola, Bro de Pruebas\n?\nB\nCONSUMO DE HOY\n0/2200 kcal · 2200 restantes\n0/3 comidas\nProteínas\n0/160g\nCarbohidratos\n0/220g\nGrasas\n0/65g\nTU AGENDA\nAún falta preparar este día\nTu coach arma comidas y entreno para hoy en segundos.\nPreparar mi día\nCHECK-IN · SEMANA 1\n13–19 oct\nNo registraste actividad esa semana. Aun así puedes ajustar tu plan para la que sigue.\nIniciar check-in\nOmitir esta semana\nO PREGÚNTALE A TU COACH\n¿Qué como para Desayuno? Me quedan 2200 kcal\n¿Cómo hago el entrenamiento de hoy?\nAdapta el entreno de hoy por falta de tiempo\n➤",
+      "headings": [
+        "Hola, Bro de Pruebas",
+        "Aún falta preparar este día"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "?",
+        "Preparar mi día",
+        "Iniciar check-in",
+        "Omitir esta semana",
+        "¿Qué como para Desayuno? Me quedan 2200 kcal",
+        "¿Cómo hago el entrenamiento de hoy?",
+        "Adapta el entreno de hoy por falta de tiempo",
+        "➤"
+      ]
+    },
+    {
+      "name": "mobile-nutricion",
+      "text": "‹\nNutrición:\nJueves, 22 Oct · Hoy\nSemana 2\n›\nNUTRICIÓN\nPrepara tus comidas de hoy\nAquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Un día preparado llena los slots automáticamente.\nPreparar mi día\nMACROS DEL DÍA\nCONSUMO DE HOY\n0/2200 kcal · 2200 restantes\n0/3 comidas\nProteínas\n0/160g\nCarbohidratos\n0/220g\nGrasas\n0/65g\n✓ Macros calculados desde tu base de datos.\nCOMIDAS DEL DÍA3\nDESAYUNO\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nOtra opción\n···\n↑\n↓\nALMUERZO\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nOtra opción\n···\n↑\n↓\nCENA\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nOtra opción\n···\n↑\n↓\n＋ Agregar comida / snack\nMás opciones",
+      "headings": [
+        "Nutrición: Jueves, 22 oct · hoy",
+        "Prepara tus comidas de hoy"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "Preparar mi día",
+        "MACROS DEL DÍA",
+        "COMIDAS DEL DÍA3",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        "＋ Agregar comida / snack",
+        "Más opciones"
+      ]
+    },
+    {
+      "name": "mobile-registro-comida",
+      "text": "✕\nAgregar comida / snack\nDescripción\n🎤\nkcal\nProt g\nCarb g\nGrasa g\n✨ Estimar macros\n📷 Estimar con foto\nGuardar",
+      "headings": [
+        "Nutrición: Jueves, 22 oct · hoy",
+        "Prepara tus comidas de hoy",
+        "Agregar comida / snack"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "Preparar mi día",
+        "MACROS DEL DÍA",
+        "COMIDAS DEL DÍA3",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        "＋ Agregar comida / snack",
+        "Más opciones",
+        "✕",
+        "🎤",
+        "✨ Estimar macros",
+        "📷 Estimar con foto",
+        "Guardar"
+      ]
+    },
+    {
+      "name": "mobile-revision-plan",
+      "text": "✕\n🍽️ Preparar mi día\nDía armado con tus metas y tu catálogo.\nTotal del día: 2184 kcal · P 159 · C 219 · G 66 g (meta 2200/160/220/65)\nBowl proteico de la mañana (desayuno)\n728 kcal · P 53 · C 73 · G 22 g\nPechuga de pollo g · Arroz blanco cocido g · Aceite de oliva g\nOtra opción 🚫 No me gusta\nSalteado de pollo y arroz (almuerzo)\n728 kcal · P 53 · C 73 · G 22 g\nPechuga de pollo g · Arroz blanco cocido g · Aceite de oliva g\nOtra opción 🚫 No me gusta\nPollo dorado con arroz y oliva (cena)\n728 kcal · P 53 · C 73 · G 22 g\nPechuga de pollo g · Arroz blanco cocido g · Aceite de oliva g\nOtra opción 🚫 No me gusta\nAplicar al día\nDescartar",
+      "headings": [
+        "Hola, Bro de Pruebas",
+        "Aún falta preparar este día",
+        "🍽️ Preparar mi día"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "?",
+        "Preparar mi día",
+        "Iniciar check-in",
+        "Omitir esta semana",
+        "¿Qué como para Desayuno? Me quedan 2050 kcal",
+        "¿Cómo hago el entrenamiento de hoy?",
+        "Adapta el entreno de hoy por falta de tiempo",
+        "➤",
+        "✕",
+        "Otra opción",
+        "🚫 No me gusta",
+        "Otra opción",
+        "🚫 No me gusta",
+        "Otra opción",
+        "🚫 No me gusta",
+        "Aplicar al día",
+        "Descartar"
+      ]
+    },
+    {
+      "name": "mobile-nutricion-preparada",
+      "text": "‹\nNutrición:\nJueves, 22 Oct · Hoy\nSemana 2\n›\nMACROS DEL DÍA\nCONSUMO DE HOY\n150/2200 kcal · 2050 restantes\n1/4 comidas\nProteínas\n12/160g\nCarbohidratos\n15/220g\nGrasas\n5/65g\n✓ Macros calculados desde tu base de datos.\nCOMIDAS DEL DÍA4\nDESAYUNO\nBowl proteico de la mañana\n728 kcal · P 53 · C 73 · G 22 g\nOtra opción\nVolver al plan\n···\n↑\n↓\nALMUERZO\nSalteado de pollo y arroz\n728 kcal · P 53 · C 73 · G 22 g\nOtra opción\nVolver al plan\n···\n↑\n↓\nCENA\nPollo dorado con arroz y oliva\n728 kcal · P 53 · C 73 · G 22 g\nOtra opción\nVolver al plan\n···\n↑\n↓\n✓\nEXTRA\nYogur de prueba\n150 kcal · P 12 · C 15 · G 5 g\nEditar\nEliminar\n↑\n↓\n＋ Agregar comida / snack\nMás opciones",
+      "headings": [
+        "Nutrición: Jueves, 22 oct · hoy"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "MACROS DEL DÍA",
+        "COMIDAS DEL DÍA4",
+        null,
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        "✓",
+        "Editar",
+        "Eliminar",
+        "↑",
+        "↓",
+        "＋ Agregar comida / snack",
+        "Más opciones"
+      ]
+    },
+    {
+      "name": "mobile-comida-registrada",
+      "text": "‹\nNutrición:\nJueves, 22 Oct · Hoy\nSemana 2\n›\nMACROS DEL DÍA\nCONSUMO DE HOY\n878/2200 kcal · 1322 restantes\n2/4 comidas\nProteínas\n65/160g\nCarbohidratos\n88/220g\nGrasas\n27/65g\n✓ Macros calculados desde tu base de datos.\nCOMIDAS DEL DÍA4\n✓\nDESAYUNO\nBowl proteico de la mañana\n728 kcal · P 53 · C 73 · G 22 g\nOtra opción\nVolver al plan\n···\n↑\n↓\nALMUERZO\nSalteado de pollo y arroz\n728 kcal · P 53 · C 73 · G 22 g\nOtra opción\nVolver al plan\n···\n↑\n↓\nCENA\nPollo dorado con arroz y oliva\n728 kcal · P 53 · C 73 · G 22 g\nOtra opción\nVolver al plan\n···\n↑\n↓\n✓\nEXTRA\nYogur de prueba\n150 kcal · P 12 · C 15 · G 5 g\nEditar\nEliminar\n↑\n↓\n＋ Agregar comida / snack\nMás opciones",
+      "headings": [
+        "Nutrición: Jueves, 22 oct · hoy"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "MACROS DEL DÍA",
+        "COMIDAS DEL DÍA4",
+        "✓",
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        "✓",
+        "Editar",
+        "Eliminar",
+        "↑",
+        "↓",
+        "＋ Agregar comida / snack",
+        "Más opciones"
+      ]
+    },
+    {
+      "name": "mobile-opciones-nutricion",
+      "text": "✕\nMás opciones\nVolver a preparar este día\nRevisar mis macros\nPreparar otra semana",
+      "headings": [
+        "Nutrición: Jueves, 22 oct · hoy",
+        "Más opciones"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "MACROS DEL DÍA",
+        "COMIDAS DEL DÍA4",
+        "✓",
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "Volver al plan",
+        "···",
+        "↑",
+        "↓",
+        "✓",
+        "Editar",
+        "Eliminar",
+        "↑",
+        "↓",
+        "＋ Agregar comida / snack",
+        "Más opciones",
+        "✕",
+        "Volver a preparar este día",
+        "Revisar mis macros",
+        "Preparar otra semana"
+      ]
+    },
+    {
+      "name": "mobile-entreno",
+      "text": "‹\nEntrenamiento:\nJueves, 22 Oct · Hoy\nSemana 2\n›\nSeñales para detenerte:\nDolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.\nPlan combinado · 4 días/semana · 10 semanas · Gimnasio\nNinguna actividad + Gimnasio\nPreparar mi plan\nConfigurar\nENTRENAMIENTO\nGimnasio · Torso A\n4 ejercicios guiados con demostración, instrucciones y alternativas. Base: 3 series por ejercicio, deja 3 repeticiones en reserva.\nPendiente\nQué vas a hacer hoy · 4 ejercicios · 12 series · ~60 min\n·\nCalentamiento\n7 min\n1\nPress de banca\n3 × 6-10\nDescanso 2 min\nRPE 6/10\n2\nRemo sentado en polea\n3 × 8-12\nDescanso 1 min 30 s\nRPE 6/10\n3\nPress militar\n3 × 6-10\nDescanso 2 min\nRPE 6/10\n4\nJalón al pecho\n3 × 8-12\nDescanso 1 min 30 s\nRPE 6/10\n·\nVuelta a la calma\n5 min\n¿Qué es RPE?\nIniciar sesión guiada\nCambiar entrenamiento\nAdaptar hoy:\nSolo 20 min\nEn casa\nSin equipo\nMe perdí la sesión\nVISTA PREVIA DE EJERCICIOS4\n⤢\nPress de banca\nGimnasio · Principiante · barbell, bench\nVer técnica\nPausar\n⤢\nRemo sentado en polea\nGimnasio · Principiante · cable\nVer técnica\nPausar\n⤢\nPress militar\nGimnasio · Principiante · barbell_or_dumbbells\nVer técnica\nPausar\n⤢\nJalón al pecho\nGimnasio · Principiante · cable\nVer técnica\nPausar\nRESUMEN\n40%\nkcal de la meta\n41%\nproteína de la meta\n2/4\ncomidas cumplidas\n—\nentrenamiento\nSemana 2 de 10 · faltan 60 días para el final",
+      "headings": [
+        "Entrenamiento: Jueves, 22 oct · hoy",
+        "Press de banca",
+        "Remo sentado en polea",
+        "Press militar",
+        "Jalón al pecho"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "Preparar mi plan",
+        "Configurar",
+        "ENTRENAMIENTO",
+        "¿Qué es RPE?",
+        "Iniciar sesión guiada",
+        "Cambiar entrenamiento",
+        "Solo 20 min",
+        "En casa",
+        "Sin equipo",
+        "Me perdí la sesión",
+        "VISTA PREVIA DE EJERCICIOS4",
+        "⤢",
+        "Ver técnica",
+        "Pausar",
+        "⤢",
+        "Ver técnica",
+        "Pausar",
+        "⤢",
+        "Ver técnica",
+        "Pausar",
+        "⤢",
+        "Ver técnica",
+        "Pausar",
+        "RESUMEN"
+      ]
+    },
+    {
+      "name": "mobile-entreno-guiado",
+      "text": "‹\nEntrenamiento:\nJueves, 22 Oct · Hoy\nSemana 2\n›\nSeñales para detenerte:\nDolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.\nPlan combinado · 4 días/semana · 10 semanas · Gimnasio\nNinguna actividad + Gimnasio\nPreparar mi plan\nConfigurar\nENTRENAMIENTO\nGimnasio · Torso A\n4 ejercicios guiados con demostración, instrucciones y alternativas. Base: 3 series por ejercicio, deja 3 repeticiones en reserva.\nEn curso · 0/6 bloques\nCambiar entrenamiento\nCompletar cada serie con técnica estable y esfuerzo controlado\n0/6 bloques registrados\nEn curso · 0/6 bloques\n00:00\nDuración estimada: 60 min · el progreso se guarda después de cada acción.\nPausar sesión\nTerminar parcialmente\nDescartar\nCALENTAMIENTO · BLOQUE 1 DE 6\nCalentamiento\nObjetivo: Movilidad dinámica y 1-2 series ligeras de los primeros movimientos\nIntensidad: RPE 2-3\nIniciar bloque\nOmitir bloque\nMarcar completado\nRESUMEN\n40%\nkcal de la meta\n41%\nproteína de la meta\n2/4\ncomidas cumplidas\nEn curso\nentrenamiento\nSemana 2 de 10 · faltan 60 días para el final",
+      "headings": [
+        "Entrenamiento: Jueves, 22 oct · hoy",
+        "Calentamiento"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "Preparar mi plan",
+        "Configurar",
+        "ENTRENAMIENTO",
+        "Cambiar entrenamiento",
+        "Pausar sesión",
+        "Terminar parcialmente",
+        "Descartar",
+        "Iniciar bloque",
+        "Omitir bloque",
+        "Marcar completado",
+        "RESUMEN"
+      ]
+    },
+    {
+      "name": "mobile-progreso",
+      "text": "Tu evolución\nProgreso\n📋 Check-in semana 1 pendiente · 13–19 oct\nPROGRESO\nRegistra tu peso de la semana\nCon tu primer registro desbloqueas tu gráfico de evolución, tu racha y tu adherencia a comidas.\nIngresar mi peso\nTUS NÚMEROS\nRACHAS E HITOS\nTUS CICLOS1\nCiclo 1 en curso\nMartes, 13 oct → Lunes, 21 dic\nCuando termines este ciclo de 10 semanas, aquí quedarán el recap y tus fotos de progreso personal.\nPESO CORPORAL\nS1\n74.7–75.3\nS2\n74.4–75.0\nS3\n74.1–74.7\nS4\n73.8–74.4\nS5\n73.5–74.1\nS6\n73.2–73.8\nS7\n72.9–73.5\nS8\n72.6–73.2\nS9\n72.3–72.9\nS10\n72.0–72.6\nSEMANA\n‹\nSemana 2\n›\nMartes, 20 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nMiércoles, 21 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nJueves, 22 Oct \n2/4 comidas · 878/2200 kcal\n41%\nproteína\nViernes, 23 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nSábado, 24 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nDomingo, 25 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nLunes, 26 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína",
+      "headings": [
+        "Progreso",
+        "Registra tu peso de la semana"
+      ],
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "buttons": [
+        "📋 Check-in semana 1 pendiente · 13–19 oct",
+        "Ingresar mi peso",
+        "TUS NÚMEROS",
+        "RACHAS E HITOS",
+        "TUS CICLOS1",
+        "PESO CORPORAL",
+        "SEMANA",
+        "‹",
+        "›"
+      ]
+    },
+    {
+      "name": "desktop-hoy",
+      "text": "Jueves, 22 oct\nHola, Bro de Pruebas\n?\nB\nCONSUMO DE HOY\n0/2200 kcal · 2200 restantes\n0/3 comidas\nProteínas\n0/160g\nCarbohidratos\n0/220g\nGrasas\n0/65g\nTU AGENDA\nAún falta preparar este día\nTu coach arma comidas y entreno para hoy en segundos.\nPreparar mi día\nCHECK-IN · SEMANA 1\n13–19 oct\nNo registraste actividad esa semana. Aun así puedes ajustar tu plan para la que sigue.\nIniciar check-in\nOmitir esta semana\nO PREGÚNTALE A TU COACH\n¿Qué como para Desayuno? Me quedan 2200 kcal\n¿Cómo hago el entrenamiento de hoy?\nAdapta el entreno de hoy por falta de tiempo\n➤",
+      "headings": [
+        "Hola, Bro de Pruebas",
+        "Aún falta preparar este día"
+      ],
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "overflow": false,
+      "buttons": [
+        "?",
+        "Preparar mi día",
+        "Iniciar check-in",
+        "Omitir esta semana",
+        "¿Qué como para Desayuno? Me quedan 2200 kcal",
+        "¿Cómo hago el entrenamiento de hoy?",
+        "Adapta el entreno de hoy por falta de tiempo",
+        "➤"
+      ]
+    },
+    {
+      "name": "desktop-nutricion",
+      "text": "‹\nNutrición:\nJueves, 22 Oct · Hoy\nSemana 2\n›\nNUTRICIÓN\nPrepara tus comidas de hoy\nAquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Un día preparado llena los slots automáticamente.\nPreparar mi día\nMACROS DEL DÍA\nCONSUMO DE HOY\n0/2200 kcal · 2200 restantes\n0/3 comidas\nProteínas\n0/160g\nCarbohidratos\n0/220g\nGrasas\n0/65g\n✓ Macros calculados desde tu base de datos.\nCOMIDAS DEL DÍA3\nDESAYUNO\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nOtra opción\n···\n↑\n↓\nALMUERZO\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nOtra opción\n···\n↑\n↓\nCENA\nSin asignar — prepara una opción con tu coach o elige\n0 kcal · P 0 · C 0 · G 0 g\nOtra opción\n···\n↑\n↓\n＋ Agregar comida / snack\nMás opciones",
+      "headings": [
+        "Nutrición: Jueves, 22 oct · hoy",
+        "Prepara tus comidas de hoy"
+      ],
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "Preparar mi día",
+        "MACROS DEL DÍA",
+        "COMIDAS DEL DÍA3",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        null,
+        "Otra opción",
+        "···",
+        "↑",
+        "↓",
+        "＋ Agregar comida / snack",
+        "Más opciones"
+      ]
+    },
+    {
+      "name": "desktop-entreno",
+      "text": "‹\nEntrenamiento:\nJueves, 22 Oct · Hoy\nSemana 2\n›\nSeñales para detenerte:\nDolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.\nPlan combinado · 4 días/semana · 10 semanas · Gimnasio\nNinguna actividad + Gimnasio\nPreparar mi plan\nConfigurar\nENTRENAMIENTO\nGimnasio · Torso A\n4 ejercicios guiados con demostración, instrucciones y alternativas. Base: 3 series por ejercicio, deja 3 repeticiones en reserva.\nPendiente\nQué vas a hacer hoy · 4 ejercicios · 12 series · ~60 min\n·\nCalentamiento\n7 min\n1\nPress de banca\n3 × 6-10\nDescanso 2 min\nRPE 6/10\n2\nRemo sentado en polea\n3 × 8-12\nDescanso 1 min 30 s\nRPE 6/10\n3\nPress militar\n3 × 6-10\nDescanso 2 min\nRPE 6/10\n4\nJalón al pecho\n3 × 8-12\nDescanso 1 min 30 s\nRPE 6/10\n·\nVuelta a la calma\n5 min\n¿Qué es RPE?\nIniciar sesión guiada\nCambiar entrenamiento\nAdaptar hoy:\nSolo 20 min\nEn casa\nSin equipo\nMe perdí la sesión\nVISTA PREVIA DE EJERCICIOS4\n⤢\nPress de banca\nGimnasio · Principiante · barbell, bench\nVer técnica\nPausar\n⤢\nRemo sentado en polea\nGimnasio · Principiante · cable\nVer técnica\nPausar\n⤢\nPress militar\nGimnasio · Principiante · barbell_or_dumbbells\nVer técnica\nPausar\n⤢\nJalón al pecho\nGimnasio · Principiante · cable\nVer técnica\nPausar\nRESUMEN\n0%\nkcal de la meta\n0%\nproteína de la meta\n0/3\ncomidas cumplidas\n—\nentrenamiento\nSemana 2 de 10 · faltan 60 días para el final",
+      "headings": [
+        "Entrenamiento: Jueves, 22 oct · hoy",
+        "Press de banca",
+        "Remo sentado en polea",
+        "Press militar",
+        "Jalón al pecho"
+      ],
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "overflow": false,
+      "buttons": [
+        "‹",
+        "›",
+        "Preparar mi plan",
+        "Configurar",
+        "ENTRENAMIENTO",
+        "¿Qué es RPE?",
+        "Iniciar sesión guiada",
+        "Cambiar entrenamiento",
+        "Solo 20 min",
+        "En casa",
+        "Sin equipo",
+        "Me perdí la sesión",
+        "VISTA PREVIA DE EJERCICIOS4",
+        "⤢",
+        "Ver técnica",
+        "Pausar",
+        "⤢",
+        "Ver técnica",
+        "Pausar",
+        "⤢",
+        "Ver técnica",
+        "Pausar",
+        "⤢",
+        "Ver técnica",
+        "Pausar",
+        "RESUMEN"
+      ]
+    },
+    {
+      "name": "desktop-progreso",
+      "text": "Tu evolución\nProgreso\n📋 Check-in semana 1 pendiente · 13–19 oct\nPROGRESO\nRegistra tu peso de la semana\nCon tu primer registro desbloqueas tu gráfico de evolución, tu racha y tu adherencia a comidas.\nIngresar mi peso\nTUS NÚMEROS\nRACHAS E HITOS\nTUS CICLOS1\nCiclo 1 en curso\nMartes, 13 oct → Lunes, 21 dic\nCuando termines este ciclo de 10 semanas, aquí quedarán el recap y tus fotos de progreso personal.\nPESO CORPORAL\nSEM\tRANGO KG\tPESO KG\t% GRASA\nS1\t74.7–75.3\t\t\nS2\t74.4–75.0\t\t\nS3\t74.1–74.7\t\t\nS4\t73.8–74.4\t\t\nS5\t73.5–74.1\t\t\nS6\t73.2–73.8\t\t\nS7\t72.9–73.5\t\t\nS8\t72.6–73.2\t\t\nS9\t72.3–72.9\t\t\nS10\t72.0–72.6\t\t\nSEMANA\n‹\nSemana 2\n›\nMartes, 20 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nMiércoles, 21 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nJueves, 22 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nViernes, 23 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nSábado, 24 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nDomingo, 25 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína\nLunes, 26 Oct \n0/3 comidas · 0/2200 kcal\n0%\nproteína",
+      "headings": [
+        "Progreso",
+        "Registra tu peso de la semana"
+      ],
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "overflow": false,
+      "buttons": [
+        "📋 Check-in semana 1 pendiente · 13–19 oct",
+        "Ingresar mi peso",
+        "TUS NÚMEROS",
+        "RACHAS E HITOS",
+        "TUS CICLOS1",
+        "PESO CORPORAL",
+        "SEMANA",
+        "‹",
+        "›"
+      ]
+    }
+  ],
+  "journeys": [
+    {
+      "id": "J01",
+      "task": "Registrar snack manual",
+      "result": "ok",
+      "navigationClicks": 2,
+      "fields": 5,
+      "notes": "Desde Nutrición: abrir editor y guardar. Requiere conocer los macros; el extra queda consumido."
+    },
+    {
+      "id": "J02",
+      "task": "Preparar y consumir comida planificada",
+      "result": "ok",
+      "navigationClicks": 3,
+      "notes": "Desde Hoy: preparar, aplicar y marcar; cambio de pestaña excluido. Datos de plan y consumo separados."
+    },
+    {
+      "id": "J03",
+      "task": "Recuperar lista de compras del plan activo",
+      "result": "sin acceso dedicado identificado",
+      "menu": "✕\nMás opciones\nVolver a preparar este día\nRevisar mis macros\nPreparar otra semana",
+      "notes": "El código la conserva en snapshot y la presenta en revisión semanal; no hay entrada en este menú."
+    },
+    {
+      "id": "J04",
+      "task": "Iniciar sesión guiada",
+      "result": "ok",
+      "navigationClicks": 1,
+      "notes": "Desde Entreno, muestra bloque actual y control de sesión."
+    },
+    {
+      "id": "J05-mobile",
+      "task": "Navegar por Hoy/Nutrición/Entreno/Progreso",
+      "result": "ok",
+      "dayWrites": 4
+    },
+    {
+      "id": "J05-desktop",
+      "task": "Navegar por Hoy/Nutrición/Entreno/Progreso",
+      "result": "ok",
+      "dayWrites": 0
+    }
+  ]
+}

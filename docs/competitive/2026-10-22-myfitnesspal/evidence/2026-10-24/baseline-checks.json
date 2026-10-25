@@ -1,0 +1,17 @@
+{
+  "base": "62c7860",
+  "stats": {
+    "startTime": "2026-10-25T03:21:00.822Z",
+    "duration": 7510.5109999999995,
+    "expected": 6,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "suites": [
+    "comidas-guardadas.spec.js",
+    "lista-compra.spec.js",
+    "registro.spec.js"
+  ],
+  "method": "Chromium de sistema; configuración local ignorada; fixtures; sin producción"
+}
