@@ -1,0 +1,19 @@
+{
+  "base": "10f9f2e",
+  "unchanged_index_blob": "e915a614e90f5dca018a88c8ae9d1c91587ac3d5",
+  "gate_failure": {
+    "test": "perfil.spec.js / secciones colapsables conservan campos y abren una a la vez",
+    "expected_max_height": 1500,
+    "received_fallback_height": 1539,
+    "received_with_real_fonts": 1551
+  },
+  "targeted_profile_with_real_fonts": {
+    "startTime": "2026-10-25T21:07:04.833Z",
+    "duration": 9991.105,
+    "expected": 6,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "note": "Las fuentes se probaron y retiraron del cambio; no resuelven el presupuesto. No se modifica el límite para forzar aprobación."
+}

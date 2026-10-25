@@ -168,7 +168,7 @@ test.describe("Actividad registrada a mano", () => {
     await expect(page.locator("#pf_sport_help")).toContainText("quedan para tu deporte");
     await page.selectOption("#pf_sport", "running");
     await expect(page.locator("#pf_sport_help")).toHaveText("Tu semana suma sesiones guiadas de correr entre las de fuerza.");
-    await expect(page.locator("#pfSecEntreno")).toContainText("Es tu semana de referencia, no una obligación");
+    await expect(page.locator("#pfSecEntreno")).toContainText("puedes cambiar una sesión o registrar otro deporte desde Entreno");
 
     // Hoy toca fuerza: juega pádel en su lugar.
     await page.locator("#tabs").getByText("Entreno").click();

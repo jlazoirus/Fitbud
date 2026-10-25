@@ -34,7 +34,14 @@ test.describe("Perfil", () => {
     expect(await detailsOpen(comidas)).toBe(true);
     expect(await comidas.evaluate((el) => el.scrollHeight)).toBeLessThanOrEqual(1500);
 
+    await page.check("#pf_diet_omnivoro");
     await page.fill("#pf_preferred_ingredients", "avena, lentejas");
+    const tastes = page.locator("#pfTastePreferences");
+    await expect(page.locator("#pf_allergies")).toBeVisible();
+    await tastes.locator("> summary").click();
+    const cuisine = tastes.locator('input[id^="pf_cuisine_"]').nth(1);
+    await cuisine.check();
+    await tastes.locator("> summary").click();
     await expect(page.locator("#profileSaveFloat")).toBeVisible();
 
     await entreno.locator("> summary").click();
@@ -46,6 +53,16 @@ test.describe("Perfil", () => {
     expect(await detailsOpen(comidas)).toBe(true);
     expect(await detailsOpen(entreno)).toBe(false);
     await expect(page.locator("#pf_preferred_ingredients")).toHaveValue("avena, lentejas");
+    await expect(cuisine).toBeChecked();
+
+    // Guardar también debe leer las preferencias opcionales cerradas.
+    await page.locator("#profileSaveFloat button").click();
+    await expect(page.locator("#profileSaveFloat")).toBeHidden();
+    await comidas.locator("> summary").click();
+    await expect(page.locator("#pf_preferred_ingredients")).toHaveValue("avena, lentejas");
+    expect(await detailsOpen(tastes)).toBe(false);
+    await tastes.locator("> summary").click();
+    await expect(cuisine).toBeChecked();
 
     await page.setViewportSize({ width: 1024, height: 768 });
     const cuenta = page.locator("#pfSecCuenta");

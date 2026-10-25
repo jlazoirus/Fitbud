@@ -1,0 +1,658 @@
+[
+  {
+    "name": "mobile-fallback",
+    "width": 390,
+    "height": 844,
+    "font": false,
+    "touch": false,
+    "panels": {
+      "pfSecComidas": {
+        "height": 1162,
+        "width": 362,
+        "overflow": false,
+        "fields": [
+          {
+            "id": "pf_meal_count",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_main_meal",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_0",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_1",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_2",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_cooking",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_budget",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_preferred_ingredients",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_preferred_dishes",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_food_notes",
+            "height": 68,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_allergies",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_disliked",
+            "height": 46,
+            "fontSize": "16px"
+          }
+        ]
+      },
+      "pfSecEntreno": {
+        "height": 1480,
+        "width": 362,
+        "overflow": false,
+        "fields": [
+          {
+            "id": "pf_sport",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_strength",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_priority",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_experience",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_minutes",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_between_rest",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_time",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_1",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_2",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_3",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_4",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_5",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_6",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_0",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_duration",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_safety_mode",
+            "height": 48,
+            "fontSize": "16px"
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "name": "mobile-real-fonts",
+    "width": 390,
+    "height": 844,
+    "font": true,
+    "touch": true,
+    "panels": {
+      "pfSecComidas": {
+        "height": 1184,
+        "width": 362,
+        "overflow": false,
+        "fields": [
+          {
+            "id": "pf_meal_count",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_main_meal",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_0",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_1",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_2",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_cooking",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_budget",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_preferred_ingredients",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_preferred_dishes",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_food_notes",
+            "height": 68,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_allergies",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_disliked",
+            "height": 46,
+            "fontSize": "16px"
+          }
+        ]
+      },
+      "pfSecEntreno": {
+        "height": 1481,
+        "width": 362,
+        "overflow": false,
+        "fields": [
+          {
+            "id": "pf_sport",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_strength",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_priority",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_experience",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_minutes",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_between_rest",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_time",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_1",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_2",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_3",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_4",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_5",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_6",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_0",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_duration",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_safety_mode",
+            "height": 48,
+            "fontSize": "16px"
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "name": "desktop-real-fonts",
+    "width": 1024,
+    "height": 768,
+    "font": true,
+    "touch": false,
+    "panels": {
+      "pfSecComidas": {
+        "height": 1118,
+        "width": 532,
+        "overflow": false,
+        "fields": [
+          {
+            "id": "pf_meal_count",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_main_meal",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_0",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_1",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_2",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_cooking",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_budget",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_preferred_ingredients",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_preferred_dishes",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_food_notes",
+            "height": 68,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_allergies",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_disliked",
+            "height": 46,
+            "fontSize": "16px"
+          }
+        ]
+      },
+      "pfSecEntreno": {
+        "height": 1379,
+        "width": 532,
+        "overflow": false,
+        "fields": [
+          {
+            "id": "pf_sport",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_strength",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_priority",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_experience",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_minutes",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_between_rest",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_time",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_1",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_2",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_3",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_4",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_5",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_6",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_0",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_duration",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_safety_mode",
+            "height": 48,
+            "fontSize": "16px"
+          }
+        ]
+      }
+    },
+    "errors": []
+  },
+  {
+    "name": "small-real-fonts",
+    "width": 360,
+    "height": 800,
+    "font": true,
+    "touch": true,
+    "panels": {
+      "pfSecComidas": {
+        "height": 1440,
+        "width": 332,
+        "overflow": false,
+        "fields": [
+          {
+            "id": "pf_meal_count",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_main_meal",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_0",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_1",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_meal_time_2",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_cooking",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_budget",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_preferred_ingredients",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_preferred_dishes",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_food_notes",
+            "height": 68,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_allergies",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_disliked",
+            "height": 46,
+            "fontSize": "16px"
+          }
+        ]
+      },
+      "pfSecEntreno": {
+        "height": 1689,
+        "width": 332,
+        "overflow": false,
+        "fields": [
+          {
+            "id": "pf_sport",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_strength",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_priority",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_experience",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_minutes",
+            "height": 46,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_between_rest",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_time",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_1",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_2",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_3",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_4",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_5",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_6",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_location_0",
+            "height": 44,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_duration",
+            "height": 48,
+            "fontSize": "16px"
+          },
+          {
+            "id": "pf_safety_mode",
+            "height": 48,
+            "fontSize": "16px"
+          }
+        ]
+      }
+    },
+    "errors": []
+  }
+]

@@ -965,10 +965,12 @@
   .pf-accordion[open]>summary:after{content:'-';color:var(--txt)}
   .pf-accordion-panel{display:flex;flex-direction:column;gap:12px}
   .pf-accordion-panel>.dash{margin:0}
-  .pf-accordion .field{margin:9px 0}
+  .pf-accordion .field{margin:8px 0}
+  .pf-accordion .field input,.pf-accordion .field select,.pf-accordion .field textarea,.pf-accordion .availability-day select{font-size:16px}
+  .pf-accordion .adv-settings>summary{min-height:44px;display:flex;align-items:center;margin:0}
   .pf-accordion .availability{gap:6px}
   .pf-accordion .availability-day{grid-template-columns:minmax(106px,.9fr) minmax(126px,1.1fr);gap:8px;padding:8px 9px}
-  .pf-accordion .availability-day select{padding:8px;min-height:40px}
+  .pf-accordion .availability-day select{padding:8px;min-height:44px}
   .pf-save-float{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:0;right:0;padding:0 16px;z-index:49;pointer-events:none}
   .pf-save-float button{width:100%;max-width:528px;margin:0 auto;display:block;background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--r-lg);padding:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.55);pointer-events:auto;font-family:var(--font-body)}
   /* REQ-193: objetivos táctiles de 44px (después de las reglas base para ganar la cascada) */
@@ -7698,7 +7700,7 @@ function renderProfile(){
     <div class="chips" style="margin:9px 0 4px">
       ${[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Como de todo"]].map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="pf_diet_${v}" ${chk(v)}><span>${l}</span></label>`).join("")}
     </div>
-    <div class="onboarding-grid training-choice-grid">
+    <div class="onboarding-grid">
       <div class="field"><label for="pf_meal_count">Comidas al día</label><select id="pf_meal_count" onchange="updateProfileMealCount(this.value)">
         ${[2,3,4,5,6].map(value=>`<option value="${value}" ${p.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
       </select></div>
@@ -7724,8 +7726,11 @@ function renderProfile(){
         </select></div>
       </div>
     </details>
+    <details id="pfTastePreferences" class="adv-settings">
+      <summary>Cocinas y preparaciones preferidas</summary>
     <div class="field"><label>Cocinas preferidas</label><div class="chips">${checkChips("pf_cuisine",CUISINE_LABELS,p.preferredCuisines)}</div></div>
     <div class="field"><label>Preparaciones preferidas</label><div class="chips">${checkChips("pf_preparation",PREPARATION_LABELS,p.preferredPreparations)}</div></div>
+    </details>
     <div class="field"><label for="pf_preferred_ingredients">Ingredientes que disfrutas</label><input id="pf_preferred_ingredients" value="${esc(p.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
     <div class="field"><label for="pf_preferred_dishes">Platos que te gustan</label><input id="pf_preferred_dishes" value="${esc(p.preferredDishes)}" placeholder="lomo saltado, pollo a la plancha..."></div>
     <div class="field"><label for="pf_food_notes">Otras preferencias (opcional)</label><textarea id="pf_food_notes" rows="2" placeholder="Ej. prefiero desayunos salados">${esc(p.foodNotes)}</textarea></div>
@@ -7738,7 +7743,7 @@ function renderProfile(){
   <details id="pfSecEntreno" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
   <summary onclick="return profileAccordionGuard(event,this)">Entrenamiento</summary>
   <div class="pf-accordion-panel"><div class="dash">
-    <div class="muted small" style="margin-bottom:10px">El plan usa tus días y lugares reales. Cambiar disponibilidad ajusta las próximas sesiones sin borrar lo que ya registraste.</div>
+    <div class="muted small" style="margin-bottom:10px">Elige días y lugares para tus próximas sesiones.</div>
     <div class="onboarding-grid">
       <div class="field">
         <label for="pf_sport">¿Haces otro deporte además de la fuerza?</label>
@@ -7775,10 +7780,10 @@ function renderProfile(){
     </div>
     <label class="muted small">Tu semana tipo: días y lugar</label>
     ${trainingAvailabilityHtml("pf",p)}
-    <div class="field-note">Es tu semana de referencia, no una obligación: cualquier día puedes cambiar la sesión desde Entreno o registrar otro deporte en su lugar (por ejemplo, pádel en vez de gimnasio). Recomendamos entre 3 y 6 días con al menos uno de descanso.</div>
+    <div class="field-note">Tu semana de referencia: puedes cambiar una sesión o registrar otro deporte desde Entreno. Recomendamos entre 3 y 6 días y al menos uno de descanso.</div>
     <div class="field"><label for="pf_duration">Ciclo de seguimiento</label><select id="pf_duration" onchange="updateTrainingSummary()">
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
-    </select><div class="muted small" style="margin-top:6px">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado. Al cambiarlo se ajusta la fecha final del ciclo actual; tus registros no se borran.</div></div>
+    </select><div class="muted small" style="margin-top:6px">Cambiar el ciclo ajusta su fecha final y conserva tus registros.</div></div>
     <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled,p.strengthMode)}</div>
     <div class="onboarding-grid training-choice-grid">${trainingSafetyModeHtml("pf",p)}</div>
     <details class="adv-settings">
