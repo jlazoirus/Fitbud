@@ -1863,7 +1863,7 @@ Pruebas puras de parseo y E2E de negativos/vacíos/decimales/cero/solo calorías
 
 ## REQ-267 - Registro: conservar procedencia y snapshot nutricional
 
-**Estado: pendiente.** Prioridad P1. Dependencias: REQ-265 y REQ-266. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-265 y REQ-266. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 `saveEditor()`, `applyEstimatedMacros()`, `mealMacrosEntry()` y `normalizedSavedMeals()`; metadatos no persistidos.
@@ -1888,6 +1888,11 @@ Guardar/reabrir/reutilizar preserva origen; editar fuente no cambia pasado. ×2 
 
 ### Verificación sugerida
 Roundtrip, fuente editada, favoritas ×2, dos cuentas y merge offline; inspección de detalle accesible.
+
+### Implementación
+- Contrato `nutritionMeta` v1 en `js/meal-log.js` (documentado en el módulo): `source` manual/catalog/estimate/recipe/food/legacy, `ref` opcional, `base` por unidad, `qty`, `estimate.{kind,note}`, `corrected`, `macrosUnknown`. `normalizeNutritionMeta` descarta imagen/prompt y acota textos; `finalizeNutritionMeta` marca `corrected` sin perder la base.
+- Editor: borrador por fuente (manual, estimación texto/foto, reciente/favorita con porción, catálogo, receta del plan). Se guarda con el consumo; recientes y favoritas lo conservan (`mealMacrosEntry`, `perPortion` vuelve `qty` a 1). Detalle «Origen: …» en el editor y en `openMealMore`. Entradas sin metadatos se leen como legacy y solo pasan a manual si se cambian; sin backfill.
+- Verificación: `scripts/test-meal-log.mjs` (contrato, legacy, corrección, merge offline) y `tests/e2e/origen-registro.spec.js`.
 
 ## REQ-268 - Registro: editar ingredientes y gramos decimales sin perder el cálculo
 

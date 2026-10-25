@@ -54,7 +54,11 @@ test.describe("Comidas guardadas", () => {
         const saved = calls.filter((c) => c.table === "profiles" && c.payload && c.payload.prefs).map((c) => c.payload.prefs.savedMeals);
         return saved.at(-1);
       })
-      .toEqual([{ name: "Bowl de yogur con avena", kcal: 420, p: 30, c: 50, f: 10 }]);
+      .toEqual([{
+        name: "Bowl de yogur con avena", kcal: 420, p: 30, c: 50, f: 10,
+        // REQ-267: la favorita conserva su snapshot: viene de una reciente sin origen guardado, una porción.
+        nutritionMeta: { v: 1, source: "legacy", ref: { kind: "recent", name: "Bowl de yogur con avena" }, base: { kcal: 420, p: 30, c: 50, f: 10, unit: "portion" }, qty: 1 },
+      }]);
 
     // Al reabrir, Recientes sigue mostrando una porción, no la ×1,5 de hoy (REQ-243).
     await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();

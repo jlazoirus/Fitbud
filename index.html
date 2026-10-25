@@ -470,6 +470,7 @@
   .field-errors ul{margin:0;padding-left:18px}
   input[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--bad)}
   .partial-macros{margin-top:6px}
+  .meal-origin{margin:8px 0}
   .qp-save-fav input{accent-color:var(--accent);width:17px;height:17px}
   .closebar{display:flex;justify-content:flex-end;margin-bottom:4px}
   .closebar button{background:var(--surf3);width:36px;height:36px;border-radius:999px;font-size:16px;color:var(--muted)}
@@ -1178,7 +1179,9 @@ function mealMacrosEntry(v){
   const num=(x,k)=>Math.max(0,Math.min(MEAL_VALUE_LIMITS[k],roundTenth(Number(x)||0)));
   if(!name)return null;
   const unknown=!!(v&&v.macrosUnknown);
-  return Object.assign({name,kcal:num(v.kcal,"kcal"),p:unknown?0:num(v.p,"p"),c:unknown?0:num(v.c,"c"),f:unknown?0:num(v.f,"f")},unknown?{macrosUnknown:true}:{});
+  // REQ-267: recientes y favoritas conservan el origen del registro que las originó.
+  const meta=normalizeNutritionMeta(v&&v.nutritionMeta);
+  return Object.assign({name,kcal:num(v.kcal,"kcal"),p:unknown?0:num(v.p,"p"),c:unknown?0:num(v.c,"c"),f:unknown?0:num(v.f,"f")},unknown?{macrosUnknown:true}:{},meta?{nutritionMeta:meta}:{});
 }
 function normalizedSavedMeals(list){
   const out=[],seen=new Set();
@@ -9505,8 +9508,13 @@ function openMealMore(ds,id){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
   const ms=mealState(ds,id);const r=mealRecipe(base,ms);const v=mealValue(base,ms);
   const recHtml=r?`<div class="recipe open" style="margin:6px 0 10px">${r.lines.map(l=>`<div class="r-row"><span>${esc(l.name)}</span><span class="g">${l.grams} g</span></div>`).join("")}<div class="r-foot">${r.lines.length} ingredientes · ${r.generated?"opción de tu coach":"macros calculados desde la receta"}</div></div>`:"";
+  const custom=ms.ovr&&ms.ovr.kcal!=null&&ms.ovr.dishName==null;
+  const meta=custom?normalizeNutritionMeta(ms.ovr.nutritionMeta):null;
+  const note=meta&&meta.estimate&&meta.estimate.note;
+  const originHtml=custom?`<div class="muted small meal-origin">Origen: ${esc(nutritionMetaLabel(meta))}${note?` — ${esc(note)}`:""}</div>`:"";
   modal(`<h3>${esc(base.slot)}</h3>
     ${recHtml}
+    ${originHtml}
     <button class="opt" onclick="closeModal();openEditor('meal','${ds}','${id}')">✎ Editar valores / comida personalizada</button>
     ${v.name?`<button class="opt" onclick="blockCurrentMealDish('${ds}','${id}')">🚫 No me gusta este plato — no lo sugieras más</button>`:""}
     ${!ms.done?`<button class="opt" onclick="skipMeal('${ds}','${id}')">⏭ Saltar esta comida — no la haré hoy</button>`:""}
@@ -9580,15 +9588,47 @@ function openEditor(kind,ds,id){
   let title="Agregar comida / snack";
   if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,macrosUnknown:v.macrosUnknown};title="Editar — "+base.slot;}
   // REQ-229: el nombre precargado de una comida del plan es lo planeado, no lo que comió.
-  window._editor={kind,ds,id,extraIdx:null,planName:kind==="meal"?String(pre.name||""):""};
+  window._editor={kind,ds,id,extraIdx:null,planName:kind==="meal"?String(pre.name||""):"",...editorMetaDraft(kind==="meal"?mealState(ds,id).ovr:null,pre,kind==="meal")};
   editorSheet(title,pre);
 }
-function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i};editorSheet("Editar comida extra",e);}
+function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i,...editorMetaDraft(e,e,false)};editorSheet("Editar comida extra",e);}
+// REQ-267: borrador de origen al abrir el editor. Una entrada con metadatos los
+// conserva; una antigua es "legacy" y solo pasa a manual si se cambian sus valores;
+// una comida del plan sin tocar parte de su receta.
+function editorMetaDraft(entry,pre,isPlanMeal){
+  const orig={name:String(pre&&pre.name||""),kcal:+(pre&&pre.kcal)||0,p:+(pre&&pre.p)||0,c:+(pre&&pre.c)||0,f:+(pre&&pre.f)||0};
+  const custom=entry&&entry.kcal!=null&&entry.dishName==null;
+  if(custom){
+    const meta=normalizeNutritionMeta(entry.nutritionMeta);
+    return {meta,legacyEntry:!meta,orig,existing:true};
+  }
+  if(isPlanMeal&&mealHasContent(orig))return {meta:{source:"recipe",ref:{kind:"recipe",name:orig.name},base:{kcal:orig.kcal,p:orig.p,c:orig.c,f:orig.f,unit:"portion"},qty:1},orig,existing:false};
+  return {meta:{source:"manual"},orig,existing:false};
+}
+function editorOriginHtml(){
+  const e=window._editor;if(!e||!e.existing)return "";
+  const meta=e.meta;
+  const note=meta&&meta.estimate&&meta.estimate.note;
+  return `<div class="muted small meal-origin" id="f_origin">Origen: ${esc(nutritionMetaLabel(meta))}${note?` — ${esc(note)}`:""}</div>`;
+}
+// REQ-267: origen que se guarda con el consumo (null = no tocar, registro antiguo sin cambios).
+function editorMetaForSave(e,v){
+  if(!e.meta){
+    if(!e.legacyEntry)return {v:NUTRITION_META_VERSION,source:"manual"};
+    const same=sameMacros(e.orig,v)&&e.orig.name===v.name&&!v.macrosUnknown;
+    return same?null:{v:NUTRITION_META_VERSION,source:"manual"};
+  }
+  return finalizeNutritionMeta(e.meta,v);
+}
 /* REQ-188: reutilizar comidas ya registradas o favoritas y sumar alimentos sueltos por gramos. */
 // REQ-243: lo registrado con porción ×0,5–×2 guarda `portion`; Recientes y Favoritas muestran una porción.
 function perPortion(v){
   const k=+(v&&v.portion);
-  return k>0&&k!==1?{name:v.name,kcal:v.kcal/k,p:v.p/k,c:v.c/k,f:v.f/k}:v;
+  if(!(k>0&&k!==1))return v;
+  // REQ-267: una porción de la fuente; la base se conserva y la cantidad vuelve a 1.
+  const meta=normalizeNutritionMeta(v.nutritionMeta);
+  if(meta&&meta.base&&meta.base.unit==="portion"){meta.qty=1;delete meta.corrected;}
+  return Object.assign({name:v.name,kcal:v.kcal/k,p:v.p/k,c:v.c/k,f:v.f/k},v.macrosUnknown?{macrosUnknown:true}:{},meta?{nutritionMeta:meta}:{});
 }
 function recentCustomMeals(limit){
   const out=[],seen=new Set();
@@ -9703,6 +9743,12 @@ function applyQuickPick(i){
   const qp=window._qp,item=qp&&qp.items&&qp.items[i];if(!item)return;
   qp.base=mealMacrosEntry(item);qp.portion=1;
   setEditorValues(qp.base);renderPortionChips();
+  // REQ-267: snapshot de la reciente/favorita; conserva su origen y la marca como referencia.
+  const src=qp.base.nutritionMeta;
+  const e=window._editor;
+  if(e)e.meta={source:src&&src.source||"legacy",ref:{kind:qp.tab==="fav"?"saved":"recent",name:qp.base.name},
+    base:{kcal:qp.base.kcal,p:qp.base.p,c:qp.base.c,f:qp.base.f,unit:"portion"},qty:1,
+    ...(src&&src.estimate?{estimate:src.estimate}:{}),...(qp.base.macrosUnknown?{macrosUnknown:true}:{})};
 }
 function renderPortionChips(){
   const qp=window._qp,box=$("#qpPortion");if(!qp||!box)return;
@@ -9713,6 +9759,7 @@ function setQuickPickPortion(factor){
   const qp=window._qp;if(!qp||!qp.base)return;
   qp.portion=factor;
   const b=qp.base;
+  if(window._editor&&window._editor.meta&&window._editor.meta.base)window._editor.meta.qty=factor;
   setEditorValues({name:b.name,kcal:b.kcal*factor,p:b.p*factor,c:b.c*factor,f:b.f*factor,macrosUnknown:b.macrosUnknown});
   renderPortionChips();
 }
@@ -9729,6 +9776,9 @@ function addFoodToEditor(i){
     kcal:cur.kcal+(+ing.kcal||0)*k,p:cur.p+(+ing.protein_g||0)*k,c:cur.c+(+ing.carbs_g||0)*k,f:cur.f+(+ing.fat_g||0)*k,
   });
   qp.base=null;renderPortionChips();
+  // REQ-267: alimentos del catálogo; si ya había otra fuente, la mezcla queda como manual.
+  const e=window._editor;
+  if(e){const wasEmpty=!cur.kcal&&!cur.p&&!cur.c&&!cur.f;e.meta=wasEmpty||(e.meta&&e.meta.source==="catalog")?{source:"catalog"}:{source:"manual"};}
   toast(`${part} añadido`);
 }
 function quickPicksHtml(){
@@ -9769,6 +9819,7 @@ function editorSheet(title,pre){
     <input id="f_photo" type="file" accept="image/*" hidden onchange="onMealPhotoSelected(this)">
     <img id="f_photo_preview" class="meal-photo-preview" alt="Foto de la comida" hidden>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
     <div id="aiOut"></div>
+    ${editorOriginHtml()}
     <label class="qp-save-fav"><input type="checkbox" id="f_fav" ${pre.name&&isSavedMeal(pre.name)?"checked disabled":""}> Guardar en favoritas</label>
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
   if(pre.macrosUnknown)setKcalOnlyMode(true);
@@ -9797,9 +9848,11 @@ function saveEditor(){
   const prev=e.kind==="meal"?mealState(e.ds,e.id).ovr:e.kind==="extra"&&e.extraIdx!=null?dayState(e.ds).extras[e.extraIdx]:null;
   const portion=editorPortion(v,prev);
   if(portion!==1)v.portion=portion;
+  const meta=editorMetaForSave(e,v);
+  if(meta)v.nutritionMeta=meta;
   const fav=$("#f_fav");
   if(fav&&fav.checked&&!fav.disabled&&!isSavedMeal(v.name))toggleSavedMeal(perPortion(v));
-  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},portion!==1?{portion}:{},v.macrosUnknown?{macrosUnknown:true}:{});}
+  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},portion!==1?{portion}:{},v.macrosUnknown?{macrosUnknown:true}:{},meta?{nutritionMeta:meta}:{});}
   else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null){const x=Object.assign(d.extras[e.extraIdx],v);if(portion===1)delete x.portion;if(!v.macrosUnknown)delete x.macrosUnknown;}else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");
 }
@@ -10607,7 +10660,7 @@ async function aiEstimate(){
     const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". No hagas preguntas: deja "preguntas" vacío y da tu mejor estimación. Responde SOLO JSON: {"nombre":"...","kcal":n,"proteina_g":n,"carbohidratos_g":n,"grasa_g":n,"nota":"texto breve","preguntas":[]}`,400,quota);
     const j=validEstimate(parseJSON(txt));
     if(!j)throw estimateUnavailableError();
-    const applied=applyEstimatedMacros(j);
+    const applied=applyEstimatedMacros(j,"text");
     out.innerHTML=`<div class="ai-box">✓ ${esc(coachCopy(j.nota||"Estimado. Revisa y ajusta si quieres."))}${applied}</div>`;
   }catch(e){
     // REQ-238: como la foto (REQ-228), dice qué pasó, con código si no se reconoce, y deja reintentar.
@@ -10711,10 +10764,13 @@ function renderPhotoEstimateError(e){
 }
 // REQ-230: aplica la estimación a los campos, los resalta y devuelve la línea
 // "Aplicado: …" para que se vea qué cambió aunque se parezca a lo anterior.
-function applyEstimatedMacros(j){
+function applyEstimatedMacros(j,kind){
   const vals={f_kcal:Math.round(+j.kcal||0),f_p:Math.round(+j.proteina_g||0),f_c:Math.round(+j.carbohidratos_g||0),f_f:Math.round(+j.grasa_g||0)};
   // REQ-266: una estimación trae los cuatro valores: sale del modo solo calorías.
   setKcalOnlyMode(false);clearEditorErrors();
+  // REQ-267: origen estimado con su supuesto visible; la foto y el pedido no se guardan.
+  if(window._editor)window._editor.meta={source:"estimate",estimate:{kind:kind==="photo"?"photo":"text",note:coachCopy(String(j.nota||""))},
+    base:{kcal:vals.f_kcal,p:vals.f_p,c:vals.f_c,f:vals.f_f,unit:"portion"},qty:1};
   Object.entries(vals).forEach(([id,v])=>{
     const el=$("#"+id);if(!el)return;
     el.value=v;el.classList.remove("field-updated");void el.offsetWidth;el.classList.add("field-updated");
@@ -10726,7 +10782,7 @@ function renderPhotoEstimate(j,canAsk){
   const kcal=Math.round(+j.kcal||0);
   let applied="";
   if(kcal>0){
-    applied=applyEstimatedMacros(j);
+    applied=applyEstimatedMacros(j,"photo");
     // El nombre se completa si está vacío o si lo puso una ronda anterior; lo que escribió el usuario se respeta.
     const name=$("#f_name");
     const planName=window._editor&&window._editor.planName||"";
