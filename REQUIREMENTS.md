@@ -1797,7 +1797,7 @@ Solicitud directa: compartir el análisis guardado localmente. Publica `docs/com
 
 ## REQ-265 - Estimación: no aplicar plantillas genéricas como macros de una comida
 
-**Estado: pendiente.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Solicitud directa; contraste MFP sin entrevistas. Probe `fallback-template` y `aiEstimate()`/rama reuse de `api/claude.js`.
@@ -1822,6 +1822,11 @@ Sin resultado compatible no cambia macros ni anuncia estimación aplicada. Reuti
 
 ### Verificación sugerida
 Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; E2E de conservación de valores.
+
+### Implementación
+- Cliente: `aiEstimate()` y `photoEstimateRound()` envían `fallbackText` vacío; `validEstimate()` exige cuatro valores finitos no negativos y rechaza respuestas `origin:"template"`. Sin resultado válido, `estimateErrorMessage` dice que no se pudo estimar y que los valores no cambiaron; no se muestra «Aplicado» ni ✓.
+- Servidor: `NO_TEMPLATE_ACTIONS` (`meal_estimate`) descarta cualquier fallback, también el de un cliente antiguo; si `select_reusable_coach_part` no tiene una generación del mismo usuario y `contextKey`, responde 422 `no_compatible_result` y marca la parte fallida (devuelve la reserva). La respuesta reutilizada informa `origin`. `validateCoachOutput` rechaza macros negativos. Sin cambios SQL.
+- Verificación: `scripts/test-meal-estimate-no-template.mjs` (sin pool, cliente antiguo con plantilla, reutilización exacta, origen template) y `tests/e2e/estimacion.spec.js` (422, plantilla reutilizada, negativos, reutilización compatible, foto).
 
 ## REQ-266 - Registro: validar valores nutricionales y distinguir desconocidos de ceros
 
