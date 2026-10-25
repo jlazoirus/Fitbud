@@ -1,0 +1,42 @@
+{
+  "at": "2026-10-25T03:23:41.455Z",
+  "base": "62c7860",
+  "mode": "fixtures; no producción",
+  "observations": [
+    {
+      "name": "negative-manual",
+      "finding": "Se aceptan nutrientes negativos sin error",
+      "entry": {
+        "done": true,
+        "oid": 1,
+        "name": "Entrada negativa de prueba",
+        "kcal": -100,
+        "p": -10,
+        "c": 0,
+        "f": 0,
+        "_syncId": "x_0_ok4rjc"
+      }
+    },
+    {
+      "name": "ingredient-snapshot",
+      "finding": "Gramos redondeados; ingredientes convertidos en texto y totales sin líneas editables ni procedencia",
+      "draft": "Pechuga de pollo 34 g",
+      "entry": {
+        "done": true,
+        "oid": 1,
+        "name": "Pechuga de pollo 34 g",
+        "kcal": 56,
+        "p": 11,
+        "c": 0,
+        "f": 1,
+        "_syncId": "x_0_s5rj3o"
+      }
+    },
+    {
+      "name": "fallback-template",
+      "finding": "La plantilla genérica del código se aplica como estimación; respuesta reuse simulada, no prueba de incidencia en producción",
+      "kcal": "500",
+      "text": "✓ Estimación de referencia. Ajusta la porción si conoces la receta.\nAplicado: 500 kcal · P 25 g · C 55 g · G 20 g"
+    }
+  ]
+}

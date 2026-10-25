@@ -1,0 +1,24 @@
+{
+  "scope": "Refinamiento documental del backlog; sin cambios de runtime",
+  "base_app": "62c7860",
+  "checks": {
+    "docs_index": {
+      "passed": true,
+      "requirements": 273,
+      "automatable_pending": 9,
+      "next": "REQ-265",
+      "requirements_words": 13289
+    },
+    "selector_developer_self_test": true,
+    "selector_auditor_self_test": true,
+    "deploy_allowlist": true,
+    "secrets_audit": true,
+    "local_links_and_matrices": true,
+    "archived_records_preserved": 15,
+    "current_e2e_passed_without_retries": 6,
+    "browser_probes": 3,
+    "official_articles_read": 14
+  },
+  "release_gate": "No se repite la suite completa: runtime sin cambios; comprobaciones pertinentes y E2E de contraste ejecutados con Chromium de sistema. La configuración por defecto del gate exige main y Chromium descargado; la rama de revisión usa override local para los E2E.",
+  "privacy": "Solo fixtures y fuentes públicas; sin producción, compras ni entrevistas."
+}

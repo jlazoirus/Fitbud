@@ -35,6 +35,10 @@ Diferencias con los dos loops anteriores: **no usa** el lock `.git/fitbros-agent
 
 **Estado actual: en pausa (desde 2026-10-19)** hasta validar el producto con usuarios en la web. Mientras `native-migration.json` tenga `paused`, el selector devuelve `plan_paused` y ningún agente trabaja en este track.
 
+## Análisis competitivo y propuestas de producto
+
+El [plan vigente de mejoras frente a MyFitnessPal](docs/competitive/2026-10-22-myfitnesspal/README.md) incorpora fuentes oficiales y contraste con `main`. El usuario autorizó **REQ-268..276** en `REQUIREMENTS.md`: pendientes funcionales ordenados, con [alcance y dependencias](docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md), sin entrevistas/reclutamiento como condición. El selector descubre estos REQ. Revalidar código al tomar cada uno y usar el lock del desarrollador; este paquete no reactiva la migración nativa. Las propuestas MFP-00..17 y el snapshot inicial quedan como histórico.
+
 ## Memoria operativa entre corridas (continuidad, no fuente de verdad)
 
 Cada corrida autónoma arranca en frío: no hereda el historial conversacional de la anterior. Para preservar continuidad operativa entre corridas existe una **bitácora compartida fuera del repo**:

@@ -1,0 +1,156 @@
+[
+  {
+    "id": 34889191368077,
+    "title": "The difference between Free, Premium, and Premium +",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/34889191368077-The-difference-between-Free-Premium-and-Premium",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/34889191368077.json",
+    "updated_at": "2026-10-15T12:57:53Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646056+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "La tabla oficial distingue registro gratuito, herramientas Premium y planificación/compras Premium+. Incluye Workout Routines dentro de Premium; no permite asumir que MFP carece de rutinas.",
+    "source_id": "S01"
+  },
+  {
+    "id": 15457546881805,
+    "title": "What is included in the free version?",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/15457546881805-What-is-included-in-the-free-version",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/15457546881805.json",
+    "updated_at": "2026-09-06T19:49:09Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646162+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "La versión gratuita permite registro, creación de alimentos/comidas/recetas y consulta nutricional; no es correcto atribuir todo el análisis nutricional exclusivamente a Premium.",
+    "source_id": "S02"
+  },
+  {
+    "id": 34347930588557,
+    "title": "Premium+",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/34347930588557-Premium",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/34347930588557.json",
+    "updated_at": "2026-09-20T10:57:47Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646206+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Premium+ incorpora planificación y compras. El artículo enumera Estados Unidos, Reino Unido, Canadá, Irlanda, Nueva Zelanda y Australia; no incluye Perú. Las funciones se describen para las apps móviles.",
+    "source_id": "S03"
+  },
+  {
+    "id": 34603055097869,
+    "title": "How to use the Meal Planner",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/34603055097869-How-to-use-the-Meal-Planner",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/34603055097869.json",
+    "updated_at": "2026-10-01T22:03:27Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646243+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Meal Planner documenta planes de 2 a 15 días, sustituciones, alimentos que ya se tienen, porciones del hogar y compras. Exige inglés, versión mínima y países enumerados; no está en la web.",
+    "source_id": "S04"
+  },
+  {
+    "id": 360032622131,
+    "title": "How do I copy a meal from one day to another?",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/360032622131-How-do-I-copy-a-meal-from-one-day-to-another",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/360032622131.json",
+    "updated_at": "2026-10-04T21:41:50Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646267+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "La ayuda documenta copiar alimentos y comidas entre fechas en web, iOS y Android.",
+    "source_id": "S05"
+  },
+  {
+    "id": 33535658002061,
+    "title": "Multi-Day Logging with MyFitnessPal Premium",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/33535658002061-Multi-Day-Logging-with-MyFitnessPal-Premium",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/33535658002061.json",
+    "updated_at": "2026-09-16T21:25:33Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646296+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Multi-Day Logging es Premium/Premium+ en apps móviles, hasta siete días. No soporta My Meals y no ofrece deshacer de todo el lote.",
+    "source_id": "S06"
+  },
+  {
+    "id": 360032271452,
+    "title": "How to create and find your recipes",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/360032271452-How-to-create-and-find-your-recipes",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/360032271452.json",
+    "updated_at": "2026-09-29T20:26:49Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646336+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Las recetas guardan ingredientes y rendimiento; los nutrientes se suman y dividen entre porciones. Crear manualmente funciona en web y móvil; importar web exige inglés.",
+    "source_id": "S07"
+  },
+  {
+    "id": 360032622191,
+    "title": "Can the recipe feature calculate the number of servings produced?",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/360032622191-Can-the-recipe-feature-calculate-the-number-of-servings-produced",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/360032622191.json",
+    "updated_at": "2026-09-05T15:34:39Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646354+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "El rendimiento no se puede deducir automáticamente de una mezcla de medidas; debe indicarlo el usuario y corregirlo tras cocinar si corresponde.",
+    "source_id": "S08"
+  },
+  {
+    "id": 360032624771,
+    "title": "How to use the Barcode Scanner",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/360032624771-How-to-use-the-Barcode-Scanner",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/360032624771.json",
+    "updated_at": "2026-10-15T15:50:13Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646378+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Barcode Scanner se describe como Premium para apps móviles; pide cámara trasera, confirmar cantidad y permite crear alimento desde la etiqueta si falta el producto.",
+    "source_id": "S09"
+  },
+  {
+    "id": 360032270912,
+    "title": "The barcode scanner returned the wrong item",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/360032270912-The-barcode-scanner-returned-the-wrong-item",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/360032270912.json",
+    "updated_at": "2026-10-01T17:23:03Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646399+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "La corrección de un emparejamiento de código se describe como cambio global para otros usuarios; para Evolv se propone corrección privada sin contaminar catálogo compartido.",
+    "source_id": "S10"
+  },
+  {
+    "id": 360032622071,
+    "title": "How the Recent and Frequent lists work.",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/360032622071-How-the-Recent-and-Frequent-lists-work",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/360032622071.json",
+    "updated_at": "2026-09-28T20:51:55Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646420+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Recientes/frecuentes se construyen desde registros; ocultar una entrada de esas listas no elimina el alimento de la base.",
+    "source_id": "S11"
+  },
+  {
+    "id": 360032272852,
+    "title": "What to do if the serving size you need isn't available",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/360032272852-What-to-do-if-the-serving-size-you-need-isn-t-available",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/360032272852.json",
+    "updated_at": "2026-09-24T20:53:51Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646439+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Las porciones dependen de las unidades de la entrada. Se documentan decimales, unidades alternativas y crear alimento propio; no toda entrada admite conversión universal.",
+    "source_id": "S12"
+  },
+  {
+    "id": 360045761612,
+    "title": "How to use the Meal Scanner",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/360045761612-How-to-use-the-Meal-Scanner",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/360045761612.json",
+    "updated_at": "2026-09-16T18:08:57Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646466+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Meal Scan es Premium, en inglés y apps con requisitos de OS/versión. El usuario revisa sugerencias y porciones, y puede añadir alimentos no detectados antes de registrar.",
+    "source_id": "S13"
+  },
+  {
+    "id": 30332897072269,
+    "title": "How to log food with your voice",
+    "url": "https://support.myfitnesspal.com/hc/en-us/articles/30332897072269-How-to-log-food-with-your-voice",
+    "api_url": "https://support.myfitnesspal.com/api/v2/help_center/en-us/articles/30332897072269.json",
+    "updated_at": "2026-09-21T21:25:13Z",
+    "retrieved_at_utc": "2026-10-25T03:26:27.646631+00:00",
+    "method": "GET público oficial; artículo leído, sin iniciar sesión",
+    "summary_es": "Voice Logging es Premium en inglés y apps móviles, con revisión por alimento. No admite entradas personales My Foods/Recipes/Meals ni funciona offline.",
+    "source_id": "S14"
+  }
+]
