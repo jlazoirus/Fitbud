@@ -2,6 +2,7 @@
 // REQ-266 — Los recordatorios salen en el primer disparo a la hora elegida o
 // después (mismo día local), una sola vez por día. Antes exigían que el cron
 // cayera justo en esa hora y el cron diario (03:00 en Lima) nunca coincidía.
+// REQ-265: y no avisan de entreno en días de descanso.
 import assert from "node:assert/strict";
 
 process.env.SUPABASE_URL = "https://example.supabase.co";
@@ -27,7 +28,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes("/notification_preferences?push_opt_in")) return json([]);
   if (u.includes("/profiles?id=")) return json([{ email: "ana@example.com", active: true }]);
   if (u.includes("/profiles?select=id")) return json([{ id: "u1" }]);
-  if (u.includes("/day_log?")) return json([{ state: { meals: { desayuno: { done: false } }, workoutDone: true } }]);
+  if (u.includes("/day_log?")) return json([{ state: state.day }]);
   if (u.includes("/notification_log")) {
     if (method === "POST") return json([{ id: 1 }]);
     if (method === "PATCH") return json({});
@@ -37,8 +38,9 @@ globalThis.fetch = async (url, init = {}) => {
 };
 const { default: handler } = await import("../api/notify.js");
 
-async function run(notifyHour, log = []) {
-  state = { calls: [], emails: [], log, pref: { user_id: "u1", timezone: tz, notify_hour: notifyHour, enabled_days: [0, 1, 2, 3, 4, 5, 6], notify_nutrition: true, notify_training: true, unsubscribe_token: "tok_0123456789" } };
+const NUTRITION_PENDING = { meals: { desayuno: { done: false } }, workoutDone: true };
+async function run(notifyHour, log = [], day = NUTRITION_PENDING, prefs = {}) {
+  state = { calls: [], emails: [], log, day, pref: { user_id: "u1", timezone: tz, notify_hour: notifyHour, enabled_days: [0, 1, 2, 3, 4, 5, 6], notify_nutrition: true, notify_training: true, unsubscribe_token: "tok_0123456789", ...prefs } };
   const res = { code: 0, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, send(b) { this.body = b; return this; }, setHeader() {} };
   await handler({ method: "GET", url: "/api/notify", headers: { authorization: "Bearer secret" } }, res);
   assert.equal(res.code, 200, JSON.stringify(res.body));
@@ -63,4 +65,18 @@ out = await run(hour - 1, [{ id: 1, status: "sent" }]);
 assert.equal(out.sent, 0, "ya enviado hoy: los disparos siguientes no repiten");
 assert.equal(out.skipped, 1);
 assert.equal(state.emails.length, 0);
+// REQ-265: el recordatorio de entreno no sale en días de descanso. El cliente
+// guarda workoutOverride como string y restDay en cada guardado del día.
+const trainingOnly = { notify_nutrition: false };
+const training = (day) => run(hour, [], { meals: {}, workoutDone: false, ...day }, trainingOnly);
+out = await training({ restDay: true });
+assert.equal(out.sent, 0, "descanso del plan (restDay): sin recordatorio de entreno");
+out = await training({ workoutOverride: "descanso" });
+assert.equal(out.sent, 0, "día marcado como descanso: sin recordatorio de entreno");
+out = await training({ restDay: false, workoutOverride: "fullA" });
+assert.equal(out.sent, 1, "sesión prescrita sin cerrar: sí hay recordatorio");
+assert.equal(state.emails[0].subject, "Tienes entrenamiento pendiente para hoy");
+out = await training({ restDay: false, workoutDone: true });
+assert.equal(out.sent, 0, "sesión cerrada: sin recordatorio");
+console.log("  descanso (plan o marcado) y sesión cerrada → sin aviso de entreno; sesión pendiente → aviso");
 console.log("validate-notify-schedule: OK");

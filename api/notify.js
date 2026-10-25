@@ -142,8 +142,11 @@ async function checkPending(userId, dateStr, e) {
   const nutritionPending = mealIds.length > 0 && mealIds.some(id => !meals[id].done);
 
   const workoutDone = !!state.workoutDone;
-  const override = state.workoutOverride || {};
-  const isRestDay = override.type === "rest" || override.type === "missed_converted_rest";
+  // REQ-265: el cliente guarda workoutOverride como string ("descanso" o el id
+  // de un entreno) y restDay en cada guardado del día (descanso del plan,
+  // marcado por el usuario o pausa por seguridad).
+  const override = state.workoutOverride;
+  const isRestDay = state.restDay === true || override === "descanso";
   const trainingPending = !workoutDone && !isRestDay;
 
   return { nutrition: nutritionPending, training: trainingPending };

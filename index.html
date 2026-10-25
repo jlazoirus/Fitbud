@@ -12556,6 +12556,9 @@ const _dayCommitSeq={};
 function commitDay(ds){
   _dayCommitSeq[ds]=(_dayCommitSeq[ds]||0)+1;
   const st=dayState(ds);
+  // REQ-265: el recordatorio (api/notify.js) no conoce el plan; se guarda si
+  // el día es de descanso (planificado, marcado o pausa por seguridad).
+  try{const wid=effectiveWorkout(ds).id;st.restDay=wid==="descanso"||wid==="safety_hold";}catch(e){/* sin plan legible: se conserva el valor anterior */}
   prepareDayStateForSync(st);
   const planVersionId=st.planVersionId||resolvePlanVersionIdForDate(ds);
   if(planVersionId)st.planVersionId=planVersionId;

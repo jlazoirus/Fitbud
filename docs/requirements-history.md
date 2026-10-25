@@ -10946,3 +10946,62 @@ REQ-38 embebió la clave pública `BG6yy…` en `index.html` y como respaldo en 
 
 - Cliente y servidor usan la misma clave nueva, válida. ✓ `scripts/validate-vapid-key.mjs`.
 - Con las variables en Vercel, un usuario con avisos activos que vuelve a entrar queda suscrito con la clave nueva y recibe el aviso a su hora (REQ-266).
+
+## REQ-265 - Fix recordatorios: el cron marca "entrenamiento pendiente" en días de descanso
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría del journey de retención (recordatorios REQ-24 y push de racha REQ-38). El criterio de "descanso" de `checkPending()` en `api/notify.js` no coincide con la forma del dato que escribe `index.html`.
+
+### Problema
+
+El recordatorio diario de entrenamiento se dispara también en días de **descanso planificado** del split y en días marcados como descanso ("Día marcado como descanso planificado"). Como `notify_training` está activo por defecto (`index.html:8028`), un usuario que entrena 3 días/semana recibe hasta 4 avisos falsos de "Tienes entrenamiento pendiente para hoy" por semana. Contradice el criterio propio de REQ-38 ("solo cuando hay algo pendiente… sin castigar descansos planificados", `docs/requirements-history.md:2030`) y empuja a desactivar notificaciones — daño directo a retención.
+
+### Causa raíz
+
+`checkPending()` (`api/notify.js:134-137`) decide el descanso solo con `override.type === "rest" || override.type === "missed_converted_rest"`, esperando un objeto. Pero el cliente escribe `workoutOverride` siempre como **string**: `st.workoutOverride="descanso"` (`index.html:7295` y `:9548`) o un id de entreno (`:6524`, `:9530`). `"descanso".type` es `undefined`, así que `isRestDay` es siempre `false` y `trainingPending = !workoutDone`. Además `"missed_converted_rest"` no existe en ningún otro archivo: es una forma que nadie produce. El cron tampoco consulta el plan/split (no lee `plan_versions` ni `plannedWorkoutId`), así que no detecta un descanso planificado sin override.
+
+### Objetivo
+
+Que el recordatorio de entrenamiento NO se envíe en días de descanso (planificados o marcados por el usuario); solo cuando hay una sesión realmente prescrita y sin cerrar.
+
+### Alcance
+
+1. En `checkPending()`, reconocer el descanso con la forma real del dato: `workoutOverride === "descanso"` (string).
+2. Detectar el descanso planificado del split cuando no hay override (replicar `plannedWorkoutId`/schedule con las prefs del usuario, o persistir el tipo de día en `day_log` para que el cron lo lea).
+
+### Fuera de alcance
+
+- Rediseñar `workoutOverride` a objeto; el cliente lo usa como string en todos los flujos.
+- Recordatorio de nutrición (su criterio `mealIds` no depende de esto).
+
+### Riesgos
+
+- Si solo se arregla el string pero no el descanso planificado sin override, persiste el falso positivo mayoritario.
+- Cambiar la firma de `workoutOverride` rompería lectura del cliente; mantener compatibilidad con string.
+
+### Criterios de aceptación
+
+- En día de descanso (planificado o `workoutOverride==="descanso"`) sin sesión cerrada, `checkPending().training === false`.
+- En día con sesión prescrita y sin cerrar, sigue siendo `true`.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Fixture de `checkPending()` con cuatro estados: descanso planificado sin override, `workoutOverride:"descanso"`, entreno sin cerrar, entreno cerrado.
+- Repro de esta auditoría: la lógica de `:134-137` sobre `{workoutOverride:"descanso"}` da `pending=true` hoy (debe ser `false`).
+
+### Implementación
+
+1. `commitDay()` (`index.html`) guarda `restDay` en el estado del día: `true` si `effectiveWorkout(ds).id` es `descanso` (plan o marcado por el usuario) o `safety_hold` (pausa por seguridad). Envuelto en try/catch: un error al leer el plan nunca impide guardar el día.
+2. `checkPending()` (`api/notify.js`): el entreno no está pendiente si `restDay === true` o `workoutOverride === "descanso"` (string, la forma real). Se quitó la forma de objeto que nadie produce.
+3. `CACHE_NAME` → `fitbud-pwa-v143`.
+
+Límite conocido: `restDay` se calcula al guardar el día. Si el usuario cambia sus días de entreno en Perfil, un día ya guardado conserva el valor anterior hasta que se vuelva a guardar. Un día sin fila en `day_log` no recibe ningún recordatorio (como antes).
+
+### Verificación
+
+- `scripts/validate-notify-schedule.mjs`: descanso por `restDay`, por `workoutOverride:"descanso"`, sesión pendiente y sesión cerrada (falla con el código anterior).
+- `tests/e2e/recordatorios.spec.js`: con sesión prescrita `restDay` es `false`; tras "Me perdí la sesión" → "Convertir en descanso" es `true`.
