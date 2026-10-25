@@ -12978,15 +12978,18 @@ async function adminBetaAccept(id,btn,linkOnly){
     const first=String((out.applicant&&out.applicant.name)||"").split(/\s+/)[0];
     const who=first?esc(first):"La persona";
     if(out.mode==="email"||out.mode==="existing"){
+      window._betaInviteMsg=out.message||"";
       modal(`<h3>${first?esc(first)+" está dentro":"Postulante aceptado"}</h3>
         <p class="muted small">${out.mode==="email"
           ?`Le enviamos la invitación a <b>${esc(out.email)}</b>. ${who} crea su contraseña desde ese correo y entra con ${out.days} días de plan completo.`
           :`<b>${esc(out.email)}</b> ya tenía cuenta: su acceso de ${out.days} días ya está activo. Puede entrar con su contraseña de siempre.`}</p>
         ${out.betaError?`<div class="ai-box" style="margin-top:10px">⚠️ ${esc(out.betaError)}</div>`:""}
+        ${out.message?`<div class="field" style="margin-top:10px"><label for="betaInviteMsg">Mensaje de bienvenida</label><textarea id="betaInviteMsg" rows="9" readonly>${esc(out.message)}</textarea></div>`:""}
         <p class="muted small" style="margin-top:10px">Si no le llega en unos minutos, que revise spam o promociones. También puedes generarle un enlace desde "Aceptados".</p>
         <div class="row wrap" style="margin-top:12px">
-          <button class="btn btn-accent" onclick="closeModal()">Listo</button>
-          ${out.whatsappUrl?`<a class="btn" href="${esc(out.whatsappUrl)}" target="_blank" rel="noopener">Escribirle por WhatsApp</a>`:""}
+          ${out.whatsappUrl?`<a class="btn btn-accent" href="${esc(out.whatsappUrl)}" target="_blank" rel="noopener">Enviar por WhatsApp</a>`:""}
+          ${out.message?`<button class="btn${out.whatsappUrl?"":" btn-accent"}" onclick="copyBetaInvite()">Copiar mensaje</button>`:""}
+          <button class="btn${out.whatsappUrl||out.message?"":" btn-accent"}" onclick="closeModal()">Listo</button>
         </div>`);
     }else{
       window._betaInviteMsg=out.message||"";
