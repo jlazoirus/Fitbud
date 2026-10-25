@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 272" role="img" aria-labelledby="title desc">
+  <title id="title">Sentadilla búlgara sin carga con pie posterior elevado</title>
+  <desc id="desc">Vista lateral. El empeine del pie posterior está apoyado en un banco bajo y estable. El pie delantero permanece completamente en el suelo. La persona flexiona ambas rodillas para descender, manteniendo el tronco estable y sin mancuernas.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1l7 4-7 4" fill="none" stroke="#c6f36a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>
+    .limb,.torso,.far,.prop,.floor,.arrow,.band{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .limb{stroke:#e4ebdf;stroke-width:9}.torso{stroke:#e4ebdf;stroke-width:13}
+    .far{stroke:#738372;stroke-width:8}.head{fill:#e4ebdf}.joint{fill:#c6f36a}
+    .prop{stroke:#9eaf9a;stroke-width:5}.floor{stroke:#46513f;stroke-width:2}
+    .arrow{stroke:#c6f36a;stroke-width:2.5}.band{stroke:#c6f36a;stroke-width:4}
+    .label{font:600 14px system-ui,sans-serif;fill:#c6f36a}.cue{font:14px system-ui,sans-serif;fill:#b9c5b3}
+  </style>
+  <rect width="640" height="272" fill="#171b16"/>
+  <path d="M320 48v181" stroke="#36402f"/>
+  <g transform="translate(0 0)"><text class="label" x="28" y="31">1 · Pie posterior en el banco</text><path class="floor" d="M28 224H292"/><path class="prop" d="M37 176h67m-59 0v48m51 -48v48"/><path class="far" d="M162 143L119 163 86 176"/><path class="torso" d="M171 93L162 143"/><path class="limb" d="M162 143L170 182 177 224"/><path class="limb" d="M172 224h18"/><path class="limb" d="M171 102L189 128 181 155"/><circle class="head" cx="174" cy="67" r="11"/><path class="limb" d="M173 80L171 93"/><circle class="joint" cx="86" cy="176" r="4"/></g>
+  <g transform="translate(320 0)"><text class="label" x="28" y="31">2 · Desciende entre ambos apoyos</text><path class="floor" d="M28 224H292"/><path class="prop" d="M37 176h67m-59 0v48m51 -48v48"/><path class="far" d="M149 167L105 211 86 176"/><path class="torso" d="M157 122L149 167"/><path class="limb" d="M149 167L180 183 177 224"/><path class="limb" d="M172 224h18"/><path class="limb" d="M157 129L183 149 171 174"/><circle class="head" cx="160" cy="96" r="11"/><path class="limb" d="M159 109L157 122"/><circle class="joint" cx="86" cy="176" r="4"/><path class="arrow" d="M236 136v44" marker-end="url(#arrow)"/></g>
+  <text class="cue" x="320" y="254" text-anchor="middle">Banco estable · Pie delantero apoyado · Sin carga</text>
+</svg>

@@ -1,4 +1,4 @@
-# REQ-264 — Dispara cada hora los recordatorios (correo y push) de api/notify.js.
+# REQ-265 — Dispara cada hora los recordatorios (correo y push) de api/notify.js.
 # El cron de Vercel (plan Hobby) solo corre una vez al día, así que el envío a
 # la hora que elige cada usuario depende de este workflow.
 # Requiere el secreto del repo CRON_SECRET con el mismo valor que en Vercel.

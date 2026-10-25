@@ -1,7 +1,8 @@
 -- ============================================================
 -- Fitbros — media real de ejercicios (REQ-15)
 -- Generado por scripts/ingest-exercise-media.mjs. Idempotente.
--- Fuente: Free Exercise DB (yuhonas) — dominio público / Unlicense.
+-- Fuente: Free Exercise DB (yuhonas), salvo los SVG propios de Evolv Studio.
+-- Los SVG propios representan la variante exacta y sustituyen proxies anteriores.
 -- Ejecutar después de supabase/exercises.sql.
 -- ============================================================
 
@@ -94,14 +95,14 @@ update exercises set
 where slug = 'lat-pulldown';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/bulgarian-split-squat/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/bulgarian-split-squat/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/bulgarian-split-squat/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/bulgarian-split-squat.svg',
+  media_url    = 'assets/exercise-media/bulgarian-split-squat.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'bulgarian-split-squat';
 
@@ -118,26 +119,26 @@ update exercises set
 where slug = 'overhead-press';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/walking-lunge/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/walking-lunge/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/walking-lunge/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/walking-lunge.svg',
+  media_url    = 'assets/exercise-media/walking-lunge.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'walking-lunge';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/standing-calf-raise/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/standing-calf-raise/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/standing-calf-raise/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/standing-calf-raise.svg',
+  media_url    = 'assets/exercise-media/standing-calf-raise.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'standing-calf-raise';
 
@@ -238,14 +239,14 @@ update exercises set
 where slug = 'incline-push-up';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/band-row/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/band-row/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/band-row/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/band-row.svg',
+  media_url    = 'assets/exercise-media/band-row.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'band-row';
 
@@ -310,26 +311,26 @@ update exercises set
 where slug = 'dead-bug';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/pike-push-up/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/pike-push-up/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/pike-push-up/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/pike-push-up.svg',
+  media_url    = 'assets/exercise-media/pike-push-up.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'pike-push-up';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/single-leg-rdl/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/single-leg-rdl/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/single-leg-rdl/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/single-leg-rdl.svg',
+  media_url    = 'assets/exercise-media/single-leg-rdl.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'single-leg-rdl';
 
@@ -346,38 +347,38 @@ update exercises set
 where slug = 'assisted-pull-up';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/shoulder-tap-plank/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/shoulder-tap-plank/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/shoulder-tap-plank/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/shoulder-tap-plank.svg',
+  media_url    = 'assets/exercise-media/shoulder-tap-plank.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'shoulder-tap-plank';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/step-up/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/step-up/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/step-up/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/step-up.svg',
+  media_url    = 'assets/exercise-media/step-up.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'step-up';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/slider-leg-curl/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/slider-leg-curl/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/slider-leg-curl/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/slider-leg-curl.svg',
+  media_url    = 'assets/exercise-media/slider-leg-curl.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'slider-leg-curl';
 
@@ -490,14 +491,14 @@ update exercises set
 where slug = 'front-squat';
 
 update exercises set
-  media_type   = 'image_sequence',
-  frames       = '["https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/archer-push-up/0.jpg","https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/archer-push-up/1.jpg"]'::jsonb,
-  poster_url   = 'https://wtqnvtixvfapdbzcegdw.supabase.co/storage/v1/object/public/exercise-media/archer-push-up/0.jpg',
-  media_url    = null,
-  source_name  = 'Free Exercise DB',
-  source_url   = 'https://github.com/yuhonas/free-exercise-db',
-  license_name = 'Public Domain (Unlicense)',
-  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
+  media_type   = 'image',
+  frames       = '[]'::jsonb,
+  poster_url   = 'assets/exercise-media/archer-push-up.svg',
+  media_url    = 'assets/exercise-media/archer-push-up.svg',
+  source_name  = 'Evolv Studio',
+  source_url   = '',
+  license_name = 'Contenido propio Evolv',
+  attribution  = 'Evolv Studio',
   updated_at   = now()
 where slug = 'archer-push-up';
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REQ-265 — La clave pública VAPID del cliente y la del servidor son la misma
+// REQ-266 — La clave pública VAPID del cliente y la del servidor son la misma
 // y es un punto P-256 válido (65 bytes, sin comprimir). La privada vive solo
 // en Vercel (VAPID_PRIVATE_KEY): nunca en el repo.
 import assert from "node:assert/strict";

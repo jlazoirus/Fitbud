@@ -13,7 +13,7 @@
 // vercel.json define: { "crons": [{ "path": "/api/notify", "schedule": "0 8 * * *" }] }
 // Limitación Vercel Hobby: mínimo un disparo diario; granularidad horaria requiere plan Pro.
 // Vercel envía Authorization: Bearer CRON_SECRET en cada invocación automática del cron.
-// REQ-264: ese cron diario (03:00 en Lima) solo mantiene despierto Supabase. El
+// REQ-265: ese cron diario (03:00 en Lima) solo mantiene despierto Supabase. El
 // envío lo dispara cada hora .github/workflows/notify-hourly.yml con el mismo
 // CRON_SECRET (secreto del repo en GitHub).
 // Lenguaje REQ-31: todos los textos hablan de "tu plan"/"tu racha"; sin mención de IA.
@@ -121,7 +121,7 @@ function dayOfWeekInTz(tz) {
   return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(w.value);
 }
 
-// REQ-264: se envía en el primer disparo a la hora elegida o después, dentro
+// REQ-265: se envía en el primer disparo a la hora elegida o después, dentro
 // del mismo día local. Un disparo horario que llega tarde (GitHub Actions puede
 // demorarse) no pierde el aviso; la idempotencia por día evita repetirlo.
 function isNotifyTime(notifyHour, tz) {

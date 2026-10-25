@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v140";
+const CACHE_NAME = "fitbud-pwa-v142";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -13,6 +13,16 @@ const APP_SHELL = [
   "./assets/icon-180.png",
   "./assets/icon-192.png",
   "./assets/icon-512.png",
+  "./assets/exercise-media/pike-push-up.svg",
+  "./assets/exercise-media/band-row.svg",
+  "./assets/exercise-media/shoulder-tap-plank.svg",
+  "./assets/exercise-media/archer-push-up.svg",
+  "./assets/exercise-media/slider-leg-curl.svg",
+  "./assets/exercise-media/single-leg-rdl.svg",
+  "./assets/exercise-media/step-up.svg",
+  "./assets/exercise-media/standing-calf-raise.svg",
+  "./assets/exercise-media/bulgarian-split-squat.svg",
+  "./assets/exercise-media/walking-lunge.svg",
 ];
 
 self.addEventListener("install", event => {

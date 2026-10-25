@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 272" role="img" aria-labelledby="title desc">
+  <title id="title">Subida al banco sin carga</title>
+  <desc id="desc">Vista lateral. La persona coloca un pie completo sobre un escalón bajo y estable. Empuja con esa pierna para subir el cuerpo, extendiendo cadera y rodilla; luego desciende con control. Las manos están libres y no hay mancuernas.</desc>
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M1 1l7 4-7 4" fill="none" stroke="#c6f36a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+  <style>
+    .limb,.torso,.far,.prop,.floor,.arrow,.band{fill:none;stroke-linecap:round;stroke-linejoin:round}
+    .limb{stroke:#e4ebdf;stroke-width:9}.torso{stroke:#e4ebdf;stroke-width:13}
+    .far{stroke:#738372;stroke-width:8}.head{fill:#e4ebdf}.joint{fill:#c6f36a}
+    .prop{stroke:#9eaf9a;stroke-width:5}.floor{stroke:#46513f;stroke-width:2}
+    .arrow{stroke:#c6f36a;stroke-width:2.5}.band{stroke:#c6f36a;stroke-width:4}
+    .label{font:600 14px system-ui,sans-serif;fill:#c6f36a}.cue{font:14px system-ui,sans-serif;fill:#b9c5b3}
+  </style>
+  <rect width="640" height="272" fill="#171b16"/>
+  <path d="M320 48v181" stroke="#36402f"/>
+  <g transform="translate(0 0)"><text class="label" x="28" y="31">1 · Apoya todo el pie</text><path class="floor" d="M28 224H292"/><path class="prop" d="M177 180h102m-94 0v44m86 -44v44"/><path class="far" d="M140 167L116 198 100 224"/><path class="torso" d="M140 119L140 167"/><path class="limb" d="M140 167L193 154 205 180"/><path class="limb" d="M200 180h18"/><path class="limb" d="M95 224h18"/><path class="limb" d="M140 124L119 147 128 174"/><circle class="head" cx="140" cy="93" r="11"/><path class="limb" d="M140 106v13"/><circle class="joint" cx="193" cy="154" r="4"/></g>
+  <g transform="translate(320 0)"><text class="label" x="28" y="31">2 · Sube con la pierna del banco</text><path class="floor" d="M28 224H292"/><path class="prop" d="M177 180h102m-94 0v44m86 -44v44"/><path class="far" d="M209 130L171 179 150 210"/><path class="torso" d="M209 79L209 130"/><path class="limb" d="M209 130L207 156 207 180"/><path class="limb" d="M202 180h18"/><path class="limb" d="M209 86L232 110 228 139"/><circle class="head" cx="209" cy="53" r="11"/><path class="limb" d="M209 66v13"/><circle class="joint" cx="207" cy="156" r="4"/><path class="arrow" d="M261 145v-43" marker-end="url(#arrow)"/></g>
+  <text class="cue" x="320" y="254" text-anchor="middle">Escalón estable · Pie completo apoyado · Sin carga</text>
+</svg>

@@ -1,6 +1,6 @@
 # Fitbud - Contexto operativo compacto
 
-Este es el handoff corto para agentes. La referencia larga quedo en `docs/architecture-reference.md`; abrirla solo si necesitas detalle de archivos, variables, migraciones o historia. La fuente de verdad es siempre el codigo en `HEAD`.
+Contexto breve para agentes. Referencia extensa: `docs/architecture-reference.md`, bajo demanda para archivos, variables, migraciones o historia. La fuente de verdad es el código en `HEAD`.
 
 ## Producto
 
@@ -12,7 +12,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 
 - Frontend vanilla sin framework ni build step. `index.html` es el shell principal; funciones publicas siguen expuestas para handlers inline.
 - Modulos puros sin DOM: `js/nutrition-pure.js`, `js/nutrition-domain.js`, `domain-contracts.js`, `workout-player.js`, `training-plan.js`, `sync-conflicts.js`.
-- Hosting en Vercel: estatico + funciones `api/*.js`. Produccion: `https://evolvapp.club/`.
+- Vercel: estático y `api/*.js`; producción: `https://evolvapp.club/`.
 - Supabase es fuente de verdad. `localStorage` espeja/cachea para offline; no debe ser la unica ubicacion de datos personales.
 - PWA: `manifest.webmanifest`, `service-worker.js`, iconos en `assets/`. `index.html`/`config.js` son network-first; `/api/*` network-only.
 
@@ -64,14 +64,14 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 - REQ-169/170/171: descartes de sesion (`prefsWithSessionRejections()`) bloquean en prompt y cierre; `slotMomentTextConflict()` filtra desayunos contundentes; `collectGlobalLines()` escala propuestas del coach.
 - REQ-172: "Estimar con foto": `meal_estimate` con bloque `image` y hasta 2 `preguntas`; la foto no se guarda.
 - REQ-180: marca Evolv (lima `--accent`, `--on-accent`, Unbounded/Manrope, `brandMark()`); ids `fitbros_*` intactos.
-- REQ-216: modo conversacional oculto (`/?labs=conversacion` → `prefs.labs`, `prefs.uiMode`, `renderChatMode()`).
+- REQ-216: conversación oculta (`/?labs=conversacion`, `renderChatMode()`).
 - REQ-143 sigue pausado, pero el "techo de catalogo 32-33%" que lo motivaba no existia (era el objetivo de cierre). Sus criterios requieren re-basarse contra 289/378. El hueco real son las 7 dimensiones en 0/7, todas de 2 comidas mas vegano/`sin_tofu`. REQ-147 cerrado por decision de Jonathan (2026-08-30).
 - La primera nutricion posterior al onboarding usa las preferencias guardadas antes de aplicar comidas: `validateGeneratedDay` bloquea patrón alimentario, alergias, sin lácteos y sin gluten con `foodTextConflictForProfile`; si la generación semanal no pasa, `prepareFirstWeekNutrition()` completa faltantes con `deterministicDaysForWeek()`.
 - En `Cambiar comida`, el usuario puede tocar `Rehacer opciones` hasta 4 veces por día; usa `meal_option` con lista cerrada de platos candidatos y fallback determinista del catálogo. `regenerateGenMeal()` comparte ese límite para una comida individual. La acción no vive en `Más opciones`: ese menú queda solo para acciones globales de nutrición.
 
 ## Entrenamiento
 
-- `exercise-catalog.js` y `supabase/exercises.sql` cubren biblioteca, media y roles de rutina.
+- `exercise-catalog.js` cubre biblioteca y rutinas. REQ-264: niveles/demos revisados prevalecen sobre Supabase; planes pendientes respetan experiencia sin reescribir historial. Inventario: `docs/exercise-levels.md`; SQL opcional: `supabase/exercise-levels.sql`.
 - `training-plan.js` valida planes de 4/10 semanas; `workout-player.js` maneja ejecucion recuperable, series, cardio, temporizadores, RPE y sustituciones.
 - Onboarding/Perfil de entrenamiento (REQ-115): la UI pregunta actividad fisica principal (`walking/running/cycling/swimming/other/strength_only`) y donde entrenar fuerza (`strengthPlace: gym/home/outdoor/none`). `strengthMode:"none"` soporta semanas solo de actividad; caminata tiene ejercicios/roles `walking`; casa/aire libre muestran recursos (`bodyweight`, bandas, mancuernas, barra/discos, dominadas) sin duplicar lugar como decision principal.
 - Modo seguro de entrenamiento (REQ-116): `trainingSafetyMode` (`auto/gentle/full`) recomienda modo suave por edad 18-21, 50+, 55+ o limitaciones. En suave, el deporte efectivo puede pasar de running/otra actividad a `walking`, la dosis baja a RPE/series conservadoras y `allowedExercisesForSession()` filtra pike push-ups, dominadas, movimientos invertidos/unilaterales complejos antes de validar/generar semanas. Red flags del safety screening mantienen `trainingSafetyHold()`.
@@ -88,7 +88,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 - Landing publica, catalogo de planes, paywall, Stripe Checkout, webhooks, entitlements, cupones y billing history estan implementados. Cobro real depende de variables y configuracion externa.
 - REQ-104: sin `STRIPE_SECRET_KEY`, `showPaywall` muestra "Disponible pronto" + canje de codigo. Pago unico, sin renovacion.
 - **Cobro siempre en la web** (Stripe Checkout en `evolvapp.club`), tambien con app nativa: nada de compras dentro de la app. REQ-208: `noPricesMode()` (acceso beta/cupon/cortesia vigente o invitacion sin canjear) reemplaza el paywall por `showAccessNotice()` y Perfil no muestra precios; Admin "Crear cuenta"/"Invitar" con casilla beta da 90 dias de cortesia `quarterly`.
-- `api/notify.js`: correo (Resend) y push (`web-push`); lo dispara cada hora `.github/workflows/notify-hourly.yml` (REQ-264).
+- `api/notify.js`: correo (Resend) y push (`web-push`); lo dispara cada hora `.github/workflows/notify-hourly.yml` (REQ-265).
 - `api/analytics.js` registra eventos permitidos por allowlist; no enviar datos de salud, alergias, fotos, prompts ni contenido de conversaciones.
 
 ## Archivos calientes

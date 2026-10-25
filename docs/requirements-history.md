@@ -10782,7 +10782,68 @@ Re-preparar no descarta una comida elegida o editada a mano, aunque no esté mar
 
 E2E nuevo en `tests/e2e/nutricion.spec.js`: preparar día (mock del coach aplica "Bowl proteico de la mañana" en desayuno) → editar desayuno a "Dos huevos con pan" / 777 kcal sin marcarlo hecho → "Más opciones de nutrición" → "Volver a preparar este día" → "Aplicar al día" (el mock vuelve a proponer "Bowl proteico de la mañana" en el borrador, como antes del fix) → el desayuno aplicado sigue siendo "Dos huevos con pan" / 777 kcal, "Bowl proteico de la mañana" no aparece en ninguna tarjeta. Pasa junto con las otras 3 pruebas de `nutricion.spec.js`. `node --check` sobre el `<script>` final de `index.html` OK. `git diff --check` limpio.
 
-## REQ-264 - Fix: los recordatorios por correo y push nunca se enviaban
+## REQ-263 - Fix Progreso: la "Adherencia a comidas" del ciclo activo se diluye con los días futuros
+
+**Estado: implementado.**
+
+### Origen
+
+Auditoría del journey **progreso** (commit previo leído: `ef55f45` REQ-256). Al recorrer Progreso con un ciclo en curso, la tarjeta "Adherencia a comidas" (sección "Tus números") muestra un porcentaje mucho menor que la adherencia real del usuario.
+
+### Problema
+
+Un usuario que marcó **todas** las comidas de **todos** los días transcurridos del ciclo (adherencia real 100% hasta hoy) ve "14%" en la tarjeta. El número contradice lo que el usuario hizo y es desmotivante justo donde Progreso busca reforzar el hábito. Además contradice el propio criterio de REQ-44 ("10 días registrados + 2 fallidos → ~83%", es decir adherencia acumulada sobre días transcurridos, no sobre el ciclo completo).
+
+### Causa raíz
+
+`cycleSummary(untilDs)` (`index.html:2636`): sin argumento, `last=END` (`index.html:2638`), así que el bucle `while(ds<=last)` (`index.html:2640`) recorre **todo** el ciclo —incluidos los días futuros— y acumula `plannedMeals+=day.meals.length` (`index.html:2648`) de cada día futuro (`buildDay` siempre devuelve slots, con kcal:0, incluso para días sin registrar). `progressStats()` (`index.html:6516`) llamaba `cycleSummary()` sin argumento y mostraba `cs.mealAdherence` como la tarjeta del ciclo en curso. El recap de cierre llama `cycleSummary()` cuando `today>=END`, así que ahí el conteo completo ya era correcto; el bug era solo en la vista en curso.
+
+### Fix
+
+`progressStats()` ahora llama `cycleSummary(todayStr())`, que ya soportaba acotar `last` a un `untilDs<END` (REQ-214). El recap de cierre (`renderPlanRecap`, `startNextChallenge`, `confirmRestartPlan`) sigue llamando `cycleSummary()`/`cycleSummary(until)` sin cambios: su conteo full-cycle (o hasta el día de interrupción) es correcto y no se tocó.
+
+### Verificación
+
+Nuevo test E2E en `tests/e2e/progreso.spec.js` ("REQ-263"): con `completePrefs()` (ciclo 10 semanas, START hoy−9), siembra `ovr`+`done:true` en todas las comidas de START..hoy (contenido custom para pasar `mealHasContent()`) y confirma que la tarjeta "Adherencia a comidas" muestra "100%". Revertir el fix (volver a `cycleSummary()` sin argumento) reproduce exactamente el "14%" que documentó la auditoría, confirmando que el test cubre la regresión. `node --check` sobre el `<script>` final de `index.html` OK. `git diff --check` limpio. `node scripts/release-gate.mjs`: 98/99 antes del commit (el único rojo es "Sin modificaciones no intencionadas", que solo detecta cambios sin commitear — se resuelve al commitear). `CACHE_NAME` v139→v140 (index.html es parte de `APP_SHELL`).
+
+### Operación manual pendiente
+
+Ninguna.
+
+
+## REQ-264 - Entreno: revisar todos los niveles y corregir demos de variantes distintas
+
+**Estado: implementado.**
+
+### Origen y problema
+
+Jonathan, 2026-10-24: captura de Pike push-up con la etiqueta Principiante y una demostración de flexión en parada de manos. Pide revisar todos los ejercicios.
+
+### Causa raíz
+
+El constructor del catálogo asignaba beginner a toda fila sin nivel. 31 fichas originales de fuerza y los 12 bloques de resistencia heredaban ese valor. Supabase reemplazaba el catálogo empaquetado, así que corregir el archivo local no corregía las filas remotas. Además, el mapeo de demos usaba otros ejercicios del mismo músculo como proxies: pike → handstand, remo con banda → invertido, toques de hombro → escaladores y arquero → pliométricas. Las plantillas estáticas no filtraban experiencia.
+
+### Alcance implementado
+
+- Revisión individual de las 54 fichas empaquetadas y de las 16 fichas adicionales encontradas por lectura del catálogo real de producción (67 filas remotas, 51 compartidas): unión de 70 ejercicios, 34 principiantes, 32 intermedios y 4 avanzados. `docs/exercise-levels.md` fija criterio, variante exacta, razón individual y fuentes primarias; la carga y la dosis son distintas del nivel técnico.
+- Nivel explícito obligatorio para cada ficha local; registro revisado adicional para los 16 slugs remotos. Normalización sin mutaciones en los catálogos de visualización y generación: niveles conocidos prevalecen sobre datos antiguos; los ejercicios propios conservan sus datos. Un nivel ausente o inválido se muestra como Nivel por revisar y queda fuera de generación automática.
+- Diez SVG propios con posiciones exactas reemplazan demos distintas o cargadas de ejercicios sin carga. Pike muestra pies en el suelo y cadera elevada, con técnica específica; no una parada de manos. Se retiran proxies del mapa de ingestión y SQL de media. No se consumen llamadas pagadas.
+- Plantillas y planes guardados de hoy/futuro todavía sin ejecución usan ejercicios compatibles con la experiencia; se conservan ejercicios iniciados, sesiones registradas y fechas pasadas. Los snapshots no se escriben ni se migran. Cardio principiante usa el bloque fácil cuando el intervalo supera su nivel. Las búsquedas manuales siguen disponibles e informan el nivel.
+- Al sustituir un ejercicio pendiente, repeticiones, tempo y descanso corresponden al destino; se conservan series y objetivos de esfuerzo.
+- Al iniciar una sesión nueva se guarda una copia de su prescripción efectiva en `workoutExecution.contentPrescription`: las adaptaciones conservan ejercicios y bloques al continuar o recargar. Las ejecuciones anteriores sin esa copia mantienen su recuperación previa.
+- El hash de compatibilidad incluye niveles para evitar reutilizar planes con clasificaciones obsoletas. Cache PWA v141. SQL base actualizado; parche incremental opcional `supabase/exercise-levels.sql`, idempotente y sin cambios de permisos ni tablas. No se ejecutó SQL de producción.
+
+### Criterios y verificación
+
+- Cobertura de los 70 slugs revisados, enum válido, paridad de SQL e inventario, filas antiguas corregidas sin mutación y media propia existente: `scripts/validate-exercises.mjs`.
+- E2E: Supabase antiguo muestra Pike intermedio con la demo correcta; variante remota asistida también intermedia; Full Body principiante conserva al menos tres ejercicios; generación y cardio respetan nivel; planes pendientes se adaptan sin modificar snapshots ni registros; búsqueda manual informa nivel y el hash cambia si cambia nivel. Inicio real por cuenta atrás y recarga desde `day_log` conservan la sesión de fuerza adaptada (cuatro ejercicios y una sola vuelta a la calma) y el cardio fácil.
+- Validadores de splits, planes, reproductor, migraciones, documentación y release gate.
+
+### Operación
+
+La corrección cliente funciona al desplegar sin una migración de producción. El SQL incremental es opcional para alinear las filas del servidor. Historial, registros, cargas utilizadas y resultados anteriores se conservan.
+
+## REQ-265 - Fix: los recordatorios por correo y push nunca se enviaban
 
 **Estado: implementado — requiere acción humana:** crear el secreto `CRON_SECRET` en GitHub (Settings → Secrets and variables → Actions) con el mismo valor que la variable `CRON_SECRET` de Vercel.
 
@@ -10816,13 +10877,13 @@ Jonathan (2026-10-24): "Creo que las notificaciones no están funcionando".
 - Con la hora elegida ya pasada hoy, el disparo envía; justo a la hora, envía; antes, no; ya enviado hoy, no repite. ✓ `scripts/validate-notify-schedule.mjs` (falla con el código anterior), en el release gate.
 - Tras crear el secreto, "Run workflow" del workflow responde 200 y, a la hora elegida, `notification_log` registra el envío.
 
-## REQ-265 - Fix: los avisos push no tenían clave privada VAPID
+## REQ-266 - Fix: los avisos push no tenían clave privada VAPID
 
 **Estado: implementado — requiere acción humana:** crear en Vercel (Production) `VAPID_PRIVATE_KEY` (generada para este cambio y entregada fuera del repo) y `VAPID_SUBJECT` (`mailto:` del responsable), y volver a desplegar.
 
 ### Origen
 
-Jonathan (2026-10-24), al revisar las variables de Vercel para REQ-264: "Las de vapid no existen".
+Jonathan (2026-10-24), al revisar las variables de Vercel para REQ-265: "Las de vapid no existen".
 
 ### Causa raíz
 
@@ -10833,7 +10894,7 @@ REQ-38 embebió la clave pública `BG6yy…` en `index.html` y como respaldo en 
 1. Par VAPID nuevo: la pública reemplaza a la anterior en `index.html` y `api/notify.js`. La privada no entra al repo.
 2. `refreshPushSubscriptionKey()` (no-await en `onAuth()`): con permiso concedido y `push_opt_in` activo, si la suscripción del dispositivo usa otra clave (`pushKeyOf()`), la anula y se suscribe de nuevo con la actual (`subscribePush(true)`, sin toast). Lee las preferencias frescas del usuario que entra.
 3. `scripts/validate-vapid-key.mjs` en el release gate: misma clave en cliente y servidor, punto P-256 de 65 bytes y no la anterior.
-4. `CACHE_NAME` → `fitbud-pwa-v140`.
+4. `CACHE_NAME` → `fitbud-pwa-v142` (`main` ya usaba v141 por REQ-264).
 
 ### Fuera de alcance
 
@@ -10842,4 +10903,4 @@ REQ-38 embebió la clave pública `BG6yy…` en `index.html` y como respaldo en 
 ### Criterios de aceptación
 
 - Cliente y servidor usan la misma clave nueva, válida. ✓ `scripts/validate-vapid-key.mjs`.
-- Con las variables en Vercel, un usuario con avisos activos que vuelve a entrar queda suscrito con la clave nueva y recibe el aviso a su hora (REQ-264).
+- Con las variables en Vercel, un usuario con avisos activos que vuelve a entrar queda suscrito con la clave nueva y recibe el aviso a su hora (REQ-265).

@@ -1927,54 +1927,23 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 
 ## REQ-263 - Fix Progreso: la "Adherencia a comidas" del ciclo activo se diluye con los días futuros
 
-**Estado: pendiente.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
+`progressStats()` acotaba `cycleSummary()` al ciclo completo (incluidos días futuros sin registrar), diluyendo la adherencia real a ~14% con 100% de cumplimiento hasta hoy. Ahora llama `cycleSummary(todayStr())`. ✓ `tests/e2e/progreso.spec.js`.
 
-Auditoría del journey **progreso** (commit previo leído: `ef55f45` REQ-256). Al recorrer Progreso con un ciclo en curso, la tarjeta "Adherencia a comidas" (sección "Tus números") muestra un porcentaje mucho menor que la adherencia real del usuario.
+## REQ-264 - Entreno: revisar todos los niveles y corregir demos de variantes distintas
 
-### Problema
+**Estado: implementado.** Revisión de Jonathan (2026-10-24): Pike push-up aparecía como principiante con una parada de manos. Inventario completo: 54 fichas locales y 16 adicionales de producción, 70 ejercicios únicos; criterio y razones en `docs/exercise-levels.md`.
 
-Un usuario que marcó **todas** las comidas de **todos** los días transcurridos del ciclo (adherencia real 100% hasta hoy) ve "14%" en la tarjeta. El número contradice lo que el usuario hizo y es desmotivante justo donde Progreso busca reforzar el hábito. Además contradice el propio criterio de REQ-44 ("10 días registrados + 2 fallidos → ~83%", es decir adherencia acumulada sobre días transcurridos, no sobre el ciclo completo).
+Niveles explícitos y corrección de filas remotas antiguas sin modificar la base; diez demostraciones propias exactas; rutinas automáticas respetan experiencia y los planes pendientes se adaptan al leerlos, preservando ejecuciones/historial. Búsqueda manual muestra el nivel. Sin nivel válido no entra al plan. SQL opcional `supabase/exercise-levels.sql`; ninguna migración de producción ejecutada. Verificación: `scripts/validate-exercises.mjs`, `tests/e2e/exercise-levels.spec.js`, release gate. Detalle en `docs/requirements-history.md`.
 
-### Causa raíz
-
-`cycleSummary(untilDs)` (`index.html:2636`): sin argumento, `last=END` (`index.html:2638`), así que el bucle `while(ds<=last)` (`index.html:2640`) recorre **todo** el ciclo —incluidos los días futuros— y acumula `plannedMeals+=day.meals.length` (`index.html:2648`) de cada día futuro (`buildDay` siempre devuelve slots, con kcal:0, incluso para días sin registrar). `progressStats()` (`index.html:6516`) llama `cycleSummary()` sin argumento (`index.html:6523`) y muestra `cs.mealAdherence` (`index.html:6524`, `6529`) como la tarjeta del ciclo en curso. El recap de cierre llama `cycleSummary()` cuando `today>=END`, así que ahí el conteo completo es correcto; el bug es solo en la vista en curso.
-
-### Objetivo
-
-Durante el ciclo activo, la "Adherencia a comidas" debe reflejar el porcentaje de comidas registradas sobre las **planificadas hasta hoy** (días transcurridos), no sobre el ciclo entero.
-
-### Alcance
-
-1. En `progressStats()`, calcular la adherencia del ciclo en curso acotando el denominador a los días transcurridos (p. ej. `cycleSummary(todayStr())`, que ya soporta `untilDs<END`).
-
-### Fuera de alcance
-
-- El recap de cierre (`renderPlanRecap`/`cycleSummary()` al terminar): su conteo full-cycle es correcto y no debe cambiar.
-- La racha y demás tarjetas: siguen midiendo lo suyo.
-
-### Riesgos
-
-- `cycleSummary(untilDs)` también calcula `workouts`, `bestStreak`, `weightChange`: acotar a hoy no los altera (los días futuros aportan 0), pero verificar que ningún otro llamador dependa del conteo full-cycle en curso.
-
-### Criterios de aceptación
-
-- Con todas las comidas de los días transcurridos marcadas hechas en un ciclo en curso, la tarjeta muestra ~100% (no 14%).
-- El recap de cierre no cambia su cálculo.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- E2E (reusar `tests/e2e/progreso.spec.js`): sembrar un ciclo con `planStartDate` a −9 días, marcar todas las comidas de START..hoy como hechas y afirmar que la tarjeta "Adherencia a comidas" muestra 100%. Evidencia de la auditoría: con `completePrefs()` (ciclo 10 sem, START hoy−9), `cycleSummary()` devuelve `plannedMeals:210, doneMeals:30, mealAdherence:14` mientras la adherencia real de los 10 días transcurridos es 30/30 = 100%.
-
-## REQ-264 - Fix: los recordatorios por correo y push nunca se enviaban
+## REQ-265 - Fix: los recordatorios por correo y push nunca se enviaban
 
 **Estado: implementado — requiere acción humana:** secreto `CRON_SECRET` en GitHub (mismo valor que en Vercel).
 
 El cron diario (03:00 en Lima) nunca coincidía con la hora elegida (17–23). `.github/workflows/notify-hourly.yml` llama cada hora a `/api/notify`, que envía desde la hora elegida (`isNotifyTime`), una vez por día. ✓ `scripts/validate-notify-schedule.mjs`.
 
-## REQ-265 - Fix: los avisos push no tenían clave privada VAPID
+## REQ-266 - Fix: los avisos push no tenían clave privada VAPID
 
 **Estado: implementado — requiere acción humana:** `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel.
 

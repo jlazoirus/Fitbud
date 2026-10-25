@@ -9,6 +9,7 @@
 //        Valida el mapeo contra el dataset y sugiere candidatos.
 //   node scripts/ingest-exercise-media.mjs --upload
 //        Descarga las fotos, las sube a Storage y escribe el SQL.
+//        Conserva las guías SVG propias como rutas locales, sin subirlas.
 //   node scripts/ingest-exercise-media.mjs --apply
 //        Además, aplica los UPDATE vía PostgREST (opcional).
 //
@@ -41,6 +42,13 @@ const SOURCE = {
   source_url: "https://github.com/yuhonas/free-exercise-db",
   license_name: "Public Domain (Unlicense)",
   attribution: "Free Exercise DB (yuhonas) — dominio público",
+};
+const CURATED_SOURCE = {
+  media_type: "image",
+  source_name: "Evolv Studio",
+  source_url: "",
+  license_name: "Contenido propio Evolv",
+  attribution: "Evolv Studio",
 };
 
 const mode = process.argv.includes("--upload") ? "upload"
@@ -87,18 +95,47 @@ async function loadMap() {
   return mod.default || {};
 }
 
+export async function validateCuratedMedia(slug, entry) {
+  const expected = `assets/exercise-media/${slug}.svg`;
+  if (entry.id != null || entry.curated_svg !== expected) {
+    throw new Error(`La guía propia debe usar id:null y curated_svg:"${expected}".`);
+  }
+  const svg = await readFile(resolve(ROOT, expected), "utf8");
+  if (!/<svg\b/.test(svg) || !/<title\b/.test(svg)) {
+    throw new Error(`La guía ${expected} debe ser un SVG con título accesible.`);
+  }
+}
+
+export function curatedMediaRecord(slug, entry) {
+  return {
+    slug, ...CURATED_SOURCE, frames: [],
+    poster: entry.curated_svg, media_url: entry.curated_svg,
+  };
+}
+
 // ---- Validación / sugerencias -------------------------------------------------
 
 async function runCheck() {
   const [slugs, map, dataset] = await Promise.all([loadCatalogSlugs(), loadMap(), fetchDataset()]);
   const byId = new Map(dataset.map(d => [d.id, d]));
-  let ok = 0, skip = 0, bad = 0;
+  let ok = 0, curated = 0, skip = 0, bad = 0;
   console.log(`\nDataset: ${dataset.length} ejercicios · catálogo: ${slugs.length} slugs\n`);
   for (const { slug, name } of slugs) {
     const entry = map[slug];
+    if (entry && entry.curated_svg) {
+      try {
+        await validateCuratedMedia(slug, entry);
+        curated++;
+        console.log(`✓ ${slug.padEnd(26)} guía SVG propia de la variante exacta`);
+      } catch (err) {
+        bad++;
+        console.log(`✖ ${slug.padEnd(26)} ${err.message}`);
+      }
+      continue;
+    }
     if (!entry || entry.id == null) {
       skip++;
-      console.log(`· ${slug.padEnd(26)} sin demo → SVG fallback`);
+      console.log(`· ${slug.padEnd(26)} sin importar → media del catálogo local`);
       continue;
     }
     const hit = byId.get(entry.id);
@@ -115,8 +152,8 @@ async function runCheck() {
       else console.log(`    (sin candidatos; ajusta "q" en el mapeo)`);
     }
   }
-  console.log(`\nResumen: ${ok} mapeados · ${skip} sin demo · ${bad} a corregir`);
-  if (bad) { console.log("Corrige los `id` marcados con ✖ en scripts/free-exercise-db-map.mjs y vuelve a correr --check.\n"); process.exit(2); }
+  console.log(`\nResumen: ${ok} fotos remotas · ${curated} guías SVG exactas · ${skip} sin importar · ${bad} a corregir`);
+  if (bad) { console.log("Corrige las entradas marcadas con ✖ en scripts/free-exercise-db-map.mjs y vuelve a correr --check.\n"); process.exit(2); }
   console.log(mode === "check" ? "Mapeo válido. Ejecuta --upload para subir la media.\n" : "");
   return { slugs, map, dataset, byId };
 }
@@ -156,12 +193,28 @@ async function downloadImage(relPath) {
 // ---- SQL ----------------------------------------------------------------------
 
 function sqlEscape(s) { return String(s).replace(/'/g, "''"); }
-function buildSql(records) {
+function sqlValue(value) { return value == null ? "null" : `'${sqlEscape(value)}'`; }
+
+export function mediaPayload(record) {
+  return {
+    media_type: record.media_type || SOURCE.media_type,
+    frames: record.frames || [],
+    poster_url: record.poster || null,
+    media_url: record.media_url || null,
+    source_name: record.source_name ?? SOURCE.source_name,
+    source_url: record.source_url ?? SOURCE.source_url,
+    license_name: record.license_name ?? SOURCE.license_name,
+    attribution: record.attribution ?? SOURCE.attribution,
+  };
+}
+
+export function buildSql(records) {
   const head = [
     "-- ============================================================",
     "-- Fitbros — media real de ejercicios (REQ-15)",
     "-- Generado por scripts/ingest-exercise-media.mjs. Idempotente.",
-    "-- Fuente: Free Exercise DB (yuhonas) — dominio público / Unlicense.",
+    "-- Fuente: Free Exercise DB (yuhonas), salvo los SVG propios de Evolv Studio.",
+    "-- Los SVG propios representan la variante exacta y sustituyen proxies anteriores.",
     "-- Ejecutar después de supabase/exercises.sql.",
     "-- ============================================================",
     "",
@@ -171,17 +224,18 @@ function buildSql(records) {
     "",
   ];
   const updates = records.map(r => {
-    const framesJson = sqlEscape(JSON.stringify(r.frames));
+    const media = mediaPayload(r);
+    const framesJson = sqlEscape(JSON.stringify(media.frames));
     return [
       "update exercises set",
-      `  media_type   = '${SOURCE.media_type}',`,
+      `  media_type   = ${sqlValue(media.media_type)},`,
       `  frames       = '${framesJson}'::jsonb,`,
-      `  poster_url   = '${sqlEscape(r.poster)}',`,
-      `  media_url    = null,`,
-      `  source_name  = '${sqlEscape(SOURCE.source_name)}',`,
-      `  source_url   = '${sqlEscape(SOURCE.source_url)}',`,
-      `  license_name = '${sqlEscape(SOURCE.license_name)}',`,
-      `  attribution  = '${sqlEscape(SOURCE.attribution)}',`,
+      `  poster_url   = ${sqlValue(media.poster_url)},`,
+      `  media_url    = ${sqlValue(media.media_url)},`,
+      `  source_name  = ${sqlValue(media.source_name)},`,
+      `  source_url   = ${sqlValue(media.source_url)},`,
+      `  license_name = ${sqlValue(media.license_name)},`,
+      `  attribution  = ${sqlValue(media.attribution)},`,
       `  updated_at   = now()`,
       `where slug = '${sqlEscape(r.slug)}';`,
       "",
@@ -199,9 +253,7 @@ async function applyViaRest(records) {
         "Content-Type": "application/json", Prefer: "return=minimal",
       },
       body: JSON.stringify({
-        media_type: SOURCE.media_type, frames: r.frames, poster_url: r.poster, media_url: null,
-        source_name: SOURCE.source_name, source_url: SOURCE.source_url,
-        license_name: SOURCE.license_name, attribution: SOURCE.attribution,
+        ...mediaPayload(r),
         updated_at: new Date().toISOString(),
       }),
     });
@@ -219,6 +271,11 @@ async function runUpload() {
   const records = [];
   for (const { slug } of slugs) {
     const entry = map[slug];
+    if (entry && entry.curated_svg) {
+      records.push(curatedMediaRecord(slug, entry));
+      console.log(`· ${slug}: guía propia local conservada en SQL`);
+      continue;
+    }
     if (!entry || entry.id == null) continue;
     const ex = byId.get(entry.id);
     const images = (Array.isArray(ex.images) ? ex.images : []).slice(0, 2);
@@ -241,7 +298,7 @@ async function runUpload() {
 
 // ---- Main ---------------------------------------------------------------------
 
-(async () => {
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) (async () => {
   try {
     if (mode === "check") await runCheck();
     else await runUpload();

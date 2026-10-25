@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REQ-264 — Los recordatorios salen en el primer disparo a la hora elegida o
+// REQ-265 — Los recordatorios salen en el primer disparo a la hora elegida o
 // después (mismo día local), una sola vez por día. Antes exigían que el cron
 // cayera justo en esa hora y el cron diario (03:00 en Lima) nunca coincidía.
 import assert from "node:assert/strict";

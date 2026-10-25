@@ -130,14 +130,16 @@
     },
   };
 
+  const EXERCISE_LEVELS=new Set(["beginner","intermediate","advanced"]);
   function exercise(spec){
+    if(!EXERCISE_LEVELS.has(spec.level))throw new Error(`Nivel sin revisar: ${spec.slug}`);
     const pattern=PATTERNS[spec.pattern];
     return Object.assign({},OWN_MEDIA,{
       slug:spec.slug,
       name:spec.name,
       aliases:spec.aliases||[],
       discipline:spec.discipline,
-      level:spec.level||"beginner",
+      level:spec.level,
       equipment:spec.equipment||[],
       places:spec.places||[],
       muscles:spec.muscles||[],
@@ -157,46 +159,44 @@
   }
 
   const strength=[
-    ["back-squat","Sentadilla con barra",["sentadilla"],"gym","squat",["barbell","rack"],["gym"],["cuádriceps","glúteos"],"Sentadilla a caja","Sentadilla frontal",["tempo-squat","leg-press"]],
-    ["bench-press","Press de banca",["press banca"],"gym","push",["barbell","bench"],["gym"],["pecho","tríceps"],"Press con mancuernas ligeras","Press con pausa",["push-up","incline-dumbbell-press"]],
-    ["seated-cable-row","Remo sentado en polea",["remo sentado"],"gym","pull",["cable"],["gym"],["espalda","bíceps"],"Remo con banda","Remo con pausa",["band-row","lat-pulldown"]],
-    ["romanian-deadlift","Peso muerto rumano",["RDL"],"gym","hinge",["barbell"],["gym"],["isquiotibiales","glúteos"],"Bisagra con palo","Peso muerto rumano a una pierna",["single-leg-rdl","barbell-hip-thrust"]],
-    ["barbell-hip-thrust","Hip thrust",["empuje de cadera"],"gym","bridge",["barbell","bench"],["gym"],["glúteos","isquiotibiales"],"Puente de glúteo","Hip thrust con pausa",["glute-bridge","single-leg-glute-bridge"]],
-    ["incline-dumbbell-press","Press inclinado con mancuernas",["press inclinado"],"gym","push",["dumbbells","bench"],["gym"],["pecho","hombros","tríceps"],"Press inclinado ligero","Press alternado",["bench-press","incline-push-up"]],
-    ["lat-pulldown","Jalón al pecho",["jalón"],"gym","pull",["cable"],["gym"],["dorsales","bíceps"],"Jalón con banda","Dominada asistida",["assisted-pull-up","band-row"]],
-    ["bulgarian-split-squat","Sentadilla búlgara",["búlgara"],"strength","lunge",["bench_or_chair"],["gym","home"],["cuádriceps","glúteos"],"Zancada estática","Búlgara con carga",["walking-lunge","step-up"]],
-    ["overhead-press","Press militar",["press sobre cabeza"],"gym","push",["barbell_or_dumbbells"],["gym"],["hombros","tríceps"],"Press sentado ligero","Press de pie con pausa",["pike-push-up","incline-dumbbell-press"]],
-    ["walking-lunge","Zancada",["lunges"],"strength","lunge",[],["gym","home","outdoor"],["cuádriceps","glúteos"],"Zancada asistida","Zancada caminando con carga",["bulgarian-split-squat","step-up"]],
-    ["standing-calf-raise","Elevación de gemelos",["gemelos"],"strength","calf",[],["gym","home"],["pantorrillas"],"Elevación con apoyo","Elevación a una pierna",[]],
-    ["assisted-dip","Fondos asistidos",["fondos"],"strength","push",["bench_or_assistance"],["gym","home"],["pecho","tríceps"],"Flexión inclinada","Fondos con menor asistencia",["incline-push-up","push-up"]],
-    ["biceps-curl","Curl de bíceps",["curl"],"gym","isolation",["dumbbells_or_cable"],["gym"],["bíceps"],"Curl con banda ligera","Curl alternado controlado",["band-row"]],
-    ["triceps-pushdown","Extensión de tríceps en polea",["tríceps polea"],"gym","isolation",["cable"],["gym"],["tríceps"],"Extensión con banda","Extensión unilateral",["assisted-dip","push-up"]],
-    ["leg-press","Prensa de piernas",["prensa"],"gym","squat",["leg_press"],["gym"],["cuádriceps","glúteos"],"Prensa con rango corto","Prensa unilateral",["back-squat","tempo-squat"]],
-    ["leg-curl","Curl femoral",["femoral"],"gym","isolation",["leg_curl"],["gym"],["isquiotibiales"],"Curl con rango corto","Curl unilateral",["slider-leg-curl","romanian-deadlift"]],
-    ["tempo-squat","Sentadilla tempo",["sentadilla corporal"],"bodyweight","squat",[],["home","outdoor","gym"],["cuádriceps","glúteos"],"Sentarse y levantarse de una silla","Sentadilla con pausa",["back-squat","step-up"]],
-    ["push-up","Flexión de brazos",["flexiones"],"bodyweight","push",[],["home","outdoor","gym"],["pecho","tríceps"],"Flexión inclinada","Flexión con pausa",["incline-push-up","bench-press"]],
-    ["incline-push-up","Flexión inclinada",["flexión elevada"],"bodyweight","push",["bench_or_wall"],["home","outdoor","gym"],["pecho","tríceps"],"Flexión contra pared","Flexión en el suelo",["push-up","assisted-dip"]],
-    ["band-row","Remo con banda",["remo invertido"],"bodyweight","pull",["resistance_band"],["home","outdoor","gym"],["espalda","bíceps"],"Remo con menor tensión","Remo invertido",["seated-cable-row","assisted-pull-up"]],
-    ["glute-bridge","Puente de glúteo",["puente"],"bodyweight","bridge",[],["home","gym"],["glúteos","isquiotibiales"],"Puente con rango corto","Puente a una pierna",["barbell-hip-thrust","single-leg-glute-bridge"]],
-    ["single-leg-glute-bridge","Puente de glúteo a una pierna",["puente unilateral"],"bodyweight","bridge",[],["home","gym"],["glúteos","isquiotibiales"],"Puente bilateral","Puente unilateral con pausa",["glute-bridge","barbell-hip-thrust"]],
-    ["front-plank","Plancha frontal",["plancha"],"bodyweight","core",[],["home","gym"],["core"],"Plancha elevada","Plancha con mayor duración",["dead-bug","side-plank"]],
-    ["side-plank","Plancha lateral",["plancha de lado"],"bodyweight","core",[],["home","gym"],["core","oblicuos"],"Plancha lateral con rodillas","Plancha lateral con pierna elevada",["front-plank","dead-bug"]],
-    ["dead-bug","Dead bug",["insecto muerto"],"bodyweight","core",[],["home","gym"],["core"],"Mover solo brazos o piernas","Extender brazo y pierna opuestos",["front-plank","shoulder-tap-plank"]],
-    ["pike-push-up","Pike push-up",["flexión pica"],"bodyweight","push",[],["home","gym"],["hombros","tríceps"],"Pike con manos elevadas","Pike con pies elevados",["overhead-press","incline-push-up"]],
-    ["single-leg-rdl","Peso muerto a una pierna",["bisagra unilateral"],"bodyweight","hinge",[],["home","gym"],["isquiotibiales","glúteos"],"Bisagra asistida","Bisagra unilateral con carga",["romanian-deadlift","glute-bridge"]],
-    ["assisted-pull-up","Dominada asistida",["dominada con banda"],"bodyweight","pull",["pullup_bar","resistance_band"],["home","outdoor","gym"],["espalda","bíceps"],"Jalón con banda","Dominada con menos asistencia",["lat-pulldown","band-row"]],
-    ["shoulder-tap-plank","Plancha con toque de hombro",["toques de hombro"],"bodyweight","core",[],["home","gym"],["core","hombros"],"Plancha alta sin toques","Toques más lentos",["front-plank","dead-bug"]],
-    ["step-up","Subida al banco",["step ups"],"bodyweight","lunge",["step_or_bench"],["home","outdoor","gym"],["cuádriceps","glúteos"],"Escalón bajo con apoyo","Escalón más alto o con carga",["walking-lunge","bulgarian-split-squat"]],
-    ["slider-leg-curl","Curl femoral deslizante",["curl deslizante"],"bodyweight","hinge",["sliders_or_towel"],["home","gym"],["isquiotibiales","glúteos"],"Deslizar una pierna por vez","Curl completo con cadera elevada",["leg-curl","glute-bridge"]],
-    // intermediate
-    ["lateral-raise","Elevación lateral",["elevaciones laterales"],"gym","isolation",["dumbbells"],["gym"],["hombros"],"Elevación con poco rango","Elevación con pausa arriba",["overhead-press"],"intermediate"],
+    ["back-squat","Sentadilla con barra",["sentadilla"],"gym","squat",["barbell","rack"],["gym"],["cuádriceps","glúteos"],"Sentadilla a caja","Sentadilla frontal",["tempo-squat","leg-press"],"intermediate"],
+    ["bench-press","Press de banca",["press banca"],"gym","push",["barbell","bench"],["gym"],["pecho","tríceps"],"Press con mancuernas ligeras","Press con pausa",["push-up","incline-dumbbell-press"],"intermediate"],
+    ["seated-cable-row","Remo sentado en polea",["remo sentado"],"gym","pull",["cable"],["gym"],["espalda","bíceps"],"Remo con banda","Remo con pausa",["band-row","lat-pulldown"],"beginner"],
+    ["romanian-deadlift","Peso muerto rumano",["RDL"],"gym","hinge",["barbell"],["gym"],["isquiotibiales","glúteos"],"Bisagra con palo","Peso muerto rumano a una pierna",["single-leg-rdl","barbell-hip-thrust"],"intermediate"],
+    ["barbell-hip-thrust","Hip thrust",["empuje de cadera"],"gym","bridge",["barbell","bench"],["gym"],["glúteos","isquiotibiales"],"Puente de glúteo","Hip thrust con pausa",["glute-bridge","single-leg-glute-bridge"],"intermediate"],
+    ["incline-dumbbell-press","Press inclinado con mancuernas",["press inclinado"],"gym","push",["dumbbells","bench"],["gym"],["pecho","hombros","tríceps"],"Press inclinado ligero","Press alternado",["bench-press","incline-push-up"],"beginner"],
+    ["lat-pulldown","Jalón al pecho",["jalón"],"gym","pull",["cable"],["gym"],["dorsales","bíceps"],"Jalón con banda","Dominada asistida",["assisted-pull-up","band-row"],"beginner"],
+    ["bulgarian-split-squat","Sentadilla búlgara",["búlgara"],"strength","lunge",["bench_or_chair"],["gym","home"],["cuádriceps","glúteos"],"Zancada estática","Búlgara con carga",["walking-lunge","step-up"],"intermediate"],
+    ["overhead-press","Press militar",["press sobre cabeza"],"gym","push",["barbell_or_dumbbells"],["gym"],["hombros","tríceps"],"Press sentado ligero","Press de pie con pausa",["pike-push-up","incline-dumbbell-press"],"intermediate"],
+    ["walking-lunge","Zancada",["lunges"],"strength","lunge",[],["gym","home","outdoor"],["cuádriceps","glúteos"],"Zancada asistida","Zancada caminando con carga",["bulgarian-split-squat","step-up"],"intermediate"],
+    ["standing-calf-raise","Elevación de gemelos",["gemelos"],"strength","calf",[],["gym","home"],["pantorrillas"],"Elevación con apoyo","Elevación a una pierna",[],"beginner"],
+    ["assisted-dip","Fondos asistidos",["fondos"],"strength","push",["bench_or_assistance"],["gym","home"],["pecho","tríceps"],"Flexión inclinada","Fondos con menor asistencia",["incline-push-up","push-up"],"intermediate"],
+    ["biceps-curl","Curl de bíceps",["curl"],"gym","isolation",["dumbbells_or_cable"],["gym"],["bíceps"],"Curl con banda ligera","Curl alternado controlado",["band-row"],"beginner"],
+    ["triceps-pushdown","Extensión de tríceps en polea",["tríceps polea"],"gym","isolation",["cable"],["gym"],["tríceps"],"Extensión con banda","Extensión unilateral",["assisted-dip","push-up"],"beginner"],
+    ["leg-press","Prensa de piernas",["prensa"],"gym","squat",["leg_press"],["gym"],["cuádriceps","glúteos"],"Prensa con rango corto","Prensa unilateral",["back-squat","tempo-squat"],"beginner"],
+    ["leg-curl","Curl femoral",["femoral"],"gym","isolation",["leg_curl"],["gym"],["isquiotibiales"],"Curl con rango corto","Curl unilateral",["slider-leg-curl","romanian-deadlift"],"beginner"],
+    ["tempo-squat","Sentadilla tempo",["sentadilla corporal"],"bodyweight","squat",[],["home","outdoor","gym"],["cuádriceps","glúteos"],"Sentarse y levantarse de una silla","Sentadilla con pausa",["back-squat","step-up"],"beginner"],
+    ["push-up","Flexión de brazos",["flexiones"],"bodyweight","push",[],["home","outdoor","gym"],["pecho","tríceps"],"Flexión inclinada","Flexión con pausa",["incline-push-up","bench-press"],"intermediate"],
+    ["incline-push-up","Flexión inclinada",["flexión elevada"],"bodyweight","push",["bench_or_wall"],["home","outdoor","gym"],["pecho","tríceps"],"Flexión contra pared","Flexión en el suelo",["push-up","assisted-dip"],"beginner"],
+    ["band-row","Remo con banda",["remo con banda elástica"],"bodyweight","pull",["resistance_band"],["home","outdoor","gym"],["espalda","bíceps"],"Remo con menor tensión","Remo invertido",["seated-cable-row","assisted-pull-up"],"beginner"],
+    ["glute-bridge","Puente de glúteo",["puente"],"bodyweight","bridge",[],["home","gym"],["glúteos","isquiotibiales"],"Puente con rango corto","Puente a una pierna",["barbell-hip-thrust","single-leg-glute-bridge"],"beginner"],
+    ["single-leg-glute-bridge","Puente de glúteo a una pierna",["puente unilateral"],"bodyweight","bridge",[],["home","gym"],["glúteos","isquiotibiales"],"Puente bilateral","Puente unilateral con pausa",["glute-bridge","barbell-hip-thrust"],"intermediate"],
+    ["front-plank","Plancha frontal",["plancha"],"bodyweight","core",[],["home","gym"],["core"],"Plancha elevada","Plancha con mayor duración",["dead-bug","side-plank"],"beginner"],
+    ["side-plank","Plancha lateral",["plancha de lado"],"bodyweight","core",[],["home","gym"],["core","oblicuos"],"Plancha lateral con rodillas","Plancha lateral con pierna elevada",["front-plank","dead-bug"],"intermediate"],
+    ["dead-bug","Dead bug",["insecto muerto"],"bodyweight","core",[],["home","gym"],["core"],"Mover solo brazos o piernas","Extender brazo y pierna opuestos",["front-plank","shoulder-tap-plank"],"beginner"],
+    ["pike-push-up","Pike push-up",["flexión pica"],"bodyweight","push",[],["home","gym"],["hombros","tríceps"],"Pike con manos elevadas","Pike con pies elevados",["overhead-press","incline-push-up"],"intermediate"],
+    ["single-leg-rdl","Peso muerto a una pierna",["bisagra unilateral"],"bodyweight","hinge",[],["home","gym"],["isquiotibiales","glúteos"],"Bisagra asistida","Bisagra unilateral con carga",["romanian-deadlift","glute-bridge"],"intermediate"],
+    ["assisted-pull-up","Dominada asistida",["dominada con banda"],"bodyweight","pull",["pullup_bar","resistance_band"],["home","outdoor","gym"],["espalda","bíceps"],"Jalón con banda","Dominada con menos asistencia",["lat-pulldown","band-row"],"intermediate"],
+    ["shoulder-tap-plank","Plancha con toque de hombro",["toques de hombro"],"bodyweight","core",[],["home","gym"],["core","hombros"],"Plancha alta sin toques","Toques más lentos",["front-plank","dead-bug"],"intermediate"],
+    ["step-up","Subida al banco",["step ups"],"bodyweight","lunge",["step_or_bench"],["home","outdoor","gym"],["cuádriceps","glúteos"],"Escalón bajo con apoyo","Escalón más alto o con carga",["walking-lunge","bulgarian-split-squat"],"beginner"],
+    ["slider-leg-curl","Curl femoral deslizante",["curl deslizante"],"bodyweight","hinge",["sliders_or_towel"],["home","gym"],["isquiotibiales","glúteos"],"Deslizar una pierna por vez","Curl completo con cadera elevada",["leg-curl","glute-bridge"],"intermediate"],
+    ["lateral-raise","Elevación lateral",["elevaciones laterales"],"gym","isolation",["dumbbells"],["gym"],["hombros"],"Elevación con poco rango","Elevación con pausa arriba",["overhead-press"],"beginner"],
     ["cable-fly","Apertura en polea",["cruces en polea"],"gym","push",["cable"],["gym"],["pecho","hombros"],"Apertura con rango corto","Apertura con pausa al centro",["bench-press","incline-dumbbell-press"],"intermediate"],
     ["face-pull","Face pull",["jalón a la cara"],"gym","pull",["cable"],["gym"],["hombros posteriores","trapecios"],"Face pull con poco peso","Face pull con rotación externa",["seated-cable-row"],"intermediate"],
-    ["hammer-curl","Curl martillo",["curl neutro"],"gym","isolation",["dumbbells"],["gym"],["bíceps","antebrazo"],"Curl martillo ligero","Curl inclinado",["biceps-curl"],"intermediate"],
+    ["hammer-curl","Curl martillo",["curl neutro"],"gym","isolation",["dumbbells"],["gym"],["bíceps","antebrazo"],"Curl martillo ligero","Curl inclinado",["biceps-curl"],"beginner"],
     ["diamond-push-up","Flexión diamante",["flexión tríceps"],"bodyweight","push",[],["home","gym"],["tríceps","pecho"],"Flexión diamante con rodillas","Flexión diamante con pausa",["push-up","assisted-dip"],"intermediate"],
     ["pull-up","Dominada",["dominadas","chin-up"],"bodyweight","pull",["pullup_bar"],["gym","outdoor"],["espalda","bíceps"],"Dominada asistida con banda","Dominada con lastre",["assisted-pull-up","lat-pulldown"],"intermediate"],
     ["decline-push-up","Flexión con pies elevados",["flexión declinada"],"bodyweight","push",["bench_or_chair"],["home","gym"],["pecho","tríceps"],"Flexión con pies a media altura","Flexión con lastre en espalda",["push-up","bench-press"],"intermediate"],
-    // advanced
     ["weighted-pull-up","Dominada con lastre",["dominada lastrada"],"gym","pull",["pullup_bar","weight_belt"],["gym"],["espalda","bíceps"],"Dominada sin lastre","Dominada con lastre máximo",["pull-up","lat-pulldown"],"advanced"],
     ["front-squat","Sentadilla frontal",["front squat"],"gym","squat",["barbell","rack"],["gym"],["cuádriceps","core"],"Sentadilla goblet","Sentadilla frontal con pausa",["back-squat","tempo-squat"],"advanced"],
     ["archer-push-up","Flexión arquero",["flexión lateral"],"bodyweight","push",[],["home","gym"],["pecho","tríceps"],"Flexión arquero con apoyo","Flexión con un brazo asistida",["diamond-push-up","push-up"],"advanced"],
@@ -204,28 +204,28 @@
   ].map(row=>exercise({
     slug:row[0],name:row[1],aliases:row[2],discipline:row[3],pattern:row[4],
     equipment:row[5],places:row[6],muscles:row[7],regression:row[8],
-    progression:row[9],substitutes:row[10],level:row[11]||"beginner",
+    progression:row[9],substitutes:row[10],level:row[11],
   }));
 
   const endurance=[
-    ["walk-brisk","Caminata a paso activo","walking","walk","Caminar a ritmo cómodo con pausas breves","Aumentar tiempo a paso vivo sin perder respiración controlada",["walk-easy","walk-mobility"]],
-    ["walk-easy","Caminata aeróbica fácil","walking","walk","Caminata corta en terreno plano","Aumentar duración manteniendo conversación",["walk-brisk","walk-mobility"]],
-    ["walk-mobility","Caminata con movilidad","walking","walk","Caminata suave y movilidad articular","Sumar bloques de paso activo entre movilidad",["walk-easy"]],
-    ["run-intervals","Intervalos de running","running","run","Series de carrera suave con más recuperación","Aumentar gradualmente la duración del bloque rápido",["run-easy","run-drills"]],
-    ["run-easy","Running aeróbico fácil","running","run","Alternar caminar y correr","Aumentar tiempo manteniendo ritmo conversacional",["run-intervals","run-drills"]],
-    ["run-drills","Técnica de carrera","running","run","Marcha técnica y progresivos cortos","Añadir repeticiones sin perder postura",["run-easy"]],
-    ["cycle-intervals","Intervalos de cycling","cycling","cycle","Bloques cortos con resistencia moderada","Aumentar duración antes que resistencia",["cycle-endurance","cycle-cadence"]],
-    ["cycle-endurance","Cycling aeróbico fácil","cycling","cycle","Sesión más corta y resistencia baja","Aumentar tiempo en zona cómoda",["cycle-intervals","cycle-cadence"]],
-    ["cycle-cadence","Técnica y cadencia en bicicleta","cycling","cycle","Cadencia cómoda con bloques breves","Bloques más largos sin balancear el tronco",["cycle-endurance"]],
-    ["swim-intervals","Intervalos de natación","swimming","swim","Bloques más cortos con pausa amplia","Aumentar distancia manteniendo técnica",["swim-endurance","swim-drills"]],
-    ["swim-endurance","Natación aeróbica fácil","swimming","swim","Alternar largos suaves y pausas","Aumentar distancia sin perder alineación",["swim-intervals","swim-drills"]],
-    ["swim-drills","Técnica de natación","swimming","swim","Un ejercicio técnico por bloque","Combinar ejercicios manteniendo respiración estable",["swim-endurance"]],
+    ["walk-brisk","Caminata a paso activo","walking","walk","Caminar a ritmo cómodo con pausas breves","Aumentar tiempo a paso vivo sin perder respiración controlada",["walk-easy","walk-mobility"],"beginner"],
+    ["walk-easy","Caminata aeróbica fácil","walking","walk","Caminata corta en terreno plano","Aumentar duración manteniendo conversación",["walk-brisk","walk-mobility"],"beginner"],
+    ["walk-mobility","Caminata con movilidad","walking","walk","Caminata suave y movilidad articular","Sumar bloques de paso activo entre movilidad",["walk-easy"],"beginner"],
+    ["run-intervals","Intervalos de running","running","run","Series de carrera suave con más recuperación","Aumentar gradualmente la duración del bloque rápido",["run-easy","run-drills"],"intermediate"],
+    ["run-easy","Running aeróbico fácil","running","run","Alternar caminar y correr","Aumentar tiempo manteniendo ritmo conversacional",["run-intervals","run-drills"],"beginner"],
+    ["run-drills","Técnica de carrera","running","run","Marcha técnica y progresivos cortos","Añadir repeticiones sin perder postura",["run-easy"],"beginner"],
+    ["cycle-intervals","Intervalos de cycling","cycling","cycle","Bloques cortos con resistencia moderada","Aumentar duración antes que resistencia",["cycle-endurance","cycle-cadence"],"intermediate"],
+    ["cycle-endurance","Cycling aeróbico fácil","cycling","cycle","Sesión más corta y resistencia baja","Aumentar tiempo en zona cómoda",["cycle-intervals","cycle-cadence"],"beginner"],
+    ["cycle-cadence","Técnica y cadencia en bicicleta","cycling","cycle","Cadencia cómoda con bloques breves","Bloques más largos sin balancear el tronco",["cycle-endurance"],"beginner"],
+    ["swim-intervals","Intervalos de natación","swimming","swim","Bloques más cortos con pausa amplia","Aumentar distancia manteniendo técnica",["swim-endurance","swim-drills"],"intermediate"],
+    ["swim-endurance","Natación aeróbica fácil","swimming","swim","Alternar largos suaves y pausas","Aumentar distancia sin perder alineación",["swim-intervals","swim-drills"],"beginner"],
+    ["swim-drills","Técnica de natación","swimming","swim","Un ejercicio técnico por bloque","Combinar ejercicios manteniendo respiración estable",["swim-endurance"],"beginner"],
   ].map(row=>exercise({
     slug:row[0],name:row[1],aliases:[],discipline:row[2],pattern:row[3],
     equipment:row[2]==="cycling"?["bicycle"]:row[2]==="swimming"?["pool"]:[],
     places:row[2]==="swimming"?["pool"]:row[2]==="cycling"?["outdoor","gym"]:["outdoor"],
     muscles:row[2]==="swimming"?["cuerpo completo"]:["piernas","sistema cardiovascular"],
-    regression:row[4],progression:row[5],substitutes:row[6],
+    regression:row[4],progression:row[5],substitutes:row[6],level:row[7],
   }));
   // REQ-259: foto real por disciplina, como los ejercicios de fuerza (antes
   // caían al dibujo SVG). Se sirve desde assets/ del propio deploy, sin hotlinks.
@@ -241,7 +241,67 @@
     Object.assign(ex,source,{media_type:"image",media_url:url,poster_url:url});
   });
 
+  // REQ-264: las demostraciones deben enseñar el ejercicio nombrado, sin
+  // sustituirlo por otro más difícil que trabaje músculos parecidos.
+  const CURATED_DEMO_SLUGS=new Set([
+    "pike-push-up","band-row","shoulder-tap-plank","archer-push-up",
+    "slider-leg-curl","single-leg-rdl","step-up","standing-calf-raise",
+    "bulgarian-split-squat","walking-lunge",
+  ]);
+  const reviewedMedia=new Map();
+  strength.forEach(ex=>{
+    if(!CURATED_DEMO_SLUGS.has(ex.slug))return;
+    const url=`assets/exercise-media/${ex.slug}.svg`;
+    const media={...OWN_MEDIA,media_type:"image",media_url:url,poster_url:url,frames:[]};
+    // active es contenido administrativo, no parte de la corrección de media.
+    delete media.active;
+    Object.assign(ex,media);
+    reviewedMedia.set(ex.slug,media);
+  });
+  const pike=strength.find(ex=>ex.slug==="pike-push-up");
+  Object.assign(pike,{
+    start_position:"Manos al ancho de hombros, pies apoyados en el suelo y cadera elevada formando una V invertida.",
+    steps:["Mantén los pies en el suelo y el abdomen firme; flexiona los codos con control.","Acerca la cabeza al suelo entre las manos y ligeramente por delante, sin apoyarla ni cargar el cuello.","Empuja con los brazos para volver a la V invertida, conservando la cadera elevada."],
+    common_errors:["Despegar los pies e intentar una parada de manos","Abrir los codos en exceso","Apoyar el peso sobre la cabeza o el cuello"],
+  });
   root.FITBUD_EXERCISES=strength.concat(endurance);
+  const reviewedBySlug=new Map(root.FITBUD_EXERCISES.map(ex=>[ex.slug,ex]));
+  // Ejercicios adicionales presentes en producción, revisados con sus
+  // instrucciones reales. No duplicamos aquí sus fichas ni sus demostraciones.
+  const SUPPLEMENTAL_LEVELS={
+    "band-alternating-lat-pulldown":"beginner",
+    "band-assisted-pull-up":"intermediate",
+    "dumbbell-alternating-curl":"beginner",
+    "dumbbell-alternating-hammer-curl":"beginner",
+    "dumbbell-bent-over-row":"intermediate",
+    "dumbbell-floor-press":"beginner",
+    "dumbbell-glute-bridge":"beginner",
+    "dumbbell-lateral-raise":"beginner",
+    "dumbbell-overhead-triceps-extension":"intermediate",
+    "dumbbell-reverse-fly":"intermediate",
+    "dumbbell-reverse-lunge":"intermediate",
+    "dumbbell-romanian-deadlift":"intermediate",
+    "dumbbell-standing-shoulder-press":"intermediate",
+    "goblet-squat":"beginner",
+    "scaled-push-up":"intermediate",
+    "standing-heel-raise":"beginner",
+  };
+  root.FITBUD_REVIEWED_EXERCISE_LEVELS=Object.freeze({
+    ...Object.fromEntries(root.FITBUD_EXERCISES.map(ex=>[ex.slug,ex.level])),...SUPPLEMENTAL_LEVELS,
+  });
+  // La versión empaquetada corrige niveles y demos antiguas de Supabase sin
+  // modificar filas, planes guardados, estados administrativos ni ejercicios propios.
+  function normalizeReviewedExercise(exercise){
+    if(!exercise)return exercise;
+    const reviewed=reviewedBySlug.get(exercise.slug);
+    const level=root.FITBUD_REVIEWED_EXERCISE_LEVELS[exercise.slug];
+    if(!EXERCISE_LEVELS.has(level))return {...exercise};
+    const technique=exercise.slug==="pike-push-up"?{
+      start_position:reviewed.start_position,steps:reviewed.steps,common_errors:reviewed.common_errors,
+    }:{};
+    return {...exercise,level,...(reviewedMedia.get(exercise.slug)||{}),...technique};
+  }
+  root.FITBUD_EXERCISE_CONTENT={normalize:normalizeReviewedExercise};
   // REQ-241: qué hacen "Usar versión más fácil" y "Usar progresión" en cada
   // ejercicio de fuerza. Vive aquí (por slug) y no en la tabla para que valga
   // igual con el catálogo local que con el de Supabase.
