@@ -1936,3 +1936,49 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 **Estado: implementado.** Revisión de Jonathan (2026-10-24): Pike push-up aparecía como principiante con una parada de manos. Inventario completo: 54 fichas locales y 16 adicionales de producción, 70 ejercicios únicos; criterio y razones en `docs/exercise-levels.md`.
 
 Niveles explícitos y corrección de filas remotas antiguas sin modificar la base; diez demostraciones propias exactas; rutinas automáticas respetan experiencia y los planes pendientes se adaptan al leerlos, preservando ejecuciones/historial. Búsqueda manual muestra el nivel. Sin nivel válido no entra al plan. SQL opcional `supabase/exercise-levels.sql`; ninguna migración de producción ejecutada. Verificación: `scripts/validate-exercises.mjs`, `tests/e2e/exercise-levels.spec.js`, release gate. Detalle en `docs/requirements-history.md`.
+
+## REQ-265 - Fix recordatorios: el cron marca "entrenamiento pendiente" en días de descanso
+
+**Estado: pendiente.**
+
+### Origen
+
+Auditoría del journey de retención (recordatorios REQ-24 y push de racha REQ-38). El criterio de "descanso" de `checkPending()` en `api/notify.js` no coincide con la forma del dato que escribe `index.html`.
+
+### Problema
+
+El recordatorio diario de entrenamiento se dispara también en días de **descanso planificado** del split y en días marcados como descanso ("Día marcado como descanso planificado"). Como `notify_training` está activo por defecto (`index.html:8028`), un usuario que entrena 3 días/semana recibe hasta 4 avisos falsos de "Tienes entrenamiento pendiente para hoy" por semana. Contradice el criterio propio de REQ-38 ("solo cuando hay algo pendiente… sin castigar descansos planificados", `docs/requirements-history.md:2030`) y empuja a desactivar notificaciones — daño directo a retención.
+
+### Causa raíz
+
+`checkPending()` (`api/notify.js:134-137`) decide el descanso solo con `override.type === "rest" || override.type === "missed_converted_rest"`, esperando un objeto. Pero el cliente escribe `workoutOverride` siempre como **string**: `st.workoutOverride="descanso"` (`index.html:7295` y `:9548`) o un id de entreno (`:6524`, `:9530`). `"descanso".type` es `undefined`, así que `isRestDay` es siempre `false` y `trainingPending = !workoutDone`. Además `"missed_converted_rest"` no existe en ningún otro archivo: es una forma que nadie produce. El cron tampoco consulta el plan/split (no lee `plan_versions` ni `plannedWorkoutId`), así que no detecta un descanso planificado sin override.
+
+### Objetivo
+
+Que el recordatorio de entrenamiento NO se envíe en días de descanso (planificados o marcados por el usuario); solo cuando hay una sesión realmente prescrita y sin cerrar.
+
+### Alcance
+
+1. En `checkPending()`, reconocer el descanso con la forma real del dato: `workoutOverride === "descanso"` (string).
+2. Detectar el descanso planificado del split cuando no hay override (replicar `plannedWorkoutId`/schedule con las prefs del usuario, o persistir el tipo de día en `day_log` para que el cron lo lea).
+
+### Fuera de alcance
+
+- Rediseñar `workoutOverride` a objeto; el cliente lo usa como string en todos los flujos.
+- Recordatorio de nutrición (su criterio `mealIds` no depende de esto).
+
+### Riesgos
+
+- Si solo se arregla el string pero no el descanso planificado sin override, persiste el falso positivo mayoritario.
+- Cambiar la firma de `workoutOverride` rompería lectura del cliente; mantener compatibilidad con string.
+
+### Criterios de aceptación
+
+- En día de descanso (planificado o `workoutOverride==="descanso"`) sin sesión cerrada, `checkPending().training === false`.
+- En día con sesión prescrita y sin cerrar, sigue siendo `true`.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Fixture de `checkPending()` con cuatro estados: descanso planificado sin override, `workoutOverride:"descanso"`, entreno sin cerrar, entreno cerrado.
+- Repro de esta auditoría: la lógica de `:134-137` sobre `{workoutOverride:"descanso"}` da `pending=true` hoy (debe ser `false`).
