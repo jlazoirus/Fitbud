@@ -471,6 +471,11 @@
   input[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--bad)}
   .partial-macros{margin-top:6px}
   .meal-origin{margin:8px 0}
+  .log-intent{border:1px solid var(--line);border-radius:var(--r-md);padding:8px 12px 10px;margin:0 0 10px}
+  .log-intent legend{font-weight:700;font-size:13px;padding:0 4px}
+  .intent-opt{display:flex;align-items:center;gap:8px;min-height:44px;font-size:14px}
+  .intent-opt input{accent-color:var(--accent);width:18px;height:18px}
+  #f_impact{margin-top:6px}
   .components{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r-md)}
   .comp-head{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;margin-bottom:6px}
   .comp-total{margin-top:6px}
@@ -6452,7 +6457,7 @@ function mealCard(ds,b,order){
     </div>
     <div class="meal-actions">
       <button class="btn btn-sm" onclick="openChangeMeal('${ds}','${b.id}')" ${ms.done?"disabled title=\"Desmarca la comida si necesitas cambiarla\"":""}>Otra opción</button>
-      ${ms.ovr?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
+      ${canUndoSubst(ms)?`<button class="btn btn-sm" onclick="undoMealSubstitution('${ds}','${b.id}')">Deshacer cambio</button>`:ms.ovr?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
       <button class="btn btn-sm" aria-label="Más opciones de ${esc(b.slot)}" onclick="openMealMore('${ds}','${b.id}')">···</button>
     </div>
     ${recipeHtml}
@@ -9168,7 +9173,7 @@ function addContingencyEntry(ds,entry){
 }
 function revertMeal(ds,id){
   const ms=mealState(ds,id);const prev=ms.ovr?ms.ovr.name:null;
-  delete ms.ovr;
+  delete ms.ovr;delete ms.subst;
   // Deshacer rebalanceos asociados al último meal_replace de este slot (REQ-83)
   const st=dayState(ds);
   const log=st.contingencyLog||[];
@@ -9524,6 +9529,7 @@ function openMealMore(ds,id){
   modal(`<h3>${esc(base.slot)}</h3>
     ${recHtml}
     ${originHtml}
+    ${canUndoSubst(ms)?`<button class="opt" onclick="undoMealSubstitution('${ds}','${id}')">↩ Deshacer la sustitución<div class="o-meta">Vuelve a como estaba antes de registrar «${esc(ms.ovr.name)}».</div></button>`:""}
     <button class="opt" onclick="closeModal();openEditor('meal','${ds}','${id}')">✎ Editar valores / comida personalizada</button>
     ${v.name?`<button class="opt" onclick="blockCurrentMealDish('${ds}','${id}')">🚫 No me gusta este plato — no lo sugieras más</button>`:""}
     ${!ms.done?`<button class="opt" onclick="skipMeal('${ds}','${id}')">⏭ Saltar esta comida — no la haré hoy</button>`:""}
@@ -9718,6 +9724,7 @@ function setEditorValues(v){
   setKcalOnlyMode(!!v.macrosUnknown);
   [["kcal","f_kcal"],["p","f_p"],["c","f_c"],["f","f_f"]].forEach(([k,id])=>{$("#"+id).value=v.macrosUnknown&&k!=="kcal"?"":formatEditorNumber(v[k]);});
   clearEditorErrors();
+  renderEditorImpact();
 }
 // REQ-266: el editor muestra hasta una décima con coma; un campo vacío sigue vacío.
 function formatEditorNumber(n){
@@ -9857,6 +9864,7 @@ function applyEditorComponents(){
   e.meta=e.recipeLoaded?{source:"recipe",ref:e.recipeLoaded}:{source:componentsSource(list)};
   clearEditorErrors();
   renderEditorComponents();
+  renderEditorImpact();
 }
 function renderEditorComponents(){
   const e=window._editor,box=$("#f_components");if(!e||!box)return;
@@ -9912,11 +9920,96 @@ function quickPicksHtml(){
     <div id="qpPortion" class="qp-portion-row"></div>
   </div>`;
 }
+/* REQ-269: registrar «además de lo previsto» o «en lugar de» una comida concreta. */
+function logIntentHtml(){
+  const e=window._editor;
+  e.intent=e.intent||"extra";
+  return `<fieldset class="log-intent">
+    <legend>¿Cómo lo registras?</legend>
+    <div class="field" style="margin:4px 0 2px"><label for="f_date">Día</label><input id="f_date" type="date" min="${START}" max="${END}" value="${e.ds}" onchange="setEditorDate(this.value)"></div>
+    <label class="intent-opt"><input type="radio" name="f_intent" value="extra" ${e.intent==="extra"?"checked":""} onchange="setEditorIntent('extra')"> Además de lo previsto</label>
+    <label class="intent-opt"><input type="radio" name="f_intent" value="replace" ${e.intent==="replace"?"checked":""} onchange="setEditorIntent('replace')"> En lugar de una comida del día</label>
+    <div id="f_replaceBox" ${e.intent==="replace"?"":"hidden"}>${replaceTargetHtml()}</div>
+    <div id="f_impact" class="muted small" aria-live="polite"></div>
+  </fieldset>`;
+}
+function replaceTargetHtml(){
+  const e=window._editor;const day=buildDay(e.ds);
+  const opts=day.meals.map(b=>{
+    const ms=mealState(e.ds,b.id),v=mealValue(b,ms);
+    const state=ms.done?" · registrada":ms.skipped?" · saltada":"";
+    return `<option value="${esc(b.id)}" ${e.target===b.id?"selected":""}>${esc(b.slot)} — ${esc(v.name||"Sin asignar")}${state}</option>`;
+  }).join("");
+  const eaten=e.eaten!=null?e.eaten:e.ds<=todayStr();
+  return `<div class="field" style="margin:8px 0 0"><label for="f_target">Comida que reemplaza</label>
+      <select id="f_target" onchange="setReplaceTarget(this.value)"><option value="">Elige una comida…</option>${opts}</select></div>
+    <label class="qp-save-fav"><input type="checkbox" id="f_eaten" ${eaten?"checked":""} onchange="window._editor.eaten=this.checked;renderEditorImpact()"> Ya me lo comí</label>`;
+}
+function setEditorIntent(intent){
+  const e=window._editor;if(!e)return;
+  e.intent=intent==="replace"?"replace":"extra";
+  const box=$("#f_replaceBox");if(box)box.hidden=e.intent!=="replace";
+  renderEditorImpact();
+}
+function setEditorDate(ds){
+  const e=window._editor;if(!e||!ds||ds<START||ds>END){const el=$("#f_date");if(el&&e)el.value=e.ds;return;}
+  e.ds=ds;e.target=null;e.eaten=null;
+  const box=$("#f_replaceBox");if(box)box.innerHTML=replaceTargetHtml();
+  renderEditorImpact();
+}
+function setReplaceTarget(id){const e=window._editor;if(!e)return;e.target=id||null;renderEditorImpact();}
+function renderEditorImpact(){
+  const e=window._editor,box=$("#f_impact");if(!e||!box)return;
+  const r=parseNutrientInput(($("#f_kcal")||{}).value);
+  const kcal=r.ok?Math.round(r.value):null;
+  const when=e.ds===todayStr()?"hoy":prettyDate(e.ds).toLowerCase();
+  if(e.intent!=="replace"){
+    box.textContent=kcal!=null?`Se suma a lo previsto: +${kcal} kcal ${e.ds===todayStr()?"hoy":"el "+when}. El plan no cambia.`:`Se suma a lo previsto ${e.ds===todayStr()?"hoy":"el "+when}. El plan no cambia.`;
+    return;
+  }
+  const day=buildDay(e.ds);const b=e.target&&day.meals.find(m=>m.id===e.target);
+  if(!b){box.textContent="Elige qué comida reemplaza.";return;}
+  const ms=mealState(e.ds,b.id),v=mealValue(b,ms);
+  const prevK=mealHasContent(v)?Math.round(v.kcal):0;
+  const diff=kcal!=null?kcal-prevK:null;
+  const eaten=$("#f_eaten")?$("#f_eaten").checked:true;
+  const parts=[`Reemplaza ${b.slot}${v.name?` (${v.name}, ${prevK} kcal)`:""}${diff!=null?`: ${diff>=0?"+":""}${diff} kcal en el día`:""}.`];
+  if(ms.done)parts.push("Ya estaba registrada: la corriges con lo que comiste.");
+  else if(ms.skipped)parts.push("Estaba saltada: vuelve a contar.");
+  parts.push(eaten?"Quedará registrada como comida hecha.":"Quedará planificada, sin marcar como comida.");
+  box.textContent=parts.join(" ");
+}
+// Aplica la sustitución sobre una sola comida, guardando lo anterior para deshacer.
+function applyMealSubstitution(ds,id,v,eaten){
+  const ms=mealState(ds,id);const day=buildDay(ds);const b=day.meals.find(m=>m.id===id);
+  const before=mealValue(b,ms);
+  const prev={ovr:ms.ovr?JSON.parse(JSON.stringify(ms.ovr)):null,done:!!ms.done,skipped:!!ms.skipped};
+  ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},
+    v.macrosUnknown?{macrosUnknown:true}:{},v.nutritionMeta?{nutritionMeta:v.nutritionMeta}:{},v.components?{components:v.components}:{});
+  ms.done=!!eaten;delete ms.skipped;
+  ms.subst={at:new Date().toISOString(),prev,sig:substSignature(ms)};
+  addContingencyEntry(ds,{type:"meal_replace",id,reason:"logged_instead",prev:{name:before.name||null,kcal:mealHasContent(before)?before.kcal:null},chosen:{name:v.name,kcal:v.kcal},rebalanced:[]});
+}
+function substSignature(ms){return JSON.stringify(ms&&ms.ovr||null);}
+function canUndoSubst(ms){return !!(ms&&ms.subst&&substSignature(ms)===ms.subst.sig);}
+// Deshace solo el cambio propio: si la comida se editó después, no se pisa.
+function undoMealSubstitution(ds,id){
+  const ms=mealState(ds,id);const sub=ms.subst;if(!sub)return;
+  if(substSignature(ms)!==sub.sig){toast("Esta comida cambió después; edítala o vuelve al plan.");return;}
+  const prev=sub.prev||{};
+  if(prev.ovr)ms.ovr=prev.ovr;else delete ms.ovr;
+  ms.done=!!prev.done;
+  if(prev.skipped)ms.skipped=true;else delete ms.skipped;
+  delete ms.subst;
+  addContingencyEntry(ds,{type:"meal_revert",id,reason:"undo_logged_instead",prev:null,revertedSlots:[]});
+  commitDay(ds);closeModal();render();toast("Sustitución deshecha");
+}
 function editorSheet(title,pre){
   const aiOn=aiAvailable();
   const e0=window._editor;
   window._photoEstimate=null;
   modal(`<h3>${title}</h3>
+    ${e0&&e0.kind==="extra"&&e0.extraIdx==null?logIntentHtml():""}
     ${quickPicksHtml()}
     <div id="f_components" class="components" hidden></div>
     ${e0&&e0.kind==="meal"&&!(e0.components&&e0.components.length)&&recipeComponentsFor(e0.ds,e0.id)?`<button class="btn btn-sm" id="f_loadRecipe" style="margin-top:8px" onclick="loadRecipeComponents()">Ajustar ingredientes de la receta</button>`:""}
@@ -9925,7 +10018,7 @@ function editorSheet(title,pre){
       <button class="mic" id="micBtn" onclick="toggleMic()" title="${aiOn?'Dictar':'El dictado no está disponible ahora'}">🎤</button></div>
     </div>
     <div class="grid4">
-      <div class="field"><label for="f_kcal">kcal</label><input id="f_kcal" type="text" inputmode="decimal" autocomplete="off" value="${formatEditorNumber(pre.kcal)}"></div>
+      <div class="field"><label for="f_kcal">kcal</label><input id="f_kcal" type="text" inputmode="decimal" autocomplete="off" value="${formatEditorNumber(pre.kcal)}" oninput="renderEditorImpact()"></div>
       <div class="field"><label for="f_p">Prot g</label><input id="f_p" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.p)}"></div>
       <div class="field"><label for="f_c">Carb g</label><input id="f_c" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.c)}"></div>
       <div class="field"><label for="f_f">Grasa g</label><input id="f_f" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.f)}"></div>
@@ -9944,6 +10037,7 @@ function editorSheet(title,pre){
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
   if(pre.macrosUnknown)setKcalOnlyMode(true);
   renderEditorComponents();
+  renderEditorImpact();
   renderQuickPicks();
 }
 // REQ-266: lee el texto tal cual; validateMealValues decide (vacío ≠ 0, sin negativos).
@@ -9981,6 +10075,12 @@ function saveEditor(){
   if(meta)v.nutritionMeta=meta;
   const fav=$("#f_fav");
   if(fav&&fav.checked&&!fav.disabled&&!isSavedMeal(v.name))toggleSavedMeal(perPortion(v));
+  if(e.kind==="extra"&&e.extraIdx==null&&e.intent==="replace"){
+    if(!e.target){e.saving=false;toast("Elige qué comida reemplaza");const t=$("#f_target");if(t)t.focus();return;}
+    applyMealSubstitution(e.ds,e.target,v,$("#f_eaten")?$("#f_eaten").checked:e.ds<=todayStr());
+    commitDay(e.ds);closeModal();render();toast("Comida reemplazada · puedes deshacerlo en la comida");
+    return;
+  }
   if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},portion!==1?{portion}:{},v.macrosUnknown?{macrosUnknown:true}:{},meta?{nutritionMeta:meta}:{},components.length?{components}:{});}
   else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null){const x=Object.assign(d.extras[e.extraIdx],v);if(portion===1)delete x.portion;if(!v.macrosUnknown)delete x.macrosUnknown;if(!components.length)delete x.components;}else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");

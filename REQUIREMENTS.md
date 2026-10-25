@@ -1929,7 +1929,7 @@ Cálculo puro, E2E de composición/reapertura/corrección, compras, offline y ca
 
 ## REQ-269 - Nutrición: registrar una sustitución o un adicional de forma explícita
 
-**Estado: pendiente.** Prioridad P1. Dependencias: REQ-267. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-267. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 `openEditor(extra)`, `saveEditor()` y `openMealMore()`; flujo libre siempre añade un extra.
@@ -1954,6 +1954,11 @@ Pendiente/hecha/saltada tienen resultado explícito; cancelar no escribe. Sustit
 
 ### Verificación sugerida
 E2E de tres estados, adicional, cancelación, fecha, reintento, totales e historial.
+
+### Implementación
+- «Agregar comida / snack» pregunta «¿Cómo lo registras?»: día (dentro del ciclo), «Además de lo previsto» o «En lugar de una comida del día» con selector de comida, «Ya me lo comí» (por defecto sí hasta hoy, no en el futuro) e impacto en kcal; avisa si la comida ya estaba registrada o saltada.
+- `applyMealSubstitution` cambia solo esa comida (snapshot, origen y líneas), quita el saltado, registra `meal_replace`/`logged_instead` y guarda `ms.subst` con el estado previo. `undoMealSubstitution` (tarjeta y «···») restaura solo si la comida no se editó después. Sin rebalanceos ni regeneración de la semana.
+- Verificación: `tests/e2e/sustitucion.spec.js`.
 
 ## REQ-270 - Nutrición: copiar comida o selección del día a otra fecha
 
