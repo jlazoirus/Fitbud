@@ -1,4 +1,4 @@
-// REQ-265: "Estimar macros" solo aplica una estimación real de la comida descrita.
+// REQ-268: "Estimar macros" solo aplica una estimación real de la comida descrita.
 // Una plantilla genérica, un valor negativo o la ausencia de resultado compatible
 // se informan como fallo y los campos del formulario no cambian.
 import { test, expect } from "@playwright/test";
@@ -89,7 +89,7 @@ test("foto sin estimación compatible: avisa y conserva los campos", async ({ pa
   await expect(overlay.locator("#f_kcal")).toHaveValue("700");
   await expect(overlay.locator("#f_name")).toHaveValue("Lomo saltado");
   expect(calls[0].quota.fallbackText).toBe("");
-  // Guardar después del fallo registra solo lo que el usuario escribió (REQ-266: solo calorías).
+  // Guardar después del fallo registra solo lo que el usuario escribió (REQ-269: solo calorías).
   await overlay.getByLabel("Solo conozco las calorías").check();
   await overlay.getByRole("button", { name: "Guardar" }).click();
   await expect(page.locator("#app")).toContainText("Lomo saltado");

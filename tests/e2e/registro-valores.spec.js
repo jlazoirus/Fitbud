@@ -1,4 +1,4 @@
-// REQ-266: el editor de comidas valida los números antes de tocar el día, las
+// REQ-269: el editor de comidas valida los números antes de tocar el día, las
 // favoritas o la cola. Vacío ≠ 0; «Solo conozco las calorías» deja los macros
 // como desconocidos y los totales se marcan como parciales.
 import { test, expect } from "@playwright/test";

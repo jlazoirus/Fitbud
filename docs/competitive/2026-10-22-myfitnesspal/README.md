@@ -2,7 +2,7 @@
 
 **Actualización: 24 de octubre de 2026 · Trabajo autorizado sin entrevistas ni reclutamiento.**
 
-Se contrastó el plan con `origin/main` `62c7860`, se leyeron 14 artículos oficiales actuales de MyFitnessPal, se ejecutaron seis E2E de Evolv y tres reproducciones en Chromium con fixtures. El resultado es un paquete de **nueve REQ pendientes, REQ-265..273**, con alcance, dependencias, aceptación y pruebas. No son funcionalidades terminadas.
+Se contrastó el plan con `origin/main` `62c7860`, se leyeron 14 artículos oficiales actuales de MyFitnessPal, se ejecutaron seis E2E de Evolv y tres reproducciones en Chromium con fixtures. El resultado es un paquete de **nueve REQ pendientes, REQ-268..276**, con alcance, dependencias, aceptación y pruebas. No son funcionalidades terminadas.
 
 ## Empezar aquí
 
@@ -11,7 +11,7 @@ Se contrastó el plan con `origin/main` `62c7860`, se leyeron 14 artículos ofic
 3. [Fuentes verificadas](FUENTES-VERIFICADAS.md): catorce artículos oficiales, límites de país/plataforma y evidencia de Evolv.
 4. [Matriz actualizada de 48 dimensiones](matriz-actualizada-2026-10-24.csv): fuente y estado de revalidación por fila; lo no revalidado está identificado y no genera un REQ nuevo.
 
-El primer trabajo es **REQ-265: eliminar la estimación genérica aplicada como resultado**. Luego REQ-266 valida valores, REQ-267 preserva procedencia y REQ-268 permite editar ingredientes. Continúan sustitución, copia, alimentos propios, recetas y GTIN. El selector existente descubre pendientes no listados por orden numérico; la cola estará disponible al integrarse en `main`.
+El primer trabajo es **REQ-268: eliminar la estimación genérica aplicada como resultado**. Luego REQ-269 valida valores, REQ-270 preserva procedencia y REQ-271 permite editar ingredientes. Continúan sustitución, copia, alimentos propios, recetas y GTIN. El selector existente descubre pendientes no listados por orden numérico; la cola estará disponible al integrarse en `main`.
 
 ## Qué cambió respecto al informe inicial
 
@@ -31,4 +31,4 @@ El primer trabajo es **REQ-265: eliminar la estimación genérica aplicada como 
 
 El [análisis del 22 de octubre](ANALISIS.md), la [matriz original](matriz.csv), el [registro de fuentes inicial](FUENTES.md), `capture.mjs` y las capturas iniciales describen `df27422`, un checkout distinto del `main` contrastado. Sus 11 E2E/14 capturas son históricos; no son resultados de esta actualización. Las decisiones vigentes están en PLAN/BACKLOG y los nuevos REQ.
 
-REQ-274 registra la publicación compartida del informe. REQ-265..273 son pendientes funcionales, uno por implementación/commit. Al tomar uno, revalidar su necesidad, revisar dependencias y respetar lock, privacidad, historial y los contratos existentes. Este paquete no reanuda el track nativo pausado ni introduce proveedores, pagos o migraciones de producción como prerrequisito.
+REQ-277 registra la publicación compartida del informe. REQ-268..276 son pendientes funcionales, uno por implementación/commit. Al tomar uno, revalidar su necesidad, revisar dependencias y respetar lock, privacidad, historial y los contratos existentes. Este paquete no reanuda el track nativo pausado ni introduce proveedores, pagos o migraciones de producción como prerrequisito.

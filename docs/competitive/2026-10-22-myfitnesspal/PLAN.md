@@ -4,7 +4,7 @@
 
 ## Qué se decidió
 
-Crear **nueve requerimientos pendientes, REQ-265 a REQ-273**, apoyados en documentación oficial de MyFitnessPal y pruebas actuales de Evolv. Primero resolver confianza y calidad del registro; después completar composición, sustitución y copia; finalmente alimentos/recetas propios y código de producto. No se propone rehacer toda la aplicación ni esperar un estudio de mercado.
+Crear **nueve requerimientos pendientes, REQ-268 a REQ-276**, apoyados en documentación oficial de MyFitnessPal y pruebas actuales de Evolv. Primero resolver confianza y calidad del registro; después completar composición, sustitución y copia; finalmente alimentos/recetas propios y código de producto. No se propone rehacer toda la aplicación ni esperar un estudio de mercado.
 
 - [Backlog detallado con alcance y casos por REQ](BACKLOG.md).
 - [Fuentes oficiales actuales y verificación](FUENTES-VERIFICADAS.md).
@@ -21,13 +21,13 @@ La ayuda oficial confirma planificación y compras en Premium+, con límites de 
 
 | Paquete | REQ | Resultado verificable |
 |---|---|---|
-| A · Registro fiable | 265, 266 | No aplicar valores genéricos como estimación; rechazar datos inválidos y distinguir desconocidos |
-| B · Registro explicable y editable | 267, 268 | Guardar procedencia/snapshot y poder corregir cada ingrediente/cantidad |
-| C · Menos trabajo repetido | 269, 270 | Registrar como sustitución/adicional y copiar entre fechas sin duplicados ni consumo futuro |
-| D · Comida real propia | 271, 272 | Crear alimentos desde etiqueta y recetas privadas con rendimiento/porciones |
-| E · Acceso por producto | 273 | Identificar productos propios por GTIN; cámara solo donde haya soporte y alternativa manual completa |
+| A · Registro fiable | 268, 269 | No aplicar valores genéricos como estimación; rechazar datos inválidos y distinguir desconocidos |
+| B · Registro explicable y editable | 270, 271 | Guardar procedencia/snapshot y poder corregir cada ingrediente/cantidad |
+| C · Menos trabajo repetido | 272, 273 | Registrar como sustitución/adicional y copiar entre fechas sin duplicados ni consumo futuro |
+| D · Comida real propia | 274, 275 | Crear alimentos desde etiqueta y recetas privadas con rendimiento/porciones |
+| E · Acceso por producto | 276 | Identificar productos propios por GTIN; cámara solo donde haya soporte y alternativa manual completa |
 
-Implementar en ese orden. Las dependencias exactas están en BACKLOG. Las estimaciones del plan anterior de 90 días no son un compromiso: el siguiente trabajo ya está decidido, y cada incremento se cierra por sus criterios de aceptación. El selector descubre REQ pendientes no listados; al integrarse en `main`, REQ-265 será el primero del paquete. Los agentes comparten el lock existente y no deben modificar el mismo editor simultáneamente.
+Implementar en ese orden. Las dependencias exactas están en BACKLOG. Las estimaciones del plan anterior de 90 días no son un compromiso: el siguiente trabajo ya está decidido, y cada incremento se cierra por sus criterios de aceptación. El selector descubre REQ pendientes no listados; al integrarse en `main`, REQ-268 será el primero del paquete. Los agentes comparten el lock existente y no deben modificar el mismo editor simultáneamente.
 
 ## Decisiones técnicas que permiten empezar
 
@@ -53,4 +53,4 @@ El criterio para empezar es la especificación con evidencia, no conseguir parti
 
 ## Primer trabajo concreto
 
-Tomar **REQ-265**: evitar que «Estimar macros» aplique 500 kcal/25P/55C/20G genéricos si no existe una estimación compatible. El caso ya se reproduce con una respuesta de reutilización simulada. Debe conservarse el texto/valores escritos y explicar el fallo, manteniendo la reutilización válida del mismo contexto. Después se continúa con REQ-266.
+Tomar **REQ-268**: evitar que «Estimar macros» aplique 500 kcal/25P/55C/20G genéricos si no existe una estimación compatible. El caso ya se reproduce con una respuesta de reutilización simulada. Debe conservarse el texto/valores escritos y explicar el fallo, manteniendo la reutilización válida del mismo contexto. Después se continúa con REQ-269.

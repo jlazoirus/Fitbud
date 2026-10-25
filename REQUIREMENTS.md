@@ -52,7 +52,7 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 
 ## Secuencia activa
 
-**Paquete MyFitnessPal aprobado (24 oct 2026): REQ-265..273, en orden.** Especificaciones en `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`. No depende de entrevistas/reclutamiento. El selector descubre estos pendientes; revalidar contra código al tomar cada uno.
+**Paquete MyFitnessPal aprobado (24 oct 2026): REQ-268..276, en orden.** Especificaciones en `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`. No depende de entrevistas/reclutamiento. El selector descubre estos pendientes; revalidar contra código al tomar cada uno.
 
 Automatizable por el agente desarrollador:
 
@@ -1789,13 +1789,13 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 **Estado: implementado.** Revisión de Jonathan (2026-10-24): Pike push-up aparecía como principiante con una parada de manos. Inventario completo: 54 fichas locales y 16 adicionales de producción, 70 ejercicios únicos; criterio y razones en `docs/exercise-levels.md`.
 
 Niveles explícitos y corrección de filas remotas antiguas sin modificar la base; diez demostraciones propias exactas; rutinas automáticas respetan experiencia y los planes pendientes se adaptan al leerlos, preservando ejecuciones/historial. Búsqueda manual muestra el nivel. Sin nivel válido no entra al plan. SQL opcional `supabase/exercise-levels.sql`; ninguna migración de producción ejecutada. Verificación: `scripts/validate-exercises.mjs`, `tests/e2e/exercise-levels.spec.js`, release gate. Detalle en `docs/requirements-history.md`.
-## REQ-274 - Publicar análisis MyFitnessPal para continuidad entre agentes
+## REQ-277 - Publicar análisis MyFitnessPal para continuidad entre agentes
 
 **Estado: implementado.**
 
 Solicitud directa: compartir el análisis guardado localmente. Publica `docs/competitive/2026-10-22-myfitnesspal/README.md`, matriz de 48 dimensiones y propuestas MFP-00..17; añade entradas desde AGENTS, README y estrategia. Conserva evidencia del checkout anterior, declara diferencias con main y verificación externa pendiente. No incorpora las propuestas al selector ni reactiva el track nativo.
 
-## REQ-265 - Estimación: no aplicar plantillas genéricas como macros de una comida
+## REQ-268 - Estimación: no aplicar plantillas genéricas como macros de una comida
 
 **Estado: implementado.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
@@ -1828,7 +1828,7 @@ Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; 
 - Servidor: `NO_TEMPLATE_ACTIONS` (`meal_estimate`) descarta cualquier fallback, también el de un cliente antiguo; si `select_reusable_coach_part` no tiene una generación del mismo usuario y `contextKey`, responde 422 `no_compatible_result` y marca la parte fallida (devuelve la reserva). La respuesta reutilizada informa `origin`. `validateCoachOutput` rechaza macros negativos. Sin cambios SQL.
 - Verificación: `scripts/test-meal-estimate-no-template.mjs` (sin pool, cliente antiguo con plantilla, reutilización exacta, origen template) y `tests/e2e/estimacion.spec.js` (422, plantilla reutilizada, negativos, reutilización compatible, foto).
 
-## REQ-266 - Registro: validar valores nutricionales y distinguir desconocidos de ceros
+## REQ-269 - Registro: validar valores nutricionales y distinguir desconocidos de ceros
 
 **Estado: implementado.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
@@ -1861,9 +1861,9 @@ Pruebas puras de parseo y E2E de negativos/vacíos/decimales/cero/solo calorías
 - Editor: campos de texto `inputmode="decimal"`, casilla «Solo conozco las calorías», errores por campo (`#f_errors`, `aria-invalid`, foco). `saveEditor` valida antes de tocar día/favoritas/cola y tiene guardia de doble envío. `macrosUnknown:true` se conserva en `mealMacrosEntry`/`mealValue`; tarjetas muestran «macros no informados» y `dayTotals` redondea al final y cuenta `partial` («Macros parciales»). Registros antiguos no se reinterpretan.
 - Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/registro-valores.spec.js`.
 
-## REQ-267 - Registro: conservar procedencia y snapshot nutricional
+## REQ-270 - Registro: conservar procedencia y snapshot nutricional
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-265 y REQ-266. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-268 y REQ-269. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 `saveEditor()`, `applyEstimatedMacros()`, `mealMacrosEntry()` y `normalizedSavedMeals()`; metadatos no persistidos.
@@ -1894,9 +1894,9 @@ Roundtrip, fuente editada, favoritas ×2, dos cuentas y merge offline; inspecci�
 - Editor: borrador por fuente (manual, estimación texto/foto, reciente/favorita con porción, catálogo, receta del plan). Se guarda con el consumo; recientes y favoritas lo conservan (`mealMacrosEntry`, `perPortion` vuelve `qty` a 1). Detalle «Origen: …» en el editor y en `openMealMore`. Entradas sin metadatos se leen como legacy y solo pasan a manual si se cambian; sin backfill.
 - Verificación: `scripts/test-meal-log.mjs` (contrato, legacy, corrección, merge offline) y `tests/e2e/origen-registro.spec.js`.
 
-## REQ-268 - Registro: editar ingredientes y gramos decimales sin perder el cálculo
+## REQ-271 - Registro: editar ingredientes y gramos decimales sin perder el cálculo
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-267. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-270. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Probe `ingredient-snapshot`; `addFoodToEditor()` redondea gramos y concatena texto.
@@ -1927,9 +1927,9 @@ Cálculo puro, E2E de composición/reapertura/corrección, compras, offline y ca
 - Editor: «Alimento» añade una línea (gramos con coma), cada línea se edita o se quita y recalcula; lo ya elegido/escrito pasa a ser la primera línea por porción. Guardar persiste `components` y totales a una décima; cambiar totales a mano marca `corrected`. Comidas del plan con receta del catálogo: «Ajustar ingredientes de la receta». `mealRecipe()` usa las líneas (tarjeta, detalle y lista de compra). Reabrir no depende del catálogo; entradas antiguas sin líneas siguen manuales. Nada se escribe en el catálogo global.
 - Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/composicion.spec.js`.
 
-## REQ-269 - Nutrición: registrar una sustitución o un adicional de forma explícita
+## REQ-272 - Nutrición: registrar una sustitución o un adicional de forma explícita
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-267. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-270. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 `openEditor(extra)`, `saveEditor()` y `openMealMore()`; flujo libre siempre añade un extra.
@@ -1960,9 +1960,9 @@ E2E de tres estados, adicional, cancelación, fecha, reintento, totales e histor
 - `applyMealSubstitution` cambia solo esa comida (snapshot, origen y líneas), quita el saltado, registra `meal_replace`/`logged_instead` y guarda `ms.subst` con el estado previo. `undoMealSubstitution` (tarjeta y «···») restaura solo si la comida no se editó después. Sin rebalanceos ni regeneración de la semana.
 - Verificación: `tests/e2e/sustitucion.spec.js`.
 
-## REQ-270 - Nutrición: copiar comida o selección del día a otra fecha
+## REQ-273 - Nutrición: copiar comida o selección del día a otra fecha
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-267 y REQ-269. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-270 y REQ-272. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Fuentes oficiales S05/S06; búsqueda de código distingue recientes/propagación de un flujo general de copia.
@@ -1993,9 +1993,9 @@ E2E de destino ocupado/vacío, futuro, misma fecha, cancelación, receta version
 - `copyEntrySnapshot` copia valores, líneas y origen con `copiedFrom`, sin ids de sync, estado ni deshacer del origen; extras con `oid` nuevo; los reemplazos usan `applyMealSubstitution` (deshacibles). Un solo `commitDay` por copia. Lote de varios días queda fuera.
 - Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/copiar-comidas.spec.js`.
 
-## REQ-271 - Nutrición: biblioteca privada de alimentos desde etiqueta
+## REQ-274 - Nutrición: biblioteca privada de alimentos desde etiqueta
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-266, REQ-267 y REQ-268. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-269, REQ-270 y REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Fuentes S02/S09/S12; `renderQuickPicks()` solo busca DB.ingredients y favoritas no tienen unidad base.
@@ -2026,9 +2026,9 @@ Cálculo por base/unidad, límites, E2E alta/búsqueda/registro/corrección, con
 - La pestaña «Alimento» muestra «Tus alimentos» (etiqueta «Tuyo») antes del catálogo, «＋ Crear alimento propio» (precarga la búsqueda), editar (versión +1) y eliminar. Registrar crea una línea `ref:{kind:"food",id,version}` con snapshot. Guardar relee el perfil y aplica la operación; sin conexión, error sin cambios. Sin OCR ni proveedor; el catálogo global no cambia.
 - Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/alimentos-propios.spec.js`.
 
-## REQ-272 - Nutrición: recetas propias con rendimiento y registro por porción
+## REQ-275 - Nutrición: recetas propias con rendimiento y registro por porción
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-268 y REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-271 y REQ-274. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Fuentes S07/S08; Evolv tiene recetas curadas pero no biblioteca privada con rendimiento editable.
@@ -2055,13 +2055,13 @@ Cuatro porciones registra una cuarta parte; 150 g usa peso final conocido. Guard
 Pruebas de fracciones/rendimiento, E2E crear/guardar/registrar/editar, legado, sync y aislamiento.
 
 ### Implementación
-- `prefs.customRecipes` (máx. 50): hasta 30 líneas del catálogo o alimentos propios, pasos opcionales y rendimiento indicado por el usuario (porciones y/o peso final cocinado); nunca se infiere del crudo. `recipeBase` da la base por porción o por 100 g cocinada; fusión por id/versión con lápidas (`persistLibraryOp` compartido con REQ-271).
+- `prefs.customRecipes` (máx. 50): hasta 30 líneas del catálogo o alimentos propios, pasos opcionales y rendimiento indicado por el usuario (porciones y/o peso final cocinado); nunca se infiere del crudo. `recipeBase` da la base por porción o por 100 g cocinada; fusión por id/versión con lápidas (`persistLibraryOp` compartido con REQ-274).
 - «Mis recetas» (Más opciones): crear, editar (versión +1) y eliminar con vista previa por porción/100 g; guardar no registra nada. En «Alimento», «Tus recetas» se registran por porciones o gramos como línea `ref:{kind:"recipe",id,version}` con snapshot: cambiar rendimiento o eliminar no reescribe consumos. No entra al solver ni se comparte.
 - Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/recetas.spec.js`.
 
-## REQ-273 - Nutrición: productos propios por código y escaneo progresivo
+## REQ-276 - Nutrición: productos propios por código y escaneo progresivo
 
-**Estado: implementado.** Prioridad P2. Dependencias: REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.** Prioridad P2. Dependencias: REQ-274. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
 
 ### Origen
 Fuentes S09/S10; no hay código de producto en el registro actual.

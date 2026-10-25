@@ -1,4 +1,4 @@
-// REQ-272: recetas privadas con rendimiento por porciones y/o peso final.
+// REQ-275: recetas privadas con rendimiento por porciones y/o peso final.
 // Guardar la receta es independiente de registrarla; registrar una parte guarda
 // la base de esa versión y editar la receta después no reescribe el pasado.
 import { test, expect } from "@playwright/test";

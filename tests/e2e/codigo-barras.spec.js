@@ -1,4 +1,4 @@
-// REQ-273: código GTIN privado en tus alimentos, búsqueda por código escrito y
+// REQ-276: código GTIN privado en tus alimentos, búsqueda por código escrito y
 // escaneo solo donde el navegador trae BarcodeDetector. Sin servicios externos;
 // un código desconocido ofrece alta manual, nunca un registro automático.
 import { test, expect } from "@playwright/test";

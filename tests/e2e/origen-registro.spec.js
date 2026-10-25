@@ -1,4 +1,4 @@
-// REQ-267: cada consumo guarda su origen (manual, estimación, favorita/reciente,
+// REQ-270: cada consumo guarda su origen (manual, estimación, favorita/reciente,
 // receta del plan) y un snapshot de los valores. Editar la fuente no cambia el
 // pasado; una corrección manual conserva la base; lo antiguo se lee como legacy.
 import { test, expect } from "@playwright/test";

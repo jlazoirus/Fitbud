@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REQ-265 — "Estimar macros" nunca aplica una plantilla genérica (500/25/55/20)
+// REQ-268 — "Estimar macros" nunca aplica una plantilla genérica (500/25/55/20)
 // como si fuera la estimación de la comida descrita. Con la cuota de frescas
 // agotada solo vale una generación previa del mismo contexto (user_pool); si no
 // hay, el servidor responde 422 no_compatible_result y la reserva se devuelve.

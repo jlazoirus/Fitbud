@@ -1,6 +1,6 @@
 # Análisis de MyFitnessPal y brechas de Evolv
 
-**Snapshot histórico del 22 de octubre.** La [actualización del 24 de octubre](README.md) revalida `main`, incorpora fuentes oficiales de MFP y crea REQ-265..273 sin entrevistas. Este texto conserva el diagnóstico anterior y no determina la cola vigente.
+**Snapshot histórico del 22 de octubre.** La [actualización del 24 de octubre](README.md) revalida `main`, incorpora fuentes oficiales de MFP y crea REQ-268..276 sin entrevistas. Este texto conserva el diagnóstico anterior y no determina la cola vigente.
 
 **Estado en aquella ejecución: comparación de producto provisional; Evolv verificado localmente, MyFitnessPal sin inspección contemporánea.** Convenciones y fuentes: [FUENTES.md](FUENTES.md). El inventario completo se entrega en [48 dimensiones](matriz.csv).
 

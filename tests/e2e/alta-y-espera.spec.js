@@ -27,7 +27,7 @@ test("la consulta al coach bloquea la app con un aviso hasta que responde", asyn
   await expect(busy).toContainText("Estimando tu comida…");
   // El botón Guardar queda tapado por la capa: no se puede tocar mientras espera.
   const covered = await overlay.getByRole("button", { name: "Guardar" }).evaluate((btn) => {
-    btn.scrollIntoView({ block: "center" }); // el editor es más alto que la pantalla (REQ-266..273)
+    btn.scrollIntoView({ block: "center" }); // el editor es más alto que la pantalla (REQ-269..276)
     const r = btn.getBoundingClientRect();
     const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
     return !!(top && top.closest("#coach-busy"));

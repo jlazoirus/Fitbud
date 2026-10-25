@@ -1000,7 +1000,7 @@
 <script src="js/nutrition-pure.js"></script>
 <!-- Dominio nutricional puro: tolerancias, macros de recetas, restricciones, slots, validadores. -->
 <script src="js/nutrition-domain.js"></script>
-<!-- REQ-266..273: registro nutricional puro (validación, origen, composición, alimentos y recetas propios). -->
+<!-- REQ-269..276: registro nutricional puro (validación, origen, composición, alimentos y recetas propios). -->
 <script src="js/meal-log.js"></script>
 <!-- Contratos de dominio: validadores sin DOM para perfil, macros, día, entitlement, sync y coach. -->
 <script src="domain-contracts.js"></script>
@@ -1194,11 +1194,11 @@ function normalizedBlockedDishes(value){
 const SAVED_MEALS_MAX=50;
 function mealMacrosEntry(v){
   const name=String(v&&v.name||"").trim().slice(0,160);
-  // REQ-266: décimas, nunca negativos; los macros desconocidos se conservan como tales.
+  // REQ-269: décimas, nunca negativos; los macros desconocidos se conservan como tales.
   const num=(x,k)=>Math.max(0,Math.min(MEAL_VALUE_LIMITS[k],roundTenth(Number(x)||0)));
   if(!name)return null;
   const unknown=!!(v&&v.macrosUnknown);
-  // REQ-267: recientes y favoritas conservan el origen del registro que las originó.
+  // REQ-270: recientes y favoritas conservan el origen del registro que las originó.
   const meta=normalizeNutritionMeta(v&&v.nutritionMeta);
   return Object.assign({name,kcal:num(v.kcal,"kcal"),p:unknown?0:num(v.p,"p"),c:unknown?0:num(v.c,"c"),f:unknown?0:num(v.f,"f")},unknown?{macrosUnknown:true}:{},meta?{nutritionMeta:meta}:{});
 }
@@ -1254,10 +1254,10 @@ function migrateProfilePrefs(source){
     sessionMinutes:Math.min(180,Math.max(20,Number.parseInt(p.sessionMinutes,10)||60)),
     betweenExerciseRestSeconds:normalizedBetweenExerciseRest(p.betweenExerciseRestSeconds),
     ...(p.savedMeals!=null?{savedMeals:normalizedSavedMeals(p.savedMeals)}:{}),
-    // REQ-271: biblioteca privada de alimentos propios + lápidas de borrados.
+    // REQ-274: biblioteca privada de alimentos propios + lápidas de borrados.
     ...(p.customFoods!=null?{customFoods:normalizedCustomFoods(p.customFoods)}:{}),
     ...(p.customFoodsDeleted!=null?{customFoodsDeleted:(Array.isArray(p.customFoodsDeleted)?p.customFoodsDeleted:[]).map(String).filter(x=>/^[a-z0-9_-]{4,64}$/i.test(x)).slice(-CUSTOM_FOOD_DELETED_MAX)}:{}),
-    // REQ-272: recetas propias con rendimiento + lápidas.
+    // REQ-275: recetas propias con rendimiento + lápidas.
     ...(p.customRecipes!=null?{customRecipes:normalizedCustomRecipes(p.customRecipes)}:{}),
     ...(p.customRecipesDeleted!=null?{customRecipesDeleted:(Array.isArray(p.customRecipesDeleted)?p.customRecipesDeleted:[]).map(String).filter(x=>/^[a-z0-9_-]{4,64}$/i.test(x)).slice(-CUSTOM_FOOD_DELETED_MAX)}:{}),
     equipment:normalizedList(p.equipment,Object.keys(EQUIPMENT_LABELS)),
@@ -2689,9 +2689,9 @@ function dayTotals(ds){
   let t={kcal:0,p:0,c:0,f:0}, doneMeals=0, totMeals=day.meals.length-skippedCount+st.extras.length, partial=0;
   day.meals.forEach(b=>{const ms=st.meals[b.id];if(ms&&ms.done){const v=mealValue(b,ms);if(mealHasContent(v)){t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;doneMeals++;if(v.macrosUnknown)partial++;}}});
   st.extras.forEach(e=>{if(e.done){t.kcal+=+e.kcal||0;t.p+=+e.p||0;t.c+=+e.c||0;t.f+=+e.f||0;doneMeals++;if(e.macrosUnknown)partial++;}});
-  // REQ-266/268: se suma con la precisión guardada y se redondea solo al final.
+  // REQ-269/271: se suma con la precisión guardada y se redondea solo al final.
   t={kcal:Math.round(t.kcal),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f)};
-  // REQ-266: `partial` cuenta comidas registradas solo con calorías (macros incompletos).
+  // REQ-269: `partial` cuenta comidas registradas solo con calorías (macros incompletos).
   return {t,doneMeals,totMeals,target:day.target,partial};
 }
 
@@ -6409,7 +6409,7 @@ function renderWorkout(){
 // Receta (ingredientes + gramos) de la comida, desde la DB, respetando override.
 function mealRecipe(b,ms){
   const o=ms&&ms.ovr;
-  // REQ-268: líneas reales que registró el usuario (gramos/ml); también alimentan la lista de compra.
+  // REQ-271: líneas reales que registró el usuario (gramos/ml); también alimentan la lista de compra.
   if(o&&Array.isArray(o.components)&&o.components.length){
     const lines=normalizeComponents(o.components).filter(c=>c.unit!=="portion")
       .map(c=>({name:c.name,grams:c.amount,label:componentAmountLabel(c)}));
@@ -6495,7 +6495,7 @@ function toggleRecipe(btn){
   const open=r.classList.toggle("open");
   btn.textContent=open?"Ocultar receta":"Ver receta";
 }
-// REQ-266: kcal y macros redondeados para mostrar; solo calorías no aparenta macros en cero.
+// REQ-269: kcal y macros redondeados para mostrar; solo calorías no aparenta macros en cero.
 function mealNumsHtml(v){
   const r=x=>Math.round(+x||0);
   return v&&v.macrosUnknown
@@ -9628,7 +9628,7 @@ function openEditor(kind,ds,id){
   editorSheet(title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i,...editorMetaDraft(e,e,false)};editorSheet("Editar comida extra",e);}
-// REQ-267: borrador de origen al abrir el editor. Una entrada con metadatos los
+// REQ-270: borrador de origen al abrir el editor. Una entrada con metadatos los
 // conserva; una antigua es "legacy" y solo pasa a manual si se cambian sus valores;
 // una comida del plan sin tocar parte de su receta.
 function editorMetaDraft(entry,pre,isPlanMeal){
@@ -9636,7 +9636,7 @@ function editorMetaDraft(entry,pre,isPlanMeal){
   const custom=entry&&entry.kcal!=null&&entry.dishName==null;
   if(custom){
     const meta=normalizeNutritionMeta(entry.nutritionMeta);
-    // REQ-268: las líneas guardadas se reabren con su propia base (snapshot).
+    // REQ-271: las líneas guardadas se reabren con su propia base (snapshot).
     const components=normalizeComponents(entry.components);
     const recipeLoaded=meta&&meta.source==="recipe"&&components.length&&meta.ref?meta.ref:null;
     return {meta,legacyEntry:!meta,orig,existing:true,components,autoName:components.length?componentsName(components):"",recipeLoaded};
@@ -9650,7 +9650,7 @@ function editorOriginHtml(){
   const note=meta&&meta.estimate&&meta.estimate.note;
   return `<div class="muted small meal-origin" id="f_origin">Origen: ${esc(nutritionMetaLabel(meta))}${note?` — ${esc(note)}`:""}</div>`;
 }
-// REQ-267: origen que se guarda con el consumo (null = no tocar, registro antiguo sin cambios).
+// REQ-270: origen que se guarda con el consumo (null = no tocar, registro antiguo sin cambios).
 function editorMetaForSave(e,v){
   if(!e.meta){
     if(!e.legacyEntry)return {v:NUTRITION_META_VERSION,source:"manual"};
@@ -9664,7 +9664,7 @@ function editorMetaForSave(e,v){
 function perPortion(v){
   const k=+(v&&v.portion);
   if(!(k>0&&k!==1))return v;
-  // REQ-267: una porción de la fuente; la base se conserva y la cantidad vuelve a 1.
+  // REQ-270: una porción de la fuente; la base se conserva y la cantidad vuelve a 1.
   const meta=normalizeNutritionMeta(v.nutritionMeta);
   if(meta&&meta.base&&meta.base.unit==="portion"){meta.qty=1;delete meta.corrected;}
   return Object.assign({name:v.name,kcal:v.kcal/k,p:v.p/k,c:v.c/k,f:v.f/k},v.macrosUnknown?{macrosUnknown:true}:{},meta?{nutritionMeta:meta}:{});
@@ -9715,12 +9715,12 @@ function renderQuickPicks(){
   if(search)search.placeholder=qp.tab==="food"?"Busca un alimento: avena, pollo…":"Buscar";
   const q=catalogSlug(qp.query||"");
   if(qp.tab==="food"){
-    // REQ-271: el mismo buscador muestra primero tus alimentos (privados) y luego el catálogo.
+    // REQ-274: el mismo buscador muestra primero tus alimentos (privados) y luego el catálogo.
     box.classList.toggle("qp-list-form",!!qp.foodForm);
     if(qp.foodForm){box.innerHTML=customFoodFormHtml(qp.foodForm);if(!qp.foodForm.focused){qp.foodForm.focused=true;box.scrollIntoView({block:"start"});const f=$("#cf_name");if(f)f.focus({preventScroll:true});}return;}
     const mine=customFoods();
     renderScanRow();
-    // REQ-273: un número de 8+ dígitos se busca como código entre tus alimentos (sin servicios externos).
+    // REQ-276: un número de 8+ dígitos se busca como código entre tus alimentos (sin servicios externos).
     const code=String(qp.query||"").replace(/[\s-]/g,"");
     if(/^\d{8,}$/.test(code)){
       const g=parseGtin(code);
@@ -9773,12 +9773,12 @@ function setEditorValues(v){
   clearEditorErrors();
   renderEditorImpact();
 }
-// REQ-266: el editor muestra hasta una décima con coma; un campo vacío sigue vacío.
+// REQ-269: el editor muestra hasta una décima con coma; un campo vacío sigue vacío.
 function formatEditorNumber(n){
   if(n===""||n==null||!Number.isFinite(Number(n)))return "";
   return String(roundTenth(n)).replace(".",",");
 }
-// REQ-266: "Solo conozco las calorías" deja los macros como desconocidos, no como cero.
+// REQ-269: "Solo conozco las calorías" deja los macros como desconocidos, no como cero.
 function setKcalOnlyMode(on){
   const box=$("#f_kcalOnly");if(box)box.checked=!!on;
   ["f_p","f_c","f_f"].forEach(id=>{
@@ -9807,7 +9807,7 @@ function renderEditorErrors(errors){
 function clearEditorErrors(){if(window._editor)window._editor.errors=null;renderEditorErrors(null);}
 function applyQuickPick(i){
   const qp=window._qp,item=qp&&qp.items&&qp.items[i];if(!item)return;
-  // REQ-268: con ingredientes ya listados, una reciente/favorita se suma como línea por porción.
+  // REQ-271: con ingredientes ya listados, una reciente/favorita se suma como línea por porción.
   const ed=window._editor;
   if(ed&&ed.components&&ed.components.length){
     const m=mealMacrosEntry(item);
@@ -9818,7 +9818,7 @@ function applyQuickPick(i){
   }
   qp.base=mealMacrosEntry(item);qp.portion=1;
   setEditorValues(qp.base);renderPortionChips();
-  // REQ-267: snapshot de la reciente/favorita; conserva su origen y la marca como referencia.
+  // REQ-270: snapshot de la reciente/favorita; conserva su origen y la marca como referencia.
   const src=qp.base.nutritionMeta;
   const e=window._editor;
   if(e)e.meta={source:src&&src.source||"legacy",ref:{kind:qp.tab==="fav"?"saved":"recent",name:qp.base.name},
@@ -9838,7 +9838,7 @@ function setQuickPickPortion(factor){
   setEditorValues({name:b.name,kcal:b.kcal*factor,p:b.p*factor,c:b.c*factor,f:b.f*factor,macrosUnknown:b.macrosUnknown});
   renderPortionChips();
 }
-// REQ-268: un alimento del catálogo entra como línea con su base por 100 g;
+// REQ-271: un alimento del catálogo entra como línea con su base por 100 g;
 // los totales salen de las líneas, con gramos decimales y redondeo solo al mostrar.
 function addFoodToEditor(i){
   const qp=window._qp,ing=qp&&qp.items&&qp.items[i];const e=window._editor;if(!ing||!e)return;
@@ -9930,7 +9930,7 @@ function renderEditorComponents(){
       </div>`;}).join("")}
     <div class="muted small comp-total">Total: ${Math.round(t.kcal)} kcal · P ${r1(t.p)} · C ${r1(t.c)} · G ${r1(t.f)} g</div>`;
 }
-// REQ-268: los ingredientes de la receta de una comida del plan, si todos están en el catálogo.
+// REQ-271: los ingredientes de la receta de una comida del plan, si todos están en el catálogo.
 function recipeComponentsFor(ds,id){
   const day=buildDay(ds);const b=day.meals.find(m=>m.id===id);if(!b||!DB.loaded)return null;
   const ms=mealState(ds,id);const r=mealRecipe(b,ms);if(!r||!r.lines.length)return null;
@@ -9953,7 +9953,7 @@ function loadRecipeComponents(){
   applyEditorComponents();
   const btn=$("#f_loadRecipe");if(btn)btn.remove();
 }
-/* REQ-271: alimentos propios (privados) creados desde la etiqueta. */
+/* REQ-274: alimentos propios (privados) creados desde la etiqueta. */
 function customFoods(){return normalizedCustomFoods(profile&&profile.prefs&&profile.prefs.customFoods);}
 function customFoodRowHtml(f,j){
   const unit=f.unit==="portion"?"porc.":f.unit==="100ml"?"ml":"g";
@@ -10027,7 +10027,7 @@ async function saveCustomFoodForm(){
   const check=validateCustomFoodInput(ff);
   if(!check.ok){ff.errors=check.errors;renderQuickPicks();return;}
   const mine=customFoods();
-  // REQ-273: un código identifica una sola presentación entre tus alimentos.
+  // REQ-276: un código identifica una sola presentación entre tus alimentos.
   const dup=check.value.gtin&&mine.find(x=>x.id!==ff.id&&sameGtin(x.gtin,check.value.gtin));
   if(dup){ff.errors={gtin:`Ese código ya está en «${customFoodLabel(dup)}». Cada tamaño o presentación tiene su propio código.`};renderQuickPicks();return;}
   if(!ff.id&&mine.length>=CUSTOM_FOODS_MAX){ff.errors={name:`Puedes guardar hasta ${CUSTOM_FOODS_MAX} alimentos propios.`};renderQuickPicks();return;}
@@ -10075,7 +10075,7 @@ async function persistLibraryOp(kind,op){
 }
 function persistCustomFoodOp(op){return persistLibraryOp("foods",op);}
 
-/* REQ-272: recetas propias. Guardar una receta es independiente de registrarla. */
+/* REQ-275: recetas propias. Guardar una receta es independiente de registrarla. */
 function customRecipes(){return normalizedCustomRecipes(profile&&profile.prefs&&profile.prefs.customRecipes);}
 function recipeYieldLabel(r){
   const parts=[];
@@ -10226,7 +10226,7 @@ function addRecipeToEditor(j){
   const line=normalizeComponent({name:r.name,unit,amount:amt.value,base,ref:{kind:"recipe",id:r.id,version:r.version}});
   if(line&&addEditorComponent(line))toast(`${line.name} ${componentAmountLabel(line)} añadido`);
 }
-/* REQ-273: escaneo progresivo. Solo si el navegador trae BarcodeDetector y cámara
+/* REQ-276: escaneo progresivo. Solo si el navegador trae BarcodeDetector y cámara
    en contexto seguro; si no, se escribe el código. Sin librerías ni servicios externos. */
 const SCAN_FORMATS=["ean_13","ean_8","upc_a","itf"];
 function barcodeScanSupported(){
@@ -10303,7 +10303,7 @@ function quickPicksHtml(){
     <div id="qpPortion" class="qp-portion-row"></div>
   </div>`;
 }
-/* REQ-269: registrar «además de lo previsto» o «en lugar de» una comida concreta. */
+/* REQ-272: registrar «además de lo previsto» o «en lugar de» una comida concreta. */
 function logIntentHtml(){
   const e=window._editor;
   e.intent=e.intent||"extra";
@@ -10387,7 +10387,7 @@ function undoMealSubstitution(ds,id){
   addContingencyEntry(ds,{type:"meal_revert",id,reason:"undo_logged_instead",prev:null,revertedSlots:[]});
   commitDay(ds);closeModal();render();toast("Sustitución deshecha");
 }
-/* REQ-270: copiar una comida o las entradas de un día a otra fecha del ciclo, con
+/* REQ-273: copiar una comida o las entradas de un día a otra fecha del ciclo, con
    vista previa. El origen no cambia; las copias tienen identidad nueva y
    procedencia. El futuro queda planificado; hoy/pasado exige elegir si se comió. */
 function copyableEntries(ds){
@@ -10515,7 +10515,7 @@ function editorSheet(title,pre){
   renderEditorImpact();
   renderQuickPicks();
 }
-// REQ-266: lee el texto tal cual; validateMealValues decide (vacío ≠ 0, sin negativos).
+// REQ-269: lee el texto tal cual; validateMealValues decide (vacío ≠ 0, sin negativos).
 function readEditor(){return{name:$("#f_name").value.trim(),kcal:$("#f_kcal").value,p:$("#f_p").value,c:$("#f_c").value,f:$("#f_f").value};}
 // Porción con la que se guarda: la elegida sobre una reciente/favorita, o la que ya tenía lo editado.
 function editorPortion(v,prev){
@@ -10525,7 +10525,7 @@ function editorPortion(v,prev){
 }
 function saveEditor(){
   const e=window._editor;if(!e||e.saving)return;
-  // REQ-266: validar antes de tocar el día, las favoritas o la cola; un error conserva el formulario.
+  // REQ-269: validar antes de tocar el día, las favoritas o la cola; un error conserva el formulario.
   const check=validateMealValues(readEditor(),{mode:editorMode()});
   if(!check.ok){
     e.errors=check.errors;renderEditorErrors(check.errors);
@@ -10538,7 +10538,7 @@ function saveEditor(){
   const prev=e.kind==="meal"?mealState(e.ds,e.id).ovr:e.kind==="extra"&&e.extraIdx!=null?dayState(e.ds).extras[e.extraIdx]:null;
   const portion=e.components&&e.components.length?1:editorPortion(v,prev);
   if(portion!==1)v.portion=portion;
-  // REQ-268: con líneas, los totales derivan de ellas; si se cambian a mano queda como corrección.
+  // REQ-271: con líneas, los totales derivan de ellas; si se cambian a mano queda como corrección.
   const components=normalizeComponents(e.components);
   if(components.length){
     v.components=components;
@@ -10741,7 +10741,7 @@ async function coachProxyFetch(payload){
 // REQ-123: expone si la última respuesta fue "reutilizada" (cupo de frescas agotado)
 // para que los botones de "otra opción" puedan avisar en vez de parecer no hacer nada.
 let lastCoachCallReused=false;
-// REQ-265: "fresh", "reused" (generación previa compatible) o "template" (reserva genérica).
+// REQ-268: "fresh", "reused" (generación previa compatible) o "template" (reserva genérica).
 let lastCoachCallOrigin="";
 // REQ-175: mientras el coach responde, una capa a pantalla completa bloquea la
 // app (sin tocar otros botones ni cerrar el modal) y dice qué está pasando.
@@ -11357,7 +11357,7 @@ async function aiEstimate(){
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const out=$("#aiOut");out.innerHTML=`<div class="ai-box">Estimando…</div>`;
   try{
-    // REQ-265: sin plantilla. Solo vale una estimación generada para esta misma
+    // REQ-268: sin plantilla. Solo vale una estimación generada para esta misma
     // descripción; si no hay, se informa el fallo y los campos no cambian.
     const quota=coachQuota("meal_estimate",requestId,"estimate","",{},hashText(name.toLowerCase()));
     // REQ-246: misma forma que el schema del servidor; aquí no se muestran preguntas.
@@ -11429,7 +11429,7 @@ ${canAsk?`Si algo que no se ve cambia mucho las kcal (cantidad real, aceite o fr
 Entrega siempre tu mejor estimación actual. "nombre": nombre corto y descriptivo del plato. "nota": una frase con lo que supusiste.
 Responde SOLO JSON: {"nombre":"...","kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0,"nota":"...","preguntas":[]}`;
     // La foto va en la clave: una respuesta guardada solo se reutiliza para la misma foto y respuestas.
-    // REQ-265: sin plantilla; sin resultado compatible se informa el fallo.
+    // REQ-268: sin plantilla; sin resultado compatible se informa el fallo.
     const quota=coachQuota("meal_estimate",requestId,"photo-"+st.round,"",{},`photo:${st.hash}:${hashText(qa)}:${hashText(desc)}`);
     const j=validEstimate(parseJSON(await callClaude(prompt,700,quota,{image:st.image})));
     if(!j)throw estimateUnavailableError();
@@ -11440,7 +11440,7 @@ Responde SOLO JSON: {"nombre":"...","kcal":0,"proteina_g":0,"carbohidratos_g":0,
 // REQ-228: el error de la estimación dice qué pasó (sin hablar de tecnología) y
 // deja reintentar; un motivo no reconocido muestra su código. REQ-238: también
 // para "Estimar macros" por texto (photo=false).
-// REQ-265: una respuesta solo se aplica si trae los cuatro valores finitos y no
+// REQ-268: una respuesta solo se aplica si trae los cuatro valores finitos y no
 // negativos y no es una plantilla de reserva; si no, cuenta como fallo.
 function validEstimate(j){
   if(!j||typeof j!=="object"||lastCoachCallOrigin==="template")return null;
@@ -11470,9 +11470,9 @@ function renderPhotoEstimateError(e){
 // "Aplicado: …" para que se vea qué cambió aunque se parezca a lo anterior.
 function applyEstimatedMacros(j,kind){
   const vals={f_kcal:Math.round(+j.kcal||0),f_p:Math.round(+j.proteina_g||0),f_c:Math.round(+j.carbohidratos_g||0),f_f:Math.round(+j.grasa_g||0)};
-  // REQ-266: una estimación trae los cuatro valores: sale del modo solo calorías.
+  // REQ-269: una estimación trae los cuatro valores: sale del modo solo calorías.
   setKcalOnlyMode(false);clearEditorErrors();
-  // REQ-267: origen estimado con su supuesto visible; la foto y el pedido no se guardan.
+  // REQ-270: origen estimado con su supuesto visible; la foto y el pedido no se guardan.
   if(window._editor)window._editor.meta={source:"estimate",estimate:{kind:kind==="photo"?"photo":"text",note:coachCopy(String(j.nota||""))},
     base:{kcal:vals.f_kcal,p:vals.f_p,c:vals.f_c,f:vals.f_f,unit:"portion"},qty:1};
   Object.entries(vals).forEach(([id,v])=>{

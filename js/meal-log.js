@@ -1,4 +1,4 @@
-// Registro nutricional puro de Fitbros — REQ-266..273.
+// Registro nutricional puro de Fitbros — REQ-269..276.
 // Sin DOM ni estado global: parseo y validación de valores, contrato de origen
 // (nutritionMeta), composición por ingredientes, alimentos/recetas propios y GTIN.
 // Compatible con navegador (<script src="js/meal-log.js">) y Node.js (import).
@@ -7,7 +7,7 @@
 (function(root){
   "use strict";
 
-  // ── REQ-266: valores de una comida ──────────────────────────────────────────
+  // ── REQ-269: valores de una comida ──────────────────────────────────────────
   // Límites por comida registrada: una entrada razonable y nunca negativa.
   const MEAL_VALUE_LIMITS={kcal:5000,p:500,c:1000,f:500};
   const MEAL_NAME_MAX=160;
@@ -57,7 +57,7 @@
     return{ok,value:ok?value:null,errors};
   }
 
-  // ── REQ-267: origen y snapshot nutricional ──────────────────────────────────
+  // ── REQ-270: origen y snapshot nutricional ──────────────────────────────────
   // Contrato `nutritionMeta` (v1) guardado junto a los totales de cada consumo:
   //   source  manual | catalog | estimate | recipe | food | legacy
   //           (legacy = reutiliza un registro anterior sin origen; al leer una
@@ -67,7 +67,7 @@
   //   qty     cantidad aplicada sobre base (porción ×k, o gramos/ml si unit es 100g/100ml)
   //   estimate {kind: text|photo, note?}  supuestos visibles; nunca prompt ni imagen
   //   corrected  true si el usuario cambió los totales calculados por la fuente
-  //   macrosUnknown  copia del modo solo calorías (REQ-266)
+  //   macrosUnknown  copia del modo solo calorías (REQ-269)
   // Los totales del consumo son el snapshot: editar la fuente no cambia el pasado.
   const NUTRITION_META_VERSION=1;
   const NUTRITION_SOURCES=["manual","catalog","estimate","recipe","food","legacy"];
@@ -154,7 +154,7 @@
     return parts.join(" · ");
   }
 
-  // ── REQ-268: composición por ingredientes ──────────────────────────────────
+  // ── REQ-271: composición por ingredientes ──────────────────────────────────
   // Una línea guarda su propia base (snapshot): reabrir no depende del catálogo.
   //   {name, unit: 100g|100ml|portion, amount, base:{kcal,p,c,f}, ref?}
   // amount son gramos/ml (100g/100ml) o porciones (portion). Los totales se
@@ -206,7 +206,7 @@
     return "manual";
   }
 
-  // ── REQ-270: copiar comidas entre días ──────────────────────────────────────
+  // ── REQ-273: copiar comidas entre días ──────────────────────────────────────
   // Copia el snapshot (valores, líneas y origen) con identidad nueva: nunca
   // arrastra ids de sync, orden, estado hecho/saltado ni el deshacer del origen.
   function copyEntrySnapshot(entry,from){
@@ -224,7 +224,7 @@
     return out;
   }
 
-  // ── REQ-271: alimentos propios desde la etiqueta ───────────────────────────
+  // ── REQ-274: alimentos propios desde la etiqueta ───────────────────────────
   // Biblioteca privada en profiles.prefs.customFoods (máx. 100):
   //   {id, name, brand?, unit: 100g|100ml|portion, base:{kcal,p,c,f},
   //    portion?:{label, amount}, version, updatedAt}
@@ -274,7 +274,7 @@
       else if(r.value>COMPONENT_AMOUNT_MAX[unit])errors.portionAmount=`Máximo ${COMPONENT_AMOUNT_MAX[unit]} ${unit==="100ml"?"ml":"g"}.`;
       if(!errors.portionLabel&&!errors.portionAmount)portion={label,amount:roundTenth(r.value)};
     }
-    // REQ-273: código opcional de la presentación (identifica tamaño/marca concreta).
+    // REQ-276: código opcional de la presentación (identifica tamaño/marca concreta).
     let gtin="";
     const g=parseGtin(input&&input.gtin);
     if(!g.empty){if(g.ok)gtin=g.value;else errors.gtin=gtinErrorText(g.error);}
@@ -318,7 +318,7 @@
   function customFoodLabel(f){return f.brand?`${f.name} (${f.brand})`:f.name;}
   function customFoodBaseLabel(f){return f.unit==="portion"?`por ${f.portion&&f.portion.label||"porción"}`:`por 100 ${f.unit==="100ml"?"ml":"g"}`;}
 
-  // ── REQ-273: código de producto (GTIN) ─────────────────────────────────────
+  // ── REQ-276: código de producto (GTIN) ─────────────────────────────────────
   // GTIN-8/12/13/14 con dígito de control (módulo 10 GS1). Se guarda como texto
   // tal como se leyó (con ceros a la izquierda); para comparar presentaciones se
   // rellena a 14 dígitos, así un UPC-A leído como EAN-13 es el mismo producto.
@@ -344,7 +344,7 @@
       :"Escribe solo los números del código de barras.";
   }
 
-  // ── REQ-272: recetas propias con rendimiento ───────────────────────────────
+  // ── REQ-275: recetas propias con rendimiento ───────────────────────────────
   // prefs.customRecipes (máx. 50): {id, name, lines (≤30 de catálogo o alimentos
   // propios), steps?, yield:{servings?, weight?}, version, updatedAt}. El
   // rendimiento lo indica el usuario (porciones y/o peso final cocinado); nunca

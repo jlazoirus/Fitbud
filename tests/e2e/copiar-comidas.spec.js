@@ -1,4 +1,4 @@
-// REQ-270: copiar una comida o las entradas de un día a otra fecha del ciclo con
+// REQ-273: copiar una comida o las entradas de un día a otra fecha del ciclo con
 // vista previa. El origen no cambia, las copias tienen identidad nueva y
 // procedencia, el futuro queda planificado y hoy/pasado exige decidir si se comió.
 import { test, expect } from "@playwright/test";

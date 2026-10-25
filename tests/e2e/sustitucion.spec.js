@@ -1,4 +1,4 @@
-// REQ-269: al registrar algo se elige «Además de lo previsto» o «En lugar de» una
+// REQ-272: al registrar algo se elige «Además de lo previsto» o «En lugar de» una
 // comida concreta. La sustitución modifica solo esa comida, el total cambia una
 // sola vez y se puede deshacer sin pisar cambios posteriores.
 import { test, expect } from "@playwright/test";

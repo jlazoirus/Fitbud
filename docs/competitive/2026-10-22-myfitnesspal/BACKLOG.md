@@ -24,30 +24,30 @@ Los recorridos de MyFitnessPal se reconstruyeron desde su ayuda oficial; no se i
 
 | Orden | REQ | Entrega | Dependencias |
 |---|---|---|---|
-| 1 | 265 · P0 | Fallo honesto de estimación, sin plantilla de 500 kcal | Ninguna nueva |
-| 2 | 266 · P0 | Validación de valores manuales, sin negativos/vacíos convertidos en cero | Ninguna nueva |
-| 3 | 267 · P1 | Origen y snapshot del registro nutricional | 265–266 |
-| 4 | 268 · P1 | Composición editable por ingredientes y gramos decimales | 267 |
-| 5 | 269 · P1 | Registrar en lugar de una comida o además de ella | 267 |
-| 6 | 270 · P1 | Copiar comida/día con preview, sin consumir el futuro | 267 y 269 |
-| 7 | 271 · P1 | Alimentos propios desde etiqueta: marca, base y porción | 266–268 |
-| 8 | 272 · P1 | Recetas propias y rendimiento por porción/peso final | 268 y 271 |
-| 9 | 273 · P2 | Código GTIN privado y escaneo progresivo cuando el navegador lo soporte | 271 |
+| 1 | 268 · P0 | Fallo honesto de estimación, sin plantilla de 500 kcal | Ninguna nueva |
+| 2 | 269 · P0 | Validación de valores manuales, sin negativos/vacíos convertidos en cero | Ninguna nueva |
+| 3 | 270 · P1 | Origen y snapshot del registro nutricional | 268–269 |
+| 4 | 271 · P1 | Composición editable por ingredientes y gramos decimales | 270 |
+| 5 | 272 · P1 | Registrar en lugar de una comida o además de ella | 270 |
+| 6 | 273 · P1 | Copiar comida/día con preview, sin consumir el futuro | 270 y 272 |
+| 7 | 274 · P1 | Alimentos propios desde etiqueta: marca, base y porción | 269–271 |
+| 8 | 275 · P1 | Recetas propias y rendimiento por porción/peso final | 271 y 274 |
+| 9 | 276 · P2 | Código GTIN privado y escaneo progresivo cuando el navegador lo soporte | 274 |
 
-El selector actual descubre pendientes no listados y los ordena por número; no hace falta cambiar `agent-loop.json`. Al integrarse este cambio en `main`, el primero será REQ-265. La escritura sobre archivos compartidos sigue usando el lock existente y un REQ por implementación/commit. Este paquete no habilita trabajo nativo ni promueve los nueve REQ como una sola implementación.
+El selector actual descubre pendientes no listados y los ordena por número; no hace falta cambiar `agent-loop.json`. Al integrarse este cambio en `main`, el primero será REQ-268. La escritura sobre archivos compartidos sigue usando el lock existente y un REQ por implementación/commit. Este paquete no habilita trabajo nativo ni promueve los nueve REQ como una sola implementación.
 
 ## Contratos comunes para los agentes
 
 - Mantener frontend sin framework/build nuevo y sin dependencias runtime nuevas. Cálculos puros bajo `js/` con el patrón existente cuando corresponda; funciones públicas compatibles con handlers.
 - Persistir preferencias/bibliotecas privadas dentro de `profiles.prefs`, siguiendo `savedMeals`, con límites explícitos. Conservar claves ajenas y manejo de fallos/conflictos. Usar RLS, API y cola actuales; este paquete no necesita una nueva tabla para arrancar.
 - Guardar en cada consumo un snapshot de valores utilizados, no un enlace que cambie el pasado si se edita el alimento/receta. No inferir ingredientes de una descripción antigua ni certificar alérgenos.
-- Propuesta de contrato versionado: `nutritionMeta` con origen (`manual/catalog/estimate/recipe/legacy`), referencia opcional y valores base/porción; `components` para líneas reales del compositor. La forma final debe quedar documentada y probada en REQ-267/268, sin inventar datos en backfill.
+- Propuesta de contrato versionado: `nutritionMeta` con origen (`manual/catalog/estimate/recipe/legacy`), referencia opcional y valores base/porción; `components` para líneas reales del compositor. La forma final debe quedar documentada y probada en REQ-270/271, sin inventar datos en backfill.
 - No registrar alimentos, fotos, GTIN, salud ni descripciones en analytics. Pruebas solo con fixtures y cuentas ficticias. La foto de comida no se persiste como consecuencia de estos cambios.
 - Toda escritura nueva debe conservar idempotencia, aislamiento entre cuentas, cola offline y flags de consumo/plan. Subir versión de cache si se toca el shell; los documentos por sí solos no requieren bump.
 
 ## Especificaciones y casos de verificación
 
-### REQ-265 · Eliminar estimaciones genéricas presentadas como resultado
+### REQ-268 · Eliminar estimaciones genéricas presentadas como resultado
 
 **Problema observado:** `aiEstimate()` (`index.html:10444`) envía una plantilla fija 500/25/55/20 en `fallbackText`; `api/claude.js:926` permite seleccionarla en `reuse`. El navegador aplica una respuesta con esos valores a «Un vaso de agua». Se simuló esa respuesta; no es una medición de incidencias reales.
 
@@ -57,7 +57,7 @@ El selector actual descubre pendientes no listados y los ordena por número; no 
 
 **Fuera:** cambiar pricing/cuotas o quitar la reutilización compatible de otras acciones del coach.
 
-### REQ-266 · Validar números y datos nutricionales incompletos
+### REQ-269 · Validar números y datos nutricionales incompletos
 
 **Problema observado:** `readEditor()` convierte vacío/NaN en 0; `saveEditor()` solo exige nombre. El probe guardó `kcal:-100,p:-10` como consumido.
 
@@ -67,7 +67,7 @@ Implementar «Solo conozco las calorías» como modo explícito: kcal válida, m
 
 **Casos:** negativos, vacío, texto no numérico, infinito en entrada programática, 0 explícito válido, decimales locales, doble envío y guardado en favoritas. Un error conserva formulario/estado y no modifica día, perfil ni cola.
 
-### REQ-267 · Origen y snapshot nutricional persistidos
+### REQ-270 · Origen y snapshot nutricional persistidos
 
 **Problema:** los números de una receta, una entrada manual y una estimación acaban guardados como nombre y totales; las notas de estimación son temporales. `saveEditor`, `applyEstimatedMacros`, `mealMacrosEntry`, `perPortion` y `normalizedSavedMeals` son rutas a cubrir, no solo el editor visible.
 
@@ -75,7 +75,7 @@ Implementar «Solo conozco las calorías» como modo explícito: kcal válida, m
 
 **Casos:** guardar/reabrir/sincronizar, corregir cantidad, favorita/reciente con ×2, editar fuente tras consumir, cuenta A→B y merge offline. Valores visibles e históricos permanecen iguales en la migración de lectura. No conservar imagen ni prompts completos.
 
-### REQ-268 · Editor de ingredientes con cantidades reales
+### REQ-271 · Editor de ingredientes con cantidades reales
 
 **Problema observado:** `addFoodToEditor()` redondea 33,5 a 34 g, concatena nombres y suma a campos; el registro pierde las líneas. No permite quitar/corregir una línea sin rehacer cuentas.
 
@@ -83,7 +83,7 @@ Implementar «Solo conozco las calorías» como modo explícito: kcal válida, m
 
 **Casos:** 33,5 g + 0,5 g, mismo alimento dos veces, quitar componente, ingrediente no disponible al reabrir, base crudo/cocido, receta aplicada y gramos cambiados, editor de una entrada antigua sin líneas. Registrar no debe editar ni añadir elementos al catálogo global.
 
-### REQ-269 · Registrar claramente una sustitución o un adicional
+### REQ-272 · Registrar claramente una sustitución o un adicional
 
 **Problema:** `openEditor('extra')` siempre suma un extra consumido; reemplazar exige otra ruta en la tarjeta. La intención de «comí esto en lugar del almuerzo» no tiene una acción explícita en el registro general.
 
@@ -91,7 +91,7 @@ Implementar «Solo conozco las calorías» como modo explícito: kcal válida, m
 
 **Casos:** comida pendiente/hecha/saltada, adicional que mantiene el plan, cancelar, fecha equivocada, reintento de red y deshacer. El total cambia exactamente una vez. Ni sustitución ni copiar prescriben compensaciones agresivas ni regeneran automáticamente toda la semana.
 
-### REQ-270 · Copiar comidas/día con control del destino
+### REQ-273 · Copiar comidas/día con control del destino
 
 **Referencia:** artículos oficiales de copia entre días y Multi-Day Logging. En Evolv hay recientes y propagación de una alternativa, pero no un flujo general de copiar selección/día con preview.
 
@@ -99,7 +99,7 @@ Implementar «Solo conozco las calorías» como modo explícito: kcal válida, m
 
 **Casos:** origen vacío, destino con datos, cancelación, misma fecha, parcial de red y reintento, copiar receta antigua y editarla después. Nueva copia no debe aparecer en adherencia/racha hasta consumirse. La primera entrega es una fecha destino: registro múltiple de siete días/undo de lotes se deja para otro REQ y no bloquea este.
 
-### REQ-271 · Alimentos privados desde la etiqueta
+### REQ-274 · Alimentos privados desde la etiqueta
 
 **Referencia:** MFP ofrece alimentos propios aun en Free; su ayuda propone crearlos cuando falta el producto o su porción. Evolv solo guarda comidas favoritas totales y consulta `DB.ingredients`, sin una ficha privada de producto reutilizable por gramos/porción.
 
@@ -107,7 +107,7 @@ Implementar «Solo conozco las calorías» como modo explícito: kcal válida, m
 
 **Casos:** yogur por 125 g, bebida por 100 ml, alimento por una unidad sin peso conocido (no convertir a gramos), variantes de marca, edición tras registrar, otro dispositivo, offline, conflicto y cuenta A→B. No sobrescribir globalmente ingredientes ni afirmar que una marca es segura para alergias. El alta se puede completar manualmente sin OCR/proveedor.
 
-### REQ-272 · Recetas propias con rendimiento y porciones
+### REQ-275 · Recetas propias con rendimiento y porciones
 
 **Referencia:** MFP suma ingredientes y divide entre porciones, con rendimiento indicado por el usuario. En Evolv existen recetas curadas, no una biblioteca privada de recetas de cocina con rendimiento editable.
 
@@ -115,7 +115,7 @@ Implementar «Solo conozco las calorías» como modo explícito: kcal válida, m
 
 **Casos:** receta de cuatro porciones registrar 1/4, pesar resultado y registrar 150 g, cambiar rendimiento tras cocinar sin reescribir consumos pasados, editar ingrediente, eliminar receta con historia, ausencia de datos y sincronización. Un cambio futuro crea nueva versión; la receta no entra automáticamente al solver público ni se comparte con otras cuentas.
 
-### REQ-273 · Código de producto y escaneo progresivo
+### REQ-276 · Código de producto y escaneo progresivo
 
 **Referencia:** MFP usa Barcode Scanner para identificar un producto, pero documenta faltantes y emparejamientos erróneos; exige confirmar cantidad. No se necesita contratar un catálogo externo para empezar con productos propios.
 

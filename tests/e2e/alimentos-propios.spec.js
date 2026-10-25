@@ -1,4 +1,4 @@
-// REQ-271: alimentos privados creados desde la etiqueta (por 100 g, 100 ml o por
+// REQ-274: alimentos privados creados desde la etiqueta (por 100 g, 100 ml o por
 // porción declarada), buscables en el mismo buscador, editables sin cambiar lo ya
 // registrado y fusionados con lo creado en otro dispositivo.
 import { test, expect } from "@playwright/test";

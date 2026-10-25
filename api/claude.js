@@ -29,7 +29,7 @@ const STRUCTURED_OUTPUT_ACTIONS = new Set(["diet_day", "diet_week", "meal_option
 // el cliente la reduce a ~1024 px, asi que 3 MB de base64 es holgado y deja la
 // peticion bajo el limite de cuerpo de Vercel (4.5 MB).
 const IMAGE_ACTIONS = new Set(["meal_estimate"]);
-// REQ-265: acciones cuyo resultado describe algo concreto del usuario; sin
+// REQ-268: acciones cuyo resultado describe algo concreto del usuario; sin
 // generacion compatible se informa el fallo en vez de servir una plantilla.
 const NO_TEMPLATE_ACTIONS = new Set(["meal_estimate"]);
 const IMAGE_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -629,7 +629,7 @@ function validateCoachOutput(action, text, validation) {
   if (action === "diet_day" || action === "diet_week") return validateDietDay(data, validation);
   if (action === "meal_option") return validateMealOptions(data, validation);
   if (action === "meal_estimate") {
-    // REQ-265: macros finitos y no negativos; un negativo no es una estimacion.
+    // REQ-268: macros finitos y no negativos; un negativo no es una estimacion.
     if (![data.kcal, data.proteina_g, data.carbohidratos_g, data.grasa_g].every(v => finiteNumber(v) && Number(v) >= 0)) return false;
     if (data.preguntas == null) return true;
     // REQ-246: el schema no puede topar las preguntas y el cliente muestra como
@@ -928,7 +928,7 @@ export default async function handler(req, res) {
     }
 
     if (reservation.mode === "reuse") {
-      // REQ-265: una estimacion de comida solo se reutiliza si salio de una
+      // REQ-268: una estimacion de comida solo se reutiliza si salio de una
       // generacion real del mismo contexto; una plantilla generica nunca vale.
       const templateAllowed = !NO_TEMPLATE_ACTIONS.has(quota.action);
       if (templateAllowed && !validateCoachOutput(quota.action, quota.fallbackText, quota.validation)) {

@@ -56,7 +56,7 @@ test.describe("Comidas guardadas", () => {
       })
       .toEqual([{
         name: "Bowl de yogur con avena", kcal: 420, p: 30, c: 50, f: 10,
-        // REQ-267: la favorita conserva su snapshot: viene de una reciente sin origen guardado, una porción.
+        // REQ-270: la favorita conserva su snapshot: viene de una reciente sin origen guardado, una porción.
         nutritionMeta: { v: 1, source: "legacy", ref: { kind: "recent", name: "Bowl de yogur con avena" }, base: { kcal: 420, p: 30, c: 50, f: 10, unit: "portion" }, qty: 1 },
       }]);
 
@@ -127,7 +127,7 @@ test.describe("Comidas guardadas", () => {
     await overlay.locator("#qpGrams0").fill("60");
     await overlay.getByRole("button", { name: "Añadir" }).first().click();
     await expect(overlay.locator("#f_name")).toHaveValue("Avena 60 g");
-    await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(389 * 0.6)); // REQ-266: una décima, con coma
+    await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(389 * 0.6)); // REQ-269: una décima, con coma
     await expect(overlay.locator("#f_p")).toHaveValue(tenth(16.9 * 0.6));
 
     await overlay.locator("#qpSearch").fill("platano"); // sin tilde también encuentra "Plátano"

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Pruebas puras de js/meal-log.js — REQ-266..273.
+// Pruebas puras de js/meal-log.js — REQ-269..276.
 import assert from "node:assert/strict";
 import "../js/meal-log.js";
 import "../sync-conflicts.js";
@@ -7,7 +7,7 @@ import "../sync-conflicts.js";
 const g = globalThis;
 assert.ok(g.FITBUD_MEAL_LOG, "Namespace FITBUD_MEAL_LOG debe existir");
 
-// ── REQ-266: parseo numérico ──────────────────────────────────────────────────
+// ── REQ-269: parseo numérico ──────────────────────────────────────────────────
 const p = g.parseNutrientInput;
 assert.deepEqual(p("12,5"), { ok: true, empty: false, value: 12.5 }, "coma decimal");
 assert.deepEqual(p("12.5"), { ok: true, empty: false, value: 12.5 }, "punto decimal");
@@ -26,9 +26,9 @@ assert.equal(p(NaN).ok, false, "NaN programático");
 assert.equal(p("1.234,5").ok, false, "dos separadores es ambiguo");
 assert.equal(p(",5").value, 0.5, "decimal sin entero");
 assert.equal(p(42).value, 42, "número programático");
-console.log("  REQ-266: parseo con coma/punto, vacío ≠ 0, sin negativos ni infinitos");
+console.log("  REQ-269: parseo con coma/punto, vacío ≠ 0, sin negativos ni infinitos");
 
-// ── REQ-266: validación de una comida ────────────────────────────────────────
+// ── REQ-269: validación de una comida ────────────────────────────────────────
 const v = g.validateMealValues;
 let r = v({ name: "Yogur", kcal: "-100", p: "-10", c: "5", f: "1" });
 assert.equal(r.ok, false);
@@ -58,9 +58,9 @@ r = v({ name: "Torta", kcal: "abc", p: "1", c: "1", f: "1" });
 assert.ok(/número/.test(r.errors.kcal));
 // No exige 4/4/9: 100 kcal con 0/0/0 se acepta (bebidas con alcohol, fibra, etc.).
 assert.equal(v({ name: "Vino", kcal: "100", p: "0", c: "0", f: "0" }).ok, true);
-console.log("  REQ-266: validación completa / solo calorías, ceros explícitos y límites");
+console.log("  REQ-269: validación completa / solo calorías, ceros explícitos y límites");
 
-// ── REQ-267: origen y snapshot ────────────────────────────────────────────────
+// ── REQ-270: origen y snapshot ────────────────────────────────────────────────
 const n = g.normalizeNutritionMeta;
 assert.equal(n(null), null);
 assert.equal(n({ source: "magia" }), null, "origen desconocido se descarta");
@@ -86,9 +86,9 @@ const sc = g.FITBUD_SYNC_CONFLICTS;
 const entry = { _syncId: "x1", name: "Avena", kcal: 400, p: 16, c: 60, f: 10, done: true, nutritionMeta: n(fav) };
 const merged = sc.mergeDayLogStates({ meals: {}, extras: [] }, { meals: {}, extras: [entry] }, { meals: {}, extras: [], workoutDone: true });
 assert.deepEqual(merged.merged.extras[0].nutritionMeta, n(fav), "merge offline conserva nutritionMeta");
-console.log("  REQ-267: contrato nutritionMeta, legacy en lectura, corrección con base y merge offline");
+console.log("  REQ-270: contrato nutritionMeta, legacy en lectura, corrección con base y merge offline");
 
-// ── REQ-268: composición ─────────────────────────────────────────────────────
+// ── REQ-271: composición ─────────────────────────────────────────────────────
 const avena = { kcal: 389, p: 16.9, c: 66, f: 6.9 };
 const lines = g.normalizeComponents([
   { name: "Avena", unit: "100g", amount: 33.5, base: avena, ref: { kind: "ingredient", id: "7" } },
@@ -108,9 +108,9 @@ assert.deepEqual(g.componentValues(portion), { kcal: 180, p: 10, c: 20, f: 4 });
 assert.equal(g.componentAmountLabel(portion), "2 porciones");
 assert.equal(g.normalizeComponent({ name: "X", unit: "100g", amount: 2500, base: avena }), null, "más de 2000 g se rechaza");
 assert.equal(g.normalizeComponents(Array.from({ length: 40 }, () => lines[0])).length, 30, "máximo 30 líneas");
-console.log("  REQ-268: líneas con base propia, precisión completa y límites");
+console.log("  REQ-271: líneas con base propia, precisión completa y límites");
 
-// ── REQ-270: copia ────────────────────────────────────────────────────────────
+// ── REQ-273: copia ────────────────────────────────────────────────────────────
 const src = { name: "Café", kcal: 120, p: 6, c: 10, f: 6, done: true, skipped: false, oid: 3, _syncId: "s1", subst: { prev: {} }, portion: 2,
   components: [{ name: "Leche", unit: "100ml", amount: 200, base: { kcal: 60, p: 3, c: 5, f: 3 } }], nutritionMeta: { source: "manual" } };
 const copy = g.copyEntrySnapshot(src, { date: "2026-10-24", key: "extra:0" });
@@ -119,9 +119,9 @@ copy.components[0].amount = 999;
 assert.equal(src.components[0].amount, 200, "editar la copia no toca el origen");
 assert.equal(g.copyEntrySnapshot({ name: "", kcal: 1 }), null);
 assert.equal(g.copyEntrySnapshot({ name: "X", kcal: -1, p: 0, c: 0, f: 0 }), null);
-console.log("  REQ-270: copia con identidad nueva, procedencia y sin estado del origen");
+console.log("  REQ-273: copia con identidad nueva, procedencia y sin estado del origen");
 
-// ── REQ-271: alimentos propios ────────────────────────────────────────────────
+// ── REQ-274: alimentos propios ────────────────────────────────────────────────
 const vf = g.validateCustomFoodInput;
 let fr = vf({ name: "Yogur", brand: "Gloria", unit: "100g", kcal: "59", p: "10", c: "3,6", f: "0,4", portionLabel: "1 pote", portionAmount: "125" });
 assert.deepEqual(fr.value, { name: "Yogur", unit: "100g", base: { kcal: 59, p: 10, c: 3.6, f: 0.4 }, brand: "Gloria", portion: { label: "1 pote", amount: 125 } });
@@ -142,9 +142,9 @@ merged2 = g.mergeCustomFoods([fA, fB], [fB], ["faaaa1"]);
 assert.deepEqual(merged2.map((f) => f.id), ["fbbbb1"], "un borrado no resucita");
 assert.equal(g.normalizedCustomFoods(Array.from({ length: 120 }, (_, i) => ({ ...fA, id: "f" + String(i).padStart(5, "0") }))).length, 100, "máximo 100 alimentos");
 assert.equal(g.normalizeCustomFood({ ...fA, id: "a b" }), null, "id inválido");
-console.log("  REQ-271: validación de etiqueta, porción sin peso, límites y fusión entre dispositivos");
+console.log("  REQ-274: validación de etiqueta, porción sin peso, límites y fusión entre dispositivos");
 
-// ── REQ-272: recetas ──────────────────────────────────────────────────────────
+// ── REQ-275: recetas ──────────────────────────────────────────────────────────
 const arroz = { name: "Arroz", unit: "100g", amount: 400, base: { kcal: 130, p: 2.7, c: 28, f: 0.3 }, ref: { kind: "ingredient", id: "6" } };
 const pollo = { name: "Pollo", unit: "100g", amount: 600, base: { kcal: 165, p: 31, c: 0, f: 3.6 }, ref: { kind: "ingredient", id: "1" } };
 let rv = g.validateRecipeInput({ name: "Arroz con pollo", lines: [arroz, pollo], servings: "4", weight: "1200", steps: "Cocer." });
@@ -163,9 +163,9 @@ assert.equal(g.recipeBase({ ...recipe, yield: { servings: 4 } }, "100g"), null, 
 const r2 = { ...recipe, version: 2, yield: { servings: 2 } };
 assert.deepEqual(g.mergeCustomRecipes([recipe], [r2], []).map((r) => r.version), [2]);
 assert.deepEqual(g.mergeCustomRecipes([recipe], [], ["rtest01"]), []);
-console.log("  REQ-272: validación, rendimiento por porción/peso final y fusión");
+console.log("  REQ-275: validación, rendimiento por porción/peso final y fusión");
 
-// ── REQ-273: GTIN ─────────────────────────────────────────────────────────────
+// ── REQ-276: GTIN ─────────────────────────────────────────────────────────────
 assert.deepEqual(g.parseGtin("4006381333931"), { ok: true, value: "4006381333931" }, "EAN-13 válido");
 assert.equal(g.parseGtin("036000291452").ok, true, "UPC-A (GTIN-12)");
 assert.equal(g.parseGtin("96385074").ok, true, "EAN-8");
@@ -181,6 +181,6 @@ assert.ok(!g.sameGtin("", ""), "vacío nunca coincide");
 assert.equal(vf({ name: "Y", unit: "100g", kcal: "1", p: "1", c: "1", f: "1", gtin: "4006381333931" }).value.gtin, "4006381333931");
 assert.ok(vf({ name: "Y", unit: "100g", kcal: "1", p: "1", c: "1", f: "1", gtin: "4006381333932" }).errors.gtin);
 assert.equal(g.normalizeCustomFood({ ...fA, gtin: "bad" }).gtin, undefined, "un código inválido no se guarda");
-console.log("  REQ-273: GTIN-8/12/13/14, dígito de control, ceros y presentaciones");
+console.log("  REQ-276: GTIN-8/12/13/14, dígito de control, ceros y presentaciones");
 
 console.log("test-meal-log: OK");

@@ -1,4 +1,4 @@
-// REQ-268: una comida se compone de líneas reales (alimento + gramos decimales)
+// REQ-271: una comida se compone de líneas reales (alimento + gramos decimales)
 // que se pueden editar o quitar; los totales salen de las líneas y la lista de
 // compra usa esas cantidades. Registrar no toca el catálogo global.
 import { test, expect } from "@playwright/test";
