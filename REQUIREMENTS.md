@@ -2010,3 +2010,9 @@ Que el modal de resolución de conflictos ofrezca "Combinar seguro" cuando exist
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 `api/notify.js` recorta `VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` y responde `push: {ready, issue}` (sin valores). ✓ `scripts/validate-notify-push-ready.mjs`.
+
+## REQ-282 - Recordatorios: avisar a quien todavía no empezó el día
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Sin el día en `day_log`, o sin nada registrado, `checkPending()` cuenta comidas pendientes y el correo dice "Tu plan de hoy te espera"; el entreno no se avisa sin el día. ✓ `scripts/validate-notify-schedule.mjs`.

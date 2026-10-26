@@ -11457,3 +11457,30 @@ Jonathan (2026-10-26), tras cargar las variables VAPID en Vercel y redesplegar: 
 ### Criterios de aceptación
 
 - Sin clave privada, sin subject o con clave inválida, `push.ready` es `false` con el motivo, y el motivo no contiene la clave. Con espacios o saltos de línea pegados, `push.ready` es `true`. ✓ `scripts/validate-notify-push-ready.mjs`, en el release gate.
+
+## REQ-282 - Recordatorios: avisar a quien todavía no empezó el día
+
+**Estado: implementado.**
+
+### Origen
+
+Primer envío real (2026-10-25, 20:00 Lima): el job corrió con el usuario de correo activo (`processed: 1`) pero envió 0. Ninguno de los dos usuarios con avisos tenía fila en `day_log` ese día: no habían abierto ni preparado el día.
+
+### Problema
+
+`checkPending()` (`api/notify.js`) devolvía "nada pendiente" cuando no existía el día. Quien no abrió la app, que es quien más necesita el recordatorio, nunca lo recibía. Tampoco quien abrió el día sin prepararlo (sin comidas en el estado).
+
+### Alcance
+
+1. Sin fila en `day_log`, o con fila sin comidas, extras, actividades manuales ni entreno hecho (`notStarted`), cuenta como comidas pendientes.
+2. El correo de ese caso usa el asunto "Tu plan de hoy te espera" y el texto "Aún no has empezado tu plan de hoy". Reutiliza el tipo `nutrition` de `notification_log` (la restricción `CHECK` solo admite `nutrition`, `training` y `push_streak`): un aviso por día, sin migración.
+3. El push de racha también sale en ese caso, porque usa `checkPending()`.
+4. El recordatorio de entreno no sale sin el día: sin el estado no se sabe si toca descanso (REQ-265).
+
+### Fuera de alcance
+
+- Saber si toca entrenar un día que nunca se abrió (requeriría guardar el calendario del plan en el servidor).
+
+### Criterios de aceptación
+
+- Sin el día, o con el día sin nada registrado, y aviso de comidas activo: sale "Tu plan de hoy te espera". Con solo el aviso de entreno: no sale nada. Con algo registrado (comidas hechas, un extra): no sale el aviso de no empezado. ✓ `scripts/validate-notify-schedule.mjs` (falla con el código anterior).
