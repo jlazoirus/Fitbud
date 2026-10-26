@@ -29,8 +29,9 @@ Todas en la zona horaria del usuario (`notification_preferences.timezone`).
 |---|---|---|
 | `lastActive` | Último día con algo registrado (comida o extra marcada, entreno con series, sesión cerrada o actividad manual) | `day_log` de los últimos 60 días (servidor) |
 | `gap` | Días entre hoy y `lastActive`; sin ningún registro, desde el inicio del plan | Calculado |
-| `streak`, `streakThrough` | Racha combinada viva y último día que cuenta | `profiles.prefs.engagement`, que la app escribe al cambiar (REQ-283) |
-| `bestStreak`, `activeDays`, `workouts`, semana del plan | Progreso del ciclo para los mensajes de regreso | `profiles.prefs.engagement` (o conteo en `day_log` si falta) |
+| `streak`, `streakThrough`, `rescueDate`/`rescueStreak` | Racha combinada viva, último día que cuenta y racha que se recupera si se completa ayer | `notification_preferences.engagement`, que la app escribe al cambiar (columna propia: no reescribe `profiles.prefs`) |
+| `bestStreak`, `activeDays`, `workouts` | Progreso del ciclo para los mensajes de regreso | `notification_preferences.engagement` (o conteo en `day_log` si falta) |
+| Objetivo, semana del plan | Mensajes de regreso | `profiles.prefs` (`goal`, `planStartDate`, `planDurationWeeks`); semana = días desde el inicio / 7 + 1 |
 | Pendiente de hoy | Comidas sin marcar / entreno sin cerrar (no en descanso) | Fila de hoy en `day_log` |
 
 ## Etapas
@@ -85,5 +86,6 @@ En Perfil → Recordatorios y Avisos del dispositivo, el texto explica lo que ll
 
 ## Operación
 
-- Migración manual `supabase/notifications_journey.sql`: amplía el `CHECK` de `notification_log.notification_type` con `comeback`, `push_comeback` y `push_last_call`. Mientras no se aplique, esas etapas no se envían (el envío exige registrar antes el intento) y el aviso del día sigue funcionando como hoy.
+- Migración manual `supabase/notifications_journey.sql`: agrega `notification_preferences.engagement` y amplía el `CHECK` de `notification_log.notification_type` con `comeback`, `push_comeback` y `push_last_call`. Mientras no se aplique, esas etapas no se envían (el envío exige registrar antes el intento) y el aviso del día sale sin racha ni rescate.
+- Cada envío lee y registra su intento antes de enviar; si no puede (registro caído o tipo rechazado), no envía: sin registro, el disparo de la hora siguiente lo repetiría.
 - Las variables y el disparo horario son los de REQ-24/38/266/267.

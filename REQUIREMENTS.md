@@ -2021,28 +2021,6 @@ Jonathan (2026-10-26). `returnCardHtml()` en Hoy, bajo la tarjeta de reinicio de
 
 ## REQ-283 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
-**Estado: pendiente.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+**Estado: implementado — requiere acción humana:** aplicar `supabase/notifications_journey.sql` en Supabase (columna `notification_preferences.engagement` y tipos nuevos de `notification_log`).
 
-### Origen
-Jonathan (2026-10-26): recordatorios para usuarios del día, para quien dejó unos días y para quien dejó semanas.
-
-### Problema
-`api/notify.js` solo mira la fila de hoy: quien no abrió la app no recibe nada aunque su racha esté en riesgo; quien se fue con la semana preparada recibe el mismo correo cada día; nadie recibe progreso u objetivo; los enlaces `?date=` no se leen.
-
-### Objetivo
-Un journey con una decisión pura por usuario y día: día en juego, rescate de ayer, última llamada (push) y regreso a los 2/5/7/14/30 días, con silencio después.
-
-### Alcance
-`planReminder()` puro en `api/notify.js`; actividad desde `day_log` (60 días); racha y progreso desde `profiles.prefs.engagement`, escrito por la app; un correo diario; idempotencia por ausencia; no enviar sin registrar el intento; migración del `CHECK`; `?date=`/`r=` y `reminder_opened`; copy de Perfil.
-
-### Fuera de alcance
-WhatsApp (REQ-255), nuevas horas o preferencias por etapa.
-
-### Riesgos
-Spam por reintentos; datos sensibles en pantalla bloqueada; romper el aviso actual antes de la migración.
-
-### Criterios de aceptación
-Cada etapa sale una vez en su ventana; tras 45 días no sale nada; sin migración el aviso del día sigue; ningún mensaje lleva peso ni objetivo en push/asunto.
-
-### Verificación sugerida
-Validador Node con matriz de ausencias, zonas, idempotencia y fallo de registro; E2E de `?date=` y del snapshot.
+Jonathan (2026-10-26). `planReminder()` (puro, `api/notify.js`) decide una etapa por usuario y día: día en juego (también sin abrir la app hoy), rescate de ayer, última llamada por push (racha 3+, 21-22 h) y regreso a los 2/5/7/14/30 días, una vez por ausencia; después, silencio. Un correo diario; envío solo tras registrar el intento. La app guarda el resumen de racha en `engagement`, abre `?date=` y registra `reminder_opened`. Diseño: `docs/reminders-journey.md`; detalle en `docs/requirements-history.md`. ✓ `scripts/validate-reminder-journey.mjs`, `scripts/validate-notify-schedule.mjs`, `tests/e2e/recordatorios.spec.js`.

@@ -11507,3 +11507,40 @@ E2E: ayer vacío con racha previa → rescate; 4 días fuera → bienvenida con 
 - El descarte vive en `localStorage` (`evolv_return_card_v1:<uid>`) con la clave de la ausencia (`rescue:<ayer>` / `welcome:<último día activo>`): una ausencia nueva vuelve a mostrarla. Acciones registradas con `home_agenda_action` (`return_rescue`, `return_restart`, `return_start`), sin datos personales.
 - Sin kicker sobre el título (skill de diseño); llama SVG en contorno, la misma de la píldora de REQ-281.
 - Verificación: `tests/e2e/regreso.spec.js` (rescate y recuperación con la píldora, descarte persistente tras recargar, bienvenida con progreso/objetivo que se oculta al registrar, sin registros, racha viva sin tarjeta) y capturas 390/1280 px.
+
+## REQ-283 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
+
+**Estado: implementado — requiere acción humana:** aplicar `supabase/notifications_journey.sql`. Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): recordatorios para usuarios del día, para quien dejó unos días y para quien dejó semanas.
+
+### Problema
+`api/notify.js` solo mira la fila de hoy: quien no abrió la app no recibe nada aunque su racha esté en riesgo; quien se fue con la semana preparada recibe el mismo correo cada día; nadie recibe progreso u objetivo; los enlaces `?date=` no se leen.
+
+### Objetivo
+Un journey con una decisión pura por usuario y día: día en juego, rescate de ayer, última llamada (push) y regreso a los 2/5/7/14/30 días, con silencio después.
+
+### Alcance
+`planReminder()` puro en `api/notify.js`; actividad desde `day_log` (60 días); racha y progreso desde `profiles.prefs.engagement`, escrito por la app; un correo diario; idempotencia por ausencia; no enviar sin registrar el intento; migración del `CHECK`; `?date=`/`r=` y `reminder_opened`; copy de Perfil.
+
+### Fuera de alcance
+WhatsApp (REQ-255), nuevas horas o preferencias por etapa.
+
+### Riesgos
+Spam por reintentos; datos sensibles en pantalla bloqueada; romper el aviso actual antes de la migración.
+
+### Criterios de aceptación
+Cada etapa sale una vez en su ventana; tras 45 días no sale nada; sin migración el aviso del día sigue; ningún mensaje lleva peso ni objetivo en push/asunto.
+
+### Verificación sugerida
+Validador Node con matriz de ausencias, zonas, idempotencia y fallo de registro; E2E de `?date=` y del snapshot.
+
+### Implementación
+- `api/notify.js`: un solo recorrido por usuario con correo o push activo (`notification_preferences?or=(email_opt_in,push_opt_in)&select=*`). Tras la hora y el día habilitado, `loadUserContext()` lee perfil (activo, `goal`, `planStartDate`, `planEndDate`, `planDurationWeeks`) y `day_log` de 60 días con solo los campos de estado necesarios.
+- `planReminder(ctx)` (puro, exportado): `dayHasActivity()` (mismo criterio que `dayActive()`), `gap` desde el último día activo o el inicio del plan. Rescate si `engagement.rescueDate` es ayer o la racha llega a anteayer (2+ días). `gap` ≤ 1: aviso del día salvo racha de hoy asegurada; sin fila de hoy = "registrar tu día"; respeta `notify_nutrition/notify_training` y REQ-265; `lastCall` a `max(21, hora+2)` si ≤ 22 y racha 3+. `gap` 2-3/5-6/7-13/14-29/30-45 → `comeback_*` con `ref` = último día activo; después, nada. Plan terminado: sin aviso del día y regreso sin semanas. Nunca registró: variantes de activación.
+- `reminderMessage()`: textos por etapa; push y asunto sin objetivo ni datos corporales; el correo nombra el objetivo en el cuerpo. Enlaces `/?date=…&r=<etapa>` o `/?r=<etapa>`. Correo con colores de marca.
+- `deliver()`: lee la clave idempotente (y la clave hermana del aviso diario, para no duplicar el día del despliegue); si no puede leer o registrar el intento, no envía (falla cerrado). Tipos: aviso del día/rescate con `nutrition`/`training` y `push_streak` (de REQ-24/38, sin migración); `comeback`, `push_comeback`, `push_last_call` (con migración). Última llamada solo si el aviso del día ya salió en un disparo anterior. Push solo con suscripciones.
+- App: `engagementSnapshot()` (racha, `streakThrough`, rescate de ayer, mejor racha, días registrados, entrenos) se guarda en `notification_preferences.engagement` (columna propia, no reescribe `profiles.prefs`) 3 s después de cada registro y al iniciar, solo si cambió; sin la columna deja de intentar. `openReminderLink()` abre `?date=` (día del plan) y registra `reminder_opened` con `step`. Perfil explica el journey. `api/analytics.js` permite `reminder_opened`.
+- Migración `supabase/notifications_journey.sql` (idempotente, con rollback): columna `engagement` y `CHECK` ampliado. No aplicada en producción.
+- Verificación: `scripts/validate-reminder-journey.mjs` (actividad, día en juego, rescate, última llamada, matriz de ausencias 2-59, activación, plan terminado, privacidad de 13 variantes, handler con push, falla cerrado y registro ilegible), `scripts/validate-notify-schedule.mjs` (REQ-265/266 sobre el journey) y `tests/e2e/recordatorios.spec.js` (resumen guardado en su columna, enlace del aviso).
