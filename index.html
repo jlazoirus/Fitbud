@@ -7723,9 +7723,8 @@ function renderProfile(){
     <div id="pfMealCountNote">${twoMealNoticeHtml(p.mealCount)}</div>
     <label class="muted small">Horarios aproximados</label>
     <div id="pfMealTimes">${mealTimesHtml("pf",p)}</div>
-    ${cookingLevelFieldHtml("pf",p.cookingLevel)}
     <div class="onboarding-grid">
-      <div class="field"><label for="pf_cooking">Minutos para cocinar</label><input id="pf_cooking" type="number" inputmode="numeric" min="5" max="180" step="5" value="${p.cookingMinutes}"></div>
+      ${cookingLevelFieldHtml("pf",p.cookingLevel,{compact:true})}
       <div class="field"><label for="pf_budget">Presupuesto</label><select id="pf_budget">
         ${Object.entries(FOOD_BUDGET_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.foodBudget,v)}>${l}</option>`).join("")}
       </select></div>
@@ -7733,6 +7732,7 @@ function renderProfile(){
     <details class="adv-settings">
       <summary>Configuración avanzada</summary>
       <div class="onboarding-grid">
+        <div class="field"><label for="pf_cooking">Minutos para cocinar</label><input id="pf_cooking" type="number" inputmode="numeric" min="5" max="180" step="5" value="${p.cookingMinutes}"></div>
         <div class="field"><label for="pf_window_start">Inicio de ventana</label><input id="pf_window_start" type="time" value="${p.eatingWindowStart}"></div>
         <div class="field"><label for="pf_window_end">Fin de ventana</label><input id="pf_window_end" type="time" value="${p.eatingWindowEnd}"></div>
         <div class="field"><label for="pf_repeat">Repetición aceptable</label><select id="pf_repeat">
@@ -7956,11 +7956,11 @@ function twoMealNoticeHtml(count){
   return `<div class="alert meal-count-note" role="note"><b>Con 2 comidas al día es difícil cuadrar exacto tus metas.</b> Sobre todo si buscas mucha proteína o comes vegano o vegetariano sin tofu. Te propondremos lo más cercano posible; con 3 o más comidas el plan cuadra mejor.</div>`;
 }
 // REQ-254: "¿Cuánto cocinas?" — decide qué platos puede proponer el plan (COOKING_LEVEL_LABELS en js/nutrition-pure.js).
-function cookingLevelFieldHtml(prefix,value){
+function cookingLevelFieldHtml(prefix,value,opts){
   const v=COOKING_LEVEL_LABELS[value]?value:"basic";
   return `<div class="field"><label for="${prefix}_cooking_level">¿Cuánto cocinas?</label><select id="${prefix}_cooking_level">
-    ${Object.entries(COOKING_LEVEL_LABELS).map(([k,l])=>`<option value="${k}" ${k===v?"selected":""}>${l}</option>`).join("")}
-  </select><div class="field-note">Con «No cocino» solo te proponemos platos para armar o calentar.</div></div>`;
+    ${Object.entries(COOKING_LEVEL_LABELS).map(([k,l])=>`<option value="${k}" ${k===v?"selected":""}>${opts&&opts.compact?l.replace(/ \(.*\)$/,""):l}</option>`).join("")}
+  </select>${opts&&opts.compact?"":`<div class="field-note">Con «No cocino» solo te proponemos platos para armar o calentar.</div>`}</div>`;
 }
 function cookingLevelPromptLine(level){
   if(level==="none")return "Nivel de cocina: NO cocina. Propón solo comidas para armar o calentar (pollo rostizado, atún o legumbres en lata, arroz o quinua listos, wraps, sándwiches, ensaladas, microondas); nada de guisos, salsas caseras, masas ni frituras. ";
