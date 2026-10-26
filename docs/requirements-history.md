@@ -11510,7 +11510,7 @@ E2E: ayer vacío con racha previa → rescate; 4 días fuera → bienvenida con 
 
 ## REQ-283 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
-**Estado: implementado — requiere acción humana:** aplicar `supabase/notifications_journey.sql`. Prioridad P1. Diseño: `docs/reminders-journey.md`.
+**Estado: implementado.** Migración aplicada en Supabase el 2026-10-26. Prioridad P1. Diseño: `docs/reminders-journey.md`.
 
 ### Origen
 Jonathan (2026-10-26): recordatorios para usuarios del día, para quien dejó unos días y para quien dejó semanas.
@@ -11542,5 +11542,5 @@ Validador Node con matriz de ausencias, zonas, idempotencia y fallo de registro;
 - `reminderMessage()`: textos por etapa; push y asunto sin objetivo ni datos corporales; el correo nombra el objetivo en el cuerpo. Enlaces `/?date=…&r=<etapa>` o `/?r=<etapa>`. Correo con colores de marca.
 - `deliver()`: lee la clave idempotente (y la clave hermana del aviso diario, para no duplicar el día del despliegue); si no puede leer o registrar el intento, no envía (falla cerrado). Tipos: aviso del día/rescate con `nutrition`/`training` y `push_streak` (de REQ-24/38, sin migración); `comeback`, `push_comeback`, `push_last_call` (con migración). Última llamada solo si el aviso del día ya salió en un disparo anterior. Push solo con suscripciones.
 - App: `engagementSnapshot()` (racha, `streakThrough`, rescate de ayer, mejor racha, días registrados, entrenos) se guarda en `notification_preferences.engagement` (columna propia, no reescribe `profiles.prefs`) 3 s después de cada registro y al iniciar, solo si cambió; sin la columna deja de intentar. `openReminderLink()` abre `?date=` (día del plan) y registra `reminder_opened` con `step`. Perfil explica el journey. `api/analytics.js` permite `reminder_opened`.
-- Migración `supabase/notifications_journey.sql` (idempotente, con rollback): columna `engagement` y `CHECK` ampliado. No aplicada en producción.
+- Migración `supabase/notifications_journey.sql` (idempotente, con rollback): columna `engagement` y `CHECK` ampliado. Aplicada en producción el 2026-10-26 a pedido de Jonathan, vía la API de gestión de Supabase; verificado después: `CHECK` con los 6 tipos, `engagement jsonb` nulo, RLS y `notif_prefs_self` intactos.
 - Verificación: `scripts/validate-reminder-journey.mjs` (actividad, día en juego, rescate, última llamada, matriz de ausencias 2-59, activación, plan terminado, privacidad de 13 variantes, handler con push, falla cerrado y registro ilegible), `scripts/validate-notify-schedule.mjs` (REQ-265/266 sobre el journey) y `tests/e2e/recordatorios.spec.js` (resumen guardado en su columna, enlace del aviso).

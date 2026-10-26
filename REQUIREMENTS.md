@@ -2021,6 +2021,6 @@ Jonathan (2026-10-26). `returnCardHtml()` en Hoy, bajo la tarjeta de reinicio de
 
 ## REQ-283 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
-**Estado: implementado — requiere acción humana:** aplicar `supabase/notifications_journey.sql` en Supabase (columna `notification_preferences.engagement` y tipos nuevos de `notification_log`).
+**Estado: implementado.** Migración `supabase/notifications_journey.sql` aplicada en Supabase el 2026-10-26 (columna `notification_preferences.engagement` y tipos nuevos de `notification_log`).
 
 Jonathan (2026-10-26). `planReminder()` (puro, `api/notify.js`) decide una etapa por usuario y día: día en juego (también sin abrir la app hoy), rescate de ayer, última llamada por push (racha 3+, 21-22 h) y regreso a los 2/5/7/14/30 días, una vez por ausencia; después, silencio. Un correo diario; envío solo tras registrar el intento. La app guarda el resumen de racha en `engagement`, abre `?date=` y registra `reminder_opened`. Diseño: `docs/reminders-journey.md`; detalle en `docs/requirements-history.md`. ✓ `scripts/validate-reminder-journey.mjs`, `scripts/validate-notify-schedule.mjs`, `tests/e2e/recordatorios.spec.js`.

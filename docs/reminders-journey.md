@@ -86,6 +86,6 @@ En Perfil → Recordatorios y Avisos del dispositivo, el texto explica lo que ll
 
 ## Operación
 
-- Migración manual `supabase/notifications_journey.sql`: agrega `notification_preferences.engagement` y amplía el `CHECK` de `notification_log.notification_type` con `comeback`, `push_comeback` y `push_last_call`. Mientras no se aplique, esas etapas no se envían (el envío exige registrar antes el intento) y el aviso del día sale sin racha ni rescate.
+- Migración `supabase/notifications_journey.sql` (aplicada en producción el 2026-10-26): agrega `notification_preferences.engagement` y amplía el `CHECK` de `notification_log.notification_type` con `comeback`, `push_comeback` y `push_last_call`. Mientras no se aplique, esas etapas no se envían (el envío exige registrar antes el intento) y el aviso del día sale sin racha ni rescate.
 - Cada envío lee y registra su intento antes de enviar; si no puede (registro caído o tipo rechazado), no envía: sin registro, el disparo de la hora siguiente lo repetiría.
 - Las variables y el disparo horario son los de REQ-24/38/266/267.
