@@ -507,9 +507,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-59`).
 
 ## REQ-60 - Corregir Site URL / Redirect URLs de Supabase (recuperar contrasena apunta a localhost)
 
-**Estado: pendiente. Requiere accion manual en el dashboard de Supabase; no implementable por el agente autonomo.**
-
-Corregir Site URL / Redirect URLs en el dashboard de Supabase para que recuperacion de contrasena no apunte a localhost. Accion manual externa; no agregar a `agent-loop.json`.
+**Estado: implementado (configuración externa).** Verificado el 2026-10-26 leyendo la configuración de Auth del proyecto `fitbud` (API de gestión de Supabase, solo lectura): Site URL `https://evolvapp.club`; Redirect URLs incluye `https://evolvapp.club/**`, `https://fitbud-green.vercel.app/**`, `https://fitbros.vercel.app/**` y `http://localhost:8923/**`. Sin cambios de código. Pendiente opcional: probar un reset real y revisar el enlace del correo.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-60`).
 
@@ -912,7 +910,7 @@ _Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Ca
 
 ## REQ-127 - Personalizar remitente y asunto de los correos de autenticacion de Supabase (branding Fitbud)
 
-**Estado: pendiente. Requiere accion manual en el dashboard de Supabase (y de un proveedor SMTP externo para el remitente); no implementable por el agente autonomo.**
+**Estado: implementado (configuración externa, con la marca Evolv).** Verificado el 2026-10-26 (API de gestión de Supabase, solo lectura): SMTP propio `smtp-relay.brevo.com`, remitente «Evolv» <hola@evolvapp.club>; asuntos «Tu cuenta de Evolv está lista», «Restablece tu contraseña de Evolv» y «Confirma tu correo en Evolv». Magic link y cambio de correo siguen en inglés, pero la app no usa esos flujos. Pendiente opcional: invitación/reset real para revisar la bandeja.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
 
