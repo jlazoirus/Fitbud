@@ -11436,3 +11436,39 @@ Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; 
 - Cliente: `aiEstimate()` y `photoEstimateRound()` envían `fallbackText` vacío; `validEstimate()` exige cuatro valores finitos no negativos y rechaza respuestas `origin:"template"`. Sin resultado válido, `estimateErrorMessage` dice que no se pudo estimar y que los valores no cambiaron; no se muestra «Aplicado» ni ✓.
 - Servidor: `NO_TEMPLATE_ACTIONS` (`meal_estimate`) descarta cualquier fallback, también el de un cliente antiguo; si `select_reusable_coach_part` no tiene una generación del mismo usuario y `contextKey`, responde 422 `no_compatible_result` y marca la parte fallida (devuelve la reserva). La respuesta reutilizada informa `origin`. `validateCoachOutput` rechaza macros negativos. Sin cambios SQL.
 - Verificación: `scripts/test-meal-estimate-no-template.mjs` (sin pool, cliente antiguo con plantilla, reutilización exacta, origen template) y `tests/e2e/estimacion.spec.js` (422, plantilla reutilizada, negativos, reutilización compatible, foto).
+
+## REQ-281 - Racha: animación al registrar algo que la hace avanzar
+
+**Estado: implementado.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): "cuando entras y haces algo se debe ver una animación de la actualización de racha".
+
+### Problema
+Marcar comidas o cerrar el entreno no da ninguna respuesta sobre la racha: cambia en silencio y solo los hitos 3/7/14/30 muestran un toast.
+
+### Objetivo
+Cada registro que acerca el día a la racha muestra cuánto falta; al cumplir el día, el número sube con una animación, también al recuperar ayer.
+
+### Alcance
+Píldora fija arriba, desde cualquier pestaña: avance del día (comidas necesarias + entreno), día sumado, primer día, hito y racha recuperada. Solo ante cambios locales que suman; con `prefers-reduced-motion`, fundido sin desplazamiento.
+
+### Fuera de alcance
+Cambiar la definición de racha (REQ-23) o los hitos guardados.
+
+### Riesgos
+Animar cambios remotos o programáticos; tapar controles; costo de calcular la racha en cada render.
+
+### Criterios de aceptación
+Marcar una comida muestra lo que falta; cumplir el día sube el número (N → N+1) y lo anuncia por `aria-live`; desmarcar no anima; tocar la píldora la cierra.
+
+### Verificación sugerida
+E2E con racha sembrada: comida → avance; descanso → día sumado; desmarcar sin animación; capturas móvil.
+
+### Implementación
+- `streakDayProgress(ds)`: piezas del día que cuentan para la racha (REQ-23): `ceil(comidas/2)` comidas con contenido marcadas + el entreno salvo descanso. `streakEndingAt(ds)` cuenta días cumplidos seguidos que terminan en `ds`; `streak()` la usa.
+- `_streakSeen` guarda las piezas de hoy y de ayer y la racha. `render()` llama `primeStreakSeen()` (solo recalcula la racha si cambió la firma), así que lo que llega de otro dispositivo o del arranque se absorbe sin animación. `commitDay()` llama `streakFeedbackAfterCommit(ds)` (en `try`, nunca bloquea el guardado) para hoy y ayer.
+- Casos: avance de hoy ("Faltan 1 comida y el entreno / para sumar el día N+1 de tu racha"), día sumado ("Día N sumado", "Día 1. Empezó tu racha.", hitos "7 días seguidos"), ayer a medias ("para recuperar tu racha de N días") y ayer completado ("Racha recuperada"). Desmarcar o un cambio sin avance no anima.
+- `#streakPop` es un contenedor permanente `role=status aria-live=polite`; la píldora es un botón que se cierra al tocarlo y se va sola (2,8 s avance, 3,6 s día, 4,4 s hito). Llama SVG con relleno recortado (`clipPath` escalado por `--sp-from/--sp-to`), número que sube con desenfoque breve y llama que se enciende. Con `prefers-reduced-motion`, solo fundidos.
+- `checkAndSaveMilestones()` no repite el toast del hito si la píldora ya lo está mostrando.
+- Verificación: `tests/e2e/racha-animacion.spec.js` (avance, día sumado con 3 → 4, cerrar al tocar, desmarcar sin animación, día 1 tras racha rota, racha recuperada) y capturas móvil con y sin movimiento reducido.

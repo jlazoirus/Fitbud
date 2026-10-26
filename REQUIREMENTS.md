@@ -2009,31 +2009,9 @@ Que el modal de resolución de conflictos ofrezca "Combinar seguro" cuando exist
 
 ## REQ-281 - Racha: animación al registrar algo que la hace avanzar
 
-**Estado: pendiente.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
 
-### Origen
-Jonathan (2026-10-26): "cuando entras y haces algo se debe ver una animación de la actualización de racha".
-
-### Problema
-Marcar comidas o cerrar el entreno no da ninguna respuesta sobre la racha: cambia en silencio y solo los hitos 3/7/14/30 muestran un toast.
-
-### Objetivo
-Cada registro que acerca el día a la racha muestra cuánto falta; al cumplir el día, el número sube con una animación, también al recuperar ayer.
-
-### Alcance
-Píldora fija arriba, desde cualquier pestaña: avance del día (comidas necesarias + entreno), día sumado, primer día, hito y racha recuperada. Solo ante cambios locales que suman; con `prefers-reduced-motion`, fundido sin desplazamiento.
-
-### Fuera de alcance
-Cambiar la definición de racha (REQ-23) o los hitos guardados.
-
-### Riesgos
-Animar cambios remotos o programáticos; tapar controles; costo de calcular la racha en cada render.
-
-### Criterios de aceptación
-Marcar una comida muestra lo que falta; cumplir el día sube el número (N → N+1) y lo anuncia por `aria-live`; desmarcar no anima; tocar la píldora la cierra.
-
-### Verificación sugerida
-E2E con racha sembrada: comida → avance; descanso → día sumado; desmarcar sin animación; capturas móvil.
+Jonathan (2026-10-26). `commitDay()` llama `streakFeedbackAfterCommit()`: si un registro local de hoy o ayer avanza las piezas del día (`streakDayProgress`: mitad de comidas + entreno salvo descanso), la píldora `#streakPop` (arriba, desde cualquier pestaña, `role=status`) dice lo que falta; al cumplir, la llama se llena y el número sube (N → N+1, día 1, hito 3/7/14/30, racha recuperada al completar ayer). `render()` actualiza el estado visto en silencio (remoto o desmarcar no anima). Fundido con `prefers-reduced-motion`. ✓ `tests/e2e/racha-animacion.spec.js`.
 
 ## REQ-282 - Hoy: tarjeta de regreso y rescate de ayer
 
