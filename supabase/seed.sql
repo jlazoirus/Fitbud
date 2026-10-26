@@ -213,7 +213,9 @@ insert into ingredients (name, category, kcal, protein_g, carbs_g, fat_g) values
 ('Maracuyá','Fruta',97,2.2,23,0.7),
 ('Lúcuma','Fruta',99,1.5,25,0.5),
 ('Camu camu','Fruta',60,0.5,14,0.4),
-('Papaya','Fruta',43,0.5,11,0.3);
+('Papaya','Fruta',43,0.5,11,0.3),
+-- REQ-254: ingrediente listo para platos sin cocinar (pollo rostizado comprado, sin piel).
+('Pollo rostizado sin piel','Proteína animal',165,27,0,6.5);
 
 -- ---------- PLATOS ----------
 insert into dishes (name, slot, menu) values
@@ -412,7 +414,27 @@ insert into dishes (name, slot, menu) values
 ('Snack sin gluten de pan multigrano con jamón serrano','snack',null),
 ('Cancha criolla con levadura nutricional','snack',null),
 ('Batido de leche de almendra y maracuyá','batido',null),
-('Batido de bebida de coco y papaya','batido',null);
+('Batido de bebida de coco y papaya','batido',null),
+-- REQ-254: almuerzos y cenas sin cocinar o de cocina básica (nivel en supabase/cooking_level.sql).
+('Pollo rostizado con arroz listo y ensalada','almuerzo',null),
+('Wrap de atún, palta y lechuga','almuerzo',null),
+('Wrap de pavo, queso fresco y tomate','almuerzo',null),
+('Bowl de lentejas listas, arroz y palta','almuerzo',null),
+('Bowl de garbanzos listos, quinua y hummus','almuerzo',null),
+('Sándwich de pollo rostizado y palta','almuerzo',null),
+('Wrap de seitán, hummus y espinaca','almuerzo',null),
+('Bowl de edamame, arroz listo y maní','almuerzo',null),
+('Burrito frío de frijoles y queso fresco','almuerzo',null),
+('Tortilla francesa con pan y ensalada','almuerzo',null),
+('Quesadilla de pollo rostizado y queso','almuerzo',null),
+('Tempeh a la sartén con arroz listo','almuerzo',null),
+('Ensalada exprés de atún, garbanzos y palta','cena',null),
+('Pollo rostizado con ensalada y palta','cena',null),
+('Bowl de lentejas listas con espinaca y semillas','cena',null),
+('Sándwich de pavo y cottage','cena',null),
+('Wrap de seitán y verduras listas','cena',null),
+('Tortilla de claras con espinaca y pan','cena',null),
+('Seitán con quinua lista y verduras','cena',null);
 
 -- ---------- RECETAS (dish_ingredients) ----------
 insert into dish_ingredients (dish_id, ingredient_id, grams)
@@ -610,7 +632,27 @@ from (values
   ('Snack sin gluten de pan multigrano con jamón serrano','Pan sin gluten multigrano',50),('Snack sin gluten de pan multigrano con jamón serrano','Jamón serrano',50),('Snack sin gluten de pan multigrano con jamón serrano','Tomate',30),
   ('Cancha criolla con levadura nutricional','Cancha serrana',60),('Cancha criolla con levadura nutricional','Levadura nutricional',10),
   ('Batido de leche de almendra y maracuyá','Leche de almendra sin azúcar',250),('Batido de leche de almendra y maracuyá','Maracuyá',60),('Batido de leche de almendra y maracuyá','Miel',10),('Batido de leche de almendra y maracuyá','Proteína en polvo',30),
-  ('Batido de bebida de coco y papaya','Bebida de coco sin azúcar',250),('Batido de bebida de coco y papaya','Papaya',150),('Batido de bebida de coco y papaya','Proteína en polvo',30)
+  ('Batido de bebida de coco y papaya','Bebida de coco sin azúcar',250),('Batido de bebida de coco y papaya','Papaya',150),('Batido de bebida de coco y papaya','Proteína en polvo',30),
+  -- REQ-254: platos sin cocinar / cocina básica
+  ('Pollo rostizado con arroz listo y ensalada','Pollo rostizado sin piel',180),('Pollo rostizado con arroz listo y ensalada','Arroz cocido',180),('Pollo rostizado con arroz listo y ensalada','Lechuga',80),('Pollo rostizado con arroz listo y ensalada','Tomate',80),('Pollo rostizado con arroz listo y ensalada','Aceite de oliva',6),
+  ('Wrap de atún, palta y lechuga','Wrap integral',80),('Wrap de atún, palta y lechuga','Atún en agua',150),('Wrap de atún, palta y lechuga','Palta',50),('Wrap de atún, palta y lechuga','Lechuga',50),
+  ('Wrap de pavo, queso fresco y tomate','Wrap integral',80),('Wrap de pavo, queso fresco y tomate','Pechuga de pavo',140),('Wrap de pavo, queso fresco y tomate','Queso fresco',50),('Wrap de pavo, queso fresco y tomate','Tomate',60),
+  ('Bowl de lentejas listas, arroz y palta','Lentejas cocidas',250),('Bowl de lentejas listas, arroz y palta','Arroz cocido',120),('Bowl de lentejas listas, arroz y palta','Palta',40),('Bowl de lentejas listas, arroz y palta','Tomate',80),
+  ('Bowl de garbanzos listos, quinua y hummus','Garbanzos cocidos',220),('Bowl de garbanzos listos, quinua y hummus','Quinua cocida',150),('Bowl de garbanzos listos, quinua y hummus','Hummus',50),('Bowl de garbanzos listos, quinua y hummus','Pepino',80),
+  ('Sándwich de pollo rostizado y palta','Pan integral',100),('Sándwich de pollo rostizado y palta','Pollo rostizado sin piel',150),('Sándwich de pollo rostizado y palta','Palta',40),('Sándwich de pollo rostizado y palta','Lechuga',30),
+  ('Wrap de seitán, hummus y espinaca','Wrap integral',80),('Wrap de seitán, hummus y espinaca','Seitán',150),('Wrap de seitán, hummus y espinaca','Hummus',50),('Wrap de seitán, hummus y espinaca','Espinaca',40),
+  ('Bowl de edamame, arroz listo y maní','Edamame',200),('Bowl de edamame, arroz listo y maní','Arroz cocido',150),('Bowl de edamame, arroz listo y maní','Maní',15),('Bowl de edamame, arroz listo y maní','Pepino',80),
+  ('Burrito frío de frijoles y queso fresco','Tortilla integral de trigo',80),('Burrito frío de frijoles y queso fresco','Frijoles negros cocidos',180),('Burrito frío de frijoles y queso fresco','Queso fresco',60),('Burrito frío de frijoles y queso fresco','Lechuga',40),
+  ('Tortilla francesa con pan y ensalada','Huevo entero',150),('Tortilla francesa con pan y ensalada','Claras pasteurizadas',100),('Tortilla francesa con pan y ensalada','Pan integral',80),('Tortilla francesa con pan y ensalada','Lechuga',60),('Tortilla francesa con pan y ensalada','Tomate',60),('Tortilla francesa con pan y ensalada','Aceite de oliva',5),
+  ('Quesadilla de pollo rostizado y queso','Tortilla integral de trigo',80),('Quesadilla de pollo rostizado y queso','Pollo rostizado sin piel',140),('Quesadilla de pollo rostizado y queso','Mozzarella light',50),('Quesadilla de pollo rostizado y queso','Pimiento',50),
+  ('Tempeh a la sartén con arroz listo','Tempeh',180),('Tempeh a la sartén con arroz listo','Arroz cocido',150),('Tempeh a la sartén con arroz listo','Espinaca',60),('Tempeh a la sartén con arroz listo','Salsa de soya',10),
+  ('Ensalada exprés de atún, garbanzos y palta','Atún en agua',140),('Ensalada exprés de atún, garbanzos y palta','Garbanzos cocidos',150),('Ensalada exprés de atún, garbanzos y palta','Palta',40),('Ensalada exprés de atún, garbanzos y palta','Tomate',80),('Ensalada exprés de atún, garbanzos y palta','Lechuga',60),
+  ('Pollo rostizado con ensalada y palta','Pollo rostizado sin piel',160),('Pollo rostizado con ensalada y palta','Lechuga',100),('Pollo rostizado con ensalada y palta','Tomate',100),('Pollo rostizado con ensalada y palta','Palta',40),
+  ('Bowl de lentejas listas con espinaca y semillas','Lentejas cocidas',250),('Bowl de lentejas listas con espinaca y semillas','Espinaca',60),('Bowl de lentejas listas con espinaca y semillas','Semillas de calabaza',15),('Bowl de lentejas listas con espinaca y semillas','Tomate',80),
+  ('Sándwich de pavo y cottage','Pan integral',90),('Sándwich de pavo y cottage','Pechuga de pavo',120),('Sándwich de pavo y cottage','Queso cottage',80),('Sándwich de pavo y cottage','Tomate',50),
+  ('Wrap de seitán y verduras listas','Wrap integral',70),('Wrap de seitán y verduras listas','Seitán',140),('Wrap de seitán y verduras listas','Verduras mixtas',120),('Wrap de seitán y verduras listas','Hummus',40),
+  ('Tortilla de claras con espinaca y pan','Claras pasteurizadas',200),('Tortilla de claras con espinaca y pan','Huevo entero',60),('Tortilla de claras con espinaca y pan','Espinaca',60),('Tortilla de claras con espinaca y pan','Pan integral',60),
+  ('Seitán con quinua lista y verduras','Seitán',150),('Seitán con quinua lista y verduras','Quinua cocida',150),('Seitán con quinua lista y verduras','Verduras mixtas',150),('Seitán con quinua lista y verduras','Aceite de oliva',5)
 ) as v(dish_name, ing_name, grams)
 join dishes d      on d.name = v.dish_name
 join ingredients i on i.name = v.ing_name;

@@ -11218,6 +11218,60 @@ Límite conocido: `restDay` se calcula al guardar el día. Si el usuario cambia 
 - `scripts/validate-notify-schedule.mjs`: descanso por `restDay`, por `workoutOverride:"descanso"`, sesión pendiente y sesión cerrada (falla con el código anterior).
 - `tests/e2e/recordatorios.spec.js`: con sesión prescrita `restDay` es `false`; tras "Me perdí la sesión" → "Convertir en descanso" es `true`.
 
+## REQ-254 - (propuesta original) Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
+
+**Estado: pendiente — requiere acción humana:** aprobar la ampliación del catálogo y curar el nivel de cocina de cada plato antes de que un agente pueda implementar el filtro.
+
+### Origen
+
+Diego (beta, 2026-10-21, audio): "Justo ahora ya terminé todo y me sale como próxima comida tacos de no sé qué con frijol, pero yo no sé hacer ni tacos ni el frijol. Estaría bueno que afines eso para la gente que no sabe cocinar o que no cocina."
+
+### Problema
+
+Quien no cocina recibe platos que piden cocinar de verdad (tacos con frijoles, seco con frijoles, enchiladas). El perfil solo pregunta "Minutos para cocinar" y ese dato no cambia lo que propone el plan.
+
+### Causa raíz
+
+- `planDeterministicNutritionDay()` y `compatibleDishesForSlot()` (`js/nutrition-domain.js`) no leen `prefs.cookingMinutes` ni `dishes.prep_minutes`/`dishes.needs_kitchen`; solo el texto del coach (`index.html`, "Tiempo por comida: ≤N min") lo menciona.
+- Los datos del catálogo no sirven para filtrar: `prep_minutes` es un valor por franja, no por plato (consulta a producción 2026-10-21, 180 platos: todo almuerzo = 30, toda cena = 20, todo desayuno = 15), y `needs_kitchen` es `true` en todos los almuerzos y cenas. Filtrar hoy por "≤15 min" dejaría sin almuerzo ni cena.
+- No existe una preferencia de "nivel en la cocina": "Minutos para cocinar" mezcla tiempo y habilidad.
+
+### Objetivo
+
+Una persona que marca "No cocino" o "Lo básico" recibe platos que puede armar sin saber cocinar (comprar listo + ensamblar, microondas, una sartén), y sigue cuadrando macros.
+
+### Alcance propuesto
+
+1. Preferencia nueva en onboarding y Perfil → Comidas: "¿Cuánto cocinas?" — "No cocino (armo o caliento)" / "Lo básico (una sartén, hervir)" / "Me gusta cocinar". Por defecto "Lo básico" para perfiles existentes.
+2. Catálogo: columna `cooking_level` (`none`/`basic`/`cook`) en `dishes`, migración idempotente; curar los 180 platos a mano (y corregir `prep_minutes` por plato). Acción manual: ejecutar la migración en producción.
+3. Ampliar almuerzos y cenas de nivel `none`/`basic` (hoy no hay ninguno): pollo rostizado + arroz listo + ensalada, wraps de atún o pavo, bowls con legumbre en lata, tortilla francesa con pan, etc.
+4. `compatibleDishesForSlot()` excluye platos por encima del nivel elegido; si una franja queda sin candidatos, cae al nivel siguiente y lo dice ("Hoy no encontramos algo más simple para la cena").
+5. En "Cambiar comida", un filtro rápido "Más fácil de preparar".
+
+### Fuera de alcance
+
+- Videos de recetas.
+- Reescribir los platos ya planificados de días pasados (historial inmutable).
+
+### Riesgos
+
+- Menos candidatos por franja empeora el cuadre de macros (canario `DIET_CONTRACT`, ver REQ-143/REQ-147): medir antes y después.
+- El paso 2 es trabajo de contenido, no automatizable sin revisión humana del etiquetado.
+
+### Criterios de aceptación
+
+- Con "No cocino", una semana generada no incluye platos `cook`; con "Me gusta cocinar", no cambia nada.
+- Con "No cocino", ninguna franja queda vacía; si se relaja el nivel, se avisa.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Canario `DIET_CONTRACT` antes y después con perfiles "No cocino" / "Lo básico" / "Me gusta cocinar".
+- E2E: perfil "No cocino", preparar la semana y comprobar que ningún plato es `cook`.
+
+### Decisión pendiente (Jonathan)
+
+- ¿Se aprueba ampliar el catálogo con almuerzos/cenas "sin cocinar" (choca con la pausa de REQ-143)?
 ## REQ-271 - Registro: editar ingredientes y gramos decimales sin perder el cálculo
 
 **Estado: implementado.** Prioridad P1. Dependencias: REQ-270. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.

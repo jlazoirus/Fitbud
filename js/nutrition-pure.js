@@ -55,6 +55,8 @@
     machines:"Máquinas",pullup:"Barra de dominadas",bike:"Bicicleta",trainer:"Rodillo",pool_gear:"Material de piscina",
   };
   const FOOD_BUDGET_LABELS={low:"Ajustado",medium:"Moderado",flexible:"Flexible"};
+  // REQ-254: cuánto cocina la persona (filtra platos por dishes.cooking_level).
+  const COOKING_LEVEL_LABELS={none:"No cocino (armo o caliento)",basic:"Lo básico (una sartén, hervir)",cook:"Me gusta cocinar"};
   const REPEAT_LABELS={low:"Poca repetición",moderate:"Repetir 2-3 veces",high:"Priorizar practicidad"};
   const CUISINE_LABELS={peruvian:"Peruana",mediterranean:"Mediterránea",asian:"Asiática",mexican:"Mexicana",italian:"Italiana",latin:"Latinoamericana"};
   const PREPARATION_LABELS={quick:"Rápidas",batch:"Cocinar por tandas",no_cook:"Sin cocinar",one_pot:"Una sola olla",oven:"Horno",grill:"Plancha o parrilla"};
@@ -311,7 +313,7 @@
     SPORT_LABELS,STRENGTH_LABELS,PROFILE_SCHEMA_VERSION,PROFILE_REVIEW_DAYS,PROFILE_REVIEW_MS,
     MIN_TRAINING_DAYS,MAX_TRAINING_DAYS,WEEKDAY_OPTIONS,TRAINING_LOCATION_LABELS,
     TRAINING_PRIORITY_LABELS,TRAINING_EXPERIENCE_LABELS,WORKOUT_SPLIT_LABELS,TRAINING_TIME_LABELS,
-    EQUIPMENT_LABELS,FOOD_BUDGET_LABELS,REPEAT_LABELS,CUISINE_LABELS,PREPARATION_LABELS,STRENGTH_SESSION_IDS,
+    EQUIPMENT_LABELS,FOOD_BUDGET_LABELS,COOKING_LEVEL_LABELS,REPEAT_LABELS,CUISINE_LABELS,PREPARATION_LABELS,STRENGTH_SESSION_IDS,
     ACTIVITY_LEVELS,DOW,MON,
     // Coach
     coachCopy,coachKey,coachSplitTerms,coachTermInTokens,coachTextHasTerms,
@@ -355,6 +357,7 @@
   root.TRAINING_TIME_LABELS=TRAINING_TIME_LABELS;
   root.EQUIPMENT_LABELS=EQUIPMENT_LABELS;
   root.FOOD_BUDGET_LABELS=FOOD_BUDGET_LABELS;
+  root.COOKING_LEVEL_LABELS=COOKING_LEVEL_LABELS;
   root.REPEAT_LABELS=REPEAT_LABELS;
   root.CUISINE_LABELS=CUISINE_LABELS;
   root.PREPARATION_LABELS=PREPARATION_LABELS;
