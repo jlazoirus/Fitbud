@@ -6,6 +6,17 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const seed = readFileSync(join(ROOT, "supabase", "seed.sql"), "utf8");
+// REQ-254: nivel de cocina y minutos por plato (fuente: supabase/cooking_level.sql).
+const cookingSql = readFileSync(join(ROOT, "supabase", "cooking_level.sql"), "utf8");
+export function parseCookingLevels() {
+  const i = cookingSql.indexOf("-- COOKING_LEVELS:BEGIN"), j = cookingSql.indexOf("-- COOKING_LEVELS:END");
+  if (i < 0 || j < 0) throw new Error("cooking_level.sql sin bloque COOKING_LEVELS");
+  const out = new Map();
+  const re = /\('((?:[^']|'')*)','(none|basic|cook)',(\d+)\)/g;
+  let m;
+  while ((m = re.exec(cookingSql.slice(i, j)))) out.set(m[1].replace(/''/g, "'"), { level: m[2], minutes: Number(m[3]) });
+  return out;
+}
 
 function sqlString(value) {
   return String(value || "").replace(/''/g, "'");
@@ -131,6 +142,12 @@ export function parseCatalog() {
       !hasMeatOrFish && !hasVeganBlocker ? "vegano" : "",
       "omnivoro",
     ].filter(Boolean);
+  }
+
+  const levels = parseCookingLevels();
+  for (const dish of dishes) {
+    const lv = levels.get(dish.name);
+    if (lv) { dish.cooking_level = lv.level; dish.prep_minutes = lv.minutes; dish.needs_kitchen = lv.level !== "none"; }
   }
 
   return { ingredients, dishes, dishIng };

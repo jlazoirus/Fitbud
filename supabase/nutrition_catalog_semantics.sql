@@ -125,30 +125,32 @@ from (values
 where d.name = v.name
   and coalesce(array_length(d.cuisine_tags, 1), 0) = 0;
 
+-- Cada campo solo se rellena si está vacío: no pisa prep_minutes/needs_kitchen
+-- por plato que carga supabase/cooking_level.sql (REQ-254), sea cual sea el orden.
 update dishes
 set
-  prep_minutes = case
+  prep_minutes = coalesce(prep_minutes, case
     when slot in ('snack','batido') then 5
     when slot = 'desayuno' then 15
     when slot = 'cena' then 20
     else 30
-  end,
-  budget_tier = case
+  end),
+  budget_tier = coalesce(budget_tier, case
     when name ilike '%salmón%' or name ilike '%atún%' then 'flexible'
     when name ilike '%arroz%' or name ilike '%frijol%' or name ilike '%lentejas%' or
          name ilike '%avena%' or name ilike '%pan%' or name ilike '%arepa%' or
          name ilike '%garbanzo%' or name ilike '%camote%' or name ilike '%papa%' or
          name ilike '%yuca%' or name ilike '%cereal%' then 'low'
     else 'medium'
-  end,
-  needs_kitchen = case
+  end),
+  needs_kitchen = coalesce(needs_kitchen, case
     when slot in ('snack','batido') or name ilike '%yogur%' or name ilike '%shake%' then false
     else true
-  end,
-  eat_out_ok = case
+  end),
+  eat_out_ok = coalesce(eat_out_ok, case
     when name ilike '%bowl%' or name ilike '%tacos%' or name ilike '%pasta%' or name ilike '%pollo%' then true
     else false
-  end
+  end)
 where prep_minutes is null
    or budget_tier is null
    or needs_kitchen is null

@@ -517,14 +517,43 @@
     return !!key&&list.some(b=>b&&(b.key===key||solverKey(b.name)===key));
   }
 
-  function compatibleDishesForSlot(slot,prefs,catalog){
+  // REQ-254: cuánto cocina la persona. none = armar o calentar; basic = una
+  // sartén o hervir; cook = recetas de varios pasos. Sin preferencia no se filtra.
+  const COOKING_LEVELS=["none","basic","cook"];
+  function normalizedCookingLevel(value){
+    const v=String(value||"").trim().toLowerCase();
+    return COOKING_LEVELS.includes(v)?v:"";
+  }
+  function cookingLevelForDish(dish){return normalizedCookingLevel(dish&&dish.cooking_level);}
+  // Un plato sin clasificar (catálogo sin la migración) no se excluye: sin datos
+  // fiables, filtrar dejaría franjas vacías.
+  function dishAllowedForCookingLevel(dish,level){
+    const max=normalizedCookingLevel(level);
+    if(!max||max==="cook")return true;
+    const own=cookingLevelForDish(dish);
+    return !own||COOKING_LEVELS.indexOf(own)<=COOKING_LEVELS.indexOf(max);
+  }
+  function nextCookingLevel(level){
+    const i=COOKING_LEVELS.indexOf(normalizedCookingLevel(level));
+    return i>=0&&i<COOKING_LEVELS.length-1?COOKING_LEVELS[i+1]:"";
+  }
+
+  // opts.cookingLevel permite relajar el nivel sin tocar las preferencias.
+  function compatibleDishesForSlot(slot,prefs,catalog,opts){
     const slotId=typeof slot==="string"?slot:(slot&&slot.id)||"";
     const maps=catalogMaps(catalog);
+    const level=opts&&opts.cookingLevel!==undefined?opts.cookingLevel:prefs&&prefs.cookingLevel;
     return (Array.isArray(catalog&&catalog.dishes)?catalog.dishes:[]).filter(dish=>{
       if(!compatibleSlotsForDish(dish).includes(slotId))return false;
       if(!dishAllowedForSlotMoment(dish,slotId,prefs||{}))return false;
+      if(!dishAllowedForCookingLevel(dish,level))return false;
       return dishDietAllowed(dish,prefs||{},catalog||{},maps);
     });
+  }
+  const COOKING_SLOT_LABELS={desayuno:"el desayuno",media_manana:"la media mañana",almuerzo:"el almuerzo",merienda:"la merienda",snack:"el snack",cena:"la cena",recena:"la recena"};
+  function cookingRelaxedWarn(slotId,from,to){
+    return{type:"cooking_level_relaxed",slot_id:slotId,from,to,
+      message:`Hoy no encontramos algo más simple para ${COOKING_SLOT_LABELS[slotId]||slotId}: va una opción ${to==="cook"?"con más preparación":"que pide cocinar un poco"}.`};
   }
 
   function splitWeighted(total,count,index,mainIndex){
@@ -724,9 +753,17 @@
     recentForCuisine.forEach(slug=>{
       cuisineTagsForDish(dishBySlug.get(slug)).forEach(tag=>recentCuisines.set(tag,(recentCuisines.get(tag)||0)+1));
     });
-    const used=new Set(),comidas=[],diagnostics=[],causes=[];
+    const used=new Set(),comidas=[],diagnostics=[],causes=[],cookingWarns=[];
+    const userCooking=normalizedCookingLevel(prefs.cookingLevel);
     slots.forEach(slot=>{
-      const candidates=compatibleDishesForSlot(slot.id,prefs,catalog);
+      // REQ-254: si no hay nada al nivel de cocina elegido, se sube un nivel y se avisa.
+      let level=userCooking;
+      let candidates=compatibleDishesForSlot(slot.id,prefs,catalog,{cookingLevel:level});
+      while(!candidates.length&&nextCookingLevel(level)){
+        level=nextCookingLevel(level);
+        candidates=compatibleDishesForSlot(slot.id,prefs,catalog,{cookingLevel:level});
+      }
+      if(candidates.length&&level!==userCooking)cookingWarns.push(cookingRelaxedWarn(slot.id,userCooking,level));
       if(!candidates.length){
         causes.push({slot:slot.id,reason:"slot_without_candidates"});
         return;
@@ -773,6 +810,7 @@
         nombre:best.dish.name,
         dishSlug:slugFor(best.dish),
         dishId:best.dish.id,
+        ...(cookingLevelForDish(best.dish)?{cookingLevel:cookingLevelForDish(best.dish)}:{}),
         ingredientes:best.ingredients.map(({nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g})=>({
           nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g,
         })),
@@ -812,7 +850,8 @@
         ?"Preparamos la opción más viable con tu catálogo actual."
         :`Tu día quedó en ${totals.kcal} kcal con ${totals.p} g de proteína, dentro de tu meta y respetando tus restricciones.`,
       comidas,
-      warns:[...(validation.warns||[]),...omnivoreAnimal.warns],
+      warns:[...(validation.warns||[]),...omnivoreAnimal.warns,...cookingWarns],
+      cookingWarns,
       omnivoreAnimalProtein:omnivoreAnimal,
     };
   }
@@ -1059,6 +1098,9 @@
       }
       if(!dishDietAllowed(dish,prefs,catalog,maps)){
         return{ok:false,reason:"dish_restricted",detail:`${dish.name} no respeta las preferencias/restricciones.`,meal};
+      }
+      if(!dishAllowedForCookingLevel(dish,prefs&&prefs.cookingLevel)){
+        return{ok:false,reason:"dish_cooking_level",detail:`${dish.name} pide más cocina de la que elegiste.`,meal};
       }
     }else{
       if(mealNameBlockedByProfile(meal,prefs)){
@@ -1320,6 +1362,7 @@
       const compat=compatibleSlotsForDish(dish);
       if(!compat.some(s=>candidateSlots.has(s)))return;
       if(!dishDietAllowed(dish,prefs,catalog,maps))return;
+      if(!dishAllowedForCookingLevel(dish,prefs&&prefs.cookingLevel))return;
       const solved=solveDishPortion(dish,complementTarget,{catalog});
       if(!solved.ok)return;
       const newTotals=roundMacros(addMacros({...totals},solved.macros));
@@ -1434,6 +1477,9 @@
       }
     }
     const omnivoreAnimal=validateOmnivoreAnimalProtein(comidas,prefs,catalog);
+    // REQ-254: el aviso de nivel relajado solo aplica a franjas que quedaron con la opción de respaldo.
+    const fallbackSlots=new Set(comidas.filter(meal=>meal&&meal.source==="deterministic_fallback").map(slotIdForMeal));
+    const finalCookingWarns=(fallback.cookingWarns||[]).filter(w=>fallbackSlots.has(w.slot_id));
     if(!contract.ok){
       contract.errors.forEach(error=>{
         causes.push({reason:contractCauseKey(error),detail:error});
@@ -1453,7 +1499,8 @@
       residual:dayResidual(target,totals),
       contract,
       complement,
-      warns:omnivoreAnimal.warns,
+      warns:[...omnivoreAnimal.warns,...finalCookingWarns],
+      cookingWarns:finalCookingWarns,
       omnivoreAnimalProtein:omnivoreAnimal,
       comidas,
       fallbackDiagnostics:fallback.diagnostics||[],
@@ -1590,6 +1637,7 @@
     slotMomentTextConflict,
     mealNameBlockedByProfile,
     compatibleDishesForSlot,
+    COOKING_LEVELS,normalizedCookingLevel,cookingLevelForDish,dishAllowedForCookingLevel,nextCookingLevel,
     textHasAnimalProtein,
     mealHasAnimalProtein,
     findDishForMeal,
@@ -1628,6 +1676,7 @@
   root.mealWeightForDish=mealWeightForDish;
   root.dishAllowedForSlotMoment=dishAllowedForSlotMoment;
   root.compatibleDishesForSlot=compatibleDishesForSlot;
+  root.dishAllowedForCookingLevel=dishAllowedForCookingLevel;
   root.textHasAnimalProtein=textHasAnimalProtein;
   root.mealHasAnimalProtein=mealHasAnimalProtein;
   root.findDishForMeal=findDishForMeal;

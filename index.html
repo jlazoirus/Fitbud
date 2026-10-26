@@ -1275,6 +1275,8 @@ function migrateProfilePrefs(source){
     eatingWindowEnd:validTime(p.eatingWindowEnd)?p.eatingWindowEnd:defaultMealTimes(mealCount).slice(-1)[0],
     mainMealIndex:Math.min(mealCount,Math.max(1,Number.parseInt(p.mainMealIndex,10)||Math.min(2,mealCount))),
     cookingMinutes:Math.min(180,Math.max(5,Number.parseInt(p.cookingMinutes,10)||30)),
+    // REQ-254: cuánto cocina; los perfiles existentes parten de "Lo básico".
+    cookingLevel:COOKING_LEVEL_LABELS[p.cookingLevel]?p.cookingLevel:"basic",
     foodBudget:FOOD_BUDGET_LABELS[p.foodBudget]?p.foodBudget:"medium",
     repeatPreference:REPEAT_LABELS[p.repeatPreference]?p.repeatPreference:"moderate",
     preferredCuisines:normalizedList(p.preferredCuisines,Object.keys(CUISINE_LABELS)),
@@ -1911,6 +1913,7 @@ function planSnapshotFields(prefs){
     eatingWindowEnd:p.eatingWindowEnd||"",
     mainMealIndex:p.mainMealIndex,
     cookingMinutes:p.cookingMinutes,
+    cookingLevel:p.cookingLevel,
     foodBudget:p.foodBudget,
     repeatPreference:p.repeatPreference,
     preferredCuisines:[...(p.preferredCuisines||[])],
@@ -2626,6 +2629,10 @@ function mealMomentSemanticsReady(){
 function cuisineSemanticsReady(){
   return (DB.dishes||[]).some(d=>Object.prototype.hasOwnProperty.call(d,"cuisine_tags"));
 }
+// REQ-254: la columna cooking_level existe tras supabase/cooking_level.sql.
+function cookingLevelSemanticsReady(){
+  return (DB.dishes||[]).some(d=>Object.prototype.hasOwnProperty.call(d,"cooking_level"));
+}
 function catalogSlug(name){
   return String(name||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
     .toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,"").replace(/-+/g,"-");
@@ -2967,6 +2974,7 @@ function onboardingDefaults(){
     eatingWindowEnd:p.eatingWindowEnd,
     mainMealIndex:p.mainMealIndex,
     cookingMinutes:p.cookingMinutes,
+    cookingLevel:p.cookingLevel,
     foodBudget:p.foodBudget,
     repeatPreference:p.repeatPreference,
     preferredCuisines:p.preferredCuisines.slice(),
@@ -3315,6 +3323,7 @@ function readFoodScheduleFields(prefix,d){
   d.eatingWindowEnd=$("#"+prefix+"_window_end").value;
   d.mainMealIndex=+$("#"+prefix+"_main_meal").value;
   d.cookingMinutes=+$("#"+prefix+"_cooking").value;
+  const cl=$("#"+prefix+"_cooking_level");if(cl&&COOKING_LEVEL_LABELS[cl.value])d.cookingLevel=cl.value;
   d.foodBudget=$("#"+prefix+"_budget").value;
   d.repeatPreference=$("#"+prefix+"_repeat").value;
 }
@@ -3475,6 +3484,7 @@ function renderOnboarding(){
           ${dietOptions.map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}
         </div>
         <div class="field"><label for="ob_allergies">Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
+        ${cookingLevelFieldHtml("ob",d.cookingLevel)}
         <details class="adv-settings" open>
           <summary>Tus gustos (opcional)</summary>
           <div class="onboarding-grid" style="margin-top:8px">
@@ -3484,13 +3494,14 @@ function renderOnboarding(){
           </div>
           <div class="field-note">Tus favoritos guían las propuestas; lo que no quieres se excluye.</div>
         </details>
-        <details class="adv-settings">
+        <details class="adv-settings" ${d.mealCount===2?"open":""}>
           <summary>Ajustar número de comidas (opcional)</summary>
           <div class="onboarding-grid" style="margin-top:8px">
             <div class="field"><label for="ob_meal_count">Comidas al día</label><select id="ob_meal_count" onchange="updateOnboardingMealCount(this.value)">
               ${[2,3,4,5,6].map(value=>`<option value="${value}" ${d.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
             </select></div>
           </div>
+          ${twoMealNoticeHtml(d.mealCount)}
         </details>
         <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainingDays.length} días · ${SPORT_LABELS[d.primarySport]||""} + ${STRENGTH_LABELS[d.strengthMode]||""}</div>
       </div>
@@ -3549,6 +3560,7 @@ function readOnboardingStep(){
     const _obMc=$("#ob_meal_count");if(_obMc)d.mealCount=Math.min(6,Math.max(2,+_obMc.value||d.mealCount));
     d.diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#ob_diet_"+v);return el&&el.checked;});
     d.allergies=$("#ob_allergies").value.trim();
+    const _obCl=$("#ob_cooking_level");if(_obCl&&COOKING_LEVEL_LABELS[_obCl.value])d.cookingLevel=_obCl.value;
     d.preferredIngredients=$("#ob_preferred_ingredients").value.trim();
     d.preferredDishes=$("#ob_preferred_dishes").value.trim();
     d.dislikedIngredients=$("#ob_disliked").value.trim();
@@ -3935,7 +3947,7 @@ async function saveOnboarding(){
     trainNote:[d.injuries,d.limitations,d.avoidMovements].filter(Boolean).join(". "),
     diet:d.diet,mealCount:d.mealCount,mealTimes:d.mealTimes,
     eatingWindowStart:d.eatingWindowStart,eatingWindowEnd:d.eatingWindowEnd,mainMealIndex:d.mainMealIndex,
-    cookingMinutes:d.cookingMinutes,foodBudget:d.foodBudget,repeatPreference:d.repeatPreference,
+    cookingMinutes:d.cookingMinutes,cookingLevel:d.cookingLevel,foodBudget:d.foodBudget,repeatPreference:d.repeatPreference,
     preferredCuisines:d.preferredCuisines,preferredPreparations:d.preferredPreparations,
     preferredIngredients:d.preferredIngredients,preferredDishes:d.preferredDishes,foodNotes:d.foodNotes,
     allergies:d.allergies,dislikedIngredients:d.dislikedIngredients,
@@ -4494,7 +4506,9 @@ async function applyDeterministicDay(ds){
       const preservedNote=preserved?` Lo que ya registraste o personalizaste hoy no cambia.`:"";
       // REQ-139: aviso suave, solo cuando el día quedó completo (no compite con el mensaje de "opción viable").
       const contractNote=det.ok!==false?dietContractNoticeText(det.totals,det.target):"";
-      toast((det.ok===false?"Listo: preparamos la opción más viable para hoy.":"Tu día está listo con tus metas de hoy.")+(contractNote?" "+contractNote:"")+preservedNote);
+      // REQ-254: si alguna franja no tenía nada al nivel de cocina elegido, se dice.
+      const cookingNote=cookingWarnText(det.cookingWarns);
+      toast((det.ok===false?"Listo: preparamos la opción más viable para hoy.":"Tu día está listo con tus metas de hoy.")+(contractNote?" "+contractNote:"")+(cookingNote?" "+cookingNote:"")+preservedNote);
       return true;
     }
   }catch(e){}
@@ -7706,8 +7720,10 @@ function renderProfile(){
         ${Array.from({length:p.mealCount},(_,index)=>`<option value="${index+1}" ${p.mainMealIndex===index+1?"selected":""}>Comida ${index+1}</option>`).join("")}
       </select></div>
     </div>
+    <div id="pfMealCountNote">${twoMealNoticeHtml(p.mealCount)}</div>
     <label class="muted small">Horarios aproximados</label>
     <div id="pfMealTimes">${mealTimesHtml("pf",p)}</div>
+    ${cookingLevelFieldHtml("pf",p.cookingLevel)}
     <div class="onboarding-grid">
       <div class="field"><label for="pf_cooking">Minutos para cocinar</label><input id="pf_cooking" type="number" inputmode="numeric" min="5" max="180" step="5" value="${p.cookingMinutes}"></div>
       <div class="field"><label for="pf_budget">Presupuesto</label><select id="pf_budget">
@@ -7932,8 +7948,28 @@ function updatePfSplitVisibility(){
   const exp=$("#pf_experience"),wrap=$("#pf_split_wrap");
   if(wrap)wrap.style.display=(exp&&exp.value==="advanced")?"":"none";
 }
+// REQ-143: con 2 comidas el plan rara vez cuadra exacto (metas altas en pocas
+// comidas, sobre todo con mucha proteína o vegano/vegetariano sin tofu). En vez
+// de crecer el catálogo para ese caso, se avisa al elegirlo.
+function twoMealNoticeHtml(count){
+  if(+count!==2)return "";
+  return `<div class="alert meal-count-note" role="note"><b>Con 2 comidas al día es difícil cuadrar exacto tus metas.</b> Sobre todo si buscas mucha proteína o comes vegano o vegetariano sin tofu. Te propondremos lo más cercano posible; con 3 o más comidas el plan cuadra mejor.</div>`;
+}
+// REQ-254: "¿Cuánto cocinas?" — decide qué platos puede proponer el plan (COOKING_LEVEL_LABELS en js/nutrition-pure.js).
+function cookingLevelFieldHtml(prefix,value){
+  const v=COOKING_LEVEL_LABELS[value]?value:"basic";
+  return `<div class="field"><label for="${prefix}_cooking_level">¿Cuánto cocinas?</label><select id="${prefix}_cooking_level">
+    ${Object.entries(COOKING_LEVEL_LABELS).map(([k,l])=>`<option value="${k}" ${k===v?"selected":""}>${l}</option>`).join("")}
+  </select><div class="field-note">Con «No cocino» solo te proponemos platos para armar o calentar.</div></div>`;
+}
+function cookingLevelPromptLine(level){
+  if(level==="none")return "Nivel de cocina: NO cocina. Propón solo comidas para armar o calentar (pollo rostizado, atún o legumbres en lata, arroz o quinua listos, wraps, sándwiches, ensaladas, microondas); nada de guisos, salsas caseras, masas ni frituras. ";
+  if(level==="basic")return "Nivel de cocina: básico. Comidas de un solo paso (una sartén, hervir, horno simple); evita guisos largos, salsas caseras, masas o recetas de varios pasos. ";
+  return "";
+}
 function updateProfileMealCount(value){
   const count=Math.min(6,Math.max(2,+value||4));
+  const note=$("#pfMealCountNote");if(note)note.innerHTML=twoMealNoticeHtml(count);
   const d={mealCount:count,mealTimes:defaultMealTimes(count)};
   const container=$("#pfMealTimes");
   if(container)container.innerHTML=mealTimesHtml("pf",d);
@@ -7966,7 +8002,7 @@ async function saveProfile(){
     diet,
     mealCount:draft.mealCount,mealTimes:draft.mealTimes,
     eatingWindowStart:draft.eatingWindowStart,eatingWindowEnd:draft.eatingWindowEnd,mainMealIndex:draft.mainMealIndex,
-    cookingMinutes:draft.cookingMinutes,foodBudget:draft.foodBudget,repeatPreference:draft.repeatPreference,
+    cookingMinutes:draft.cookingMinutes,cookingLevel:draft.cookingLevel||previous.cookingLevel,foodBudget:draft.foodBudget,repeatPreference:draft.repeatPreference,
     preferredCuisines:checkedValues("pf_cuisine",CUISINE_LABELS),
     preferredPreparations:checkedValues("pf_preparation",PREPARATION_LABELS),
     preferredIngredients:$("#pf_preferred_ingredients").value.trim(),
@@ -9294,18 +9330,35 @@ function updateChangeMealRerollControls(){
   if(button)button.disabled=mealOptionRerollRemaining()<=0;
   if(meta)meta.textContent=changeMealRerollMeta();
 }
-function changeMealCandidatePool(ds,id,excludeSlugs,limit){
+// REQ-254: nivel máximo de cocina para "Sin cocina" / "Más fácil de preparar".
+function changeMealCookingCap(ds,id,mode){
+  if(mode==="no_cook")return "none";
+  if(mode!=="easier")return null;
+  const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return "none";
+  const ms=mealState(ds,id);const o=ms.ovr;
+  const dish=dishByName((o&&o.dishName)||(base&&base.dishName)||mealValue(base,ms).name);
+  const own=dish&&dish.cooking_level;
+  return own==="cook"?"basic":"none";
+}
+function cappedCookingLevel(userLevel,cap){
+  const order=["none","basic","cook"];
+  if(!cap)return userLevel;
+  const u=order.indexOf(userLevel);
+  return u>=0&&u<order.indexOf(cap)?userLevel:cap;
+}
+function changeMealCandidatePool(ds,id,excludeSlugs,limit,cookingCap){
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return{ranked:null,options:[]};
   const ms=mealState(ds,id);const cv=mealValue(base,ms);
   const excluded=excludeSlugs instanceof Set?excludeSlugs:new Set(excludeSlugs||[]);
   const nd=window.FITBUD_NUTRITION_DOMAIN;
+  const cookingOpts=prefs=>cookingCap?{cookingLevel:cappedCookingLevel(prefs.cookingLevel,cookingCap)}:undefined;
   if(nd&&nd.rankReplacementCandidates&&DB.loaded){
     const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
     const target=effectiveDayTarget();
     const mealTargets=nd.mealSlotTargets?nd.mealSlotTargets(target,prefs,null):null;
     const mealTarget=mealTargets&&mealTargets.find(t=>t.id===id);
     const compatible=nd.compatibleDishesForSlot
-      ?nd.compatibleDishesForSlot(id,prefs,DB)
+      ?nd.compatibleDishesForSlot(id,prefs,DB,cookingOpts(prefs))
       :DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked);
     if(mealTarget&&compatible.length){
       const candidates=nd.rankReplacementCandidates(cv,compatible,mealTarget.target,DB,prefs);
@@ -9321,7 +9374,7 @@ function changeMealCandidatePool(ds,id,excludeSlugs,limit){
     }
   }
   const optionDishes=DB.loaded&&nd&&nd.compatibleDishesForSlot
-    ?nd.compatibleDishesForSlot(id,migrateProfilePrefs((profile&&profile.prefs)||{}),DB)
+    ?nd.compatibleDishesForSlot(id,migrateProfilePrefs((profile&&profile.prefs)||{}),DB,cookingOpts(migrateProfilePrefs((profile&&profile.prefs)||{})))
     :(DB.loaded?DB.dishes.filter(d=>dishSupportsSlot(d,id)&&!coachDishBlockedByProfile(d).blocked):[]);
   const options=optionDishes
     .sort((a,b)=>{
@@ -9355,7 +9408,8 @@ function openChangeMeal(ds,id){
     <div style="margin:8px 0 4px">
       <span class="muted small">Motivo (opcional):</span>
       <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:4px">
-        <button class="btn btn-sm" id="chg-no_cook" onclick="toggleMotivoChip('no_cook')">🍱 Sin cocina</button>
+        <button class="btn btn-sm" id="chg-easier" onclick="toggleMotivoChip('easier')" aria-pressed="false">⏱ Más fácil de preparar</button>
+        <button class="btn btn-sm" id="chg-no_cook" onclick="toggleMotivoChip('no_cook')" aria-pressed="false">🍱 Sin cocina</button>
         <button class="btn btn-sm" id="chg-eat_out" onclick="toggleMotivoChip('eat_out')">🍽️ Comer fuera</button>
         <button class="btn btn-sm" id="chg-missing_ingredient" onclick="toggleMotivoChip('missing_ingredient')">🛒 Sin ingrediente</button>
       </div>
@@ -9404,7 +9458,7 @@ async function rerollChangeMealOptions(){
   try{
     const seen=changeMealCurrentSlugs(cm);
     cm.seenSlugs=seen;
-    const fallbackPool=changeMealCandidatePool(cm.ds,cm.id,seen,12);
+    const fallbackPool=changeMealCandidatePool(cm.ds,cm.id,seen,12,cm.cookingCap);
     const fallbackRanked=fallbackPool.ranked||[];
     const fallbackOptions=fallbackRanked.length
       ?fallbackRanked.slice(0,4).map(r=>({nombre:r.dish.name,kcal:r.macros.kcal,proteina_g:r.macros.p,carbohidratos_g:r.macros.c,grasa_g:r.macros.f}))
@@ -9436,7 +9490,7 @@ Evita repetir los platos ya mostrados. Responde SOLO JSON válido:
         const freshSelected=selected.filter(d=>!seen.has(d.slug||coachKey(d.name)));
         if(freshSelected.length){
           const selectedSlugs=new Set(freshSelected.map(d=>d.slug||coachKey(d.name)));
-          const selectedPool=changeMealCandidatePool(cm.ds,cm.id,new Set([...seen].filter(slug=>!selectedSlugs.has(slug))),40);
+          const selectedPool=changeMealCandidatePool(cm.ds,cm.id,new Set([...seen].filter(slug=>!selectedSlugs.has(slug))),40,cm.cookingCap);
           if(selectedPool.ranked&&selectedPool.ranked.length){
             const mapped=freshSelected.map(d=>selectedPool.ranked.find(r=>String(r.dish.id)===String(d.id))).filter(Boolean);
             if(mapped.length){cm.ranked=mapped;cm.options=[];}
@@ -9465,16 +9519,29 @@ Evita repetir los platos ya mostrados. Responde SOLO JSON válido:
 function toggleMotivoChip(reason){
   const cm=window._changeMeal;if(!cm)return;
   cm.reason=cm.reason===reason?null:reason;
-  const hints={no_cook:"Opciones sin cocina.",eat_out:"El equivalente más cercano para comer afuera.",missing_ingredient:"Otro plato compatible con tus metas."};
+  const hints={no_cook:"Opciones para armar o calentar, sin cocinar.",easier:"Opciones con menos preparación que la actual.",eat_out:"El equivalente más cercano para comer afuera.",missing_ingredient:"Otro plato compatible con tus metas."};
   const day=buildDay(cm.ds);const base=day.meals.find(m=>m.id===cm.id);
   const ms=mealState(cm.ds,cm.id);const cv=mealValue(base,ms);
   const hint=document.getElementById('chg-hint');
   if(hint)hint.textContent=(hints[cm.reason]||"Elige un plato compatible con tus metas.")+(cv.kcal?` Actual: ${cv.kcal} kcal.`:"");
-  ['no_cook','eat_out','missing_ingredient'].forEach(r=>{
+  ['easier','no_cook','eat_out','missing_ingredient'].forEach(r=>{
     const b=document.getElementById('chg-'+r);if(!b)return;
     b.style.outline=cm.reason===r?'2px solid var(--accent)':'';
     b.style.opacity=(cm.reason&&cm.reason!==r)?'0.5':'1';
+    b.setAttribute("aria-pressed",cm.reason===r?"true":"false");
   });
+  // REQ-254: "Sin cocina" y "Más fácil de preparar" filtran de verdad por nivel de cocina.
+  const cap=changeMealCookingCap(cm.ds,cm.id,cm.reason);
+  if(cap||cm.cookingCap){
+    cm.cookingCap=cap;
+    const pool=changeMealCandidatePool(cm.ds,cm.id,new Set(),12,cap);
+    cm.ranked=pool.ranked;cm.options=pool.options;cm.seenSlugs=new Set();
+    const opts=document.getElementById("chg-opts");
+    if(opts){
+      const empty=!(pool.ranked&&pool.ranked.length)&&!pool.options.length;
+      opts.innerHTML=empty&&cap?'<p class="muted small">No hay opciones con menos preparación para este espacio.</p>':_buildChangeMealOpts(cv);
+    }
+  }
 }
 function applyChangeMeal(i){
   const{ds,id,options,reason,ranked}=window._changeMeal;
@@ -10606,6 +10673,7 @@ function buildSysPrompt(){
       eating_window:{start:p.eatingWindowStart,end:p.eatingWindowEnd},
       main_meal:p.mainMealIndex,
       cooking_minutes:p.cookingMinutes,
+      cooking_level:p.cookingLevel,
       budget:p.foodBudget,
       repetition:p.repeatPreference,
       preferred_cuisines:p.preferredCuisines,
@@ -10678,7 +10746,8 @@ function coachHardRestrictions(){
 // REQ-136: bump a 9 — el hash de catálogo incluye cuisine_tags para preferencias de cocina.
 // REQ-169/170/171: bump a 10 — descartes de la sesión, desayuno reforzado y meta ±50 kcal en el prompt.
 // Bump a 11 — referencia de platos rotada por usuario y regla de variedad de cocina.
-const COACH_PROMPT_VERSION=11;
+// REQ-254: bump a 12 — el prompt incluye el nivel de cocina y los platos se filtran por cooking_level.
+const COACH_PROMPT_VERSION=12;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -10687,7 +10756,7 @@ function coachCompatibilityContext(action){
     timeZone:p.timeZone,
     nutrition:{
       target,mealCount:p.mealCount,mealTimes:p.mealTimes,diet:p.diet||[],
-      allergies:p.allergies||"",cookingMinutes:p.cookingMinutes,foodBudget:p.foodBudget,
+      allergies:p.allergies||"",cookingMinutes:p.cookingMinutes,cookingLevel:p.cookingLevel||"",foodBudget:p.foodBudget,
       repeatPreference:p.repeatPreference,
       // REQ-121: gustos/disgustos/platos bloqueados deben invalidar cache al editarse.
       preferredIngredients:p.preferredIngredients||"",preferredDishes:p.preferredDishes||"",
@@ -10704,7 +10773,7 @@ function coachCompatibilityContext(action){
     },
     catalog:{
       dishes:hashText((DB.dishes||[]).map(d=>[
-        d.id,d.name,(catalogArray(d.compatible_slots)||[]).join(","),(catalogArray(d.cuisine_tags)||[]).join(","),d.meal_weight||"",d.meal_form||"",
+        d.id,d.name,(catalogArray(d.compatible_slots)||[]).join(","),(catalogArray(d.cuisine_tags)||[]).join(","),d.meal_weight||"",d.meal_form||"",d.cooking_level||"",
       ].join(":")).join("|")),
       exercises:hashText(activeTrainingCatalog().map(e=>e.slug+":"+(e.active!==false)+":"+e.level).join("|")),
     },
@@ -10929,6 +10998,10 @@ function dietContractNoticeText(totals,target){
   if(!nd||!nd.validateDietContractTotals||!totals||!target)return"";
   const contract=nd.validateDietContractTotals(totals,target);
   return contract.ok?"":"Tu día quedó cerca de tu meta, no exacto.";
+}
+// REQ-254: texto de los avisos de nivel de cocina relajado (uno por franja).
+function cookingWarnText(warns){
+  return (Array.isArray(warns)?warns:[]).map(w=>w&&w.message).filter(Boolean).join(" ");
 }
 function deterministicDayPayload(ds){
   const day=buildDay(ds),target=effectiveDayTarget();
@@ -11707,7 +11780,7 @@ async function generateOneDay(ds,coachRequest){
   const learnedLine=lp&&lp.topIngredients&&lp.topIngredients.length?`\nEl usuario suele disfrutar ingredientes como: ${lp.topIngredients.join(", ")}. Incorpóralos cuando encajen con las metas.`:"";
   const likesLine=coachLikesLine(prefs);
   const blockedLine=coachBlockedDishesLine(migrateProfilePrefs((profile&&profile.prefs)||{}))+coachRejectedMealsLine(ds);
-  const cookCtx=`Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
+  const cookCtx=`${cookingLevelPromptLine(prefs.cookingLevel)}Tiempo por comida: ≤${prefs.cookingMinutes||30} min. Presupuesto: ${FOOD_BUDGET_LABELS[prefs.foodBudget]||"moderado"}.${isTrainingDay?" Día de entrenamiento: prioriza proteína y carbohidratos cerca de la sesión.":""}`;
   const hardResLine=hardRes.length?`\nNUNCA incluyas en ninguna comida o ingrediente, bajo ninguna circunstancia: ${hardRes.join(", ")}.`:"";
   // Carne/pescado se instruye por prompt (no por término) para no colisionar con substrings como "repollo". REQ-65.
   const dietList=Array.isArray(prefs.diet)?prefs.diet:[];
@@ -11779,7 +11852,9 @@ AJUSTE DIRIGIDO: la propuesta anterior quedó demasiado vegetariana para un perf
   if(res.ok){
     const finalized=finalizeDayWithGate(ds,day,target,prefs,res.comidas,{workoutContext:{isTrainingDay}});
     if(finalized&&Array.isArray(finalized.comidas)&&finalized.comidas.length){
-      res={...res,comidas:finalized.comidas,totals:finalized.totals,contract:finalized.contract};
+      const cookingNote=cookingWarnText(finalized.cookingWarns);
+      res={...res,comidas:finalized.comidas,totals:finalized.totals,contract:finalized.contract,
+        warns:[...(res.warns||[]),...(cookingNote?[cookingNote]:[])]};
     }
   }
   return {res,day,target,reused};
@@ -12212,7 +12287,7 @@ async function regenerateGenMeal(slotId){
   try{
     const prompt=`Sugiere UNA comida diferente para el slot "${slot.slot}" (id: ${slotId}) del ${prettyDate(draft.ds)}.
 Macros disponibles para este slot: ${remKcal} kcal, ${remP} g proteína, ${remC} g carbos, ${remF} g grasa.
-Tiempo: ≤${prefs.cookingMinutes||30} min. No repitas: ${draft.comidas.map(c=>c.nombre).join(", ")}.${hardResLine}${vegLine}${animalLine}${slotMomentLine}${likesLine}${blockedLine}
+${cookingLevelPromptLine(prefs.cookingLevel)}Tiempo: ≤${prefs.cookingMinutes||30} min. No repitas: ${draft.comidas.map(c=>c.nombre).join(", ")}.${hardResLine}${vegLine}${animalLine}${slotMomentLine}${likesLine}${blockedLine}
 Platos de referencia: ${dishList.slice(0,400)}.
 PROHIBIDO inventar nombres genéricos o ficticios. Usa un nombre descriptivo real y ingredientes reales.
 Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","comidas":[{"slot_id":"${slotId}","nombre":"...","ingredientes":[{"nombre":"...","gramos":0}],"kcal":0,"proteina_g":0,"carbohidratos_g":0,"grasa_g":0}]}`;
@@ -14494,6 +14569,7 @@ function editDish(id){
     protein_density:dish.protein_density||"",
     meal_weight:dish.meal_weight||"",
     meal_form:dish.meal_form||"",
+    cooking_level:dish.cooking_level||"",
     lines
   };
   dishModal();
@@ -14515,6 +14591,7 @@ function dishSync(){
     const density=document.getElementById("ds_density");if(density)d.protein_density=density.value;
     const weight=document.getElementById("ds_weight");if(weight)d.meal_weight=weight.value;
     const form=document.getElementById("ds_form");if(form)d.meal_form=form.value;
+    const cooking=document.getElementById("ds_cooking_level");if(cooking)d.cooking_level=cooking.value;
   }
 }
 function dishModal(){
@@ -14541,6 +14618,7 @@ function dishModal(){
         <div class="field"><label for="ds_weight">Contundencia</label><select id="ds_weight"><option value="">—</option>${["light","medium","heavy"].map(x=>`<option value="${x}" ${x===d.meal_weight?"selected":""}>${x}</option>`).join("")}</select></div>
         <div class="field"><label for="ds_form">Formato</label><select id="ds_form"><option value="">—</option>${["bowl","sandwich","shake","plated","soup","snack"].map(x=>`<option value="${x}" ${x===d.meal_form?"selected":""}>${x}</option>`).join("")}</select></div>
       </div>`:""}
+      ${cookingLevelSemanticsReady()?`<div class="field"><label for="ds_cooking_level">Nivel de cocina</label><select id="ds_cooking_level"><option value="">— sin clasificar</option>${Object.entries(COOKING_LEVEL_LABELS).map(([k,l])=>`<option value="${k}" ${k===d.cooking_level?"selected":""}>${esc(l)}</option>`).join("")}</select><div class="field-note">Sin clasificar, el plato aparece para todos los niveles.</div></div>`:""}
     </details>`:"";
   const linesHtml=d.lines.map((l,idx)=>`<div class="row" style="margin-bottom:6px">
     <select onchange="dishLineSet(${idx},'ingredient_id',this.value)" style="flex:1;background:var(--card2);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px">${DB.ingredients.map(i=>`<option value="${i.id}" ${i.id===+l.ingredient_id?"selected":""}>${esc(i.name)}</option>`).join("")}</select>
@@ -14585,6 +14663,7 @@ async function saveDish(){
       dishRow.meal_weight=d.meal_weight||null;
       dishRow.meal_form=d.meal_form||null;
     }
+    if(cookingLevelSemanticsReady())dishRow.cooking_level=COOKING_LEVEL_LABELS[d.cooking_level]?d.cooking_level:null;
   }
   if(dishId){const r=await supa.from("dishes").update(dishRow).eq("id",dishId);if(r.error){toast("Error: "+r.error.message);return;}}
   else{const r=await supa.from("dishes").insert(dishRow).select();if(r.error){toast("Error: "+r.error.message);return;}dishId=r.data[0].id;}

@@ -997,11 +997,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 
 ## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
 
-**Estado: pendiente. Requiere acción humana: sus criterios de aceptación ("subir de forma sustancial desde 32.3%") quedaron obsoletos y hay que re-basarlos antes de retomarlo; no implementable por el agente autónomo hasta esa decisión.**
-
-El "techo de catálogo ~32-33%" que motivaba este REQ **no existía**: era la función objetivo de `globalClosePass()`, corregida en REQ-166. El canario pasó de 122/378 (32.3%) a 289/378 (76.5%) sin agregar un solo plato. Las dos sesiones de lotes de catálogo (2026-07-05 y 2026-07-08) estaban alimentando un solver que optimizaba la métrica equivocada, y sus conclusiones sobre el contenido no son válidas.
-
-Lo que queda es un hueco de catálogo **real y ahora sí medible**: las 7 dimensiones que siguen en 0/7 son todas de **2 comidas** (cerrar 2250 kcal / 190 g de proteína en dos comidas) más vegano/`sin_tofu`. Si se retoma, el alcance debe apuntar solo ahí y medirse con `scripts/diff-diet-contract.mjs` contra la línea base nueva de 289/378, no contra 122/378. Detalle histórico de los experimentos (hoy superados): `docs/requirements-history.md` (buscar `## REQ-143`).
+**Estado: implementado (decisión de Jonathan, 2026-10-26: avisar en vez de crecer el catálogo).** El techo del 32,3% era la función objetivo de `globalClosePass()` (REQ-166); el hueco real que quedaba eran los planes de **2 comidas** (y vegano/vegetariano sin tofu). En vez de un lote de catálogo para ese caso, `twoMealNoticeHtml()` avisa al elegir 2 comidas en el registro inicial y en Perfil → Comidas que el plan cuadra peor y que con 3 o más cuadra mejor. Los platos de REQ-254 suben de paso el canario de 288/378 a 311/378 (2 comidas vegano/vegetariano alta proteína: 0→7 y 0→6 de 7). ✓ `tests/e2e/cocina.spec.js`. Experimentos anteriores: `docs/requirements-history.md` (buscar `## REQ-143`).
 
 ## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
 
@@ -1642,58 +1638,9 @@ Pedido del dueño: no volver a pedir lo que ya llenó al postular. Al aceptar (`
 
 ## REQ-254 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
 
-**Estado: pendiente — requiere acción humana:** aprobar la ampliación del catálogo y curar el nivel de cocina de cada plato antes de que un agente pueda implementar el filtro.
+**Estado: implementado — requiere acción humana:** ejecutar `supabase/cooking_level.sql` y luego volver a ejecutar `supabase/nutrition_catalog_semantics.sql` en Supabase.
 
-### Origen
-
-Diego (beta, 2026-10-21, audio): "Justo ahora ya terminé todo y me sale como próxima comida tacos de no sé qué con frijol, pero yo no sé hacer ni tacos ni el frijol. Estaría bueno que afines eso para la gente que no sabe cocinar o que no cocina."
-
-### Problema
-
-Quien no cocina recibe platos que piden cocinar de verdad (tacos con frijoles, seco con frijoles, enchiladas). El perfil solo pregunta "Minutos para cocinar" y ese dato no cambia lo que propone el plan.
-
-### Causa raíz
-
-- `planDeterministicNutritionDay()` y `compatibleDishesForSlot()` (`js/nutrition-domain.js`) no leen `prefs.cookingMinutes` ni `dishes.prep_minutes`/`dishes.needs_kitchen`; solo el texto del coach (`index.html`, "Tiempo por comida: ≤N min") lo menciona.
-- Los datos del catálogo no sirven para filtrar: `prep_minutes` es un valor por franja, no por plato (consulta a producción 2026-10-21, 180 platos: todo almuerzo = 30, toda cena = 20, todo desayuno = 15), y `needs_kitchen` es `true` en todos los almuerzos y cenas. Filtrar hoy por "≤15 min" dejaría sin almuerzo ni cena.
-- No existe una preferencia de "nivel en la cocina": "Minutos para cocinar" mezcla tiempo y habilidad.
-
-### Objetivo
-
-Una persona que marca "No cocino" o "Lo básico" recibe platos que puede armar sin saber cocinar (comprar listo + ensamblar, microondas, una sartén), y sigue cuadrando macros.
-
-### Alcance propuesto
-
-1. Preferencia nueva en onboarding y Perfil → Comidas: "¿Cuánto cocinas?" — "No cocino (armo o caliento)" / "Lo básico (una sartén, hervir)" / "Me gusta cocinar". Por defecto "Lo básico" para perfiles existentes.
-2. Catálogo: columna `cooking_level` (`none`/`basic`/`cook`) en `dishes`, migración idempotente; curar los 180 platos a mano (y corregir `prep_minutes` por plato). Acción manual: ejecutar la migración en producción.
-3. Ampliar almuerzos y cenas de nivel `none`/`basic` (hoy no hay ninguno): pollo rostizado + arroz listo + ensalada, wraps de atún o pavo, bowls con legumbre en lata, tortilla francesa con pan, etc.
-4. `compatibleDishesForSlot()` excluye platos por encima del nivel elegido; si una franja queda sin candidatos, cae al nivel siguiente y lo dice ("Hoy no encontramos algo más simple para la cena").
-5. En "Cambiar comida", un filtro rápido "Más fácil de preparar".
-
-### Fuera de alcance
-
-- Videos de recetas.
-- Reescribir los platos ya planificados de días pasados (historial inmutable).
-
-### Riesgos
-
-- Menos candidatos por franja empeora el cuadre de macros (canario `DIET_CONTRACT`, ver REQ-143/REQ-147): medir antes y después.
-- El paso 2 es trabajo de contenido, no automatizable sin revisión humana del etiquetado.
-
-### Criterios de aceptación
-
-- Con "No cocino", una semana generada no incluye platos `cook`; con "Me gusta cocinar", no cambia nada.
-- Con "No cocino", ninguna franja queda vacía; si se relaja el nivel, se avisa.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-
-- Canario `DIET_CONTRACT` antes y después con perfiles "No cocino" / "Lo básico" / "Me gusta cocinar".
-- E2E: perfil "No cocino", preparar la semana y comprobar que ningún plato es `cook`.
-
-### Decisión pendiente (Jonathan)
-
-- ¿Se aprueba ampliar el catálogo con almuerzos/cenas "sin cocinar" (choca con la pausa de REQ-143)?
+Feedback Diego (beta). Preferencia «¿Cuánto cocinas?» (`cookingLevel`: none/basic/cook; registro inicial y Perfil → Comidas; perfiles existentes parten de «Lo básico»). `dishes.cooking_level` clasifica los 180 platos (criterio en `docs/catalog-req-254-cooking-level.md`), corrige `prep_minutes`/`needs_kitchen` por plato y suma 19 almuerzos y cenas sin cocinar o básicos (pollo rostizado, wraps de atún/pavo/seitán, bowls con legumbres listas…). `compatibleDishesForSlot()` excluye platos por encima del nivel (sin clasificar no se excluye); si una franja queda vacía sube un nivel y avisa («Hoy no encontramos algo más simple para la cena…»); las propuestas del coach por encima del nivel se descartan y el prompt lo indica (`COACH_PROMPT_VERSION` 12). «Cambiar comida» filtra de verdad con «⏱ Más fácil de preparar» y «🍱 Sin cocina»; el editor admin fija el nivel. «No cocino» cuadra 245/252 días con 4 y 6 comidas. ✓ `scripts/validate-cooking-level.mjs`, `tests/e2e/cocina.spec.js`. Propuesta original en `docs/requirements-history.md`.
 
 ## REQ-255 - Recordatorios por WhatsApp
 

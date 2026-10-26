@@ -31,6 +31,7 @@ const DEPENDENCY_ORDER = [
   "schema.sql",       // 0 — base
   "seed.sql",         // 1 — datos
   "nutrition_catalog_semantics.sql", // 2 — metadata nutricional REQ-79
+  "cooking_level.sql", // 2b — nivel de cocina por plato REQ-254
   "auth.sql",         // 3 — multiusuario
   "plan_cycles.sql",  // 4 — ciclos y fotos
   "privacy.sql",      // 5 — consentimientos
