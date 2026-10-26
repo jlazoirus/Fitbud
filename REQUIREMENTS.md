@@ -2004,3 +2004,15 @@ Que el modal de resolución de conflictos ofrezca "Combinar seguro" cuando exist
 ### Verificación sugerida
 - Test Node/E2E: sembrar un item `conflict` de `day_log` (base/local/remoto con un slot en disputa y otro no), verificar que `item.conflict.autoMergedPayload` existe y que el modal renderiza 3 botones.
 - Repro manual (auditoría): modal "Revisar sincronización" con `hasAutoMergedPayload:false` y solo 2 botones; screenshot en `tool-results` de la corrida.
+
+## REQ-281 - Recordatorios: el job dice si el push está listo y tolera espacios en las claves
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+`api/notify.js` recorta `VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` y responde `push: {ready, issue}` (sin valores). ✓ `scripts/validate-notify-push-ready.mjs`.
+
+## REQ-282 - Recordatorios: avisar a quien todavía no empezó el día
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Sin el día en `day_log`, o sin nada registrado, `checkPending()` cuenta comidas pendientes y el correo dice "Tu plan de hoy te espera"; el entreno no se avisa sin el día. ✓ `scripts/validate-notify-schedule.mjs`.

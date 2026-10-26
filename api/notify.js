@@ -29,17 +29,23 @@ const VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
   "BHWBAWEp03r3-nwiNPaBIDA7R30G4sSj_Xkq3L_hEy4jfcT76kymwpHFDbQhuF2V41OFpOdcz0-P80MwqEQNkAc";
 
+// REQ-281: espacios o saltos de línea al pegar en Vercel invalidaban la clave
+// sin aviso. Se recortan, y si el push no queda listo la respuesta del job
+// dice por qué (sin mostrar valores).
 let vapidReady = false;
+let vapidIssue = "";
 try {
-  if (process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
-    webpush.setVapidDetails(
-      process.env.VAPID_SUBJECT,
-      VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
-    );
+  const privateKey = String(process.env.VAPID_PRIVATE_KEY || "").trim();
+  const subject = String(process.env.VAPID_SUBJECT || "").trim();
+  if (!privateKey) vapidIssue = "falta VAPID_PRIVATE_KEY";
+  else if (!subject) vapidIssue = "falta VAPID_SUBJECT";
+  else {
+    webpush.setVapidDetails(subject, VAPID_PUBLIC_KEY.trim(), privateKey);
     vapidReady = true;
   }
-} catch (_) {}
+} catch (err) {
+  vapidIssue = "VAPID inválida: " + String((err && err.message) || err);
+}
 
 function env() {
   return {
@@ -134,12 +140,17 @@ async function checkPending(userId, dateStr, e) {
   const rows = await supaGet(e,
     `/rest/v1/day_log?user_id=eq.${userId}&log_date=eq.${dateStr}&select=state`
   );
-  if (!rows.length) return { nutrition: false, training: false };
+  // REQ-282: quien no abrió ni preparó el día (sin fila, o sin comidas ni nada
+  // registrado) es quien más necesita el aviso: cuenta como comidas pendientes.
+  // El entreno no se sabe sin el día (puede tocar descanso): no se avisa.
+  if (!rows.length) return { nutrition: true, training: false, notStarted: true };
   const state = rows[0].state || {};
 
   const meals = state.meals || {};
   const mealIds = Object.keys(meals);
-  const nutritionPending = mealIds.length > 0 && mealIds.some(id => !meals[id].done);
+  const notStarted = !mealIds.length && !(state.extras || []).length &&
+    !(state.manualActivities || []).length && !state.workoutDone;
+  const nutritionPending = notStarted || (mealIds.length > 0 && mealIds.some(id => !meals[id].done));
 
   const workoutDone = !!state.workoutDone;
   // REQ-265: el cliente guarda workoutOverride como string ("descanso" o el id
@@ -149,7 +160,7 @@ async function checkPending(userId, dateStr, e) {
   const isRestDay = state.restDay === true || override === "descanso";
   const trainingPending = !workoutDone && !isRestDay;
 
-  return { nutrition: nutritionPending, training: trainingPending };
+  return { nutrition: nutritionPending, training: trainingPending, notStarted };
 }
 
 // ── Correo con Resend (fetch nativo, sin nuevas dependencias) ─────────────────
@@ -169,16 +180,20 @@ async function sendEmail(e, to, subject, html) {
   return data.id || "sent";
 }
 
-function buildEmailHtml(e, dateStr, unsubToken, type) {
+function buildEmailHtml(e, dateStr, unsubToken, type, notStarted) {
   const label = type === "nutrition" ? "tu alimentación de hoy" : "tu entrenamiento de hoy";
+  const heading = notStarted ? "Aún no has empezado tu plan de hoy" : `Todavía puedes completar ${label}`;
+  const body = notStarted
+    ? "Abre tu plan y marca lo que vayas comiendo. Unos minutos son suficientes para mantener tu racha."
+    : "El día está por cerrar y tu plan tiene actividad pendiente. Unos minutos son suficientes para mantener tu racha.";
   const link = `${e.appUrl}/?date=${dateStr}`;
   const unsubLink = `${e.appUrl}/api/notify?unsubscribe=${encodeURIComponent(unsubToken)}`;
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Actividad pendiente</title></head>
 <body style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1a1a1a;background:#fff">
-  <p style="font-size:18px;font-weight:700;margin:0 0 14px">Todavía puedes completar ${label}</p>
-  <p style="color:#555;margin:0 0 24px">El día está por cerrar y tu plan tiene actividad pendiente. Unos minutos son suficientes para mantener tu racha.</p>
+  <p style="font-size:18px;font-weight:700;margin:0 0 14px">${heading}</p>
+  <p style="color:#555;margin:0 0 24px">${body}</p>
   <a href="${link}"
      style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;
             padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">
@@ -300,11 +315,14 @@ async function runJob(e, dryRun) {
 
       // 8. Enviar correo
       try {
-        const subject = notifType === "nutrition"
+        const notStarted = notifType === "nutrition" && pending.notStarted;
+        const subject = notStarted
+          ? "Tu plan de hoy te espera"
+          : notifType === "nutrition"
           ? "Tienes comidas pendientes para hoy"
           : "Tienes entrenamiento pendiente para hoy";
         const emailId = await sendEmail(e, userEmail, subject,
-          buildEmailHtml(e, dateStr, unsubscribe_token, notifType)
+          buildEmailHtml(e, dateStr, unsubscribe_token, notifType, notStarted)
         );
         if (logId) {
           await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
@@ -326,8 +344,9 @@ async function runJob(e, dryRun) {
   }
 
   // ── Push de racha (REQ-38) ──────────────────────────────────────────────────
+  if (!vapidReady) results.push = { ready: false, issue: vapidIssue };
   if (vapidReady) {
-    results.push = { sent: 0, skipped: 0, errors: 0 };
+    results.push = { ready: true, sent: 0, skipped: 0, errors: 0 };
 
     const pushPrefs = await supaGet(e,
       "/rest/v1/notification_preferences?push_opt_in=eq.true" +
