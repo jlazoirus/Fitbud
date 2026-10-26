@@ -93,6 +93,7 @@ run("validate-supabase-keepalive.mjs", "node scripts/validate-supabase-keepalive
 run("validate-notify-schedule.mjs", "node scripts/validate-notify-schedule.mjs");
 run("validate-reminder-journey.mjs", "node scripts/validate-reminder-journey.mjs");
 run("validate-vapid-key.mjs", "node scripts/validate-vapid-key.mjs");
+run("validate-notify-push-ready.mjs", "node scripts/validate-notify-push-ready.mjs");
 run("validate-deploy-allowlist.mjs", "node scripts/validate-deploy-allowlist.mjs");
 run("validate-coach-plan-labels.mjs", "node scripts/validate-coach-plan-labels.mjs");
 run("validate-plan-version-for-date.mjs", "node scripts/validate-plan-version-for-date.mjs");

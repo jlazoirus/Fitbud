@@ -5,7 +5,7 @@ Diseño del 2026-10-26 (pedido de Jonathan). Implementación: REQ-283 (animació
 ## Punto de partida (antes de este diseño)
 
 - Un solo mensaje: a la hora elegida (17–23), si **hoy** tenía algo sin marcar, un correo por tipo (comidas y entreno: hasta dos correos) y un push "Tu racha te espera".
-- "Pendiente" salía de la fila de hoy en `day_log`. Quien no abrió la app hoy no tiene fila, así que **no recibía nada**: justo el caso en que la racha está en riesgo.
+- "Pendiente" salía de la fila de hoy en `day_log`. Quien no abrió la app hoy no tiene fila, así que **no recibía nada**: justo el caso en que la racha está en riesgo. REQ-282 lo cubrió con un correo genérico ("Tu plan de hoy te espera"); el journey lo integra con la racha.
 - Quien dejó la app con una semana ya preparada recibía el mismo correo de "comidas pendientes" **todos los días**, sin importar si llevaba dos días o tres semanas fuera.
 - Nadie que se fue recibía algo sobre su progreso u objetivo; no había un final: o spam diario o silencio.
 - Los enlaces `/?date=` de los correos y del push no se leían en la app.

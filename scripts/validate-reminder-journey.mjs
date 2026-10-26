@@ -40,8 +40,9 @@ assert.equal(dayHasActivity({ extras: [{ done: true }] }), true);
 assert.equal(dayHasActivity({ manualActivities: [{ sport: "running" }] }), true);
 assert.equal(dayHasActivity({ workoutExecution: { status: "in_progress", steps: [{ sets: [{ done: true }] }] } }), true);
 assert.equal(dayHasActivity({ meals: { a: { done: false } }, workoutDone: false }), false, "plan preparado sin marcar no es actividad");
-assert.deepEqual(pendingFromState({ meals: { a: meal(true) }, workoutExecution: { status: "partial" } }), { nutrition: false, training: false }, "sesión parcial cerrada no está pendiente");
-assert.deepEqual(pendingFromState({ meals: {}, restDay: true }), { nutrition: false, training: false }, "REQ-265: descanso sin aviso de entreno");
+assert.deepEqual(pendingFromState({ meals: { a: meal(true) }, workoutExecution: { status: "partial" } }), { nutrition: false, training: false, notStarted: false }, "sesión parcial cerrada no está pendiente");
+assert.deepEqual(pendingFromState({ meals: {}, restDay: true }), { nutrition: false, training: false, notStarted: true }, "REQ-265: descanso sin aviso de entreno; REQ-282: día abierto sin nada");
+assert.equal(pendingFromState({ meals: {}, extras: [{ name: "fruta" }], restDay: true }).notStarted, false, "REQ-282: con un extra ya empezó");
 console.log("  actividad y pendiente: mismo criterio que la app");
 
 // ── Día en juego ────────────────────────────────────────────────────────────
@@ -57,7 +58,10 @@ assert.equal(planReminder(base({ hour: 19 })), null, "antes de la hora elegida n
 d = planReminder(base({ rows: [activeRow(-1)] }));
 assert.equal(d.step, "day", "sin abrir la app hoy (sin fila) la racha sigue en riesgo");
 assert.equal(d.missing, "day");
-assert.equal(reminderMessage(d).body, "Falta registrar tu día para sumar el día 6.");
+assert.equal(reminderMessage(d).body, "Aún no has empezado tu plan de hoy. Regístralo para sumar el día 6.");
+assert.equal(planReminder(base({ rows: [activeRow(-1)], wantNutrition: false })), null, "REQ-282: sin la fila de hoy no se sabe si toca entrenar");
+d = planReminder(base({ rows: [activeRow(-1), { log_date: T, meals: {}, extras: [], restDay: true }] }));
+assert.equal(d.missing, "day", "REQ-282: día abierto sin nada registrado = no empezó");
 assert.equal(planReminder(base({ engagement: eng({ streakThrough: T, streak: 6 }) })), null, "la racha de hoy ya está a salvo");
 assert.equal(planReminder(base({ wantNutrition: false, rows: [activeRow(-1), plannedRow(0, { workoutDone: true })] })), null, "solo comidas pendientes y comidas desactivadas");
 d = planReminder(base({ engagement: null }));
@@ -120,7 +124,7 @@ assert.equal(d.never, true);
 assert.equal(reminderMessage(d).title, "Tu plan sigue listo");
 d = planReminder(base({ rows: [], engagement: null, planStart: D(-1) }));
 assert.equal(d.step, "day", "plan recién empezado sin registros: aviso del día, no de regreso");
-assert.equal(reminderMessage(d).body, "Falta registrar tu día. Hoy puede empezar tu racha.");
+assert.equal(reminderMessage(d).body, "Aún no has empezado tu plan de hoy. Hoy puede empezar tu racha.");
 assert.equal(planReminder(base({ planStart: D(3) })), null, "plan sin empezar");
 d = planReminder(base({ rows: [activeRow(-8)], planEnd: D(-2) }));
 assert.equal(d.step, "comeback_7");

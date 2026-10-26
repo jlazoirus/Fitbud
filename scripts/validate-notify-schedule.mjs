@@ -3,6 +3,7 @@
 // después (mismo día local), una sola vez por día. Antes exigían que el cron
 // cayera justo en esa hora y el cron diario (03:00 en Lima) nunca coincidía.
 // REQ-265: y no avisan de entreno en días de descanso.
+// REQ-282: y avisan a quien todavía no empezó el día.
 // REQ-285: el journey (validate-reminder-journey.mjs) decide la etapa; aquí se
 // prueba el aviso del día de quien registró ayer.
 import assert from "node:assert/strict";
@@ -32,7 +33,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes("/profiles?id=")) return json([{ email: "ana@example.com", active: true, goal: "deficit", planStartDate: null, planEndDate: null }]);
   if (u.includes("/profiles?select=id")) return json([{ id: "u1" }]);
   // Ayer con actividad y la fila de hoy (formato de columnas de loadUserContext).
-  if (u.includes("/day_log?")) return json([{ log_date: today(), ...state.day }, { log_date: yesterday(), meals: { cena: { done: true } }, workoutDone: true }]);
+  if (u.includes("/day_log?")) return json([...(state.day === null ? [] : [{ log_date: today(), ...state.day }]), { log_date: yesterday(), meals: { cena: { done: true } }, workoutDone: true }]);
   if (u.includes("/notification_log")) {
     if (method === "POST") return json([{ id: 1 }]);
     if (method === "PATCH") return json({});
@@ -84,4 +85,21 @@ assert.match(state.emails[0].html, /Falta tu entreno\./);
 out = await training({ restDay: false, workoutDone: true });
 assert.equal(out.sent, 0, "sesión cerrada: sin recordatorio");
 console.log("  descanso (plan o marcado) y sesión cerrada → sin aviso de entreno; sesión pendiente → aviso");
+// REQ-282: quien no abrió ni preparó el día recibe "Tu plan de hoy te espera".
+out = await run(hour, [], null);
+assert.equal(out.sent, 1, "sin el día en day_log: aviso de que no empezó");
+assert.equal(state.emails[0].subject, "Tu plan de hoy te espera");
+assert.match(state.emails[0].html, /Aún no has empezado tu plan de hoy/);
+out = await run(hour, [], { meals: {}, extras: [], workoutDone: false, restDay: true }, trainingOnly);
+assert.equal(out.sent, 0, "solo aviso de entreno y día sin preparar en descanso: no se avisa");
+out = await run(hour, [], null, trainingOnly);
+assert.equal(out.sent, 0, "sin el día y solo aviso de entreno: no se sabe si toca, no se avisa");
+out = await run(hour, [], { meals: {}, extras: [], workoutDone: false, restDay: true });
+assert.equal(out.sent, 1, "día abierto pero sin nada registrado: también cuenta como no empezado");
+assert.equal(state.emails[0].subject, "Tu plan de hoy te espera");
+out = await run(hour, [], { meals: { desayuno: { done: true } }, workoutDone: true });
+assert.equal(out.sent, 0, "comidas registradas y entreno hecho: sin aviso");
+out = await run(hour, [], { meals: {}, extras: [{ name: "fruta" }], workoutDone: false, restDay: true });
+assert.equal(out.sent, 0, "con algo registrado (un extra) ya empezó: sin aviso de no empezado");
+console.log("  sin el día o sin nada registrado → \"Tu plan de hoy te espera\"; con algo registrado → no");
 console.log("validate-notify-schedule: OK");

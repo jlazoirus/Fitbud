@@ -30,17 +30,23 @@ const VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
   "BHWBAWEp03r3-nwiNPaBIDA7R30G4sSj_Xkq3L_hEy4jfcT76kymwpHFDbQhuF2V41OFpOdcz0-P80MwqEQNkAc";
 
+// REQ-281: espacios o saltos de línea al pegar en Vercel invalidaban la clave
+// sin aviso. Se recortan, y si el push no queda listo la respuesta del job
+// dice por qué (sin mostrar valores).
 let vapidReady = false;
+let vapidIssue = "";
 try {
-  if (process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
-    webpush.setVapidDetails(
-      process.env.VAPID_SUBJECT,
-      VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
-    );
+  const privateKey = String(process.env.VAPID_PRIVATE_KEY || "").trim();
+  const subject = String(process.env.VAPID_SUBJECT || "").trim();
+  if (!privateKey) vapidIssue = "falta VAPID_PRIVATE_KEY";
+  else if (!subject) vapidIssue = "falta VAPID_SUBJECT";
+  else {
+    webpush.setVapidDetails(subject, VAPID_PUBLIC_KEY.trim(), privateKey);
     vapidReady = true;
   }
-} catch (_) {}
+} catch (err) {
+  vapidIssue = "VAPID inválida: " + String((err && err.message) || err);
+}
 
 function env() {
   return {
@@ -178,13 +184,15 @@ export function dayHasActivity(st) {
 }
 
 // Lo que falta hoy según la fila del día. REQ-265: el cliente guarda restDay
-// y workoutOverride ("descanso") en cada guardado.
+// y workoutOverride ("descanso") en cada guardado. REQ-282: un día abierto sin
+// comidas preparadas ni nada registrado es un día que no empezó.
 export function pendingFromState(st) {
   const meals = (st && st.meals) || {};
   const ids = Object.keys(meals);
+  const notStarted = !ids.length && !(Array.isArray(st.extras) && st.extras.length) && !trainedInState(st);
   const nutrition = ids.length > 0 && ids.some((id) => !(meals[id] && meals[id].done));
   const isRestDay = st.restDay === true || st.workoutOverride === "descanso";
-  return { nutrition, training: !trainedInState(st) && !isRestDay };
+  return { nutrition, training: !trainedInState(st) && !isRestDay, notStarted };
 }
 
 // Última llamada: dos horas después del aviso del día, desde las 21:00 y
@@ -246,16 +254,19 @@ export function planReminder(ctx) {
     if (planEnded) return null;
     if (eng && eng.streakThrough === today) return null; // la racha de hoy ya está a salvo
     const streak = eng && eng.streakThrough === yesterday ? engStreak : 0;
+    // REQ-282: sin la fila de hoy (no abrió la app) o con la fila sin nada,
+    // el día no empezó: cuenta como comidas pendientes. Sin la fila no se sabe
+    // si toca entrenar (puede ser descanso), así que el entreno solo no avisa.
     const todayRow = rows.find((r) => r.log_date === today);
-    let missing = "day"; // sin fila: la app aún no se abrió hoy
-    if (todayRow) {
-      const pending = pendingFromState(todayRow);
-      const n = pending.nutrition && ctx.wantNutrition !== false;
-      const t = pending.training && ctx.wantTraining !== false;
+    const pending = todayRow ? pendingFromState(todayRow) : { nutrition: false, training: false, notStarted: true };
+    const wantN = ctx.wantNutrition !== false, wantT = ctx.wantTraining !== false;
+    let missing;
+    if (pending.notStarted && wantN) missing = "day";
+    else {
+      const n = pending.nutrition && wantN;
+      const t = pending.training && wantT;
       if (!n && !t) return null;
       missing = n && t ? "both" : n ? "nutrition" : "training";
-    } else if (ctx.wantNutrition === false && ctx.wantTraining === false) {
-      return null;
     }
     const callHour = lastCallHour(ctx.notifyHour);
     const lastCall = streak >= LAST_CALL_MIN_STREAK && callHour != null && ctx.hour >= callHour && ctx.hour <= LAST_CALL_LATEST_HOUR;
@@ -313,15 +324,20 @@ export function reminderMessage(d, kind) {
   }
   if (d.step === "day") {
     const missing = MISSING_TEXT[d.missing] || MISSING_TEXT.day;
+    const notStarted = d.missing === "day";
     if (d.streak > 0) {
       title = `Tu racha de ${days(d.streak)} sigue en juego`;
-      body = `Falta ${missing} para sumar el día ${d.streak + 1}.`;
+      body = notStarted
+        ? `Aún no has empezado tu plan de hoy. Regístralo para sumar el día ${d.streak + 1}.`
+        : `Falta ${missing} para sumar el día ${d.streak + 1}.`;
     } else {
       title = "Tu plan de hoy te espera";
-      body = `Falta ${missing}. Hoy puede empezar tu racha.`;
+      body = notStarted ? "Aún no has empezado tu plan de hoy. Hoy puede empezar tu racha." : `Falta ${missing}. Hoy puede empezar tu racha.`;
     }
     subject = title;
-    paragraphs = [body, "Unos minutos bastan: marca lo que ya hiciste y el día cuenta."];
+    paragraphs = [body, notStarted
+      ? "Abre tu plan y marca lo que vayas comiendo: unos minutos bastan para que el día cuente."
+      : "Unos minutos bastan: marca lo que ya hiciste y el día cuenta."];
     cta = "Ver mi plan de hoy";
     url = `/?date=${d.date}&r=day`;
   } else if (d.step === "rescue") {
@@ -558,7 +574,8 @@ async function handleUnsubscribe(token, e, res) {
 
 async function runJob(e, dryRun) {
   const results = { processed: 0, sent: 0, skipped: 0, errors: 0, dryRun, log: [] };
-  if (vapidReady) results.push = { sent: 0, skipped: 0, errors: 0 };
+  // REQ-281: la respuesta siempre dice si el push está listo.
+  results.push = vapidReady ? { ready: true, sent: 0, skipped: 0, errors: 0 } : { ready: false, issue: vapidIssue };
 
   // select=*: la columna engagement (resumen de racha que escribe la app) llega
   // con supabase/notifications_journey.sql; sin ella la consulta sigue valiendo.

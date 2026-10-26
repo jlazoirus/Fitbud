@@ -11437,6 +11437,54 @@ Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; 
 - Servidor: `NO_TEMPLATE_ACTIONS` (`meal_estimate`) descarta cualquier fallback, también el de un cliente antiguo; si `select_reusable_coach_part` no tiene una generación del mismo usuario y `contextKey`, responde 422 `no_compatible_result` y marca la parte fallida (devuelve la reserva). La respuesta reutilizada informa `origin`. `validateCoachOutput` rechaza macros negativos. Sin cambios SQL.
 - Verificación: `scripts/test-meal-estimate-no-template.mjs` (sin pool, cliente antiguo con plantilla, reutilización exacta, origen template) y `tests/e2e/estimacion.spec.js` (422, plantilla reutilizada, negativos, reutilización compatible, foto).
 
+## REQ-281 - Recordatorios: el job dice si el push está listo y tolera espacios en las claves
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-26), tras cargar las variables VAPID en Vercel y redesplegar: la respuesta del job (`notify-hourly.yml`) seguía sin la sección `push`. No había forma de saber si faltaba una variable o si su valor era inválido.
+
+### Causa raíz
+
+`api/notify.js` solo activaba el push si ambas variables existían y `webpush.setVapidDetails()` no fallaba. El error se tragaba (`catch (_) {}`) y la respuesta omitía `push`. Un espacio o salto de línea al pegar la clave privada en Vercel basta para que `web-push` la rechace ("should be 32 bytes long when decoded").
+
+### Alcance
+
+1. Se recortan (`trim`) `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y la pública antes de configurar `web-push`.
+2. La respuesta del job siempre incluye `push`: `{ready: true, sent, skipped, errors}` o `{ready: false, issue}`. `issue` es "falta VAPID_PRIVATE_KEY", "falta VAPID_SUBJECT" o "VAPID inválida: <mensaje de web-push>". Los mensajes de `web-push` no incluyen la clave privada. El endpoint solo responde con `CRON_SECRET` y el workflow imprime solo conteos y `push`.
+
+### Criterios de aceptación
+
+- Sin clave privada, sin subject o con clave inválida, `push.ready` es `false` con el motivo, y el motivo no contiene la clave. Con espacios o saltos de línea pegados, `push.ready` es `true`. ✓ `scripts/validate-notify-push-ready.mjs`, en el release gate.
+
+## REQ-282 - Recordatorios: avisar a quien todavía no empezó el día
+
+**Estado: implementado.**
+
+### Origen
+
+Primer envío real (2026-10-25, 20:00 Lima): el job corrió con el usuario de correo activo (`processed: 1`) pero envió 0. Ninguno de los dos usuarios con avisos tenía fila en `day_log` ese día: no habían abierto ni preparado el día.
+
+### Problema
+
+`checkPending()` (`api/notify.js`) devolvía "nada pendiente" cuando no existía el día. Quien no abrió la app, que es quien más necesita el recordatorio, nunca lo recibía. Tampoco quien abrió el día sin prepararlo (sin comidas en el estado).
+
+### Alcance
+
+1. Sin fila en `day_log`, o con fila sin comidas, extras, actividades manuales ni entreno hecho (`notStarted`), cuenta como comidas pendientes.
+2. El correo de ese caso usa el asunto "Tu plan de hoy te espera" y el texto "Aún no has empezado tu plan de hoy". Reutiliza el tipo `nutrition` de `notification_log` (la restricción `CHECK` solo admite `nutrition`, `training` y `push_streak`): un aviso por día, sin migración.
+3. El push de racha también sale en ese caso, porque usa `checkPending()`.
+4. El recordatorio de entreno no sale sin el día: sin el estado no se sabe si toca descanso (REQ-265).
+
+### Fuera de alcance
+
+- Saber si toca entrenar un día que nunca se abrió (requeriría guardar el calendario del plan en el servidor).
+
+### Criterios de aceptación
+
+- Sin el día, o con el día sin nada registrado, y aviso de comidas activo: sale "Tu plan de hoy te espera". Con solo el aviso de entreno: no sale nada. Con algo registrado (comidas hechas, un extra): no sale el aviso de no empezado. ✓ `scripts/validate-notify-schedule.mjs` (falla con el código anterior).
+
 ## REQ-283 - Racha: animación al registrar algo que la hace avanzar
 
 **Estado: implementado.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
@@ -11542,5 +11590,6 @@ Validador Node con matriz de ausencias, zonas, idempotencia y fallo de registro;
 - `reminderMessage()`: textos por etapa; push y asunto sin objetivo ni datos corporales; el correo nombra el objetivo en el cuerpo. Enlaces `/?date=…&r=<etapa>` o `/?r=<etapa>`. Correo con colores de marca.
 - `deliver()`: lee la clave idempotente (y la clave hermana del aviso diario, para no duplicar el día del despliegue); si no puede leer o registrar el intento, no envía (falla cerrado). Tipos: aviso del día/rescate con `nutrition`/`training` y `push_streak` (de REQ-24/38, sin migración); `comeback`, `push_comeback`, `push_last_call` (con migración). Última llamada solo si el aviso del día ya salió en un disparo anterior. Push solo con suscripciones.
 - App: `engagementSnapshot()` (racha, `streakThrough`, rescate de ayer, mejor racha, días registrados, entrenos) se guarda en `notification_preferences.engagement` (columna propia, no reescribe `profiles.prefs`) 3 s después de cada registro y al iniciar, solo si cambió; sin la columna deja de intentar. `openReminderLink()` abre `?date=` (día del plan) y registra `reminder_opened` con `step`. Perfil explica el journey. `api/analytics.js` permite `reminder_opened`.
+- Integración con REQ-281/282 (#49, en `main` antes del merge): se conserva el recorte de claves VAPID y `push: {ready, issue}`; el día sin abrir o abierto sin nada registrado (`notStarted`) es el caso `missing:"day"` del aviso del día ("Aún no has empezado tu plan de hoy"), y con solo el aviso de entreno no sale sin la fila de hoy. Este trabajo se numeró primero REQ-281..283 y se renumeró a REQ-283..285.
 - Migración `supabase/notifications_journey.sql` (idempotente, con rollback): columna `engagement` y `CHECK` ampliado. Aplicada en producción el 2026-10-26 a pedido de Jonathan, vía la API de gestión de Supabase; verificado después: `CHECK` con los 6 tipos, `engagement jsonb` nulo, RLS y `notif_prefs_self` intactos.
 - Verificación: `scripts/validate-reminder-journey.mjs` (actividad, día en juego, rescate, última llamada, matriz de ausencias 2-59, activación, plan terminado, privacidad de 13 variantes, handler con push, falla cerrado y registro ilegible), `scripts/validate-notify-schedule.mjs` (REQ-265/266 sobre el journey) y `tests/e2e/recordatorios.spec.js` (resumen guardado en su columna, enlace del aviso).
