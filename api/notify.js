@@ -29,17 +29,23 @@ const VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
   "BHWBAWEp03r3-nwiNPaBIDA7R30G4sSj_Xkq3L_hEy4jfcT76kymwpHFDbQhuF2V41OFpOdcz0-P80MwqEQNkAc";
 
+// REQ-281: espacios o saltos de línea al pegar en Vercel invalidaban la clave
+// sin aviso. Se recortan, y si el push no queda listo la respuesta del job
+// dice por qué (sin mostrar valores).
 let vapidReady = false;
+let vapidIssue = "";
 try {
-  if (process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT) {
-    webpush.setVapidDetails(
-      process.env.VAPID_SUBJECT,
-      VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
-    );
+  const privateKey = String(process.env.VAPID_PRIVATE_KEY || "").trim();
+  const subject = String(process.env.VAPID_SUBJECT || "").trim();
+  if (!privateKey) vapidIssue = "falta VAPID_PRIVATE_KEY";
+  else if (!subject) vapidIssue = "falta VAPID_SUBJECT";
+  else {
+    webpush.setVapidDetails(subject, VAPID_PUBLIC_KEY.trim(), privateKey);
     vapidReady = true;
   }
-} catch (_) {}
+} catch (err) {
+  vapidIssue = "VAPID inválida: " + String((err && err.message) || err);
+}
 
 function env() {
   return {
@@ -326,8 +332,9 @@ async function runJob(e, dryRun) {
   }
 
   // ── Push de racha (REQ-38) ──────────────────────────────────────────────────
+  if (!vapidReady) results.push = { ready: false, issue: vapidIssue };
   if (vapidReady) {
-    results.push = { sent: 0, skipped: 0, errors: 0 };
+    results.push = { ready: true, sent: 0, skipped: 0, errors: 0 };
 
     const pushPrefs = await supaGet(e,
       "/rest/v1/notification_preferences?push_opt_in=eq.true" +

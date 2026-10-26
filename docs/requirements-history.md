@@ -11436,3 +11436,24 @@ Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; 
 - Cliente: `aiEstimate()` y `photoEstimateRound()` envían `fallbackText` vacío; `validEstimate()` exige cuatro valores finitos no negativos y rechaza respuestas `origin:"template"`. Sin resultado válido, `estimateErrorMessage` dice que no se pudo estimar y que los valores no cambiaron; no se muestra «Aplicado» ni ✓.
 - Servidor: `NO_TEMPLATE_ACTIONS` (`meal_estimate`) descarta cualquier fallback, también el de un cliente antiguo; si `select_reusable_coach_part` no tiene una generación del mismo usuario y `contextKey`, responde 422 `no_compatible_result` y marca la parte fallida (devuelve la reserva). La respuesta reutilizada informa `origin`. `validateCoachOutput` rechaza macros negativos. Sin cambios SQL.
 - Verificación: `scripts/test-meal-estimate-no-template.mjs` (sin pool, cliente antiguo con plantilla, reutilización exacta, origen template) y `tests/e2e/estimacion.spec.js` (422, plantilla reutilizada, negativos, reutilización compatible, foto).
+
+## REQ-281 - Recordatorios: el job dice si el push está listo y tolera espacios en las claves
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-26), tras cargar las variables VAPID en Vercel y redesplegar: la respuesta del job (`notify-hourly.yml`) seguía sin la sección `push`. No había forma de saber si faltaba una variable o si su valor era inválido.
+
+### Causa raíz
+
+`api/notify.js` solo activaba el push si ambas variables existían y `webpush.setVapidDetails()` no fallaba. El error se tragaba (`catch (_) {}`) y la respuesta omitía `push`. Un espacio o salto de línea al pegar la clave privada en Vercel basta para que `web-push` la rechace ("should be 32 bytes long when decoded").
+
+### Alcance
+
+1. Se recortan (`trim`) `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` y la pública antes de configurar `web-push`.
+2. La respuesta del job siempre incluye `push`: `{ready: true, sent, skipped, errors}` o `{ready: false, issue}`. `issue` es "falta VAPID_PRIVATE_KEY", "falta VAPID_SUBJECT" o "VAPID inválida: <mensaje de web-push>". Los mensajes de `web-push` no incluyen la clave privada. El endpoint solo responde con `CRON_SECRET` y el workflow imprime solo conteos y `push`.
+
+### Criterios de aceptación
+
+- Sin clave privada, sin subject o con clave inválida, `push.ready` es `false` con el motivo, y el motivo no contiene la clave. Con espacios o saltos de línea pegados, `push.ready` es `true`. ✓ `scripts/validate-notify-push-ready.mjs`, en el release gate.
