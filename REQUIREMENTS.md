@@ -2021,3 +2021,41 @@ Comidas y Entreno abiertos miden como máximo 1500 px en el caso E2E; editar, al
 
 ### Verificación sugerida
 `tests/e2e/perfil.spec.js`, capturas móvil/escritorio y validación de etiquetas/controles. Evidencia del bloqueo: `docs/requirements-evidence/req-279-profile.json`.
+
+## REQ-280 - Conflictos de sync: el botón "Combinar seguro" nunca aparece y se pierden cambios no conflictivos
+
+**Estado: pendiente.**
+
+### Origen
+Journey `sync`, auditoría del 2026-10-26 sobre `6ed64ed` (REQ-278). Al recorrer la resolución de conflictos offline reproduje un conflicto real en la app corriendo (localhost:8923) y el modal "Revisar sincronización" solo ofrece dos opciones, nunca la tercera que REQ-73 documenta.
+
+### Problema
+Cuando dos dispositivos editan el mismo día y hay un campo en conflicto (p. ej. la misma comida con valores distintos), el usuario solo puede elegir "Conservar este dispositivo" o "Usar versión guardada": ambas opciones son con pérdida. La opción "Combinar seguro" —diseñada para preservar los cambios NO conflictivos de ambos lados y resolver solo el campo en disputa— no se muestra jamás. Repro: con base `{meals.lunch}`, local que cambia `lunch` y además agrega `breakfast` + un extra, y remoto que cambia `lunch` distinto, el motor marca conflicto en `meals.lunch` pero computa un merge que conserva `breakfast` y el extra; aun así el usuario no puede aplicarlo y, al elegir local o remoto, pierde los cambios no conflictivos del otro dispositivo.
+
+### Causa raíz
+`_markSyncConflict()` (`index.html:2250`) guarda `item.conflict={detectedAt,remoteUpdatedAt,remotePayload,conflicts}` y **nunca** escribe `autoMergedPayload`. Además `_resolveQueuedConflictPayload()` (`index.html:2322-2329`) computa `merged.merged` con `mergeDayLogStates()` pero, cuando `ok===false`, devuelve `{ok:false,remotePayload,conflicts}` y **descarta** `merged.merged`. Como consecuencia, los dos únicos lectores de `autoMergedPayload` quedan muertos: `hasMerge` en `openSyncConflicts()` (`index.html:2409`) siempre es `false` (el botón no se renderiza) y la rama `action==="merge"` de `resolveSyncConflict()` (`index.html:2453`) es inalcanzable. La propiedad se referencia pero nunca se asigna desde el commit original de REQ-73 (`80fc012`, verificado con `git log -S`).
+
+### Objetivo
+Que el modal de resolución de conflictos ofrezca "Combinar seguro" cuando exista un merge parcial computable, aplicando los cambios no conflictivos de ambos dispositivos y resolviendo el campo en disputa, como promete REQ-73.
+
+### Alcance
+1. En `_markSyncConflict()` (o en el llamador `drainSyncQueue`), cuando `mergeDayLogStates` haya producido un `merged.merged` utilizable, almacenarlo en `item.conflict.autoMergedPayload` (payload `day_log` completo con `updated_at` nuevo, análogo al de la rama `auto_merge`).
+2. Que `_resolveQueuedConflictPayload` propague ese payload combinado hacia `_markSyncConflict` en vez de descartarlo.
+
+### Fuera de alcance
+- Cambiar la semántica de `mergeDayLogStates`/`mergeWeightPayload` ni las ramas local/remoto (funcionan).
+- Ofrecer "Combinar seguro" para `weight_log` cuando el conflicto es sobre el mismo campo (REQ-73 lo deja como conflicto visible).
+- CRDT o edición colaborativa en tiempo real.
+
+### Riesgos
+- Registrar el merge en `syncResolutionLog` sin duplicar (reusar `appendSyncResolutionLogToPayload`).
+- No exponer datos de salud a analytics ni romper el aislamiento por `uid`.
+
+### Criterios de aceptación
+- Ante un conflicto de `day_log` con merge parcial computable, el modal muestra "Combinar seguro" y aplicarlo conserva los cambios no conflictivos de ambos dispositivos.
+- Las opciones local/remoto siguen funcionando igual.
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+- Test Node/E2E: sembrar un item `conflict` de `day_log` (base/local/remoto con un slot en disputa y otro no), verificar que `item.conflict.autoMergedPayload` existe y que el modal renderiza 3 botones.
+- Repro manual (auditoría): modal "Revisar sincronización" con `hasAutoMergedPayload:false` y solo 2 botones; screenshot en `tool-results` de la corrida.
