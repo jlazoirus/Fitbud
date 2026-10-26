@@ -99,6 +99,8 @@ Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/R
 
 - REQ-258 - Home: día cerrado muestra mañana. (Jonathan; implementado)
 
+Journey de recordatorios y racha (Jonathan, 2026-10-26; diseño en `docs/reminders-journey.md`): REQ-281 animación de racha, REQ-282 regreso en Hoy, REQ-283 recordatorios por ausencia.
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -2004,3 +2006,87 @@ Que el modal de resolución de conflictos ofrezca "Combinar seguro" cuando exist
 ### Verificación sugerida
 - Test Node/E2E: sembrar un item `conflict` de `day_log` (base/local/remoto con un slot en disputa y otro no), verificar que `item.conflict.autoMergedPayload` existe y que el modal renderiza 3 botones.
 - Repro manual (auditoría): modal "Revisar sincronización" con `hasAutoMergedPayload:false` y solo 2 botones; screenshot en `tool-results` de la corrida.
+
+## REQ-281 - Racha: animación al registrar algo que la hace avanzar
+
+**Estado: pendiente.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): "cuando entras y haces algo se debe ver una animación de la actualización de racha".
+
+### Problema
+Marcar comidas o cerrar el entreno no da ninguna respuesta sobre la racha: cambia en silencio y solo los hitos 3/7/14/30 muestran un toast.
+
+### Objetivo
+Cada registro que acerca el día a la racha muestra cuánto falta; al cumplir el día, el número sube con una animación, también al recuperar ayer.
+
+### Alcance
+Píldora fija arriba, desde cualquier pestaña: avance del día (comidas necesarias + entreno), día sumado, primer día, hito y racha recuperada. Solo ante cambios locales que suman; con `prefers-reduced-motion`, fundido sin desplazamiento.
+
+### Fuera de alcance
+Cambiar la definición de racha (REQ-23) o los hitos guardados.
+
+### Riesgos
+Animar cambios remotos o programáticos; tapar controles; costo de calcular la racha en cada render.
+
+### Criterios de aceptación
+Marcar una comida muestra lo que falta; cumplir el día sube el número (N → N+1) y lo anuncia por `aria-live`; desmarcar no anima; tocar la píldora la cierra.
+
+### Verificación sugerida
+E2E con racha sembrada: comida → avance; descanso → día sumado; desmarcar sin animación; capturas móvil.
+
+## REQ-282 - Hoy: tarjeta de regreso y rescate de ayer
+
+**Estado: pendiente.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): el journey debe cubrir a quien volvió tras días o semanas, recordando progreso, objetivos o racha.
+
+### Problema
+Al volver tras 2-13 días, Hoy no reconoce la ausencia ni muestra lo logrado; quien olvidó registrar ayer pierde la racha sin saber que puede corregirlo (ventana de REQ-23).
+
+### Objetivo
+Hoy muestra una tarjeta según la ausencia: rescate de ayer o bienvenida con progreso, objetivo y semana del plan.
+
+### Alcance
+Rescate: ayer sin cumplir con racha de 2+ días hasta anteayer, "Registrar ayer" abre ese día. Bienvenida: 2+ días sin registrar, sin la tarjeta de reinicio de REQ-214; se oculta al registrar hoy o al descartarla.
+
+### Fuera de alcance
+Cambiar la tarjeta de reinicio de REQ-214 o el resumen de ciclo.
+
+### Riesgos
+Duplicar tarjetas; mostrar progreso de otro ciclo; lenguaje de culpa.
+
+### Criterios de aceptación
+Cada condición muestra su tarjeta y ninguna otra; registrar ayer desde la tarjeta recupera la racha; descartar persiste en el dispositivo.
+
+### Verificación sugerida
+E2E: ayer vacío con racha previa → rescate; 4 días fuera → bienvenida con días/entrenos; registrar hoy la oculta.
+
+## REQ-283 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
+
+**Estado: pendiente.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): recordatorios para usuarios del día, para quien dejó unos días y para quien dejó semanas.
+
+### Problema
+`api/notify.js` solo mira la fila de hoy: quien no abrió la app no recibe nada aunque su racha esté en riesgo; quien se fue con la semana preparada recibe el mismo correo cada día; nadie recibe progreso u objetivo; los enlaces `?date=` no se leen.
+
+### Objetivo
+Un journey con una decisión pura por usuario y día: día en juego, rescate de ayer, última llamada (push) y regreso a los 2/5/7/14/30 días, con silencio después.
+
+### Alcance
+`planReminder()` puro en `api/notify.js`; actividad desde `day_log` (60 días); racha y progreso desde `profiles.prefs.engagement`, escrito por la app; un correo diario; idempotencia por ausencia; no enviar sin registrar el intento; migración del `CHECK`; `?date=`/`r=` y `reminder_opened`; copy de Perfil.
+
+### Fuera de alcance
+WhatsApp (REQ-255), nuevas horas o preferencias por etapa.
+
+### Riesgos
+Spam por reintentos; datos sensibles en pantalla bloqueada; romper el aviso actual antes de la migración.
+
+### Criterios de aceptación
+Cada etapa sale una vez en su ventana; tras 45 días no sale nada; sin migración el aviso del día sigue; ningún mensaje lleva peso ni objetivo en push/asunto.
+
+### Verificación sugerida
+Validador Node con matriz de ausencias, zonas, idempotencia y fallo de registro; E2E de `?date=` y del snapshot.
