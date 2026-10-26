@@ -69,7 +69,7 @@ Cada registro que mueve el día hacia la racha (marcar una comida, cerrar el ent
 
 ### Tarjetas de regreso en Hoy (REQ-282)
 
-- **Rescate de ayer** (la misma condición que el aviso): "Ayer quedó sin registrar. Si lo cumpliste, regístralo y tu racha de 5 días sigue." Botones "Registrar ayer" y "Empezar de nuevo hoy".
+- **Rescate de ayer** (la misma condición que el aviso): "Ayer quedó sin registrar. Si lo cumpliste, regístralo y tu racha de 5 días sigue." Botones "Registrar ayer" y "Empezar hoy" (descarta la tarjeta en este dispositivo).
 - **Bienvenida** (2+ días sin registrar): resume el progreso del ciclo, el objetivo y la semana del plan. Desaparece al registrar lo primero de hoy o al descartarla. Si corresponde la tarjeta "Retomar / Empezar de nuevo" (14+ días sin entrenar, REQ-214), esa ocupa su lugar.
 - Los enlaces de los avisos (`/?date=AAAA-MM-DD&r=<etapa>`) abren ese día y registran `reminder_opened` con la etapa (sin datos personales) para medir qué etapa trae de vuelta.
 

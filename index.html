@@ -665,6 +665,12 @@
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-next{margin-top:12px}
+  /* REQ-282: tarjeta de regreso (rescate de ayer / bienvenida) */
+  .return-card .agenda-head{justify-content:flex-start;align-items:center}
+  .return-flame{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-dim);border:1px solid var(--border-acc)}
+  .return-flame svg{width:24px;height:24px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .return-body{font-size:14px;line-height:1.5;color:var(--txt);margin:0;max-width:62ch}
+  .return-goal{font-size:12.5px;line-height:1.4;color:var(--muted);margin:6px 0 0}
   .agenda-next-head{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase}
   @media(max-width:380px){
     .agenda-head{flex-direction:column}
@@ -4833,6 +4839,7 @@ function renderHoy(){
   </header>
   ${adminBetaPendingCardHtml()}
   ${restartNudgeCard()}
+  ${returnCardHtml()}
   ${dayClosed?"":heroDash(ds,{compact:true})}
   ${homeAgendaHtml(ds)}
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
@@ -13292,6 +13299,88 @@ async function dismissRestartNudge(){
   profile.prefs=prefs;render();
   toast("Vamos: tu plan sigue donde ibas");
   await saveProfilePrefs(prefs);
+}
+/* ---------- REQ-282: tarjeta de regreso en Hoy ---------- */
+// Rescate de ayer (ventana de corrección de REQ-23) o bienvenida tras 2+ días
+// sin registrar. Descartarla es una comodidad de este dispositivo.
+const RETURN_CARD_KEY="evolv_return_card_v1";
+function lastActiveDayBefore(ds){
+  return Object.keys(S.days||{}).filter(d=>d>=START&&d<ds&&dayActive(d)).sort().pop()||null;
+}
+function returnCardDismissed(key){
+  try{return localStorage.getItem(RETURN_CARD_KEY+":"+uid())===key;}catch(e){return false;}
+}
+function returnCardData(){
+  const p=(profile&&profile.prefs)||{};
+  if(!hasCompleteOnboarding(p)||onboardingActive)return null;
+  const today=todayStr();
+  if(today<START||today>END)return null;
+  const yesterday=addDays(today,-1);
+  if(yesterday>=START&&!combinedDayDone(yesterday)){
+    const rescue=streakEndingAt(addDays(yesterday,-1));
+    if(rescue>=2){
+      const key="rescue:"+yesterday;
+      return returnCardDismissed(key)?null:{kind:"rescue",key,ds:yesterday,streak:rescue};
+    }
+  }
+  if(dayActive(today)||restartNudgeDue())return null;
+  const last=lastActiveDayBefore(today);
+  if(daysBetween(last||START,today)<2)return null;
+  const key="welcome:"+(last||START);
+  return returnCardDismissed(key)?null:{kind:"welcome",key,never:!last};
+}
+function returnGoalLine(){
+  const p=(profile&&profile.prefs)||{};
+  const goal=GOAL_OPTIONS[p.goal];
+  const today=todayStr();
+  const w=weekOf(today,planPrefsForDate(today))||weekOf(today);
+  const week=w&&w.num?`semana ${w.num} de ${PLAN_DURATION_WEEKS}`:"";
+  return [goal?`Tu objetivo: ${goal.label}`:"",week].filter(Boolean).join(" · ");
+}
+function returnCardHtml(){
+  const data=returnCardData();
+  if(!data)return "";
+  const flame=`<span class="return-flame" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${STREAK_FLAME_PATH}"/></svg></span>`;
+  if(data.kind==="rescue"){
+    return `<section class="agenda-card agenda-state return-card" aria-labelledby="returnCardTitle">
+      <div class="agenda-head">${flame}<h2 class="agenda-title" id="returnCardTitle">Ayer quedó sin registrar</h2></div>
+      <p class="return-body">Si lo cumpliste, regístralo ahora y tu racha de ${data.streak} días sigue en pie.</p>
+      <div class="agenda-actions">
+        <button class="btn btn-accent" onclick="returnRescueYesterday('${data.ds}')">Registrar ayer</button>
+        <button class="btn" onclick="dismissReturnCard('${data.key}','return_restart')">Empezar hoy</button>
+      </div>
+    </section>`;
+  }
+  let body;
+  if(data.never)body="Aún no registras tu primer día. Empieza con una comida: ahí arranca tu racha.";
+  else{
+    const s=cycleSummary(todayStr());
+    const workouts=s.workouts+s.partialWorkouts;
+    const parts=[`${s.activeDays} día${s.activeDays===1?"":"s"} registrado${s.activeDays===1?"":"s"}`];
+    if(workouts)parts.push(`${workouts} entreno${workouts===1?"":"s"}`);
+    body=`Tu racha se reinició, tu progreso no: en este plan llevas ${parts.join(" y ")}${s.bestStreak>=2?`, con una mejor racha de ${s.bestStreak} días`:""}.`;
+  }
+  const goal=returnGoalLine();
+  return `<section class="agenda-card agenda-state return-card" aria-labelledby="returnCardTitle">
+    <div class="agenda-head">${flame}<h2 class="agenda-title" id="returnCardTitle">${data.never?"Tu plan te espera":"Qué bueno verte de vuelta"}</h2></div>
+    <p class="return-body">${esc(body)}</p>
+    ${goal?`<p class="return-goal">${esc(goal)}</p>`:""}
+    <div class="agenda-actions"><button class="btn btn-accent" onclick="returnStartToday('${data.key}')">Empezar hoy</button></div>
+  </section>`;
+}
+function dismissReturnCard(key,action){
+  try{localStorage.setItem(RETURN_CARD_KEY+":"+uid(),key);}catch(e){/* sin almacenamiento: vuelve a mostrarse */}
+  if(action)homeTrackAction(todayStr(),action);
+  render();
+}
+function returnRescueYesterday(ds){
+  homeTrackAction(todayStr(),"return_rescue");
+  goDay(ds);
+}
+function returnStartToday(key){
+  dismissReturnCard(key,"return_start");
+  const target=document.querySelector("#app .agenda-card:not(.return-card)");
+  if(target)target.scrollIntoView({block:"start",behavior:window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
 }
 async function archiveCompletedCycle(summary,challenge,photoPath,endDate){
   if(!supa||!uid())throw new Error("Sin conexión con tu historial.");

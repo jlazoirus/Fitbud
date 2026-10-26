@@ -11472,3 +11472,38 @@ E2E con racha sembrada: comida → avance; descanso → día sumado; desmarcar s
 - `#streakPop` es un contenedor permanente `role=status aria-live=polite`; la píldora es un botón que se cierra al tocarlo y se va sola (2,8 s avance, 3,6 s día, 4,4 s hito). Llama SVG con relleno recortado (`clipPath` escalado por `--sp-from/--sp-to`), número que sube con desenfoque breve y llama que se enciende. Con `prefers-reduced-motion`, solo fundidos.
 - `checkAndSaveMilestones()` no repite el toast del hito si la píldora ya lo está mostrando.
 - Verificación: `tests/e2e/racha-animacion.spec.js` (avance, día sumado con 3 → 4, cerrar al tocar, desmarcar sin animación, día 1 tras racha rota, racha recuperada) y capturas móvil con y sin movimiento reducido.
+
+## REQ-282 - Hoy: tarjeta de regreso y rescate de ayer
+
+**Estado: implementado.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): el journey debe cubrir a quien volvió tras días o semanas, recordando progreso, objetivos o racha.
+
+### Problema
+Al volver tras 2-13 días, Hoy no reconoce la ausencia ni muestra lo logrado; quien olvidó registrar ayer pierde la racha sin saber que puede corregirlo (ventana de REQ-23).
+
+### Objetivo
+Hoy muestra una tarjeta según la ausencia: rescate de ayer o bienvenida con progreso, objetivo y semana del plan.
+
+### Alcance
+Rescate: ayer sin cumplir con racha de 2+ días hasta anteayer, "Registrar ayer" abre ese día. Bienvenida: 2+ días sin registrar, sin la tarjeta de reinicio de REQ-214; se oculta al registrar hoy o al descartarla.
+
+### Fuera de alcance
+Cambiar la tarjeta de reinicio de REQ-214 o el resumen de ciclo.
+
+### Riesgos
+Duplicar tarjetas; mostrar progreso de otro ciclo; lenguaje de culpa.
+
+### Criterios de aceptación
+Cada condición muestra su tarjeta y ninguna otra; registrar ayer desde la tarjeta recupera la racha; descartar persiste en el dispositivo.
+
+### Verificación sugerida
+E2E: ayer vacío con racha previa → rescate; 4 días fuera → bienvenida con días/entrenos; registrar hoy la oculta.
+
+### Implementación
+- `returnCardData()` decide la tarjeta: rescate (ayer ≥ inicio del plan, `!combinedDayDone(ayer)` y `streakEndingAt(anteayer) >= 2`) o bienvenida (hoy sin actividad, sin `restartNudgeDue()` y `lastActiveDayBefore(hoy)` —o el inicio del plan si nunca hubo registro— a 2+ días). Fuera del rango del plan no hay tarjeta.
+- `returnCardHtml()` se pinta en `renderHoy()` después de `restartNudgeCard()`: rescate con "Registrar ayer" (`goDay(ayer)`) y "Empezar hoy"; bienvenida con frase de progreso de `cycleSummary(hoy)` (días registrados, entrenos completos y parciales, mejor racha si es 2+), `returnGoalLine()` (objetivo de `GOAL_OPTIONS` y semana del plan) y "Empezar hoy", que la descarta y lleva a la agenda. Sin registros: "Tu plan te espera".
+- El descarte vive en `localStorage` (`evolv_return_card_v1:<uid>`) con la clave de la ausencia (`rescue:<ayer>` / `welcome:<último día activo>`): una ausencia nueva vuelve a mostrarla. Acciones registradas con `home_agenda_action` (`return_rescue`, `return_restart`, `return_start`), sin datos personales.
+- Sin kicker sobre el título (skill de diseño); llama SVG en contorno, la misma de la píldora de REQ-281.
+- Verificación: `tests/e2e/regreso.spec.js` (rescate y recuperación con la píldora, descarte persistente tras recargar, bienvenida con progreso/objetivo que se oculta al registrar, sin registros, racha viva sin tarjeta) y capturas 390/1280 px.

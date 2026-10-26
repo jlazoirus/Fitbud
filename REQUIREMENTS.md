@@ -2015,31 +2015,9 @@ Jonathan (2026-10-26). `commitDay()` llama `streakFeedbackAfterCommit()`: si un 
 
 ## REQ-282 - Hoy: tarjeta de regreso y rescate de ayer
 
-**Estado: pendiente.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
 
-### Origen
-Jonathan (2026-10-26): el journey debe cubrir a quien volvió tras días o semanas, recordando progreso, objetivos o racha.
-
-### Problema
-Al volver tras 2-13 días, Hoy no reconoce la ausencia ni muestra lo logrado; quien olvidó registrar ayer pierde la racha sin saber que puede corregirlo (ventana de REQ-23).
-
-### Objetivo
-Hoy muestra una tarjeta según la ausencia: rescate de ayer o bienvenida con progreso, objetivo y semana del plan.
-
-### Alcance
-Rescate: ayer sin cumplir con racha de 2+ días hasta anteayer, "Registrar ayer" abre ese día. Bienvenida: 2+ días sin registrar, sin la tarjeta de reinicio de REQ-214; se oculta al registrar hoy o al descartarla.
-
-### Fuera de alcance
-Cambiar la tarjeta de reinicio de REQ-214 o el resumen de ciclo.
-
-### Riesgos
-Duplicar tarjetas; mostrar progreso de otro ciclo; lenguaje de culpa.
-
-### Criterios de aceptación
-Cada condición muestra su tarjeta y ninguna otra; registrar ayer desde la tarjeta recupera la racha; descartar persiste en el dispositivo.
-
-### Verificación sugerida
-E2E: ayer vacío con racha previa → rescate; 4 días fuera → bienvenida con días/entrenos; registrar hoy la oculta.
+Jonathan (2026-10-26). `returnCardHtml()` en Hoy, bajo la tarjeta de reinicio de REQ-214: rescate si ayer no se cumplió y había racha de 2+ días hasta anteayer ("Registrar ayer" abre ese día; al completarlo, "Racha recuperada"); bienvenida tras 2+ días sin registrar con días registrados, entrenos, mejor racha, objetivo y semana del plan, o "Tu plan te espera" sin registros. Se oculta al registrar hoy; descartarla se guarda en el dispositivo. ✓ `tests/e2e/regreso.spec.js`.
 
 ## REQ-283 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
