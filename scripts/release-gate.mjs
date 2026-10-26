@@ -86,6 +86,7 @@ run("validate-session-rejections.mjs", "node scripts/validate-session-rejections
 run("validate-meal-photo-estimate.mjs", "node scripts/validate-meal-photo-estimate.mjs");
 run("validate-meal-estimate-output.mjs", "node scripts/validate-meal-estimate-output.mjs");
 run("test-meal-estimate-no-template.mjs", "node scripts/test-meal-estimate-no-template.mjs");
+run("test-meal-estimate-reuse.mjs", "node scripts/test-meal-estimate-reuse.mjs");
 run("validate-sw-cache-bump.mjs", "node scripts/validate-sw-cache-bump.mjs");
 run("validate-admin-create-user.mjs", "node scripts/validate-admin-create-user.mjs");
 run("validate-supabase-keepalive.mjs", "node scripts/validate-supabase-keepalive.mjs");

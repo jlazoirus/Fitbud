@@ -1,0 +1,139 @@
+=== Evolv Release Gate ===
+
+[ Estado del repositorio ]
+  ✓ git diff --check (sin whitespace errors) (4 ms)
+  ✓ git diff --cached --check (3 ms)
+  ✓ Rama activa es main
+  ✓ Sin modificaciones no intencionadas
+
+[ Sintaxis de módulos JS ]
+  ✓ node --check js/nutrition-pure.js (26 ms)
+  ✓ node --check js/nutrition-domain.js (26 ms)
+  ✓ node --check js/meal-log.js (26 ms)
+  ✓ node --check domain-contracts.js (26 ms)
+  ✓ node --check exercise-catalog.js (25 ms)
+  ✓ node --check workout-player.js (27 ms)
+  ✓ node --check training-plan.js (26 ms)
+  ✓ node --check sync-conflicts.js (24 ms)
+
+[ Validadores de dominio ]
+  ✓ test-nutrition-pure.mjs (31 ms)
+  ✓ test-meal-log.mjs (38 ms)
+  ✓ validate-contracts.mjs (32 ms)
+  ✓ validate-exercises.mjs (56 ms)
+  ✓ validate-workout-player.mjs (40 ms)
+  ✓ validate-training-plan.mjs (46 ms)
+  ✓ validate-training-plan-wiring.mjs (41 ms)
+  ✓ validate-macro-target-wiring.mjs (36 ms)
+  ✓ validate-macro-targets-invariant.mjs (65 ms)
+  ✓ validate-nutrition-domain.mjs (37 ms)
+  ✓ validate-finalize-nutrition-day.mjs (45 ms)
+  ✓ validate-nutrition-finalize-wiring.mjs (45 ms)
+  ✓ validate-global-close-objective.mjs (37 ms)
+  ✓ validate-proposal-close.mjs (5442 ms)
+  ✓ validate-session-rejections.mjs (218 ms)
+  ✓ validate-meal-photo-estimate.mjs (37 ms)
+  ✓ validate-meal-estimate-output.mjs (37 ms)
+  ✓ test-meal-estimate-no-template.mjs (49 ms)
+  ✓ test-meal-estimate-reuse.mjs (355 ms)
+  ✓ validate-sw-cache-bump.mjs (45 ms)
+  ✓ validate-admin-create-user.mjs (49 ms)
+  ✓ validate-supabase-keepalive.mjs (71 ms)
+  ✓ validate-notify-schedule.mjs (71 ms)
+  ✓ validate-vapid-key.mjs (37 ms)
+  ✓ validate-deploy-allowlist.mjs (47 ms)
+  ✓ validate-coach-plan-labels.mjs (37 ms)
+  ✓ validate-plan-version-for-date.mjs (38 ms)
+  ✓ validate-diet-contract.mjs (9365 ms)
+  ✓ validate-diet-contract-diff.mjs (18083 ms)
+  ✓ validate-diet-contract-runtime-notice.mjs (44 ms)
+  ✓ validate-nutrition-catalog.mjs (40 ms)
+  ✓ validate-cuisine-preferences.mjs (34 ms)
+  ✓ validate-meal-variety.mjs (1275 ms)
+  ✓ validate-grow-catalog.mjs (75 ms)
+  ✓ validate-nutrition-solver.mjs (78 ms)
+  ✓ validate-nutrition-week-planner.mjs (67 ms)
+  ✓ validate-nutrition-plan-snapshot.mjs (52 ms)
+  ✓ validate-nutrition-replacements.mjs (53 ms)
+  ✓ test-meal-value-replacement.mjs (48 ms)
+  ✓ test-nutritionplan-priority.mjs (45 ms)
+  ✓ validate-blocked-dishes.mjs (39 ms)
+  ✓ validate-nutrition-coach-contract.mjs (36 ms)
+  ✓ validate-first-day-preferences.mjs (35 ms)
+  ✓ validate-meal-option-reroll.mjs (41 ms)
+  ✓ validate-high-protein-prompt.mjs (35 ms)
+  ✓ validate-slot-budget-prompt.mjs (33 ms)
+  ✓ validate-placeholder-meals.mjs (34 ms)
+  ✓ validate-coach-prompt-version.mjs (32 ms)
+  ✓ validate-week-skip-past.mjs (38 ms)
+  ✓ validate-day-scope-in-context.mjs (37 ms)
+  ✓ validate-preference-cache-invalidation.mjs (41 ms)
+  ✓ validate-diet-completion-fallback.mjs (39 ms)
+  ✗ validate-retry-feedback.mjs
+    node:internal/modules/run_main:107
+        triggerUncaughtException(
+        ^
+
+    AssertionError [ERR_ASSERTION]: api/claude.js debe devolver reused:true en la respuesta cuando reservation.mode es 'reuse'.
+        at file:///workspace/Fitbud/scripts/validate-retry-feedback.mjs:28:8
+  ✓ validate-home-macro-ring-first.mjs (38 ms)
+  ✓ test-checkin-goal-mapping.mjs (37 ms)
+  ✓ validate-meal-reorder-skip.mjs (37 ms)
+  ✓ validate-gap-snack.mjs (51 ms)
+  ✓ validate-portion-editing.mjs (37 ms)
+  ✓ validate-gap-snack-pending.mjs (35 ms)
+  ✓ validate-coach-quota.mjs (35 ms)
+  ✓ validate-coach-structured-output.mjs (37 ms)
+  ✓ test-coach-quota.mjs (70 ms)
+  ✓ validate-privacy.mjs (43 ms)
+  ✓ validate-password-toggle.mjs (37 ms)
+  ✓ validate-onboarding-copy.mjs (40 ms)
+  ✓ validate-onboarding-first-week.mjs (37 ms)
+  ✓ validate-onboarding-macro-reconcile.mjs (35 ms)
+  ✓ validate-training-onboarding-decisions.mjs (37 ms)
+  ✓ validate-training-safety-mode.mjs (41 ms)
+  ✓ validate-splits.mjs (35 ms)
+  ✓ validate-strength-only-schedule.mjs (40 ms)
+  ✓ validate-e2e-training-fixture.mjs (42 ms)
+  ✓ test-sync-conflicts.mjs (36 ms)
+  ✓ test-admin-api.mjs (47 ms)
+  ✓ test-admin-beta-api.mjs (56 ms)
+  ✓ test-admin-beta-signup.mjs (56 ms)
+  ✓ test-admin-reset.mjs (67 ms)
+  ✓ test-beta-recruitment-api.mjs (39 ms)
+  ✓ invite-beta-tester.mjs --self-test (61 ms)
+  ✓ test-invite-signup-api.mjs (43 ms)
+  ✓ test-webhook-refund.mjs (40 ms)
+  ✓ test-webhook-renewal.mjs (46 ms)
+  ✓ test-service-worker-cache.mjs (39 ms)
+
+[ SQL y datos ]
+  ✓ supabase/validate.mjs (recetas y macros) (35 ms)
+  ✓ validate-migrations.mjs (41 ms)
+
+[ Seguridad y calidad ]
+  ✓ validate-docs-index.mjs (38 ms)
+  ✓ native-next-task.mjs --validate (plan de migración nativa) (40 ms)
+  ✓ audit-secrets.mjs (86 ms)
+  ✓ audit-html.mjs (98 ms)
+  ✓ validate-css-tokens.mjs (35 ms)
+  ✓ validate-cdn-pins.mjs (38 ms)
+  ✓ validate-beta-form-values.mjs (30 ms)
+
+[ E2E de journeys críticos (Playwright) ]
+  ✗ Suite E2E (npx playwright test)
+    Running 155 tests using 1 worker
+
+      ✓    1 tests/e2e/accesibilidad.spec.js:8:3 › Accesibilidad › cada tab tiene un único <main> y un h1 (1.7s)
+      ✓    2 tests/e2e/accesibilidad.spec.js:26:3 › Accesibilidad › los campos del onboarding están asociados a su etiqueta (582ms)
+      ✓    3 tests/e2e/accesibilidad.spec.js:39:3 › Accesibilidad › la FAQ de la portada usa <details> nativo (estado anunciado por el navegador) (548ms)
+      ✓    4 tests/e2e/actividad-manual.spec.js:24:3 › Actividad registrada a mano › en un día de descanso se registra lo entrenado, estima kcal y cuenta como entrenado (1.3s)
+
+────────────────────────────────────────────
+103/105 checks pasaron en 225.4 s.
+
+✗ 2 check(s) bloqueante(s):
+  - validate-retry-feedback.mjs
+  - Suite E2E (npx playwright test)
+
+Corregir estos errores antes de hacer push a producción.

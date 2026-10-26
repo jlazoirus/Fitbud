@@ -45,6 +45,7 @@ function reuseRoutes(select, log) {
     if (auth) return auth;
     if (value.endsWith("/rpc/reserve_coach_action")) return response(200, [{ usage_id: 90, mode: "reuse", usage_status: "reused", effective_limit: 1, quota_day: "2026-10-24", policy_enabled: true }]);
     if (value.endsWith("/rpc/claim_coach_generation_part")) return response(200, [{ claimed: true, part_status: "processing", response_text: null, result_id: null }]);
+    if (value.includes("/rest/v1/coach_option_pool?")) return response(200, [{ id: 7, response_text: estimate }]);
     if (value.endsWith("/rpc/select_reusable_coach_part")) { log.selectPayload = JSON.parse(options.body || "{}"); return select(log.selectPayload); }
     if (value.endsWith("/rpc/fail_coach_generation_part")) { log.failed = JSON.parse(options.body || "{}"); return response(200, true); }
     if (value.includes("api.anthropic.com")) { log.provider = true; return response(500, {}); }
@@ -86,7 +87,7 @@ global.fetch = reuseRoutes(sqlLike(estimate), log);
 res = capture();
 await handler({ method: "POST", headers: { authorization: "Bearer t" }, body: body("") }, res);
 assert(res.statusCode === 200 && res.body.text === estimate && res.body.reused === true && res.body.origin === "reused", "La reutilización compatible sigue funcionando.");
-assert(log.selectPayload.p_context_key === "ctx-agua", "La selección usa la clave del contexto de esta comida.");
+assert(/^estimate-v2-[a-f0-9]{64}$/.test(log.selectPayload.p_context_key), "La selección usa el contexto de entrada verificado por el servidor.");
 console.log("  La reutilización de una generación compatible sigue funcionando");
 
 // 4. Si la base devolviera igualmente una plantilla, el servidor la rechaza.

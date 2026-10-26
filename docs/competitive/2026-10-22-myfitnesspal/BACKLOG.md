@@ -1,6 +1,6 @@
-# Requerimientos aprobados para iniciar implementación
+# Especificaciones del paquete MyFitnessPal implementado
 
-Actualización: **24 de octubre de 2026**, por instrucción directa del usuario: no depender de entrevistas; identificar mejoras e incorporarlas al backlog operativo. Base contrastada: `origin/main` `62c7860`. Los REQ están pendientes, no implementados. Su fuente operativa es `REQUIREMENTS.md`.
+Actualización: **25 de octubre de 2026**, por instrucción directa del usuario: no depender de entrevistas; identificar mejoras e incorporarlas al backlog operativo. Base contrastada: `origin/main` `62c7860`. REQ-268..276 ya están implementados en `main` (`10f9f2e`, PR #46). Las tablas y casos conservan la especificación de partida; su fuente operativa es `REQUIREMENTS.md`.
 
 ## Decisión y método
 
@@ -15,12 +15,12 @@ Los recorridos de MyFitnessPal se reconstruyeron desde su ayuda oficial; no se i
 | Recientes, favoritas y búsqueda de ingredientes | REQ-188 y REQ-243; `recentCustomMeals`, `savedMeals`, `renderQuickPicks`; tres E2E pasan | Reutilizar; no volver a construir |
 | Compras recuperables y checklist | REQ-215 y REQ-231; `openShoppingList`, dos E2E pasan | Conservar y hacer que las composiciones nuevas aporten ingredientes |
 | Reenvío de confirmación | REQ-190; `resendConfirmEmail`; E2E pasa | No crear otro REQ de alta por el caso histórico |
-| Preview roto y errores de estimación | REQ-228/230/238/246 y CSS actual | No repetir esos fixes; el fallback específico sí sigue pendiente |
+| Preview roto y errores de estimación | REQ-228/230/238/246 y CSS actual | No repetir esos fixes; el fallback específico se cubrió en REQ-268; el replay adicional se trata en REQ-278 |
 | Última carga de un ejercicio | REQ-232 y `lastWorkoutPerformance`/render asociado | Ya existe; no confundirlo con progresión automática |
 | Historial alterado por check-in | REQ-234 | Conservar el fix; no rehacer check-in como prerequisito |
 | Búsqueda/cambio/añadir ejercicios | REQ-260/261/262 | Ya implementado; sin trabajo duplicado |
 
-## Orden ejecutable
+## Secuencia del paquete implementado
 
 | Orden | REQ | Entrega | Dependencias |
 |---|---|---|---|
@@ -34,7 +34,7 @@ Los recorridos de MyFitnessPal se reconstruyeron desde su ayuda oficial; no se i
 | 8 | 275 · P1 | Recetas propias y rendimiento por porción/peso final | 271 y 274 |
 | 9 | 276 · P2 | Código GTIN privado y escaneo progresivo cuando el navegador lo soporte | 274 |
 
-El selector actual descubre pendientes no listados y los ordena por número; no hace falta cambiar `agent-loop.json`. Al integrarse este cambio en `main`, el primero será REQ-268. La escritura sobre archivos compartidos sigue usando el lock existente y un REQ por implementación/commit. Este paquete no habilita trabajo nativo ni promueve los nueve REQ como una sola implementación.
+El selector actual descubre los pendientes del ledger y los ordena por número; no hace falta cambiar `agent-loop.json`. No volver a tomar REQ-268..276 solo por aparecer aquí. Los nuevos fixes usan el lock existente y un REQ por implementación/commit. Este paquete no habilita trabajo nativo.
 
 ## Contratos comunes para los agentes
 
@@ -125,6 +125,6 @@ Implementar «Solo conozco las calorías» como modo explícito: kcal válida, m
 
 ## Definition of ready y cierre
 
-Cada REQ tiene problema, objetivo, alcance, exclusiones, riesgo, aceptación y verificación en el ledger. Los nueve pueden resolverse con los servicios y patrones actuales. El agente debe confirmar de nuevo su necesidad al tomarlo, implementar uno por vez y adjuntar evidencia de sus casos, sin pedir entrevistas como condición.
+Cada REQ tiene problema, objetivo, alcance, exclusiones, riesgo, aceptación y verificación en el ledger. Los nueve se implementaron con los servicios y patrones actuales. Para nuevas regresiones, el agente debe registrar evidencia, comprobar que el trabajo sigue pendiente e implementar un REQ por vez, sin pedir entrevistas como condición.
 
 Se valida con fixtures de alimentos/porciones, pruebas puras de cálculo, E2E de tarea, RLS ya existente, dos cuentas, offline/reintento y móvil/escritorio. Para cámara, los tests de capacidad/permiso deben acompañarse de límites declarados; una simulación no se presenta como una prueba física en iPhone. Estas pruebas justifican funcionamiento y menor trabajo de interacción; no prueban retención, demanda ni resultados clínicos. Métricas pasivas futuras son observación opcional posterior, no una puerta que impida implementar.

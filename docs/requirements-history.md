@@ -11272,3 +11272,167 @@ Una persona que marca "No cocino" o "Lo básico" recibe platos que puede armar s
 ### Decisión pendiente (Jonathan)
 
 - ¿Se aprueba ampliar el catálogo con almuerzos/cenas "sin cocinar" (choca con la pausa de REQ-143)?
+## REQ-271 - Registro: editar ingredientes y gramos decimales sin perder el cálculo
+
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-270. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Probe `ingredient-snapshot`; `addFoodToEditor()` redondea gramos y concatena texto.
+
+### Problema
+33,5 g se guarda como 34 g y las líneas no se pueden corregir después.
+
+### Objetivo
+Componer una comida editable con totales derivados de cantidades reales.
+
+### Alcance
+Componentes con base nutricional capturada; añadir/editar/quitar, gramos decimales y redondeo solo visible; integrarlos en ficha y compras actuales cuando existen.
+
+### Fuera de alcance
+Extraer ingredientes de texto antiguo o alterar catálogo global.
+
+### Riesgos
+Doble suma, pérdida de precisión, crudo/cocido ambiguo y componentes obsoletos.
+
+### Criterios de aceptación
+33,5+0,5 g mantiene precisión interna; editar/quitar recalcula. Recarga conserva líneas y snapshot; compras refleja componentes reales. Legado sin líneas sigue editable manualmente.
+
+### Verificación sugerida
+Cálculo puro, E2E de composición/reapertura/corrección, compras, offline y cancelación.
+
+### Implementación
+- `js/meal-log.js`: líneas `{name, unit 100g|100ml|portion, amount, base, ref}` con base propia (snapshot), máx. 30 líneas y 2000 g/ml o 20 porciones; `componentsTotals` suma con precisión completa; nombre automático `componentsName`; origen `componentsSource`.
+- Editor: «Alimento» añade una línea (gramos con coma), cada línea se edita o se quita y recalcula; lo ya elegido/escrito pasa a ser la primera línea por porción. Guardar persiste `components` y totales a una décima; cambiar totales a mano marca `corrected`. Comidas del plan con receta del catálogo: «Ajustar ingredientes de la receta». `mealRecipe()` usa las líneas (tarjeta, detalle y lista de compra). Reabrir no depende del catálogo; entradas antiguas sin líneas siguen manuales. Nada se escribe en el catálogo global.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/composicion.spec.js`.
+
+## REQ-276 - Nutrición: productos propios por código y escaneo progresivo
+
+**Estado: implementado.** Prioridad P2. Dependencias: REQ-274. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Fuentes S09/S10; no hay código de producto en el registro actual.
+
+### Problema
+Identificar de nuevo un producto ya creado exige buscar por nombre.
+
+### Objetivo
+Resolver producto propio por GTIN, sin inventar nutrientes ni depender de un proveedor.
+
+### Alcance
+GTIN-8/12/13/14 válido, búsqueda escrita y captura si cámara/BarcodeDetector soportados; corrección privada y confirmación de etiqueta/cantidad.
+
+### Fuera de alcance
+Proveedor externo, lector universal, librería runtime y garantía de escaneo en iOS.
+
+### Riesgos
+Perder ceros, confundir presentación, permiso denegado o contaminar catálogo compartido.
+
+### Criterios de aceptación
+Código propio válido abre ficha; desconocido ofrece alta manual. Sin cámara/API sigue disponible entrada escrita. No registra automáticamente ni modifica coincidencias de otras cuentas.
+
+### Verificación sugerida
+Checksum/normalización, capacidades/permiso simulados, E2E escrito/válido/desconocido/offline y confirmación.
+
+### Implementación
+- `parseGtin`/`sameGtin`: GTIN-8/12/13/14 con dígito de control GS1; se guarda tal como se leyó (ceros incluidos) y se compara rellenado a 14 dígitos. Alimento propio con «Código de barras (opcional)»; un código no se repite entre presentaciones.
+- En «Alimento», un número de 8+ dígitos busca por código entre tus alimentos: si coincide pide confirmar etiqueta y cantidad; si es desconocido ofrece «Crear alimento con este código» (nunca registra solo); si es inválido lo explica. «Escanear» solo aparece con `BarcodeDetector`, cámara y contexto seguro; si no (p. ej. iOS), se escribe el código. Varios códigos se eligen; cancelar o cerrar apaga la cámara. Sin red externa ni librerías.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/codigo-barras.spec.js` (detector simulado; no es una prueba física en iPhone).
+
+## REQ-274 - Nutrición: biblioteca privada de alimentos desde etiqueta
+
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-269, REQ-270 y REQ-271. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Fuentes S02/S09/S12; `renderQuickPicks()` solo busca DB.ingredients y favoritas no tienen unidad base.
+
+### Problema
+Un producto local no catalogado debe registrarse por totales cada vez que cambia la cantidad.
+
+### Objetivo
+Crear producto propio reutilizable por su base y porción declaradas.
+
+### Alcance
+Hasta 100 fichas privadas en profiles.prefs: nombre/marca, base 100 g/100 ml/porción, nutrientes y equivalencia conocida; integración en buscador existente.
+
+### Fuera de alcance
+Proveedor, OCR, catálogo público y certificación de alérgenos.
+
+### Riesgos
+Confundir ml/g, variantes o editar historia consumida; preservar otras preferencias y privacidad.
+
+### Criterios de aceptación
+Ficha por 125 g escala correctamente; unidad sin masa no convierte a gramos. Editar no cambia consumos previos; búsqueda incluye marca; otra cuenta no accede y recarga conserva.
+
+### Verificación sugerida
+Cálculo por base/unidad, límites, E2E alta/búsqueda/registro/corrección, conflicto y dos cuentas.
+
+### Implementación
+- `prefs.customFoods` (máx. 100; nombre ≤160, marca ≤80): valores por 100 g, 100 ml o porción declarada sin peso (se registra por porciones, nunca en gramos) y equivalencia opcional «1 pote = 125 g». `validateCustomFoodInput` exige los cuatro valores con límites plausibles; `mergeCustomFoods` fusiona por id/versión con lápidas (`customFoodsDeleted`).
+- La pestaña «Alimento» muestra «Tus alimentos» (etiqueta «Tuyo») antes del catálogo, «＋ Crear alimento propio» (precarga la búsqueda), editar (versión +1) y eliminar. Registrar crea una línea `ref:{kind:"food",id,version}` con snapshot. Guardar relee el perfil y aplica la operación; sin conexión, error sin cambios. Sin OCR ni proveedor; el catálogo global no cambia.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/alimentos-propios.spec.js`.
+
+## REQ-273 - Nutrición: copiar comida o selección del día a otra fecha
+
+**Estado: implementado.** Prioridad P1. Dependencias: REQ-270 y REQ-272. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Fuentes oficiales S05/S06; búsqueda de código distingue recientes/propagación de un flujo general de copia.
+
+### Problema
+No hay preview de copia de entradas/selección a otro día con control de consumo y destino.
+
+### Objetivo
+Repetir comidas sin reescribir números ni modificar la fuente.
+
+### Alcance
+Selección de comida/día, una fecha destino del ciclo, preview y modo adicional/sustitución; nuevas identidades y snapshot; preservar fuente.
+
+### Fuera de alcance
+Copia masiva a siete días, cambio de ciclo y prescripción automática.
+
+### Riesgos
+Heredar done, duplicar al reintentar o sobreescribir destino.
+
+### Criterios de aceptación
+Futuro queda pendiente; hoy/pasado exige decisión de consumo. Destino con datos no se pisa silenciosamente; cancelar no escribe. Copia/edición no altera origen ni racha antes de consumir.
+
+### Verificación sugerida
+E2E de destino ocupado/vacío, futuro, misma fecha, cancelación, receta versionada e idempotencia.
+
+### Implementación
+- «⧉ Copiar a otro día» (menú «···» de la comida) y «Copiar comidas a otro día» (Más opciones): elegir entradas, día del ciclo y modo adicional o «en lugar de la misma comida»; vista previa con destino, reemplazos y kcal. Hoy/pasado exige elegir si se comió; el futuro queda planificado. Misma fecha, origen vacío o sin selección no copian.
+- `copyEntrySnapshot` copia valores, líneas y origen con `copiedFrom`, sin ids de sync, estado ni deshacer del origen; extras con `oid` nuevo; los reemplazos usan `applyMealSubstitution` (deshacibles). Un solo `commitDay` por copia. Lote de varios días queda fuera.
+- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/copiar-comidas.spec.js`.
+
+## REQ-268 - Estimación: no aplicar plantillas genéricas como macros de una comida
+
+**Estado: implementado.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+
+### Origen
+Solicitud directa; contraste MFP sin entrevistas. Probe `fallback-template` y `aiEstimate()`/rama reuse de `api/claude.js`.
+
+### Problema
+La plantilla 500/25/55/20 puede aplicarse a cualquier descripción como resultado específico.
+
+### Objetivo
+Reutilizar solo resultados compatibles o explicar el fallo conservando los campos.
+
+### Alcance
+Cliente, contrato de respuesta y fallback de meal_estimate; conservar reutilización válida y límites existentes.
+
+### Fuera de alcance
+Pricing, nuevas cuotas y otras acciones del coach.
+
+### Riesgos
+Confundir fallo con cero o romper reutilización válida; no reutilizar entre usuarios o contextos distintos.
+
+### Criterios de aceptación
+Sin resultado compatible no cambia macros ni anuncia estimación aplicada. Reutilización exacta funciona. Error conserva formulario; foto distinta no usa otro resultado.
+
+### Verificación sugerida
+Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; E2E de conservación de valores.
+
+### Implementación
+- Cliente: `aiEstimate()` y `photoEstimateRound()` envían `fallbackText` vacío; `validEstimate()` exige cuatro valores finitos no negativos y rechaza respuestas `origin:"template"`. Sin resultado válido, `estimateErrorMessage` dice que no se pudo estimar y que los valores no cambiaron; no se muestra «Aplicado» ni ✓.
+- Servidor: `NO_TEMPLATE_ACTIONS` (`meal_estimate`) descarta cualquier fallback, también el de un cliente antiguo; si `select_reusable_coach_part` no tiene una generación del mismo usuario y `contextKey`, responde 422 `no_compatible_result` y marca la parte fallida (devuelve la reserva). La respuesta reutilizada informa `origin`. `validateCoachOutput` rechaza macros negativos. Sin cambios SQL.
+- Verificación: `scripts/test-meal-estimate-no-template.mjs` (sin pool, cliente antiguo con plantilla, reutilización exacta, origen template) y `tests/e2e/estimacion.spec.js` (422, plantilla reutilizada, negativos, reutilización compatible, foto).

@@ -1,10 +1,10 @@
 # Plan ejecutable de mejoras para Evolv
 
-**Actualizado el 24 de octubre de 2026.** Por instrucción del usuario, las entrevistas y el reclutamiento dejan de ser condiciones para avanzar. Este plan sustituye la propuesta inicial del 22 de octubre. El usuario autoriza identificar mejoras y crear requerimientos; las funcionalidades aún no están implementadas.
+**Actualizado el 25 de octubre de 2026.** Por instrucción del usuario, las entrevistas y el reclutamiento dejan de ser condiciones para avanzar. Este plan sustituye la propuesta inicial del 22 de octubre. El paquete REQ-268..276 ya está implementado en `main` (`10f9f2e`, PR #46); el estado de los nuevos fixes se consulta en `REQUIREMENTS.md`.
 
 ## Qué se decidió
 
-Crear **nueve requerimientos pendientes, REQ-268 a REQ-276**, apoyados en documentación oficial de MyFitnessPal y pruebas actuales de Evolv. Primero resolver confianza y calidad del registro; después completar composición, sustitución y copia; finalmente alimentos/recetas propios y código de producto. No se propone rehacer toda la aplicación ni esperar un estudio de mercado.
+Se definieron e implementaron **nueve requerimientos, REQ-268 a REQ-276**, apoyados en documentación oficial de MyFitnessPal y pruebas actuales de Evolv. Primero resolver confianza y calidad del registro; después completar composición, sustitución y copia; finalmente alimentos/recetas propios y código de producto. No se propone rehacer toda la aplicación ni esperar un estudio de mercado.
 
 - [Backlog detallado con alcance y casos por REQ](BACKLOG.md).
 - [Fuentes oficiales actuales y verificación](FUENTES-VERIFICADAS.md).
@@ -27,7 +27,7 @@ La ayuda oficial confirma planificación y compras en Premium+, con límites de 
 | D · Comida real propia | 274, 275 | Crear alimentos desde etiqueta y recetas privadas con rendimiento/porciones |
 | E · Acceso por producto | 276 | Identificar productos propios por GTIN; cámara solo donde haya soporte y alternativa manual completa |
 
-Implementar en ese orden. Las dependencias exactas están en BACKLOG. Las estimaciones del plan anterior de 90 días no son un compromiso: el siguiente trabajo ya está decidido, y cada incremento se cierra por sus criterios de aceptación. El selector descubre REQ pendientes no listados; al integrarse en `main`, REQ-268 será el primero del paquete. Los agentes comparten el lock existente y no deben modificar el mismo editor simultáneamente.
+La tabla conserva la secuencia y las dependencias del paquete ya implementado; no es una cola pendiente. Las estimaciones del plan anterior de 90 días no son un compromiso. Para nuevos fixes, consultar `REQUIREMENTS.md`, revalidar el código y cerrar un requerimiento por sus criterios de aceptación. Los agentes comparten el lock existente y no deben modificar el mismo editor simultáneamente.
 
 ## Decisiones técnicas que permiten empezar
 
@@ -51,6 +51,6 @@ Cada entrega debe pasar sus casos deterministas y una tarea real en navegador co
 
 El criterio para empezar es la especificación con evidencia, no conseguir participantes. Las pruebas garantizan el comportamiento comprobado; no demuestran demanda, retención o superioridad clínica. Métricas pasivas pueden observarse después si están disponibles, sin convertirse en una nueva dependencia humana ni enviar alimentos/fotos/salud a analytics.
 
-## Primer trabajo concreto
+## Continuidad después de la implementación
 
-Tomar **REQ-268**: evitar que «Estimar macros» aplique 500 kcal/25P/55C/20G genéricos si no existe una estimación compatible. El caso ya se reproduce con una respuesta de reutilización simulada. Debe conservarse el texto/valores escritos y explicar el fallo, manteniendo la reutilización válida del mismo contexto. Después se continúa con REQ-269.
+El paquete REQ-268..276 está en `main`. Las correcciones adicionales se documentan como REQ propios: REQ-278 valida la procedencia y entrada real de respuestas de estimación reutilizadas; REQ-279 recupera la altura de Perfil sin rebajar la prueba. Consultar su estado en `REQUIREMENTS.md` antes de tomar trabajo. Las verificaciones anteriores siguen siendo el contrato para futuras regresiones; no se exige reclutamiento.
