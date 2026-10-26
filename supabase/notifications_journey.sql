@@ -1,4 +1,4 @@
--- Journey de recordatorios (REQ-283): resumen de racha por usuario y etapas
+-- Journey de recordatorios (REQ-285): resumen de racha por usuario y etapas
 -- nuevas en notification_log.
 -- Diseño: docs/reminders-journey.md. Dependencias: notifications.sql y
 -- push_subscriptions.sql. Idempotente; aplicar manualmente:

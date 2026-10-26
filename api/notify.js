@@ -1,5 +1,5 @@
 // Recordatorios por correo (REQ-24) y push de racha (REQ-38); journey según la
-// ausencia —día, rescate, última llamada, regreso— (REQ-283, docs/reminders-journey.md)
+// ausencia —día, rescate, última llamada, regreso— (REQ-285, docs/reminders-journey.md)
 // Excepción a allowNewRuntimeDependency: se usa `web-push` para firmar notificaciones
 // VAPID sin depender de un proveedor externo de pago. Autorizado explícitamente
 // para REQ-38; el resto del proyecto sigue sin dependencias runtime nuevas.
@@ -129,7 +129,7 @@ function isNotifyTime(notifyHour, tz) {
   return currentHourInTz(tz) >= (notifyHour ?? 20);
 }
 
-// ── Journey de recordatorios (REQ-283) ────────────────────────────────────────
+// ── Journey de recordatorios (REQ-285) ────────────────────────────────────────
 // Diseño: docs/reminders-journey.md. Una decisión pura por usuario y día según
 // cuánto lleva sin registrar (gap): día en juego, rescate de ayer, última
 // llamada (solo push) y regreso a los 2/5/7/14/30 días; después, silencio.

@@ -99,7 +99,7 @@ Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/R
 
 - REQ-258 - Home: día cerrado muestra mañana. (Jonathan; implementado)
 
-Journey de recordatorios y racha (Jonathan, 2026-10-26; diseño en `docs/reminders-journey.md`): REQ-281 animación de racha, REQ-282 regreso en Hoy, REQ-283 recordatorios por ausencia.
+Journey de recordatorios y racha (Jonathan, 2026-10-26; diseño en `docs/reminders-journey.md`): REQ-283 animación de racha, REQ-284 regreso en Hoy, REQ-285 recordatorios por ausencia.
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
@@ -2007,19 +2007,19 @@ Que el modal de resolución de conflictos ofrezca "Combinar seguro" cuando exist
 - Test Node/E2E: sembrar un item `conflict` de `day_log` (base/local/remoto con un slot en disputa y otro no), verificar que `item.conflict.autoMergedPayload` existe y que el modal renderiza 3 botones.
 - Repro manual (auditoría): modal "Revisar sincronización" con `hasAutoMergedPayload:false` y solo 2 botones; screenshot en `tool-results` de la corrida.
 
-## REQ-281 - Racha: animación al registrar algo que la hace avanzar
+## REQ-283 - Racha: animación al registrar algo que la hace avanzar
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
 
 Jonathan (2026-10-26). `commitDay()` llama `streakFeedbackAfterCommit()`: si un registro local de hoy o ayer avanza las piezas del día (`streakDayProgress`: mitad de comidas + entreno salvo descanso), la píldora `#streakPop` (arriba, desde cualquier pestaña, `role=status`) dice lo que falta; al cumplir, la llama se llena y el número sube (N → N+1, día 1, hito 3/7/14/30, racha recuperada al completar ayer). `render()` actualiza el estado visto en silencio (remoto o desmarcar no anima). Fundido con `prefers-reduced-motion`. ✓ `tests/e2e/racha-animacion.spec.js`.
 
-## REQ-282 - Hoy: tarjeta de regreso y rescate de ayer
+## REQ-284 - Hoy: tarjeta de regreso y rescate de ayer
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
 
 Jonathan (2026-10-26). `returnCardHtml()` en Hoy, bajo la tarjeta de reinicio de REQ-214: rescate si ayer no se cumplió y había racha de 2+ días hasta anteayer ("Registrar ayer" abre ese día; al completarlo, "Racha recuperada"); bienvenida tras 2+ días sin registrar con días registrados, entrenos, mejor racha, objetivo y semana del plan, o "Tu plan te espera" sin registros. Se oculta al registrar hoy; descartarla se guarda en el dispositivo. ✓ `tests/e2e/regreso.spec.js`.
 
-## REQ-283 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
+## REQ-285 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
 **Estado: implementado.** Migración `supabase/notifications_journey.sql` aplicada en Supabase el 2026-10-26 (columna `notification_preferences.engagement` y tipos nuevos de `notification_log`).
 

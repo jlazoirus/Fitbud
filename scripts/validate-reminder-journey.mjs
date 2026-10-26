@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REQ-283 — Journey de recordatorios (docs/reminders-journey.md).
+// REQ-285 — Journey de recordatorios (docs/reminders-journey.md).
 // 1) planReminder() decide una etapa por usuario y día según la ausencia.
 // 2) reminderMessage(): sin objetivo ni datos corporales en push/asunto (REQ-24/38)
 //    y sin vocabulario técnico (REQ-31).

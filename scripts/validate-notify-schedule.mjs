@@ -3,7 +3,7 @@
 // después (mismo día local), una sola vez por día. Antes exigían que el cron
 // cayera justo en esa hora y el cron diario (03:00 en Lima) nunca coincidía.
 // REQ-265: y no avisan de entreno en días de descanso.
-// REQ-283: el journey (validate-reminder-journey.mjs) decide la etapa; aquí se
+// REQ-285: el journey (validate-reminder-journey.mjs) decide la etapa; aquí se
 // prueba el aviso del día de quien registró ayer.
 import assert from "node:assert/strict";
 

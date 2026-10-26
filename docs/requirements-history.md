@@ -11437,7 +11437,7 @@ Fixtures de generation/reuse/template/ausencia/error, dos contextos y usuarios; 
 - Servidor: `NO_TEMPLATE_ACTIONS` (`meal_estimate`) descarta cualquier fallback, también el de un cliente antiguo; si `select_reusable_coach_part` no tiene una generación del mismo usuario y `contextKey`, responde 422 `no_compatible_result` y marca la parte fallida (devuelve la reserva). La respuesta reutilizada informa `origin`. `validateCoachOutput` rechaza macros negativos. Sin cambios SQL.
 - Verificación: `scripts/test-meal-estimate-no-template.mjs` (sin pool, cliente antiguo con plantilla, reutilización exacta, origen template) y `tests/e2e/estimacion.spec.js` (422, plantilla reutilizada, negativos, reutilización compatible, foto).
 
-## REQ-281 - Racha: animación al registrar algo que la hace avanzar
+## REQ-283 - Racha: animación al registrar algo que la hace avanzar
 
 **Estado: implementado.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
 
@@ -11473,7 +11473,7 @@ E2E con racha sembrada: comida → avance; descanso → día sumado; desmarcar s
 - `checkAndSaveMilestones()` no repite el toast del hito si la píldora ya lo está mostrando.
 - Verificación: `tests/e2e/racha-animacion.spec.js` (avance, día sumado con 3 → 4, cerrar al tocar, desmarcar sin animación, día 1 tras racha rota, racha recuperada) y capturas móvil con y sin movimiento reducido.
 
-## REQ-282 - Hoy: tarjeta de regreso y rescate de ayer
+## REQ-284 - Hoy: tarjeta de regreso y rescate de ayer
 
 **Estado: implementado.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
 
@@ -11505,10 +11505,10 @@ E2E: ayer vacío con racha previa → rescate; 4 días fuera → bienvenida con 
 - `returnCardData()` decide la tarjeta: rescate (ayer ≥ inicio del plan, `!combinedDayDone(ayer)` y `streakEndingAt(anteayer) >= 2`) o bienvenida (hoy sin actividad, sin `restartNudgeDue()` y `lastActiveDayBefore(hoy)` —o el inicio del plan si nunca hubo registro— a 2+ días). Fuera del rango del plan no hay tarjeta.
 - `returnCardHtml()` se pinta en `renderHoy()` después de `restartNudgeCard()`: rescate con "Registrar ayer" (`goDay(ayer)`) y "Empezar hoy"; bienvenida con frase de progreso de `cycleSummary(hoy)` (días registrados, entrenos completos y parciales, mejor racha si es 2+), `returnGoalLine()` (objetivo de `GOAL_OPTIONS` y semana del plan) y "Empezar hoy", que la descarta y lleva a la agenda. Sin registros: "Tu plan te espera".
 - El descarte vive en `localStorage` (`evolv_return_card_v1:<uid>`) con la clave de la ausencia (`rescue:<ayer>` / `welcome:<último día activo>`): una ausencia nueva vuelve a mostrarla. Acciones registradas con `home_agenda_action` (`return_rescue`, `return_restart`, `return_start`), sin datos personales.
-- Sin kicker sobre el título (skill de diseño); llama SVG en contorno, la misma de la píldora de REQ-281.
+- Sin kicker sobre el título (skill de diseño); llama SVG en contorno, la misma de la píldora de REQ-283.
 - Verificación: `tests/e2e/regreso.spec.js` (rescate y recuperación con la píldora, descarte persistente tras recargar, bienvenida con progreso/objetivo que se oculta al registrar, sin registros, racha viva sin tarjeta) y capturas 390/1280 px.
 
-## REQ-283 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
+## REQ-285 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
 **Estado: implementado.** Migración aplicada en Supabase el 2026-10-26. Prioridad P1. Diseño: `docs/reminders-journey.md`.
 

@@ -1,4 +1,4 @@
-// REQ-282: al volver, Hoy reconoce la ausencia. Rescate de ayer (ventana de
+// REQ-284: al volver, Hoy reconoce la ausencia. Rescate de ayer (ventana de
 // corrección de REQ-23) o bienvenida con progreso, objetivo y semana del plan.
 import { test, expect } from "@playwright/test";
 import {
@@ -33,7 +33,7 @@ async function open(page, context, rows) {
   return errors;
 }
 
-test.describe("Hoy — tarjeta de regreso (REQ-282)", () => {
+test.describe("Hoy — tarjeta de regreso (REQ-284)", () => {
   test("ayer sin registrar con racha previa: rescatarlo recupera la racha", async ({ page, context }) => {
     const rows = [row(-4, doneDay()), row(-3, doneDay()), row(-2, doneDay()), row(-1, plannedDay()), row(0, plannedDay())];
     const errors = await open(page, context, rows);

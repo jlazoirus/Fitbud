@@ -665,7 +665,7 @@
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-next{margin-top:12px}
-  /* REQ-282: tarjeta de regreso (rescate de ayer / bienvenida) */
+  /* REQ-284: tarjeta de regreso (rescate de ayer / bienvenida) */
   .return-card .agenda-head{justify-content:flex-start;align-items:center}
   .return-flame{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-dim);border:1px solid var(--border-acc)}
   .return-flame svg{width:24px;height:24px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -702,7 +702,7 @@
   .milestone .ms-date{font-size:11px;color:var(--muted);margin-top:2px}
   .streak-recovery{background:var(--warn-dim);border:1px solid rgba(245,158,11,.32);border-radius:var(--r-md);padding:10px 12px;font-size:13px;color:#fcd34d;margin-bottom:10px}
 
-  /* REQ-281: píldora de racha. La llama se llena con lo cumplido hoy; al
+  /* REQ-283: píldora de racha. La llama se llena con lo cumplido hoy; al
      sumar el día termina de llenarse y el número sube. */
   .streak-pop{--sp-from:0;--sp-to:1;position:fixed;left:12px;right:12px;top:calc(10px + var(--safe-top));z-index:205;display:flex;justify-content:center;pointer-events:none}
   .streak-pop:empty{display:none}
@@ -4126,7 +4126,7 @@ function render(){
   if(privacyGateRequired())return renderPrivacyGate();
   if(planNeedsRecap()){ $("#tabs").innerHTML="";return renderPlanRecap(); }
   if(chatModeActive())return renderChatMode();
-  primeStreakSeen(); // REQ-281: estado de racha visto antes del próximo registro
+  primeStreakSeen(); // REQ-283: estado de racha visto antes del próximo registro
   renderTabs();
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
@@ -8216,7 +8216,7 @@ async function saveNotifPrefs(){
   if(error){toast("No se pudieron guardar los recordatorios");return;}
   notifPrefsCache={...notifPrefsCache,...row};
   pfNotifClearDirty();
-  _engagementSaved="";scheduleEngagementSave(0); // REQ-283: la fila puede ser nueva
+  _engagementSaved="";scheduleEngagementSave(0); // REQ-285: la fila puede ser nueva
   toast("Recordatorios guardados");
 }
 
@@ -8334,7 +8334,7 @@ async function _savePushOptInDb(enabled){
   const{error}=await supa.from("notification_preferences").upsert(row,{onConflict:"user_id"});
   if(!error){
     notifPrefsCache={...notifPrefsCache,...row};
-    _engagementSaved="";scheduleEngagementSave(0); // REQ-283: la fila puede ser nueva
+    _engagementSaved="";scheduleEngagementSave(0); // REQ-285: la fila puede ser nueva
     toast(enabled?"Avisos del dispositivo activados":"Avisos del dispositivo desactivados");
   }else{
     toast("No se pudo guardar la preferencia");
@@ -12816,7 +12816,7 @@ function checkAndSaveMilestones(){
       const key=`combined-${level}-c${cycleNumber()}`;
       if(!getStreakMilestones().some(m=>m.key===key)){
         saveStreakMilestone("combined",level);
-        // REQ-281: si la píldora de racha ya lo está celebrando, no se repite.
+        // REQ-283: si la píldora de racha ya lo está celebrando, no se repite.
         if(!streakPopShowing())toast(`🔥 ¡${level} días de racha! Sigue así.`);
       }
     }
@@ -12835,7 +12835,7 @@ function streakEndingAt(ds){
   return n;
 }
 
-/* ---------- REQ-281: la racha se mueve a la vista ---------- */
+/* ---------- REQ-283: la racha se mueve a la vista ---------- */
 // Último estado visto de hoy y de ayer. Solo un registro local (commitDay) que
 // lo hace avanzar muestra la píldora; el render y lo que llega de otro
 // dispositivo lo actualizan en silencio.
@@ -12937,7 +12937,7 @@ function hideStreakPop(){
   _streakPopTimer=setTimeout(()=>{el.innerHTML="";el.classList.remove("out");},180);
 }
 
-/* ---------- REQ-283: resumen de constancia para los recordatorios ---------- */
+/* ---------- REQ-285: resumen de constancia para los recordatorios ---------- */
 // api/notify.js no conoce el plan: lee de notification_preferences.engagement
 // la racha, el rescate posible de ayer y el progreso del ciclo. Columna propia
 // (no profiles.prefs) para no pisar ediciones del perfil. Solo existe la fila
@@ -13215,8 +13215,8 @@ async function onAuth(){
     trackEvent("session_start",{});
     refreshAdminBetaPending(); // REQ-225: aviso de postulaciones nuevas (solo admin, no-await)
     openAdminBetaFromLink(); // REQ-226: el botón del correo de aviso abre Postulantes beta
-    openReminderLink(); // REQ-283: el aviso abre su día y registra la etapa
-    scheduleEngagementSave(1500); // REQ-283: resumen para los recordatorios
+    openReminderLink(); // REQ-285: el aviso abre su día y registra la etapa
+    scheduleEngagementSave(1500); // REQ-285: resumen para los recordatorios
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
     refreshPushSubscriptionKey(); // REQ-267: no-await
   }finally{_authBusy=false;}
@@ -13356,7 +13356,7 @@ async function dismissRestartNudge(){
   toast("Vamos: tu plan sigue donde ibas");
   await saveProfilePrefs(prefs);
 }
-/* ---------- REQ-282: tarjeta de regreso en Hoy ---------- */
+/* ---------- REQ-284: tarjeta de regreso en Hoy ---------- */
 // Rescate de ayer (ventana de corrección de REQ-23) o bienvenida tras 2+ días
 // sin registrar. Descartarla es una comodidad de este dispositivo.
 const RETURN_CARD_KEY="evolv_return_card_v1";
@@ -13793,8 +13793,8 @@ function commitDay(ds){
   }
   save();
   pushDay(ds);
-  try{streakFeedbackAfterCommit(ds);}catch(e){/* REQ-281: la animación nunca bloquea el guardado */}
-  scheduleEngagementSave(); // REQ-283
+  try{streakFeedbackAfterCommit(ds);}catch(e){/* REQ-283: la animación nunca bloquea el guardado */}
+  scheduleEngagementSave(); // REQ-285
 }
 // Trae el día desde la DB y re-renderiza si seguimos viéndolo.
 function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view==="nutricion"||view==="entreno")&&current===ds)render();});}

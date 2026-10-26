@@ -1,4 +1,4 @@
-// REQ-281: cada registro que acerca el día a la racha muestra la píldora de
+// REQ-283: cada registro que acerca el día a la racha muestra la píldora de
 // racha (lo que falta); al cumplir el día el número sube. Desmarcar no anima.
 import { test, expect } from "@playwright/test";
 import {
@@ -25,7 +25,7 @@ const todayPlanned = () => ({ meals: { desayuno: meal(false), almuerzo: meal(fal
 
 const pop = (page) => page.locator("#streakPop .sp-card");
 
-test.describe("Racha — animación al registrar (REQ-281)", () => {
+test.describe("Racha — animación al registrar (REQ-283)", () => {
   test("registrar comidas muestra lo que falta y convertir en descanso suma el día", async ({ page, context }) => {
     const rows = [row(-3, doneDay()), row(-2, doneDay()), row(-1, doneDay()), row(0, todayPlanned())];
     await installMocks(context, { tables: { day_log: { rows } } });

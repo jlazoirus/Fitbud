@@ -23,7 +23,7 @@ test("el día guarda restDay: falso con sesión prescrita, verdadero al converti
   expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
 });
 
-// REQ-283: el journey de recordatorios lee de prefs.engagement la racha, el
+// REQ-285: el journey de recordatorios lee de prefs.engagement la racha, el
 // rescate posible de ayer y el progreso, que la app guarda al cambiar.
 const doneMeal = () => ({ done: true, ovr: { name: "Comida registrada", kcal: 500, p: 30, c: 50, f: 15 } });
 const dayRow = (offset, state) => ({ user_id: USER_ID, log_date: daysFromToday(offset), state, plan_version_id: null, updated_at: new Date().toISOString() });

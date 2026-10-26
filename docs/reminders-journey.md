@@ -1,6 +1,6 @@
 # Journey de recordatorios y racha
 
-Diseño del 2026-10-26 (pedido de Jonathan). Implementación: REQ-281 (animación de racha), REQ-282 (regreso dentro de la app) y REQ-283 (recordatorios por correo y push). La verdad final es el código: `planReminder()` en `api/notify.js` y las funciones `streakFeedback*`/`returnCard*` de `index.html`.
+Diseño del 2026-10-26 (pedido de Jonathan). Implementación: REQ-283 (animación de racha), REQ-284 (regreso dentro de la app) y REQ-285 (recordatorios por correo y push). La verdad final es el código: `planReminder()` en `api/notify.js` y las funciones `streakFeedback*`/`returnCard*` de `index.html`.
 
 ## Punto de partida (antes de este diseño)
 
@@ -58,7 +58,7 @@ Notas:
 
 ## Dentro de la app
 
-### Animación de racha (REQ-281)
+### Animación de racha (REQ-283)
 
 Cada registro que mueve el día hacia la racha (marcar una comida, cerrar el entreno, convertirlo en descanso, registrar ayer) muestra una píldora arriba de la pantalla, desde cualquier pestaña:
 
@@ -68,7 +68,7 @@ Cada registro que mueve el día hacia la racha (marcar una comida, cerrar el ent
 - Desmarcar no anima nada. Los cambios que llegan de otro dispositivo tampoco.
 - Con "reducir movimiento" no hay desplazamientos: el número y la llama cambian con un fundido.
 
-### Tarjetas de regreso en Hoy (REQ-282)
+### Tarjetas de regreso en Hoy (REQ-284)
 
 - **Rescate de ayer** (la misma condición que el aviso): "Ayer quedó sin registrar. Si lo cumpliste, regístralo y tu racha de 5 días sigue." Botones "Registrar ayer" y "Empezar hoy" (descarta la tarjeta en este dispositivo).
 - **Bienvenida** (2+ días sin registrar): resume el progreso del ciclo, el objetivo y la semana del plan. Desaparece al registrar lo primero de hoy o al descartarla. Si corresponde la tarjeta "Retomar / Empezar de nuevo" (14+ días sin entrenar, REQ-214), esa ocupa su lugar.
