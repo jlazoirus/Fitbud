@@ -1968,7 +1968,7 @@ Solicitud directa: compartir el análisis guardado localmente. Publica `docs/com
 
 ## REQ-278 - Estimación: validar también las respuestas completadas y su entrada real
 
-**Estado: pendiente.** Integración de la rama publicada `codex/estimate-cache-hardening` después de resolver REQ-279.
+**Estado: implementado.**
 
 ### Origen
 Revisión del paquete ya integrado en `10f9f2e`. Un fixture de `claim_coach_generation_part` con parte completed y result_id nulo todavía devolvía la plantilla 500/25/55/20 con HTTP 200, antes del filtro de REQ-268.
