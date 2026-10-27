@@ -203,6 +203,7 @@
   @keyframes countdownTick{from{transform:scale(1.25);opacity:.4}to{transform:scale(1);opacity:1}}
   @media(prefers-reduced-motion:reduce){.countdown-n.tick{animation:none}}
   .countdown-next{font-size:15px;color:var(--txt);max-width:320px;overflow-wrap:anywhere}
+  .countdown-safety{font-size:13px;color:var(--muted);max-width:320px;line-height:1.4}
   .countdown-actions{display:flex;gap:10px;margin-top:18px}
   .countdown-actions .btn{min-height:48px;min-width:132px}
   .meal-tap{cursor:pointer}
@@ -359,6 +360,21 @@
   .last-perf b{color:var(--txt);font-size:15px}
   .last-perf-hint{margin-top:6px}
   .plan-timed{background:transparent}
+  /* REQ-287: el plan de Entreno en una línea que abre sus opciones */
+  .wk-planline{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;margin:0 0 10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1);color:var(--txt);font:inherit;text-align:left;cursor:pointer}
+  .wk-planline-main{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .wk-planline-main b{font-size:14px;overflow-wrap:anywhere}
+  .wk-planline-meta{font-size:12px;color:var(--muted)}
+  .wk-planline-go{margin-left:auto;font-size:22px;line-height:1;color:var(--muted)}
+  .wk-hint{display:flex;align-items:center;gap:8px;margin:-2px 0 10px;padding:0 0 0 14px;font-size:13px;line-height:1.35;color:var(--muted)}
+  .wk-hint>span{flex:1 1 auto;min-width:0}
+  .wk-hint .btn{flex:0 0 auto}
+  .wk-hint-x{flex:0 0 auto;min-width:44px;min-height:44px;border:none;background:transparent;color:var(--muted);font-size:14px;cursor:pointer}
+  .wk-sheet-plan{display:flex;flex-direction:column;gap:4px;margin:4px 0 16px}
+  .wk-sheet-actions{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+  .wk-sheet-actions .muted{margin:0 2px 6px}
+  .wk-safety-line{width:100%}
+  .wk-location{margin-top:4px}
   .wk-context{margin:0 0 14px}
   .wk-context>summary{display:flex;align-items:center;gap:8px;min-height:48px;padding:12px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1);color:var(--txt);font-weight:700;font-size:14px;cursor:pointer;list-style:none}
   .wk-context>summary::-webkit-details-marker{display:none}
@@ -4331,8 +4347,8 @@ function setView(v){
 
 /* ---------- helpers de cabecera + hero (reutilizados por las vistas) ---------- */
 // Cabecera con navegación de día (Nutrición y Entreno)
-function dayHeaderNav(ds){
-  const day=buildDay(ds); const isToday=ds===todayStr(); const w=day.week;
+function dayHeaderNav(ds,opts){
+  const day=buildDay(ds); const isToday=ds===todayStr(); const w=opts&&opts.hideWeek?null:day.week;
   return `<header>
     <div class="daynav">
       <button onclick="nav(-1)" ${ds<=START?"disabled style=opacity:.3":""}>‹</button>
@@ -5604,6 +5620,7 @@ function openWorkoutCountdown(ds,firstLabel){
   el.innerHTML=`<div class="countdown-label">Prepárate</div>
     <div class="countdown-n" aria-live="assertive">3</div>
     ${firstLabel?`<div class="countdown-next">Empiezas con: ${esc(firstLabel)}</div>`:""}
+    <div class="countdown-safety">Señales para detenerte: ${WORKOUT_STOP_SIGNS}.</div>
     <div class="countdown-actions">
       <button class="btn" onclick="closeWorkoutCountdown()">Cancelar</button>
       <button class="btn btn-accent" onclick="finishWorkoutCountdown()">Empezar ya</button>
@@ -6398,6 +6415,60 @@ function workoutPlanSummaryHtml(prescription,ds){
     ${n>1?`<div class="muted small plan-between-rest">Entre ejercicios: ${formatRestShort(betweenExerciseRestSeconds())} de descanso</div>`:""}
     <button class="link-btn small" onclick="explainWorkoutEffort()">¿Qué es RPE?</button></div>`;
 }
+// REQ-287: señales para detenerse. Corta junto al botón de inicio; completa en
+// la cuenta atrás (y en la hoja del plan).
+const WORKOUT_STOP_SIGNS_SHORT="Detente si notas dolor, mareo o falta de aire inusual.";
+const WORKOUT_STOP_SIGNS="dolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante";
+const PERSONALIZE_HINT_KEY="evolv_wk_personalize_hint";
+// Sin deporte o sin fuerza, el título nombra solo lo que sí hay en la semana.
+function trainingPlanTitle(training){
+  const sport=training.primary==="strength_only"?"":SPORT_LABELS[training.primary];
+  const strength=training.strength==="none"?"":STRENGTH_LABELS[training.strength];
+  return [sport,strength].filter(Boolean).join(" + ")||"Tu plan";
+}
+function trainingPlanMeta(ds,training){
+  const w=weekOf(ds);
+  const week=w?(w.label==="Arranque"?"Arranque":w.num?`Semana ${w.num} de ${PLAN_DURATION_WEEKS}`:""):`${PLAN_DURATION_WEEKS} semanas`;
+  return [week,`${training.days} días/semana`].filter(Boolean).join(" · ");
+}
+// Sugerencia única para quien aún no personalizó el plan; al descartarla o
+// abrir el generador no vuelve en este dispositivo.
+function personalizeHintHtml(generatedVersion){
+  if(generatedVersion||trainingSafetyHold())return "";
+  try{if(localStorage.getItem(PERSONALIZE_HINT_KEY+":"+uid()))return "";}catch(e){/* sin almacenamiento: se muestra */}
+  return `<div class="wk-hint" role="note">
+    <span>Ajusta el plan a tu nivel, tus días y tu equipo.</span>
+    <button type="button" class="btn btn-sm" onclick="dismissPersonalizeHint();openTrainingPlanGenerator()">Personalizar</button>
+    <button type="button" class="wk-hint-x" onclick="dismissPersonalizeHint();render()" aria-label="Ocultar sugerencia">✕</button>
+  </div>`;
+}
+function dismissPersonalizeHint(){
+  try{localStorage.setItem(PERSONALIZE_HINT_KEY+":"+uid(),"1");}catch(e){/* sin almacenamiento */}
+}
+function openTrainingPlanSheet(ds){
+  const training=trainingPrefs();
+  const generatedVersion=activeGeneratedTrainingVersion();
+  const hold=trainingSafetyHold();
+  modal(`<h3>Tu plan de entrenamiento</h3>
+    <div class="wk-sheet-plan"><b>${esc(trainingPlanTitle(training))}</b>
+      <div class="muted small">${esc(trainingPlanMeta(ds||current,training))}</div>
+      <div class="muted small">${generatedVersion?`Personalizado desde ${prettyDate(generatedVersion.valid_from)} · ${esc(generatedVersion.reason||"ajustado a tu perfil")}`:"Plan base según tu perfil"}</div>
+    </div>
+    <div class="wk-sheet-actions">
+      <button class="btn btn-accent" onclick="dismissPersonalizeHint();closeModal();openTrainingPlanGenerator()" ${hold?"disabled":""}>${generatedVersion?"Preparar otra versión":"Personalizar mi plan"}</button>
+      <div class="muted small">${generatedVersion?"Rehace las próximas semanas con tu perfil actual. Lo ya entrenado no cambia.":"Ajusta las sesiones a tu nivel, tus días y tu equipo."}</div>
+      <button class="btn" onclick="closeModal();openTrainingSettings()">Cambiar días, deporte o lugar</button>
+    </div>
+    ${hold?"":`<div class="alert violet"><b>Señales para detenerte:</b><br>Dolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.</div>`}`);
+}
+// Lleva a Perfil con la sección Entrenamiento abierta.
+function openTrainingSettings(){
+  setView("perfil");
+  const sec=document.getElementById("pfSecEntreno");
+  if(!sec)return;
+  sec.open=true;
+  sec.scrollIntoView({block:"start",behavior:"auto"});
+}
 let wkContextOpen=false;
 function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
@@ -6409,9 +6480,11 @@ function renderWorkout(){
   const freeDay=isFreeActivityWorkout(ew.workout)&&!trainingSafetyHold();
   const restDay=prescription.sessionType==="rest"&&!freeDay&&!trainingSafetyHold();
   const contentIssues=workoutContentIssues(ds);
+  // REQ-287: solo la pausa por seguridad va arriba; las señales para detenerse
+  // acompañan a "Iniciar sesión guiada", la cuenta atrás y la hoja del plan.
   const safetyNotice=trainingSafetyHold()
     ? `<div class="alert"><b>Entrenamiento pausado por seguridad.</b><br>No inicies esta rutina hasta recibir orientación de un profesional. Nutrición, historial y exportación siguen disponibles.</div>`
-    : `<div class="alert violet"><b>Señales para detenerte:</b><br>Dolor, mareo, desmayo, falta de aire inusual o cualquier síntoma preocupante.</div>`;
+    : "";
   // Tarjeta instructiva solo como empty state real: hoy no hay sesión ejecutable (rutina sin ejercicios válidos).
   // Con sesión disponible, la única tarjeta es la de "wk.entreno" más abajo (REQ-101).
   const emptyWkHtml=(contentIssues.length&&!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold())?`<section class="agenda-card agenda-state setup">
@@ -6421,31 +6494,26 @@ function renderWorkout(){
       <div class="agenda-sub">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción abajo antes de iniciarla.</div>
     </div></div>
   </section>`:"";
-  const planCardHtml=`<div class="dash" style="padding:12px 14px">
-    <div class="row between">
-      <div>
-        <div class="muted small">Plan combinado · ${training.days} días/semana · ${PLAN_DURATION_WEEKS} semanas${location?` · ${TRAINING_LOCATION_LABELS[location]}`:""}</div>
-        <div style="font-weight:700;margin-top:3px">${SPORT_LABELS[training.primary]} + ${STRENGTH_LABELS[training.strength]}</div>
-        ${generatedVersion?`<div class="muted small" style="margin-top:4px">Plan personalizado activo desde ${prettyDate(generatedVersion.valid_from)} · ${esc(generatedVersion.reason||"ajustado a tu perfil")}</div>`:""}
-      </div>
-      <div class="row wrap">
-        <button class="btn btn-sm" onclick="openTrainingPlanGenerator()" ${trainingSafetyHold()?"disabled":""}>${generatedVersion?"Preparar otra versión":"Preparar mi plan"}</button>
-        <button class="btn btn-sm" onclick="setView('perfil')">Configurar</button>
-      </div>
-    </div>
-  </div>`;
+  // REQ-239: con la sesión en curso, el plan y la tarjeta van en un desplegable.
+  const sessionActive=!!execution&&(execution.status==="in_progress"||execution.status==="paused");
+  // REQ-287: el plan es contexto, no la tarea de hoy: una línea que abre sus opciones.
+  const planCardHtml=`<button type="button" class="wk-planline" onclick="openTrainingPlanSheet('${ds}')" aria-haspopup="dialog">
+    <span class="wk-planline-main"><b>${esc(trainingPlanTitle(training))}</b><span class="wk-planline-meta">${esc(trainingPlanMeta(ds,training))}</span></span>
+    <span class="wk-planline-go" aria-hidden="true">›</span>
+  </button>${sessionActive?"":personalizeHintHtml(generatedVersion)}`;
   const workoutCardHtml=section("wk.entreno","Entrenamiento",`<div class="workout">
     <div class="meal-head">
       <div>
         <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}</div>
         <div class="detail">${esc(ew.workout.detail)}</div>
+        ${location&&!restDay&&!freeDay?`<div class="muted small wk-location">Lugar: ${esc(TRAINING_LOCATION_LABELS[location])}</div>`:""}
         ${workoutStatusHtml(ds,execution)}
       </div>
     </div>
     ${!execution&&!restDay&&!freeDay?workoutPlanSummaryHtml(prescription,ds):""}
     <div class="meal-actions">
       ${contentIssues.length?'<div class="alert">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción antes de iniciarla.</div>':""}
-      ${!execution&&!st.workoutDone&&!restDay&&!freeDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>`:""}
+      ${!execution&&!st.workoutDone&&!restDay&&!freeDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>${trainingSafetyHold()?"":`<span class="muted small wk-safety-line">${WORKOUT_STOP_SIGNS_SHORT}</span>`}`:""}
       ${freeDay&&!execution&&!manualActivities(st).length&&canLogManualActivity(ds)?`<button class="btn btn-accent" onclick="openManualActivity('${ds}')">Registrar mi actividad</button>`:""}
       ${freeDay&&!manualActivities(st).length?`<span class="muted small" style="width:100%">Si hoy no la haces, no cuenta como sesión perdida.</span>`:""}
       ${!execution&&st.workoutDone?'<span class="muted small">Completado con el registro anterior; las series no estaban disponibles.</span>':""}
@@ -6455,18 +6523,17 @@ function renderWorkout(){
       ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar hoy:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','casa')">En casa</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','equipo')">Sin equipo</button><button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
   </div>`);
-  // REQ-239: con la sesión en curso, el reproductor va primero y el aviso, el
-  // plan y la tarjeta del entrenamiento quedan juntos en un desplegable cerrado.
+  // REQ-239: con la sesión en curso, el reproductor va primero y el plan y la
+  // tarjeta del entrenamiento quedan juntos en un desplegable cerrado.
   // La pausa por seguridad sigue siempre a la vista.
-  const sessionActive=!!execution&&(execution.status==="in_progress"||execution.status==="paused");
   if(sessionActive){
     $("#app").innerHTML=`
-  ${dayHeaderNav(ds)}
+  ${dayHeaderNav(ds,{hideWeek:true})}
   ${trainingSafetyHold()?safetyNotice:""}
   ${renderWorkoutExecution(ds,execution)}
   <details class="wk-context" ${wkContextOpen?"open":""} ontoggle="wkContextOpen=this.open">
     <summary>Plan y detalles de hoy<span class="wk-context-sub">${esc(ew.workout.name)}</span></summary>
-    <div class="wk-context-body">${trainingSafetyHold()?"":safetyNotice}${planCardHtml}${workoutCardHtml}</div>
+    <div class="wk-context-body">${planCardHtml}${workoutCardHtml}</div>
   </details>
   ${manualActivityBlock(ds,restDay)}
   ${daySummary(ds)}
@@ -6474,7 +6541,7 @@ function renderWorkout(){
     return;
   }
   $("#app").innerHTML=`
-  ${dayHeaderNav(ds)}
+  ${dayHeaderNav(ds,{hideWeek:true})}
   ${safetyNotice}
   ${emptyWkHtml}
   ${planCardHtml}

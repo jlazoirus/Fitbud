@@ -82,7 +82,8 @@ test("mientras se prepara el plan de entrenamiento no se puede cerrar el modal c
   await autoDismissNudges(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Entreno").click();
-  await page.getByRole("button", { name: /Preparar mi plan|Preparar otra versión/ }).first().click();
+  await page.locator("#app button.wk-planline").click();
+  await page.locator("#overlay").getByRole("button", { name: /Personalizar mi plan|Preparar otra versión/ }).click();
 
   const busy = page.locator("#coach-busy");
   await expect(busy).toBeVisible();

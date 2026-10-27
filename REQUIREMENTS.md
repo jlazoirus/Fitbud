@@ -2092,3 +2092,9 @@ Que el hilo del modo conversación de un usuario nunca sea visible para otra cue
 ### Verificación sugerida
 
 - Caso nuevo en `tests/e2e/conversacion.spec.js` o `sync-isolation.spec.js`: sembrar hilo con A, disparar `SIGNED_OUT`, re-seedear como B con `labs.conversational`+`uiMode:"chat"`, afirmar que el modo conversación de B no muestra las burbujas de A.
+
+## REQ-287 - Entreno: el plan en una línea y las señales para detenerse junto al inicio
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Jonathan (2026-10-27). Sin aviso fijo ni tarjeta del plan: `.wk-planline` ("Semana N de M") abre `openTrainingPlanSheet()` (personalizar, cambiar días/deporte/lugar, señales). Señales bajo "Iniciar sesión guiada" y en la cuenta atrás. ✓ `tests/e2e/entreno.spec.js`.

@@ -11593,3 +11593,46 @@ Validador Node con matriz de ausencias, zonas, idempotencia y fallo de registro;
 - Integración con REQ-281/282 (#49, en `main` antes del merge): se conserva el recorte de claves VAPID y `push: {ready, issue}`; el día sin abrir o abierto sin nada registrado (`notStarted`) es el caso `missing:"day"` del aviso del día ("Aún no has empezado tu plan de hoy"), y con solo el aviso de entreno no sale sin la fila de hoy. Este trabajo se numeró primero REQ-281..283 y se renumeró a REQ-283..285.
 - Migración `supabase/notifications_journey.sql` (idempotente, con rollback): columna `engagement` y `CHECK` ampliado. Aplicada en producción el 2026-10-26 a pedido de Jonathan, vía la API de gestión de Supabase; verificado después: `CHECK` con los 6 tipos, `engagement jsonb` nulo, RLS y `notif_prefs_self` intactos.
 - Verificación: `scripts/validate-reminder-journey.mjs` (actividad, día en juego, rescate, última llamada, matriz de ausencias 2-59, activación, plan terminado, privacidad de 13 variantes, handler con push, falla cerrado y registro ilegible), `scripts/validate-notify-schedule.mjs` (REQ-265/266 sobre el journey) y `tests/e2e/recordatorios.spec.js` (resumen guardado en su columna, enlace del aviso).
+
+## REQ-287 - Entreno: el plan en una línea y las señales para detenerse junto al inicio
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-10-27), con captura de Entreno ("Martes 27 oct · Semana 2", día "Descanso total · cambiado"), marcando el aviso "Señales para detenerte" y la tarjeta "Plan combinado · 6 días/semana · 10 semanas · Exterior / Correr + Gimnasio / Preparar mi plan / Configurar": "esta parte no tiene tanto sentido".
+
+### Problema
+Antes de la sesión, `renderWorkout()` pintaba siempre, encima del entrenamiento de hoy:
+- el aviso violeta de señales para detenerse, también en descanso, donde no aplica, y fijo todos los días (se deja de leer);
+- una tarjeta con datos del plan completo ("Plan combinado" repite "Correr + Gimnasio"; "10 semanas" separado de la "Semana 2" de la cabecera; "Exterior", que es el lugar de hoy, en la tarjeta del plan) y dos botones: "Preparar mi plan" (el usuario ya tiene plan; en realidad genera una versión personalizada) y "Configurar" (no dice qué y saca a Perfil sin abrir nada).
+
+### Objetivo
+Que lo primero bajo la fecha sea la sesión de hoy; el plan queda como contexto con una sola entrada clara, y las señales de seguridad aparecen cuando sirven.
+
+### Alcance
+1. Línea del plan (`.wk-planline`): título (`trainingPlanTitle()`: deporte + fuerza, sin "Ninguna actividad" ni "Sin fuerza") y `trainingPlanMeta()` ("Semana N de M · D días/semana", "Arranque" o "M semanas" fuera del calendario). Abre `openTrainingPlanSheet()`: resumen (personalizado desde X o plan base), "Personalizar mi plan"/"Preparar otra versión" con una frase de qué hace, "Cambiar días, deporte o lugar" (`openTrainingSettings()`: Perfil con `#pfSecEntreno` abierto) y las señales completas. Con la pausa por seguridad el botón de personalizar queda deshabilitado y no se muestran las señales.
+2. `dayHeaderNav(ds,{hideWeek:true})` en Entreno: la semana va en la línea del plan (Nutrición no cambia).
+3. Sugerencia única (`personalizeHintHtml()`) si no hay versión personalizada: "Personalizar" o ✕ la ocultan (`evolv_wk_personalize_hint:<uid>` en `localStorage`); no sale con la sesión en curso ni con la pausa por seguridad.
+4. Señales: línea corta bajo "Iniciar sesión guiada" (`WORKOUT_STOP_SIGNS_SHORT`) y texto completo en la cuenta atrás de REQ-235. Sin señales en descanso ni actividad libre. La pausa por seguridad (`trainingSafetyHold()`) sigue arriba siempre.
+5. "Lugar: …" en la tarjeta del entrenamiento solo con sesión (no en descanso ni actividad libre).
+6. Con la sesión en curso (REQ-239) el desplegable contiene la línea del plan y la tarjeta del entrenamiento.
+7. `CACHE_NAME` → `fitbud-pwa-v157`.
+
+### Fuera de alcance
+- El generador del plan (`openTrainingPlanGenerator()`) y la sección Entrenamiento de Perfil.
+- "Actividad registrada" y "Resumen".
+
+### Riesgos
+- Solo cambian orden y visibilidad; no toca datos. La sugerencia se guarda por usuario y dispositivo; sin almacenamiento vuelve a mostrarse.
+
+### Criterios de aceptación
+- Antes de la sesión no hay aviso violeta, "Preparar mi plan" ni "Configurar"; la línea dice "Semana 2 de 10" y la cabecera no repite la semana; hay "Lugar: Gimnasio" y la línea de señales bajo "Iniciar sesión guiada". ✓
+- La sugerencia se oculta con ✕ y no vuelve al recargar. ✓
+- La cuenta atrás muestra las señales completas. ✓
+- La hoja tiene "Personalizar mi plan", las señales y "Cambiar días, deporte o lugar", que abre Perfil con Entrenamiento desplegado. ✓
+- En descanso no hay señales ni lugar. ✓
+- Con la sesión en curso, la línea del plan va en el desplegable cerrado (REQ-239). ✓
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación
+`tests/e2e/entreno.spec.js` ("Plan compacto" ×2, "Sesión en curso" actualizado), `tests/e2e/alta-y-espera.spec.js` (el generador se abre desde la hoja); capturas a 375px de día de entreno, hoja y descanso revisadas; detector de impeccable sin hallazgos.
