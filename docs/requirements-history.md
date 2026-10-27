@@ -11639,7 +11639,7 @@ Que lo primero bajo la fecha sea la sesión de hoy; el plan queda como contexto 
 
 ## REQ-288 - Push: par VAPID nuevo (la privada de REQ-267 no estaba en ningún lado)
 
-**Estado: implementado — requiere acción humana:** cargar `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel (Production) y volver a desplegar.
+**Estado: implementado.** Jonathan cargó las variables en Vercel; tras desplegar `ec3ccc8`, "Recordatorios cada hora" respondió `push: {"ready": true}` (2026-10-27 19:10 UTC).
 
 ### Origen
 

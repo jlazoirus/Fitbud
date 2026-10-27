@@ -2101,7 +2101,7 @@ Jonathan (2026-10-27). Sin aviso fijo ni tarjeta del plan: `.wk-planline` ("Sema
 
 ## REQ-288 - Push: par VAPID nuevo (la privada de REQ-267 no estaba en ningún lado)
 
-**Estado: implementado — requiere acción humana:** cargar `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel (Production) y volver a desplegar.
+**Estado: implementado.** Variables cargadas en Vercel; el 2026-10-27 el job respondió `push.ready:true`.
 
 El job respondía `push.ready:false` ("falta VAPID_PRIVATE_KEY"). Clave pública nueva en `index.html` y `api/notify.js`; las suscripciones se renuevan al entrar. ✓ `scripts/validate-vapid-key.mjs`.
 
