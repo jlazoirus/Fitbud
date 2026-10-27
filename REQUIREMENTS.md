@@ -2024,13 +2024,13 @@ Sin el día en `day_log`, o sin nada registrado, `checkPending()` cuenta comidas
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
 
-Jonathan (2026-10-26). `commitDay()` llama `streakFeedbackAfterCommit()`: si un registro local de hoy o ayer avanza las piezas del día (`streakDayProgress`: mitad de comidas + entreno salvo descanso), la píldora `#streakPop` (arriba, desde cualquier pestaña, `role=status`) dice lo que falta; al cumplir, la llama se llena y el número sube (N → N+1, día 1, hito 3/7/14/30, racha recuperada al completar ayer). `render()` actualiza el estado visto en silencio (remoto o desmarcar no anima). Fundido con `prefers-reduced-motion`. ✓ `tests/e2e/racha-animacion.spec.js`.
+Jonathan (2026-10-26). Cada registro que avanza el día muestra la píldora `#streakPop` con lo que falta; al cumplir, el número sube. ✓ `tests/e2e/racha-animacion.spec.js`.
 
 ## REQ-284 - Hoy: tarjeta de regreso y rescate de ayer
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
 
-Jonathan (2026-10-26). `returnCardHtml()` en Hoy, bajo la tarjeta de reinicio de REQ-214: rescate si ayer no se cumplió y había racha de 2+ días hasta anteayer ("Registrar ayer" abre ese día; al completarlo, "Racha recuperada"); bienvenida tras 2+ días sin registrar con días registrados, entrenos, mejor racha, objetivo y semana del plan, o "Tu plan te espera" sin registros. Se oculta al registrar hoy; descartarla se guarda en el dispositivo. ✓ `tests/e2e/regreso.spec.js`.
+Jonathan (2026-10-26). `returnCardHtml()`: rescate de ayer con racha previa de 2+ días, o bienvenida con progreso, objetivo y semana tras 2+ días fuera. ✓ `tests/e2e/regreso.spec.js`.
 
 ## REQ-285 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
@@ -2101,6 +2101,12 @@ Jonathan (2026-10-27). Sin aviso fijo ni tarjeta del plan: `.wk-planline` ("Sema
 
 ## REQ-288 - Push: par VAPID nuevo (la privada de REQ-267 no estaba en ningún lado)
 
-**Estado: implementado — requiere acción humana:** cargar `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel (Production) y volver a desplegar.
+**Estado: implementado.** Variables cargadas en Vercel; el 2026-10-27 el job respondió `push.ready:true`.
 
 El job respondía `push.ready:false` ("falta VAPID_PRIVATE_KEY"). Clave pública nueva en `index.html` y `api/notify.js`; las suscripciones se renuevan al entrar. ✓ `scripts/validate-vapid-key.mjs`.
+
+## REQ-289 - Onboarding: instalar la app y activar avisos; Hoy lo recuerda cada día
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Jonathan (2026-10-27). Con la primera semana lista, `renderNotifySetup()` pide instalar Evolv (móvil) y activar avisos (o correo si no hay push). Hoy muestra `notifyNudgeHtml()` hasta activarlos; "Ahora no" lo oculta hasta mañana. ✓ `tests/e2e/avisos.spec.js`.

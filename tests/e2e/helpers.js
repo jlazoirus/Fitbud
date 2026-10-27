@@ -453,6 +453,11 @@ export async function autoDismissNudges(page) {
   await page.addLocatorHandler(cardio, async () => {
     await cardio.click();
   });
+  // REQ-289: al terminar el onboarding se pide instalar la app y activar avisos.
+  const notifySetup = page.getByRole("button", { name: "Ahora no, ir a mi plan" });
+  await page.addLocatorHandler(notifySetup, async () => {
+    await notifySetup.click();
+  });
 }
 
 /** Navega a la app y espera a que salga del splash. */

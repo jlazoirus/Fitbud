@@ -27,6 +27,7 @@ const ALLOWED_EVENT_TYPES = new Set([
   "coach_message_sent",
   "streak_milestone",
   "reminder_opened", // REQ-285: etapa del recordatorio que abrió la app (props.step)
+  "notifications_prompt", // REQ-289: instalar/activar avisos (props.source, props.action)
 ]);
 
 // Solo estas claves se almacenan en properties. Ningun dato de salud, identidad ni prompts.

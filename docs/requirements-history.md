@@ -11639,7 +11639,7 @@ Que lo primero bajo la fecha sea la sesión de hoy; el plan queda como contexto 
 
 ## REQ-288 - Push: par VAPID nuevo (la privada de REQ-267 no estaba en ningún lado)
 
-**Estado: implementado — requiere acción humana:** cargar `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel (Production) y volver a desplegar.
+**Estado: implementado.** Jonathan cargó las variables en Vercel; tras desplegar `ec3ccc8`, "Recordatorios cada hora" respondió `push: {"ready": true}` (2026-10-27 19:10 UTC).
 
 ### Origen
 
@@ -11657,3 +11657,22 @@ Jonathan (2026-10-27), al revisar qué faltaba tras REQ-283..285: el job `notify
 1. Vercel → `fitbud` → Environment Variables (Production): `VAPID_PRIVATE_KEY` (la nueva) y `VAPID_SUBJECT` (`mailto:` del responsable). Si existe `VAPID_PUBLIC_KEY`, actualizarla a la nueva o borrarla.
 2. Volver a desplegar y correr "Recordatorios cada hora" a mano: `push.ready` debe ser `true`.
 3. Quien tenga avisos del dispositivo activos debe abrir la app una vez para quedar suscrito con la clave nueva.
+
+## REQ-289 - Onboarding: instalar la app y activar avisos; Hoy lo recuerda cada día
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-27): "como parte del onboarding debemos pedirle a la gente que se instale el app en el home y además que active las notificaciones; a las personas que no han activado las notificaciones hay que recordarles que lo hagan siempre". Antes, activar avisos solo era posible en Perfil → Avisos del dispositivo y la sugerencia de instalar era un banner flotante que salía una sola vez.
+
+### Hecho
+
+- `devicePushState()`: `on` (permiso concedido y `push_opt_in`), `off`, `denied`, `needs_install` (iPhone fuera de la app instalada: ahí no existe el push) o `unsupported`. `remindersCovered()`: `on`, o correo activo donde el push no es posible (bloqueado o sin soporte).
+- Al cerrar el onboarding (primer ciclo o ciclo nuevo) y con la semana lista sin errores, `saveOnboarding()` carga las preferencias y, si falta instalar (móvil) o los avisos, abre `renderNotifySetup()` antes de Hoy (`notifySetupActive`, compuerta en `render()`): "Tu semana está lista. Que no se te pase." con dos pasos: instalar (iPhone: Compartir → Añadir a pantalla de inicio e iniciar sesión desde el ícono; Android: botón "Instalar Evolv" si el navegador lo ofrece, si no el menú) y activar avisos (`enableDevicePush()`: permiso → `subscribePush()` con tope de 15 s → `push_opt_in`; bloqueado: cómo permitirlos y "Recibir por correo"; sin soporte: correo, `enableEmailReminders()`). "Ahora no, ir a mi plan" o "Ir a mi plan" lleva a Hoy (y a la guía).
+- Hoy (`notifyNudgeHtml()`, después de la agenda): mientras no esté cubierto, cada día, con la acción de su estado y "Ahora no" (`evolv_notify_nudge_v1:<uid>` = hoy en este dispositivo: vuelve mañana). Sin parpadeo: no se muestra hasta cargar las preferencias (`loadNotifPrefs()` en `onAuth`).
+- El banner flotante de instalar ya no sale en iPhone (lo cubren la pantalla y la tarjeta), ni sobre la pantalla de avisos, ni en Hoy mientras la tarjeta está visible.
+- Al cerrar sesión se limpian `notifPrefsCache` y `notifySetupActive` (antes las preferencias de una cuenta quedaban en memoria para la siguiente).
+- Analytics `notifications_prompt` con `source` (onboarding/home) y `action` (shown, enable, enabled, denied, dismissed, email, install, dismiss, skip, done); sin datos personales.
+- E2E: `autoDismissNudges()` salta la pantalla como lo haría un usuario. `CACHE_NAME` → `fitbud-pwa-v159`.
+- Verificación: `tests/e2e/avisos.spec.js` (tarjeta y "Ahora no" hasta mañana, activar con permiso concedido, bloqueado → correo, avisos activos sin tarjeta, iPhone sin banner duplicado, pantalla real tras guardar el plan); capturas 390 px Android/iPhone.

@@ -74,6 +74,11 @@ Cada registro que mueve el día hacia la racha (marcar una comida, cerrar el ent
 - **Bienvenida** (2+ días sin registrar): resume el progreso del ciclo, el objetivo y la semana del plan. Desaparece al registrar lo primero de hoy o al descartarla. Si corresponde la tarjeta "Retomar / Empezar de nuevo" (14+ días sin entrenar, REQ-214), esa ocupa su lugar.
 - Los enlaces de los avisos (`/?date=AAAA-MM-DD&r=<etapa>`) abren ese día y registran `reminder_opened` con la etapa (sin datos personales) para medir qué etapa trae de vuelta.
 
+### Instalar y activar avisos (REQ-289)
+
+- Al terminar el onboarding, con la semana lista: pantalla "Tu semana está lista. Que no se te pase." con dos pasos, instalar Evolv en el inicio (solo móvil) y activar avisos. En iPhone el push solo existe en la app instalada: primero instalar; al abrirla desde el ícono, Hoy pide activarlos. Si el navegador no permite avisos o están bloqueados, se ofrece el correo.
+- Mientras los avisos no estén activos, Hoy lo recuerda **cada día** con una tarjeta; "Ahora no" la oculta hasta mañana. Medición: `notifications_prompt` (`source`, `action`).
+
 ## Preferencias
 
 En Perfil → Recordatorios y Avisos del dispositivo, el texto explica lo que llega: el aviso del día, la última llamada si la racha es de 3+ días y los mensajes de regreso con su final. La baja de un clic del correo y desactivar el aviso del dispositivo cortan todo el journey de ese canal.
