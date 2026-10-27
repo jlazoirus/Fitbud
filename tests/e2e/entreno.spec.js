@@ -4,7 +4,7 @@
 // El plan decide la sesión del día (y puede incluir bloque de cardio), así que
 // el test lee el total de bloques de la UI y completa los que haya.
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, startGuidedSession, completeTimedBlock } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, startGuidedSession, completeTimedBlock, completePrefs } from "./helpers.js";
 
 test.describe("Entreno", () => {
   test("sesión guiada completa: todos los bloques registrados y cierre guardado", async ({ page, context }) => {
@@ -597,16 +597,16 @@ test.describe("Sesión en curso", () => {
     await gotoApp(page);
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
-    // Antes de empezar se ve todo, como siempre.
-    await expect(app.getByText("Señales para detenerte:")).toBeVisible();
-    await expect(app.getByRole("button", { name: "Preparar mi plan" })).toBeVisible();
+    // Antes de empezar se ve la línea del plan y la tarjeta del entrenamiento.
+    const planLine = app.locator("button.wk-planline");
+    await expect(planLine).toBeVisible();
+    await expect(app.getByRole("button", { name: "Cambiar entrenamiento" })).toBeVisible();
 
     await startGuidedSession(page);
     const details = app.locator("details.wk-context");
     await expect(details).toHaveCount(1);
     await expect(details).not.toHaveAttribute("open", /.*/);
-    await expect(app.getByText("Señales para detenerte:")).toBeHidden();
-    await expect(app.getByRole("button", { name: "Preparar mi plan" })).toBeHidden();
+    await expect(planLine).toBeHidden();
     await expect(app.getByRole("button", { name: "Cambiar entrenamiento" })).toBeHidden();
     // El reproductor queda justo después de la cabecera del día, antes del desplegable.
     const order = await page.evaluate(() => {
@@ -618,8 +618,8 @@ test.describe("Sesión en curso", () => {
 
     // Abrirlo muestra lo de siempre y sigue abierto tras una acción del reproductor.
     await details.locator("summary").click();
-    await expect(app.getByText("Señales para detenerte:")).toBeVisible();
-    await expect(app.getByRole("button", { name: "Preparar mi plan" })).toBeVisible();
+    await expect(planLine).toBeVisible();
+    await expect(app.getByRole("button", { name: "Cambiar entrenamiento" })).toBeVisible();
     await page.getByRole("button", { name: "Ahora no" }).click();
     await expect(app.locator("details.wk-context")).toHaveAttribute("open", "");
 
@@ -627,7 +627,7 @@ test.describe("Sesión en curso", () => {
     page.once("dialog", (d) => d.accept());
     await page.getByRole("button", { name: "Descartar" }).click();
     await expect(app.locator("details.wk-context")).toHaveCount(0);
-    await expect(app.getByText("Señales para detenerte:")).toBeVisible();
+    await expect(planLine).toBeVisible();
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
@@ -1084,5 +1084,77 @@ test.describe("Plan de entrenamiento con el coach (REQ-257)", () => {
       expect(sent[i].maxTokens, `semana de ${week.sessions} sesiones (${week.pretty} caracteres con sangría)`).toBeGreaterThanOrEqual(Math.ceil(week.pretty / 2.5));
       expect(sent[i].userText).toContain("en una sola línea, sin sangría");
     });
+  });
+});
+
+// REQ-287 (Jonathan): el aviso fijo y la tarjeta del plan con "Preparar mi plan"
+// y "Configurar" no tenían sentido arriba de la sesión de hoy. El plan queda en
+// una línea que abre sus opciones y las señales para detenerse acompañan al inicio.
+test.describe("Plan compacto", () => {
+  test("línea del plan, hoja de opciones y señales junto al inicio", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+
+    // Sin aviso fijo ni botones sueltos del plan; la semana va en la línea del plan.
+    await expect(app.getByText("Señales para detenerte:")).toHaveCount(0);
+    await expect(app.getByRole("button", { name: "Preparar mi plan" })).toHaveCount(0);
+    await expect(app.getByRole("button", { name: "Configurar" })).toHaveCount(0);
+    await expect(app.locator("header .weeknote")).toHaveCount(0);
+    const planLine = app.locator("button.wk-planline");
+    await expect(planLine).toContainText("Semana 2 de 10");
+    await expect(planLine).toContainText("días/semana");
+    // Lo del día va en la tarjeta del entrenamiento.
+    await expect(app.locator(".wk-location")).toHaveText("Lugar: Gimnasio");
+    await expect(app.locator(".wk-safety-line")).toContainText("Detente si notas dolor");
+
+    // Sugerencia única para personalizar: al descartarla no vuelve.
+    const hint = app.locator(".wk-hint");
+    await expect(hint).toBeVisible();
+    await hint.getByRole("button", { name: "Ocultar sugerencia" }).click();
+    await expect(hint).toHaveCount(0);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    await expect(app.locator("button.wk-planline")).toBeVisible();
+    await expect(app.locator(".wk-hint")).toHaveCount(0);
+
+    // La cuenta atrás recuerda las señales completas.
+    await page.getByRole("button", { name: "Iniciar sesión guiada" }).click();
+    const countdown = page.locator("#workoutCountdown");
+    await expect(countdown).toContainText("Señales para detenerte: dolor, mareo, desmayo");
+    await countdown.getByRole("button", { name: "Cancelar" }).click();
+    await expect(countdown).toHaveCount(0);
+
+    // La línea abre la hoja con las acciones del plan y las señales.
+    await app.locator("button.wk-planline").click();
+    const sheet = page.locator("#overlay");
+    await expect(sheet.getByRole("heading", { name: "Tu plan de entrenamiento" })).toBeVisible();
+    await expect(sheet.getByRole("button", { name: "Personalizar mi plan" })).toBeEnabled();
+    await expect(sheet).toContainText("Señales para detenerte:");
+    await sheet.getByRole("button", { name: "Cambiar días, deporte o lugar" }).click();
+    await expect(page.locator("#overlay")).toHaveCount(0);
+    await expect(page.locator("#tabs button.active")).toHaveAttribute("data-tab", "perfil");
+    await expect(page.locator("#pfSecEntreno")).toHaveAttribute("open", "");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("en descanso no hay señales ni lugar", async ({ page, context }) => {
+    const dow = new Date().getDay();
+    const trainingDays = [0, 1, 2, 3, 4, 5, 6].filter((d) => d !== dow).slice(0, 4);
+    await installMocks(context, { prefs: completePrefs({ trainingDays }) });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await expect(app).toContainText("Descanso planificado");
+    await expect(app.locator("button.wk-planline")).toBeVisible();
+    await expect(app.locator(".wk-safety-line")).toHaveCount(0);
+    await expect(app.locator(".wk-location")).toHaveCount(0);
+    await expect(app.getByText("Señales para detenerte:")).toHaveCount(0);
   });
 });
