@@ -28,7 +28,7 @@ import webpush from "web-push";
 
 const VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
-  "BHWBAWEp03r3-nwiNPaBIDA7R30G4sSj_Xkq3L_hEy4jfcT76kymwpHFDbQhuF2V41OFpOdcz0-P80MwqEQNkAc";
+  "BCLTdYHpdcITrwUwXO1J0OYSaIuHjtPKk3zcc2E3isQAV51IQG4OPOTOdP5KwIm5z_baw-mN4qOeZuAtvzPyHb8";
 
 // REQ-281: espacios o saltos de línea al pegar en Vercel invalidaban la clave
 // sin aviso. Se recortan, y si el push no queda listo la respuesta del job
