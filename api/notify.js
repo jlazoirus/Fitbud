@@ -1,4 +1,5 @@
-// Recordatorios por correo (REQ-24) y push de racha (REQ-38)
+// Recordatorios por correo (REQ-24) y push de racha (REQ-38); journey según la
+// ausencia —día, rescate, última llamada, regreso— (REQ-285, docs/reminders-journey.md)
 // Excepción a allowNewRuntimeDependency: se usa `web-push` para firmar notificaciones
 // VAPID sin depender de un proveedor externo de pago. Autorizado explícitamente
 // para REQ-38; el resto del proyecto sigue sin dependencias runtime nuevas.
@@ -134,33 +135,260 @@ function isNotifyTime(notifyHour, tz) {
   return currentHourInTz(tz) >= (notifyHour ?? 20);
 }
 
-// ── Verificar actividad pendiente del día ─────────────────────────────────────
+// ── Journey de recordatorios (REQ-285) ────────────────────────────────────────
+// Diseño: docs/reminders-journey.md. Una decisión pura por usuario y día según
+// cuánto lleva sin registrar (gap): día en juego, rescate de ayer, última
+// llamada (solo push) y regreso a los 2/5/7/14/30 días; después, silencio.
 
-async function checkPending(userId, dateStr, e) {
-  const rows = await supaGet(e,
-    `/rest/v1/day_log?user_id=eq.${userId}&log_date=eq.${dateStr}&select=state`
-  );
-  // REQ-282: quien no abrió ni preparó el día (sin fila, o sin comidas ni nada
-  // registrado) es quien más necesita el aviso: cuenta como comidas pendientes.
-  // El entreno no se sabe sin el día (puede tocar descanso): no se avisa.
-  if (!rows.length) return { nutrition: true, training: false, notStarted: true };
-  const state = rows[0].state || {};
+const ACTIVITY_WINDOW_DAYS = 60;
+const LAST_CALL_MIN_STREAK = 3;
+const LAST_CALL_LATEST_HOUR = 22;
+// Cada etapa de regreso es una ventana: sale una vez por ausencia, el primer
+// día habilitado dentro de ella. Después de 45 días no se escribe más.
+export const COMEBACK_STEPS = [
+  { step: "comeback_2", from: 2, to: 3 },
+  { step: "comeback_5", from: 5, to: 6 },
+  { step: "comeback_7", from: 7, to: 13 },
+  { step: "comeback_14", from: 14, to: 29 },
+  { step: "comeback_30", from: 30, to: 45 },
+];
+// Mismas etiquetas que GOAL_OPTIONS en la app. Solo van dentro del correo.
+const GOAL_LABELS = { deficit: "Bajar grasa", mantenimiento: "Recomponer mi cuerpo", volumen: "Ganar músculo" };
 
-  const meals = state.meals || {};
-  const mealIds = Object.keys(meals);
-  const notStarted = !mealIds.length && !(state.extras || []).length &&
-    !(state.manualActivities || []).length && !state.workoutDone;
-  const nutritionPending = notStarted || (mealIds.length > 0 && mealIds.some(id => !meals[id].done));
+const isYmd = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+export function addDaysYmd(ds, n) {
+  const d = new Date(ds + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+export function daysBetweenYmd(a, b) {
+  return Math.round((Date.parse(b + "T12:00:00Z") - Date.parse(a + "T12:00:00Z")) / 86400000);
+}
 
-  const workoutDone = !!state.workoutDone;
-  // REQ-265: el cliente guarda workoutOverride como string ("descanso" o el id
-  // de un entreno) y restDay en cada guardado del día (descanso del plan,
-  // marcado por el usuario o pausa por seguridad).
-  const override = state.workoutOverride;
-  const isRestDay = state.restDay === true || override === "descanso";
-  const trainingPending = !workoutDone && !isRestDay;
+function trainedInState(st) {
+  const ex = st.workoutExecution;
+  return !!st.workoutDone
+    || !!(ex && (ex.status === "completed" || ex.status === "partial"))
+    || (Array.isArray(st.manualActivities) && st.manualActivities.some((a) => a && a.sport));
+}
 
-  return { nutrition: nutritionPending, training: trainingPending, notStarted };
+// Mismo criterio que dayActive() en la app: algo registrado ese día.
+export function dayHasActivity(st) {
+  if (!st || typeof st !== "object") return false;
+  const meals = st.meals && typeof st.meals === "object" ? Object.values(st.meals) : [];
+  if (meals.some((m) => m && m.done)) return true;
+  if (Array.isArray(st.extras) && st.extras.some((x) => x && x.done)) return true;
+  if (trainedInState(st)) return true;
+  const steps = st.workoutExecution && Array.isArray(st.workoutExecution.steps) ? st.workoutExecution.steps : [];
+  return steps.some((s) => s && (s.status === "done" || s.status === "skipped" || (Array.isArray(s.sets) && s.sets.some((x) => x && x.done))));
+}
+
+// Lo que falta hoy según la fila del día. REQ-265: el cliente guarda restDay
+// y workoutOverride ("descanso") en cada guardado. REQ-282: un día abierto sin
+// comidas preparadas ni nada registrado es un día que no empezó.
+export function pendingFromState(st) {
+  const meals = (st && st.meals) || {};
+  const ids = Object.keys(meals);
+  const notStarted = !ids.length && !(Array.isArray(st.extras) && st.extras.length) && !trainedInState(st);
+  const nutrition = ids.length > 0 && ids.some((id) => !(meals[id] && meals[id].done));
+  const isRestDay = st.restDay === true || st.workoutOverride === "descanso";
+  return { nutrition, training: !trainedInState(st) && !isRestDay, notStarted };
+}
+
+// Última llamada: dos horas después del aviso del día, desde las 21:00 y
+// nunca después de las 22:00.
+export function lastCallHour(notifyHour) {
+  const h = Math.max(21, (notifyHour ?? 20) + 2);
+  return h <= LAST_CALL_LATEST_HOUR ? h : null;
+}
+
+/**
+ * Decide el mensaje del día para un usuario. Puro: sin red ni reloj.
+ * ctx: { today, hour, notifyHour, rows:[{log_date,...estado}], engagement,
+ *        planStart, planEnd, planWeeks, goal, wantNutrition, wantTraining }
+ * Devuelve { step, ref, ... } o null; `lastCall` indica si además toca la
+ * última llamada por push.
+ */
+export function planReminder(ctx) {
+  const { today } = ctx;
+  if (!isYmd(today) || ctx.hour < (ctx.notifyHour ?? 20)) return null;
+  const planStart = isYmd(ctx.planStart) ? ctx.planStart : null;
+  if (planStart && today < planStart) return null;
+  const planEnded = isYmd(ctx.planEnd) && today > ctx.planEnd;
+  const rows = (ctx.rows || []).filter((r) => r && isYmd(r.log_date) && r.log_date <= today && (!planStart || r.log_date >= planStart));
+  const active = rows.filter(dayHasActivity);
+  const last = active.map((r) => r.log_date).sort().pop() || null;
+  const ref = last || planStart;
+  if (!ref) return null;
+  const gap = daysBetweenYmd(ref, today);
+  const yesterday = addDaysYmd(today, -1);
+
+  // El resumen de la app vale solo si es del ciclo actual.
+  const raw = ctx.engagement && typeof ctx.engagement === "object" ? ctx.engagement : null;
+  const eng = raw && (!planStart || raw.cycleStart === planStart) ? raw : null;
+  const engStreak = eng ? Math.max(0, Number(eng.streak) || 0) : 0;
+  const progress = {
+    activeDays: eng ? Number(eng.activeDays) || 0 : active.length,
+    workouts: eng ? Number(eng.workouts) || 0 : rows.filter(trainedInState).length,
+    bestStreak: eng ? Number(eng.bestStreak) || 0 : 0,
+    week: null,
+    weeks: Number(ctx.planWeeks) || null,
+    goal: GOAL_LABELS[ctx.goal] || null,
+  };
+  if (planStart && !planEnded) {
+    const w = Math.floor(daysBetweenYmd(planStart, today) / 7) + 1;
+    progress.week = progress.weeks ? Math.min(w, progress.weeks) : w;
+  }
+
+  // Rescate: ayer quedó sin cumplir y hasta anteayer había racha de 2+ días.
+  // La ventana de corrección (REQ-23) es solo el día anterior. La app lo deja
+  // calculado (rescueDate) si se abrió hoy; si no, la racha llega a anteayer.
+  let rescue = 0;
+  if (eng && eng.rescueDate === yesterday) rescue = Math.max(0, Number(eng.rescueStreak) || 0);
+  else if (eng && eng.streakThrough === addDaysYmd(today, -2)) rescue = engStreak;
+  if (!planEnded && rescue >= 2 && (!planStart || yesterday >= planStart)) {
+    return { step: "rescue", ref: today, date: yesterday, streak: rescue, gap, progress };
+  }
+
+  if (gap <= 1) {
+    if (planEnded) return null;
+    if (eng && eng.streakThrough === today) return null; // la racha de hoy ya está a salvo
+    const streak = eng && eng.streakThrough === yesterday ? engStreak : 0;
+    // REQ-282: sin la fila de hoy (no abrió la app) o con la fila sin nada,
+    // el día no empezó: cuenta como comidas pendientes. Sin la fila no se sabe
+    // si toca entrenar (puede ser descanso), así que el entreno solo no avisa.
+    const todayRow = rows.find((r) => r.log_date === today);
+    const pending = todayRow ? pendingFromState(todayRow) : { nutrition: false, training: false, notStarted: true };
+    const wantN = ctx.wantNutrition !== false, wantT = ctx.wantTraining !== false;
+    let missing;
+    if (pending.notStarted && wantN) missing = "day";
+    else {
+      const n = pending.nutrition && wantN;
+      const t = pending.training && wantT;
+      if (!n && !t) return null;
+      missing = n && t ? "both" : n ? "nutrition" : "training";
+    }
+    const callHour = lastCallHour(ctx.notifyHour);
+    const lastCall = streak >= LAST_CALL_MIN_STREAK && callHour != null && ctx.hour >= callHour && ctx.hour <= LAST_CALL_LATEST_HOUR;
+    return { step: "day", ref: today, date: today, streak, missing, lastCall, gap, progress };
+  }
+
+  const stage = COMEBACK_STEPS.find((s) => gap >= s.from && gap <= s.to);
+  if (!stage) return null;
+  return { step: stage.step, ref, gap, never: !last, planEnded, progress };
+}
+
+// ── Textos (REQ-31: plan, racha, coach; sin datos corporales) ─────────────────
+// El push se ve en la pantalla bloqueada: sin objetivo ni datos de progreso
+// corporal. El objetivo con nombre va solo dentro del correo, nunca en el asunto.
+
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const MISSING_TEXT = {
+  both: "registrar tus comidas y tu entreno",
+  nutrition: "registrar tus comidas",
+  training: "tu entreno",
+  day: "registrar tu día",
+};
+
+function progressSentence(p) {
+  const parts = [plural(p.activeDays, "día registrado", "días registrados")];
+  if (p.workouts) parts.push(plural(p.workouts, "entreno", "entrenos"));
+  return `Llevas ${parts.join(" y ")} en este plan.`;
+}
+function achievementsLine(p) {
+  const parts = [];
+  if (p.bestStreak >= 2) parts.push(`Mejor racha: ${p.bestStreak} días`);
+  if (p.workouts) parts.push(plural(p.workouts, "entreno", "entrenos"));
+  if (p.activeDays) parts.push(plural(p.activeDays, "día registrado", "días registrados"));
+  return parts.join(" · ");
+}
+function weekLine(d) {
+  const p = d.progress || {};
+  if (d.planEnded || !p.week) return "";
+  return p.weeks ? `Vas en la semana ${p.week} de ${p.weeks} de tu plan.` : `Vas en la semana ${p.week} de tu plan.`;
+}
+
+/**
+ * Texto de una decisión. `title`/`body` son el push; `subject` y `paragraphs`
+ * el correo. `url` abre el día correcto y deja la etapa para medir aperturas.
+ */
+export function reminderMessage(d, kind) {
+  const p = d.progress || {};
+  const days = (n) => plural(n, "día", "días");
+  let title, body, subject, paragraphs, cta = "Volver a mi plan";
+  let url = `/?r=${d.step}`;
+  if (kind === "last_call") {
+    title = "Quedan pocas horas";
+    body = `Registra lo de hoy y tu racha de ${days(d.streak)} sigue.`;
+    return { title, body, url: `/?date=${d.date}&r=last_call`, tag: "fitbros-streak" };
+  }
+  if (d.step === "day") {
+    const missing = MISSING_TEXT[d.missing] || MISSING_TEXT.day;
+    const notStarted = d.missing === "day";
+    if (d.streak > 0) {
+      title = `Tu racha de ${days(d.streak)} sigue en juego`;
+      body = notStarted
+        ? `Aún no has empezado tu plan de hoy. Regístralo para sumar el día ${d.streak + 1}.`
+        : `Falta ${missing} para sumar el día ${d.streak + 1}.`;
+    } else {
+      title = "Tu plan de hoy te espera";
+      body = notStarted ? "Aún no has empezado tu plan de hoy. Hoy puede empezar tu racha." : `Falta ${missing}. Hoy puede empezar tu racha.`;
+    }
+    subject = title;
+    paragraphs = [body, notStarted
+      ? "Abre tu plan y marca lo que vayas comiendo: unos minutos bastan para que el día cuente."
+      : "Unos minutos bastan: marca lo que ya hiciste y el día cuenta."];
+    cta = "Ver mi plan de hoy";
+    url = `/?date=${d.date}&r=day`;
+  } else if (d.step === "rescue") {
+    title = "Ayer quedó sin registrar";
+    body = `Si lo cumpliste, regístralo y tu racha de ${days(d.streak)} sigue.`;
+    subject = `¿Cumpliste ayer? Tu racha de ${days(d.streak)} sigue en pie`;
+    paragraphs = [body, "Puedes completar el día anterior hasta que termine hoy."];
+    cta = "Registrar ayer";
+    url = `/?date=${d.date}&r=rescue`;
+  } else if (d.never) {
+    // Nunca registró nada: activación, sin hablar de progreso.
+    const byStep = {
+      comeback_2: ["Tu plan está listo", "Aún no registras tu primer día. Empieza con una comida: ahí arranca tu racha."],
+      comeback_5: ["Tu objetivo sigue en pie", "Tu plan está preparado. Registrar una comida es el primer paso."],
+      comeback_7: ["Tu plan sigue listo", "Empieza cuando quieras; también puedes reiniciarlo desde la semana 1."],
+      comeback_14: ["Tu plan sigue listo", "Tus comidas y entrenos siguen preparados. Empieza con una comida."],
+      comeback_30: ["Aquí sigue tu plan", "Vuelve cuando quieras. Es nuestro último recordatorio hasta que empieces."],
+    };
+    [title, body] = byStep[d.step] || byStep.comeback_2;
+    subject = title;
+    paragraphs = [body, p.goal ? `Tu objetivo: ${p.goal}.` : "", weekLine(d)].filter(Boolean);
+  } else if (d.step === "comeback_2") {
+    title = "Tu racha se reinició, tu progreso no";
+    body = `${progressSentence(p)} Hoy puede empezar tu siguiente racha.`;
+    subject = title;
+    paragraphs = [progressSentence(p), p.bestStreak >= 2 ? `Tu mejor racha fue de ${p.bestStreak} días: la siguiente empieza con un registro.` : "Hoy puede empezar tu siguiente racha."];
+  } else if (d.step === "comeback_5") {
+    title = "Tu objetivo sigue en pie";
+    body = d.planEnded ? "Tu ciclo terminó: empieza el siguiente cuando quieras." : `${weekLine(d)} Retomar toma una comida registrada.`.trim();
+    subject = title;
+    paragraphs = [p.goal ? `Tu objetivo: ${p.goal}.` : "", d.planEnded ? "Tu ciclo terminó: empieza el siguiente cuando quieras." : weekLine(d), "Retomar toma una comida registrada."].filter(Boolean);
+  } else if (d.step === "comeback_7") {
+    title = "Una semana sin registrar";
+    body = d.planEnded
+      ? "Tu ciclo terminó. Empieza uno nuevo cuando quieras: tu historial se conserva."
+      : "Retoma donde ibas o empieza de nuevo desde la semana 1. Tu historial se conserva.";
+    subject = title;
+    paragraphs = [body, progressSentence(p)];
+  } else if (d.step === "comeback_14") {
+    const line = achievementsLine(p);
+    title = "Mira lo que ya lograste";
+    body = line ? `${line}. Volver toma un registro.` : "Tu progreso sigue guardado. Volver toma un registro.";
+    subject = title;
+    paragraphs = [line ? `${line}.` : "Tu progreso sigue guardado.", p.goal ? `Tu objetivo: ${p.goal}.` : "", "Volver toma un registro."].filter(Boolean);
+  } else {
+    title = "Aquí sigue tu plan";
+    body = "Tu progreso está guardado. Es nuestro último recordatorio hasta que vuelvas.";
+    subject = title;
+    paragraphs = ["Tu progreso está guardado y tu plan sigue disponible.", "Este es nuestro último recordatorio hasta que vuelvas."];
+  }
+  return { title, body, subject, paragraphs, cta, url, tag: d.step === "day" || d.step === "rescue" ? "fitbros-streak" : "fitbros-comeback" };
 }
 
 // ── Correo con Resend (fetch nativo, sin nuevas dependencias) ─────────────────
@@ -180,31 +408,138 @@ async function sendEmail(e, to, subject, html) {
   return data.id || "sent";
 }
 
-function buildEmailHtml(e, dateStr, unsubToken, type, notStarted) {
-  const label = type === "nutrition" ? "tu alimentación de hoy" : "tu entrenamiento de hoy";
-  const heading = notStarted ? "Aún no has empezado tu plan de hoy" : `Todavía puedes completar ${label}`;
-  const body = notStarted
-    ? "Abre tu plan y marca lo que vayas comiendo. Unos minutos son suficientes para mantener tu racha."
-    : "El día está por cerrar y tu plan tiene actividad pendiente. Unos minutos son suficientes para mantener tu racha.";
-  const link = `${e.appUrl}/?date=${dateStr}`;
-  const unsubLink = `${e.appUrl}/api/notify?unsubscribe=${encodeURIComponent(unsubToken)}`;
+// Todo el texto sale de reminderMessage(): ningún dato escrito por el usuario.
+export function buildEmailHtml(e, msg, unsubToken) {
+  const link = e.appUrl + msg.url;
+  const unsubLink = `${e.appUrl}/api/notify?unsubscribe=${encodeURIComponent(unsubToken || "")}`;
+  const paragraphs = (msg.paragraphs || [msg.body])
+    .map((t) => `<p style="color:#444;font-size:15px;line-height:1.5;margin:0 0 12px">${t}</p>`)
+    .join("\n  ");
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Actividad pendiente</title></head>
+<title>${msg.subject}</title></head>
 <body style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1a1a1a;background:#fff">
-  <p style="font-size:18px;font-weight:700;margin:0 0 14px">${heading}</p>
-  <p style="color:#555;margin:0 0 24px">${body}</p>
+  <p style="font-size:19px;font-weight:700;margin:0 0 14px">${msg.title}</p>
+  ${paragraphs}
   <a href="${link}"
-     style="display:inline-block;background:#7c3aed;color:#fff;text-decoration:none;
-            padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">
-    Ver mi plan de hoy
+     style="display:inline-block;background:#101010;color:#d6ff3a;text-decoration:none;
+            padding:12px 28px;border-radius:10px;font-weight:700;font-size:15px;margin-top:12px">
+    ${msg.cta}
   </a>
   <hr style="margin:36px 0;border:none;border-top:1px solid #eee">
-  <p style="font-size:12px;color:#999;margin:0">
-    Recibes este recordatorio porque lo activaste en tu perfil.
-    <a href="${unsubLink}" style="color:#7c3aed;text-decoration:none">Desactivar recordatorios</a>
+  <p style="font-size:12px;color:#777;margin:0">
+    Recibes estos recordatorios porque los activaste en tu perfil.
+    <a href="${unsubLink}" style="color:#1a1a1a">Desactivar recordatorios</a>
   </p>
 </body></html>`;
+}
+
+// ── Datos por usuario ─────────────────────────────────────────────────────────
+
+const DAY_FIELDS = [
+  "log_date", "meals:state->meals", "extras:state->extras", "workoutDone:state->workoutDone",
+  "workoutExecution:state->workoutExecution", "manualActivities:state->manualActivities",
+  "restDay:state->restDay", "workoutOverride:state->workoutOverride",
+].join(",");
+
+async function loadUserContext(e, userId, today) {
+  const profiles = await supaGet(e,
+    `/rest/v1/profiles?id=eq.${userId}&select=email,active,goal:prefs->>goal,` +
+    "planStartDate:prefs->>planStartDate,planEndDate:prefs->>planEndDate,planDurationWeeks:prefs->>planDurationWeeks"
+  );
+  const profile = profiles[0];
+  if (!profile || profile.active === false) return null;
+  const from = addDaysYmd(today, -ACTIVITY_WINDOW_DAYS);
+  const rows = await supaGet(e,
+    `/rest/v1/day_log?user_id=eq.${userId}&log_date=gte.${from}&log_date=lte.${today}&select=${DAY_FIELDS}&order=log_date.desc`
+  );
+  return { profile, rows };
+}
+
+// ── Envío idempotente ─────────────────────────────────────────────────────────
+// Cada envío exige leer y registrar antes su intento en notification_log. Si no
+// se puede (red, o una etapa nueva sin la migración del CHECK), no se envía:
+// sin registro, el disparo de la hora siguiente lo repetiría.
+
+async function deliver(e, dryRun, results, counter, job) {
+  const { userId, type, keys, refDate, step, send } = job;
+  const entry = { user: userId, type, step, date: refDate };
+  const inList = keys.map((k) => encodeURIComponent(k)).join(",");
+  const existing = await supaGet(e,
+    `/rest/v1/notification_log?idempotency_key=in.(${inList})&select=id,status,idempotency_key`
+  ).catch(() => null);
+  if (existing === null) {
+    counter.errors++;
+    results.log.push({ ...entry, action: "log_unavailable" });
+    return "log_unavailable";
+  }
+  if (existing.some((r) => r.status === "sent")) {
+    counter.skipped++;
+    results.log.push({ ...entry, action: "already_sent" });
+    return "already_sent";
+  }
+  if (dryRun) {
+    counter.skipped++;
+    results.log.push({ ...entry, action: "dry_run" });
+    return "dry_run";
+  }
+  let logId = (existing.find((r) => r.idempotency_key === keys[0]) || {}).id || null;
+  if (!logId) {
+    const ins = await supaPost(e, "/rest/v1/notification_log", {
+      user_id: userId,
+      notification_type: type,
+      reference_date: refDate,
+      idempotency_key: keys[0],
+      status: "pending",
+      attempted_at: new Date().toISOString(),
+    }, { Prefer: "return=representation" }).catch(() => null);
+    logId = ins && ins[0] && ins[0].id;
+  }
+  if (!logId) {
+    counter.errors++;
+    results.log.push({ ...entry, action: "log_failed" });
+    return "log_failed";
+  }
+  try {
+    const out = await send();
+    await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
+      { status: "sent", delivered_at: new Date().toISOString() }
+    ).catch(() => null);
+    counter.sent++;
+    results.log.push({ ...entry, action: "sent", ...(out && typeof out === "object" ? out : {}) });
+    return "sent";
+  } catch (err) {
+    await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
+      { status: "error", error_message: err.message }
+    ).catch(() => null);
+    counter.errors++;
+    results.log.push({ ...entry, action: "error", error: err.message });
+    return "error";
+  }
+}
+
+async function sendPush(e, subs, msg) {
+  const payload = JSON.stringify({ title: msg.title, body: msg.body, tag: msg.tag, url: msg.url });
+  let ok = false;
+  for (const sub of subs) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.keys_p256dh, auth: sub.keys_auth } },
+        payload
+      );
+      ok = true;
+    } catch (err) {
+      if (err.statusCode === 410) {
+        // Suscripción caducada: eliminarla
+        await fetch(
+          `${e.url}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`,
+          { method: "DELETE", headers: mutateHeaders(e) }
+        ).catch(() => null);
+      }
+    }
+  }
+  if (!ok) throw new Error("Ninguna suscripción entregada");
+  return { channel: "push" };
 }
 
 // ── Baja de un solo clic ──────────────────────────────────────────────────────
@@ -239,219 +574,80 @@ async function handleUnsubscribe(token, e, res) {
 
 async function runJob(e, dryRun) {
   const results = { processed: 0, sent: 0, skipped: 0, errors: 0, dryRun, log: [] };
+  // REQ-281: la respuesta siempre dice si el push está listo.
+  results.push = vapidReady ? { ready: true, sent: 0, skipped: 0, errors: 0 } : { ready: false, issue: vapidIssue };
 
-  // 1. Obtener usuarios con opt-in activo
+  // select=*: la columna engagement (resumen de racha que escribe la app) llega
+  // con supabase/notifications_journey.sql; sin ella la consulta sigue valiendo.
   const prefs = await supaGet(e,
-    "/rest/v1/notification_preferences?email_opt_in=eq.true" +
-    "&select=user_id,timezone,notify_hour,enabled_days,notify_nutrition,notify_training,unsubscribe_token"
+    "/rest/v1/notification_preferences?or=(email_opt_in.eq.true,push_opt_in.eq.true)&select=*"
   );
 
   for (const pref of prefs) {
-    const { user_id, timezone, notify_hour, enabled_days, notify_nutrition, notify_training, unsubscribe_token } = pref;
-    const tz = safeTimezone(timezone || "UTC");
-    const nowDow = dayOfWeekInTz(tz);
-    const dateStr = todayInTz(tz);
+    const { user_id, notify_hour, enabled_days, unsubscribe_token } = pref;
+    const wantEmail = !!pref.email_opt_in;
+    const wantPush = !!pref.push_opt_in && vapidReady;
+    if (!wantEmail && !wantPush) continue;
+    const tz = safeTimezone(pref.timezone || "UTC");
+    const today = todayInTz(tz);
+    const hour = currentHourInTz(tz);
 
-    // 2. ¿Ya llegó la hora configurada del usuario?
+    // 1. ¿Ya llegó la hora elegida? ¿Día habilitado?
     if (!isNotifyTime(notify_hour, tz)) continue;
+    const days = Array.isArray(enabled_days) ? enabled_days.map(Number) : [0, 1, 2, 3, 4, 5, 6];
+    if (!days.includes(dayOfWeekInTz(tz))) continue;
 
-    // 3. ¿Día habilitado?
-    const days = Array.isArray(enabled_days) ? enabled_days.map(Number) : [0,1,2,3,4,5,6];
-    if (!days.includes(nowDow)) continue;
+    // 2. Perfil activo, objetivo y plan, y actividad de los últimos 60 días.
+    const ctx = await loadUserContext(e, user_id, today).catch((err) => {
+      results.errors++;
+      results.log.push({ user: user_id, date: today, action: "context_error", error: err.message });
+      return null;
+    });
+    if (!ctx) continue;
 
-    // 4. Obtener email del usuario desde profiles
-    const profileRows = await supaGet(e,
-      `/rest/v1/profiles?id=eq.${user_id}&select=email,active`
-    ).catch(() => []);
-    if (!profileRows.length || !profileRows[0].email) continue;
-    if (profileRows[0].active === false) continue;
-    const userEmail = profileRows[0].email;
-
-    // 5. Actividad pendiente
-    const pending = await checkPending(user_id, dateStr, e)
-      .catch(() => ({ nutrition: false, training: false }));
-
-    const typesToSend = [];
-    if (notify_nutrition && pending.nutrition) typesToSend.push("nutrition");
-    if (notify_training && pending.training) typesToSend.push("training");
-
+    // 3. Etapa del journey.
+    const p = ctx.profile;
+    const decision = planReminder({
+      today, hour, notifyHour: notify_hour ?? 20, rows: ctx.rows, engagement: pref.engagement,
+      planStart: p.planStartDate, planEnd: p.planEndDate, planWeeks: Number(p.planDurationWeeks) || null,
+      goal: p.goal, wantNutrition: pref.notify_nutrition !== false, wantTraining: pref.notify_training !== false,
+    });
+    if (!decision) continue;
     results.processed++;
 
-    for (const notifType of typesToSend) {
-      const key = `${user_id}:${notifType}:${dateStr}`;
+    const msg = reminderMessage(decision);
+    const daily = decision.step === "day" || decision.step === "rescue";
 
-      // 6. Idempotencia: ¿ya se envió hoy?
-      const existing = await supaGet(e,
-        `/rest/v1/notification_log?idempotency_key=eq.${encodeURIComponent(key)}&select=id,status`
-      ).catch(() => []);
-      if (existing.length && existing[0].status === "sent") {
-        results.skipped++;
-        results.log.push({ user: user_id, type: notifType, date: dateStr, action: "already_sent" });
-        continue;
-      }
-
-      // 7. Registrar intento (pending) si no existe
-      let logId = existing.length ? existing[0].id : null;
-      if (!logId && !dryRun) {
-        const ins = await supaPost(e, "/rest/v1/notification_log",
-          {
-            user_id,
-            notification_type: notifType,
-            reference_date: dateStr,
-            idempotency_key: key,
-            status: "pending",
-            attempted_at: new Date().toISOString(),
-          },
-          { Prefer: "return=representation" }
-        ).catch(() => null);
-        logId = ins && ins[0] && ins[0].id;
-      }
-
-      if (dryRun) {
-        results.skipped++;
-        results.log.push({ user: user_id, type: notifType, date: dateStr, action: "dry_run", email: userEmail });
-        continue;
-      }
-
-      // 8. Enviar correo
-      try {
-        const notStarted = notifType === "nutrition" && pending.notStarted;
-        const subject = notStarted
-          ? "Tu plan de hoy te espera"
-          : notifType === "nutrition"
-          ? "Tienes comidas pendientes para hoy"
-          : "Tienes entrenamiento pendiente para hoy";
-        const emailId = await sendEmail(e, userEmail, subject,
-          buildEmailHtml(e, dateStr, unsubscribe_token, notifType, notStarted)
-        );
-        if (logId) {
-          await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
-            { status: "sent", delivered_at: new Date().toISOString() }
-          ).catch(() => null);
-        }
-        results.sent++;
-        results.log.push({ user: user_id, type: notifType, date: dateStr, action: "sent", emailId });
-      } catch (err) {
-        if (logId) {
-          await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
-            { status: "error", error_message: err.message }
-          ).catch(() => null);
-        }
-        results.errors++;
-        results.log.push({ user: user_id, type: notifType, date: dateStr, action: "error", error: err.message });
-      }
-    }
-  }
-
-  // ── Push de racha (REQ-38) ──────────────────────────────────────────────────
-  if (!vapidReady) results.push = { ready: false, issue: vapidIssue };
-  if (vapidReady) {
-    results.push = { ready: true, sent: 0, skipped: 0, errors: 0 };
-
-    const pushPrefs = await supaGet(e,
-      "/rest/v1/notification_preferences?push_opt_in=eq.true" +
-      "&select=user_id,timezone,notify_hour,enabled_days"
-    ).catch(() => []);
-
-    for (const pref of pushPrefs) {
-      const { user_id, timezone, notify_hour, enabled_days } = pref;
-      const tz = safeTimezone(timezone || "UTC");
-      const nowDow  = dayOfWeekInTz(tz);
-      const dateStr = todayInTz(tz);
-
-      if (!isNotifyTime(notify_hour, tz)) continue;
-      const days = Array.isArray(enabled_days) ? enabled_days.map(Number) : [0,1,2,3,4,5,6];
-      if (!days.includes(nowDow)) continue;
-
-      // Verificar usuario activo
-      const profileRows = await supaGet(e,
-        `/rest/v1/profiles?id=eq.${user_id}&select=active`
-      ).catch(() => []);
-      if (!profileRows.length || profileRows[0].active === false) continue;
-
-      // Actividad pendiente
-      const pending = await checkPending(user_id, dateStr, e)
-        .catch(() => ({ nutrition: false, training: false }));
-      if (!pending.nutrition && !pending.training) continue;
-
-      // Idempotencia
-      const key = `${user_id}:push_streak:${dateStr}`;
-      const existing = await supaGet(e,
-        `/rest/v1/notification_log?idempotency_key=eq.${encodeURIComponent(key)}&select=id,status`
-      ).catch(() => []);
-      if (existing.length && existing[0].status === "sent") {
-        results.push.skipped++;
-        results.log.push({ user: user_id, type: "push_streak", date: dateStr, action: "already_sent" });
-        continue;
-      }
-
-      // Obtener suscripciones del usuario
-      const subs = await supaGet(e,
-        `/rest/v1/push_subscriptions?user_id=eq.${user_id}&select=endpoint,keys_p256dh,keys_auth`
-      ).catch(() => []);
-      if (!subs.length) continue;
-
-      // Registrar intento
-      let logId = existing.length ? existing[0].id : null;
-      if (!logId && !dryRun) {
-        const ins = await supaPost(e, "/rest/v1/notification_log", {
-          user_id,
-          notification_type: "push_streak",
-          reference_date: dateStr,
-          idempotency_key: key,
-          status: "pending",
-          attempted_at: new Date().toISOString(),
-        }, { Prefer: "return=representation" }).catch(() => null);
-        logId = ins && ins[0] && ins[0].id;
-      }
-
-      if (dryRun) {
-        results.push.skipped++;
-        results.log.push({ user: user_id, type: "push_streak", date: dateStr, action: "dry_run" });
-        continue;
-      }
-
-      // Enviar push a todas las suscripciones del usuario
-      const payload = JSON.stringify({
-        title: "Tu racha te espera",
-        body: "Tienes actividad pendiente. Unos minutos bastan para mantener tu racha.",
-        tag: "fitbros-streak",
-        url: `/?date=${dateStr}`,
+    // 4. Correo: uno por día. El aviso del día conserva los tipos de REQ-24
+    // (y sus claves, para no repetir el día del despliegue).
+    if (wantEmail && p.email) {
+      const emailType = daily ? (decision.missing === "training" ? "training" : "nutrition") : "comeback";
+      const keys = daily
+        ? [`${user_id}:${emailType}:${today}`, `${user_id}:${emailType === "training" ? "nutrition" : "training"}:${today}`]
+        : [`${user_id}:${decision.step}:${decision.ref}`];
+      await deliver(e, dryRun, results, results, {
+        userId: user_id, type: emailType, keys, refDate: daily ? today : decision.ref, step: decision.step,
+        send: async () => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, unsubscribe_token)) }),
       });
+    }
 
-      let sendOk = false;
-      for (const sub of subs) {
-        try {
-          await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.keys_p256dh, auth: sub.keys_auth } },
-            payload
-          );
-          sendOk = true;
-        } catch (err) {
-          if (err.statusCode === 410) {
-            // Suscripción caducada: eliminarla
-            await fetch(
-              `${e.url}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`,
-              { method: "DELETE", headers: mutateHeaders(e) }
-            ).catch(() => null);
-          }
-          results.log.push({ user: user_id, type: "push_streak", date: dateStr, action: "push_error", error: err.message });
-        }
-      }
-
-      if (logId) {
-        await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
-          sendOk
-            ? { status: "sent",  delivered_at: new Date().toISOString() }
-            : { status: "error", error_message: "Ninguna suscripción entregada" }
-        ).catch(() => null);
-      }
-
-      if (sendOk) {
-        results.push.sent++;
-        results.log.push({ user: user_id, type: "push_streak", date: dateStr, action: "push_sent" });
-      } else {
-        results.push.errors++;
+    // 5. Push: el del día (o la etapa de regreso) y, si toca, la última
+    // llamada, solo cuando el aviso del día ya salió en un disparo anterior.
+    const subs = wantPush
+      ? await supaGet(e, `/rest/v1/push_subscriptions?user_id=eq.${user_id}&select=endpoint,keys_p256dh,keys_auth`).catch(() => [])
+      : [];
+    if (subs.length) {
+      const pushType = daily ? "push_streak" : "push_comeback";
+      const pushKey = daily ? `${user_id}:push_streak:${today}` : `${user_id}:push_${decision.step}:${decision.ref}`;
+      const status = await deliver(e, dryRun, results, results.push, {
+        userId: user_id, type: pushType, keys: [pushKey], refDate: daily ? today : decision.ref, step: decision.step,
+        send: () => sendPush(e, subs, msg),
+      });
+      if (decision.lastCall && status === "already_sent") {
+        await deliver(e, dryRun, results, results.push, {
+          userId: user_id, type: "push_last_call", keys: [`${user_id}:push_last_call:${today}`], refDate: today, step: "last_call",
+          send: () => sendPush(e, subs, reminderMessage(decision, "last_call")),
+        });
       }
     }
   }

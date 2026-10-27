@@ -665,6 +665,12 @@
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-next{margin-top:12px}
+  /* REQ-284: tarjeta de regreso (rescate de ayer / bienvenida) */
+  .return-card .agenda-head{justify-content:flex-start;align-items:center}
+  .return-flame{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-dim);border:1px solid var(--border-acc)}
+  .return-flame svg{width:24px;height:24px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .return-body{font-size:14px;line-height:1.5;color:var(--txt);margin:0;max-width:62ch}
+  .return-goal{font-size:12.5px;line-height:1.4;color:var(--muted);margin:6px 0 0}
   .agenda-next-head{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase}
   @media(max-width:380px){
     .agenda-head{flex-direction:column}
@@ -695,6 +701,48 @@
   .milestone .ms-lbl{font-weight:600}
   .milestone .ms-date{font-size:11px;color:var(--muted);margin-top:2px}
   .streak-recovery{background:var(--warn-dim);border:1px solid rgba(245,158,11,.32);border-radius:var(--r-md);padding:10px 12px;font-size:13px;color:#fcd34d;margin-bottom:10px}
+
+  /* REQ-283: píldora de racha. La llama se llena con lo cumplido hoy; al
+     sumar el día termina de llenarse y el número sube. */
+  .streak-pop{--sp-from:0;--sp-to:1;position:fixed;left:12px;right:12px;top:calc(10px + var(--safe-top));z-index:205;display:flex;justify-content:center;pointer-events:none}
+  .streak-pop:empty{display:none}
+  .sp-card{pointer-events:auto;display:flex;align-items:center;gap:12px;width:100%;max-width:380px;min-height:56px;padding:9px 18px 9px 10px;border-radius:var(--r-lg);background:var(--surf2);border:1px solid var(--border-2);box-shadow:0 12px 32px rgba(0,0,0,.5);color:var(--txt);font:inherit;text-align:left;cursor:pointer;animation:spIn .3s cubic-bezier(.16,1,.3,1) both}
+  .sp-card.sp-day,.sp-card.sp-recovered{border-color:var(--border-acc)}
+  .sp-card:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .streak-pop.out .sp-card{animation:spOut .18s ease-in both}
+  .sp-flame{flex:0 0 auto;width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:var(--accent-dim)}
+  .sp-flame svg{width:26px;height:26px;overflow:visible}
+  .sp-line{fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .sp-fill{fill:var(--accent);opacity:.82}
+  .sp-level{transform-box:fill-box;transform-origin:50% 100%;animation:spFill .56s .14s cubic-bezier(.16,1,.3,1) both}
+  .sp-day .sp-flame svg,.sp-recovered .sp-flame svg{animation:spLit .5s .6s cubic-bezier(.16,1,.3,1) both}
+  .sp-day .sp-fill,.sp-recovered .sp-fill{animation:spFillLit .3s .6s ease-out both}
+  .sp-count{display:grid;align-items:center;overflow:hidden;height:30px;min-width:1.2ch;font-family:var(--font-display);font-weight:800;font-size:25px;line-height:30px;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+  .sp-n{grid-area:1/1}
+  .sp-from{animation:spRollOut .42s .62s cubic-bezier(.16,1,.3,1) both}
+  .sp-to{animation:spRollIn .46s .62s cubic-bezier(.16,1,.3,1) both}
+  .sp-copy{display:flex;flex-direction:column;gap:2px;min-width:0;padding-left:12px;border-left:1px solid var(--border-2)}
+  .sp-copy b{font-size:14px;font-weight:700;line-height:1.3}
+  .sp-copy span{font-size:12.5px;color:var(--muted);line-height:1.35}
+  .sp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  @keyframes spIn{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
+  @keyframes spOut{to{opacity:0;transform:translateY(-8px)}}
+  @keyframes spFill{from{transform:scaleY(var(--sp-from))}to{transform:scaleY(var(--sp-to))}}
+  @keyframes spFillLit{to{opacity:1}}
+  @keyframes spLit{0%{transform:scale(.88);filter:none}60%{filter:drop-shadow(0 2px 6px var(--accent-glow))}100%{transform:none;filter:drop-shadow(0 2px 4px var(--accent-glow))}}
+  @keyframes spRollOut{to{transform:translateY(-110%);opacity:0;filter:blur(2px)}}
+  @keyframes spRollIn{from{transform:translateY(110%);opacity:0;filter:blur(2px)}to{transform:none;opacity:1;filter:none}}
+  @keyframes spFade{from{opacity:0}to{opacity:1}}
+  @keyframes spFadeOut{to{opacity:0}}
+  @media(prefers-reduced-motion:reduce){
+    /* Sin desplazamientos: el número y la llama cambian con un fundido. */
+    .sp-card{animation:spFade .2s ease-out both}
+    .streak-pop.out .sp-card{animation:spFadeOut .15s ease-in both}
+    .sp-level{animation:none;transform:scaleY(var(--sp-to))}
+    .sp-day .sp-flame svg,.sp-recovered .sp-flame svg{animation:none}
+    .sp-from{animation:spFadeOut .2s .3s both}
+    .sp-to{animation:spFade .2s .3s both}
+  }
 
   /* Coach conversacional (REQ-21) */
   .coach-wrap{display:flex;flex-direction:column;height:calc(100dvh - 102px - var(--safe-top) - var(--safe-bottom));padding-bottom:0}
@@ -1016,6 +1064,7 @@
 <main id="app"></main>
 <div class="tabs" id="tabs"></div>
 <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<div class="streak-pop" id="streakPop" role="status" aria-live="polite" aria-atomic="true"></div>
 <aside class="sync-badge" id="sync-badge" aria-live="polite" aria-label="Estado de sincronización" hidden></aside>
 
 <script>
@@ -4077,6 +4126,7 @@ function render(){
   if(privacyGateRequired())return renderPrivacyGate();
   if(planNeedsRecap()){ $("#tabs").innerHTML="";return renderPlanRecap(); }
   if(chatModeActive())return renderChatMode();
+  primeStreakSeen(); // REQ-283: estado de racha visto antes del próximo registro
   renderTabs();
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
@@ -4789,6 +4839,7 @@ function renderHoy(){
   </header>
   ${adminBetaPendingCardHtml()}
   ${restartNudgeCard()}
+  ${returnCardHtml()}
   ${dayClosed?"":heroDash(ds,{compact:true})}
   ${homeAgendaHtml(ds)}
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
@@ -7837,7 +7888,7 @@ function renderProfile(){
   <details id="pfSecRecordatorios" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
   <summary onclick="return profileAccordionGuard(event,this)">Recordatorios</summary>
   <div class="pf-accordion-panel"><div class="dash" oninput="pfNotifMarkDirty()" onchange="pfNotifMarkDirty()">
-    <div class="muted small" style="margin-bottom:12px">Recibe un aviso por correo si tienes actividad pendiente al final del día. Solo se envía cuando corresponde; nunca dos veces el mismo día.</div>
+    <div class="muted small" style="margin-bottom:12px">Como máximo un correo al día y solo cuando sirve: si te falta algo para sumar el día a tu racha, si ayer quedó sin registrar o, si llevas días sin entrar, lo que ya lograste. Tras un mes sin registros dejamos de escribirte hasta que vuelvas.</div>
     <label class="chip-check" style="display:flex;margin-bottom:4px">
       <input type="checkbox" id="notif_opt_in" onchange="toggleNotifOptions()">
       <span>Activar recordatorios por correo</span>
@@ -8165,6 +8216,7 @@ async function saveNotifPrefs(){
   if(error){toast("No se pudieron guardar los recordatorios");return;}
   notifPrefsCache={...notifPrefsCache,...row};
   pfNotifClearDirty();
+  _engagementSaved="";scheduleEngagementSave(0); // REQ-285: la fila puede ser nueva
   toast("Recordatorios guardados");
 }
 
@@ -8186,7 +8238,7 @@ function renderPushSection(){
   }
   const perm=Notification.permission;
   const pushEnabled=!!(notifPrefsCache&&notifPrefsCache.push_opt_in);
-  const note='<p class="muted small" style="margin-bottom:10px">Recibe un aviso en este dispositivo antes de que termine el día para no perder tu racha. Usa la misma hora y días configurados arriba. Solo funciona con la app instalada (iOS 16.4+ y Android).</p>';
+  const note='<p class="muted small" style="margin-bottom:10px">Recibe un aviso en este dispositivo para no perder tu racha, con la hora y los días de Recordatorios. Solo funciona con la app instalada (iOS 16.4+ y Android).</p>';
   if(perm==="denied"){
     el.innerHTML=note+`<div class="alert violet"><b>Avisos bloqueados.</b> Para reactivarlos ve a la configuración de tu navegador y permite las notificaciones para esta app.<br><span class="muted small">iOS: Safari → Configuración del sitio web → Notificaciones. Android: ajustes del navegador → Notificaciones.</span></div>`;
     return;
@@ -8196,7 +8248,7 @@ function renderPushSection(){
     return;
   }
   // permission === "granted"
-  el.innerHTML=note+`<label class="chip-check" style="display:flex;margin-bottom:6px"><input type="checkbox" id="push_opt_in" ${pushEnabled?"checked":""} onchange="savePushOptIn(this)"><span>Aviso de racha en este dispositivo</span></label><p class="muted small">El aviso se envía una sola vez al día si tienes actividad pendiente.</p>`;
+  el.innerHTML=note+`<label class="chip-check" style="display:flex;margin-bottom:6px"><input type="checkbox" id="push_opt_in" ${pushEnabled?"checked":""} onchange="savePushOptIn(this)"><span>Aviso de racha en este dispositivo</span></label><p class="muted small">Un aviso al día como máximo. Si tu racha es de 3 días o más y sigue pendiente, uno más antes de las 22:00.</p>`;
 }
 
 async function requestPushPermission(btn){
@@ -8282,6 +8334,7 @@ async function _savePushOptInDb(enabled){
   const{error}=await supa.from("notification_preferences").upsert(row,{onConflict:"user_id"});
   if(!error){
     notifPrefsCache={...notifPrefsCache,...row};
+    _engagementSaved="";scheduleEngagementSave(0); // REQ-285: la fila puede ser nueva
     toast(enabled?"Avisos del dispositivo activados":"Avisos del dispositivo desactivados");
   }else{
     toast("No se pudo guardar la preferencia");
@@ -12763,7 +12816,8 @@ function checkAndSaveMilestones(){
       const key=`combined-${level}-c${cycleNumber()}`;
       if(!getStreakMilestones().some(m=>m.key===key)){
         saveStreakMilestone("combined",level);
-        toast(`🔥 ¡${level} días de racha! Sigue así.`);
+        // REQ-283: si la píldora de racha ya lo está celebrando, no se repite.
+        if(!streakPopShowing())toast(`🔥 ¡${level} días de racha! Sigue así.`);
       }
     }
   });
@@ -12771,10 +12825,168 @@ function checkAndSaveMilestones(){
 
 // Racha combinada: días consecutivos cumplidos hasta hoy (ventana de 1 día).
 function streak(){
-  let n=0,ds=todayStr();
-  if(!combinedDayDone(ds))ds=addDays(ds,-1);
+  const ds=todayStr();
+  return streakEndingAt(combinedDayDone(ds)?ds:addDays(ds,-1));
+}
+// Días cumplidos seguidos que terminan en ds (incluido).
+function streakEndingAt(ds){
+  let n=0;
   while(ds>=START&&combinedDayDone(ds)){n++;ds=addDays(ds,-1);}
   return n;
+}
+
+/* ---------- REQ-283: la racha se mueve a la vista ---------- */
+// Último estado visto de hoy y de ayer. Solo un registro local (commitDay) que
+// lo hace avanzar muestra la píldora; el render y lo que llega de otro
+// dispositivo lo actualizan en silencio.
+let _streakSeen=null,_streakPopTimer=null;
+const STREAK_FLAME_PATH="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z";
+// Piezas del día que cuentan para la racha (REQ-23): la mitad de las comidas
+// con contenido y el entreno, salvo descanso.
+function streakDayProgress(ds){
+  if(ds<START||ds>END||ds>todayStr())return null;
+  const day=buildDay(ds);
+  if(!day.meals.length)return null;
+  const need=Math.ceil(day.meals.length/2);
+  const meals=Math.min(need,day.meals.filter(m=>{const ms=mealState(ds,m.id);return ms.done&&mealHasContent(mealValue(m,ms));}).length);
+  const tr=trainingDayResult(ds);
+  const trainNeeded=tr!=="rest",trainOk=tr==="done";
+  const total=need+(trainNeeded?1:0);
+  const doneSteps=meals+(trainNeeded&&trainOk?1:0);
+  return {need,meals,trainNeeded,trainOk,total,doneSteps,done:doneSteps>=total};
+}
+function streakSeenState(){
+  const today=todayStr();
+  const t=streakDayProgress(today),y=streakDayProgress(addDays(today,-1));
+  const sig=p=>p?p.doneSteps+"/"+p.total:"-";
+  return {today,t,y,sig:sig(t)+"|"+sig(y)};
+}
+function primeStreakSeen(){
+  try{
+    const cur=streakSeenState();
+    if(_streakSeen&&_streakSeen.today===cur.today&&_streakSeen.sig===cur.sig)return;
+    _streakSeen={...cur,streak:streak()};
+  }catch(e){_streakSeen=null;}
+}
+function streakFeedbackAfterCommit(ds){
+  if(!session||!profile||onboardingActive)return;
+  const today=todayStr();
+  if(ds!==today&&ds!==addDays(today,-1))return;
+  const prev=_streakSeen;
+  const cur=streakSeenState();
+  if(prev&&prev.today===cur.today&&prev.sig===cur.sig)return;
+  const after=streak();
+  _streakSeen={...cur,streak:after};
+  if(!prev||prev.today!==cur.today)return;
+  const isToday=ds===today;
+  const p=isToday?cur.t:cur.y,before=isToday?prev.t:prev.y;
+  if(!p||!before)return;
+  const fill=x=>x.total?x.doneSteps/x.total:0;
+  if(after>prev.streak){
+    showStreakPop({kind:isToday?"day":"recovered",from:prev.streak,to:after,fillFrom:fill(before),fillTo:1});
+    return;
+  }
+  if(p.done||p.doneSteps<=before.doneSteps)return;
+  // Ayer a medias: lo que está en juego es la racha que terminaba anteayer.
+  const recover=isToday?0:streakEndingAt(addDays(ds,-1));
+  if(!isToday&&!recover)return;
+  showStreakPop({kind:"progress",from:after,to:after,recover,progress:p,fillFrom:fill(before),fillTo:fill(p)});
+}
+function streakMissingText(p){
+  const meals=p.need-p.meals,train=p.trainNeeded&&!p.trainOk;
+  const m=meals>0?`${meals} comida${meals===1?"":"s"}`:"";
+  if(m&&train)return `Faltan ${m} y el entreno`;
+  if(m)return `${meals===1?"Falta":"Faltan"} ${m}`;
+  return train?"Falta el entreno":"Falta registrar tu día";
+}
+function streakPopCopy(o){
+  const n=o.to,days=x=>`${x} día${x===1?"":"s"}`;
+  if(o.kind==="progress"){
+    const sub=o.recover?`para recuperar tu racha de ${days(o.recover)}`:n>0?`para sumar el día ${n+1} de tu racha`:"para empezar tu racha";
+    return {title:streakMissingText(o.progress),sub};
+  }
+  if(o.kind==="recovered")return {title:"Racha recuperada",sub:`Vuelves a llevar ${days(n)} seguidos.`};
+  if(n===1)return {title:"Día 1",sub:"Empezó tu racha."};
+  if(STREAK_MILESTONE_LEVELS.includes(n))return {title:`${n} días seguidos`,sub:"Nuevo hito de constancia."};
+  return {title:`Día ${n} sumado`,sub:"Tu racha está a salvo hoy."};
+}
+function streakPopShowing(){return !!document.querySelector("#streakPop .sp-card");}
+function showStreakPop(o){
+  const el=document.getElementById("streakPop");
+  if(!el)return;
+  const c=streakPopCopy(o);
+  const rolls=o.kind!=="progress"&&o.from!==o.to;
+  const milestone=o.kind==="day"&&STREAK_MILESTONE_LEVELS.includes(o.to);
+  clearTimeout(_streakPopTimer);
+  el.classList.remove("out");
+  el.style.setProperty("--sp-from",String(o.fillFrom));
+  el.style.setProperty("--sp-to",String(o.fillTo));
+  el.innerHTML=`<button type="button" class="sp-card sp-${o.kind}" onclick="hideStreakPop()">
+    <span class="sp-flame" aria-hidden="true"><svg viewBox="0 0 24 24"><defs><clipPath id="spLevelClip"><rect class="sp-level" x="0" y="0" width="24" height="24"/></clipPath></defs><path class="sp-fill" clip-path="url(#spLevelClip)" d="${STREAK_FLAME_PATH}"/><path class="sp-line" d="${STREAK_FLAME_PATH}"/></svg></span>
+    <span class="sp-count" aria-hidden="true">${rolls?`<span class="sp-n sp-from">${o.from}</span><span class="sp-n sp-to">${o.to}</span>`:`<span class="sp-n">${o.to}</span>`}</span>
+    <span class="sp-copy"><b>${esc(c.title)}</b><span>${esc(c.sub)}</span></span>
+    <span class="sp-sr">Racha: ${o.to} día${o.to===1?"":"s"}.</span>
+  </button>`;
+  _streakPopTimer=setTimeout(hideStreakPop,o.kind==="progress"?2800:milestone?4400:3600);
+}
+function hideStreakPop(){
+  const el=document.getElementById("streakPop");
+  clearTimeout(_streakPopTimer);
+  if(!el||!el.firstElementChild)return;
+  el.classList.add("out");
+  _streakPopTimer=setTimeout(()=>{el.innerHTML="";el.classList.remove("out");},180);
+}
+
+/* ---------- REQ-285: resumen de constancia para los recordatorios ---------- */
+// api/notify.js no conoce el plan: lee de notification_preferences.engagement
+// la racha, el rescate posible de ayer y el progreso del ciclo. Columna propia
+// (no profiles.prefs) para no pisar ediciones del perfil. Solo existe la fila
+// de quien activó recordatorios; privado del usuario, no va a analytics.
+let _engagementTimer=null,_engagementSaved="",_engagementUnsupported=false;
+function engagementSnapshot(){
+  const today=todayStr(),yesterday=addDays(today,-1);
+  const stk=streak();
+  const s=cycleSummary(today);
+  const rescue=yesterday>=START&&!combinedDayDone(yesterday)?streakEndingAt(addDays(yesterday,-1)):0;
+  return {
+    v:1,cycleStart:START,
+    streak:stk,streakThrough:stk>0?(combinedDayDone(today)?today:yesterday):null,
+    rescueDate:rescue>=2?yesterday:null,rescueStreak:rescue>=2?rescue:0,
+    bestStreak:s.bestStreak,activeDays:s.activeDays,workouts:s.workouts+s.partialWorkouts,
+  };
+}
+function scheduleEngagementSave(delay){
+  clearTimeout(_engagementTimer);
+  _engagementTimer=setTimeout(saveEngagementSnapshot,delay==null?3000:delay);
+}
+async function saveEngagementSnapshot(){
+  if(_engagementUnsupported||!supa||!session||!profile||!isActive()||onboardingActive)return;
+  if(!hasCompleteOnboarding(profile.prefs||{})||todayStr()<START)return;
+  let snap;
+  try{snap=JSON.stringify(engagementSnapshot());}catch(e){return;}
+  const key=uid()+":"+snap;
+  if(key===_engagementSaved)return;
+  try{
+    const r=await supa.from("notification_preferences").update({engagement:JSON.parse(snap)}).eq("user_id",uid());
+    if(!r.error)_engagementSaved=key;
+    // Sin la migración supabase/notifications_journey.sql no hay columna: no reintentar.
+    else if(/engagement|column/i.test(String(r.error.message||"")))_engagementUnsupported=true;
+  }catch(e){/* best-effort: se reintenta con el próximo registro */}
+}
+// Los avisos abren el día del aviso (?date=) y dejan la etapa (?r=) para medir
+// qué etapa trae de vuelta, sin datos personales.
+function openReminderLink(){
+  try{
+    const params=new URLSearchParams(location.search);
+    const ds=params.get("date"),step=params.get("r");
+    if(ds===null&&step===null)return;
+    params.delete("date");params.delete("r");
+    const qs=params.toString();
+    history.replaceState(history.state,"",location.pathname+(qs?"?"+qs:"")+location.hash);
+    if(step&&/^[a-z0-9_]{1,24}$/.test(step))trackEvent("reminder_opened",{step});
+    if(onboardingActive||!validYmd(ds)||!inRange(ds)||ds===todayStr())return;
+    goDay(ds);
+  }catch(_){}
 }
 
 // Resuelve la sesión actual y carga el perfil. authReady=true al terminar.
@@ -13003,6 +13215,8 @@ async function onAuth(){
     trackEvent("session_start",{});
     refreshAdminBetaPending(); // REQ-225: aviso de postulaciones nuevas (solo admin, no-await)
     openAdminBetaFromLink(); // REQ-226: el botón del correo de aviso abre Postulantes beta
+    openReminderLink(); // REQ-285: el aviso abre su día y registra la etapa
+    scheduleEngagementSave(1500); // REQ-285: resumen para los recordatorios
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
     refreshPushSubscriptionKey(); // REQ-267: no-await
   }finally{_authBusy=false;}
@@ -13141,6 +13355,88 @@ async function dismissRestartNudge(){
   profile.prefs=prefs;render();
   toast("Vamos: tu plan sigue donde ibas");
   await saveProfilePrefs(prefs);
+}
+/* ---------- REQ-284: tarjeta de regreso en Hoy ---------- */
+// Rescate de ayer (ventana de corrección de REQ-23) o bienvenida tras 2+ días
+// sin registrar. Descartarla es una comodidad de este dispositivo.
+const RETURN_CARD_KEY="evolv_return_card_v1";
+function lastActiveDayBefore(ds){
+  return Object.keys(S.days||{}).filter(d=>d>=START&&d<ds&&dayActive(d)).sort().pop()||null;
+}
+function returnCardDismissed(key){
+  try{return localStorage.getItem(RETURN_CARD_KEY+":"+uid())===key;}catch(e){return false;}
+}
+function returnCardData(){
+  const p=(profile&&profile.prefs)||{};
+  if(!hasCompleteOnboarding(p)||onboardingActive)return null;
+  const today=todayStr();
+  if(today<START||today>END)return null;
+  const yesterday=addDays(today,-1);
+  if(yesterday>=START&&!combinedDayDone(yesterday)){
+    const rescue=streakEndingAt(addDays(yesterday,-1));
+    if(rescue>=2){
+      const key="rescue:"+yesterday;
+      return returnCardDismissed(key)?null:{kind:"rescue",key,ds:yesterday,streak:rescue};
+    }
+  }
+  if(dayActive(today)||restartNudgeDue())return null;
+  const last=lastActiveDayBefore(today);
+  if(daysBetween(last||START,today)<2)return null;
+  const key="welcome:"+(last||START);
+  return returnCardDismissed(key)?null:{kind:"welcome",key,never:!last};
+}
+function returnGoalLine(){
+  const p=(profile&&profile.prefs)||{};
+  const goal=GOAL_OPTIONS[p.goal];
+  const today=todayStr();
+  const w=weekOf(today,planPrefsForDate(today))||weekOf(today);
+  const week=w&&w.num?`semana ${w.num} de ${PLAN_DURATION_WEEKS}`:"";
+  return [goal?`Tu objetivo: ${goal.label}`:"",week].filter(Boolean).join(" · ");
+}
+function returnCardHtml(){
+  const data=returnCardData();
+  if(!data)return "";
+  const flame=`<span class="return-flame" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${STREAK_FLAME_PATH}"/></svg></span>`;
+  if(data.kind==="rescue"){
+    return `<section class="agenda-card agenda-state return-card" aria-labelledby="returnCardTitle">
+      <div class="agenda-head">${flame}<h2 class="agenda-title" id="returnCardTitle">Ayer quedó sin registrar</h2></div>
+      <p class="return-body">Si lo cumpliste, regístralo ahora y tu racha de ${data.streak} días sigue en pie.</p>
+      <div class="agenda-actions">
+        <button class="btn btn-accent" onclick="returnRescueYesterday('${data.ds}')">Registrar ayer</button>
+        <button class="btn" onclick="dismissReturnCard('${data.key}','return_restart')">Empezar hoy</button>
+      </div>
+    </section>`;
+  }
+  let body;
+  if(data.never)body="Aún no registras tu primer día. Empieza con una comida: ahí arranca tu racha.";
+  else{
+    const s=cycleSummary(todayStr());
+    const workouts=s.workouts+s.partialWorkouts;
+    const parts=[`${s.activeDays} día${s.activeDays===1?"":"s"} registrado${s.activeDays===1?"":"s"}`];
+    if(workouts)parts.push(`${workouts} entreno${workouts===1?"":"s"}`);
+    body=`Tu racha se reinició, tu progreso no: en este plan llevas ${parts.join(" y ")}${s.bestStreak>=2?`, con una mejor racha de ${s.bestStreak} días`:""}.`;
+  }
+  const goal=returnGoalLine();
+  return `<section class="agenda-card agenda-state return-card" aria-labelledby="returnCardTitle">
+    <div class="agenda-head">${flame}<h2 class="agenda-title" id="returnCardTitle">${data.never?"Tu plan te espera":"Qué bueno verte de vuelta"}</h2></div>
+    <p class="return-body">${esc(body)}</p>
+    ${goal?`<p class="return-goal">${esc(goal)}</p>`:""}
+    <div class="agenda-actions"><button class="btn btn-accent" onclick="returnStartToday('${data.key}')">Empezar hoy</button></div>
+  </section>`;
+}
+function dismissReturnCard(key,action){
+  try{localStorage.setItem(RETURN_CARD_KEY+":"+uid(),key);}catch(e){/* sin almacenamiento: vuelve a mostrarse */}
+  if(action)homeTrackAction(todayStr(),action);
+  render();
+}
+function returnRescueYesterday(ds){
+  homeTrackAction(todayStr(),"return_rescue");
+  goDay(ds);
+}
+function returnStartToday(key){
+  dismissReturnCard(key,"return_start");
+  const target=document.querySelector("#app .agenda-card:not(.return-card)");
+  if(target)target.scrollIntoView({block:"start",behavior:window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});
 }
 async function archiveCompletedCycle(summary,challenge,photoPath,endDate){
   if(!supa||!uid())throw new Error("Sin conexión con tu historial.");
@@ -13497,6 +13793,8 @@ function commitDay(ds){
   }
   save();
   pushDay(ds);
+  try{streakFeedbackAfterCommit(ds);}catch(e){/* REQ-283: la animación nunca bloquea el guardado */}
+  scheduleEngagementSave(); // REQ-285
 }
 // Trae el día desde la DB y re-renderiza si seguimos viéndolo.
 function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view==="nutricion"||view==="entreno")&&current===ds)render();});}

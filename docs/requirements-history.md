@@ -11484,3 +11484,112 @@ Primer envío real (2026-10-25, 20:00 Lima): el job corrió con el usuario de co
 ### Criterios de aceptación
 
 - Sin el día, o con el día sin nada registrado, y aviso de comidas activo: sale "Tu plan de hoy te espera". Con solo el aviso de entreno: no sale nada. Con algo registrado (comidas hechas, un extra): no sale el aviso de no empezado. ✓ `scripts/validate-notify-schedule.mjs` (falla con el código anterior).
+
+## REQ-283 - Racha: animación al registrar algo que la hace avanzar
+
+**Estado: implementado.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): "cuando entras y haces algo se debe ver una animación de la actualización de racha".
+
+### Problema
+Marcar comidas o cerrar el entreno no da ninguna respuesta sobre la racha: cambia en silencio y solo los hitos 3/7/14/30 muestran un toast.
+
+### Objetivo
+Cada registro que acerca el día a la racha muestra cuánto falta; al cumplir el día, el número sube con una animación, también al recuperar ayer.
+
+### Alcance
+Píldora fija arriba, desde cualquier pestaña: avance del día (comidas necesarias + entreno), día sumado, primer día, hito y racha recuperada. Solo ante cambios locales que suman; con `prefers-reduced-motion`, fundido sin desplazamiento.
+
+### Fuera de alcance
+Cambiar la definición de racha (REQ-23) o los hitos guardados.
+
+### Riesgos
+Animar cambios remotos o programáticos; tapar controles; costo de calcular la racha en cada render.
+
+### Criterios de aceptación
+Marcar una comida muestra lo que falta; cumplir el día sube el número (N → N+1) y lo anuncia por `aria-live`; desmarcar no anima; tocar la píldora la cierra.
+
+### Verificación sugerida
+E2E con racha sembrada: comida → avance; descanso → día sumado; desmarcar sin animación; capturas móvil.
+
+### Implementación
+- `streakDayProgress(ds)`: piezas del día que cuentan para la racha (REQ-23): `ceil(comidas/2)` comidas con contenido marcadas + el entreno salvo descanso. `streakEndingAt(ds)` cuenta días cumplidos seguidos que terminan en `ds`; `streak()` la usa.
+- `_streakSeen` guarda las piezas de hoy y de ayer y la racha. `render()` llama `primeStreakSeen()` (solo recalcula la racha si cambió la firma), así que lo que llega de otro dispositivo o del arranque se absorbe sin animación. `commitDay()` llama `streakFeedbackAfterCommit(ds)` (en `try`, nunca bloquea el guardado) para hoy y ayer.
+- Casos: avance de hoy ("Faltan 1 comida y el entreno / para sumar el día N+1 de tu racha"), día sumado ("Día N sumado", "Día 1. Empezó tu racha.", hitos "7 días seguidos"), ayer a medias ("para recuperar tu racha de N días") y ayer completado ("Racha recuperada"). Desmarcar o un cambio sin avance no anima.
+- `#streakPop` es un contenedor permanente `role=status aria-live=polite`; la píldora es un botón que se cierra al tocarlo y se va sola (2,8 s avance, 3,6 s día, 4,4 s hito). Llama SVG con relleno recortado (`clipPath` escalado por `--sp-from/--sp-to`), número que sube con desenfoque breve y llama que se enciende. Con `prefers-reduced-motion`, solo fundidos.
+- `checkAndSaveMilestones()` no repite el toast del hito si la píldora ya lo está mostrando.
+- Verificación: `tests/e2e/racha-animacion.spec.js` (avance, día sumado con 3 → 4, cerrar al tocar, desmarcar sin animación, día 1 tras racha rota, racha recuperada) y capturas móvil con y sin movimiento reducido.
+
+## REQ-284 - Hoy: tarjeta de regreso y rescate de ayer
+
+**Estado: implementado.** Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): el journey debe cubrir a quien volvió tras días o semanas, recordando progreso, objetivos o racha.
+
+### Problema
+Al volver tras 2-13 días, Hoy no reconoce la ausencia ni muestra lo logrado; quien olvidó registrar ayer pierde la racha sin saber que puede corregirlo (ventana de REQ-23).
+
+### Objetivo
+Hoy muestra una tarjeta según la ausencia: rescate de ayer o bienvenida con progreso, objetivo y semana del plan.
+
+### Alcance
+Rescate: ayer sin cumplir con racha de 2+ días hasta anteayer, "Registrar ayer" abre ese día. Bienvenida: 2+ días sin registrar, sin la tarjeta de reinicio de REQ-214; se oculta al registrar hoy o al descartarla.
+
+### Fuera de alcance
+Cambiar la tarjeta de reinicio de REQ-214 o el resumen de ciclo.
+
+### Riesgos
+Duplicar tarjetas; mostrar progreso de otro ciclo; lenguaje de culpa.
+
+### Criterios de aceptación
+Cada condición muestra su tarjeta y ninguna otra; registrar ayer desde la tarjeta recupera la racha; descartar persiste en el dispositivo.
+
+### Verificación sugerida
+E2E: ayer vacío con racha previa → rescate; 4 días fuera → bienvenida con días/entrenos; registrar hoy la oculta.
+
+### Implementación
+- `returnCardData()` decide la tarjeta: rescate (ayer ≥ inicio del plan, `!combinedDayDone(ayer)` y `streakEndingAt(anteayer) >= 2`) o bienvenida (hoy sin actividad, sin `restartNudgeDue()` y `lastActiveDayBefore(hoy)` —o el inicio del plan si nunca hubo registro— a 2+ días). Fuera del rango del plan no hay tarjeta.
+- `returnCardHtml()` se pinta en `renderHoy()` después de `restartNudgeCard()`: rescate con "Registrar ayer" (`goDay(ayer)`) y "Empezar hoy"; bienvenida con frase de progreso de `cycleSummary(hoy)` (días registrados, entrenos completos y parciales, mejor racha si es 2+), `returnGoalLine()` (objetivo de `GOAL_OPTIONS` y semana del plan) y "Empezar hoy", que la descarta y lleva a la agenda. Sin registros: "Tu plan te espera".
+- El descarte vive en `localStorage` (`evolv_return_card_v1:<uid>`) con la clave de la ausencia (`rescue:<ayer>` / `welcome:<último día activo>`): una ausencia nueva vuelve a mostrarla. Acciones registradas con `home_agenda_action` (`return_rescue`, `return_restart`, `return_start`), sin datos personales.
+- Sin kicker sobre el título (skill de diseño); llama SVG en contorno, la misma de la píldora de REQ-283.
+- Verificación: `tests/e2e/regreso.spec.js` (rescate y recuperación con la píldora, descarte persistente tras recargar, bienvenida con progreso/objetivo que se oculta al registrar, sin registros, racha viva sin tarjeta) y capturas 390/1280 px.
+
+## REQ-285 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
+
+**Estado: implementado.** Migración aplicada en Supabase el 2026-10-26. Prioridad P1. Diseño: `docs/reminders-journey.md`.
+
+### Origen
+Jonathan (2026-10-26): recordatorios para usuarios del día, para quien dejó unos días y para quien dejó semanas.
+
+### Problema
+`api/notify.js` solo mira la fila de hoy: quien no abrió la app no recibe nada aunque su racha esté en riesgo; quien se fue con la semana preparada recibe el mismo correo cada día; nadie recibe progreso u objetivo; los enlaces `?date=` no se leen.
+
+### Objetivo
+Un journey con una decisión pura por usuario y día: día en juego, rescate de ayer, última llamada (push) y regreso a los 2/5/7/14/30 días, con silencio después.
+
+### Alcance
+`planReminder()` puro en `api/notify.js`; actividad desde `day_log` (60 días); racha y progreso desde `profiles.prefs.engagement`, escrito por la app; un correo diario; idempotencia por ausencia; no enviar sin registrar el intento; migración del `CHECK`; `?date=`/`r=` y `reminder_opened`; copy de Perfil.
+
+### Fuera de alcance
+WhatsApp (REQ-255), nuevas horas o preferencias por etapa.
+
+### Riesgos
+Spam por reintentos; datos sensibles en pantalla bloqueada; romper el aviso actual antes de la migración.
+
+### Criterios de aceptación
+Cada etapa sale una vez en su ventana; tras 45 días no sale nada; sin migración el aviso del día sigue; ningún mensaje lleva peso ni objetivo en push/asunto.
+
+### Verificación sugerida
+Validador Node con matriz de ausencias, zonas, idempotencia y fallo de registro; E2E de `?date=` y del snapshot.
+
+### Implementación
+- `api/notify.js`: un solo recorrido por usuario con correo o push activo (`notification_preferences?or=(email_opt_in,push_opt_in)&select=*`). Tras la hora y el día habilitado, `loadUserContext()` lee perfil (activo, `goal`, `planStartDate`, `planEndDate`, `planDurationWeeks`) y `day_log` de 60 días con solo los campos de estado necesarios.
+- `planReminder(ctx)` (puro, exportado): `dayHasActivity()` (mismo criterio que `dayActive()`), `gap` desde el último día activo o el inicio del plan. Rescate si `engagement.rescueDate` es ayer o la racha llega a anteayer (2+ días). `gap` ≤ 1: aviso del día salvo racha de hoy asegurada; sin fila de hoy = "registrar tu día"; respeta `notify_nutrition/notify_training` y REQ-265; `lastCall` a `max(21, hora+2)` si ≤ 22 y racha 3+. `gap` 2-3/5-6/7-13/14-29/30-45 → `comeback_*` con `ref` = último día activo; después, nada. Plan terminado: sin aviso del día y regreso sin semanas. Nunca registró: variantes de activación.
+- `reminderMessage()`: textos por etapa; push y asunto sin objetivo ni datos corporales; el correo nombra el objetivo en el cuerpo. Enlaces `/?date=…&r=<etapa>` o `/?r=<etapa>`. Correo con colores de marca.
+- `deliver()`: lee la clave idempotente (y la clave hermana del aviso diario, para no duplicar el día del despliegue); si no puede leer o registrar el intento, no envía (falla cerrado). Tipos: aviso del día/rescate con `nutrition`/`training` y `push_streak` (de REQ-24/38, sin migración); `comeback`, `push_comeback`, `push_last_call` (con migración). Última llamada solo si el aviso del día ya salió en un disparo anterior. Push solo con suscripciones.
+- App: `engagementSnapshot()` (racha, `streakThrough`, rescate de ayer, mejor racha, días registrados, entrenos) se guarda en `notification_preferences.engagement` (columna propia, no reescribe `profiles.prefs`) 3 s después de cada registro y al iniciar, solo si cambió; sin la columna deja de intentar. `openReminderLink()` abre `?date=` (día del plan) y registra `reminder_opened` con `step`. Perfil explica el journey. `api/analytics.js` permite `reminder_opened`.
+- Integración con REQ-281/282 (#49, en `main` antes del merge): se conserva el recorte de claves VAPID y `push: {ready, issue}`; el día sin abrir o abierto sin nada registrado (`notStarted`) es el caso `missing:"day"` del aviso del día ("Aún no has empezado tu plan de hoy"), y con solo el aviso de entreno no sale sin la fila de hoy. Este trabajo se numeró primero REQ-281..283 y se renumeró a REQ-283..285.
+- Migración `supabase/notifications_journey.sql` (idempotente, con rollback): columna `engagement` y `CHECK` ampliado. Aplicada en producción el 2026-10-26 a pedido de Jonathan, vía la API de gestión de Supabase; verificado después: `CHECK` con los 6 tipos, `engagement jsonb` nulo, RLS y `notif_prefs_self` intactos.
+- Verificación: `scripts/validate-reminder-journey.mjs` (actividad, día en juego, rescate, última llamada, matriz de ausencias 2-59, activación, plan terminado, privacidad de 13 variantes, handler con push, falla cerrado y registro ilegible), `scripts/validate-notify-schedule.mjs` (REQ-265/266 sobre el journey) y `tests/e2e/recordatorios.spec.js` (resumen guardado en su columna, enlace del aviso).

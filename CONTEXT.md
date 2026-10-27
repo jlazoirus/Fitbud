@@ -88,7 +88,7 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 - Landing publica, catalogo de planes, paywall, Stripe Checkout, webhooks, entitlements, cupones y billing history estan implementados. Cobro real depende de variables y configuracion externa.
 - REQ-104: sin `STRIPE_SECRET_KEY`, `showPaywall` muestra "Disponible pronto" + canje de codigo. Pago unico, sin renovacion.
 - **Cobro siempre en la web** (Stripe Checkout en `evolvapp.club`), tambien con app nativa: nada de compras dentro de la app. REQ-208: `noPricesMode()` (acceso beta/cupon/cortesia vigente o invitacion sin canjear) reemplaza el paywall por `showAccessNotice()` y Perfil no muestra precios; Admin "Crear cuenta"/"Invitar" con casilla beta da 90 dias de cortesia `quarterly`.
-- `api/notify.js`: correo (Resend) y push (`web-push`); lo dispara cada hora `.github/workflows/notify-hourly.yml` (REQ-266).
+- `api/notify.js`: correo y push cada hora (`notify-hourly.yml`, REQ-266); `planReminder()` elige etapa por ausencia (REQ-285, `docs/reminders-journey.md`).
 - `api/analytics.js` registra eventos permitidos por allowlist; no enviar datos de salud, alergias, fotos, prompts ni contenido de conversaciones.
 
 ## Archivos calientes

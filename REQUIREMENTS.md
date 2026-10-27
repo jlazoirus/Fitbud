@@ -99,6 +99,8 @@ Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/R
 
 - REQ-258 - Home: día cerrado muestra mañana. (Jonathan; implementado)
 
+Journey de recordatorios y racha (Jonathan, 2026-10-26; diseño en `docs/reminders-journey.md`): REQ-283 animación de racha, REQ-284 regreso en Hoy, REQ-285 recordatorios por ausencia.
+
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
 - REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
@@ -2016,3 +2018,21 @@ Que el modal de resolución de conflictos ofrezca "Combinar seguro" cuando exist
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Sin el día en `day_log`, o sin nada registrado, `checkPending()` cuenta comidas pendientes y el correo dice "Tu plan de hoy te espera"; el entreno no se avisa sin el día. ✓ `scripts/validate-notify-schedule.mjs`.
+
+## REQ-283 - Racha: animación al registrar algo que la hace avanzar
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
+
+Jonathan (2026-10-26). `commitDay()` llama `streakFeedbackAfterCommit()`: si un registro local de hoy o ayer avanza las piezas del día (`streakDayProgress`: mitad de comidas + entreno salvo descanso), la píldora `#streakPop` (arriba, desde cualquier pestaña, `role=status`) dice lo que falta; al cumplir, la llama se llena y el número sube (N → N+1, día 1, hito 3/7/14/30, racha recuperada al completar ayer). `render()` actualiza el estado visto en silencio (remoto o desmarcar no anima). Fundido con `prefers-reduced-motion`. ✓ `tests/e2e/racha-animacion.spec.js`.
+
+## REQ-284 - Hoy: tarjeta de regreso y rescate de ayer
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
+
+Jonathan (2026-10-26). `returnCardHtml()` en Hoy, bajo la tarjeta de reinicio de REQ-214: rescate si ayer no se cumplió y había racha de 2+ días hasta anteayer ("Registrar ayer" abre ese día; al completarlo, "Racha recuperada"); bienvenida tras 2+ días sin registrar con días registrados, entrenos, mejor racha, objetivo y semana del plan, o "Tu plan te espera" sin registros. Se oculta al registrar hoy; descartarla se guarda en el dispositivo. ✓ `tests/e2e/regreso.spec.js`.
+
+## REQ-285 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
+
+**Estado: implementado.** Migración `supabase/notifications_journey.sql` aplicada en Supabase el 2026-10-26 (columna `notification_preferences.engagement` y tipos nuevos de `notification_log`).
+
+Jonathan (2026-10-26). `planReminder()` (puro, `api/notify.js`) decide una etapa por usuario y día: día en juego (también sin abrir la app hoy), rescate de ayer, última llamada por push (racha 3+, 21-22 h) y regreso a los 2/5/7/14/30 días, una vez por ausencia; después, silencio. Un correo diario; envío solo tras registrar el intento. La app guarda el resumen de racha en `engagement`, abre `?date=` y registra `reminder_opened`. Diseño: `docs/reminders-journey.md`; detalle en `docs/requirements-history.md`. ✓ `scripts/validate-reminder-journey.mjs`, `scripts/validate-notify-schedule.mjs`, `tests/e2e/recordatorios.spec.js`.
