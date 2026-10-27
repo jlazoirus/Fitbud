@@ -2299,7 +2299,7 @@ function restorePendingFromQueue(){
     else if(x.entity==="weight_log"&&x.payload.kg!=null)S.weights[x.payload.week]={kg:Number(x.payload.kg),bf:(x.payload.bf_pct==null?null:Number(x.payload.bf_pct))};
   });
 }
-function _markSyncConflict(item,remotePayload,conflicts){
+function _markSyncConflict(item,remotePayload,conflicts,autoMergedPayload){
   const q=_getSyncQ();const i=q.findIndex(x=>x.id===item.id);
   if(i===-1)return;
   q[i].status="conflict";
@@ -2309,6 +2309,7 @@ function _markSyncConflict(item,remotePayload,conflicts){
     remoteUpdatedAt:remotePayload&&remotePayload.updated_at||null,
     remotePayload,
     conflicts:Array.isArray(conflicts)?conflicts.map(String):["cambio remoto"],
+    autoMergedPayload:autoMergedPayload||null,
   };
   _setSyncQ(q);_updateSyncBadge();
 }
@@ -2377,7 +2378,17 @@ function _resolveQueuedConflictPayload(item,remotePayload){
       const payload={...item.payload,state:merged.merged,updated_at:new Date().toISOString()};
       return {ok:true,payload:appendSyncResolutionLogToPayload(payload,"auto_merge",{remoteUpdatedAt:remotePayload.updated_at}),remotePayload};
     }
-    return {ok:false,remotePayload,conflicts:merged.conflicts};
+    // REQ-280: aunque el campo en disputa quede sin resolver automáticamente,
+    // mergeDayLogStates ya conservó los cambios no conflictivos de ambos lados
+    // (el campo en conflicto queda con el valor remoto). Ese resultado parcial
+    // es justo lo que "Combinar seguro" necesita ofrecer en el modal.
+    const safeMergePayload={...item.payload,state:merged.merged,updated_at:new Date().toISOString()};
+    return {
+      ok:false,
+      remotePayload,
+      conflicts:merged.conflicts,
+      autoMergedPayload:appendSyncResolutionLogToPayload(safeMergePayload,"safe_merge",{remoteUpdatedAt:remotePayload.updated_at,conflicts:merged.conflicts}),
+    };
   }
   if(item.entity==="weight_log"&&SYNC_ENGINE.mergeWeightPayload){
     const merged=SYNC_ENGINE.mergeWeightPayload(item.basePayload,item.payload,remotePayload);
@@ -2404,7 +2415,7 @@ async function drainSyncQueue(){
         if(!session||!session.access_token){await refreshAuth();if(!session)break;}
         const remotePayload=await _fetchRemoteSyncPayload(item);
         const resolved=_resolveQueuedConflictPayload(item,remotePayload);
-        if(!resolved.ok){_markSyncConflict(item,remotePayload,resolved.conflicts);continue;}
+        if(!resolved.ok){_markSyncConflict(item,remotePayload,resolved.conflicts,resolved.autoMergedPayload);continue;}
         if(resolved.dequeueOnly){
           _rememberRemoteVersion(item.entity,item.entityKey,remotePayload&&remotePayload.updated_at,item.payload);
           _dequeueMutation(item.entity,item.entityKey);
@@ -2504,8 +2515,10 @@ function resolveSyncConflict(id,action){
   }
   if(action==="merge"&&item.conflict&&item.conflict.autoMergedPayload){
     const payload=item.conflict.autoMergedPayload;
+    if(item.entity==="day_log"&&payload.state)S.days[item.entityKey]=payload.state;
+    save();
     _resetConflictAsPending(item.id,payload,remote,item.conflict.remoteUpdatedAt);
-    closeModal();toast("Combinación lista para guardar");drainSyncQueue();return;
+    closeModal();_refreshAfterSyncResolution(item);toast("Combinación lista para guardar");drainSyncQueue();return;
   }
   if(action==="local"){
     let payload={...item.payload,updated_at:new Date().toISOString()};

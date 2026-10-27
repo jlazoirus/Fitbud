@@ -144,6 +144,7 @@ run("validate-splits.mjs", "node scripts/validate-splits.mjs");
 run("validate-strength-only-schedule.mjs", "node scripts/validate-strength-only-schedule.mjs");
 run("validate-e2e-training-fixture.mjs", "node scripts/validate-e2e-training-fixture.mjs");
 run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
+run("validate-sync-safe-merge.mjs", "node scripts/validate-sync-safe-merge.mjs");
 run("test-admin-api.mjs", "node scripts/test-admin-api.mjs");
 run("test-admin-beta-api.mjs", "node scripts/test-admin-beta-api.mjs");
 run("test-admin-beta-signup.mjs", "node scripts/test-admin-beta-signup.mjs");

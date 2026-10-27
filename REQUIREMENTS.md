@@ -1971,7 +1971,8 @@ Comidas y Entreno abiertos miden como máximo 1500 px en el caso E2E; editar, al
 
 ## REQ-280 - Conflictos de sync: el botón "Combinar seguro" nunca aparece y se pierden cambios no conflictivos
 
-**Estado: pendiente.**
+**Estado: implementado.**
+`_resolveQueuedConflictPayload()` (`index.html`) calcula `merged.merged` con `mergeDayLogStates` también cuando `merged.ok===false` y lo etiqueta `autoMergedPayload` (log `safe_merge`); `drainSyncQueue()` lo propaga a `_markSyncConflict()`, que ahora lo guarda en `item.conflict.autoMergedPayload`. `openSyncConflicts()` ya mostraba el botón cuando esa propiedad existe; `resolveSyncConflict("merge")` ahora también aplica `payload.state` a `S.days` antes de reencolar, igual que la rama "local". `weight_log` queda sin esta oferta, como define REQ-73. ✓ `scripts/validate-sync-safe-merge.mjs`.
 
 ### Origen
 Journey `sync`, auditoría del 2026-10-26 sobre `6ed64ed` (REQ-278). Al recorrer la resolución de conflictos offline reproduje un conflicto real en la app corriendo (localhost:8923) y el modal "Revisar sincronización" solo ofrece dos opciones, nunca la tercera que REQ-73 documenta.
