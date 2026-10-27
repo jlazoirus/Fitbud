@@ -11636,3 +11636,24 @@ Que lo primero bajo la fecha sea la sesión de hoy; el plan queda como contexto 
 
 ### Verificación
 `tests/e2e/entreno.spec.js` ("Plan compacto" ×2, "Sesión en curso" actualizado), `tests/e2e/alta-y-espera.spec.js` (el generador se abre desde la hoja); capturas a 375px de día de entreno, hoja y descanso revisadas; detector de impeccable sin hallazgos.
+
+## REQ-288 - Push: par VAPID nuevo (la privada de REQ-267 no estaba en ningún lado)
+
+**Estado: implementado — requiere acción humana:** cargar `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel (Production) y volver a desplegar.
+
+### Origen
+
+Jonathan (2026-10-27), al revisar qué faltaba tras REQ-283..285: el job `notify-hourly.yml` respondía `push: {"ready": false, "issue": "falta VAPID_PRIVATE_KEY"}` (diagnóstico de REQ-281). La privada generada en REQ-267 se entregó fuera del repo y no se encontró.
+
+### Hecho
+
+- Par VAPID nuevo (`web-push.generateVAPIDKeys()`): la pública `BCLTdYHp…` reemplaza a `BHWBAWEp…` en `index.html` y en el respaldo de `api/notify.js`. La privada se entregó a Jonathan en un archivo fuera del repo; se verificó que corresponde a la pública.
+- `scripts/validate-vapid-key.mjs` rechaza también la clave anterior (`BHWBAWEp…`), además de la de REQ-38.
+- `refreshPushSubscriptionKey()` (REQ-267) renueva sola, al entrar, la suscripción de quien tenía avisos activos con otra clave.
+- `CACHE_NAME` → `fitbud-pwa-v158`.
+
+### Operación pendiente
+
+1. Vercel → `fitbud` → Environment Variables (Production): `VAPID_PRIVATE_KEY` (la nueva) y `VAPID_SUBJECT` (`mailto:` del responsable). Si existe `VAPID_PUBLIC_KEY`, actualizarla a la nueva o borrarla.
+2. Volver a desplegar y correr "Recordatorios cada hora" a mano: `push.ready` debe ser `true`.
+3. Quien tenga avisos del dispositivo activos debe abrir la app una vez para quedar suscrito con la clave nueva.

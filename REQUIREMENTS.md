@@ -2034,9 +2034,9 @@ Jonathan (2026-10-26). `returnCardHtml()` en Hoy, bajo la tarjeta de reinicio de
 
 ## REQ-285 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
-**Estado: implementado.** Migración `supabase/notifications_journey.sql` aplicada en Supabase el 2026-10-26 (columna `notification_preferences.engagement` y tipos nuevos de `notification_log`).
+**Estado: implementado.** Migración `supabase/notifications_journey.sql` aplicada el 2026-10-26.
 
-Jonathan (2026-10-26). `planReminder()` (puro, `api/notify.js`) decide una etapa por usuario y día: día en juego (también sin abrir la app hoy), rescate de ayer, última llamada por push (racha 3+, 21-22 h) y regreso a los 2/5/7/14/30 días, una vez por ausencia; después, silencio. Un correo diario; envío solo tras registrar el intento. La app guarda el resumen de racha en `engagement`, abre `?date=` y registra `reminder_opened`. Diseño: `docs/reminders-journey.md`; detalle en `docs/requirements-history.md`. ✓ `scripts/validate-reminder-journey.mjs`, `scripts/validate-notify-schedule.mjs`, `tests/e2e/recordatorios.spec.js`.
+Jonathan (2026-10-26). `planReminder()` en `api/notify.js` elige una etapa por usuario y día: día en juego, rescate de ayer, última llamada (push) o regreso a los 2/5/7/14/30 días; después, silencio. Diseño: `docs/reminders-journey.md`; detalle en `docs/requirements-history.md`. ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
 
 ## REQ-286 - Modo conversación: el hilo del día no se aísla entre cuentas en el mismo dispositivo
 
@@ -2098,3 +2098,9 @@ Que el hilo del modo conversación de un usuario nunca sea visible para otra cue
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Jonathan (2026-10-27). Sin aviso fijo ni tarjeta del plan: `.wk-planline` ("Semana N de M") abre `openTrainingPlanSheet()` (personalizar, cambiar días/deporte/lugar, señales). Señales bajo "Iniciar sesión guiada" y en la cuenta atrás. ✓ `tests/e2e/entreno.spec.js`.
+
+## REQ-288 - Push: par VAPID nuevo (la privada de REQ-267 no estaba en ningún lado)
+
+**Estado: implementado — requiere acción humana:** cargar `VAPID_PRIVATE_KEY` y `VAPID_SUBJECT` en Vercel (Production) y volver a desplegar.
+
+El job respondía `push.ready:false` ("falta VAPID_PRIVATE_KEY"). Clave pública nueva en `index.html` y `api/notify.js`; las suscripciones se renuevan al entrar. ✓ `scripts/validate-vapid-key.mjs`.
