@@ -25,6 +25,7 @@
 //   VAPID_PUBLIC_KEY    — clave pública (el cliente usa el literal; esta var es opcional)
 
 import webpush from "web-push";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 const VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
@@ -141,6 +142,13 @@ function isNotifyTime(notifyHour, tz) {
 // llamada (solo push) y regreso a los 2/5/7/14/30 días; después, silencio.
 
 const ACTIVITY_WINDOW_DAYS = 60;
+// REQ-296: quien nunca eligió sus avisos (sin fila de preferencias) recibe
+// solo los correos de seguimiento a esta hora local. La app aún no guarda la
+// zona horaria en el perfil: se asume la del mercado inicial.
+const FOLLOWUP_HOUR = 20;
+const FOLLOWUP_DEFAULT_TZ = "America/Lima";
+// Sin plan ni registros (no terminó el perfil): tres correos y silencio.
+const NO_PLAN_STEPS = new Set(["comeback_2", "comeback_7", "comeback_30"]);
 const LAST_CALL_MIN_STREAK = 3;
 const LAST_CALL_LATEST_HOUR = 22;
 // Cada etapa de regreso es una ventana: sale una vez por ausencia, el primer
@@ -152,6 +160,13 @@ export const COMEBACK_STEPS = [
   { step: "comeback_14", from: 14, to: 29 },
   { step: "comeback_30", from: 30, to: 45 },
 ];
+// REQ-295: quien sigue registrando pero dejó de entrenar. Una vez por pausa en
+// cada ventana (días desde el último entreno), y solo en un día que toca.
+export const TRAINING_LAPSE_STEPS = [
+  { step: "training_lapse_4", from: 4, to: 10 },
+  { step: "training_lapse_11", from: 11, to: 30 },
+];
+const TRAINING_LAPSE_MIN_MISSED = 2;
 // Mismas etiquetas que GOAL_OPTIONS en la app. Solo van dentro del correo.
 const GOAL_LABELS = { deficit: "Bajar grasa", mantenimiento: "Recomponer mi cuerpo", volumen: "Ganar músculo" };
 
@@ -195,6 +210,24 @@ export function pendingFromState(st) {
   return { nutrition, training: !trainedInState(st) && !isRestDay, notStarted };
 }
 
+// REQ-295: días desde el último entreno (o desde el inicio del plan) si hoy
+// toca entrenar y en la pausa hubo al menos dos días que tocaba (los descansos
+// planificados no cuentan). Sin la fila de hoy no se sabe si toca: no avisa.
+export function trainingLapse(rows, today, planStart) {
+  const todayRow = rows.find((r) => r.log_date === today);
+  if (!todayRow || !pendingFromState(todayRow).training) return null;
+  const lastTrain = rows.filter(trainedInState).map((r) => r.log_date).sort().pop() || null;
+  const ref = lastTrain || planStart;
+  if (!ref) return null;
+  const since = daysBetweenYmd(ref, today);
+  const stage = TRAINING_LAPSE_STEPS.find((s) => since >= s.from && since <= s.to);
+  if (!stage) return null;
+  const missed = rows.filter((r) => r.log_date > ref && r.log_date < today && !trainedInState(r)
+    && r.restDay !== true && r.workoutOverride !== "descanso").length;
+  if (missed < TRAINING_LAPSE_MIN_MISSED) return null;
+  return { step: stage.step, ref, since };
+}
+
 // Última llamada: dos horas después del aviso del día, desde las 21:00 y
 // nunca después de las 22:00.
 export function lastCallHour(notifyHour) {
@@ -218,7 +251,10 @@ export function planReminder(ctx) {
   const rows = (ctx.rows || []).filter((r) => r && isYmd(r.log_date) && r.log_date <= today && (!planStart || r.log_date >= planStart));
   const active = rows.filter(dayHasActivity);
   const last = active.map((r) => r.log_date).sort().pop() || null;
-  const ref = last || planStart;
+  // REQ-296: quien no terminó el perfil no tiene plan ni registros: la
+  // referencia es el alta de la cuenta.
+  const noPlan = !planStart && !last;
+  const ref = last || planStart || (noPlan && isYmd(ctx.accountCreated) ? ctx.accountCreated : null);
   if (!ref) return null;
   const gap = daysBetweenYmd(ref, today);
   const yesterday = addDaysYmd(today, -1);
@@ -246,12 +282,17 @@ export function planReminder(ctx) {
   let rescue = 0;
   if (eng && eng.rescueDate === yesterday) rescue = Math.max(0, Number(eng.rescueStreak) || 0);
   else if (eng && eng.streakThrough === addDaysYmd(today, -2)) rescue = engStreak;
-  if (!planEnded && rescue >= 2 && (!planStart || yesterday >= planStart)) {
+  if (!ctx.followupOnly && !planEnded && rescue >= 2 && (!planStart || yesterday >= planStart)) {
     return { step: "rescue", ref: today, date: yesterday, streak: rescue, gap, progress };
   }
 
   if (gap <= 1) {
     if (planEnded) return null;
+    // REQ-295: registra, pero lleva días sin entrenar. Reemplaza el aviso del
+    // día (nunca dos correos el mismo día) y sale aunque la racha esté a salvo.
+    const lapse = ctx.wantTraining !== false ? trainingLapse(rows, today, planStart) : null;
+    if (lapse) return { step: lapse.step, ref: lapse.ref, date: today, since: lapse.since, gap, progress };
+    if (ctx.followupOnly) return null; // REQ-296: el aviso del día es solo para quien lo activó
     if (eng && eng.streakThrough === today) return null; // la racha de hoy ya está a salvo
     const streak = eng && eng.streakThrough === yesterday ? engStreak : 0;
     // REQ-282: sin la fila de hoy (no abrió la app) o con la fila sin nada,
@@ -275,7 +316,8 @@ export function planReminder(ctx) {
 
   const stage = COMEBACK_STEPS.find((s) => gap >= s.from && gap <= s.to);
   if (!stage) return null;
-  return { step: stage.step, ref, gap, never: !last, planEnded, progress };
+  if (noPlan && !NO_PLAN_STEPS.has(stage.step)) return null;
+  return { step: stage.step, ref, gap, never: !last, noPlan, planEnded, progress };
 }
 
 // ── Textos (REQ-31: plan, racha, coach; sin datos corporales) ─────────────────
@@ -347,6 +389,27 @@ export function reminderMessage(d, kind) {
     paragraphs = [body, "Puedes completar el día anterior hasta que termine hoy."];
     cta = "Registrar ayer";
     url = `/?date=${d.date}&r=rescue`;
+  } else if (d.step.startsWith("training_lapse")) {
+    const first = d.step === "training_lapse_4";
+    title = first ? "¿Retomamos el entreno?" : "Tu entreno te espera";
+    body = first
+      ? `Llevas ${days(d.since)} sin entrenar. Hoy te toca: si vas justo de tiempo, la versión de 20 minutos también cuenta.`
+      : `Llevas ${days(d.since)} sin entrenar. Retomar con una sesión suave está bien: tu plan se ajusta.`;
+    subject = title;
+    paragraphs = [body, "Los descansos planificados no cuentan: solo miramos los días en que te tocaba entrenar."];
+    cta = "Ver mi entreno de hoy";
+    url = `/?date=${d.date}&r=${d.step}`;
+  } else if (d.noPlan) {
+    // REQ-296: no terminó el perfil; no hay plan todavía.
+    const byStep = {
+      comeback_2: ["Tu plan está a dos minutos", "Termina tu perfil y te armamos tu primera semana de comidas y entrenos."],
+      comeback_7: ["Tu plan te está esperando", "Solo faltan unas preguntas para armarte tu primera semana."],
+      comeback_30: ["Aquí seguimos", "Cuando quieras, termina tu perfil y te armamos tu plan. Es nuestro último correo hasta entonces."],
+    };
+    [title, body] = byStep[d.step] || byStep.comeback_2;
+    subject = title;
+    paragraphs = [body];
+    cta = "Terminar mi perfil";
   } else if (d.never) {
     // Nunca registró nada: activación, sin hablar de progreso.
     const byStep = {
@@ -409,7 +472,7 @@ async function sendEmail(e, to, subject, html) {
 }
 
 // Todo el texto sale de reminderMessage(): ningún dato escrito por el usuario.
-export function buildEmailHtml(e, msg, unsubToken) {
+export function buildEmailHtml(e, msg, unsubToken, opts = {}) {
   const link = e.appUrl + msg.url;
   const unsubLink = `${e.appUrl}/api/notify?unsubscribe=${encodeURIComponent(unsubToken || "")}`;
   const paragraphs = (msg.paragraphs || [msg.body])
@@ -428,8 +491,10 @@ export function buildEmailHtml(e, msg, unsubToken) {
   </a>
   <hr style="margin:36px 0;border:none;border-top:1px solid #eee">
   <p style="font-size:12px;color:#777;margin:0">
-    Recibes estos recordatorios porque los activaste en tu perfil.
-    <a href="${unsubLink}" style="color:#1a1a1a">Desactivar recordatorios</a>
+    ${opts.followup
+      ? "Te escribimos porque tienes una cuenta en Evolv y llevas días sin usar tu plan."
+      : "Recibes estos recordatorios porque los activaste en tu perfil."}
+    <a href="${unsubLink}" style="color:#1a1a1a">${opts.followup ? "No recibir más estos correos" : "Desactivar recordatorios"}</a>
   </p>
 </body></html>`;
 }
@@ -442,6 +507,13 @@ const DAY_FIELDS = [
   "restDay:state->restDay", "workoutOverride:state->workoutOverride",
 ].join(",");
 
+function loadRows(e, userId, today) {
+  const from = addDaysYmd(today, -ACTIVITY_WINDOW_DAYS);
+  return supaGet(e,
+    `/rest/v1/day_log?user_id=eq.${userId}&log_date=gte.${from}&log_date=lte.${today}&select=${DAY_FIELDS}&order=log_date.desc`
+  );
+}
+
 async function loadUserContext(e, userId, today) {
   const profiles = await supaGet(e,
     `/rest/v1/profiles?id=eq.${userId}&select=email,active,goal:prefs->>goal,` +
@@ -449,11 +521,7 @@ async function loadUserContext(e, userId, today) {
   );
   const profile = profiles[0];
   if (!profile || profile.active === false) return null;
-  const from = addDaysYmd(today, -ACTIVITY_WINDOW_DAYS);
-  const rows = await supaGet(e,
-    `/rest/v1/day_log?user_id=eq.${userId}&log_date=gte.${from}&log_date=lte.${today}&select=${DAY_FIELDS}&order=log_date.desc`
-  );
-  return { profile, rows };
+  return { profile, rows: await loadRows(e, userId, today) };
 }
 
 // ── Envío idempotente ─────────────────────────────────────────────────────────
@@ -544,11 +612,48 @@ async function sendPush(e, subs, msg) {
 
 // ── Baja de un solo clic ──────────────────────────────────────────────────────
 
+// REQ-296: quien no tiene fila de preferencias no tiene unsubscribe_token. Su
+// enlace lleva el id firmado con CRON_SECRET (solo lo conoce el servidor).
+export function followupUnsubToken(e, userId) {
+  if (!e.cronSecret || !userId) return "";
+  const sig = createHmac("sha256", e.cronSecret).update("unsubscribe:" + userId).digest("base64url").slice(0, 32);
+  return `u-${userId}-${sig}`;
+}
+function followupUserFromToken(e, token) {
+  const m = /^u-([0-9a-f-]{36})-[A-Za-z0-9_-]{32}$/.exec(token);
+  if (!m) return null;
+  const expected = Buffer.from(followupUnsubToken(e, m[1]));
+  const given = Buffer.from(token);
+  return expected.length === given.length && timingSafeEqual(expected, given) ? m[1] : null;
+}
+
+function unsubscribedPage(e) {
+  return `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recordatorios desactivados</title></head>
+<body style="font-family:sans-serif;max-width:400px;margin:60px auto;padding:24px;text-align:center;color:#1a1a1a">
+  <p style="font-size:22px;font-weight:700">Recordatorios desactivados</p>
+  <p style="color:#666;margin-bottom:28px">Ya no recibirás recordatorios de actividad. Puedes reactivarlos en tu perfil cuando quieras.</p>
+  <a href="${e.appUrl}" style="color:#7c3aed;font-weight:600;text-decoration:none">Volver a la app</a>
+</body></html>`;
+}
+
 async function handleUnsubscribe(token, e, res) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   const safeToken = String(token).replace(/[^a-zA-Z0-9_-]/g, "");
   if (!safeToken || safeToken.length < 10) {
     return res.status(400).send("<p>Enlace de baja no válido.</p>");
+  }
+  // REQ-296: baja de los correos de seguimiento. Crear la fila con el correo
+  // apagado es elegir: desde ahí ya no recibe seguimiento (runFollowups).
+  const followUser = followupUserFromToken(e, safeToken);
+  if (followUser) {
+    const ok = await supaPost(e, "/rest/v1/notification_preferences?on_conflict=user_id",
+      { user_id: followUser, email_opt_in: false, updated_at: new Date().toISOString() },
+      { Prefer: "resolution=merge-duplicates,return=minimal" }
+    ).then(() => true).catch(() => false);
+    if (!ok) return res.status(500).send("<p>No pudimos procesar la baja. Inténtalo de nuevo en unos minutos.</p>");
+    return res.status(200).send(unsubscribedPage(e));
   }
   const rows = await supaGet(e,
     `/rest/v1/notification_preferences?unsubscribe_token=eq.${safeToken}&select=user_id`
@@ -560,14 +665,7 @@ async function handleUnsubscribe(token, e, res) {
     `/rest/v1/notification_preferences?unsubscribe_token=eq.${safeToken}`,
     { email_opt_in: false, updated_at: new Date().toISOString() }
   ).catch(() => null);
-  return res.status(200).send(`<!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Recordatorios desactivados</title></head>
-<body style="font-family:sans-serif;max-width:400px;margin:60px auto;padding:24px;text-align:center;color:#1a1a1a">
-  <p style="font-size:22px;font-weight:700">Recordatorios desactivados</p>
-  <p style="color:#666;margin-bottom:28px">Ya no recibirás recordatorios de actividad. Puedes reactivarlos en tu perfil cuando quieras.</p>
-  <a href="${e.appUrl}" style="color:#7c3aed;font-weight:600;text-decoration:none">Volver a la app</a>
-</body></html>`);
+  return res.status(200).send(unsubscribedPage(e));
 }
 
 // ── Job principal del cron ────────────────────────────────────────────────────
@@ -652,7 +750,55 @@ async function runJob(e, dryRun) {
     }
   }
 
+  await runFollowups(e, dryRun, results);
   return results;
+}
+
+// REQ-296: correos de seguimiento para quien nunca eligió sus avisos (sin fila
+// en notification_preferences): activación, regreso y volver a entrenar. Nunca
+// el aviso del día ni push (el push exige permiso del dispositivo). Guardar las
+// preferencias en Perfil o darse de baja crea la fila y corta el seguimiento.
+async function runFollowups(e, dryRun, results) {
+  if (!e.cronSecret) return; // sin enlace de baja firmado no se escribe
+  let chose, people;
+  try {
+    [chose, people] = await Promise.all([
+      supaGet(e, "/rest/v1/notification_preferences?select=user_id"),
+      supaGet(e, "/rest/v1/profiles?active=not.is.false&email=not.is.null&select=id,email,created_at," +
+        "timeZone:prefs->>timeZone,goal:prefs->>goal,planStartDate:prefs->>planStartDate," +
+        "planEndDate:prefs->>planEndDate,planDurationWeeks:prefs->>planDurationWeeks"),
+    ]);
+  } catch (err) {
+    results.errors++;
+    results.log.push({ action: "followup_list_error", error: err.message });
+    return;
+  }
+  const hasPrefs = new Set(chose.map((r) => r.user_id));
+  for (const p of people) {
+    if (hasPrefs.has(p.id) || !p.email) continue;
+    const tz = safeTimezone(p.timeZone || FOLLOWUP_DEFAULT_TZ);
+    if (!isNotifyTime(FOLLOWUP_HOUR, tz)) continue;
+    const today = todayInTz(tz);
+    const rows = await loadRows(e, p.id, today).catch(() => null);
+    if (!rows) {
+      results.errors++;
+      results.log.push({ user: p.id, date: today, action: "context_error" });
+      continue;
+    }
+    const created = p.created_at ? new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(p.created_at)) : null;
+    const decision = planReminder({
+      today, hour: currentHourInTz(tz), notifyHour: FOLLOWUP_HOUR, rows, engagement: null,
+      planStart: p.planStartDate, planEnd: p.planEndDate, planWeeks: Number(p.planDurationWeeks) || null,
+      goal: p.goal, accountCreated: created, followupOnly: true,
+    });
+    if (!decision) continue;
+    results.processed++;
+    const msg = reminderMessage(decision);
+    await deliver(e, dryRun, results, results, {
+      userId: p.id, type: "comeback", keys: [`${p.id}:${decision.step}:${decision.ref}`], refDate: decision.ref, step: decision.step,
+      send: async () => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, followupUnsubToken(e, p.id), { followup: true })) }),
+    });
+  }
 }
 
 // ── Keep-alive de Supabase (REQ-178) ──────────────────────────────────────────

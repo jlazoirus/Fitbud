@@ -11875,3 +11875,50 @@ Siguen con dibujo `band-row`, `bulgarian-split-squat`, `pike-push-up`, `single-l
 ### Verificación
 
 `tests/e2e/entreno-casa.spec.js` (la ficha de la zancada muestra la foto y ningún SVG); `scripts/validate-exercises.mjs`.
+
+## REQ-295 - Recordatorios: volver a entrenar
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28): "¿y los avisos proactivos, si aún no has usado la app nunca o si hace días no entrenas?". El journey (REQ-285) solo mira la ausencia total (`gap`): quien sigue registrando comidas pero dejó de entrenar no recibía nada sobre el entreno. En producción, 4 de 14 usuarios activos llevaban 4+ días sin entrenar.
+
+### Alcance
+
+1. `trainingLapse(rows, today, planStart)` (`api/notify.js`): días desde el último entreno (o desde el inicio del plan si nunca entrenó). Avisa si hoy toca entrenar (fila de hoy sin descanso ni entreno), si la pausa entra en una ventana (4–10: `training_lapse_4`; 11–30: `training_lapse_11`) y si en la pausa hubo al menos 2 días que tocaba entrenar (`restDay`/`workoutOverride` de REQ-265). Sin la fila de hoy no se sabe si toca: no avisa.
+2. En `planReminder()` va con `gap` ≤ 1, después del rescate y **en lugar** del aviso del día (un correo por día), aunque la racha de hoy esté a salvo. Respeta `notify_training`.
+3. Texto sin culpa ni datos corporales: "¿Retomamos el entreno?" / "Tu entreno te espera", con la versión de 20 minutos como salida.
+4. Reutiliza los tipos `comeback`/`push_comeback` (sin migración), con clave `<usuario>:training_lapse_N:<último entreno>`: una vez por pausa y ventana.
+5. `docs/reminders-journey.md`: nueva etapa en la tabla.
+
+### Criterios de aceptación
+
+- 5 días sin entrenar → `training_lapse_4`; 12 → `training_lapse_11`; 3 → aviso del día. Pausa de descansos, hoy descanso, sin fila de hoy o con el aviso de entreno apagado → no sale. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
+- El handler envía un correo y un push con tipo `comeback`/`push_comeback` y la clave por pausa. ✓ mismo script.
+
+## REQ-296 - Recordatorios: seguimiento por correo para quien nunca eligió sus avisos
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28), sobre los avisos proactivos para quien nunca usó la app o dejó de entrenar. En producción, 12 de 14 usuarios activos no tenían fila en `notification_preferences`: el journey (REQ-285) solo corre para `email_opt_in` o `push_opt_in`, así que no recibían nada. 5 nunca registraron un día y ninguno de ellos tenía `planStartDate` (no terminaron el perfil), con lo que el journey tampoco tenía referencia para escribirles. Decisión del usuario: aplicar la opción recomendada, a todos con baja fácil.
+
+### Alcance
+
+1. `runFollowups()` (`api/notify.js`), al final del job: perfiles activos con correo y **sin fila** de preferencias reciben, solo por correo, las etapas de regreso (`comeback_*`) y volver a entrenar (REQ-295) a las 20:00 de su zona (`prefs.timeZone`; por defecto `America/Lima`). Nunca el aviso del día, el rescate ni la última llamada (`planReminder({followupOnly: true})`), ni push.
+2. Sin plan ni registros: la referencia es `profiles.created_at` (`accountCreated`) y solo salen `comeback_2`, `comeback_7` y `comeback_30`, con textos propios ("Tu plan está a dos minutos", CTA "Terminar mi perfil").
+3. Baja: el correo de seguimiento lleva `?unsubscribe=u-<id>-<HMAC con CRON_SECRET>` y su pie explica por qué llega. La baja crea la fila con `email_opt_in=false` (upsert). Un token alterado no da de baja a nadie. Sin `CRON_SECRET` no se envía seguimiento.
+4. Perfil → Recordatorios avisa que, mientras no se guarde la sección, llegan esos correos, y que guardarla con el correo desactivado los apaga.
+5. Tipo `comeback` (sin migración), clave `<usuario>:<etapa>:<referencia>`: una vez por etapa. `CACHE_NAME` → `fitbud-pwa-v168`.
+
+### Fuera de alcance
+
+- Guardar la zona horaria en el perfil (hoy se asume `America/Lima` para quien no tiene preferencias).
+- Paginar la lista de perfiles (hoy son pocos).
+
+### Criterios de aceptación
+
+- Sin plan: correo a los 2, 7 y 30 días del alta, nada a los 1 o 5. Sin preferencias: sin aviso del día ni rescate, con regreso y volver a entrenar. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
+- Handler: un correo sin push, con la baja firmada; no repite la etapa; quien tiene fila no recibe seguimiento. La baja firmada crea la fila con el correo apagado y un token alterado no hace nada. ✓ mismo script.

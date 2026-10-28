@@ -47,6 +47,7 @@ Todas en la zona horaria del usuario (`notification_preferences.timezone`).
 | **Regreso, 2 semanas** | `gap` 14–29 | correo + push | "Mira lo que ya lograste · Mejor racha: 12 días · 9 entrenos · 18 días registrados." | Hoy |
 | **Último mensaje** | `gap` 30–45 | correo + push | "Aquí sigue tu plan · Tu progreso está guardado. Es nuestro último recordatorio hasta que vuelvas." | Hoy |
 | **Silencio** | `gap` > 45, o tras el último mensaje | — | — | — |
+| **Volver a entrenar** (REQ-295) | Registra (`gap` ≤ 1) pero lleva 4–10 o 11–30 días sin entrenar, con al menos 2 días que tocaba entrenar en la pausa (los descansos no cuentan), y hoy toca entrenar | correo + push, a la hora elegida, en lugar del aviso del día | "¿Retomamos el entreno? · Llevas 5 días sin entrenar. Hoy te toca: si vas justo de tiempo, la versión de 20 minutos también cuenta." | Hoy |
 
 Notas:
 
@@ -78,6 +79,12 @@ Cada registro que mueve el día hacia la racha (marcar una comida, cerrar el ent
 
 - Al terminar el onboarding, con la semana lista: pantalla "Tu semana está lista. Que no se te pase." con dos pasos, instalar Evolv en el inicio (solo móvil) y activar avisos. En iPhone el push solo existe en la app instalada: primero instalar; al abrirla desde el ícono, Hoy pide activarlos. Si el navegador no permite avisos o están bloqueados, se ofrece el correo.
 - Mientras los avisos no estén activos, Hoy lo recuerda **cada día** con una tarjeta; "Ahora no" la oculta hasta mañana. Medición: `notifications_prompt` (`source`, `action`).
+
+## Seguimiento para quien nunca eligió sus avisos (REQ-296)
+
+- Quien no tiene fila en `notification_preferences` (nunca guardó Recordatorios ni Avisos del dispositivo) recibe **solo por correo** las etapas de regreso y volver a entrenar, a las 20:00 de su zona (por defecto `America/Lima`). Nunca el aviso del día, el rescate ni la última llamada, y nunca push (exige permiso del dispositivo).
+- Quien no terminó el perfil (sin plan ni registros) cuenta desde el alta de la cuenta y recibe tres correos propios: 2 días ("Tu plan está a dos minutos"), 7 y 30; después, silencio.
+- La baja de esos correos es un enlace firmado con `CRON_SECRET` (`u-<id>-<firma>`): crea la fila de preferencias con el correo apagado. Guardar la sección Recordatorios en Perfil también crea la fila: desde ahí manda lo elegido.
 
 ## Preferencias
 

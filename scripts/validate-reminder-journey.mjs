@@ -165,7 +165,10 @@ globalThis.fetch = async (url, init = {}) => {
   const u = decodeURIComponent(String(url)), method = init.method || "GET";
   const json = (body, ok = true) => ({ ok, status: ok ? 200 : 400, json: async () => body });
   if (u.startsWith("https://api.resend.com/")) { state.emails.push(JSON.parse(init.body)); return json({ id: "email-1" }); }
-  if (u.includes("/notification_preferences?")) return json([state.pref]);
+  if (u.includes("/notification_preferences?on_conflict")) { state.upserts.push(JSON.parse(init.body)); return json({}); }
+  if (u.includes("/notification_preferences?select=user_id")) return json(state.pref ? [{ user_id: state.pref.user_id }] : []);
+  if (u.includes("/notification_preferences?")) return json(state.pref ? [state.pref] : []);
+  if (u.includes("/profiles?active=")) return json(state.people || []);
   if (u.includes("/profiles?id=")) return json([state.profile]);
   if (u.includes("/profiles?select=id")) return json([{ id: "u1" }]);
   if (u.includes("/day_log?")) return json(state.rows);
@@ -191,7 +194,7 @@ async function run({ hour, notifyHour = hour, rows, engagement, log = [], checkT
   const today = localToday(tz);
   pushes.length = 0;
   state = {
-    emails: [], inserted: [], log: log.map((k) => ({ id: 9, status: "sent", idempotency_key: k.replace("{today}", today) })), checkTypes,
+    emails: [], inserted: [], upserts: [], log: log.map((k) => ({ id: 9, status: "sent", idempotency_key: k.replace("{today}", today) })), checkTypes,
     rows: rows(today),
     pref: { user_id: "u1", timezone: tz, notify_hour: notifyHour, enabled_days: [0, 1, 2, 3, 4, 5, 6], notify_nutrition: true, notify_training: true, unsubscribe_token: "tok_0123456789", email_opt_in: emailOptIn, push_opt_in: true, engagement: engagement ? engagement(today) : null },
     profile: { email: "ana@example.com", active: true, goal: "deficit", planStartDate: addDaysYmd(today, -30), planEndDate: addDaysYmd(today, 39), planDurationWeeks: "10" },
@@ -252,5 +255,112 @@ r = await run({ hour: 20, rows: yesterdayActive, engagement: liveStreak });
 assert.equal(state.emails.length + pushes.length, 0, "sin poder leer el registro no se envía");
 globalThis.fetch = realFetch;
 console.log("  handler: registro ilegible → no se envía");
+
+// ── REQ-295: volver a entrenar ──────────────────────────────────────────────
+const { trainingLapse } = mod;
+const mealOnly = (n, extra = {}) => ({ log_date: D(n), meals: { desayuno: meal(true) }, workoutDone: false, restDay: false, ...extra });
+const trained = (n) => ({ log_date: D(n), meals: { desayuno: meal(true) }, workoutDone: true, restDay: false });
+const lapseRows = (lastTrain, extra = {}) => [trained(lastTrain), ...Array.from({ length: -lastTrain - 1 }, (_, i) => mealOnly(lastTrain + 1 + i, extra)), plannedRow(0)];
+d = planReminder(base({ rows: lapseRows(-5) }));
+assert.equal(d.step, "training_lapse_4", "registra pero 5 días sin entrenar: aviso de volver a entrenar");
+assert.equal(d.ref, D(-5));
+assert.equal(d.since, 5);
+m = reminderMessage(d);
+assert.equal(m.title, "¿Retomamos el entreno?");
+assert.match(m.body, /^Llevas 5 días sin entrenar\. Hoy te toca/);
+assert.equal(m.url, `/?date=${T}&r=training_lapse_4`);
+assert.doesNotMatch(`${m.title} ${m.body} ${m.subject} ${m.paragraphs.join(" ")}`, /Bajar grasa|Recomponer|Ganar músculo|\bkg\b|peso/);
+assert.doesNotMatch(`${m.title} ${m.body} ${m.paragraphs.join(" ")}`, BANNED);
+assert.equal(planReminder(base({ rows: lapseRows(-12) })).step, "training_lapse_11");
+assert.equal(planReminder(base({ rows: lapseRows(-3) })).step, "day", "3 días sin entrenar todavía no");
+assert.equal(planReminder(base({ rows: lapseRows(-5, { restDay: true }) })).step, "day", "si la pausa fueron descansos planificados, no avisa");
+assert.equal(planReminder(base({ rows: [...lapseRows(-5).slice(0, -1), plannedRow(0, { restDay: true })] })).step, "day", "hoy toca descanso: no avisa de entrenar");
+assert.equal(planReminder(base({ rows: lapseRows(-5).slice(0, -1) })).missing, "day", "sin la fila de hoy no se sabe si toca: no avisa");
+assert.equal(planReminder(base({ rows: lapseRows(-5), wantTraining: false })).step, "day", "sin aviso de entreno activado no sale");
+assert.equal(planReminder(base({ rows: lapseRows(-5), engagement: eng({ streakThrough: T }) })).step, "training_lapse_4", "sale aunque la racha de hoy esté a salvo");
+assert.equal(trainingLapse([...Array.from({ length: 5 }, (_, i) => mealOnly(-5 + i)), plannedRow(0)], T, D(-6)).ref, D(-6), "nunca entrenó: cuenta desde el inicio del plan");
+console.log("  REQ-295: volver a entrenar a los 4 y 11 días, sin contar descansos ni días de descanso");
+
+r = await run({ hour: 20, rows: (today) => [
+  { log_date: addDaysYmd(today, -6), meals: { a: { done: true } }, workoutDone: true },
+  ...[-5, -4, -3, -2, -1].map((n) => ({ log_date: addDaysYmd(today, n), meals: { a: { done: true } }, workoutDone: false, restDay: false })),
+  { log_date: today, meals: { a: { done: false } }, workoutDone: false, restDay: false },
+], engagement: null });
+assert.equal(state.emails.length, 1, "un solo correo: reemplaza el aviso del día");
+assert.equal(state.emails[0].subject, "¿Retomamos el entreno?");
+assert.equal(pushes[0].url, `/?date=${r.today}&r=training_lapse_4`);
+assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [
+  ["comeback", `u1:training_lapse_4:${addDaysYmd(r.today, -6)}`],
+  ["push_comeback", `u1:push_training_lapse_4:${addDaysYmd(r.today, -6)}`],
+]);
+console.log("  handler: volver a entrenar por correo y push, una vez por pausa, con los tipos ya permitidos");
+
+// ── REQ-296: seguimiento para quien nunca eligió sus avisos ─────────────────
+d = planReminder(base({ rows: [], engagement: null, planStart: null, accountCreated: D(-2), followupOnly: true }));
+assert.equal(d.step, "comeback_2");
+assert.equal(d.noPlan, true);
+m = reminderMessage(d);
+assert.equal(m.title, "Tu plan está a dos minutos");
+assert.equal(m.cta, "Terminar mi perfil");
+assert.equal(planReminder(base({ rows: [], engagement: null, planStart: null, accountCreated: D(-5), followupOnly: true })), null, "sin plan: solo 3 correos (2, 7 y 30 días)");
+assert.equal(planReminder(base({ rows: [], engagement: null, planStart: null, accountCreated: D(-8), followupOnly: true })).step, "comeback_7");
+assert.equal(planReminder(base({ rows: [], engagement: null, planStart: null, accountCreated: D(-1), followupOnly: true })), null, "recién creada: aún nada");
+assert.equal(planReminder(base({ followupOnly: true })), null, "sin aviso del día para quien no lo activó");
+assert.equal(planReminder(base({ rows: [activeRow(-3)], engagement: null, followupOnly: true })).step, "comeback_2", "el regreso sí le llega");
+assert.equal(planReminder(base({ rows: lapseRows(-5), followupOnly: true })).step, "training_lapse_4", "volver a entrenar también");
+assert.equal(planReminder(base({ rows: [activeRow(-2)], engagement: eng({ rescueDate: D(-1), rescueStreak: 4 }) })).step, "rescue");
+assert.equal(planReminder(base({ rows: [activeRow(-2)], engagement: eng({ rescueDate: D(-1), rescueStreak: 4 }), followupOnly: true })).step, "comeback_2", "ni el rescate de ayer: le llega el regreso");
+for (const step of ["comeback_2", "comeback_7", "comeback_30"]) {
+  const msg = reminderMessage({ step, ref: D(-2), gap: 2, never: true, noPlan: true, progress: {} });
+  assert.doesNotMatch(`${msg.title} ${msg.body} ${msg.paragraphs.join(" ")}`, BANNED);
+}
+console.log("  REQ-296: activación sin plan (2/7/30 días) y solo regreso/volver a entrenar para quien no eligió");
+
+const { followupUnsubToken } = mod;
+const followup = async ({ people, rows, log = [], prefUser = null }) => {
+  const tz = tzAt(20);
+  const today = localToday(tz);
+  pushes.length = 0;
+  state = {
+    emails: [], inserted: [], upserts: [], rows: rows(today), people: people(today, tz),
+    log: log.map((k) => ({ id: 9, status: "sent", idempotency_key: k(today) })), pref: prefUser ? { user_id: prefUser } : null,
+  };
+  const res = { code: 0, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, send(b) { this.body = b; return this; }, setHeader() {} };
+  await mod.default({ method: "GET", url: "/api/notify", headers: { authorization: "Bearer secret" } }, res);
+  assert.equal(res.code, 200, JSON.stringify(res.body));
+  return { out: res.body, today };
+};
+const UID = "11111111-2222-3333-4444-555555555555";
+r = await followup({
+  people: (today, tz) => [{ id: UID, email: "beto@example.com", created_at: `${addDaysYmd(today, -2)}T15:00:00Z`, timeZone: tz }],
+  rows: () => [],
+});
+assert.equal(state.emails.length, 1);
+assert.equal(state.emails[0].subject, "Tu plan está a dos minutos");
+assert.equal(pushes.length, 0, "el seguimiento es solo por correo");
+assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [["comeback", `${UID}:comeback_2:${addDaysYmd(r.today, -2)}`]]);
+const token = followupUnsubToken({ cronSecret: "secret" }, UID);
+assert.ok(state.emails[0].html.includes(`unsubscribe=${token}`), "el correo trae la baja firmada");
+assert.match(state.emails[0].html, /No recibir más estos correos/);
+const newcomer = (today, tz) => [{ id: UID, email: "beto@example.com", created_at: `${addDaysYmd(today, -2)}T15:00:00Z`, timeZone: tz }];
+r = await followup({ people: newcomer, rows: () => [], log: [(today) => `${UID}:comeback_2:${addDaysYmd(today, -2)}`] });
+assert.equal(state.emails.length, 0, "la misma etapa no se repite");
+r = await followup({ people: newcomer, rows: () => [], prefUser: UID });
+assert.equal(state.emails.length, 0, "quien ya eligió en Perfil (o se dio de baja) no recibe seguimiento");
+console.log("  handler: seguimiento por correo con baja firmada, una vez por etapa");
+
+// Baja firmada: crea la fila con el correo apagado; un token alterado no vale.
+const unsub = async (tok) => {
+  state = { emails: [], inserted: [], upserts: [], log: [], rows: [], pref: null };
+  const res = { code: 0, body: "", status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, send(b) { this.body = b; return this; }, setHeader() {} };
+  await mod.default({ method: "GET", url: `/api/notify?unsubscribe=${tok}`, headers: {} }, res);
+  return res;
+};
+let res = await unsub(token);
+assert.equal(res.code, 200);
+assert.deepEqual(state.upserts.map((x) => [x.user_id, x.email_opt_in]), [[UID, false]]);
+res = await unsub(token.slice(0, -1) + (token.endsWith("A") ? "B" : "A"));
+assert.equal(state.upserts.length, 0, "token alterado: no da de baja a nadie");
+console.log("  baja firmada: crea la preferencia con el correo apagado; token alterado no vale");
 
 console.log("validate-reminder-journey: OK");
