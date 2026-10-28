@@ -11941,3 +11941,25 @@ Jonathan (2026-10-28): "se debe incluir en el journey un aviso para que activen 
 ### Criterios de aceptación
 
 - Ventana de 7 a 13 días; sin plan, no. Con suscripción, con `push_opt_in`, con el correo apagado o ya enviada: no. Si hoy toca otro correo, espera. También llega a quien nunca eligió. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
+
+## REQ-298 - Recordatorios: elegir la hora del aviso y resumen de la mañana
+
+**Estado: implementado; requiere aplicar `supabase/notifications_morning.sql` en producción.**
+
+### Origen
+
+Jonathan (2026-10-28) pidió implementar el selector de hora (06:00 a 23:00) y el aviso por la mañana con el plan del día. Antes, Perfil → Recordatorios solo ofrecía de 17:00 a 23:00, y el selector estaba oculto tras el correo: quien solo usaba push quedaba a las 20:00.
+
+### Alcance
+
+1. Perfil → Recordatorios: hora del aviso del día de 06:00 a 23:00, días y tipos siempre visibles (valen para correo y push). Casilla "Resumen de la mañana con tu plan del día", con su hora de 05:00 a 11:00 (07:00 por defecto). Sin la migración, guarda el resto y lo dice.
+2. La app agrega a `notification_preferences.engagement` el plan de hoy y de los 7 días siguientes (`engagementPlanDays()`): nombre de la sesión o descanso, cuántas comidas y el plato con que empieza el día. Es el plan, no datos de salud.
+3. `morningPlan()` (`api/notify.js`, puro): a la hora elegida o hasta dos horas después, siempre antes del aviso del día. Solo con el plan en curso, el plan del día del ciclo actual y como mucho 2 días sin registrar (después manda el journey de regreso). No sale si el día ya está cumplido. Respeta los días activos y los tipos de recordatorio.
+4. Uno por día y un solo canal: push si hay suscripción; si no, correo. "Tu plan de hoy · Entreno: Torso A · 4 comidas, empiezas con Avena. Hoy sumas el día 6 de tu racha." Abre `/?date=<hoy>&r=morning`.
+5. Tipos `morning` y `push_morning`, y columnas `morning_opt_in` y `morning_hour` (`supabase/notifications_morning.sql`, idempotente). Sin la migración no se envía (falla cerrado).
+6. El correo escapa todo su texto, porque los nombres los escribe la app.
+
+### Criterios de aceptación
+
+- Ventana horaria, ciclo, plan terminado o sin empezar, ausencia de 3 días, día cumplido, preferencias de tipo, push antes que correo, uno por día y falla cerrado sin migración. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
+- Perfil guarda `notify_hour`, `morning_opt_in` y `morning_hour`, y la app guarda el plan de 8 días. ✓ `tests/e2e/recordatorios.spec.js`.

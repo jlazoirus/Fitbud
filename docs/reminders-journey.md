@@ -30,6 +30,7 @@ Todas en la zona horaria del usuario (`notification_preferences.timezone`).
 | `lastActive` | Último día con algo registrado (comida o extra marcada, entreno con series, sesión cerrada o actividad manual) | `day_log` de los últimos 60 días (servidor) |
 | `gap` | Días entre hoy y `lastActive`; sin ningún registro, desde el inicio del plan | Calculado |
 | `streak`, `streakThrough`, `rescueDate`/`rescueStreak` | Racha combinada viva, último día que cuenta y racha que se recupera si se completa ayer | `notification_preferences.engagement`, que la app escribe al cambiar (columna propia: no reescribe `profiles.prefs`) |
+| `plan` (REQ-298) | Plan de hoy y de los 7 días siguientes: sesión o descanso, cuántas comidas y el primer plato | `notification_preferences.engagement.plan`, que escribe la app |
 | `bestStreak`, `activeDays`, `workouts` | Progreso del ciclo para los mensajes de regreso | `notification_preferences.engagement` (o conteo en `day_log` si falta) |
 | Objetivo, semana del plan | Mensajes de regreso | `profiles.prefs` (`goal`, `planStartDate`, `planDurationWeeks`); semana = días desde el inicio / 7 + 1 |
 | Pendiente de hoy | Comidas sin marcar / entreno sin cerrar (no en descanso) | Fila de hoy en `day_log` |
@@ -48,6 +49,7 @@ Todas en la zona horaria del usuario (`notification_preferences.timezone`).
 | **Último mensaje** | `gap` 30–45 | correo + push | "Aquí sigue tu plan · Tu progreso está guardado. Es nuestro último recordatorio hasta que vuelvas." | Hoy |
 | **Silencio** | `gap` > 45, o tras el último mensaje | — | — | — |
 | **Activar los avisos** (REQ-297) | A los 7–13 días del inicio del plan, sin suscripción push ni `push_opt_in`, un día sin otro correo; una vez por plan | solo correo (a quien tiene el correo activado o nunca eligió) | "Activa los avisos en tu teléfono · Te avisamos a tiempo de tus comidas y tu entreno, sin depender del correo." Con los pasos de iPhone y Android | Hoy (tarjeta de avisos de REQ-289) |
+| **Resumen de la mañana** (REQ-298) | Opt-in. A la hora elegida (05:00–11:00) o hasta 2 h después, antes del aviso del día; plan en curso, `gap` ≤ 2 y el día sin cumplir | push si hay suscripción; si no, correo. Uno por día | "Tu plan de hoy · Entreno: Torso A · 4 comidas, empiezas con Avena con plátano. Hoy sumas el día 6 de tu racha." | Hoy |
 | **Volver a entrenar** (REQ-295) | Registra (`gap` ≤ 1) pero lleva 4–10 o 11–30 días sin entrenar, con al menos 2 días que tocaba entrenar en la pausa (los descansos no cuentan), y hoy toca entrenar | correo + push, a la hora elegida, en lugar del aviso del día | "¿Retomamos el entreno? · Llevas 5 días sin entrenar. Hoy te toca: si vas justo de tiempo, la versión de 20 minutos también cuenta." | Hoy |
 
 Notas:
@@ -89,7 +91,7 @@ Cada registro que mueve el día hacia la racha (marcar una comida, cerrar el ent
 
 ## Preferencias
 
-En Perfil → Recordatorios y Avisos del dispositivo, el texto explica lo que llega: el aviso del día, la última llamada si la racha es de 3+ días y los mensajes de regreso con su final. La baja de un clic del correo y desactivar el aviso del dispositivo cortan todo el journey de ese canal.
+En Perfil → Recordatorios se elige la hora del aviso del día (06:00–23:00, para correo y push) y, si se quiere, el resumen de la mañana y su hora (REQ-298). El texto de esa sección y el de Avisos del dispositivo explica lo que llega: el aviso del día, la última llamada si la racha es de 3+ días y los mensajes de regreso con su final. La baja de un clic del correo y desactivar el aviso del dispositivo cortan todo el journey de ese canal.
 
 ## Medición
 
@@ -100,5 +102,6 @@ En Perfil → Recordatorios y Avisos del dispositivo, el texto explica lo que ll
 ## Operación
 
 - Migración `supabase/notifications_journey.sql` (aplicada en producción el 2026-10-26): agrega `notification_preferences.engagement` y amplía el `CHECK` de `notification_log.notification_type` con `comeback`, `push_comeback` y `push_last_call`. Mientras no se aplique, esas etapas no se envían (el envío exige registrar antes el intento) y el aviso del día sale sin racha ni rescate.
+- Migración `supabase/notifications_morning.sql` (REQ-298, aplicar a mano): columnas `morning_opt_in` y `morning_hour`, y tipos `morning` y `push_morning`. Mientras no se aplique, la app guarda Recordatorios sin el resumen de la mañana y este no se envía.
 - Cada envío lee y registra su intento antes de enviar; si no puede (registro caído o tipo rechazado), no envía: sin registro, el disparo de la hora siguiente lo repetiría.
 - Las variables y el disparo horario son los de REQ-24/38/266/267.
