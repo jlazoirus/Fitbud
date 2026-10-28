@@ -2118,3 +2118,9 @@ Jonathan (2026-10-27). Con la primera semana lista, `renderNotifySetup()` pide i
 **Estado: implementado.** Falta aplicar el seed de `supabase/entitlements.sql` y crear los precios en Stripe (`STRIPE_SETUP.md`).
 
 `semiannual` (180 días) reemplaza a `quarterly`, que queda `active=false` solo para cortesías beta e histórico.
+
+## REQ-291 - Entreno: un día en otro lugar sin tocar el perfil
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Jonathan: `day_log.state.trainingPlace` lleva la sesión del día a otro lugar. ✓ `tests/e2e/lugar-del-dia.spec.js`.

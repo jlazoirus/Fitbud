@@ -11676,3 +11676,40 @@ Jonathan (2026-10-27): "como parte del onboarding debemos pedirle a la gente que
 - Analytics `notifications_prompt` con `source` (onboarding/home) y `action` (shown, enable, enabled, denied, dismissed, email, install, dismiss, skip, done); sin datos personales.
 - E2E: `autoDismissNudges()` salta la pantalla como lo haría un usuario. `CACHE_NAME` → `fitbud-pwa-v159`.
 - Verificación: `tests/e2e/avisos.spec.js` (tarjeta y "Ahora no" hasta mañana, activar con permiso concedido, bloqueado → correo, avisos activos sin tarjeta, iPhone sin banner duplicado, pantalla real tras guardar el plan); capturas 390 px Android/iPhone.
+
+## REQ-291 - Entreno: un día en otro lugar sin tocar el perfil
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28): "Mañana voy a entrenar con mi sesión, pero en casa, y mi perfil está configurado para el gimnasio. Normalmente me debería dar mi rutina de gimnasio, pero si un día quiero hacer otra cosa me debería dejar."
+
+### Problema
+
+Con perfil de gimnasio, Entreno → "Adaptar hoy" → "En casa" (y "Sin equipo") solo ofrecía **"Descanso total"**: no había ninguna forma de hacer la sesión del día en casa sin cambiar el perfil entero. La portada promete "Mismos grupos musculares, sin pisar el gimnasio".
+
+### Causa raíz
+
+`openWorkoutContingency()` filtraba `workoutOptions(ds)` por ejercicios sin equipo, pero esas opciones salen de `strengthSessions(training.strength)` con el modo del perfil: un usuario de gimnasio solo tiene sesiones de gimnasio, ninguna pasa el filtro y queda solo el descanso. El lugar vivía solo en el perfil (`strengthPlace`/`trainingLocations`), sin forma de cambiarlo para un día.
+
+### Alcance
+
+1. `day_log.state.trainingPlace` (`gym/home/outdoor`), solo cuando difiere del lugar del plan para ese día. `trainingPrefsForDate(ds)` aplica su modo de fuerza (`strengthModeFromChoice`) y equipo por defecto; lo usan `effectiveWorkout`, `workoutOptions`, `generatedWorkoutForDate`, la plantilla de respaldo de `workoutPrescription` y el filtro de lugar de alternativas. Las sesiones siguen en los mismos días (`trainingLocations` no cambia): Pierna A en el gimnasio pasa a "Peso corporal · Pierna A"; en un plan del coach, cada ejercicio se cambia por uno del mismo músculo principal.
+2. Entreno: "Adaptar hoy/mañana/este día" con un botón "En casa" (o "En el gimnasio" si el plan es fuera del gimnasio) en días de fuerza, que abre "¿Dónde entrenas …?" con Gimnasio / Casa / Aire libre. "Lugar: Casa · solo este día" y "Volver al gimnasio". "Sin equipo" se retira: casa y aire libre ya son sin máquinas. Las razones `casa`/`equipo` de la acción `adaptar_entreno` del coach abren la misma hoja.
+3. Registro de adaptación `place_change` ("lugar cambiado"). `validateDayLogState` acepta solo `gym/home/outdoor`. `CACHE_NAME` → `fitbud-pwa-v162`.
+
+### Fuera de alcance
+
+- Elegir recursos de casa para ese día (mancuernas, bandas): fuera del gimnasio se usa peso corporal, igual que hoy en perfiles de casa/aire libre.
+- Filtrar las plantillas de aire libre por ejercicios de suelo (pre-existente en perfiles de aire libre).
+
+### Riesgos
+
+- Historial inmutable: solo se puede cambiar con la sesión sin iniciar ni registrar; la sesión iniciada conserva su prescripción.
+
+### Criterios de aceptación
+
+- Perfil de gimnasio: mañana → "En casa" → Casa muestra "Peso corporal · <misma sesión>", todos los ejercicios se pueden hacer en casa, pasado mañana y el perfil siguen en gimnasio, el día se sincroniza con `trainingPlace:"home"` y "Volver al gimnasio" lo deshace. ✓ (`tests/e2e/lugar-del-dia.spec.js`, capturas 390 px revisadas)
+- Hoy en casa: la sesión guiada prescribe esos ejercicios y el cambio sobrevive a recargar; `adaptar_entreno` con `equipo` abre la hoja. ✓ (`tests/e2e/lugar-del-dia.spec.js`)
+- `node scripts/release-gate.mjs` pasa.
