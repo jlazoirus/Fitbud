@@ -11875,3 +11875,24 @@ Siguen con dibujo `band-row`, `bulgarian-split-squat`, `pike-push-up`, `single-l
 ### Verificación
 
 `tests/e2e/entreno-casa.spec.js` (la ficha de la zancada muestra la foto y ningún SVG); `scripts/validate-exercises.mjs`.
+
+## REQ-295 - Recordatorios: volver a entrenar
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28): "¿y los avisos proactivos, si aún no has usado la app nunca o si hace días no entrenas?". El journey (REQ-285) solo mira la ausencia total (`gap`): quien sigue registrando comidas pero dejó de entrenar no recibía nada sobre el entreno. En producción, 4 de 14 usuarios activos llevaban 4+ días sin entrenar.
+
+### Alcance
+
+1. `trainingLapse(rows, today, planStart)` (`api/notify.js`): días desde el último entreno (o desde el inicio del plan si nunca entrenó). Avisa si hoy toca entrenar (fila de hoy sin descanso ni entreno), si la pausa entra en una ventana (4–10: `training_lapse_4`; 11–30: `training_lapse_11`) y si en la pausa hubo al menos 2 días que tocaba entrenar (`restDay`/`workoutOverride` de REQ-265). Sin la fila de hoy no se sabe si toca: no avisa.
+2. En `planReminder()` va con `gap` ≤ 1, después del rescate y **en lugar** del aviso del día (un correo por día), aunque la racha de hoy esté a salvo. Respeta `notify_training`.
+3. Texto sin culpa ni datos corporales: "¿Retomamos el entreno?" / "Tu entreno te espera", con la versión de 20 minutos como salida.
+4. Reutiliza los tipos `comeback`/`push_comeback` (sin migración), con clave `<usuario>:training_lapse_N:<último entreno>`: una vez por pausa y ventana.
+5. `docs/reminders-journey.md`: nueva etapa en la tabla.
+
+### Criterios de aceptación
+
+- 5 días sin entrenar → `training_lapse_4`; 12 → `training_lapse_11`; 3 → aviso del día. Pausa de descansos, hoy descanso, sin fila de hoy o con el aviso de entreno apagado → no sale. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
+- El handler envía un correo y un push con tipo `comeback`/`push_comeback` y la clave por pausa. ✓ mismo script.

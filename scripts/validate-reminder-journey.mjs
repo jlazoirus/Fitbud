@@ -253,4 +253,43 @@ assert.equal(state.emails.length + pushes.length, 0, "sin poder leer el registro
 globalThis.fetch = realFetch;
 console.log("  handler: registro ilegible → no se envía");
 
+// ── REQ-295: volver a entrenar ──────────────────────────────────────────────
+const { trainingLapse } = mod;
+const mealOnly = (n, extra = {}) => ({ log_date: D(n), meals: { desayuno: meal(true) }, workoutDone: false, restDay: false, ...extra });
+const trained = (n) => ({ log_date: D(n), meals: { desayuno: meal(true) }, workoutDone: true, restDay: false });
+const lapseRows = (lastTrain, extra = {}) => [trained(lastTrain), ...Array.from({ length: -lastTrain - 1 }, (_, i) => mealOnly(lastTrain + 1 + i, extra)), plannedRow(0)];
+d = planReminder(base({ rows: lapseRows(-5) }));
+assert.equal(d.step, "training_lapse_4", "registra pero 5 días sin entrenar: aviso de volver a entrenar");
+assert.equal(d.ref, D(-5));
+assert.equal(d.since, 5);
+m = reminderMessage(d);
+assert.equal(m.title, "¿Retomamos el entreno?");
+assert.match(m.body, /^Llevas 5 días sin entrenar\. Hoy te toca/);
+assert.equal(m.url, `/?date=${T}&r=training_lapse_4`);
+assert.doesNotMatch(`${m.title} ${m.body} ${m.subject} ${m.paragraphs.join(" ")}`, /Bajar grasa|Recomponer|Ganar músculo|\bkg\b|peso/);
+assert.doesNotMatch(`${m.title} ${m.body} ${m.paragraphs.join(" ")}`, BANNED);
+assert.equal(planReminder(base({ rows: lapseRows(-12) })).step, "training_lapse_11");
+assert.equal(planReminder(base({ rows: lapseRows(-3) })).step, "day", "3 días sin entrenar todavía no");
+assert.equal(planReminder(base({ rows: lapseRows(-5, { restDay: true }) })).step, "day", "si la pausa fueron descansos planificados, no avisa");
+assert.equal(planReminder(base({ rows: [...lapseRows(-5).slice(0, -1), plannedRow(0, { restDay: true })] })).step, "day", "hoy toca descanso: no avisa de entrenar");
+assert.equal(planReminder(base({ rows: lapseRows(-5).slice(0, -1) })).missing, "day", "sin la fila de hoy no se sabe si toca: no avisa");
+assert.equal(planReminder(base({ rows: lapseRows(-5), wantTraining: false })).step, "day", "sin aviso de entreno activado no sale");
+assert.equal(planReminder(base({ rows: lapseRows(-5), engagement: eng({ streakThrough: T }) })).step, "training_lapse_4", "sale aunque la racha de hoy esté a salvo");
+assert.equal(trainingLapse([...Array.from({ length: 5 }, (_, i) => mealOnly(-5 + i)), plannedRow(0)], T, D(-6)).ref, D(-6), "nunca entrenó: cuenta desde el inicio del plan");
+console.log("  REQ-295: volver a entrenar a los 4 y 11 días, sin contar descansos ni días de descanso");
+
+r = await run({ hour: 20, rows: (today) => [
+  { log_date: addDaysYmd(today, -6), meals: { a: { done: true } }, workoutDone: true },
+  ...[-5, -4, -3, -2, -1].map((n) => ({ log_date: addDaysYmd(today, n), meals: { a: { done: true } }, workoutDone: false, restDay: false })),
+  { log_date: today, meals: { a: { done: false } }, workoutDone: false, restDay: false },
+], engagement: null });
+assert.equal(state.emails.length, 1, "un solo correo: reemplaza el aviso del día");
+assert.equal(state.emails[0].subject, "¿Retomamos el entreno?");
+assert.equal(pushes[0].url, `/?date=${r.today}&r=training_lapse_4`);
+assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [
+  ["comeback", `u1:training_lapse_4:${addDaysYmd(r.today, -6)}`],
+  ["push_comeback", `u1:push_training_lapse_4:${addDaysYmd(r.today, -6)}`],
+]);
+console.log("  handler: volver a entrenar por correo y push, una vez por pausa, con los tipos ya permitidos");
+
 console.log("validate-reminder-journey: OK");

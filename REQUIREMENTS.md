@@ -2085,3 +2085,9 @@ Jonathan: `day_log.state.trainingPlace` lleva la sesión del día a otro lugar. 
 ## REQ-294 - Entreno: la zancada muestra su foto real en vez del dibujo
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/entreno-casa.spec.js`.
+
+## REQ-295 - Recordatorios: volver a entrenar
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Quien registra pero lleva 4+ días sin entrenar (2+ días que tocaba, descansos aparte) recibe "¿Retomamos el entreno?" por correo y push, una vez a los 4 y otra a los 11 días (`trainingLapse()`). ✓ `scripts/validate-reminder-journey.mjs`.

@@ -152,6 +152,13 @@ export const COMEBACK_STEPS = [
   { step: "comeback_14", from: 14, to: 29 },
   { step: "comeback_30", from: 30, to: 45 },
 ];
+// REQ-295: quien sigue registrando pero dejó de entrenar. Una vez por pausa en
+// cada ventana (días desde el último entreno), y solo en un día que toca.
+export const TRAINING_LAPSE_STEPS = [
+  { step: "training_lapse_4", from: 4, to: 10 },
+  { step: "training_lapse_11", from: 11, to: 30 },
+];
+const TRAINING_LAPSE_MIN_MISSED = 2;
 // Mismas etiquetas que GOAL_OPTIONS en la app. Solo van dentro del correo.
 const GOAL_LABELS = { deficit: "Bajar grasa", mantenimiento: "Recomponer mi cuerpo", volumen: "Ganar músculo" };
 
@@ -193,6 +200,24 @@ export function pendingFromState(st) {
   const nutrition = ids.length > 0 && ids.some((id) => !(meals[id] && meals[id].done));
   const isRestDay = st.restDay === true || st.workoutOverride === "descanso";
   return { nutrition, training: !trainedInState(st) && !isRestDay, notStarted };
+}
+
+// REQ-295: días desde el último entreno (o desde el inicio del plan) si hoy
+// toca entrenar y en la pausa hubo al menos dos días que tocaba (los descansos
+// planificados no cuentan). Sin la fila de hoy no se sabe si toca: no avisa.
+export function trainingLapse(rows, today, planStart) {
+  const todayRow = rows.find((r) => r.log_date === today);
+  if (!todayRow || !pendingFromState(todayRow).training) return null;
+  const lastTrain = rows.filter(trainedInState).map((r) => r.log_date).sort().pop() || null;
+  const ref = lastTrain || planStart;
+  if (!ref) return null;
+  const since = daysBetweenYmd(ref, today);
+  const stage = TRAINING_LAPSE_STEPS.find((s) => since >= s.from && since <= s.to);
+  if (!stage) return null;
+  const missed = rows.filter((r) => r.log_date > ref && r.log_date < today && !trainedInState(r)
+    && r.restDay !== true && r.workoutOverride !== "descanso").length;
+  if (missed < TRAINING_LAPSE_MIN_MISSED) return null;
+  return { step: stage.step, ref, since };
 }
 
 // Última llamada: dos horas después del aviso del día, desde las 21:00 y
@@ -252,6 +277,10 @@ export function planReminder(ctx) {
 
   if (gap <= 1) {
     if (planEnded) return null;
+    // REQ-295: registra, pero lleva días sin entrenar. Reemplaza el aviso del
+    // día (nunca dos correos el mismo día) y sale aunque la racha esté a salvo.
+    const lapse = ctx.wantTraining !== false ? trainingLapse(rows, today, planStart) : null;
+    if (lapse) return { step: lapse.step, ref: lapse.ref, date: today, since: lapse.since, gap, progress };
     if (eng && eng.streakThrough === today) return null; // la racha de hoy ya está a salvo
     const streak = eng && eng.streakThrough === yesterday ? engStreak : 0;
     // REQ-282: sin la fila de hoy (no abrió la app) o con la fila sin nada,
@@ -347,6 +376,16 @@ export function reminderMessage(d, kind) {
     paragraphs = [body, "Puedes completar el día anterior hasta que termine hoy."];
     cta = "Registrar ayer";
     url = `/?date=${d.date}&r=rescue`;
+  } else if (d.step.startsWith("training_lapse")) {
+    const first = d.step === "training_lapse_4";
+    title = first ? "¿Retomamos el entreno?" : "Tu entreno te espera";
+    body = first
+      ? `Llevas ${days(d.since)} sin entrenar. Hoy te toca: si vas justo de tiempo, la versión de 20 minutos también cuenta.`
+      : `Llevas ${days(d.since)} sin entrenar. Retomar con una sesión suave está bien: tu plan se ajusta.`;
+    subject = title;
+    paragraphs = [body, "Los descansos planificados no cuentan: solo miramos los días en que te tocaba entrenar."];
+    cta = "Ver mi entreno de hoy";
+    url = `/?date=${d.date}&r=${d.step}`;
   } else if (d.never) {
     // Nunca registró nada: activación, sin hablar de progreso.
     const byStep = {
