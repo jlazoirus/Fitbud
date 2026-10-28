@@ -697,6 +697,15 @@
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-next{margin-top:12px}
+  /* REQ-292: tarjeta "Prepara tus comidas" colapsable en Nutrición */
+  .nut-setup-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;background:transparent;border:none;padding:0 4px;margin:0;color:var(--txt);font:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left}
+  .nut-setup-toggle .chev{flex:0 0 auto;color:var(--muted);transition:transform .2s}
+  .nut-setup-toggle[aria-expanded="true"] .chev{transform:rotate(90deg)}
+  .nut-setup-toggle.icon-only{flex:0 0 auto;justify-content:center;min-width:44px;margin:-10px -8px 0 0}
+  .nut-setup.is-collapsed{padding:6px 10px 6px 8px}
+  .nut-setup-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .nut-setup-row .nut-setup-toggle{flex:1 1 auto;min-width:0}
+  .nut-setup-row .btn{flex:0 0 auto}
   /* REQ-284: tarjeta de regreso (rescate de ayer / bienvenida) */
   .return-card .agenda-head{justify-content:flex-start;align-items:center}
   .return-flame{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-dim);border:1px solid var(--border-acc)}
@@ -706,6 +715,7 @@
   .agenda-next-head{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase}
   @media(max-width:380px){
     .agenda-head{flex-direction:column}
+    .nut-setup .agenda-head{flex-direction:row}
     .agenda-count{align-self:flex-start}
     .agenda-actions .btn{flex-basis:100%}
   }
@@ -4952,14 +4962,21 @@ function renderNutrition(){
     return it.type==="meal"?mealCard(ds,it.base,order):extraCard(ds,it.data,it.idx,order);
   }).join("");
   // Un solo CTA primario: día sin preparar → tarjeta de arranque; día preparado → nada prominente (REQ-100).
-  const emptyNutHtml=!prepared?`<section class="agenda-card agenda-state setup">
+  // REQ-292: la tarjeta se colapsa a una línea (estado recordado en UI.collapsed) sin perder el CTA.
+  const setupCollapsed=isCollapsed("nut.setup");
+  const emptyNutHtml=!prepared?(setupCollapsed?`<section class="agenda-card agenda-state setup nut-setup is-collapsed">
+    <div class="nut-setup-row">
+      <button class="nut-setup-toggle" onclick="toggleNutSetup()" aria-expanded="false" aria-label="Mostrar cómo preparar tus comidas">${chevron()}<span>Comidas sin preparar</span></button>
+      <button class="btn btn-sm btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button>
+    </div>
+  </section>`:`<section class="agenda-card agenda-state setup nut-setup">
     <div class="agenda-head"><div>
       <div class="agenda-kicker">Nutrición</div>
       <h2 class="agenda-title">Prepara tus comidas de hoy</h2>
       <div class="agenda-sub">Aquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Al preparar el día, cada comida se llena sola.</div>
-    </div></div>
+    </div><button class="nut-setup-toggle icon-only" onclick="toggleNutSetup()" aria-expanded="true" aria-label="Ocultar tarjeta" title="Ocultar">${chevron()}</button></div>
     <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
-  </section>`:"";
+  </section>`):"";
   // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
   // REQ-231: la lista de compra (de la semana, no del día) va en esta fila, con la misma forma.
   const shopWeek=shoppingWeek();
@@ -4978,6 +4995,14 @@ function renderNutrition(){
     `${orderedItems.length}`)}
   ${moreBtn}
   `;
+}
+function toggleNutSetup(){
+  UI.collapsed=UI.collapsed||{};
+  UI.collapsed["nut.setup"]=!isCollapsed("nut.setup");
+  uiSave();
+  render();
+  const t=document.querySelector("#app .nut-setup-toggle");
+  if(t)t.focus({preventScroll:true});
 }
 /* ---- REQ-215: lista de compra semanal ----
    Cantidades sobre las comidas EFECTIVAS de cada día (cambios incluidos, sin
