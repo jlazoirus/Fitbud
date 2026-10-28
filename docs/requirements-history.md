@@ -11594,6 +11594,63 @@ Validador Node con matriz de ausencias, zonas, idempotencia y fallo de registro;
 - Migración `supabase/notifications_journey.sql` (idempotente, con rollback): columna `engagement` y `CHECK` ampliado. Aplicada en producción el 2026-10-26 a pedido de Jonathan, vía la API de gestión de Supabase; verificado después: `CHECK` con los 6 tipos, `engagement jsonb` nulo, RLS y `notif_prefs_self` intactos.
 - Verificación: `scripts/validate-reminder-journey.mjs` (actividad, día en juego, rescate, última llamada, matriz de ausencias 2-59, activación, plan terminado, privacidad de 13 variantes, handler con push, falla cerrado y registro ilegible), `scripts/validate-notify-schedule.mjs` (REQ-265/266 sobre el journey) y `tests/e2e/recordatorios.spec.js` (resumen guardado en su columna, enlace del aviso).
 
+## REQ-286 - Modo conversación: el hilo del día no se aísla entre cuentas en el mismo dispositivo
+
+**Estado: implementado.**
+
+`chatTurns()`/`saveChatTurns()` namespaced por `uid()` además de fecha; `clearSignedOutState()` purga `evolv_chat_turns_v1` al cerrar sesión. ✓ `tests/e2e/sync-isolation.spec.js`.
+
+### Origen
+
+Auditoría del journey **auth-roles** (aislamiento entre usuarios en un dispositivo compartido) sobre `62aef73`. Revisando qué estado local sobrevive a `signOutUser()`/`clearSignedOutState()` cuando una cuenta cierra sesión y otra entra en la misma pestaña, el hilo del "modo conversación" (REQ-216) persiste en `sessionStorage` sin identificar al usuario.
+
+### Problema
+
+En modo conversación (labs: `labs.conversational` + `uiMode:"chat"`), el hilo del día se guarda en `sessionStorage` bajo la clave fija `evolv_chat_turns_v1`, etiquetado **solo por fecha** (`{ds, turns}`), sin `user_id`. Si en el mismo dispositivo/pestaña y el mismo día el usuario A usa el modo conversación (incluido el texto libre que escribe, p. ej. datos de salud) y luego cierra sesión y entra el usuario B —también con el modo activo—, el hilo de B muestra los mensajes de A.
+
+Reproducción (contra la app en `http://127.0.0.1:8923`, 0 llamadas pagadas): (1) A escribe `saveChatTurns([{role:"user",text:"Tengo 95 kg…"},{role:"assistant",text:"Claro…"}])`; (2) A cierra sesión con `clearSignedOutState("user-A-uuid")` (el helper real del botón y del evento `SIGNED_OUT`), **sin recargar** (SPA); (3) entra B; (4) `chatTurns()` devuelve para B los mismos turnos de A, y `renderChatMode()` los pinta como burbujas de B.
+
+### Causa raíz
+
+El hilo no lleva el `uid` en su clave ni en su payload, y el logout no lo purga:
+
+- `index.html:7488` `const CHAT_TURNS_KEY="evolv_chat_turns_v1"` — clave fija sin `uid`.
+- `index.html:7512-7513` `chatTurns()` solo filtra por fecha: `all.ds===todayStr()&&Array.isArray(all.turns)?all.turns:[]`; nunca compara el dueño.
+- `index.html:7515` `saveChatTurns()` guarda `{ds,turns}` sin `uid`.
+- `index.html:13125-13142` `clearSignedOutState()` limpia `S.days`/`S.weights`/cola de sync (REQ-156)/coach/entitlement pero **no toca** `sessionStorage["evolv_chat_turns_v1"]`.
+- Lo materializa en UI `index.html:7576` `renderChatMode()` (tramo `local:true` desde `chatTurns()`).
+
+Contrasta con el resto del journey, ya aislado por `uid`: `RETURN_CARD_KEY+":"+uid()` (`index.html:13441`), `mealOptionRerollBucket()` (`index.html:9371`), `coachChatKey()` con `session.user.id` (`index.html:6932`) y la purga de REQ-156. Evidencia funcional (`javascript_tool` sobre funciones reales): tras `clearSignedOutState("user-A-uuid")`, `sessionStorage` sigue con el hilo de A y `chatTurns()` desde B devuelve ese mismo contenido.
+
+### Objetivo
+
+Que el hilo del modo conversación de un usuario nunca sea visible para otra cuenta que inicie sesión en el mismo dispositivo/pestaña, coherente con "privacidad por defecto" y con el aislamiento del resto de claves locales y la cola de sync.
+
+### Alcance
+
+1. Namespacing por usuario: incluir `uid()` en la clave o el payload de `evolv_chat_turns_v1`; `chatTurns()` solo devuelve turnos cuando el `uid` coincide con el usuario actual (además del filtro por fecha).
+2. Purga en logout: `clearSignedOutState()` elimina el hilo local del modo conversación del usuario saliente.
+
+### Fuera de alcance
+
+- La funcionalidad del modo conversación (REQ-216) y el `coachChatMemory` del coach normal (ya namespaced por `uid`+ciclo).
+- La cola de sync (REQ-156) y las claves ya aisladas; persistir el hilo entre recargas (es efímero por diseño).
+
+### Riesgos
+
+- No romper `tests/e2e/conversacion.spec.js` (flujo de un solo usuario).
+- Lectura tolerante al formato viejo del payload si se cambia su forma.
+
+### Criterios de aceptación
+
+- Tras A escribe → A cierra sesión (`clearSignedOutState`/`SIGNED_OUT`, sin reload) → B entra en la misma pestaña, `chatTurns()` y el hilo de `renderChatMode()` para B **no** contienen los turnos de A.
+- Un solo usuario conserva su hilo del día en la misma sesión de pestaña (sin regresión de REQ-216).
+- `node scripts/release-gate.mjs` pasa.
+
+### Verificación sugerida
+
+- Caso nuevo en `tests/e2e/conversacion.spec.js` o `sync-isolation.spec.js`: sembrar hilo con A, disparar `SIGNED_OUT`, re-seedear como B con `labs.conversational`+`uiMode:"chat"`, afirmar que el modo conversación de B no muestra las burbujas de A.
+
 ## REQ-287 - Entreno: el plan en una línea y las señales para detenerse junto al inicio
 
 **Estado: implementado.**
@@ -11713,3 +11770,35 @@ Con perfil de gimnasio, Entreno → "Adaptar hoy" → "En casa" (y "Sin equipo")
 - Perfil de gimnasio: mañana → "En casa" → Casa muestra "Peso corporal · <misma sesión>", todos los ejercicios se pueden hacer en casa, pasado mañana y el perfil siguen en gimnasio, el día se sincroniza con `trainingPlace:"home"` y "Volver al gimnasio" lo deshace. ✓ (`tests/e2e/lugar-del-dia.spec.js`, capturas 390 px revisadas)
 - Hoy en casa: la sesión guiada prescribe esos ejercicios y el cambio sobrevive a recargar; `adaptar_entreno` con `equipo` abre la hoja. ✓ (`tests/e2e/lugar-del-dia.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
+
+## REQ-292 - Nutrición: la tarjeta "Prepara tus comidas de hoy" se puede colapsar
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28), con captura de Nutrición: "Esta parte de preparar mi día debe poder esconderse o colapsarse".
+
+### Problema
+
+Con el día sin preparar, la tarjeta de arranque de Nutrición (REQ-100) ocupa casi media pantalla en móvil y empuja macros y comidas hacia abajo. No había forma de ocultarla aunque el usuario prefiera llenar cada comida con "Otra opción".
+
+### Alcance
+
+1. Botón chevron (44px, `aria-expanded`, "Ocultar tarjeta") en la cabecera de la tarjeta; colapsada queda una línea "Comidas sin preparar" con el mismo CTA "Preparar mi día" en pequeño. Tocar la línea la expande.
+2. El estado se guarda en `UI.collapsed["nut.setup"]` (mismo mecanismo que las secciones de `section()`), por dispositivo; sigue aplicando a cualquier día sin preparar. Con el día preparado la tarjeta no aparece, como antes.
+3. `CACHE_NAME` → `fitbud-pwa-v163`.
+
+### Fuera de alcance
+
+- La tarjeta "Aún falta preparar este día" de Hoy (es la agenda principal y su único CTA).
+
+### Criterios de aceptación
+
+- Colapsar oculta título y explicación y deja visible "Preparar mi día".
+- El estado colapsado sobrevive a una recarga y se puede volver a expandir.
+- En 340px la cabecera no se apila (el chevron queda a la derecha del título).
+
+### Verificación
+
+`tests/e2e/nutricion-colapsar.spec.js`; `tests/e2e/nutricion.spec.js` sin cambios en verde.
