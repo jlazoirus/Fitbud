@@ -2103,3 +2103,9 @@ Sin fila en `notification_preferences`: correo de regreso/volver a entrenar a la
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 A los 7–13 días del plan, sin push, un día sin otro correo: "Activa los avisos en tu teléfono", una vez (`pushInvite()`). El onboarding ya los pide (REQ-289). ✓ `scripts/validate-reminder-journey.mjs`.
+
+## REQ-298 - Recordatorios: elegir la hora del aviso y resumen de la mañana
+
+**Estado: implementado; requiere aplicar `supabase/notifications_morning.sql`.** Detalle en `docs/requirements-history.md`.
+
+Aviso del día de 06:00 a 23:00, elegible también con push. Resumen opcional de 05:00 a 11:00 con el entreno y las comidas de hoy (`morningPlan()`, plan en `engagement.plan`), por push o, sin push, por correo; uno por día. ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.

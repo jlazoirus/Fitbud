@@ -8089,32 +8089,42 @@ function renderProfile(){
   <details id="pfSecRecordatorios" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
   <summary onclick="return profileAccordionGuard(event,this)">Recordatorios</summary>
   <div class="pf-accordion-panel"><div class="dash" oninput="pfNotifMarkDirty()" onchange="pfNotifMarkDirty()">
-    <div class="muted small" style="margin-bottom:12px">Como máximo un correo al día y solo cuando sirve: si te falta algo para sumar el día a tu racha, si ayer quedó sin registrar o, si llevas días sin entrar, lo que ya lograste. Tras un mes sin registros dejamos de escribirte hasta que vuelvas. Mientras no guardes esta sección, igual te escribimos si llevas días sin usar tu plan (cada correo trae su baja); guardarla con el correo desactivado los apaga.</div>
+    <div class="muted small" style="margin-bottom:12px">El aviso del día sale a la hora que elijas y solo cuando sirve: si te falta algo para sumar el día a tu racha, si ayer quedó sin registrar o, si llevas días sin entrar, lo que ya lograste. Tras un mes sin registros dejamos de escribirte hasta que vuelvas. Mientras no guardes esta sección, igual te escribimos si llevas días sin usar tu plan (cada correo trae su baja); guardarla con el correo desactivado los apaga.</div>
+    <div class="field">
+      <label for="notif_hour">Hora del aviso del día (en tu zona horaria)</label>
+      <select id="notif_hour">
+        ${NOTIF_HOURS.map(h=>`<option value="${h}"${h===NOTIF_HOUR_DEFAULT?" selected":""}>${String(h).padStart(2,"0")}:00</option>`).join("")}
+      </select>
+    </div>
+    <label class="chip-check" style="display:flex;margin-bottom:4px">
+      <input type="checkbox" id="notif_morning" onchange="toggleNotifMorning()">
+      <span>Resumen de la mañana con tu plan del día</span>
+    </label>
+    <div id="notifMorningOptions" class="field" style="display:none;margin-top:10px">
+      <label for="notif_morning_hour">Hora del resumen</label>
+      <select id="notif_morning_hour">
+        ${NOTIF_MORNING_HOURS.map(h=>`<option value="${h}"${h===NOTIF_MORNING_DEFAULT?" selected":""}>${String(h).padStart(2,"0")}:00</option>`).join("")}
+      </select>
+      <div class="muted small" style="margin-top:6px">Tu entreno y tus comidas de hoy. Llega como aviso del dispositivo si lo tienes activo; si no, por correo.</div>
+    </div>
+    <div class="field" style="margin-top:14px">
+      <label>Días activos</label>
+      <div class="chips" style="margin-top:6px">
+        ${NOTIF_DAY_LABELS.map((l,i)=>`<label class="chip-check"><input type="checkbox" id="notif_day_${i}" checked><span>${l}</span></label>`).join("")}
+      </div>
+    </div>
+    <div class="field">
+      <label>Tipo de recordatorio</label>
+      <div class="chips" style="margin-top:6px">
+        <label class="chip-check"><input type="checkbox" id="notif_nutrition" checked><span>Alimentación</span></label>
+        <label class="chip-check"><input type="checkbox" id="notif_training" checked><span>Entrenamiento</span></label>
+      </div>
+    </div>
     <label class="chip-check" style="display:flex;margin-bottom:4px">
       <input type="checkbox" id="notif_opt_in" onchange="toggleNotifOptions()">
       <span>Activar recordatorios por correo</span>
     </label>
-    <div id="notifOptions" style="display:none;margin-top:14px">
-      <div class="field">
-        <label for="notif_hour">Hora del recordatorio (en tu zona horaria)</label>
-        <select id="notif_hour">
-          ${NOTIF_HOURS.map(h=>`<option value="${h}"${h===NOTIF_HOUR_DEFAULT?" selected":""}>${String(h).padStart(2,"0")}:00</option>`).join("")}
-        </select>
-      </div>
-      <div class="field">
-        <label>Días activos</label>
-        <div class="chips" style="margin-top:6px">
-          ${NOTIF_DAY_LABELS.map((l,i)=>`<label class="chip-check"><input type="checkbox" id="notif_day_${i}" checked><span>${l}</span></label>`).join("")}
-        </div>
-      </div>
-      <div class="field" style="margin-bottom:0">
-        <label>Tipo de recordatorio</label>
-        <div class="chips" style="margin-top:6px">
-          <label class="chip-check"><input type="checkbox" id="notif_nutrition" checked><span>Alimentación</span></label>
-          <label class="chip-check"><input type="checkbox" id="notif_training" checked><span>Entrenamiento</span></label>
-        </div>
-      </div>
-    </div>
+    <div id="notifOptions" class="muted small" style="display:none;margin-top:8px">Como máximo un recordatorio por correo al día, más el resumen de la mañana si lo activaste y no tienes avisos del dispositivo.</div>
     <div id="pfNotifDirtyHint" class="muted small" style="display:none;margin-top:14px">Cambios sin guardar</div>
     <button id="notifSaveBtn" class="btn btn-accent" style="width:100%;margin-top:14px" onclick="saveNotifPrefs()">Guardar recordatorios</button>
   </div></div>
@@ -8355,8 +8365,12 @@ async function exportPersonalData(button){
 /* ============================================================
    RECORDATORIOS POR CORREO (REQ-24) Y PUSH DE RACHA (REQ-38)
    ============================================================ */
-const NOTIF_HOURS=[17,18,19,20,21,22,23];
+// REQ-298: aviso del día de 06:00 a 23:00 y resumen de la mañana de 05:00 a
+// 11:00 (mismo rango que MORNING_HOURS en api/notify.js).
+const NOTIF_HOURS=Array.from({length:18},(_,i)=>i+6);
 const NOTIF_HOUR_DEFAULT=20;
+const NOTIF_MORNING_HOURS=[5,6,7,8,9,10,11];
+const NOTIF_MORNING_DEFAULT=7;
 const NOTIF_DAY_LABELS=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 
 async function loadNotifPrefs(){
@@ -8376,6 +8390,11 @@ function populateNotifPrefsForm(){
   if(opts)opts.style.display=p.email_opt_in?"block":"none";
   const hourEl=document.getElementById("notif_hour");
   if(hourEl)hourEl.value=p.notify_hour!=null?String(p.notify_hour):String(NOTIF_HOUR_DEFAULT);
+  const mEl=document.getElementById("notif_morning");
+  if(mEl)mEl.checked=!!p.morning_opt_in;
+  const mHourEl=document.getElementById("notif_morning_hour");
+  if(mHourEl)mHourEl.value=String(NOTIF_MORNING_HOURS.includes(Number(p.morning_hour))?Number(p.morning_hour):NOTIF_MORNING_DEFAULT);
+  toggleNotifMorning();
   const nutEl=document.getElementById("notif_nutrition");
   if(nutEl)nutEl.checked=p.notify_nutrition!==false;
   const traEl=document.getElementById("notif_training");
@@ -8390,6 +8409,12 @@ function toggleNotifOptions(){
   if(opts)opts.style.display=(optIn&&optIn.checked)?"block":"none";
 }
 
+function toggleNotifMorning(){
+  const el=document.getElementById("notif_morning");
+  const opts=document.getElementById("notifMorningOptions");
+  if(opts)opts.style.display=(el&&el.checked)?"block":"none";
+}
+
 async function saveNotifPrefs(){
   if(!supa||!uid()){toast("Conecta tu cuenta para guardar");return;}
   const optIn=!!(document.getElementById("notif_opt_in")||{}).checked;
@@ -8398,6 +8423,9 @@ async function saveNotifPrefs(){
   const enabledDays=[0,1,2,3,4,5,6].filter(d=>{const el=document.getElementById("notif_day_"+d);return el&&el.checked;});
   const notifNutrition=!!(document.getElementById("notif_nutrition")||{}).checked;
   const notifTraining=!!(document.getElementById("notif_training")||{}).checked;
+  const morning=!!(document.getElementById("notif_morning")||{}).checked;
+  const mHourEl=document.getElementById("notif_morning_hour");
+  const morningHour=mHourEl?parseInt(mHourEl.value,10):NOTIF_MORNING_DEFAULT;
   const tz=(Intl&&Intl.DateTimeFormat?Intl.DateTimeFormat().resolvedOptions().timeZone:null)||
     (profile&&profile.prefs&&profile.prefs.timeZone)||"UTC";
   const row={
@@ -8408,17 +8436,26 @@ async function saveNotifPrefs(){
     enabled_days:enabledDays,
     notify_nutrition:notifNutrition,
     notify_training:notifTraining,
+    morning_opt_in:morning,
+    morning_hour:morningHour,
     updated_at:new Date().toISOString(),
   };
   const btn=document.getElementById("notifSaveBtn");
   if(btn){btn.disabled=true;btn.textContent="Guardando…";}
-  const{error}=await supa.from("notification_preferences").upsert(row,{onConflict:"user_id"});
+  let{error}=await supa.from("notification_preferences").upsert(row,{onConflict:"user_id"});
+  // REQ-298: sin supabase/notifications_morning.sql no hay columnas del
+  // resumen de la mañana; se guarda el resto.
+  let morningSaved=!error;
+  if(error&&/morning/i.test(String(error.message||""))){
+    delete row.morning_opt_in;delete row.morning_hour;
+    ({error}=await supa.from("notification_preferences").upsert(row,{onConflict:"user_id"}));
+  }
   if(btn){btn.disabled=false;btn.textContent="Guardar recordatorios";}
   if(error){toast("No se pudieron guardar los recordatorios");return;}
   notifPrefsCache={...notifPrefsCache,...row};
   pfNotifClearDirty();
   _engagementSaved="";scheduleEngagementSave(0); // REQ-285: la fila puede ser nueva
-  toast("Recordatorios guardados");
+  toast(morning&&!morningSaved?"Recordatorios guardados. El resumen de la mañana aún no está disponible.":"Recordatorios guardados");
 }
 
 /* ── Web Push / avisos del dispositivo (REQ-38) ─────────────────────────── */
@@ -8449,7 +8486,7 @@ function renderPushSection(){
     return;
   }
   // permission === "granted"
-  el.innerHTML=note+`<label class="chip-check" style="display:flex;margin-bottom:6px"><input type="checkbox" id="push_opt_in" ${pushEnabled?"checked":""} onchange="savePushOptIn(this)"><span>Aviso de racha en este dispositivo</span></label><p class="muted small">Un aviso al día como máximo. Si tu racha es de 3 días o más y sigue pendiente, uno más antes de las 22:00.</p>`;
+  el.innerHTML=note+`<label class="chip-check" style="display:flex;margin-bottom:6px"><input type="checkbox" id="push_opt_in" ${pushEnabled?"checked":""} onchange="savePushOptIn(this)"><span>Aviso de racha en este dispositivo</span></label><p class="muted small">Un aviso al día como máximo, más el resumen de la mañana si lo activas en Recordatorios. Si tu racha es de 3 días o más y sigue pendiente, uno más antes de las 22:00.</p>`;
 }
 
 async function requestPushPermission(btn){
@@ -13382,7 +13419,28 @@ function engagementSnapshot(){
     streak:stk,streakThrough:stk>0?(combinedDayDone(today)?today:yesterday):null,
     rescueDate:rescue>=2?yesterday:null,rescueStreak:rescue>=2?rescue:0,
     bestStreak:s.bestStreak,activeDays:s.activeDays,workouts:s.workouts+s.partialWorkouts,
+    plan:engagementPlanDays(today),
   };
+}
+// REQ-298: plan de hoy y de la semana siguiente para el resumen de la mañana
+// (entreno o descanso, cuántas comidas y con qué plato se empieza). Una semana
+// porque la app puede no abrirse a diario.
+function engagementPlanDays(today){
+  const out={};
+  for(let i=0;i<8;i++){
+    const ds=addDays(today,i);
+    if(ds<START)continue;
+    try{
+      const day=buildDay(ds);
+      const w=day.workout;
+      const rest=!w||w.id==="descanso";
+      const m0=day.meals[0];
+      const ms=m0&&S.days[ds]&&S.days[ds].meals?S.days[ds].meals[m0.id]:null;
+      const first=m0?String(mealValue(m0,ms).name||"").trim().slice(0,60):"";
+      out[ds]={w:rest?null:String(w.name||"").slice(0,60)||null,rest,meals:day.meals.length,first:first||null};
+    }catch(e){/* un día sin plan resoluble no entra */}
+  }
+  return out;
 }
 function scheduleEngagementSave(delay){
   clearTimeout(_engagementTimer);

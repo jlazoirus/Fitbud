@@ -188,7 +188,7 @@ globalThis.fetch = async (url, init = {}) => {
   throw new Error("fetch inesperado: " + u);
 };
 
-async function run({ hour, notifyHour = hour, rows, engagement, log = [], checkTypes = null, emailOptIn = true, pushOptIn = true, subs, planDaysAgo = 30 }) {
+async function run({ hour, notifyHour = hour, rows, engagement, log = [], checkTypes = null, emailOptIn = true, pushOptIn = true, subs, planDaysAgo = 30, prefExtra = {} }) {
   const tz = tzAt(hour);
   assert.ok(tz, `sin zona a las ${hour}`);
   const today = localToday(tz);
@@ -196,7 +196,7 @@ async function run({ hour, notifyHour = hour, rows, engagement, log = [], checkT
   state = {
     emails: [], inserted: [], upserts: [], subs, log: log.map((k) => ({ id: 9, status: "sent", idempotency_key: k.replace("{today}", today).replace("{plan}", addDaysYmd(today, -planDaysAgo)) })), checkTypes,
     rows: rows(today),
-    pref: { user_id: "u1", timezone: tz, notify_hour: notifyHour, enabled_days: [0, 1, 2, 3, 4, 5, 6], notify_nutrition: true, notify_training: true, unsubscribe_token: "tok_0123456789", email_opt_in: emailOptIn, push_opt_in: pushOptIn, engagement: engagement ? engagement(today) : null },
+    pref: { user_id: "u1", timezone: tz, notify_hour: notifyHour, enabled_days: [0, 1, 2, 3, 4, 5, 6], notify_nutrition: true, notify_training: true, unsubscribe_token: "tok_0123456789", email_opt_in: emailOptIn, push_opt_in: pushOptIn, engagement: engagement ? engagement(today) : null, ...prefExtra },
     profile: { email: "ana@example.com", active: true, goal: "deficit", planStartDate: addDaysYmd(today, -planDaysAgo), planEndDate: addDaysYmd(today, 70 - planDaysAgo - 1), planDurationWeeks: "10" },
   };
   const res = { code: 0, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, send(b) { this.body = b; return this; }, setHeader() {} };
@@ -396,5 +396,72 @@ assert.equal(state.emails.length, 1, "también a quien nunca eligió sus avisos"
 assert.equal(state.emails[0].subject, "Activa los avisos en tu teléfono");
 assert.match(state.emails[0].html, /No recibir más estos correos/);
 console.log("  REQ-297: invitación a activar el push a la semana, una vez, sin pisar otro correo");
+
+// ── REQ-298: resumen de la mañana con el plan del día ───────────────────────
+const { morningPlan, morningHour, MORNING_HOURS, buildEmailHtml } = mod;
+const dayPlan = (over = {}) => ({ w: "Torso A", rest: false, meals: 4, first: "Avena con plátano", ...over });
+const mBase = (over = {}) => ({
+  today: T, hour: 7, morningHour: 7, notifyHour: 20, rows: [activeRow(-1)],
+  engagement: eng({ plan: { [T]: dayPlan() } }), planStart: START, planEnd: addDaysYmd(START, 69),
+  wantNutrition: true, wantTraining: true, ...over,
+});
+d = morningPlan(mBase());
+assert.deepEqual(d, { step: "morning", ref: T, date: T, workout: "Torso A", rest: false, meals: 4, first: "Avena con plátano", streak: 5 });
+m = reminderMessage(d);
+assert.equal(m.title, "Tu plan de hoy");
+assert.equal(m.body, "Entreno: Torso A · 4 comidas, empiezas con Avena con plátano. Hoy sumas el día 6 de tu racha.");
+assert.equal(m.subject, "Tu plan de hoy: Torso A");
+assert.equal(m.url, `/?date=${T}&r=morning`);
+assert.doesNotMatch(`${m.title} ${m.body} ${m.subject} ${m.paragraphs.join(" ")}`, BANNED);
+assert.doesNotMatch(`${m.title} ${m.body} ${m.subject}`, /Bajar grasa|Recomponer|Ganar músculo|\bkg\b|peso/);
+m = reminderMessage(morningPlan(mBase({ engagement: eng({ streakThrough: D(-3), plan: { [T]: dayPlan({ rest: true, w: null, first: null }) } }) })));
+assert.equal(m.body, "Hoy descansas · 4 comidas.", "descanso, sin plato conocido y sin racha viva");
+assert.equal(m.subject, "Tu plan de hoy: descanso");
+assert.equal(reminderMessage(morningPlan(mBase({ wantTraining: false }))).body, "4 comidas, empiezas con Avena con plátano. Hoy sumas el día 6 de tu racha.");
+assert.equal(reminderMessage(morningPlan(mBase({ wantNutrition: false }))).body, "Entreno: Torso A. Hoy sumas el día 6 de tu racha.");
+assert.equal(morningPlan(mBase({ wantNutrition: false, wantTraining: false })), null, "sin nada que mostrar no sale");
+assert.equal(morningPlan(mBase({ hour: 6 })), null, "antes de la hora elegida no sale");
+assert.ok(morningPlan(mBase({ hour: 9 })), "un disparo atrasado hasta dos horas aún vale");
+assert.equal(morningPlan(mBase({ hour: 10 })), null, "más tarde ya no es de mañana");
+assert.equal(morningPlan(mBase({ hour: 8, morningHour: 8, notifyHour: 8 })), null, "a la hora del aviso del día manda ese aviso");
+assert.equal(morningPlan(mBase({ engagement: eng() })), null, "sin el plan del día que deja la app no sale");
+assert.equal(morningPlan(mBase({ engagement: eng({ cycleStart: D(-100), plan: { [T]: dayPlan() } }) })), null, "plan de otro ciclo no vale");
+assert.equal(morningPlan(mBase({ rows: [activeRow(-3)] })), null, "3 días sin registrar: le toca el journey de regreso");
+assert.ok(morningPlan(mBase({ rows: [], planStart: D(-1), engagement: eng({ cycleStart: D(-1), plan: { [T]: dayPlan() } }) })), "plan recién empezado sin registros sí");
+assert.equal(morningPlan(mBase({ planStart: D(2) })), null, "plan sin empezar");
+assert.equal(morningPlan(mBase({ planEnd: D(-1) })), null, "plan terminado");
+assert.equal(morningPlan(mBase({ rows: [activeRow(-1), { log_date: T, meals: { a: meal(true) }, workoutDone: true }] })), null, "día ya cumplido");
+assert.equal(morningPlan(mBase({ engagement: eng({ plan: { [T]: dayPlan({ w: `  Torso\n${"x".repeat(80)}` }) } }) })).workout.length, 60, "nombres recortados y en una línea");
+assert.equal(morningHour(3), 7, "hora fuera de rango: 07:00");
+assert.deepEqual(MORNING_HOURS, [5, 6, 7, 8, 9, 10, 11]);
+const html = buildEmailHtml({ appUrl: "https://evolvapp.club" }, reminderMessage(morningPlan(mBase({ engagement: eng({ plan: { [T]: dayPlan({ first: "<b>Avena</b> & fruta" }) } }) }))), "tok");
+assert.ok(html.includes("&lt;b&gt;Avena&lt;/b&gt; &amp; fruta") && !html.includes("<b>Avena"), "el correo escapa los nombres que escribe la app");
+console.log("  REQ-298: resumen de la mañana con entreno, comidas y racha; ventana, ciclo y día cumplido");
+
+const morningPrefs = { morning_opt_in: true, morning_hour: 7 };
+const mEng = (today) => ({ cycleStart: addDaysYmd(today, -30), streak: 5, streakThrough: addDaysYmd(today, -1), plan: { [today]: { w: "Torso A", rest: false, meals: 4, first: "Avena con plátano" } } });
+r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng, prefExtra: morningPrefs });
+assert.equal(pushes.length, 1, "con push activo, el resumen va por push");
+assert.equal(state.emails.length, 0, "y no por correo; el aviso del día espera a su hora");
+assert.equal(pushes[0].title, "Tu plan de hoy");
+assert.equal(pushes[0].url, `/?date=${r.today}&r=morning`);
+assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [["push_morning", `u1:push_morning:${r.today}`]]);
+r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng, prefExtra: morningPrefs, pushOptIn: false });
+assert.equal(state.emails.length, 1, "sin push, por correo");
+assert.equal(state.emails[0].subject, "Tu plan de hoy: Torso A");
+assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [["morning", `u1:morning:${r.today}`]]);
+r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng, prefExtra: morningPrefs, log: ["u1:push_morning:{today}"] });
+assert.equal(pushes.length + state.emails.length, 0, "uno por día");
+r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng, prefExtra: morningPrefs, subs: [], log: ["u1:push_morning:{today}"] });
+assert.equal(state.emails.length, 0, "si ya salió por push, no repite por correo aunque la suscripción caduque");
+r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng, prefExtra: morningPrefs, checkTypes: ["nutrition", "training", "push_streak", "comeback", "push_comeback", "push_last_call"] });
+assert.equal(pushes.length + state.emails.length, 0, "sin la migración no sale (falla cerrado)");
+r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng });
+assert.equal(pushes.length + state.emails.length, 0, "sin activarlo no sale");
+r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng, prefExtra: { ...morningPrefs, morning_hour: 9 } });
+assert.equal(pushes.length + state.emails.length, 0, "antes de su hora no sale");
+r = await run({ hour: 7, notifyHour: 7, rows: yesterdayActive, engagement: liveStreak });
+assert.equal(state.emails[0].subject, "Tu racha de 5 días sigue en juego", "REQ-298: el aviso del día también puede elegirse de mañana");
+console.log("  handler: resumen de la mañana por push o, sin push, por correo; uno por día y falla cerrado");
 
 console.log("validate-reminder-journey: OK");

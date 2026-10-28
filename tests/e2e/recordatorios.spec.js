@@ -42,11 +42,19 @@ test("la app guarda el resumen de racha que leen los recordatorios", async ({ pa
   await expect.poll(() => saved().length, { timeout: 8000 }).toBeGreaterThan(0);
   const start = await page.evaluate(() => START);
   // Ayer quedó roto: racha 0, pero el rescate de 3 días sigue abierto hasta hoy.
-  expect(saved().at(-1)).toEqual({
+  const { plan, ...summary } = saved().at(-1);
+  expect(summary).toEqual({
     v: 1, cycleStart: start, streak: 0, streakThrough: null,
     rescueDate: daysFromTodayInPage(-1), rescueStreak: 3,
     bestStreak: 3, activeDays: 3, workouts: 3,
   });
+  // REQ-298: el plan de hoy y de la semana siguiente para el resumen de la mañana.
+  const today = await page.evaluate(() => {
+    const ds = todayStr(), day = buildDay(ds);
+    return { ds, name: day.workout.name, meals: day.meals.length, first: mealValue(day.meals[0], (S.days[ds] && S.days[ds].meals || {})[day.meals[0].id]).name || null };
+  });
+  expect(Object.keys(plan)).toHaveLength(8);
+  expect(plan[today.ds]).toEqual({ w: today.name, rest: false, meals: today.meals, first: today.first });
   expect(calls.some((c) => c.table === "profiles" && c.payload && c.payload.prefs && c.payload.prefs.engagement)).toBe(false);
   expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
 
@@ -66,5 +74,33 @@ test("el enlace del aviso abre su día y registra la etapa sin datos personales"
   expect(body.event_type).toBe("reminder_opened");
   expect(body.properties).toEqual({ step: "rescue" });
   await expect.poll(() => page.evaluate(() => ({ view, current, search: location.search }))).toEqual({ view: "nutricion", current: yesterday, search: "" });
+  expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+});
+
+// REQ-298: horario del aviso del día de 06:00 a 23:00 y resumen de la mañana.
+test("Recordatorios: elegir la hora del aviso y activar el resumen de la mañana", async ({ page, context }) => {
+  const { calls } = await installMocks(context);
+  await seedLoggedInUser(page);
+  await autoDismissNudges(page);
+  const errors = collectConsoleErrors(page);
+  await gotoApp(page);
+  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#pfSecRecordatorios > summary").click();
+
+  const hours = await page.locator("#notif_hour option").evaluateAll((os) => os.map((o) => o.value));
+  expect(hours).toEqual(Array.from({ length: 18 }, (_, i) => String(i + 6)));
+  await expect(page.locator("#notif_hour")).toHaveValue("20");
+  await page.selectOption("#notif_hour", "7");
+
+  await expect(page.locator("#notif_morning_hour")).toBeHidden();
+  await page.check("#notif_morning");
+  await expect(page.locator("#notif_morning_hour")).toBeVisible();
+  await expect(page.locator("#notif_morning_hour")).toHaveValue("7");
+  await page.selectOption("#notif_morning_hour", "6");
+  await page.click("#notifSaveBtn");
+  await expect(page.locator("#pfNotifDirtyHint")).toBeHidden();
+
+  const row = calls.filter((c) => c.table === "notification_preferences" && c.method === "POST").map((c) => (Array.isArray(c.payload) ? c.payload[0] : c.payload)).at(-1);
+  expect(row).toMatchObject({ email_opt_in: false, notify_hour: 7, morning_opt_in: true, morning_hour: 6 });
   expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
 });

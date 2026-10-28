@@ -152,6 +152,14 @@ const NO_PLAN_STEPS = new Set(["comeback_2", "comeback_7", "comeback_30"]);
 // REQ-297: invitación a activar el push a la semana del plan si nunca lo hizo.
 // Ventana 7–13 días: sale el primer día de esa semana sin otro correo.
 const PUSH_INVITE = { step: "push_invite_7", from: 7, to: 13 };
+// REQ-298: resumen de la mañana con el plan del día (opt-in). Sale a la hora
+// elegida o hasta dos horas después (un disparo atrasado no manda "buenos
+// días" a mediodía) y solo antes del aviso de la tarde.
+export const MORNING_HOURS = [5, 6, 7, 8, 9, 10, 11];
+const MORNING_DEFAULT_HOUR = 7;
+const MORNING_LATE_HOURS = 2;
+// Con más días sin registrar el journey de regreso toma el relevo.
+const MORNING_MAX_GAP = 2;
 const LAST_CALL_MIN_STREAK = 3;
 const LAST_CALL_LATEST_HOUR = 22;
 // Cada etapa de regreso es una ventana: sale una vez por ausencia, el primer
@@ -236,6 +244,50 @@ export function trainingLapse(rows, today, planStart) {
 export function lastCallHour(notifyHour) {
   const h = Math.max(21, (notifyHour ?? 20) + 2);
   return h <= LAST_CALL_LATEST_HOUR ? h : null;
+}
+
+export function morningHour(h) {
+  const n = Number(h);
+  return MORNING_HOURS.includes(n) ? n : MORNING_DEFAULT_HOUR;
+}
+
+// Nombres que escribe la app (sesión, plato): texto plano y corto.
+function planLabel(v) {
+  if (typeof v !== "string") return null;
+  const t = v.replace(/\s+/g, " ").trim().slice(0, 60);
+  return t || null;
+}
+
+/**
+ * REQ-298: resumen de la mañana. Puro. El plan de cada día lo deja la app en
+ * engagement.plan (el servidor no conoce el plan): sin él no sale.
+ * Devuelve { step:"morning", ref, date, workout, rest, meals, first, streak } o null.
+ */
+export function morningPlan(ctx) {
+  const { today } = ctx;
+  if (!isYmd(today)) return null;
+  const at = morningHour(ctx.morningHour);
+  if (ctx.hour < at || ctx.hour > at + MORNING_LATE_HOURS || ctx.hour >= (ctx.notifyHour ?? 20)) return null;
+  const planStart = isYmd(ctx.planStart) ? ctx.planStart : null;
+  if (!planStart || today < planStart || (isYmd(ctx.planEnd) && today > ctx.planEnd)) return null;
+  const eng = ctx.engagement && typeof ctx.engagement === "object" && ctx.engagement.cycleStart === planStart ? ctx.engagement : null;
+  const day = eng && eng.plan && typeof eng.plan === "object" ? eng.plan[today] : null;
+  if (!day || typeof day !== "object") return null;
+  const rows = (ctx.rows || []).filter((r) => r && isYmd(r.log_date) && r.log_date <= today && r.log_date >= planStart);
+  const last = rows.filter(dayHasActivity).map((r) => r.log_date).sort().pop() || null;
+  if (daysBetweenYmd(last || planStart, today) > MORNING_MAX_GAP) return null;
+  const todayRow = rows.find((r) => r.log_date === today);
+  if (todayRow) {
+    const p = pendingFromState(todayRow);
+    if (!p.notStarted && !p.nutrition && !p.training) return null; // ya cumplió el día
+  }
+  const wantT = ctx.wantTraining !== false, wantN = ctx.wantNutrition !== false;
+  const rest = wantT && day.rest === true;
+  const workout = wantT && !rest ? planLabel(day.w) : null;
+  const meals = wantN ? Math.max(0, Math.min(8, Math.floor(Number(day.meals) || 0))) : 0;
+  if (!workout && !rest && !meals) return null;
+  const streak = eng.streakThrough === addDaysYmd(today, -1) ? Math.max(0, Number(eng.streak) || 0) : 0;
+  return { step: "morning", ref: today, date: today, workout, rest, meals, first: meals ? planLabel(day.first) : null, streak };
 }
 
 /**
@@ -375,6 +427,21 @@ export function reminderMessage(d, kind) {
     body = `Registra lo de hoy y tu racha de ${days(d.streak)} sigue.`;
     return { title, body, url: `/?date=${d.date}&r=last_call`, tag: "fitbros-streak" };
   }
+  if (d.step === "morning") {
+    const mealsText = d.meals ? (d.first ? `${plural(d.meals, "comida", "comidas")}, empiezas con ${d.first}` : plural(d.meals, "comida", "comidas")) : "";
+    const trainText = d.workout ? `Entreno: ${d.workout}` : d.rest ? "Hoy descansas" : "";
+    const streakText = d.streak >= 2 ? `Hoy sumas el día ${d.streak + 1} de tu racha.` : "";
+    title = "Tu plan de hoy";
+    body = [[trainText, mealsText].filter(Boolean).join(" · ") + ".", streakText].filter(Boolean).join(" ");
+    subject = d.workout ? `Tu plan de hoy: ${d.workout}` : d.rest ? "Tu plan de hoy: descanso" : title;
+    paragraphs = [
+      trainText ? `${trainText}.` : "",
+      mealsText ? `${mealsText.charAt(0).toUpperCase()}${mealsText.slice(1)}.` : "",
+      streakText,
+      "Abre tu plan para ver el detalle y marcar lo que vayas haciendo.",
+    ].filter(Boolean);
+    return { title, body, subject, paragraphs, cta: "Ver mi plan de hoy", url: `/?date=${d.date}&r=morning`, tag: "fitbros-morning" };
+  }
   if (d.step === "day") {
     const missing = MISSING_TEXT[d.missing] || MISSING_TEXT.day;
     const notStarted = d.missing === "day";
@@ -494,22 +561,25 @@ async function sendEmail(e, to, subject, html) {
 }
 
 // Todo el texto sale de reminderMessage(): ningún dato escrito por el usuario.
+// REQ-298: el resumen de la mañana trae nombres que escribe la app.
+const escHtml = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
 export function buildEmailHtml(e, msg, unsubToken, opts = {}) {
-  const link = e.appUrl + msg.url;
+  const link = escHtml(e.appUrl + msg.url);
   const unsubLink = `${e.appUrl}/api/notify?unsubscribe=${encodeURIComponent(unsubToken || "")}`;
   const paragraphs = (msg.paragraphs || [msg.body])
-    .map((t) => `<p style="color:#444;font-size:15px;line-height:1.5;margin:0 0 12px">${t}</p>`)
+    .map((t) => `<p style="color:#444;font-size:15px;line-height:1.5;margin:0 0 12px">${escHtml(t)}</p>`)
     .join("\n  ");
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${msg.subject}</title></head>
+<title>${escHtml(msg.subject)}</title></head>
 <body style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1a1a1a;background:#fff">
-  <p style="font-size:19px;font-weight:700;margin:0 0 14px">${msg.title}</p>
+  <p style="font-size:19px;font-weight:700;margin:0 0 14px">${escHtml(msg.title)}</p>
   ${paragraphs}
   <a href="${link}"
      style="display:inline-block;background:#101010;color:#d6ff3a;text-decoration:none;
             padding:12px 28px;border-radius:10px;font-weight:700;font-size:15px;margin-top:12px">
-    ${msg.cta}
+    ${escHtml(msg.cta)}
   </a>
   <hr style="margin:36px 0;border:none;border-top:1px solid #eee">
   <p style="font-size:12px;color:#777;margin:0">
@@ -712,10 +782,14 @@ async function runJob(e, dryRun) {
     const today = todayInTz(tz);
     const hour = currentHourInTz(tz);
 
-    // 1. ¿Ya llegó la hora elegida? ¿Día habilitado?
-    if (!isNotifyTime(notify_hour, tz)) continue;
+    // 1. ¿Día habilitado? ¿Toca el resumen de la mañana (REQ-298) o ya llegó
+    // la hora del aviso del día?
     const days = Array.isArray(enabled_days) ? enabled_days.map(Number) : [0, 1, 2, 3, 4, 5, 6];
     if (!days.includes(dayOfWeekInTz(tz))) continue;
+    const evening = isNotifyTime(notify_hour, tz);
+    const mAt = morningHour(pref.morning_hour);
+    const morning = !!pref.morning_opt_in && hour >= mAt && hour <= mAt + MORNING_LATE_HOURS && hour < (notify_hour ?? 20);
+    if (!evening && !morning) continue;
 
     // 2. Perfil activo, objetivo y plan, y actividad de los últimos 60 días.
     const ctx = await loadUserContext(e, user_id, today).catch((err) => {
@@ -725,8 +799,11 @@ async function runJob(e, dryRun) {
     });
     if (!ctx) continue;
 
-    // 3. Etapa del journey.
     const p = ctx.profile;
+    if (morning) await sendMorning(e, dryRun, results, { pref, profile: p, rows: ctx.rows, today, hour, wantEmail, wantPush });
+    if (!evening) continue;
+
+    // 3. Etapa del journey.
     const decision = planReminder({
       today, hour, notifyHour: notify_hour ?? 20, rows: ctx.rows, engagement: pref.engagement,
       planStart: p.planStartDate, planEnd: p.planEndDate, planWeeks: Number(p.planDurationWeeks) || null,
@@ -780,6 +857,35 @@ async function runJob(e, dryRun) {
 
   await runFollowups(e, dryRun, results);
   return results;
+}
+
+// REQ-298: resumen de la mañana, uno por día y por un solo canal: push si el
+// dispositivo tiene avisos activos; si no, correo. Cada canal mira también la
+// clave del otro: si la suscripción caduca tras el push, no sale el correo.
+async function sendMorning(e, dryRun, results, { pref, profile: p, rows, today, hour, wantEmail, wantPush }) {
+  const uid = pref.user_id;
+  const decision = morningPlan({
+    today, hour, morningHour: pref.morning_hour, notifyHour: pref.notify_hour ?? 20, rows, engagement: pref.engagement,
+    planStart: p.planStartDate, planEnd: p.planEndDate,
+    wantNutrition: pref.notify_nutrition !== false, wantTraining: pref.notify_training !== false,
+  });
+  if (!decision) return;
+  results.processed++;
+  const msg = reminderMessage(decision);
+  const subs = wantPush
+    ? await supaGet(e, `/rest/v1/push_subscriptions?user_id=eq.${uid}&select=endpoint,keys_p256dh,keys_auth`).catch(() => [])
+    : [];
+  if (subs.length) {
+    await deliver(e, dryRun, results, results.push, {
+      userId: uid, type: "push_morning", keys: [`${uid}:push_morning:${today}`, `${uid}:morning:${today}`], refDate: today, step: "morning",
+      send: () => sendPush(e, subs, msg),
+    });
+  } else if (wantEmail && p.email) {
+    await deliver(e, dryRun, results, results, {
+      userId: uid, type: "morning", keys: [`${uid}:morning:${today}`, `${uid}:push_morning:${today}`], refDate: today, step: "morning",
+      send: async () => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, pref.unsubscribe_token)) }),
+    });
+  }
 }
 
 // REQ-297: una vez, por correo, a quien lleva una semana de plan sin push. Si
