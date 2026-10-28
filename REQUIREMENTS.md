@@ -2040,7 +2040,9 @@ Jonathan (2026-10-26). `planReminder()` en `api/notify.js` elige una etapa por u
 
 ## REQ-286 - Modo conversación: el hilo del día no se aísla entre cuentas en el mismo dispositivo
 
-**Estado: pendiente.**
+**Estado: implementado.**
+
+`chatTurns()`/`saveChatTurns()` namespaced por `uid()` además de fecha; `clearSignedOutState()` purga `evolv_chat_turns_v1` al cerrar sesión. ✓ `tests/e2e/sync-isolation.spec.js`.
 
 ### Origen
 

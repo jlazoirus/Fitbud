@@ -7606,9 +7606,11 @@ async function setUiMode(mode){
   await saveProfilePrefs(prefs);
 }
 function chatTurns(){
-  try{const all=JSON.parse(sessionStorage.getItem(CHAT_TURNS_KEY)||"{}");return all.ds===todayStr()&&Array.isArray(all.turns)?all.turns:[];}catch(e){return[];}
+  // REQ-286: namespaced por uid además de fecha, para que el hilo de una cuenta
+  // nunca se pinte en la de otra que inicie sesión en el mismo dispositivo/pestaña.
+  try{const all=JSON.parse(sessionStorage.getItem(CHAT_TURNS_KEY)||"{}");return all.ds===todayStr()&&all.uid===uid()&&Array.isArray(all.turns)?all.turns:[];}catch(e){return[];}
 }
-function saveChatTurns(turns){try{sessionStorage.setItem(CHAT_TURNS_KEY,JSON.stringify({ds:todayStr(),turns:turns.slice(-30)}));}catch(e){}}
+function saveChatTurns(turns){try{sessionStorage.setItem(CHAT_TURNS_KEY,JSON.stringify({ds:todayStr(),uid:uid(),turns:turns.slice(-30)}));}catch(e){}}
 const CHAT_ASKS={
   workout:{q:"¿Qué entreno hoy?",a:"Esto es lo que toca hoy. Puedes empezar desde aquí y seguir paso a paso."},
   meals:{q:"¿Qué como hoy?",a:"Estas son tus comidas de hoy. Márcalas al comerlas o cámbialas si hoy comes otra cosa."},
@@ -13366,6 +13368,7 @@ function clearSignedOutState(prevUid){
   if(recapPhotoUrl)URL.revokeObjectURL(recapPhotoUrl);
   recapPhotoUrl="";
   S.days={};S.weights={};save();   // limpia caché local del usuario anterior
+  try{sessionStorage.removeItem(CHAT_TURNS_KEY);}catch(e){} // REQ-286: no exponer el hilo del modo conversación a la próxima cuenta
   if(prevUid)clearSyncQueueForUser(prevUid); // aislar cola: no exponer datos al próximo usuario
   authReady=true;
   closeModal();
