@@ -54,6 +54,7 @@ export default {
   "pull-up":                 { q: "pullups pull up", id: "Pullups" },
   "assisted-pull-up":        { q: "assisted pull up machine band", id: "Band_Assisted_Pull-Up" },
   "band-row":                { q: "resistance band row standing", id: null, curated_svg: "assets/exercise-media/band-row.svg" }, // Banda; no sustituir por un remo invertido bajo barra.
+  "inverted-row":            { q: "inverted row", id: null }, // REQ-293: fotos de Inverted_Row ya copiadas en assets/exercise-media/inverted-row-{0,1}.jpg.
   "glute-bridge":            { q: "butt lift bridge glute", id: "Butt_Lift_Bridge" },
   "single-leg-glute-bridge": { q: "single leg glute bridge", id: "Single_Leg_Glute_Bridge" },
   "front-plank":             { q: "plank core", id: "Plank" },

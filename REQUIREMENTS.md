@@ -2077,3 +2077,7 @@ Jonathan: `day_log.state.trainingPlace` lleva la sesión del día a otro lugar. 
 ## REQ-292 - Nutrición: la tarjeta "Prepara tus comidas de hoy" se puede colapsar
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/nutricion-colapsar.spec.js`.
+
+## REQ-293 - Entreno en casa: nada que pida material no declarado y siempre hay con qué sustituir
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/entreno-casa.spec.js`.

@@ -715,7 +715,7 @@ test.describe("Sustituir ejercicio", () => {
     await setCurrent("seated-cable-row");
     await app.getByRole("button", { name: "Sustituir", exact: true }).click();
     await expect(overlay).toContainText("mismo músculo principal (espalda media)");
-    await expect(options).toHaveText(["Remo con banda"]);
+    await expect(options).toHaveText(["Remo con banda", "Remo invertido"]);
     await expect(overlay.locator("button.opt").first()).toContainText("Músculo principal: Espalda media");
     await overlay.locator("button.opt").first().click();
     await expect(app.locator(".player-title h3")).toHaveText("Remo con banda");

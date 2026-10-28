@@ -229,6 +229,14 @@ insert into exercises (
   'Fitbros Studio', '', 'Contenido propio Fitbros', 'Fitbros Studio', true
 ),
 (
+  'inverted-row', 'Remo invertido', '["remo bajo la mesa","remo australiano"]'::jsonb, 'bodyweight', 'beginner',
+  '["table_or_low_bar"]'::jsonb, '["home","outdoor","gym"]'::jsonb, '["espalda","bíceps"]'::jsonb, 'pull',
+  'Túmbate boca arriba bajo una mesa firme (o una barra baja) y agarra el borde con las manos al ancho de hombros, rodillas flexionadas y talones en el suelo.', '["Aprieta glúteos y abdomen para que hombros, cadera y rodillas queden en línea.","Lleva el pecho hacia el borde juntando las escápulas, con los codos cerca del cuerpo.","Baja con control hasta estirar los brazos, sin dejar caer la cadera."]'::jsonb, 'Exhala al tirar e inhala al volver.', '["Dejar caer la cadera","Adelantar el cuello hacia el borde","Usar una mesa ligera o con patas plegables"]'::jsonb,
+  '["La mesa se mueve, cruje o se inclina","Dolor agudo de hombro o codo","Hormigueo en brazo o mano"]'::jsonb, 'Remo invertido más vertical', 'Remo invertido con piernas estiradas', '["band-row","seated-cable-row"]'::jsonb,
+  '["dolor agudo de hombro","lesión reciente de codo"]'::jsonb, 'image_sequence', 'pull', 'pull',
+  'Free Exercise DB', '', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
+),
+(
   'glute-bridge', 'Puente de glúteo', '["puente"]'::jsonb, 'bodyweight', 'beginner',
   '[]'::jsonb, '["home","gym"]'::jsonb, '["glúteos","isquiotibiales"]'::jsonb, 'bridge',
   'Apoya la espalda y los pies con la pelvis neutra.', '["Activa el abdomen antes de mover la cadera.","Eleva la pelvis apretando glúteos sin arquear la espalda.","Pausa arriba y baja de forma controlada."]'::jsonb, 'Exhala al elevar la cadera e inhala al bajar.', '["Empujar solo con la zona lumbar","Pies demasiado lejos","Rodillas abriéndose o cerrándose"]'::jsonb,

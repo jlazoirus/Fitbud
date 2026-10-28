@@ -1,6 +1,6 @@
 # Revisión de niveles del catálogo de ejercicios
 
-Revisión: 2026-10-24. Cobertura conjunta: **70 ejercicios únicos**, con **34 principiantes, 32 intermedios y 4 avanzados**. El inventario distingue los **54 ejercicios empaquetados** en `exercise-catalog.js` (26 principiantes, 24 intermedios y 4 avanzados) de **16 ejercicios complementarios presentes en producción** (8 principiantes y 8 intermedios).
+Revisión: 2026-10-24. Cobertura conjunta: **71 ejercicios únicos**, con **35 principiantes, 32 intermedios y 4 avanzados**. El inventario distingue los **55 ejercicios empaquetados** en `exercise-catalog.js` (27 principiantes, 24 intermedios y 4 avanzados) de **16 ejercicios complementarios presentes en producción** (8 principiantes y 8 intermedios).
 
 La lectura de producción encontró 67 ejercicios: 51 compartidos con el catálogo empaquetado y los 16 complementarios. Las tres caminatas (`walk-brisk`, `walk-easy`, `walk-mobility`) existen en el catálogo empaquetado y no figuraban en esa respuesta remota. Por tanto, 70 es la unión revisada, no el número de filas de producción ni una afirmación de que se hayan creado allí nuevos ejercicios.
 
@@ -18,7 +18,7 @@ Se evalúa la variante indicada, no su regresión ni una progresión que trabaje
 
 Estas etiquetas constituyen una **decisión de producto coherente para todo el catálogo**, informada por bibliotecas profesionales, no una equivalencia universal entre proveedores. ACE clasifica la [sentadilla trasera como avanzada](https://www.acefitness.org/resources/everyone/exercise-library/11/back-squat/) y el [peso muerto a una pierna sin equipo como avanzado](https://www.acefitness.org/resources/everyone/exercise-library/329/single-leg-romanian-deadlift/); aquí ambos se ubican en intermedio por sus prerrequisitos de control, reservando avanzado para las variantes de mayor exigencia del catálogo.
 
-## Inventario de fuerza: 42 ejercicios
+## Inventario de fuerza: 43 ejercicios
 
 | Slug | Ejercicio | Nivel revisado | Razón y variante evaluada |
 |---|---|---|---|
@@ -42,6 +42,7 @@ Estas etiquetas constituyen una **decisión de producto coherente para todo el c
 | `push-up` | Flexión de brazos | Intermedio | La flexión completa en el suelo requiere fuerza de empuje y mantener el cuerpo alineado durante todo el recorrido; no se confunde con la inclinada o con rodillas. |
 | `incline-push-up` | Flexión inclinada | Principiante | La pared o un apoyo elevado y estable permiten reducir la carga corporal hasta aprender el empuje y la alineación. |
 | `band-row` | Remo con banda | Principiante | Tirón con pies apoyados y banda de tensión ajustable; no se evalúa el remo invertido suspendido bajo una barra. |
+| `inverted-row` | Remo invertido | Principiante | REQ-293. Rodillas flexionadas y talones apoyados bajo una mesa firme o barra baja: la inclinación del cuerpo regula la carga, como en [Free Exercise DB](https://github.com/yuhonas/free-exercise-db) (beginner). Con piernas estiradas es su progresión. |
 | `glute-bridge` | Puente de glúteo | Principiante | Apoyo bilateral en el suelo y recorrido fácil de ajustar para aprender la extensión de cadera. |
 | `single-leg-glute-bridge` | Puente de glúteo a una pierna | Intermedio | Retirar un apoyo aumenta la demanda unilateral y de control de la pelvis respecto al puente bilateral. |
 | `front-plank` | Plancha frontal | Principiante | Posición estática con base bilateral amplia; se regula la duración y se usa apoyo elevado o rodillas al aprender. No incluye toques ni retirada de apoyos. |
@@ -88,7 +89,7 @@ En natación, **principiante significa principiante del entrenamiento, con capac
 
 ## Inventario complementario de producción: 16 ejercicios
 
-Se aplicó el mismo criterio a la posición inicial, los pasos, las regresiones y la identidad del recurso multimedia declarados en cada ficha remota. Un slug que incluya `scaled` o una etiqueta remota antigua de principiante no sustituye la revisión de la ejecución descrita. Este inventario complementa los 54 ejercicios empaquetados sin duplicar en el código sus fichas completas ni alterar su contenido remoto.
+Se aplicó el mismo criterio a la posición inicial, los pasos, las regresiones y la identidad del recurso multimedia declarados en cada ficha remota. Un slug que incluya `scaled` o una etiqueta remota antigua de principiante no sustituye la revisión de la ejecución descrita. Este inventario complementa los 55 ejercicios empaquetados sin duplicar en el código sus fichas completas ni alterar su contenido remoto.
 
 | Slug | Ejercicio | Nivel revisado | Razón y variante remota evaluada |
 |---|---|---|---|
@@ -121,7 +122,7 @@ Las demostraciones exactas se curan como recursos locales de `assets/exercise-me
 
 ## Aplicación y continuidad
 
-Los niveles canónicos revisados del catálogo local y su registro complementario de niveles prevalecen para los **70 slugs conocidos** frente a valores antiguos recuperados de la base de datos. Los demás ejercicios personalizados conservan su clasificación explícita. Esto evita que una respuesta remota desactualizada vuelva a presentar una pike, una búlgara, una bisagra unilateral o las variantes complementarias revisadas con un nivel incorrecto.
+Los niveles canónicos revisados del catálogo local y su registro complementario de niveles prevalecen para los **71 slugs conocidos** frente a valores antiguos recuperados de la base de datos. Los demás ejercicios personalizados conservan su clasificación explícita. Esto evita que una respuesta remota desactualizada vuelva a presentar una pike, una búlgara, una bisagra unilateral o las variantes complementarias revisadas con un nivel incorrecto.
 
 Regresiones, progresiones y sustituciones conservan sus identidades: al cambiar de ejercicio se consulta el nivel del destino; una variación de carga no modifica por sí sola el nivel técnico. Una etiqueta compartida no indica que dos ejercicios tengan exactamente la misma dificultad dentro de ese nivel.
 

@@ -178,7 +178,8 @@
     ["tempo-squat","Sentadilla tempo",["sentadilla corporal"],"bodyweight","squat",[],["home","outdoor","gym"],["cuádriceps","glúteos"],"Sentarse y levantarse de una silla","Sentadilla con pausa",["back-squat","step-up"],"beginner"],
     ["push-up","Flexión de brazos",["flexiones"],"bodyweight","push",[],["home","outdoor","gym"],["pecho","tríceps"],"Flexión inclinada","Flexión con pausa",["incline-push-up","bench-press"],"intermediate"],
     ["incline-push-up","Flexión inclinada",["flexión elevada"],"bodyweight","push",["bench_or_wall"],["home","outdoor","gym"],["pecho","tríceps"],"Flexión contra pared","Flexión en el suelo",["push-up","assisted-dip"],"beginner"],
-    ["band-row","Remo con banda",["remo con banda elástica"],"bodyweight","pull",["resistance_band"],["home","outdoor","gym"],["espalda","bíceps"],"Remo con menor tensión","Remo invertido",["seated-cable-row","assisted-pull-up"],"beginner"],
+    ["band-row","Remo con banda",["remo con banda elástica"],"bodyweight","pull",["resistance_band"],["home","outdoor","gym"],["espalda","bíceps"],"Remo con menor tensión","Remo invertido",["inverted-row","seated-cable-row","assisted-pull-up"],"beginner"],
+    ["inverted-row","Remo invertido",["remo bajo la mesa","remo australiano"],"bodyweight","pull",["table_or_low_bar"],["home","outdoor","gym"],["espalda","bíceps"],"Remo invertido más vertical","Remo invertido con piernas estiradas",["band-row","seated-cable-row"],"beginner"],
     ["glute-bridge","Puente de glúteo",["puente"],"bodyweight","bridge",[],["home","gym"],["glúteos","isquiotibiales"],"Puente con rango corto","Puente a una pierna",["barbell-hip-thrust","single-leg-glute-bridge"],"beginner"],
     ["single-leg-glute-bridge","Puente de glúteo a una pierna",["puente unilateral"],"bodyweight","bridge",[],["home","gym"],["glúteos","isquiotibiales"],"Puente bilateral","Puente unilateral con pausa",["glute-bridge","barbell-hip-thrust"],"intermediate"],
     ["front-plank","Plancha frontal",["plancha"],"bodyweight","core",[],["home","gym"],["core"],"Plancha elevada","Plancha con mayor duración",["dead-bug","side-plank"],"beginner"],
@@ -258,6 +259,24 @@
     Object.assign(ex,media);
     reviewedMedia.set(ex.slug,media);
   });
+  // REQ-293: remo de espalda sin material para casa, con foto real del
+  // movimiento (la barra de la foto es el borde de la mesa en casa).
+  const PHOTO_DEMOS={
+    "inverted-row":["assets/exercise-media/inverted-row-0.jpg","assets/exercise-media/inverted-row-1.jpg"],
+  };
+  strength.forEach(ex=>{
+    const frames=PHOTO_DEMOS[ex.slug];
+    if(!frames)return;
+    const media={...FREE_EXERCISE_DB,media_type:"image_sequence",media_url:"",poster_url:frames[0],frames};
+    Object.assign(ex,media);
+    reviewedMedia.set(ex.slug,media);
+  });
+  Object.assign(strength.find(ex=>ex.slug==="inverted-row"),{
+    start_position:"Túmbate boca arriba bajo una mesa firme (o una barra baja) y agarra el borde con las manos al ancho de hombros, rodillas flexionadas y talones en el suelo.",
+    steps:["Aprieta glúteos y abdomen para que hombros, cadera y rodillas queden en línea.","Lleva el pecho hacia el borde juntando las escápulas, con los codos cerca del cuerpo.","Baja con control hasta estirar los brazos, sin dejar caer la cadera."],
+    common_errors:["Dejar caer la cadera","Adelantar el cuello hacia el borde","Usar una mesa ligera o con patas plegables"],
+    safety_signals:["La mesa se mueve, cruje o se inclina","Dolor agudo de hombro o codo","Hormigueo en brazo o mano"],
+  });
   const pike=strength.find(ex=>ex.slug==="pike-push-up");
   Object.assign(pike,{
     start_position:"Manos al ancho de hombros, pies apoyados en el suelo y cadera elevada formando una V invertida.",
@@ -331,7 +350,8 @@
     "tempo-squat":{regression:variant("Sentarse y levantarse de una silla"),progression:variant("Sentadilla con pausa abajo")},
     "push-up":{regression:toEx("incline-push-up","Flexión inclinada"),progression:toEx("decline-push-up","Flexión con pies elevados")},
     "incline-push-up":{regression:variant("Flexión contra la pared"),progression:toEx("push-up","Flexión de brazos")},
-    "band-row":{regression:load("Usa una banda más suave"),progression:variant("Remo invertido")},
+    "band-row":{regression:load("Usa una banda más suave"),progression:toEx("inverted-row","Remo invertido")},
+    "inverted-row":{regression:variant("Remo invertido más vertical"),progression:variant("Remo invertido con piernas estiradas")},
     "glute-bridge":{regression:variant("Puente de glúteo con rango corto"),progression:toEx("single-leg-glute-bridge","Puente de glúteo a una pierna")},
     "single-leg-glute-bridge":{regression:toEx("glute-bridge","Puente de glúteo"),progression:variant("Puente a una pierna con pausa arriba")},
     "front-plank":{regression:variant("Plancha con rodillas apoyadas"),progression:toEx("shoulder-tap-plank","Plancha con toque de hombro")},
@@ -374,7 +394,7 @@
     "lateral-raise":"Deltoides lateral",
     "face-pull":"Deltoides posterior",
     "lat-pulldown":"Dorsal ancho","pull-up":"Dorsal ancho","assisted-pull-up":"Dorsal ancho","weighted-pull-up":"Dorsal ancho",
-    "seated-cable-row":"Espalda media","band-row":"Espalda media",
+    "seated-cable-row":"Espalda media","band-row":"Espalda media","inverted-row":"Espalda media",
     "biceps-curl":"Bíceps","hammer-curl":"Bíceps",
     "front-plank":"Core","side-plank":"Core","dead-bug":"Core","shoulder-tap-plank":"Core",
   };
@@ -439,17 +459,17 @@
       legsB:["barbell-hip-thrust","bulgarian-split-squat","leg-press","leg-curl","standing-calf-raise"],
     },
     bodyweight:{
-      fullA:["tempo-squat","push-up","band-row","glute-bridge","front-plank"],
-      fullB:["bulgarian-split-squat","pike-push-up","band-row","single-leg-rdl","side-plank"],
-      torsoA:["push-up","band-row","pike-push-up","assisted-pull-up"],
+      fullA:["tempo-squat","push-up","inverted-row","glute-bridge","front-plank"],
+      fullB:["bulgarian-split-squat","pike-push-up","inverted-row","single-leg-rdl","side-plank"],
+      torsoA:["push-up","inverted-row","pike-push-up","assisted-pull-up"],
       piernaA:["tempo-squat","walking-lunge","single-leg-glute-bridge","standing-calf-raise"],
-      torsoB:["incline-push-up","band-row","assisted-dip","shoulder-tap-plank"],
+      torsoB:["incline-push-up","inverted-row","assisted-dip","shoulder-tap-plank"],
       piernaB:["bulgarian-split-squat","single-leg-rdl","step-up","slider-leg-curl","dead-bug"],
       pushA:["push-up","pike-push-up","diamond-push-up","assisted-dip"],
-      pullA:["pull-up","band-row","assisted-pull-up"],
+      pullA:["pull-up","inverted-row","assisted-pull-up"],
       legsA:["tempo-squat","bulgarian-split-squat","single-leg-rdl","standing-calf-raise"],
       pushB:["decline-push-up","push-up","pike-push-up","assisted-dip"],
-      pullB:["pull-up","band-row","assisted-pull-up"],
+      pullB:["pull-up","inverted-row","assisted-pull-up"],
       legsB:["walking-lunge","glute-bridge","slider-leg-curl","step-up"],
     },
     walking:{calidad:["walk-brisk"],facil:["walk-easy"],tecnica:["walk-mobility"]},
