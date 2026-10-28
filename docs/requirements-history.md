@@ -11713,3 +11713,7 @@ Con perfil de gimnasio, Entreno → "Adaptar hoy" → "En casa" (y "Sin equipo")
 - Perfil de gimnasio: mañana → "En casa" → Casa muestra "Peso corporal · <misma sesión>", todos los ejercicios se pueden hacer en casa, pasado mañana y el perfil siguen en gimnasio, el día se sincroniza con `trainingPlace:"home"` y "Volver al gimnasio" lo deshace. ✓ (`tests/e2e/lugar-del-dia.spec.js`, capturas 390 px revisadas)
 - Hoy en casa: la sesión guiada prescribe esos ejercicios y el cambio sobrevive a recargar; `adaptar_entreno` con `equipo` abre la hoja. ✓ (`tests/e2e/lugar-del-dia.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
+
+### Seguimiento (2026-10-28)
+
+Jonathan, captura de un día de carrera ("Correr · fondo fácil"): el botón de lugar solo sale en sesiones de fuerza. Si eliges una de gimnasio con "Cambiar entrenamiento" en un día de deporte, el lugar se toma del perfil (`plannedStrengthPlace()`) y no del exterior del día: dice "Lugar: Gimnasio" y ofrece "En casa". "Cambiar entrenamiento" agrupa la fuerza por tipo de sesión, así que con perfil o día en casa ya lista las sesiones de peso corporal (antes el grupo "Casa o aire libre" quedaba vacío). `CACHE_NAME` → `fitbud-pwa-v163`. ✓ `tests/e2e/lugar-del-dia.spec.js`.
