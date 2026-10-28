@@ -172,7 +172,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes("/profiles?id=")) return json([state.profile]);
   if (u.includes("/profiles?select=id")) return json([{ id: "u1" }]);
   if (u.includes("/day_log?")) return json(state.rows);
-  if (u.includes("/push_subscriptions?")) return json([{ endpoint: "https://push.example/1", keys_p256dh: "k", keys_auth: "a" }]);
+  if (u.includes("/push_subscriptions?")) return json(state.subs ?? [{ endpoint: "https://push.example/1", keys_p256dh: "k", keys_auth: "a" }]);
   if (u.includes("/notification_log")) {
     if (method === "POST") {
       const row = JSON.parse(init.body);
@@ -188,16 +188,16 @@ globalThis.fetch = async (url, init = {}) => {
   throw new Error("fetch inesperado: " + u);
 };
 
-async function run({ hour, notifyHour = hour, rows, engagement, log = [], checkTypes = null, emailOptIn = true }) {
+async function run({ hour, notifyHour = hour, rows, engagement, log = [], checkTypes = null, emailOptIn = true, pushOptIn = true, subs, planDaysAgo = 30 }) {
   const tz = tzAt(hour);
   assert.ok(tz, `sin zona a las ${hour}`);
   const today = localToday(tz);
   pushes.length = 0;
   state = {
-    emails: [], inserted: [], upserts: [], log: log.map((k) => ({ id: 9, status: "sent", idempotency_key: k.replace("{today}", today) })), checkTypes,
+    emails: [], inserted: [], upserts: [], subs, log: log.map((k) => ({ id: 9, status: "sent", idempotency_key: k.replace("{today}", today).replace("{plan}", addDaysYmd(today, -planDaysAgo)) })), checkTypes,
     rows: rows(today),
-    pref: { user_id: "u1", timezone: tz, notify_hour: notifyHour, enabled_days: [0, 1, 2, 3, 4, 5, 6], notify_nutrition: true, notify_training: true, unsubscribe_token: "tok_0123456789", email_opt_in: emailOptIn, push_opt_in: true, engagement: engagement ? engagement(today) : null },
-    profile: { email: "ana@example.com", active: true, goal: "deficit", planStartDate: addDaysYmd(today, -30), planEndDate: addDaysYmd(today, 39), planDurationWeeks: "10" },
+    pref: { user_id: "u1", timezone: tz, notify_hour: notifyHour, enabled_days: [0, 1, 2, 3, 4, 5, 6], notify_nutrition: true, notify_training: true, unsubscribe_token: "tok_0123456789", email_opt_in: emailOptIn, push_opt_in: pushOptIn, engagement: engagement ? engagement(today) : null },
+    profile: { email: "ana@example.com", active: true, goal: "deficit", planStartDate: addDaysYmd(today, -planDaysAgo), planEndDate: addDaysYmd(today, 70 - planDaysAgo - 1), planDurationWeeks: "10" },
   };
   const res = { code: 0, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, send(b) { this.body = b; return this; }, setHeader() {} };
   await mod.default({ method: "GET", url: "/api/notify", headers: { authorization: "Bearer secret" } }, res);
@@ -322,7 +322,7 @@ const followup = async ({ people, rows, log = [], prefUser = null }) => {
   const today = localToday(tz);
   pushes.length = 0;
   state = {
-    emails: [], inserted: [], upserts: [], rows: rows(today), people: people(today, tz),
+    emails: [], inserted: [], upserts: [], subs: [], rows: rows(today), people: people(today, tz),
     log: log.map((k) => ({ id: 9, status: "sent", idempotency_key: k(today) })), pref: prefUser ? { user_id: prefUser } : null,
   };
   const res = { code: 0, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, send(b) { this.body = b; return this; }, setHeader() {} };
@@ -362,5 +362,39 @@ assert.deepEqual(state.upserts.map((x) => [x.user_id, x.email_opt_in]), [[UID, f
 res = await unsub(token.slice(0, -1) + (token.endsWith("A") ? "B" : "A"));
 assert.equal(state.upserts.length, 0, "token alterado: no da de baja a nadie");
 console.log("  baja firmada: crea la preferencia con el correo apagado; token alterado no vale");
+
+// ── REQ-297: invitación a activar el push a la semana ──────────────────────
+const { pushInvite } = mod;
+assert.equal(pushInvite(T, D(-7)).step, "push_invite_7");
+assert.equal(pushInvite(T, D(-13)).ref, D(-13));
+assert.equal(pushInvite(T, D(-6)), null, "antes de la semana, no");
+assert.equal(pushInvite(T, D(-14)), null, "pasada la ventana, no");
+assert.equal(pushInvite(T, null), null, "sin plan (perfil sin terminar), no");
+m = reminderMessage(pushInvite(T, D(-8)));
+assert.equal(m.title, "Activa los avisos en tu teléfono");
+assert.equal(m.cta, "Activar avisos");
+assert.doesNotMatch(`${m.title} ${m.body} ${m.paragraphs.join(" ")}`, BANNED);
+const allDone = (today) => [{ log_date: addDaysYmd(today, -1), meals: { a: { done: true } }, workoutDone: true }, { log_date: today, meals: { a: { done: true } }, workoutDone: true }];
+r = await run({ hour: 20, rows: allDone, engagement: null, pushOptIn: false, subs: [], planDaysAgo: 8 });
+assert.equal(state.emails.length, 1, "sin otro correo hoy y sin push: invitación");
+assert.equal(state.emails[0].subject, "Activa los avisos en tu teléfono");
+assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [["comeback", `u1:push_invite_7:${addDaysYmd(r.today, -8)}`]]);
+r = await run({ hour: 20, rows: allDone, engagement: null, pushOptIn: false, subs: [{ endpoint: "https://push.example/1" }], planDaysAgo: 8 });
+assert.equal(state.emails.length, 0, "con una suscripción push, no");
+r = await run({ hour: 20, rows: allDone, engagement: null, pushOptIn: true, subs: [], planDaysAgo: 8 });
+assert.equal(state.emails.length, 0, "con el push activado en preferencias, no");
+r = await run({ hour: 20, rows: allDone, engagement: null, pushOptIn: false, subs: [], planDaysAgo: 8, emailOptIn: false });
+assert.equal(state.emails.length, 0, "con el correo apagado, no");
+r = await run({ hour: 20, rows: allDone, engagement: null, pushOptIn: false, subs: [], planDaysAgo: 9, log: ["u1:push_invite_7:{plan}"] });
+assert.equal(state.emails.length, 0, "una sola vez por plan");
+r = await run({ hour: 20, rows: (today) => [{ log_date: addDaysYmd(today, -1), meals: { a: { done: true } }, workoutDone: true }, { log_date: today, meals: { a: { done: false } }, workoutDone: true }], engagement: null, pushOptIn: false, subs: [], planDaysAgo: 8 });
+assert.equal(state.emails.length, 1, "un correo por día: si hoy toca el aviso del día, la invitación espera");
+assert.notEqual(state.emails[0].subject, "Activa los avisos en tu teléfono");
+const weekOld = (today, tz) => [{ id: UID, email: "beto@example.com", created_at: `${addDaysYmd(today, -9)}T15:00:00Z`, timeZone: tz, planStartDate: addDaysYmd(today, -8) }];
+r = await followup({ people: weekOld, rows: allDone });
+assert.equal(state.emails.length, 1, "también a quien nunca eligió sus avisos");
+assert.equal(state.emails[0].subject, "Activa los avisos en tu teléfono");
+assert.match(state.emails[0].html, /No recibir más estos correos/);
+console.log("  REQ-297: invitación a activar el push a la semana, una vez, sin pisar otro correo");
 
 console.log("validate-reminder-journey: OK");

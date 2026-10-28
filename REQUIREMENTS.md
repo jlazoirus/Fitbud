@@ -2097,3 +2097,9 @@ Quien registra pero lleva 4+ días sin entrenar (2+ días que tocaba, descansos 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Sin fila en `notification_preferences`: correo de regreso/volver a entrenar a las 20:00 (`runFollowups`); sin perfil terminado, 3 correos desde el alta. Baja firmada. ✓ `scripts/validate-reminder-journey.mjs`.
+
+## REQ-297 - Recordatorios: invitar a activar el push a la semana
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+A los 7–13 días del plan, sin push, un día sin otro correo: "Activa los avisos en tu teléfono", una vez (`pushInvite()`). El onboarding ya los pide (REQ-289). ✓ `scripts/validate-reminder-journey.mjs`.
