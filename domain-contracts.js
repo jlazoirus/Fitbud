@@ -77,6 +77,7 @@
     if(!Array.isArray(state.extras))errors.push("extras debe ser un array.");
     if(state.contingencyLog!==undefined&&!Array.isArray(state.contingencyLog))errors.push("contingencyLog debe ser un array.");
     if(state.manualActivities!==undefined&&!Array.isArray(state.manualActivities))errors.push("manualActivities debe ser un array.");
+    if(state.trainingPlace!==undefined&&!["gym","home","outdoor"].includes(state.trainingPlace))errors.push("trainingPlace debe ser gym, home u outdoor.");
     return ok(errors);
   }
 
