@@ -149,6 +149,9 @@ const FOLLOWUP_HOUR = 20;
 const FOLLOWUP_DEFAULT_TZ = "America/Lima";
 // Sin plan ni registros (no terminó el perfil): tres correos y silencio.
 const NO_PLAN_STEPS = new Set(["comeback_2", "comeback_7", "comeback_30"]);
+// REQ-297: invitación a activar el push a la semana del plan si nunca lo hizo.
+// Ventana 7–13 días: sale el primer día de esa semana sin otro correo.
+const PUSH_INVITE = { step: "push_invite_7", from: 7, to: 13 };
 const LAST_CALL_MIN_STREAK = 3;
 const LAST_CALL_LATEST_HOUR = 22;
 // Cada etapa de regreso es una ventana: sale una vez por ausencia, el primer
@@ -354,6 +357,14 @@ function weekLine(d) {
  * Texto de una decisión. `title`/`body` son el push; `subject` y `paragraphs`
  * el correo. `url` abre el día correcto y deja la etapa para medir aperturas.
  */
+// REQ-297: días desde el inicio del plan (el onboarding terminado) dentro de
+// la ventana de la invitación a activar el push.
+export function pushInvite(today, planStart) {
+  if (!isYmd(today) || !isYmd(planStart) || planStart > today) return null;
+  const days = daysBetweenYmd(planStart, today);
+  return days >= PUSH_INVITE.from && days <= PUSH_INVITE.to ? { step: PUSH_INVITE.step, ref: planStart, progress: {} } : null;
+}
+
 export function reminderMessage(d, kind) {
   const p = d.progress || {};
   const days = (n) => plural(n, "día", "días");
@@ -399,6 +410,17 @@ export function reminderMessage(d, kind) {
     paragraphs = [body, "Los descansos planificados no cuentan: solo miramos los días en que te tocaba entrenar."];
     cta = "Ver mi entreno de hoy";
     url = `/?date=${d.date}&r=${d.step}`;
+  } else if (d.step === PUSH_INVITE.step) {
+    title = "Activa los avisos en tu teléfono";
+    body = "Te avisamos a tiempo de tus comidas y tu entreno, sin depender del correo.";
+    subject = title;
+    paragraphs = [
+      body,
+      "En iPhone: abre Evolv en Safari, toca Compartir → «Añadir a pantalla de inicio» y entra desde el ícono. En Android: abre Evolv y toca «Activar avisos».",
+      "Tarda un minuto y puedes desactivarlos cuando quieras.",
+    ];
+    cta = "Activar avisos";
+    url = `/?r=${PUSH_INVITE.step}`;
   } else if (d.noPlan) {
     // REQ-296: no terminó el perfil; no hay plan todavía.
     const byStep = {
@@ -710,7 +732,13 @@ async function runJob(e, dryRun) {
       planStart: p.planStartDate, planEnd: p.planEndDate, planWeeks: Number(p.planDurationWeeks) || null,
       goal: p.goal, wantNutrition: pref.notify_nutrition !== false, wantTraining: pref.notify_training !== false,
     });
-    if (!decision) continue;
+    if (!decision) {
+      // REQ-297: un día sin otro correo, invitar a activar el push si nunca lo hizo.
+      if (wantEmail && !pref.push_opt_in && p.email) {
+        await maybePushInvite(e, dryRun, results, { userId: user_id, email: p.email, today, planStart: p.planStartDate, unsubToken: unsubscribe_token });
+      }
+      continue;
+    }
     results.processed++;
 
     const msg = reminderMessage(decision);
@@ -754,6 +782,21 @@ async function runJob(e, dryRun) {
   return results;
 }
 
+// REQ-297: una vez, por correo, a quien lleva una semana de plan sin push. Si
+// no se puede saber si tiene suscripción, no se envía.
+async function maybePushInvite(e, dryRun, results, { userId, email, today, planStart, unsubToken, followup = false }) {
+  const invite = pushInvite(today, planStart);
+  if (!invite) return;
+  const subs = await supaGet(e, `/rest/v1/push_subscriptions?user_id=eq.${userId}&select=endpoint&limit=1`).catch(() => null);
+  if (!subs || subs.length) return;
+  results.processed++;
+  const msg = reminderMessage(invite);
+  await deliver(e, dryRun, results, results, {
+    userId, type: "comeback", keys: [`${userId}:${invite.step}:${invite.ref}`], refDate: invite.ref, step: invite.step,
+    send: async () => ({ emailId: await sendEmail(e, email, msg.subject, buildEmailHtml(e, msg, unsubToken, { followup })) }),
+  });
+}
+
 // REQ-296: correos de seguimiento para quien nunca eligió sus avisos (sin fila
 // en notification_preferences): activación, regreso y volver a entrenar. Nunca
 // el aviso del día ni push (el push exige permiso del dispositivo). Guardar las
@@ -791,7 +834,10 @@ async function runFollowups(e, dryRun, results) {
       planStart: p.planStartDate, planEnd: p.planEndDate, planWeeks: Number(p.planDurationWeeks) || null,
       goal: p.goal, accountCreated: created, followupOnly: true,
     });
-    if (!decision) continue;
+    if (!decision) {
+      await maybePushInvite(e, dryRun, results, { userId: p.id, email: p.email, today, planStart: p.planStartDate, unsubToken: followupUnsubToken(e, p.id), followup: true });
+      continue;
+    }
     results.processed++;
     const msg = reminderMessage(decision);
     await deliver(e, dryRun, results, results, {

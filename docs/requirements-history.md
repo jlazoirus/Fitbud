@@ -11922,3 +11922,22 @@ Jonathan (2026-10-28), sobre los avisos proactivos para quien nunca usó la app 
 
 - Sin plan: correo a los 2, 7 y 30 días del alta, nada a los 1 o 5. Sin preferencias: sin aviso del día ni rescate, con regreso y volver a entrenar. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
 - Handler: un correo sin push, con la baja firmada; no repite la etapa; quien tiene fila no recibe seguimiento. La baja firmada crea la fila con el correo apagado y un token alterado no hace nada. ✓ mismo script.
+
+## REQ-297 - Recordatorios: invitar a activar el push a la semana
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28): "se debe incluir en el journey un aviso para que activen las push en el onboarding y luego al día 7 si es que no activaron nunca". El onboarding ya lo pide (REQ-289: pantalla "Tu semana está lista" y tarjeta en Hoy). Faltaba el recordatorio fuera de la app a la semana.
+
+### Alcance
+
+1. `pushInvite(today, planStart)` (`api/notify.js`): ventana de 7 a 13 días desde el inicio del plan (onboarding terminado). Sin plan no aplica (para eso están los correos de REQ-296).
+2. Se evalúa solo cuando el journey no tiene otro mensaje ese día (un correo por día), para quien tiene el correo activado sin `push_opt_in` (`runJob`) y para quien nunca eligió (`runFollowups`, con su baja firmada). No se envía si hay alguna fila en `push_subscriptions`, ni si no se pudo consultar.
+3. Correo "Activa los avisos en tu teléfono", con los pasos de iPhone (Safari → Añadir a pantalla de inicio) y Android, y CTA a `/?r=push_invite_7` (Hoy muestra la tarjeta de avisos de REQ-289).
+4. Tipo `comeback` (sin migración), clave `<usuario>:push_invite_7:<inicio del plan>`: una vez por plan. `docs/reminders-journey.md`: nueva fila.
+
+### Criterios de aceptación
+
+- Ventana de 7 a 13 días; sin plan, no. Con suscripción, con `push_opt_in`, con el correo apagado o ya enviada: no. Si hoy toca otro correo, espera. También llega a quien nunca eligió. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
