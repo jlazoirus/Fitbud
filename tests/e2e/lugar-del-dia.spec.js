@@ -75,7 +75,7 @@ test.describe("Entreno: lugar de un día", () => {
     // Aire libre usa las mismas sesiones de peso corporal que un perfil de aire libre.
     await expect(app.locator(".workout .name").first()).toContainText("Peso corporal ·");
 
-    await page.getByRole("button", { name: "En el gimnasio" }).click();
+    await page.getByRole("button", { name: "Cambiar lugar" }).click();
     await overlay.getByRole("button", { name: /^Casa/ }).click();
     await expect(app.locator(".workout .name").first()).toContainText("Peso corporal ·");
     const today = await page.evaluate(() => todayStr());
