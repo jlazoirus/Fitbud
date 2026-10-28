@@ -11808,3 +11808,70 @@ Con el día sin preparar, la tarjeta de arranque de Nutrición (REQ-100) ocupa c
 ### Verificación
 
 `tests/e2e/nutricion-colapsar.spec.js`; `tests/e2e/nutricion.spec.js` sin cambios en verde.
+
+## REQ-293 - Entreno en casa: nada que pida material no declarado y siempre hay con qué sustituir
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28), con capturas de un día en casa: "me salió este ejercicio que tenía un dibujito con palitos… y luego cuando trataba de sustituir el ejercicio no había con qué sustituirlo".
+
+### Problema
+
+- En casa salió **Remo con banda** aunque el día en casa no declara bandas (`defaultEquipmentForStrengthChoice("home")` = solo peso corporal). La ficha mostraba la clave interna `resistance_band`.
+- "Sustituir ejercicio" respondía "No hay otro ejercicio para espalda media…": las dos únicas fichas de espalda media eran el remo con banda y el remo en polea (solo gimnasio).
+
+### Causa raíz
+
+- `compatibleStrengthExerciseSelection()` filtraba por disciplina, nivel, limitaciones y modo suave, pero no por el material ni el lugar: solo la generación con el coach (`allowedExercisesForSession`) miraba `prefs.equipment`. Las plantillas de peso corporal llevaban `band-row` en Full body, Superior y Pull.
+- El catálogo no tenía un remo de espalda sin material.
+- `openExerciseGuide()`/`exerciseCard()` pintaban `equipment.join(", ")` sin traducir.
+
+### Alcance
+
+1. Ficha nueva `inverted-row` "Remo invertido" (bajo una mesa firme o barra baja; principiante, espalda media), con las dos fotos reales de Free Exercise DB (`Inverted_Row`, dominio público) copiadas en `assets/exercise-media/inverted-row-{0,1}.jpg`. Sustituye a `band-row` en las plantillas de peso corporal; la progresión del remo con banda pasa a ser este ejercicio.
+2. En modo peso corporal (perfil de casa/aire libre o día en otro lugar, REQ-291) la selección solo usa ejercicios de ese lugar con el material declarado (`exerciseFitsHomeSetup`). Gimnasio sin cambios.
+3. "Sustituir ejercicio" sigue ofreciendo lo que pide material no declarado, al final y con "Necesita: banda elástica" (`exerciseMissingEquipment`).
+4. El material se muestra en español (`EXERCISE_EQUIPMENT_LABELS`).
+5. `exerciseCatalog()` añade las fichas empaquetadas que aún no están en la tabla `exercises`, así el remo invertido funciona sin aplicar SQL. Las filas de la tabla siguen mandando.
+6. SQL: fila nueva en `supabase/exercises.sql` y nivel en `supabase/exercise-levels.sql` (aplicación manual opcional, no se ejecutó en producción). `docs/exercise-levels.md` justifica el nivel. `CACHE_NAME` → `fitbud-pwa-v166`.
+
+### Fuera de alcance
+
+- Fotos reales para el resto de ejercicios de casa que siguen con dibujo propio (REQ-264): la librería libre no tiene su variante exacta.
+
+### Criterios de aceptación
+
+- Día en casa sin bandas: ninguna sesión de peso corporal pide material no declarado ni ejercicios de otro lugar; Full body A, Superior A y Pull A incluyen el remo invertido.
+- Sustituir el remo invertido ofrece el remo con banda con "Necesita: banda elástica" y sin el aviso de "no hay otro ejercicio".
+- La ficha del remo invertido muestra la foto y "mesa firme o barra baja", sin claves con guion bajo.
+
+### Verificación
+
+`tests/e2e/entreno-casa.spec.js`; `tests/e2e/entreno.spec.js` (en gimnasio, el remo en polea ahora ofrece también el remo invertido) y `lugar-del-dia.spec.js` en verde; `scripts/validate-exercises.mjs`.
+
+## REQ-294 - Entreno: la zancada muestra su foto real en vez del dibujo
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28), mismo día en casa que REQ-293: el dibujo de palitos "jamás debería pasar".
+
+### Problema y causa raíz
+
+REQ-264 cambió 10 demos de casa por SVG propios porque las fotos anteriores mostraban otra variante. Para `walking-lunge` sí existe la variante exacta en Free Exercise DB (`Bodyweight_Walking_Lunge`: zancada caminando sin carga, manos en la cadera), pero el mapa la marcó `id:null`.
+
+### Alcance
+
+- `walking-lunge` usa las dos fotos (`assets/exercise-media/walking-lunge-{0,1}.jpg`, dominio público) por `PHOTO_DEMOS`; la revisión de contenido también corrige filas remotas con el SVG antiguo. Se retira `walking-lunge.svg`.
+- `scripts/free-exercise-db-map.mjs` apunta a `Bodyweight_Walking_Lunge`; `supabase/exercise-media.sql` actualiza la fila (manual, no aplicado). `CACHE_NAME` → `fitbud-pwa-v167`.
+
+### Fuera de alcance
+
+Siguen con dibujo `band-row`, `bulgarian-split-squat`, `pike-push-up`, `single-leg-rdl`, `standing-calf-raise`, `shoulder-tap-plank`, `step-up`, `slider-leg-curl` y `archer-push-up`: la librería libre no tiene su variante exacta. Necesitan fotos o vídeos propios o una librería con licencia (decisión de Jonathan).
+
+### Verificación
+
+`tests/e2e/entreno-casa.spec.js` (la ficha de la zancada muestra la foto y ningún SVG); `scripts/validate-exercises.mjs`.

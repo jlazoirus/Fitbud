@@ -119,14 +119,14 @@ update exercises set
 where slug = 'overhead-press';
 
 update exercises set
-  media_type   = 'image',
-  frames       = '[]'::jsonb,
-  poster_url   = 'assets/exercise-media/walking-lunge.svg',
-  media_url    = 'assets/exercise-media/walking-lunge.svg',
-  source_name  = 'Evolv Studio',
-  source_url   = '',
-  license_name = 'Contenido propio Evolv',
-  attribution  = 'Evolv Studio',
+  media_type   = 'image_sequence',
+  frames       = '["assets/exercise-media/walking-lunge-0.jpg","assets/exercise-media/walking-lunge-1.jpg"]'::jsonb,
+  poster_url   = 'assets/exercise-media/walking-lunge-0.jpg',
+  media_url    = null,
+  source_name  = 'Free Exercise DB',
+  source_url   = 'https://github.com/yuhonas/free-exercise-db',
+  license_name = 'Public Domain (Unlicense)',
+  attribution  = 'Free Exercise DB (yuhonas) — dominio público',
   updated_at   = now()
 where slug = 'walking-lunge';
 

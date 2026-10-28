@@ -1,4 +1,4 @@
--- REQ-264: niveles revisados del catálogo empaquetado (70 ejercicios: 54 empaquetados y 16 adicionales de producción).
+-- REQ-264: niveles revisados del catálogo empaquetado (71 ejercicios: 55 empaquetados y 16 adicionales de producción; REQ-293 suma inverted-row).
 -- Aplicación manual opcional DESPUÉS de exercises.sql; el cliente ya aplica
 -- la revisión por slug, también con filas antiguas/offline. No toca planes ni logs.
 -- Idempotente: actualiza solo niveles distintos. RLS/políticas de exercises
@@ -30,6 +30,7 @@ from (values
   ('push-up', 'intermediate'),
   ('incline-push-up', 'beginner'),
   ('band-row', 'beginner'),
+  ('inverted-row', 'beginner'),
   ('glute-bridge', 'beginner'),
   ('single-leg-glute-bridge', 'intermediate'),
   ('front-plank', 'beginner'),
