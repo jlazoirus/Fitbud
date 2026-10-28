@@ -80,6 +80,12 @@ Cada registro que mueve el día hacia la racha (marcar una comida, cerrar el ent
 - Al terminar el onboarding, con la semana lista: pantalla "Tu semana está lista. Que no se te pase." con dos pasos, instalar Evolv en el inicio (solo móvil) y activar avisos. En iPhone el push solo existe en la app instalada: primero instalar; al abrirla desde el ícono, Hoy pide activarlos. Si el navegador no permite avisos o están bloqueados, se ofrece el correo.
 - Mientras los avisos no estén activos, Hoy lo recuerda **cada día** con una tarjeta; "Ahora no" la oculta hasta mañana. Medición: `notifications_prompt` (`source`, `action`).
 
+## Seguimiento para quien nunca eligió sus avisos (REQ-296)
+
+- Quien no tiene fila en `notification_preferences` (nunca guardó Recordatorios ni Avisos del dispositivo) recibe **solo por correo** las etapas de regreso y volver a entrenar, a las 20:00 de su zona (por defecto `America/Lima`). Nunca el aviso del día, el rescate ni la última llamada, y nunca push (exige permiso del dispositivo).
+- Quien no terminó el perfil (sin plan ni registros) cuenta desde el alta de la cuenta y recibe tres correos propios: 2 días ("Tu plan está a dos minutos"), 7 y 30; después, silencio.
+- La baja de esos correos es un enlace firmado con `CRON_SECRET` (`u-<id>-<firma>`): crea la fila de preferencias con el correo apagado. Guardar la sección Recordatorios en Perfil también crea la fila: desde ahí manda lo elegido.
+
 ## Preferencias
 
 En Perfil → Recordatorios y Avisos del dispositivo, el texto explica lo que llega: el aviso del día, la última llamada si la racha es de 3+ días y los mensajes de regreso con su final. La baja de un clic del correo y desactivar el aviso del dispositivo cortan todo el journey de ese canal.

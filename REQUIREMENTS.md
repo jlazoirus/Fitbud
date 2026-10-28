@@ -2091,3 +2091,9 @@ Jonathan: `day_log.state.trainingPlace` lleva la sesión del día a otro lugar. 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Quien registra pero lleva 4+ días sin entrenar (2+ días que tocaba, descansos aparte) recibe "¿Retomamos el entreno?" por correo y push, una vez a los 4 y otra a los 11 días (`trainingLapse()`). ✓ `scripts/validate-reminder-journey.mjs`.
+
+## REQ-296 - Recordatorios: seguimiento por correo para quien nunca eligió sus avisos
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Sin fila en `notification_preferences`: correo de regreso/volver a entrenar a las 20:00 (`runFollowups`); sin perfil terminado, 3 correos desde el alta. Baja firmada. ✓ `scripts/validate-reminder-journey.mjs`.
