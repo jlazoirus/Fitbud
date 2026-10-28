@@ -247,7 +247,7 @@
   const CURATED_DEMO_SLUGS=new Set([
     "pike-push-up","band-row","shoulder-tap-plank","archer-push-up",
     "slider-leg-curl","single-leg-rdl","step-up","standing-calf-raise",
-    "bulgarian-split-squat","walking-lunge",
+    "bulgarian-split-squat",
   ]);
   const reviewedMedia=new Map();
   strength.forEach(ex=>{
@@ -261,8 +261,10 @@
   });
   // REQ-293: remo de espalda sin material para casa, con foto real del
   // movimiento (la barra de la foto es el borde de la mesa en casa).
+  // REQ-294: la zancada sin carga también tiene foto exacta; deja el dibujo.
   const PHOTO_DEMOS={
     "inverted-row":["assets/exercise-media/inverted-row-0.jpg","assets/exercise-media/inverted-row-1.jpg"],
+    "walking-lunge":["assets/exercise-media/walking-lunge-0.jpg","assets/exercise-media/walking-lunge-1.jpg"],
   };
   strength.forEach(ex=>{
     const frames=PHOTO_DEMOS[ex.slug];

@@ -31,7 +31,7 @@ export default {
   "lat-pulldown":            { q: "wide grip lat pulldown", id: "Wide-Grip_Lat_Pulldown" },
   "bulgarian-split-squat":   { q: "bodyweight rear foot elevated split squat", id: null, curated_svg: "assets/exercise-media/bulgarian-split-squat.svg" }, // Pie posterior elevado, sin mancuernas.
   "overhead-press":          { q: "standing military press shoulder", id: "Standing_Military_Press" },
-  "walking-lunge":           { q: "bodyweight walking lunge", id: null, curated_svg: "assets/exercise-media/walking-lunge.svg" }, // Zancada caminando sin mancuernas.
+  "walking-lunge":           { q: "bodyweight walking lunge", id: "Bodyweight_Walking_Lunge" }, // REQ-294: zancada caminando sin mancuernas, variante exacta.
   "standing-calf-raise":     { q: "bodyweight standing calf raise", id: null, curated_svg: "assets/exercise-media/standing-calf-raise.svg" }, // Variante sin máquina ni carga.
   "assisted-dip":            { q: "bench dips triceps", id: "Bench_Dips" },
   "biceps-curl":             { q: "dumbbell bicep curl", id: "Dumbbell_Bicep_Curl" },

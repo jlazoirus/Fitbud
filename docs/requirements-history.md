@@ -11850,3 +11850,28 @@ Jonathan (2026-10-28), con capturas de un día en casa: "me salió este ejercici
 ### Verificación
 
 `tests/e2e/entreno-casa.spec.js`; `tests/e2e/entreno.spec.js` (en gimnasio, el remo en polea ahora ofrece también el remo invertido) y `lugar-del-dia.spec.js` en verde; `scripts/validate-exercises.mjs`.
+
+## REQ-294 - Entreno: la zancada muestra su foto real en vez del dibujo
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28), mismo día en casa que REQ-293: el dibujo de palitos "jamás debería pasar".
+
+### Problema y causa raíz
+
+REQ-264 cambió 10 demos de casa por SVG propios porque las fotos anteriores mostraban otra variante. Para `walking-lunge` sí existe la variante exacta en Free Exercise DB (`Bodyweight_Walking_Lunge`: zancada caminando sin carga, manos en la cadera), pero el mapa la marcó `id:null`.
+
+### Alcance
+
+- `walking-lunge` usa las dos fotos (`assets/exercise-media/walking-lunge-{0,1}.jpg`, dominio público) por `PHOTO_DEMOS`; la revisión de contenido también corrige filas remotas con el SVG antiguo. Se retira `walking-lunge.svg`.
+- `scripts/free-exercise-db-map.mjs` apunta a `Bodyweight_Walking_Lunge`; `supabase/exercise-media.sql` actualiza la fila (manual, no aplicado). `CACHE_NAME` → `fitbud-pwa-v167`.
+
+### Fuera de alcance
+
+Siguen con dibujo `band-row`, `bulgarian-split-squat`, `pike-push-up`, `single-leg-rdl`, `standing-calf-raise`, `shoulder-tap-plank`, `step-up`, `slider-leg-curl` y `archer-push-up`: la librería libre no tiene su variante exacta. Necesitan fotos o vídeos propios o una librería con licencia (decisión de Jonathan).
+
+### Verificación
+
+`tests/e2e/entreno-casa.spec.js` (la ficha de la zancada muestra la foto y ningún SVG); `scripts/validate-exercises.mjs`.

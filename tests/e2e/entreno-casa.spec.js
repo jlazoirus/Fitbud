@@ -47,6 +47,11 @@ test("en casa sin bandas: remo invertido, sustitutos con el material que piden y
   await expect(overlay.locator(".exercise-meta")).toContainText("mesa firme o barra baja");
   await expect(overlay.locator(".exercise-meta")).not.toContainText("_");
   await page.evaluate(() => closeModal());
+  // REQ-294: la zancada también enseña su foto real en vez del dibujo.
+  await page.evaluate(() => openExerciseGuide("walking-lunge"));
+  await expect(overlay.locator(".guide-demo img").first()).toHaveAttribute("src", /walking-lunge-0\.jpg$/);
+  await expect(overlay.locator(".guide-demo svg")).toHaveCount(0);
+  await page.evaluate(() => closeModal());
 
   // Sustituir el remo invertido ofrece el remo con banda avisando que necesita banda.
   await startGuidedSession(page);
