@@ -90,15 +90,22 @@ insert into subscription_plans
   (id, name, price_usd, duration_days, auto_renew, active, badge, description, features, catalog_version)
 values
   ('monthly',
-   'Plan mensual', 14.00, 30, false, true, null,
+   'Plan mensual', 7.99, 30, false, true, null,
    'Acceso completo. Sin permanencia. Sin renovación automática — pagas solo el período.',
    '["Plan de nutrición personalizado","Rutinas de entrenamiento guiadas","Seguimiento de progreso","Adaptaciones y contingencias","Rachas e hitos de constancia","Recordatorios opcionales"]'::jsonb,
-   '2026-07-03'),
+   '2026-10-27'),
+  -- Precios de lanzamiento (2026-10-27): quarterly deja de venderse (active=false) pero
+  -- se conserva para las cortesías beta de 90 días y los entitlements históricos.
   ('quarterly',
-   'Paquete 3 meses', 36.00, 90, false, true, 'Mejor valor',
+   'Paquete 3 meses', 36.00, 90, false, false, null,
    'Ahorra un 15 % respecto al plan mensual. Ideal para un ciclo completo.',
    '["Todo lo del plan mensual","Ahorro del 15 %","Acceso a ciclos de 10 semanas","Recap detallado al cerrar ciclo","Fotos de progreso privadas","Prioridad en nuevas funciones"]'::jsonb,
-   '2026-07-03')
+   '2026-10-27'),
+  ('semiannual',
+   'Paquete 6 meses', 39.90, 180, false, true, 'Mejor valor',
+   'Ahorra un 17 % respecto al plan mensual (USD 6.65 al mes). Ideal para dos ciclos completos.',
+   '["Todo lo del plan mensual","Ahorro del 17 %","Acceso a ciclos de 10 semanas","Recap detallado al cerrar ciclo","Fotos de progreso privadas","Prioridad en nuevas funciones"]'::jsonb,
+   '2026-10-27')
 on conflict (id) do update set
   name            = excluded.name,
   price_usd       = excluded.price_usd,

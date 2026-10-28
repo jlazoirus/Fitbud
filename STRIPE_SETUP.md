@@ -17,8 +17,10 @@ https://dashboard.stripe.com/register — el modo **Test** (sandbox) es gratuito
 
 | Plan | Monto | Tipo | Variable Vercel |
 |------|-------|------|-----------------|
-| Plan mensual | USD 14.00 | One-time | `STRIPE_PRICE_MONTHLY` |
-| Paquete 3 meses | USD 36.00 | One-time | `STRIPE_PRICE_QUARTERLY` |
+| Plan mensual | USD 7.99 | One-time | `STRIPE_PRICE_MONTHLY` |
+| Paquete 6 meses | USD 39.90 | One-time | `STRIPE_PRICE_SEMIANNUAL` |
+
+> Precios de lanzamiento (2026-10-27). Los precios de Stripe son inmutables: crea precios nuevos y reemplaza los `price_...` en Vercel. `STRIPE_PRICE_QUARTERLY` ya no se usa.
 
 Copiar el `price_xxx` de cada uno.
 
@@ -32,7 +34,7 @@ Ir a **Vercel → fitbud-green → Settings → Environment Variables** y agrega
 STRIPE_SECRET_KEY        sk_test_...       (Stripe → Developers → API keys)
 STRIPE_WEBHOOK_SECRET    whsec_...         (se genera en el paso 4)
 STRIPE_PRICE_MONTHLY     price_...
-STRIPE_PRICE_QUARTERLY   price_...
+STRIPE_PRICE_SEMIANNUAL  price_...
 ```
 
 > Las keys de test tienen prefijo `sk_test_` y `pk_test_`. Las de producción usan `sk_live_` / `pk_live_`.

@@ -72,8 +72,8 @@ Modelo: **acceso por suscripción / paquete** gestionado con *entitlements* serv
 
 | Plan | Precio | Duración | Nota |
 |------|--------|----------|------|
-| **Plan mensual** | **USD 14** | 30 días | "Acceso completo. Sin permanencia. Cancela cuando quieras." |
-| **Paquete 3 meses** | **USD 36** | 90 días | Badge "Mejor valor" · ahorro ~15 % vs. mensual · ideal para un ciclo completo |
+| **Plan mensual** | **USD 7.99** | 30 días | "Acceso completo. Sin permanencia. Cancela cuando quieras." |
+| **Paquete 6 meses** | **USD 39.90** | 180 días | Badge "Mejor valor" · ahorro ~17 % vs. mensual (USD 6.65/mes) · ideal para dos ciclos completos |
 
 - Hoy los planes son **pago único por período** (no auto-renovables).
 - **Checkout vía Stripe**: la infraestructura de facturación está lista (`billing_events` aplicada), pero el checkout **está pendiente de activar** (REQ-26 — ver `STRIPE_SETUP.md`).

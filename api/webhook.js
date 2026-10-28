@@ -8,7 +8,8 @@ import crypto from "crypto";
 
 export const config = { api: { bodyParser: false } };
 
-const PLAN_DURATION_DAYS = { monthly: 30, quarterly: 90 };
+// quarterly se conserva para sesiones de checkout anteriores al cambio de precios.
+const PLAN_DURATION_DAYS = { monthly: 30, quarterly: 90, semiannual: 180 };
 
 function env() {
   return {

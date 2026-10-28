@@ -2110,3 +2110,9 @@ El job respondía `push.ready:false` ("falta VAPID_PRIVATE_KEY"). Clave pública
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Jonathan (2026-10-27). Con la primera semana lista, `renderNotifySetup()` pide instalar Evolv (móvil) y activar avisos (o correo si no hay push). Hoy muestra `notifyNudgeHtml()` hasta activarlos; "Ahora no" lo oculta hasta mañana. ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-290 - Precios de lanzamiento: USD 7.99/mes y USD 39.90 por 6 meses
+
+**Estado: implementado.** Falta aplicar el seed de `supabase/entitlements.sql` y crear los precios en Stripe (`STRIPE_SETUP.md`).
+
+`semiannual` (180 días) reemplaza a `quarterly`, que queda `active=false` solo para cortesías beta e histórico.

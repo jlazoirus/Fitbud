@@ -36,7 +36,7 @@ function assert(condition, message) {
 process.env.SUPABASE_URL = "https://test.supabase.co";
 process.env.SUPABASE_PUBLISHABLE_KEY = "publishable";
 process.env.STRIPE_PRICE_MONTHLY = "price_monthly";
-process.env.STRIPE_PRICE_QUARTERLY = "price_quarterly";
+process.env.STRIPE_PRICE_SEMIANNUAL = "price_semiannual";
 process.env.NOTIFY_APP_URL = "https://fitbud.test";
 delete process.env.STRIPE_SECRET_KEY;
 

@@ -1,7 +1,7 @@
 // Serverless: crea una sesión de pago en Stripe (checkout alojado).
-// POST /api/checkout  Body: { planId: "monthly"|"quarterly" }
+// POST /api/checkout  Body: { planId: "monthly"|"semiannual" }
 // Requiere sesión autenticada.
-// Vars: STRIPE_SECRET_KEY, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_QUARTERLY, NOTIFY_APP_URL
+// Vars: STRIPE_SECRET_KEY, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_SEMIANNUAL, NOTIFY_APP_URL
 
 function env() {
   return {
@@ -9,7 +9,7 @@ function env() {
     supaAnon:      process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY || "",
     stripeKey:     process.env.STRIPE_SECRET_KEY || "",
     priceMonthly:  process.env.STRIPE_PRICE_MONTHLY || "",
-    priceQuarterly: process.env.STRIPE_PRICE_QUARTERLY || "",
+    priceSemiannual: process.env.STRIPE_PRICE_SEMIANNUAL || "",
     appUrl: (process.env.NOTIFY_APP_URL || "https://evolvapp.club").replace(/\/$/, ""),
   };
 }
@@ -31,7 +31,8 @@ async function verifyUser(req, e) {
   }
 }
 
-const VALID_PLANS = new Set(["monthly", "quarterly"]);
+// "quarterly" ya no se vende: queda solo para cortesías beta y entitlements históricos.
+const VALID_PLANS = new Set(["monthly", "semiannual"]);
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -60,11 +61,11 @@ export default async function handler(req, res) {
 
   const planId = String(body.planId || "");
   if (!VALID_PLANS.has(planId)) {
-    res.status(400).json({ error: "Plan no válido. Usa 'monthly' o 'quarterly'." });
+    res.status(400).json({ error: "Plan no válido. Usa 'monthly' o 'semiannual'." });
     return;
   }
 
-  const priceId = planId === "quarterly" ? e.priceQuarterly : e.priceMonthly;
+  const priceId = planId === "semiannual" ? e.priceSemiannual : e.priceMonthly;
   if (!priceId) {
     res.status(503).json({ error: "Plan no configurado en el servidor. Contacta al administrador." });
     return;

@@ -1118,15 +1118,18 @@ async function loadCatalog(){
   }catch(_){}
   // Fallback inline para cuando /api/catalog no existe aún (local dev, GitHub Pages)
   catalogPlans=[
-    {id:"monthly",name:"Plan mensual",price_usd:14,duration_days:30,auto_renew:false,active:true,badge:null,
+    {id:"monthly",name:"Plan mensual",price_usd:7.99,duration_days:30,auto_renew:false,active:true,badge:null,
      description:"Acceso completo. Sin permanencia. Sin renovación automática — pagas solo el período.",
      features:["Plan de nutrición personalizado","Rutinas de entrenamiento guiadas","Seguimiento de progreso","Adaptaciones y contingencias","Rachas e hitos de constancia","Recordatorios opcionales"]},
-    {id:"quarterly",name:"Paquete 3 meses",price_usd:36,duration_days:90,auto_renew:false,active:true,badge:"Mejor valor",
-     description:"Ahorra un 15 % respecto al plan mensual. Ideal para un ciclo completo.",
-     features:["Todo lo del plan mensual","Ahorro del 15 %","Acceso a ciclos de 10 semanas","Recap detallado al cerrar ciclo","Fotos de progreso privadas","Prioridad en nuevas funciones"]},
+    {id:"semiannual",name:"Paquete 6 meses",price_usd:39.9,duration_days:180,auto_renew:false,active:true,badge:"Mejor valor",
+     description:"Ahorra un 17 % respecto al plan mensual (USD 6.65 al mes). Ideal para dos ciclos completos.",
+     features:["Todo lo del plan mensual","Ahorro del 17 %","Acceso a ciclos de 10 semanas","Recap detallado al cerrar ciclo","Fotos de progreso privadas","Prioridad en nuevas funciones"]},
   ];
 }
 function activeCatalogPlans(){return(catalogPlans||[]).filter(p=>p.active!==false);}
+// 7.99 → "7.99", 39.9 → "39.90", 14 → "14" (numeric de Postgres puede llegar como string).
+function planPriceText(p){const n=Number(p&&p.price_usd);if(!Number.isFinite(n))return"";return Number.isInteger(n)?String(n):n.toFixed(2);}
+function planPeriodText(p){const d=Number(p&&p.duration_days)||0;if(d<=31)return"mes";return Math.round(d/30)+" meses";}
 
 /* ---------- CONFIGURACIÓN RUNTIME (config.js + overrides locales) ---------- */
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
@@ -8653,7 +8656,7 @@ function showPaywall(context){
     return`<div class="paywall-plan${isHi?" paywall-plan-hi":""}">
       ${badge}
       <div class="paywall-plan-name">${esc(p.name)}</div>
-      <div class="paywall-plan-price"><span class="paywall-cur">USD</span> ${p.price_usd} <span class="paywall-period">/ ${p.duration_days<=31?"mes":"3 meses"}</span></div>
+      <div class="paywall-plan-price"><span class="paywall-cur">USD</span> ${planPriceText(p)} <span class="paywall-period">/ ${planPeriodText(p)}</span></div>
       <div class="paywall-plan-desc">${esc(p.description||"")}</div>
       <ul class="paywall-features">${features}</ul>
       ${cta}
@@ -8804,6 +8807,7 @@ async function redeemPendingInvite(){
 function planDisplayName(planId){
   const plan=(catalogPlans||[]).find(p=>String(p.id)===String(planId));
   if(plan&&plan.name)return plan.name;
+  if(planId==="semiannual")return "Paquete 6 meses";
   if(planId==="quarterly")return "Paquete 3 meses";
   if(planId==="monthly")return "Plan mensual";
   return "Plan";
@@ -9122,7 +9126,7 @@ function landingPricingHtml(){
     return`<div class="l-plan${isHi?" highlight":""}">
       ${badge}
       <div class="l-plan-name">${esc(p.name)}</div>
-      <div class="l-plan-price"><span class="l-plan-cur">USD</span>${p.price_usd} <span class="l-plan-period">/ ${p.duration_days<=31?"mes":"3 meses"}</span></div>
+      <div class="l-plan-price"><span class="l-plan-cur">USD</span>${planPriceText(p)} <span class="l-plan-period">/ ${planPeriodText(p)}</span></div>
       <div class="l-plan-desc">${esc(p.description||"")}</div>
       <div class="l-plan-items">${items}</div>
       ${inviteOnlySignup()
