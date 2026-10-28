@@ -2,7 +2,7 @@
 // cambiar el perfil. La sesión del plan se adapta al lugar: mismos días y
 // mismos grupos musculares; el resto de la semana sigue igual.
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, daysFromToday } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, daysFromToday, trainingDaysIncludingToday } from "./helpers.js";
 
 // Todos los ejercicios de la sesión se pueden hacer en ese lugar.
 const allDoableAt = (page, ds, place) =>
@@ -90,6 +90,87 @@ test.describe("Entreno: lugar de un día", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     await expect(app.locator(".workout .name").first()).toContainText("Peso corporal ·");
     await expect(app.locator(".wk-location")).toHaveText("Lugar: Casa · solo este día");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("en un día de carrera: se elige una sesión de gimnasio y se hace en casa", async ({ page, context }) => {
+    // Prioridad rendimiento: hoy (exterior) toca correr.
+    const today = new Date().getDay();
+    const days = trainingDaysIncludingToday();
+    const prefs = completePrefs({
+      primarySport: "running", trainingPriority: "performance",
+      trainingDays: days, trainingLocations: Object.fromEntries(days.map((d) => [d, d === today ? "outdoor" : "gym"])),
+    });
+    await installMocks(context, { prefs });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    const nombre = app.locator(".workout .name").first();
+    await expect(nombre).toContainText("Correr ·");
+
+    await page.getByRole("button", { name: "Cambiar entrenamiento" }).click();
+    const overlay = page.locator("#overlay");
+    await overlay.getByRole("button", { name: /^Gimnasio · Full body A/ }).click();
+    await expect(nombre).toContainText("Gimnasio · Full body A");
+    await expect(app.locator(".wk-location")).toHaveText("Lugar: Gimnasio");
+
+    await page.getByRole("button", { name: "En casa", exact: true }).click();
+    await expect(overlay.getByRole("button", { name: /Gimnasio · tu plan ✓/ })).toBeVisible();
+    await overlay.getByRole("button", { name: /^Casa/ }).click();
+    await expect(nombre).toContainText("Peso corporal · Full body A");
+    await expect(app.locator(".wk-location")).toHaveText("Lugar: Casa · solo este día");
+    expect(await allDoableAt(page, await page.evaluate(() => todayStr()), "home")).toBe(true);
+
+    // Con el día en casa, "Cambiar entrenamiento" ofrece las sesiones de casa.
+    await page.getByRole("button", { name: "Cambiar entrenamiento" }).click();
+    await expect(overlay.getByRole("button", { name: /^Peso corporal · Full body B/ })).toBeVisible();
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("en un día de carrera, \"En casa\" cambia la carrera por la próxima sesión de fuerza en casa", async ({ page, context }) => {
+    const today = new Date().getDay();
+    const days = trainingDaysIncludingToday();
+    const prefs = completePrefs({
+      primarySport: "running", trainingPriority: "performance",
+      trainingDays: days, trainingLocations: Object.fromEntries(days.map((d) => [d, d === today ? "outdoor" : "gym"])),
+    });
+    const { calls } = await installMocks(context, { prefs });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    const nombre = app.locator(".workout .name").first();
+    await expect(nombre).toContainText("Correr ·");
+    const proxima = await page.evaluate(() => strengthSessionForSportDay(todayStr()));
+    expect(proxima).toBeTruthy();
+
+    // Un toque: "En casa" está a la vista en el día de carrera.
+    await page.getByRole("button", { name: "En casa", exact: true }).click();
+    const overlay = page.locator("#overlay");
+    await expect(overlay).toContainText("¿Dónde entrenas hoy?");
+    await expect(overlay).toContainText("Correr ·");
+    await overlay.getByRole("button", { name: /^Casa/ }).click();
+
+    await expect(nombre).toContainText("Peso corporal ·");
+    await expect(app.locator(".wk-location")).toHaveText("Lugar: Casa · solo este día");
+    const today_ = await page.evaluate(() => todayStr());
+    expect(await page.evaluate((d) => effectiveWorkout(d).id, today_)).toBe(proxima);
+    expect(await allDoableAt(page, today_, "home")).toBe(true);
+    await expect
+      .poll(() => calls.filter((c) => c.table === "day_log" && c.payload && c.payload.log_date === today_).map((c) => c.payload.state.trainingPlace).at(-1))
+      .toBe("home");
+
+    // "Volver al plan" recupera la carrera y quita el lugar del día.
+    await page.getByRole("button", { name: "Volver al plan" }).click();
+    await expect(nombre).toContainText("Correr ·");
+    expect(await page.evaluate((d) => dayState(d).trainingPlace, today_)).toBeUndefined();
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });

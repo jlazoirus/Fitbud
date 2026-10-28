@@ -11771,6 +11771,12 @@ Con perfil de gimnasio, Entreno → "Adaptar hoy" → "En casa" (y "Sin equipo")
 - Hoy en casa: la sesión guiada prescribe esos ejercicios y el cambio sobrevive a recargar; `adaptar_entreno` con `equipo` abre la hoja. ✓ (`tests/e2e/lugar-del-dia.spec.js`)
 - `node scripts/release-gate.mjs` pasa.
 
+### Seguimiento (2026-10-28)
+
+Jonathan, captura de un día de carrera ("Correr · fondo fácil"): el botón de lugar solo sale en sesiones de fuerza. Si eliges una de gimnasio con "Cambiar entrenamiento" en un día de deporte, el lugar se toma del perfil (`plannedStrengthPlace()`) y no del exterior del día: dice "Lugar: Gimnasio" y ofrece "En casa". "Cambiar entrenamiento" agrupa la fuerza por tipo de sesión, así que con perfil o día en casa ya lista las sesiones de peso corporal (antes el grupo "Casa o aire libre" quedaba vacío). `CACHE_NAME` → `fitbud-pwa-v163`. ✓ `tests/e2e/lugar-del-dia.spec.js`.
+
+Segunda captura de Jonathan (2026-10-28): el camino "Cambiar entrenamiento → sesión de gimnasio → En casa" no se descubre. "En casa" sale también en días de deporte: abre "¿Dónde entrenas hoy?" con Casa / Gimnasio / mantener la sesión del plan, y Casa o Gimnasio ponen la próxima sesión de fuerza del plan (`strengthSessionForSportDay()`) adaptada al lugar. "Volver al plan" recupera el deporte y quita el lugar del día. `CACHE_NAME` → `fitbud-pwa-v164`. ✓ `tests/e2e/lugar-del-dia.spec.js`.
+
 ## REQ-292 - Nutrición: la tarjeta "Prepara tus comidas de hoy" se puede colapsar
 
 **Estado: implementado.**
@@ -11787,7 +11793,7 @@ Con el día sin preparar, la tarjeta de arranque de Nutrición (REQ-100) ocupa c
 
 1. Botón chevron (44px, `aria-expanded`, "Ocultar tarjeta") en la cabecera de la tarjeta; colapsada queda una línea "Comidas sin preparar" con el mismo CTA "Preparar mi día" en pequeño. Tocar la línea la expande.
 2. El estado se guarda en `UI.collapsed["nut.setup"]` (mismo mecanismo que las secciones de `section()`), por dispositivo; sigue aplicando a cualquier día sin preparar. Con el día preparado la tarjeta no aparece, como antes.
-3. `CACHE_NAME` → `fitbud-pwa-v163`.
+3. `CACHE_NAME` → `fitbud-pwa-v165`.
 
 ### Fuera de alcance
 

@@ -1437,6 +1437,15 @@ function plannedTrainingLocation(ds,prefs){
 function dayTrainingLocation(ds){
   return dayTrainingPlace(ds)||plannedTrainingLocation(ds);
 }
+// Lugar de fuerza del plan para ese día, sin el cambio del día. En un día de
+// deporte (exterior, piscina) con una sesión de fuerza elegida manda el perfil.
+function plannedStrengthPlace(ds){
+  const prefs=planPrefsForDate(ds);
+  if(prefs.strengthMode==="gym")return "gym";
+  const loc=plannedTrainingLocation(ds,prefs);
+  if(STRENGTH_SESSION_IDS.has(plannedWorkoutId(ds,prefs))&&(loc==="home"||loc==="outdoor"))return loc;
+  return prefs.strengthPlace==="outdoor"?"outdoor":"home";
+}
 function trainingPrefsForDate(ds){
   const prefs=planPrefsForDate(ds);
   const place=dayTrainingPlace(ds);
@@ -6550,9 +6559,11 @@ function renderWorkout(){
   const ds=current; const st=dayState(ds); const ew=effectiveWorkout(ds);
   const training=trainingPrefs();
   const generatedVersion=activeGeneratedTrainingVersion();
-  const location=dayTrainingLocation(ds);
-  const dayPlace=dayTrainingPlace(ds);
-  const plannedPlace=plannedTrainingLocation(ds)||training.strengthPlace;
+  // REQ-291: en fuerza, el lugar es el de la sesión (también si se eligió en un día de deporte).
+  const strengthDay=isStrengthWorkout(ew.workout);
+  const dayPlace=strengthDay?dayTrainingPlace(ds):null;
+  const plannedPlace=plannedStrengthPlace(ds);
+  const location=strengthDay?(dayPlace||plannedPlace):plannedTrainingLocation(ds);
   const prescription=workoutPrescription(ds);
   const execution=normalizedWorkoutExecution(ds);
   const freeDay=isFreeActivityWorkout(ew.workout)&&!trainingSafetyHold();
@@ -6599,7 +6610,7 @@ function renderWorkout(){
       <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()||execution||st.workoutDone?"disabled":""}>Cambiar entrenamiento</button>
       ${ew.overridden&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
       ${dayPlace&&!execution&&!st.workoutDone&&!trainingSafetyHold()?`<button class="btn btn-sm" onclick="setDayTrainingPlace('${ds}',null)">${esc(dayPlaceBackLabel(plannedPlace))}</button>`:''}
-      ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar ${adaptDayLabel(ds)}:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button>${isStrengthWorkout(ew.workout)?`<button class="btn btn-sm" onclick="openDayTrainingPlace('${ds}')">${dayPlace?"Cambiar lugar":(location||plannedPlace)==="gym"?"En casa":"En el gimnasio"}</button>`:""}<button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
+      ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar ${adaptDayLabel(ds)}:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button>${strengthDay||training.strength!=="none"?`<button class="btn btn-sm" onclick="openDayTrainingPlace('${ds}')">${dayPlace?"Cambiar lugar":strengthDay&&plannedPlace!=="gym"?"En el gimnasio":"En casa"}</button>`:""}<button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
   </div>`);
   // REQ-239: con la sesión en curso, el reproductor va primero y el plan y la
@@ -6789,9 +6800,10 @@ function openWorkoutPicker(ds){
   if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
   if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
   const ew=effectiveWorkout(ds);
-  const prefs=trainingPrefs();
+  const prefs=trainingPrefsFromPrefs(trainingPrefsForDate(ds));
   const options=workoutOptions(ds);
-  const groups=[[STRENGTH_LABELS[prefs.strength],"💪"],[SPORT_LABELS[prefs.primary],"◉"],["Descanso","☾"]];
+  // El grupo de fuerza filtra por el tipo de sesión ("Peso corporal" en casa o aire libre).
+  const groups=[[prefs.strength==="gym"?"Gimnasio":"Peso corporal","💪"],[SPORT_LABELS[prefs.primary],"◉"],["Descanso","☾"]];
   let html=`<h3>Cambiar entrenamiento</h3><p class="muted small">Tu plan combina <b>${SPORT_LABELS[prefs.primary]}</b> con <b>${STRENGTH_LABELS[prefs.strength]}</b>. La sesión planificada es <b>${esc(ew.planned.name)}</b>.</p>`;
   groups.forEach(([k,ic])=>{
     const opts=options.filter(o=>o.kind===k);
@@ -6808,7 +6820,10 @@ function setWorkout(ds,id){
   const execution=normalizedWorkoutExecution(ds);
   if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
   if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
-  const d=dayState(ds);if(id&&id!==plannedWorkoutId(ds))d.workoutOverride=id;else delete d.workoutOverride;commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");
+  const d=dayState(ds);if(id&&id!==plannedWorkoutId(ds))d.workoutOverride=id;else delete d.workoutOverride;
+  // REQ-291: volver a un plan de deporte deja también el lugar del día.
+  if(!d.workoutOverride&&!isStrengthWorkout(effectiveWorkout(ds).workout))delete d.trainingPlace;
+  commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");
 }
 function delExtra(ds,i){if(!confirm("¿Eliminar esta comida extra?"))return;const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);render();}
 
@@ -10056,9 +10071,10 @@ const DAY_PLACE_OPTIONS={
 function openDayTrainingPlace(ds){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
   if(normalizedWorkoutExecution(ds)||dayState(ds).workoutDone){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
-  const planned=plannedTrainingLocation(ds)||planPrefsForDate(ds).strengthPlace;
-  const currentPlace=dayTrainingLocation(ds)||planned;
+  const planned=plannedStrengthPlace(ds);
+  const currentPlace=dayTrainingPlace(ds)||planned;
   const ew=effectiveWorkout(ds);
+  if(!isStrengthWorkout(ew.workout)){openSportDayPlace(ds,ew);return;}
   const opts=DAY_TRAINING_PLACES.map(place=>{
     const [label,hint]=DAY_PLACE_OPTIONS[place];
     const cur=place===currentPlace;
@@ -10069,11 +10085,50 @@ function openDayTrainingPlace(ds){
     ${opts}
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cancelar</button>`);
 }
+// En un día de deporte (correr, nadar…), entrenar en casa o en el gimnasio es
+// hacer fuerza en su lugar: la próxima sesión de fuerza del plan, adaptada al lugar.
+function strengthSessionForSportDay(ds){
+  for(let i=1;i<=7;i++){
+    const day=addDays(ds,i);
+    const id=plannedWorkoutId(day,planPrefsForDate(day));
+    if(STRENGTH_SESSION_IDS.has(id))return id;
+  }
+  const option=workoutOptions(ds).find(isStrengthWorkout);
+  return option?option.id:null;
+}
+function strengthSessionAt(ds,id,place){
+  const prefs=planPrefsForDate(ds);
+  return workoutById(ds,id,{...prefs,strengthPlace:place,strengthMode:strengthModeFromChoice(place),equipment:defaultEquipmentForStrengthChoice(place)});
+}
+function openSportDayPlace(ds,ew){
+  const sid=strengthSessionForSportDay(ds);
+  if(!sid){toast("Tu plan no tiene sesiones de fuerza");return;}
+  const opt=(place,label)=>{
+    const session=strengthSessionAt(ds,sid,place);
+    return `<button class="opt" onclick="setDayTrainingPlace('${ds}','${place}')">${label}<div class="o-meta">${esc(session?session.name:"")}${place==="home"?", sin máquinas.":"."}</div></button>`;
+  };
+  modal(`<h3>¿Dónde entrenas ${adaptDayLabel(ds)}?</h3>
+    <p class="muted small">Tu plan tiene <b>${esc(ew.workout.name)}</b>. En casa o en el gimnasio haces una sesión de fuerza en su lugar; solo cambia este día.</p>
+    ${opt("home","Casa")}
+    ${opt("gym","Gimnasio")}
+    <button class="opt" onclick="closeModal()" style="border-color:var(--accent)">${esc(ew.workout.name)} · tu plan ✓<div class="o-meta">Mantener la sesión de hoy.</div></button>`);
+}
 function setDayTrainingPlace(ds,place){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
   if(normalizedWorkoutExecution(ds)||dayState(ds).workoutDone){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
   const d=dayState(ds);
-  const planned=plannedTrainingLocation(ds)||planPrefsForDate(ds).strengthPlace;
+  const ew=effectiveWorkout(ds);
+  if(!isStrengthWorkout(ew.workout)){
+    const sid=DAY_TRAINING_PLACES.includes(place)&&strengthSessionForSportDay(ds);
+    if(!sid){closeModal();return;}
+    d.workoutOverride=sid;
+    if(place===plannedStrengthPlace(ds))delete d.trainingPlace;else d.trainingPlace=place;
+    addContingencyEntry(ds,{type:"place_change",reason:place,prev:ew.id,chosen:sid});
+    commitDay(ds);closeModal();render();
+    toast(place==="gym"?"Hoy toca fuerza en el gimnasio":"Hoy toca fuerza en casa, sin máquinas");
+    return;
+  }
+  const planned=plannedStrengthPlace(ds);
   const prev=dayTrainingPlace(ds)||planned;
   const next=DAY_TRAINING_PLACES.includes(place)?place:planned;
   if(next===planned)delete d.trainingPlace;else d.trainingPlace=next;
