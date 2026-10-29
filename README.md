@@ -143,6 +143,8 @@ La guia de lectura esta en [`docs/diet-contract-catalog-diff.md`](docs/diet-cont
 
 > Para una instalación existente, ejecuta las migraciones idempotentes pendientes en orden: [`supabase/nutrition_catalog_semantics.sql`](supabase/nutrition_catalog_semantics.sql) después de tener el catálogo cargado, [`supabase/cooking_level.sql`](supabase/cooking_level.sql) seguido de otra pasada de `nutrition_catalog_semantics.sql` (nivel de cocina y platos sin cocinar, REQ-254), [`supabase/plan_cycles.sql`](supabase/plan_cycles.sql) si aún no se aplicó, después [`supabase/privacy.sql`](supabase/privacy.sql), [`supabase/exercises.sql`](supabase/exercises.sql), [`supabase/coach_quota.sql`](supabase/coach_quota.sql), [`supabase/entitlements.sql`](supabase/entitlements.sql), [`supabase/billing.sql`](supabase/billing.sql), [`supabase/coupon_codes.sql`](supabase/coupon_codes.sql) y [`supabase/analytics.sql`](supabase/analytics.sql). No se ejecutan automáticamente en producción.
 
+Para comparar rachas entre amigos (REQ-300), aplicar también [`supabase/streak_friends.sql`](supabase/streak_friends.sql) después de `auth.sql`. Es idempotente y no abre datos de salud. Activación y recuperación: [`docs/streak-friends.md`](docs/streak-friends.md).
+
 El catálogo base se mantiene en [`exercise-catalog.js`](exercise-catalog.js). Después de editarlo, regenera la migración y valida referencias con:
 
 ```bash

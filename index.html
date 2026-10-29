@@ -441,8 +441,8 @@
   .sheet h3{font-family:var(--font-body);font-weight:700;font-size:18px;margin-bottom:4px;letter-spacing:-.02em}
   .field{margin:12px 0}
   .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:500}
-  .field input,.field select,.field textarea{width:100%;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:11px;font-size:15px;font-family:inherit}
-  .field input:focus,.field select:focus,.field textarea:focus,.opt:focus{outline:none;border-color:var(--accent)}
+  .field input,.field select,.field textarea,.streak-social input,.streak-social textarea{width:100%;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:11px;font-size:15px;font-family:inherit}
+  .field input:focus,.field select:focus,.field textarea:focus,.streak-social input:focus,.streak-social textarea:focus,.opt:focus{outline:none;border-color:var(--accent)}
   .password-wrap{position:relative}
   .password-wrap input{padding-right:48px}
   .password-toggle{position:absolute;right:7px;top:50%;transform:translateY(-50%);width:34px;height:34px;border-radius:999px;background:transparent;border:1px solid transparent;color:var(--muted);display:flex;align-items:center;justify-content:center}
@@ -726,6 +726,34 @@
   .hq-label{font-size:11px;font-weight:600;color:var(--txt)}
   .hq-sub{font-size:10px;color:var(--muted)}
 
+  /* REQ-300: lista privada de rachas, con el mismo sistema de controles. */
+  .streak-social{margin:14px 0 24px;padding:16px;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);scroll-margin-top:20px}
+  .streak-social-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .streak-social h2{font-family:var(--font-body);font-size:18px;margin:0;font-weight:700}
+  .streak-social h3{font-size:16px;margin:0 0 8px}
+  .streak-social p{line-height:1.5}
+  .streak-social label{display:block;font-size:14px;margin-bottom:8px}
+  .streak-social input,.streak-social textarea{width:100%;font-size:16px;min-height:44px}
+  .streak-alias-form{max-width:440px;margin-top:16px}
+  .streak-social-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .streak-social .btn{min-height:44px}
+  .streak-ranking{list-style:none;padding:0;margin:18px 0;font-variant-numeric:tabular-nums}
+  .streak-ranking li{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
+  .streak-ranking .self{color:var(--accent)}
+  .streak-place{width:20px;flex-shrink:0;text-align:center;font-weight:700}
+  .streak-person{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;overflow-wrap:anywhere}
+  .streak-person strong{font-weight:600}
+  .streak-days{text-align:right;font-size:22px;line-height:1.2}
+  .streak-days span{display:block;font-size:12px;font-weight:400}
+  .streak-social-status{color:var(--txt);padding:12px;background:var(--surf2);border-radius:var(--r-md);font-size:14px}
+  .streak-incoming,.streak-outgoing{padding:16px 0;margin:12px 0;border-block:1px solid var(--border)}
+  .streak-incoming .btn{margin:4px 8px 4px 0}
+  .streak-social-settings{margin-top:20px}
+  .streak-social-settings summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px}
+  .streak-social-settings[open] summary svg{transform:rotate(180deg)}
+  .streak-social-settings[open] summary{margin-bottom:8px}
+  .streak-social-settings .streak-alias-form{margin:0 0 16px}
+  .streak-share-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
   /* Rachas e hitos (REQ-23) */
   .streak-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
   .streak-card{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px;text-align:center}
@@ -1098,6 +1126,7 @@
 <script src="domain-contracts.js"></script>
 <!-- Motor puro de resolución de conflictos offline. -->
 <script src="sync-conflicts.js"></script>
+<script src="js/streak-friends.js"></script>
 <!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
 <!-- REQ-197: versión exacta + SRI; defer para no bloquear el primer render (boot() espera supabaseLibReady()). -->
 <script id="supabase-js" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous" defer onerror="window._supabaseLoadFailed=true"></script>
@@ -2355,6 +2384,7 @@ function enqueueMutation(entity,entityKey,payload){
 function _dequeueMutation(entity,entityKey){
   _setSyncQ(_getSyncQ().filter(x=>!(x.uid===uid()&&x.entity===entity&&x.entityKey===entityKey)));
   _updateSyncBadge();
+  if(entity==="day_log")scheduleStreakSocialSync(); // REQ-300: publicar al terminar de subir los registros
 }
 // Descarta toda la cola del usuario al cerrar sesión (aislamiento entre usuarios en el dispositivo).
 function clearSyncQueueForUser(userId){
@@ -4132,6 +4162,7 @@ async function saveOnboarding(){
   render();scrollAppTop();
   if(weekIssues)firstWeekIssueModal(firstWeekSummary);
   if(!notifySetupActive)toast(firstCycle||newCycle?(weekIssues?"Tu semana quedó parcialmente lista":"Tu primera semana está lista"):"Tu plan quedó actualizado");
+  loadStreakFriendsAfterAuth(); // REQ-300: retomar la invitación tras completar el perfil
 }
 function maybePromptProfileReview(){
   if(reviewPromptShown||onboardingActive||!session)return;
@@ -4792,10 +4823,12 @@ function homeTomorrowData(ds){
   const ew=effectiveWorkout(next);
   const rest=!ew.workout||ew.workout.id==="descanso";
   const day=buildDay(next);
-  const prepared=homeDayHasPreparedMeals(next,day);
+  // REQ-299: planificar es opcional; contar contenido real también reconoce
+  // comidas propias y no presenta los slots vacíos como un menú completo.
+  const definedMeals=day.meals.filter(m=>mealHasContent(mealValue(m,mealState(next,m.id)))).length;
   return {ds:next,items:[
     {kind:rest?"rest":"workout",icon:rest?"○":"◉",label:"Entreno",title:rest?"Descanso planificado":(ew.workout.name||"Sesión del día")},
-    {kind:"meal",icon:"●",label:"Comidas",title:prepared?`${day.meals.length} comida${day.meals.length===1?"":"s"} lista${day.meals.length===1?"":"s"}`:"Aún por preparar"}
+    {kind:"meal",icon:"●",label:"Comidas de mañana",title:definedMeals?`${definedMeals} comida${definedMeals===1?"":"s"} definida${definedMeals===1?"":"s"}`:"Puedes registrarlas mañana",meta:definedMeals?"":"Preparar un menú es opcional."}
   ]};
 }
 function homeOpenTomorrow(ds){
@@ -4824,7 +4857,7 @@ function homeAgendaHtml(ds){
     const workoutLabel=data.ew.workout&&data.ew.workout.id==="descanso"
       ?"descanso planificado"
       :"entreno "+workoutStatusLabel(data.workoutOutcome).toLowerCase();
-    const todaySummary=[`${data.doneMeals}/${data.totMeals} comidas`,`${dayTotals(ds).t.kcal} kcal`,workoutLabel].join(" · ");
+    const todaySummary=[`${data.doneMeals}/${data.totMeals} comidas registradas`,`${dayTotals(ds).t.kcal} kcal`,workoutLabel].join(" · ");
     const next=homeTomorrowData(ds);
     const nextHtml=next?`<div class="agenda-next">
         <div class="agenda-next-head">Mañana · ${esc(prettyDate(next.ds))}</div>
@@ -4933,7 +4966,7 @@ function renderHoy(){
       <h1>Hola, ${esc(name)}</h1>
     </div>
     <div class="row" style="gap:9px">
-      ${stk>0?`<span class="badge b-BAJO">🔥 ${stk}</span>`:""}
+      <button type="button" class="btn btn-sm" aria-label="Ver mi racha y amigos" onclick="openStreakFriends()">Racha ${stk}</button>
       <button class="btn btn-sm" title="Ver guía rápida" aria-label="Ver guía rápida" onclick="startFitbrosTour(true)" style="min-width:44px;min-height:44px;padding:0;font-weight:700">?</button>
       <div class="avatar">${esc((name[0]||"F").toUpperCase())}</div>
     </div>
@@ -6889,6 +6922,7 @@ function renderProgress(){
     ${empty?weightSetupCard(true):startWeightNoteCard()}
     ${section("pr.stats","Tus números",progressStats(),null,empty)}
     ${section("pr.rachas","Rachas e hitos",renderStreakSection(),null,empty)}
+    <section id="streakFriends" class="streak-social" aria-label="Rachas con amigos">${streakFriendsBody()}</section>
     ${section("pr.ciclos","Tus ciclos",progressJourney(),`${cycleNumber()}`)}
     ${section("pr.peso","Peso corporal",
       (empty?"":weightSetupCard(false))
@@ -6986,7 +7020,8 @@ function renderStreakSection(){
   </div>
   ${weekHtml}
   ${nextHint}
-  ${milestonesHtml}`;
+  ${milestonesHtml}
+  <div class="streak-share-actions"><button type="button" class="btn" onclick="shareStreak()">Compartir mi racha</button><button type="button" class="btn" onclick="openStreakFriends()">Ver amigos</button></div>`;
 }
 // REQ-195: semana del ciclo en la que cae hoy (1 antes de empezar, la última al terminar).
 function currentWeightWeek(){
@@ -8693,6 +8728,7 @@ function finishNotifySetup(reason){
   trackNotifyPrompt("onboarding",reason==="done"?"done":"skip");
   notifySetupActive=false;
   render();scrollAppTop();
+  if(streakSocialPending)loadStreakFriendsAfterAuth();
 }
 // Tarjeta de Hoy: cada día, hasta que los avisos estén activos.
 function notifyNudgeDue(){
@@ -9379,6 +9415,7 @@ function renderAuth(){
     <div class="auth-brand" role="img" aria-label="Evolv">${brandMark(40)}${brandWordmark()}</div>
     <div class="muted small center" style="margin-bottom:20px">${mode==="in"?"Inicia sesión para continuar":"Crea tu cuenta gratis"}</div>
     ${pendingInviteCode()?`<div class="auth-invite" role="status"><b>Tu invitación a la beta está lista.</b> ${mode==="in"?"Inicia sesión":"Crea tu cuenta"} y tu acceso completo se activa solo.</div>`:""}
+    ${streakSocialPending?`<div class="auth-invite" role="status"><b>Te invitaron a comparar rachas.</b> Entra o crea tu cuenta para decidir si aceptas. Solo compartirás tu alias y tus días de racha.</div>`:""}
     <div class="dash">
       <div class="field"><label for="au_email">Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
       ${passwordField({id:"au_pwd",label:"Contraseña",autocomplete:mode==="in"?"current-password":"new-password",placeholder:"••••••••"})}
@@ -9441,6 +9478,7 @@ function toggleAuthMode(){window._authMode=(window._authMode==="up")?"in":"up";r
 function authRedirectUrl(mode){
   const url=new URL(location.origin+location.pathname);
   if(mode)url.searchParams.set("auth",mode);
+  if(streakSocialPending)url.searchParams.set("friend",streakSocialPending);
   return url.toString();
 }
 function authRedirectParams(){
@@ -13605,6 +13643,7 @@ let _recoveryBusy=false;
 // porque ahí la sesión todavía está seteada en ese momento.
 function clearSignedOutState(prevUid){
   if(prevUid===undefined)prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
+  resetStreakSocial(); // REQ-300: ni invitaciones ni clasificación pasan a otra cuenta
   session=null;profile=null;view="hoy";
   entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
   billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
@@ -13663,6 +13702,7 @@ function mustChangePassword(){
 }
 async function onAuth(){
   if(_authBusy)return;
+  if(streakSocial.owner&&streakSocial.owner!==uid())resetStreakSocial();
   if(mustChangePassword()){
     passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode="first_login";authReady=true;render();
     return;
@@ -13714,6 +13754,7 @@ async function onAuth(){
     openReminderLink(); // REQ-285: el aviso abre su día y registra la etapa
     loadNotifPrefs().then(()=>{if(session&&view==="hoy"&&!onboardingActive&&!notifySetupActive)render();}); // REQ-289
     scheduleEngagementSave(1500); // REQ-285: resumen para los recordatorios
+    loadStreakFriendsAfterAuth(); // REQ-300
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
     refreshPushSubscriptionKey(); // REQ-267: no-await
   }finally{_authBusy=false;}
@@ -14292,6 +14333,7 @@ function commitDay(ds){
   pushDay(ds);
   try{streakFeedbackAfterCommit(ds);}catch(e){/* REQ-283: la animación nunca bloquea el guardado */}
   scheduleEngagementSave(); // REQ-285
+  scheduleStreakSocialSync(); // REQ-300
 }
 // Trae el día desde la DB y re-renderiza si seguimos viéndolo.
 function syncDay(ds){if(supa)pullDay(ds).then(ok=>{if(ok&&(view==="hoy"||view==="nutricion"||view==="entreno")&&current===ds)render();});}
@@ -15956,6 +15998,8 @@ function hasStoredAuthSession(){
   return false;
 }
 async function boot(){
+  captureStreakInvite(); // REQ-300: conservar invitación al iniciar sesión o confirmar correo
+  if(streakSocialPending&&!hasStoredAuthSession())window._showAuth=true;
   // REQ-197: quien llega sin sesión guardada ve la portada al instante, sin
   // esperar a /api/config ni a Supabase; al resolver la sesión se confirma.
   // no-await: catálogo de planes en paralelo (REQ-25), sin esperar a la config.
