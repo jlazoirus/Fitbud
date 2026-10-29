@@ -4792,10 +4792,12 @@ function homeTomorrowData(ds){
   const ew=effectiveWorkout(next);
   const rest=!ew.workout||ew.workout.id==="descanso";
   const day=buildDay(next);
-  const prepared=homeDayHasPreparedMeals(next,day);
+  // REQ-299: planificar es opcional; contar contenido real también reconoce
+  // comidas propias y no presenta los slots vacíos como un menú completo.
+  const definedMeals=day.meals.filter(m=>mealHasContent(mealValue(m,mealState(next,m.id)))).length;
   return {ds:next,items:[
     {kind:rest?"rest":"workout",icon:rest?"○":"◉",label:"Entreno",title:rest?"Descanso planificado":(ew.workout.name||"Sesión del día")},
-    {kind:"meal",icon:"●",label:"Comidas",title:prepared?`${day.meals.length} comida${day.meals.length===1?"":"s"} lista${day.meals.length===1?"":"s"}`:"Aún por preparar"}
+    {kind:"meal",icon:"●",label:"Comidas de mañana",title:definedMeals?`${definedMeals} comida${definedMeals===1?"":"s"} definida${definedMeals===1?"":"s"}`:"Puedes registrarlas mañana",meta:definedMeals?"":"Preparar un menú es opcional."}
   ]};
 }
 function homeOpenTomorrow(ds){
@@ -4824,7 +4826,7 @@ function homeAgendaHtml(ds){
     const workoutLabel=data.ew.workout&&data.ew.workout.id==="descanso"
       ?"descanso planificado"
       :"entreno "+workoutStatusLabel(data.workoutOutcome).toLowerCase();
-    const todaySummary=[`${data.doneMeals}/${data.totMeals} comidas`,`${dayTotals(ds).t.kcal} kcal`,workoutLabel].join(" · ");
+    const todaySummary=[`${data.doneMeals}/${data.totMeals} comidas registradas`,`${dayTotals(ds).t.kcal} kcal`,workoutLabel].join(" · ");
     const next=homeTomorrowData(ds);
     const nextHtml=next?`<div class="agenda-next">
         <div class="agenda-next-head">Mañana · ${esc(prettyDate(next.ds))}</div>

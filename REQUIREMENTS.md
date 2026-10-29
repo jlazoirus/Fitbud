@@ -2109,3 +2109,11 @@ A los 7–13 días del plan, sin push, un día sin otro correo: "Activa los avis
 **Estado: implementado; requiere aplicar `supabase/notifications_morning.sql`.** Detalle en `docs/requirements-history.md`.
 
 Aviso del día de 06:00 a 23:00, elegible también con push. Resumen opcional de 05:00 a 11:00 con el entreno y las comidas de hoy (`morningPlan()`, plan en `engagement.plan`), por push o, sin push, por correo; uno por día. ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
+
+## REQ-299 - Hoy: distinguir comidas registradas de la planificación opcional de mañana
+
+**Estado: implementado.**
+
+Jonathan (2026-10-28, captura): registró sus propias comidas sin preparar un menú y leyó «Aún por preparar» como un pendiente de hoy. `homeTomorrowData()` mostraba esa obligación ambigua para mañana y contaba todos los slots aunque solo uno tuviera contenido.
+
+Hoy confirma «comidas registradas». El resumen dice «Comidas de mañana» y, sin contenido, «Puedes registrarlas mañana» / «Preparar un menú es opcional». Con contenido propio o del plan, cuenta solo las comidas definidas. No cambia registros ni genera un menú. ✓ `tests/e2e/home.spec.js`: hoy manual, mañana vacío/parcial/completo, navegación, conservación de hoy y vistas móvil/escritorio.

@@ -124,6 +124,65 @@ test.describe("Home — agenda (REQ-249)", () => {
 });
 
 test.describe("Home — día cerrado (REQ-258)", () => {
+  test("REQ-299: registrar comidas propias cierra hoy sin exigir un menú para mañana", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    const preparations = [];
+    page.on("request", request => {
+      if (request.url().includes("/api/claude") && /diet_day|diet_week/.test(request.postData() || "")) preparations.push(request.url());
+    });
+    await gotoApp(page);
+    // Datos de comidas propias, sin gen ni snapshot de un menú del coach.
+    await page.evaluate(() => {
+      const ds = todayStr();
+      buildDay(ds).meals.forEach(m => {
+        mealState(ds, m.id).ovr = { name: "Mi " + m.slot, kcal: 400, p: 25, c: 45, f: 13 };
+        toggleMeal(ds, m.id);
+      });
+      dayState(ds).workoutDone = true;
+      setView("hoy");
+    });
+    const original = await page.evaluate(() => JSON.stringify(dayState(todayStr())));
+    const card = page.locator(".agenda-state.done");
+    await expect(card).toContainText("Todo listo por hoy");
+    await expect(card.locator(".agenda-sub")).toContainText("3/3 comidas registradas · 1200 kcal");
+    const meals = card.locator(".agenda-next .kind-meal");
+    await expect(meals).toContainText("Comidas de mañana");
+    await expect(meals).toContainText("Puedes registrarlas mañana");
+    await expect(meals).toContainText("Preparar un menú es opcional.");
+    await expect(card).not.toContainText("Aún por preparar");
+
+    // Revisar el texto real en móvil y escritorio, sin desbordes.
+    for (const [name, width, height] of [["mobile", 390, 844], ["desktop", 1440, 1000]]) {
+      await page.setViewportSize({ width, height });
+      await expect(meals).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await card.screenshot({ path: `/tmp/req-299-${name}.png` });
+    }
+    await card.getByRole("button", { name: "Ver mañana" }).click();
+    await expect.poll(() => page.evaluate(() => current)).toBe(await page.evaluate(() => addDays(todayStr(), 1)));
+    expect(await page.evaluate(() => JSON.stringify(dayState(todayStr())))).toBe(original);
+
+    // Una comida propia para mañana no equivale a tener todos los slots listos.
+    await page.evaluate(() => {
+      const ds = addDays(todayStr(), 1);
+      mealState(ds, buildDay(ds).meals[0].id).ovr = { name: "Mi desayuno", kcal: 400, p: 25, c: 45, f: 13 };
+      setView("hoy");
+    });
+    await expect(meals).toContainText("1 comida definida");
+    await expect(meals).not.toContainText("3 comidas");
+    await page.evaluate(() => {
+      const ds = addDays(todayStr(), 1);
+      buildDay(ds).meals.forEach(m => { mealState(ds, m.id).ovr = { name: "Mi " + m.slot, kcal: 400, p: 25, c: 45, f: 13 }; });
+      render();
+    });
+    await expect(meals).toContainText("3 comidas definidas");
+    expect(preparations).toEqual([]);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
   test("con comidas y entreno hechos, Hoy resume el día en una línea y muestra lo que toca mañana", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
@@ -146,7 +205,7 @@ test.describe("Home — día cerrado (REQ-258)", () => {
 
     const card = page.locator(".agenda-state.done");
     await expect(card).toContainText("Todo listo por hoy");
-    await expect(card.locator(".agenda-sub")).toContainText(/3\/3 comidas · \d+ kcal · (entreno completado|descanso planificado)/);
+    await expect(card.locator(".agenda-sub")).toContainText(/3\/3 comidas registradas · \d+ kcal · (entreno completado|descanso planificado)/);
     // El consumo detallado de hoy ya no ocupa la pantalla.
     await expect(page.locator(".mini-macro-dash")).toHaveCount(0);
 
@@ -155,7 +214,7 @@ test.describe("Home — día cerrado (REQ-258)", () => {
     const tomorrowLabel = await page.evaluate((ds) => prettyDate(ds), tomorrow);
     await expect(card.locator(".agenda-next-head")).toHaveText(`Mañana · ${tomorrowLabel}`);
     await expect(card.locator(".agenda-next .agenda-item")).toHaveCount(2);
-    await expect(card.locator(".agenda-next")).toContainText("Aún por preparar");
+    await expect(card.locator(".agenda-next")).toContainText("Puedes registrarlas mañana");
 
     // "Ver mañana" abre el día siguiente.
     await card.getByRole("button", { name: "Ver mañana" }).click();
