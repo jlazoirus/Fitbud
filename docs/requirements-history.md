@@ -11997,3 +11997,30 @@ Una base de productos de marca o la búsqueda del código de barras en una base 
 
 - Los pedidos de texto y foto llevan las reglas. ✓ `scripts/validate-meal-estimate-output.mjs`.
 - Reestimar un registro de una favorita ×2 actualiza el origen. ✓ `tests/e2e/origen-registro.spec.js` (falla con el código anterior).
+
+## REQ-302 - Rachas con amigos: explicar cómo se suma a un amigo
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-29), con una captura de Progreso → Rachas con amigos: "¿Cómo se supone que vea mi alias y sepa el de mis amigos? Debería ser por mail o usuario". Antes de activar, la pantalla solo mostraba un campo vacío "Tu alias para amigos" y el botón "Activar comparación". No explicaba que a un amigo se le suma con un enlace privado (REQ-300).
+
+### Decisión
+
+Se mantiene el enlace privado de un uso (7 días). Jonathan descartó invitar por correo y el nombre de usuario con buscador: un buscador permite ver quién usa Evolv y obliga a moderar nombres.
+
+### Alcance
+
+1. Antes de activar (`js/streak-friends.js`), tres pasos:
+   - elige tu alias, que es el nombre con el que te ven;
+   - crea una invitación y envía el enlace por WhatsApp o donde quieras;
+   - tu amigo la acepta y los dos aparecen en la lista con su alias.
+
+   Debajo, "Nadie puede buscarte: solo entra quien recibe tu enlace". Con una invitación recibida no se muestran los pasos.
+2. El alias se propone con el primer nombre del perfil (`prefs.name`) y se puede editar. No se comparte hasta que la persona activa la comparación y acepta una amistad.
+3. Activada, se muestra "Tus amigos te ven como <alias>. Para sumar a alguien, crea una invitación y envíale el enlace."
+
+### Criterios de aceptación
+
+- Antes de activar se ven los pasos, el aviso de privacidad y el alias propuesto. Al activar desaparecen los pasos y se muestra el alias propio. ✓ `tests/e2e/rachas-amigos.spec.js`.

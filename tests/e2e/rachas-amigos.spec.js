@@ -49,8 +49,14 @@ async function enable(page,alias='Mi alias'){
 test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,context,social})=>{
   const errors=collectConsoleErrors(page);
   await setup(page,context,social,[row(-3),row(-2),row(-1)]);
-  await expect(page.getByLabel('Tu alias para amigos')).toHaveValue('');
+  // REQ-302: la pantalla explica cómo se suma a un amigo y propone el primer nombre como alias.
+  await expect(page.locator('.streak-steps')).toContainText('Elige tu alias');
+  await expect(page.locator('.streak-steps')).toContainText('envía el enlace a un amigo');
+  await expect(page.getByText('Nadie puede buscarte')).toBeVisible();
+  await expect(page.getByLabel('Tu alias para amigos')).toHaveValue('Bro');
   await enable(page,'Ana');
+  await expect(page.locator('.streak-you')).toContainText('Tus amigos te ven como Ana');
+  await expect(page.locator('.streak-steps')).toHaveCount(0);
   const list=page.getByRole('list',{name:'Clasificación por racha actual'});
   await expect(list).toContainText('Ana (tú)');await expect(list.locator('.streak-days')).toHaveText('3días');
   await page.getByRole('button',{name:'Crear invitación'}).click();

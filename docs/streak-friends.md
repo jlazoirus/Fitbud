@@ -6,7 +6,7 @@ Jonathan eligió comparar la **racha actual**, sin retos semanales. En Hoy, el b
 
 «Compartir mi racha» abre el selector del dispositivo con el número real calculado por `streak()`. Sin selector, copia el texto; si el portapapeles está bloqueado, ofrece un campo seleccionable. Cancelar no anuncia éxito. Compartir este texto no activa la comparación.
 
-Para comparar, cada participante elige un alias (2–24 caracteres) y activa voluntariamente la función. «Crear invitación» prepara un enlace para un solo amigo, válido por 7 días. Un nuevo enlace cancela el anterior. El usuario decide dónde compartirlo; la app no envía mensajes automáticamente.
+Para comparar, cada participante elige un alias (2–24 caracteres) y activa voluntariamente la función. Antes de activar, la pantalla explica los tres pasos (alias → enlace → tu amigo acepta) y propone el primer nombre del perfil como alias. Una vez activada, dice con qué alias te ven (REQ-302). No hay buscador de usuarios ni invitación por correo. «Crear invitación» prepara un enlace para un solo amigo, válido por 7 días. Un nuevo enlace cancela el anterior. El usuario decide dónde compartirlo; la app no envía mensajes automáticamente.
 
 El destinatario inicia sesión o se registra, completa el onboarding/privacidad habitual y acepta expresamente. Antes de aceptar solo puede ver el alias del invitante, nunca sus días ni su progreso. La invitación se conserva durante la autenticación y el correo de confirmación. Una invitación de amistad no concede acceso beta ni cambia los requisitos de registro o de pago existentes.
 

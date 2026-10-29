@@ -159,10 +159,15 @@ window.addEventListener("online",()=>{if(uid()&&streakSocial.enabled&&!streakSoc
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="visible"&&uid()&&streakSocial.enabled&&!streakSocialBusy)refreshStreakSocial();
 });
+// REQ-302: antes de activar, el alias se propone con el primer nombre del perfil.
+function streakAliasSuggestion(){
+  const name=String(profile&&profile.prefs&&profile.prefs.name||"").trim().split(/\s+/)[0]||"";
+  return name.length>=2?name.slice(0,24):"";
+}
 function streakAliasForm(enabled){
   return `<form class="streak-alias-form" onsubmit="return saveStreakAlias(this)">
     <label for="streakAlias">Tu alias para amigos</label>
-    <input id="streakAlias" name="alias" minlength="2" maxlength="24" required autocomplete="off" value="${esc(streakSocial.alias||"")}" aria-describedby="streakPrivacy">
+    <input id="streakAlias" name="alias" minlength="2" maxlength="24" required autocomplete="off" value="${esc(streakSocial.alias||(enabled?"":streakAliasSuggestion()))}" aria-describedby="streakPrivacy">
     <p id="streakPrivacy" class="muted small">${enabled?"Tus amigos solo ven tu alias y tus días de racha.":"Al activar y aceptar una amistad, ambos verán su alias y sus días de racha. Tu peso, comidas y fotos siguen privados."}</p>
     <button type="submit" class="btn ${enabled?"":"btn-accent"}" ${streakSocialBusy?"disabled":""}>${enabled?"Guardar alias":"Activar comparación"}</button>
   </form>`;
@@ -178,7 +183,9 @@ function streakFriendsBody(){
   const retry=`<button class="btn" type="button" onclick="refreshStreakSocial()" ${busy}>Actualizar rachas</button>`;
   if(mine.unavailable)return head+error+retry+fallback;
   const invitation=streakSocialPending?`<div class="streak-incoming"><h3>${streakSocialPreview?`${esc(streakSocialPreview.alias)} te invita a comparar rachas`:"Tienes una invitación"}</h3><p class="muted small">Aceptar comparte tu alias y tus días de racha con esta persona, y te permite ver los suyos.</p>${mine.enabled&&streakSocialPreview?`<button class="btn btn-accent" type="button" onclick="changeStreakSocial('accept',{token:streakSocialPending},this)" ${busy}>Aceptar amistad</button>`:""}<button class="btn" type="button" onclick="closeStreakInvite()">Descartar invitación</button></div>`:"";
-  if(!mine.enabled)return head+error+invitation+streakAliasForm(false)+fallback;
+  // REQ-302: sin buscador ni correo: se agrega a un amigo con un enlace privado.
+  const steps=`<ol class="streak-steps"><li><strong>Elige tu alias.</strong> Es el nombre con el que te verán tus amigos.</li><li><strong>Crea una invitación</strong> y envía el enlace a un amigo por WhatsApp o donde quieras.</li><li><strong>Tu amigo la acepta</strong> desde su cuenta y los dos aparecen en la lista, cada uno con su alias.</li></ol><p class="muted small">Nadie puede buscarte: solo entra quien recibe tu enlace.</p>`;
+  if(!mine.enabled)return head+error+invitation+(invitation?"":steps)+streakAliasForm(false)+fallback;
   const rows=Array.isArray(mine.rows)?mine.rows:[];
   const ranking=rows.length?`<ol class="streak-ranking" aria-label="Clasificación por racha actual">${rows.map(r=>{
     const id=/^[a-f0-9-]{36}$/i.test(r.id)?r.id:"";
@@ -188,7 +195,9 @@ function streakFriendsBody(){
     return `<li ${r.self?'class="self"':''}><span class="streak-place" aria-label="Posición ${position}">${position}</span><div class="streak-person"><strong>${esc(r.alias)}${r.self?" (tú)":""}</strong><span class="muted small">Actualizada: ${esc(when)}</span></div><strong class="streak-days">${days}<span>día${days===1?"":"s"}</span></strong>${!r.self&&id?`<button type="button" class="btn btn-sm" aria-label="Eliminar amistad con ${esc(r.alias)}" onclick="removeStreakFriend('${id}')" ${busy}>Quitar</button>`:""}</li>`;
   }).join("")}</ol>`:"";
   const invite=streakSocialInvite?`<div class="streak-outgoing"><label for="streakInviteLink">Invitación para un amigo · válida por 7 días</label><input id="streakInviteLink" value="${esc(streakInviteUrl())}" readonly onclick="this.select()"><div class="streak-social-actions"><button type="button" class="btn btn-accent" onclick="shareStreakInvite()">Compartir invitación</button><button type="button" class="btn" onclick="changeStreakSocial('revoke',{},this)" ${busy}>Cancelar enlace</button></div></div>`:"";
-  return head+error+invitation+`<p class="muted small">Gana la racha actual más larga. Los empates comparten posición. Se mantienen tus descansos y las reglas de tu racha.</p>`
+  const self=rows.find(r=>r.self);
+  const youAre=`<p class="streak-you">Tus amigos te ven como <strong>${esc((self&&self.alias)||mine.alias||"")}</strong>. Para sumar a alguien, crea una invitación y envíale el enlace.</p>`;
+  return head+error+invitation+youAre+`<p class="muted small">Gana la racha actual más larga. Los empates comparten posición. Se mantienen tus descansos y las reglas de tu racha.</p>`
     +(streakSocialSyncPending()?`<p class="streak-social-status" role="status">Actualización pendiente: la clasificación muestra la última racha guardada.</p>`:"")
     +ranking+(rows.length<=1?`<p class="muted small">Invita a tu primer amigo para comparar sus rachas.</p>`:"")
     +`<div class="streak-social-actions"><button class="btn btn-accent" type="button" onclick="changeStreakSocial('invite',{},this)" ${busy}>Crear invitación</button>${retry}</div>`+invite
