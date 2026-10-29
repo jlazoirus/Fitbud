@@ -2106,6 +2106,12 @@ A los 7–13 días del plan, sin push, un día sin otro correo: "Activa los avis
 
 ## REQ-298 - Recordatorios: elegir la hora del aviso y resumen de la mañana
 
-**Estado: implementado; requiere aplicar `supabase/notifications_morning.sql`.** Detalle en `docs/requirements-history.md`.
+**Estado: implementado** (migración `supabase/notifications_morning.sql` aplicada el 2026-10-28). Detalle en `docs/requirements-history.md`.
 
 Aviso del día de 06:00 a 23:00, elegible también con push. Resumen opcional de 05:00 a 11:00 con el entreno y las comidas de hoy (`morningPlan()`, plan en `engagement.plan`), por push o, sin push, por correo; uno por día. ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
+
+## REQ-299 - Estimar macros: productos de marca sin inventar
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+"Shake proteina gloria pro" se estimó como proteína en polvo con agua (es una bebida lista para tomar). El pedido de texto decide el formato, no afirma datos de una marca que no conoce y orienta a la foto de la etiqueta; la foto lee la etiqueta. Reestimar actualiza el origen visible. ✓ `scripts/validate-meal-estimate-output.mjs`, `tests/e2e/origen-registro.spec.js`.

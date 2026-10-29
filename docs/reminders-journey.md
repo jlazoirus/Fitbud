@@ -102,6 +102,6 @@ En Perfil → Recordatorios se elige la hora del aviso del día (06:00–23:00, 
 ## Operación
 
 - Migración `supabase/notifications_journey.sql` (aplicada en producción el 2026-10-26): agrega `notification_preferences.engagement` y amplía el `CHECK` de `notification_log.notification_type` con `comeback`, `push_comeback` y `push_last_call`. Mientras no se aplique, esas etapas no se envían (el envío exige registrar antes el intento) y el aviso del día sale sin racha ni rescate.
-- Migración `supabase/notifications_morning.sql` (REQ-298, aplicar a mano): columnas `morning_opt_in` y `morning_hour`, y tipos `morning` y `push_morning`. Mientras no se aplique, la app guarda Recordatorios sin el resumen de la mañana y este no se envía.
+- Migración `supabase/notifications_morning.sql` (REQ-298, aplicada en producción el 2026-10-28): columnas `morning_opt_in` y `morning_hour`, y tipos `morning` y `push_morning`. Sin ella, la app guarda Recordatorios sin el resumen de la mañana y este no se envía.
 - Cada envío lee y registra su intento antes de enviar; si no puede (registro caído o tipo rechazado), no envía: sin registro, el disparo de la hora siguiente lo repetiría.
 - Las variables y el disparo horario son los de REQ-24/38/266/267.
