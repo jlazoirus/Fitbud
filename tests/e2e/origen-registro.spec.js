@@ -104,7 +104,7 @@ test("comida del plan editada: el detalle muestra que parte de la receta y la co
   await expect(overlay.locator(".meal-origin")).toHaveText("Origen: Calculado desde una receta · «Arroz con pollo» · corregido a mano");
 });
 
-// REQ-299: reestimar un registro existente cambia el origen visible al instante.
+// REQ-301: reestimar un registro existente cambia el origen visible al instante.
 test("reestimar un registro de una favorita ×2 actualiza su origen", async ({ page, context }) => {
   const { overlay, errors } = await setup(page, context, {
     estimate: { nombre: "Shake proteína", kcal: 210, proteina_g: 25, carbohidratos_g: 14, grasa_g: 5, nota: "Estimé un batido listo para tomar de 320 ml.", preguntas: [] },

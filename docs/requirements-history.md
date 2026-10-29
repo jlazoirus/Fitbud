@@ -11964,7 +11964,7 @@ Jonathan (2026-10-28) pidió implementar el selector de hora (06:00 a 23:00) y e
 - Ventana horaria, ciclo, plan terminado o sin empezar, ausencia de 3 días, día cumplido, preferencias de tipo, push antes que correo, uno por día y falla cerrado sin migración. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
 - Perfil guarda `notify_hour`, `morning_opt_in` y `morning_hour`, y la app guarda el plan de 8 días. ✓ `tests/e2e/recordatorios.spec.js`.
 
-## REQ-299 - Estimar macros: productos de marca sin inventar
+## REQ-301 - Estimar macros: productos de marca sin inventar
 
 **Estado: implementado.**
 

@@ -11979,7 +11979,7 @@ async function aiEstimate(){
     // descripción; si no hay, se informa el fallo y los campos no cambian.
     const quota=coachQuota("meal_estimate",requestId,"estimate","",{},hashText(name.toLowerCase()));
     // REQ-246: misma forma que el schema del servidor; aquí no se muestran preguntas.
-    // REQ-299: un producto de marca no se inventa (formato, presentación ni etiqueta).
+    // REQ-301: un producto de marca no se inventa (formato, presentación ni etiqueta).
     const txt=await callClaude(`Estima kcal y macros de esta comida: "${name}". El usuario vive en Perú: considera marcas, presentaciones y porciones locales.
 Si es un producto envasado o de marca (bebida, batido, yogur, barra, suplemento), decide primero el formato: listo para tomar (botella, caja) o en polvo para preparar. "Shake", "batido" o "bebida" con marca y sin "scoop" ni "polvo" es listo para tomar: una botella o caja. Usa los valores de la etiqueta solo si conoces ese producto exacto; si no, estima un producto típico de esa categoría y formato y dilo en "nota" (por ejemplo: "No tengo la etiqueta de este producto: estimé un batido proteico listo para tomar de 320 ml. Para el valor exacto, usa la foto de la etiqueta."). Nunca afirmes datos de una marca que no conoces ni cambies el nombre que escribió el usuario.
 Si la descripción dice una cantidad (2 vasos, media botella), estima esa cantidad; si no, una porción habitual.
@@ -12098,7 +12098,7 @@ function applyEstimatedMacros(j,kind){
   // REQ-270: origen estimado con su supuesto visible; la foto y el pedido no se guardan.
   if(window._editor)window._editor.meta={source:"estimate",estimate:{kind:kind==="photo"?"photo":"text",note:coachCopy(String(j.nota||""))},
     base:{kcal:vals.f_kcal,p:vals.f_p,c:vals.f_c,f:vals.f_f,unit:"portion"},qty:1};
-  // REQ-299: al reestimar un registro, el origen visible pasa a ser la estimación.
+  // REQ-301: al reestimar un registro, el origen visible pasa a ser la estimación.
   const origin=$("#f_origin");if(origin)origin.outerHTML=editorOriginHtml();
   Object.entries(vals).forEach(([id,v])=>{
     const el=$("#"+id);if(!el)return;
