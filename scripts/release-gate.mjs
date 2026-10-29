@@ -60,7 +60,7 @@ if (modifiedLines.length) {
 
 // ── Sintaxis de módulos JS ────────────────────────────────────────────────────
 console.log("\n[ Sintaxis de módulos JS ]");
-for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "js/meal-log.js", "domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
+for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "js/meal-log.js", "js/streak-friends.js", "domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
   if (existsSync(join(ROOT, file))) {
     run(`node --check ${file}`, `node --check "${join(ROOT, file)}"`);
   }
@@ -160,6 +160,7 @@ run("test-service-worker-cache.mjs", "node scripts/test-service-worker-cache.mjs
 console.log("\n[ SQL y datos ]");
 run("supabase/validate.mjs (recetas y macros)", "node supabase/validate.mjs");
 run("validate-migrations.mjs", "node scripts/validate-migrations.mjs");
+run("test-streak-friends.mjs (PostgreSQL/RLS)", "node scripts/test-streak-friends.mjs");
 
 // ── Auditorías de seguridad y calidad ───────────────────────────────────────
 console.log("\n[ Seguridad y calidad ]");

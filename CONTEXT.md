@@ -1,12 +1,12 @@
 # Fitbud - Contexto operativo compacto
 
-Contexto breve para agentes. Referencia extensa: `docs/architecture-reference.md`, bajo demanda para archivos, variables, migraciones o historia. La fuente de verdad es el código en `HEAD`.
+Referencia ampliada: `docs/architecture-reference.md`. Fuente de verdad: código en `HEAD`.
 
 ## Producto
 
-Fitbud es una PWA/web app de nutricion y entrenamiento personalizada. El usuario completa perfil, metas, restricciones, disponibilidad y recursos; la app prepara planes de 4 o 10 semanas, permite registrar ejecucion diaria, adaptar comidas/entrenos y revisar progreso.
+PWA de nutrición y entrenamiento personalizados: planes de 4/10 semanas, registro diario, adaptaciones y progreso según perfil, metas, restricciones y recursos.
 
-Promesa operativa: el usuario siempre debe tener una opcion viable para comer y entrenar hoy, entender como ejecutarla y conservar su historial.
+Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservado.
 
 ## Arquitectura vigente
 
@@ -79,6 +79,8 @@ Promesa operativa: el usuario siempre debe tener una opcion viable para comer y 
 - Splits progresivos: beginner = Full Body, intermediate = Upper/Lower, advanced = Push/Pull/Legs por defecto con selector avanzado.
 
 ## Persistencia, sync y planes
+
+- REQ-300: rachas privadas entre amigos (`js/streak-friends.js`, RPC `streak_social`). Alias voluntario + invitación de un uso/7 días + aceptación; ranking de racha actual, empates y revocación. Solo proyección mínima, sin abrir datos de salud. Migración manual: `supabase/streak_friends.sql`; operación y límites en `docs/streak-friends.md`.
 
 - `plan_versions` guarda snapshots activos/previos. Entrenamiento ya usa borrador + activacion confirmada. Nutricion aun esta migrando hacia `snapshot.nutritionPlan` (REQ-82).
 - `day_log` registra ejecucion diaria, overrides, extras, adaptaciones y estado offline. No debe convertirse en fuente principal de prescripcion futura.
