@@ -103,3 +103,21 @@ test("comida del plan editada: el detalle muestra que parte de la receta y la co
   await page.evaluate(() => openMealMore(todayStr(), "almuerzo"));
   await expect(overlay.locator(".meal-origin")).toHaveText("Origen: Calculado desde una receta · «Arroz con pollo» · corregido a mano");
 });
+
+// REQ-301: reestimar un registro existente cambia el origen visible al instante.
+test("reestimar un registro de una favorita ×2 actualiza su origen", async ({ page, context }) => {
+  const { overlay, errors } = await setup(page, context, {
+    estimate: { nombre: "Shake proteína", kcal: 210, proteina_g: 25, carbohidratos_g: 14, grasa_g: 5, nota: "Estimé un batido listo para tomar de 320 ml.", preguntas: [] },
+  });
+  await page.evaluate(() => {
+    const d = dayState(todayStr());
+    d.extras.push({ name: "Shake proteina gloria pro", kcal: 440, p: 50, c: 16, f: 10, done: true, portion: 2, oid: nextExtraOid(d),
+      nutritionMeta: { v: 1, source: "manual", ref: { kind: "saved", name: "Shake proteina gloria pro" }, base: { kcal: 220, p: 25, c: 8, f: 5, unit: "portion" }, qty: 2 } });
+    commitDay(todayStr()); render(); editExtra(todayStr(), 0);
+  });
+  await expect(overlay.locator("#f_origin")).toHaveText("Origen: Ingresado a mano · favorita «Shake proteina gloria pro» · porción ×2");
+  await overlay.getByRole("button", { name: /Estimar macros/ }).click();
+  await expect(overlay.locator("#f_kcal")).toHaveValue("210");
+  await expect(overlay.locator("#f_origin")).toHaveText("Origen: Estimado por tu coach a partir de la descripción — Estimé un batido listo para tomar de 320 ml.");
+  expect(errors).toEqual([]);
+});

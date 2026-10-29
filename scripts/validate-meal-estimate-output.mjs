@@ -46,4 +46,14 @@ assert.ok(aiEstimate.includes('\\"preguntas\\":[]') || aiEstimate.includes('"pre
 assert.ok(/deja "preguntas" vac[ií]o/i.test(aiEstimate), "el prompt de texto dice que no haga preguntas");
 console.log("  El prompt de texto coincide con el schema y no pide preguntas");
 
+// REQ-301: "Shake proteina gloria pro" se estimó como proteína en polvo con agua
+// (es una bebida lista para tomar): un producto de marca no se inventa.
+assert.ok(/producto envasado o de marca/.test(aiEstimate) && /listo para tomar/.test(aiEstimate) && /en polvo/.test(aiEstimate), "el prompt de texto decide el formato del producto");
+assert.ok(/Nunca afirmes datos de una marca que no conoces/.test(aiEstimate), "el prompt de texto no inventa datos de marca");
+assert.ok(/foto de la etiqueta/.test(aiEstimate), "sin la etiqueta, la nota orienta a la foto");
+assert.ok(/Perú/.test(aiEstimate), "el prompt de texto considera el mercado local");
+const photoRound = html.slice(html.indexOf("async function photoEstimateRound("), html.indexOf("function renderPhotoEstimate("));
+assert.ok(/etiqueta o tabla nutricional/.test(photoRound), "la foto de una etiqueta usa sus valores");
+console.log("  REQ-301: productos de marca sin inventar formato ni etiqueta; la foto lee la etiqueta");
+
 console.log("validate-meal-estimate-output: OK");

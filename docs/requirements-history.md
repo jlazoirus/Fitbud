@@ -11944,7 +11944,7 @@ Jonathan (2026-10-28): "se debe incluir en el journey un aviso para que activen 
 
 ## REQ-298 - Recordatorios: elegir la hora del aviso y resumen de la mañana
 
-**Estado: implementado; requiere aplicar `supabase/notifications_morning.sql` en producción.**
+**Estado: implementado.** Migración `supabase/notifications_morning.sql` aplicada en producción el 2026-10-28.
 
 ### Origen
 
@@ -11963,3 +11963,37 @@ Jonathan (2026-10-28) pidió implementar el selector de hora (06:00 a 23:00) y e
 
 - Ventana horaria, ciclo, plan terminado o sin empezar, ausencia de 3 días, día cumplido, preferencias de tipo, push antes que correo, uno por día y falla cerrado sin migración. ✓ `scripts/validate-reminder-journey.mjs` (falla con el código anterior).
 - Perfil guarda `notify_hour`, `morning_opt_in` y `morning_hour`, y la app guarda el plan de 8 días. ✓ `tests/e2e/recordatorios.spec.js`.
+
+## REQ-301 - Estimar macros: productos de marca sin inventar
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-29), con captura: "La estimación está mal". Al reestimar un registro "Shake proteina gloria pro", la nota dijo "Glory Pro es una proteína en polvo común en Perú", con un vaso preparado con agua (220 kcal · P 25 · C 8 · G 5). Gloria Pro es una bebida láctea lista para tomar, en botella de unos 320 ml. Además, la línea "Origen" seguía mostrando "favorita … · porción ×2" después de aplicar la estimación.
+
+### Causa raíz
+
+- `aiEstimate()` (`index.html`) pedía "Estima kcal y macros de esta comida" sin ninguna regla para productos envasados. El modelo por defecto (`claude-haiku-4-5-20251001`, `api/claude.js`) eligió un formato y afirmó datos de una marca que no conocía.
+- `photoEstimateRound()` solo hablaba de platos: una foto de la etiqueta no tenía instrucciones.
+- `applyEstimatedMacros()` cambiaba `_editor.meta` sin volver a pintar `#f_origin`.
+
+### Alcance
+
+1. Pedido de texto:
+   - el usuario vive en Perú (marcas y porciones locales);
+   - con un producto envasado o de marca, decide primero el formato. "Shake", "batido" o "bebida" con marca, sin "scoop" ni "polvo", se toma como listo para tomar;
+   - usa la etiqueta solo si conoce el producto exacto. Si no, estima un producto típico de esa categoría y formato, lo dice en la nota y orienta a la foto de la etiqueta;
+   - nunca afirma datos de una marca que no conoce ni cambia el nombre que escribió el usuario;
+   - respeta la cantidad descrita.
+2. Pedido de foto: si muestra una etiqueta o tabla nutricional, usa sus valores tal cual (por porción, o por envase si se consume entero).
+3. Al reestimar un registro existente, `#f_origin` pasa a "Estimado por tu coach … — <nota>".
+
+### Fuera de alcance
+
+Una base de productos de marca o la búsqueda del código de barras en una base externa (hoy solo busca en el catálogo propio, REQ-276). Cambiar el modelo de `meal_estimate`, que se configura con `ANTHROPIC_MODEL_MEAL_ESTIMATE` en Vercel.
+
+### Criterios de aceptación
+
+- Los pedidos de texto y foto llevan las reglas. ✓ `scripts/validate-meal-estimate-output.mjs`.
+- Reestimar un registro de una favorita ×2 actualiza el origen. ✓ `tests/e2e/origen-registro.spec.js` (falla con el código anterior).
