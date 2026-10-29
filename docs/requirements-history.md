@@ -12019,8 +12019,9 @@ Se mantiene el enlace privado de un uso (7 días). Jonathan descartó invitar po
 
    Debajo, "Nadie puede buscarte: solo entra quien recibe tu enlace". Con una invitación recibida no se muestran los pasos.
 2. El alias se propone con el primer nombre del perfil (`prefs.name`) y se puede editar. No se comparte hasta que la persona activa la comparación y acepta una amistad.
-3. Activada, se muestra "Tus amigos te ven como <alias>. Para sumar a alguien, crea una invitación y envíale el enlace."
+3. Activada, se muestra "Tus amigos te ven como <alias>".
+4. Seguimiento del mismo día: Jonathan señaló que sin alias no veía el botón para invitar. Si no hay una invitación recibida, el botón del formulario dice "Crear invitación": activa la comparación con el alias y deja el enlace listo para compartir en un solo paso. Con una invitación recibida sigue diciendo "Activar comparación", porque hay que activar antes de aceptar. Con un enlace a la vista, la acción principal es "Compartir invitación" y el otro botón pasa a "Crear otro enlace", que cancela el anterior.
 
 ### Criterios de aceptación
 
-- Antes de activar se ven los pasos, el aviso de privacidad y el alias propuesto. Al activar desaparecen los pasos y se muestra el alias propio. ✓ `tests/e2e/rachas-amigos.spec.js`.
+- Antes de activar se ven los pasos, el aviso de privacidad y el alias propuesto. "Crear invitación" activa y muestra el enlace; al activar desaparecen los pasos y se muestra el alias propio. Con una invitación recibida, "Activar comparación" deja aceptar. ✓ `tests/e2e/rachas-amigos.spec.js`.

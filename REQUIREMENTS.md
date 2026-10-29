@@ -2134,4 +2134,4 @@ Un shake de marca se estimó como polvo con agua. El pedido decide el formato, n
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Antes de activar: tres pasos (alias → enlace → acepta) y alias propuesto con el primer nombre; activada: "Tus amigos te ven como …". Sin buscador ni correo. ✓ `tests/e2e/rachas-amigos.spec.js`.
+Tres pasos, alias propuesto y «Crear invitación» que activa y deja el enlace; luego "Tus amigos te ven como …". Sin buscador. ✓ `tests/e2e/rachas-amigos.spec.js`.

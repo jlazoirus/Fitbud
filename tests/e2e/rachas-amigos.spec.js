@@ -38,19 +38,21 @@ async function setup(page,context,social,rows=[]){
   await installMocks(context,{tables:{day_log:{rows}}});await social.route(context);
   await seedLoggedInUser(page);await autoDismissNudges(page);await gotoApp(page);
   await page.getByRole('button',{name:'Ver mi racha y amigos'}).click();
-  await expect(page.getByRole('button',{name:'Activar comparación'})).toBeVisible();
-}
-async function enable(page,alias='Mi alias'){
-  await page.getByLabel('Tu alias para amigos').fill(alias);
-  await page.getByRole('button',{name:'Activar comparación'}).click();
   await expect(page.getByRole('button',{name:'Crear invitación'})).toBeVisible();
+}
+// REQ-302: sin invitación recibida, «Crear invitación» activa y deja el enlace listo.
+async function enable(page,alias='Mi alias',{invited=false}={}){
+  await page.getByLabel('Tu alias para amigos').fill(alias);
+  await page.getByRole('button',{name:invited?'Activar comparación':'Crear invitación'}).click();
+  if(invited)await expect(page.getByRole('button',{name:'Aceptar amistad'})).toBeVisible();
+  else await expect(page.getByLabel(/Invitación para un amigo/)).toBeVisible();
 }
 
 test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,context,social})=>{
   const errors=collectConsoleErrors(page);
   await setup(page,context,social,[row(-3),row(-2),row(-1)]);
   // REQ-302: la pantalla explica cómo se suma a un amigo y propone el primer nombre como alias.
-  await expect(page.locator('.streak-steps')).toContainText('Elige tu alias');
+  await expect(page.locator('.streak-steps')).toContainText('Revisa tu alias');
   await expect(page.locator('.streak-steps')).toContainText('envía el enlace a un amigo');
   await expect(page.getByText('Nadie puede buscarte')).toBeVisible();
   await expect(page.getByLabel('Tu alias para amigos')).toHaveValue('Bro');
@@ -59,7 +61,7 @@ test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,co
   await expect(page.locator('.streak-steps')).toHaveCount(0);
   const list=page.getByRole('list',{name:'Clasificación por racha actual'});
   await expect(list).toContainText('Ana (tú)');await expect(list.locator('.streak-days')).toHaveText('3días');
-  await page.getByRole('button',{name:'Crear invitación'}).click();
+  // El enlace ya quedó creado al activar (REQ-302).
   const link=await page.getByLabel(/Invitación para un amigo/).inputValue();
   const token=new URLSearchParams(new URL(link).hash.slice(1)).get('friend');
   await social.rpc(FRIEND,'enable',{alias:'Bruno'});
@@ -72,8 +74,9 @@ test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,co
   page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Eliminar amistad con Bruno'}).click();
   await expect(list.locator('li')).toHaveCount(1);expect((await social.rpc(FRIEND)).rows).toHaveLength(1);
   // Cancelar también funciona después de que el primer enlace se haya usado.
-  await page.getByRole('button',{name:'Crear invitación'}).click();
+  await page.getByRole('button',{name:'Crear otro enlace'}).click();
   await page.getByRole('button',{name:'Cancelar enlace'}).click();
+  await expect(page.getByRole('button',{name:'Crear invitación'})).toBeVisible();
   await expect(page.getByLabel(/Invitación para un amigo/)).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -90,15 +93,15 @@ test('invitación persiste durante login y exige activar y aceptar antes de most
   await seedLoggedInUser(page);await gotoApp(page);
   await expect(page.getByRole('heading',{name:'Amigo invitante te invita a comparar rachas'})).toBeVisible();
   await expect(page.getByRole('list',{name:'Clasificación por racha actual'})).toHaveCount(0);
-  await enable(page,'Alias elegido');
-  await expect(page.getByRole('button',{name:'Aceptar amistad'})).toBeVisible();
+  await enable(page,'Alias elegido',{invited:true});
+  await expect(page.getByLabel(/Invitación para un amigo/)).toHaveCount(0);
   expect((await social.rpc(FRIEND)).rows).toHaveLength(1);
   await page.getByRole('button',{name:'Aceptar amistad'}).click();
   await expect(page.getByRole('listitem').filter({hasText:'Amigo invitante'})).toBeVisible();
   expect(await page.evaluate(()=>sessionStorage.getItem(STREAK_INVITE_KEY))).toBeNull();
   await page.getByText('Alias y privacidad',{exact:true}).click();
   page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Dejar de comparar mi racha'}).click();
-  await expect(page.getByRole('button',{name:'Activar comparación'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Crear invitación'})).toBeVisible();
   expect((await social.rpc(FRIEND)).rows).toHaveLength(1);
 });
 
