@@ -2188,6 +2188,8 @@ Segunda ampliación (2026-10-30): se reemplazan 4 pendientes por demostraciones 
 
 Tercera ampliación (2026-10-30): la foto de standing-heel-raise resultó unipodal con bloque y la ficha es bilateral en suelo plano, así que vuelve a pendiente explícito conservando su media anterior hasta encontrar demo exacta. El frame de tracción de band-row se corrige para mostrar la fase de tirón, no dos frames equivalentes. La guía de ejercicio ("Ver técnica") muestra ahora el crédito de la demostración (fuente/autor y licencia) cuando no es contenido propio, cumpliendo la atribución de CC BY/CC BY-SA de forma visible para el usuario. Bump de caché `fitbud-pwa-v182`.
 
+Cuarta ampliación (2026-10-30): los 9 ejercicios de cardio (run-drills/easy/intervals, cycle-cadence/endurance/intervals, swim-drills/endurance/intervals) dejan el SVG procedural: `normalize` les asigna las fotos reales por disciplina que el catálogo local ya usaba (running.jpg, cycling.jpg, swimming.jpg), con su atribución. Bump de caché `fitbud-pwa-v183`.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**
