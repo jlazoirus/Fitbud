@@ -165,7 +165,7 @@ assert(mails[0].auth === "Bearer re_test" && mail.from === "Evolv <hola@evolv.te
 assert(JSON.stringify(mail.to) === JSON.stringify(["admin@evolv.test"]), "Sin BETA_NOTIFY_EMAIL va a los admins activos.");
 assert(mail.subject === "Nueva postulación a la beta: Ana <Test>" && mail.reply_to === "ana@correo.test", "Asunto con el nombre y respuesta directa al postulante.");
 assert(mail.html.includes("Ana &lt;Test&gt;") && !mail.html.includes("<Test>"), "El correo escapa lo que escribe el postulante.");
-assert(mail.html.includes("/?ver=postulantes") && mail.html.includes("lesión o indicación médica"), "Lleva el enlace a revisar y el aviso de salud.");
+assert(mail.html.includes("/admin?ver=postulantes") && mail.html.includes("lesión o indicación médica"), "Lleva el enlace a revisar y el aviso de salud.");
 
 mails = [];
 rowCreatedAt = "2026-01-01T00:00:00Z";
