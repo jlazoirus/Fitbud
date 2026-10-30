@@ -79,6 +79,29 @@ for(const exercise of strength){
     if(v&&v.kind==="exercise"&&bySlug.has(v.to)&&substitution.primaryMuscle(bySlug.get(v.to))!==muscle)errors.push(`${exercise.slug}.${direction}: ${v.to} trabaja otro músculo`);
   }
 }
+// REQ-302: enlaces explícitos, no solo candidatos filtrados en runtime.
+for(const exercise of strength){
+  if(!exercise.substitute_slugs.length)errors.push(`${exercise.slug}: sin sustitución del mismo músculo`);
+  for(const slug of exercise.substitute_slugs){
+    const target=bySlug.get(slug);
+    if(!target||slug===exercise.slug||substitution.primaryMuscle(target)!==substitution.primaryMuscle(exercise))errors.push(`${exercise.slug}: enlace de sustitución inválido ${slug}`);
+  }
+}
+const expanded=strength.filter(ex=>ex.source_id);
+if(expanded.length<28)errors.push("Ampliación: faltan fichas con fotos locales exactas");
+for(const ex of expanded){
+  if(mediaMap[ex.slug]?.id!==ex.source_id)errors.push(`${ex.slug}: identidad multimedia no coincide`);
+  if(ex.frames?.length!==2)errors.push(`${ex.slug}: falta inicio/final de la demostración`);
+  for(const frame of ex.frames||[]){
+    const asset=path.join(root,frame);
+    if(!fs.existsSync(asset)){errors.push(`${ex.slug}: foto inexistente ${frame}`);continue;}
+    const data=fs.readFileSync(asset);
+    if(data.length<1000||data[0]!==0xff||data[1]!==0xd8)errors.push(`${ex.slug}: foto JPEG inválida`);
+  }
+  const stale={slug:ex.slug,active:false,muscles:["incorrecto"],equipment:[],level:"advanced"};
+  const normalized=context.globalThis.FITBUD_EXERCISE_CONTENT.normalize(stale);
+  if(normalized.active!==false||normalized.poster_url!==ex.poster_url||JSON.stringify(normalized.equipment)!==JSON.stringify(ex.equipment)||normalized.muscles[0]!==ex.muscles[0])errors.push(`${ex.slug}: metadatos remotos obsoletos prevalecen`);
+}
 for(const slug of Object.keys(substitution.primaryMuscles))if(!bySlug.has(slug))errors.push(`Músculo principal para slug inexistente: ${slug}`);
 const names=slug=>substitution.candidates(bySlug.get(slug),catalog).map(exercise=>exercise.slug);
 const expect=(slug,includes,excludes)=>{

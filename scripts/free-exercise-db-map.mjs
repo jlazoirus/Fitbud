@@ -21,6 +21,36 @@
 // ============================================================
 
 export default {
+  // REQ-302: identidad exacta del recurso local, sin proxies.
+  "band-pull-apart": { id: "Band_Pull_Apart" },
+  "band-lateral-raise": { id: "Lateral_Raise_-_With_Bands" },
+  "band-shoulder-press": { id: "Shoulder_Press_-_With_Bands" },
+  "band-chest-fly": { id: "Cross_Over_-_With_Bands" },
+  "band-seated-leg-curl": { id: "Seated_Band_Hamstring_Curl" },
+  "dumbbell-floor-press": { id: "Dumbbell_Floor_Press" },
+  "one-arm-dumbbell-row": { id: "One-Arm_Dumbbell_Row" },
+  "dumbbell-squat": { id: "Dumbbell_Squat" },
+  "dumbbell-reverse-lunge": { id: "Dumbbell_Rear_Lunge" },
+  "dumbbell-stiff-leg-deadlift": { id: "Stiff-Legged_Dumbbell_Deadlift" },
+  "seated-dumbbell-press": { id: "Seated_Dumbbell_Press" },
+  "seated-dumbbell-reverse-fly": { id: "Seated_Bent-Over_Rear_Delt_Raise" },
+  "concentration-curl": { id: "Concentration_Curls" },
+  "lying-dumbbell-triceps-extension": { id: "Lying_Dumbbell_Tricep_Extension" },
+  "seated-dumbbell-calf-raise": { id: "Dumbbell_Seated_One-Leg_Calf_Raise" },
+  "dumbbell-chest-fly": { id: "Dumbbell_Flyes" },
+  "dumbbell-alternating-curl": { id: "Dumbbell_Alternate_Bicep_Curl" },
+  "machine-chest-press": { id: "Machine_Bench_Press" },
+  "machine-shoulder-press": { id: "Machine_Shoulder_Military_Press" },
+  "reverse-pec-deck": { id: "Reverse_Machine_Flyes" },
+  "leg-extension": { id: "Leg_Extensions" },
+  "seated-leg-curl": { id: "Seated_Leg_Curl" },
+  "seated-calf-raise": { id: "Seated_Calf_Raise" },
+  "machine-biceps-curl": { id: "Machine_Bicep_Curl" },
+  "pec-deck": { id: "Butterfly" },
+  "crunch": { id: "Crunches" },
+  "reverse-crunch": { id: "Reverse_Crunch" },
+  "oblique-crunch": { id: "Oblique_Crunches_-_On_The_Floor" },
+
   // --- Gimnasio / fuerza ---
   "back-squat":              { q: "barbell full squat", id: "Barbell_Full_Squat" },
   "bench-press":             { q: "barbell bench press medium grip", id: "Barbell_Bench_Press_-_Medium_Grip" },

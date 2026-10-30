@@ -5194,7 +5194,7 @@ function exerciseLevelLabel(level){
 }
 // REQ-293: el material se muestra en español, nunca con su clave interna.
 const EXERCISE_EQUIPMENT_LABELS={
-  barbell:"barra",rack:"rack",bench:"banco",cable:"polea",dumbbells:"mancuernas",
+  machines:"máquinas",barbell:"barra",rack:"rack",bench:"banco",cable:"polea",dumbbells:"mancuernas",
   bench_or_chair:"banco o silla",barbell_or_dumbbells:"barra o mancuernas",bench_or_assistance:"banco o asistencia",
   dumbbells_or_cable:"mancuernas o polea",leg_press:"prensa",leg_curl:"máquina de femoral",bench_or_wall:"banco o pared",
   resistance_band:"banda elástica",pullup_bar:"barra de dominadas",step_or_bench:"escalón o banco",
@@ -11619,7 +11619,7 @@ function trainingEquipmentSupports(requirement,prefs){
   const selected=new Set(prefs.equipment||[]);
   const support={
     barbell:["barbell"],rack:["barbell"],bench:["dumbbells","barbell","machines"],
-    cable:["machines"],leg_press:["machines"],leg_curl:["machines"],
+    machines:["machines"],cable:["machines"],leg_press:["machines"],leg_curl:["machines"],
     dumbbells:["dumbbells"],dumbbells_or_cable:["dumbbells","machines"],
     barbell_or_dumbbells:["barbell","dumbbells"],resistance_band:["bands"],
     pullup_bar:["pullup"],bench_or_assistance:["machines","bodyweight"],table_or_low_bar:[],

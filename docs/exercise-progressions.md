@@ -91,3 +91,50 @@ Sus progresiones son de volumen (más tiempo, distancia o repeticiones de técni
 | Intervalos de natación | Aumentar distancia manteniendo técnica |
 | Natación aeróbica fácil | Aumentar distancia sin perder alineación |
 | Técnica de natación | Combinar ejercicios manteniendo respiración estable |
+
+## Ampliación REQ-302
+
+El catálogo pasa de 55 a 83 fichas (71 de fuerza y 12 de resistencia). Las 28 altas tienen foto inicial y final locales; 20 admiten casa según el material declarado y 8 son de máquinas en gimnasio.
+
+Las fichas con resistencia graduable bajan la carga o tensión para la regresión. Para progresar se añaden 1–2 repeticiones controladas y luego un incremento pequeño de resistencia, sin cambiar de movimiento. En abdominales sin material se reduce o aumenta el número de repeticiones manteniendo postura y recorrido. Estas pautas son ajustes voluntarios: no alteran los registros ni añaden peso automáticamente.
+
+Se añaden alternativas de deltoides lateral y posterior, pantorrillas, brazos, pecho, cuádriceps, isquiotibiales, espalda media y core. Todos los enlaces de sustitución, incluidos los exportados a SQL, tienen destino real y el mismo músculo principal. El material y el nivel se comprueban por separado al preparar la sesión.
+
+El press militar puede regresar al press sentado con mancuernas; la banca al press en el suelo; la sentadilla frontal a la sentadilla con mancuernas. Cada cambio usa la ficha y la imagen de destino. El curl martillo progresa su carga conservando el agarre neutro, y la regresión del curl deslizante es bilateral de recorrido corto.
+
+Las fotos son de Free Exercise DB (dominio público / Unlicense), servidas desde `assets/exercise-media/`. La identidad de origen exacta queda en `source_id` de cada ficha y en `scripts/free-exercise-db-map.mjs`.
+
+Persistencia opcional y manual: regenerar con `node scripts/generate-exercise-sql.mjs` y aplicar `supabase/exercises.sql` después de `supabase/auth.sql`. Incluye columnas de media idempotentes y conserva RLS. Los recursos son locales: no hace falta subir a Storage. El cliente combina las nuevas fichas con Supabase incluso antes de aplicar SQL y corrige sus metadatos antiguos conservando el estado administrativo. Recuperación: desactivar las filas nuevas con `active=false`; no borrar ejercicios presentes en historiales.
+
+### Identidad de las demostraciones añadidas
+
+| Ejercicio | Fuente exacta en Free Exercise DB |
+|---|---|
+| Apertura de banda al frente (`band-pull-apart`) | [Band_Pull_Apart](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Band_Pull_Apart) |
+| Elevación lateral con banda (`band-lateral-raise`) | [Lateral_Raise_-_With_Bands](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Lateral_Raise_-_With_Bands) |
+| Press de hombros con banda (`band-shoulder-press`) | [Shoulder_Press_-_With_Bands](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Shoulder_Press_-_With_Bands) |
+| Apertura de pecho con banda (`band-chest-fly`) | [Cross_Over_-_With_Bands](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Cross_Over_-_With_Bands) |
+| Curl femoral sentado con banda (`band-seated-leg-curl`) | [Seated_Band_Hamstring_Curl](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Seated_Band_Hamstring_Curl) |
+| Press de pecho en el suelo (`dumbbell-floor-press`) | [Dumbbell_Floor_Press](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Dumbbell_Floor_Press) |
+| Remo con mancuerna a una mano con apoyo (`one-arm-dumbbell-row`) | [One-Arm_Dumbbell_Row](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/One-Arm_Dumbbell_Row) |
+| Sentadilla con mancuernas a los lados (`dumbbell-squat`) | [Dumbbell_Squat](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Dumbbell_Squat) |
+| Zancada hacia atrás con mancuernas (`dumbbell-reverse-lunge`) | [Dumbbell_Rear_Lunge](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Dumbbell_Rear_Lunge) |
+| Peso muerto de piernas semirrígidas con mancuernas (`dumbbell-stiff-leg-deadlift`) | [Stiff-Legged_Dumbbell_Deadlift](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Stiff-Legged_Dumbbell_Deadlift) |
+| Press de hombros sentado con mancuernas (`seated-dumbbell-press`) | [Seated_Dumbbell_Press](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Seated_Dumbbell_Press) |
+| Pájaros sentado con mancuernas (`seated-dumbbell-reverse-fly`) | [Seated_Bent-Over_Rear_Delt_Raise](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Seated_Bent-Over_Rear_Delt_Raise) |
+| Curl concentrado (`concentration-curl`) | [Concentration_Curls](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Concentration_Curls) |
+| Extensión de tríceps tumbado con mancuernas (`lying-dumbbell-triceps-extension`) | [Lying_Dumbbell_Tricep_Extension](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Lying_Dumbbell_Tricep_Extension) |
+| Elevación de talón sentado con mancuerna (`seated-dumbbell-calf-raise`) | [Dumbbell_Seated_One-Leg_Calf_Raise](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Dumbbell_Seated_One-Leg_Calf_Raise) |
+| Apertura de pecho con mancuernas (`dumbbell-chest-fly`) | [Dumbbell_Flyes](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Dumbbell_Flyes) |
+| Curl alternado de bíceps (`dumbbell-alternating-curl`) | [Dumbbell_Alternate_Bicep_Curl](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Dumbbell_Alternate_Bicep_Curl) |
+| Press de pecho en máquina (`machine-chest-press`) | [Machine_Bench_Press](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Machine_Bench_Press) |
+| Press de hombros en máquina (`machine-shoulder-press`) | [Machine_Shoulder_Military_Press](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Machine_Shoulder_Military_Press) |
+| Apertura inversa en máquina (`reverse-pec-deck`) | [Reverse_Machine_Flyes](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Reverse_Machine_Flyes) |
+| Extensión de cuádriceps en máquina (`leg-extension`) | [Leg_Extensions](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Leg_Extensions) |
+| Curl femoral sentado en máquina (`seated-leg-curl`) | [Seated_Leg_Curl](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Seated_Leg_Curl) |
+| Elevación de gemelos sentado en máquina (`seated-calf-raise`) | [Seated_Calf_Raise](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Seated_Calf_Raise) |
+| Curl de bíceps en máquina (`machine-biceps-curl`) | [Machine_Bicep_Curl](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Machine_Bicep_Curl) |
+| Apertura de pecho en máquina (`pec-deck`) | [Butterfly](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Butterfly) |
+| Crunch abdominal (`crunch`) | [Crunches](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Crunches) |
+| Crunch inverso (`reverse-crunch`) | [Reverse_Crunch](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Reverse_Crunch) |
+| Crunch oblicuo en el suelo (`oblique-crunch`) | [Oblique_Crunches_-_On_The_Floor](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Oblique_Crunches_-_On_The_Floor) |

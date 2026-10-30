@@ -3,6 +3,7 @@
 // Evalúa .vercelignore con semántica gitignore sobre los archivos del repo y
 // falla si falta un archivo del runtime o si se publicaría uno no declarado.
 import assert from "node:assert/strict";
+import vm from "node:vm";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -72,6 +73,14 @@ for (const page of ["index.html", "beta-reclutamiento.html"]) {
 }
 // Fotos de ejercicios servidas desde el propio deploy (REQ-259).
 for (const [, ref] of read("exercise-catalog.js").matchAll(/"(assets\/[^"]+)"/g)) required.add(ref);
+// REQ-302: incluye también rutas derivadas por slug, sin permitir assets ajenos.
+const catalogContext={globalThis:{}};
+vm.runInNewContext(read("exercise-catalog.js"),catalogContext);
+for(const ex of catalogContext.globalThis.FITBUD_EXERCISES){
+  for(const ref of [ex.media_url,ex.poster_url,...(ex.frames||[])]){
+    if(String(ref||"").startsWith("assets/"))required.add(ref);
+  }
+}
 const shell = read("service-worker.js").match(/const APP_SHELL = \[([\s\S]*?)\];/);
 assert.ok(shell, "service-worker.js debe declarar APP_SHELL");
 for (const [, ref] of shell[1].matchAll(/"\.\/([^"]*)"/g)) required.add(ref || "index.html");

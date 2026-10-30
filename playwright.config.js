@@ -13,7 +13,8 @@ export default defineConfig({
   timeout: 45_000,
   expect: { timeout: 10_000 },
   retries: 1,
-  workers: 1, // la app usa localStorage compartido por origen; en serie es determinista
+  // Por defecto en serie; cada contexto aísla almacenamiento y mocks.
+  workers: process.env.PLAYWRIGHT_WORKERS ? Number(process.env.PLAYWRIGHT_WORKERS) : 1,
   reporter: [["list"]],
   use: {
     launchOptions: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH

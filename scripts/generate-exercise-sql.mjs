@@ -29,10 +29,10 @@ const sql=`-- ============================================================
 -- Fitbros - biblioteca de ejercicios y demostraciones (REQ-15)
 -- Idempotente. Ejecuta despues de supabase/auth.sql.
 --
--- Decision de contenido: produccion propia Fitbros. Las demostraciones
--- SVG procedimentales viven en la app; no se usan hotlinks ni media de
--- terceros. Recuperacion: archivar filas (active=false) o borrar la tabla
--- exercises si se necesita retirar por completo este catalogo.
+-- Contenido: guías SVG propias y fotografías Free Exercise DB (Unlicense),
+-- con fuente/licencia por ficha. Las demostraciones revisadas se sirven
+-- desde assets/ del deploy, sin hotlinks. Recuperación: archivar filas
+-- nuevas (active=false); conservar IDs utilizados en historiales.
 -- ============================================================
 
 create table if not exists exercises (
@@ -125,5 +125,15 @@ on conflict (slug) do update set
   updated_at=now();
 `;
 
-fs.writeFileSync(outputPath,sql);
+// Persiste también las demostraciones locales revisadas. No sustituye fotos
+// remotas de fichas sin media local ni requiere subirlas a Storage.
+const localMedia=catalog.filter(ex=>String(ex.poster_url||ex.media_url||"").startsWith("assets/"));
+const mediaSql=`
+-- Demostraciones locales revisadas (REQ-302). Mismos permisos RLS.
+alter table exercises add column if not exists media_url text;
+alter table exercises add column if not exists poster_url text;
+alter table exercises add column if not exists frames jsonb not null default '[]'::jsonb;
+${localMedia.map(ex=>`update exercises set media_type=${text(ex.media_type)}, media_url=${text(ex.media_url||null)}, poster_url=${text(ex.poster_url)}, frames=${json(ex.frames||[])} where slug=${text(ex.slug)};`).join("\n")}
+`;
+fs.writeFileSync(outputPath,sql+mediaSql);
 console.log(`Generado ${path.relative(root,outputPath)} con ${catalog.length} ejercicios.`);

@@ -71,7 +71,7 @@ Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservad
 
 ## Entrenamiento
 
-- `exercise-catalog.js` cubre biblioteca y rutinas. REQ-264: niveles/demos revisados prevalecen sobre Supabase; planes pendientes respetan experiencia sin reescribir historial. Inventario: `docs/exercise-levels.md`; SQL opcional: `supabase/exercise-levels.sql`.
+- REQ-302: 83 fichas; ver `docs/exercise-progressions.md`. REQ-264: niveles/demos revisados prevalecen sobre Supabase; planes pendientes respetan experiencia sin reescribir historial. Inventario: `docs/exercise-levels.md`; SQL opcional: `supabase/exercise-levels.sql`.
 - `training-plan.js` valida planes de 4/10 semanas; `workout-player.js` maneja ejecucion recuperable, series, cardio, temporizadores, RPE y sustituciones.
 - Onboarding/Perfil de entrenamiento (REQ-115): la UI pregunta deporte (`walking/running/cycling/swimming/other/strength_only`) y lugar de fuerza (`strengthPlace: gym/home/outdoor/none`). `strengthMode:"none"` soporta semanas solo de actividad; caminata usa roles `walking`; casa/aire libre muestran recursos (`bodyweight`, bandas, mancuernas, barra/discos, dominadas).
 - Modo seguro de entrenamiento (REQ-116): `trainingSafetyMode` (`auto/gentle/full`) recomienda modo suave por edad 18-21, 50+, 55+ o limitaciones. En suave, el deporte efectivo puede pasar de running/otra actividad a `walking`, la dosis baja a RPE/series conservadoras y `allowedExercisesForSession()` filtra pike push-ups, dominadas, movimientos invertidos/unilaterales complejos antes de validar/generar semanas. Red flags del safety screening mantienen `trainingSafetyHold()`.

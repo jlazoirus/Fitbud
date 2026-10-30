@@ -127,3 +127,38 @@ Los niveles canónicos revisados del catálogo local y su registro complementari
 Regresiones, progresiones y sustituciones conservan sus identidades: al cambiar de ejercicio se consulta el nivel del destino; una variación de carga no modifica por sí sola el nivel técnico. Una etiqueta compartida no indica que dos ejercicios tengan exactamente la misma dificultad dentro de ese nivel.
 
 La revisión corrige los metadatos y las referencias actuales del catálogo. **No reescribe sesiones ejecutadas, registros históricos, cargas utilizadas ni resultados anteriores.** Tampoco implica que se haya ejecutado una migración de producción ni documenta por sí misma pruebas funcionales de la app.
+
+## Ampliación REQ-302: 28 fichas revisadas
+
+El nivel describe la ejecución base de la demostración local. Los aumentos de repeticiones o resistencia conservan esa ejecución.
+
+| Slug | Nivel | Criterio |
+|---|---|---|
+| `band-pull-apart` | beginner | De pie, sujeta una banda delante del pecho con los brazos extendidos. Apoyo estable y resistencia o recorrido graduable. |
+| `band-lateral-raise` | beginner | Pisa el centro de la banda y sujeta los extremos junto a los muslos. Apoyo estable y resistencia o recorrido graduable. |
+| `band-shoulder-press` | intermediate | Pisa la banda con ambos pies y coloca las manos a la altura de los hombros. Control de bisagra, hombro o equilibrio previo. |
+| `band-chest-fly` | intermediate | Ancla la banda a un poste firme detrás del cuerpo, a la altura del pecho, y adelanta un pie. Control de bisagra, hombro o equilibrio previo. |
+| `band-seated-leg-curl` | beginner | Siéntate en un banco firme frente a una banda anclada cerca del suelo, colocada detrás de los tobillos. Apoyo estable y resistencia o recorrido graduable. |
+| `dumbbell-floor-press` | beginner | Túmbate boca arriba con rodillas flexionadas y una mancuerna en cada mano sobre el pecho. Apoyo estable y resistencia o recorrido graduable. |
+| `one-arm-dumbbell-row` | beginner | Apoya una mano y una rodilla en un banco firme y sostén una mancuerna con el brazo libre. Apoyo estable y resistencia o recorrido graduable. |
+| `dumbbell-squat` | beginner | De pie, pies al ancho de hombros y una mancuerna junto a cada muslo. Apoyo estable y resistencia o recorrido graduable. |
+| `dumbbell-reverse-lunge` | intermediate | De pie con una mancuerna a cada lado y espacio libre detrás. Control de bisagra, hombro o equilibrio previo. |
+| `dumbbell-stiff-leg-deadlift` | intermediate | De pie con mancuernas delante de los muslos y rodillas ligeramente flexionadas, sin bloquearlas. Control de bisagra, hombro o equilibrio previo. |
+| `seated-dumbbell-press` | beginner | Siéntate con la espalda apoyada en un banco con respaldo y las mancuernas a la altura de hombros. Apoyo estable y resistencia o recorrido graduable. |
+| `seated-dumbbell-reverse-fly` | intermediate | Siéntate al borde de un banco firme con los pies apoyados, inclina el tronco hacia los muslos y mantén la espalda neutra. Control de bisagra, hombro o equilibrio previo. |
+| `concentration-curl` | beginner | Siéntate con las piernas separadas y apoya la parte posterior del brazo contra la cara interna del muslo. Apoyo estable y resistencia o recorrido graduable. |
+| `lying-dumbbell-triceps-extension` | intermediate | Túmbate en un banco plano con las mancuernas sobre los hombros y las palmas enfrentadas. Control de bisagra, hombro o equilibrio previo. |
+| `seated-dumbbell-calf-raise` | beginner | Siéntate en un banco firme, coloca el antepié sobre un escalón bajo y sujeta una mancuerna encima del muslo de esa pierna. Apoyo estable y resistencia o recorrido graduable. |
+| `dumbbell-chest-fly` | intermediate | Túmbate en un banco plano con las mancuernas sobre el pecho y los codos ligeramente flexionados. Control de bisagra, hombro o equilibrio previo. |
+| `dumbbell-alternating-curl` | beginner | De pie con una mancuerna a cada lado, brazos junto al tronco y palmas hacia dentro. Apoyo estable y resistencia o recorrido graduable. |
+| `machine-chest-press` | beginner | Ajusta el asiento para que las asas queden a la altura del pecho y apoya la espalda. Apoyo estable y resistencia o recorrido graduable. |
+| `machine-shoulder-press` | beginner | Ajusta el asiento con las asas a la altura de hombros y la espalda apoyada. Apoyo estable y resistencia o recorrido graduable. |
+| `reverse-pec-deck` | beginner | Siéntate mirando al respaldo con el pecho apoyado y las asas a la altura de hombros. Apoyo estable y resistencia o recorrido graduable. |
+| `leg-extension` | beginner | Alinea la rodilla con el eje de la máquina, apoya la espalda y coloca el rodillo sobre la parte baja de las espinillas. Apoyo estable y resistencia o recorrido graduable. |
+| `seated-leg-curl` | beginner | Ajusta el eje a la altura de las rodillas, el apoyo sobre los muslos y el rodillo detrás de los tobillos. Apoyo estable y resistencia o recorrido graduable. |
+| `seated-calf-raise` | beginner | Siéntate con el antepié en la plataforma y las almohadillas sobre los muslos; libera el seguro según la máquina. Apoyo estable y resistencia o recorrido graduable. |
+| `machine-biceps-curl` | beginner | Ajusta el asiento, apoya los brazos en la almohadilla y alinea los codos con el eje de giro. Apoyo estable y resistencia o recorrido graduable. |
+| `pec-deck` | beginner | Siéntate con la espalda apoyada, ajusta el asiento y coloca los antebrazos en las almohadillas a la altura del pecho. Apoyo estable y resistencia o recorrido graduable. |
+| `crunch` | beginner | Túmbate boca arriba con las rodillas flexionadas y los pies apoyados; coloca las manos a los lados de la cabeza sin tirar de ella. Apoyo estable y resistencia o recorrido graduable. |
+| `reverse-crunch` | intermediate | Túmbate boca arriba con brazos a los lados, caderas y rodillas flexionadas a unos 90 grados. Control de bisagra, hombro o equilibrio previo. |
+| `oblique-crunch` | beginner | Túmbate de lado con las rodillas flexionadas y una mano junto a la cabeza sin tirar del cuello. Apoyo estable y resistencia o recorrido graduable. |

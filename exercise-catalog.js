@@ -208,6 +208,292 @@
     progression:row[9],substitutes:row[10],level:row[11],
   }));
 
+  // REQ-302: fichas completas con demostración exacta, dosis y músculo revisados.
+  const EXPANDED_STRENGTH_SPECS=[
+    {
+      slug:"band-pull-apart",name:"Apertura de banda al frente",aliases:["Band Pull Apart"],
+      discipline:"strength",pattern:"isolation",level:"beginner",
+      muscles:["Deltoides posterior"],primary_muscle:"Deltoides posterior",equipment:["resistance_band"],places:["home","gym"],
+      start_position:"De pie, sujeta una banda delante del pecho con los brazos extendidos.",
+      steps:["Separa las manos sin encoger los hombros.","Acerca la banda al pecho con los codos suaves y el tronco quieto.","Vuelve despacio sin soltar la tensión."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["face-pull","seated-dumbbell-reverse-fly","reverse-pec-deck"],source_id:"Band_Pull_Apart",
+    },
+    {
+      slug:"band-lateral-raise",name:"Elevación lateral con banda",aliases:["Lateral Raise - With Bands"],
+      discipline:"strength",pattern:"isolation",level:"beginner",
+      muscles:["Deltoides lateral"],primary_muscle:"Deltoides lateral",equipment:["resistance_band"],places:["home","gym"],
+      start_position:"Pisa el centro de la banda y sujeta los extremos junto a los muslos.",
+      steps:["Eleva los brazos hacia los lados hasta la altura de hombros.","Mantén los codos ligeramente flexionados y las muñecas neutras.","Baja sin balancear el cuerpo."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["lateral-raise"],source_id:"Lateral_Raise_-_With_Bands",
+    },
+    {
+      slug:"band-shoulder-press",name:"Press de hombros con banda",aliases:["Shoulder Press - With Bands"],
+      discipline:"strength",pattern:"push",level:"intermediate",
+      muscles:["Hombros"],primary_muscle:"Hombros",equipment:["resistance_band"],places:["home","gym"],
+      start_position:"Pisa la banda con ambos pies y coloca las manos a la altura de los hombros.",
+      steps:["Activa el abdomen y empuja los extremos por encima de la cabeza.","Extiende los brazos sin arquear la espalda ni encoger el cuello.","Vuelve con control a la altura de hombros."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["overhead-press","pike-push-up","seated-dumbbell-press","machine-shoulder-press"],source_id:"Shoulder_Press_-_With_Bands",
+    },
+    {
+      slug:"band-chest-fly",name:"Apertura de pecho con banda",aliases:["Cross Over - With Bands"],
+      discipline:"strength",pattern:"push",level:"intermediate",
+      muscles:["Pecho"],primary_muscle:"Pecho",equipment:["resistance_band"],places:["home","gym"],
+      start_position:"Ancla la banda a un poste firme detrás del cuerpo, a la altura del pecho, y adelanta un pie.",
+      steps:["Abre los brazos con los codos ligeramente flexionados.","Junta las manos delante del pecho sin cambiar el ángulo de los codos.","Abre despacio hasta un recorrido cómodo; comprueba antes el anclaje."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["push-up","bench-press","dumbbell-floor-press","dumbbell-chest-fly","machine-chest-press","pec-deck"],source_id:"Cross_Over_-_With_Bands",
+    },
+    {
+      slug:"band-seated-leg-curl",name:"Curl femoral sentado con banda",aliases:["Seated Band Hamstring Curl"],
+      discipline:"strength",pattern:"isolation",level:"beginner",
+      muscles:["Isquiotibiales"],primary_muscle:"Isquiotibiales",equipment:["resistance_band","bench_or_chair"],places:["home","gym"],
+      start_position:"Siéntate en un banco firme frente a una banda anclada cerca del suelo, colocada detrás de los tobillos.",
+      steps:["Empieza con las piernas casi extendidas y el tronco estable.","Flexiona las rodillas llevando los talones hacia el banco.","Extiende despacio sin que la banda se suelte del anclaje o los tobillos."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["leg-curl","slider-leg-curl","dumbbell-stiff-leg-deadlift","seated-leg-curl"],source_id:"Seated_Band_Hamstring_Curl",
+    },
+    {
+      slug:"dumbbell-floor-press",name:"Press de pecho en el suelo",aliases:["Dumbbell Floor Press"],
+      discipline:"strength",pattern:"push",level:"beginner",
+      muscles:["Pecho"],primary_muscle:"Pecho",equipment:["dumbbells"],places:["home","gym"],
+      start_position:"Túmbate boca arriba con rodillas flexionadas y una mancuerna en cada mano sobre el pecho.",
+      steps:["Baja las pesas con los codos a unos 45 grados del tronco.","Apoya suavemente la parte posterior de los brazos en el suelo sin rebotar.","Empuja hacia arriba manteniendo las muñecas alineadas."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["push-up","bench-press","band-chest-fly","dumbbell-chest-fly","machine-chest-press","pec-deck"],source_id:"Dumbbell_Floor_Press",
+    },
+    {
+      slug:"one-arm-dumbbell-row",name:"Remo con mancuerna a una mano con apoyo",aliases:["One-Arm Dumbbell Row"],
+      discipline:"strength",pattern:"pull",level:"beginner",
+      muscles:["Espalda media"],primary_muscle:"Espalda media",equipment:["dumbbells","bench_or_chair"],places:["home","gym"],
+      start_position:"Apoya una mano y una rodilla en un banco firme y sostén una mancuerna con el brazo libre.",
+      steps:["Mantén la espalda neutra y tira del codo hacia la cadera.","Acerca la mancuerna al costado sin girar el tronco.","Estira el brazo con control y repite por el otro lado."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["band-row","seated-cable-row"],source_id:"One-Arm_Dumbbell_Row",
+    },
+    {
+      slug:"dumbbell-squat",name:"Sentadilla con mancuernas a los lados",aliases:["Dumbbell Squat"],
+      discipline:"strength",pattern:"squat",level:"beginner",
+      muscles:["Cuádriceps"],primary_muscle:"Cuádriceps",equipment:["dumbbells"],places:["home","gym"],
+      start_position:"De pie, pies al ancho de hombros y una mancuerna junto a cada muslo.",
+      steps:["Flexiona caderas y rodillas manteniendo toda la planta apoyada.","Baja hasta donde puedas controlar la postura sin dolor.","Empuja el suelo y sube sin juntar las rodillas."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["tempo-squat","leg-press","dumbbell-reverse-lunge","leg-extension"],source_id:"Dumbbell_Squat",
+    },
+    {
+      slug:"dumbbell-reverse-lunge",name:"Zancada hacia atrás con mancuernas",aliases:["Dumbbell Rear Lunge"],
+      discipline:"strength",pattern:"lunge",level:"intermediate",
+      muscles:["Cuádriceps"],primary_muscle:"Cuádriceps",equipment:["dumbbells"],places:["home","gym"],
+      start_position:"De pie con una mancuerna a cada lado y espacio libre detrás.",
+      steps:["Da un paso hacia atrás y mantén el pie delantero completamente apoyado.","Flexiona ambas rodillas sin golpear el suelo con la posterior.","Empuja con la pierna delantera para regresar; alterna lados."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["tempo-squat","leg-press","dumbbell-squat","leg-extension"],source_id:"Dumbbell_Rear_Lunge",
+    },
+    {
+      slug:"dumbbell-stiff-leg-deadlift",name:"Peso muerto de piernas semirrígidas con mancuernas",aliases:["Stiff-Legged Dumbbell Deadlift"],
+      discipline:"strength",pattern:"hinge",level:"intermediate",
+      muscles:["Isquiotibiales"],primary_muscle:"Isquiotibiales",equipment:["dumbbells"],places:["home","gym"],
+      start_position:"De pie con mancuernas delante de los muslos y rodillas ligeramente flexionadas, sin bloquearlas.",
+      steps:["Lleva la cadera atrás sin redondear la espalda.","Desliza las pesas cerca de las piernas y detente al notar tensión en los isquiotibiales.","Extiende la cadera para volver, sin inclinarte hacia atrás."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["leg-curl","slider-leg-curl","band-seated-leg-curl","seated-leg-curl"],source_id:"Stiff-Legged_Dumbbell_Deadlift",
+    },
+    {
+      slug:"seated-dumbbell-press",name:"Press de hombros sentado con mancuernas",aliases:["Seated Dumbbell Press"],
+      discipline:"strength",pattern:"push",level:"beginner",
+      muscles:["Hombros"],primary_muscle:"Hombros",equipment:["dumbbells","bench"],places:["home","gym"],
+      start_position:"Siéntate con la espalda apoyada en un banco con respaldo y las mancuernas a la altura de hombros.",
+      steps:["Empuja ambas pesas hacia arriba manteniendo el abdomen activo.","Extiende sin bloquear los codos ni separar la espalda del respaldo.","Baja despacio hasta un recorrido cómodo."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["overhead-press","pike-push-up","band-shoulder-press","machine-shoulder-press"],source_id:"Seated_Dumbbell_Press",
+    },
+    {
+      slug:"seated-dumbbell-reverse-fly",name:"Pájaros sentado con mancuernas",aliases:["Seated Bent-Over Rear Delt Raise"],
+      discipline:"strength",pattern:"isolation",level:"intermediate",
+      muscles:["Deltoides posterior"],primary_muscle:"Deltoides posterior",equipment:["dumbbells","bench_or_chair"],places:["home","gym"],
+      start_position:"Siéntate al borde de un banco firme con los pies apoyados, inclina el tronco hacia los muslos y mantén la espalda neutra.",
+      steps:["Abre los brazos hacia los lados con los codos ligeramente flexionados.","Mantén quietos el tronco y el cuello sin dar impulso.","Baja lentamente las mancuernas."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["face-pull","band-pull-apart","reverse-pec-deck"],source_id:"Seated_Bent-Over_Rear_Delt_Raise",
+    },
+    {
+      slug:"concentration-curl",name:"Curl concentrado",aliases:["Concentration Curls"],
+      discipline:"strength",pattern:"isolation",level:"beginner",
+      muscles:["Bíceps"],primary_muscle:"Bíceps",equipment:["dumbbells","bench_or_chair"],places:["home","gym"],
+      start_position:"Siéntate con las piernas separadas y apoya la parte posterior del brazo contra la cara interna del muslo.",
+      steps:["Flexiona el codo llevando la mancuerna hacia el hombro.","Mantén el brazo apoyado y evita girar el tronco.","Baja con control y cambia de brazo al completar la serie."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["biceps-curl","hammer-curl","dumbbell-alternating-curl","machine-biceps-curl"],source_id:"Concentration_Curls",
+    },
+    {
+      slug:"lying-dumbbell-triceps-extension",name:"Extensión de tríceps tumbado con mancuernas",aliases:["Lying Dumbbell Tricep Extension"],
+      discipline:"strength",pattern:"isolation",level:"intermediate",
+      muscles:["Tríceps"],primary_muscle:"Tríceps",equipment:["dumbbells","bench"],places:["home","gym"],
+      start_position:"Túmbate en un banco plano con las mancuernas sobre los hombros y las palmas enfrentadas.",
+      steps:["Mantén los brazos superiores estables y flexiona los codos.","Baja las mancuernas junto a la cabeza sin golpearla.","Extiende los codos despacio sin abrirlos en exceso."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["triceps-pushdown","diamond-push-up"],source_id:"Lying_Dumbbell_Tricep_Extension",
+    },
+    {
+      slug:"seated-dumbbell-calf-raise",name:"Elevación de talón sentado con mancuerna",aliases:["Dumbbell Seated One-Leg Calf Raise"],
+      discipline:"strength",pattern:"calf",level:"beginner",
+      muscles:["Pantorrillas"],primary_muscle:"Pantorrillas",equipment:["dumbbells","bench_or_chair","step_or_bench"],places:["home","gym"],
+      start_position:"Siéntate en un banco firme, coloca el antepié sobre un escalón bajo y sujeta una mancuerna encima del muslo de esa pierna.",
+      steps:["Eleva el talón sin que el pie gire hacia fuera.","Pausa arriba con la pesa sujeta en todo momento.","Baja despacio dentro del recorrido cómodo y cambia de pierna."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["standing-calf-raise","seated-calf-raise"],source_id:"Dumbbell_Seated_One-Leg_Calf_Raise",
+    },
+    {
+      slug:"dumbbell-chest-fly",name:"Apertura de pecho con mancuernas",aliases:["Dumbbell Flyes"],
+      discipline:"strength",pattern:"push",level:"intermediate",
+      muscles:["Pecho"],primary_muscle:"Pecho",equipment:["dumbbells","bench"],places:["home","gym"],
+      start_position:"Túmbate en un banco plano con las mancuernas sobre el pecho y los codos ligeramente flexionados.",
+      steps:["Abre los brazos en arco sin variar la flexión de codos.","Detente antes de que el hombro moleste o el brazo descienda más allá del tronco.","Junta las pesas sobre el pecho sin golpearlas."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["push-up","bench-press","band-chest-fly","dumbbell-floor-press","machine-chest-press","pec-deck"],source_id:"Dumbbell_Flyes",
+    },
+    {
+      slug:"dumbbell-alternating-curl",name:"Curl alternado de bíceps",aliases:["Dumbbell Alternate Bicep Curl"],
+      discipline:"strength",pattern:"isolation",level:"beginner",
+      muscles:["Bíceps"],primary_muscle:"Bíceps",equipment:["dumbbells"],places:["home","gym"],
+      start_position:"De pie con una mancuerna a cada lado, brazos junto al tronco y palmas hacia dentro.",
+      steps:["Flexiona un codo y gira suavemente la palma hacia arriba.","Mantén el brazo pegado al cuerpo y evita balancearte.","Baja lentamente antes de repetir con el otro brazo."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["biceps-curl","hammer-curl","concentration-curl","machine-biceps-curl"],source_id:"Dumbbell_Alternate_Bicep_Curl",
+    },
+    {
+      slug:"machine-chest-press",name:"Press de pecho en máquina",aliases:["Machine Bench Press"],
+      discipline:"gym",pattern:"push",level:"beginner",
+      muscles:["Pecho"],primary_muscle:"Pecho",equipment:["machines"],places:["gym"],
+      start_position:"Ajusta el asiento para que las asas queden a la altura del pecho y apoya la espalda.",
+      steps:["Toma las asas sin llevar los hombros hacia delante.","Empuja sin bloquear los codos ni despegarte del respaldo.","Vuelve lentamente hasta un rango cómodo."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["push-up","bench-press","band-chest-fly","dumbbell-floor-press","dumbbell-chest-fly","pec-deck"],source_id:"Machine_Bench_Press",
+    },
+    {
+      slug:"machine-shoulder-press",name:"Press de hombros en máquina",aliases:["Machine Shoulder (Military) Press"],
+      discipline:"gym",pattern:"push",level:"beginner",
+      muscles:["Hombros"],primary_muscle:"Hombros",equipment:["machines"],places:["gym"],
+      start_position:"Ajusta el asiento con las asas a la altura de hombros y la espalda apoyada.",
+      steps:["Empuja hacia arriba sin arquear la zona lumbar.","Mantén el cuello relajado y evita bloquear los codos.","Baja lentamente hasta la posición inicial."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["overhead-press","pike-push-up","band-shoulder-press","seated-dumbbell-press"],source_id:"Machine_Shoulder_Military_Press",
+    },
+    {
+      slug:"reverse-pec-deck",name:"Apertura inversa en máquina",aliases:["Reverse Machine Flyes"],
+      discipline:"gym",pattern:"isolation",level:"beginner",
+      muscles:["Deltoides posterior"],primary_muscle:"Deltoides posterior",equipment:["machines"],places:["gym"],
+      start_position:"Siéntate mirando al respaldo con el pecho apoyado y las asas a la altura de hombros.",
+      steps:["Abre los brazos hacia los lados sin despegar el pecho.","Mantén los codos ligeramente flexionados y los hombros bajos.","Vuelve despacio sin dejar que las placas golpeen."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["face-pull","band-pull-apart","seated-dumbbell-reverse-fly"],source_id:"Reverse_Machine_Flyes",
+    },
+    {
+      slug:"leg-extension",name:"Extensión de cuádriceps en máquina",aliases:["Leg Extensions"],
+      discipline:"gym",pattern:"isolation",level:"beginner",
+      muscles:["Cuádriceps"],primary_muscle:"Cuádriceps",equipment:["machines"],places:["gym"],
+      start_position:"Alinea la rodilla con el eje de la máquina, apoya la espalda y coloca el rodillo sobre la parte baja de las espinillas.",
+      steps:["Extiende las rodillas con control y sin dar patadas.","Pausa sin bloquear las rodillas.","Baja despacio manteniendo la cadera en el asiento."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["tempo-squat","leg-press","dumbbell-squat","dumbbell-reverse-lunge"],source_id:"Leg_Extensions",
+    },
+    {
+      slug:"seated-leg-curl",name:"Curl femoral sentado en máquina",aliases:["Seated Leg Curl"],
+      discipline:"gym",pattern:"isolation",level:"beginner",
+      muscles:["Isquiotibiales"],primary_muscle:"Isquiotibiales",equipment:["leg_curl"],places:["gym"],
+      start_position:"Ajusta el eje a la altura de las rodillas, el apoyo sobre los muslos y el rodillo detrás de los tobillos.",
+      steps:["Flexiona las rodillas llevando los talones hacia abajo y atrás.","Mantén la espalda y la pelvis apoyadas.","Vuelve lentamente sin que las placas golpeen."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["leg-curl","slider-leg-curl","band-seated-leg-curl","dumbbell-stiff-leg-deadlift"],source_id:"Seated_Leg_Curl",
+    },
+    {
+      slug:"seated-calf-raise",name:"Elevación de gemelos sentado en máquina",aliases:["Seated Calf Raise"],
+      discipline:"gym",pattern:"calf",level:"beginner",
+      muscles:["Pantorrillas"],primary_muscle:"Pantorrillas",equipment:["machines"],places:["gym"],
+      start_position:"Siéntate con el antepié en la plataforma y las almohadillas sobre los muslos; libera el seguro según la máquina.",
+      steps:["Eleva los talones sin girar los tobillos.","Pausa arriba sin rebotar.","Desciende con control y coloca el seguro antes de salir."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["standing-calf-raise","seated-dumbbell-calf-raise"],source_id:"Seated_Calf_Raise",
+    },
+    {
+      slug:"machine-biceps-curl",name:"Curl de bíceps en máquina",aliases:["Machine Bicep Curl"],
+      discipline:"gym",pattern:"isolation",level:"beginner",
+      muscles:["Bíceps"],primary_muscle:"Bíceps",equipment:["machines"],places:["gym"],
+      start_position:"Ajusta el asiento, apoya los brazos en la almohadilla y alinea los codos con el eje de giro.",
+      steps:["Flexiona los codos sin levantar los brazos del apoyo.","Evita adelantar los hombros para terminar la repetición.","Baja con control sin bloquear los codos."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["biceps-curl","hammer-curl","concentration-curl","dumbbell-alternating-curl"],source_id:"Machine_Bicep_Curl",
+    },
+    {
+      slug:"pec-deck",name:"Apertura de pecho en máquina",aliases:["Butterfly"],
+      discipline:"gym",pattern:"push",level:"beginner",
+      muscles:["Pecho"],primary_muscle:"Pecho",equipment:["machines"],places:["gym"],
+      start_position:"Siéntate con la espalda apoyada, ajusta el asiento y coloca los antebrazos en las almohadillas a la altura del pecho.",
+      steps:["Junta las almohadillas delante del pecho sin encoger los hombros.","Mantén la espalda apoyada y evita impulsarte.","Abre lentamente hasta un recorrido cómodo."],
+      regression:"Reduce la resistencia y completa las repeticiones sin perder la postura.",
+      progression:"Añade 1–2 repeticiones por serie cuando completes todas con control; después aumenta gradualmente la resistencia.",
+      substitutes:["push-up","bench-press","band-chest-fly","dumbbell-floor-press","dumbbell-chest-fly","machine-chest-press"],source_id:"Butterfly",
+    },
+    {
+      slug:"crunch",name:"Crunch abdominal",aliases:["Crunches"],
+      discipline:"strength",pattern:"core",level:"beginner",
+      muscles:["Core"],primary_muscle:"Core",equipment:[],places:["home","gym"],
+      start_position:"Túmbate boca arriba con las rodillas flexionadas y los pies apoyados; coloca las manos a los lados de la cabeza sin tirar de ella.",
+      steps:["Acerca las costillas a la pelvis elevando ligeramente los hombros.","Mantén la zona lumbar en el suelo y el cuello relajado.","Baja despacio sin usar impulso."],
+      regression:"Reduce las repeticiones manteniendo el recorrido cómodo y la técnica.",
+      progression:"Añade 1–2 repeticiones por serie sin impulso ni pérdida de postura.",
+      substitutes:["dead-bug","front-plank","reverse-crunch","oblique-crunch"],source_id:"Crunches",
+    },
+    {
+      slug:"reverse-crunch",name:"Crunch inverso",aliases:["Reverse Crunch"],
+      discipline:"strength",pattern:"core",level:"intermediate",
+      muscles:["Core"],primary_muscle:"Core",equipment:[],places:["home","gym"],
+      start_position:"Túmbate boca arriba con brazos a los lados, caderas y rodillas flexionadas a unos 90 grados.",
+      steps:["Enrolla suavemente la pelvis para despegar un poco la cadera.","Acerca las rodillas hacia el tronco sin balancear las piernas.","Baja la pelvis despacio sin arquear la espalda."],
+      regression:"Reduce las repeticiones manteniendo el recorrido cómodo y la técnica.",
+      progression:"Añade 1–2 repeticiones por serie sin impulso ni pérdida de postura.",
+      substitutes:["dead-bug","front-plank","crunch","oblique-crunch"],source_id:"Reverse_Crunch",
+    },
+    {
+      slug:"oblique-crunch",name:"Crunch oblicuo en el suelo",aliases:["Oblique Crunches - On The Floor"],
+      discipline:"strength",pattern:"core",level:"beginner",
+      muscles:["Core"],primary_muscle:"Core",equipment:[],places:["home","gym"],
+      start_position:"Túmbate de lado con las rodillas flexionadas y una mano junto a la cabeza sin tirar del cuello.",
+      steps:["Eleva el hombro acercando las costillas a la cadera.","Haz un recorrido corto sin girar de golpe el tronco.","Baja despacio y cambia de lado al completar la serie."],
+      regression:"Reduce las repeticiones manteniendo el recorrido cómodo y la técnica.",
+      progression:"Añade 1–2 repeticiones por serie sin impulso ni pérdida de postura.",
+      substitutes:["dead-bug","front-plank","crunch","reverse-crunch"],source_id:"Oblique_Crunches_-_On_The_Floor",
+    },
+  ];
+  const expandedStrength=EXPANDED_STRENGTH_SPECS.map(spec=>Object.assign(exercise(spec),{source_id:spec.source_id}));
+  strength.push(...expandedStrength);
+
   const endurance=[
     ["walk-brisk","Caminata a paso activo","walking","walk","Caminar a ritmo cómodo con pausas breves","Aumentar tiempo a paso vivo sin perder respiración controlada",["walk-easy","walk-mobility"],"beginner"],
     ["walk-easy","Caminata aeróbica fácil","walking","walk","Caminata corta en terreno plano","Aumentar duración manteniendo conversación",["walk-brisk","walk-mobility"],"beginner"],
@@ -285,6 +571,12 @@
     steps:["Mantén los pies en el suelo y el abdomen firme; flexiona los codos con control.","Acerca la cabeza al suelo entre las manos y ligeramente por delante, sin apoyarla ni cargar el cuello.","Empuja con los brazos para volver a la V invertida, conservando la cadera elevada."],
     common_errors:["Despegar los pies e intentar una parada de manos","Abrir los codos en exceso","Apoyar el peso sobre la cabeza o el cuello"],
   });
+  expandedStrength.forEach(ex=>{
+    const frames=[0,1].map(i=>`assets/exercise-media/${ex.slug}-${i}.jpg`);
+    const media={...FREE_EXERCISE_DB,media_type:"image_sequence",media_url:"",poster_url:frames[0],frames};
+    Object.assign(ex,media);
+    reviewedMedia.set(ex.slug,media);
+  });
   root.FITBUD_EXERCISES=strength.concat(endurance);
   const reviewedBySlug=new Map(root.FITBUD_EXERCISES.map(ex=>[ex.slug,ex]));
   // Ejercicios adicionales presentes en producción, revisados con sus
@@ -320,7 +612,12 @@
     const technique=exercise.slug==="pike-push-up"?{
       start_position:reviewed.start_position,steps:reviewed.steps,common_errors:reviewed.common_errors,
     }:{};
-    return {...exercise,level,...(reviewedMedia.get(exercise.slug)||{}),...technique};
+    // Las nuevas fichas también corrigen metadatos remotos antiguos. Se conserva
+    // active (administración) y no se modifica ningún snapshot de entrenamiento.
+    const expanded=expandedStrength.find(ex=>ex.slug===exercise.slug);
+    const content=expanded?Object.fromEntries(Object.entries(expanded).filter(([key])=>key!=="active")):{};
+    const guidance=reviewed?{regression:reviewed.regression,progression:reviewed.progression,substitute_slugs:reviewed.substitute_slugs}:{};
+    return {...exercise,...guidance,...content,level,...(reviewedMedia.get(exercise.slug)||{}),...technique};
   }
   root.FITBUD_EXERCISE_CONTENT={normalize:normalizeReviewedExercise};
   // REQ-241: qué hacen "Usar versión más fácil" y "Usar progresión" en cada
@@ -334,19 +631,19 @@
   const load=name=>({kind:"load",name});
   root.FITBUD_EXERCISE_VARIANTS={
     "back-squat":{regression:variant("Sentadilla a caja"),progression:toEx("front-squat","Sentadilla frontal")},
-    "bench-press":{regression:variant("Press de banca con mancuernas ligeras"),progression:variant("Press de banca con pausa en el pecho")},
+    "bench-press":{regression:toEx("dumbbell-floor-press","Press de pecho en el suelo"),progression:variant("Press de banca con pausa en el pecho")},
     "seated-cable-row":{regression:toEx("band-row","Remo con banda"),progression:variant("Remo sentado con pausa")},
-    "romanian-deadlift":{regression:variant("Bisagra con palo"),progression:toEx("single-leg-rdl","Peso muerto a una pierna")},
+    "romanian-deadlift":{regression:load("Reduce la carga de la barra para practicar la bisagra sin perder la postura"),progression:toEx("single-leg-rdl","Peso muerto a una pierna")},
     "barbell-hip-thrust":{regression:toEx("glute-bridge","Puente de glúteo"),progression:variant("Hip thrust con pausa arriba")},
     "incline-dumbbell-press":{regression:load("Usa mancuernas más ligeras"),progression:variant("Press inclinado alternado")},
-    "lat-pulldown":{regression:variant("Jalón con banda"),progression:toEx("assisted-pull-up","Dominada asistida")},
+    "lat-pulldown":{regression:load("Reduce el peso de la polea sin perder el control del tirón"),progression:toEx("assisted-pull-up","Dominada asistida")},
     "bulgarian-split-squat":{regression:toEx("walking-lunge","Zancada"),progression:load("Sentadilla búlgara con más carga")},
-    "overhead-press":{regression:variant("Press militar sentado"),progression:variant("Press militar de pie con pausa")},
+    "overhead-press":{regression:toEx("seated-dumbbell-press","Press de hombros sentado con mancuernas"),progression:variant("Press militar de pie con pausa")},
     "walking-lunge":{regression:variant("Zancada con apoyo"),progression:toEx("bulgarian-split-squat","Sentadilla búlgara")},
     "standing-calf-raise":{regression:variant("Elevación de gemelos con apoyo"),progression:variant("Elevación de gemelos a una pierna")},
     "assisted-dip":{regression:toEx("incline-push-up","Flexión inclinada"),progression:variant("Fondos con menos asistencia")},
-    "biceps-curl":{regression:variant("Curl con banda ligera"),progression:variant("Curl alternado controlado")},
-    "triceps-pushdown":{regression:variant("Extensión de tríceps con banda"),progression:variant("Extensión de tríceps a un brazo")},
+    "biceps-curl":{regression:load("Usa mancuernas más ligeras"),progression:variant("Curl alternado controlado")},
+    "triceps-pushdown":{regression:load("Reduce el peso de la polea"),progression:variant("Extensión de tríceps a un brazo")},
     "leg-press":{regression:variant("Prensa con rango corto"),progression:variant("Prensa a una pierna")},
     "leg-curl":{regression:variant("Curl femoral con rango corto"),progression:variant("Curl femoral a una pierna")},
     "tempo-squat":{regression:variant("Sentarse y levantarse de una silla"),progression:variant("Sentadilla con pausa abajo")},
@@ -361,22 +658,33 @@
     "dead-bug":{regression:variant("Dead bug moviendo solo brazos o piernas"),progression:variant("Dead bug con brazo y pierna opuestos")},
     "pike-push-up":{regression:variant("Pike push-up con manos elevadas"),progression:variant("Pike push-up con pies elevados")},
     "single-leg-rdl":{regression:variant("Peso muerto a una pierna con apoyo"),progression:load("Peso muerto a una pierna con carga")},
-    "assisted-pull-up":{regression:variant("Jalón con banda"),progression:variant("Dominada con menos asistencia")},
+    "assisted-pull-up":{regression:load("Usa una banda de mayor asistencia y conserva la bajada controlada"),progression:variant("Dominada con menos asistencia")},
     "shoulder-tap-plank":{regression:toEx("front-plank","Plancha frontal"),progression:variant("Toques de hombro más lentos")},
     "step-up":{regression:variant("Subida a un escalón bajo con apoyo"),progression:load("Escalón más alto o con carga")},
-    "slider-leg-curl":{regression:variant("Curl deslizante con una pierna por vez"),progression:variant("Curl deslizante completo con cadera elevada")},
+    "slider-leg-curl":{regression:variant("Curl deslizante bilateral con recorrido corto"),progression:variant("Curl deslizante completo con cadera elevada")},
     "lateral-raise":{regression:variant("Elevación lateral con poco rango"),progression:variant("Elevación lateral con pausa arriba")},
     "cable-fly":{regression:variant("Apertura en polea con rango corto"),progression:variant("Apertura en polea con pausa al centro")},
     "face-pull":{regression:load("Usa menos peso"),progression:variant("Face pull con rotación externa")},
-    "hammer-curl":{regression:load("Usa mancuernas más ligeras"),progression:variant("Curl inclinado")},
+    "hammer-curl":{regression:load("Usa mancuernas más ligeras"),progression:load("Aumenta ligeramente las mancuernas al completar todas las series sin balancearte")},
     "diamond-push-up":{regression:variant("Flexión diamante con rodillas"),progression:variant("Flexión diamante con pausa")},
     "pull-up":{regression:toEx("assisted-pull-up","Dominada asistida"),progression:toEx("weighted-pull-up","Dominada con lastre")},
     "decline-push-up":{regression:toEx("push-up","Flexión de brazos"),progression:toEx("archer-push-up","Flexión arquero")},
     "weighted-pull-up":{regression:toEx("pull-up","Dominada"),progression:load("Dominada con más lastre")},
-    "front-squat":{regression:variant("Sentadilla goblet"),progression:variant("Sentadilla frontal con pausa")},
+    "front-squat":{regression:toEx("dumbbell-squat","Sentadilla con mancuernas a los lados"),progression:variant("Sentadilla frontal con pausa")},
     "archer-push-up":{regression:variant("Flexión arquero con apoyo"),progression:variant("Flexión a un brazo asistida")},
     "nordic-hamstring-curl":{regression:variant("Curl nórdico parcial"),progression:variant("Curl nórdico completo con pausa")},
   };
+  expandedStrength.forEach(ex=>{
+    root.FITBUD_EXERCISE_VARIANTS[ex.slug]={
+      regression:ex.equipment.length?load(ex.regression):variant(ex.regression),
+      progression:ex.equipment.length?load(ex.progression):variant(ex.progression),
+    };
+  });
+  strength.forEach(ex=>{
+    const directions=root.FITBUD_EXERCISE_VARIANTS[ex.slug];
+    ex.regression=directions.regression.name;
+    ex.progression=directions.progression.name;
+  });
   // REQ-247: "Sustituir ejercicio" solo propone ejercicios que trabajan el
   // mismo músculo principal. El patrón no basta: "pull" junta jalón, remo y
   // face pull, que cargan músculos distintos. Por slug, como las variantes, para
@@ -400,6 +708,7 @@
     "biceps-curl":"Bíceps","hammer-curl":"Bíceps",
     "front-plank":"Core","side-plank":"Core","dead-bug":"Core","shoulder-tap-plank":"Core",
   };
+  EXPANDED_STRENGTH_SPECS.forEach(spec=>{PRIMARY_MUSCLE[spec.slug]=spec.primary_muscle;});
   const list=value=>{
     if(Array.isArray(value))return value;
     try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[];}catch(e){return [];}
@@ -409,6 +718,13 @@
     const muscle=PRIMARY_MUSCLE[exercise.slug]||list(exercise.muscles)[0]||"";
     return String(muscle).trim();
   }
+  // REQ-302: también los enlaces declarados y exportados a SQL son válidos.
+  // No basta con ocultar en la UI los destinos con otro músculo principal.
+  strength.forEach(ex=>{
+    const compatible=strength.filter(other=>other.slug!==ex.slug&&primaryMuscle(other)===primaryMuscle(ex));
+    const valid=new Set(compatible.map(other=>other.slug));
+    ex.substitute_slugs=[...new Set(ex.substitute_slugs.filter(slug=>valid.has(slug)).concat(compatible.map(other=>other.slug)))];
+  });
   // Sustitutos directos primero y luego el resto del catálogo, siempre con el
   // mismo músculo principal que el ejercicio actual.
   function substituteCandidates(current,catalog){

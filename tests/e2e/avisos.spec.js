@@ -22,7 +22,11 @@ async function openHoy(page, context, opts = {}) {
 
 test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
   test("sin avisos activos, Hoy lo recuerda; 'Ahora no' lo oculta hasta mañana", async ({ page, context }) => {
-    const { errors } = await openHoy(page, context);
+    // La prueba representa un permiso aún no solicitado. Chromium headless
+    // puede arrancar con denied; no depender del valor del navegador anfitrión.
+    const { errors } = await openHoy(page, context, {
+      init: () => Object.defineProperty(Notification, "permission", { get: () => "default" }),
+    });
     await expect(card(page)).toContainText("Activa los avisos para no perder tu racha");
     await expect(card(page)).toContainText("Un aviso al día como máximo, a las 20:00");
     await expect(card(page).getByRole("button", { name: "Activar avisos" })).toBeVisible();
@@ -92,6 +96,7 @@ test.describe("Avisos — al terminar el onboarding (REQ-289)", () => {
     // Recorrido real por saveOnboarding() (ciclo nuevo). Sin autoDismissNudges para ver la pantalla.
     const prefs = completePrefs({ planStartDate: daysFromToday(-30), planEndDate: daysFromToday(-30 + 69), restartNudgeDismissedAt: new Date().toISOString() });
     await installMocks(context, { tables: { profiles: { row: profileFixture(prefs) } } });
+    await page.addInitScript(() => Object.defineProperty(Notification, "permission", { get: () => "default" }));
     await seedLoggedInUser(page);
     const errors = collectConsoleErrors(page);
     await gotoApp(page);
