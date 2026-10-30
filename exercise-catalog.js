@@ -960,8 +960,10 @@
   // el catálogo local; si la tabla de Supabase no carga o una fila pierde su
   // media, ya no caen al dibujo SVG. Fotos de Free Exercise DB (dominio
   // público) servidas desde assets/, como el resto del catálogo.
+  const SIN_FOTO_EXACTA=new Set(["weighted-pull-up"]); // la única foto del dataset muestra asistencia con liga; la ficha exige lastre. Pendiente imagen exacta (ni proxy ni monigote disfrazado).
   strength.forEach(ex=>{
     if(ex.media_type!=="inline_svg")return; // conserva guías SVG propias y fotos ya asignadas
+    if(SIN_FOTO_EXACTA.has(ex.slug))return;
     const frames=[0,1].map(i=>`assets/exercise-media/${ex.slug}-${i}.jpg`);
     const media={...FREE_EXERCISE_DB,media_type:"image_sequence",media_url:"",poster_url:frames[0],frames};
     Object.assign(ex,media);
@@ -975,6 +977,8 @@
     "scaled-push-up","dumbbell-alternating-hammer-curl","dumbbell-lateral-raise",
     "dumbbell-reverse-fly","dumbbell-romanian-deadlift","dumbbell-standing-shoulder-press",
     "dumbbell-bent-over-row","goblet-squat",
+    "dumbbell-reverse-lunge","dumbbell-floor-press",
+    "dumbbell-overhead-triceps-extension","dumbbell-alternating-curl",
   ];
   // Pendientes por falta de foto exacta con licencia compatible (no usar proxies
   // de otro equipo o variante): "band-alternating-lat-pulldown" (jalón con banda),
@@ -984,6 +988,10 @@
     const frames=[0,1].map(i=>`assets/exercise-media/${slug}-${i}.jpg`);
     reviewedMedia.set(slug,{...FREE_EXERCISE_DB,media_type:"image_sequence",media_url:"",poster_url:frames[0],frames});
   });
+  // REQ-310: la fila Supabase de "weighted-pull-up" muestra la misma foto
+  // incorrecta (dominada asistida con liga, sin lastre). Se retira la media
+  // remota y cae a la guía SVG propia hasta tener foto exacta con lastre.
+  reviewedMedia.set("weighted-pull-up",{...OWN_MEDIA});
   root.FITBUD_EXERCISES=strength.concat(endurance);
   const reviewedBySlug=new Map(root.FITBUD_EXERCISES.map(ex=>[ex.slug,ex]));
   // Ejercicios adicionales presentes en producción, revisados con sus
