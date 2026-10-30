@@ -2196,6 +2196,8 @@ Sexta ampliación (2026-10-30): corrección urgente - el bloque de cardio de exe
 
 Séptima ampliación (2026-10-30): el crédito de la guía enlaza a la fuente/licencia cuando hay URL (Commons, Free Exercise DB), cumpliendo la atribución completa de CC BY-SA 4.0. Bump de caché `fitbud-pwa-v186`.
 
+Octava ampliación (2026-10-30): dos pendientes más resueltos con demostración exacta y licencia verificable - pike-push-up (animación con pies al suelo, CC BY-SA 4.0, Danielflefil, Wikimedia Commons) y shoulder-tap-plank (fotos del Ejército de EE. UU. del "plank shoulder tap", dominio público). Quedan 5 pendientes explícitos sin fuente libre exacta tras buscar en Free Exercise DB, Wikimedia Commons y Openverse: archer-push-up y slider-leg-curl (guía SVG propia transitoria), band-alternating-lat-pulldown, dumbbell-glute-bridge y standing-heel-raise (conservan su media anterior). Bump de caché `fitbud-pwa-v187`.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**

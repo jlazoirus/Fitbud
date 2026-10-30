@@ -901,6 +901,8 @@
   const WIKIMEDIA_BANDROW={source_name:"Wikimedia Commons (GyorgyGajdos)",source_url:"https://commons.wikimedia.org/wiki/File:Bent_over_rows_with_resistance_bands_01.gif",license_name:"CC BY-SA 4.0",attribution:"GyorgyGajdos, Wikimedia Commons"};
   const WIKIMEDIA_HEELRAISE={source_name:"Wikimedia Commons (GeorgeStepanek)",source_url:"https://commons.wikimedia.org/wiki/File:DumbbellStandingCalfRaise.JPG",license_name:"CC BY-SA 3.0",attribution:"GeorgeStepanek, Wikimedia Commons"};
   const WIKIMEDIA_CALF={source_name:"Wikimedia Commons (BruceBlaus)",source_url:"https://commons.wikimedia.org/wiki/File:Exercise_Heel_Raise_Two_Legs.png",license_name:"CC BY-SA 4.0",attribution:"BruceBlaus, Wikimedia Commons"};
+  const WIKIMEDIA_PIKE={source_name:"Wikimedia Commons (Danielflefil)",source_url:"https://commons.wikimedia.org/wiki/File:Pike_Push_Ups.gif",license_name:"CC BY-SA 4.0",attribution:"Danielflefil, Wikimedia Commons"};
+  const USARMY_PLANK_TAP={source_name:"10th AAMDC (U.S. Army)",source_url:"https://commons.wikimedia.org/wiki/File:10th_AAMDC_host_%22Key_Leader_Physical_Readiness_Training%22_(8448514).jpg",license_name:"Dominio público (obra del Gobierno de EE. UU.)",attribution:"U.S. Army vía Wikimedia Commons — dominio público"};
   const ENDURANCE_MEDIA={
     walking:["assets/exercise-media/walking.jpg",FREE_EXERCISE_DB],
     running:["assets/exercise-media/running.jpg",FREE_EXERCISE_DB],
@@ -919,8 +921,7 @@
   // REQ-264: las demostraciones deben enseñar el ejercicio nombrado, sin
   // sustituirlo por otro más difícil que trabaje músculos parecidos.
   const CURATED_DEMO_SLUGS=new Set([
-    "pike-push-up","band-row","shoulder-tap-plank","archer-push-up",
-    "slider-leg-curl","single-leg-rdl","step-up","standing-calf-raise",
+    "archer-push-up","slider-leg-curl","single-leg-rdl","step-up",
     "bulgarian-split-squat",
   ]);
   const reviewedMedia=new Map();
@@ -1014,9 +1015,17 @@
   // vez de arquero, máquina en vez de elevación de pie. Se retira la media
   // remota y caen a la guía SVG propia como pendientes explícitos hasta
   // tener foto o animación exacta con licencia verificable.
-  ["archer-push-up","pike-push-up","slider-leg-curl","shoulder-tap-plank"].forEach(slug=>{
+  ["archer-push-up","slider-leg-curl"].forEach(slug=>{
     reviewedMedia.set(slug,{...OWN_MEDIA});
   });
+  // REQ-310: pike-push-up y shoulder-tap-plank ya tienen demostración exacta
+  // con licencia verificable: animación de flexión pike con pies al suelo
+  // (CC BY-SA 4.0, Danielflefil) y fotos del Ejército de EE. UU. del "plank
+  // shoulder tap" (dominio público). Verificación visual 2026-10-30.
+  const pikeFrames=["assets/exercise-media/pike-push-up-0.jpg","assets/exercise-media/pike-push-up-1.jpg"];
+  reviewedMedia.set("pike-push-up",{...WIKIMEDIA_PIKE,media_type:"image_sequence",media_url:"",poster_url:pikeFrames[0],frames:pikeFrames});
+  const stpFrames=["assets/exercise-media/shoulder-tap-plank-0.jpg","assets/exercise-media/shoulder-tap-plank-1.jpg"];
+  reviewedMedia.set("shoulder-tap-plank",{...USARMY_PLANK_TAP,media_type:"image_sequence",media_url:"",poster_url:stpFrames[0],frames:stpFrames});
   // REQ-310: band-row, standing-calf-raise y standing-heel-raise ya tienen
   // demostración exacta con licencia verificable (Wikimedia Commons). La foto
   // standing-calf-raise usa una ilustración anatómica exacta mientras se
