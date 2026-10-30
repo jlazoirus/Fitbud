@@ -218,7 +218,7 @@ export function newApplicantEmail(data, score, appUrl) {
   ];
   const caution = data.health === "caution"
     ? '<p style="background:#fff7e6;border-radius:8px;padding:10px 12px;margin:0 0 16px">Marcó lesión o indicación médica: conviene la llamada antes de darle el entrenamiento.</p>' : "";
-  const link = appUrl.replace(/\/$/, "") + "/?ver=postulantes";
+  const link = appUrl.replace(/\/$/, "") + "/admin?ver=postulantes";
   return {
     subject: "Nueva postulación a la beta: " + data.name,
     html: `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nueva postulación</title></head>
