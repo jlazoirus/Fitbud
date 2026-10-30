@@ -895,7 +895,7 @@
   }));
   // REQ-259: foto real por disciplina, como los ejercicios de fuerza (antes
   // caían al dibujo SVG). Se sirve desde assets/ del propio deploy, sin hotlinks.
-  const FREE_EXERCISE_DB={source_name:"Free Exercise DB",license_name:"Public Domain (Unlicense)",attribution:"Free Exercise DB (yuhonas) — dominio público"};
+  const FREE_EXERCISE_DB={source_name:"Free Exercise DB",source_url:"https://github.com/yuhonas/free-exercise-db",license_name:"Public Domain (Unlicense)",attribution:"Free Exercise DB (yuhonas) — dominio público"};
   // REQ-310: fuentes con licencia verificable para pendientes exactos.
   const WIKIMEDIA_PD_PULLUP={source_name:"Wikimedia Commons (Extremistpullup)",source_url:"https://commons.wikimedia.org/wiki/File:Weighted,_wide-grip_pullup_video.gif",license_name:"Dominio público",attribution:"Extremistpullup, Wikimedia Commons"};
   const WIKIMEDIA_BANDROW={source_name:"Wikimedia Commons (GyorgyGajdos)",source_url:"https://commons.wikimedia.org/wiki/File:Bent_over_rows_with_resistance_bands_01.gif",license_name:"CC BY-SA 4.0",attribution:"GyorgyGajdos, Wikimedia Commons"};
@@ -905,7 +905,7 @@
     walking:["assets/exercise-media/walking.jpg",FREE_EXERCISE_DB],
     running:["assets/exercise-media/running.jpg",FREE_EXERCISE_DB],
     cycling:["assets/exercise-media/cycling.jpg",FREE_EXERCISE_DB],
-    swimming:["assets/exercise-media/swimming.jpg",{source_name:"DoD Warrior Games 2016 (U.S. Army)",license_name:"Public Domain (obra del Gobierno de EE. UU.)",attribution:"U.S. Army vía Wikimedia Commons — dominio público"}],
+    swimming:["assets/exercise-media/swimming.jpg",{source_name:"DoD Warrior Games 2016 (U.S. Army)",source_url:"https://commons.wikimedia.org/wiki/Category:2016_Warrior_Games",license_name:"Public Domain (obra del Gobierno de EE. UU.)",attribution:"U.S. Army vía Wikimedia Commons — dominio público"}],
   };
   endurance.forEach(ex=>{
     const [url,source]=ENDURANCE_MEDIA[ex.discipline];

@@ -5342,7 +5342,7 @@ function openExerciseGuide(slug){
   modal(`<div class="guide-demo">${exerciseMediaHtml(exercise)}</div>
     <h3>${esc(exercise.name)}</h3>
     <div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(exerciseEquipmentText(equipment))}`:""}${muscles.length?` · ${esc(muscles.join(", "))}`:""}</div>
-    ${exercise.source_name&&exercise.source_name!=="Evolv Studio"?`<div class="exercise-copy" style="opacity:.7;font-size:.85em"><b>Demostración:</b> ${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}</div>`:""}
+    ${exercise.source_name&&exercise.source_name!=="Evolv Studio"?`<div class="exercise-copy" style="opacity:.7;font-size:.85em"><b>Demostración:</b> ${exercise.source_url?`<a href="${esc(exercise.source_url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}</a>`:`${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}`}</div>`:""}
     <div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
     <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
     <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
