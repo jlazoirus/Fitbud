@@ -2145,3 +2145,15 @@ Detalle: `docs/exercise-progressions.md`.
 **Estado: implementado.**
 
 Animación visible del incremento, sin duplicados y con movimiento reducido. Detalle: `docs/streak-celebration.md`. ✓ `tests/e2e/streak-celebration.spec.js`.
+## REQ-305 - Registro con invitación reconoce el correo ya registrado
+
+**Estado: implementado.**
+
+Al aceptar una postulación la cuenta ya existe (invitación por correo, REQ-225); si esa persona se registra con su enlace de código, GoTrue responde `{"code":422,"error_code":"email_exists",...}` y el `code` numérico tapaba el texto del error: caía en el 500 genérico "No pudimos crear tu cuenta" en vez del 409 útil. Ahora `invite-signup` lee todos los campos del error, devuelve 409 con instrucciones (iniciar sesión, "Olvidé mi contraseña", canjear en Perfil → Mi suscripción), distingue contraseña débil y deja el motivo real del alta rechazada y del canje fallido en los logs de Vercel. ✓ `tests/unit/invite-signup.test.mjs` (node, mocks, sin producción).
+
+## REQ-306 - Canje de cupones: columnas calificadas en redeem_redemption_code
+
+**Estado: implementado.**
+
+Los parámetros OUT del `returns table` (`status`, `expires_at`) chocaban con las columnas de `user_entitlements`: plpgsql fallaba siempre con 42702 "column reference is ambiguous" y NINGÚN canje de código funcionaba en producción (registro por invitación y "Canjear" en Mi suscripción). Confirmado en vivo ejecutando la función dentro de una transacción con rollback. Se califican las columnas con la tabla. Requiere re-aplicar `supabase/coupon_codes.sql` en producción (create or replace, sin tocar datos).
+
