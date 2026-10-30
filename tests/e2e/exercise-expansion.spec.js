@@ -10,7 +10,7 @@ for(const width of [390,1280]){
     await gotoApp(page);
     const result=await page.evaluate(()=>{
       const catalog=activeTrainingCatalog();
-      const added=catalog.filter(ex=>ex.source_id);
+      const added=catalog.filter(ex=>ex.catalog_batch===302);
       const home=equipment=>added.filter(ex=>exerciseFitsHomeSetup(ex,{strengthPlace:"home",equipment})).map(ex=>ex.slug);
       return {count:added.length,without:home(["bodyweight"]),bands:home(["bodyweight","bands"]),dumbbells:home(["bodyweight","dumbbells"]),
         bad:added.flatMap(ex=>window.FITBUD_EXERCISE_SUBSTITUTION.candidates(ex,catalog).filter(other=>EXERCISE_SUBSTITUTION.primaryMuscle(other)!==EXERCISE_SUBSTITUTION.primaryMuscle(ex)).map(other=>other.slug)),

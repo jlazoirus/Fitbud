@@ -138,3 +138,7 @@ Persistencia opcional y manual: regenerar con `node scripts/generate-exercise-sq
 | Crunch abdominal (`crunch`) | [Crunches](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Crunches) |
 | Crunch inverso (`reverse-crunch`) | [Reverse_Crunch](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Reverse_Crunch) |
 | Crunch oblicuo en el suelo (`oblique-crunch`) | [Oblique_Crunches_-_On_The_Floor](https://github.com/yuhonas/free-exercise-db/tree/main/exercises/Oblique_Crunches_-_On_The_Floor) |
+
+## Segundo lote: prioridad gimnasio (REQ-303)
+
+40 fichas adicionales, 80 fotos, inventario actual de 123. Criterios, cambios de ejercicio, revisión anatómica, fuentes y operación: [exercise-gym-expansion.md](exercise-gym-expansion.md).

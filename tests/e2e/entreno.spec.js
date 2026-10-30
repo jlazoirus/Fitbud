@@ -715,7 +715,9 @@ test.describe("Sustituir ejercicio", () => {
     await setCurrent("seated-cable-row");
     await app.getByRole("button", { name: "Sustituir", exact: true }).click();
     await expect(overlay).toContainText("mismo músculo principal (espalda media)");
-    await expect(options).toHaveText(["Remo con banda", "Remo invertido", "Remo con mancuerna a una mano con apoyo"]);
+    await expect(overlay.getByText("Remo con mancuernas y pecho apoyado", {exact:true})).toBeVisible();
+    expect(await options.allTextContents()).toEqual(expect.arrayContaining(["Remo con banda", "Remo invertido", "Remo con mancuerna a una mano con apoyo"]));
+    expect((await overlay.locator("button.opt .o-meta").allTextContents()).every(text=>text.includes("Músculo principal: Espalda media"))).toBe(true);
     await expect(overlay.locator("button.opt").first()).toContainText("Músculo principal: Espalda media");
     await overlay.locator("button.opt").first().click();
     await expect(app.locator(".player-title h3")).toHaveText("Remo con banda");
@@ -723,7 +725,8 @@ test.describe("Sustituir ejercicio", () => {
     await setCurrent("face-pull");
     await app.getByRole("button", { name: "Sustituir", exact: true }).click();
     await expect(overlay).toContainText("deltoides posterior");
-    await expect(options).toHaveText(["Apertura de banda al frente", "Pájaros sentado con mancuernas", "Apertura inversa en máquina"]);
+    await expect(overlay.getByText("Apertura posterior en poleas altas", {exact:true})).toBeVisible();
+    expect(await options.allTextContents()).toEqual(expect.arrayContaining(["Apertura de banda al frente", "Pájaros sentado con mancuernas", "Apertura inversa en máquina"]));
     const muscles=await overlay.locator("button.opt .o-meta").allTextContents();
     expect(muscles.every(text=>text.includes("Músculo principal: Deltoides posterior"))).toBe(true);
     await expect(overlay.locator(".alert")).toHaveCount(0);

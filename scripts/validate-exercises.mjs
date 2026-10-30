@@ -88,8 +88,13 @@ for(const exercise of strength){
   }
 }
 const expanded=strength.filter(ex=>ex.source_id);
-if(expanded.length<28)errors.push("Ampliación: faltan fichas con fotos locales exactas");
+if(expanded.length<68)errors.push("Ampliación: faltan fichas con fotos locales exactas");
+const gymBatch=expanded.filter(ex=>ex.catalog_batch===303);
+if(gymBatch.length!==40||gymBatch.filter(ex=>ex.discipline==="gym").length!==32)errors.push("REQ-303: lote incompleto o sin prioridad gimnasio");
+const sourceIds=new Set();
 for(const ex of expanded){
+  if(sourceIds.has(ex.source_id))errors.push(`${ex.slug}: demostración reutilizada como ejercicio nuevo`);
+  sourceIds.add(ex.source_id);
   if(mediaMap[ex.slug]?.id!==ex.source_id)errors.push(`${ex.slug}: identidad multimedia no coincide`);
   if(ex.frames?.length!==2)errors.push(`${ex.slug}: falta inicio/final de la demostración`);
   for(const frame of ex.frames||[]){
@@ -120,7 +125,7 @@ expect("lateral-raise",[],["overhead-press"]);
 // nunca devuelve ejercicios de resistencia (caminar, correr…).
 const search=query=>substitution.search(query,catalog).map(exercise=>exercise.slug);
 if(search("press banca").join()!=="bench-press")errors.push(`Buscar "press banca": ${search("press banca").join()}`);
-if(search("GLUTEO")[0]!=="barbell-hip-thrust"&&search("GLUTEO")[0]!=="glute-bridge")errors.push(`Buscar "GLUTEO" no empieza por un ejercicio de glúteo: ${search("GLUTEO")[0]}`);
+if(substitution.primaryMuscle(bySlug.get(search("GLUTEO")[0]))!=="Glúteos")errors.push(`Buscar "GLUTEO" no empieza por un ejercicio de glúteo: ${search("GLUTEO")[0]}`);
 if(search("caminata").length)errors.push(`Buscar "caminata" devuelve ejercicios de resistencia`);
 if(search("").some(slug=>!["gym","strength","bodyweight"].includes(bySlug.get(slug).discipline)))errors.push("El buscador incluye ejercicios que no son de fuerza");
 for(const exercise of catalog)if(!Array.isArray(exercise.substitute_slugs))errors.push(`${exercise.slug}: substitute_slugs no es lista`);

@@ -162,3 +162,50 @@ El nivel describe la ejecución base de la demostración local. Los aumentos de 
 | `crunch` | beginner | Túmbate boca arriba con las rodillas flexionadas y los pies apoyados; coloca las manos a los lados de la cabeza sin tirar de ella. Apoyo estable y resistencia o recorrido graduable. |
 | `reverse-crunch` | intermediate | Túmbate boca arriba con brazos a los lados, caderas y rodillas flexionadas a unos 90 grados. Control de bisagra, hombro o equilibrio previo. |
 | `oblique-crunch` | beginner | Túmbate de lado con las rodillas flexionadas y una mano junto a la cabeza sin tirar del cuello. Apoyo estable y resistencia o recorrido graduable. |
+
+## REQ-303: 40 fichas con prioridad gimnasio
+
+32 fichas de gimnasio y ocho compartidas con casa. La clasificación evalúa la ejecución mostrada: la máquina guiada no elimina por sí sola la necesidad de controlar una bisagra o preparar los seguros.
+
+| Slug | Nivel | Ejecución evaluada |
+|---|---|---|
+| `quadruped-glute-kickback` | beginner | Apoya manos y rodillas en el suelo, con la espalda neutra y la rodilla de trabajo flexionada. |
+| `alternating-heel-touch` | beginner | Túmbate boca arriba con rodillas flexionadas, pies apoyados y brazos junto al tronco. |
+| `tuck-crunch` | intermediate | Túmbate boca arriba, eleva los muslos con rodillas flexionadas, cruza los tobillos y apoya las manos sobre el pecho. |
+| `close-grip-incline-push-up` | beginner | Apoya las manos próximas entre sí sobre una barra fija baja o una superficie elevada firme; alinea hombros, cadera y talones. |
+| `chin-up` | intermediate | Cuélgate de una barra segura con palmas hacia ti y manos aproximadamente al ancho de hombros. |
+| `body-up` | advanced | Colócate en plancha sobre antebrazos y puntas de los pies, con las palmas apoyadas y el abdomen firme. |
+| `band-standing-hip-extension` | beginner | Ancla una banda a un poste firme a poca altura, fíjala al tobillo y sujétate al poste mirando hacia él. |
+| `band-hip-adduction` | beginner | Ancla la banda a un poste firme a la altura del tobillo, colócala en la pierna próxima al poste y apóyate si lo necesitas. |
+| `dumbbell-flat-bench-press` | beginner | Túmbate en un banco plano firme con pies apoyados y una mancuerna a cada lado del pecho. |
+| `chest-supported-dumbbell-row` | beginner | Apoya el pecho en un banco inclinado, mantén los pies firmes y deja las mancuernas colgando con agarre neutro. |
+| `dumbbell-step-up` | intermediate | De pie ante un escalón o banco firme y bajo, con una mancuerna a cada lado. |
+| `dumbbell-forward-lunge` | intermediate | De pie con espacio delante y una mancuerna a cada lado del cuerpo. |
+| `dumbbell-box-squat` | beginner | Coloca un banco firme detrás de ti y sujeta una mancuerna a cada lado, con los pies al ancho de hombros. |
+| `seated-dumbbell-lateral-raise` | beginner | Siéntate en un banco firme con pies apoyados y las mancuernas a los lados del cuerpo. |
+| `incline-dumbbell-curl` | intermediate | Siéntate con la espalda apoyada en un banco inclinado y las mancuernas colgando con las palmas al frente. |
+| `dumbbell-overhead-triceps-extension` | intermediate | De pie, sujeta una mancuerna con ambas manos por encima de la cabeza, con abdomen firme y pies estables. |
+| `supported-dumbbell-triceps-kickback` | beginner | Apoya una mano y una rodilla en un banco, inclina el tronco y coloca el brazo libre junto al costado con el codo flexionado. |
+| `dumbbell-standing-calf-raise` | beginner | Sujeta dos mancuernas a los lados y apoya los antepiés sobre una plataforma muy baja y firme, con talones libres. |
+| `dumbbell-plie-squat` | beginner | Sujeta una mancuerna con ambas manos entre las piernas, con pies separados y puntas ligeramente hacia fuera. |
+| `arnold-press` | intermediate | Siéntate en un banco con respaldo, pies apoyados y mancuernas delante de los hombros con palmas hacia ti. |
+| `smith-squat` | intermediate | Ajusta los topes de seguridad de la Smith y coloca la barra sobre la parte alta de la espalda, nunca sobre el cuello. |
+| `smith-incline-bench-press` | intermediate | Sitúa un banco inclinado bajo la Smith, alinea la barra con la parte alta del pecho y ajusta los topes de seguridad. |
+| `smith-stiff-leg-deadlift` | intermediate | De pie frente a la barra de la Smith a la altura de los muslos, con rodillas ligeramente flexionadas y espalda neutra. |
+| `leg-press-calf-raise` | intermediate | Siéntate con la espalda apoyada y antepiés firmes en la plataforma; mantén los seguros activos si la máquina lo permite. |
+| `underhand-lat-pulldown` | beginner | Siéntate en la polea alta con muslos sujetos y toma la barra con palmas hacia ti, aproximadamente al ancho de hombros. |
+| `single-arm-seated-cable-row` | intermediate | Siéntate en la polea baja con pies apoyados, rodillas suaves y un asa individual en una mano. |
+| `cable-overhead-triceps-extension` | intermediate | De espaldas a una polea baja con cuerda, coloca las manos por encima de la cabeza y adopta una postura estable. |
+| `cable-biceps-curl` | beginner | De pie frente a la polea baja, sujeta una barra corta con palmas hacia arriba y codos junto al tronco. |
+| `cable-reverse-fly` | intermediate | De pie entre dos poleas altas, sujeta cada cable con la mano contraria y mantén una ligera flexión de codos. |
+| `kneeling-cable-crunch` | intermediate | Arrodíllate ante una polea alta con cuerda y coloca las manos junto a la cabeza sin tirar del cuello. |
+| `cable-glute-kickback` | beginner | Fija una tobillera a la polea baja y sujétate a la estructura con el tronco estable y las rodillas suaves. |
+| `machine-triceps-extension` | beginner | Ajusta el asiento, apoya los brazos en las almohadillas y alinea los codos con el eje de la máquina. |
+| `machine-hip-adduction` | beginner | Siéntate en la máquina de aductores con espalda apoyada y almohadillas contra la cara interna de las rodillas. |
+| `hack-squat` | beginner | Apoya espalda y hombros en la máquina hack, coloca los pies firmes en la plataforma y ajusta los topes de seguridad. |
+| `seated-cable-reverse-fly` | intermediate | Siéntate entre dos poleas bajas, inclina el tronco hacia los muslos con espalda neutra y toma los cables cruzados bajo las rodillas. |
+| `cable-hip-adduction` | beginner | Colócate de lado a una polea baja, fija la tobillera a la pierna próxima a la máquina y agárrate a la estructura. |
+| `smith-flat-bench-press` | intermediate | Coloca un banco plano bajo la Smith, alinea la barra con el pecho y ajusta los topes para poder salir con seguridad. |
+| `chest-supported-t-bar-row` | beginner | Apoya el pecho en la almohadilla de la máquina de remo en T, fija los pies en la plataforma y toma las asas. |
+| `cable-pull-through` | intermediate | De espaldas a una polea baja, sujeta una cuerda entre las piernas y separa los pies con rodillas suaves. |
+| `lying-cable-triceps-extension` | intermediate | Túmbate en un banco con la cabeza hacia una polea baja, sujeta la barra corta y orienta los brazos hacia arriba. |

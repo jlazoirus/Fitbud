@@ -1526,6 +1526,9 @@ const GENTLE_BLOCKED_EXERCISE_SLUGS=new Set([
   "bulgarian-split-squat","walking-lunge","single-leg-rdl",
   "slider-leg-curl","nordic-hamstring-curl","shoulder-tap-plank",
   "overhead-press",
+  // REQ-303: nuevas ejecuciones con suspensión, plancha de alta demanda,
+  // apoyo unilateral cargado o coordinación de empuje y rotación.
+  "chin-up","body-up","dumbbell-step-up","dumbbell-forward-lunge","arnold-press",
 ]);
 function normalizedTrainingSafetyMode(value){
   return TRAINING_SAFETY_MODE_LABELS[value]?value:"auto";

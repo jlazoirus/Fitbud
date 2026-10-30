@@ -2134,4 +2134,10 @@ Jonathan (2026-10-28): eligió comparar la racha actual. Compartir desde Hoy/Pro
 
 **Estado: implementado.** SQL de aplicación manual.
 
-28 fichas, progresiones, fotos y sustituciones revisadas. Detalle y verificación: `docs/exercise-progressions.md`, `tests/e2e/exercise-expansion.spec.js`.
+Detalle: `docs/exercise-progressions.md`.
+
+## REQ-303 - Más ejercicios de gimnasio
+
+**Estado: implementado.**
+
+40 fichas; 32 de gimnasio. Criterios y operación SQL manual: `docs/exercise-gym-expansion.md`. ✓ `tests/e2e/exercise-gym-expansion.spec.js`.
