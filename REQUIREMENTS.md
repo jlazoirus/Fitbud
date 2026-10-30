@@ -2194,6 +2194,8 @@ Quinta ampliación (2026-10-30): el crédito visible de la demostración ("Demos
 
 Sexta ampliación (2026-10-30): corrección urgente - el bloque de cardio de exercise-catalog.js usaba reviewedMedia antes de su declaración (error de inicialización) y la app quedaba en "Cargando…" para todos los usuarios desde v183; se mueve el bloque tras la declaración. Bump de caché `fitbud-pwa-v185`.
 
+Séptima ampliación (2026-10-30): el crédito de la guía enlaza a la fuente/licencia cuando hay URL (Commons, Free Exercise DB), cumpliendo la atribución completa de CC BY-SA 4.0. Bump de caché `fitbud-pwa-v186`.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**
