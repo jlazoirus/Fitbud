@@ -2186,6 +2186,8 @@ Ampliación (2026-10-30, segunda pasada): la inspección visual completa encontr
 
 Segunda ampliación (2026-10-30): se reemplazan 4 pendientes por demostraciones exactas de Wikimedia Commons con licencia verificable: weighted-pull-up (video de dominada con cinturón de lastre, dominio público, Extremistpullup), band-row (remo sentado con banda, CC BY-SA 4.0, GyorgyGajdos), standing-heel-raise (elevación de talones con mancuernas, CC BY-SA 3.0, GeorgeStepanek) y standing-calf-raise (ilustración anatómica exacta a dos piernas sin máquina, CC BY-SA 4.0, BruceBlaus). Quedan pendientes explícitos: band-alternating-lat-pulldown y dumbbell-glute-bridge (GIF ajenos actuales), archer-push-up, pike-push-up, slider-leg-curl y shoulder-tap-plank (guía SVG propia transitoria), más las 9 demos de cardio. Bump de caché `fitbud-pwa-v181`.
 
+Tercera ampliación (2026-10-30): la foto de standing-heel-raise resultó unipodal con bloque y la ficha es bilateral en suelo plano, así que vuelve a pendiente explícito conservando su media anterior hasta encontrar demo exacta. El frame de tracción de band-row se corrige para mostrar la fase de tirón, no dos frames equivalentes. La guía de ejercicio ("Ver técnica") muestra ahora el crédito de la demostración (fuente/autor y licencia) cuando no es contenido propio, cumpliendo la atribución de CC BY/CC BY-SA de forma visible para el usuario. Bump de caché `fitbud-pwa-v182`.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**
