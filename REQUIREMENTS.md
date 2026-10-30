@@ -2192,6 +2192,8 @@ Cuarta ampliación (2026-10-30): los 9 ejercicios de cardio (run-drills/easy/int
 
 Quinta ampliación (2026-10-30): el crédito visible de la demostración ("Demostración: <fuente/autor> · <licencia>") llega a index.html y se muestra en la guía "Ver técnica" de cada ejercicio cuya media no es contenido propio Evolv; durante esta publicación se restauró además el index.html completo en main tras un commit de subida web que lo había dejado truncado. Bump de caché `fitbud-pwa-v184`.
 
+Sexta ampliación (2026-10-30): corrección urgente - el bloque de cardio de exercise-catalog.js usaba reviewedMedia antes de su declaración (error de inicialización) y la app quedaba en "Cargando…" para todos los usuarios desde v183; se mueve el bloque tras la declaración. Bump de caché `fitbud-pwa-v185`.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**
