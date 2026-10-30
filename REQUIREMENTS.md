@@ -2184,6 +2184,8 @@ Corrección posterior (2026-10-30, inspección visual completa): la tabla tiene 
 
 Ampliación (2026-10-30, segunda pasada): la inspección visual completa encontró 6 filas remotas cuya foto enseña otro movimiento u otro equipo que su ficha (pike-push-up con parada de manos, band-row sin banda, slider-leg-curl con balón, shoulder-tap-plank en posición de escalador, archer-push-up con flexión estándar y standing-calf-raise en máquina). Se retira su media por `normalize` y quedan como pendientes explícitos con guía SVG propia transitoria mientras se consigue foto o animación exacta con licencia verificable; los 9 ejercicios de cardio (run/cycle/swim) también están en proceso de sustitución del SVG procedural por fotos con licencia. Bump de caché `fitbud-pwa-v180`.
 
+Segunda ampliación (2026-10-30): se reemplazan 4 pendientes por demostraciones exactas de Wikimedia Commons con licencia verificable: weighted-pull-up (video de dominada con cinturón de lastre, dominio público, Extremistpullup), band-row (remo sentado con banda, CC BY-SA 4.0, GyorgyGajdos), standing-heel-raise (elevación de talones con mancuernas, CC BY-SA 3.0, GeorgeStepanek) y standing-calf-raise (ilustración anatómica exacta a dos piernas sin máquina, CC BY-SA 4.0, BruceBlaus). Quedan pendientes explícitos: band-alternating-lat-pulldown y dumbbell-glute-bridge (GIF ajenos actuales), archer-push-up, pike-push-up, slider-leg-curl y shoulder-tap-plank (guía SVG propia transitoria), más las 9 demos de cardio. Bump de caché `fitbud-pwa-v181`.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**

@@ -896,6 +896,11 @@
   // REQ-259: foto real por disciplina, como los ejercicios de fuerza (antes
   // caían al dibujo SVG). Se sirve desde assets/ del propio deploy, sin hotlinks.
   const FREE_EXERCISE_DB={source_name:"Free Exercise DB",license_name:"Public Domain (Unlicense)",attribution:"Free Exercise DB (yuhonas) — dominio público"};
+  // REQ-310: fuentes con licencia verificable para pendientes exactos.
+  const WIKIMEDIA_PD_PULLUP={source_name:"Wikimedia Commons (Extremistpullup)",source_url:"https://commons.wikimedia.org/wiki/File:Weighted,_wide-grip_pullup_video.gif",license_name:"Dominio público",attribution:"Extremistpullup, Wikimedia Commons"};
+  const WIKIMEDIA_BANDROW={source_name:"Wikimedia Commons (GyorgyGajdos)",source_url:"https://commons.wikimedia.org/wiki/File:Bent_over_rows_with_resistance_bands_01.gif",license_name:"CC BY-SA 4.0",attribution:"GyorgyGajdos, Wikimedia Commons"};
+  const WIKIMEDIA_HEELRAISE={source_name:"Wikimedia Commons (GeorgeStepanek)",source_url:"https://commons.wikimedia.org/wiki/File:DumbbellStandingCalfRaise.JPG",license_name:"CC BY-SA 3.0",attribution:"GeorgeStepanek, Wikimedia Commons"};
+  const WIKIMEDIA_CALF={source_name:"Wikimedia Commons (BruceBlaus)",source_url:"https://commons.wikimedia.org/wiki/File:Exercise_Heel_Raise_Two_Legs.png",license_name:"CC BY-SA 4.0",attribution:"BruceBlaus, Wikimedia Commons"};
   const ENDURANCE_MEDIA={
     walking:["assets/exercise-media/walking.jpg",FREE_EXERCISE_DB],
     running:["assets/exercise-media/running.jpg",FREE_EXERCISE_DB],
@@ -960,7 +965,7 @@
   // el catálogo local; si la tabla de Supabase no carga o una fila pierde su
   // media, ya no caen al dibujo SVG. Fotos de Free Exercise DB (dominio
   // público) servidas desde assets/, como el resto del catálogo.
-  const SIN_FOTO_EXACTA=new Set(["weighted-pull-up"]); // la única foto del dataset muestra asistencia con liga; la ficha exige lastre. Pendiente imagen exacta (ni proxy ni monigote disfrazado).
+  const SIN_FOTO_EXACTA=new Set(); // weighted-pull-up ya tiene foto exacta (Wikimedia Commons, dominio público).
   strength.forEach(ex=>{
     if(ex.media_type!=="inline_svg")return; // conserva guías SVG propias y fotos ya asignadas
     if(SIN_FOTO_EXACTA.has(ex.slug))return;
@@ -981,9 +986,10 @@
     "dumbbell-overhead-triceps-extension","dumbbell-alternating-curl",
   ];
   // Pendientes por falta de foto exacta con licencia compatible (no usar proxies
-  // de otro equipo o variante): "band-alternating-lat-pulldown" (jalón con banda),
-  // "standing-heel-raise" (elevación de pie sin máquina) y "dumbbell-glute-bridge"
-  // (puente con mancuerna). Conservan su media actual hasta tener demo exacta.
+  // de otro equipo o variante): "band-alternating-lat-pulldown" (jalón con banda)
+  // y "dumbbell-glute-bridge" (puente con mancuerna). Conservan su media actual
+  // hasta tener demo exacta. "standing-heel-raise" ya se resolvió con foto de
+  // Wikimedia Commons (CC BY-SA 3.0).
   GIF_CON_MARCA_DE_AGUA.forEach(slug=>{
     const frames=[0,1].map(i=>`assets/exercise-media/${slug}-${i}.jpg`);
     reviewedMedia.set(slug,{...FREE_EXERCISE_DB,media_type:"image_sequence",media_url:"",poster_url:frames[0],frames});
@@ -991,7 +997,8 @@
   // REQ-310: la fila Supabase de "weighted-pull-up" muestra la misma foto
   // incorrecta (dominada asistida con liga, sin lastre). Se retira la media
   // remota y cae a la guía SVG propia hasta tener foto exacta con lastre.
-  reviewedMedia.set("weighted-pull-up",{...OWN_MEDIA});
+  const wpuFrames=["assets/exercise-media/weighted-pull-up-0.jpg","assets/exercise-media/weighted-pull-up-1.jpg"];
+  reviewedMedia.set("weighted-pull-up",{...WIKIMEDIA_PD_PULLUP,media_type:"image_sequence",media_url:"",poster_url:wpuFrames[0],frames:wpuFrames});
   // REQ-310: estas 6 filas remotas enseñaban otro movimiento u otro equipo
   // que su ficha (inspección visual 2026-10-30): parada de manos en vez de
   // pike push-up, remo en banco en vez de remo con banda, balón en vez de
@@ -999,9 +1006,20 @@
   // vez de arquero, máquina en vez de elevación de pie. Se retira la media
   // remota y caen a la guía SVG propia como pendientes explícitos hasta
   // tener foto o animación exacta con licencia verificable.
-  ["archer-push-up","band-row","pike-push-up","slider-leg-curl","standing-calf-raise","shoulder-tap-plank"].forEach(slug=>{
+  ["archer-push-up","pike-push-up","slider-leg-curl","shoulder-tap-plank"].forEach(slug=>{
     reviewedMedia.set(slug,{...OWN_MEDIA});
   });
+  // REQ-310: band-row, standing-calf-raise y standing-heel-raise ya tienen
+  // demostración exacta con licencia verificable (Wikimedia Commons). La foto
+  // de standing-heel-raise muestra la variante con apoyo en bloque; la ficha
+  // indica suelo plano, mismo movimiento. standing-calf-raise usa una
+  // ilustración anatómica exacta mientras se consigue foto sin máquina.
+  const brFrames=["assets/exercise-media/band-row-0.jpg","assets/exercise-media/band-row-1.jpg"];
+  reviewedMedia.set("band-row",{...WIKIMEDIA_BANDROW,media_type:"image_sequence",media_url:"",poster_url:brFrames[0],frames:brFrames});
+  const scrFrames=["assets/exercise-media/standing-calf-raise-0.jpg","assets/exercise-media/standing-calf-raise-1.jpg"];
+  reviewedMedia.set("standing-calf-raise",{...WIKIMEDIA_CALF,media_type:"image_sequence",media_url:"",poster_url:scrFrames[0],frames:scrFrames});
+  const shrFrames=["assets/exercise-media/standing-heel-raise-0.jpg","assets/exercise-media/standing-heel-raise-1.jpg"];
+  reviewedMedia.set("standing-heel-raise",{...WIKIMEDIA_HEELRAISE,media_type:"image_sequence",media_url:"",poster_url:shrFrames[0],frames:shrFrames});
   root.FITBUD_EXERCISES=strength.concat(endurance);
   const reviewedBySlug=new Map(root.FITBUD_EXERCISES.map(ex=>[ex.slug,ex]));
   // Ejercicios adicionales presentes en producción, revisados con sus
