@@ -974,7 +974,7 @@
   // dominio público servidas desde assets/. normalize corrige la media sin
   // modificar las filas, como ya hace con las demos antiguas.
   const GIF_CON_MARCA_DE_AGUA=[
-    "scaled-push-up","dumbbell-alternating-hammer-curl","dumbbell-lateral-raise",
+    "scaled-push-up","band-assisted-pull-up","dumbbell-alternating-hammer-curl","dumbbell-lateral-raise",
     "dumbbell-reverse-fly","dumbbell-romanian-deadlift","dumbbell-standing-shoulder-press",
     "dumbbell-bent-over-row","goblet-squat",
     "dumbbell-reverse-lunge","dumbbell-floor-press",
