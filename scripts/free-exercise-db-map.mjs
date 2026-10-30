@@ -139,4 +139,21 @@ export default {
   "slider-leg-curl":         { q: "sliding leg curl hamstring", id: null, curated_svg: "assets/exercise-media/slider-leg-curl.svg" }, // Deslizadores o toalla; no usar pelota.
   "archer-push-up":          { q: "archer push up", id: null, curated_svg: "assets/exercise-media/archer-push-up.svg" }, // Desplazamiento lateral; no sustituir por flexión pliométrica.
   "nordic-hamstring-curl":   { q: "natural glute ham raise nordic", id: "Natural_Glute_Ham_Raise" },
+
+  // REQ-310: ejercicios de producción que hoy muestran un GIF ajeno con
+  // marca de agua (fitnessprogramer.com); se reemplazan por fotos de
+  // dominio público servidas desde assets/ (normalize corrige la media
+  // sin tocar las filas de Supabase).
+  "scaled-push-up":            { q: "push ups", id: "Pushups" }, // La ficha enseña la flexión estándar con opciones de escalado.
+  "dumbbell-alternating-hammer-curl": { q: "hammer curls dumbbell", id: "Hammer_Curls" },
+  "band-assisted-pull-up":     { q: "band assisted pull up", id: "Band_Assisted_Pull-Up" },
+  "standing-heel-raise":       { q: "standing calf raise bodyweight", id: null }, // PENDIENTE: solo hay elevación en máquina; la ficha es de pie sin equipo.
+  "dumbbell-lateral-raise":    { q: "side lateral raise dumbbell", id: "Side_Lateral_Raise" },
+  "band-alternating-lat-pulldown": { q: "band lat pulldown", id: null }, // PENDIENTE: el dataset no tiene jalón con banda; no usar proxy de polea.
+  "dumbbell-reverse-fly":      { q: "bent over rear delt raise dumbbell", id: "Seated_Bent-Over_Rear_Delt_Raise" },
+  "dumbbell-romanian-deadlift": { q: "dumbbell romanian deadlift stiff leg", id: "Stiff-Legged_Dumbbell_Deadlift" },
+  "dumbbell-standing-shoulder-press": { q: "standing dumbbell shoulder press", id: "Standing_Dumbbell_Press" },
+  "dumbbell-glute-bridge":     { q: "glute bridge dumbbell", id: null }, // PENDIENTE: el dataset solo tiene el puente sin carga; la ficha lleva mancuerna.
+  "dumbbell-bent-over-row":    { q: "bent over dumbbell row two arm", id: "Bent_Over_Two-Dumbbell_Row" },
+  "goblet-squat":              { q: "goblet squat kettlebell dumbbell", id: "Goblet_Squat" },
 };
