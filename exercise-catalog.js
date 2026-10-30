@@ -911,6 +911,14 @@
     const [url,source]=ENDURANCE_MEDIA[ex.discipline];
     Object.assign(ex,source,{media_type:"image",media_url:url,poster_url:url});
   });
+  // REQ-310: las 9 filas de cardio en Supabase (run/cycle/swim x3) siguen con
+  // el SVG procedural; se normalizan a las mismas fotos reales revisadas que
+  // ya usa el catálogo local de resistencia.
+  const CARDIO_BY_DISCIPLINE={running:["run-drills","run-easy","run-intervals"],cycling:["cycle-cadence","cycle-endurance","cycle-intervals"],swimming:["swim-drills","swim-endurance","swim-intervals"]};
+  Object.entries(CARDIO_BY_DISCIPLINE).forEach(([disc,slugs])=>{
+    const [url,source]=ENDURANCE_MEDIA[disc];
+    slugs.forEach(slug=>reviewedMedia.set(slug,{...source,media_type:"image",media_url:url,poster_url:url,frames:[]}));
+  });
 
   // REQ-264: las demostraciones deben enseñar el ejercicio nombrado, sin
   // sustituirlo por otro más difícil que trabaje músculos parecidos.
