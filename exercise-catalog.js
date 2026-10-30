@@ -992,6 +992,16 @@
   // incorrecta (dominada asistida con liga, sin lastre). Se retira la media
   // remota y cae a la guía SVG propia hasta tener foto exacta con lastre.
   reviewedMedia.set("weighted-pull-up",{...OWN_MEDIA});
+  // REQ-310: estas 6 filas remotas enseñaban otro movimiento u otro equipo
+  // que su ficha (inspección visual 2026-10-30): parada de manos en vez de
+  // pike push-up, remo en banco en vez de remo con banda, balón en vez de
+  // deslizadores, escalador en vez de plancha con toque, flexión estándar en
+  // vez de arquero, máquina en vez de elevación de pie. Se retira la media
+  // remota y caen a la guía SVG propia como pendientes explícitos hasta
+  // tener foto o animación exacta con licencia verificable.
+  ["archer-push-up","band-row","pike-push-up","slider-leg-curl","standing-calf-raise","shoulder-tap-plank"].forEach(slug=>{
+    reviewedMedia.set(slug,{...OWN_MEDIA});
+  });
   root.FITBUD_EXERCISES=strength.concat(endurance);
   const reviewedBySlug=new Map(root.FITBUD_EXERCISES.map(ex=>[ex.slug,ex]));
   // Ejercicios adicionales presentes en producción, revisados con sus
