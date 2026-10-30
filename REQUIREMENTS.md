@@ -2169,6 +2169,17 @@ Jonathan (2026-10-30): el customer service de Evolv se atiende en su WhatsApp de
 
 Jonathan (2026-10-30): separar la consola de administración a otra URL y dar acceso a Sathya (b.ll.sathya@gmail.com, mismos permisos de administrador). La consola vive en `/admin` (rewrite de `vercel.json` al mismo `index.html`; el modo consola se activa por ruta). La app de usuarios ya no renderiza vistas de administración para nadie: `setView` las bloquea fuera del modo consola, el despachador de `render()` exige modo consola y Perfil solo enlaza a `/admin`. En `/admin`: sin sesión → login; sesión sin `is_admin` → pantalla "Sin acceso"; admin → consola con pestañas propias (Beta, Usuarios, Alimentos, Ejercicios, Analítica, Ajustes) y vuelta a la app. El enlace del correo de aviso de postulantes y la tarjeta de pendientes en Hoy apuntan a `/admin?ver=postulantes`. La autorización real no cambia: ya era server-side (`api/admin` valida JWT + `is_admin`; RLS protege los datos). El alta de Sathya es un paso operativo en Supabase (`is_admin=true` en su perfil), fuera del repo. ✓ `tests/e2e/admin-console.spec.js`; `tests/e2e/admin-beta.spec.js` actualizado.
 
+## REQ-310 - Fotos reales en todo el catálogo de ejercicios (adiós al monigote)
+
+**Estado: implementado.**
+
+Jonathan (2026-10-30): "hay varios ejercicios que no tienen fotos ni animación correcta, solo se ve un monigote horrible". Diagnóstico con sesión real:
+
+- 12 ejercicios que solo existen en la tabla de Supabase usaban un GIF ajeno con marca de agua (fitnessprogramer.com, figura anatómica gris y licencia no libre): scaled-push-up, dumbbell-alternating-hammer-curl, band-assisted-pull-up, standing-heel-raise, dumbbell-lateral-raise, band-alternating-lat-pulldown, dumbbell-reverse-fly, dumbbell-romanian-deadlift, dumbbell-standing-shoulder-press, dumbbell-glute-bridge, dumbbell-bent-over-row y goblet-squat.
+- Los 32 ejercicios base de fuerza (press de banca, sentadilla con barra, dominada, etc.) solo tenían fotos en la fila de Supabase: si la tabla no cargaba, el catálogo local de respaldo los dibujaba con el SVG procedimental (el monigote).
+
+Corrección, siguiendo la mecánica de REQ-259/302/303 sin tocar filas de Supabase: se descargaron las 88 fotos de Free Exercise DB (dominio público / Unlicense) a `assets/exercise-media/<slug>-{0,1}.jpg` (mapeo en `scripts/free-exercise-db-map.mjs`, validado con `ingest-exercise-media.mjs --check`); `exercise-catalog.js` asigna secuencia de fotos a los ejercicios base que aún tenían `inline_svg` y registra en `reviewedMedia` el reemplazo de los 12 GIF, que `normalize` aplica sobre las filas remotas. Quedan pendientes 3 ejercicios por no existir foto exacta con licencia compatible (no se usan proxies de otra variante o equipo): `band-alternating-lat-pulldown` (jalón con banda), `standing-heel-raise` (de pie sin máquina) y `dumbbell-glute-bridge` (con mancuerna); conservan su media actual hasta tener demostración exacta. Bump de caché `fitbud-pwa-v177` para que los clientes reciban el catálogo nuevo.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**
