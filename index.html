@@ -4267,23 +4267,56 @@ function screenHeader(title,sub,icon){
   </header>`;
 }
 
+/* ---------- REQ-308: consola de administración separada en /admin ---------- */
+// La consola vive en evolvapp.club/admin (rewrite a este mismo index.html en
+// vercel.json). La app de usuarios ya no renderiza vistas de administración:
+// solo enlaza a la consola. La autorización real no cambia: /api/admin y las
+// tablas siguen verificando is_admin en el servidor.
+const ADMIN_CONSOLE=/^\/admin(?:\/|$)/.test(location.pathname)||window.__forceAdminConsole===true;
+const ADMIN_VIEWS=["adminBeta","admin","foods","exercises","analytics","settings"];
+const ADMIN_TABS=[["adminBeta","Beta","mail"],["admin","Usuarios","perfil"],["foods","Alimentos","foods"],["exercises","Ejercicios","entreno"],["analytics","Analítica","progreso"],["settings","Ajustes","settings"]];
+function renderAdminTabs(){
+  $("#tabs").innerHTML=ADMIN_TABS.map(([v,l,ic])=>`<button data-tab="${v}" class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(ic)}</span><span>${l}</span></button>`).join("")
+    +`<button onclick="location.href='/'"><span class="ic">${tabIcon("hoy")}</span><span>App</span></button>`;
+}
+function renderAdminConsole(){
+  if(!isAdmin()){
+    $("#tabs").innerHTML="";
+    const mail=(session&&session.user&&session.user.email)||"";
+    $("#app").innerHTML=`<div class="onboarding"><div class="onboarding-brand">EVOLV · ADMINISTRACIÓN</div>
+      <h1>Sin acceso</h1>
+      <p class="onboarding-copy">Esta consola es solo para el equipo de Evolv.${mail?` La cuenta ${esc(mail)} no tiene permisos de administración.`:""}</p>
+      <div class="onboarding-actions"><a class="btn btn-accent" style="flex:1;text-align:center" href="/">Ir a la app</a></div></div>`;
+    return;
+  }
+  if(!ADMIN_VIEWS.includes(view))view="adminBeta";
+  renderAdminTabs();
+  if(view==="foods")return renderFoods();
+  if(view==="exercises")return renderExerciseAdmin();
+  if(view==="settings")return renderSettings();
+  if(view==="admin")return renderAdminUsers();
+  if(view==="analytics")return renderAnalytics();
+  return renderAdminBeta();
+}
+
 let authReady=false;   // true cuando ya resolvimos la sesión de Supabase
 let passwordRecovery=false;
 let passwordRecoveryError="";
 let passwordRecoveryMode="recovery";
 function render(){
   updateInstallPrompt();
-  $("#app").classList.toggle("landing-host", !!(authReady&&!session&&!window._showAuth));
+  $("#app").classList.toggle("landing-host", !!(authReady&&!session&&!window._showAuth&&!ADMIN_CONSOLE));
   if(!authReady){$("#tabs").innerHTML="";return renderSplash();}
   if(passwordRecovery){$("#tabs").innerHTML="";return renderPasswordRecovery();}
   if(!session){
     resetStreakFeedback();
     $("#tabs").innerHTML="";
-    return window._showAuth ? renderAuth() : renderLanding();
+    return (window._showAuth||ADMIN_CONSOLE) ? renderAuth() : renderLanding();
   }
   if(profile&&!isActive()){ $("#tabs").innerHTML="";return renderInactive(); }
   if(!privacyReady){$("#tabs").innerHTML="";return renderSplash();}
   if(privacyError)return renderPrivacyUnavailable();
+  if(ADMIN_CONSOLE)return renderAdminConsole();
   if(onboardingActive)return renderOnboarding();
   if(privacyGateRequired())return renderPrivacyGate();
   if(planNeedsRecap()){ $("#tabs").innerHTML="";return renderPlanRecap(); }
@@ -4295,12 +4328,12 @@ function render(){
   if(view==="entreno")return renderWorkout();
   if(view==="progreso")return renderProgress();
   if(view==="perfil")return renderProfile();
-  if(isAdmin()&&view==="foods")return renderFoods();
-  if(isAdmin()&&view==="exercises")return renderExerciseAdmin();
-  if(isAdmin()&&view==="settings")return renderSettings();
-  if(isAdmin()&&view==="admin")return renderAdminUsers();
-  if(isAdmin()&&view==="adminBeta")return renderAdminBeta();
-  if(isAdmin()&&view==="analytics")return renderAnalytics();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="foods")return renderFoods();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="exercises")return renderExerciseAdmin();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="settings")return renderSettings();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="admin")return renderAdminUsers();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="adminBeta")return renderAdminBeta();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="analytics")return renderAnalytics();
   renderHoy();
 }
 function renderSplash(){$("#app").innerHTML=`<div class="splash"><div class="muted">Cargando…</div></div>`;}
@@ -4471,7 +4504,7 @@ function renderTabs(){
   $("#tabs").innerHTML=tabs.map(([v,l])=>`<button data-tab="${v}" class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
 }
 function setView(v){
-  if((v==="foods"||v==="exercises"||v==="settings"||v==="admin"||v==="adminBeta")&&!isAdmin())v="perfil";
+  if(ADMIN_VIEWS.includes(v)&&(!isAdmin()||!ADMIN_CONSOLE))v="perfil";
   if(v==="coach")v="hoy";
   view=v;
   if(v==="hoy")current=clampDate(todayStr());
@@ -8216,13 +8249,8 @@ function renderProfile(){
   ${isAdmin()?`<details id="pfSecAdmin" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
   <summary onclick="return profileAccordionGuard(event,this)">Administración</summary>
   <div class="pf-accordion-panel"><div class="dash">
-    <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, alimentos, ejercicios y la configuración técnica.</div>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('adminBeta')">🌱 Postulantes beta${adminBetaPending?` · ${adminBetaPending} por revisar`:""}</button>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('foods')">🥗 Alimentos (catálogo)</button>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('exercises')">🏋️ Ejercicios (catálogo)</button>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('analytics')">📊 Analítica</button>
-    <button class="btn" style="width:100%" onclick="setView('settings')">⚙️ Ajustes técnicos</button>
+    <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, postulantes, catálogos y la configuración desde la consola.</div>
+    <a class="btn btn-accent" style="width:100%;text-align:center" href="/admin">Abrir consola de administración${adminBetaPending?` · ${adminBetaPending} por revisar`:""}</a>
   </div></div>
   </details>`:""}
 
@@ -14876,14 +14904,17 @@ function openAdminBetaFromLink(){
     params.delete("ver");
     const qs=params.toString();
     history.replaceState(history.state,"",location.pathname+(qs?"?"+qs:"")+location.hash);
-    if(isAdmin())setView("adminBeta");
+    if(isAdmin()){
+      if(ADMIN_CONSOLE){setView("adminBeta");}
+      else{location.href="/admin?ver=postulantes";}
+    }
   }catch(_){}
 }
 function adminBetaPendingCardHtml(){
   if(!isAdmin()||!adminBetaPending)return "";
   return `<div class="dash" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
     <div><b>${adminBetaPending} ${adminBetaPending===1?"postulación espera":"postulaciones esperan"} tu revisión</b><div class="muted small">Beta</div></div>
-    <button class="btn btn-sm btn-accent" onclick="setView('adminBeta')">Revisar</button>
+    <button class="btn btn-sm btn-accent" onclick="location.href='/admin?ver=postulantes'">Revisar</button>
   </div>`;
 }
 let adminBetaCache=[];
@@ -16115,7 +16146,7 @@ async function boot(){
   loadCatalog().then(()=>{if(!session)refreshLandingPlans();});
   // REQ-203: el enlace de invitación abre directo el registro.
   if(captureInviteCode()&&!hasStoredAuthSession()){window._showAuth=true;window._authMode="up";}
-  if(!passwordRedirectMode()&&!hasStoredAuthSession()&&!window._showAuth){
+  if(!passwordRedirectMode()&&!hasStoredAuthSession()&&!window._showAuth&&!ADMIN_CONSOLE){
     $("#tabs").innerHTML="";$("#app").classList.add("landing-host");
     renderLanding();
   }
