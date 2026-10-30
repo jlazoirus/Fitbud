@@ -2128,8 +2128,6 @@ Jonathan (2026-10-28): eligió comparar la racha actual. Compartir desde Hoy/Pro
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-"Shake proteina gloria pro" se estimó como proteína en polvo con agua (es una bebida lista para tomar). El pedido de texto decide el formato, no afirma datos de una marca que no conoce y orienta a la foto de la etiqueta; la foto lee la etiqueta. Reestimar actualiza el origen visible. ✓ `scripts/validate-meal-estimate-output.mjs`, `tests/e2e/origen-registro.spec.js`.
-
 ## REQ-302 - Ampliar ejercicios
 
 **Estado: implementado.** SQL de aplicación manual.
@@ -2141,3 +2139,9 @@ Detalle: `docs/exercise-progressions.md`.
 **Estado: implementado.**
 
 40 fichas; 32 de gimnasio. Criterios y operación SQL manual: `docs/exercise-gym-expansion.md`. ✓ `tests/e2e/exercise-gym-expansion.spec.js`.
+
+## REQ-304 - Celebrar cada día de racha
+
+**Estado: implementado.**
+
+Animación visible del incremento, sin duplicados y con movimiento reducido. Detalle: `docs/streak-celebration.md`. ✓ `tests/e2e/streak-celebration.spec.js`.

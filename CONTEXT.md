@@ -80,7 +80,8 @@ Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservad
 
 ## Persistencia, sync y planes
 
-- REQ-300: rachas privadas entre amigos (`js/streak-friends.js`, RPC `streak_social`). Alias voluntario + invitación de un uso/7 días + aceptación; ranking de racha actual, empates y revocación. Solo proyección mínima, sin abrir datos de salud. Migración manual: `supabase/streak_friends.sql`; operación y límites en `docs/streak-friends.md`.
+- REQ-300: rachas privadas entre amigos (RPC `streak_social`, `js/streak-friends.js`): alias, invitación de un uso/7 días, aceptación, ranking con empates y revocación, sin datos de salud. Migración manual: `supabase/streak_friends.sql`; detalles: `docs/streak-friends.md`.
+- REQ-304: celebración por día de racha, sin duplicados; `docs/streak-celebration.md`.
 
 - `plan_versions` guarda snapshots activos/previos. Entrenamiento ya usa borrador + activacion confirmada. Nutricion aun esta migrando hacia `snapshot.nutritionPlan` (REQ-82).
 - `day_log` registra ejecucion diaria, overrides, extras, adaptaciones y estado offline. No debe convertirse en fuente principal de prescripcion futura.
