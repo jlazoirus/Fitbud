@@ -669,7 +669,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-84`).
 
 ## REQ-86 - Fix: caché de coach reutilizaba resultados generados con prompts obsoletos
 
-**Estado: implementado.** `COACH_PROMPT_VERSION` (constante en `index.html`) se incluye en `coachCompatibilityContext`, que alimenta el `contextKey` del sistema de quota. Bumpar la constante invalida todos los resultados reutilizables generados con versiones anteriores del prompt. 3 asserts en `scripts/validate-coach-prompt-version.mjs`.
+**Estado: implementado.** `COACH_PROMPT_VERSION` (constante en `index.html`) se incluye en `coachCompatibilityContext`, que alimenta el `contextKey` del sistema de quota.  Correcciones tras inspección visual del PR: `front-plank` publica el frame de plancha correcto (el frame 0 del dataset mostraba a la persona incorporándose); `weighted-pull-up` queda pendiente (la foto del dataset muestra asistencia con liga, no lastre) y su media incorrecta se retira vía `normalize` hasta tener imagen exacta; se cubren 4 GIF más con marca de agua detectados en la tabla (`dumbbell-reverse-lunge`, `dumbbell-floor-press`, `dumbbell-overhead-triceps-extension`, `dumbbell-alternating-curl`). Bumpar la constante invalida todos los resultados reutilizables generados con versiones anteriores del prompt. 3 asserts en `scripts/validate-coach-prompt-version.mjs`.
 
 ## REQ-87 - Fix: "Preparar mi semana" sobrescribía días pasados y con datos registrados
 

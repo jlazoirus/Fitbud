@@ -115,7 +115,7 @@ export default {
   "face-pull":               { q: "face pull rope rear delt", id: "Face_Pull" },
   "hammer-curl":             { q: "hammer curls dumbbell", id: "Hammer_Curls" },
   "front-squat":             { q: "front barbell squat", id: "Front_Barbell_Squat" },
-  "weighted-pull-up":        { q: "weighted pull ups", id: "Weighted_Pull_Ups" },
+  "weighted-pull-up":        { q: "weighted pull ups belt", id: null }, // PENDIENTE: la unica entrada del dataset (Weighted_Pull_Ups) muestra asistencia con liga, no lastre; el equipo de la ficha exige cinturon de lastre.
 
   // --- Peso corporal ---
   "tempo-squat":             { q: "bodyweight squat", id: "Bodyweight_Squat" },
@@ -129,7 +129,7 @@ export default {
   "inverted-row":            { q: "inverted row", id: null }, // REQ-293: fotos de Inverted_Row ya copiadas en assets/exercise-media/inverted-row-{0,1}.jpg.
   "glute-bridge":            { q: "butt lift bridge glute", id: "Butt_Lift_Bridge" },
   "single-leg-glute-bridge": { q: "single leg glute bridge", id: "Single_Leg_Glute_Bridge" },
-  "front-plank":             { q: "plank core", id: "Plank" },
+  "front-plank":             { q: "plank core", id: "Plank" }, // El frame 0 del dataset muestra a la persona incorporandose; se publica el frame de plancha correcto en ambas posiciones (ejercicio estatico).
   "side-plank":              { q: "side bridge plank", id: "Side_Bridge" },
   "dead-bug":                { q: "dead bug core", id: "Dead_Bug" },
   "pike-push-up":            { q: "pike push up shoulders", id: null, curated_svg: "assets/exercise-media/pike-push-up.svg" }, // Pies al suelo; una flexión de pino no es un pike.
@@ -155,5 +155,9 @@ export default {
   "dumbbell-standing-shoulder-press": { q: "standing dumbbell shoulder press", id: "Standing_Dumbbell_Press" },
   "dumbbell-glute-bridge":     { q: "glute bridge dumbbell", id: null }, // PENDIENTE: el dataset solo tiene el puente sin carga; la ficha lleva mancuerna.
   "dumbbell-bent-over-row":    { q: "bent over dumbbell row two arm", id: "Bent_Over_Two-Dumbbell_Row" },
+  "dumbbell-reverse-lunge":      { q: "dumbbell rear lunge", id: "Dumbbell_Rear_Lunge" },
+  "dumbbell-floor-press":        { q: "dumbbell floor press", id: "Dumbbell_Floor_Press" },
+  "dumbbell-overhead-triceps-extension": { q: "standing dumbbell triceps extension", id: "Standing_Dumbbell_Triceps_Extension" },
+  "dumbbell-alternating-curl":   { q: "dumbbell alternate bicep curl", id: "Dumbbell_Alternate_Bicep_Curl" },
   "goblet-squat":              { q: "goblet squat kettlebell dumbbell", id: "Goblet_Squat" },
 };
