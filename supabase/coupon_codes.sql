@@ -119,5 +119,6 @@ begin
 end;
 $$;
 
+revoke execute on function public.redeem_redemption_code(text, uuid) from PUBLIC;
 revoke execute on function public.redeem_redemption_code(text, uuid) from anon, authenticated;
 grant execute on function public.redeem_redemption_code(text, uuid) to service_role;
