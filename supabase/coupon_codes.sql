@@ -64,12 +64,15 @@ begin
     raise exception 'El código ha expirado.';
   end if;
 
+  -- REQ-306: status y expires_at también son parámetros OUT del returns table;
+  -- sin calificar, plpgsql los toma por variables y el canje siempre fallaba
+  -- con 42702 (column reference is ambiguous).
   if exists (
     select 1
       from user_entitlements
-     where user_id = p_user_id
-       and status in ('active','courtesy')
-       and expires_at > v_now
+     where user_entitlements.user_id = p_user_id
+       and user_entitlements.status in ('active','courtesy')
+       and user_entitlements.expires_at > v_now
   ) then
     raise exception 'Ya tienes un plan activo.';
   end if;
