@@ -2182,6 +2182,8 @@ Corrección, siguiendo la mecánica de REQ-259/302/303 sin tocar filas de Supaba
 
 Corrección posterior (2026-10-30, inspección visual completa): la tabla tiene 16 filas con GIF, no 12; se sustituyen también dumbbell-reverse-lunge, dumbbell-floor-press, dumbbell-overhead-triceps-extension y dumbbell-alternating-curl por sus fotos de Free Exercise DB, y se asigna la foto ya descargada a band-assisted-pull-up, que había quedado fuera de la lista de reemplazo. front-plank usaba un primer fotograma incorrecto (persona incorporándose) y ahora publica el fotograma de plancha en ambas posiciones. weighted-pull-up mostraba la misma foto errónea en dataset y fila remota (dominada asistida con liga, sin lastre): se retira la media y cae a la guía SVG propia hasta tener foto exacta con lastre. Bump de caché `fitbud-pwa-v179`.
 
+Ampliación (2026-10-30, segunda pasada): la inspección visual completa encontró 6 filas remotas cuya foto enseña otro movimiento u otro equipo que su ficha (pike-push-up con parada de manos, band-row sin banda, slider-leg-curl con balón, shoulder-tap-plank en posición de escalador, archer-push-up con flexión estándar y standing-calf-raise en máquina). Se retira su media por `normalize` y quedan como pendientes explícitos con guía SVG propia transitoria mientras se consigue foto o animación exacta con licencia verificable; los 9 ejercicios de cardio (run/cycle/swim) también están en proceso de sustitución del SVG procedural por fotos con licencia. Bump de caché `fitbud-pwa-v180`.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**
