@@ -2168,3 +2168,9 @@ Jonathan (2026-10-30): el customer service de Evolv se atiende en su WhatsApp de
 **Estado: implementado.**
 
 Jonathan (2026-10-30): separar la consola de administración a otra URL y dar acceso a Sathya (b.ll.sathya@gmail.com, mismos permisos de administrador). La consola vive en `/admin` (rewrite de `vercel.json` al mismo `index.html`; el modo consola se activa por ruta). La app de usuarios ya no renderiza vistas de administración para nadie: `setView` las bloquea fuera del modo consola, el despachador de `render()` exige modo consola y Perfil solo enlaza a `/admin`. En `/admin`: sin sesión → login; sesión sin `is_admin` → pantalla "Sin acceso"; admin → consola con pestañas propias (Beta, Usuarios, Alimentos, Ejercicios, Analítica, Ajustes) y vuelta a la app. El enlace del correo de aviso de postulantes y la tarjeta de pendientes en Hoy apuntan a `/admin?ver=postulantes`. La autorización real no cambia: ya era server-side (`api/admin` valida JWT + `is_admin`; RLS protege los datos). El alta de Sathya es un paso operativo en Supabase (`is_admin=true` en su perfil), fuera del repo. ✓ `tests/e2e/admin-console.spec.js`; `tests/e2e/admin-beta.spec.js` actualizado.
+
+## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
+
+**Estado: implementado.**
+
+Tras publicar REQ-307 y REQ-308 se detectó en producción que los navegadores con el service worker instalado seguían sirviendo la versión anterior de `index.html` desde caché (navegación cache-first por generación de caché, REQ-150). Al no cambiar el binario del SW no se disparaba actualización y los usuarios existentes no veían el widget de WhatsApp ni la consola. Se sube `CACHE_NAME` a `fitbud-pwa-v176`: en la próxima visita el SW nuevo se instala, `skipWaiting()` lo activa y `activate` borra los cachés anteriores, sirviendo el build actual.
