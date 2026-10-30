@@ -2157,3 +2157,8 @@ Al aceptar una postulación la cuenta ya existe (invitación por correo, REQ-225
 
 Los parámetros OUT del `returns table` (`status`, `expires_at`) chocaban con las columnas de `user_entitlements`: plpgsql fallaba siempre con 42702 "column reference is ambiguous" y NINGÚN canje de código funcionaba en producción (registro por invitación y "Canjear" en Mi suscripción). Confirmado en vivo ejecutando la función dentro de una transacción con rollback. Se califican las columnas con la tabla. Requiere re-aplicar `supabase/coupon_codes.sql` en producción (create or replace, sin tocar datos).
 
+## REQ-307 - Soporte por WhatsApp en app, onboarding y web pública
+
+**Estado: implementado.**
+
+Jonathan (2026-10-30): el customer service de Evolv se atiende en su WhatsApp de EE. UU. (+1 830 262-9397). Sin mensajes automáticos: cada persona abre WhatsApp y escribe voluntariamente. Widget flotante en la portada (sin tapar navegación ni formularios en móvil), bloque "¿Dudas antes de postular?" en /beta (no flotante para no tapar el formulario), sección "Ayuda y soporte" en Perfil y "Estamos contigo" en el último paso del onboarding. El enlace del pie de la portada migra del número peruano anterior al de soporte. Enlace único con mensaje prellenado sin datos personales: `https://wa.me/18302629397?text=Hola%2C+tengo+una+duda+sobre+Evolv`. ✓ `tests/e2e/soporte-whatsapp.spec.js`.
