@@ -2221,3 +2221,12 @@ Novena ampliación (2026-10-30): standing-heel-raise resuelto con demostración 
 **Estado: implementado.**
 
 Tras publicar REQ-307 y REQ-308 se detectó en producción que los navegadores con el service worker instalado seguían sirviendo la versión anterior de `index.html` desde caché (navegación cache-first por generación de caché, REQ-150). Al no cambiar el binario del SW no se disparaba actualización y los usuarios existentes no veían el widget de WhatsApp ni la consola. Se sube `CACHE_NAME` a `fitbud-pwa-v176`: en la próxima visita el SW nuevo se instala, `skipWaiting()` lo activa y `activate` borra los cachés anteriores, sirviendo el build actual.
+
+## REQ-312 - Curl predicador en banco Scott con barra EZ
+
+**Estado: implementado.**
+
+Solicitud directa: variante de la imagen con ficha completa, respiración, errores, alertas, contraindicaciones, nivel principiante, gimnasio, banco Scott y barra EZ. `preacher-curl` incluye alias Scott/predicador, regresión y progresión de carga tipadas, sustitutos de bíceps y secuencia animada con dos fotos locales exactas (Free Exercise DB, Preacher_Curl, Unlicense). No modifica planes ni historial. Caché v191. SQL regenerado, aplicación opcional/manual; el cliente incorpora la ficha sin migración de producción.
+
+Verificación: pruebas específicas de ficha/alias/animación/sustitutos en 390 y 1280 px (2/2), suite de ampliación gimnasio (2/2), sintaxis y diff correctos. Los fallos iniciales de los controles se corrigen en REQ-315. Integración autorizada por el usuario. No se ejecutó SQL en producción.
+

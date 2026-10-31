@@ -957,6 +957,14 @@ insert into exercises (
   'Free Exercise DB', '', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
 ),
 (
+  'preacher-curl', 'Curl predicador en banco Scott con barra EZ', '["Curl Scott","Curl en banco Scott","Curl predicador","Preacher Curl","EZ-bar preacher curl"]'::jsonb, 'gym', 'beginner',
+  '["barbell","bench"]'::jsonb, '["gym"]'::jsonb, '["Bíceps"]'::jsonb, 'isolation',
+  'Ajusta el asiento del banco Scott para apoyar el pecho y la parte posterior de los brazos en la almohadilla. Apoya los pies y toma la barra EZ por los agarres interiores, con las palmas hacia arriba y las muñecas alineadas.', '["Con los codos ligeramente flexionados, eleva la barra hacia los hombros sin despegar los brazos del apoyo.","Haz una pausa breve arriba, manteniendo el pecho apoyado y sin doblar las muñecas.","Baja lentamente hasta un recorrido cómodo sin bloquear los codos ni rebotar; devuelve la barra a sus soportes con control al terminar."]'::jsonb, 'Exhala al flexionar los codos e inhala al bajar la barra.', '["Despegar los brazos o el pecho de la almohadilla","Rebotar abajo o bloquear los codos bajo carga","Doblar las muñecas o balancear el tronco"]'::jsonb,
+  '["Dolor agudo en codo, tendón del bíceps o muñeca","Hormigueo o pérdida de agarre","El banco se mueve o no puedes devolver la barra al soporte con control"]'::jsonb, 'Usa una barra EZ más ligera, conservando el apoyo y un recorrido cómodo sin bloquear los codos.', 'Cuando completes todas las repeticiones y series previstas con técnica estable y dos repeticiones en reserva en dos sesiones, añade el incremento mínimo de peso disponible. Reduce la carga si pierdes el apoyo o el control.', '["biceps-curl","concentration-curl","machine-biceps-curl","cable-biceps-curl","incline-dumbbell-curl","hammer-curl","dumbbell-alternating-curl"]'::jsonb,
+  '["dolor agudo de codo o muñeca","lesión reciente del tendón del bíceps"]'::jsonb, 'image_sequence', 'isolation', 'isolation',
+  'Free Exercise DB', 'https://github.com/yuhonas/free-exercise-db', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
+),
+(
   'walk-brisk', 'Caminata a paso activo', '[]'::jsonb, 'walking', 'beginner',
   '[]'::jsonb, '["outdoor"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'walk',
   'Postura alta, mirada al frente y pasos cómodos.', '["Empieza con paso suave para entrar en calor.","Mantén un ritmo estable y respiración controlada.","Baja el ritmo o detente ante cualquier señal de alerta."]'::jsonb, 'Respira de forma rítmica y conserva un ritmo que te permita hablar.', '["Caminar encorvado","Tensar hombros y manos","Ignorar dolor creciente"]'::jsonb,

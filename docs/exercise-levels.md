@@ -209,3 +209,5 @@ El nivel describe la ejecución base de la demostración local. Los aumentos de 
 | `chest-supported-t-bar-row` | beginner | Apoya el pecho en la almohadilla de la máquina de remo en T, fija los pies en la plataforma y toma las asas. |
 | `cable-pull-through` | intermediate | De espaldas a una polea baja, sujeta una cuerda entre las piernas y separa los pies con rodillas suaves. |
 | `lying-cable-triceps-extension` | intermediate | Túmbate en un banco con la cabeza hacia una polea baja, sujeta la barra corta y orienta los brazos hacia arriba. |
+
+- `preacher-curl`: principiante; curl de bíceps sentado en banco Scott con barra EZ, brazos apoyados. Ajustar el asiento, usar poca carga al aprender y evitar bloquear los codos.

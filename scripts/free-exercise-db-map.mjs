@@ -21,6 +21,7 @@
 // ============================================================
 
 export default {
+  "preacher-curl": { id: "Preacher_Curl" },
   // REQ-303: demos locales de la variante exacta; no inferir el músculo por el nombre del recurso.
   "quadruped-glute-kickback": { id: "Glute_Kickback" },
   "alternating-heel-touch": { id: "Alternate_Heel_Touchers" },

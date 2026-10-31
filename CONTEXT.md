@@ -144,3 +144,5 @@ node scripts/audit-secrets.mjs
 - Migraciones SQL deben ser idempotentes, con RLS, y nunca se aplican automaticamente a produccion.
 - Si cambia comportamiento visible, probar desktop y movil. Si cambia PWA, revisar safe areas y cache.
 - Si un agente necesita detalle historico, abrir `docs/requirements-history.md` o `docs/architecture-reference.md` por seccion, no como lectura obligatoria completa.
+
+- REQ-312: curl predicador en banco Scott con barra EZ; ficha completa, secuencia local y progresión de carga.

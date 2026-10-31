@@ -870,6 +870,21 @@
     },
   ];
   EXPANDED_STRENGTH_SPECS.push(...GYM_EXPANSION_SPECS);
+  EXPANDED_STRENGTH_SPECS.push({
+    slug:"preacher-curl",name:"Curl predicador en banco Scott con barra EZ",aliases:["Curl Scott","Curl en banco Scott","Curl predicador","Preacher Curl","EZ-bar preacher curl"],
+    discipline:"gym",pattern:"isolation",level:"beginner",
+    muscles:["Bíceps"],primary_muscle:"Bíceps",equipment:["barbell","bench"],places:["gym"],
+    start_position:"Ajusta el asiento del banco Scott para apoyar el pecho y la parte posterior de los brazos en la almohadilla. Apoya los pies y toma la barra EZ por los agarres interiores, con las palmas hacia arriba y las muñecas alineadas.",
+    steps:["Con los codos ligeramente flexionados, eleva la barra hacia los hombros sin despegar los brazos del apoyo.","Haz una pausa breve arriba, manteniendo el pecho apoyado y sin doblar las muñecas.","Baja lentamente hasta un recorrido cómodo sin bloquear los codos ni rebotar; devuelve la barra a sus soportes con control al terminar."],
+    breathing:"Exhala al flexionar los codos e inhala al bajar la barra.",
+    common_errors:["Despegar los brazos o el pecho de la almohadilla","Rebotar abajo o bloquear los codos bajo carga","Doblar las muñecas o balancear el tronco"],
+    safety_signals:["Dolor agudo en codo, tendón del bíceps o muñeca","Hormigueo o pérdida de agarre","El banco se mueve o no puedes devolver la barra al soporte con control"],
+    contraindications:["dolor agudo de codo o muñeca","lesión reciente del tendón del bíceps"],
+    regression:"Usa una barra EZ más ligera, conservando el apoyo y un recorrido cómodo sin bloquear los codos.",
+    progression:"Cuando completes todas las repeticiones y series previstas con técnica estable y dos repeticiones en reserva en dos sesiones, añade el incremento mínimo de peso disponible. Reduce la carga si pierdes el apoyo o el control.",
+    substitutes:["biceps-curl","concentration-curl","machine-biceps-curl","cable-biceps-curl","incline-dumbbell-curl"],source_id:"Preacher_Curl",batch:312,
+  });
+
   const expandedStrength=EXPANDED_STRENGTH_SPECS.map(spec=>Object.assign(exercise(spec),{source_id:spec.source_id,catalog_batch:spec.batch||302}));
   strength.push(...expandedStrength);
 
