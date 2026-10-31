@@ -2230,3 +2230,11 @@ Solicitud directa: variante de la imagen con ficha completa, respiración, error
 
 Verificación: pruebas específicas de ficha/alias/animación/sustitutos en 390 y 1280 px (2/2), suite de ampliación gimnasio (2/2), sintaxis y diff correctos. Los fallos iniciales de los controles se corrigen en REQ-315. Integración autorizada por el usuario. No se ejecutó SQL en producción.
 
+## REQ-313 - Extensión de tríceps en polea alta con cuerda
+
+**Estado: implementado.**
+
+Solicitud directa del usuario con imagen. La ficha previa `triceps-pushdown` tiene barra; se conserva y se agrega `rope-triceps-pushdown`, variante propia con agarre neutro y cuerda. Incluye nivel principiante, equipo/lugar, técnica, respiración, errores, alertas, contraindicaciones, regresión/progresión de carga tipadas y sustitutos del mismo músculo. Dos fotografías locales exactas de Free Exercise DB, Triceps_Pushdown_-_Rope_Attachment (Unlicense), en secuencia animada. Caché v192. SQL opcional/manual; sin migraciones de producción ni modificación de planes/historial. Los controles generales se corrigen en REQ-315. Integración autorizada por el usuario.
+
+Verificación REQ-313: suite dirigida de ambos ejercicios y ampliación de gimnasio, 6/6 pruebas correctas en Chromium (390/1280 px): búsqueda, carga de ambas fotos, animación activa, nivel, progresión/regresión y sustitución por músculo. Sintaxis y `git diff --check` correctos. El validador general se actualiza en REQ-315.
+

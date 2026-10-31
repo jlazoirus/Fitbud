@@ -965,6 +965,14 @@ insert into exercises (
   'Free Exercise DB', 'https://github.com/yuhonas/free-exercise-db', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
 ),
 (
+  'rope-triceps-pushdown', 'Extensión de tríceps en polea alta con cuerda', '["Tríceps con cuerda","Jalón de tríceps con cuerda","Rope triceps pushdown","Triceps Pushdown - Rope Attachment"]'::jsonb, 'gym', 'beginner',
+  '["cable"]'::jsonb, '["gym"]'::jsonb, '["Tríceps"]'::jsonb, 'isolation',
+  'Fija una cuerda a la polea alta y comprueba el cierre del mosquetón. De pie con los pies firmes, toma un extremo con cada mano y las palmas enfrentadas. Mantén el abdomen firme, el tronco ligeramente inclinado y los codos junto al cuerpo.', '["Extiende los codos llevando los extremos de la cuerda hacia los lados de los muslos, sin mover los brazos superiores.","Pausa brevemente abajo con las muñecas alineadas, sin bloquear los codos ni abrir los hombros.","Flexiona los codos despacio para volver al inicio, sin balancear el tronco ni dejar que las placas golpeen."]'::jsonb, 'Exhala al bajar la cuerda e inhala al regresar.', '["Mover los codos hacia delante o separar los brazos del cuerpo","Balancear el tronco para bajar una carga excesiva","Doblar las muñecas o forzar la separación de la cuerda"]'::jsonb,
+  '["Dolor agudo en codo, hombro o muñeca","Hormigueo o pérdida de agarre","La cuerda está deteriorada o el mosquetón no cierra"]'::jsonb, 'Reduce el peso de la polea y mantén los codos junto al cuerpo durante todo el recorrido cómodo.', 'Cuando completes todas las repeticiones y series previstas con técnica estable y dos repeticiones en reserva en dos sesiones, añade el incremento mínimo de peso disponible. Reduce la carga si necesitas balancearte o mover los codos.', '["triceps-pushdown","machine-triceps-extension","dumbbell-overhead-triceps-extension","lying-dumbbell-triceps-extension","diamond-push-up","close-grip-incline-push-up","body-up","supported-dumbbell-triceps-kickback","cable-overhead-triceps-extension","lying-cable-triceps-extension"]'::jsonb,
+  '["dolor agudo de codo o muñeca","lesión reciente de tríceps u hombro"]'::jsonb, 'image_sequence', 'isolation', 'isolation',
+  'Free Exercise DB', 'https://github.com/yuhonas/free-exercise-db', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
+),
+(
   'walk-brisk', 'Caminata a paso activo', '[]'::jsonb, 'walking', 'beginner',
   '[]'::jsonb, '["outdoor"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'walk',
   'Postura alta, mirada al frente y pasos cómodos.', '["Empieza con paso suave para entrar en calor.","Mantén un ritmo estable y respiración controlada.","Baja el ritmo o detente ante cualquier señal de alerta."]'::jsonb, 'Respira de forma rítmica y conserva un ritmo que te permita hablar.', '["Caminar encorvado","Tensar hombros y manos","Ignorar dolor creciente"]'::jsonb,

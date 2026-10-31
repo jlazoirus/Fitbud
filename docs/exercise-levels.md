@@ -211,3 +211,5 @@ El nivel describe la ejecución base de la demostración local. Los aumentos de 
 | `lying-cable-triceps-extension` | intermediate | Túmbate en un banco con la cabeza hacia una polea baja, sujeta la barra corta y orienta los brazos hacia arriba. |
 
 - `preacher-curl`: principiante; curl de bíceps sentado en banco Scott con barra EZ, brazos apoyados. Ajustar el asiento, usar poca carga al aprender y evitar bloquear los codos.
+
+- `rope-triceps-pushdown`: principiante; extensión de codos en polea alta con cuerda, agarre neutro y brazos junto al cuerpo. Aprender con carga ligera, sin balanceo.
