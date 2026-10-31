@@ -2183,6 +2183,8 @@ Cambio en `trainingSafetyHold()` (antes cualquier respuesta "sí" del cuestionar
 
 Sin cambios para las señales graves ni para el resto del flujo de privacidad. Bump de caché `fitbud-pwa-v189`.
 
+Ampliación (2026-10-31): los botones deshabilitados (`.btn:disabled`) ahora se ven atenuados y sin cursor de clic; antes un botón deshabilitado por la pausa de seguridad parecía activo y la pausa se leía como "los botones no responden". Bump de caché `fitbud-pwa-v190`.
+
 ## REQ-310 - Fotos reales en todo el catálogo de ejercicios (adiós al monigote)
 
 **Estado: implementado.**
