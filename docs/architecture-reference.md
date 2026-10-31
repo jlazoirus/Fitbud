@@ -243,3 +243,12 @@ La app ahora es **multiusuario con Supabase Auth** (email + contraseña). Migrac
 - **Commits:** mensajes en español, con `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Trabajar en `main` y `git push` (dispara deploy).
 - **Service worker:** al cambiar `index.html`, los usuarios con SW viejo pueden ver caché; navegaciones son network-first así que se actualiza, pero subir `CACHE_NAME` (vX) fuerza purga.
 - **`.claude/` está en `.gitignore`** (config local de Claude Code).
+
+
+## Compactación de contexto — 2026-10-31
+
+Detalle operativo conservado desde CONTEXT.md:
+
+- Perfil (REQ-105) usa acordeon nativo: `renderProfile()` monta secciones `<details class="pf-accordion">` y `profileAccordionToggle()` deja una sola abierta; los campos no se desmontan y `#pfEditableBody` conserva el guardado global solo para Objetivo/Comidas/Entreno. Orden (REQ-107): Objetivo, Comidas, Entreno, Privacidad, Suscripcion, Recordatorios, Avisos del dispositivo, [Administracion], Cuenta. REQ-108 agrego `profileAccordionGuard()` en el `onclick` de cada `<summary>`: si la seccion abierta tiene cambios sin guardar (`pfGroupDirty`, grupos "editable"/"privacy"/"notif") y se intenta abrir otra, hace `confirm()` antes de navegar; Privacidad y Recordatorios tienen su propio par mark/clearDirty (`pfPrivacyMarkDirty`/`pfNotifMarkDirty`) e indicador `#pfPrivacyDirtyHint`/`#pfNotifDirtyHint`, ademas del flotante global existente.
+
+- REQ-84 agrego contrato de validacion del coach nutricional en `js/nutrition-domain.js`: `normalizeCoachIngredient(ingName, ingSlug, maps)` busca por slug luego por nombre normalizado (solverKey); `recalcCoachMealMacros(comida, catalog)` itera ingredientes, mapea al catálogo, calcula macros reales y marca desconocidos con `needs_catalog_review:true`. `validateGeneratedDay` en `index.html` ahora usa `recalcCoachMealMacros` cuando `DB.loaded` — los macros declarados por el coach son ignorados; si hay ingredientes desconocidos se emite warn (no se bloquea); si el catálogo no está cargado se hace fallback a macros declarados (backward compatible). Tests: `scripts/validate-nutrition-coach-contract.mjs` (8 tests).

@@ -189,7 +189,8 @@ if (!existsSync(join(ROOT, "node_modules", "@playwright", "test"))) {
   const retryFailed = process.env.E2E_RETRY_FAILED === "1";
   run(retryFailed ? "Suite E2E (reintento de fallidos)" : "Suite E2E (npx playwright test)",
     `npx playwright test --reporter=list${retryFailed ? " --last-failed" : ""}`,
-    { timeout: Number(process.env.E2E_TIMEOUT_MS) || 300_000, stdio: "inherit" });
+    // La suite completa supera 200 journeys; reserva 15 min para entornos CI pequeños.
+    { timeout: Number(process.env.E2E_TIMEOUT_MS) || 900_000, stdio: "inherit" });
 }
 
 // ── Resumen ──────────────────────────────────────────────────────────────────

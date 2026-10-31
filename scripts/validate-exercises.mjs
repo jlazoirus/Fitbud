@@ -28,7 +28,14 @@ for(const exercise of catalog){
     const value=exercise[key];
     if(value==null||value===""||(Array.isArray(value)&&!value.length))errors.push(`${exercise.slug}: falta ${key}`);
   }
-  if(exercise.source_url&&/^https?:\/\//.test(exercise.source_url))errors.push(`${exercise.slug}: usa media externa`);
+  // source_url acredita la fuente; las URLs que se cargan como media son otras.
+  for(const media of [exercise.media_url,exercise.poster_url,...(exercise.frames||[])].filter(Boolean)){
+    if(/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(media))errors.push(`${exercise.slug}: usa media externa ${media}`);
+    else {
+      const asset=path.resolve(root,media);
+      if(!asset.startsWith(root+path.sep)||!fs.existsSync(asset))errors.push(`${exercise.slug}: media local inexistente o fuera del deploy ${media}`);
+    }
+  }
 }
 
 function visit(node,label){
@@ -158,7 +165,7 @@ const stale={...bySlug.get("pike-push-up"),level:"beginner",active:false,
 const original=JSON.stringify(stale),reviewed=normalize(stale);
 if(reviewed.level!=="intermediate"||reviewed.active!==false)errors.push("Pike: no aplica nivel revisado o pisa estado administrativo");
 if(JSON.stringify(stale)!==original)errors.push("La revisión muta la fila original");
-if(reviewed.media_url!=="assets/exercise-media/pike-push-up.svg"||reviewed.frames.length)errors.push("Pike: conserva la demo antigua de handstand");
+if(reviewed.media_type!=="image_sequence"||reviewed.media_url||JSON.stringify(reviewed.frames)!==JSON.stringify(["assets/exercise-media/pike-push-up-0.jpg","assets/exercise-media/pike-push-up-1.jpg"]))errors.push("Pike: no reemplaza handstand por la secuencia exacta revisada");
 const custom={slug:"custom-exercise",name:"Ejercicio propio",level:"advanced",active:false};
 if(JSON.stringify(normalize(custom))!==JSON.stringify(custom))errors.push("La revisión modifica un ejercicio propio");
 if(normalize({slug:"unknown"}).level)errors.push("Ejercicio sin revisar hereda nivel por defecto");

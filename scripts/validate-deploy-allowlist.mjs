@@ -61,6 +61,18 @@ const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclud
   .split("\n").filter(Boolean);
 const deployed = new Set(files.filter((file) => !isIgnored(file)));
 
+// Las rutas públicas reescritas por Vercel no son archivos estáticos.
+const rewrites=JSON.parse(read("vercel.json")).rewrites||[];
+function runtimeFile(ref){
+  const pathname=ref.replace(/[?#].*$/, "").replace(/^\.?\//, "");
+  const rewrite=rewrites.find(rule=>rule.source==="/"+pathname);
+  return rewrite?rewrite.destination.replace(/^\//, ""):pathname||"index.html";
+}
+assert.equal(runtimeFile("/admin?tab=users"),"index.html");
+assert.equal(runtimeFile("/beta"),"beta-reclutamiento.html");
+assert.equal(runtimeFile("/assets/icon-180.png"),"assets/icon-180.png");
+assert.equal(runtimeFile("/unknown-file.js"),"unknown-file.js");
+
 // Lo que el runtime carga: referencias locales de las páginas, shell del SW,
 // íconos del manifest, funciones serverless y su configuración.
 const required = new Set(["index.html", "beta-reclutamiento.html", "service-worker.js", "manifest.webmanifest", "package.json", "package-lock.json", "vercel.json"]);
@@ -68,7 +80,7 @@ for (const page of ["index.html", "beta-reclutamiento.html"]) {
   for (const [, ref] of read(page).matchAll(/(?:src|href)="([^"]+)"/g)) {
     if (/^[a-z]+:|^\/\/|^#|\$\{/.test(ref)) continue;
     // href="/" es la portada; ?source=… y #ancla no son parte del archivo
-    required.add(ref.replace(/[?#].*$/, "").replace(/^\.?\//, "") || "index.html");
+    required.add(runtimeFile(ref));
   }
 }
 // Fotos de ejercicios servidas desde el propio deploy (REQ-259).
@@ -77,6 +89,14 @@ for (const [, ref] of read("exercise-catalog.js").matchAll(/"(assets\/[^"]+)"/g)
 const catalogContext={globalThis:{}};
 vm.runInNewContext(read("exercise-catalog.js"),catalogContext);
 for(const ex of catalogContext.globalThis.FITBUD_EXERCISES){
+  for(const ref of [ex.media_url,ex.poster_url,...(ex.frames||[])]){
+    if(String(ref||"").startsWith("assets/"))required.add(ref);
+  }
+}
+// Las fichas que solo existen en Supabase también reciben media local revisada.
+const reviewed=catalogContext.globalThis.FITBUD_REVIEWED_EXERCISE_LEVELS||{};
+for(const slug of Object.keys(reviewed)){
+  const ex=catalogContext.globalThis.FITBUD_EXERCISE_CONTENT.normalize({slug});
   for(const ref of [ex.media_url,ex.poster_url,...(ex.frames||[])]){
     if(String(ref||"").startsWith("assets/"))required.add(ref);
   }
