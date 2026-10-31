@@ -3225,8 +3225,66 @@ function hasCurrentScreening(){
 function privacyGateRequired(){
   return hasCompleteOnboarding((profile&&profile.prefs)||{})&&(!hasRequiredConsents()||!hasCurrentScreening());
 }
+// REQ-311: la pausa dura se reserva para señales graves (dolor de pecho,
+// desmayos o mareos importantes, restricción indicada por un profesional) o
+// para una evaluación faltante o incompleta. Una lesión declarada
+// (acute_injury) sin señales graves pasa a aviso visible con opción
+// voluntaria de continuar; continuar no es una autorización médica y el
+// aviso permanece mientras la lesión siga declarada. Filas antiguas sin
+// detalle de respuestas se tratan como señal grave (criterio seguro).
+const SAFETY_HARD_KEYS=["chest_pain","fainting_dizziness","clinician_restriction"];
+const SAFETY_SOFT_KEYS=["acute_injury"];
+function hasHardSafetyFlags(){
+  if(!safetyScreening)return false;
+  const r=safetyScreening.responses;
+  if(!r||typeof r!=="object")return !!safetyScreening.has_red_flags;
+  return SAFETY_HARD_KEYS.some(k=>r[k]===true);
+}
+function hasSoftSafetyFlags(){
+  if(!safetyScreening||hasHardSafetyFlags())return false;
+  const r=safetyScreening.responses;
+  if(!r||typeof r!=="object")return false;
+  return SAFETY_SOFT_KEYS.some(k=>r[k]===true);
+}
+function injuryTrainingAcked(){
+  const ack=profile&&profile.prefs&&profile.prefs.injuryTrainingAckAt;
+  const done=safetyScreening&&(safetyScreening.completed_at||safetyScreening.updated_at);
+  return !!(ack&&done&&Date.parse(ack)>=Date.parse(done));
+}
 function trainingSafetyHold(){
-  return !hasCurrentScreening()||!!(safetyScreening&&safetyScreening.has_red_flags)||!(safetyScreening&&safetyScreening.cleared_for_training);
+  return !hasCurrentScreening()||hasHardSafetyFlags();
+}
+// Lesión declarada sin señales graves y sin aceptación vigente del aviso.
+function trainingSafetySoftHold(){
+  return !trainingSafetyHold()&&hasSoftSafetyFlags()&&!injuryTrainingAcked();
+}
+// La lesión sigue declarada (con o sin aceptación): el aviso se mantiene visible.
+function trainingInjuryNoticeActive(){
+  return !trainingSafetyHold()&&hasSoftSafetyFlags();
+}
+async function acknowledgeInjuryTraining(ds,next){
+  if(!trainingSafetySoftHold()){closeModal();render();return;}
+  if(!profile)return;
+  if(!profile.prefs)profile.prefs={};
+  profile.prefs.injuryTrainingAckAt=new Date().toISOString();
+  if(supa&&uid()){
+    try{await supa.from("profiles").update({prefs:profile.prefs,updated_at:new Date().toISOString()}).eq("id",uid());}catch(e){/* best-effort */}
+  }
+  closeModal();
+  toast("Aviso aceptado: entrenas bajo tu responsabilidad");
+  render();
+  if(next==="start")startWorkoutExecution(ds);
+  else if(next==="picker")openWorkoutPicker(ds);
+  else if(next==="manual")openManualActivity(ds);
+}
+function openInjuryTrainingNotice(ds,next){
+  modal(`<h3>Aviso por lesión declarada</h3>
+    <p class="muted">Declaraste una lesión aguda o dolor que empeora al moverte. Entrenar con esta lesión es tu decisión y bajo tu responsabilidad: no es una autorización médica ni sustituye la orientación de un profesional de salud.</p>
+    <div class="alert violet"><b>Si decides continuar:</b> modera la intensidad, evita lo que te duele y detente ante dolor, mareo, desmayo o falta de aire inusual.</div>
+    <div class="wk-sheet-actions">
+      <button class="btn btn-accent" onclick="acknowledgeInjuryTraining('${ds}','${next}')">Continuar bajo mi responsabilidad</button>
+      <button class="btn" onclick="closeModal()">Ahora no</button>
+    </div>`);
 }
 function safetyHoldWorkout(){
   return {
@@ -5541,6 +5599,7 @@ function manualActivityBlock(ds,restDay){
 }
 function openManualActivity(ds,index){
   if(!canLogManualActivity(ds)){toast("No se puede registrar actividad en este día");return;}
+  if(trainingSafetySoftHold()){openInjuryTrainingNotice(ds,"manual");return;}
   const prev=index!=null?manualActivities(S.days[ds])[index]:null;
   const primary=profile&&profile.prefs&&profile.prefs.primarySport;
   // REQ-252/253: en el día de tu deporte, o en lugar de la sesión de fuerza, se propone
@@ -5781,6 +5840,7 @@ function persistWorkoutExecution(ds,execution,rerender){
 }
 function startWorkoutExecution(ds){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  if(trainingSafetySoftHold()){openInjuryTrainingNotice(ds,"start");return;}
   const prescription=workoutPrescription(ds);
   if(prescription.sessionType==="rest"){toast("Hoy corresponde descanso planificado");return;}
   if(workoutContentIssues(ds).length){toast("Esta sesión necesita actualizar su contenido antes de iniciarse");return;}
@@ -6698,7 +6758,9 @@ function renderWorkout(){
   // acompañan a "Iniciar sesión guiada", la cuenta atrás y la hoja del plan.
   const safetyNotice=trainingSafetyHold()
     ? `<div class="alert"><b>Entrenamiento pausado por seguridad.</b><br>No inicies esta rutina hasta recibir orientación de un profesional. Nutrición, historial y exportación siguen disponibles.</div>`
-    : "";
+    : trainingInjuryNoticeActive()
+      ? `<div class="alert violet"><b>Aviso por lesión declarada.</b><br>Entrenar es tu decisión y bajo tu responsabilidad; no es una autorización médica ni sustituye la orientación de un profesional. Modera la intensidad, evita lo que te duele y detente ante cualquier señal de alerta.</div>`
+      : "";
   // Tarjeta instructiva solo como empty state real: hoy no hay sesión ejecutable (rutina sin ejercicios válidos).
   // Con sesión disponible, la única tarjeta es la de "wk.entreno" más abajo (REQ-101).
   const emptyWkHtml=(contentIssues.length&&!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold())?`<section class="agenda-card agenda-state setup">
@@ -6921,6 +6983,7 @@ function toggleWorkout(){
 }
 function openWorkoutPicker(ds){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  if(trainingSafetySoftHold()){openInjuryTrainingNotice(ds,"picker");return;}
   const execution=normalizedWorkoutExecution(ds);
   if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
   if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
@@ -11285,7 +11348,9 @@ function buildSysPrompt(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const safety=trainingSafetyHold()
     ?"La evaluación tiene una señal de alerta: no propongas rutinas, progresiones ni formas de entrenar; indica detener actividad y buscar evaluación profesional."
-    :"Ante dolor de pecho, mareo, desmayo, falta de aire inusual, lesión aguda u otra señal de alerta, indica detener la actividad y buscar evaluación profesional.";
+    :trainingInjuryNoticeActive()
+      ?"El usuario declaró una lesión y entrena bajo su responsabilidad: adapta las propuestas evitando sobrecargar la zona lesionada, sugiere alternativas suaves y recuerda detenerse ante dolor, mareo, desmayo o falta de aire inusual; nunca lo presentes como autorización médica."
+      :"Ante dolor de pecho, mareo, desmayo, falta de aire inusual, lesión aguda u otra señal de alerta, indica detener la actividad y buscar evaluación profesional.";
   const base=`Da estimaciones realistas de porciones reales, con kcal y macros. Habla como el coach del usuario y no menciones tecnología, proveedores, modelos, prompts ni tokens. No diagnostiques, no prescribas tratamientos, no cambies medicación y no sustituyas a un profesional de salud. ${safety}`;
   const context={
     schema_version:p.profileSchemaVersion,

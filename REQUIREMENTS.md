@@ -2169,6 +2169,20 @@ Jonathan (2026-10-30): el customer service de Evolv se atiende en su WhatsApp de
 
 Jonathan (2026-10-30): separar la consola de administración a otra URL y dar acceso a Sathya (b.ll.sathya@gmail.com, mismos permisos de administrador). La consola vive en `/admin` (rewrite de `vercel.json` al mismo `index.html`; el modo consola se activa por ruta). La app de usuarios ya no renderiza vistas de administración para nadie: `setView` las bloquea fuera del modo consola, el despachador de `render()` exige modo consola y Perfil solo enlaza a `/admin`. En `/admin`: sin sesión → login; sesión sin `is_admin` → pantalla "Sin acceso"; admin → consola con pestañas propias (Beta, Usuarios, Alimentos, Ejercicios, Analítica, Ajustes) y vuelta a la app. El enlace del correo de aviso de postulantes y la tarjeta de pendientes en Hoy apuntan a `/admin?ver=postulantes`. La autorización real no cambia: ya era server-side (`api/admin` valida JWT + `is_admin`; RLS protege los datos). El alta de Sathya es un paso operativo en Supabase (`is_admin=true` en su perfil), fuera del repo. ✓ `tests/e2e/admin-console.spec.js`; `tests/e2e/admin-beta.spec.js` actualizado.
 
+## REQ-311 - Lesión declarada: aviso con opción voluntaria, no bloqueo duro
+
+**Estado: implementado.**
+
+Jonathan (2026-10-31): Diego declaró una lesión en la evaluación de seguridad y la app le mostraba "Entrenamiento en pausa" con los botones "Iniciar sesión guiada" y "Cambiar entrenamiento" deshabilitados, sin forma de entrenar. Pedido: la lesión declarada no debe ser una restricción dura; debe mostrar un aviso y permitir continuar si el usuario lo decide.
+
+Cambio en `trainingSafetyHold()` (antes cualquier respuesta "sí" del cuestionario pausaba todo por igual, porque `has_red_flags` y `cleared_for_training` no distinguían gravedad):
+
+- Pausa dura solo para señales graves: `chest_pain`, `fainting_dizziness`, `clinician_restriction` (o evaluación faltante/incompleta). Las filas antiguas sin detalle de respuestas se tratan como graves por criterio seguro.
+- Lesión declarada (`acute_injury`) sin señales graves: aviso visible permanente en la tarjeta de entreno y botones habilitados. Al iniciar sesión guiada, cambiar entrenamiento o registrar otra actividad, primero se muestra el aviso ("Continuar bajo mi responsabilidad" / "Ahora no"); la aceptación se guarda en `prefs.injuryTrainingAckAt` y se invalida si el usuario repite la evaluación.
+- El coach adapta sus propuestas a la lesión declarada sin presentarlas como autorización médica; el aviso aclara que continuar es decisión del usuario y no sustituye orientación profesional.
+
+Sin cambios para las señales graves ni para el resto del flujo de privacidad. Bump de caché `fitbud-pwa-v189`.
+
 ## REQ-310 - Fotos reales en todo el catálogo de ejercicios (adiós al monigote)
 
 **Estado: implementado.**
