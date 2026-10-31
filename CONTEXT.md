@@ -145,4 +145,5 @@ node scripts/audit-secrets.mjs
 - Si cambia comportamiento visible, probar desktop y movil. Si cambia PWA, revisar safe areas y cache.
 - Si un agente necesita detalle historico, abrir `docs/requirements-history.md` o `docs/architecture-reference.md` por seccion, no como lectura obligatoria completa.
 
-- REQ-312/313: curl Scott con barra EZ y extensión de tríceps con cuerda; fichas completas, secuencias locales y progresión de carga.
+- REQ-312/313: curl Scott y tríceps con cuerda, secuencias locales y progresión.
+- REQ-314: bienvenida contextual del Coach durante los primeros cinco días de uso, con descartes privados y navegación sin cambios automáticos de planes.

@@ -2238,3 +2238,21 @@ Solicitud directa del usuario con imagen. La ficha previa `triceps-pushdown` tie
 
 Verificación REQ-313: suite dirigida de ambos ejercicios y ampliación de gimnasio, 6/6 pruebas correctas en Chromium (390/1280 px): búsqueda, carga de ambas fotos, animación activa, nivel, progresión/regresión y sustitución por músculo. Sintaxis y `git diff --check` correctos. El validador general se actualiza en REQ-315.
 
+## REQ-314 - Acompañamiento del coach durante los primeros usos
+
+**Estado: implementado.**
+
+**Origen:** solicitud directa: acompañar al cliente de la mano, invitándolo a preguntar cómo entrenar hoy y guiándolo a acciones reales.
+
+**Problema:** el coach estaba bajo la agenda y los nuevos usuarios debían descubrir el campo de preguntas; el tour automático explicaba pantallas en vez de resolver su siguiente paso.
+
+**Implementación:** bienvenida visible en Hoy durante los primeros cinco días distintos de uso, dentro de los 14 días posteriores al onboarding. Preguntas de entrenamiento, poco tiempo y comidas; respuestas locales basadas en el día real, con navegación a Entreno, adaptación existente, Nutrición o evaluación de seguridad. Las preguntas frecuentes escritas también resuelven esta navegación. Otras preguntas mantienen el coach conversacional existente. No hay llamadas automáticas al servicio, notificaciones push nuevas ni cambios de planes por leer o preguntar.
+
+**Controles:** Ahora no oculta por hoy; No volver a mostrar persiste por usuario/dispositivo. Solo se guardan fechas y descartes, sin salud ni conversación. La navegación revisa el estado actual: descanso, sesión registrada/en curso y pausa de seguridad. Las opciones de adaptación conservan su flujo de elección explícita. No se modifica historial. La bienvenida sustituye el inicio automático del tour para este grupo; la guía manual sigue en el botón ?. Caché v193.
+
+**Fuera de alcance:** mensajes push/correos, cambios autónomos de sesión, habilitar el modo conversación experimental o rediseñar la página Hoy.
+
+**Verificación:** suite coach-welcome en móvil/escritorio, navegación real, consulta escrita, foco, descarte tras recargar, límite de exposición, aislamiento, descanso, registro, seguridad y guía sin servicio externo. Sintaxis/HTML y detector Impeccable. Los controles generales se corrigen en REQ-315; integración autorizada por el usuario.
+
+Resultado REQ-314: 10/10 pruebas dirigidas correctas en Chromium local, incluidas móvil/escritorio, consulta escrita, ayudas sin servicio, seguridad, persistencia, retomar sin modificar registros y tour manual. Regresión de Hoy: 5/6 correctas; la prueba antigua de seguridad usa has_red_flags sin responses de señales graves, incompatible con REQ-311 ya presente en HEAD (hasHardSafetyFlags no se cambió). Audit HTML/JS/accesibilidad, detect Impeccable, validadores de plan/wiring y git diff --check correctos. Capturas móvil/escritorio revisadas. La corrección del escape de argumentos en los chips existentes permite que las preguntas contextuales ejecuten su acción. La reparación de los controles se documenta en REQ-315.
+
