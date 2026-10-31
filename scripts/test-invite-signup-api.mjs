@@ -20,7 +20,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "service";
 const handler = await importHandler("api/entitlement.js");
 const NEW_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 
-let codeRow, createStatus, redeemOk, calls, betaInvited, overrides, profilePrefs, profileWrite;
+let codeRow, createStatus, createError, redeemOk, calls, betaInvited, overrides, profilePrefs, profileWrite;
 global.fetch = async (url, options = {}) => {
   const value = String(url);
   const method = options.method || "GET";
@@ -30,7 +30,7 @@ global.fetch = async (url, options = {}) => {
   if (value.endsWith("/auth/v1/admin/users") && method === "POST") {
     const body = JSON.parse(options.body);
     assert(body.email_confirm === true && body.email === "ana@correo.test", "Crea el usuario confirmado con el correo normalizado.");
-    if (createStatus === 422) return response(422, { code: "email_exists", msg: "A user with this email address has already been registered" });
+    if (createStatus === 422) return response(422, createError);
     return response(200, { id: NEW_ID, email: body.email });
   }
   if (value.endsWith("/rest/v1/rpc/redeem_redemption_code")) {
@@ -57,7 +57,7 @@ global.fetch = async (url, options = {}) => {
 
 async function signup(body, setup) {
   codeRow = { code: "FIT-AB12-CD34", redeemed_by: null, valid_until: null };
-  createStatus = 200; redeemOk = true; calls = []; betaInvited = false; overrides = null; profilePrefs = {}; profileWrite = null;
+  createStatus = 200; createError = { code: "email_exists", msg: "A user with this email address has already been registered" }; redeemOk = true; calls = []; betaInvited = false; overrides = null; profilePrefs = {}; profileWrite = null;
   if (setup) setup();
   const res = capture();
   await handler({ method: "POST", headers: {}, body: { action: "invite-signup", code: "fit ab12 cd34", email: " Ana@Correo.test ", password: "ClaveSegura2026", ...body } }, res);
@@ -96,8 +96,14 @@ assert(res.statusCode === 400 && calls.length === 0, "Contraseña corta: se rech
 res = await signup({ email: "no-es-correo" });
 assert(res.statusCode === 400 && calls.length === 0, "Correo inválido: se rechaza antes de tocar Supabase.");
 
-res = await signup({}, () => { createStatus = 422; });
-assert(res.statusCode === 409 && /Ya existe una cuenta/.test(res.body.error), "Correo ya registrado: 409 con instrucción de canjear en Perfil.");
+for(const duplicate of [
+  {code:"email_exists",msg:"A user with this email address has already been registered"},
+  {code:422,error_code:"email_exists",msg:"A user with this email address has already been registered"},
+]){
+  res = await signup({}, () => { createStatus = 422;createError = duplicate; });
+  assert(res.statusCode === 409 && /Inicia sesión/.test(res.body.error) && /Olvidé mi contraseña/.test(res.body.error) && /Perfil/.test(res.body.error), "Correo ya registrado: 409 con opciones de inicio de sesión, recuperación y canje.");
+  assert(!calls.some(call=>/redeem_redemption_code|DELETE/.test(call)), "Correo existente: no canjea el código ni elimina una cuenta.");
+}
 
 res = await signup({}, () => { redeemOk = false; });
 assert(res.statusCode === 400 && res.body.error === "Este código ya fue utilizado.", "Canje perdido en carrera: avisa.");

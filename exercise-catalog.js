@@ -870,6 +870,36 @@
     },
   ];
   EXPANDED_STRENGTH_SPECS.push(...GYM_EXPANSION_SPECS);
+  EXPANDED_STRENGTH_SPECS.push({
+    slug:"rope-triceps-pushdown",name:"Extensión de tríceps en polea alta con cuerda",aliases:["Tríceps con cuerda","Jalón de tríceps con cuerda","Rope triceps pushdown","Triceps Pushdown - Rope Attachment"],
+    discipline:"gym",pattern:"isolation",level:"beginner",
+    muscles:["Tríceps"],primary_muscle:"Tríceps",equipment:["cable"],places:["gym"],
+    start_position:"Fija una cuerda a la polea alta y comprueba el cierre del mosquetón. De pie con los pies firmes, toma un extremo con cada mano y las palmas enfrentadas. Mantén el abdomen firme, el tronco ligeramente inclinado y los codos junto al cuerpo.",
+    steps:["Extiende los codos llevando los extremos de la cuerda hacia los lados de los muslos, sin mover los brazos superiores.","Pausa brevemente abajo con las muñecas alineadas, sin bloquear los codos ni abrir los hombros.","Flexiona los codos despacio para volver al inicio, sin balancear el tronco ni dejar que las placas golpeen."],
+    breathing:"Exhala al bajar la cuerda e inhala al regresar.",
+    common_errors:["Mover los codos hacia delante o separar los brazos del cuerpo","Balancear el tronco para bajar una carga excesiva","Doblar las muñecas o forzar la separación de la cuerda"],
+    safety_signals:["Dolor agudo en codo, hombro o muñeca","Hormigueo o pérdida de agarre","La cuerda está deteriorada o el mosquetón no cierra"],
+    contraindications:["dolor agudo de codo o muñeca","lesión reciente de tríceps u hombro"],
+    regression:"Reduce el peso de la polea y mantén los codos junto al cuerpo durante todo el recorrido cómodo.",
+    progression:"Cuando completes todas las repeticiones y series previstas con técnica estable y dos repeticiones en reserva en dos sesiones, añade el incremento mínimo de peso disponible. Reduce la carga si necesitas balancearte o mover los codos.",
+    substitutes:["triceps-pushdown","machine-triceps-extension","dumbbell-overhead-triceps-extension","lying-dumbbell-triceps-extension"],source_id:"Triceps_Pushdown_-_Rope_Attachment",batch:313,
+  });
+
+  EXPANDED_STRENGTH_SPECS.push({
+    slug:"preacher-curl",name:"Curl predicador en banco Scott con barra EZ",aliases:["Curl Scott","Curl en banco Scott","Curl predicador","Preacher Curl","EZ-bar preacher curl"],
+    discipline:"gym",pattern:"isolation",level:"beginner",
+    muscles:["Bíceps"],primary_muscle:"Bíceps",equipment:["barbell","bench"],places:["gym"],
+    start_position:"Ajusta el asiento del banco Scott para apoyar el pecho y la parte posterior de los brazos en la almohadilla. Apoya los pies y toma la barra EZ por los agarres interiores, con las palmas hacia arriba y las muñecas alineadas.",
+    steps:["Con los codos ligeramente flexionados, eleva la barra hacia los hombros sin despegar los brazos del apoyo.","Haz una pausa breve arriba, manteniendo el pecho apoyado y sin doblar las muñecas.","Baja lentamente hasta un recorrido cómodo sin bloquear los codos ni rebotar; devuelve la barra a sus soportes con control al terminar."],
+    breathing:"Exhala al flexionar los codos e inhala al bajar la barra.",
+    common_errors:["Despegar los brazos o el pecho de la almohadilla","Rebotar abajo o bloquear los codos bajo carga","Doblar las muñecas o balancear el tronco"],
+    safety_signals:["Dolor agudo en codo, tendón del bíceps o muñeca","Hormigueo o pérdida de agarre","El banco se mueve o no puedes devolver la barra al soporte con control"],
+    contraindications:["dolor agudo de codo o muñeca","lesión reciente del tendón del bíceps"],
+    regression:"Usa una barra EZ más ligera, conservando el apoyo y un recorrido cómodo sin bloquear los codos.",
+    progression:"Cuando completes todas las repeticiones y series previstas con técnica estable y dos repeticiones en reserva en dos sesiones, añade el incremento mínimo de peso disponible. Reduce la carga si pierdes el apoyo o el control.",
+    substitutes:["biceps-curl","concentration-curl","machine-biceps-curl","cable-biceps-curl","incline-dumbbell-curl"],source_id:"Preacher_Curl",batch:312,
+  });
+
   const expandedStrength=EXPANDED_STRENGTH_SPECS.map(spec=>Object.assign(exercise(spec),{source_id:spec.source_id,catalog_batch:spec.batch||302}));
   strength.push(...expandedStrength);
 

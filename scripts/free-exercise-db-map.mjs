@@ -21,6 +21,8 @@
 // ============================================================
 
 export default {
+  "rope-triceps-pushdown": { id: "Triceps_Pushdown_-_Rope_Attachment" },
+  "preacher-curl": { id: "Preacher_Curl" },
   // REQ-303: demos locales de la variante exacta; no inferir el músculo por el nombre del recurso.
   "quadruped-glute-kickback": { id: "Glute_Kickback" },
   "alternating-heel-touch": { id: "Alternate_Heel_Touchers" },

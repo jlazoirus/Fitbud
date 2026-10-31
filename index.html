@@ -835,6 +835,19 @@
     .sp-to{animation:spFade .2s .3s both}
   }
 
+  .coach-welcome{margin:0 0 18px;padding:18px;background:var(--surf1);border:1px solid var(--border-acc);border-radius:var(--r-md)}
+  .coach-welcome-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .coach-welcome h2{margin:0;font-family:var(--font-body);font-size:20px;line-height:1.25;letter-spacing:-.02em}
+  .coach-welcome-heading .btn{flex-shrink:0;min-height:44px;margin-top:-8px}
+  .coach-welcome p{max-width:65ch;margin:8px 0 14px;color:var(--muted);font-size:14px;line-height:1.5}
+  .coach-welcome-questions{display:flex;flex-wrap:wrap;gap:8px}
+  .coach-welcome-questions .btn{min-height:44px;white-space:normal;text-align:left}
+  .coach-welcome-links{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px}
+  .coach-welcome-links button{min-height:44px;padding:4px 0;background:none;color:var(--txt);font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:3px}
+  .coach-welcome button:focus-visible,.coach-guide-reply:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+  .coach-guide-reply .coach-action-bar{flex-wrap:wrap}
+  @media(max-width:480px){.coach-welcome-questions .btn{width:100%}}
+
   /* Coach conversacional (REQ-21) */
   .coach-wrap{display:flex;flex-direction:column;height:calc(100dvh - 102px - var(--safe-top) - var(--safe-bottom));padding-bottom:0}
   .coach-wrap>.shead,.coach-wrap>.ai-box{flex:0 0 auto}
@@ -5018,6 +5031,102 @@ function homeAgendaHtml(ds){
   </section>`;
 }
 
+/* REQ-314: acompañamiento opcional durante los primeros cinco días de uso.
+   Solo guarda fechas y descartes por usuario en este dispositivo. */
+const coachWelcomeMemory={};
+function coachWelcomeKey(){return uid()?"fitbud_coach_welcome_v1_"+uid():null;}
+function coachWelcomeState(){
+  const key=coachWelcomeKey();if(!key)return {};
+  if(coachWelcomeMemory[key])return coachWelcomeMemory[key];
+  try{const value=JSON.parse(localStorage.getItem(key)||"{}");return value&&typeof value==="object"&&!Array.isArray(value)?value:{};}catch(e){return {};}
+}
+function saveCoachWelcomeState(value){
+  const key=coachWelcomeKey();if(!key)return;
+  coachWelcomeMemory[key]=value;
+  try{localStorage.setItem(key,JSON.stringify(value));}catch(e){}
+}
+function coachWelcomeEligible(){
+  if(!uid()||!isActive()||!hasCompleteOnboarding((profile&&profile.prefs)||{}))return false;
+  const started=Date.parse(profile.prefs.onboardingCompletedAt||(session.user&&session.user.created_at)||"");
+  const age=Date.now()-started;
+  return Number.isFinite(age)&&age>=0&&age<14*86400000;
+}
+function coachWelcomeHtml(){
+  if(!coachWelcomeEligible())return "";
+  const state=coachWelcomeState(),today=todayStr();
+  if(state.hidden||state.dismissedOn===today)return "";
+  const days=Array.isArray(state.days)?state.days.filter(day=>typeof day==="string").slice(0,5):[];
+  if(!days.includes(today)){
+    if(days.length>=5)return "";
+    days.push(today);saveCoachWelcomeState({...state,days});
+  }
+  const safety=trainingSafetyHold(),ew=effectiveWorkout(clampDate(today));
+  const rest=!ew.workout||ew.workout.id==="descanso";
+  const done=["completed","partial","missed"].includes(workoutOutcomeForState(dayState(clampDate(today))));
+  const inProgress=!!normalizedWorkoutExecution(clampDate(today));
+  const first=days.length===1;
+  const title=first?"Vamos paso a paso":"Aquí estoy para ayudarte";
+  const copy=safety?"Antes de entrenar, revisemos cómo empezar con seguridad.":done?"Tu entreno ya tiene un registro. Si tienes dudas sobre lo que sigue, pregúntame.":inProgress?"Tu sesión sigue donde la dejaste. Te ayudo a retomarla.":rest?"Hoy también cuenta recuperar. Te ayudo a entender tu día.":"Soy tu coach. Elige una pregunta y te ayudo a dar el siguiente paso.";
+  const canWrite=aiAvailable()&&hasRequiredConsents()&&hasCurrentScreening();
+  return `<section class="coach-welcome" aria-labelledby="coachWelcomeTitle">
+    <div class="coach-welcome-heading"><h2 id="coachWelcomeTitle">${title}</h2><button class="btn btn-sm" type="button" aria-label="Ocultar ayuda del coach por hoy" onclick="dismissCoachWelcome(false)">Ahora no</button></div>
+    <p>${copy}</p>
+    <div class="coach-welcome-questions">
+      <button type="button" class="btn btn-accent" onclick="coachWelcomeAsk('workout')">${safety?"¿Cómo empiezo con seguridad?":"¿Cómo entreno hoy?"}</button>
+      ${!safety&&!rest&&!done&&!inProgress?`<button type="button" class="btn" onclick="coachWelcomeAsk('time')">Tengo poco tiempo, ¿qué hago?</button>`:""}
+      <button type="button" class="btn" onclick="coachWelcomeAsk('meals')">¿Qué puedo comer hoy?</button>
+    </div>
+    <div class="coach-welcome-links">${canWrite?`<button type="button" onclick="focusCoachQuestion()">Escribir otra pregunta</button>`:""}<button type="button" onclick="dismissCoachWelcome(true)">No volver a mostrar</button></div>
+  </section>`;
+}
+function dismissCoachWelcome(permanent){
+  saveCoachWelcomeState({...coachWelcomeState(),dismissedOn:todayStr(),hidden:permanent===true});
+  renderHoy();
+}
+function focusCoachQuestion(){
+  setView("hoy");
+  const input=document.getElementById("coachInput");
+  if(input){input.scrollIntoView({block:"center",behavior:"auto"});input.focus();}
+}
+const COACH_WELCOME_QUESTIONS={workout:"¿Cómo entreno hoy?",time:"Tengo poco tiempo, ¿qué hago?",meals:"¿Qué puedo comer hoy?"};
+function coachWelcomeTopic(text){
+  const normalized=String(text||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[¿?¡!.,]/g,"").replace(/\s+/g," ").trim();
+  if(["como entreno hoy","que entreno hoy","hoy como entreno","hoy dia como entreno","como hago el entrenamiento de hoy"].includes(normalized))return "workout";
+  if(["tengo poco tiempo","tengo poco tiempo que hago"].includes(normalized))return "time";
+  if(["que como hoy","que puedo comer hoy"].includes(normalized))return "meals";
+  return null;
+}
+function coachWelcomeAnswer(topic){
+  const ds=clampDate(todayStr());
+  if(topic==="meals")return {text:"Vamos a Nutrición. Ahí puedes ver tus comidas, registrar lo que comiste o elegir otra opción. Preparar un menú es opcional; empieza con una comida.",action:"meals",label:"Ir a mis comidas"};
+  if(trainingSafetyHold())return {text:"Tu entrenamiento está en pausa por seguridad. Te acompaño a revisar la evaluación en Perfil antes de empezar.",action:"safety",label:"Revisar mi evaluación"};
+  const ew=effectiveWorkout(ds),st=dayState(ds),outcome=workoutOutcomeForState(st);
+  if(!ew.workout||ew.workout.id==="descanso")return {text:"Hoy tienes descanso planificado. Recuperar también forma parte del plan; no necesitas añadir una sesión. Puedes revisar tu calendario en Entreno.",action:"workout",label:"Ver mi día de descanso"};
+  if(st.workoutDone||["completed","partial","missed"].includes(outcome))return {text:"Tu sesión de hoy ya tiene un registro. Podemos revisarla sin cambiar lo que hiciste. El siguiente entrenamiento seguirá tu plan.",action:"workout",label:"Ver mi registro"};
+  if(normalizedWorkoutExecution(ds))return {text:"Ya tienes una sesión empezada. Vamos a retomarla desde donde la dejaste, conservando tus series y registros.",action:"workout",label:"Continuar mi sesión"};
+  if(topic==="time")return {text:"Busquemos una opción que encaje con tu tiempo. Te mostraré las alternativas para hoy y tú eliges cuál aplicar; tu sesión sigue igual hasta que elijas.",action:"time",label:"Ver opciones para hoy"};
+  if(isFreeActivityWorkout(ew.workout))return {text:`Hoy tienes ${ew.workout.name||"actividad libre"}. En Entreno puedes revisar la indicación del día y registrar tu actividad al terminar.`,action:"workout",label:"Ver mi actividad de hoy"};
+  return {text:`Hoy tienes ${ew.workout.name||"tu sesión del día"}. En Entreno verás los ejercicios y cómo hacerlos. Revisa la sesión y, cuando estés listo, toca Iniciar sesión guiada para seguirla paso a paso.`,action:"workout",label:"Llévame a mi entrenamiento"};
+}
+function coachWelcomeAsk(topic,userText){
+  if(!session||!isActive()||!COACH_WELCOME_QUESTIONS[topic])return;
+  const answer=coachWelcomeAnswer(topic),ts=Date.now();
+  const msgs=loadCoachChat();
+  msgs.push({id:coachRequestId(),role:"user",text:userText||COACH_WELCOME_QUESTIONS[topic],ts},
+    {id:coachRequestId(),role:"assistant",text:answer.text,type:"educativo",localGuide:topic,ts:ts+1});
+  saveCoachChat(msgs);setView("hoy");scrollCoachToBottom();
+  requestAnimationFrame(()=>{const reply=[...document.querySelectorAll(".coach-guide-reply")].pop();if(reply){reply.focus({preventScroll:true});reply.scrollIntoView({block:"center",behavior:"auto"});}});
+}
+function coachWelcomeNavigate(topic){
+  if(!session||!isActive()||!COACH_WELCOME_QUESTIONS[topic])return;
+  const answer=coachWelcomeAnswer(topic);
+  current=clampDate(todayStr());
+  if(answer.action==="safety"){setView("perfil");return;}
+  if(answer.action==="meals"){setView("nutricion");return;}
+  setView("entreno");
+  if(answer.action==="time")openWorkoutContingency(current,"tiempo");
+}
+
 /* ---------- HOME (Hoy + Coach integrado): REQ-42 ---------- */
 function buildContextualChips(ds){
   const day=buildDay(ds);
@@ -5071,8 +5180,9 @@ function renderHoy(){
   const msgsHtml=msgs.map(renderCoachMessage).join("");
   const typingHtml=`<div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="loading-row" style="padding:6px 2px"><div class="spinner"></div><span>Tu coach está pensando…</span></div></div></div>`;
   const chips=canUse?buildContextualChips(ds):[];
-  const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${JSON.stringify(s)})">${esc(s)}</button>`).join("")}</div>`:"";
+  const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${esc(JSON.stringify(s))})">${esc(s)}</button>`).join("")}</div>`:"";
   const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
+  const localGuides=msgs.filter(m=>m.localGuide||m.role==="user").map(renderCoachMessage).join("");
   const coachSection=canUse?`
     <div class="coach-home-sep">O pregúntale a tu coach</div>
     ${chipsHtml}
@@ -5084,6 +5194,7 @@ function renderHoy(){
         oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
       <button onclick="coachSendFromInput()" title="Enviar" aria-label="Enviar pregunta"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </div>`
+    :localGuides?`<div class="coach-home-sep">Tu coach te acompaña</div><div class="coach-msgs-home" id="coachMsgs">${localGuides}</div>`
     :hasAI?`<div class="coach-home-sep">Tu coach</div><div class="ai-box" style="margin:0 0 12px">⚠️ ${!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`
     :"";
   $("#app").innerHTML=`
@@ -5099,6 +5210,7 @@ function renderHoy(){
     </div>
   </header>
   ${adminBetaPendingCardHtml()}
+  ${coachWelcomeHtml()}
   ${restartNudgeCard()}
   ${returnCardHtml()}
   ${dayClosed?"":heroDash(ds,{compact:true})}
@@ -7712,6 +7824,8 @@ function parseCoachReply(raw){
 // Envía un mensaje al coach y actualiza la vista.
 async function sendCoachMessage(userText){
   if(!userText||!userText.trim())return;
+  const welcomeTopic=coachWelcomeTopic(userText);
+  if(welcomeTopic&&session&&isActive()){coachWelcomeAsk(welcomeTopic,userText.trim());return;}
   trackEvent("coach_message_sent",{});
   if(!isActive()||!hasRequiredConsents()||!hasCurrentScreening()){
     toast("Revisa privacidad y seguridad antes de usar tu coach");
@@ -7954,6 +8068,11 @@ function renderChatMode(){
     </div>`:`<div class="muted small">Tu coach por escrito no está disponible ahora; las tarjetas de arriba siguen funcionando.</div>`}`;
 }
 function renderCoachMessage(m){
+  if(m.localGuide&&COACH_WELCOME_QUESTIONS[m.localGuide]){
+    const answer=coachWelcomeAnswer(m.localGuide);
+    return `<div class="coach-msg coach coach-guide-reply" tabindex="-1" role="region" aria-label="Respuesta de tu coach"><div class="chat-bubble">${esc(answer.text)}</div><div class="coach-action-bar"><button type="button" class="btn btn-accent" onclick="coachWelcomeNavigate('${m.localGuide}')">${esc(answer.label)}</button></div></div>`;
+  }
+
   if(m.role==="summary"){
     return `<div class="coach-msg summary"><div class="chat-bubble">${esc(m.text)}</div></div>`;
   }
@@ -16346,7 +16465,7 @@ function tourEnsureStyle(){
   document.head.appendChild(s);
 }
 function maybeStartFitbrosTour(){
-  if(_tour||tourSeen())return;
+  if(_tour||tourSeen()||coachWelcomeEligible()||(coachWelcomeState().days||[]).length)return;
   if(!session||onboardingActive||view!=="hoy")return;
   if(!hasCompleteOnboarding((profile&&profile.prefs)||{}))return;
   requestAnimationFrame(()=>requestAnimationFrame(()=>startFitbrosTour(false)));

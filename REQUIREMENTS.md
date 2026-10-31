@@ -669,7 +669,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-84`).
 
 ## REQ-86 - Fix: caché de coach reutilizaba resultados generados con prompts obsoletos
 
-**Estado: implementado.** `COACH_PROMPT_VERSION` (constante en `index.html`) se incluye en `coachCompatibilityContext`, que alimenta el `contextKey` del sistema de quota.  Correcciones tras inspección visual del PR: `front-plank` publica el frame de plancha correcto (el frame 0 del dataset mostraba a la persona incorporándose); `weighted-pull-up` queda pendiente (la foto del dataset muestra asistencia con liga, no lastre) y su media incorrecta se retira vía `normalize` hasta tener imagen exacta; se cubren 4 GIF más con marca de agua detectados en la tabla (`dumbbell-reverse-lunge`, `dumbbell-floor-press`, `dumbbell-overhead-triceps-extension`, `dumbbell-alternating-curl`). Bumpar la constante invalida todos los resultados reutilizables generados con versiones anteriores del prompt. 3 asserts en `scripts/validate-coach-prompt-version.mjs`.
+**Estado: implementado.**
+
+Detalle archivado en [historial](docs/requirements-history.md#req-86).
 
 ## REQ-87 - Fix: "Preparar mi semana" sobrescribía días pasados y con datos registrados
 
@@ -886,25 +888,21 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-118`).
 
 ## REQ-123 - Fix Nutrición: todos los botones "Otra opción" soportan reintentos repetidos con feedback
 
-**Estado: implementado.** Al agotarse el cupo de generaciones frescas, `reserve_coach_action` pasa a `reuse` y devolvía en silencio la misma respuesta pooled (botón "sin efecto"); ahora `/api/claude` marca `reused:true`, `callClaude` lo expone (`lastCoachCallReused`) y `regenerateGenMeal`/`rerollChangeMealOptions`/`regenerateDayInWeekDraft` avisan con toast y descartan la sugerencia repetida por el plato más cercano no mostrado; los modales siempre ofrecen "Reintentar". Verificado con `scripts/validate-retry-feedback.mjs` y `scripts/test-coach-quota.mjs`.
+**Estado: implementado.**
 
-### Origen
-
-Feedback de producto de Jonathan (3 jul 2026): el botón de otra opción no funciona después del primer intento y no da feedback; revisar todos los botones "otra opción".
+Detalle archivado en [historial](docs/requirements-history.md#req-123).
 
 ## REQ-124 - Home y Nutrición: anillo de macros primero y agenda/comidas debajo
 
-**Estado: implementado.** `renderHoy` renderiza `heroDash` (anillo/resumen de macros) antes que `homeAgendaHtml`, reemplazando el orden de REQ-97; `renderNutrition` mueve "Más opciones" al final; el tour guiado apunta primero a `.mini-macro-dash`. "Entrenamiento pendiente con comidas completas" y "día cerrado con racha" ya funcionaban en `homeAgendaData`. Verificado con `scripts/validate-home-macro-ring-first.mjs`.
+**Estado: implementado.**
 
-Nota aparte: el crash de producción para `strength_only` sin actividad ligera quedó corregido en su commit original; faltaba el caso domingo del fixture E2E, cerrado después en REQ-145.
-
-_Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
+Detalle archivado en [historial](docs/requirements-history.md#req-124).
 
 ## REQ-125 - Nutrición: reordenar comidas y saltar comidas sin cambiar horarios históricos
 
-**Estado: implementado.** Comidas y extras en una lista ordenable; el orden se guarda en `dayState(ds).mealOrder` (solo visual, nunca slot/horario/macros) y se reconcilia en `dayEffectiveOrder`. Controles subir/bajar (accesibles, sin drag-and-drop) solo para hoy/futuro (`canReorderDay`). Acción "Saltar esta comida" (`skipMeal`/`unskipMeal`, con "Deshacer") no cuenta como pendiente ni consumida (`dayTotals` la excluye) ni aplica sobre una ya registrada; `homeAgendaData` excluye saltadas. Detalle en el commit. Verificado con `scripts/validate-meal-reorder-skip.mjs`.
+**Estado: implementado.**
 
-_Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`._
+Detalle archivado en [historial](docs/requirements-history.md#req-125).
 
 ## REQ-126 - Admin: resetear futuro y regenerar nutrición/entrenamiento para cualquier usuario
 
@@ -912,9 +910,9 @@ _Origen: feedback de Jonathan (3 jul 2026). Detalle completo (Origen/Problema/Ca
 
 ## REQ-127 - Personalizar remitente y asunto de los correos de autenticacion de Supabase (branding Fitbud)
 
-**Estado: implementado (configuración externa, con la marca Evolv).** Verificado el 2026-10-26 (API de gestión de Supabase, solo lectura): SMTP propio `smtp-relay.brevo.com`, remitente «Evolv» <hola@evolvapp.club>; asuntos «Tu cuenta de Evolv está lista», «Restablece tu contraseña de Evolv» y «Confirma tu correo en Evolv». Magic link y cambio de correo siguen en inglés, pero la app no usa esos flujos. Pendiente opcional: invitación/reset real para revisar la bandeja.
+**Estado: implementado (configuración externa, con la marca Evolv).**
 
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
+Detalle archivado en [historial](docs/requirements-history.md#req-127).
 
 ## REQ-128 - Contrato estricto único de dieta (`DIET_CONTRACT`) + canario de factibilidad
 
@@ -999,7 +997,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 
 ## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
 
-**Estado: implementado (decisión de Jonathan, 2026-10-26: avisar en vez de crecer el catálogo).** El techo del 32,3% era la función objetivo de `globalClosePass()` (REQ-166); el hueco real que quedaba eran los planes de **2 comidas** (y vegano/vegetariano sin tofu). En vez de un lote de catálogo para ese caso, `twoMealNoticeHtml()` avisa al elegir 2 comidas en el registro inicial y en Perfil → Comidas que el plan cuadra peor y que con 3 o más cuadra mejor. Los platos de REQ-254 suben de paso el canario de 288/378 a 311/378 (2 comidas vegano/vegetariano alta proteína: 0→7 y 0→6 de 7). ✓ `tests/e2e/cocina.spec.js`. Experimentos anteriores: `docs/requirements-history.md` (buscar `## REQ-143`).
+**Estado: implementado (decisión de Jonathan, 2026-10-26: avisar en vez de crecer el catálogo).**
+
+Detalle archivado en [historial](docs/requirements-history.md#req-143).
 
 ## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
 
@@ -1012,7 +1012,8 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 ## REQ-146 - Unificar el cálculo de racha: Progreso muestra "0 / racha rota" mientras hoy no se registra
 
 **Estado: implementado.**
-`streakStats()` (`index.html`) comparte ahora el criterio de `streak()`: el día en curso que aún no cumple no resetea `nutCur`/`trainCur`/`combCur`, solo un día ya vencido sin cumplir lo hace; `combBest` no cambia de fórmula, así que hitos y mejor racha no se alteran retroactivamente. `renderStreakSection()` no se tocó: al unificarse `combCur` con `streak()`, el banner de recuperación deja de dispararse solo por "hoy pendiente". Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/racha.spec.js`.
+
+Detalle archivado en [historial](docs/requirements-history.md#req-146).
 
 ## REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo del canario `DIET_CONTRACT`
 
@@ -1034,7 +1035,8 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 ## REQ-151 - Landing muestra la sección "Planes" vacía cuando el catálogo carga después del primer render
 
 **Estado: implementado.**
-`boot()` (`index.html`) encadena `loadCatalog().then(()=>{if(authReady&&!session&&!window._showAuth)render();})` en vez de dejarla en paralelo sin seguimiento: si `refreshAuth()` gana la carrera y pinta la landing antes de que `catalogPlans` esté poblado, el `then` repinta al resolver el catálogo, acotado a cuando la landing sigue visible (no repinta la app autenticada). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/navegacion.spec.js` (retraso artificial de `/api/catalog`; confirmado que el test falla sin el fix y pasa con él).
+
+Detalle archivado en [historial](docs/requirements-history.md#req-151).
 
 ## REQ-152 - Fix onboarding: "Mantenerlo por ahora" en el aviso de revisión de 4 semanas lanza ReferenceError y no cierra ni guarda
 
@@ -1047,7 +1049,8 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
 ## REQ-154 - Fix Nutrición: "Cambiar comida" guarda la porción escalada pero la tarjeta muestra (y suma) los macros de la receta base
 
 **Estado: implementado.**
-`mealValue()` (`index.html`) gana una rama antes del recálculo por `dishMacros()`: si el override es un reemplazo materializado (`ovr.gen&&ovr.dishName!=null&&ovr.kcal!=null`, la forma que arman `applyChangeMeal()` y el rebalanceo de REQ-142), honra `ovr.kcal/p/c/f` en vez de recalcular desde la receta base sin escalar. Los dos caminos preexistentes (dishName sin kcal → `dishMacros()`; kcal sin dishName → "custom") quedan intactos. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-meal-value-replacement.mjs` (mealValue() real vía `node:vm` contra un candidato real de `rankReplacementCandidates()`).
+
+Detalle archivado en [historial](docs/requirements-history.md#req-154).
 
 ## REQ-155 - Fix reproductor de entreno: "duración real" cuenta el tiempo con la app cerrada
 
@@ -1101,9 +1104,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-160`).
 
 **Estado: implementado.**
 
-`goalAwareDeltaColor(delta,goal)` (`index.html`) centraliza el color de `Δ peso (sem)`/`Δ grasa %` en `bodyComposition()` según `prefs.goal`: volumen (subir=bueno), mantenimiento (tolera hasta ±0.4, mismo umbral que el check-in de REQ-160), deficit/fallback (bajar=bueno, sin cambio de sentido). `composition()` no se tocó. Detalle completo en el commit; compactado por el tope de `validate-docs-index.mjs`. Verificado con `tests/e2e/progreso.spec.js` (meta volumen + 2 semanas de peso ascendente; confirmado que el test falla exactamente como describe el REQ —`var(--warn)` en vez de `var(--good)`— contra el código sin el fix).
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-164`).
+Detalle archivado en [historial](docs/requirements-history.md#req-164).
 
 ## REQ-165 - Fix check-in semanal: las escalas sin responder se leen como el peor valor y disparan ajustes falsos
 
@@ -1113,9 +1114,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-164`).
 
 **Estado: implementado.**
 
-`scoreDayAgainstContract()` (`js/nutrition-domain.js`) reemplaza a `scoreMacros()` como objetivo del hill-climbing de `globalClosePass()`: mide cada métrica en múltiplos de su propia tolerancia de `DIET_CONTRACT` y la eleva al cuadrado, así que las 4 pesan igual en unidades de contrato. No cambia qué plato se elige en ningún slot — `scoreMacros()` sigue siendo el score por comida de `solveDishPortion()`/`optimizeLines()`. Canario `validate-diet-contract.mjs`: 122/378 (32.3%) → 289/378 (76.5%), 34 dimensiones mejoran, **0 regresionan**, dimensiones al 100% de 5/54 a 38/54. Validador: `scripts/validate-global-close-objective.mjs`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-166`).
+Detalle archivado en [historial](docs/requirements-history.md#req-166).
 
 ## REQ-167 - Fix activación de cuenta: "Auth session missing!" crudo al crear la contraseña desde una invitación
 
@@ -1415,9 +1414,9 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-215`).
 
 ## REQ-216 - Modo conversacional (beta oculta): usar la app desde el chat
 
-**Estado: implementado.** Fase 1 en prueba: el enlace `/?labs=conversacion` habilita en la cuenta un modo "Conversación" (Perfil → Cuenta) con un hilo donde se entrena paso a paso, se marcan o cambian comidas y se registra el peso con tarjetas sin llamadas pagadas; el texto libre va al coach de siempre. Fases 2 (foto e intención libre) y 3 (métricas por modo) quedan como candidatos.
+**Estado: implementado.**
 
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-216`).
+Detalle archivado en [historial](docs/requirements-history.md#req-216).
 
 ## REQ-217 - Beta: la postulación cierra con una confirmación amable y sin callejones sin salida
 
@@ -1524,11 +1523,8 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-233`).
 ## REQ-234 - El check-in semanal re-puntúa días ya ejecutados y contradice su copy "para la próxima semana"
 
 **Estado: implementado.**
-El ajuste del check-in ya no muta `calorieTarget/carbTarget/fatTarget` al aceptar (eso re-puntuaba de inmediato hoy y días ya ejecutados). Queda como `pendingCheckinAdjustment` y recién se aplica a las prefs vivas cuando empieza la próxima semana no iniciada; no se tocó el wiring de REQ-69 (`buildDay`/`effectiveDayTarget()` sigue leyendo siempre el perfil vigente). Copy del modal/toast alineado con ese momento real. `CACHE_NAME` → `fitbud-pwa-v137`.
 
-- ✓ `node scripts/validate-macro-target-wiring.mjs`; `node scripts/release-gate.mjs` pasa (111 E2E, incl. 1 flake preexistente no relacionado en `entreno.spec.js` que pasa al reintentar).
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-234`).
+Detalle archivado en [historial](docs/requirements-history.md#req-234).
 
 ## REQ-235 - Entreno: la sesión empieza con una cuenta atrás de 3 segundos
 
@@ -1626,9 +1622,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-249`).
 
 **Estado: implementado.**
 
-Pedido del dueño: no volver a pedir lo que ya llenó al postular. Al aceptar (`api/admin.js`) o al canjear el código de una postulación (`api/entitlement.js`), `prefs` recibe `name`, `goal` (Bajar grasa → `deficit`, Ganar músculo → `volumen`, Mejorar rendimiento → `mantenimiento`) y `trainingExperience` (según `stage`). No toca perfiles con `onboardingCompletedAt`, respeta un nombre ya puesto y no marca el onboarding como hecho. Edad (rango) y salud no se copian: el onboarding las pide con detalle.
-
-- ✓ `scripts/test-admin-beta-api.mjs`, `scripts/test-invite-signup-api.mjs`; `node scripts/release-gate.mjs` pasa.
+Detalle archivado en [historial](docs/requirements-history.md#req-251).
 
 ## REQ-252 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total"
 
@@ -1640,9 +1634,9 @@ Pedido del dueño: no volver a pedir lo que ya llenó al postular. Al aceptar (`
 
 ## REQ-254 - Nutrición: el plan respeta cuánto cocinas (quien no cocina no recibe tacos con frijoles)
 
-**Estado: implementado — requiere acción humana:** ejecutar `supabase/cooking_level.sql` y luego volver a ejecutar `supabase/nutrition_catalog_semantics.sql` en Supabase.
+**Estado: implementado — requiere acción humana:**
 
-Feedback Diego (beta). Preferencia «¿Cuánto cocinas?» (`cookingLevel`: none/basic/cook; registro inicial y Perfil → Comidas; perfiles existentes parten de «Lo básico»). `dishes.cooking_level` clasifica los 180 platos (criterio en `docs/catalog-req-254-cooking-level.md`), corrige `prep_minutes`/`needs_kitchen` por plato y suma 19 almuerzos y cenas sin cocinar o básicos (pollo rostizado, wraps de atún/pavo/seitán, bowls con legumbres listas…). `compatibleDishesForSlot()` excluye platos por encima del nivel (sin clasificar no se excluye); si una franja queda vacía sube un nivel y avisa («Hoy no encontramos algo más simple para la cena…»); las propuestas del coach por encima del nivel se descartan y el prompt lo indica (`COACH_PROMPT_VERSION` 12). «Cambiar comida» filtra de verdad con «⏱ Más fácil de preparar» y «🍱 Sin cocina»; el editor admin fija el nivel. «No cocino» cuadra 245/252 días con 4 y 6 comidas. ✓ `scripts/validate-cooking-level.mjs`, `tests/e2e/cocina.spec.js`. Propuesta original en `docs/requirements-history.md`.
+Detalle archivado en [historial](docs/requirements-history.md#req-254).
 
 ## REQ-255 - Recordatorios por WhatsApp
 
@@ -1733,9 +1727,9 @@ Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de 
 
 ## REQ-264 - Entreno: revisar todos los niveles y corregir demos de variantes distintas
 
-**Estado: implementado.** Revisión de Jonathan (2026-10-24): Pike push-up aparecía como principiante con una parada de manos. Inventario completo: 54 fichas locales y 16 adicionales de producción, 70 ejercicios únicos; criterio y razones en `docs/exercise-levels.md`.
+**Estado: implementado.**
 
-Niveles explícitos y corrección de filas remotas antiguas sin modificar la base; diez demostraciones propias exactas; rutinas automáticas respetan experiencia y los planes pendientes se adaptan al leerlos, preservando ejecuciones/historial. Búsqueda manual muestra el nivel. Sin nivel válido no entra al plan. SQL opcional `supabase/exercise-levels.sql`; ninguna migración de producción ejecutada. Verificación: `scripts/validate-exercises.mjs`, `tests/e2e/exercise-levels.spec.js`, release gate. Detalle en `docs/requirements-history.md`.
+Detalle archivado en [historial](docs/requirements-history.md#req-264).
 
 ## REQ-265 - Fix recordatorios: el cron marca "entrenamiento pendiente" en días de descanso
 
@@ -1761,69 +1755,15 @@ Clave pública nueva en `index.html` y `api/notify.js`; al entrar, `refreshPushS
 
 ## REQ-269 - Registro: validar valores nutricionales y distinguir desconocidos de ceros
 
-**Estado: implementado.** Prioridad P0. Dependencias: ninguna nueva. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.**
 
-### Origen
-Probe `negative-manual`; `readEditor()` y `saveEditor()` solo validan nombre.
-
-### Problema
-Se guardan kcal/proteína negativas; vacío o NaN se convierte en cero sin decisión del usuario.
-
-### Objetivo
-Guardar solo datos válidos y representar información incompleta explícitamente.
-
-### Alcance
-Parseo finito no negativo, coma/punto, errores por campo; modo completo con cuatro campos y modo explícito Solo calorías con macros desconocidos/totales parciales.
-
-### Fuera de alcance
-Reinterpretar ceros históricos y exigir igualdad exacta 4/4/9.
-
-### Riesgos
-Perder valores, cambiar totales antiguos o guardar favoritas inválidas.
-
-### Criterios de aceptación
-Negativo/vacío inválido no escribe día/perfil/cola; cero explícito se admite. Solo calorías conserva kcal e indica macros desconocidos. Legado conserva números y formulario conserva correcciones.
-
-### Verificación sugerida
-Pruebas puras de parseo y E2E de negativos/vacíos/decimales/cero/solo calorías/doble envío.
-
-### Implementación
-- Nuevo módulo puro `js/meal-log.js` (shell PWA): `parseNutrientInput` (coma/punto, vacío ≠ 0, sin negativos, exponentes ni infinitos) y `validateMealValues` (modo completo con cuatro campos o `kcal_only`; límites 5000 kcal, 500 g P/G, 1000 g C; una décima). No exige 4/4/9.
-- Editor: campos de texto `inputmode="decimal"`, casilla «Solo conozco las calorías», errores por campo (`#f_errors`, `aria-invalid`, foco). `saveEditor` valida antes de tocar día/favoritas/cola y tiene guardia de doble envío. `macrosUnknown:true` se conserva en `mealMacrosEntry`/`mealValue`; tarjetas muestran «macros no informados» y `dayTotals` redondea al final y cuenta `partial` («Macros parciales»). Registros antiguos no se reinterpretan.
-- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/registro-valores.spec.js`.
+Detalle archivado en [historial](docs/requirements-history.md#req-269).
 
 ## REQ-270 - Registro: conservar procedencia y snapshot nutricional
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-268 y REQ-269. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.**
 
-### Origen
-`saveEditor()`, `applyEstimatedMacros()`, `mealMacrosEntry()` y `normalizedSavedMeals()`; metadatos no persistidos.
-
-### Problema
-Los totales pierden origen y supuestos al guardar o reutilizar una comida.
-
-### Objetivo
-Explicar los datos del registro y mantener historia independiente de la fuente.
-
-### Alcance
-Contrato versionado de origen manual/catálogo/estimación/receta/legacy, referencia opcional, base/porción y snapshot; lectura, corrección, recientes, favoritas y sync.
-
-### Fuera de alcance
-Guardar fotos/prompts o inferir datos antiguos.
-
-### Riesgos
-Escalar dos veces, perder metadata o compartir referencias privadas entre cuentas.
-
-### Criterios de aceptación
-Guardar/reabrir/reutilizar preserva origen; editar fuente no cambia pasado. ×2 conserva base; corrección manual se identifica. Legado legible sin backfill inventado.
-
-### Verificación sugerida
-Roundtrip, fuente editada, favoritas ×2, dos cuentas y merge offline; inspección de detalle accesible.
-
-### Implementación
-- Contrato `nutritionMeta` v1 en `js/meal-log.js` (documentado en el módulo): `source` manual/catalog/estimate/recipe/food/legacy, `ref` opcional, `base` por unidad, `qty`, `estimate.{kind,note}`, `corrected`, `macrosUnknown`. `normalizeNutritionMeta` descarta imagen/prompt y acota textos; `finalizeNutritionMeta` marca `corrected` sin perder la base.
-- Editor: borrador por fuente (manual, estimación texto/foto, reciente/favorita con porción, catálogo, receta del plan). Se guarda con el consumo; recientes y favoritas lo conservan (`mealMacrosEntry`, `perPortion` vuelve `qty` a 1). Detalle «Origen: …» en el editor y en `openMealMore`. Entradas sin metadatos se leen como legacy y solo pasan a manual si se cambian; sin backfill.
-- Verificación: `scripts/test-meal-log.mjs` (contrato, legacy, corrección, merge offline) y `tests/e2e/origen-registro.spec.js`.
+Detalle archivado en [historial](docs/requirements-history.md#req-270).
 
 ## REQ-271 - Registro: editar ingredientes y gramos decimales sin perder el cálculo
 
@@ -1831,36 +1771,9 @@ Roundtrip, fuente editada, favoritas ×2, dos cuentas y merge offline; inspecci�
 
 ## REQ-272 - Nutrición: registrar una sustitución o un adicional de forma explícita
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-270. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.**
 
-### Origen
-`openEditor(extra)`, `saveEditor()` y `openMealMore()`; flujo libre siempre añade un extra.
-
-### Problema
-Registrar algo comido en lugar del almuerzo puede acabar como consumo adicional.
-
-### Objetivo
-Expresar intención y modificar el total exactamente una vez.
-
-### Alcance
-Elegir Además de lo previsto o En lugar de, fecha/comida, preview/confirmación y deshacer propio con control de cambios posteriores.
-
-### Fuera de alcance
-Regenerar semana o compensar automáticamente calorías.
-
-### Riesgos
-Duplicar consumo, reescribir otro día o deshacer cambios ajenos.
-
-### Criterios de aceptación
-Pendiente/hecha/saltada tienen resultado explícito; cancelar no escribe. Sustituir cambia solo la elegida y no añade extra duplicado; reintento idempotente y deshacer seguro.
-
-### Verificación sugerida
-E2E de tres estados, adicional, cancelación, fecha, reintento, totales e historial.
-
-### Implementación
-- «Agregar comida / snack» pregunta «¿Cómo lo registras?»: día (dentro del ciclo), «Además de lo previsto» o «En lugar de una comida del día» con selector de comida, «Ya me lo comí» (por defecto sí hasta hoy, no en el futuro) e impacto en kcal; avisa si la comida ya estaba registrada o saltada.
-- `applyMealSubstitution` cambia solo esa comida (snapshot, origen y líneas), quita el saltado, registra `meal_replace`/`logged_instead` y guarda `ms.subst` con el estado previo. `undoMealSubstitution` (tarjeta y «···») restaura solo si la comida no se editó después. Sin rebalanceos ni regeneración de la semana.
-- Verificación: `tests/e2e/sustitucion.spec.js`.
+Detalle archivado en [historial](docs/requirements-history.md#req-272).
 
 ## REQ-273 - Nutrición: copiar comida o selección del día a otra fecha
 
@@ -1872,36 +1785,9 @@ E2E de tres estados, adicional, cancelación, fecha, reintento, totales e histor
 
 ## REQ-275 - Nutrición: recetas propias con rendimiento y registro por porción
 
-**Estado: implementado.** Prioridad P1. Dependencias: REQ-271 y REQ-274. Detalle y casos: `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`.
+**Estado: implementado.**
 
-### Origen
-Fuentes S07/S08; Evolv tiene recetas curadas pero no biblioteca privada con rendimiento editable.
-
-### Problema
-Favoritas por totales no permiten recalcular una receta al cambiar ingredientes o porciones.
-
-### Objetivo
-Guardar receta, cocinar una cantidad y registrar solo lo consumido.
-
-### Alcance
-Hasta 50 recetas privadas/30 líneas, ingredientes existentes/propios, pasos opcionales, rendimiento por porciones o peso final conocido; snapshots versionados.
-
-### Fuera de alcance
-Inferir rendimiento cocido, importar URLs, compartir públicamente o incluirla en solver global.
-
-### Riesgos
-Cambiar pasado, dividir por cero, desconocidos tratados como ceros o pérdida entre dispositivos.
-
-### Criterios de aceptación
-Cuatro porciones registra una cuarta parte; 150 g usa peso final conocido. Guardar no consume; editar/eliminar fuente conserva consumos. Cantidades inválidas no escriben.
-
-### Verificación sugerida
-Pruebas de fracciones/rendimiento, E2E crear/guardar/registrar/editar, legado, sync y aislamiento.
-
-### Implementación
-- `prefs.customRecipes` (máx. 50): hasta 30 líneas del catálogo o alimentos propios, pasos opcionales y rendimiento indicado por el usuario (porciones y/o peso final cocinado); nunca se infiere del crudo. `recipeBase` da la base por porción o por 100 g cocinada; fusión por id/versión con lápidas (`persistLibraryOp` compartido con REQ-274).
-- «Mis recetas» (Más opciones): crear, editar (versión +1) y eliminar con vista previa por porción/100 g; guardar no registra nada. En «Alimento», «Tus recetas» se registran por porciones o gramos como línea `ref:{kind:"recipe",id,version}` con snapshot: cambiar rendimiento o eliminar no reescribe consumos. No entra al solver ni se comparte.
-- Verificación: `scripts/test-meal-log.mjs`, `tests/e2e/recetas.spec.js`.
+Detalle archivado en [historial](docs/requirements-history.md#req-275).
 
 ## REQ-276 - Nutrición: productos propios por código y escaneo progresivo
 
@@ -1917,96 +1803,19 @@ Solicitud directa: compartir el análisis guardado localmente. Publica `docs/com
 
 **Estado: implementado.**
 
-### Origen
-Revisión del paquete ya integrado en `10f9f2e`. Un fixture de `claim_coach_generation_part` con parte completed y result_id nulo todavía devolvía la plantilla 500/25/55/20 con HTTP 200, antes del filtro de REQ-268.
-
-### Problema
-Las rutas de replay inmediato/en espera saltaban la comprobación de procedencia. Además, la compatibilidad dependía solo de una clave recibida del cliente, aunque cambiara texto, foto o aclaración.
-
-### Objetivo
-Solo reutilizar una estimación real, activa, del mismo usuario y entrada/política.
-
-### Alcance
-Contexto SHA-256 con namespace nuevo para prompt/texto, modelo e imagen. Verificar resultado, contenido, usuario y contexto contra pool activo en replay y selección. Mantener origin/reused y 422 no_compatible_result; sin SQL ni cambios de cuota.
-
-### Fuera de alcance
-Reimplementar REQ-268..276, modificar persistencia nutricional o migraciones de producción.
-
-### Riesgos
-Invalidar cache antigua de forma segura sin bloquear generaciones nuevas; no comparar solo la cifra 500 ni guardar imágenes/prompts en el nuevo contexto.
-
-### Criterios de aceptación
-Plantillas legacy y replays con otra entrada fallan sin texto de estimación. Generación y reutilización exacta siguen funcionando. Cambiar usuario, foto, aclaración o modelo no reutiliza. Sin resultado, cliente conserva datos.
-
-### Verificación sugerida
-`scripts/test-meal-estimate-reuse.mjs`, regresiones de cuota/estimación y suite E2E. Caso anterior: replay completed sin result_id devolvía 200; después devuelve 422. El namespace nuevo exige nueva generación para caches antiguas; no hay migración ni llamadas pagadas.
+Detalle archivado en [historial](docs/requirements-history.md#req-278).
 
 ## REQ-279 - Perfil: Comidas excede el presupuesto de altura en móvil
 
-**Estado: implementado.** Prioridad P2. Campos cortos en dos columnas, preferencias de cocina/preparación desplegables, copy resumido y controles de Perfil a 16 px/44 px. Alturas a 390 px con fuentes reales y puntero táctil: Comidas 1184 px, Entreno 1481 px. Sin cambios al límite E2E; guardado y valores del desplegable verificados. Evidencia: `docs/requirements-evidence/req-279.md`.
+**Estado: implementado.**
 
-### Origen
-Gate completo al verificar REQ-278: 154 de 155 E2E pasan; falla Perfil por altura. `index.html` es idéntico al main anterior a este fix.
-
-### Problema
-`tests/e2e/perfil.spec.js` exige máximo 1500 px al abrir Comidas. Se midieron 1539 px con fallback del entorno y 1551 px al probar las fuentes reales; no es una falla de la API de estimación.
-
-### Objetivo
-Recuperar el presupuesto móvil de la sección manteniendo campos y lectura cómoda.
-
-### Alcance
-Revisar espaciado y divulgación de opciones de Perfil, medidas en 390 px y tipografía real; conservar guardado y valores al alternar secciones.
-
-### Fuera de alcance
-Subir el límite del test para ocultar el fallo, reducir tamaño táctil o modificar nutrición/entrenamiento.
-
-### Riesgos
-Ocultar restricciones importantes, perder cambios o degradar accesibilidad.
-
-### Criterios de aceptación
-Comidas y Entreno abiertos miden como máximo 1500 px en el caso E2E; editar, alternar y guardar conserva datos. No se relaja la aserción. Gate completo verde.
-
-### Verificación sugerida
-`tests/e2e/perfil.spec.js`, capturas móvil/escritorio y validación de etiquetas/controles. Evidencia del bloqueo: `docs/requirements-evidence/req-279-profile.json`.
+Detalle archivado en [historial](docs/requirements-history.md#req-279).
 
 ## REQ-280 - Conflictos de sync: el botón "Combinar seguro" nunca aparece y se pierden cambios no conflictivos
 
 **Estado: implementado.**
-`_resolveQueuedConflictPayload()` (`index.html`) calcula `merged.merged` con `mergeDayLogStates` también cuando `merged.ok===false` y lo etiqueta `autoMergedPayload` (log `safe_merge`); `drainSyncQueue()` lo propaga a `_markSyncConflict()`, que ahora lo guarda en `item.conflict.autoMergedPayload`. `openSyncConflicts()` ya mostraba el botón cuando esa propiedad existe; `resolveSyncConflict("merge")` ahora también aplica `payload.state` a `S.days` antes de reencolar, igual que la rama "local". `weight_log` queda sin esta oferta, como define REQ-73. ✓ `scripts/validate-sync-safe-merge.mjs`.
 
-### Origen
-Journey `sync`, auditoría del 2026-10-26 sobre `6ed64ed` (REQ-278). Al recorrer la resolución de conflictos offline reproduje un conflicto real en la app corriendo (localhost:8923) y el modal "Revisar sincronización" solo ofrece dos opciones, nunca la tercera que REQ-73 documenta.
-
-### Problema
-Cuando dos dispositivos editan el mismo día y hay un campo en conflicto (p. ej. la misma comida con valores distintos), el usuario solo puede elegir "Conservar este dispositivo" o "Usar versión guardada": ambas opciones son con pérdida. La opción "Combinar seguro" —diseñada para preservar los cambios NO conflictivos de ambos lados y resolver solo el campo en disputa— no se muestra jamás. Repro: con base `{meals.lunch}`, local que cambia `lunch` y además agrega `breakfast` + un extra, y remoto que cambia `lunch` distinto, el motor marca conflicto en `meals.lunch` pero computa un merge que conserva `breakfast` y el extra; aun así el usuario no puede aplicarlo y, al elegir local o remoto, pierde los cambios no conflictivos del otro dispositivo.
-
-### Causa raíz
-`_markSyncConflict()` (`index.html:2250`) guarda `item.conflict={detectedAt,remoteUpdatedAt,remotePayload,conflicts}` y **nunca** escribe `autoMergedPayload`. Además `_resolveQueuedConflictPayload()` (`index.html:2322-2329`) computa `merged.merged` con `mergeDayLogStates()` pero, cuando `ok===false`, devuelve `{ok:false,remotePayload,conflicts}` y **descarta** `merged.merged`. Como consecuencia, los dos únicos lectores de `autoMergedPayload` quedan muertos: `hasMerge` en `openSyncConflicts()` (`index.html:2409`) siempre es `false` (el botón no se renderiza) y la rama `action==="merge"` de `resolveSyncConflict()` (`index.html:2453`) es inalcanzable. La propiedad se referencia pero nunca se asigna desde el commit original de REQ-73 (`80fc012`, verificado con `git log -S`).
-
-### Objetivo
-Que el modal de resolución de conflictos ofrezca "Combinar seguro" cuando exista un merge parcial computable, aplicando los cambios no conflictivos de ambos dispositivos y resolviendo el campo en disputa, como promete REQ-73.
-
-### Alcance
-1. En `_markSyncConflict()` (o en el llamador `drainSyncQueue`), cuando `mergeDayLogStates` haya producido un `merged.merged` utilizable, almacenarlo en `item.conflict.autoMergedPayload` (payload `day_log` completo con `updated_at` nuevo, análogo al de la rama `auto_merge`).
-2. Que `_resolveQueuedConflictPayload` propague ese payload combinado hacia `_markSyncConflict` en vez de descartarlo.
-
-### Fuera de alcance
-- Cambiar la semántica de `mergeDayLogStates`/`mergeWeightPayload` ni las ramas local/remoto (funcionan).
-- Ofrecer "Combinar seguro" para `weight_log` cuando el conflicto es sobre el mismo campo (REQ-73 lo deja como conflicto visible).
-- CRDT o edición colaborativa en tiempo real.
-
-### Riesgos
-- Registrar el merge en `syncResolutionLog` sin duplicar (reusar `appendSyncResolutionLogToPayload`).
-- No exponer datos de salud a analytics ni romper el aislamiento por `uid`.
-
-### Criterios de aceptación
-- Ante un conflicto de `day_log` con merge parcial computable, el modal muestra "Combinar seguro" y aplicarlo conserva los cambios no conflictivos de ambos dispositivos.
-- Las opciones local/remoto siguen funcionando igual.
-- `node scripts/release-gate.mjs` pasa.
-
-### Verificación sugerida
-- Test Node/E2E: sembrar un item `conflict` de `day_log` (base/local/remoto con un slot en disputa y otro no), verificar que `item.conflict.autoMergedPayload` existe y que el modal renderiza 3 botones.
-- Repro manual (auditoría): modal "Revisar sincronización" con `hasAutoMergedPayload:false` y solo 2 botones; screenshot en `tool-results` de la corrida.
+Detalle archivado en [historial](docs/requirements-history.md#req-280).
 
 ## REQ-281 - Recordatorios: el job dice si el push está listo y tolera espacios en las claves
 
@@ -2114,9 +1923,7 @@ Aviso del día de 06:00 a 23:00, elegible también con push. Resumen opcional de
 
 **Estado: implementado.**
 
-Jonathan (2026-10-28, captura): registró sus propias comidas sin preparar un menú y leyó «Aún por preparar» como un pendiente de hoy. `homeTomorrowData()` mostraba esa obligación ambigua para mañana y contaba todos los slots aunque solo uno tuviera contenido.
-
-Hoy confirma «comidas registradas». El resumen dice «Comidas de mañana» y, sin contenido, «Puedes registrarlas mañana» / «Preparar un menú es opcional». Con contenido propio o del plan, cuenta solo las comidas definidas. No cambia registros ni genera un menú. ✓ `tests/e2e/home.spec.js`: hoy manual, mañana vacío/parcial/completo, navegación, conservación de hoy y vistas móvil/escritorio.
+Detalle archivado en [historial](docs/requirements-history.md#req-299).
 
 ## REQ-300 - Compartir la racha y compararla con amigos
 
@@ -2221,3 +2028,51 @@ Novena ampliación (2026-10-30): standing-heel-raise resuelto con demostración 
 **Estado: implementado.**
 
 Tras publicar REQ-307 y REQ-308 se detectó en producción que los navegadores con el service worker instalado seguían sirviendo la versión anterior de `index.html` desde caché (navegación cache-first por generación de caché, REQ-150). Al no cambiar el binario del SW no se disparaba actualización y los usuarios existentes no veían el widget de WhatsApp ni la consola. Se sube `CACHE_NAME` a `fitbud-pwa-v176`: en la próxima visita el SW nuevo se instala, `skipWaiting()` lo activa y `activate` borra los cachés anteriores, sirviendo el build actual.
+
+
+## REQ-312 - Curl predicador en banco Scott con barra EZ
+
+**Estado: implementado.**
+
+Solicitud directa: variante de la imagen con ficha completa, respiración, errores, alertas, contraindicaciones, nivel principiante, gimnasio, banco Scott y barra EZ. `preacher-curl` incluye alias Scott/predicador, regresión y progresión de carga tipadas, sustitutos de bíceps y secuencia animada con dos fotos locales exactas (Free Exercise DB, Preacher_Curl, Unlicense). No modifica planes ni historial. Caché v191. SQL regenerado, aplicación opcional/manual; el cliente incorpora la ficha sin migración de producción.
+
+Verificación: pruebas específicas de ficha/alias/animación/sustitutos en 390 y 1280 px (2/2), suite de ampliación gimnasio (2/2), sintaxis y diff correctos. Los fallos iniciales de los controles se corrigen en REQ-315. Integración autorizada por el usuario. No se ejecutó SQL en producción.
+
+
+## REQ-313 - Extensión de tríceps en polea alta con cuerda
+
+**Estado: implementado.**
+
+Solicitud directa del usuario con imagen. La ficha previa `triceps-pushdown` tiene barra; se conserva y se agrega `rope-triceps-pushdown`, variante propia con agarre neutro y cuerda. Incluye nivel principiante, equipo/lugar, técnica, respiración, errores, alertas, contraindicaciones, regresión/progresión de carga tipadas y sustitutos del mismo músculo. Dos fotografías locales exactas de Free Exercise DB, Triceps_Pushdown_-_Rope_Attachment (Unlicense), en secuencia animada. Caché v192. SQL opcional/manual; sin migraciones de producción ni modificación de planes/historial. Los controles generales se corrigen en REQ-315. Integración autorizada por el usuario.
+
+Verificación REQ-313: suite dirigida de ambos ejercicios y ampliación de gimnasio, 6/6 pruebas correctas en Chromium (390/1280 px): búsqueda, carga de ambas fotos, animación activa, nivel, progresión/regresión y sustitución por músculo. Sintaxis y `git diff --check` correctos. El validador general se actualiza en REQ-315.
+
+
+## REQ-314 - Acompañamiento del coach durante los primeros usos
+
+**Estado: implementado.**
+
+**Origen:** solicitud directa: acompañar al cliente de la mano, invitándolo a preguntar cómo entrenar hoy y guiándolo a acciones reales.
+
+**Problema:** el coach estaba bajo la agenda y los nuevos usuarios debían descubrir el campo de preguntas; el tour automático explicaba pantallas en vez de resolver su siguiente paso.
+
+**Implementación:** bienvenida visible en Hoy durante los primeros cinco días distintos de uso, dentro de los 14 días posteriores al onboarding. Preguntas de entrenamiento, poco tiempo y comidas; respuestas locales basadas en el día real, con navegación a Entreno, adaptación existente, Nutrición o evaluación de seguridad. Las preguntas frecuentes escritas también resuelven esta navegación. Otras preguntas mantienen el coach conversacional existente. No hay llamadas automáticas al servicio, notificaciones push nuevas ni cambios de planes por leer o preguntar.
+
+**Controles:** Ahora no oculta por hoy; No volver a mostrar persiste por usuario/dispositivo. Solo se guardan fechas y descartes, sin salud ni conversación. La navegación revisa el estado actual: descanso, sesión registrada/en curso y pausa de seguridad. Las opciones de adaptación conservan su flujo de elección explícita. No se modifica historial. La bienvenida sustituye el inicio automático del tour para este grupo; la guía manual sigue en el botón ?. Caché v193.
+
+**Fuera de alcance:** mensajes push/correos, cambios autónomos de sesión, habilitar el modo conversación experimental o rediseñar la página Hoy.
+
+**Verificación:** suite coach-welcome en móvil/escritorio, navegación real, consulta escrita, foco, descarte tras recargar, límite de exposición, aislamiento, descanso, registro, seguridad y guía sin servicio externo. Sintaxis/HTML y detector Impeccable. Los controles generales se corrigen en REQ-315; integración autorizada por el usuario.
+
+Resultado REQ-314: 10/10 pruebas dirigidas correctas en Chromium local, incluidas móvil/escritorio, consulta escrita, ayudas sin servicio, seguridad, persistencia, retomar sin modificar registros y tour manual. Regresión de Hoy: 5/6 correctas; la prueba antigua de seguridad usa has_red_flags sin responses de señales graves, incompatible con REQ-311 ya presente en HEAD (hasHardSafetyFlags no se cambió). Audit HTML/JS/accesibilidad, detect Impeccable, validadores de plan/wiring y git diff --check correctos. Capturas móvil/escritorio revisadas. La corrección del escape de argumentos en los chips existentes permite que las preguntas contextuales ejecuten su acción. La reparación de los controles se documenta en REQ-315.
+
+
+## REQ-315 - Reparar los controles que bloquean la entrega
+
+**Estado: implementado.**
+
+Solicitud directa del usuario. El validador de ejercicios comprueba media real local y conserva las URLs de atribución; pike exige su secuencia exacta revisada tanto en el validador como en el test de navegador, que comprueba la carga de ambas fotos. La allowlist resuelve rewrites de Vercel y media de fichas solo remotas mediante el normalizador canónico, manteniendo la prohibición de publicar archivos internos. El test de invitaciones valida código 409, orientación útil y ausencia de canje/borrado para las dos formas de error GoTrue. El test de seguridad declara una señal grave real (chest_pain), coherente con REQ-311. Playwright usa el navegador empaquetado o Chromium instalado cuando aquel falta, respetando la ruta explícita. Documentación compactada con el detalle íntegro trasladado al historial y referencia ampliada. El gate reserva 15 minutos (configurable) para la suite de más de 200 pruebas en entornos CI pequeños, sin omitir pruebas ni cambiar los timeouts individuales. Sin cambios en permisos, seguridad clínica o contratos de producción para satisfacer tests.
+
+Verificación dirigida: validadores de ejercicios, allowlist, documentación, invitaciones y test unitario de alta. Verificación integral en una copia temporal limpia del mismo contenido; los cambios de los ejercicios y Coach permanecen en el workspace original. No se ejecutan migraciones ni despliegues de producción.
+
+Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspace. Suite completa: 232/233 aprobadas; la única expectativa antigua restante de pike fue corregida y pasó con el reintento oficial E2E_RETRY_FAILED (1/1). Alta por invitación validada también con el test unitario. Control negativo adicional confirma que una imagen externa real sigue bloqueada. No se ejecutaron migraciones ni acciones sobre datos de producción.
