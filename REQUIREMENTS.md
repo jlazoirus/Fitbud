@@ -2198,6 +2198,8 @@ Séptima ampliación (2026-10-30): el crédito de la guía enlaza a la fuente/li
 
 Octava ampliación (2026-10-30): dos pendientes más resueltos con demostración exacta y licencia verificable - pike-push-up (animación con pies al suelo, CC BY-SA 4.0, Danielflefil, Wikimedia Commons) y shoulder-tap-plank (fotos del Ejército de EE. UU. del "plank shoulder tap", dominio público). Quedan 5 pendientes explícitos sin fuente libre exacta tras buscar en Free Exercise DB, Wikimedia Commons y Openverse: archer-push-up y slider-leg-curl (guía SVG propia transitoria), band-alternating-lat-pulldown, dumbbell-glute-bridge y standing-heel-raise (conservan su media anterior). Bump de caché `fitbud-pwa-v187`.
 
+Novena ampliación (2026-10-30): standing-heel-raise resuelto con demostración exacta y licencia verificable - fotogramas del video "Leg Exercise - Standing Calf Raise" de personaltrainertoronto en Flickr (CC BY 2.0), bilateral, en suelo plano y con carga en la mano, coincidiendo con la ficha; sustituye al GIF con marca de agua. La ronda gratuita también descartó para band-alternating-lat-pulldown un video CC BY 2.0 del mismo autor por ser sentado y bilateral (la ficha es de pie y alternado). Quedan 4 pendientes explícitos: archer-push-up y slider-leg-curl (guía SVG propia transitoria), band-alternating-lat-pulldown y dumbbell-glute-bridge (conservan su media anterior). Bump de caché `fitbud-pwa-v188`.
+
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
 **Estado: implementado.**

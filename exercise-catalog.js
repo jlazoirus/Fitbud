@@ -903,6 +903,7 @@
   const WIKIMEDIA_CALF={source_name:"Wikimedia Commons (BruceBlaus)",source_url:"https://commons.wikimedia.org/wiki/File:Exercise_Heel_Raise_Two_Legs.png",license_name:"CC BY-SA 4.0",attribution:"BruceBlaus, Wikimedia Commons"};
   const WIKIMEDIA_PIKE={source_name:"Wikimedia Commons (Danielflefil)",source_url:"https://commons.wikimedia.org/wiki/File:Pike_Push_Ups.gif",license_name:"CC BY-SA 4.0",attribution:"Danielflefil, Wikimedia Commons"};
   const USARMY_PLANK_TAP={source_name:"10th AAMDC (U.S. Army)",source_url:"https://commons.wikimedia.org/wiki/File:10th_AAMDC_host_%22Key_Leader_Physical_Readiness_Training%22_(8448514).jpg",license_name:"Dominio público (obra del Gobierno de EE. UU.)",attribution:"U.S. Army vía Wikimedia Commons — dominio público"};
+  const FLICKR_HEELRAISE={source_name:"Flickr (personaltrainertoronto)",source_url:"https://www.flickr.com/photos/personaltrainertoronto/51346336932/",license_name:"CC BY 2.0",attribution:"personaltrainertoronto, Flickr"};
   const ENDURANCE_MEDIA={
     walking:["assets/exercise-media/walking.jpg",FREE_EXERCISE_DB],
     running:["assets/exercise-media/running.jpg",FREE_EXERCISE_DB],
@@ -995,10 +996,9 @@
     "dumbbell-overhead-triceps-extension","dumbbell-alternating-curl",
   ];
   // Pendientes por falta de foto exacta con licencia compatible (no usar proxies
-  // de otro equipo o variante): "band-alternating-lat-pulldown" (jalón con banda),
-  // "dumbbell-glute-bridge" (puente con mancuerna) y "standing-heel-raise"
-  // (bilateral en suelo plano con carga; la foto CC encontrada era unipodal con
-  // bloque, no corresponde). Conservan su media actual hasta tener demo exacta.
+  // de otro equipo o variante): "band-alternating-lat-pulldown" (jalón con banda)
+  // y "dumbbell-glute-bridge" (puente con mancuerna). Conservan su media actual
+  // hasta tener demo exacta.
   GIF_CON_MARCA_DE_AGUA.forEach(slug=>{
     const frames=[0,1].map(i=>`assets/exercise-media/${slug}-${i}.jpg`);
     reviewedMedia.set(slug,{...FREE_EXERCISE_DB,media_type:"image_sequence",media_url:"",poster_url:frames[0],frames});
@@ -1026,14 +1026,21 @@
   reviewedMedia.set("pike-push-up",{...WIKIMEDIA_PIKE,media_type:"image_sequence",media_url:"",poster_url:pikeFrames[0],frames:pikeFrames});
   const stpFrames=["assets/exercise-media/shoulder-tap-plank-0.jpg","assets/exercise-media/shoulder-tap-plank-1.jpg"];
   reviewedMedia.set("shoulder-tap-plank",{...USARMY_PLANK_TAP,media_type:"image_sequence",media_url:"",poster_url:stpFrames[0],frames:stpFrames});
-  // REQ-310: band-row, standing-calf-raise y standing-heel-raise ya tienen
-  // demostración exacta con licencia verificable (Wikimedia Commons). La foto
-  // standing-calf-raise usa una ilustración anatómica exacta mientras se
-  // consigue foto real sin máquina.
+  // REQ-310: band-row y standing-calf-raise ya tienen demostración exacta
+  // con licencia verificable (Wikimedia Commons). La foto standing-calf-raise
+  // usa una ilustración anatómica exacta mientras se consigue foto real sin
+  // máquina.
   const brFrames=["assets/exercise-media/band-row-0.jpg","assets/exercise-media/band-row-1.jpg"];
   reviewedMedia.set("band-row",{...WIKIMEDIA_BANDROW,media_type:"image_sequence",media_url:"",poster_url:brFrames[0],frames:brFrames});
   const scrFrames=["assets/exercise-media/standing-calf-raise-0.jpg","assets/exercise-media/standing-calf-raise-1.jpg"];
   reviewedMedia.set("standing-calf-raise",{...WIKIMEDIA_CALF,media_type:"image_sequence",media_url:"",poster_url:scrFrames[0],frames:scrFrames});
+  // REQ-310 (9ª ampliación): standing-heel-raise ya tiene demostración exacta
+  // con licencia verificable - video CC BY 2.0 de elevación de talones de pie,
+  // bilateral, en suelo plano y con mancuerna en la mano (personaltrainertoronto
+  // en Flickr); se usan dos fotogramas (talones abajo / arriba) como secuencia.
+  // Verificación visual 2026-10-30. Sustituye al GIF anterior con marca de agua.
+  const shrFrames=["assets/exercise-media/standing-heel-raise-0.jpg","assets/exercise-media/standing-heel-raise-1.jpg"];
+  reviewedMedia.set("standing-heel-raise",{...FLICKR_HEELRAISE,media_type:"image_sequence",media_url:"",poster_url:shrFrames[0],frames:shrFrames});
 
   root.FITBUD_EXERCISES=strength.concat(endurance);
   const reviewedBySlug=new Map(root.FITBUD_EXERCISES.map(ex=>[ex.slug,ex]));
