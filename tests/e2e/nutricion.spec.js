@@ -33,7 +33,7 @@ test.describe("Nutrición", () => {
     await gotoApp(page);
 
     // El día empieza sin plan: CTA visible
-    const preparar = page.getByRole("button", { name: /Preparar mi día/i });
+    const preparar = page.getByRole("button", { name: /Sugerirme un menú/i });
     await expect(preparar.first()).toBeVisible();
     await preparar.first().click();
 
@@ -79,7 +79,7 @@ test.describe("Nutrición", () => {
     await autoDismissNudges(page);
     const errors = collectConsoleErrors(page);
     await gotoApp(page);
-    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    await page.getByRole("button", { name: /Sugerirme un menú/i }).first().click();
     const overlay = page.locator("#overlay");
     await overlay.getByRole("button", { name: /Aplicar al día/i }).click({ timeout: 15_000 });
     await page.locator("#tabs").getByText("Nutrición").click();
@@ -114,7 +114,7 @@ test.describe("Nutrición", () => {
     const errors = collectConsoleErrors(page);
     await gotoApp(page);
 
-    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    await page.getByRole("button", { name: /Sugerirme un menú/i }).first().click();
     const overlay = page.locator("#overlay");
     await overlay.getByRole("button", { name: /Aplicar al día/i }).click({ timeout: 15_000 });
 

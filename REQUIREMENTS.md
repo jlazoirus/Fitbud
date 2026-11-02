@@ -2076,3 +2076,42 @@ Solicitud directa del usuario. El validador de ejercicios comprueba media real l
 Verificación dirigida: validadores de ejercicios, allowlist, documentación, invitaciones y test unitario de alta. Verificación integral en una copia temporal limpia del mismo contenido; los cambios de los ejercicios y Coach permanecen en el workspace original. No se ejecutan migraciones ni despliegues de producción.
 
 Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspace. Suite completa: 232/233 aprobadas; la única expectativa antigua restante de pike fue corregida y pasó con el reintento oficial E2E_RETRY_FAILED (1/1). Alta por invitación validada también con el test unitario. Control negativo adicional confirma que una imagen externa real sigue bloqueada. No se ejecutaron migraciones ni acciones sobre datos de producción.
+
+## REQ-316 - Hoy: registrar y entrenar sin preparar un menú
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-02), captura y aprobación de propuesta: preparar el día debe ser una sugerencia, sin dominar ni condicionar el valor principal.
+
+### Problema
+La falta de menú activaba «Aún falta preparar este día», un botón dominante y un retorno anticipado que ocultaba las acciones del entreno. Nutrición también priorizaba preparar comidas.
+
+### Causa raíz
+`homeAgendaData()` retornaba `setup` antes de construir el entrenamiento; `homeAgendaHtml()` y `renderNutrition()` presentaban la planificación opcional como tarea obligatoria.
+
+### Objetivo
+Acceder al registro, entrenamiento y coach desde Hoy; sugerir un menú de forma secundaria y voluntaria.
+
+### Alcance
+Registro directo con editor existente, entrenamiento independiente del menú y slots vacíos excluidos de pendientes. Sugerencia secundaria tras el coach, «Sugerirme un menú» y «Ahora no» persistido por día/cuenta/dispositivo. Acceso compacto en Nutrición, bienvenida del coach tras las acciones y preferencias en Perfil. Caché PWA actualizado.
+
+### Fuera de alcance
+Cambiar planes, objetivos, rachas, historial, cobros, seguridad o proveedores; generar o aplicar menús automáticamente.
+
+### Riesgos
+Cierre falso del día sin comidas, fuga de descartes entre cuentas, pérdida de acceso a generación y regresiones del editor/entrenamiento.
+
+### Criterios de aceptación
+- Registrar comidas propias suma consumo sin generar un menú; entrenamiento inicia y continúa independientemente del menú.
+- Slots vacíos y planificación no cuentan como pendientes; la seguridad, descanso, registros y cierre real se conservan.
+- Sugerencia sin botón primario, descartable hasta mañana, aislada por cuenta y disponible en Nutrición tras descartarla.
+- Generar requiere elección explícita; aplicar conserva confirmación y registros previos.
+- Móvil 320/390 y escritorio sin desbordes, controles accesibles y sin llamadas externas automáticas.
+
+### Verificación sugerida
+Playwright Home/menú opcional, nutrición, coach y regresiones de registro/entreno; detector Impeccable y release gate completo.
+
+Resultado: 9/9 casos nuevos y regresiones dirigidas de Hoy, Nutrición y coach verificadas. Capturas 320/390/1280 sin desbordes; detector Impeccable sin hallazgos, HTML/JS/accesibilidad, placeholders, macros primero, orden/saltos, caché PWA y secretos correctos. Gate integral posterior al commit antes de publicar. Sin migraciones ni llamadas pagadas.
+
+Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nueva de los slots vacíos coincidía con «o elige», prohibido por REQ-194; se cambió por «Registra lo que comiste. El menú es opcional.», sin relajar pruebas. Gate final con reintento oficial del caso de textos.

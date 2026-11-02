@@ -700,6 +700,15 @@
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-next{margin-top:12px}
+  /* REQ-316: registrar primero; el menú es una sugerencia secundaria. */
+  .home-log-action{margin:0 0 14px}
+  .home-log-action .btn{width:100%;min-height:48px}
+  .menu-suggestion{margin:20px 0 14px;padding:14px 0;border-top:1px solid var(--border)}
+  .menu-suggestion h2{margin:0;font-family:var(--font-body);font-size:15px;line-height:1.4;letter-spacing:0}
+  .menu-suggestion p{margin:4px 0 8px;color:var(--muted);font-size:13px;line-height:1.5}
+  .menu-suggestion-actions{display:flex;flex-wrap:wrap;gap:8px}
+  .menu-suggestion-actions .btn{min-height:44px}
+  .menu-suggestion button:focus-visible,.home-log-action button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   /* REQ-292: tarjeta "Prepara tus comidas" colapsable en Nutrición */
   .nut-setup-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;background:transparent;border:none;padding:0 4px;margin:0;color:var(--txt);font:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left}
   .nut-setup-toggle .chev{flex:0 0 auto;color:var(--muted);transition:transform .2s}
@@ -709,6 +718,7 @@
   .nut-setup-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .nut-setup-row .nut-setup-toggle{flex:1 1 auto;min-width:0}
   .nut-setup-row .btn{flex:0 0 auto}
+  .nut-setup .agenda-title{font-size:16px;line-height:1.4}
   /* REQ-284: tarjeta de regreso (rescate de ayer / bienvenida) */
   .return-card .agenda-head{justify-content:flex-start;align-items:center}
   .return-flame{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-dim);border:1px solid var(--border-acc)}
@@ -2940,7 +2950,7 @@ function dbStatusNote(){
   if(DB.loaded)return "✓ Macros calculados por ingrediente.";
   if(supa&&!DB.error)return "Cargando tus alimentos…";
   if(supa&&DB.error)return "No pudimos cargar los alimentos. Revisa tu conexión y vuelve a intentarlo.";
-  return "Prepara tu día o semana con tu coach, o agrega comidas; los macros se calculan por ingredientes.";
+  return "Registra tus comidas o pide un menú a tu coach; los macros se calculan por ingredientes.";
 }
 
 /* ============================================================
@@ -4795,6 +4805,38 @@ function homeRegisterMeal(ds,id){
   homeTrackAction(ds,"meal_register",{slot:meal?meal.id:id});
   toggleMeal(ds,id);
 }
+function homeLogFood(ds){
+  homeTrackAction(ds,"meal_register");
+  openFoodRegistration(ds);
+}
+function openFoodRegistration(ds,id){
+  current=ds;
+  const next=dayEffectiveOrder(ds).find(it=>it.type==="meal"&&(!id||it.base.id===id)&&!mealState(ds,it.base.id).done&&!mealState(ds,it.base.id).skipped);
+  openEditor("extra",ds,null,{title:"Registrar comida",registration:true,intent:next?"replace":"extra",target:next?next.base.id:null});
+}
+// Solo una fecha por cuenta/dispositivo; no guarda comidas ni datos de salud.
+const menuSuggestionMemory={};
+function menuSuggestionKey(){return uid()?"fitbud_menu_suggestion_v1_"+uid():null;}
+function menuSuggestionDismissed(ds){
+  const key=menuSuggestionKey();if(!key)return false;
+  if(menuSuggestionMemory[key]===ds)return true;
+  try{return localStorage.getItem(key)===ds;}catch(e){return false;}
+}
+function dismissMenuSuggestion(ds){
+  const key=menuSuggestionKey();if(!key)return;
+  menuSuggestionMemory[key]=ds;
+  try{localStorage.setItem(key,ds);}catch(e){}
+  renderHoy();
+  const button=document.querySelector(".home-log-action button");if(button)button.focus({preventScroll:true});
+}
+function homeMenuSuggestionHtml(ds){
+  if(ds!==todayStr()||homeDayHasPreparedMeals(ds,buildDay(ds))||menuSuggestionDismissed(ds))return "";
+  return `<section class="menu-suggestion" aria-labelledby="menuSuggestionTitle">
+    <h2 id="menuSuggestionTitle">¿Quieres ideas para tus comidas de hoy?</h2>
+    <p>Te proponemos un menú según tus preferencias. Tú eliges si lo usas.</p>
+    <div class="menu-suggestion-actions"><button type="button" class="btn" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button><button type="button" class="btn btn-sm" onclick="dismissMenuSuggestion('${ds}')">Ahora no</button></div>
+  </section>`;
+}
 function homeOpenWorkout(ds,action){
   homeTrackAction(ds,action||"workout_start");
   current=ds;
@@ -4850,23 +4892,19 @@ function homeAgendaData(ds){
   const ew=effectiveWorkout(ds);
   const execution=normalizedWorkoutExecution(ds);
   const workoutOutcome=workoutOutcomeForState(st);
-  const restDay=ew.workout&&ew.workout.id==="descanso";
+  const restDay=!ew.workout||ew.workout.id==="descanso";
   const safetyHold=trainingSafetyHold();
   const hasPreparedMeals=homeDayHasPreparedMeals(ds,day);
   // REQ-125: usa el orden visual del usuario (si lo definió) para decidir la próxima
   // comida pendiente, y excluye las comidas saltadas (no son una acción pendiente).
   const pendingMeals=hasPreparedMeals
     ?dayEffectiveOrder(ds).filter(it=>it.type==="meal").map(it=>it.base)
-      .filter(m=>{const ms=mealState(ds,m.id);return!ms.done&&!ms.skipped;})
+      .filter(m=>{const ms=mealState(ds,m.id);return!ms.done&&!ms.skipped&&mealHasContent(mealValue(m,ms));})
     :[];
   const workoutPending=!restDay&&!safetyHold&&!st.workoutDone&&workoutOutcome==="pending";
   const safetyPending=!restDay&&safetyHold&&workoutOutcome==="pending";
   const {doneMeals,totMeals}=dayTotals(ds);
   const items=[];
-
-  if(!hasPreparedMeals){
-    return {state:"setup",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
-  }
 
   if(execution&&(workoutOutcome==="in_progress"||workoutOutcome==="paused")){
     const prog=WORKOUT_PLAYER.progress(execution);
@@ -4924,7 +4962,7 @@ function homeAgendaData(ds){
         ?`<button class="btn btn-accent" onclick="openManualActivity('${ds}')">Registrar</button><button class="btn" onclick="homeOpenWorkout('${ds}','workout_start')">Ver detalle</button>`
         :`<button class="btn btn-accent" onclick="homeOpenWorkout('${ds}','workout_start')">Iniciar</button><button class="btn" onclick="homeAdaptWorkout('${ds}')">Adaptar</button>`
     });
-  }else if(restDay&&pendingMeals.length){
+  }else if(restDay&&(doneMeals<totMeals||!totMeals)){
     items.push({
       kind:"rest",
       icon:"○",
@@ -4936,7 +4974,9 @@ function homeAgendaData(ds){
   }
 
   if(!items.length){
-    return {state:"done",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
+    // Un menú ausente o parcial no es un pendiente ni prueba de día cerrado.
+    const state=doneMeals===totMeals&&totMeals>0?"done":"tracking";
+    return {state,day,st,ew,workoutOutcome,doneMeals,totMeals,items};
   }
   // El descanso no es pendiente aunque ofrezca "Entrené igual" (REQ-206).
   const pendingCount=items.filter(i=>i.actions&&i.kind!=="rest").length;
@@ -4978,19 +5018,8 @@ function homeOpenTomorrow(ds){
 function homeAgendaHtml(ds){
   const data=homeAgendaData(ds);
   const note=homeCacheNoticeHtml();
-  if(data.state==="setup"){
-    const cta="Preparar mi día";
-    return `<section class="agenda-card agenda-state setup">
-      <div class="agenda-head">
-        <div>
-          <div class="agenda-kicker">Tu agenda</div>
-          <h2 class="agenda-title">Aún falta preparar este día</h2>
-          <div class="agenda-sub">Tu coach arma comidas y entreno para hoy en segundos.</div>
-        </div>
-      </div>
-      ${note}
-      <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">${cta}</button></div>
-    </section>`;
+  if(data.state==="tracking"){
+    return `<section class="agenda-card"><h2 class="agenda-title">Entreno ${esc(workoutStatusLabel(data.workoutOutcome).toLowerCase())}</h2>${note}<div class="agenda-actions"><button class="btn" onclick="homeOpenWorkout('${ds}','workout_detail')">Ver detalle del entreno</button></div></section>`;
   }
   if(data.state==="done"){
     // REQ-258: con el día cerrado, hoy va en una línea y la tarjeta mira a mañana.
@@ -5020,11 +5049,9 @@ function homeAgendaHtml(ds){
   return `<section class="agenda-card">
     <div class="agenda-head">
       <div>
-        <div class="agenda-kicker">Tu agenda</div>
-        <h2 class="agenda-title">Lo que sigue hoy</h2>
-        <div class="agenda-sub">Ordenado con tu plan, lo registrado y el estado del entrenamiento.</div>
+        <h2 class="agenda-title">${data.pendingCount?"Lo que sigue hoy":"Tu día de hoy"}</h2>
       </div>
-      <span class="agenda-count">${data.pendingCount} pendiente${data.pendingCount===1?"":"s"}</span>
+      ${data.pendingCount?`<span class="agenda-count">${data.pendingCount} pendiente${data.pendingCount===1?"":"s"}</span>`:""}
     </div>
     ${note}
     <div class="agenda-list">${data.items.map(homeAgendaItemHtml).join("")}</div>
@@ -5184,7 +5211,7 @@ function renderHoy(){
   const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
   const localGuides=msgs.filter(m=>m.localGuide||m.role==="user").map(renderCoachMessage).join("");
   const coachSection=canUse?`
-    <div class="coach-home-sep">O pregúntale a tu coach</div>
+    <div class="coach-home-sep">Pregúntale a tu coach</div>
     ${chipsHtml}
     ${clearBtn}
     <div class="coach-msgs-home" id="coachMsgs">${msgsHtml}${typingHtml}</div>
@@ -5210,16 +5237,18 @@ function renderHoy(){
     </div>
   </header>
   ${adminBetaPendingCardHtml()}
-  ${coachWelcomeHtml()}
   ${restartNudgeCard()}
   ${returnCardHtml()}
   ${dayClosed?"":heroDash(ds,{compact:true})}
+  <div class="home-log-action"><button type="button" class="btn btn-accent" onclick="homeLogFood('${ds}')">Registrar comida</button></div>
   ${homeAgendaHtml(ds)}
-  ${notifyNudgeHtml()}
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
-  ${checkinDue?weeklyCheckinBanner():needsProfileTuning((profile&&profile.prefs)||{})?`<button class="coach-chip" style="margin:0 0 12px" onclick="setView('perfil')" title="Agrega preferencias de cocina, horarios y equipo para mejores propuestas">✨ Afina tu plan</button>`:""}
-  ${coachSection}`;
+  ${checkinDue?weeklyCheckinBanner():""}
+  ${coachWelcomeHtml()}
+  ${coachSection}
+  ${homeMenuSuggestionHtml(ds)}
+  ${notifyNudgeHtml()}`;
   maybeStartFitbrosTour();
 }
 function renderCoach(){chatModeActive()?renderChatMode():renderHoy();}
@@ -5236,21 +5265,19 @@ function renderNutrition(){
     const order={key,canUp:idx>0,canDown:idx<orderedItems.length-1};
     return it.type==="meal"?mealCard(ds,it.base,order):extraCard(ds,it.data,it.idx,order);
   }).join("");
-  // Un solo CTA primario: día sin preparar → tarjeta de arranque; día preparado → nada prominente (REQ-100).
-  // REQ-292: la tarjeta se colapsa a una línea (estado recordado en UI.collapsed) sin perder el CTA.
-  const setupCollapsed=isCollapsed("nut.setup");
-  const emptyNutHtml=!prepared?(setupCollapsed?`<section class="agenda-card agenda-state setup nut-setup is-collapsed">
+  // REQ-316: menú opcional, compacto por defecto; conserva el control de REQ-292.
+  const setupCollapsed=isCollapsed("nut.setup",true);
+  const emptyNutHtml=!prepared?(setupCollapsed?`<section class="agenda-card nut-setup is-collapsed">
     <div class="nut-setup-row">
-      <button class="nut-setup-toggle" onclick="toggleNutSetup()" aria-expanded="false" aria-label="Mostrar cómo preparar tus comidas">${chevron()}<span>Comidas sin preparar</span></button>
-      <button class="btn btn-sm btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button>
+      <button class="nut-setup-toggle" onclick="toggleNutSetup()" aria-expanded="false" aria-label="Mostrar sugerencia de menú">${chevron()}<span>Menú opcional</span></button>
+      <button class="btn btn-sm" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button>
     </div>
-  </section>`:`<section class="agenda-card agenda-state setup nut-setup">
+  </section>`:`<section class="agenda-card nut-setup">
     <div class="agenda-head"><div>
-      <div class="agenda-kicker">Nutrición</div>
-      <h2 class="agenda-title">Prepara tus comidas de hoy</h2>
-      <div class="agenda-sub">Aquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Al preparar el día, cada comida se llena sola.</div>
+      <h2 class="agenda-title">¿Quieres ideas para tus comidas?</h2>
+      <div class="agenda-sub">Puedes registrar lo que comiste sin preparar un menú. Si quieres ideas, te proponemos comidas según tus preferencias.</div>
     </div><button class="nut-setup-toggle icon-only" onclick="toggleNutSetup()" aria-expanded="true" aria-label="Ocultar tarjeta" title="Ocultar">${chevron()}</button></div>
-    <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
+    <div class="agenda-actions"><button class="btn" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button></div>
   </section>`):"";
   // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
   // REQ-231: la lista de compra (de la semana, no del día) va en esta fila, con la misma forma.
@@ -5263,8 +5290,8 @@ function renderNutrition(){
   // REQ-124: anillo/resumen -> comidas del día (+ extras interoperadas) -> más opciones (al final).
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
-  ${emptyNutHtml}
   ${section("nut.macros","Macros del día",heroDash(ds,{compact:"always"})+`<div class="muted small">${dbStatusNote()}</div>`)}
+  ${emptyNutHtml}
   ${section("nut.plan","Comidas del día",
     itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
     `${orderedItems.length}`)}
@@ -5273,7 +5300,7 @@ function renderNutrition(){
 }
 function toggleNutSetup(){
   UI.collapsed=UI.collapsed||{};
-  UI.collapsed["nut.setup"]=!isCollapsed("nut.setup");
+  UI.collapsed["nut.setup"]=!isCollapsed("nut.setup",true);
   uiSave();
   render();
   const t=document.querySelector("#app .nut-setup-toggle");
@@ -7003,7 +7030,7 @@ function mealCard(ds,b,order){
     </div>`:"";
   return `<div class="meal meal-tap ${ms.done?'done':''}" onclick="mealCardTap(event,'${ds}','${b.id}')">
     <div class="meal-head">
-      <button class="chk ${ms.done?'on':''}" aria-label="${esc(b.slot)}: ${ms.done?'hecha, tocar para desmarcar':'marcar como hecha'}" aria-pressed="${ms.done?'true':'false'}" ${!ms.done&&!mealHasContent(v)?'disabled title="Prepara una opción antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
+      <button class="chk ${ms.done?'on':''}" aria-label="${esc(b.slot)}: ${ms.done?'hecha, tocar para desmarcar':'marcar como hecha'}" aria-pressed="${ms.done?'true':'false'}" ${!ms.done&&!mealHasContent(v)?'disabled title="Registra lo que comiste antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
       <div>
         <div class="slot">${b.slot}</div>
         ${mealHasContent(v)
@@ -7011,10 +7038,11 @@ function mealCard(ds,b,order){
         ${mealNumsHtml(v)}`
           // REQ-195: un hueco vacío no muestra "0 kcal · P 0 · C 0 · G 0 g"
           :`<div class="name muted">Sin asignar</div>
-        <div class="meal-empty-hint">Prepara tu día o toca «Otra opción».</div>`}
+        <div class="meal-empty-hint">Registra lo que comiste. El menú es opcional.</div>`}
       </div>
     </div>
     <div class="meal-actions">
+      ${!mealHasContent(v)?`<button class="btn btn-sm" aria-label="Registrar ${esc(b.slot)}" onclick="openFoodRegistration('${ds}','${b.id}')">Registrar</button>`:""}
       <button class="btn btn-sm" onclick="openChangeMeal('${ds}','${b.id}')" ${ms.done?"disabled title=\"Desmarca la comida si necesitas cambiarla\"":""}>Otra opción</button>
       ${canUndoSubst(ms)?`<button class="btn btn-sm" onclick="undoMealSubstitution('${ds}','${b.id}')">Deshacer cambio</button>`:ms.ovr?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
       <button class="btn btn-sm" aria-label="Más opciones de ${esc(b.slot)}" onclick="openMealMore('${ds}','${b.id}')">···</button>
@@ -8016,7 +8044,7 @@ function chatWorkoutCard(ds){
 }
 function chatMealsCard(ds){
   const day=buildDay(ds);
-  if(!homeDayHasPreparedMeals(ds,day))return `<div class="muted small">Aún no hay comidas preparadas para hoy.</div><button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="homePrepareDay('${ds}')">Preparar mi día</button>`;
+  if(!homeDayHasPreparedMeals(ds,day))return `<div class="muted small">Aún no hay comidas preparadas para hoy.</div><button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button>`;
   return day.meals.map(b=>mealCard(ds,b)).join("");
 }
 function chatWeightCard(){
@@ -10518,14 +10546,14 @@ function applyMissedSession(ds,action){
 }
 
 /* editor genérico: comida del plan (override) o extra */
-function openEditor(kind,ds,id){
+function openEditor(kind,ds,id,options={}){
   ds=ds||current;
   let pre={name:"",kcal:"",p:"",c:"",f:""};
   let title="Agregar comida / snack";
   if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,macrosUnknown:v.macrosUnknown};title="Editar — "+base.slot;}
   // REQ-229: el nombre precargado de una comida del plan es lo planeado, no lo que comió.
-  window._editor={kind,ds,id,extraIdx:null,planName:kind==="meal"?String(pre.name||""):"",...editorMetaDraft(kind==="meal"?mealState(ds,id).ovr:null,pre,kind==="meal")};
-  editorSheet(title,pre);
+  window._editor={kind,ds,id,extraIdx:null,registration:!!options.registration,intent:options.intent,target:options.target,planName:kind==="meal"?String(pre.name||""):"",...editorMetaDraft(kind==="meal"?mealState(ds,id).ovr:null,pre,kind==="meal")};
+  editorSheet(options.title||title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i,...editorMetaDraft(e,e,false)};editorSheet("Editar comida extra",e);}
 // REQ-270: borrador de origen al abrir el editor. Una entrada con metadatos los
@@ -11208,10 +11236,10 @@ function logIntentHtml(){
   const e=window._editor;
   e.intent=e.intent||"extra";
   return `<fieldset class="log-intent">
-    <legend>¿Cómo lo registras?</legend>
+    <legend>${e.registration?"¿Dónde lo registras?":"¿Cómo lo registras?"}</legend>
     <div class="field" style="margin:4px 0 2px"><label for="f_date">Día</label><input id="f_date" type="date" min="${START}" max="${END}" value="${e.ds}" onchange="setEditorDate(this.value)"></div>
-    <label class="intent-opt"><input type="radio" name="f_intent" value="extra" ${e.intent==="extra"?"checked":""} onchange="setEditorIntent('extra')"> Además de lo previsto</label>
-    <label class="intent-opt"><input type="radio" name="f_intent" value="replace" ${e.intent==="replace"?"checked":""} onchange="setEditorIntent('replace')"> En lugar de una comida del día</label>
+    <label class="intent-opt"><input type="radio" name="f_intent" value="extra" ${e.intent==="extra"?"checked":""} onchange="setEditorIntent('extra')"> ${e.registration?"Otra comida o snack":"Además de lo previsto"}</label>
+    <label class="intent-opt"><input type="radio" name="f_intent" value="replace" ${e.intent==="replace"?"checked":""} onchange="setEditorIntent('replace')"> ${e.registration?"Una comida del día":"En lugar de una comida del día"}</label>
     <div id="f_replaceBox" ${e.intent==="replace"?"":"hidden"}>${replaceTargetHtml()}</div>
     <div id="f_impact" class="muted small" aria-live="polite"></div>
   </fieldset>`;
@@ -11224,7 +11252,7 @@ function replaceTargetHtml(){
     return `<option value="${esc(b.id)}" ${e.target===b.id?"selected":""}>${esc(b.slot)} — ${esc(v.name||"Sin asignar")}${state}</option>`;
   }).join("");
   const eaten=e.eaten!=null?e.eaten:e.ds<=todayStr();
-  return `<div class="field" style="margin:8px 0 0"><label for="f_target">Comida que reemplaza</label>
+  return `<div class="field" style="margin:8px 0 0"><label for="f_target">${e.registration?"Comida del día":"Comida que reemplaza"}</label>
       <select id="f_target" onchange="setReplaceTarget(this.value)"><option value="">Elige una comida…</option>${opts}</select></div>
     <label class="qp-save-fav"><input type="checkbox" id="f_eaten" ${eaten?"checked":""} onchange="window._editor.eaten=this.checked;renderEditorImpact()"> Ya me lo comí</label>`;
 }
@@ -11256,7 +11284,7 @@ function renderEditorImpact(){
   const prevK=mealHasContent(v)?Math.round(v.kcal):0;
   const diff=kcal!=null?kcal-prevK:null;
   const eaten=$("#f_eaten")?$("#f_eaten").checked:true;
-  const parts=[`Reemplaza ${b.slot}${v.name?` (${v.name}, ${prevK} kcal)`:""}${diff!=null?`: ${diff>=0?"+":""}${diff} kcal en el día`:""}.`];
+  const parts=[e.registration&&!mealHasContent(v)?`Se guarda en ${b.slot}${kcal!=null?`: ${kcal} kcal`:""}.`:`Reemplaza ${b.slot}${v.name?` (${v.name}, ${prevK} kcal)`:""}${diff!=null?`: ${diff>=0?"+":""}${diff} kcal en el día`:""}.`];
   if(ms.done)parts.push("Ya estaba registrada: la corriges con lo que comiste.");
   else if(ms.skipped)parts.push("Estaba saltada: vuelve a contar.");
   parts.push(eaten?"Quedará registrada como comida hecha.":"Quedará planificada, sin marcar como comida.");
@@ -12701,7 +12729,7 @@ async function aiGenerateDay(){
   const actionKey="diet_day";
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const ds=current; const day=buildDay(ds);
-  modal(`<h3>🍽️ Preparar mi día</h3><div id="genOut"><div class="loading-row"><div class="spinner"></div><span>Preparando tus comidas de hoy…</span></div></div>`);
+  modal(`<h3>Sugerencia de menú</h3><div id="genOut"><div class="loading-row"><div class="spinner"></div><span>Preparando tus comidas de hoy…</span></div></div>`);
   try{
     const {res,target}=await generateOneDay(ds,{action:"diet_day",requestId,partKey:"day"});
     if(res.ok){_genDayFailStreak=0;}

@@ -44,7 +44,7 @@ test("con el enlace de prueba: entreno, peso y comidas desde el hilo, y vuelta a
   // Comidas
   await app.getByRole("button", { name: "¿Qué como hoy?" }).click();
   const meals = app.locator('.chat-card[data-card="meals"]');
-  const prepare = meals.getByRole("button", { name: "Preparar mi día" });
+  const prepare = meals.getByRole("button", { name: "Sugerirme un menú" });
   if (await prepare.isVisible().catch(() => false)) {
     await prepare.click();
     await page.getByRole("button", { name: "Aplicar al día" }).click();
