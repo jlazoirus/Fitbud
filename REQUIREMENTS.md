@@ -2121,13 +2121,19 @@ Fruta en 2 comidas (1 si hay menos de 4): en el pedido y en el plan sin modelo. 
 
 **Estado: implementado.** De los ejercicios sin demostración de REQ-320, el step-up tiene una exacta y libre: la animación del CDC en Wikimedia Commons (escalón bajo, sin carga, con apoyo; obra del Gobierno de EE. UU.). Se sirve desde `assets/exercise-media/step-up.gif` con crédito y vuelve a elegirse en las sesiones; se retira `step-up.svg`. Siguen sin fuente libre exacta la búlgara (solo foto con carga), el peso muerto a una pierna, el curl deslizante y la flexión arquero. `CACHE_NAME` → `fitbud-pwa-v198`. ✓ `tests/e2e/sin-dibujos.spec.js`.
 
-## REQ-323 - Recordatorios: solo CRON_SECRET autoriza el envío
+## REQ-323 - Estimar macros: tope de salida para Sonnet 5
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Topes 1000/1200 tokens. ✓ `scripts/validate-meal-estimate-output.mjs`.
+
+## REQ-324 - Recordatorios: solo CRON_SECRET autoriza el envío
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 `/api/notify` ya no acepta la cabecera `x-vercel-cron` sin secreto; solo `Authorization: Bearer CRON_SECRET`, comparado en tiempo constante. ✓ `scripts/validate-supabase-keepalive.mjs`.
 
-## REQ-324 - Texto de baja del correo de invitaciones
+## REQ-325 - Texto de baja del correo de invitaciones
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 

@@ -56,4 +56,11 @@ const photoRound = html.slice(html.indexOf("async function photoEstimateRound(")
 assert.ok(/etiqueta o tabla nutricional/.test(photoRound), "la foto de una etiqueta usa sus valores");
 console.log("  REQ-301: productos de marca sin inventar formato ni etiqueta; la foto lee la etiqueta");
 
+// REQ-323: el tope de salida deja margen a un modelo más extenso (con Sonnet 5
+// una estimación usó 400/400 tokens y llegó cortada).
+const caps = html.match(/const MEAL_ESTIMATE_MAX_TOKENS=\{text:(\d+),photo:(\d+)\}/);
+assert.ok(caps && Number(caps[1]) >= 1000 && Number(caps[2]) >= 1200, "topes de salida de la estimación con margen");
+assert.ok(/MEAL_ESTIMATE_MAX_TOKENS\.text,quota\)/.test(aiEstimate) && /MEAL_ESTIMATE_MAX_TOKENS\.photo,quota/.test(photoRound), "texto y foto usan los topes");
+console.log("  REQ-323: topes de salida con margen para el modelo configurado");
+
 console.log("validate-meal-estimate-output: OK");

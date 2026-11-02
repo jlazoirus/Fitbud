@@ -12535,7 +12535,27 @@ Octava ampliación (2026-10-30): dos pendientes más resueltos con demostración
 
 Novena ampliación (2026-10-30): standing-heel-raise resuelto con demostración exacta y licencia verificable - fotogramas del video "Leg Exercise - Standing Calf Raise" de personaltrainertoronto en Flickr (CC BY 2.0), bilateral, en suelo plano y con carga en la mano, coincidiendo con la ficha; sustituye al GIF con marca de agua. La ronda gratuita también descartó para band-alternating-lat-pulldown un video CC BY 2.0 del mismo autor por ser sentado y bilateral (la ficha es de pie y alternado). Quedan 4 pendientes explícitos: archer-push-up y slider-leg-curl (guía SVG propia transitoria), band-alternating-lat-pulldown y dumbbell-glute-bridge (conservan su media anterior). Bump de caché `fitbud-pwa-v188`.
 
-## REQ-323 - Recordatorios: solo CRON_SECRET autoriza el envío
+## REQ-323 - Estimar macros: tope de salida para Sonnet 5
+
+**Estado: implementado.**
+
+### Origen
+
+El 2026-11-02 Jonathan configuró `ANTHROPIC_MODEL_MEAL_ESTIMATE=claude-sonnet-5` en Vercel. En su primera prueba, el primer intento falló con `invalid_provider_output` (se devolvió a la cuota) y el segundo salió bien.
+
+### Causa raíz
+
+En `coach_usage`, el intento fallido registró `output_tokens = 400`, que es justo el tope que `aiEstimate()` pedía, así que el JSON llegó cortado. El intento correcto usó 380 tokens. Con Haiku, las 111 estimaciones del último mes usaron como máximo 293 tokens. Los otros 12 fallos del mes fueron por otras causas y ninguno llegó al tope.
+
+### Alcance
+
+`MEAL_ESTIMATE_MAX_TOKENS` en `index.html`: 1000 tokens para texto (antes 400) y 1200 para foto (antes 700). El servidor sigue limitando a 4096. Se cobra por los tokens usados, no por el tope, así que el costo no cambia.
+
+### Criterios de aceptación
+
+- Texto y foto usan topes de al menos 1000 y 1200. ✓ `scripts/validate-meal-estimate-output.mjs` (falla con el código anterior).
+
+## REQ-324 - Recordatorios: solo CRON_SECRET autoriza el envío
 
 **Estado: implementado.**
 
@@ -12570,7 +12590,7 @@ Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y P
 
 Activación en producción (02/11/2026): `supabase/referrals.sql` aplicada en una transacción en el proyecto Supabase `fitbud`, sin cambios en datos existentes. Funciones, trigger, permisos (solo `service_role`) y RLS verificados. Flujo completo probado en producción con cuentas de prueba dentro de una transacción revertida. Vercel con `a47729f` (incluye REQ-317), variables de correo y cron presentes, y workflow horario autorizado. Ver `docs/referrals.md`.
 
-## REQ-324 - Texto de baja del correo de invitaciones
+## REQ-325 - Texto de baja del correo de invitaciones
 
 **Estado: implementado.**
 

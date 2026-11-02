@@ -25,7 +25,7 @@ await handler({ method: "GET", url: "/api/notify", headers: {} }, failing);
 assert.equal(failing.code, 401, "un fallo del keep-alive no rompe el handler");
 assert.equal(failing.body.keepAlive, false);
 
-// REQ-323: con CRON_SECRET configurado, solo el Bearer correcto corre el job.
+// REQ-324: con CRON_SECRET configurado, solo el Bearer correcto corre el job.
 // La cabecera x-vercel-cron (falsificable desde internet) no autoriza.
 process.env.CRON_SECRET = "s3cret-value";
 globalThis.fetch = async (url) => { calls.push(String(url)); return { ok: true, json: async () => [] }; };
