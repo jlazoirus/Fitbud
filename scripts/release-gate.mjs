@@ -161,6 +161,7 @@ run("test-service-worker-cache.mjs", "node scripts/test-service-worker-cache.mjs
 console.log("\n[ SQL y datos ]");
 run("supabase/validate.mjs (recetas y macros)", "node supabase/validate.mjs");
 run("validate-migrations.mjs", "node scripts/validate-migrations.mjs");
+run("test-referrals.mjs (PostgreSQL y campaña)", "node scripts/test-referrals.mjs");
 run("test-streak-friends.mjs (PostgreSQL/RLS)", "node scripts/test-streak-friends.mjs");
 
 // ── Auditorías de seguridad y calidad ───────────────────────────────────────

@@ -700,6 +700,15 @@
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-next{margin-top:12px}
+  /* REQ-316: registrar primero; el menú es una sugerencia secundaria. */
+  .home-log-action{margin:0 0 14px}
+  .home-log-action .btn{width:100%;min-height:48px}
+  .menu-suggestion{margin:20px 0 14px;padding:14px 0;border-top:1px solid var(--border)}
+  .menu-suggestion h2{margin:0;font-family:var(--font-body);font-size:15px;line-height:1.4;letter-spacing:0}
+  .menu-suggestion p{margin:4px 0 8px;color:var(--muted);font-size:13px;line-height:1.5}
+  .menu-suggestion-actions{display:flex;flex-wrap:wrap;gap:8px}
+  .menu-suggestion-actions .btn{min-height:44px}
+  .menu-suggestion button:focus-visible,.home-log-action button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   /* REQ-292: tarjeta "Prepara tus comidas" colapsable en Nutrición */
   .nut-setup-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;background:transparent;border:none;padding:0 4px;margin:0;color:var(--txt);font:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left}
   .nut-setup-toggle .chev{flex:0 0 auto;color:var(--muted);transition:transform .2s}
@@ -709,6 +718,7 @@
   .nut-setup-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .nut-setup-row .nut-setup-toggle{flex:1 1 auto;min-width:0}
   .nut-setup-row .btn{flex:0 0 auto}
+  .nut-setup .agenda-title{font-size:16px;line-height:1.4}
   /* REQ-284: tarjeta de regreso (rescate de ayer / bienvenida) */
   .return-card .agenda-head{justify-content:flex-start;align-items:center}
   .return-flame{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-dim);border:1px solid var(--border-acc)}
@@ -738,6 +748,9 @@
   .streak-social label{display:block;font-size:14px;margin-bottom:8px}
   .streak-social input,.streak-social textarea{width:100%;font-size:16px;min-height:44px}
   .streak-alias-form{max-width:440px;margin-top:16px}
+  .streak-steps{margin:14px 0 6px;padding-left:22px;line-height:1.5}
+  .streak-steps li{margin-bottom:8px}
+  .streak-you{margin:14px 0 4px}
   .streak-social-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
   .streak-social .btn{min-height:44px}
   .streak-ranking{list-style:none;padding:0;margin:18px 0;font-variant-numeric:tabular-nums}
@@ -1147,6 +1160,12 @@
     input[type="checkbox"]{width:20px;height:20px;accent-color:var(--accent)}
     .availability-day label,.availability-day select,.pf-accordion .availability-day select{min-height:44px}
   }
+  /* REQ-317: controles de compartir y resumen legible en móvil. */
+  .referral-panel .btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:var(--txt)}
+  .referral-panel .btn-accent{color:var(--on-accent)}
+  .referral-panel dl{margin:24px 0}
+  .referral-panel dt{color:var(--muted);font-size:14px}
+  .referral-panel dd{margin:4px 0 16px;font-weight:700;font-variant-numeric:tabular-nums}
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
 <script src="config.js"></script>
@@ -2940,7 +2959,7 @@ function dbStatusNote(){
   if(DB.loaded)return "✓ Macros calculados por ingrediente.";
   if(supa&&!DB.error)return "Cargando tus alimentos…";
   if(supa&&DB.error)return "No pudimos cargar los alimentos. Revisa tu conexión y vuelve a intentarlo.";
-  return "Prepara tu día o semana con tu coach, o agrega comidas; los macros se calculan por ingredientes.";
+  return "Registra tus comidas o pide un menú a tu coach; los macros se calculan por ingredientes.";
 }
 
 /* ============================================================
@@ -4401,6 +4420,7 @@ function render(){
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
   if(view==="progreso")return renderProgress();
+  if(view==="invitaciones")return renderReferrals();
   if(view==="perfil")return renderProfile();
   if(ADMIN_CONSOLE&&isAdmin()&&view==="foods")return renderFoods();
   if(ADMIN_CONSOLE&&isAdmin()&&view==="exercises")return renderExerciseAdmin();
@@ -4795,6 +4815,38 @@ function homeRegisterMeal(ds,id){
   homeTrackAction(ds,"meal_register",{slot:meal?meal.id:id});
   toggleMeal(ds,id);
 }
+function homeLogFood(ds){
+  homeTrackAction(ds,"meal_register");
+  openFoodRegistration(ds);
+}
+function openFoodRegistration(ds,id){
+  current=ds;
+  const next=dayEffectiveOrder(ds).find(it=>it.type==="meal"&&(!id||it.base.id===id)&&!mealState(ds,it.base.id).done&&!mealState(ds,it.base.id).skipped);
+  openEditor("extra",ds,null,{title:"Registrar comida",registration:true,intent:next?"replace":"extra",target:next?next.base.id:null});
+}
+// Solo una fecha por cuenta/dispositivo; no guarda comidas ni datos de salud.
+const menuSuggestionMemory={};
+function menuSuggestionKey(){return uid()?"fitbud_menu_suggestion_v1_"+uid():null;}
+function menuSuggestionDismissed(ds){
+  const key=menuSuggestionKey();if(!key)return false;
+  if(menuSuggestionMemory[key]===ds)return true;
+  try{return localStorage.getItem(key)===ds;}catch(e){return false;}
+}
+function dismissMenuSuggestion(ds){
+  const key=menuSuggestionKey();if(!key)return;
+  menuSuggestionMemory[key]=ds;
+  try{localStorage.setItem(key,ds);}catch(e){}
+  renderHoy();
+  const button=document.querySelector(".home-log-action button");if(button)button.focus({preventScroll:true});
+}
+function homeMenuSuggestionHtml(ds){
+  if(ds!==todayStr()||homeDayHasPreparedMeals(ds,buildDay(ds))||menuSuggestionDismissed(ds))return "";
+  return `<section class="menu-suggestion" aria-labelledby="menuSuggestionTitle">
+    <h2 id="menuSuggestionTitle">¿Quieres ideas para tus comidas de hoy?</h2>
+    <p>Te proponemos un menú según tus preferencias. Tú eliges si lo usas.</p>
+    <div class="menu-suggestion-actions"><button type="button" class="btn" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button><button type="button" class="btn btn-sm" onclick="dismissMenuSuggestion('${ds}')">Ahora no</button></div>
+  </section>`;
+}
 function homeOpenWorkout(ds,action){
   homeTrackAction(ds,action||"workout_start");
   current=ds;
@@ -4850,23 +4902,19 @@ function homeAgendaData(ds){
   const ew=effectiveWorkout(ds);
   const execution=normalizedWorkoutExecution(ds);
   const workoutOutcome=workoutOutcomeForState(st);
-  const restDay=ew.workout&&ew.workout.id==="descanso";
+  const restDay=!ew.workout||ew.workout.id==="descanso";
   const safetyHold=trainingSafetyHold();
   const hasPreparedMeals=homeDayHasPreparedMeals(ds,day);
   // REQ-125: usa el orden visual del usuario (si lo definió) para decidir la próxima
   // comida pendiente, y excluye las comidas saltadas (no son una acción pendiente).
   const pendingMeals=hasPreparedMeals
     ?dayEffectiveOrder(ds).filter(it=>it.type==="meal").map(it=>it.base)
-      .filter(m=>{const ms=mealState(ds,m.id);return!ms.done&&!ms.skipped;})
+      .filter(m=>{const ms=mealState(ds,m.id);return!ms.done&&!ms.skipped&&mealHasContent(mealValue(m,ms));})
     :[];
   const workoutPending=!restDay&&!safetyHold&&!st.workoutDone&&workoutOutcome==="pending";
   const safetyPending=!restDay&&safetyHold&&workoutOutcome==="pending";
   const {doneMeals,totMeals}=dayTotals(ds);
   const items=[];
-
-  if(!hasPreparedMeals){
-    return {state:"setup",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
-  }
 
   if(execution&&(workoutOutcome==="in_progress"||workoutOutcome==="paused")){
     const prog=WORKOUT_PLAYER.progress(execution);
@@ -4924,7 +4972,7 @@ function homeAgendaData(ds){
         ?`<button class="btn btn-accent" onclick="openManualActivity('${ds}')">Registrar</button><button class="btn" onclick="homeOpenWorkout('${ds}','workout_start')">Ver detalle</button>`
         :`<button class="btn btn-accent" onclick="homeOpenWorkout('${ds}','workout_start')">Iniciar</button><button class="btn" onclick="homeAdaptWorkout('${ds}')">Adaptar</button>`
     });
-  }else if(restDay&&pendingMeals.length){
+  }else if(restDay&&(doneMeals<totMeals||!totMeals)){
     items.push({
       kind:"rest",
       icon:"○",
@@ -4936,7 +4984,9 @@ function homeAgendaData(ds){
   }
 
   if(!items.length){
-    return {state:"done",day,st,ew,workoutOutcome,doneMeals,totMeals,items};
+    // Un menú ausente o parcial no es un pendiente ni prueba de día cerrado.
+    const state=doneMeals===totMeals&&totMeals>0?"done":"tracking";
+    return {state,day,st,ew,workoutOutcome,doneMeals,totMeals,items};
   }
   // El descanso no es pendiente aunque ofrezca "Entrené igual" (REQ-206).
   const pendingCount=items.filter(i=>i.actions&&i.kind!=="rest").length;
@@ -4978,19 +5028,8 @@ function homeOpenTomorrow(ds){
 function homeAgendaHtml(ds){
   const data=homeAgendaData(ds);
   const note=homeCacheNoticeHtml();
-  if(data.state==="setup"){
-    const cta="Preparar mi día";
-    return `<section class="agenda-card agenda-state setup">
-      <div class="agenda-head">
-        <div>
-          <div class="agenda-kicker">Tu agenda</div>
-          <h2 class="agenda-title">Aún falta preparar este día</h2>
-          <div class="agenda-sub">Tu coach arma comidas y entreno para hoy en segundos.</div>
-        </div>
-      </div>
-      ${note}
-      <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">${cta}</button></div>
-    </section>`;
+  if(data.state==="tracking"){
+    return `<section class="agenda-card"><h2 class="agenda-title">Entreno ${esc(workoutStatusLabel(data.workoutOutcome).toLowerCase())}</h2>${note}<div class="agenda-actions"><button class="btn" onclick="homeOpenWorkout('${ds}','workout_detail')">Ver detalle del entreno</button></div></section>`;
   }
   if(data.state==="done"){
     // REQ-258: con el día cerrado, hoy va en una línea y la tarjeta mira a mañana.
@@ -5020,11 +5059,9 @@ function homeAgendaHtml(ds){
   return `<section class="agenda-card">
     <div class="agenda-head">
       <div>
-        <div class="agenda-kicker">Tu agenda</div>
-        <h2 class="agenda-title">Lo que sigue hoy</h2>
-        <div class="agenda-sub">Ordenado con tu plan, lo registrado y el estado del entrenamiento.</div>
+        <h2 class="agenda-title">${data.pendingCount?"Lo que sigue hoy":"Tu día de hoy"}</h2>
       </div>
-      <span class="agenda-count">${data.pendingCount} pendiente${data.pendingCount===1?"":"s"}</span>
+      ${data.pendingCount?`<span class="agenda-count">${data.pendingCount} pendiente${data.pendingCount===1?"":"s"}</span>`:""}
     </div>
     ${note}
     <div class="agenda-list">${data.items.map(homeAgendaItemHtml).join("")}</div>
@@ -5184,7 +5221,7 @@ function renderHoy(){
   const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
   const localGuides=msgs.filter(m=>m.localGuide||m.role==="user").map(renderCoachMessage).join("");
   const coachSection=canUse?`
-    <div class="coach-home-sep">O pregúntale a tu coach</div>
+    <div class="coach-home-sep">Pregúntale a tu coach</div>
     ${chipsHtml}
     ${clearBtn}
     <div class="coach-msgs-home" id="coachMsgs">${msgsHtml}${typingHtml}</div>
@@ -5210,16 +5247,20 @@ function renderHoy(){
     </div>
   </header>
   ${adminBetaPendingCardHtml()}
-  ${coachWelcomeHtml()}
   ${restartNudgeCard()}
   ${returnCardHtml()}
   ${dayClosed?"":heroDash(ds,{compact:true})}
+  <div class="home-log-action"><button type="button" class="btn btn-accent" onclick="homeLogFood('${ds}')">Registrar comida</button></div>
   ${homeAgendaHtml(ds)}
-  ${notifyNudgeHtml()}
+
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
-  ${checkinDue?weeklyCheckinBanner():needsProfileTuning((profile&&profile.prefs)||{})?`<button class="coach-chip" style="margin:0 0 12px" onclick="setView('perfil')" title="Agrega preferencias de cocina, horarios y equipo para mejores propuestas">✨ Afina tu plan</button>`:""}
-  ${coachSection}`;
+  ${checkinDue?weeklyCheckinBanner():""}
+  ${coachWelcomeHtml()}
+  ${coachSection}
+  ${homeMenuSuggestionHtml(ds)}
+  ${referralNoticeHtml()}
+  ${notifyNudgeHtml()}`;
   maybeStartFitbrosTour();
 }
 function renderCoach(){chatModeActive()?renderChatMode():renderHoy();}
@@ -5236,21 +5277,19 @@ function renderNutrition(){
     const order={key,canUp:idx>0,canDown:idx<orderedItems.length-1};
     return it.type==="meal"?mealCard(ds,it.base,order):extraCard(ds,it.data,it.idx,order);
   }).join("");
-  // Un solo CTA primario: día sin preparar → tarjeta de arranque; día preparado → nada prominente (REQ-100).
-  // REQ-292: la tarjeta se colapsa a una línea (estado recordado en UI.collapsed) sin perder el CTA.
-  const setupCollapsed=isCollapsed("nut.setup");
-  const emptyNutHtml=!prepared?(setupCollapsed?`<section class="agenda-card agenda-state setup nut-setup is-collapsed">
+  // REQ-316: menú opcional, compacto por defecto; conserva el control de REQ-292.
+  const setupCollapsed=isCollapsed("nut.setup",true);
+  const emptyNutHtml=!prepared?(setupCollapsed?`<section class="agenda-card nut-setup is-collapsed">
     <div class="nut-setup-row">
-      <button class="nut-setup-toggle" onclick="toggleNutSetup()" aria-expanded="false" aria-label="Mostrar cómo preparar tus comidas">${chevron()}<span>Comidas sin preparar</span></button>
-      <button class="btn btn-sm btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button>
+      <button class="nut-setup-toggle" onclick="toggleNutSetup()" aria-expanded="false" aria-label="Mostrar sugerencia de menú">${chevron()}<span>Menú opcional</span></button>
+      <button class="btn btn-sm" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button>
     </div>
-  </section>`:`<section class="agenda-card agenda-state setup nut-setup">
+  </section>`:`<section class="agenda-card nut-setup">
     <div class="agenda-head"><div>
-      <div class="agenda-kicker">Nutrición</div>
-      <h2 class="agenda-title">Prepara tus comidas de hoy</h2>
-      <div class="agenda-sub">Aquí llevas cada comida y ves cuántas calorías y proteína acumulas en el día. Al preparar el día, cada comida se llena sola.</div>
+      <h2 class="agenda-title">¿Quieres ideas para tus comidas?</h2>
+      <div class="agenda-sub">Puedes registrar lo que comiste sin preparar un menú. Si quieres ideas, te proponemos comidas según tus preferencias.</div>
     </div><button class="nut-setup-toggle icon-only" onclick="toggleNutSetup()" aria-expanded="true" aria-label="Ocultar tarjeta" title="Ocultar">${chevron()}</button></div>
-    <div class="agenda-actions"><button class="btn btn-accent" onclick="homePrepareDay('${ds}')">Preparar mi día</button></div>
+    <div class="agenda-actions"><button class="btn" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button></div>
   </section>`):"";
   // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
   // REQ-231: la lista de compra (de la semana, no del día) va en esta fila, con la misma forma.
@@ -5263,8 +5302,8 @@ function renderNutrition(){
   // REQ-124: anillo/resumen -> comidas del día (+ extras interoperadas) -> más opciones (al final).
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
-  ${emptyNutHtml}
   ${section("nut.macros","Macros del día",heroDash(ds,{compact:"always"})+`<div class="muted small">${dbStatusNote()}</div>`)}
+  ${emptyNutHtml}
   ${section("nut.plan","Comidas del día",
     itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
     `${orderedItems.length}`)}
@@ -5273,7 +5312,7 @@ function renderNutrition(){
 }
 function toggleNutSetup(){
   UI.collapsed=UI.collapsed||{};
-  UI.collapsed["nut.setup"]=!isCollapsed("nut.setup");
+  UI.collapsed["nut.setup"]=!isCollapsed("nut.setup",true);
   uiSave();
   render();
   const t=document.querySelector("#app .nut-setup-toggle");
@@ -7003,7 +7042,7 @@ function mealCard(ds,b,order){
     </div>`:"";
   return `<div class="meal meal-tap ${ms.done?'done':''}" onclick="mealCardTap(event,'${ds}','${b.id}')">
     <div class="meal-head">
-      <button class="chk ${ms.done?'on':''}" aria-label="${esc(b.slot)}: ${ms.done?'hecha, tocar para desmarcar':'marcar como hecha'}" aria-pressed="${ms.done?'true':'false'}" ${!ms.done&&!mealHasContent(v)?'disabled title="Prepara una opción antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
+      <button class="chk ${ms.done?'on':''}" aria-label="${esc(b.slot)}: ${ms.done?'hecha, tocar para desmarcar':'marcar como hecha'}" aria-pressed="${ms.done?'true':'false'}" ${!ms.done&&!mealHasContent(v)?'disabled title="Registra lo que comiste antes de marcarla como hecha"':''} onclick="toggleMeal('${ds}','${b.id}')">${ms.done?'✓':''}</button>
       <div>
         <div class="slot">${b.slot}</div>
         ${mealHasContent(v)
@@ -7011,10 +7050,11 @@ function mealCard(ds,b,order){
         ${mealNumsHtml(v)}`
           // REQ-195: un hueco vacío no muestra "0 kcal · P 0 · C 0 · G 0 g"
           :`<div class="name muted">Sin asignar</div>
-        <div class="meal-empty-hint">Prepara tu día o toca «Otra opción».</div>`}
+        <div class="meal-empty-hint">Registra lo que comiste. El menú es opcional.</div>`}
       </div>
     </div>
     <div class="meal-actions">
+      ${!mealHasContent(v)?`<button class="btn btn-sm" aria-label="Registrar ${esc(b.slot)}" onclick="openFoodRegistration('${ds}','${b.id}')">Registrar</button>`:""}
       <button class="btn btn-sm" onclick="openChangeMeal('${ds}','${b.id}')" ${ms.done?"disabled title=\"Desmarca la comida si necesitas cambiarla\"":""}>Otra opción</button>
       ${canUndoSubst(ms)?`<button class="btn btn-sm" onclick="undoMealSubstitution('${ds}','${b.id}')">Deshacer cambio</button>`:ms.ovr?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
       <button class="btn btn-sm" aria-label="Más opciones de ${esc(b.slot)}" onclick="openMealMore('${ds}','${b.id}')">···</button>
@@ -7559,7 +7599,7 @@ function slotArchetypeText(slotId){
     recena:"opción muy ligera y fácil de digerir",
   }[slotId]||"opción adecuada al momento del día";
 }
-// REQ-303: mismo mínimo que el plan sin modelo (fruitMealsTarget en js/nutrition-domain.js).
+// REQ-319: mismo mínimo que el plan sin modelo (fruitMealsTarget en js/nutrition-domain.js).
 function dietFruitPromptLine(mealCount){
   const n=mealCount>=4?2:1;
   return `\nFRUTA: incluye fruta entera en al menos ${n===1?"una comida":"dos comidas"} del día (desayuno, media mañana, merienda o snack), 80–150 g por porción: plátano, manzana, papaya, mandarina, piña, fresas o la que encaje. Puede ir sola o dentro del plato (avena con plátano, yogur con fresas). Respeta las exclusiones del usuario.`;
@@ -8021,7 +8061,7 @@ function chatWorkoutCard(ds){
 }
 function chatMealsCard(ds){
   const day=buildDay(ds);
-  if(!homeDayHasPreparedMeals(ds,day))return `<div class="muted small">Aún no hay comidas preparadas para hoy.</div><button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="homePrepareDay('${ds}')">Preparar mi día</button>`;
+  if(!homeDayHasPreparedMeals(ds,day))return `<div class="muted small">Aún no hay comidas preparadas para hoy.</div><button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button>`;
   return day.meals.map(b=>mealCard(ds,b)).join("");
 }
 function chatWeightCard(){
@@ -8226,6 +8266,7 @@ function renderProfile(){
   const duration=resolvedPlanDuration(p);
   const strengthChoice=strengthChoiceFromPrefs(p);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
+  ${referralNoticeHtml()}
   ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas.</span></div>`:""}
 
   <div class="pf-accordion-list">
@@ -9184,6 +9225,86 @@ async function redeemCoupon(btn){
     toast(String(e.message||e));
   }
 }
+/* ---- REQ-317: beneficio por invitaciones ---- */
+let referralState=null;
+async function referralRequest(generate=false){
+  const token=session&&session.access_token;
+  if(!token)throw new Error("Inicia sesión para ver tus invitaciones.");
+  const r=await fetch("/api/entitlement"+(generate?"":"?action=referrals"),{
+    method:generate?"POST":"GET",headers:{Authorization:"Bearer "+token,...(generate?{"content-type":"application/json"}:{})},
+    ...(generate?{body:JSON.stringify({action:"referral-generate"})}:{})
+  });
+  const data=await r.json();
+  if(!r.ok)throw new Error(data.error||"No pudimos cargar tus invitaciones.");
+  return data;
+}
+async function loadReferralBenefit(){
+  const owner=uid();
+  try{
+    const data=await referralRequest();
+    if(!session||uid()!==owner)return;
+    referralState=data;
+    const params=new URLSearchParams(location.search);
+    if(params.get("ver")==="invitaciones"){
+      params.delete("ver");history.replaceState(history.state,"",location.pathname+(params.size?"?"+params:"")+location.hash);
+      view="invitaciones";
+    }
+    if(["hoy","perfil","invitaciones"].includes(view))render();
+  }catch(_){
+    if(session&&uid()===owner&&new URLSearchParams(location.search).get("ver")==="invitaciones"){
+      view="invitaciones";render();
+    }
+  }
+}
+function referralNoticeHtml(){
+  if(!referralState||!referralState.eligible)return "";
+  return `<section class="agenda-card" aria-labelledby="referralNoticeTitle">
+    <h2 class="agenda-title" id="referralNoticeTitle">Ser un usuario activo tiene premio</h2>
+    <p>Invita hasta a 3 amigos. Por cada uno que se registre, ganas 3 meses extra gratis y tu amigo recibe sus primeros 3 meses gratis.</p>
+    <button class="btn btn-accent" onclick="setView('invitaciones')">Ver mi beneficio</button>
+  </section>`;
+}
+function renderReferrals(){
+  $("#app").innerHTML=`${screenHeader("Invita a tus amigos",null,"perfil")}
+    <button class="btn btn-sm" onclick="setView('perfil')">Volver a Perfil</button>
+    <div id="referralPanel" class="referral-panel" aria-live="polite" style="margin-top:20px">Cargando tus invitaciones…</div>`;
+  refreshReferrals();
+}
+async function refreshReferrals(generate=false){
+  const panel=$("#referralPanel");if(!panel)return;
+  const owner=uid();
+  if(generate)panel.querySelectorAll("button").forEach(b=>b.disabled=true);
+  try{
+    const data=await referralRequest(generate);
+    if(!session||uid()!==owner||panel!==$("#referralPanel"))return;
+    referralState=data;
+    if(!data.eligible){panel.innerHTML='<p>Este beneficio aún no está disponible para tu cuenta.</p>';return;}
+    const invites=data.invitations||[],success=invites.filter(i=>i.successful).length;
+    panel.innerHTML=`<p>Por ser usuario activo, puedes invitar hasta a 3 amigos. Por cada amigo que complete su registro, ganas <b>3 meses extra gratis</b> y él recibe <b>sus primeros 3 meses gratis</b>.</p>
+      <dl><dt>Invitaciones disponibles</dt><dd>${3-success} de 3 · ${3-invites.length} por generar, ${invites.length-success} pendientes</dd>
+      <dt>Invitaciones exitosas</dt><dd>${success} de 3</dd><dt>Meses extra ganados</dt><dd>${success*3}</dd></dl>
+      <p class="muted small">Cada enlace es para un amigo nuevo y se puede usar una sola vez. Compartirlo no cuenta como un registro exitoso.</p>
+      ${invites.map((i,n)=>{
+        const link=location.origin+'/?codigo='+encodeURIComponent(i.code)+'&source=amigos';
+        const text='Te invito a Evolv. Regístrate con mi enlace y recibe tus primeros 3 meses gratis: '+link;
+        return `<section class="dash" aria-label="Invitación ${n+1}"><b>Invitación ${n+1}: ${i.successful?'Registro exitoso':'Pendiente de registro'}</b>${i.successful?'':`
+          <div class="field" style="margin-top:12px"><label for="refLink${n}">Enlace de invitación ${n+1}</label><input id="refLink${n}" readonly value="${esc(link)}" onclick="this.select()"></div>
+          <div class="row wrap" style="gap:8px"><button class="btn" onclick="copyReferralLink(${n})">Copiar enlace</button>
+          <a class="btn" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="btn" href="mailto:?subject=${encodeURIComponent('Tus primeros 3 meses en Evolv gratis')}&body=${encodeURIComponent(text)}">Enviar por correo</a></div>`}</section>`;
+      }).join('')}
+      <div class="row wrap" style="gap:8px">${invites.length<3?'<button class="btn btn-accent" onclick="refreshReferrals(true)">Generar mi enlace</button>':'<p>Ya generaste tus 3 invitaciones. Puedes volver a compartir los enlaces pendientes.</p>'}
+      <button class="btn" onclick="refreshReferrals()">Actualizar estado</button></div>`;
+  }catch(e){
+    if(session&&uid()===owner&&panel===$("#referralPanel"))panel.innerHTML=`<p>${esc(e.message)}</p><button class="btn" onclick="refreshReferrals()">Reintentar</button>`;
+  }
+}
+async function copyReferralLink(n){
+  const input=$("#refLink"+n);if(!input)return;
+  try{await navigator.clipboard.writeText(input.value);toast("Enlace copiado");}
+  catch(_){input.focus();input.select();toast("Selecciona y copia tu enlace");}
+}
+
 /* ---- Invitación a la beta (REQ-203) ----
    El enlace de invitación (/?codigo=FIT-XXXX-XXXX) guarda el código, abre el
    registro y lo canjea solo al iniciar sesión. Si el correo se confirma en
@@ -9812,7 +9933,7 @@ async function inviteSignUp(email,pwd,out){
   const s=await signIn(email,pwd);
   if(s.error){window._authMode="in";renderAuth();const o=$("#auOut");if(o)o.textContent="Tu cuenta está lista. Inicia sesión para entrar.";return;}
   const{data:sd}=await supa.auth.getSession();session=(sd&&sd.session)||null;
-  if(session){toast("¡Bienvenido a la beta! Tienes acceso completo por "+couponDurationText(data.entitlement)+".");onAuth();}
+  if(session){toast(data.referral?"¡Bienvenido a Evolv! Tus primeros 3 meses son gratis.":"¡Bienvenido a la beta! Tienes acceso completo por "+couponDurationText(data.entitlement)+".");onAuth();}
 }
 async function requestOwnPasswordReset(){
   const email=$("#au_email")&&$("#au_email").value.trim();
@@ -10523,14 +10644,14 @@ function applyMissedSession(ds,action){
 }
 
 /* editor genérico: comida del plan (override) o extra */
-function openEditor(kind,ds,id){
+function openEditor(kind,ds,id,options={}){
   ds=ds||current;
   let pre={name:"",kcal:"",p:"",c:"",f:""};
   let title="Agregar comida / snack";
   if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,macrosUnknown:v.macrosUnknown};title="Editar — "+base.slot;}
   // REQ-229: el nombre precargado de una comida del plan es lo planeado, no lo que comió.
-  window._editor={kind,ds,id,extraIdx:null,planName:kind==="meal"?String(pre.name||""):"",...editorMetaDraft(kind==="meal"?mealState(ds,id).ovr:null,pre,kind==="meal")};
-  editorSheet(title,pre);
+  window._editor={kind,ds,id,extraIdx:null,registration:!!options.registration,intent:options.intent,target:options.target,planName:kind==="meal"?String(pre.name||""):"",...editorMetaDraft(kind==="meal"?mealState(ds,id).ovr:null,pre,kind==="meal")};
+  editorSheet(options.title||title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i,...editorMetaDraft(e,e,false)};editorSheet("Editar comida extra",e);}
 // REQ-270: borrador de origen al abrir el editor. Una entrada con metadatos los
@@ -11213,10 +11334,10 @@ function logIntentHtml(){
   const e=window._editor;
   e.intent=e.intent||"extra";
   return `<fieldset class="log-intent">
-    <legend>¿Cómo lo registras?</legend>
+    <legend>${e.registration?"¿Dónde lo registras?":"¿Cómo lo registras?"}</legend>
     <div class="field" style="margin:4px 0 2px"><label for="f_date">Día</label><input id="f_date" type="date" min="${START}" max="${END}" value="${e.ds}" onchange="setEditorDate(this.value)"></div>
-    <label class="intent-opt"><input type="radio" name="f_intent" value="extra" ${e.intent==="extra"?"checked":""} onchange="setEditorIntent('extra')"> Además de lo previsto</label>
-    <label class="intent-opt"><input type="radio" name="f_intent" value="replace" ${e.intent==="replace"?"checked":""} onchange="setEditorIntent('replace')"> En lugar de una comida del día</label>
+    <label class="intent-opt"><input type="radio" name="f_intent" value="extra" ${e.intent==="extra"?"checked":""} onchange="setEditorIntent('extra')"> ${e.registration?"Otra comida o snack":"Además de lo previsto"}</label>
+    <label class="intent-opt"><input type="radio" name="f_intent" value="replace" ${e.intent==="replace"?"checked":""} onchange="setEditorIntent('replace')"> ${e.registration?"Una comida del día":"En lugar de una comida del día"}</label>
     <div id="f_replaceBox" ${e.intent==="replace"?"":"hidden"}>${replaceTargetHtml()}</div>
     <div id="f_impact" class="muted small" aria-live="polite"></div>
   </fieldset>`;
@@ -11229,7 +11350,7 @@ function replaceTargetHtml(){
     return `<option value="${esc(b.id)}" ${e.target===b.id?"selected":""}>${esc(b.slot)} — ${esc(v.name||"Sin asignar")}${state}</option>`;
   }).join("");
   const eaten=e.eaten!=null?e.eaten:e.ds<=todayStr();
-  return `<div class="field" style="margin:8px 0 0"><label for="f_target">Comida que reemplaza</label>
+  return `<div class="field" style="margin:8px 0 0"><label for="f_target">${e.registration?"Comida del día":"Comida que reemplaza"}</label>
       <select id="f_target" onchange="setReplaceTarget(this.value)"><option value="">Elige una comida…</option>${opts}</select></div>
     <label class="qp-save-fav"><input type="checkbox" id="f_eaten" ${eaten?"checked":""} onchange="window._editor.eaten=this.checked;renderEditorImpact()"> Ya me lo comí</label>`;
 }
@@ -11261,7 +11382,7 @@ function renderEditorImpact(){
   const prevK=mealHasContent(v)?Math.round(v.kcal):0;
   const diff=kcal!=null?kcal-prevK:null;
   const eaten=$("#f_eaten")?$("#f_eaten").checked:true;
-  const parts=[`Reemplaza ${b.slot}${v.name?` (${v.name}, ${prevK} kcal)`:""}${diff!=null?`: ${diff>=0?"+":""}${diff} kcal en el día`:""}.`];
+  const parts=[e.registration&&!mealHasContent(v)?`Se guarda en ${b.slot}${kcal!=null?`: ${kcal} kcal`:""}.`:`Reemplaza ${b.slot}${v.name?` (${v.name}, ${prevK} kcal)`:""}${diff!=null?`: ${diff>=0?"+":""}${diff} kcal en el día`:""}.`];
   if(ms.done)parts.push("Ya estaba registrada: la corriges con lo que comiste.");
   else if(ms.skipped)parts.push("Estaba saltada: vuelve a contar.");
   parts.push(eaten?"Quedará registrada como comida hecha.":"Quedará planificada, sin marcar como comida.");
@@ -12627,7 +12748,7 @@ async function generateOneDay(ds,coachRequest){
   // usuario no marcó vegetariano/vegano. Hay que decir OMNÍVORO en voz alta, no solo omitir el veto.
   const vegLine=dietList.includes("vegano")?`\nPatrón VEGANO: no incluyas carne, aves, pescado, mariscos, lácteos, huevo ni miel; usa solo ingredientes de origen vegetal.`:dietList.includes("vegetariano")?`\nPatrón VEGETARIANO: no incluyas carne, aves, pescado ni mariscos.`:`\nPatrón OMNÍVORO: el usuario NO es vegetariano ni vegano, así que NO generes un plan vegetariano por defecto. Incluye proteínas animales variadas a lo largo del día (pollo, res, cerdo, pescado, huevo, lácteos, etc.) cuando encajen con sus gustos y metas.`;
   const animalLine=omnivoreAnimalProteinPromptLine(prefs);
-  // REQ-303: sin esta línea el día salía sin fruta (la proteína alta la desplazaba).
+  // REQ-319: sin esta línea el día salía sin fruta (la proteína alta la desplazaba).
   const fruitLine=dietFruitPromptLine(day.meals.length||4);
   const protPct=target.kcal>0?Math.round(target.p*4/target.kcal*100):0;
   const highProt=protPct>25;
@@ -12708,7 +12829,7 @@ async function aiGenerateDay(){
   const actionKey="diet_day";
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   const ds=current; const day=buildDay(ds);
-  modal(`<h3>🍽️ Preparar mi día</h3><div id="genOut"><div class="loading-row"><div class="spinner"></div><span>Preparando tus comidas de hoy…</span></div></div>`);
+  modal(`<h3>Sugerencia de menú</h3><div id="genOut"><div class="loading-row"><div class="spinner"></div><span>Preparando tus comidas de hoy…</span></div></div>`);
   try{
     const {res,target}=await generateOneDay(ds,{action:"diet_day",requestId,partKey:"day"});
     if(res.ok){_genDayFailStreak=0;}
@@ -13973,6 +14094,7 @@ let _recoveryBusy=false;
 function clearSignedOutState(prevUid){
   if(prevUid===undefined)prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
   resetStreakFeedback(); // REQ-304: ninguna celebración pasa a otra cuenta
+  referralState=null; // REQ-317: aislar invitaciones por cuenta
   resetStreakSocial(); // REQ-300: ni invitaciones ni clasificación pasan a otra cuenta
   session=null;profile=null;view="hoy";
   entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
@@ -14085,6 +14207,7 @@ async function onAuth(){
     loadNotifPrefs().then(()=>{if(session&&view==="hoy"&&!onboardingActive&&!notifySetupActive)render();}); // REQ-289
     scheduleEngagementSave(1500); // REQ-285: resumen para los recordatorios
     loadStreakFriendsAfterAuth(); // REQ-300
+    loadReferralBenefit(); // REQ-317
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
     refreshPushSubscriptionKey(); // REQ-267: no-await
   }finally{_authBusy=false;}
@@ -16341,6 +16464,7 @@ async function boot(){
   loadCatalog().then(()=>{if(!session)refreshLandingPlans();});
   // REQ-203: el enlace de invitación abre directo el registro.
   if(captureInviteCode()&&!hasStoredAuthSession()){window._showAuth=true;window._authMode="up";}
+  if(new URLSearchParams(location.search).get("ver")==="invitaciones"&&!hasStoredAuthSession()){window._showAuth=true;window._authMode="in";}
   if(!passwordRedirectMode()&&!hasStoredAuthSession()&&!window._showAuth&&!ADMIN_CONSOLE){
     $("#tabs").innerHTML="";$("#app").classList.add("landing-host");
     renderLanding();
@@ -16375,6 +16499,15 @@ async function boot(){
 // Solo claves seguras sin datos de salud, identidad ni prompts.
 const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","action"]);
 let _analyticsSessionId=null;
+// REQ-317: al retomar la PWA tras 30 minutos fuera comienza otro uso.
+let analyticsAwayAt=0;
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){analyticsAwayAt=Date.now();return;}
+  if(analyticsAwayAt&&Date.now()-analyticsAwayAt>=30*60*1000&&session){
+    _analyticsSessionId="";trackEvent("session_start",{});
+  }
+  analyticsAwayAt=0;
+});
 function analyticsSessionId(){if(!_analyticsSessionId)_analyticsSessionId=Math.random().toString(36).slice(2)+Date.now().toString(36);return _analyticsSessionId;}
 function filterEventProps(props){
   const out={};

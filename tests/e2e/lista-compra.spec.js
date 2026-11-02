@@ -16,7 +16,7 @@ test("arma la lista de la semana, mueve lo que ya tengo y lo recuerda al reabrir
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  const prepare = page.getByRole("button", { name: "Preparar mi día" });
+  const prepare = page.getByRole("button", { name: "Sugerirme un menú" });
   if (await prepare.isVisible().catch(() => false)) {
     await prepare.click();
     await page.getByRole("button", { name: "Aplicar al día" }).click();
@@ -54,7 +54,7 @@ test("una comida saltada deja de sumar en la lista", async ({ page, context }) =
   await autoDismissNudges(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  const prepare = page.getByRole("button", { name: "Preparar mi día" });
+  const prepare = page.getByRole("button", { name: "Sugerirme un menú" });
   if (await prepare.isVisible().catch(() => false)) {
     await prepare.click();
     await page.getByRole("button", { name: "Aplicar al día" }).click();

@@ -14,7 +14,7 @@ test.describe("Descartes y momento del día en el borrador", () => {
     const errors = collectConsoleErrors(page);
     await gotoApp(page);
 
-    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    await page.getByRole("button", { name: /Sugerirme un menú/i }).first().click();
     const overlay = page.locator("#overlay");
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
     const before = await mealTitles(overlay);
@@ -26,7 +26,7 @@ test.describe("Descartes y momento del día en el borrador", () => {
     await expect.poll(() => mealTitles(overlay)).not.toContain(rejected);
 
     await overlay.getByRole("button", { name: "Descartar" }).click();
-    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    await page.getByRole("button", { name: /Sugerirme un menú/i }).first().click();
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
 
     const prompts = calls.filter((c) => c.table === "/api/claude").map((c) => String(c.payload.userText || ""));
@@ -53,7 +53,7 @@ test.describe("Descartes y momento del día en el borrador", () => {
     await autoDismissNudges(page);
     await gotoApp(page);
 
-    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    await page.getByRole("button", { name: /Sugerirme un menú/i }).first().click();
     const overlay = page.locator("#overlay");
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
     await expect(overlay).toContainText("no es una opción típica para desayuno");

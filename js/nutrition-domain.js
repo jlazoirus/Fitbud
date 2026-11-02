@@ -719,7 +719,7 @@
   // de score entre platos vecinos y todos los usuarios con metas parecidas
   // recibían el mismo plato; globalClosePass() cierra luego los macros del día.
   const VARIETY_JITTER_WEIGHT=0.10;
-  // REQ-303: el día lleva fruta. En los momentos donde encaja, un plato con fruta
+  // REQ-319: el día lleva fruta. En los momentos donde encaja, un plato con fruta
   // gana esta ventaja mientras el día no llegue a su mínimo (2 comidas con fruta
   // desde 4 comidas al día; 1 con menos).
   const FRUIT_SLOTS=new Set(["desayuno","media_manana","merienda","snack","recena"]);

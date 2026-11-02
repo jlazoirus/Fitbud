@@ -1899,25 +1899,25 @@ Jonathan: `day_log.state.trainingPlace` lleva la sesión del día a otro lugar. 
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Quien registra pero lleva 4+ días sin entrenar (2+ días que tocaba, descansos aparte) recibe "¿Retomamos el entreno?" por correo y push, una vez a los 4 y otra a los 11 días (`trainingLapse()`). ✓ `scripts/validate-reminder-journey.mjs`.
+Aviso a los 4 y 11 días sin entrenar (`trainingLapse()`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-296 - Recordatorios: seguimiento por correo para quien nunca eligió sus avisos
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Sin fila en `notification_preferences`: correo de regreso/volver a entrenar a las 20:00 (`runFollowups`); sin perfil terminado, 3 correos desde el alta. Baja firmada. ✓ `scripts/validate-reminder-journey.mjs`.
+Correos de seguimiento con baja firmada (`runFollowups`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-297 - Recordatorios: invitar a activar el push a la semana
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-A los 7–13 días del plan, sin push, un día sin otro correo: "Activa los avisos en tu teléfono", una vez (`pushInvite()`). El onboarding ya los pide (REQ-289). ✓ `scripts/validate-reminder-journey.mjs`.
+Correo único a los 7–13 días sin push (`pushInvite()`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-298 - Recordatorios: elegir la hora del aviso y resumen de la mañana
 
 **Estado: implementado** (migración `supabase/notifications_morning.sql` aplicada el 2026-10-28). Detalle en `docs/requirements-history.md`.
 
-Aviso del día de 06:00 a 23:00, elegible también con push. Resumen opcional de 05:00 a 11:00 con el entreno y las comidas de hoy (`morningPlan()`, plan en `engagement.plan`), por push o, sin push, por correo; uno por día. ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
+Hora 06–23 y resumen matutino opcional (`morningPlan()`). ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
 
 ## REQ-299 - Hoy: distinguir comidas registradas de la planificación opcional de mañana
 
@@ -2077,8 +2077,69 @@ Verificación dirigida: validadores de ejercicios, allowlist, documentación, in
 
 Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspace. Suite completa: 232/233 aprobadas; la única expectativa antigua restante de pike fue corregida y pasó con el reintento oficial E2E_RETRY_FAILED (1/1). Alta por invitación validada también con el test unitario. Control negativo adicional confirma que una imagen externa real sigue bloqueada. No se ejecutaron migraciones ni acciones sobre datos de producción.
 
-## REQ-316 - Dietas: el día incluye fruta
+## REQ-316 - Hoy: registrar y entrenar sin preparar un menú
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-02), captura y aprobación de propuesta: preparar el día debe ser una sugerencia, sin dominar ni condicionar el valor principal.
+
+### Problema
+La falta de menú activaba «Aún falta preparar este día», un botón dominante y un retorno anticipado que ocultaba las acciones del entreno. Nutrición también priorizaba preparar comidas.
+
+### Causa raíz
+`homeAgendaData()` retornaba `setup` antes de construir el entrenamiento; `homeAgendaHtml()` y `renderNutrition()` presentaban la planificación opcional como tarea obligatoria.
+
+### Objetivo
+Acceder al registro, entrenamiento y coach desde Hoy; sugerir un menú de forma secundaria y voluntaria.
+
+### Alcance
+Registro directo con editor existente, entrenamiento independiente del menú y slots vacíos excluidos de pendientes. Sugerencia secundaria tras el coach, «Sugerirme un menú» y «Ahora no» persistido por día/cuenta/dispositivo. Acceso compacto en Nutrición, bienvenida del coach tras las acciones y preferencias en Perfil. Caché PWA actualizado.
+
+### Fuera de alcance
+Cambiar planes, objetivos, rachas, historial, cobros, seguridad o proveedores; generar o aplicar menús automáticamente.
+
+### Riesgos
+Cierre falso del día sin comidas, fuga de descartes entre cuentas, pérdida de acceso a generación y regresiones del editor/entrenamiento.
+
+### Criterios de aceptación
+- Registrar comidas propias suma consumo sin generar un menú; entrenamiento inicia y continúa independientemente del menú.
+- Slots vacíos y planificación no cuentan como pendientes; la seguridad, descanso, registros y cierre real se conservan.
+- Sugerencia sin botón primario, descartable hasta mañana, aislada por cuenta y disponible en Nutrición tras descartarla.
+- Generar requiere elección explícita; aplicar conserva confirmación y registros previos.
+- Móvil 320/390 y escritorio sin desbordes, controles accesibles y sin llamadas externas automáticas.
+
+### Verificación sugerida
+Playwright Home/menú opcional, nutrición, coach y regresiones de registro/entreno; detector Impeccable y release gate completo.
+
+Resultado: 9/9 casos nuevos y regresiones dirigidas de Hoy, Nutrición y coach verificadas. Capturas 320/390/1280 sin desbordes; detector Impeccable sin hallazgos, HTML/JS/accesibilidad, placeholders, macros primero, orden/saltos, caché PWA y secretos correctos. Gate integral posterior al commit antes de publicar. Sin migraciones ni llamadas pagadas.
+
+Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nueva de los slots vacíos coincidía con «o elige», prohibido por REQ-194; se cambió por «Registra lo que comiste. El menú es opcional.», sin relajar pruebas. Gate final con reintento oficial del caso de textos.
+
+## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
+
+**Estado: implementado en código; requiere acción manual para activar en producción.**
+
+Origen: solicitud directa de Jonathan (02/11/2026). Comunicación por mail y dentro de la app para lanzar en una semana; al menos 2 usos de la app en los últimos 7 días.
+
+Problema: no existía un programa de referidos que otorgara 3 meses a cada parte y mostrara cupos y registros exitosos.
+
+Alcance: cohorte persistente de usuarios habilitados con al menos 2 sesiones distintas de uso en los 7 días previos al 09/11/2026 09:00 Lima. Mail y aviso en Hoy/Perfil llevan al panel autenticado. Generación de hasta 3 enlaces individuales de un uso, copia, WhatsApp y correo. Cupos, pendientes, éxitos y meses ganados consultados del servidor. Registro nuevo y recompensa atómicos: 3 meses calendario para el amigo y 3 extra al acceso del invitador. Sin duplicados ni autorreferidos; sin sobrescribir accesos pagados. Correos con baja e idempotencia de proveedor y base de datos. Caché v195.
+
+Criterios de aceptación: nunca mostrar «dentro de una semana» en el mensaje; no enviar antes del lanzamiento; excluir cuentas con menos de dos usos; conservar elegibilidad; máximo 3 registros únicos; solo éxito real acredita meses; aislamiento por cuenta; controles en móvil/escritorio; registro previo por invitación intacto.
+
+Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y Playwright `referrals.spec.js`/`invitacion.spec.js`; gate integral. Migración idempotente aplicada dos veces en PostgreSQL local, nunca en producción.
+
+Operación manual pendiente: aplicar `supabase/referrals.sql` en Supabase antes del lanzamiento y comprobar cron/Resend existentes. Ver `docs/referrals.md`.
+
+## REQ-318 - Rachas con amigos: explicar cómo se suma a un amigo
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Jonathan: "Las dietas no incluyen frutas". El pedido del día exige fruta entera en 2 comidas (1 con menos de 4 comidas) y el plan sin modelo prioriza platos con fruta en desayuno y snacks hasta ese mínimo, sin salirse de la meta. ✓ `scripts/validate-diet-fruit.mjs`.
+Tres pasos, alias propuesto y «Crear invitación» que activa y deja el enlace; luego "Tus amigos te ven como …". Sin buscador. ✓ `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-319 - Dietas: el día incluye fruta
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Fruta en 2 comidas (1 si hay menos de 4): en el pedido y en el plan sin modelo. ✓ `scripts/validate-diet-fruit.mjs`.

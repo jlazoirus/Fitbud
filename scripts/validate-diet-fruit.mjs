@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// REQ-303 — "Las dietas no incluyen frutas". El plan sin modelo prioriza un
+// REQ-319 — "Las dietas no incluyen frutas". El plan sin modelo prioriza un
 // plato con fruta en desayuno/snacks hasta 2 comidas con fruta (1 con menos de
 // 4 comidas), y el pedido al modelo exige fruta en el día.
 import assert from "node:assert/strict";
