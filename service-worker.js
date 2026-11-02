@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v199";
+const CACHE_NAME = "fitbud-pwa-v200";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -18,12 +18,16 @@ const APP_SHELL = [
   "./assets/exercise-media/pike-push-up.svg",
   "./assets/exercise-media/band-row.svg",
   "./assets/exercise-media/shoulder-tap-plank.svg",
-  "./assets/exercise-media/archer-push-up.svg",
-  "./assets/exercise-media/slider-leg-curl.svg",
-  "./assets/exercise-media/single-leg-rdl.svg",
+  "./assets/exercise-media/archer-push-up-0.jpg",
+  "./assets/exercise-media/archer-push-up-1.jpg",
+  "./assets/exercise-media/slider-leg-curl-0.jpg",
+  "./assets/exercise-media/slider-leg-curl-1.jpg",
+  "./assets/exercise-media/single-leg-rdl-0.jpg",
+  "./assets/exercise-media/single-leg-rdl-1.jpg",
   "./assets/exercise-media/step-up.gif",
   "./assets/exercise-media/standing-calf-raise.svg",
-  "./assets/exercise-media/bulgarian-split-squat.svg",
+  "./assets/exercise-media/bulgarian-split-squat-0.jpg",
+  "./assets/exercise-media/bulgarian-split-squat-1.jpg",
   "./assets/exercise-media/walking-lunge-0.jpg",
   "./assets/exercise-media/walking-lunge-1.jpg",
   "./assets/exercise-media/inverted-row-0.jpg",
