@@ -12458,3 +12458,19 @@ Revisión de la activación de REQ-317 en producción (02/11/2026). `api/notify.
 
 - `x-vercel-cron` solo, `user-agent` de Vercel, un secreto distinto, truncado o sin `Bearer`: 401 y solo la lectura mínima. ✓ `scripts/validate-supabase-keepalive.mjs`.
 - El Bearer correcto ejecuta el job (también con `dry_run`). ✓ mismo script; journey de recordatorios y campaña de invitaciones sin cambios.
+
+## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
+
+**Estado: implementado y activado en producción (02/11/2026).**
+
+Origen: solicitud directa de Jonathan (02/11/2026). Comunicación por mail y dentro de la app para lanzar en una semana; al menos 2 usos de la app en los últimos 7 días.
+
+Problema: no existía un programa de referidos que otorgara 3 meses a cada parte y mostrara cupos y registros exitosos.
+
+Alcance: cohorte persistente de usuarios habilitados con al menos 2 sesiones distintas de uso en los 7 días previos al 09/11/2026 09:00 Lima. Mail y aviso en Hoy/Perfil llevan al panel autenticado. Generación de hasta 3 enlaces individuales de un uso, copia, WhatsApp y correo. Cupos, pendientes, éxitos y meses ganados consultados del servidor. Registro nuevo y recompensa atómicos: 3 meses calendario para el amigo y 3 extra al acceso del invitador. Sin duplicados ni autorreferidos; sin sobrescribir accesos pagados. Correos con baja e idempotencia de proveedor y base de datos. Caché v195.
+
+Criterios de aceptación: nunca mostrar «dentro de una semana» en el mensaje; no enviar antes del lanzamiento; excluir cuentas con menos de dos usos; conservar elegibilidad; máximo 3 registros únicos; solo éxito real acredita meses; aislamiento por cuenta; controles en móvil/escritorio; registro previo por invitación intacto.
+
+Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y Playwright `referrals.spec.js`/`invitacion.spec.js`; gate integral. Migración idempotente aplicada dos veces en PostgreSQL local, nunca en producción.
+
+Activación en producción (02/11/2026): `supabase/referrals.sql` aplicada en una transacción en el proyecto Supabase `fitbud`, sin cambios en datos existentes. Funciones, trigger, permisos (solo `service_role`) y RLS verificados. Flujo completo probado en producción con cuentas de prueba dentro de una transacción revertida. Vercel con `a47729f` (incluye REQ-317), variables de correo y cron presentes, y workflow horario autorizado. Ver `docs/referrals.md`.

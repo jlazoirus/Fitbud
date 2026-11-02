@@ -2118,19 +2118,9 @@ Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nu
 
 ## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
 
-**Estado: implementado en código; requiere acción manual para activar en producción.**
+**Estado: implementado y activado en producción (02/11/2026).** Detalle en `docs/requirements-history.md`; operación en `docs/referrals.md`.
 
-Origen: solicitud directa de Jonathan (02/11/2026). Comunicación por mail y dentro de la app para lanzar en una semana; al menos 2 usos de la app en los últimos 7 días.
-
-Problema: no existía un programa de referidos que otorgara 3 meses a cada parte y mostrara cupos y registros exitosos.
-
-Alcance: cohorte persistente de usuarios habilitados con al menos 2 sesiones distintas de uso en los 7 días previos al 09/11/2026 09:00 Lima. Mail y aviso en Hoy/Perfil llevan al panel autenticado. Generación de hasta 3 enlaces individuales de un uso, copia, WhatsApp y correo. Cupos, pendientes, éxitos y meses ganados consultados del servidor. Registro nuevo y recompensa atómicos: 3 meses calendario para el amigo y 3 extra al acceso del invitador. Sin duplicados ni autorreferidos; sin sobrescribir accesos pagados. Correos con baja e idempotencia de proveedor y base de datos. Caché v195.
-
-Criterios de aceptación: nunca mostrar «dentro de una semana» en el mensaje; no enviar antes del lanzamiento; excluir cuentas con menos de dos usos; conservar elegibilidad; máximo 3 registros únicos; solo éxito real acredita meses; aislamiento por cuenta; controles en móvil/escritorio; registro previo por invitación intacto.
-
-Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y Playwright `referrals.spec.js`/`invitacion.spec.js`; gate integral. Migración idempotente aplicada dos veces en PostgreSQL local, nunca en producción.
-
-Operación manual pendiente: aplicar `supabase/referrals.sql` en Supabase antes del lanzamiento y comprobar cron/Resend existentes. Ver `docs/referrals.md`.
+Hasta 3 invitaciones para cuentas con 2+ sesiones distintas en los 7 días previos al 09/11/2026 09:00 Lima; 3 meses para cada parte. `supabase/referrals.sql` aplicada en producción. ✓ `scripts/test-referrals.mjs`, `tests/e2e/referrals.spec.js`.
 
 ## REQ-318 - Rachas con amigos: explicar cómo se suma a un amigo
 
