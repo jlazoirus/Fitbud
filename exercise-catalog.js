@@ -959,7 +959,7 @@
   // demostración (ni dibujo propio ni GIF ajeno): la ficha queda con los pasos
   // escritos y la selección de la sesión prefiere otro ejercicio con foto.
   const NO_DEMO={media_type:"none",media_url:"",poster_url:"",frames:[],source_name:OWN_MEDIA.source_name,source_url:"",license_name:OWN_MEDIA.license_name,attribution:OWN_MEDIA.attribution};
-  // REQ-324: las cuatro fichas sin fuente libre exacta llevan imágenes propias
+  // REQ-325: las cuatro fichas sin fuente libre exacta llevan imágenes propias
   // de la variante exacta (inicio y final), revisadas una a una contra la ficha.
   // Contenido propio: sin crédito visible.
   const OWN_PHOTO_SLUGS=["bulgarian-split-squat","single-leg-rdl","slider-leg-curl","archer-push-up"];

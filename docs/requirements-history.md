@@ -12555,7 +12555,7 @@ En `coach_usage`, el intento fallido registró `output_tokens = 400`, que es jus
 
 - Texto y foto usan topes de al menos 1000 y 1200. ✓ `scripts/validate-meal-estimate-output.mjs` (falla con el código anterior).
 
-## REQ-324 - Entreno: imágenes propias para los cuatro ejercicios que quedaban solo con pasos
+## REQ-325 - Entreno: imágenes propias para los cuatro ejercicios que quedaban solo con pasos
 
 **Estado: implementado.**
 
@@ -12567,7 +12567,7 @@ Jonathan (2026-11-02): "¿puedes generar las imágenes tú?". Tras REQ-320/322 q
 
 - Imágenes generadas con la IA de Canva desde la cuenta de Jonathan (diseño de trabajo "Lienzo blanco de ejercicios"), un panel de inicio y otro de final por ejercicio, revisadas una a una contra la ficha: búlgara sin carga con el empeine trasero en el banco; peso muerto a una pierna sin carga con espalda neutra; curl deslizante en puente con discos; flexión arquero con manos abiertas y el brazo contrario estirado. Se separan en `assets/exercise-media/<slug>-{0,1}.jpg` (900×600) como el resto del catálogo.
 - Contenido propio (`OWN_MEDIA`): no se muestra crédito. Por REQ-31 la interfaz no menciona IA; el origen queda solo en este registro.
-- Se retiran los cuatro SVG y su lista `CURATED_DEMO_SLUGS`; `band-alternating-lat-pulldown` y `dumbbell-glute-bridge` siguen sin demostración (REQ-320). La selección vuelve a elegir estos ejercicios donde corresponden. `CACHE_NAME` → `fitbud-pwa-v200`.
+- Se retiran los cuatro SVG y su lista `CURATED_DEMO_SLUGS`; `band-alternating-lat-pulldown` y `dumbbell-glute-bridge` siguen sin demostración (REQ-320). La selección vuelve a elegir estos ejercicios donde corresponden. `CACHE_NAME` → `fitbud-pwa-v201`.
 
 ### Verificación
 

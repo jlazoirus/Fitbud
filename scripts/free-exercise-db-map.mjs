@@ -103,7 +103,7 @@ export default {
   "barbell-hip-thrust":      { q: "barbell hip thrust glute bridge", id: "Barbell_Hip_Thrust" },
   "incline-dumbbell-press":  { q: "incline dumbbell press", id: "Incline_Dumbbell_Press" },
   "lat-pulldown":            { q: "wide grip lat pulldown", id: "Wide-Grip_Lat_Pulldown" },
-  "bulgarian-split-squat":   { q: "bodyweight rear foot elevated split squat", id: null }, // REQ-324: imágenes propias en assets/exercise-media/bulgarian-split-squat-{0,1}.jpg. Pie posterior elevado, sin mancuernas.
+  "bulgarian-split-squat":   { q: "bodyweight rear foot elevated split squat", id: null }, // REQ-325: imágenes propias en assets/exercise-media/bulgarian-split-squat-{0,1}.jpg. Pie posterior elevado, sin mancuernas.
   "overhead-press":          { q: "standing military press shoulder", id: "Standing_Military_Press" },
   "walking-lunge":           { q: "bodyweight walking lunge", id: "Bodyweight_Walking_Lunge" }, // REQ-294: zancada caminando sin mancuernas, variante exacta.
   "standing-calf-raise":     { q: "bodyweight standing calf raise", id: null, curated_svg: "assets/exercise-media/standing-calf-raise.svg" }, // Variante sin máquina ni carga.
@@ -135,11 +135,11 @@ export default {
   "side-plank":              { q: "side bridge plank", id: "Side_Bridge" },
   "dead-bug":                { q: "dead bug core", id: "Dead_Bug" },
   "pike-push-up":            { q: "pike push up shoulders", id: null, curated_svg: "assets/exercise-media/pike-push-up.svg" }, // Pies al suelo; una flexión de pino no es un pike.
-  "single-leg-rdl":          { q: "single leg romanian deadlift", id: null }, // REQ-324: imágenes propias en assets/exercise-media/single-leg-rdl-{0,1}.jpg. Variante sin carga; no usar kettlebell.
+  "single-leg-rdl":          { q: "single leg romanian deadlift", id: null }, // REQ-325: imágenes propias en assets/exercise-media/single-leg-rdl-{0,1}.jpg. Variante sin carga; no usar kettlebell.
   "shoulder-tap-plank":      { q: "plank shoulder tap", id: null, curated_svg: "assets/exercise-media/shoulder-tap-plank.svg" }, // Toque de hombro; no sustituir por escaladores.
   "step-up":                 { q: "bodyweight step ups", id: null }, // REQ-322: animación del CDC (dominio público) en assets/exercise-media/step-up.gif; variante sin carga.
-  "slider-leg-curl":         { q: "sliding leg curl hamstring", id: null }, // REQ-324: imágenes propias en assets/exercise-media/slider-leg-curl-{0,1}.jpg. Deslizadores o toalla; no usar pelota.
-  "archer-push-up":          { q: "archer push up", id: null }, // REQ-324: imágenes propias en assets/exercise-media/archer-push-up-{0,1}.jpg. Desplazamiento lateral; no sustituir por flexión pliométrica.
+  "slider-leg-curl":         { q: "sliding leg curl hamstring", id: null }, // REQ-325: imágenes propias en assets/exercise-media/slider-leg-curl-{0,1}.jpg. Deslizadores o toalla; no usar pelota.
+  "archer-push-up":          { q: "archer push up", id: null }, // REQ-325: imágenes propias en assets/exercise-media/archer-push-up-{0,1}.jpg. Desplazamiento lateral; no sustituir por flexión pliométrica.
   "nordic-hamstring-curl":   { q: "natural glute ham raise nordic", id: "Natural_Glute_Ham_Raise" },
 
   // REQ-310: ejercicios de producción que hoy muestran un GIF ajeno con
