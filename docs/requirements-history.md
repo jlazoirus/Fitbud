@@ -12411,3 +12411,31 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
 **Estado: implementado.** Fase 1 en prueba: el enlace `/?labs=conversacion` habilita en la cuenta un modo "Conversación" (Perfil → Cuenta) con un hilo donde se entrena paso a paso, se marcan o cambian comidas y se registra el peso con tarjetas sin llamadas pagadas; el texto libre va al coach de siempre. Fases 2 (foto e intención libre) y 3 (métricas por modo) quedan como candidatos.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-216`).
+
+## REQ-316 - Entreno: nunca un dibujo; sin foto exacta, solo los pasos y la sesión prefiere otro con foto
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-28): el "dibujito con palitos… jamás debería pasar". Grabar fotos propias o pagar una librería no son viables (2026-11-02).
+
+### Problema
+
+Tras REQ-310 seguían 5 ejercicios con dibujo SVG (`bulgarian-split-squat`, `single-leg-rdl`, `step-up`, `slider-leg-curl`, `archer-push-up`; los cuatro primeros en las sesiones de pierna en casa) y 2 con GIF ajeno con marca de agua (`band-alternating-lat-pulldown`, `dumbbell-glute-bridge`). Sin fuente libre exacta (Free Exercise DB, Wikimedia Commons, Openverse; wger se descarta por imágenes de procedencia dudosa).
+
+### Alcance
+
+1. Esos 7 quedan sin demostración (`media_type:"none"`, también sobre filas remotas vía `normalize`). `exerciseHasDemo()` solo cuenta foto, GIF o vídeo; `exerciseMediaHtml()` ya no tiene respaldo de dibujo (se retira `exerciseDemoSvg`). La ficha, la tarjeta y "Ver técnica" omiten el recuadro de demostración, el botón de pausa y el crédito.
+2. `compatibleStrengthExerciseSelection()`: un ejercicio sin demostración cede su sitio a otro permitido y libre del mismo músculo principal con foto (luego del mismo patrón); si no hay, se queda con sus pasos. En casa la búlgara y el step-up pasan a zancada/sentadilla tempo; el femoral sin material solo tiene foto en el curl nórdico (avanzado).
+3. Texto exacto para las 5 fichas sin imagen (antes usaban el texto genérico del patrón: el step-up describía una zancada y el curl deslizante un peso muerto), aplicado también a filas remotas.
+4. `CACHE_NAME` → `fitbud-pwa-v194`. Los SVG siguen en `assets/` sin mostrarse.
+
+### Criterios de aceptación
+
+- En gimnasio, casa y aire libre, para los tres niveles, ninguna sesión elige un ejercicio sin foto si quedaba libre otro del mismo músculo con foto.
+- Ningún ejercicio del catálogo pinta un SVG; la ficha de uno sin foto no tiene recuadro de demostración y sí sus pasos exactos.
+
+### Verificación
+
+`tests/e2e/sin-dibujos.spec.js`; specs de entreno, sustitución y expansión de ejercicios; `validate-exercises`, `validate-deploy-allowlist`.

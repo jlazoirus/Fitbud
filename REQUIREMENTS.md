@@ -2076,3 +2076,7 @@ Solicitud directa del usuario. El validador de ejercicios comprueba media real l
 Verificación dirigida: validadores de ejercicios, allowlist, documentación, invitaciones y test unitario de alta. Verificación integral en una copia temporal limpia del mismo contenido; los cambios de los ejercicios y Coach permanecen en el workspace original. No se ejecutan migraciones ni despliegues de producción.
 
 Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspace. Suite completa: 232/233 aprobadas; la única expectativa antigua restante de pike fue corregida y pasó con el reintento oficial E2E_RETRY_FAILED (1/1). Alta por invitación validada también con el test unitario. Control negativo adicional confirma que una imagen externa real sigue bloqueada. No se ejecutaron migraciones ni acciones sobre datos de producción.
+
+## REQ-316 - Entreno: nunca un dibujo; sin foto exacta, solo los pasos y la sesión prefiere otro con foto
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/sin-dibujos.spec.js`.

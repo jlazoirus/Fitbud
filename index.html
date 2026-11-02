@@ -1739,9 +1739,14 @@ function compatibleStrengthExerciseSelection(ids,ds,prefs,mode){
     const source=bySlug.get(id);
     const available=allowed.filter(exercise=>!used.has(exercise.slug)&&!reserved.has(exercise.slug));
     const muscle=source&&EXERCISE_SUBSTITUTION.primaryMuscle(source);
-    const replacement=allowedIds.has(id)&&!used.has(id)?source
-      :available.find(exercise=>muscle&&EXERCISE_SUBSTITUTION.primaryMuscle(exercise)===muscle)
-        ||available.find(exercise=>source&&exercise.movement_pattern===source.movement_pattern);
+    const sameMuscle=available.filter(exercise=>muscle&&EXERCISE_SUBSTITUTION.primaryMuscle(exercise)===muscle);
+    const samePattern=available.filter(exercise=>source&&exercise.movement_pattern===source.movement_pattern);
+    // REQ-316: un ejercicio sin demostración cede su sitio a otro del mismo
+    // músculo que sí la tenga; si no hay ninguno, se queda (solo con los pasos).
+    const keep=allowedIds.has(id)&&!used.has(id)&&(exerciseHasDemo(source)||!sameMuscle.some(exerciseHasDemo));
+    const replacement=keep?source
+      :sameMuscle.find(exerciseHasDemo)||sameMuscle[0]
+        ||samePattern.find(exerciseHasDemo)||samePattern[0];
     if(!replacement)return [];
     used.add(replacement.slug);
     return [{slug:replacement.slug,index}];
@@ -5447,29 +5452,6 @@ const EXERCISE_DISCIPLINE_LABELS={
   gym:"Gimnasio",bodyweight:"Peso corporal",strength:"Fuerza",
   walking:"Caminata",running:"Correr",cycling:"Bicicleta",swimming:"Natación",
 };
-function exerciseDemoSvg(exercise){
-  const key=exercise.media_key||exercise.static_key||"core";
-  const commonStart=`<line class="demo-floor" x1="28" y1="132" x2="212" y2="132"/>`;
-  let figure="";
-  if(key==="cycle"){
-    figure=`<circle class="demo-prop" cx="75" cy="108" r="29"/><circle class="demo-prop" cx="169" cy="108" r="29"/>
-      <path class="demo-prop" d="M75 108l38-38 25 38H75l20-25h43"/>
-      <g class="demo-athlete"><circle class="demo-head" cx="119" cy="39" r="10"/><path class="demo-body" d="M117 50l-8 25 29 10m-29-10-20 25m49-15 20-5"/>
-      <g class="demo-crank"><path class="demo-body" d="M113 80l-15 22m15-22 19 18"/></g></g>`;
-  }else if(key==="swim"){
-    figure=`<path class="demo-prop" d="M22 112c18-8 36 8 54 0s36 8 54 0 36 8 54 0 28 5 34 0"/>
-      <g class="demo-athlete"><circle class="demo-head" cx="70" cy="78" r="10"/><path class="demo-body" d="M82 81l62 9m-51-7-25 24m53-20 34-20m-11 23 36 15"/></g>`;
-  }else if(key==="push"){
-    figure=`${commonStart}<g class="demo-athlete"><circle class="demo-head" cx="58" cy="83" r="10"/><path class="demo-body" d="M70 88l74 20 35 6m-77-17-17 30m53-20-7 25"/></g>`;
-  }else if(key==="bridge"||key==="core"){
-    figure=`${commonStart}<g class="demo-athlete"><circle class="demo-head" cx="48" cy="104" r="10"/><path class="demo-body" d="M60 107l64-10 30 22m-31-22 24-28m-50 32-12 29"/></g>`;
-  }else if(key==="pull"){
-    figure=`${commonStart}<path class="demo-prop" d="M174 34v98M156 36h36"/><g class="demo-athlete"><circle class="demo-head" cx="99" cy="55" r="11"/><path class="demo-body" d="M101 68l3 39m0-24 38-25m-38 49-22 24m22-24 24 24"/></g>`;
-  }else{
-    figure=`${commonStart}<g class="demo-athlete"><circle class="demo-head" cx="112" cy="38" r="11"/><path class="demo-body" d="M112 51l1 45m0-28-27 20m27-20 29 15m-29 13-23 35m23-35 28 35"/></g>`;
-  }
-  return `<svg class="demo-${esc(key)}" viewBox="0 0 240 150" role="img" aria-label="Demostración animada de ${esc(exercise.name)}">${figure}</svg>`;
-}
 // Normaliza la media disponible de un ejercicio a una forma consistente (REQ-15).
 function exerciseMediaSources(exercise){
   // REQ-259: si la fila de Supabase no trae media, se usa la del catálogo local.
@@ -5484,9 +5466,18 @@ function exerciseMediaSources(exercise){
   const isImage=mediaType==="image"||/\.(png|jpe?g|webp|avif)(\?|#|$)/i.test(url);
   return {mediaType,frames,url,poster,isVideo,isGif,isImage};
 }
-// Cadena de degradación: video/gif → imagen → secuencia de 2 fotos → SVG procedimental.
+// REQ-316: solo cuenta una demostración real (foto, GIF o vídeo). Un dibujo SVG
+// o una ficha sin media no se muestran nunca.
+function exerciseHasDemo(exercise){
+  if(!exercise)return false;
+  const m=exerciseMediaSources(exercise);
+  if(m.mediaType==="none"||/\.svg(\?|#|$)/i.test(m.url))return false;
+  return !!(m.url||m.poster||m.frames.length);
+}
+// Cadena de degradación: video/gif → imagen → secuencia de 2 fotos → nada.
 function exerciseMediaHtml(exercise,opts){
   const autoplay=!opts||opts.autoplay!==false;
+  if(!exerciseHasDemo(exercise))return "";
   const m=exerciseMediaSources(exercise);
   const label=esc(`Demostración de ${exercise.name}`);
   if(m.url&&m.isVideo){
@@ -5501,7 +5492,7 @@ function exerciseMediaHtml(exercise,opts){
   if(m.poster||m.frames.length===1){
     return `<img class="demo-media" src="${esc(m.poster||m.frames[0])}" alt="${label}" loading="lazy">`;
   }
-  return exerciseDemoSvg(exercise);
+  return "";
 }
 // Modo "Ver técnica": demostración ampliada + instrucciones completas (REQ-16).
 function openExerciseGuide(slug){
@@ -5512,10 +5503,11 @@ function openExerciseGuide(slug){
   const signals=exerciseArray(exercise.safety_signals);
   const equipment=exerciseArray(exercise.equipment);
   const muscles=exerciseArray(exercise.muscles);
-  modal(`<div class="guide-demo">${exerciseMediaHtml(exercise)}</div>
+  const demo=exerciseMediaHtml(exercise);
+  modal(`${demo?`<div class="guide-demo">${demo}</div>`:""}
     <h3>${esc(exercise.name)}</h3>
     <div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(exerciseEquipmentText(equipment))}`:""}${muscles.length?` · ${esc(muscles.join(", "))}`:""}</div>
-    ${exercise.source_name&&exercise.source_name!=="Evolv Studio"?`<div class="exercise-copy" style="opacity:.7;font-size:.85em"><b>Demostración:</b> ${exercise.source_url?`<a href="${esc(exercise.source_url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}</a>`:`${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}`}</div>`:""}
+    ${demo&&exercise.source_name&&exercise.source_name!=="Evolv Studio"?`<div class="exercise-copy" style="opacity:.7;font-size:.85em"><b>Demostración:</b> ${exercise.source_url?`<a href="${esc(exercise.source_url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}</a>`:`${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}`}</div>`:""}
     <div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
     <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
     <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
@@ -5540,8 +5532,9 @@ function exerciseCard(exercise,admin){
   const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const pausedByDefault=reduced||admin;
   const issues=validateExerciseRecord(exercise);
+  const demo=exerciseMediaHtml(exercise,{autoplay:!pausedByDefault});
   return `<article class="exercise-card ${pausedByDefault?"paused":""} ${exercise.active===false?"inactive":""}" data-exercise="${esc(exercise.slug)}">
-    <div class="exercise-demo">${exerciseMediaHtml(exercise,{autoplay:!pausedByDefault})}<button class="demo-expand" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Ver técnica de ${esc(exercise.name)} ampliada">⤢</button></div>
+    ${demo?`<div class="exercise-demo">${demo}<button class="demo-expand" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Ver técnica de ${esc(exercise.name)} ampliada">⤢</button></div>`:""}
     <div class="exercise-body">
       <div class="exercise-title">
         <div><h2>${esc(exercise.name)}</h2><div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(exerciseEquipmentText(equipment))}`:""}</div></div>
@@ -5556,7 +5549,7 @@ function exerciseCard(exercise,admin){
       <div class="exercise-copy"><b>Músculos:</b> ${esc(muscles.join(", "))}<br><b>Fuente/licencia:</b> ${esc(exercise.source_name)} · ${esc(exercise.license_name)}${issues.length?`<br><b style="color:var(--bad)">Incompleto:</b> ${esc(issues.join(", "))}`:""}</div>`:""}
       <div class="exercise-actions">
         <button class="btn btn-sm" onclick="openExerciseGuide('${esc(exercise.slug)}')">Ver técnica</button>
-        <button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>
+        ${demo?`<button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>`:""}
         ${admin&&DB.exerciseReady?`<button class="btn btn-sm" onclick="editExercise('${esc(exercise.slug)}')">Editar</button>`:""}
       </div>
     </div>
@@ -15498,7 +15491,7 @@ function previewExerciseMedia(){
     frames:exerciseTextList($("#ex_frames").value),
   };
   const box=$("#ex_media_preview");
-  if(box)box.innerHTML=exerciseMediaHtml(ex);
+  if(box)box.innerHTML=exerciseMediaHtml(ex)||`<span class="muted small">Sin demostración: la ficha mostrará solo los pasos.</span>`;
 }
 async function saveExercise(){
   const row=readExerciseEditor();
