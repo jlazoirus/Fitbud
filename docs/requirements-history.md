@@ -12412,7 +12412,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-216`).
 
-## REQ-316 - Rachas con amigos: explicar cómo se suma a un amigo
+## REQ-318 - Rachas con amigos: explicar cómo se suma a un amigo
 
 **Estado: implementado.**
 
