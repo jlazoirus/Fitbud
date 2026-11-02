@@ -106,6 +106,7 @@ run("validate-cuisine-preferences.mjs", "node scripts/validate-cuisine-preferenc
 run("validate-meal-variety.mjs", "node scripts/validate-meal-variety.mjs");
 run("validate-grow-catalog.mjs", "node scripts/validate-grow-catalog.mjs");
 run("validate-nutrition-solver.mjs", "node scripts/validate-nutrition-solver.mjs");
+run("validate-diet-fruit.mjs", "node scripts/validate-diet-fruit.mjs");
 run("validate-nutrition-week-planner.mjs", "node scripts/validate-nutrition-week-planner.mjs");
 run("validate-nutrition-plan-snapshot.mjs", "node scripts/validate-nutrition-plan-snapshot.mjs");
 run("validate-nutrition-replacements.mjs", "node scripts/validate-nutrition-replacements.mjs");

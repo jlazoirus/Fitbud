@@ -7554,10 +7554,15 @@ function slotArchetypeText(slotId){
     media_manana:"opción ligera: fruta, yogur, batido o tostada pequeña",
     almuerzo:"plato completo: proteína, carbohidrato base y vegetales",
     merienda:"opción ligera: yogur, fruta, batido o sándwich pequeño",
-    snack:"opción pequeña y fácil de preparar",
+    snack:"opción pequeña y fácil de preparar, como fruta, yogur o frutos secos",
     cena:"plato completo, usualmente menos pesado que el almuerzo si no es comida principal",
     recena:"opción muy ligera y fácil de digerir",
   }[slotId]||"opción adecuada al momento del día";
+}
+// REQ-303: mismo mínimo que el plan sin modelo (fruitMealsTarget en js/nutrition-domain.js).
+function dietFruitPromptLine(mealCount){
+  const n=mealCount>=4?2:1;
+  return `\nFRUTA: incluye fruta entera en al menos ${n===1?"una comida":"dos comidas"} del día (desayuno, media mañana, merienda o snack), 80–150 g por porción: plátano, manzana, papaya, mandarina, piña, fresas o la que encaje. Puede ir sola o dentro del plato (avena con plátano, yogur con fresas). Respeta las exclusiones del usuario.`;
 }
 function slotArchetypePromptLine(slotId){
   return `${slotId}: ${slotArchetypeText(slotId)}`;
@@ -12622,6 +12627,8 @@ async function generateOneDay(ds,coachRequest){
   // usuario no marcó vegetariano/vegano. Hay que decir OMNÍVORO en voz alta, no solo omitir el veto.
   const vegLine=dietList.includes("vegano")?`\nPatrón VEGANO: no incluyas carne, aves, pescado, mariscos, lácteos, huevo ni miel; usa solo ingredientes de origen vegetal.`:dietList.includes("vegetariano")?`\nPatrón VEGETARIANO: no incluyas carne, aves, pescado ni mariscos.`:`\nPatrón OMNÍVORO: el usuario NO es vegetariano ni vegano, así que NO generes un plan vegetariano por defecto. Incluye proteínas animales variadas a lo largo del día (pollo, res, cerdo, pescado, huevo, lácteos, etc.) cuando encajen con sus gustos y metas.`;
   const animalLine=omnivoreAnimalProteinPromptLine(prefs);
+  // REQ-303: sin esta línea el día salía sin fruta (la proteína alta la desplazaba).
+  const fruitLine=dietFruitPromptLine(day.meals.length||4);
   const protPct=target.kcal>0?Math.round(target.p*4/target.kcal*100):0;
   const highProt=protPct>25;
   const mealCount=day.meals.length||4;
@@ -12637,7 +12644,7 @@ Metas del día: ${target.kcal} kcal, ${target.p} g proteína, ${target.c} g carb
 Llena EXACTAMENTE estos slots (usa su id en "slot_id"): ${slots}.
 Presupuesto por slot: ${slotBudgetLine}.
 ${slotArchetypesLine}
-${cookCtx}${hardResLine}${vegLine}${animalLine}${highProtLine}${likesLine}${blockedLine}
+${cookCtx}${hardResLine}${vegLine}${animalLine}${fruitLine}${highProtLine}${likesLine}${blockedLine}
 Referencia de platos compatibles por slot (elige ideas del slot correspondiente; no uses platos listados en otro slot):
 ${dishList}.
 Comidas de días recientes a NO repetir: ${recent.join(" | ")||"(ninguna)"}${learnedLine}.
