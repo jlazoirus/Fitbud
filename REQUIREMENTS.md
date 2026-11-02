@@ -2136,10 +2136,16 @@ Operación manual pendiente: aplicar `supabase/referrals.sql` en Supabase antes 
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Tres pasos, alias propuesto y «Crear invitación» que activa y deja el enlace; luego "Tus amigos te ven como …". Sin buscador. ✓ `tests/e2e/rachas-amigos.spec.js`.
+Pasos, alias propuesto e invitación en un paso. ✓ `tests/e2e/rachas-amigos.spec.js`.
 
 ## REQ-319 - Dietas: el día incluye fruta
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Fruta en 2 comidas (1 si hay menos de 4): en el pedido y en el plan sin modelo. ✓ `scripts/validate-diet-fruit.mjs`.
+
+## REQ-320 - Estimar macros: tope de salida para Sonnet 5
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Topes 1000/1200 tokens. ✓ `scripts/validate-meal-estimate-output.mjs`.

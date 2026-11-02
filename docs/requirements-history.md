@@ -12475,3 +12475,23 @@ Validar después del modelo que el día traiga fruta y regenerarlo si no la trae
 ### Criterios de aceptación
 
 - Plan sin modelo: 2 comidas con fruta desde 4 comidas y 1 con 3, dentro de la meta de kcal. El pedido incluye la regla. ✓ `scripts/validate-diet-fruit.mjs` (falla con el código anterior), en el release gate.
+
+## REQ-320 - Estimar macros: tope de salida para Sonnet 5
+
+**Estado: implementado.**
+
+### Origen
+
+El 2026-11-02 Jonathan configuró `ANTHROPIC_MODEL_MEAL_ESTIMATE=claude-sonnet-5` en Vercel. En su primera prueba, el primer intento falló con `invalid_provider_output` (se devolvió a la cuota) y el segundo salió bien.
+
+### Causa raíz
+
+En `coach_usage`, el intento fallido registró `output_tokens = 400`, que es justo el tope que `aiEstimate()` pedía, así que el JSON llegó cortado. El intento correcto usó 380 tokens. Con Haiku, las 111 estimaciones del último mes usaron como máximo 293 tokens. Los otros 12 fallos del mes fueron por otras causas y ninguno llegó al tope.
+
+### Alcance
+
+`MEAL_ESTIMATE_MAX_TOKENS` en `index.html`: 1000 tokens para texto (antes 400) y 1200 para foto (antes 700). El servidor sigue limitando a 4096. Se cobra por los tokens usados, no por el tope, así que el costo no cambia.
+
+### Criterios de aceptación
+
+- Texto y foto usan topes de al menos 1000 y 1200. ✓ `scripts/validate-meal-estimate-output.mjs` (falla con el código anterior).
