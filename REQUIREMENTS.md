@@ -2144,3 +2144,7 @@ Detalle: `docs/plan-weeks.md`.
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Pie: "No recibir más estos correos". ✓ `scripts/test-referrals.mjs`.
+
+## REQ-327 - Entreno: imágenes propias para los cuatro ejercicios que quedaban solo con pasos
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/sin-dibujos.spec.js`.

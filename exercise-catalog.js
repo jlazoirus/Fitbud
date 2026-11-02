@@ -950,12 +950,6 @@
   // ya usa el catálogo local de resistencia.
   const CARDIO_BY_DISCIPLINE={running:["run-drills","run-easy","run-intervals"],cycling:["cycle-cadence","cycle-endurance","cycle-intervals"],swimming:["swim-drills","swim-endurance","swim-intervals"]};
 
-  // REQ-264: las demostraciones deben enseñar el ejercicio nombrado, sin
-  // sustituirlo por otro más difícil que trabaje músculos parecidos.
-  const CURATED_DEMO_SLUGS=new Set([
-    "archer-push-up","slider-leg-curl","single-leg-rdl",
-    "bulgarian-split-squat",
-  ]);
   const reviewedMedia=new Map();
   Object.entries(CARDIO_BY_DISCIPLINE).forEach(([disc,slugs])=>{
     const [url,source]=ENDURANCE_MEDIA[disc];
@@ -965,10 +959,17 @@
   // demostración (ni dibujo propio ni GIF ajeno): la ficha queda con los pasos
   // escritos y la selección de la sesión prefiere otro ejercicio con foto.
   const NO_DEMO={media_type:"none",media_url:"",poster_url:"",frames:[],source_name:OWN_MEDIA.source_name,source_url:"",license_name:OWN_MEDIA.license_name,attribution:OWN_MEDIA.attribution};
+  // REQ-327: las cuatro fichas sin fuente libre exacta llevan imágenes propias
+  // de la variante exacta (inicio y final), revisadas una a una contra la ficha.
+  // Contenido propio: sin crédito visible.
+  const OWN_PHOTO_SLUGS=["bulgarian-split-squat","single-leg-rdl","slider-leg-curl","archer-push-up"];
   strength.forEach(ex=>{
-    if(!CURATED_DEMO_SLUGS.has(ex.slug))return;
-    Object.assign(ex,NO_DEMO);
-    reviewedMedia.set(ex.slug,{...NO_DEMO});
+    if(!OWN_PHOTO_SLUGS.includes(ex.slug))return;
+    const frames=[0,1].map(i=>`assets/exercise-media/${ex.slug}-${i}.jpg`);
+    const media={...OWN_MEDIA,media_type:"image_sequence",media_url:"",poster_url:frames[0],frames};
+    delete media.active;
+    Object.assign(ex,media);
+    reviewedMedia.set(ex.slug,media);
   });
   // REQ-293: remo de espalda sin material para casa, con foto real del
   // movimiento (la barra de la foto es el borde de la mesa en casa).
@@ -1083,7 +1084,7 @@
   // vez de arquero, máquina en vez de elevación de pie. Se retira la media
   // remota y caen a la guía SVG propia como pendientes explícitos hasta
   // tener foto o animación exacta con licencia verificable.
-  ["archer-push-up","slider-leg-curl","band-alternating-lat-pulldown","dumbbell-glute-bridge"].forEach(slug=>{
+  ["band-alternating-lat-pulldown","dumbbell-glute-bridge"].forEach(slug=>{
     reviewedMedia.set(slug,{...NO_DEMO});
   });
   // REQ-310: pike-push-up y shoulder-tap-plank ya tienen demostración exacta

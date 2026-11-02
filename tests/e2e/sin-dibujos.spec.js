@@ -4,7 +4,8 @@
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges } from "./helpers.js";
 
-const SIN_FOTO = ["bulgarian-split-squat", "single-leg-rdl", "slider-leg-curl", "archer-push-up"];
+// REQ-327: los cuatro que REQ-320 dejó solo con pasos ya tienen imágenes propias.
+const CON_FOTO_PROPIA = ["bulgarian-split-squat", "single-leg-rdl", "slider-leg-curl", "archer-push-up"];
 
 test("sin dibujos: las sesiones usan ejercicios con foto y una ficha sin foto muestra solo los pasos", async ({ page, context }) => {
   await installMocks(context);
@@ -42,14 +43,17 @@ test("sin dibujos: las sesiones usan ejercicios con foto y una ficha sin foto mu
   // Ningún ejercicio del catálogo pinta un dibujo SVG.
   const drawn = await page.evaluate(() => exerciseCatalog(true).filter((ex) => /<svg/.test(exerciseMediaHtml(ex))).map((ex) => ex.slug));
   expect(drawn).toEqual([]);
-  expect(await page.evaluate((slugs) => slugs.filter((s) => exerciseHasDemo(exerciseBySlug(s, true))), SIN_FOTO)).toEqual([]);
+  expect(await page.evaluate((slugs) => slugs.filter((s) => !exerciseHasDemo(exerciseBySlug(s, true))), CON_FOTO_PROPIA)).toEqual([]);
+  // Una ficha sin media (o con el antiguo dibujo procedimental) no pinta nada.
+  expect(await page.evaluate(() => [exerciseMediaHtml({ slug: "x", name: "X", media_type: "none" }), exerciseMediaHtml({ slug: "x", name: "X", media_type: "inline_svg", media_key: "pull" })])).toEqual(["", ""]);
 
-  // La ficha de un ejercicio sin foto: sin recuadro de demostración, con los pasos.
+  // La búlgara enseña sus dos fotos propias, sin crédito visible.
   await page.evaluate(() => openExerciseGuide("bulgarian-split-squat"));
   const overlay = page.locator("#overlay");
   await expect(overlay.locator("h3")).toHaveText("Sentadilla búlgara");
-  await expect(overlay.locator(".guide-demo")).toHaveCount(0);
-  await expect(overlay.locator("svg")).toHaveCount(0);
+  await expect(overlay.locator(".guide-demo img")).toHaveCount(2);
+  await expect(overlay.locator(".guide-demo img").first()).toHaveAttribute("src", "assets/exercise-media/bulgarian-split-squat-0.jpg");
+  await expect(overlay).not.toContainText("Demostración:");
   await expect(overlay.locator(".exercise-steps li").first()).toBeVisible();
   await page.evaluate(() => closeModal());
   // Sin imagen, el texto es la guía: describe la variante exacta (antes el step-up describía una zancada).
