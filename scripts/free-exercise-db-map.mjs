@@ -137,7 +137,7 @@ export default {
   "pike-push-up":            { q: "pike push up shoulders", id: null, curated_svg: "assets/exercise-media/pike-push-up.svg" }, // Pies al suelo; una flexión de pino no es un pike.
   "single-leg-rdl":          { q: "single leg romanian deadlift", id: null, curated_svg: "assets/exercise-media/single-leg-rdl.svg" }, // Variante sin carga; no usar kettlebell.
   "shoulder-tap-plank":      { q: "plank shoulder tap", id: null, curated_svg: "assets/exercise-media/shoulder-tap-plank.svg" }, // Toque de hombro; no sustituir por escaladores.
-  "step-up":                 { q: "bodyweight step ups", id: null, curated_svg: "assets/exercise-media/step-up.svg" }, // Variante sin carga; no usar mancuernas.
+  "step-up":                 { q: "bodyweight step ups", id: null }, // REQ-322: animación del CDC (dominio público) en assets/exercise-media/step-up.gif; variante sin carga.
   "slider-leg-curl":         { q: "sliding leg curl hamstring", id: null, curated_svg: "assets/exercise-media/slider-leg-curl.svg" }, // Deslizadores o toalla; no usar pelota.
   "archer-push-up":          { q: "archer push up", id: null, curated_svg: "assets/exercise-media/archer-push-up.svg" }, // Desplazamiento lateral; no sustituir por flexión pliométrica.
   "nordic-hamstring-curl":   { q: "natural glute ham raise nordic", id: "Natural_Glute_Ham_Raise" },
