@@ -68,7 +68,7 @@ assert.ok(!JSON.stringify(REFERRAL_MESSAGE).includes('una semana'));
 // El envío se prueba con reloj y red simulados, incluida baja e idempotencia.
 const RealDate=globalThis.Date;
 globalThis.Date=class extends RealDate { constructor(...args){super(...(args.length?args:['2026-11-09T14:01:00Z']));} };
-let sent=0,success=false;const calls=[];
+let sent=0,success=false,campaignHtml='';const calls=[];
 globalThis.fetch=async(url,opts={})=>{
   calls.push(url);
   let data=[];
@@ -78,7 +78,7 @@ globalThis.fetch=async(url,opts={})=>{
   else if(url.includes('notification_log')&&opts.method==='POST')data=[{id:'log1'}];
   else if(url.includes('notification_log')&&opts.method==='PATCH')success=true;
   else if(url.includes('notification_log'))data=success?[{status:'sent'}]:[];
-  else if(url.includes('api.resend.com')){sent++;assert.ok(opts.headers['Idempotency-Key']);data={id:'mail1'};}
+  else if(url.includes('api.resend.com')){sent++;assert.ok(opts.headers['Idempotency-Key']);campaignHtml=JSON.parse(opts.body).html;data={id:'mail1'};}
   else throw new Error('Unexpected '+url);
   return {ok:true,json:async()=>data};
 };
@@ -86,6 +86,8 @@ const e={url:'https://mock',service:'service',resendKey:'key',cronSecret:'secret
 const results=()=>({sent:0,skipped:0,errors:0,log:[]});
 await runReferralCampaign(e,true,results());assert.equal(sent,0);
 await runReferralCampaign(e,false,results());await runReferralCampaign(e,false,results());assert.equal(sent,1,'sin duplicado y respeta baja');
+assert.match(campaignHtml,/No recibir más estos correos/,'baja de la campaña con texto propio');
+assert.ok(!campaignHtml.includes('Desactivar recordatorios')&&!campaignHtml.includes('una semana'));
 globalThis.Date=RealDate;
 // API: el cliente no puede generar enlaces para otra cuenta ni omitir sesión.
 const { default: entitlementHandler } = await import('../api/entitlement.js');

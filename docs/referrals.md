@@ -2,6 +2,10 @@
 
 Lanzamiento configurado: **9 de noviembre de 2026, 09:00 America/Lima** (14:00 UTC).
 
+## Estado en producción
+
+Activado el 02/11/2026: `supabase/referrals.sql` aplicada en el proyecto Supabase `fitbud` (`wtqnvtixvfapdbzcegdw`), verificada y probada con cuentas de prueba en una transacción revertida. Vercel sirve `main` con REQ-317 y tiene las variables de correo y `CRON_SECRET`; el workflow horario está activo. La campaña sale sola desde el 09/11 a las 09:00 Lima, con la primera ejecución del cron (GitHub la corre cada pocas horas, no exactamente cada hora).
+
 ## Activación
 
 1. Aplicar manualmente `supabase/referrals.sql` después de las migraciones existentes de perfiles, analytics (product_events), entitlements, coupon_codes y notifications. No ejecutar `schema.sql` sobre una instalación existente.
