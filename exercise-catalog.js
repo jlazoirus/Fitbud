@@ -1319,10 +1319,12 @@
       torsoB:["incline-push-up","inverted-row","assisted-dip","shoulder-tap-plank"],
       piernaB:["bulgarian-split-squat","single-leg-rdl","step-up","slider-leg-curl","dead-bug"],
       pushA:["push-up","pike-push-up","diamond-push-up","assisted-dip"],
-      pullA:["pull-up","inverted-row","assisted-pull-up"],
+      // REQ-317: en casa sin barra ni bandas solo queda el remo invertido; el
+      // core completa el día de tirón para que no sea una sesión de un ejercicio.
+      pullA:["pull-up","inverted-row","assisted-pull-up","dead-bug","side-plank"],
       legsA:["tempo-squat","bulgarian-split-squat","single-leg-rdl","standing-calf-raise"],
       pushB:["decline-push-up","push-up","pike-push-up","assisted-dip"],
-      pullB:["pull-up","inverted-row","assisted-pull-up"],
+      pullB:["pull-up","inverted-row","assisted-pull-up","front-plank","shoulder-tap-plank"],
       legsB:["walking-lunge","glute-bridge","slider-leg-curl","step-up"],
     },
     walking:{calidad:["walk-brisk"],facil:["walk-easy"],tecnica:["walk-mobility"]},

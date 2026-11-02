@@ -2080,3 +2080,7 @@ Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspac
 ## REQ-316 - Entreno: nunca un dibujo; sin foto exacta, solo los pasos y la sesión prefiere otro con foto
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/sin-dibujos.spec.js`.
+
+## REQ-317 - Entreno en casa: el día de tirón no se queda en un solo ejercicio
+
+**Estado: implementado.** Regresión de REQ-293: sin barra ni bandas, Pull A/B en casa quedaban solo con el remo invertido. Las plantillas de peso corporal suman core (dead bug y plancha lateral; plancha frontal y con toque de hombro). `CACHE_NAME` → `fitbud-pwa-v195`. ✓ `tests/e2e/entreno-casa.spec.js`.
