@@ -2127,13 +2127,19 @@ Fruta en 2 comidas (1 si hay menos de 4): en el pedido y en el plan sin modelo. 
 
 Topes 1000/1200 tokens. ✓ `scripts/validate-meal-estimate-output.mjs`.
 
-## REQ-324 - Recordatorios: solo CRON_SECRET autoriza el envío
+## REQ-324 - Fechas y avisos de semana
+
+**Estado: implementado.**
+
+Detalle: `docs/plan-weeks.md`.
+
+## REQ-325 - Recordatorios: solo CRON_SECRET autoriza el envío
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 `/api/notify` ya no acepta la cabecera `x-vercel-cron` sin secreto; solo `Authorization: Bearer CRON_SECRET`, comparado en tiempo constante. ✓ `scripts/validate-supabase-keepalive.mjs`.
 
-## REQ-325 - Texto de baja del correo de invitaciones
+## REQ-326 - Texto de baja del correo de invitaciones
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 

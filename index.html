@@ -376,6 +376,16 @@
   .wk-sheet-plan{display:flex;flex-direction:column;gap:4px;margin:4px 0 16px}
   .wk-sheet-actions{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
   .wk-sheet-actions .muted{margin:0 2px 6px}
+  .plan-week-help{margin:0 2px 12px;line-height:1.5}
+  .plan-week-notice{margin:12px 0 16px;padding:12px 14px;border:1px solid var(--border-2);border-radius:var(--r-md);background:var(--surf1);line-height:1.5}
+  .plan-week-notice p{margin:0 0 4px}
+  .plan-week-actions{display:flex;gap:16px;flex-wrap:wrap;justify-content:space-between}
+  .plan-week-notice button{min-height:44px}
+  .plan-weeks-details{margin:0 0 20px}
+  .plan-weeks-details summary{padding:10px 0;min-height:44px;cursor:pointer;font-weight:600}
+  .plan-weeks-list{list-style:none;padding:0;margin:12px 0 0}
+  .plan-weeks-list li{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;font-variant-numeric:tabular-nums}
+  .plan-weeks-list li[aria-current]{color:var(--accent)}
   .wk-safety-line{width:100%}
   .wk-location{margin-top:4px}
   .wk-context{margin:0 0 14px}
@@ -5257,6 +5267,7 @@ function renderHoy(){
   ${dayClosed?"":heroDash(ds,{compact:true})}
   <div class="home-log-action"><button type="button" class="btn btn-accent" onclick="homeLogFood('${ds}')">Registrar comida</button></div>
   ${homeAgendaHtml(ds)}
+  ${planWeekNoticeHtml(ds)}
 
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
@@ -6843,10 +6854,61 @@ function trainingPlanTitle(training){
   const strength=training.strength==="none"?"":STRENGTH_LABELS[training.strength];
   return [sport,strength].filter(Boolean).join(" + ")||"Tu plan";
 }
+// REQ-324: explicar las semanas del ciclo sin modificar sus fechas.
+function planWeekRangeLabel(week){
+  const first=parseYmd(week.start),last=parseYmd(week.end);
+  const crossYear=first.getFullYear()!==last.getFullYear();
+  const label=d=>`${d.getDate()} ${MON[d.getMonth()]}${crossYear?" "+d.getFullYear():""}`;
+  return `${label(first)}–${label(last)}`;
+}
+function planWeekLabel(ds){
+  const {calendar,week}=planContextForDate(ds);
+  return week?`${week.num?"Semana "+week.num+" de "+calendar.durationWeeks:"Semana de arranque"} · ${planWeekRangeLabel(week)}`:`${calendar.durationWeeks} semanas`;
+}
 function trainingPlanMeta(ds,training){
-  const w=weekOf(ds);
-  const week=w?(w.label==="Arranque"?"Arranque":w.num?`Semana ${w.num} de ${PLAN_DURATION_WEEKS}`:""):`${PLAN_DURATION_WEEKS} semanas`;
-  return [week,`${training.days} días/semana`].filter(Boolean).join(" · ");
+  return [planWeekLabel(ds),`${training.days} días/semana`].join(" · ");
+}
+function planWeeksCalendarHtml(ds){
+  const {calendar}=planContextForDate(ds);
+  const today=todayStr();
+  return `<details class="plan-weeks-details"><summary>Calendario de tus ${calendar.durationWeeks} semanas</summary>
+    <p class="muted small">Tus semanas cuentan desde el día que empezaste tu plan.</p>
+    <ol class="plan-weeks-list">${calendar.weeks.map(w=>{
+      const active=today>=w.start&&today<=w.end;
+      return `<li${active?' aria-current="step"':''}><span><b>Semana ${w.num}</b>${active?' <span class="muted small">· Actual</span>':''}</span><span>${esc(planWeekRangeLabel(w))}</span></li>`;
+    }).join("")}</ol></details>`;
+}
+const planWeekNoticeHidden=new Set();
+function planWeekNoticeKey(ds){
+  const {calendar,week,prefs}=planContextForDate(ds);
+  return week?`evolv_week_notice:${uid()}:${prefs.planCycleNumber||1}:${calendar.startDate}:${calendar.durationWeeks}:${week.num}`:"";
+}
+function dismissPlanWeekNotice(ds){
+  const key=planWeekNoticeKey(ds);
+  if(!key)return;
+  planWeekNoticeHidden.add(key);
+  try{localStorage.setItem(key,"1");}catch(_){}
+  render();
+}
+function planWeekNoticeHtml(ds){
+  if(ds!==todayStr())return ""; // no decir «mañana» al navegar por otras fechas
+  const {calendar,week}=planContextForDate(ds);
+  if(!week||!week.num)return "";
+  const next=calendar.weeks.find(w=>w.num===week.num+1);
+  if(ds===week.end){
+    const text=next?`Hoy termina tu semana ${week.num}. Mañana comienza la semana ${next.num}.`:`Hoy termina tu semana ${week.num} y tu plan actual.`;
+    return `<aside class="plan-week-notice" role="note"><p>${text}</p><button class="link-btn" onclick="openTrainingPlanSheet('${ds}')">Ver calendario</button></aside>`;
+  }
+  if(week.num===1)return "";
+  const key=planWeekNoticeKey(ds);
+  if(planWeekNoticeHidden.has(key))return "";
+  try{if(localStorage.getItem(key)==="1")return "";}catch(_){}
+  return `<aside class="plan-week-notice" role="status">
+    <p><b>${ds===week.start?`¡Comienza tu semana ${week.num}!`:`Ya estás en tu semana ${week.num}`}</b></p>
+    <p class="muted small">${esc(planWeekRangeLabel(week))}</p>
+    <div class="plan-week-actions"><button class="link-btn" onclick="openTrainingPlanSheet('${ds}')">Ver calendario</button>
+      <button class="link-btn" onclick="dismissPlanWeekNotice('${ds}')" aria-label="Ocultar aviso de semana">Entendido</button></div>
+  </aside>`;
 }
 // Sugerencia única para quien aún no personalizó el plan; al descartarla o
 // abrir el generador no vuelve en este dispositivo.
@@ -6863,7 +6925,8 @@ function dismissPersonalizeHint(){
   try{localStorage.setItem(PERSONALIZE_HINT_KEY+":"+uid(),"1");}catch(e){/* sin almacenamiento */}
 }
 function openTrainingPlanSheet(ds){
-  const training=trainingPrefs();
+  ds=ds||current;
+  const training=trainingPrefsFromPrefs(planPrefsForDate(ds));
   const generatedVersion=activeGeneratedTrainingVersion();
   const hold=trainingSafetyHold();
   modal(`<h3>Tu plan de entrenamiento</h3>
@@ -6871,6 +6934,7 @@ function openTrainingPlanSheet(ds){
       <div class="muted small">${esc(trainingPlanMeta(ds||current,training))}</div>
       <div class="muted small">${generatedVersion?`Personalizado desde ${prettyDate(generatedVersion.valid_from)} · ${esc(generatedVersion.reason||"ajustado a tu perfil")}`:"Plan base según tu perfil"}</div>
     </div>
+    ${planWeeksCalendarHtml(ds)}
     <div class="wk-sheet-actions">
       <button class="btn btn-accent" onclick="dismissPersonalizeHint();closeModal();openTrainingPlanGenerator()" ${hold?"disabled":""}>${generatedVersion?"Preparar otra versión":"Personalizar mi plan"}</button>
       <div class="muted small">${generatedVersion?"Rehace las próximas semanas con tu perfil actual. Lo ya entrenado no cambia.":"Ajusta las sesiones a tu nivel, tus días y tu equipo."}</div>
@@ -6969,6 +7033,8 @@ function renderWorkout(){
   ${safetyNotice}
   ${emptyWkHtml}
   ${planCardHtml}
+  <p class="plan-week-help muted small">Tus semanas cuentan desde el día que empezaste tu plan.</p>
+  ${planWeekNoticeHtml(ds)}
   ${workoutCardHtml}
   ${freeDay&&!manualActivities(st).length?"":manualActivityBlock(ds,restDay)}
   ${execution?renderWorkoutExecution(ds,execution):""}
@@ -7102,7 +7168,8 @@ function daySummary(ds){
   const day=buildDay(ds); const st=dayState(ds); const {t,target,doneMeals,totMeals}=dayTotals(ds);
   const workoutOutcome=workoutOutcomeForState(st);
   const workoutSummary=workoutOutcome==="completed"?"✓":workoutOutcome==="partial"?"Parcial":workoutOutcome==="in_progress"?"En curso":workoutOutcome==="paused"?"Pausado":"—";
-  const w=day.week; const daysLeft=Math.round((parseYmd(END)-parseYmd(ds))/86400000);
+  const ctx=planContextForDate(ds);
+  const daysLeft=Math.round((parseYmd(ctx.calendar.endDate)-parseYmd(ds))/86400000);
   return section("wk.resumen","Resumen",`
   <div class="summary">
     <div class="scard"><div class="n">${Math.round(target.kcal?t.kcal/target.kcal*100:0)}%</div><div class="l">kcal de la meta</div></div>
@@ -7110,7 +7177,7 @@ function daySummary(ds){
     <div class="scard"><div class="n">${doneMeals}/${totMeals}</div><div class="l">comidas cumplidas</div></div>
     <div class="scard"><div class="n">${workoutSummary}</div><div class="l">entrenamiento</div></div>
   </div>
-  <div class="muted small center" style="margin-top:10px">${w?(w.num?("Semana "+w.num+" de "+PLAN_DURATION_WEEKS):"Semana de arranque"):""} · faltan ${daysLeft} días para el final</div>
+  <div class="muted small center" style="margin-top:10px">${esc(planWeekLabel(ds))} · faltan ${daysLeft} días para el final</div>
   ${(()=>{const clog=st.contingencyLog||[];if(!clog.length)return"";const labels={meal_replace:"comida adaptada",meal_revert:"comida restaurada",workout_change:"entrenamiento cambiado",place_change:"lugar cambiado",missed_session:"sesión no realizada"};return`<div class="muted small center" style="margin-top:4px">Adaptaciones: ${clog.map(e=>labels[e.type]||e.type).join(", ")}</div>`;})()}`);
 }
 
@@ -7375,7 +7442,7 @@ function weekSection(){
   }).join("");
   return `<div class="row between" style="margin-bottom:10px">
       <button class="btn btn-sm" onclick="weekNav(-1)" ${w.num<=1?'disabled style=opacity:.3':''}>‹</button>
-      <span class="muted small">${w.label==="Arranque"?"Arranque":"Semana "+w.num}</span>
+      <span class="muted small">${w.label==="Arranque"?"Arranque":"Semana "+w.num} · ${esc(planWeekRangeLabel(w))}</span>
       <button class="btn btn-sm" onclick="weekNav(1)" ${w.num>=resolvedPlanDuration(currentPrefs)?'disabled style=opacity:.3':''}>›</button>
     </div>
     ${rows}`;

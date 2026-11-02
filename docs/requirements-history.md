@@ -12555,7 +12555,7 @@ En `coach_usage`, el intento fallido registró `output_tokens = 400`, que es jus
 
 - Texto y foto usan topes de al menos 1000 y 1200. ✓ `scripts/validate-meal-estimate-output.mjs` (falla con el código anterior).
 
-## REQ-324 - Recordatorios: solo CRON_SECRET autoriza el envío
+## REQ-325 - Recordatorios: solo CRON_SECRET autoriza el envío
 
 **Estado: implementado.**
 
@@ -12590,7 +12590,7 @@ Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y P
 
 Activación en producción (02/11/2026): `supabase/referrals.sql` aplicada en una transacción en el proyecto Supabase `fitbud`, sin cambios en datos existentes. Funciones, trigger, permisos (solo `service_role`) y RLS verificados. Flujo completo probado en producción con cuentas de prueba dentro de una transacción revertida. Vercel con `a47729f` (incluye REQ-317), variables de correo y cron presentes, y workflow horario autorizado. Ver `docs/referrals.md`.
 
-## REQ-325 - Texto de baja del correo de invitaciones
+## REQ-326 - Texto de baja del correo de invitaciones
 
 **Estado: implementado.**
 
