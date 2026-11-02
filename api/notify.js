@@ -1032,7 +1032,7 @@ export default async function handler(req, res) {
 
   const awake = await keepSupabaseAwake(e);
 
-  // Job del cron — verificar CRON_SECRET (REQ-320). El cron de Vercel y el
+  // Job del cron — verificar CRON_SECRET (REQ-323). El cron de Vercel y el
   // workflow horario envían Authorization: Bearer CRON_SECRET. Una cabecera
   // como x-vercel-cron la puede enviar cualquiera, así que no autoriza.
   if (!cronAuthorized(e, req.headers["authorization"])) {

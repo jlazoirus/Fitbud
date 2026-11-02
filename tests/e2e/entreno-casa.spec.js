@@ -39,6 +39,8 @@ test("en casa sin bandas: remo invertido, sustitutos con el material que piden y
     }
   }
   for (const id of ["fullA", "torsoA", "pullA"]) expect(sessions[id].map((e) => e.slug)).toContain("inverted-row");
+  // REQ-321: sin barra ni bandas, el día de tirón no se queda en un solo ejercicio.
+  for (const id of ["pullA", "pullB"]) expect(sessions[id].length, id).toBeGreaterThanOrEqual(3);
   expect(Object.values(sessions).flat().map((e) => e.slug)).not.toContain("band-row");
 
   // La ficha del remo invertido: foto real y material en español.

@@ -933,6 +933,7 @@
   const WIKIMEDIA_CALF={source_name:"Wikimedia Commons (BruceBlaus)",source_url:"https://commons.wikimedia.org/wiki/File:Exercise_Heel_Raise_Two_Legs.png",license_name:"CC BY-SA 4.0",attribution:"BruceBlaus, Wikimedia Commons"};
   const WIKIMEDIA_PIKE={source_name:"Wikimedia Commons (Danielflefil)",source_url:"https://commons.wikimedia.org/wiki/File:Pike_Push_Ups.gif",license_name:"CC BY-SA 4.0",attribution:"Danielflefil, Wikimedia Commons"};
   const USARMY_PLANK_TAP={source_name:"10th AAMDC (U.S. Army)",source_url:"https://commons.wikimedia.org/wiki/File:10th_AAMDC_host_%22Key_Leader_Physical_Readiness_Training%22_(8448514).jpg",license_name:"Dominio público (obra del Gobierno de EE. UU.)",attribution:"U.S. Army vía Wikimedia Commons — dominio público"};
+  const CDC_STEPUP={source_name:"CDC (Centers for Disease Control and Prevention)",source_url:"https://commons.wikimedia.org/wiki/File:Step_up-CDC_strength_training_for_older_adults.gif",license_name:"Dominio público (obra del Gobierno de EE. UU.)",attribution:"CDC vía Wikimedia Commons"};
   const FLICKR_HEELRAISE={source_name:"Flickr (personaltrainertoronto)",source_url:"https://www.flickr.com/photos/personaltrainertoronto/51346336932/",license_name:"CC BY 2.0",attribution:"personaltrainertoronto, Flickr"};
   const ENDURANCE_MEDIA={
     walking:["assets/exercise-media/walking.jpg",FREE_EXERCISE_DB],
@@ -952,7 +953,7 @@
   // REQ-264: las demostraciones deben enseñar el ejercicio nombrado, sin
   // sustituirlo por otro más difícil que trabaje músculos parecidos.
   const CURATED_DEMO_SLUGS=new Set([
-    "archer-push-up","slider-leg-curl","single-leg-rdl","step-up",
+    "archer-push-up","slider-leg-curl","single-leg-rdl",
     "bulgarian-split-squat",
   ]);
   const reviewedMedia=new Map();
@@ -960,14 +961,14 @@
     const [url,source]=ENDURANCE_MEDIA[disc];
     slugs.forEach(slug=>reviewedMedia.set(slug,{...source,media_type:"image",media_url:url,poster_url:url,frames:[]}));
   });
+  // REQ-320: sin foto exacta con licencia libre no se muestra ninguna
+  // demostración (ni dibujo propio ni GIF ajeno): la ficha queda con los pasos
+  // escritos y la selección de la sesión prefiere otro ejercicio con foto.
+  const NO_DEMO={media_type:"none",media_url:"",poster_url:"",frames:[],source_name:OWN_MEDIA.source_name,source_url:"",license_name:OWN_MEDIA.license_name,attribution:OWN_MEDIA.attribution};
   strength.forEach(ex=>{
     if(!CURATED_DEMO_SLUGS.has(ex.slug))return;
-    const url=`assets/exercise-media/${ex.slug}.svg`;
-    const media={...OWN_MEDIA,media_type:"image",media_url:url,poster_url:url,frames:[]};
-    // active es contenido administrativo, no parte de la corrección de media.
-    delete media.active;
-    Object.assign(ex,media);
-    reviewedMedia.set(ex.slug,media);
+    Object.assign(ex,NO_DEMO);
+    reviewedMedia.set(ex.slug,{...NO_DEMO});
   });
   // REQ-293: remo de espalda sin material para casa, con foto real del
   // movimiento (la barra de la foto es el borde de la mesa en casa).
@@ -989,6 +990,43 @@
     common_errors:["Dejar caer la cadera","Adelantar el cuello hacia el borde","Usar una mesa ligera o con patas plegables"],
     safety_signals:["La mesa se mueve, cruje o se inclina","Dolor agudo de hombro o codo","Hormigueo en brazo o mano"],
   });
+  // REQ-322: step-up con la animación del CDC (escalón bajo, sin carga y con
+  // apoyo, la variante exacta de la ficha; dominio público).
+  const stepUpMedia={...CDC_STEPUP,media_type:"gif",media_url:"assets/exercise-media/step-up.gif",poster_url:"",frames:[]};
+  Object.assign(strength.find(ex=>ex.slug==="step-up"),stepUpMedia);
+  reviewedMedia.set("step-up",stepUpMedia);
+  // REQ-320: estas fichas no tenían demostración, así que el texto es la única
+  // guía y debe describir la variante exacta (antes usaban el texto genérico
+  // del patrón: el step-up describía una zancada y el curl deslizante, un peso muerto).
+  const TEXT_ONLY_TECHNIQUE={
+    "bulgarian-split-squat":{
+      start_position:"De espaldas a un banco o silla estable, a un paso largo; apoya el empeine del pie trasero sobre el asiento y deja el peso en el pie delantero.",
+      steps:["Con el tronco alto, baja doblando la rodilla delantera hasta que el muslo quede casi paralelo al suelo.","Mantén la rodilla delantera alineada con el pie y el talón apoyado; la pierna de atrás solo equilibra.","Empuja con el pie delantero para subir. Completa las repeticiones y cambia de pierna."],
+      common_errors:["Pie delantero demasiado cerca del banco","Rodilla delantera hacia dentro","Empujar con la pierna de atrás"],
+    },
+    "single-leg-rdl":{
+      start_position:"De pie sobre una pierna con la rodilla un poco flexionada, abdomen firme y brazos colgando delante de los muslos.",
+      steps:["Inclina el tronco hacia delante desde la cadera mientras la otra pierna se estira hacia atrás en línea con la espalda.","Baja hasta sentir el estiramiento detrás del muslo de apoyo, con la cadera nivelada y sin girarla.","Aprieta el glúteo de la pierna de apoyo y vuelve a la vertical. Completa las repeticiones y cambia de pierna."],
+      common_errors:["Redondear la espalda","Abrir la cadera de la pierna que se eleva","Bloquear la rodilla de apoyo"],
+    },
+    "step-up":{
+      start_position:"De frente a un escalón o banco bajo y estable, con un pie completo apoyado arriba y el tronco alto.",
+      steps:["Empuja con el pie de arriba (no con el de abajo) hasta subir y estirar la pierna.","Arriba, junta el otro pie o déjalo suspendido sin apoyarlo con fuerza.","Baja despacio controlando con la pierna de arriba. Completa las repeticiones y cambia de pierna."],
+      common_errors:["Impulsarse con el pie del suelo","Rodilla hacia dentro al subir","Escalón inestable o demasiado alto"],
+    },
+    "slider-leg-curl":{
+      start_position:"Boca arriba en un suelo liso, rodillas flexionadas y talones sobre deslizadores o una toalla; brazos a los lados.",
+      steps:["Eleva la cadera apretando glúteos hasta que hombros, cadera y rodillas formen una línea.","Sin bajar la cadera, desliza los talones hacia delante hasta casi estirar las piernas.","Tira de los talones hacia los glúteos con los isquiotibiales y vuelve a la posición inicial."],
+      common_errors:["Dejar caer la cadera al estirar","Arquear la zona lumbar","Deslizar demasiado rápido"],
+      safety_signals:["Calambre que no cede al parar","Dolor punzante lumbar o detrás de la rodilla"],
+    },
+    "archer-push-up":{
+      start_position:"En posición de flexión con las manos mucho más abiertas que los hombros y los dedos hacia fuera; cuerpo recto.",
+      steps:["Baja llevando el pecho hacia una mano y flexionando ese codo, mientras el otro brazo se estira de lado.","Mantén el cuerpo recto y el brazo estirado como apoyo, sin rotar la cadera.","Empuja con el brazo flexionado para subir y alterna el lado en cada repetición."],
+      common_errors:["Rotar la cadera hacia un lado","Hombros cerca de las orejas","Recorrido corto en el brazo que trabaja"],
+    },
+  };
+  Object.entries(TEXT_ONLY_TECHNIQUE).forEach(([slug,technique])=>Object.assign(strength.find(ex=>ex.slug===slug),technique));
   const pike=strength.find(ex=>ex.slug==="pike-push-up");
   Object.assign(pike,{
     start_position:"Manos al ancho de hombros, pies apoyados en el suelo y cadera elevada formando una V invertida.",
@@ -1027,8 +1065,8 @@
   ];
   // Pendientes por falta de foto exacta con licencia compatible (no usar proxies
   // de otro equipo o variante): "band-alternating-lat-pulldown" (jalón con banda)
-  // y "dumbbell-glute-bridge" (puente con mancuerna). Conservan su media actual
-  // hasta tener demo exacta.
+  // y "dumbbell-glute-bridge" (puente con mancuerna). REQ-320: su GIF ajeno se
+  // retira (sin demostración) hasta tener demo exacta.
   GIF_CON_MARCA_DE_AGUA.forEach(slug=>{
     const frames=[0,1].map(i=>`assets/exercise-media/${slug}-${i}.jpg`);
     reviewedMedia.set(slug,{...FREE_EXERCISE_DB,media_type:"image_sequence",media_url:"",poster_url:frames[0],frames});
@@ -1045,8 +1083,8 @@
   // vez de arquero, máquina en vez de elevación de pie. Se retira la media
   // remota y caen a la guía SVG propia como pendientes explícitos hasta
   // tener foto o animación exacta con licencia verificable.
-  ["archer-push-up","slider-leg-curl"].forEach(slug=>{
-    reviewedMedia.set(slug,{...OWN_MEDIA});
+  ["archer-push-up","slider-leg-curl","band-alternating-lat-pulldown","dumbbell-glute-bridge"].forEach(slug=>{
+    reviewedMedia.set(slug,{...NO_DEMO});
   });
   // REQ-310: pike-push-up y shoulder-tap-plank ya tienen demostración exacta
   // con licencia verificable: animación de flexión pike con pies al suelo
@@ -1104,8 +1142,9 @@
     const reviewed=reviewedBySlug.get(exercise.slug);
     const level=root.FITBUD_REVIEWED_EXERCISE_LEVELS[exercise.slug];
     if(!EXERCISE_LEVELS.has(level))return {...exercise};
-    const technique=exercise.slug==="pike-push-up"?{
+    const technique=exercise.slug==="pike-push-up"||TEXT_ONLY_TECHNIQUE[exercise.slug]?{
       start_position:reviewed.start_position,steps:reviewed.steps,common_errors:reviewed.common_errors,
+      safety_signals:reviewed.safety_signals,
     }:{};
     // Las nuevas fichas también corrigen metadatos remotos antiguos. Se conserva
     // active (administración) y no se modifica ningún snapshot de entrenamiento.
@@ -1286,10 +1325,12 @@
       torsoB:["incline-push-up","inverted-row","assisted-dip","shoulder-tap-plank"],
       piernaB:["bulgarian-split-squat","single-leg-rdl","step-up","slider-leg-curl","dead-bug"],
       pushA:["push-up","pike-push-up","diamond-push-up","assisted-dip"],
-      pullA:["pull-up","inverted-row","assisted-pull-up"],
+      // REQ-321: en casa sin barra ni bandas solo queda el remo invertido; el
+      // core completa el día de tirón para que no sea una sesión de un ejercicio.
+      pullA:["pull-up","inverted-row","assisted-pull-up","dead-bug","side-plank"],
       legsA:["tempo-squat","bulgarian-split-squat","single-leg-rdl","standing-calf-raise"],
       pushB:["decline-push-up","push-up","pike-push-up","assisted-dip"],
-      pullB:["pull-up","inverted-row","assisted-pull-up"],
+      pullB:["pull-up","inverted-row","assisted-pull-up","front-plank","shoulder-tap-plank"],
       legsB:["walking-lunge","glute-bridge","slider-leg-curl","step-up"],
     },
     walking:{calidad:["walk-brisk"],facil:["walk-easy"],tecnica:["walk-mobility"]},
