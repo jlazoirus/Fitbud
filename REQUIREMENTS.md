@@ -2136,3 +2136,9 @@ Fruta en 2 comidas (1 si hay menos de 4): en el pedido y en el plan sin modelo. 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Topes 1000/1200 tokens. ✓ `scripts/validate-meal-estimate-output.mjs`.
+
+## REQ-324 - Fechas y avisos de semana
+
+**Estado: implementado.**
+
+Detalle: `docs/plan-weeks.md`.

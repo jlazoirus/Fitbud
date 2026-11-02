@@ -8,7 +8,7 @@ PWA de nutrición y entrenamiento personalizados: planes de 4/10 semanas, regist
 
 Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservado.
 
-REQ-316: Hoy prioriza registro y entreno; menú opcional descartable por día/cuenta/dispositivo. Nutrición conserva acceso compacto al menú. Registrar una comida no requiere generarlo.
+REQ-316: Hoy prioriza registro y entreno; menú opcional descartable por día/cuenta/dispositivo y accesible en Nutrición. REQ-324: fechas/avisos de semana (`docs/plan-weeks.md`).
 
 ## Arquitectura vigente
 
