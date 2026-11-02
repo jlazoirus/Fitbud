@@ -2137,3 +2137,9 @@ Operación manual pendiente: aplicar `supabase/referrals.sql` en Supabase antes 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Tres pasos, alias propuesto y «Crear invitación» que activa y deja el enlace; luego "Tus amigos te ven como …". Sin buscador. ✓ `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-319 - Recordatorios: solo CRON_SECRET autoriza el envío
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+`/api/notify` ya no acepta la cabecera `x-vercel-cron` sin secreto; solo `Authorization: Bearer CRON_SECRET`, comparado en tiempo constante. ✓ `scripts/validate-supabase-keepalive.mjs`.

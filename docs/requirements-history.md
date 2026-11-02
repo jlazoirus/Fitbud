@@ -12439,3 +12439,22 @@ Se mantiene el enlace privado de un uso (7 días). Jonathan descartó invitar po
 ### Criterios de aceptación
 
 - Antes de activar se ven los pasos, el aviso de privacidad y el alias propuesto. "Crear invitación" activa y muestra el enlace; al activar desaparecen los pasos y se muestra el alias propio. Con una invitación recibida, "Activar comparación" deja aceptar. ✓ `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-319 - Recordatorios: solo CRON_SECRET autoriza el envío
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de la activación de REQ-317 en producción (02/11/2026). `api/notify.js` aceptaba `x-vercel-cron: 1` como autorización sin comprobar el secreto. Esa cabecera la puede enviar cualquiera desde internet, así que cualquiera podía ejecutar el job de recordatorios y la campaña de invitaciones cuando quisiera. La idempotencia evitaba duplicados y el calendario impedía adelantar la campaña, pero el job no debía quedar abierto.
+
+### Alcance
+
+- El job solo corre con `Authorization: Bearer CRON_SECRET`, comparado con `timingSafeEqual`. Sin `CRON_SECRET` configurado, nunca corre.
+- El cron diario de Vercel sigue funcionando: con `CRON_SECRET` definido en el proyecto, Vercel envía ese Bearer en cada invocación. El workflow horario de GitHub ya lo enviaba.
+- Sin cambios en la baja de un clic (`?unsubscribe=`) ni en la lectura mínima que mantiene despierto Supabase, que sigue ocurriendo antes de la verificación.
+
+### Criterios de aceptación
+
+- `x-vercel-cron` solo, `user-agent` de Vercel, un secreto distinto, truncado o sin `Bearer`: 401 y solo la lectura mínima. ✓ `scripts/validate-supabase-keepalive.mjs`.
+- El Bearer correcto ejecuta el job (también con `dry_run`). ✓ mismo script; journey de recordatorios y campaña de invitaciones sin cambios.

@@ -1010,6 +1010,13 @@ async function keepSupabaseAwake(e) {
 
 // ── Handler de Vercel ─────────────────────────────────────────────────────────
 
+function cronAuthorized(e, authHeader) {
+  if (!e.cronSecret) return false;
+  const got = Buffer.from(String(authHeader || ""));
+  const want = Buffer.from("Bearer " + e.cronSecret);
+  return got.length === want.length && timingSafeEqual(got, want);
+}
+
 export default async function handler(req, res) {
   const e = env();
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
@@ -1025,10 +1032,10 @@ export default async function handler(req, res) {
 
   const awake = await keepSupabaseAwake(e);
 
-  // Job del cron — verificar CRON_SECRET
-  const authHeader = req.headers["authorization"] || "";
-  const isVercelCron = req.headers["x-vercel-cron"] === "1";
-  if (!isVercelCron && (!e.cronSecret || authHeader !== "Bearer " + e.cronSecret)) {
+  // Job del cron — verificar CRON_SECRET (REQ-319). El cron de Vercel y el
+  // workflow horario envían Authorization: Bearer CRON_SECRET. Una cabecera
+  // como x-vercel-cron la puede enviar cualquiera, así que no autoriza.
+  if (!cronAuthorized(e, req.headers["authorization"])) {
     return res.status(401).json({ error: "Unauthorized", keepAlive: awake });
   }
 
