@@ -2128,13 +2128,19 @@ Hasta 3 invitaciones para cuentas con 2+ sesiones distintas en los 7 días previ
 
 Tres pasos, alias propuesto y «Crear invitación» que activa y deja el enlace; luego "Tus amigos te ven como …". Sin buscador. ✓ `tests/e2e/rachas-amigos.spec.js`.
 
-## REQ-319 - Recordatorios: solo CRON_SECRET autoriza el envío
+## REQ-319 - Dietas: el día incluye fruta
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Fruta en 2 comidas (1 si hay menos de 4): en el pedido y en el plan sin modelo. ✓ `scripts/validate-diet-fruit.mjs`.
+
+## REQ-320 - Recordatorios: solo CRON_SECRET autoriza el envío
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 `/api/notify` ya no acepta la cabecera `x-vercel-cron` sin secreto; solo `Authorization: Bearer CRON_SECRET`, comparado en tiempo constante. ✓ `scripts/validate-supabase-keepalive.mjs`.
 
-## REQ-320 - Texto de baja del correo de invitaciones
+## REQ-321 - Texto de baja del correo de invitaciones
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 

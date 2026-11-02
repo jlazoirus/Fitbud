@@ -12440,7 +12440,43 @@ Se mantiene el enlace privado de un uso (7 días). Jonathan descartó invitar po
 
 - Antes de activar se ven los pasos, el aviso de privacidad y el alias propuesto. "Crear invitación" activa y muestra el enlace; al activar desaparecen los pasos y se muestra el alias propio. Con una invitación recibida, "Activar comparación" deja aceptar. ✓ `tests/e2e/rachas-amigos.spec.js`.
 
-## REQ-319 - Recordatorios: solo CRON_SECRET autoriza el envío
+## REQ-319 - Dietas: el día incluye fruta
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-11-02): "Las dietas no incluyen frutas".
+
+### Causa raíz
+
+- `generateOneDay()` (`index.html`) arma el día con el modelo. El pedido no decía nada de la fruta: solo aparecía como una opción más en los arquetipos de desayuno y media mañana. Con meta de proteína alta, el bloque "no sacrifiques proteína por variedad" la desplazaba.
+- `planDeterministicNutritionDay()` (`js/nutrition-domain.js`) es el plan de respaldo sin modelo y elegía solo por ajuste de macros. Con el catálogo de producción (49 de 180 platos con fruta) y 10 usuarios × 7 días por perfil, los días con fruta eran 18/70 con 5 comidas y 44/70 con 3.
+
+### Alcance
+
+1. Pedido del día: `dietFruitPromptLine()` exige fruta entera en al menos 2 comidas del día (1 si hay menos de 4 comidas), 80–150 g por porción, sola o dentro del plato, respetando las exclusiones. El arquetipo de snack la menciona.
+2. Plan sin modelo: en desayuno, media mañana, merienda, snack y recena, un plato con fruta (un ingrediente de categoría "Fruta") gana una ventaja de puntaje (`FRUIT_BONUS`, 0,12) mientras el día no llegue al mínimo. Si ningún plato con fruta encaja en la meta, no se fuerza.
+3. Resultado con el mismo catálogo y los mismos usuarios simulados:
+
+   | Perfil | Días con fruta antes | Días con fruta después | Error promedio de kcal y proteína |
+   |---|---|---|---|
+   | 4 comidas | 70/70 | 70/70 | sin cambio |
+   | 5 comidas | 18/70 | 64/70 | kcal 27 → 22; proteína 14,1 → 14,7 g |
+   | 3 comidas | 44/70 | 70/70 | kcal 5 → 3; proteína 17,3 → 19,1 g |
+   | Vegetariano | 70/70 | 70/70 | sin cambio |
+
+   Todos los días quedan dentro de la meta.
+
+### Fuera de alcance
+
+Validar después del modelo que el día traiga fruta y regenerarlo si no la trae. Tendría costo extra por llamada.
+
+### Criterios de aceptación
+
+- Plan sin modelo: 2 comidas con fruta desde 4 comidas y 1 con 3, dentro de la meta de kcal. El pedido incluye la regla. ✓ `scripts/validate-diet-fruit.mjs` (falla con el código anterior), en el release gate.
+
+## REQ-320 - Recordatorios: solo CRON_SECRET autoriza el envío
 
 **Estado: implementado.**
 
@@ -12475,7 +12511,7 @@ Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y P
 
 Activación en producción (02/11/2026): `supabase/referrals.sql` aplicada en una transacción en el proyecto Supabase `fitbud`, sin cambios en datos existentes. Funciones, trigger, permisos (solo `service_role`) y RLS verificados. Flujo completo probado en producción con cuentas de prueba dentro de una transacción revertida. Vercel con `a47729f` (incluye REQ-317), variables de correo y cron presentes, y workflow horario autorizado. Ver `docs/referrals.md`.
 
-## REQ-320 - Texto de baja del correo de invitaciones
+## REQ-321 - Texto de baja del correo de invitaciones
 
 **Estado: implementado.**
 
