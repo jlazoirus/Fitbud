@@ -25,7 +25,7 @@ test.describe("Perfil", () => {
 
     await expect(page.locator(".pf-nav")).toHaveCount(0);
     const sections = page.locator("details.pf-accordion");
-    await expect(sections).toHaveCount(8);
+    await expect(sections).toHaveCount(9);
     expect(await sections.evaluateAll((items) => items.filter((item) => item.open).length)).toBe(0);
 
     const comidas = page.locator("#pfSecComidas");
@@ -118,7 +118,7 @@ test.describe("Perfil", () => {
     expect(ids).toEqual([
       "pfSecObjetivo", "pfSecComidas", "pfSecEntreno",
       "pfSecPrivacidad", "pfSecSuscripcion", "pfSecRecordatorios", "pfSecAvisos",
-      "pfSecCuenta",
+      "pfSecAyuda", "pfSecCuenta",
     ]);
 
     // Recordatorios: activar el opt-in sigue revelando las opciones (wiring de #notif_* intacto).

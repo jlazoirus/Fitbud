@@ -28,7 +28,14 @@ for(const exercise of catalog){
     const value=exercise[key];
     if(value==null||value===""||(Array.isArray(value)&&!value.length))errors.push(`${exercise.slug}: falta ${key}`);
   }
-  if(exercise.source_url&&/^https?:\/\//.test(exercise.source_url))errors.push(`${exercise.slug}: usa media externa`);
+  // source_url acredita la fuente; las URLs que se cargan como media son otras.
+  for(const media of [exercise.media_url,exercise.poster_url,...(exercise.frames||[])].filter(Boolean)){
+    if(/^(?:[a-z][a-z0-9+.-]*:|\/\/)/i.test(media))errors.push(`${exercise.slug}: usa media externa ${media}`);
+    else {
+      const asset=path.resolve(root,media);
+      if(!asset.startsWith(root+path.sep)||!fs.existsSync(asset))errors.push(`${exercise.slug}: media local inexistente o fuera del deploy ${media}`);
+    }
+  }
 }
 
 function visit(node,label){
@@ -79,6 +86,34 @@ for(const exercise of strength){
     if(v&&v.kind==="exercise"&&bySlug.has(v.to)&&substitution.primaryMuscle(bySlug.get(v.to))!==muscle)errors.push(`${exercise.slug}.${direction}: ${v.to} trabaja otro músculo`);
   }
 }
+// REQ-302: enlaces explícitos, no solo candidatos filtrados en runtime.
+for(const exercise of strength){
+  if(!exercise.substitute_slugs.length)errors.push(`${exercise.slug}: sin sustitución del mismo músculo`);
+  for(const slug of exercise.substitute_slugs){
+    const target=bySlug.get(slug);
+    if(!target||slug===exercise.slug||substitution.primaryMuscle(target)!==substitution.primaryMuscle(exercise))errors.push(`${exercise.slug}: enlace de sustitución inválido ${slug}`);
+  }
+}
+const expanded=strength.filter(ex=>ex.source_id);
+if(expanded.length<68)errors.push("Ampliación: faltan fichas con fotos locales exactas");
+const gymBatch=expanded.filter(ex=>ex.catalog_batch===303);
+if(gymBatch.length!==40||gymBatch.filter(ex=>ex.discipline==="gym").length!==32)errors.push("REQ-303: lote incompleto o sin prioridad gimnasio");
+const sourceIds=new Set();
+for(const ex of expanded){
+  if(sourceIds.has(ex.source_id))errors.push(`${ex.slug}: demostración reutilizada como ejercicio nuevo`);
+  sourceIds.add(ex.source_id);
+  if(mediaMap[ex.slug]?.id!==ex.source_id)errors.push(`${ex.slug}: identidad multimedia no coincide`);
+  if(ex.frames?.length!==2)errors.push(`${ex.slug}: falta inicio/final de la demostración`);
+  for(const frame of ex.frames||[]){
+    const asset=path.join(root,frame);
+    if(!fs.existsSync(asset)){errors.push(`${ex.slug}: foto inexistente ${frame}`);continue;}
+    const data=fs.readFileSync(asset);
+    if(data.length<1000||data[0]!==0xff||data[1]!==0xd8)errors.push(`${ex.slug}: foto JPEG inválida`);
+  }
+  const stale={slug:ex.slug,active:false,muscles:["incorrecto"],equipment:[],level:"advanced"};
+  const normalized=context.globalThis.FITBUD_EXERCISE_CONTENT.normalize(stale);
+  if(normalized.active!==false||normalized.poster_url!==ex.poster_url||JSON.stringify(normalized.equipment)!==JSON.stringify(ex.equipment)||normalized.muscles[0]!==ex.muscles[0])errors.push(`${ex.slug}: metadatos remotos obsoletos prevalecen`);
+}
 for(const slug of Object.keys(substitution.primaryMuscles))if(!bySlug.has(slug))errors.push(`Músculo principal para slug inexistente: ${slug}`);
 const names=slug=>substitution.candidates(bySlug.get(slug),catalog).map(exercise=>exercise.slug);
 const expect=(slug,includes,excludes)=>{
@@ -97,7 +132,7 @@ expect("lateral-raise",[],["overhead-press"]);
 // nunca devuelve ejercicios de resistencia (caminar, correr…).
 const search=query=>substitution.search(query,catalog).map(exercise=>exercise.slug);
 if(search("press banca").join()!=="bench-press")errors.push(`Buscar "press banca": ${search("press banca").join()}`);
-if(search("GLUTEO")[0]!=="barbell-hip-thrust"&&search("GLUTEO")[0]!=="glute-bridge")errors.push(`Buscar "GLUTEO" no empieza por un ejercicio de glúteo: ${search("GLUTEO")[0]}`);
+if(substitution.primaryMuscle(bySlug.get(search("GLUTEO")[0]))!=="Glúteos")errors.push(`Buscar "GLUTEO" no empieza por un ejercicio de glúteo: ${search("GLUTEO")[0]}`);
 if(search("caminata").length)errors.push(`Buscar "caminata" devuelve ejercicios de resistencia`);
 if(search("").some(slug=>!["gym","strength","bodyweight"].includes(bySlug.get(slug).discipline)))errors.push("El buscador incluye ejercicios que no son de fuerza");
 for(const exercise of catalog)if(!Array.isArray(exercise.substitute_slugs))errors.push(`${exercise.slug}: substitute_slugs no es lista`);
@@ -130,7 +165,7 @@ const stale={...bySlug.get("pike-push-up"),level:"beginner",active:false,
 const original=JSON.stringify(stale),reviewed=normalize(stale);
 if(reviewed.level!=="intermediate"||reviewed.active!==false)errors.push("Pike: no aplica nivel revisado o pisa estado administrativo");
 if(JSON.stringify(stale)!==original)errors.push("La revisión muta la fila original");
-if(reviewed.media_url!=="assets/exercise-media/pike-push-up.svg"||reviewed.frames.length)errors.push("Pike: conserva la demo antigua de handstand");
+if(reviewed.media_type!=="image_sequence"||reviewed.media_url||JSON.stringify(reviewed.frames)!==JSON.stringify(["assets/exercise-media/pike-push-up-0.jpg","assets/exercise-media/pike-push-up-1.jpg"]))errors.push("Pike: no reemplaza handstand por la secuencia exacta revisada");
 const custom={slug:"custom-exercise",name:"Ejercicio propio",level:"advanced",active:false};
 if(JSON.stringify(normalize(custom))!==JSON.stringify(custom))errors.push("La revisión modifica un ejercicio propio");
 if(normalize({slug:"unknown"}).level)errors.push("Ejercicio sin revisar hereda nivel por defecto");

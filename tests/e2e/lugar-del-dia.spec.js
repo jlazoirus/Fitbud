@@ -29,6 +29,7 @@ test.describe("Entreno: lugar de un día", () => {
     const nombre = app.locator(".workout .name").first();
     await expect(nombre).toContainText("Gimnasio ·");
     const sesion = (await nombre.innerText()).replace(/^Gimnasio · /, "").trim();
+    const sessionId = await page.evaluate(d => effectiveWorkout(d).workout.id, manana);
     await expect(app).toContainText("Adaptar mañana:");
     await expect(app.locator(".wk-location")).toHaveText("Lugar: Gimnasio");
 
@@ -38,7 +39,8 @@ test.describe("Entreno: lugar de un día", () => {
     await expect(overlay.getByRole("button", { name: /Gimnasio · tu plan ✓/ })).toBeVisible();
     await overlay.getByRole("button", { name: /^Casa/ }).click();
 
-    await expect(nombre).toContainText(`Peso corporal · ${sesion}`);
+    await expect(nombre).toContainText("Peso corporal ·");
+    expect(await page.evaluate(d => effectiveWorkout(d).workout.id, manana)).toBe(sessionId);
     await expect(app.locator(".wk-location")).toHaveText("Lugar: Casa · solo este día");
     expect(await allDoableAt(page, manana, "home")).toBe(true);
     // Solo ese día: pasado mañana y el perfil siguen en gimnasio.

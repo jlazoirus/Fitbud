@@ -124,7 +124,7 @@ async function changeStreakSocial(action,data,button){
     if(uid()===owner){streakSocialBusy=false;paintStreakSocial();}
   }
 }
-// REQ-317: sin una invitación recibida, activar y crear el enlace es un solo paso.
+// REQ-316: sin una invitación recibida, activar y crear el enlace es un solo paso.
 function streakInviteOnActivate(){return !streakSocial.enabled&&!streakSocialPending;}
 async function saveStreakAlias(form){
   const alias=form.elements.alias.value.trim();
@@ -164,7 +164,7 @@ window.addEventListener("online",()=>{if(uid()&&streakSocial.enabled&&!streakSoc
 document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="visible"&&uid()&&streakSocial.enabled&&!streakSocialBusy)refreshStreakSocial();
 });
-// REQ-317: antes de activar, el alias se propone con el primer nombre del perfil.
+// REQ-316: antes de activar, el alias se propone con el primer nombre del perfil.
 function streakAliasSuggestion(){
   const name=String(profile&&profile.prefs&&profile.prefs.name||"").trim().split(/\s+/)[0]||"";
   return name.length>=2?name.slice(0,24):"";
@@ -188,7 +188,7 @@ function streakFriendsBody(){
   const retry=`<button class="btn" type="button" onclick="refreshStreakSocial()" ${busy}>Actualizar rachas</button>`;
   if(mine.unavailable)return head+error+retry+fallback;
   const invitation=streakSocialPending?`<div class="streak-incoming"><h3>${streakSocialPreview?`${esc(streakSocialPreview.alias)} te invita a comparar rachas`:"Tienes una invitación"}</h3><p class="muted small">Aceptar comparte tu alias y tus días de racha con esta persona, y te permite ver los suyos.</p>${mine.enabled&&streakSocialPreview?`<button class="btn btn-accent" type="button" onclick="changeStreakSocial('accept',{token:streakSocialPending},this)" ${busy}>Aceptar amistad</button>`:""}<button class="btn" type="button" onclick="closeStreakInvite()">Descartar invitación</button></div>`:"";
-  // REQ-317: sin buscador ni correo: se agrega a un amigo con un enlace privado.
+  // REQ-316: sin buscador ni correo: se agrega a un amigo con un enlace privado.
   const steps=`<ol class="streak-steps"><li><strong>Revisa tu alias.</strong> Es el nombre con el que te verán tus amigos.</li><li><strong>Toca «Crear invitación»</strong> y envía el enlace a un amigo por WhatsApp o donde quieras.</li><li><strong>Tu amigo la acepta</strong> desde su cuenta y los dos aparecen en la lista, cada uno con su alias.</li></ol><p class="muted small">Nadie puede buscarte: solo entra quien recibe tu enlace.</p>`;
   if(!mine.enabled)return head+error+invitation+(invitation?"":steps)+streakAliasForm(false)+fallback;
   const rows=Array.isArray(mine.rows)?mine.rows:[];
@@ -205,7 +205,7 @@ function streakFriendsBody(){
   return head+error+invitation+youAre+`<p class="muted small">Gana la racha actual más larga. Los empates comparten posición. Se mantienen tus descansos y las reglas de tu racha.</p>`
     +(streakSocialSyncPending()?`<p class="streak-social-status" role="status">Actualización pendiente: la clasificación muestra la última racha guardada.</p>`:"")
     +ranking+(rows.length<=1&&!streakSocialInvite?`<p class="muted small">Invita a tu primer amigo para comparar sus rachas.</p>`:"")
-    // REQ-317: con un enlace a la vista, la acción principal es compartirlo; un enlace nuevo cancela el anterior.
+    // REQ-316: con un enlace a la vista, la acción principal es compartirlo; un enlace nuevo cancela el anterior.
     +`<div class="streak-social-actions"><button class="btn ${streakSocialInvite?"":"btn-accent"}" type="button" onclick="changeStreakSocial('invite',{},this)" ${busy}>${streakSocialInvite?"Crear otro enlace":"Crear invitación"}</button>${retry}</div>`+invite
     +`<details class="streak-social-settings"><summary>${chevron()}Alias y privacidad</summary>${streakAliasForm(true)}<button class="btn" type="button" onclick="disableStreakSocial()" ${busy}>Dejar de comparar mi racha</button></details>`+fallback;
 }

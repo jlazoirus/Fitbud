@@ -327,12 +327,18 @@ async function inviteSignup(e, body, res) {
   });
   const created = await rj(ur);
   if (!ur.ok) {
-    const msg = String(created.code || created.error_code || created.msg || created.message || "");
-    if (ur.status === 422 && /exists|registered/i.test(msg)) {
-      res.status(409).json({ error: "Ya existe una cuenta con este correo. Inicia sesión y canjea tu código en Perfil → Mi suscripción." });
-    } else if (/password/i.test(msg)) {
+    // REQ-305: GoTrue responde {"code":422,"error_code":"email_exists","msg":"..."};
+    // created.code es numérico y tapaba el texto, así que un correo ya registrado
+    // caía en el 500 genérico en vez del 409 con instrucciones.
+    const msg = [created.code, created.error_code, created.msg, created.message, created.error_description]
+      .filter((part) => part !== undefined && part !== null && part !== "")
+      .join(" ");
+    if (/exists|registered/i.test(msg)) {
+      res.status(409).json({ error: "Ya tienes una cuenta con este correo. Inicia sesión para entrar; si no recuerdas tu contraseña, toca \"Olvidé mi contraseña\" en el inicio de sesión. Si tu acceso no aparece activo, canjea tu código en Perfil → Mi suscripción." });
+    } else if (/password|weak/i.test(msg)) {
       res.status(400).json({ error: "Elige una contraseña más segura." });
     } else {
+      console.error("invite-signup: alta rechazada por Supabase", ur.status, msg);
       res.status(500).json({ error: "No pudimos crear tu cuenta. Intenta de nuevo." });
     }
     return;
@@ -346,6 +352,9 @@ async function inviteSignup(e, body, res) {
   });
   const redeemed = await rj(rr);
   if (!rr.ok) {
+    // REQ-305: deja el motivo real en los logs de Vercel; al usuario solo le
+    // llega el mensaje amable de couponError.
+    console.error("invite-signup: canje rechazado", rr.status, redeemed && (redeemed.message || redeemed.error || redeemed.code));
     await fetch(e.url + "/auth/v1/admin/users/" + encodeURIComponent(userId), {
       method: "DELETE",
       headers: svcHeaders(e),

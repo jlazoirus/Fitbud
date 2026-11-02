@@ -14,6 +14,7 @@ const ANA = {
 
 test("REQ-218: aceptar a una postulante crea su acceso y deja el WhatsApp listo", async ({ page, context }) => {
   await installMocks(context, { tables: { profiles: { row: { ...profileFixture(), is_admin: true } } } });
+  await page.addInitScript(() => { window.__forceAdminConsole = true; }); // REQ-308: la consola vive en /admin
   await seedLoggedInUser(page);
   await autoDismissNudges(page);
   const errors = collectConsoleErrors(page);
@@ -90,7 +91,12 @@ test("REQ-225: con correo, aceptar envía la invitación por correo y avisa de p
   });
   await gotoApp(page);
   await expect(page.getByText("1 postulación espera tu revisión")).toBeVisible();
+  // REQ-308: la tarjeta de Hoy enlaza a la consola separada en /admin
   await page.getByRole("button", { name: "Revisar" }).click();
+  await expect(page).toHaveURL(/\/admin\?ver=postulantes$/);
+  await page.addInitScript(() => { window.__forceAdminConsole = true; });
+  await page.goto("/index.html");
+  await page.waitForFunction(() => typeof profile !== "undefined" && profile && !_authBusy, { timeout: 15_000 });
   const card = page.locator("#betaList .meal").first();
   await expect(card).toContainText("ana@correo.test");
   await card.getByRole("button", { name: "Aceptar (90 días)" }).click();
@@ -108,7 +114,11 @@ test("REQ-226: el enlace del correo de aviso abre Postulantes beta al admin", as
   await seedLoggedInUser(page);
   await autoDismissNudges(page);
   await page.route("**/api/admin", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ applicants: [], counts: { pending: 0, invited: 0, closed: 0 } }) }));
+  // REQ-308: el enlace apunta a la consola; si llega a la app, redirige a /admin
+  await page.goto("/index.html?ver=postulantes");
+  await page.waitForURL(/\/admin\?ver=postulantes$/, { timeout: 15_000 });
+  await page.addInitScript(() => { window.__forceAdminConsole = true; });
   await page.goto("/index.html?ver=postulantes");
   await expect(page.getByRole("heading", { name: "Postulantes beta" })).toBeVisible();
-  expect(new URL(page.url()).search).toBe("");
+  await page.waitForFunction(() => window.location.search === "");
 });

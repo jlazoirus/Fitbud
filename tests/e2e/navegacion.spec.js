@@ -55,8 +55,10 @@ test.describe("Navegación", () => {
     await installMocks(context);
     // Retrasa /api/catalog para forzar que refreshAuth() (sin sesión) gane la
     // carrera y boot() pinte la landing ANTES de que catalogPlans esté poblado.
+    let releaseCatalog;
+    const catalogReleased = new Promise(resolve => { releaseCatalog = resolve; });
     await context.route("**/api/catalog", async (route) => {
-      await new Promise((resolve) => setTimeout(resolve, 300));
+      await catalogReleased;
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ plans: [] }) });
     });
     const errors = collectConsoleErrors(page);
@@ -65,6 +67,7 @@ test.describe("Navegación", () => {
 
     // Justo tras el primer render (antes de que resuelva /api/catalog) no hay tarjetas todavía.
     await expect(page.locator(".l-plan")).toHaveCount(0);
+    releaseCatalog();
     // Sin ninguna interacción del usuario, deben aparecer solas cuando el catálogo carga.
     await expect(page.locator(".l-plan")).toHaveCount(2, { timeout: 5_000 });
 

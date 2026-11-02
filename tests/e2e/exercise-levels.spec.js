@@ -32,7 +32,12 @@ test("REQ-264: corrige niveles y demo antiguos de Supabase sin modificar las fil
   const guide = page.locator("#overlay");
   await expect(guide).toContainText("Intermedio");
   await expect(guide).toContainText("pies en el suelo");
-  await expect(guide.locator("img")).toHaveAttribute("src", "assets/exercise-media/pike-push-up.svg");
+  await expect(guide.locator("img")).toHaveCount(2);
+  for(const i of [0,1]){
+    const frame=guide.locator(`.demo-frame-${i}`);
+    await expect(frame).toHaveAttribute("src",`assets/exercise-media/pike-push-up-${i}.jpg`);
+    await expect.poll(()=>frame.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
+  }
   expect(errors).toEqual([]);
 });
 

@@ -40,7 +40,7 @@ test.describe("Home — chips del coach", () => {
 
   test("REQ-153: con pausa por seguridad activa, ningún chip ofrece el entrenamiento", async ({ page, context }) => {
     await installMocks(context, {
-      tables: { safety_screenings: { row: { ...screeningFixture(), has_red_flags: true, cleared_for_training: false } } },
+      tables: { safety_screenings: { row: { ...screeningFixture(), has_red_flags: true, cleared_for_training: false, responses: { chest_pain: true } } } },
     });
     await seedLoggedInUser(page);
     await autoDismissNudges(page);

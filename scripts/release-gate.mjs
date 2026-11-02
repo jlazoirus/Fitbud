@@ -184,7 +184,13 @@ if (!existsSync(join(ROOT, "node_modules", "@playwright", "test"))) {
   });
   console.error("  ✗ Suite E2E: falta @playwright/test — corre `npm install && npx playwright install chromium`");
 } else {
-  run("Suite E2E (npx playwright test)", "npx playwright test --reporter=list", { timeout: 300_000 });
+  // Reintento explícito tras una pasada completa: Playwright conserva los
+  // fallidos en .last-run.json. Por defecto siempre se ejecuta toda la suite.
+  const retryFailed = process.env.E2E_RETRY_FAILED === "1";
+  run(retryFailed ? "Suite E2E (reintento de fallidos)" : "Suite E2E (npx playwright test)",
+    `npx playwright test --reporter=list${retryFailed ? " --last-failed" : ""}`,
+    // La suite completa supera 200 journeys; reserva 15 min para entornos CI pequeños.
+    { timeout: Number(process.env.E2E_TIMEOUT_MS) || 900_000, stdio: "inherit" });
 }
 
 // ── Resumen ──────────────────────────────────────────────────────────────────

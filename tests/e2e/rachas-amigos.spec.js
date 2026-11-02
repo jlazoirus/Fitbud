@@ -40,7 +40,7 @@ async function setup(page,context,social,rows=[]){
   await page.getByRole('button',{name:'Ver mi racha y amigos'}).click();
   await expect(page.getByRole('button',{name:'Crear invitación'})).toBeVisible();
 }
-// REQ-317: sin invitación recibida, «Crear invitación» activa y deja el enlace listo.
+// REQ-316: sin invitación recibida, «Crear invitación» activa y deja el enlace listo.
 async function enable(page,alias='Mi alias',{invited=false}={}){
   await page.getByLabel('Tu alias para amigos').fill(alias);
   await page.getByRole('button',{name:invited?'Activar comparación':'Crear invitación'}).click();
@@ -51,7 +51,7 @@ async function enable(page,alias='Mi alias',{invited=false}={}){
 test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,context,social})=>{
   const errors=collectConsoleErrors(page);
   await setup(page,context,social,[row(-3),row(-2),row(-1)]);
-  // REQ-317: la pantalla explica cómo se suma a un amigo y propone el primer nombre como alias.
+  // REQ-316: la pantalla explica cómo se suma a un amigo y propone el primer nombre como alias.
   await expect(page.locator('.streak-steps')).toContainText('Revisa tu alias');
   await expect(page.locator('.streak-steps')).toContainText('envía el enlace a un amigo');
   await expect(page.getByText('Nadie puede buscarte')).toBeVisible();
@@ -61,7 +61,7 @@ test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,co
   await expect(page.locator('.streak-steps')).toHaveCount(0);
   const list=page.getByRole('list',{name:'Clasificación por racha actual'});
   await expect(list).toContainText('Ana (tú)');await expect(list.locator('.streak-days')).toHaveText('3días');
-  // El enlace ya quedó creado al activar (REQ-317).
+  // El enlace ya quedó creado al activar (REQ-316).
   const link=await page.getByLabel(/Invitación para un amigo/).inputValue();
   const token=new URLSearchParams(new URL(link).hash.slice(1)).get('friend');
   await social.rpc(FRIEND,'enable',{alias:'Bruno'});

@@ -98,6 +98,9 @@
   button{font-family:inherit;cursor:pointer;border:none;border-radius:var(--r-sm);color:var(--txt)}
   .btn{background:var(--surf2);padding:9px 14px;font-size:14px;font-weight:500;border:1px solid var(--border-2);border-radius:999px;transition:.15s}
   .btn:active{transform:scale(.97)}
+  /* REQ-311: el botón deshabilitado debe verse deshabilitado (antes parecía clicable y la pausa se leía como "los botones no responden"). */
+  .btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+  .btn:disabled:active{transform:none}
   .btn-accent{background:var(--accent);color:var(--on-accent);font-weight:700;font-family:var(--font-body);border:none;box-shadow:0 1px 2px rgba(0,0,0,.35)}
   .btn-sm{padding:7px 13px;font-size:13px}
   /* Touch targets accesibles en pantallas táctiles (auditoría UX 23 jun 2026): mínimo 44px */
@@ -798,6 +801,22 @@
   .sp-copy b{font-size:14px;font-weight:700;line-height:1.3}
   .sp-copy span{font-size:12.5px;color:var(--muted);line-height:1.35}
   .sp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  /* REQ-304: el día ganado tiene más presencia que el avance parcial. */
+  .sp-card.sp-earned{position:relative;display:grid;grid-template-columns:56px minmax(0,1fr);column-gap:16px;row-gap:6px;max-width:420px;min-height:148px;padding:18px 38px 18px 18px;background:var(--accent);border-color:transparent;box-shadow:none;color:var(--on-accent)}
+  .sp-earned .sp-flame{grid-column:1;grid-row:1 / 3;width:56px;height:64px;background:transparent;align-self:center}
+  .sp-earned .sp-flame svg{width:44px;height:44px;animation:spEarnFlame .6s .35s cubic-bezier(.16,1,.3,1) both;filter:none}
+  .sp-earned .sp-line{stroke:var(--on-accent)}
+  .sp-earned .sp-fill{fill:var(--on-accent)}
+  .sp-earned .sp-count{grid-column:2;grid-row:1;grid-template-columns:auto auto;column-gap:8px;justify-content:start;align-items:baseline;width:fit-content;max-width:100%;height:52px;font-size:clamp(32px,10vw,44px);line-height:52px}
+  .sp-unit{grid-area:1 / 2;font-family:var(--font-body);font-weight:600;font-size:14px;letter-spacing:normal;line-height:1.4}
+  .sp-earned .sp-copy{grid-column:2;grid-row:2;padding:0;border:0;gap:4px}
+  .sp-earned .sp-copy b{font-size:15px}
+  .sp-earned .sp-copy span{color:var(--on-accent);font-size:13px}
+  .sp-close{position:absolute;top:12px;right:12px;width:18px;height:18px}
+  .sp-sparks{opacity:0;transform-origin:12px 12px;animation:spSparks .6s .58s ease-out both}
+  .streak-pop.sp-paused .sp-card,.streak-pop.sp-paused .sp-card *{animation-play-state:paused}
+  @keyframes spEarnFlame{from{transform:scale(.9)}to{transform:none}}
+  @keyframes spSparks{0%{opacity:0;transform:scale(.7)}30%{opacity:.8}100%{opacity:0;transform:scale(1.35)}}
   @keyframes spIn{from{opacity:0;transform:translateY(-14px) scale(.97)}to{opacity:1;transform:none}}
   @keyframes spOut{to{opacity:0;transform:translateY(-8px)}}
   @keyframes spFill{from{transform:scaleY(var(--sp-from))}to{transform:scaleY(var(--sp-to))}}
@@ -813,9 +832,24 @@
     .streak-pop.out .sp-card{animation:spFadeOut .15s ease-in both}
     .sp-level{animation:none;transform:scaleY(var(--sp-to))}
     .sp-day .sp-flame svg,.sp-recovered .sp-flame svg{animation:none}
+    .sp-earned .sp-sparks{display:none;animation:none}
+    .sp-earned .sp-flame svg{animation:none;filter:none}
     .sp-from{animation:spFadeOut .2s .3s both}
     .sp-to{animation:spFade .2s .3s both}
   }
+
+  .coach-welcome{margin:0 0 18px;padding:18px;background:var(--surf1);border:1px solid var(--border-acc);border-radius:var(--r-md)}
+  .coach-welcome-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .coach-welcome h2{margin:0;font-family:var(--font-body);font-size:20px;line-height:1.25;letter-spacing:-.02em}
+  .coach-welcome-heading .btn{flex-shrink:0;min-height:44px;margin-top:-8px}
+  .coach-welcome p{max-width:65ch;margin:8px 0 14px;color:var(--muted);font-size:14px;line-height:1.5}
+  .coach-welcome-questions{display:flex;flex-wrap:wrap;gap:8px}
+  .coach-welcome-questions .btn{min-height:44px;white-space:normal;text-align:left}
+  .coach-welcome-links{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:8px}
+  .coach-welcome-links button{min-height:44px;padding:4px 0;background:none;color:var(--txt);font:inherit;font-size:13px;text-decoration:underline;text-underline-offset:3px}
+  .coach-welcome button:focus-visible,.coach-guide-reply:focus-visible{outline:2px solid var(--accent);outline-offset:4px}
+  .coach-guide-reply .coach-action-bar{flex-wrap:wrap}
+  @media(max-width:480px){.coach-welcome-questions .btn{width:100%}}
 
   /* Coach conversacional (REQ-21) */
   .coach-wrap{display:flex;flex-direction:column;height:calc(100dvh - 102px - var(--safe-top) - var(--safe-bottom));padding-bottom:0}
@@ -1094,6 +1128,12 @@
   .pf-accordion .availability-day select{padding:8px;min-height:44px}
   .pf-save-float{position:fixed;bottom:calc(70px + env(safe-area-inset-bottom,0px));left:0;right:0;padding:0 16px;z-index:49;pointer-events:none}
   .pf-save-float button{width:100%;max-width:528px;margin:0 auto;display:block;background:var(--accent);color:var(--on-accent);border:none;border-radius:var(--r-lg);padding:14px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.55);pointer-events:auto;font-family:var(--font-body)}
+  /* REQ-307: soporte por WhatsApp */
+  .wa-fab{position:fixed;right:16px;bottom:calc(18px + var(--safe-bottom,0px));z-index:70;width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(0,0,0,.45),0 0 0 1px var(--border-acc);transition:transform .15s ease}
+  .wa-fab:hover{transform:scale(1.06)}
+  .wa-fab svg{width:30px;height:30px}
+  .wa-support-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  .wa-support-btn svg{width:18px;height:18px;flex-shrink:0}
   /* REQ-193: objetivos táctiles de 44px (después de las reglas base para ganar la cascada) */
   @media(pointer:coarse){
     .btn{min-height:44px}
@@ -1529,6 +1569,9 @@ const GENTLE_BLOCKED_EXERCISE_SLUGS=new Set([
   "bulgarian-split-squat","walking-lunge","single-leg-rdl",
   "slider-leg-curl","nordic-hamstring-curl","shoulder-tap-plank",
   "overhead-press",
+  // REQ-303: nuevas ejecuciones con suspensión, plancha de alta demanda,
+  // apoyo unilateral cargado o coordinación de empuje y rotación.
+  "chin-up","body-up","dumbbell-step-up","dumbbell-forward-lunge","arnold-press",
 ]);
 function normalizedTrainingSafetyMode(value){
   return TRAINING_SAFETY_MODE_LABELS[value]?value:"auto";
@@ -3201,8 +3244,66 @@ function hasCurrentScreening(){
 function privacyGateRequired(){
   return hasCompleteOnboarding((profile&&profile.prefs)||{})&&(!hasRequiredConsents()||!hasCurrentScreening());
 }
+// REQ-311: la pausa dura se reserva para señales graves (dolor de pecho,
+// desmayos o mareos importantes, restricción indicada por un profesional) o
+// para una evaluación faltante o incompleta. Una lesión declarada
+// (acute_injury) sin señales graves pasa a aviso visible con opción
+// voluntaria de continuar; continuar no es una autorización médica y el
+// aviso permanece mientras la lesión siga declarada. Filas antiguas sin
+// detalle de respuestas se tratan como señal grave (criterio seguro).
+const SAFETY_HARD_KEYS=["chest_pain","fainting_dizziness","clinician_restriction"];
+const SAFETY_SOFT_KEYS=["acute_injury"];
+function hasHardSafetyFlags(){
+  if(!safetyScreening)return false;
+  const r=safetyScreening.responses;
+  if(!r||typeof r!=="object")return !!safetyScreening.has_red_flags;
+  return SAFETY_HARD_KEYS.some(k=>r[k]===true);
+}
+function hasSoftSafetyFlags(){
+  if(!safetyScreening||hasHardSafetyFlags())return false;
+  const r=safetyScreening.responses;
+  if(!r||typeof r!=="object")return false;
+  return SAFETY_SOFT_KEYS.some(k=>r[k]===true);
+}
+function injuryTrainingAcked(){
+  const ack=profile&&profile.prefs&&profile.prefs.injuryTrainingAckAt;
+  const done=safetyScreening&&(safetyScreening.completed_at||safetyScreening.updated_at);
+  return !!(ack&&done&&Date.parse(ack)>=Date.parse(done));
+}
 function trainingSafetyHold(){
-  return !hasCurrentScreening()||!!(safetyScreening&&safetyScreening.has_red_flags)||!(safetyScreening&&safetyScreening.cleared_for_training);
+  return !hasCurrentScreening()||hasHardSafetyFlags();
+}
+// Lesión declarada sin señales graves y sin aceptación vigente del aviso.
+function trainingSafetySoftHold(){
+  return !trainingSafetyHold()&&hasSoftSafetyFlags()&&!injuryTrainingAcked();
+}
+// La lesión sigue declarada (con o sin aceptación): el aviso se mantiene visible.
+function trainingInjuryNoticeActive(){
+  return !trainingSafetyHold()&&hasSoftSafetyFlags();
+}
+async function acknowledgeInjuryTraining(ds,next){
+  if(!trainingSafetySoftHold()){closeModal();render();return;}
+  if(!profile)return;
+  if(!profile.prefs)profile.prefs={};
+  profile.prefs.injuryTrainingAckAt=new Date().toISOString();
+  if(supa&&uid()){
+    try{await supa.from("profiles").update({prefs:profile.prefs,updated_at:new Date().toISOString()}).eq("id",uid());}catch(e){/* best-effort */}
+  }
+  closeModal();
+  toast("Aviso aceptado: entrenas bajo tu responsabilidad");
+  render();
+  if(next==="start")startWorkoutExecution(ds);
+  else if(next==="picker")openWorkoutPicker(ds);
+  else if(next==="manual")openManualActivity(ds);
+}
+function openInjuryTrainingNotice(ds,next){
+  modal(`<h3>Aviso por lesión declarada</h3>
+    <p class="muted">Declaraste una lesión aguda o dolor que empeora al moverte. Entrenar con esta lesión es tu decisión y bajo tu responsabilidad: no es una autorización médica ni sustituye la orientación de un profesional de salud.</p>
+    <div class="alert violet"><b>Si decides continuar:</b> modera la intensidad, evita lo que te duele y detente ante dolor, mareo, desmayo o falta de aire inusual.</div>
+    <div class="wk-sheet-actions">
+      <button class="btn btn-accent" onclick="acknowledgeInjuryTraining('${ds}','${next}')">Continuar bajo mi responsabilidad</button>
+      <button class="btn" onclick="closeModal()">Ahora no</button>
+    </div>`);
 }
 function safetyHoldWorkout(){
   return {
@@ -3689,6 +3790,11 @@ function renderOnboarding(){
         ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("ob_safety_"+key,d.safetyResponses[key])}</div>`).join("")}
         <div class="alert"><b>Evolv es bienestar, no atención médica.</b><br>Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
         <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
+      </div>
+      <div class="section-h" style="margin-left:0">Estamos contigo</div>
+      <div class="dash">
+        <div class="alert violet"><b>¿Dudas?</b> Nuestro equipo te acompaña por WhatsApp en lo que necesites.</div>
+        ${waSupportButtonHtml()}
       </div>${onboardingButtons(true)}`;
   }
   $("#tabs").innerHTML="";
@@ -4238,39 +4344,73 @@ function screenHeader(title,sub,icon){
   </header>`;
 }
 
+/* ---------- REQ-308: consola de administración separada en /admin ---------- */
+// La consola vive en evolvapp.club/admin (rewrite a este mismo index.html en
+// vercel.json). La app de usuarios ya no renderiza vistas de administración:
+// solo enlaza a la consola. La autorización real no cambia: /api/admin y las
+// tablas siguen verificando is_admin en el servidor.
+const ADMIN_CONSOLE=/^\/admin(?:\/|$)/.test(location.pathname)||window.__forceAdminConsole===true;
+const ADMIN_VIEWS=["adminBeta","admin","foods","exercises","analytics","settings"];
+const ADMIN_TABS=[["adminBeta","Beta","mail"],["admin","Usuarios","perfil"],["foods","Alimentos","foods"],["exercises","Ejercicios","entreno"],["analytics","Analítica","progreso"],["settings","Ajustes","settings"]];
+function renderAdminTabs(){
+  $("#tabs").innerHTML=ADMIN_TABS.map(([v,l,ic])=>`<button data-tab="${v}" class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(ic)}</span><span>${l}</span></button>`).join("")
+    +`<button onclick="location.href='/'"><span class="ic">${tabIcon("hoy")}</span><span>App</span></button>`;
+}
+function renderAdminConsole(){
+  if(!isAdmin()){
+    $("#tabs").innerHTML="";
+    const mail=(session&&session.user&&session.user.email)||"";
+    $("#app").innerHTML=`<div class="onboarding"><div class="onboarding-brand">EVOLV · ADMINISTRACIÓN</div>
+      <h1>Sin acceso</h1>
+      <p class="onboarding-copy">Esta consola es solo para el equipo de Evolv.${mail?` La cuenta ${esc(mail)} no tiene permisos de administración.`:""}</p>
+      <div class="onboarding-actions"><a class="btn btn-accent" style="flex:1;text-align:center" href="/">Ir a la app</a></div></div>`;
+    return;
+  }
+  if(!ADMIN_VIEWS.includes(view))view="adminBeta";
+  renderAdminTabs();
+  if(view==="foods")return renderFoods();
+  if(view==="exercises")return renderExerciseAdmin();
+  if(view==="settings")return renderSettings();
+  if(view==="admin")return renderAdminUsers();
+  if(view==="analytics")return renderAnalytics();
+  return renderAdminBeta();
+}
+
 let authReady=false;   // true cuando ya resolvimos la sesión de Supabase
 let passwordRecovery=false;
 let passwordRecoveryError="";
 let passwordRecoveryMode="recovery";
 function render(){
   updateInstallPrompt();
-  $("#app").classList.toggle("landing-host", !!(authReady&&!session&&!window._showAuth));
+  $("#app").classList.toggle("landing-host", !!(authReady&&!session&&!window._showAuth&&!ADMIN_CONSOLE));
   if(!authReady){$("#tabs").innerHTML="";return renderSplash();}
   if(passwordRecovery){$("#tabs").innerHTML="";return renderPasswordRecovery();}
   if(!session){
+    resetStreakFeedback();
     $("#tabs").innerHTML="";
-    return window._showAuth ? renderAuth() : renderLanding();
+    return (window._showAuth||ADMIN_CONSOLE) ? renderAuth() : renderLanding();
   }
   if(profile&&!isActive()){ $("#tabs").innerHTML="";return renderInactive(); }
   if(!privacyReady){$("#tabs").innerHTML="";return renderSplash();}
   if(privacyError)return renderPrivacyUnavailable();
+  if(ADMIN_CONSOLE)return renderAdminConsole();
   if(onboardingActive)return renderOnboarding();
   if(privacyGateRequired())return renderPrivacyGate();
   if(planNeedsRecap()){ $("#tabs").innerHTML="";return renderPlanRecap(); }
   if(notifySetupActive){ $("#tabs").innerHTML="";return renderNotifySetup(); } // REQ-289
+  primeStreakSeen(); // REQ-304: también antes de registrar desde el modo conversación
   if(chatModeActive())return renderChatMode();
-  primeStreakSeen(); // REQ-283: estado de racha visto antes del próximo registro
   renderTabs();
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
   if(view==="progreso")return renderProgress();
   if(view==="perfil")return renderProfile();
-  if(isAdmin()&&view==="foods")return renderFoods();
-  if(isAdmin()&&view==="exercises")return renderExerciseAdmin();
-  if(isAdmin()&&view==="settings")return renderSettings();
-  if(isAdmin()&&view==="admin")return renderAdminUsers();
-  if(isAdmin()&&view==="adminBeta")return renderAdminBeta();
-  if(isAdmin()&&view==="analytics")return renderAnalytics();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="foods")return renderFoods();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="exercises")return renderExerciseAdmin();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="settings")return renderSettings();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="admin")return renderAdminUsers();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="adminBeta")return renderAdminBeta();
+  if(ADMIN_CONSOLE&&isAdmin()&&view==="analytics")return renderAnalytics();
   renderHoy();
 }
 function renderSplash(){$("#app").innerHTML=`<div class="splash"><div class="muted">Cargando…</div></div>`;}
@@ -4441,7 +4581,7 @@ function renderTabs(){
   $("#tabs").innerHTML=tabs.map(([v,l])=>`<button data-tab="${v}" class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
 }
 function setView(v){
-  if((v==="foods"||v==="exercises"||v==="settings"||v==="admin"||v==="adminBeta")&&!isAdmin())v="perfil";
+  if(ADMIN_VIEWS.includes(v)&&(!isAdmin()||!ADMIN_CONSOLE))v="perfil";
   if(v==="coach")v="hoy";
   view=v;
   if(v==="hoy")current=clampDate(todayStr());
@@ -4894,6 +5034,102 @@ function homeAgendaHtml(ds){
   </section>`;
 }
 
+/* REQ-314: acompañamiento opcional durante los primeros cinco días de uso.
+   Solo guarda fechas y descartes por usuario en este dispositivo. */
+const coachWelcomeMemory={};
+function coachWelcomeKey(){return uid()?"fitbud_coach_welcome_v1_"+uid():null;}
+function coachWelcomeState(){
+  const key=coachWelcomeKey();if(!key)return {};
+  if(coachWelcomeMemory[key])return coachWelcomeMemory[key];
+  try{const value=JSON.parse(localStorage.getItem(key)||"{}");return value&&typeof value==="object"&&!Array.isArray(value)?value:{};}catch(e){return {};}
+}
+function saveCoachWelcomeState(value){
+  const key=coachWelcomeKey();if(!key)return;
+  coachWelcomeMemory[key]=value;
+  try{localStorage.setItem(key,JSON.stringify(value));}catch(e){}
+}
+function coachWelcomeEligible(){
+  if(!uid()||!isActive()||!hasCompleteOnboarding((profile&&profile.prefs)||{}))return false;
+  const started=Date.parse(profile.prefs.onboardingCompletedAt||(session.user&&session.user.created_at)||"");
+  const age=Date.now()-started;
+  return Number.isFinite(age)&&age>=0&&age<14*86400000;
+}
+function coachWelcomeHtml(){
+  if(!coachWelcomeEligible())return "";
+  const state=coachWelcomeState(),today=todayStr();
+  if(state.hidden||state.dismissedOn===today)return "";
+  const days=Array.isArray(state.days)?state.days.filter(day=>typeof day==="string").slice(0,5):[];
+  if(!days.includes(today)){
+    if(days.length>=5)return "";
+    days.push(today);saveCoachWelcomeState({...state,days});
+  }
+  const safety=trainingSafetyHold(),ew=effectiveWorkout(clampDate(today));
+  const rest=!ew.workout||ew.workout.id==="descanso";
+  const done=["completed","partial","missed"].includes(workoutOutcomeForState(dayState(clampDate(today))));
+  const inProgress=!!normalizedWorkoutExecution(clampDate(today));
+  const first=days.length===1;
+  const title=first?"Vamos paso a paso":"Aquí estoy para ayudarte";
+  const copy=safety?"Antes de entrenar, revisemos cómo empezar con seguridad.":done?"Tu entreno ya tiene un registro. Si tienes dudas sobre lo que sigue, pregúntame.":inProgress?"Tu sesión sigue donde la dejaste. Te ayudo a retomarla.":rest?"Hoy también cuenta recuperar. Te ayudo a entender tu día.":"Soy tu coach. Elige una pregunta y te ayudo a dar el siguiente paso.";
+  const canWrite=aiAvailable()&&hasRequiredConsents()&&hasCurrentScreening();
+  return `<section class="coach-welcome" aria-labelledby="coachWelcomeTitle">
+    <div class="coach-welcome-heading"><h2 id="coachWelcomeTitle">${title}</h2><button class="btn btn-sm" type="button" aria-label="Ocultar ayuda del coach por hoy" onclick="dismissCoachWelcome(false)">Ahora no</button></div>
+    <p>${copy}</p>
+    <div class="coach-welcome-questions">
+      <button type="button" class="btn btn-accent" onclick="coachWelcomeAsk('workout')">${safety?"¿Cómo empiezo con seguridad?":"¿Cómo entreno hoy?"}</button>
+      ${!safety&&!rest&&!done&&!inProgress?`<button type="button" class="btn" onclick="coachWelcomeAsk('time')">Tengo poco tiempo, ¿qué hago?</button>`:""}
+      <button type="button" class="btn" onclick="coachWelcomeAsk('meals')">¿Qué puedo comer hoy?</button>
+    </div>
+    <div class="coach-welcome-links">${canWrite?`<button type="button" onclick="focusCoachQuestion()">Escribir otra pregunta</button>`:""}<button type="button" onclick="dismissCoachWelcome(true)">No volver a mostrar</button></div>
+  </section>`;
+}
+function dismissCoachWelcome(permanent){
+  saveCoachWelcomeState({...coachWelcomeState(),dismissedOn:todayStr(),hidden:permanent===true});
+  renderHoy();
+}
+function focusCoachQuestion(){
+  setView("hoy");
+  const input=document.getElementById("coachInput");
+  if(input){input.scrollIntoView({block:"center",behavior:"auto"});input.focus();}
+}
+const COACH_WELCOME_QUESTIONS={workout:"¿Cómo entreno hoy?",time:"Tengo poco tiempo, ¿qué hago?",meals:"¿Qué puedo comer hoy?"};
+function coachWelcomeTopic(text){
+  const normalized=String(text||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[¿?¡!.,]/g,"").replace(/\s+/g," ").trim();
+  if(["como entreno hoy","que entreno hoy","hoy como entreno","hoy dia como entreno","como hago el entrenamiento de hoy"].includes(normalized))return "workout";
+  if(["tengo poco tiempo","tengo poco tiempo que hago"].includes(normalized))return "time";
+  if(["que como hoy","que puedo comer hoy"].includes(normalized))return "meals";
+  return null;
+}
+function coachWelcomeAnswer(topic){
+  const ds=clampDate(todayStr());
+  if(topic==="meals")return {text:"Vamos a Nutrición. Ahí puedes ver tus comidas, registrar lo que comiste o elegir otra opción. Preparar un menú es opcional; empieza con una comida.",action:"meals",label:"Ir a mis comidas"};
+  if(trainingSafetyHold())return {text:"Tu entrenamiento está en pausa por seguridad. Te acompaño a revisar la evaluación en Perfil antes de empezar.",action:"safety",label:"Revisar mi evaluación"};
+  const ew=effectiveWorkout(ds),st=dayState(ds),outcome=workoutOutcomeForState(st);
+  if(!ew.workout||ew.workout.id==="descanso")return {text:"Hoy tienes descanso planificado. Recuperar también forma parte del plan; no necesitas añadir una sesión. Puedes revisar tu calendario en Entreno.",action:"workout",label:"Ver mi día de descanso"};
+  if(st.workoutDone||["completed","partial","missed"].includes(outcome))return {text:"Tu sesión de hoy ya tiene un registro. Podemos revisarla sin cambiar lo que hiciste. El siguiente entrenamiento seguirá tu plan.",action:"workout",label:"Ver mi registro"};
+  if(normalizedWorkoutExecution(ds))return {text:"Ya tienes una sesión empezada. Vamos a retomarla desde donde la dejaste, conservando tus series y registros.",action:"workout",label:"Continuar mi sesión"};
+  if(topic==="time")return {text:"Busquemos una opción que encaje con tu tiempo. Te mostraré las alternativas para hoy y tú eliges cuál aplicar; tu sesión sigue igual hasta que elijas.",action:"time",label:"Ver opciones para hoy"};
+  if(isFreeActivityWorkout(ew.workout))return {text:`Hoy tienes ${ew.workout.name||"actividad libre"}. En Entreno puedes revisar la indicación del día y registrar tu actividad al terminar.`,action:"workout",label:"Ver mi actividad de hoy"};
+  return {text:`Hoy tienes ${ew.workout.name||"tu sesión del día"}. En Entreno verás los ejercicios y cómo hacerlos. Revisa la sesión y, cuando estés listo, toca Iniciar sesión guiada para seguirla paso a paso.`,action:"workout",label:"Llévame a mi entrenamiento"};
+}
+function coachWelcomeAsk(topic,userText){
+  if(!session||!isActive()||!COACH_WELCOME_QUESTIONS[topic])return;
+  const answer=coachWelcomeAnswer(topic),ts=Date.now();
+  const msgs=loadCoachChat();
+  msgs.push({id:coachRequestId(),role:"user",text:userText||COACH_WELCOME_QUESTIONS[topic],ts},
+    {id:coachRequestId(),role:"assistant",text:answer.text,type:"educativo",localGuide:topic,ts:ts+1});
+  saveCoachChat(msgs);setView("hoy");scrollCoachToBottom();
+  requestAnimationFrame(()=>{const reply=[...document.querySelectorAll(".coach-guide-reply")].pop();if(reply){reply.focus({preventScroll:true});reply.scrollIntoView({block:"center",behavior:"auto"});}});
+}
+function coachWelcomeNavigate(topic){
+  if(!session||!isActive()||!COACH_WELCOME_QUESTIONS[topic])return;
+  const answer=coachWelcomeAnswer(topic);
+  current=clampDate(todayStr());
+  if(answer.action==="safety"){setView("perfil");return;}
+  if(answer.action==="meals"){setView("nutricion");return;}
+  setView("entreno");
+  if(answer.action==="time")openWorkoutContingency(current,"tiempo");
+}
+
 /* ---------- HOME (Hoy + Coach integrado): REQ-42 ---------- */
 function buildContextualChips(ds){
   const day=buildDay(ds);
@@ -4947,8 +5183,9 @@ function renderHoy(){
   const msgsHtml=msgs.map(renderCoachMessage).join("");
   const typingHtml=`<div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="loading-row" style="padding:6px 2px"><div class="spinner"></div><span>Tu coach está pensando…</span></div></div></div>`;
   const chips=canUse?buildContextualChips(ds):[];
-  const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${JSON.stringify(s)})">${esc(s)}</button>`).join("")}</div>`:"";
+  const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${esc(JSON.stringify(s))})">${esc(s)}</button>`).join("")}</div>`:"";
   const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
+  const localGuides=msgs.filter(m=>m.localGuide||m.role==="user").map(renderCoachMessage).join("");
   const coachSection=canUse?`
     <div class="coach-home-sep">O pregúntale a tu coach</div>
     ${chipsHtml}
@@ -4960,6 +5197,7 @@ function renderHoy(){
         oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
       <button onclick="coachSendFromInput()" title="Enviar" aria-label="Enviar pregunta"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </div>`
+    :localGuides?`<div class="coach-home-sep">Tu coach te acompaña</div><div class="coach-msgs-home" id="coachMsgs">${localGuides}</div>`
     :hasAI?`<div class="coach-home-sep">Tu coach</div><div class="ai-box" style="margin:0 0 12px">⚠️ ${!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`
     :"";
   $("#app").innerHTML=`
@@ -4975,6 +5213,7 @@ function renderHoy(){
     </div>
   </header>
   ${adminBetaPendingCardHtml()}
+  ${coachWelcomeHtml()}
   ${restartNudgeCard()}
   ${returnCardHtml()}
   ${dayClosed?"":heroDash(ds,{compact:true})}
@@ -5197,7 +5436,7 @@ function exerciseLevelLabel(level){
 }
 // REQ-293: el material se muestra en español, nunca con su clave interna.
 const EXERCISE_EQUIPMENT_LABELS={
-  barbell:"barra",rack:"rack",bench:"banco",cable:"polea",dumbbells:"mancuernas",
+  machines:"máquinas",barbell:"barra",rack:"rack",bench:"banco",cable:"polea",dumbbells:"mancuernas",
   bench_or_chair:"banco o silla",barbell_or_dumbbells:"barra o mancuernas",bench_or_assistance:"banco o asistencia",
   dumbbells_or_cable:"mancuernas o polea",leg_press:"prensa",leg_curl:"máquina de femoral",bench_or_wall:"banco o pared",
   resistance_band:"banda elástica",pullup_bar:"barra de dominadas",step_or_bench:"escalón o banco",
@@ -5279,6 +5518,7 @@ function openExerciseGuide(slug){
   modal(`<div class="guide-demo">${exerciseMediaHtml(exercise)}</div>
     <h3>${esc(exercise.name)}</h3>
     <div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(exerciseEquipmentText(equipment))}`:""}${muscles.length?` · ${esc(muscles.join(", "))}`:""}</div>
+    ${exercise.source_name&&exercise.source_name!=="Evolv Studio"?`<div class="exercise-copy" style="opacity:.7;font-size:.85em"><b>Demostración:</b> ${exercise.source_url?`<a href="${esc(exercise.source_url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}</a>`:`${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}`}</div>`:""}
     <div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
     <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
     <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
@@ -5477,6 +5717,7 @@ function manualActivityBlock(ds,restDay){
 }
 function openManualActivity(ds,index){
   if(!canLogManualActivity(ds)){toast("No se puede registrar actividad en este día");return;}
+  if(trainingSafetySoftHold()){openInjuryTrainingNotice(ds,"manual");return;}
   const prev=index!=null?manualActivities(S.days[ds])[index]:null;
   const primary=profile&&profile.prefs&&profile.prefs.primarySport;
   // REQ-252/253: en el día de tu deporte, o en lugar de la sesión de fuerza, se propone
@@ -5717,6 +5958,7 @@ function persistWorkoutExecution(ds,execution,rerender){
 }
 function startWorkoutExecution(ds){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  if(trainingSafetySoftHold()){openInjuryTrainingNotice(ds,"start");return;}
   const prescription=workoutPrescription(ds);
   if(prescription.sessionType==="rest"){toast("Hoy corresponde descanso planificado");return;}
   if(workoutContentIssues(ds).length){toast("Esta sesión necesita actualizar su contenido antes de iniciarse");return;}
@@ -6634,7 +6876,9 @@ function renderWorkout(){
   // acompañan a "Iniciar sesión guiada", la cuenta atrás y la hoja del plan.
   const safetyNotice=trainingSafetyHold()
     ? `<div class="alert"><b>Entrenamiento pausado por seguridad.</b><br>No inicies esta rutina hasta recibir orientación de un profesional. Nutrición, historial y exportación siguen disponibles.</div>`
-    : "";
+    : trainingInjuryNoticeActive()
+      ? `<div class="alert violet"><b>Aviso por lesión declarada.</b><br>Entrenar es tu decisión y bajo tu responsabilidad; no es una autorización médica ni sustituye la orientación de un profesional. Modera la intensidad, evita lo que te duele y detente ante cualquier señal de alerta.</div>`
+      : "";
   // Tarjeta instructiva solo como empty state real: hoy no hay sesión ejecutable (rutina sin ejercicios válidos).
   // Con sesión disponible, la única tarjeta es la de "wk.entreno" más abajo (REQ-101).
   const emptyWkHtml=(contentIssues.length&&!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold())?`<section class="agenda-card agenda-state setup">
@@ -6857,6 +7101,7 @@ function toggleWorkout(){
 }
 function openWorkoutPicker(ds){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
+  if(trainingSafetySoftHold()){openInjuryTrainingNotice(ds,"picker");return;}
   const execution=normalizedWorkoutExecution(ds);
   if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
   if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
@@ -7582,6 +7827,8 @@ function parseCoachReply(raw){
 // Envía un mensaje al coach y actualiza la vista.
 async function sendCoachMessage(userText){
   if(!userText||!userText.trim())return;
+  const welcomeTopic=coachWelcomeTopic(userText);
+  if(welcomeTopic&&session&&isActive()){coachWelcomeAsk(welcomeTopic,userText.trim());return;}
   trackEvent("coach_message_sent",{});
   if(!isActive()||!hasRequiredConsents()||!hasCurrentScreening()){
     toast("Revisa privacidad y seguridad antes de usar tu coach");
@@ -7824,6 +8071,11 @@ function renderChatMode(){
     </div>`:`<div class="muted small">Tu coach por escrito no está disponible ahora; las tarjetas de arriba siguen funcionando.</div>`}`;
 }
 function renderCoachMessage(m){
+  if(m.localGuide&&COACH_WELCOME_QUESTIONS[m.localGuide]){
+    const answer=coachWelcomeAnswer(m.localGuide);
+    return `<div class="coach-msg coach coach-guide-reply" tabindex="-1" role="region" aria-label="Respuesta de tu coach"><div class="chat-bubble">${esc(answer.text)}</div><div class="coach-action-bar"><button type="button" class="btn btn-accent" onclick="coachWelcomeNavigate('${m.localGuide}')">${esc(answer.label)}</button></div></div>`;
+  }
+
   if(m.role==="summary"){
     return `<div class="coach-msg summary"><div class="chat-bubble">${esc(m.text)}</div></div>`;
   }
@@ -8175,16 +8427,19 @@ function renderProfile(){
   </div></div>
   </details>
 
+  <details id="pfSecAyuda" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
+  <summary onclick="return profileAccordionGuard(event,this)">Ayuda y soporte</summary>
+  <div class="pf-accordion-panel"><div class="dash">
+    <div class="muted small" style="margin-bottom:10px">¿Dudas o algo no funciona? Escríbenos por WhatsApp y te ayudamos.</div>
+    ${waSupportButtonHtml()}
+  </div></div>
+  </details>
+
   ${isAdmin()?`<details id="pfSecAdmin" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
   <summary onclick="return profileAccordionGuard(event,this)">Administración</summary>
   <div class="pf-accordion-panel"><div class="dash">
-    <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, alimentos, ejercicios y la configuración técnica.</div>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('adminBeta')">🌱 Postulantes beta${adminBetaPending?` · ${adminBetaPending} por revisar`:""}</button>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('admin')">👥 Usuarios</button>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('foods')">🥗 Alimentos (catálogo)</button>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('exercises')">🏋️ Ejercicios (catálogo)</button>
-    <button class="btn" style="width:100%;margin-bottom:8px" onclick="setView('analytics')">📊 Analítica</button>
-    <button class="btn" style="width:100%" onclick="setView('settings')">⚙️ Ajustes técnicos</button>
+    <div class="muted small" style="margin-bottom:10px">Eres administrador. Gestiona usuarios, postulantes, catálogos y la configuración desde la consola.</div>
+    <a class="btn btn-accent" style="width:100%;text-align:center" href="/admin">Abrir consola de administración${adminBetaPending?` · ${adminBetaPending} por revisar`:""}</a>
   </div></div>
   </details>`:""}
 
@@ -9312,6 +9567,13 @@ const LANDING_FAQ=[
   ["¿Mis datos son privados?","Sí. Tu progreso, fotos, conversaciones y datos corporales son privados y solo tú los puedes ver. Puedes exportar o solicitar el borrado de tu cuenta y todos tus datos en cualquier momento."],
 ];
 
+/* ---------- REQ-307: soporte por WhatsApp ---------- */
+// Número oficial de soporte de Evolv (WhatsApp del equipo, línea de EE. UU.).
+const SUPPORT_WA_URL="https://wa.me/18302629397?text=Hola%2C+tengo+una+duda+sobre+Evolv";
+function waSvg(size){return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>`;}
+function waFabHtml(){return `<a class="wa-fab" href="${SUPPORT_WA_URL}" target="_blank" rel="noopener noreferrer" aria-label="Escríbenos por WhatsApp">${waSvg(30)}</a>`;}
+function waSupportButtonHtml(label){return `<a class="btn btn-accent wa-support-btn" href="${SUPPORT_WA_URL}" target="_blank" rel="noopener noreferrer">${waSvg(18)}${label||"Escríbenos por WhatsApp"}</a>`;}
+
 function renderLanding(){
   _landingKey=landingRenderKey();
   const plansHtml=landingPricingHtml();
@@ -9367,7 +9629,7 @@ function renderLanding(){
     </section>
 
     <footer class="l-wrap l-footer">
-      <a href="https://wa.me/51958978521" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex-shrink:0;margin-right:6px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Escríbenos por WhatsApp</a>
+      <a href="${SUPPORT_WA_URL}" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="flex-shrink:0;margin-right:6px"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>Escríbenos por WhatsApp</a>
       <span>© 2026 Evolv</span>
       <nav aria-label="Legal">
         <a href="#" onclick="showAuthFromLanding('in');return false">Iniciar sesión</a>
@@ -9375,6 +9637,7 @@ function renderLanding(){
         <a href="#" onclick="openTermsNotice();return false">Términos</a>
       </nav>
     </footer>
+    ${waFabHtml()}
   </div>`;
   initLandingStair();
 }
@@ -11210,7 +11473,9 @@ function buildSysPrompt(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const safety=trainingSafetyHold()
     ?"La evaluación tiene una señal de alerta: no propongas rutinas, progresiones ni formas de entrenar; indica detener actividad y buscar evaluación profesional."
-    :"Ante dolor de pecho, mareo, desmayo, falta de aire inusual, lesión aguda u otra señal de alerta, indica detener la actividad y buscar evaluación profesional.";
+    :trainingInjuryNoticeActive()
+      ?"El usuario declaró una lesión y entrena bajo su responsabilidad: adapta las propuestas evitando sobrecargar la zona lesionada, sugiere alternativas suaves y recuerda detenerse ante dolor, mareo, desmayo o falta de aire inusual; nunca lo presentes como autorización médica."
+      :"Ante dolor de pecho, mareo, desmayo, falta de aire inusual, lesión aguda u otra señal de alerta, indica detener la actividad y buscar evaluación profesional.";
   const base=`Da estimaciones realistas de porciones reales, con kcal y macros. Habla como el coach del usuario y no menciones tecnología, proveedores, modelos, prompts ni tokens. No diagnostiques, no prescribas tratamientos, no cambies medicación y no sustituyas a un profesional de salud. ${safety}`;
   const context={
     schema_version:p.profileSchemaVersion,
@@ -11622,7 +11887,7 @@ function trainingEquipmentSupports(requirement,prefs){
   const selected=new Set(prefs.equipment||[]);
   const support={
     barbell:["barbell"],rack:["barbell"],bench:["dumbbells","barbell","machines"],
-    cable:["machines"],leg_press:["machines"],leg_curl:["machines"],
+    machines:["machines"],cable:["machines"],leg_press:["machines"],leg_curl:["machines"],
     dumbbells:["dumbbells"],dumbbells_or_cable:["dumbbells","machines"],
     barbell_or_dumbbells:["barbell","dumbbells"],resistance_band:["bands"],
     pullup_bar:["pullup"],bench_or_assistance:["machines","bodyweight"],table_or_low_bar:[],
@@ -13353,7 +13618,8 @@ function streakEndingAt(ds){
 // Último estado visto de hoy y de ayer. Solo un registro local (commitDay) que
 // lo hace avanzar muestra la píldora; el render y lo que llega de otro
 // dispositivo lo actualizan en silencio.
-let _streakSeen=null,_streakPopTimer=null;
+let _streakSeen=null,_streakPopTimer=null,_streakExitTimer=null,_streakActive=null;
+const _streakCelebrated=new Set(),_streakCelebrations=[];
 const STREAK_FLAME_PATH="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z";
 // Piezas del día que cuentan para la racha (REQ-23): la mitad de las comidas
 // con contenido y el entreno, salvo descanso.
@@ -13373,11 +13639,12 @@ function streakSeenState(){
   const today=todayStr();
   const t=streakDayProgress(today),y=streakDayProgress(addDays(today,-1));
   const sig=p=>p?p.doneSteps+"/"+p.total:"-";
-  return {today,t,y,sig:sig(t)+"|"+sig(y)};
+  return {today,user:uid(),cycle:START,t,y,sig:sig(t)+"|"+sig(y)};
 }
 function primeStreakSeen(){
   try{
     const cur=streakSeenState();
+    if(_streakSeen&&(_streakSeen.user!==cur.user||_streakSeen.cycle!==cur.cycle))resetStreakFeedback();
     if(_streakSeen&&_streakSeen.today===cur.today&&_streakSeen.sig===cur.sig)return;
     _streakSeen={...cur,streak:streak()};
   }catch(e){_streakSeen=null;}
@@ -13388,16 +13655,20 @@ function streakFeedbackAfterCommit(ds){
   if(ds!==today&&ds!==addDays(today,-1))return;
   const prev=_streakSeen;
   const cur=streakSeenState();
-  if(prev&&prev.today===cur.today&&prev.sig===cur.sig)return;
+  if(prev&&prev.user===cur.user&&prev.cycle===cur.cycle&&prev.today===cur.today&&prev.sig===cur.sig)return;
   const after=streak();
   _streakSeen={...cur,streak:after};
-  if(!prev||prev.today!==cur.today)return;
+  if(!prev||prev.user!==cur.user||prev.cycle!==cur.cycle||prev.today!==cur.today)return;
   const isToday=ds===today;
   const p=isToday?cur.t:cur.y,before=isToday?prev.t:prev.y;
   if(!p||!before)return;
   const fill=x=>x.total?x.doneSteps/x.total:0;
+  if(after<prev.streak){
+    if(_streakActive&&_streakActive.kind!=="progress"&&(after<_streakActive.to||!combinedDayDone(_streakActive.date||todayStr())))hideStreakPop();
+    return;
+  }
   if(after>prev.streak){
-    showStreakPop({kind:isToday?"day":"recovered",from:prev.streak,to:after,fillFrom:fill(before),fillTo:1});
+    showStreakPop({kind:isToday?"day":"recovered",date:ds,from:prev.streak,to:after,fillFrom:fill(before),fillTo:1});
     return;
   }
   if(p.done||p.doneSteps<=before.doneSteps)return;
@@ -13422,34 +13693,85 @@ function streakPopCopy(o){
   if(o.kind==="recovered")return {title:"Racha recuperada",sub:`Vuelves a llevar ${days(n)} seguidos.`};
   if(n===1)return {title:"Día 1",sub:"Empezó tu racha."};
   if(STREAK_MILESTONE_LEVELS.includes(n))return {title:`${n} días seguidos`,sub:"Nuevo hito de constancia."};
-  return {title:`Día ${n} sumado`,sub:"Tu racha está a salvo hoy."};
+  return {title:`Día ${n} sumado`,sub:"Este día lo sumaste tú. Sigue a tu ritmo."};
 }
 function streakPopShowing(){return !!document.querySelector("#streakPop .sp-card");}
+// Las celebraciones se encolan para que cada incremento tenga su momento.
+// Todo es efímero y privado: no se guarda en analytics, perfil ni historial.
 function showStreakPop(o){
+  if(o.kind==="progress"){
+    if(document.hidden||(_streakActive&&_streakActive.kind!=="progress"))return;
+    renderStreakPop(o);return;
+  }
+  const event={...o,user:uid(),cycle:START,date:o.date||todayStr()};
+  event.key=JSON.stringify([event.user,event.cycle,event.date,event.to]);
+  if(!event.user||_streakCelebrated.has(event.key))return;
+  _streakCelebrated.add(event.key);
+  _streakCelebrations.push(event);
+  flushStreakCelebrations();
+}
+function flushStreakCelebrations(){
+  if(document.hidden||(_streakActive&&_streakActive.kind!=="progress"))return;
+  while(_streakCelebrations.length){
+    const event=_streakCelebrations.shift();
+    if(event.user!==uid()||event.cycle!==START)continue;
+    // Si se deshizo el registro antes de verlo, no se celebra un día incompleto.
+    if(!combinedDayDone(event.date)||streak()<event.to){_streakCelebrated.delete(event.key);continue;}
+    renderStreakPop(event);return;
+  }
+}
+function pauseStreakPop(){clearTimeout(_streakPopTimer);}
+function resumeStreakPop(){
+  clearTimeout(_streakPopTimer);
+  const el=document.getElementById("streakPop"),card=el&&el.querySelector(".sp-card");
+  if(!_streakActive||!card||el.classList.contains("out")||document.hidden||card.matches(":hover")||card.contains(document.activeElement))return;
+  _streakPopTimer=setTimeout(hideStreakPop,_streakActive&&_streakActive.kind!=="progress"?8000:2800);
+}
+function renderStreakPop(o){
   const el=document.getElementById("streakPop");
   if(!el)return;
-  const c=streakPopCopy(o);
-  const rolls=o.kind!=="progress"&&o.from!==o.to;
-  const milestone=o.kind==="day"&&STREAK_MILESTONE_LEVELS.includes(o.to);
+  const c=streakPopCopy(o),earned=o.kind!=="progress";
+  const rolls=earned&&o.from!==o.to;
   clearTimeout(_streakPopTimer);
-  el.classList.remove("out");
-  el.style.setProperty("--sp-from",String(o.fillFrom));
-  el.style.setProperty("--sp-to",String(o.fillTo));
-  el.innerHTML=`<button type="button" class="sp-card sp-${o.kind}" onclick="hideStreakPop()">
-    <span class="sp-flame" aria-hidden="true"><svg viewBox="0 0 24 24"><defs><clipPath id="spLevelClip"><rect class="sp-level" x="0" y="0" width="24" height="24"/></clipPath></defs><path class="sp-fill" clip-path="url(#spLevelClip)" d="${STREAK_FLAME_PATH}"/><path class="sp-line" d="${STREAK_FLAME_PATH}"/></svg></span>
-    <span class="sp-count" aria-hidden="true">${rolls?`<span class="sp-n sp-from">${o.from}</span><span class="sp-n sp-to">${o.to}</span>`:`<span class="sp-n">${o.to}</span>`}</span>
+  clearTimeout(_streakExitTimer);
+  _streakActive=o;
+  el.classList.remove("out","sp-paused");
+  el.style.setProperty("--sp-from",String(Math.max(0,Math.min(1,Number(o.fillFrom)||0))));
+  el.style.setProperty("--sp-to",String(Math.max(0,Math.min(1,Number(o.fillTo)||0))));
+  const sparks=earned?`<g class="sp-sparks" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M12 0v-3M21 4l2-2M24 13h3M20 23l2 2M3 21l-2 2M0 10h-3"/></g>`:"";
+  el.innerHTML=`<button type="button" class="sp-card sp-${o.kind}${earned?" sp-earned":""}" onclick="hideStreakPop()" onpointerenter="pauseStreakPop()" onpointerleave="resumeStreakPop()" onfocus="pauseStreakPop()" onblur="resumeStreakPop()">
+    <span class="sp-flame" aria-hidden="true"><svg viewBox="0 0 24 24"><defs><clipPath id="spLevelClip"><rect class="sp-level" x="0" y="0" width="24" height="24"/></clipPath></defs>${sparks}<path class="sp-fill" clip-path="url(#spLevelClip)" d="${STREAK_FLAME_PATH}"/><path class="sp-line" d="${STREAK_FLAME_PATH}"/></svg></span>
+    <span class="sp-count" aria-hidden="true">${rolls?`<span class="sp-n sp-from">${o.from}</span><span class="sp-n sp-to">${o.to}</span>`:`<span class="sp-n">${o.to}</span>`}${earned?`<span class="sp-unit">${o.to===1?"día":"días"}</span>`:""}</span>
     <span class="sp-copy"><b>${esc(c.title)}</b><span>${esc(c.sub)}</span></span>
-    <span class="sp-sr">Racha: ${o.to} día${o.to===1?"":"s"}.</span>
+    ${earned?`<svg class="sp-close" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`:""}
+    <span class="sp-sr">${rolls?`Racha actualizada de ${o.from} a ${o.to} día${o.to===1?"":"s"}.`:`Racha: ${o.to} día${o.to===1?"":"s"}.`} Toca para cerrar.</span>
   </button>`;
-  _streakPopTimer=setTimeout(hideStreakPop,o.kind==="progress"?2800:milestone?4400:3600);
+  // El tiempo de lectura empieza con el primer fotograma, no durante
+  // trabajo síncrono que todavía pueda impedir que la tarjeta se pinte.
+  requestAnimationFrame(()=>{if(_streakActive===o)resumeStreakPop();});
 }
 function hideStreakPop(){
   const el=document.getElementById("streakPop");
   clearTimeout(_streakPopTimer);
-  if(!el||!el.firstElementChild)return;
+  if(!el||!el.firstElementChild||el.classList.contains("out"))return;
   el.classList.add("out");
-  _streakPopTimer=setTimeout(()=>{el.innerHTML="";el.classList.remove("out");},180);
+  _streakExitTimer=setTimeout(()=>{
+    el.innerHTML="";el.classList.remove("out");_streakActive=null;
+    flushStreakCelebrations();
+  },180);
 }
+function resetStreakFeedback(){
+  clearTimeout(_streakPopTimer);clearTimeout(_streakExitTimer);_streakSeen=null;_streakActive=null;
+  _streakCelebrations.length=0;_streakCelebrated.clear();
+  const el=document.getElementById("streakPop");
+  if(el){el.innerHTML="";el.classList.remove("out","sp-paused");}
+}
+document.addEventListener("visibilitychange",()=>{
+  const el=document.getElementById("streakPop");
+  if(document.hidden){pauseStreakPop();if(el)el.classList.add("sp-paused");return;}
+  if(el)el.classList.remove("sp-paused");
+  flushStreakCelebrations();resumeStreakPop();
+});
 
 /* ---------- REQ-285: resumen de constancia para los recordatorios ---------- */
 // api/notify.js no conoce el plan: lee de notification_preferences.engagement
@@ -13646,6 +13968,7 @@ let _recoveryBusy=false;
 // porque ahí la sesión todavía está seteada en ese momento.
 function clearSignedOutState(prevUid){
   if(prevUid===undefined)prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
+  resetStreakFeedback(); // REQ-304: ninguna celebración pasa a otra cuenta
   resetStreakSocial(); // REQ-300: ni invitaciones ni clasificación pasan a otra cuenta
   session=null;profile=null;view="hoy";
   entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
@@ -14772,14 +15095,17 @@ function openAdminBetaFromLink(){
     params.delete("ver");
     const qs=params.toString();
     history.replaceState(history.state,"",location.pathname+(qs?"?"+qs:"")+location.hash);
-    if(isAdmin())setView("adminBeta");
+    if(isAdmin()){
+      if(ADMIN_CONSOLE){setView("adminBeta");}
+      else{location.href="/admin?ver=postulantes";}
+    }
   }catch(_){}
 }
 function adminBetaPendingCardHtml(){
   if(!isAdmin()||!adminBetaPending)return "";
   return `<div class="dash" style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
     <div><b>${adminBetaPending} ${adminBetaPending===1?"postulación espera":"postulaciones esperan"} tu revisión</b><div class="muted small">Beta</div></div>
-    <button class="btn btn-sm btn-accent" onclick="setView('adminBeta')">Revisar</button>
+    <button class="btn btn-sm btn-accent" onclick="location.href='/admin?ver=postulantes'">Revisar</button>
   </div>`;
 }
 let adminBetaCache=[];
@@ -16011,7 +16337,7 @@ async function boot(){
   loadCatalog().then(()=>{if(!session)refreshLandingPlans();});
   // REQ-203: el enlace de invitación abre directo el registro.
   if(captureInviteCode()&&!hasStoredAuthSession()){window._showAuth=true;window._authMode="up";}
-  if(!passwordRedirectMode()&&!hasStoredAuthSession()&&!window._showAuth){
+  if(!passwordRedirectMode()&&!hasStoredAuthSession()&&!window._showAuth&&!ADMIN_CONSOLE){
     $("#tabs").innerHTML="";$("#app").classList.add("landing-host");
     renderLanding();
   }
@@ -16142,7 +16468,7 @@ function tourEnsureStyle(){
   document.head.appendChild(s);
 }
 function maybeStartFitbrosTour(){
-  if(_tour||tourSeen())return;
+  if(_tour||tourSeen()||coachWelcomeEligible()||(coachWelcomeState().days||[]).length)return;
   if(!session||onboardingActive||view!=="hoy")return;
   if(!hasCompleteOnboarding((profile&&profile.prefs)||{}))return;
   requestAnimationFrame(()=>requestAnimationFrame(()=>startFitbrosTour(false)));
