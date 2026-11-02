@@ -304,7 +304,7 @@ async function inviteSignup(e, body, res) {
   }
 
   const cr = await fetch(
-    e.url + "/rest/v1/redemption_codes?code=eq." + encodeURIComponent(code) + "&select=code,redeemed_by,valid_until",
+    e.url + "/rest/v1/redemption_codes?code=eq." + encodeURIComponent(code) + "&select=*",
     { headers: svcHeaders(e) }
   );
   const rows = await rj(cr);
@@ -323,7 +323,7 @@ async function inviteSignup(e, body, res) {
   const ur = await fetch(e.url + "/auth/v1/admin/users", {
     method: "POST",
     headers: svcHeaders(e, { "content-type": "application/json" }),
-    body: JSON.stringify({ email, password, email_confirm: true }),
+    body: JSON.stringify({ email, password, email_confirm: true, ...(row.referral_owner ? { app_metadata: { referral_code: code } } : {}) }),
   });
   const created = await rj(ur);
   if (!ur.ok) {
@@ -364,7 +364,7 @@ async function inviteSignup(e, body, res) {
   }
   const ent = Array.isArray(redeemed) ? redeemed[0] : redeemed;
   await applyBetaInvite(e, code, userId, ent);
-  res.status(201).json({ ok: true, entitlement: entitlementOut(ent || {}) });
+  res.status(201).json({ ok: true, ...(row.referral_owner ? { referral: true } : {}), entitlement: entitlementOut(ent || {}) });
 }
 
 // ── handler ───────────────────────────────────────────────────────────────────
@@ -391,6 +391,22 @@ export default async function handler(req, res) {
   if (!auth) {
     res.status(401).json({ error: "Sesión requerida." });
     return;
+  }
+
+  // REQ-317: identidad exclusivamente de la sesión, nunca del body.
+  let referralBody = {};
+  try { referralBody = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {}; } catch (_) {}
+  const referralAction = req.method === "GET" ? req.query?.action : referralBody.action;
+  if ((req.method === "GET" && referralAction === "referrals") || (req.method === "POST" && referralAction === "referral-generate")) {
+    try {
+      const r = await fetch(e.url + "/rest/v1/rpc/referral_dashboard", {
+        method: "POST", headers: svcHeaders(e, { "content-type": "application/json" }),
+        body: JSON.stringify({ p_user_id: auth.user.id, p_generate: req.method === "POST" }),
+      });
+      const data = await rj(r);
+      if (!r.ok) return res.status(503).json({ error: "No pudimos cargar tus invitaciones. Intenta de nuevo." });
+      return res.status(200).json(data);
+    } catch (_) { return res.status(503).json({ error: "No pudimos cargar tus invitaciones. Intenta de nuevo." }); }
   }
 
   // GET /api/entitlement?action=billing-history

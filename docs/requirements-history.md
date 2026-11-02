@@ -12412,7 +12412,71 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-127`).
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-216`).
 
-## REQ-316 - Entreno: nunca un dibujo; sin foto exacta, solo los pasos y la sesión prefiere otro con foto
+## REQ-318 - Rachas con amigos: explicar cómo se suma a un amigo
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-10-29), con una captura de Progreso → Rachas con amigos: "¿Cómo se supone que vea mi alias y sepa el de mis amigos? Debería ser por mail o usuario". Antes de activar, la pantalla solo mostraba un campo vacío "Tu alias para amigos" y el botón "Activar comparación". No explicaba que a un amigo se le suma con un enlace privado (REQ-300).
+
+### Decisión
+
+Se mantiene el enlace privado de un uso (7 días). Jonathan descartó invitar por correo y el nombre de usuario con buscador: un buscador permite ver quién usa Evolv y obliga a moderar nombres.
+
+### Alcance
+
+1. Antes de activar (`js/streak-friends.js`), tres pasos:
+   - elige tu alias, que es el nombre con el que te ven;
+   - crea una invitación y envía el enlace por WhatsApp o donde quieras;
+   - tu amigo la acepta y los dos aparecen en la lista con su alias.
+
+   Debajo, "Nadie puede buscarte: solo entra quien recibe tu enlace". Con una invitación recibida no se muestran los pasos.
+2. El alias se propone con el primer nombre del perfil (`prefs.name`) y se puede editar. No se comparte hasta que la persona activa la comparación y acepta una amistad.
+3. Activada, se muestra "Tus amigos te ven como <alias>".
+4. Seguimiento del mismo día: Jonathan señaló que sin alias no veía el botón para invitar. Si no hay una invitación recibida, el botón del formulario dice "Crear invitación": activa la comparación con el alias y deja el enlace listo para compartir en un solo paso. Con una invitación recibida sigue diciendo "Activar comparación", porque hay que activar antes de aceptar. Con un enlace a la vista, la acción principal es "Compartir invitación" y el otro botón pasa a "Crear otro enlace", que cancela el anterior.
+
+### Criterios de aceptación
+
+- Antes de activar se ven los pasos, el aviso de privacidad y el alias propuesto. "Crear invitación" activa y muestra el enlace; al activar desaparecen los pasos y se muestra el alias propio. Con una invitación recibida, "Activar comparación" deja aceptar. ✓ `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-319 - Dietas: el día incluye fruta
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-11-02): "Las dietas no incluyen frutas".
+
+### Causa raíz
+
+- `generateOneDay()` (`index.html`) arma el día con el modelo. El pedido no decía nada de la fruta: solo aparecía como una opción más en los arquetipos de desayuno y media mañana. Con meta de proteína alta, el bloque "no sacrifiques proteína por variedad" la desplazaba.
+- `planDeterministicNutritionDay()` (`js/nutrition-domain.js`) es el plan de respaldo sin modelo y elegía solo por ajuste de macros. Con el catálogo de producción (49 de 180 platos con fruta) y 10 usuarios × 7 días por perfil, los días con fruta eran 18/70 con 5 comidas y 44/70 con 3.
+
+### Alcance
+
+1. Pedido del día: `dietFruitPromptLine()` exige fruta entera en al menos 2 comidas del día (1 si hay menos de 4 comidas), 80–150 g por porción, sola o dentro del plato, respetando las exclusiones. El arquetipo de snack la menciona.
+2. Plan sin modelo: en desayuno, media mañana, merienda, snack y recena, un plato con fruta (un ingrediente de categoría "Fruta") gana una ventaja de puntaje (`FRUIT_BONUS`, 0,12) mientras el día no llegue al mínimo. Si ningún plato con fruta encaja en la meta, no se fuerza.
+3. Resultado con el mismo catálogo y los mismos usuarios simulados:
+
+   | Perfil | Días con fruta antes | Días con fruta después | Error promedio de kcal y proteína |
+   |---|---|---|---|
+   | 4 comidas | 70/70 | 70/70 | sin cambio |
+   | 5 comidas | 18/70 | 64/70 | kcal 27 → 22; proteína 14,1 → 14,7 g |
+   | 3 comidas | 44/70 | 70/70 | kcal 5 → 3; proteína 17,3 → 19,1 g |
+   | Vegetariano | 70/70 | 70/70 | sin cambio |
+
+   Todos los días quedan dentro de la meta.
+
+### Fuera de alcance
+
+Validar después del modelo que el día traiga fruta y regenerarlo si no la trae. Tendría costo extra por llamada.
+
+### Criterios de aceptación
+
+- Plan sin modelo: 2 comidas con fruta desde 4 comidas y 1 con 3, dentro de la meta de kcal. El pedido incluye la regla. ✓ `scripts/validate-diet-fruit.mjs` (falla con el código anterior), en el release gate.
+
+## REQ-320 - Entreno: nunca un dibujo; sin foto exacta, solo los pasos y la sesión prefiere otro con foto
 
 **Estado: implementado.**
 
@@ -12429,7 +12493,7 @@ Tras REQ-310 seguían 5 ejercicios con dibujo SVG (`bulgarian-split-squat`, `sin
 1. Esos 7 quedan sin demostración (`media_type:"none"`, también sobre filas remotas vía `normalize`). `exerciseHasDemo()` solo cuenta foto, GIF o vídeo; `exerciseMediaHtml()` ya no tiene respaldo de dibujo (se retira `exerciseDemoSvg`). La ficha, la tarjeta y "Ver técnica" omiten el recuadro de demostración, el botón de pausa y el crédito.
 2. `compatibleStrengthExerciseSelection()`: un ejercicio sin demostración cede su sitio a otro permitido y libre del mismo músculo principal con foto (luego del mismo patrón); si no hay, se queda con sus pasos. En casa la búlgara y el step-up pasan a zancada/sentadilla tempo; el femoral sin material solo tiene foto en el curl nórdico (avanzado).
 3. Texto exacto para las 5 fichas sin imagen (antes usaban el texto genérico del patrón: el step-up describía una zancada y el curl deslizante un peso muerto), aplicado también a filas remotas.
-4. `CACHE_NAME` → `fitbud-pwa-v194`. Los SVG siguen en `assets/` sin mostrarse.
+4. `CACHE_NAME` → `fitbud-pwa-v198`. Los SVG siguen en `assets/` sin mostrarse.
 
 ### Criterios de aceptación
 
@@ -12439,3 +12503,35 @@ Tras REQ-310 seguían 5 ejercicios con dibujo SVG (`bulgarian-split-squat`, `sin
 ### Verificación
 
 `tests/e2e/sin-dibujos.spec.js`; specs de entreno, sustitución y expansión de ejercicios; `validate-exercises`, `validate-deploy-allowlist`.
+
+## REQ-310 - Fotos reales en todo el catálogo de ejercicios (adiós al monigote)
+
+**Estado: implementado.**
+
+Jonathan (2026-10-30): "hay varios ejercicios que no tienen fotos ni animación correcta, solo se ve un monigote horrible". Diagnóstico con sesión real:
+
+- 12 ejercicios que solo existen en la tabla de Supabase usaban un GIF ajeno con marca de agua (fitnessprogramer.com, figura anatómica gris y licencia no libre): scaled-push-up, dumbbell-alternating-hammer-curl, band-assisted-pull-up, standing-heel-raise, dumbbell-lateral-raise, band-alternating-lat-pulldown, dumbbell-reverse-fly, dumbbell-romanian-deadlift, dumbbell-standing-shoulder-press, dumbbell-glute-bridge, dumbbell-bent-over-row y goblet-squat.
+- Los 32 ejercicios base de fuerza (press de banca, sentadilla con barra, dominada, etc.) solo tenían fotos en la fila de Supabase: si la tabla no cargaba, el catálogo local de respaldo los dibujaba con el SVG procedimental (el monigote).
+
+Corrección, siguiendo la mecánica de REQ-259/302/303 sin tocar filas de Supabase: se descargaron las 88 fotos de Free Exercise DB (dominio público / Unlicense) a `assets/exercise-media/<slug>-{0,1}.jpg` (mapeo en `scripts/free-exercise-db-map.mjs`, validado con `ingest-exercise-media.mjs --check`); `exercise-catalog.js` asigna secuencia de fotos a los ejercicios base que aún tenían `inline_svg` y registra en `reviewedMedia` el reemplazo de los 12 GIF, que `normalize` aplica sobre las filas remotas. Quedan pendientes 3 ejercicios por no existir foto exacta con licencia compatible (no se usan proxies de otra variante o equipo): `band-alternating-lat-pulldown` (jalón con banda), `standing-heel-raise` (de pie sin máquina) y `dumbbell-glute-bridge` (con mancuerna); conservan su media actual hasta tener demostración exacta. Bump de caché `fitbud-pwa-v177` para que los clientes reciban el catálogo nuevo.
+
+Corrección posterior (2026-10-30, inspección visual completa): la tabla tiene 16 filas con GIF, no 12; se sustituyen también dumbbell-reverse-lunge, dumbbell-floor-press, dumbbell-overhead-triceps-extension y dumbbell-alternating-curl por sus fotos de Free Exercise DB, y se asigna la foto ya descargada a band-assisted-pull-up, que había quedado fuera de la lista de reemplazo. front-plank usaba un primer fotograma incorrecto (persona incorporándose) y ahora publica el fotograma de plancha en ambas posiciones. weighted-pull-up mostraba la misma foto errónea en dataset y fila remota (dominada asistida con liga, sin lastre): se retira la media y cae a la guía SVG propia hasta tener foto exacta con lastre. Bump de caché `fitbud-pwa-v179`.
+
+Ampliación (2026-10-30, segunda pasada): la inspección visual completa encontró 6 filas remotas cuya foto enseña otro movimiento u otro equipo que su ficha (pike-push-up con parada de manos, band-row sin banda, slider-leg-curl con balón, shoulder-tap-plank en posición de escalador, archer-push-up con flexión estándar y standing-calf-raise en máquina). Se retira su media por `normalize` y quedan como pendientes explícitos con guía SVG propia transitoria mientras se consigue foto o animación exacta con licencia verificable; los 9 ejercicios de cardio (run/cycle/swim) también están en proceso de sustitución del SVG procedural por fotos con licencia. Bump de caché `fitbud-pwa-v180`.
+
+Segunda ampliación (2026-10-30): se reemplazan 4 pendientes por demostraciones exactas de Wikimedia Commons con licencia verificable: weighted-pull-up (video de dominada con cinturón de lastre, dominio público, Extremistpullup), band-row (remo sentado con banda, CC BY-SA 4.0, GyorgyGajdos), standing-heel-raise (elevación de talones con mancuernas, CC BY-SA 3.0, GeorgeStepanek) y standing-calf-raise (ilustración anatómica exacta a dos piernas sin máquina, CC BY-SA 4.0, BruceBlaus). Quedan pendientes explícitos: band-alternating-lat-pulldown y dumbbell-glute-bridge (GIF ajenos actuales), archer-push-up, pike-push-up, slider-leg-curl y shoulder-tap-plank (guía SVG propia transitoria), más las 9 demos de cardio. Bump de caché `fitbud-pwa-v181`.
+
+Tercera ampliación (2026-10-30): la foto de standing-heel-raise resultó unipodal con bloque y la ficha es bilateral en suelo plano, así que vuelve a pendiente explícito conservando su media anterior hasta encontrar demo exacta. El frame de tracción de band-row se corrige para mostrar la fase de tirón, no dos frames equivalentes. La guía de ejercicio ("Ver técnica") muestra ahora el crédito de la demostración (fuente/autor y licencia) cuando no es contenido propio, cumpliendo la atribución de CC BY/CC BY-SA de forma visible para el usuario. Bump de caché `fitbud-pwa-v182`.
+
+Cuarta ampliación (2026-10-30): los 9 ejercicios de cardio (run-drills/easy/intervals, cycle-cadence/endurance/intervals, swim-drills/endurance/intervals) dejan el SVG procedural: `normalize` les asigna las fotos reales por disciplina que el catálogo local ya usaba (running.jpg, cycling.jpg, swimming.jpg), con su atribución. Bump de caché `fitbud-pwa-v183`.
+
+Quinta ampliación (2026-10-30): el crédito visible de la demostración ("Demostración: <fuente/autor> · <licencia>") llega a index.html y se muestra en la guía "Ver técnica" de cada ejercicio cuya media no es contenido propio Evolv; durante esta publicación se restauró además el index.html completo en main tras un commit de subida web que lo había dejado truncado. Bump de caché `fitbud-pwa-v184`.
+
+Sexta ampliación (2026-10-30): corrección urgente - el bloque de cardio de exercise-catalog.js usaba reviewedMedia antes de su declaración (error de inicialización) y la app quedaba en "Cargando…" para todos los usuarios desde v183; se mueve el bloque tras la declaración. Bump de caché `fitbud-pwa-v185`.
+
+Séptima ampliación (2026-10-30): el crédito de la guía enlaza a la fuente/licencia cuando hay URL (Commons, Free Exercise DB), cumpliendo la atribución completa de CC BY-SA 4.0. Bump de caché `fitbud-pwa-v186`.
+
+Octava ampliación (2026-10-30): dos pendientes más resueltos con demostración exacta y licencia verificable - pike-push-up (animación con pies al suelo, CC BY-SA 4.0, Danielflefil, Wikimedia Commons) y shoulder-tap-plank (fotos del Ejército de EE. UU. del "plank shoulder tap", dominio público). Quedan 5 pendientes explícitos sin fuente libre exacta tras buscar en Free Exercise DB, Wikimedia Commons y Openverse: archer-push-up y slider-leg-curl (guía SVG propia transitoria), band-alternating-lat-pulldown, dumbbell-glute-bridge y standing-heel-raise (conservan su media anterior). Bump de caché `fitbud-pwa-v187`.
+
+Novena ampliación (2026-10-30): standing-heel-raise resuelto con demostración exacta y licencia verificable - fotogramas del video "Leg Exercise - Standing Calf Raise" de personaltrainertoronto en Flickr (CC BY 2.0), bilateral, en suelo plano y con carga en la mano, coincidiendo con la ficha; sustituye al GIF con marca de agua. La ronda gratuita también descartó para band-alternating-lat-pulldown un video CC BY 2.0 del mismo autor por ser sentado y bilateral (la ficha es de pie y alternado). Quedan 4 pendientes explícitos: archer-push-up y slider-leg-curl (guía SVG propia transitoria), band-alternating-lat-pulldown y dumbbell-glute-bridge (conservan su media anterior). Bump de caché `fitbud-pwa-v188`.
+

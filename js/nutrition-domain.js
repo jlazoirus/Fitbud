@@ -719,6 +719,15 @@
   // de score entre platos vecinos y todos los usuarios con metas parecidas
   // recibían el mismo plato; globalClosePass() cierra luego los macros del día.
   const VARIETY_JITTER_WEIGHT=0.10;
+  // REQ-319: el día lleva fruta. En los momentos donde encaja, un plato con fruta
+  // gana esta ventaja mientras el día no llegue a su mínimo (2 comidas con fruta
+  // desde 4 comidas al día; 1 con menos).
+  const FRUIT_SLOTS=new Set(["desayuno","media_manana","merienda","snack","recena"]);
+  const FRUIT_BONUS=0.12;
+  function fruitMealsTarget(mealCount){return mealCount>=4?2:1;}
+  function dishHasFruit(dish,catalog,maps){
+    return dishLines(dish,catalog,maps||catalogMaps(catalog)).some(line=>/fruta/i.test(String(line.ingredient&&line.ingredient.category||"")));
+  }
 
   // kcal base de un plato con sus gramajes de receta (proxy barato para pre-rankear).
   function dishBaseKcal(dish,catalog,maps){
@@ -755,6 +764,8 @@
     });
     const used=new Set(),comidas=[],diagnostics=[],causes=[],cookingWarns=[];
     const userCooking=normalizedCookingLevel(prefs.cookingLevel);
+    const fruitTarget=fruitMealsTarget(slots.length);
+    let fruitMeals=0;
     slots.forEach(slot=>{
       // REQ-254: si no hay nada al nivel de cocina elegido, se sube un nivel y se avisa.
       let level=userCooking;
@@ -796,14 +807,17 @@
         const jitter=jitterSeed?seededJitter(jitterSeed+"|"+slot.id+"|"+slug)*VARIETY_JITTER_WEIGHT:0;
         const prefAdj=preferenceScoreAdjustment(dish,prefs,catalog,maps);
         const cuisineAdj=cuisineRepeatPenalty(dish,preferredCuisines,dayCuisines,recentCuisines);
-        const score=solved.score+reuse+yesterday+recent+jitter+prefAdj+cuisineAdj;
-        if(!best||score<best.rankScore)best={...solved,rankScore:score};
+        const hasFruit=FRUIT_SLOTS.has(slot.id)&&dishHasFruit(dish,catalog,maps);
+        const fruitAdj=hasFruit&&fruitMeals<fruitTarget?-FRUIT_BONUS:0;
+        const score=solved.score+reuse+yesterday+recent+jitter+prefAdj+cuisineAdj+fruitAdj;
+        if(!best||score<best.rankScore)best={...solved,rankScore:score,hasFruit};
       });
       if(!best){
         causes.push({slot:slot.id,reason:(diagnostics.find(d=>d.slot===slot.id)||{}).reason||"no_viable_candidate"});
         return;
       }
       used.add(slugFor(best.dish));
+      if(best.hasFruit)fruitMeals++;
       cuisineTagsForDish(best.dish).forEach(tag=>dayCuisines.set(tag,(dayCuisines.get(tag)||0)+1));
       comidas.push({
         slot_id:slot.id,

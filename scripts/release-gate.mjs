@@ -106,6 +106,7 @@ run("validate-cuisine-preferences.mjs", "node scripts/validate-cuisine-preferenc
 run("validate-meal-variety.mjs", "node scripts/validate-meal-variety.mjs");
 run("validate-grow-catalog.mjs", "node scripts/validate-grow-catalog.mjs");
 run("validate-nutrition-solver.mjs", "node scripts/validate-nutrition-solver.mjs");
+run("validate-diet-fruit.mjs", "node scripts/validate-diet-fruit.mjs");
 run("validate-nutrition-week-planner.mjs", "node scripts/validate-nutrition-week-planner.mjs");
 run("validate-nutrition-plan-snapshot.mjs", "node scripts/validate-nutrition-plan-snapshot.mjs");
 run("validate-nutrition-replacements.mjs", "node scripts/validate-nutrition-replacements.mjs");
@@ -160,6 +161,7 @@ run("test-service-worker-cache.mjs", "node scripts/test-service-worker-cache.mjs
 console.log("\n[ SQL y datos ]");
 run("supabase/validate.mjs (recetas y macros)", "node supabase/validate.mjs");
 run("validate-migrations.mjs", "node scripts/validate-migrations.mjs");
+run("test-referrals.mjs (PostgreSQL y campaña)", "node scripts/test-referrals.mjs");
 run("test-streak-friends.mjs (PostgreSQL/RLS)", "node scripts/test-streak-friends.mjs");
 
 // ── Auditorías de seguridad y calidad ───────────────────────────────────────

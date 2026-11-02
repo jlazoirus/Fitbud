@@ -1,4 +1,4 @@
-// REQ-316 (Jonathan): "el dibujito con palitos jamás debería pasar". Sin foto
+// REQ-320 (Jonathan): "el dibujito con palitos jamás debería pasar". Sin foto
 // exacta con licencia libre no se muestra ninguna demostración: la ficha queda
 // con los pasos y la sesión prefiere otro ejercicio del mismo músculo con foto.
 import { test, expect } from "@playwright/test";
@@ -55,7 +55,7 @@ test("sin dibujos: las sesiones usan ejercicios con foto y una ficha sin foto mu
   // Sin imagen, el texto es la guía: describe la variante exacta (antes el step-up describía una zancada).
   await page.evaluate(() => openExerciseGuide("step-up"));
   await expect(overlay.locator(".exercise-steps")).toContainText("Empuja con el pie de arriba");
-  // REQ-318: el step-up enseña la animación del CDC (dominio público) con su crédito.
+  // REQ-322: el step-up enseña la animación del CDC (dominio público) con su crédito.
   await expect(overlay.locator(".guide-demo img")).toHaveAttribute("src", "assets/exercise-media/step-up.gif");
   await expect(overlay).toContainText("CDC");
   await page.evaluate(() => closeModal());

@@ -8,6 +8,8 @@ PWA de nutrición y entrenamiento personalizados: planes de 4/10 semanas, regist
 
 Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservado.
 
+REQ-316: Hoy prioriza registro y entreno; menú opcional descartable por día/cuenta/dispositivo. Nutrición conserva acceso compacto al menú. Registrar una comida no requiere generarlo.
+
 ## Arquitectura vigente
 
 - Frontend vanilla sin framework ni build step. `index.html` es el shell principal; funciones publicas siguen expuestas para handlers inline.
@@ -90,6 +92,9 @@ Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservad
 - Cola offline `fitbud_syncq_v1`: mutaciones con base remota y estados pending/failed/conflict. `sync-conflicts.js` mergea cambios seguros y evita upsert ciego.
 
 ## Pagos, notificaciones y analytics
+
+- REQ-317: referidos; `supabase/referrals.sql`. Audiencia/campaña/operación: `docs/referrals.md`.
+
 
 - Landing publica, catalogo de planes, paywall, Stripe Checkout, webhooks, entitlements, cupones y billing history estan implementados. Cobro real depende de variables y configuracion externa.
 - REQ-104: sin `STRIPE_SECRET_KEY`, `showPaywall` muestra "Disponible pronto" + canje de codigo. Pago unico, sin renovacion.

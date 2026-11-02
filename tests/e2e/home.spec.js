@@ -14,7 +14,7 @@ test.describe("Home — chips del coach", () => {
     await gotoApp(page);
 
     // Prepara el día (mealCount:3 → desayuno/almuerzo/cena) y lo aplica.
-    const preparar = page.getByRole("button", { name: /Preparar mi día/i });
+    const preparar = page.getByRole("button", { name: /Sugerirme un menú/i });
     await expect(preparar.first()).toBeVisible();
     await preparar.first().click();
     const overlay = page.locator("#overlay");
@@ -65,7 +65,7 @@ test.describe("Nutrición — comidas sin asignar (REQ-161)", () => {
     const errors = collectConsoleErrors(page);
 
     await gotoApp(page);
-    // Día SIN preparar (no se toca "Preparar mi día"): los 3 slots quedan "Sin asignar".
+    // Día SIN preparar (no se toca "Sugerirme un menú"): los 3 slots quedan "Sin asignar".
     await page.locator("#tabs").getByText("Nutrición").click();
     const app = page.locator("#app");
     await expect(app).toContainText("Sin asignar");
@@ -100,7 +100,7 @@ test.describe("Home — agenda (REQ-249)", () => {
     const errors = collectConsoleErrors(page);
 
     await gotoApp(page);
-    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    await page.getByRole("button", { name: /Sugerirme un menú/i }).first().click();
     const overlay = page.locator("#overlay");
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
     await overlay.getByRole("button", { name: /Aplicar al día/i }).click();
@@ -190,7 +190,7 @@ test.describe("Home — día cerrado (REQ-258)", () => {
     const errors = collectConsoleErrors(page);
 
     await gotoApp(page);
-    await page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+    await page.getByRole("button", { name: /Sugerirme un menú/i }).first().click();
     const overlay = page.locator("#overlay");
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
     await overlay.getByRole("button", { name: /Aplicar al día/i }).click();

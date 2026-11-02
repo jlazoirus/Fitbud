@@ -961,7 +961,7 @@
     const [url,source]=ENDURANCE_MEDIA[disc];
     slugs.forEach(slug=>reviewedMedia.set(slug,{...source,media_type:"image",media_url:url,poster_url:url,frames:[]}));
   });
-  // REQ-316: sin foto exacta con licencia libre no se muestra ninguna
+  // REQ-320: sin foto exacta con licencia libre no se muestra ninguna
   // demostración (ni dibujo propio ni GIF ajeno): la ficha queda con los pasos
   // escritos y la selección de la sesión prefiere otro ejercicio con foto.
   const NO_DEMO={media_type:"none",media_url:"",poster_url:"",frames:[],source_name:OWN_MEDIA.source_name,source_url:"",license_name:OWN_MEDIA.license_name,attribution:OWN_MEDIA.attribution};
@@ -990,12 +990,12 @@
     common_errors:["Dejar caer la cadera","Adelantar el cuello hacia el borde","Usar una mesa ligera o con patas plegables"],
     safety_signals:["La mesa se mueve, cruje o se inclina","Dolor agudo de hombro o codo","Hormigueo en brazo o mano"],
   });
-  // REQ-318: step-up con la animación del CDC (escalón bajo, sin carga y con
+  // REQ-322: step-up con la animación del CDC (escalón bajo, sin carga y con
   // apoyo, la variante exacta de la ficha; dominio público).
   const stepUpMedia={...CDC_STEPUP,media_type:"gif",media_url:"assets/exercise-media/step-up.gif",poster_url:"",frames:[]};
   Object.assign(strength.find(ex=>ex.slug==="step-up"),stepUpMedia);
   reviewedMedia.set("step-up",stepUpMedia);
-  // REQ-316: estas fichas no tenían demostración, así que el texto es la única
+  // REQ-320: estas fichas no tenían demostración, así que el texto es la única
   // guía y debe describir la variante exacta (antes usaban el texto genérico
   // del patrón: el step-up describía una zancada y el curl deslizante, un peso muerto).
   const TEXT_ONLY_TECHNIQUE={
@@ -1065,7 +1065,7 @@
   ];
   // Pendientes por falta de foto exacta con licencia compatible (no usar proxies
   // de otro equipo o variante): "band-alternating-lat-pulldown" (jalón con banda)
-  // y "dumbbell-glute-bridge" (puente con mancuerna). REQ-316: su GIF ajeno se
+  // y "dumbbell-glute-bridge" (puente con mancuerna). REQ-320: su GIF ajeno se
   // retira (sin demostración) hasta tener demo exacta.
   GIF_CON_MARCA_DE_AGUA.forEach(slug=>{
     const frames=[0,1].map(i=>`assets/exercise-media/${slug}-${i}.jpg`);
@@ -1325,7 +1325,7 @@
       torsoB:["incline-push-up","inverted-row","assisted-dip","shoulder-tap-plank"],
       piernaB:["bulgarian-split-squat","single-leg-rdl","step-up","slider-leg-curl","dead-bug"],
       pushA:["push-up","pike-push-up","diamond-push-up","assisted-dip"],
-      // REQ-317: en casa sin barra ni bandas solo queda el remo invertido; el
+      // REQ-321: en casa sin barra ni bandas solo queda el remo invertido; el
       // core completa el día de tirón para que no sea una sesión de un ejercicio.
       pullA:["pull-up","inverted-row","assisted-pull-up","dead-bug","side-plank"],
       legsA:["tempo-squat","bulgarian-split-squat","single-leg-rdl","standing-calf-raise"],

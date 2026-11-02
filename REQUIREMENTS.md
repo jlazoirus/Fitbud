@@ -1899,25 +1899,25 @@ Jonathan: `day_log.state.trainingPlace` lleva la sesión del día a otro lugar. 
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Quien registra pero lleva 4+ días sin entrenar (2+ días que tocaba, descansos aparte) recibe "¿Retomamos el entreno?" por correo y push, una vez a los 4 y otra a los 11 días (`trainingLapse()`). ✓ `scripts/validate-reminder-journey.mjs`.
+Aviso a los 4 y 11 días sin entrenar (`trainingLapse()`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-296 - Recordatorios: seguimiento por correo para quien nunca eligió sus avisos
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Sin fila en `notification_preferences`: correo de regreso/volver a entrenar a las 20:00 (`runFollowups`); sin perfil terminado, 3 correos desde el alta. Baja firmada. ✓ `scripts/validate-reminder-journey.mjs`.
+Correos de seguimiento con baja firmada (`runFollowups`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-297 - Recordatorios: invitar a activar el push a la semana
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-A los 7–13 días del plan, sin push, un día sin otro correo: "Activa los avisos en tu teléfono", una vez (`pushInvite()`). El onboarding ya los pide (REQ-289). ✓ `scripts/validate-reminder-journey.mjs`.
+Correo único a los 7–13 días sin push (`pushInvite()`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-298 - Recordatorios: elegir la hora del aviso y resumen de la mañana
 
 **Estado: implementado** (migración `supabase/notifications_morning.sql` aplicada el 2026-10-28). Detalle en `docs/requirements-history.md`.
 
-Aviso del día de 06:00 a 23:00, elegible también con push. Resumen opcional de 05:00 a 11:00 con el entreno y las comidas de hoy (`morningPlan()`, plan en `engagement.plan`), por push o, sin push, por correo; uno por día. ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
+Hora 06–23 y resumen matutino opcional (`morningPlan()`). ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
 
 ## REQ-299 - Hoy: distinguir comidas registradas de la planificación opcional de mañana
 
@@ -1994,34 +1994,9 @@ Ampliación (2026-10-31): los botones deshabilitados (`.btn:disabled`) ahora se 
 
 ## REQ-310 - Fotos reales en todo el catálogo de ejercicios (adiós al monigote)
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Jonathan (2026-10-30): "hay varios ejercicios que no tienen fotos ni animación correcta, solo se ve un monigote horrible". Diagnóstico con sesión real:
-
-- 12 ejercicios que solo existen en la tabla de Supabase usaban un GIF ajeno con marca de agua (fitnessprogramer.com, figura anatómica gris y licencia no libre): scaled-push-up, dumbbell-alternating-hammer-curl, band-assisted-pull-up, standing-heel-raise, dumbbell-lateral-raise, band-alternating-lat-pulldown, dumbbell-reverse-fly, dumbbell-romanian-deadlift, dumbbell-standing-shoulder-press, dumbbell-glute-bridge, dumbbell-bent-over-row y goblet-squat.
-- Los 32 ejercicios base de fuerza (press de banca, sentadilla con barra, dominada, etc.) solo tenían fotos en la fila de Supabase: si la tabla no cargaba, el catálogo local de respaldo los dibujaba con el SVG procedimental (el monigote).
-
-Corrección, siguiendo la mecánica de REQ-259/302/303 sin tocar filas de Supabase: se descargaron las 88 fotos de Free Exercise DB (dominio público / Unlicense) a `assets/exercise-media/<slug>-{0,1}.jpg` (mapeo en `scripts/free-exercise-db-map.mjs`, validado con `ingest-exercise-media.mjs --check`); `exercise-catalog.js` asigna secuencia de fotos a los ejercicios base que aún tenían `inline_svg` y registra en `reviewedMedia` el reemplazo de los 12 GIF, que `normalize` aplica sobre las filas remotas. Quedan pendientes 3 ejercicios por no existir foto exacta con licencia compatible (no se usan proxies de otra variante o equipo): `band-alternating-lat-pulldown` (jalón con banda), `standing-heel-raise` (de pie sin máquina) y `dumbbell-glute-bridge` (con mancuerna); conservan su media actual hasta tener demostración exacta. Bump de caché `fitbud-pwa-v177` para que los clientes reciban el catálogo nuevo.
-
-Corrección posterior (2026-10-30, inspección visual completa): la tabla tiene 16 filas con GIF, no 12; se sustituyen también dumbbell-reverse-lunge, dumbbell-floor-press, dumbbell-overhead-triceps-extension y dumbbell-alternating-curl por sus fotos de Free Exercise DB, y se asigna la foto ya descargada a band-assisted-pull-up, que había quedado fuera de la lista de reemplazo. front-plank usaba un primer fotograma incorrecto (persona incorporándose) y ahora publica el fotograma de plancha en ambas posiciones. weighted-pull-up mostraba la misma foto errónea en dataset y fila remota (dominada asistida con liga, sin lastre): se retira la media y cae a la guía SVG propia hasta tener foto exacta con lastre. Bump de caché `fitbud-pwa-v179`.
-
-Ampliación (2026-10-30, segunda pasada): la inspección visual completa encontró 6 filas remotas cuya foto enseña otro movimiento u otro equipo que su ficha (pike-push-up con parada de manos, band-row sin banda, slider-leg-curl con balón, shoulder-tap-plank en posición de escalador, archer-push-up con flexión estándar y standing-calf-raise en máquina). Se retira su media por `normalize` y quedan como pendientes explícitos con guía SVG propia transitoria mientras se consigue foto o animación exacta con licencia verificable; los 9 ejercicios de cardio (run/cycle/swim) también están en proceso de sustitución del SVG procedural por fotos con licencia. Bump de caché `fitbud-pwa-v180`.
-
-Segunda ampliación (2026-10-30): se reemplazan 4 pendientes por demostraciones exactas de Wikimedia Commons con licencia verificable: weighted-pull-up (video de dominada con cinturón de lastre, dominio público, Extremistpullup), band-row (remo sentado con banda, CC BY-SA 4.0, GyorgyGajdos), standing-heel-raise (elevación de talones con mancuernas, CC BY-SA 3.0, GeorgeStepanek) y standing-calf-raise (ilustración anatómica exacta a dos piernas sin máquina, CC BY-SA 4.0, BruceBlaus). Quedan pendientes explícitos: band-alternating-lat-pulldown y dumbbell-glute-bridge (GIF ajenos actuales), archer-push-up, pike-push-up, slider-leg-curl y shoulder-tap-plank (guía SVG propia transitoria), más las 9 demos de cardio. Bump de caché `fitbud-pwa-v181`.
-
-Tercera ampliación (2026-10-30): la foto de standing-heel-raise resultó unipodal con bloque y la ficha es bilateral en suelo plano, así que vuelve a pendiente explícito conservando su media anterior hasta encontrar demo exacta. El frame de tracción de band-row se corrige para mostrar la fase de tirón, no dos frames equivalentes. La guía de ejercicio ("Ver técnica") muestra ahora el crédito de la demostración (fuente/autor y licencia) cuando no es contenido propio, cumpliendo la atribución de CC BY/CC BY-SA de forma visible para el usuario. Bump de caché `fitbud-pwa-v182`.
-
-Cuarta ampliación (2026-10-30): los 9 ejercicios de cardio (run-drills/easy/intervals, cycle-cadence/endurance/intervals, swim-drills/endurance/intervals) dejan el SVG procedural: `normalize` les asigna las fotos reales por disciplina que el catálogo local ya usaba (running.jpg, cycling.jpg, swimming.jpg), con su atribución. Bump de caché `fitbud-pwa-v183`.
-
-Quinta ampliación (2026-10-30): el crédito visible de la demostración ("Demostración: <fuente/autor> · <licencia>") llega a index.html y se muestra en la guía "Ver técnica" de cada ejercicio cuya media no es contenido propio Evolv; durante esta publicación se restauró además el index.html completo en main tras un commit de subida web que lo había dejado truncado. Bump de caché `fitbud-pwa-v184`.
-
-Sexta ampliación (2026-10-30): corrección urgente - el bloque de cardio de exercise-catalog.js usaba reviewedMedia antes de su declaración (error de inicialización) y la app quedaba en "Cargando…" para todos los usuarios desde v183; se mueve el bloque tras la declaración. Bump de caché `fitbud-pwa-v185`.
-
-Séptima ampliación (2026-10-30): el crédito de la guía enlaza a la fuente/licencia cuando hay URL (Commons, Free Exercise DB), cumpliendo la atribución completa de CC BY-SA 4.0. Bump de caché `fitbud-pwa-v186`.
-
-Octava ampliación (2026-10-30): dos pendientes más resueltos con demostración exacta y licencia verificable - pike-push-up (animación con pies al suelo, CC BY-SA 4.0, Danielflefil, Wikimedia Commons) y shoulder-tap-plank (fotos del Ejército de EE. UU. del "plank shoulder tap", dominio público). Quedan 5 pendientes explícitos sin fuente libre exacta tras buscar en Free Exercise DB, Wikimedia Commons y Openverse: archer-push-up y slider-leg-curl (guía SVG propia transitoria), band-alternating-lat-pulldown, dumbbell-glute-bridge y standing-heel-raise (conservan su media anterior). Bump de caché `fitbud-pwa-v187`.
-
-Novena ampliación (2026-10-30): standing-heel-raise resuelto con demostración exacta y licencia verificable - fotogramas del video "Leg Exercise - Standing Calf Raise" de personaltrainertoronto en Flickr (CC BY 2.0), bilateral, en suelo plano y con carga en la mano, coincidiendo con la ficha; sustituye al GIF con marca de agua. La ronda gratuita también descartó para band-alternating-lat-pulldown un video CC BY 2.0 del mismo autor por ser sentado y bilateral (la ficha es de pie y alternado). Quedan 4 pendientes explícitos: archer-push-up y slider-leg-curl (guía SVG propia transitoria), band-alternating-lat-pulldown y dumbbell-glute-bridge (conservan su media anterior). Bump de caché `fitbud-pwa-v188`.
+Jonathan (2026-10-30). Fotos de Free Exercise DB (dominio público) en `assets/exercise-media/<slug>-{0,1}.jpg` para el catálogo local y para las filas remotas vía `normalize`; demostraciones exactas de Wikimedia Commons y Flickr con crédito visible en "Ver técnica". Lo que no tenía fuente libre exacta lo cierra REQ-320 (sin demostración, solo pasos).
 
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
@@ -2077,14 +2052,81 @@ Verificación dirigida: validadores de ejercicios, allowlist, documentación, in
 
 Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspace. Suite completa: 232/233 aprobadas; la única expectativa antigua restante de pike fue corregida y pasó con el reintento oficial E2E_RETRY_FAILED (1/1). Alta por invitación validada también con el test unitario. Control negativo adicional confirma que una imagen externa real sigue bloqueada. No se ejecutaron migraciones ni acciones sobre datos de producción.
 
-## REQ-316 - Entreno: nunca un dibujo; sin foto exacta, solo los pasos y la sesión prefiere otro con foto
+## REQ-316 - Hoy: registrar y entrenar sin preparar un menú
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-02), captura y aprobación de propuesta: preparar el día debe ser una sugerencia, sin dominar ni condicionar el valor principal.
+
+### Problema
+La falta de menú activaba «Aún falta preparar este día», un botón dominante y un retorno anticipado que ocultaba las acciones del entreno. Nutrición también priorizaba preparar comidas.
+
+### Causa raíz
+`homeAgendaData()` retornaba `setup` antes de construir el entrenamiento; `homeAgendaHtml()` y `renderNutrition()` presentaban la planificación opcional como tarea obligatoria.
+
+### Objetivo
+Acceder al registro, entrenamiento y coach desde Hoy; sugerir un menú de forma secundaria y voluntaria.
+
+### Alcance
+Registro directo con editor existente, entrenamiento independiente del menú y slots vacíos excluidos de pendientes. Sugerencia secundaria tras el coach, «Sugerirme un menú» y «Ahora no» persistido por día/cuenta/dispositivo. Acceso compacto en Nutrición, bienvenida del coach tras las acciones y preferencias en Perfil. Caché PWA actualizado.
+
+### Fuera de alcance
+Cambiar planes, objetivos, rachas, historial, cobros, seguridad o proveedores; generar o aplicar menús automáticamente.
+
+### Riesgos
+Cierre falso del día sin comidas, fuga de descartes entre cuentas, pérdida de acceso a generación y regresiones del editor/entrenamiento.
+
+### Criterios de aceptación
+- Registrar comidas propias suma consumo sin generar un menú; entrenamiento inicia y continúa independientemente del menú.
+- Slots vacíos y planificación no cuentan como pendientes; la seguridad, descanso, registros y cierre real se conservan.
+- Sugerencia sin botón primario, descartable hasta mañana, aislada por cuenta y disponible en Nutrición tras descartarla.
+- Generar requiere elección explícita; aplicar conserva confirmación y registros previos.
+- Móvil 320/390 y escritorio sin desbordes, controles accesibles y sin llamadas externas automáticas.
+
+### Verificación sugerida
+Playwright Home/menú opcional, nutrición, coach y regresiones de registro/entreno; detector Impeccable y release gate completo.
+
+Resultado: 9/9 casos nuevos y regresiones dirigidas de Hoy, Nutrición y coach verificadas. Capturas 320/390/1280 sin desbordes; detector Impeccable sin hallazgos, HTML/JS/accesibilidad, placeholders, macros primero, orden/saltos, caché PWA y secretos correctos. Gate integral posterior al commit antes de publicar. Sin migraciones ni llamadas pagadas.
+
+Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nueva de los slots vacíos coincidía con «o elige», prohibido por REQ-194; se cambió por «Registra lo que comiste. El menú es opcional.», sin relajar pruebas. Gate final con reintento oficial del caso de textos.
+
+## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
+
+**Estado: implementado en código; requiere acción manual para activar en producción.**
+
+Origen: solicitud directa de Jonathan (02/11/2026). Comunicación por mail y dentro de la app para lanzar en una semana; al menos 2 usos de la app en los últimos 7 días.
+
+Problema: no existía un programa de referidos que otorgara 3 meses a cada parte y mostrara cupos y registros exitosos.
+
+Alcance: cohorte persistente de usuarios habilitados con al menos 2 sesiones distintas de uso en los 7 días previos al 09/11/2026 09:00 Lima. Mail y aviso en Hoy/Perfil llevan al panel autenticado. Generación de hasta 3 enlaces individuales de un uso, copia, WhatsApp y correo. Cupos, pendientes, éxitos y meses ganados consultados del servidor. Registro nuevo y recompensa atómicos: 3 meses calendario para el amigo y 3 extra al acceso del invitador. Sin duplicados ni autorreferidos; sin sobrescribir accesos pagados. Correos con baja e idempotencia de proveedor y base de datos. Caché v195.
+
+Criterios de aceptación: nunca mostrar «dentro de una semana» en el mensaje; no enviar antes del lanzamiento; excluir cuentas con menos de dos usos; conservar elegibilidad; máximo 3 registros únicos; solo éxito real acredita meses; aislamiento por cuenta; controles en móvil/escritorio; registro previo por invitación intacto.
+
+Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y Playwright `referrals.spec.js`/`invitacion.spec.js`; gate integral. Migración idempotente aplicada dos veces en PostgreSQL local, nunca en producción.
+
+Operación manual pendiente: aplicar `supabase/referrals.sql` en Supabase antes del lanzamiento y comprobar cron/Resend existentes. Ver `docs/referrals.md`.
+
+## REQ-318 - Rachas con amigos: explicar cómo se suma a un amigo
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Tres pasos, alias propuesto y «Crear invitación» que activa y deja el enlace; luego "Tus amigos te ven como …". Sin buscador. ✓ `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-319 - Dietas: el día incluye fruta
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Fruta en 2 comidas (1 si hay menos de 4): en el pedido y en el plan sin modelo. ✓ `scripts/validate-diet-fruit.mjs`.
+
+## REQ-320 - Entreno: nunca un dibujo; sin foto exacta, solo los pasos y la sesión prefiere otro con foto
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/sin-dibujos.spec.js`.
 
-## REQ-317 - Entreno en casa: el día de tirón no se queda en un solo ejercicio
+## REQ-321 - Entreno en casa: el día de tirón no se queda en un solo ejercicio
 
-**Estado: implementado.** Regresión de REQ-293: sin barra ni bandas, Pull A/B en casa quedaban solo con el remo invertido. Las plantillas de peso corporal suman core (dead bug y plancha lateral; plancha frontal y con toque de hombro). `CACHE_NAME` → `fitbud-pwa-v195`. ✓ `tests/e2e/entreno-casa.spec.js`.
+**Estado: implementado.** Regresión de REQ-293: sin barra ni bandas, Pull A/B en casa quedaban solo con el remo invertido. Las plantillas de peso corporal suman core (dead bug y plancha lateral; plancha frontal y con toque de hombro). `CACHE_NAME` → `fitbud-pwa-v198`. ✓ `tests/e2e/entreno-casa.spec.js`.
 
-## REQ-318 - Entreno: el step-up con la animación del CDC (dominio público)
+## REQ-322 - Entreno: el step-up con la animación del CDC (dominio público)
 
-**Estado: implementado.** De los ejercicios sin demostración de REQ-316, el step-up tiene una exacta y libre: la animación del CDC en Wikimedia Commons (escalón bajo, sin carga, con apoyo; obra del Gobierno de EE. UU.). Se sirve desde `assets/exercise-media/step-up.gif` con crédito y vuelve a elegirse en las sesiones; se retira `step-up.svg`. Siguen sin fuente libre exacta la búlgara (solo foto con carga), el peso muerto a una pierna, el curl deslizante y la flexión arquero. `CACHE_NAME` → `fitbud-pwa-v196`. ✓ `tests/e2e/sin-dibujos.spec.js`.
+**Estado: implementado.** De los ejercicios sin demostración de REQ-320, el step-up tiene una exacta y libre: la animación del CDC en Wikimedia Commons (escalón bajo, sin carga, con apoyo; obra del Gobierno de EE. UU.). Se sirve desde `assets/exercise-media/step-up.gif` con crédito y vuelve a elegirse en las sesiones; se retira `step-up.svg`. Siguen sin fuente libre exacta la búlgara (solo foto con carga), el peso muerto a una pierna, el curl deslizante y la flexión arquero. `CACHE_NAME` → `fitbud-pwa-v198`. ✓ `tests/e2e/sin-dibujos.spec.js`.

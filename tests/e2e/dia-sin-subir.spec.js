@@ -40,7 +40,7 @@ test("lo de ayer que no subió sigue visible al día siguiente y no se pisa al c
 
   // Ayer: prepara el día y luego registra lo que de verdad comió, sin que llegue al servidor.
   const d1 = await openAppOn(context, new Date(`${ayer}T10:00:00-05:00`));
-  await d1.page.getByRole("button", { name: /Preparar mi día/i }).first().click();
+  await d1.page.getByRole("button", { name: /Sugerirme un menú/i }).first().click();
   await d1.page.locator("#overlay").getByRole("button", { name: /Aplicar al día/i }).click();
   failWrites = true;
   await editMeal(d1.page, ayer, "desayuno", "6 huevos con pan con queso y café", 700);
