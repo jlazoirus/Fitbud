@@ -4,7 +4,7 @@
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges } from "./helpers.js";
 
-// REQ-325: los cuatro que REQ-320 dejó solo con pasos ya tienen imágenes propias.
+// REQ-327: los cuatro que REQ-320 dejó solo con pasos ya tienen imágenes propias.
 const CON_FOTO_PROPIA = ["bulgarian-split-squat", "single-leg-rdl", "slider-leg-curl", "archer-push-up"];
 
 test("sin dibujos: las sesiones usan ejercicios con foto y una ficha sin foto muestra solo los pasos", async ({ page, context }) => {

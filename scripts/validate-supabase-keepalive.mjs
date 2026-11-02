@@ -24,4 +24,29 @@ globalThis.fetch = async (url) => { calls.push(String(url)); throw new Error("re
 await handler({ method: "GET", url: "/api/notify", headers: {} }, failing);
 assert.equal(failing.code, 401, "un fallo del keep-alive no rompe el handler");
 assert.equal(failing.body.keepAlive, false);
+
+// REQ-325: con CRON_SECRET configurado, solo el Bearer correcto corre el job.
+// La cabecera x-vercel-cron (falsificable desde internet) no autoriza.
+process.env.CRON_SECRET = "s3cret-value";
+globalThis.fetch = async (url) => { calls.push(String(url)); return { ok: true, json: async () => [] }; };
+for (const headers of [
+  { "x-vercel-cron": "1" },
+  { "x-vercel-cron": "1", "user-agent": "vercel-cron/1.0" },
+  { authorization: "Bearer otro-valor" },
+  { authorization: "Bearer s3cret-valu" },
+  { authorization: "s3cret-value" },
+]) {
+  calls.length = 0;
+  const r = response();
+  await handler({ method: "GET", url: "/api/notify", headers }, r);
+  assert.equal(r.code, 401, "sin el Bearer correcto el job no corre: " + JSON.stringify(headers));
+  assert.deepEqual(calls, ["https://example.supabase.co/rest/v1/profiles?select=id&limit=1"], "solo la lectura mínima");
+}
+console.log("  x-vercel-cron o secreto incorrecto: 401 sin ejecutar el job");
+calls.length = 0;
+const authorized = response();
+await handler({ method: "GET", url: "/api/notify?dry_run=true", headers: { authorization: "Bearer s3cret-value" } }, authorized);
+assert.equal(authorized.code, 200, "el Bearer correcto (cron de Vercel y workflow horario) corre el job");
+assert.ok(calls.length > 1, "el job consulta la base");
+console.log("  Bearer CRON_SECRET: job ejecutado");
 console.log("validate-supabase-keepalive: OK");

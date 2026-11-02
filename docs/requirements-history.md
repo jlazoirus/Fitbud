@@ -12555,7 +12555,60 @@ En `coach_usage`, el intento fallido registró `output_tokens = 400`, que es jus
 
 - Texto y foto usan topes de al menos 1000 y 1200. ✓ `scripts/validate-meal-estimate-output.mjs` (falla con el código anterior).
 
-## REQ-325 - Entreno: imágenes propias para los cuatro ejercicios que quedaban solo con pasos
+## REQ-325 - Recordatorios: solo CRON_SECRET autoriza el envío
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de la activación de REQ-317 en producción (02/11/2026). `api/notify.js` aceptaba `x-vercel-cron: 1` como autorización sin comprobar el secreto. Esa cabecera la puede enviar cualquiera desde internet, así que cualquiera podía ejecutar el job de recordatorios y la campaña de invitaciones cuando quisiera. La idempotencia evitaba duplicados y el calendario impedía adelantar la campaña, pero el job no debía quedar abierto.
+
+### Alcance
+
+- El job solo corre con `Authorization: Bearer CRON_SECRET`, comparado con `timingSafeEqual`. Sin `CRON_SECRET` configurado, nunca corre.
+- El cron diario de Vercel sigue funcionando: con `CRON_SECRET` definido en el proyecto, Vercel envía ese Bearer en cada invocación. El workflow horario de GitHub ya lo enviaba.
+- Sin cambios en la baja de un clic (`?unsubscribe=`) ni en la lectura mínima que mantiene despierto Supabase, que sigue ocurriendo antes de la verificación.
+
+### Criterios de aceptación
+
+- `x-vercel-cron` solo, `user-agent` de Vercel, un secreto distinto, truncado o sin `Bearer`: 401 y solo la lectura mínima. ✓ `scripts/validate-supabase-keepalive.mjs`.
+- El Bearer correcto ejecuta el job (también con `dry_run`). ✓ mismo script; journey de recordatorios y campaña de invitaciones sin cambios.
+
+## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
+
+**Estado: implementado y activado en producción (02/11/2026).**
+
+Origen: solicitud directa de Jonathan (02/11/2026). Comunicación por mail y dentro de la app para lanzar en una semana; al menos 2 usos de la app en los últimos 7 días.
+
+Problema: no existía un programa de referidos que otorgara 3 meses a cada parte y mostrara cupos y registros exitosos.
+
+Alcance: cohorte persistente de usuarios habilitados con al menos 2 sesiones distintas de uso en los 7 días previos al 09/11/2026 09:00 Lima. Mail y aviso en Hoy/Perfil llevan al panel autenticado. Generación de hasta 3 enlaces individuales de un uso, copia, WhatsApp y correo. Cupos, pendientes, éxitos y meses ganados consultados del servidor. Registro nuevo y recompensa atómicos: 3 meses calendario para el amigo y 3 extra al acceso del invitador. Sin duplicados ni autorreferidos; sin sobrescribir accesos pagados. Correos con baja e idempotencia de proveedor y base de datos. Caché v195.
+
+Criterios de aceptación: nunca mostrar «dentro de una semana» en el mensaje; no enviar antes del lanzamiento; excluir cuentas con menos de dos usos; conservar elegibilidad; máximo 3 registros únicos; solo éxito real acredita meses; aislamiento por cuenta; controles en móvil/escritorio; registro previo por invitación intacto.
+
+Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y Playwright `referrals.spec.js`/`invitacion.spec.js`; gate integral. Migración idempotente aplicada dos veces en PostgreSQL local, nunca en producción.
+
+Activación en producción (02/11/2026): `supabase/referrals.sql` aplicada en una transacción en el proyecto Supabase `fitbud`, sin cambios en datos existentes. Funciones, trigger, permisos (solo `service_role`) y RLS verificados. Flujo completo probado en producción con cuentas de prueba dentro de una transacción revertida. Vercel con `a47729f` (incluye REQ-317), variables de correo y cron presentes, y workflow horario autorizado. Ver `docs/referrals.md`.
+
+## REQ-326 - Texto de baja del correo de invitaciones
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de la activación de REQ-317 en producción (02/11/2026). El correo de la campaña de invitaciones reutiliza la plantilla de recordatorios y su enlace de baja decía "Desactivar recordatorios", aunque el correo no es un recordatorio que la persona activó.
+
+### Alcance
+
+- Con `opts.campaign`, el pie usa "No recibir más estos correos", el mismo texto que los correos de seguimiento (REQ-296). El enlace y su efecto (`email_opt_in=false`) no cambian.
+- Recordatorios y seguimientos conservan sus textos.
+
+### Criterios de aceptación
+
+- El HTML enviado por la campaña incluye "No recibir más estos correos" y no incluye "Desactivar recordatorios" ni "una semana". ✓ `scripts/test-referrals.mjs` (falla con el texto anterior).
+- Recordatorios y seguimientos sin cambios. ✓ `scripts/validate-reminder-journey.mjs`.
+
+## REQ-327 - Entreno: imágenes propias para los cuatro ejercicios que quedaban solo con pasos
 
 **Estado: implementado.**
 
