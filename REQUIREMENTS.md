@@ -2133,3 +2133,9 @@ Tres pasos, alias propuesto y «Crear invitación» que activa y deja el enlace;
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 `/api/notify` ya no acepta la cabecera `x-vercel-cron` sin secreto; solo `Authorization: Bearer CRON_SECRET`, comparado en tiempo constante. ✓ `scripts/validate-supabase-keepalive.mjs`.
+
+## REQ-320 - Texto de baja del correo de invitaciones
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Pie: "No recibir más estos correos". ✓ `scripts/test-referrals.mjs`.

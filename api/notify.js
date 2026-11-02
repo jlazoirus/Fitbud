@@ -587,7 +587,7 @@ export function buildEmailHtml(e, msg, unsubToken, opts = {}) {
     ${opts.campaign ? "Recibes este beneficio por tener una cuenta activa en Evolv." : opts.followup
       ? "Te escribimos porque tienes una cuenta en Evolv y llevas días sin usar tu plan."
       : "Recibes estos recordatorios porque los activaste en tu perfil."}
-    <a href="${unsubLink}" style="color:#1a1a1a">${opts.followup ? "No recibir más estos correos" : "Desactivar recordatorios"}</a>
+    <a href="${unsubLink}" style="color:#1a1a1a">${opts.followup || opts.campaign ? "No recibir más estos correos" : "Desactivar recordatorios"}</a>
   </p>
 </body></html>`;
 }

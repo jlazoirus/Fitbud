@@ -12474,3 +12474,21 @@ Criterios de aceptación: nunca mostrar «dentro de una semana» en el mensaje; 
 Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y Playwright `referrals.spec.js`/`invitacion.spec.js`; gate integral. Migración idempotente aplicada dos veces en PostgreSQL local, nunca en producción.
 
 Activación en producción (02/11/2026): `supabase/referrals.sql` aplicada en una transacción en el proyecto Supabase `fitbud`, sin cambios en datos existentes. Funciones, trigger, permisos (solo `service_role`) y RLS verificados. Flujo completo probado en producción con cuentas de prueba dentro de una transacción revertida. Vercel con `a47729f` (incluye REQ-317), variables de correo y cron presentes, y workflow horario autorizado. Ver `docs/referrals.md`.
+
+## REQ-320 - Texto de baja del correo de invitaciones
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de la activación de REQ-317 en producción (02/11/2026). El correo de la campaña de invitaciones reutiliza la plantilla de recordatorios y su enlace de baja decía "Desactivar recordatorios", aunque el correo no es un recordatorio que la persona activó.
+
+### Alcance
+
+- Con `opts.campaign`, el pie usa "No recibir más estos correos", el mismo texto que los correos de seguimiento (REQ-296). El enlace y su efecto (`email_opt_in=false`) no cambian.
+- Recordatorios y seguimientos conservan sus textos.
+
+### Criterios de aceptación
+
+- El HTML enviado por la campaña incluye "No recibir más estos correos" y no incluye "Desactivar recordatorios" ni "una semana". ✓ `scripts/test-referrals.mjs` (falla con el texto anterior).
+- Recordatorios y seguimientos sin cambios. ✓ `scripts/validate-reminder-journey.mjs`.
