@@ -545,12 +545,13 @@ export function reminderMessage(d, kind) {
 
 // ── Correo con Resend (fetch nativo, sin nuevas dependencias) ─────────────────
 
-async function sendEmail(e, to, subject, html) {
+async function sendEmail(e, to, subject, html, idempotencyKey) {
   if (!e.resendKey) throw new Error("RESEND_API_KEY no configurada");
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       Authorization: "Bearer " + e.resendKey,
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ from: e.fromEmail, to, subject, html }),
@@ -583,7 +584,7 @@ export function buildEmailHtml(e, msg, unsubToken, opts = {}) {
   </a>
   <hr style="margin:36px 0;border:none;border-top:1px solid #eee">
   <p style="font-size:12px;color:#777;margin:0">
-    ${opts.followup
+    ${opts.campaign ? "Recibes este beneficio por tener una cuenta activa en Evolv." : opts.followup
       ? "Te escribimos porque tienes una cuenta en Evolv y llevas días sin usar tu plan."
       : "Recibes estos recordatorios porque los activaste en tu perfil."}
     <a href="${unsubLink}" style="color:#1a1a1a">${opts.followup ? "No recibir más estos correos" : "Desactivar recordatorios"}</a>
@@ -856,6 +857,7 @@ async function runJob(e, dryRun) {
   }
 
   await runFollowups(e, dryRun, results);
+  await runReferralCampaign(e, dryRun, results);
   return results;
 }
 
@@ -950,6 +952,43 @@ async function runFollowups(e, dryRun, results) {
       userId: p.id, type: "comeback", keys: [`${p.id}:${decision.step}:${decision.ref}`], refDate: decision.ref, step: decision.step,
       send: async () => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, followupUnsubToken(e, p.id), { followup: true })) }),
     });
+  }
+}
+
+// REQ-317: campaña única, 09/11/2026 09:00 Lima, con recuperación por siete días.
+export function referralCampaignDue(now = new Date()) {
+  return now >= new Date("2026-11-09T14:00:00Z") && now < new Date("2026-11-16T14:00:00Z");
+}
+export const REFERRAL_MESSAGE = {
+  title: "Por ser usuario activo, tienes un regalo para compartir",
+  subject: "Invita a tus amigos y gana hasta 9 meses extra gratis",
+  paragraphs: ["Gracias por ser parte activa de Evolv. Como beneficio, puedes invitar hasta a 3 amigos a la plataforma.",
+    "Por cada amigo que se registre con tu enlace, ganas 3 meses extra gratis y tu amigo recibe sus primeros 3 meses gratis.",
+    "Genera tus enlaces y compártelos por WhatsApp o correo. Desde tu página de invitaciones podrás ver cuántas te quedan y cuántas fueron exitosas."],
+  cta: "Invitar a mis amigos", url: "/?ver=invitaciones",
+};
+export async function runReferralCampaign(e, dryRun, results) {
+  if (!referralCampaignDue() || !e.cronSecret) return;
+  for (let offset = 0; ; offset += 200) {
+    const people = await supaGet(e, "/rest/v1/profiles?active=eq.true&created_at=lte.2026-11-09T14:00:00Z&select=id,email&order=id&limit=200&offset=" + offset);
+    for (const p of people) {
+      const benefit = await supaPost(e, "/rest/v1/rpc/referral_dashboard", { p_user_id: p.id, p_generate: false })
+        .catch(() => null);
+      if (!benefit) {
+        results.errors++; results.log.push({ action: "referral_migration_unavailable" }); return;
+      }
+      if (!benefit.eligible) continue;
+      const prefs = await supaGet(e, `/rest/v1/notification_preferences?user_id=eq.${p.id}&select=email_opt_in,unsubscribe_token`);
+      if (!p.email || prefs[0]?.email_opt_in === false) continue;
+      const token = prefs[0]?.unsubscribe_token || followupUnsubToken(e, p.id);
+      const key = `${p.id}:referral_campaign:2026-11-09`;
+      await deliver(e, dryRun, results, results, {
+        userId: p.id, type: "comeback", keys: [key], refDate: "2026-11-09", step: "referral_campaign",
+        send: async () => ({ emailId: await sendEmail(e, p.email, REFERRAL_MESSAGE.subject,
+          buildEmailHtml(e, REFERRAL_MESSAGE, token, { campaign: true }), key) }),
+      });
+    }
+    if (people.length < 200) break;
   }
 }
 

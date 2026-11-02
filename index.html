@@ -1157,6 +1157,12 @@
     input[type="checkbox"]{width:20px;height:20px;accent-color:var(--accent)}
     .availability-day label,.availability-day select,.pf-accordion .availability-day select{min-height:44px}
   }
+  /* REQ-317: controles de compartir y resumen legible en móvil. */
+  .referral-panel .btn{min-height:44px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none;color:var(--txt)}
+  .referral-panel .btn-accent{color:var(--on-accent)}
+  .referral-panel dl{margin:24px 0}
+  .referral-panel dt{color:var(--muted);font-size:14px}
+  .referral-panel dd{margin:4px 0 16px;font-weight:700;font-variant-numeric:tabular-nums}
 </style>
 <!-- Configuración runtime: crea/edita config.js para conectar servicios sin tocar la app. -->
 <script src="config.js"></script>
@@ -4411,6 +4417,7 @@ function render(){
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
   if(view==="progreso")return renderProgress();
+  if(view==="invitaciones")return renderReferrals();
   if(view==="perfil")return renderProfile();
   if(ADMIN_CONSOLE&&isAdmin()&&view==="foods")return renderFoods();
   if(ADMIN_CONSOLE&&isAdmin()&&view==="exercises")return renderExerciseAdmin();
@@ -5242,12 +5249,14 @@ function renderHoy(){
   ${dayClosed?"":heroDash(ds,{compact:true})}
   <div class="home-log-action"><button type="button" class="btn btn-accent" onclick="homeLogFood('${ds}')">Registrar comida</button></div>
   ${homeAgendaHtml(ds)}
+
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
   ${checkinDue?weeklyCheckinBanner():""}
   ${coachWelcomeHtml()}
   ${coachSection}
   ${homeMenuSuggestionHtml(ds)}
+  ${referralNoticeHtml()}
   ${notifyNudgeHtml()}`;
   maybeStartFitbrosTour();
 }
@@ -8249,6 +8258,7 @@ function renderProfile(){
   const duration=resolvedPlanDuration(p);
   const strengthChoice=strengthChoiceFromPrefs(p);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
+  ${referralNoticeHtml()}
   ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas.</span></div>`:""}
 
   <div class="pf-accordion-list">
@@ -9207,6 +9217,86 @@ async function redeemCoupon(btn){
     toast(String(e.message||e));
   }
 }
+/* ---- REQ-317: beneficio por invitaciones ---- */
+let referralState=null;
+async function referralRequest(generate=false){
+  const token=session&&session.access_token;
+  if(!token)throw new Error("Inicia sesión para ver tus invitaciones.");
+  const r=await fetch("/api/entitlement"+(generate?"":"?action=referrals"),{
+    method:generate?"POST":"GET",headers:{Authorization:"Bearer "+token,...(generate?{"content-type":"application/json"}:{})},
+    ...(generate?{body:JSON.stringify({action:"referral-generate"})}:{})
+  });
+  const data=await r.json();
+  if(!r.ok)throw new Error(data.error||"No pudimos cargar tus invitaciones.");
+  return data;
+}
+async function loadReferralBenefit(){
+  const owner=uid();
+  try{
+    const data=await referralRequest();
+    if(!session||uid()!==owner)return;
+    referralState=data;
+    const params=new URLSearchParams(location.search);
+    if(params.get("ver")==="invitaciones"){
+      params.delete("ver");history.replaceState(history.state,"",location.pathname+(params.size?"?"+params:"")+location.hash);
+      view="invitaciones";
+    }
+    if(["hoy","perfil","invitaciones"].includes(view))render();
+  }catch(_){
+    if(session&&uid()===owner&&new URLSearchParams(location.search).get("ver")==="invitaciones"){
+      view="invitaciones";render();
+    }
+  }
+}
+function referralNoticeHtml(){
+  if(!referralState||!referralState.eligible)return "";
+  return `<section class="agenda-card" aria-labelledby="referralNoticeTitle">
+    <h2 class="agenda-title" id="referralNoticeTitle">Ser un usuario activo tiene premio</h2>
+    <p>Invita hasta a 3 amigos. Por cada uno que se registre, ganas 3 meses extra gratis y tu amigo recibe sus primeros 3 meses gratis.</p>
+    <button class="btn btn-accent" onclick="setView('invitaciones')">Ver mi beneficio</button>
+  </section>`;
+}
+function renderReferrals(){
+  $("#app").innerHTML=`${screenHeader("Invita a tus amigos",null,"perfil")}
+    <button class="btn btn-sm" onclick="setView('perfil')">Volver a Perfil</button>
+    <div id="referralPanel" class="referral-panel" aria-live="polite" style="margin-top:20px">Cargando tus invitaciones…</div>`;
+  refreshReferrals();
+}
+async function refreshReferrals(generate=false){
+  const panel=$("#referralPanel");if(!panel)return;
+  const owner=uid();
+  if(generate)panel.querySelectorAll("button").forEach(b=>b.disabled=true);
+  try{
+    const data=await referralRequest(generate);
+    if(!session||uid()!==owner||panel!==$("#referralPanel"))return;
+    referralState=data;
+    if(!data.eligible){panel.innerHTML='<p>Este beneficio aún no está disponible para tu cuenta.</p>';return;}
+    const invites=data.invitations||[],success=invites.filter(i=>i.successful).length;
+    panel.innerHTML=`<p>Por ser usuario activo, puedes invitar hasta a 3 amigos. Por cada amigo que complete su registro, ganas <b>3 meses extra gratis</b> y él recibe <b>sus primeros 3 meses gratis</b>.</p>
+      <dl><dt>Invitaciones disponibles</dt><dd>${3-success} de 3 · ${3-invites.length} por generar, ${invites.length-success} pendientes</dd>
+      <dt>Invitaciones exitosas</dt><dd>${success} de 3</dd><dt>Meses extra ganados</dt><dd>${success*3}</dd></dl>
+      <p class="muted small">Cada enlace es para un amigo nuevo y se puede usar una sola vez. Compartirlo no cuenta como un registro exitoso.</p>
+      ${invites.map((i,n)=>{
+        const link=location.origin+'/?codigo='+encodeURIComponent(i.code)+'&source=amigos';
+        const text='Te invito a Evolv. Regístrate con mi enlace y recibe tus primeros 3 meses gratis: '+link;
+        return `<section class="dash" aria-label="Invitación ${n+1}"><b>Invitación ${n+1}: ${i.successful?'Registro exitoso':'Pendiente de registro'}</b>${i.successful?'':`
+          <div class="field" style="margin-top:12px"><label for="refLink${n}">Enlace de invitación ${n+1}</label><input id="refLink${n}" readonly value="${esc(link)}" onclick="this.select()"></div>
+          <div class="row wrap" style="gap:8px"><button class="btn" onclick="copyReferralLink(${n})">Copiar enlace</button>
+          <a class="btn" href="https://wa.me/?text=${encodeURIComponent(text)}" target="_blank" rel="noopener">WhatsApp</a>
+          <a class="btn" href="mailto:?subject=${encodeURIComponent('Tus primeros 3 meses en Evolv gratis')}&body=${encodeURIComponent(text)}">Enviar por correo</a></div>`}</section>`;
+      }).join('')}
+      <div class="row wrap" style="gap:8px">${invites.length<3?'<button class="btn btn-accent" onclick="refreshReferrals(true)">Generar mi enlace</button>':'<p>Ya generaste tus 3 invitaciones. Puedes volver a compartir los enlaces pendientes.</p>'}
+      <button class="btn" onclick="refreshReferrals()">Actualizar estado</button></div>`;
+  }catch(e){
+    if(session&&uid()===owner&&panel===$("#referralPanel"))panel.innerHTML=`<p>${esc(e.message)}</p><button class="btn" onclick="refreshReferrals()">Reintentar</button>`;
+  }
+}
+async function copyReferralLink(n){
+  const input=$("#refLink"+n);if(!input)return;
+  try{await navigator.clipboard.writeText(input.value);toast("Enlace copiado");}
+  catch(_){input.focus();input.select();toast("Selecciona y copia tu enlace");}
+}
+
 /* ---- Invitación a la beta (REQ-203) ----
    El enlace de invitación (/?codigo=FIT-XXXX-XXXX) guarda el código, abre el
    registro y lo canjea solo al iniciar sesión. Si el correo se confirma en
@@ -9835,7 +9925,7 @@ async function inviteSignUp(email,pwd,out){
   const s=await signIn(email,pwd);
   if(s.error){window._authMode="in";renderAuth();const o=$("#auOut");if(o)o.textContent="Tu cuenta está lista. Inicia sesión para entrar.";return;}
   const{data:sd}=await supa.auth.getSession();session=(sd&&sd.session)||null;
-  if(session){toast("¡Bienvenido a la beta! Tienes acceso completo por "+couponDurationText(data.entitlement)+".");onAuth();}
+  if(session){toast(data.referral?"¡Bienvenido a Evolv! Tus primeros 3 meses son gratis.":"¡Bienvenido a la beta! Tienes acceso completo por "+couponDurationText(data.entitlement)+".");onAuth();}
 }
 async function requestOwnPasswordReset(){
   const email=$("#au_email")&&$("#au_email").value.trim();
@@ -13994,6 +14084,7 @@ let _recoveryBusy=false;
 function clearSignedOutState(prevUid){
   if(prevUid===undefined)prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
   resetStreakFeedback(); // REQ-304: ninguna celebración pasa a otra cuenta
+  referralState=null; // REQ-317: aislar invitaciones por cuenta
   resetStreakSocial(); // REQ-300: ni invitaciones ni clasificación pasan a otra cuenta
   session=null;profile=null;view="hoy";
   entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
@@ -14106,6 +14197,7 @@ async function onAuth(){
     loadNotifPrefs().then(()=>{if(session&&view==="hoy"&&!onboardingActive&&!notifySetupActive)render();}); // REQ-289
     scheduleEngagementSave(1500); // REQ-285: resumen para los recordatorios
     loadStreakFriendsAfterAuth(); // REQ-300
+    loadReferralBenefit(); // REQ-317
     if(!onboardingActive)setTimeout(maybePromptProfileReview,0);
     refreshPushSubscriptionKey(); // REQ-267: no-await
   }finally{_authBusy=false;}
@@ -16362,6 +16454,7 @@ async function boot(){
   loadCatalog().then(()=>{if(!session)refreshLandingPlans();});
   // REQ-203: el enlace de invitación abre directo el registro.
   if(captureInviteCode()&&!hasStoredAuthSession()){window._showAuth=true;window._authMode="up";}
+  if(new URLSearchParams(location.search).get("ver")==="invitaciones"&&!hasStoredAuthSession()){window._showAuth=true;window._authMode="in";}
   if(!passwordRedirectMode()&&!hasStoredAuthSession()&&!window._showAuth&&!ADMIN_CONSOLE){
     $("#tabs").innerHTML="";$("#app").classList.add("landing-host");
     renderLanding();
@@ -16396,6 +16489,15 @@ async function boot(){
 // Solo claves seguras sin datos de salud, identidad ni prompts.
 const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","action"]);
 let _analyticsSessionId=null;
+// REQ-317: al retomar la PWA tras 30 minutos fuera comienza otro uso.
+let analyticsAwayAt=0;
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){analyticsAwayAt=Date.now();return;}
+  if(analyticsAwayAt&&Date.now()-analyticsAwayAt>=30*60*1000&&session){
+    _analyticsSessionId="";trackEvent("session_start",{});
+  }
+  analyticsAwayAt=0;
+});
 function analyticsSessionId(){if(!_analyticsSessionId)_analyticsSessionId=Math.random().toString(36).slice(2)+Date.now().toString(36);return _analyticsSessionId;}
 function filterEventProps(props){
   const out={};

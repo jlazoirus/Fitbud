@@ -93,6 +93,9 @@ REQ-316: Hoy prioriza registro y entreno; menú opcional descartable por día/cu
 
 ## Pagos, notificaciones y analytics
 
+- REQ-317: referidos; `supabase/referrals.sql`. Audiencia/campaña/operación: `docs/referrals.md`.
+
+
 - Landing publica, catalogo de planes, paywall, Stripe Checkout, webhooks, entitlements, cupones y billing history estan implementados. Cobro real depende de variables y configuracion externa.
 - REQ-104: sin `STRIPE_SECRET_KEY`, `showPaywall` muestra "Disponible pronto" + canje de codigo. Pago unico, sin renovacion.
 - **Cobro siempre en la web** (Stripe Checkout en `evolvapp.club`), tambien con app nativa: nada de compras dentro de la app. REQ-208: `noPricesMode()` (acceso beta/cupon/cortesia vigente o invitacion sin canjear) reemplaza el paywall por `showAccessNotice()` y Perfil no muestra precios; Admin "Crear cuenta"/"Invitar" con casilla beta da 90 dias de cortesia `quarterly`.

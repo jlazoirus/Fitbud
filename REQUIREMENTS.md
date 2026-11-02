@@ -2115,3 +2115,19 @@ Playwright Home/menú opcional, nutrición, coach y regresiones de registro/entr
 Resultado: 9/9 casos nuevos y regresiones dirigidas de Hoy, Nutrición y coach verificadas. Capturas 320/390/1280 sin desbordes; detector Impeccable sin hallazgos, HTML/JS/accesibilidad, placeholders, macros primero, orden/saltos, caché PWA y secretos correctos. Gate integral posterior al commit antes de publicar. Sin migraciones ni llamadas pagadas.
 
 Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nueva de los slots vacíos coincidía con «o elige», prohibido por REQ-194; se cambió por «Registra lo que comiste. El menú es opcional.», sin relajar pruebas. Gate final con reintento oficial del caso de textos.
+
+## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
+
+**Estado: implementado en código; requiere acción manual para activar en producción.**
+
+Origen: solicitud directa de Jonathan (02/11/2026). Comunicación por mail y dentro de la app para lanzar en una semana; al menos 2 usos de la app en los últimos 7 días.
+
+Problema: no existía un programa de referidos que otorgara 3 meses a cada parte y mostrara cupos y registros exitosos.
+
+Alcance: cohorte persistente de usuarios habilitados con al menos 2 sesiones distintas de uso en los 7 días previos al 09/11/2026 09:00 Lima. Mail y aviso en Hoy/Perfil llevan al panel autenticado. Generación de hasta 3 enlaces individuales de un uso, copia, WhatsApp y correo. Cupos, pendientes, éxitos y meses ganados consultados del servidor. Registro nuevo y recompensa atómicos: 3 meses calendario para el amigo y 3 extra al acceso del invitador. Sin duplicados ni autorreferidos; sin sobrescribir accesos pagados. Correos con baja e idempotencia de proveedor y base de datos. Caché v195.
+
+Criterios de aceptación: nunca mostrar «dentro de una semana» en el mensaje; no enviar antes del lanzamiento; excluir cuentas con menos de dos usos; conservar elegibilidad; máximo 3 registros únicos; solo éxito real acredita meses; aislamiento por cuenta; controles en móvil/escritorio; registro previo por invitación intacto.
+
+Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y Playwright `referrals.spec.js`/`invitacion.spec.js`; gate integral. Migración idempotente aplicada dos veces en PostgreSQL local, nunca en producción.
+
+Operación manual pendiente: aplicar `supabase/referrals.sql` en Supabase antes del lanzamiento y comprobar cron/Resend existentes. Ver `docs/referrals.md`.
