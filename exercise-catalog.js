@@ -933,6 +933,7 @@
   const WIKIMEDIA_CALF={source_name:"Wikimedia Commons (BruceBlaus)",source_url:"https://commons.wikimedia.org/wiki/File:Exercise_Heel_Raise_Two_Legs.png",license_name:"CC BY-SA 4.0",attribution:"BruceBlaus, Wikimedia Commons"};
   const WIKIMEDIA_PIKE={source_name:"Wikimedia Commons (Danielflefil)",source_url:"https://commons.wikimedia.org/wiki/File:Pike_Push_Ups.gif",license_name:"CC BY-SA 4.0",attribution:"Danielflefil, Wikimedia Commons"};
   const USARMY_PLANK_TAP={source_name:"10th AAMDC (U.S. Army)",source_url:"https://commons.wikimedia.org/wiki/File:10th_AAMDC_host_%22Key_Leader_Physical_Readiness_Training%22_(8448514).jpg",license_name:"Dominio público (obra del Gobierno de EE. UU.)",attribution:"U.S. Army vía Wikimedia Commons — dominio público"};
+  const CDC_STEPUP={source_name:"CDC (Centers for Disease Control and Prevention)",source_url:"https://commons.wikimedia.org/wiki/File:Step_up-CDC_strength_training_for_older_adults.gif",license_name:"Dominio público (obra del Gobierno de EE. UU.)",attribution:"CDC vía Wikimedia Commons"};
   const FLICKR_HEELRAISE={source_name:"Flickr (personaltrainertoronto)",source_url:"https://www.flickr.com/photos/personaltrainertoronto/51346336932/",license_name:"CC BY 2.0",attribution:"personaltrainertoronto, Flickr"};
   const ENDURANCE_MEDIA={
     walking:["assets/exercise-media/walking.jpg",FREE_EXERCISE_DB],
@@ -952,7 +953,7 @@
   // REQ-264: las demostraciones deben enseñar el ejercicio nombrado, sin
   // sustituirlo por otro más difícil que trabaje músculos parecidos.
   const CURATED_DEMO_SLUGS=new Set([
-    "archer-push-up","slider-leg-curl","single-leg-rdl","step-up",
+    "archer-push-up","slider-leg-curl","single-leg-rdl",
     "bulgarian-split-squat",
   ]);
   const reviewedMedia=new Map();
@@ -989,7 +990,12 @@
     common_errors:["Dejar caer la cadera","Adelantar el cuello hacia el borde","Usar una mesa ligera o con patas plegables"],
     safety_signals:["La mesa se mueve, cruje o se inclina","Dolor agudo de hombro o codo","Hormigueo en brazo o mano"],
   });
-  // REQ-316: estas fichas no tienen demostración, así que el texto es la única
+  // REQ-318: step-up con la animación del CDC (escalón bajo, sin carga y con
+  // apoyo, la variante exacta de la ficha; dominio público).
+  const stepUpMedia={...CDC_STEPUP,media_type:"gif",media_url:"assets/exercise-media/step-up.gif",poster_url:"",frames:[]};
+  Object.assign(strength.find(ex=>ex.slug==="step-up"),stepUpMedia);
+  reviewedMedia.set("step-up",stepUpMedia);
+  // REQ-316: estas fichas no tenían demostración, así que el texto es la única
   // guía y debe describir la variante exacta (antes usaban el texto genérico
   // del patrón: el step-up describía una zancada y el curl deslizante, un peso muerto).
   const TEXT_ONLY_TECHNIQUE={

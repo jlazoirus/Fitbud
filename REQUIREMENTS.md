@@ -2084,3 +2084,7 @@ Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspac
 ## REQ-317 - Entreno en casa: el día de tirón no se queda en un solo ejercicio
 
 **Estado: implementado.** Regresión de REQ-293: sin barra ni bandas, Pull A/B en casa quedaban solo con el remo invertido. Las plantillas de peso corporal suman core (dead bug y plancha lateral; plancha frontal y con toque de hombro). `CACHE_NAME` → `fitbud-pwa-v195`. ✓ `tests/e2e/entreno-casa.spec.js`.
+
+## REQ-318 - Entreno: el step-up con la animación del CDC (dominio público)
+
+**Estado: implementado.** De los ejercicios sin demostración de REQ-316, el step-up tiene una exacta y libre: la animación del CDC en Wikimedia Commons (escalón bajo, sin carga, con apoyo; obra del Gobierno de EE. UU.). Se sirve desde `assets/exercise-media/step-up.gif` con crédito y vuelve a elegirse en las sesiones; se retira `step-up.svg`. Siguen sin fuente libre exacta la búlgara (solo foto con carga), el peso muerto a una pierna, el curl deslizante y la flexión arquero. `CACHE_NAME` → `fitbud-pwa-v196`. ✓ `tests/e2e/sin-dibujos.spec.js`.

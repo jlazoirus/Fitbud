@@ -4,7 +4,7 @@
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges } from "./helpers.js";
 
-const SIN_FOTO = ["bulgarian-split-squat", "single-leg-rdl", "step-up", "slider-leg-curl", "archer-push-up"];
+const SIN_FOTO = ["bulgarian-split-squat", "single-leg-rdl", "slider-leg-curl", "archer-push-up"];
 
 test("sin dibujos: las sesiones usan ejercicios con foto y una ficha sin foto muestra solo los pasos", async ({ page, context }) => {
   await installMocks(context);
@@ -55,6 +55,9 @@ test("sin dibujos: las sesiones usan ejercicios con foto y una ficha sin foto mu
   // Sin imagen, el texto es la guía: describe la variante exacta (antes el step-up describía una zancada).
   await page.evaluate(() => openExerciseGuide("step-up"));
   await expect(overlay.locator(".exercise-steps")).toContainText("Empuja con el pie de arriba");
+  // REQ-318: el step-up enseña la animación del CDC (dominio público) con su crédito.
+  await expect(overlay.locator(".guide-demo img")).toHaveAttribute("src", "assets/exercise-media/step-up.gif");
+  await expect(overlay).toContainText("CDC");
   await page.evaluate(() => closeModal());
 
   // Una con foto sigue igual.
