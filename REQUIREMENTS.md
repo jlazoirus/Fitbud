@@ -1899,25 +1899,25 @@ Jonathan: `day_log.state.trainingPlace` lleva la sesión del día a otro lugar. 
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Quien registra pero lleva 4+ días sin entrenar (2+ días que tocaba, descansos aparte) recibe "¿Retomamos el entreno?" por correo y push, una vez a los 4 y otra a los 11 días (`trainingLapse()`). ✓ `scripts/validate-reminder-journey.mjs`.
+Aviso a los 4 y 11 días sin entrenar (`trainingLapse()`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-296 - Recordatorios: seguimiento por correo para quien nunca eligió sus avisos
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Sin fila en `notification_preferences`: correo de regreso/volver a entrenar a las 20:00 (`runFollowups`); sin perfil terminado, 3 correos desde el alta. Baja firmada. ✓ `scripts/validate-reminder-journey.mjs`.
+Correos de seguimiento con baja firmada (`runFollowups`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-297 - Recordatorios: invitar a activar el push a la semana
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-A los 7–13 días del plan, sin push, un día sin otro correo: "Activa los avisos en tu teléfono", una vez (`pushInvite()`). El onboarding ya los pide (REQ-289). ✓ `scripts/validate-reminder-journey.mjs`.
+Correo único a los 7–13 días sin push (`pushInvite()`). ✓ `scripts/validate-reminder-journey.mjs`.
 
 ## REQ-298 - Recordatorios: elegir la hora del aviso y resumen de la mañana
 
 **Estado: implementado** (migración `supabase/notifications_morning.sql` aplicada el 2026-10-28). Detalle en `docs/requirements-history.md`.
 
-Aviso del día de 06:00 a 23:00, elegible también con push. Resumen opcional de 05:00 a 11:00 con el entreno y las comidas de hoy (`morningPlan()`, plan en `engagement.plan`), por push o, sin push, por correo; uno por día. ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
+Hora 06–23 y resumen matutino opcional (`morningPlan()`). ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
 
 ## REQ-299 - Hoy: distinguir comidas registradas de la planificación opcional de mañana
 
@@ -2131,3 +2131,9 @@ Criterios de aceptación: nunca mostrar «dentro de una semana» en el mensaje; 
 Verificación: `node scripts/test-referrals.mjs`, pruebas API de invitación y Playwright `referrals.spec.js`/`invitacion.spec.js`; gate integral. Migración idempotente aplicada dos veces en PostgreSQL local, nunca en producción.
 
 Operación manual pendiente: aplicar `supabase/referrals.sql` en Supabase antes del lanzamiento y comprobar cron/Resend existentes. Ver `docs/referrals.md`.
+
+## REQ-318 - Rachas con amigos: explicar cómo se suma a un amigo
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Tres pasos, alias propuesto y «Crear invitación» que activa y deja el enlace; luego "Tus amigos te ven como …". Sin buscador. ✓ `tests/e2e/rachas-amigos.spec.js`.
