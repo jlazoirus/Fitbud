@@ -2130,7 +2130,7 @@ Jonathan (2026-10-28): eligió comparar la racha actual. Compartir desde Hoy/Pro
 
 Un shake de marca se estimó como polvo con agua. El pedido decide el formato, no inventa datos de marca y orienta a la foto de la etiqueta, que se lee tal cual. Reestimar actualiza el origen. ✓ `scripts/validate-meal-estimate-output.mjs`, `tests/e2e/origen-registro.spec.js`.
 
-## REQ-302 - Rachas con amigos: explicar cómo se suma a un amigo
+## REQ-317 - Rachas con amigos: explicar cómo se suma a un amigo
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 

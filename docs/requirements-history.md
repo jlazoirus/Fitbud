@@ -11998,7 +11998,7 @@ Una base de productos de marca o la búsqueda del código de barras en una base 
 - Los pedidos de texto y foto llevan las reglas. ✓ `scripts/validate-meal-estimate-output.mjs`.
 - Reestimar un registro de una favorita ×2 actualiza el origen. ✓ `tests/e2e/origen-registro.spec.js` (falla con el código anterior).
 
-## REQ-302 - Rachas con amigos: explicar cómo se suma a un amigo
+## REQ-317 - Rachas con amigos: explicar cómo se suma a un amigo
 
 **Estado: implementado.**
 
