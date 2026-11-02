@@ -2025,71 +2025,21 @@ Verificación REQ-313: suite dirigida de ambos ejercicios y ampliación de gimna
 
 ## REQ-314 - Acompañamiento del coach durante los primeros usos
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-**Origen:** solicitud directa: acompañar al cliente de la mano, invitándolo a preguntar cómo entrenar hoy y guiándolo a acciones reales.
-
-**Problema:** el coach estaba bajo la agenda y los nuevos usuarios debían descubrir el campo de preguntas; el tour automático explicaba pantallas en vez de resolver su siguiente paso.
-
-**Implementación:** bienvenida visible en Hoy durante los primeros cinco días distintos de uso, dentro de los 14 días posteriores al onboarding. Preguntas de entrenamiento, poco tiempo y comidas; respuestas locales basadas en el día real, con navegación a Entreno, adaptación existente, Nutrición o evaluación de seguridad. Las preguntas frecuentes escritas también resuelven esta navegación. Otras preguntas mantienen el coach conversacional existente. No hay llamadas automáticas al servicio, notificaciones push nuevas ni cambios de planes por leer o preguntar.
-
-**Controles:** Ahora no oculta por hoy; No volver a mostrar persiste por usuario/dispositivo. Solo se guardan fechas y descartes, sin salud ni conversación. La navegación revisa el estado actual: descanso, sesión registrada/en curso y pausa de seguridad. Las opciones de adaptación conservan su flujo de elección explícita. No se modifica historial. La bienvenida sustituye el inicio automático del tour para este grupo; la guía manual sigue en el botón ?. Caché v193.
-
-**Fuera de alcance:** mensajes push/correos, cambios autónomos de sesión, habilitar el modo conversación experimental o rediseñar la página Hoy.
-
-**Verificación:** suite coach-welcome en móvil/escritorio, navegación real, consulta escrita, foco, descarte tras recargar, límite de exposición, aislamiento, descanso, registro, seguridad y guía sin servicio externo. Sintaxis/HTML y detector Impeccable. Los controles generales se corrigen en REQ-315; integración autorizada por el usuario.
-
-Resultado REQ-314: 10/10 pruebas dirigidas correctas en Chromium local, incluidas móvil/escritorio, consulta escrita, ayudas sin servicio, seguridad, persistencia, retomar sin modificar registros y tour manual. Regresión de Hoy: 5/6 correctas; la prueba antigua de seguridad usa has_red_flags sin responses de señales graves, incompatible con REQ-311 ya presente en HEAD (hasHardSafetyFlags no se cambió). Audit HTML/JS/accesibilidad, detect Impeccable, validadores de plan/wiring y git diff --check correctos. Capturas móvil/escritorio revisadas. La corrección del escape de argumentos en los chips existentes permite que las preguntas contextuales ejecuten su acción. La reparación de los controles se documenta en REQ-315.
-
+Bienvenida del coach en Hoy durante los primeros usos, con preguntas que llevan a acciones reales; sin llamadas automáticas ni cambios de plan.
 
 ## REQ-315 - Reparar los controles que bloquean la entrega
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Solicitud directa del usuario. El validador de ejercicios comprueba media real local y conserva las URLs de atribución; pike exige su secuencia exacta revisada tanto en el validador como en el test de navegador, que comprueba la carga de ambas fotos. La allowlist resuelve rewrites de Vercel y media de fichas solo remotas mediante el normalizador canónico, manteniendo la prohibición de publicar archivos internos. El test de invitaciones valida código 409, orientación útil y ausencia de canje/borrado para las dos formas de error GoTrue. El test de seguridad declara una señal grave real (chest_pain), coherente con REQ-311. Playwright usa el navegador empaquetado o Chromium instalado cuando aquel falta, respetando la ruta explícita. Documentación compactada con el detalle íntegro trasladado al historial y referencia ampliada. El gate reserva 15 minutos (configurable) para la suite de más de 200 pruebas en entornos CI pequeños, sin omitir pruebas ni cambiar los timeouts individuales. Sin cambios en permisos, seguridad clínica o contratos de producción para satisfacer tests.
-
-Verificación dirigida: validadores de ejercicios, allowlist, documentación, invitaciones y test unitario de alta. Verificación integral en una copia temporal limpia del mismo contenido; los cambios de los ejercicios y Coach permanecen en el workspace original. No se ejecutan migraciones ni despliegues de producción.
-
-Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspace. Suite completa: 232/233 aprobadas; la única expectativa antigua restante de pike fue corregida y pasó con el reintento oficial E2E_RETRY_FAILED (1/1). Alta por invitación validada también con el test unitario. Control negativo adicional confirma que una imagen externa real sigue bloqueada. No se ejecutaron migraciones ni acciones sobre datos de producción.
+Validadores, allowlist, invitaciones, seguridad y Playwright reparados sin relajar contratos; gate con margen para la suite completa.
 
 ## REQ-316 - Hoy: registrar y entrenar sin preparar un menú
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
-Jonathan (2026-11-02), captura y aprobación de propuesta: preparar el día debe ser una sugerencia, sin dominar ni condicionar el valor principal.
-
-### Problema
-La falta de menú activaba «Aún falta preparar este día», un botón dominante y un retorno anticipado que ocultaba las acciones del entreno. Nutrición también priorizaba preparar comidas.
-
-### Causa raíz
-`homeAgendaData()` retornaba `setup` antes de construir el entrenamiento; `homeAgendaHtml()` y `renderNutrition()` presentaban la planificación opcional como tarea obligatoria.
-
-### Objetivo
-Acceder al registro, entrenamiento y coach desde Hoy; sugerir un menú de forma secundaria y voluntaria.
-
-### Alcance
-Registro directo con editor existente, entrenamiento independiente del menú y slots vacíos excluidos de pendientes. Sugerencia secundaria tras el coach, «Sugerirme un menú» y «Ahora no» persistido por día/cuenta/dispositivo. Acceso compacto en Nutrición, bienvenida del coach tras las acciones y preferencias en Perfil. Caché PWA actualizado.
-
-### Fuera de alcance
-Cambiar planes, objetivos, rachas, historial, cobros, seguridad o proveedores; generar o aplicar menús automáticamente.
-
-### Riesgos
-Cierre falso del día sin comidas, fuga de descartes entre cuentas, pérdida de acceso a generación y regresiones del editor/entrenamiento.
-
-### Criterios de aceptación
-- Registrar comidas propias suma consumo sin generar un menú; entrenamiento inicia y continúa independientemente del menú.
-- Slots vacíos y planificación no cuentan como pendientes; la seguridad, descanso, registros y cierre real se conservan.
-- Sugerencia sin botón primario, descartable hasta mañana, aislada por cuenta y disponible en Nutrición tras descartarla.
-- Generar requiere elección explícita; aplicar conserva confirmación y registros previos.
-- Móvil 320/390 y escritorio sin desbordes, controles accesibles y sin llamadas externas automáticas.
-
-### Verificación sugerida
-Playwright Home/menú opcional, nutrición, coach y regresiones de registro/entreno; detector Impeccable y release gate completo.
-
-Resultado: 9/9 casos nuevos y regresiones dirigidas de Hoy, Nutrición y coach verificadas. Capturas 320/390/1280 sin desbordes; detector Impeccable sin hallazgos, HTML/JS/accesibilidad, placeholders, macros primero, orden/saltos, caché PWA y secretos correctos. Gate integral posterior al commit antes de publicar. Sin migraciones ni llamadas pagadas.
-
-Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nueva de los slots vacíos coincidía con «o elige», prohibido por REQ-194; se cambió por «Registra lo que comiste. El menú es opcional.», sin relajar pruebas. Gate final con reintento oficial del caso de textos.
+Registrar y entrenar sin menú; sugerencia de menú secundaria y descartable por día/cuenta/dispositivo. ✓ E2E de Hoy/menú opcional.
 
 ## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
 
@@ -2148,3 +2098,119 @@ Pie: "No recibir más estos correos". ✓ `scripts/test-referrals.mjs`.
 ## REQ-327 - Entreno: imágenes propias para los cuatro ejercicios que quedaban solo con pasos
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/sin-dibujos.spec.js`.
+
+## REQ-328 - Entreno: ver el siguiente ejercicio sin salir del actual
+
+**Estado: pendiente.**
+
+### Origen
+Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): durante la sesión quieren saber qué viene después sin tocar nada.
+
+### Problema
+En la pantalla del ejercicio de fuerza en curso no hay forma de ver cuál es el siguiente sin completar u omitir el actual, o sin abrir «Hacer otro ejercicio primero».
+
+### Causa raíz
+`renderCurrentWorkoutStep()` (`index.html:6717`) solo pinta el paso actual: título, «Cómo se hace», `.player-dose` (`index.html:6742`), series y controles. No consulta el paso siguiente. El orden real no es «paso actual + 1»: `nextWorkoutStepIndex()` (`index.html:5905`) devuelve el primer paso `pending` distinto del actual, así que cuentan los ejercicios aplazados, los elegidos con `openWorkoutStepPicker()` (`index.html:6231`), los opcionales y los bloques por tiempo (vuelta a la calma).
+
+### Objetivo
+Una tarjeta compacta «A continuación» bajo el título del ejercicio actual, antes de `.player-dose`, con el nombre del siguiente ejercicio, series × repeticiones y descanso, visible en el primer viewport a 360-390 px.
+
+### Alcance
+- Calcular el siguiente con la misma regla que usa `completeWorkoutStep()` (`nextWorkoutStepIndex(execution, execution.currentStep)`), sin duplicar lógica.
+- Fuerza: nombre (con la variación o sustitución vigente), `prescribedSets × reps` y descanso (`restLabel`/`restSeconds`). Bloque por tiempo: su etiqueta y duración u objetivo, sin series. Paso opcional no aceptado: su nombre marcado como opcional.
+- Sin siguiente pendiente: la tarjeta no se muestra.
+- Una sola línea en móvil (texto truncado si hace falta) para no empujar las series; solo lectura, sin botones.
+- Reutilizar clases y tokens existentes; sin fuentes ni colores nuevos. Subir `CACHE_NAME` del service worker.
+
+### Fuera de alcance
+Mostrar máquina o zona, mostrar dos ejercicios por delante, saltar al siguiente desde la tarjeta, cambiar series, cargas, descanso, botones o «Cómo se hace».
+
+### Riesgos
+Mostrar un siguiente distinto del que realmente abre «Siguiente ejercicio» (aplazados, picker, opcionales); desbordes a 320-360 px; bajar las series fuera del primer viewport.
+
+### Criterios de aceptación
+- A 360 y 390 px, la tarjeta se ve sin scroll ni interacción en la pantalla del ejercicio en curso.
+- El ejercicio mostrado es exactamente el que aparece al tocar «Siguiente ejercicio», también tras aplazar uno o usar «Hacer otro ejercicio primero».
+- Avanza al pasar de ejercicio y desaparece cuando no queda nada pendiente.
+- Registrar series, el descanso, sustituir, omitir y completar la sesión siguen igual.
+
+### Verificación sugerida
+Playwright a 360/390/1280: sesión con ≥3 ejercicios, comprobar la tarjeta en cada paso, aplazar uno y comparar con el destino real de «Siguiente ejercicio», último ejercicio sin tarjeta. Regresiones del reproductor, detector Impeccable y release gate.
+
+## REQ-329 - Nutrición: registrar alimentos por gramos sin sentir que armas una comida
+
+**Estado: pendiente.**
+
+### Origen
+Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): registrar comida se siente complejo, como armar una «comida»; piden buscar un alimento, poner los gramos y que la app calcule.
+
+### Problema
+La capacidad ya existe (REQ-188, REQ-271), pero queda escondida. El editor abre por defecto en «Recientes» o «Favoritas», y muestra a la vez el día y el destino del registro, la descripción, cuatro campos de macros a mano, «Solo conozco las calorías», los botones de estimación y «Guardar en favoritas». El camino alimento + gramos no es el protagonista.
+
+### Causa raíz
+`quickPicksHtml()` (`index.html:11376`) elige la pestaña inicial con `hasRecent?"recent":hasFav?"fav":"food"` (`index.html:11378`). `editorSheet()` (`index.html:11568`) pinta siempre visibles los campos `f_kcal/f_p/f_c/f_f` y el resto de controles, aunque al sumar alimentos (`addFoodToEditor()`, `index.html:10929`) los totales ya se derivan de las líneas y la descripción se completa sola (`autoName`).
+
+Ya resuelto en el código actual, que no hay que rehacer: búsqueda en el catálogo con gramos, varias líneas con total, macros desde la base de alimentos, persistencia con `commitDay()`, validación de gramos (más de 0 y hasta 2000), protección contra doble toque (`e.saving` en `saveEditor()`, `index.html:11612`) y «Guardar en favoritas» desmarcado por defecto.
+
+### Objetivo
+Que registrar por gramos sea el camino evidente del editor existente: buscar alimento → gramos → total en vivo → Guardar, sin nombrar nada ni tocar macros a mano.
+
+### Alcance
+- El editor admite abrir directamente en la pestaña «Alimento» (opción de `openEditor()`), usada por los accesos de registro (Hoy y REQ-330).
+- Con líneas añadidas, mostrar un total destacado (kcal, proteína, carbohidratos, grasa) que se actualiza al añadir, cambiar o quitar líneas.
+- Agrupar en un plegable cerrado por defecto el ingreso a mano: los cuatro campos de macros, «Solo conozco las calorías» y la estimación. Se abre solo, o ya está abierto, al editar un registro que tiene macros manuales.
+- La descripción sigue rellenándose sola con los alimentos y no se exige escribirla.
+- Mantener «Guardar en favoritas» como opción desmarcada; sin nuevos conceptos de «comida».
+- Reutilizar clases y componentes existentes. Subir `CACHE_NAME`.
+
+### Fuera de alcance
+Un flujo o pantalla nuevos paralelos al editor, ingreso por texto libre, cambios de catálogo o de base nutricional, quitar el ingreso manual o la estimación, cambios de backend o migraciones.
+
+### Riesgos
+Romper la edición de registros antiguos con macros manuales o con porciones (REQ-243, REQ-270); perder la corrección manual de totales derivados; que el plegable esconda errores de validación; textos que choquen con REQ-31/REQ-194.
+
+### Criterios de aceptación
+- Desde un acceso de registro se anota «150 g de pollo» + «80 g de avena» sin escribir nombre ni macros, y el total coincide con la base de alimentos (mismos valores que `componentsTotals()`).
+- Tras recargar, el registro sigue ahí y los totales del día son correctos.
+- Gramos vacíos, cero, negativos, no numéricos o mayores de 2000 no se guardan; un doble toque en Guardar no duplica.
+- Abrir «Recientes», «Favoritas», el ingreso a mano y la estimación sigue funcionando; editar un registro manual antiguo muestra sus valores.
+- Móvil 320/390 y escritorio sin desbordes.
+
+### Verificación sugerida
+Playwright a 360/390/1280: registro por gramos con dos alimentos, recarga, doble toque, gramos inválidos, edición de un registro manual y de uno con porción. Regresiones de REQ-188/243/269/270/271, detector Impeccable y release gate.
+
+## REQ-330 - Nutrición: acceso evidente para registrar algo fuera del plan
+
+**Estado: pendiente.** Implementar después de REQ-329.
+
+### Origen
+Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): «le puedo dar click a registrar, pero no logro encontrar el camino» para anotar algo fuera del plan (ej. «cené 10 makis»).
+
+### Problema
+En Nutrición, el registro libre solo está al final de la lista de comidas («＋ Agregar comida / snack»), con estilo secundario. Con varias comidas en la lista queda bajo el pliegue.
+
+### Causa raíz
+`renderNutrition()` (`index.html:5285`) añade el botón después de `itemsHtml` dentro de la sección «Comidas del día» (`index.html:5324`). Caminos que ya existen: «Registrar comida» en Hoy (REQ-316, `homeLogFood()` → `openFoodRegistration()`, `index.html:4833`, que propone reemplazar la próxima comida sin registrar), «Registra lo que comiste» en cada comida vacía (REQ-316), el editor de cada comida del plan y «＋ Agregar comida / snack». Falta descubribilidad, no capacidad.
+
+### Objetivo
+Un botón principal sobre la lista de comidas del día que lleve al flujo existente para registrar algo fuera del plan.
+
+### Alcance
+- Botón principal «Registrar algo que comí» antes de la lista de comidas, con texto de apoyo breve. Si el día no tiene menú preparado, evitar «tu plan»; algo como «Aunque no esté en tu menú de hoy» solo cuando hay menú.
+- Abre `openEditor("extra", ds, null, {registration:true, intent:"extra", …})` en la pestaña «Alimento» de REQ-329. Nada de lógica nueva de guardado.
+- «＋ Agregar comida / snack» se conserva como acceso secundario, sin renombrarlo.
+- Subir `CACHE_NAME`.
+
+### Fuera de alcance
+Cambiar Hoy (ya resuelto en REQ-316), eliminar o renombrar el botón actual, cambiar la sugerencia de menú opcional, registro por texto libre.
+
+### Riesgos
+Dos botones de registro compitiendo, jerarquía confusa con la tarjeta «Menú opcional», textos vetados por REQ-194 (ver la nota de verificación de REQ-316) o que mencionen tecnología (REQ-31).
+
+### Criterios de aceptación
+- En Nutrición del día, el acceso se ve sobre la lista de comidas sin scroll a 360-390 px, con y sin menú preparado.
+- Lo registrado desde ahí cuenta en los macros del día como extra y persiste tras recargar.
+- «＋ Agregar comida / snack» sigue funcionando igual.
+
+### Verificación sugerida
+Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gramos desde él, recarga y totales; regresión del botón secundario y de los registros de Hoy. Detector Impeccable y release gate.

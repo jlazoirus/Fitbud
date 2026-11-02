@@ -12625,3 +12625,70 @@ Jonathan (2026-11-02): "¿puedes generar las imágenes tú?". Tras REQ-320/322 q
 ### Verificación
 
 `tests/e2e/sin-dibujos.spec.js` (los cuatro tienen demostración; la búlgara enseña sus dos imágenes sin crédito; una ficha sin media no pinta nada); specs de entreno; `validate-exercises`, `validate-deploy-allowlist`; capturas a 390 px.
+
+## REQ-314 - Acompañamiento del coach durante los primeros usos
+
+**Estado: implementado.**
+
+**Origen:** solicitud directa: acompañar al cliente de la mano, invitándolo a preguntar cómo entrenar hoy y guiándolo a acciones reales.
+
+**Problema:** el coach estaba bajo la agenda y los nuevos usuarios debían descubrir el campo de preguntas; el tour automático explicaba pantallas en vez de resolver su siguiente paso.
+
+**Implementación:** bienvenida visible en Hoy durante los primeros cinco días distintos de uso, dentro de los 14 días posteriores al onboarding. Preguntas de entrenamiento, poco tiempo y comidas; respuestas locales basadas en el día real, con navegación a Entreno, adaptación existente, Nutrición o evaluación de seguridad. Las preguntas frecuentes escritas también resuelven esta navegación. Otras preguntas mantienen el coach conversacional existente. No hay llamadas automáticas al servicio, notificaciones push nuevas ni cambios de planes por leer o preguntar.
+
+**Controles:** Ahora no oculta por hoy; No volver a mostrar persiste por usuario/dispositivo. Solo se guardan fechas y descartes, sin salud ni conversación. La navegación revisa el estado actual: descanso, sesión registrada/en curso y pausa de seguridad. Las opciones de adaptación conservan su flujo de elección explícita. No se modifica historial. La bienvenida sustituye el inicio automático del tour para este grupo; la guía manual sigue en el botón ?. Caché v193.
+
+**Fuera de alcance:** mensajes push/correos, cambios autónomos de sesión, habilitar el modo conversación experimental o rediseñar la página Hoy.
+
+**Verificación:** suite coach-welcome en móvil/escritorio, navegación real, consulta escrita, foco, descarte tras recargar, límite de exposición, aislamiento, descanso, registro, seguridad y guía sin servicio externo. Sintaxis/HTML y detector Impeccable. Los controles generales se corrigen en REQ-315; integración autorizada por el usuario.
+
+Resultado REQ-314: 10/10 pruebas dirigidas correctas en Chromium local, incluidas móvil/escritorio, consulta escrita, ayudas sin servicio, seguridad, persistencia, retomar sin modificar registros y tour manual. Regresión de Hoy: 5/6 correctas; la prueba antigua de seguridad usa has_red_flags sin responses de señales graves, incompatible con REQ-311 ya presente en HEAD (hasHardSafetyFlags no se cambió). Audit HTML/JS/accesibilidad, detect Impeccable, validadores de plan/wiring y git diff --check correctos. Capturas móvil/escritorio revisadas. La corrección del escape de argumentos en los chips existentes permite que las preguntas contextuales ejecuten su acción. La reparación de los controles se documenta en REQ-315.
+
+## REQ-315 - Reparar los controles que bloquean la entrega
+
+**Estado: implementado.**
+
+Solicitud directa del usuario. El validador de ejercicios comprueba media real local y conserva las URLs de atribución; pike exige su secuencia exacta revisada tanto en el validador como en el test de navegador, que comprueba la carga de ambas fotos. La allowlist resuelve rewrites de Vercel y media de fichas solo remotas mediante el normalizador canónico, manteniendo la prohibición de publicar archivos internos. El test de invitaciones valida código 409, orientación útil y ausencia de canje/borrado para las dos formas de error GoTrue. El test de seguridad declara una señal grave real (chest_pain), coherente con REQ-311. Playwright usa el navegador empaquetado o Chromium instalado cuando aquel falta, respetando la ruta explícita. Documentación compactada con el detalle íntegro trasladado al historial y referencia ampliada. El gate reserva 15 minutos (configurable) para la suite de más de 200 pruebas en entornos CI pequeños, sin omitir pruebas ni cambiar los timeouts individuales. Sin cambios en permisos, seguridad clínica o contratos de producción para satisfacer tests.
+
+Verificación dirigida: validadores de ejercicios, allowlist, documentación, invitaciones y test unitario de alta. Verificación integral en una copia temporal limpia del mismo contenido; los cambios de los ejercicios y Coach permanecen en el workspace original. No se ejecutan migraciones ni despliegues de producción.
+
+Resultado REQ-315: gate final 111/111 en copia limpia del contenido del workspace. Suite completa: 232/233 aprobadas; la única expectativa antigua restante de pike fue corregida y pasó con el reintento oficial E2E_RETRY_FAILED (1/1). Alta por invitación validada también con el test unitario. Control negativo adicional confirma que una imagen externa real sigue bloqueada. No se ejecutaron migraciones ni acciones sobre datos de producción.
+
+## REQ-316 - Hoy: registrar y entrenar sin preparar un menú
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-02), captura y aprobación de propuesta: preparar el día debe ser una sugerencia, sin dominar ni condicionar el valor principal.
+
+### Problema
+La falta de menú activaba «Aún falta preparar este día», un botón dominante y un retorno anticipado que ocultaba las acciones del entreno. Nutrición también priorizaba preparar comidas.
+
+### Causa raíz
+`homeAgendaData()` retornaba `setup` antes de construir el entrenamiento; `homeAgendaHtml()` y `renderNutrition()` presentaban la planificación opcional como tarea obligatoria.
+
+### Objetivo
+Acceder al registro, entrenamiento y coach desde Hoy; sugerir un menú de forma secundaria y voluntaria.
+
+### Alcance
+Registro directo con editor existente, entrenamiento independiente del menú y slots vacíos excluidos de pendientes. Sugerencia secundaria tras el coach, «Sugerirme un menú» y «Ahora no» persistido por día/cuenta/dispositivo. Acceso compacto en Nutrición, bienvenida del coach tras las acciones y preferencias en Perfil. Caché PWA actualizado.
+
+### Fuera de alcance
+Cambiar planes, objetivos, rachas, historial, cobros, seguridad o proveedores; generar o aplicar menús automáticamente.
+
+### Riesgos
+Cierre falso del día sin comidas, fuga de descartes entre cuentas, pérdida de acceso a generación y regresiones del editor/entrenamiento.
+
+### Criterios de aceptación
+- Registrar comidas propias suma consumo sin generar un menú; entrenamiento inicia y continúa independientemente del menú.
+- Slots vacíos y planificación no cuentan como pendientes; la seguridad, descanso, registros y cierre real se conservan.
+- Sugerencia sin botón primario, descartable hasta mañana, aislada por cuenta y disponible en Nutrición tras descartarla.
+- Generar requiere elección explícita; aplicar conserva confirmación y registros previos.
+- Móvil 320/390 y escritorio sin desbordes, controles accesibles y sin llamadas externas automáticas.
+
+### Verificación sugerida
+Playwright Home/menú opcional, nutrición, coach y regresiones de registro/entreno; detector Impeccable y release gate completo.
+
+Resultado: 9/9 casos nuevos y regresiones dirigidas de Hoy, Nutrición y coach verificadas. Capturas 320/390/1280 sin desbordes; detector Impeccable sin hallazgos, HTML/JS/accesibilidad, placeholders, macros primero, orden/saltos, caché PWA y secretos correctos. Gate integral posterior al commit antes de publicar. Sin migraciones ni llamadas pagadas.
+
+Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nueva de los slots vacíos coincidía con «o elige», prohibido por REQ-194; se cambió por «Registra lo que comiste. El menú es opcional.», sin relajar pruebas. Gate final con reintento oficial del caso de textos.
