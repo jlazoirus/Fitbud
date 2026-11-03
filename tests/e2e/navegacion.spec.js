@@ -61,6 +61,11 @@ test.describe("Navegación", () => {
       await catalogReleased;
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ plans: [] }) });
     });
+    // REQ-333: con la beta cerrada la portada muestra la tienda; su catálogo también llega tarde.
+    await context.route("**/tienda/planes.js", async (route) => {
+      await catalogReleased;
+      await route.continue();
+    });
     const errors = collectConsoleErrors(page);
 
     await gotoApp(page);
@@ -69,7 +74,7 @@ test.describe("Navegación", () => {
     await expect(page.locator(".l-plan")).toHaveCount(0);
     releaseCatalog();
     // Sin ninguna interacción del usuario, deben aparecer solas cuando el catálogo carga.
-    await expect(page.locator(".l-plan")).toHaveCount(2, { timeout: 5_000 });
+    await expect(page.locator(".l-plan")).toHaveCount(3, { timeout: 5_000 });
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });

@@ -37,9 +37,11 @@ test.describe("Portada", () => {
     expect(text).not.toMatch(/Perú|Chile|México/); // REQ-223
     await expect(page.locator(".l-step")).toHaveCount(5);
     const apply = page.getByRole("link", { name: "Postular a la beta" });
-    // hero + CTA final + un botón por plan (REQ-205: beta cerrada)
+    // hero + CTA final + enlace bajo "Elige tu ritmo" (REQ-205: beta cerrada)
     expect(await apply.count()).toBeGreaterThanOrEqual(3);
-    await expect(page.locator(".l-plan a.l-btn").first()).toHaveAttribute("href", "beta-reclutamiento.html?source=portada-planes");
+    await expect(page.locator(".l-pricing").getByRole("link", { name: "Postular a la beta" })).toHaveAttribute("href", "beta-reclutamiento.html?source=portada-planes");
+    // REQ-333: con la beta cerrada, cada plan de la tienda (soles) lleva a pagar con Culqi.
+    await expect(page.locator(".l-plan a.l-btn").first()).toHaveAttribute("href", "/pago?plan=monthly");
     await expect(apply.first()).toHaveAttribute("href", "beta-reclutamiento.html?source=portada");
     await apply.first().click();
     await expect(page.locator("h1")).toContainText("Úsalo gratis tres meses");

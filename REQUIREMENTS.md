@@ -2222,3 +2222,7 @@ Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gr
 ## REQ-332 - Tienda: Libro de Reclamaciones virtual integrado
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. Pendiente humano: ejecutar `supabase/tienda_culqi.sql` en producción.
+
+## REQ-333 - Tienda: planes en soles con imagen y botón Comprar, sin cerrar la beta
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/tienda.spec.js`.

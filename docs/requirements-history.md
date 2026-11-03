@@ -12730,3 +12730,16 @@ Vista de admin para responder (se responde por el medio indicado y se registra e
 
 ### Pendiente humano
 Ejecutar `supabase/tienda_culqi.sql` en producción antes de reenviar a Culqi.
+
+## REQ-333 - Tienda: planes en soles con imagen y botón Comprar, sin cerrar la beta
+
+**Estado: implementado.**
+
+### Origen
+Culqi pidió foto, descripción y precio de cada producto y un flujo de compra con botón Comprar. La portada mostraba precios en USD con «Los planes se abren al terminar la beta» y solo «Postular a la beta».
+
+### Alcance
+`tienda/planes.js` (fuente del precio que cobra el servidor): mensual S/ 29.90 (30 días), trimestral S/ 79.90 (90) y semestral S/ 149.90 (180), pago único sin renovación (decisión de Jonathan: 3 planes). Imágenes de marca en `assets/planes/*.svg`. `/planes` con foto, descripción, items, precio y «Comprar». Con la beta cerrada, la sección de precios de la portada carga el catálogo de la tienda (`loadStorePlans()`, import dinámico) y cada plan lleva a `/pago?plan=…`; «Postular a la beta» sigue en cabecera, hero, bajo «Elige tu ritmo» y cierre. El pie de la portada enlaza Planes, Contacto, Términos, Devoluciones, Privacidad y Libro, y muestra razón social y RUC. Si el catálogo de la tienda no carga, vuelve a los planes de la app. Con `SIGNUP_MODE=open` no cambia nada.
+
+### Fuera de alcance
+El paywall dentro de la app (sigue con `/api/catalog`, USD y Stripe sin activar); usuarios beta no ven precios dentro de la app (REQ-208 intacto).

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planes y precios · Evolv</title>
+  <meta name="description" content="Planes de Evolv de 1, 3 y 6 meses: nutrición personalizada, entrenamiento guiado y seguimiento de progreso. Pago único con tarjeta, sin renovación automática.">
+  <meta property="og:title" content="Planes y precios · Evolv">
+  <meta property="og:description" content="Nutrición personalizada, entrenamiento guiado y seguimiento de progreso. Desde S/ 29.90.">
+  <meta property="og:image" content="https://evolvapp.club/assets/og-image.png">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=3">
+</head>
+<body>
+  <header id="t-header"></header>
+  <main class="wrap">
+    <h1>Planes y precios</h1>
+    <p class="lead">Evolv arma lo que comes y entrenas cada día con tu cuerpo, tus horarios y lo que tienes a mano, y lo ajusta contigo cada semana. Elige cuánto tiempo quieres acceso.</p>
+
+    <div id="planes" class="planes" aria-live="polite"></div>
+
+    <div class="nota">
+      <b>Pago único, sin renovación automática.</b> Pagas una vez con tarjeta de crédito o débito a través de Culqi y tienes acceso completo durante el período elegido. Precios en soles, impuestos incluidos. Si no te convence, tienes <a href="/devoluciones">7 días para pedir el reembolso completo</a>.
+    </div>
+
+    <h2>Cómo funciona la compra</h2>
+    <ol class="legal" style="padding-left:22px">
+      <li>Eliges tu plan y tocas <b>Comprar</b>.</li>
+      <li>Escribes tu correo y pagas con tu tarjeta en el formulario seguro de Culqi.</li>
+      <li>Si ya tienes cuenta en Evolv, el plan se activa en ella al instante. Si no, te llega un correo para crear tu contraseña con el plan ya activo.</li>
+    </ol>
+  </main>
+  <footer id="t-footer"></footer>
+  <script type="module">
+    import { mountLayout, esc } from "/tienda/layout.js";
+    import { PLANES_TIENDA, formatoSoles } from "/tienda/planes.js";
+    mountLayout();
+
+    document.getElementById("planes").innerHTML = PLANES_TIENDA.map((p) => `
+      <article class="plan${p.destacado ? " destacado" : ""}" aria-labelledby="plan-${p.id}">
+        <img class="plan-img" src="${p.imagen}" alt="${esc(p.nombre)}: ${esc(p.periodo)} de acceso a Evolv" width="1200" height="750" loading="lazy">
+        <div class="plan-body">
+          <div class="plan-top"><h2 class="plan-nombre" id="plan-${p.id}">${esc(p.nombre)}</h2>${p.destacado ? `<span class="plan-badge">${esc(p.destacado)}</span>` : ""}</div>
+          <div class="plan-precio">${formatoSoles(p.montoCentimos)} <small>/ ${esc(p.periodo)}</small></div>
+          <p class="plan-desc">${esc(p.descripcion)}</p>
+          <ul class="ticks">${p.incluye.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
+          <a class="btn ${p.destacado ? "btn-accent" : ""} btn-block" href="/pago?plan=${encodeURIComponent(p.id)}">Comprar ${esc(p.nombre.toLowerCase())}</a>
+        </div>
+      </article>`).join("");
+  </script>
+</body>
+</html>

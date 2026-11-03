@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-labelledby="t">
+  <title id="t">Plan trimestral de Evolv: 90 días · un ciclo completo</title>
+  <defs>
+    <radialGradient id="g" cx="78%" cy="20%" r="70%"><stop offset="0" stop-color="#d6ff3a" stop-opacity=".16"/><stop offset="1" stop-color="#d6ff3a" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1200" height="750" fill="#101010"/>
+  <rect width="1200" height="750" fill="url(#g)"/>
+  <g transform="translate(80 84)">
+    <rect width="64" height="64" rx="14" fill="#1e1e1e"/>
+    <g transform="translate(0 4.4) scale(.125)" fill="none" stroke="#d6ff3a" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"><path d="M146 352 L256 262 L366 352" stroke-opacity=".35"/><path d="M146 266 L256 176 L366 266" stroke-opacity=".65"/><path d="M146 180 L256 90 L366 180"/></g>
+    <text x="84" y="44" font-family="Manrope, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="800" fill="#f2f2ee">evol<tspan fill="#d6ff3a">v</tspan></text>
+  </g>
+  <text x="80" y="390" font-family="Manrope, 'Helvetica Neue', Arial, sans-serif" font-size="230" font-weight="800" fill="#f2f2ee" letter-spacing="-8">3</text>
+  <text x="80" y="460" font-family="Manrope, 'Helvetica Neue', Arial, sans-serif" font-size="44" font-weight="800" fill="#d6ff3a" letter-spacing="6">MESES</text>
+  <text x="80" y="560" font-family="Manrope, 'Helvetica Neue', Arial, sans-serif" font-size="40" font-weight="800" fill="#f2f2ee">Plan trimestral</text>
+  <text x="80" y="612" font-family="Manrope, 'Helvetica Neue', Arial, sans-serif" font-size="30" font-weight="600" fill="#a8a8a0">90 días · un ciclo completo</text>
+  <rect x="640" y="554" width="62" height="46" rx="10" fill="#d6ff3a" fill-opacity="0.57" />
+  <rect x="710" y="508" width="62" height="92" rx="10" fill="#d6ff3a" fill-opacity="0.78" />
+  <rect x="780" y="462" width="62" height="138" rx="10" fill="#d6ff3a" fill-opacity="1.00" />
+  <rect x="850" y="416" width="62" height="184" rx="10" fill="#1e1e1e" fill-opacity="1" stroke="#303030" stroke-width="2"/>
+  <rect x="920" y="370" width="62" height="230" rx="10" fill="#1e1e1e" fill-opacity="1" stroke="#303030" stroke-width="2"/>
+  <rect x="990" y="324" width="62" height="276" rx="10" fill="#1e1e1e" fill-opacity="1" stroke="#303030" stroke-width="2"/>
+  <text x="640" y="660" font-family="Manrope, 'Helvetica Neue', Arial, sans-serif" font-size="24" font-weight="700" fill="#a8a8a0">Nutrición · Entreno · Progreso</text>
+</svg>

@@ -76,12 +76,25 @@ assert.equal(runtimeFile("/unknown-file.js"),"unknown-file.js");
 // Lo que el runtime carga: referencias locales de las páginas, shell del SW,
 // íconos del manifest, funciones serverless y su configuración.
 const required = new Set(["index.html", "beta-reclutamiento.html", "service-worker.js", "manifest.webmanifest", "package.json", "package-lock.json", "vercel.json"]);
-for (const page of ["index.html", "beta-reclutamiento.html"]) {
+// REQ-331..334: las páginas de la tienda son destinos de reescrituras (carpeta/index.html).
+const pages = ["index.html", "beta-reclutamiento.html", ...rewrites.map((rule) => rule.destination.replace(/^\//, "")).filter((file) => file.endsWith("/index.html"))];
+for (const page of pages) {
+  required.add(page);
   for (const [, ref] of read(page).matchAll(/(?:src|href)="([^"]+)"/g)) {
-    if (/^[a-z]+:|^\/\/|^#|\$\{/.test(ref)) continue;
+    // Se omiten URLs externas, anclas y selectores armados en JS (p. ej. script[src="' + src + '"]).
+    if (/^[a-z]+:|^\/\/|^#|\$\{|['+ ]/.test(ref)) continue;
     // href="/" es la portada; ?source=… y #ancla no son parte del archivo
     required.add(runtimeFile(ref));
   }
+  // Módulos ES que cargan las páginas (import estático o dinámico con ruta absoluta).
+  for (const [, ref] of read(page).matchAll(/(?:from\s*|import\()\s*"(\/[^"]+\.js)"/g)) required.add(ref.slice(1));
+}
+// Módulos de la tienda: sus imports relativos y las imágenes de los planes.
+for (const file of [...required].filter((f) => /^tienda\/[^/]+\.js$/.test(f))) {
+  for (const [, ref] of read(file).matchAll(/from\s*"\.\/([^"]+\.js)"/g)) required.add("tienda/" + ref);
+}
+for (const file of [...required].filter((f) => /^tienda\/[^/]+\.js$/.test(f))) {
+  for (const [, ref] of read(file).matchAll(/"\/(assets\/[^"]+)"/g)) required.add(ref);
 }
 // Fotos de ejercicios servidas desde el propio deploy (REQ-259).
 for (const [, ref] of read("exercise-catalog.js").matchAll(/"(assets\/[^"]+)"/g)) required.add(ref);
