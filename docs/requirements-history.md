@@ -12764,3 +12764,28 @@ Ver `CULQI_SETUP.md`: datos del comercio, SQL, llaves en Vercel, prueba con tarj
 
 ### Verificación
 `scripts/test-tienda-culqi.mjs` (catálogo, cuerpo del cargo, precio del servidor, cuenta existente, días sumados, invitación, 3DS, rechazo, falla tras cobro, Libro y SQL con PGlite) y `tests/e2e/tienda.spec.js` con Culqi simulado.
+
+## REQ-335 - Primera semana: "Otra actividad" o deporte en días de gimnasio ya no bloquean el entreno
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-11-03, iPhone): al terminar el onboarding, "Preparando tu semana…" y después "Tu semana está casi lista · Faltan ejercicios compatibles con tus lugares o recursos". Diego juega pádel ("Otra actividad", REQ-253).
+
+### Causa raíz
+
+`prepareFirstWeekTraining()` aborta si alguna sesión de `trainingExpectedWeeks()` queda sin `allowedExerciseIds`. `allowedExercisesForSession()` pedía para cada sesión no de fuerza un ejercicio con `discipline===primarySport` y del lugar del día. Una prueba sobre todas las combinaciones de deporte × lugar × nivel × recursos × días mostró 199 combinaciones que fallaban:
+- `other` ("Otra actividad"): el catálogo no tiene esa disciplina; fallaba siempre.
+- `strength_only` con más días que sesiones: el día de `descanso` se trataba como sesión.
+- Correr, caminar, nadar o bici en un día marcado gimnasio o casa: el lugar del día es el de la fuerza, y el filtro de lugares lo dejaba sin ejercicio.
+
+### Alcance
+
+1. `trainingExpectedWeeks()` omite los días no de fuerza cuyo deporte no está en el catálogo (`TRAINING_CATALOG_SPORTS`) y los de `descanso`: quedan fuera del plan generado y el día muestra la actividad libre o el descanso de siempre (`effectiveWorkout` cae a la plantilla). `validatePlan` no exige una sesión por día.
+2. `allowedExercisesForSession()` aplica el lugar solo a la fuerza; el deporte conserva su lugar en la sesión.
+3. `CACHE_NAME` → `fitbud-pwa-v203`.
+
+### Verificación
+
+`tests/e2e/semana-otra-actividad.spec.js` (pádel + gimnasio, correr con días de gimnasio y solo fuerza en casa preparan la semana; sin el cambio reproduce el mensaje de Diego); la prueba combinatoria queda en 0 fallos; onboarding, entreno, lugar del día, actividad manual y niveles en verde.
