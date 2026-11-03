@@ -2246,3 +2246,9 @@ Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gr
 ## REQ-338 - Entreno: rutina propia editable de una vez y sugerida la próxima vez
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/rutina-propia.spec.js`.
+
+## REQ-339 - Avisos: medir la tarjeta y los fallos al activar
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Eventos con estado, plataforma e instalación; fallos con paso. ✓ `tests/e2e/avisos.spec.js`.

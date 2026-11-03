@@ -9125,16 +9125,22 @@ function renderPushSection(){
 
 async function requestPushPermission(btn){
   if(btn){btn.disabled=true;btn.textContent="Solicitando permiso…";}
+  trackNotifyPrompt("profile","enable");
+  let step="permission";
   try{
     const perm=await Notification.requestPermission();
     if(perm==="granted"){
+      step="subscribe";
       await subscribePush();
+      trackNotifyPrompt("profile","enabled");
       renderPushSection();
       toast("Avisos del dispositivo activados");
     }else{
+      trackNotifyPrompt("profile",perm==="denied"?"denied":"dismissed");
       renderPushSection();
     }
   }catch(e){
+    trackNotifyPrompt("profile","error",{error_code:notifyErrorCode(step,e)});
     if(btn){btn.disabled=false;btn.textContent="Activar avisos del dispositivo";}
     toast("No se pudo activar el aviso del dispositivo");
   }
@@ -9149,13 +9155,15 @@ async function subscribePush(quiet){
   });
   const subJson=sub.toJSON();
   const token=session&&session.access_token;
-  if(!token)return;
+  // REQ-339: errores con nombre para saber en qué paso falló activar.
+  const named=(name,msg)=>Object.assign(new Error(msg),{name});
+  if(!token)throw named("NoSession","Sin sesión para guardar la suscripción");
   const r=await fetch("/api/push-subscribe",{
     method:"POST",
     headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},
     body:JSON.stringify(subJson),
   });
-  if(!r.ok)throw new Error("No se pudo guardar la suscripción");
+  if(!r.ok)throw named("SaveFailed_"+r.status,"No se pudo guardar la suscripción");
   if(!quiet)await _savePushOptInDb(true);
 }
 // REQ-267: la clave VAPID cambió (la privada de la anterior nunca estuvo en el
@@ -9249,14 +9257,28 @@ function notifyHourLabel(){
   const h=notifPrefsCache&&notifPrefsCache.notify_hour!=null?Number(notifPrefsCache.notify_hour):NOTIF_HOUR_DEFAULT;
   return String(h).padStart(2,"0")+":00";
 }
-function trackNotifyPrompt(source,action){trackEvent("notifications_prompt",{source,action});}
+// REQ-339: cada evento dice qué tarjeta vio la persona (estado del push), en
+// qué teléfono y si la app está instalada; los fallos, en qué paso. Sin datos
+// personales: solo categorías.
+function notifyPlatform(){return isIOSDevice()?"ios":/android/i.test(navigator.userAgent||"")?"android":isMobileDevice()?"mobile":"desktop";}
+function trackNotifyPrompt(source,action,extra){
+  let state="unknown";try{state=devicePushState();}catch(_){}
+  trackEvent("notifications_prompt",{source,action,state,platform:notifyPlatform(),standalone:isStandaloneMode(),...(extra||{})});
+}
+// Paso en que falló activar: permiso, service worker, suscripción o guardado.
+function notifyErrorCode(step,e){
+  const name=String(e&&(e.name&&e.name!=="Error"?e.name:e.message)||"error").replace(/[^A-Za-z_]+/g,"_").slice(0,40);
+  return step+":"+name;
+}
 function notifySnoozed(){try{return localStorage.getItem(NOTIFY_NUDGE_KEY+":"+uid())===todayStr();}catch(e){return false;}}
 async function enableDevicePush(source){
   trackNotifyPrompt(source,"enable");
   document.querySelectorAll("[data-notify-enable]").forEach(b=>{b.disabled=true;b.textContent="Activando…";});
+  let step="permission";
   try{
     const perm=await Notification.requestPermission();
     if(perm==="granted"){
+      step="subscribe";
       // Sin service worker activo la suscripción no llega nunca: no dejar el botón colgado.
       await Promise.race([subscribePush(),new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),15000))]);
       trackNotifyPrompt(source,"enabled");
@@ -9264,7 +9286,11 @@ async function enableDevicePush(source){
       trackNotifyPrompt(source,perm==="denied"?"denied":"dismissed");
       if(perm==="denied")toast("Los avisos quedaron bloqueados. Puedes permitirlos en los ajustes.");
     }
-  }catch(e){toast("No se pudieron activar los avisos. Intenta de nuevo.");}
+  }catch(e){
+    // REQ-339: antes este camino no dejaba rastro (un "enable" sin desenlace).
+    trackNotifyPrompt(source,"error",{error_code:notifyErrorCode(step,e)});
+    toast("No se pudieron activar los avisos. Intenta de nuevo.");
+  }
   render();
 }
 async function enableEmailReminders(source){
@@ -16843,7 +16869,7 @@ async function boot(){
 }
 /* ---- Analitica de producto (REQ-27) ---- */
 // Solo claves seguras sin datos de salud, identidad ni prompts.
-const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","action"]);
+const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","action","state","platform","standalone"]); // REQ-339: state/platform/standalone de la tarjeta de avisos (igual que api/analytics.js)
 let _analyticsSessionId=null;
 // REQ-317: al retomar la PWA tras 30 minutos fuera comienza otro uso.
 let analyticsAwayAt=0;

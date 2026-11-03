@@ -12844,3 +12844,31 @@ Antes de empezar solo se podía elegir otra plantilla ("Cambiar entrenamiento").
 - "Hoy la del plan" la oculta ese día.
 
 Además, specs de entreno, casa, lugar del día, aislamiento de sync y REQ-320/335 en verde; detector de diseño sin hallazgos; capturas a 390 px.
+
+## REQ-339 - Avisos: medir la tarjeta y los fallos al activar
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-11-03): "hay que hacer algo para que más personas prendan sus notificaciones". Datos al 2026-11-03:
+
+- 3 de 25 cuentas activas tienen push; 13 personas usaron la app en los últimos 14 días.
+- La tarjeta de Hoy se mostró 98 veces a 9 personas. Solo 1 tocó "Activar avisos" (2 veces) y ninguna lo logró desde Hoy.
+- Esos 2 toques no dejaron ningún evento después: ni `enabled`, ni `denied`, ni `dismissed`.
+
+### Causa raíz
+
+- `trackNotifyPrompt()` solo guardaba `source` y `action`, así que no se sabía qué tarjeta vio cada persona (instalar, activar o bloqueada), en qué teléfono ni si la app estaba instalada.
+- El `catch` de `enableDevicePush()` mostraba un aviso de error pero no registraba nada.
+- `subscribePush()` volvía sin hacer nada si no había sesión, y entonces el intento quedaba como `enabled` aunque no se hubiera guardado.
+
+### Alcance
+
+1. Cada `notifications_prompt` lleva `state` (on, off, denied, needs_install o unsupported), `platform` (ios, android, mobile o desktop) y `standalone`.
+2. Las claves nuevas se agregaron a las dos listas de propiedades permitidas: `ANALYTICS_SAFE_PROPS` (`index.html`) y `ALLOWED_PROP_KEYS` (`api/analytics.js`). Son solo categorías, sin datos personales.
+3. Un fallo al activar registra `action: "error"` con `error_code` = paso y nombre del error, por ejemplo `subscribe:AbortError`, `subscribe:timeout`, `subscribe:SaveFailed_500` o `subscribe:NoSession`. Vale para Hoy, el onboarding y Perfil (`source: "profile"`).
+
+### Criterios de aceptación
+
+- El evento de la tarjeta mostrada lleva estado, plataforma e instalación. Un fallo de suscripción registra el paso y el motivo. ✓ `tests/e2e/avisos.spec.js`.

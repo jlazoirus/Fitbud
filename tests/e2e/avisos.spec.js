@@ -57,6 +57,27 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
+  // REQ-339: un fallo al activar deja rastro con el paso y el motivo, y cada
+  // evento dice qué tarjeta vio la persona, en qué teléfono y si está instalada.
+  test("si activar falla, el evento dice en qué paso y qué tarjeta se vio", async ({ page, context }) => {
+    await context.grantPermissions(["notifications"]);
+    const events = [];
+    page.on("request", (req) => {
+      if (req.url().includes("/api/analytics") && req.method() === "POST") {
+        try { const b = JSON.parse(req.postData() || "{}"); if (b.event_type === "notifications_prompt") events.push(b.properties); } catch (_) {}
+      }
+    });
+    const { errors } = await openHoy(page, context);
+    await expect(card(page)).toBeVisible();
+    await page.evaluate(() => { window.subscribePush = async () => { throw Object.assign(new Error("x"), { name: "AbortError" }); }; });
+    await card(page).getByRole("button", { name: "Activar avisos" }).click();
+    await expect.poll(() => events.find((e) => e.action === "error")).toBeTruthy();
+    const shown = events.find((e) => e.action === "shown");
+    expect(shown).toMatchObject({ source: "home", state: "off", platform: "desktop", standalone: false });
+    expect(events.find((e) => e.action === "error")).toMatchObject({ source: "home", error_code: "subscribe:AbortError", state: "off" });
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
   test("con los avisos bloqueados explica cómo permitirlos y ofrece el correo", async ({ page, context }) => {
     const { calls, errors } = await openHoy(page, context, {
       init: () => Object.defineProperty(Notification, "permission", { get: () => "denied" }),

@@ -35,6 +35,8 @@ const ALLOWED_PROP_KEYS = new Set([
   "week", "cycle", "day_of_week", "slot", "count",
   "source", "outcome", "plan_type", "sport",
   "context", "step", "error_code", "duration_weeks", "action",
+  // REQ-339: tarjeta de avisos (estado del push, tipo de teléfono, app instalada).
+  "state", "platform", "standalone",
 ]);
 
 function filterProps(props) {
