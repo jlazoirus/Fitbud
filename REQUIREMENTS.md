@@ -2254,3 +2254,9 @@ La tarjeta ofrece el correo a la hora elegida; activado, cubre y la tarjeta se v
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Al cerrar la celebración, "¿Te aviso mañana?" (push o correo); máximo dos veces. ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-342 - Tienda: imagen de cada plan que muestra el servicio
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Cada plan muestra comidas, entreno o progreso además de su duración. ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda.spec.js`.

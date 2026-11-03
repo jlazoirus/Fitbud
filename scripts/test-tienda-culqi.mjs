@@ -25,6 +25,9 @@ for (const p of PLANES_TIENDA) {
   assert.ok(Number.isInteger(p.montoCentimos) && p.montoCentimos >= 300, p.id + ": monto en céntimos (mínimo de Culqi 3DS)");
   assert.ok(entitlementsSql.includes("'" + p.id + "'"), p.id + " debe existir en subscription_plans (FK de user_entitlements)");
   assert.ok(fs.existsSync(ROOT + p.imagen.slice(1)), p.id + ": falta la imagen " + p.imagen);
+  // REQ-342: imagen que muestra el servicio (scripts/build-plan-images.mjs), no solo la duración.
+  assert.match(p.imagen, /^\/assets\/planes\/[a-z]+\.webp$/, p.id + ": la imagen sale de scripts/build-plan-images.mjs");
+  assert.match(p.imagenAlt || "", /comida|desayuno|entreno|ciclo|progreso/i, p.id + ": el texto alternativo describe lo que se ve");
   assert.ok(p.descripcion.length > 40 && p.incluye.length >= 3, p.id + ": descripción e items visibles");
 }
 assert.equal(formatoSoles(2990), "S/ 29.90");

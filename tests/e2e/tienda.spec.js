@@ -36,7 +36,7 @@ test.describe("Tienda web (Culqi)", () => {
     const planes = page.locator(".l-plan");
     await expect(planes).toHaveCount(3);
     await expect(planes.first()).toContainText("S/29.90");
-    await expect(planes.first().locator("img")).toHaveAttribute("src", "/assets/planes/mensual.svg");
+    await expect(planes.first().locator("img")).toHaveAttribute("src", "/assets/planes/mensual.webp");
     await expect(page.locator(".l-plan a.l-btn")).toHaveText(["Comprar", "Comprar", "Comprar"]);
     await expect(page.getByRole("link", { name: "Postular a la beta" }).first()).toBeVisible();
     const footer = page.locator(".l-footer");

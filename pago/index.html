@@ -39,7 +39,7 @@
       </form>
 
       <aside class="resumen" aria-label="Resumen del pedido">
-        <img id="rImg" class="plan-img" src="/assets/planes/mensual.svg" alt="Plan de Evolv" width="1200" height="750">
+        <img id="rImg" class="plan-img" src="/assets/planes/mensual.webp" alt="Plan de Evolv" width="1200" height="750">
         <div class="plan-body">
           <h2 class="plan-nombre" id="rNombre"></h2>
           <p class="plan-desc" id="rDesc"></p>
@@ -79,7 +79,7 @@
       document.getElementById("pago").hidden = false;
       const img = document.getElementById("rImg");
       img.src = plan.imagen;
-      img.alt = plan.nombre + ": " + plan.periodo + " de acceso a Evolv";
+      img.alt = plan.imagenAlt;
       document.getElementById("rNombre").textContent = plan.nombre;
       document.getElementById("rDesc").textContent = plan.descripcion;
       document.getElementById("rPeriodo").textContent = plan.periodo + " (" + plan.duracionDias + " días)";

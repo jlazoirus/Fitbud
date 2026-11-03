@@ -12930,3 +12930,29 @@ Es parte del plan de Jonathan para que más personas activen sus avisos (2026-11
 ### Criterios de aceptación
 
 - Tras celebrar, el pedido aparece y "Sí, avísame" guarda `push_opt_in`. Si se cerró una vez, solo vuelve desde 3 días; con dos pedidos o con "Ahora no" de hoy, no aparece. En iPhone sin instalar ofrece el correo. ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-342 - Tienda: imagen de cada plan que muestra el servicio
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de Culqi a `evolvapp.club` (2026-11-03): "Cada producto o servicio debe contar con una imagen o fotografía representativa, relacionada con lo que se ofrece". Las imágenes de REQ-333 (`assets/planes/*.svg`) solo mostraban el número de meses y unas barras, sin nada de comidas ni entreno.
+
+### Alcance
+
+1. `scripts/build-plan-images.mjs` genera `assets/planes/{mensual,trimestral,semestral}.webp` (1200 × 750) con Playwright. A la izquierda va la duración y el nombre del plan; a la derecha, tarjetas "Ejemplo" del servicio con el estilo de la portada:
+   - mensual: un desayuno con ingredientes en gramos y macros, y un ejercicio;
+   - trimestral: un entreno serie por serie con descanso, y un check-in semanal;
+   - semestral: el resumen de un ciclo de 10 semanas y las fotos de progreso privadas.
+2. `tienda/planes.js` apunta a los WebP y agrega `imagenAlt`, que describe lo que se ve. Lo usan `/planes`, `/pago` y la portada.
+3. Se borran los SVG anteriores.
+
+### Fuera de alcance
+
+Cantidad de planes: siguen siendo 3. Es un servicio digital por suscripción y Culqi admite menos de cinco productos para servicios (decisión de Jonathan, 2026-11-03).
+
+### Criterios de aceptación
+
+- Cada plan tiene un WebP que existe y un texto alternativo que nombra comidas, entreno, ciclo o progreso. ✓ `scripts/test-tienda-culqi.mjs`.
+- La portada muestra `mensual.webp` en el primer plan. ✓ `tests/e2e/tienda.spec.js`.
