@@ -12814,3 +12814,33 @@ Registros de producción (solo tiempos, sin contenido): plan guardado a las 11:3
 ### Verificación
 
 `tests/e2e/semana-rapida.spec.js` (con 700 ms por llamada: más de una llamada a la vez, nunca más de 4, menos de 4 s para 7 días y el contador visible en la capa; sin el cambio, una sola llamada a la vez); onboarding, nutrición, avisos, espera del coach, bienvenida, Hoy y REQ-335 en verde; detector de diseño sin hallazgos.
+
+## REQ-338 - Entreno: rutina propia editable de una vez y sugerida la próxima vez
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-11-03): "debemos encontrar una manera más simple de editar las rutinas. Si quiero hacer mi propia rutina de push… debería ser sencillo que reemplace los ejercicios todos de una sola vez. Y que esa rutina sea recordada… para que la siguiente vez… se me sugiera: la última vez hiciste esta rutina, ¿quieres repetirla?".
+
+### Problema
+
+Antes de empezar solo se podía elegir otra plantilla ("Cambiar entrenamiento"). Durante la sesión se sustituía o añadía un ejercicio cada vez, y nada se recordaba para la próxima.
+
+### Alcance
+
+1. **"Editar ejercicios"** en la tarjeta de fuerza, antes de iniciar. Abre "Tu rutina de hoy" con los ejercicios de la sesión. En cada uno: **Cambiar** (sin escribir, propone los del mismo músculo principal) y **Quitar**. Además, buscador para **añadir** y **"Empezar de cero"**. Todo se aplica junto con **"Guardar rutina"**. Las series, repeticiones y descansos siguen la fase (`buildWorkoutPrescription`).
+2. El día guarda su lista en `day_log.state.customExercises` (validado en `validateDayLogState`). `workoutPrescription()` la usa en lugar de los ejercicios del plan y, al empezar, la sesión la congela como siempre (`contentPrescription`). La tarjeta muestra "tu rutina" y **"Volver a la rutina del plan"**.
+3. Con **"Recordar para mis sesiones de Push"** (marcado por defecto), la rutina se guarda en `profiles.prefs.savedRoutines` por tipo de sesión: push, pull, pierna (legs y pierna comparten), torso o full body. Se sincroniza con el perfil, sin crear versión de plan.
+4. En la próxima sesión de ese tipo sin rutina propia, la tarjeta sugiere **"La última vez hiciste tu rutina de Push · ejercicios…"**. Las opciones son **"Repetir mi rutina"** y **"Hoy la del plan"** (`routineChoice:"plan"`, solo ese día). No se sugiere si coincide con la del plan.
+5. Con REQ-337, al repetirla las series llegan con lo de la última vez. `CACHE_NAME` → `fitbud-pwa-v206`.
+
+### Verificación
+
+`tests/e2e/rutina-propia.spec.js` cubre:
+- Empezar de cero, añadir tres ejercicios, cambiar uno (con sugerencias del mismo músculo), quitar otro y guardar.
+- La prescripción usa la rutina, que se sincroniza en el perfil y en `day_log`, y "Volver a la del plan" la deshace.
+- Otro día del mismo tipo la sugiere y "Repetir mi rutina" la aplica.
+- "Hoy la del plan" la oculta ese día.
+
+Además, specs de entreno, casa, lugar del día, aislamiento de sync y REQ-320/335 en verde; detector de diseño sin hallazgos; capturas a 390 px.

@@ -78,6 +78,9 @@
     if(state.contingencyLog!==undefined&&!Array.isArray(state.contingencyLog))errors.push("contingencyLog debe ser un array.");
     if(state.manualActivities!==undefined&&!Array.isArray(state.manualActivities))errors.push("manualActivities debe ser un array.");
     if(state.trainingPlace!==undefined&&!["gym","home","outdoor"].includes(state.trainingPlace))errors.push("trainingPlace debe ser gym, home u outdoor.");
+    // REQ-338: rutina propia del día (slugs del catálogo) y elección de la del plan.
+    if(state.customExercises!==undefined&&(!Array.isArray(state.customExercises)||!state.customExercises.every(slug=>typeof slug==="string"&&slug)))errors.push("customExercises debe ser un array de slugs.");
+    if(state.routineChoice!==undefined&&state.routineChoice!=="plan")errors.push("routineChoice solo admite \"plan\".");
     return ok(errors);
   }
 

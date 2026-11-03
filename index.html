@@ -366,6 +366,18 @@
   .last-perf-hint{margin-top:6px}
   .plan-timed{background:transparent}
   /* REQ-287: el plan de Entreno en una línea que abre sus opciones */
+  .routine-suggest{display:flex;flex-direction:column;gap:10px;margin:10px 0;padding:12px 14px;border:1px solid var(--border-acc);border-radius:var(--r-md);background:var(--accent-dim)}
+  .routine-pill{background:var(--accent-dim);color:var(--accent);border:1px solid var(--border-acc)}
+  .routine-list{list-style:none;margin:10px 0;padding:0;display:flex;flex-direction:column;gap:8px;counter-reset:routine}
+  .routine-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1)}
+  .routine-row.replacing{border-color:var(--border-acc);background:var(--accent-dim)}
+  .routine-row-main{flex:1 1 auto;min-width:0}
+  .routine-row-actions{display:flex;gap:6px;flex:0 0 auto}
+  .routine-empty{color:var(--muted);font-size:13px;margin:10px 0}
+  .routine-clear{margin-bottom:6px}
+  .routine-picker{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+  .routine-picker-h{font-size:13px;color:var(--muted);margin-bottom:6px}
+  .routine-remember{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;min-height:44px}
   .wk-planline{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;margin:0 0 10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1);color:var(--txt);font:inherit;text-align:left;cursor:pointer}
   .wk-planline-main{display:flex;flex-direction:column;gap:2px;min-width:0}
   .wk-planline-main b{font-size:14px;overflow-wrap:anywhere}
@@ -5689,6 +5701,9 @@ function workoutPrescription(ds){
     const template=workoutById(ds,workout.role,trainingPrefsForDate(ds));
     if(template&&template.exerciseIds&&template.exerciseIds.length)prescribedIds=exerciseArray(template.exerciseIds);
   }
+  // REQ-338: la rutina propia del día reemplaza los ejercicios del plan (la dosis sigue la fase).
+  const custom=isStrengthWorkout(workout)?dayCustomExercises(ds):[];
+  if(custom.length)prescribedIds=custom;
   const exercises=prescribedIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
   return buildWorkoutPrescription(workout,exercises,workoutPlayerContext(ds));
 }
@@ -5948,6 +5963,32 @@ function lastPerformanceHtml(ds,step,exercise){
   const rpe=lastPerformanceRpe(perf);
   const noLoad=!bodyweight&&perf.sets.every(set=>!set.load);
   return `<div class="last-perf"><span class="last-perf-h">Última vez · ${esc(when)}${esc(variation)}</span><b>${esc(lastPerformanceSummary(perf))}</b>${rpe?`<span>${esc(rpe)}</span>`:""}${noLoad?'<span class="last-perf-note">Sin carga anotada</span>':""}</div>`;
+}
+// REQ-337: repeticiones y carga de la última vez como valores reales de cada
+// serie pendiente (no como texto de referencia), editables. La serie N toma la
+// N de la última vez (o la última si ahora hay más). El esfuerzo no se copia.
+// Cada serie recuerda para qué ejercicio se precargó: si se sustituye el
+// ejercicio, lo precargado cambia al del nuevo; lo que escribió el usuario se queda.
+function prefillStepFromLastTime(ds,step){
+  if(!step||step.type!=="strength"||!Array.isArray(step.sets))return false;
+  const slug=step.exerciseSlug;
+  const pending=step.sets.filter(set=>!set.done&&set.prefillFor!==slug);
+  if(!pending.length)return false;
+  const perf=lastWorkoutPerformance(ds,slug);
+  const sameUnit=perf&&(perf.unit||"reps")===(step.unit||"reps");
+  step.sets.forEach((set,index)=>{
+    if(set.done||set.prefillFor===slug)return;
+    const was=set.prefilled||{};
+    if(was.reps)set.reps=null;
+    if(was.load)set.load="";
+    const src=perf&&perf.sets.length?(perf.sets[index]||perf.sets[perf.sets.length-1]):null;
+    const now={};
+    if(src&&sameUnit&&set.reps==null&&src.reps!=null){set.reps=src.reps;now.reps=true;}
+    if(src&&!set.load&&src.load){set.load=src.load;now.load=true;}
+    if(now.reps||now.load)set.prefilled=now;else delete set.prefilled;
+    set.prefillFor=slug;
+  });
+  return true;
 }
 function lastLoadLabel(ds,exerciseSlug){
   const perf=lastWorkoutPerformance(ds,exerciseSlug);
@@ -6341,6 +6382,7 @@ function saveWorkoutSetField(ds,stepIndex,setIndex,field,value){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=execution.steps[stepIndex],set=step&&step.sets&&step.sets[setIndex];if(!set)return;
   set[field]=field==="load"?String(value||""):((value===""||value==null)?null:Number(value));
+  if(set.prefilled)delete set.prefilled[field]; // REQ-337: lo escrito ya es del usuario
   persistWorkoutExecution(ds,execution,false);
 }
 function toggleWorkoutSet(ds,stepIndex,setIndex){
@@ -6790,6 +6832,8 @@ function renderCurrentWorkoutStep(ds,execution){
       </div>
     </div>`;
   }
+  // REQ-337: al repetir un ejercicio, sus series llegan con lo de la última vez.
+  if(execution.status!=="completed"&&prefillStepFromLastTime(ds,step))persistWorkoutExecution(ds,execution,false);
   const exercise=exerciseBySlug(step.exerciseSlug,true);
   const variation=workoutVariationLabel(step,exercise);
   const others=pendingStrengthStepIndexes(execution,stepIndex);
@@ -6877,6 +6921,139 @@ function formatRestShort(seconds){
   if(s<60)return `${s} s`;
   const m=Math.floor(s/60),r=s%60;
   return r?`${m} min ${r} s`:`${m} min`;
+}
+/* ---- REQ-338: rutina propia ----
+   Jonathan: cambiar todos los ejercicios de una sesión de una vez y que la
+   rutina se recuerde para sugerirla la próxima vez que toquen esos músculos.
+   El día guarda su lista (day_log.state.customExercises) y la rutina recordada
+   vive en profiles.prefs.savedRoutines por tipo de sesión (push, pull, pierna…). */
+const ROUTINE_FAMILY_LABELS={push:"Push",pull:"Pull",legs:"Pierna",pierna:"Pierna",torso:"Torso",full:"Full body"};
+function routineFamily(workout){
+  const match=String((workout&&(workout.role||workout.id))||"").match(/^(push|pull|legs|torso|pierna|full)/);
+  return match?match[1]:"";
+}
+function routineFamilyKey(family){return family==="legs"?"pierna":family;}
+function savedRoutineFor(family){
+  const all=(profile&&profile.prefs&&profile.prefs.savedRoutines)||{};
+  const routine=family&&all[routineFamilyKey(family)];
+  const ids=routine&&Array.isArray(routine.exerciseIds)?routine.exerciseIds.filter(slug=>exerciseBySlug(slug)):[];
+  return ids.length?{...routine,exerciseIds:ids}:null;
+}
+function dayCustomExercises(ds){
+  const st=S.days[ds];
+  return st&&Array.isArray(st.customExercises)?st.customExercises.filter(slug=>exerciseBySlug(slug,true)):[];
+}
+function routineNamesLine(ids,max){
+  const names=ids.map(slug=>(exerciseBySlug(slug,true)||{}).name).filter(Boolean);
+  const shown=names.slice(0,max||3).join(" · ");
+  return names.length>(max||3)?`${shown} y ${names.length-(max||3)} más`:shown;
+}
+function routineSuggestionHtml(ds,workout){
+  const st=dayState(ds);
+  if(st.customExercises||st.routineChoice==="plan")return "";
+  const family=routineFamily(workout);
+  const saved=savedRoutineFor(family);
+  if(!saved)return "";
+  const planIds=workoutPrescription(ds).steps.filter(step=>step.type==="strength").map(step=>step.exerciseSlug);
+  if(planIds.join("|")===saved.exerciseIds.join("|"))return "";
+  return `<div class="routine-suggest">
+    <div><b>La última vez hiciste tu rutina de ${esc(ROUTINE_FAMILY_LABELS[family])}</b><div class="muted small">${esc(routineNamesLine(saved.exerciseIds))}</div></div>
+    <div class="row wrap"><button class="btn btn-sm btn-accent" onclick="useSavedRoutine('${ds}')">Repetir mi rutina</button><button class="btn btn-sm" onclick="dismissSavedRoutine('${ds}')">Hoy la del plan</button></div>
+  </div>`;
+}
+function useSavedRoutine(ds){
+  const saved=savedRoutineFor(routineFamily(effectiveWorkout(ds).workout));if(!saved)return;
+  const st=dayState(ds);
+  st.customExercises=[...saved.exerciseIds];delete st.routineChoice;
+  commitDay(ds);render();toast("Hoy haces tu rutina");
+}
+function dismissSavedRoutine(ds){
+  const st=dayState(ds);
+  st.routineChoice="plan";
+  commitDay(ds);render();
+}
+function resetDayRoutine(ds){
+  const st=dayState(ds);
+  delete st.customExercises;st.routineChoice="plan";
+  commitDay(ds);render();toast("Vuelves a la rutina del plan");
+}
+let routineDraft=null;
+function openRoutineEditor(ds){
+  const ew=effectiveWorkout(ds);
+  if(!isStrengthWorkout(ew.workout)||normalizedWorkoutExecution(ds))return;
+  const ids=workoutPrescription(ds).steps.filter(step=>step.type==="strength").map(step=>step.exerciseSlug);
+  routineDraft={ds,ids,family:routineFamily(ew.workout),replace:null,remember:true};
+  renderRoutineEditor();
+}
+function renderRoutineEditor(){
+  const d=routineDraft;if(!d)return;
+  const label=ROUTINE_FAMILY_LABELS[d.family];
+  const rows=d.ids.map((slug,index)=>{
+    const ex=exerciseBySlug(slug,true);const name=ex?ex.name:slug;
+    return `<li class="routine-row${d.replace===index?" replacing":""}">
+      <div class="routine-row-main"><b>${esc(name)}</b><div class="o-meta">${esc(ex?EXERCISE_SUBSTITUTION.primaryMuscle(ex):"")}</div></div>
+      <div class="routine-row-actions"><button class="btn btn-sm" onclick="routineStartReplace(${index})" aria-label="Cambiar ${esc(name)}">Cambiar</button><button class="btn btn-sm" onclick="routineRemove(${index})" aria-label="Quitar ${esc(name)}">Quitar</button></div>
+    </li>`;
+  }).join("");
+  const replacing=d.replace!=null?exerciseBySlug(d.ids[d.replace],true):null;
+  modal(`<h3>Tu rutina de hoy</h3>
+    <p class="muted small">Cambia, quita o añade ejercicios: se aplica todo junto al guardar. Las series y repeticiones siguen tu fase.</p>
+    ${d.ids.length?`<ol class="routine-list">${rows}</ol>`:`<p class="routine-empty">Sin ejercicios todavía: busca y añade los que vas a hacer.</p>`}
+    ${d.ids.length?`<button class="btn btn-sm routine-clear" onclick="routineClear()">Empezar de cero</button>`:""}
+    <div class="routine-picker">
+      <div class="routine-picker-h">${replacing?`En lugar de <b>${esc(replacing.name)}</b>:`:"Añadir ejercicio:"}${replacing?` <button class="link-btn" onclick="routineCancelReplace()">cancelar</button>`:""}</div>
+      <input class="exercise-search" id="routine-search" type="search" aria-label="Buscar ejercicio para tu rutina" placeholder="Nombre o músculo: press, glúteo…" autocomplete="off" oninput="renderRoutineSearch(this.value)">
+      <div id="routine-search-results" aria-live="polite">${routineSearchResultsHtml("")}</div>
+    </div>
+    ${label?`<label class="routine-remember"><input type="checkbox" id="routine_remember" ${d.remember?"checked":""} onchange="routineDraft.remember=this.checked"> Recordar para mis sesiones de ${esc(label)}</label>`:""}
+    <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="saveRoutineDraft()" ${d.ids.length?"":"disabled"}>Guardar rutina</button>`);
+}
+function routineSearchResultsHtml(query){
+  const d=routineDraft;if(!d)return "";
+  const q=String(query||"").trim();
+  const replacing=d.replace!=null?exerciseBySlug(d.ids[d.replace],true):null;
+  // Al cambiar uno, sin escribir nada se proponen los del mismo músculo principal.
+  if(!q&&!replacing)return "";
+  const found=q?EXERCISE_SUBSTITUTION.search(q,exerciseCatalog(false))
+    :EXERCISE_SUBSTITUTION.candidates(replacing,exerciseCatalog(false));
+  const safe=found.filter(ex=>!d.ids.includes(ex.slug)&&exerciseSafeForLimits(ex,d.ds)).slice(0,12);
+  if(!safe.length)return q?`<div class="muted small exercise-search-empty">No encontramos “${esc(q)}”. Prueba con otro nombre o un músculo.</div>`:"";
+  return safe.map(ex=>{
+    const places=exerciseArray(ex.places).map(place=>TRAINING_LOCATION_LABELS[place]).filter(Boolean).join(" · ");
+    return `<button class="opt" onclick="routinePick('${esc(ex.slug)}')"><b>${esc(ex.name)}</b><div class="o-meta">${esc(EXERCISE_SUBSTITUTION.primaryMuscle(ex))}${places?` · ${esc(places)}`:""}</div></button>`;
+  }).join("");
+}
+function renderRoutineSearch(query){
+  const box=document.getElementById("routine-search-results");
+  if(box)box.innerHTML=routineSearchResultsHtml(query);
+}
+function routinePick(slug){
+  const d=routineDraft;if(!d||!exerciseBySlug(slug)||d.ids.includes(slug))return;
+  if(d.replace!=null)d.ids[d.replace]=slug;else d.ids.push(slug);
+  d.replace=null;
+  renderRoutineEditor();
+  const input=document.getElementById("routine-search");if(input)input.focus({preventScroll:true});
+}
+function routineStartReplace(index){if(routineDraft){routineDraft.replace=index;renderRoutineEditor();}}
+function routineCancelReplace(){if(routineDraft){routineDraft.replace=null;renderRoutineEditor();}}
+function routineRemove(index){
+  const d=routineDraft;if(!d)return;
+  d.ids.splice(index,1);d.replace=null;renderRoutineEditor();
+}
+function routineClear(){if(routineDraft){routineDraft.ids=[];routineDraft.replace=null;renderRoutineEditor();}}
+async function saveRoutineDraft(){
+  const d=routineDraft;if(!d||!d.ids.length)return;
+  const st=dayState(d.ds);
+  st.customExercises=[...d.ids];delete st.routineChoice;
+  commitDay(d.ds);
+  routineDraft=null;closeModal();render();
+  toast("Rutina guardada para hoy");
+  if(d.remember&&d.family&&profile&&profile.prefs){
+    const prefs=migrateProfilePrefs(profile.prefs);
+    prefs.savedRoutines={...(prefs.savedRoutines||{}),[routineFamilyKey(d.family)]:{exerciseIds:[...d.ids],savedAt:new Date().toISOString()}};
+    profile.prefs=prefs;
+    try{await saveProfilePrefs(prefs,{source:"system",reason:"Rutina propia",skipPlanVersion:true});}catch(e){}
+  }
 }
 function workoutPlanSummaryHtml(prescription,ds){
   const steps=(prescription&&prescription.steps)||[];
@@ -7049,12 +7226,13 @@ function renderWorkout(){
   const workoutCardHtml=section("wk.entreno","Entrenamiento",`<div class="workout">
     <div class="meal-head">
       <div>
-        <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}</div>
+        <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}${strengthDay&&dayCustomExercises(ds).length?' <span class="pill routine-pill">tu rutina</span>':''}</div>
         <div class="detail">${esc(ew.workout.detail)}</div>
         ${location&&!restDay&&!freeDay?`<div class="muted small wk-location">Lugar: ${esc(TRAINING_LOCATION_LABELS[location])}${dayPlace?" · solo este día":""}</div>`:""}
         ${workoutStatusHtml(ds,execution)}
       </div>
     </div>
+    ${!execution&&!st.workoutDone&&strengthDay&&!restDay&&!freeDay&&!trainingSafetyHold()?routineSuggestionHtml(ds,ew.workout):""}
     ${!execution&&!restDay&&!freeDay?workoutPlanSummaryHtml(prescription,ds):""}
     <div class="meal-actions">
       ${contentIssues.length?'<div class="alert">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción antes de iniciarla.</div>':""}
@@ -7064,6 +7242,8 @@ function renderWorkout(){
       ${!execution&&st.workoutDone?'<span class="muted small">Completado con el registro anterior; las series no estaban disponibles.</span>':""}
       ${restDay?`<span class="muted small">${manualActivities(st).length?"Descanso planificado, pero entrenaste igual: cuenta como día entrenado.":"Descanso planificado: no cuenta como sesión incompleta."}</span>`:""}
       <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()||execution||st.workoutDone?"disabled":""}>Cambiar entrenamiento</button>
+      ${strengthDay&&!execution&&!st.workoutDone&&!trainingSafetyHold()?`<button class="btn btn-sm" onclick="openRoutineEditor('${ds}')">Editar ejercicios</button>`:""}
+      ${strengthDay&&dayCustomExercises(ds).length&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="resetDayRoutine('${ds}')">Volver a la rutina del plan</button>`:""}
       ${ew.overridden&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
       ${dayPlace&&!execution&&!st.workoutDone&&!trainingSafetyHold()?`<button class="btn btn-sm" onclick="setDayTrainingPlace('${ds}',null)">${esc(dayPlaceBackLabel(plannedPlace))}</button>`:''}
       ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar ${adaptDayLabel(ds)}:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button>${strengthDay||training.strength!=="none"?`<button class="btn btn-sm" onclick="openDayTrainingPlace('${ds}')">${dayPlace?"Cambiar lugar":strengthDay&&plannedPlace!=="gym"?"En el gimnasio":"En casa"}</button>`:""}<button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
