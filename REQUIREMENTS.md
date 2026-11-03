@@ -1978,19 +1978,9 @@ Jonathan (2026-10-30): separar la consola de administración a otra URL y dar ac
 
 ## REQ-311 - Lesión declarada: aviso con opción voluntaria, no bloqueo duro
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Jonathan (2026-10-31): Diego declaró una lesión en la evaluación de seguridad y la app le mostraba "Entrenamiento en pausa" con los botones "Iniciar sesión guiada" y "Cambiar entrenamiento" deshabilitados, sin forma de entrenar. Pedido: la lesión declarada no debe ser una restricción dura; debe mostrar un aviso y permitir continuar si el usuario lo decide.
-
-Cambio en `trainingSafetyHold()` (antes cualquier respuesta "sí" del cuestionario pausaba todo por igual, porque `has_red_flags` y `cleared_for_training` no distinguían gravedad):
-
-- Pausa dura solo para señales graves: `chest_pain`, `fainting_dizziness`, `clinician_restriction` (o evaluación faltante/incompleta). Las filas antiguas sin detalle de respuestas se tratan como graves por criterio seguro.
-- Lesión declarada (`acute_injury`) sin señales graves: aviso visible permanente en la tarjeta de entreno y botones habilitados. Al iniciar sesión guiada, cambiar entrenamiento o registrar otra actividad, primero se muestra el aviso ("Continuar bajo mi responsabilidad" / "Ahora no"); la aceptación se guarda en `prefs.injuryTrainingAckAt` y se invalida si el usuario repite la evaluación.
-- El coach adapta sus propuestas a la lesión declarada sin presentarlas como autorización médica; el aviso aclara que continuar es decisión del usuario y no sustituye orientación profesional.
-
-Sin cambios para las señales graves ni para el resto del flujo de privacidad. Bump de caché `fitbud-pwa-v189`.
-
-Ampliación (2026-10-31): los botones deshabilitados (`.btn:disabled`) ahora se ven atenuados y sin cursor de clic; antes un botón deshabilitado por la pausa de seguridad parecía activo y la pausa se leía como "los botones no responden". Bump de caché `fitbud-pwa-v190`.
+Una lesión declarada muestra un aviso y permite entrenar si la persona lo decide; las señales graves siguen pausando.
 
 ## REQ-310 - Fotos reales en todo el catálogo de ejercicios (adiós al monigote)
 
@@ -2252,3 +2242,9 @@ Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gr
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Eventos con estado, plataforma e instalación; fallos con paso. ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-340 - Avisos: correo con un toque en iPhone sin instalar
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+La tarjeta ofrece el correo a la hora elegida; activado, cubre y la tarjeta se va. ✓ `tests/e2e/avisos.spec.js`.

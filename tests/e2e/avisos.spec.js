@@ -110,6 +110,16 @@ test.describe("Avisos — iPhone fuera de la app instalada (REQ-289)", () => {
     await expect(page.locator("#a2hs")).toHaveCount(0);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
+
+  // REQ-340: instalar en iPhone toma pasos; el correo es un toque y quita la tarjeta.
+  test("ofrece el correo con un toque y, activado, la tarjeta se va", async ({ page, context }) => {
+    const { calls, errors } = await openHoy(page, context);
+    await expect(card(page)).toContainText("O recibe el recordatorio por correo a las 20:00");
+    await card(page).getByRole("button", { name: "Recibir por correo" }).click();
+    await expect(card(page)).toHaveCount(0);
+    expect(prefsWrites(calls).some((r) => r.email_opt_in === true)).toBe(true);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
 });
 
 test.describe("Avisos — al terminar el onboarding (REQ-289)", () => {

@@ -9251,7 +9251,8 @@ function installPending(){return isMobileDevice()&&!isStandaloneMode();}
 function remindersCovered(){
   const st=devicePushState();
   if(st==="on")return true;
-  return (st==="denied"||st==="unsupported")&&!!(notifPrefsCache&&notifPrefsCache.email_opt_in);
+  // REQ-340: en iPhone sin instalar, el correo también cubre (la tarjeta diaria se va).
+  return (st==="denied"||st==="unsupported"||st==="needs_install")&&!!(notifPrefsCache&&notifPrefsCache.email_opt_in);
 }
 function notifyHourLabel(){
   const h=notifPrefsCache&&notifPrefsCache.notify_hour!=null?Number(notifPrefsCache.notify_hour):NOTIF_HOUR_DEFAULT;
@@ -9329,7 +9330,7 @@ function notifyPushCopy(source){
   const st=devicePushState(),email=!!(notifPrefsCache&&notifPrefsCache.email_opt_in);
   const emailBtn=email?"":`<button class="btn" onclick="enableEmailReminders('${source}')">Recibir por correo</button>`;
   if(st==="on")return {done:true,icon:"bell",title:"Avisos activados",text:`Te avisamos a las ${notifyHourLabel()} si te falta algo. Cambia la hora en Perfil → Recordatorios.`};
-  if(st==="needs_install")return {icon:"bell",title:"Activa los avisos desde la app",text:"En iPhone los avisos solo llegan a la app instalada. Al abrirla desde el ícono te pediremos activarlos."};
+  if(st==="needs_install")return {done:email,icon:"bell",title:"Activa los avisos desde la app",text:"En iPhone los avisos solo llegan a la app instalada. Al abrirla desde el ícono te pediremos activarlos."+(email?" Mientras tanto te escribimos por correo.":` Mientras tanto, te recordamos por correo a las ${notifyHourLabel()}.`),action:email?"":`<button class="btn" onclick="enableEmailReminders('${source}')">Recibir por correo</button>`};
   if(st==="denied")return {icon:"bell",title:"Tus avisos están bloqueados",text:"Permite las notificaciones de Evolv en los ajustes. iPhone: Ajustes → Notificaciones → Evolv. Android: mantén presionado el ícono → Información → Notificaciones."+(email?" Mientras tanto te escribimos por correo.":""),action:emailBtn};
   if(st==="unsupported")return {done:email,icon:"mail",title:email?"Recordatorios por correo activados":"Recibe los recordatorios por correo",text:(email?"":"Este navegador no permite avisos. ")+"Te escribimos solo cuando sirve: un correo al día como máximo.",action:emailBtn};
   return {icon:"bell",title:"Activa los avisos",text:`Un aviso al día como máximo, a las ${notifyHourLabel()}: si te falta algo para sumar el día a tu racha, o si llevas días sin entrar.`,action:`<button class="btn btn-accent" data-notify-enable onclick="enableDevicePush('${source}')">Activar avisos</button>`};
@@ -9365,6 +9366,11 @@ function notifyNudgeHtml(){
   if(_notifyShownToday!=="home:"+todayStr()){_notifyShownToday="home:"+todayStr();trackNotifyPrompt("home","shown");}
   const st=devicePushState();
   const c=st==="needs_install"?notifyInstallCopy("home"):notifyPushCopy("home");
+  // REQ-340: instalar en iPhone toma pasos; el correo es un toque y sirve desde hoy.
+  if(st==="needs_install"){
+    c.text+=` O recibe el recordatorio por correo a las ${notifyHourLabel()}.`;
+    c.action=`<button class="btn btn-accent" onclick="enableEmailReminders('home')">Recibir por correo</button>`+(c.action||"");
+  }
   const title={needs_install:"Instala Evolv para recibir avisos",denied:"Tus avisos están bloqueados",unsupported:"Recibe los recordatorios por correo"}[st]||"Activa los avisos para no perder tu racha";
   return `<section class="agenda-card notify-card" aria-labelledby="notifyCardTitle">
     <div class="agenda-head"><span class="notify-step-ic">${notifyIcon(c.icon)}</span><h2 class="agenda-title" id="notifyCardTitle">${title}</h2></div>

@@ -12845,6 +12845,23 @@ Antes de empezar solo se podía elegir otra plantilla ("Cambiar entrenamiento").
 
 Además, specs de entreno, casa, lugar del día, aislamiento de sync y REQ-320/335 en verde; detector de diseño sin hallazgos; capturas a 390 px.
 
+
+## REQ-311 - Lesión declarada: aviso con opción voluntaria, no bloqueo duro
+
+**Estado: implementado.** (Trasladado íntegro desde REQUIREMENTS.md el 2026-11-03.)
+
+Jonathan (2026-10-31): Diego declaró una lesión en la evaluación de seguridad y la app le mostraba "Entrenamiento en pausa" con los botones "Iniciar sesión guiada" y "Cambiar entrenamiento" deshabilitados, sin forma de entrenar. Pedido: la lesión declarada no debe ser una restricción dura; debe mostrar un aviso y permitir continuar si el usuario lo decide.
+
+Cambio en `trainingSafetyHold()` (antes cualquier respuesta "sí" del cuestionario pausaba todo por igual, porque `has_red_flags` y `cleared_for_training` no distinguían gravedad):
+
+- Pausa dura solo para señales graves: `chest_pain`, `fainting_dizziness`, `clinician_restriction` (o evaluación faltante/incompleta). Las filas antiguas sin detalle de respuestas se tratan como graves por criterio seguro.
+- Lesión declarada (`acute_injury`) sin señales graves: aviso visible permanente en la tarjeta de entreno y botones habilitados. Al iniciar sesión guiada, cambiar entrenamiento o registrar otra actividad, primero se muestra el aviso ("Continuar bajo mi responsabilidad" / "Ahora no"); la aceptación se guarda en `prefs.injuryTrainingAckAt` y se invalida si el usuario repite la evaluación.
+- El coach adapta sus propuestas a la lesión declarada sin presentarlas como autorización médica; el aviso aclara que continuar es decisión del usuario y no sustituye orientación profesional.
+
+Sin cambios para las señales graves ni para el resto del flujo de privacidad. Bump de caché `fitbud-pwa-v189`.
+
+Ampliación (2026-10-31): los botones deshabilitados (`.btn:disabled`) ahora se ven atenuados y sin cursor de clic; antes un botón deshabilitado por la pausa de seguridad parecía activo y la pausa se leía como "los botones no responden". Bump de caché `fitbud-pwa-v190`.
+
 ## REQ-339 - Avisos: medir la tarjeta y los fallos al activar
 
 **Estado: implementado.**
@@ -12872,3 +12889,21 @@ Jonathan (2026-11-03): "hay que hacer algo para que más personas prendan sus no
 ### Criterios de aceptación
 
 - El evento de la tarjeta mostrada lleva estado, plataforma e instalación. Un fallo de suscripción registra el paso y el motivo. ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-340 - Avisos: correo con un toque en iPhone sin instalar
+
+**Estado: implementado.**
+
+### Origen
+
+Es parte del plan de Jonathan para que más personas activen sus avisos (2026-11-03), junto con REQ-339 y REQ-341. En iPhone, el push solo funciona con la app instalada en la pantalla de inicio. La tarjeta de Hoy solo explicaba cómo instalarla (varios pasos en Safari) y no ofrecía nada que funcionara al momento. Solo 1 persona tenía los recordatorios por correo activados.
+
+### Alcance
+
+1. Tarjeta de Hoy en iPhone sin instalar (`needs_install`): conserva los pasos para instalar y agrega "O recibe el recordatorio por correo a las <hora>.", con el botón principal "Recibir por correo" (`enableEmailReminders('home')`).
+2. Paso de avisos del onboarding en el mismo estado: agrega el botón "Recibir por correo"; con el correo activo, el paso queda marcado como hecho.
+3. `remindersCovered()`: en `needs_install` con el correo activado cuenta como cubierto, igual que `denied` y `unsupported`. La tarjeta diaria deja de aparecer, pero instalar la app sigue disponible desde el onboarding y Perfil.
+
+### Criterios de aceptación
+
+- En iPhone sin instalar, la tarjeta ofrece el correo; al tocarlo, guarda `email_opt_in` y desaparece. ✓ `tests/e2e/avisos.spec.js`.
