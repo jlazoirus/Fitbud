@@ -1,5 +1,5 @@
 // REQ-334: cobro de un plan de la tienda web con Culqi (pago único, en soles).
-// POST /api/culqi-charge — pública: la compra no exige cuenta (REQ-333).
+// POST /api/culqi-charge (reescrita a /api/checkout?op=culqi) — pública: la compra no exige cuenta (REQ-333).
 // Body: { planId, tokenId, email, firstName, lastName, phone, deviceId,
 //         acceptTerms: true, authentication3DS? }
 // El monto sale de tienda/planes.js, nunca del navegador. Si el cargo sale bien:
@@ -8,8 +8,8 @@
 // Vars: CULQI_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 //       NOTIFY_APP_URL, RESEND_API_KEY, NOTIFY_FROM_EMAIL.
 
-import { MONEDA, planPorId, formatoSoles } from "../tienda/planes.js";
-import { COMERCIO } from "../tienda/comercio.js";
+import { MONEDA, planPorId, formatoSoles } from "../../tienda/planes.js";
+import { COMERCIO } from "../../tienda/comercio.js";
 
 const CULQI_CHARGES_URL = "https://api.culqi.com/v2/charges";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;

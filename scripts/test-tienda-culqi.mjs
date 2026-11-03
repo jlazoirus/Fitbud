@@ -5,8 +5,14 @@ import fs from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { PLANES_TIENDA, planPorId, formatoSoles, MONEDA } from "../tienda/planes.js";
 import { COMERCIO, esMarcador } from "../tienda/comercio.js";
-import charge, { parseCompra, chargeBody, interpretCharge } from "../api/culqi-charge.js";
-import reclamaciones, { parseHoja, hojaRows } from "../api/reclamaciones.js";
+import { parseCompra, chargeBody, interpretCharge } from "../api/_tienda/culqi-charge.js";
+import { parseHoja, hojaRows } from "../api/_tienda/reclamaciones.js";
+import checkout from "../api/checkout.js";
+
+// Los handlers de la tienda se ejecutan a través de /api/checkout (rewrites de vercel.json):
+// uno por req.query (Vercel) y otro por la URL, para cubrir ambas formas.
+const charge = (rq, rs) => checkout({ ...rq, query: { op: "culqi" } }, rs);
+const reclamaciones = (rq, rs) => checkout({ ...rq, url: "/api/checkout?op=reclamaciones" }, rs);
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const read = (p) => fs.readFileSync(ROOT + p, "utf8");
@@ -36,6 +42,12 @@ for (const p of PAGINAS) {
   assert.ok(vercel.rewrites.some((r) => r.source === "/" + p && r.destination === "/" + p + "/index.html"), p + ": falta la ruta limpia en vercel.json");
   if (p !== "pago") assert.ok(index.includes('href="/' + p + '"'), p + ": la portada debe enlazarla en el pie");
 }
+for (const [source, op] of [["/api/culqi-charge", "culqi"], ["/api/reclamaciones", "reclamaciones"]]) {
+  assert.ok(vercel.rewrites.some((r) => r.source === source && r.destination === "/api/checkout?op=" + op), source + ": falta la reescritura a /api/checkout");
+}
+// Plan Hobby de Vercel: máximo 12 funciones por deploy (el PR #93 falló por pasarlo).
+const funciones = fs.readdirSync(ROOT + "api").filter((f) => f.endsWith(".js") && !f.startsWith("_"));
+assert.ok(funciones.length <= 12, "Vercel Hobby admite 12 funciones y hay " + funciones.length + ": " + funciones.join(", "));
 assert.match(read("tienda/layout.js"), /href="\/libro-de-reclamaciones">\$\{LIBRO_ICONO\}/, "el pie muestra el ícono del Libro de Reclamaciones");
 const marcadores = Object.entries(COMERCIO).filter(([, v]) => esMarcador(v)).map(([k]) => k);
 if (marcadores.length) console.warn("  ⚠ tienda/comercio.js tiene datos por completar antes de reenviar a Culqi: " + marcadores.join(", "));

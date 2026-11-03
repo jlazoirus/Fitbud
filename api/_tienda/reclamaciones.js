@@ -1,12 +1,12 @@
 // REQ-332: Libro de Reclamaciones virtual integrado en la web.
-// POST /api/reclamaciones — pública. Guarda la hoja con número correlativo,
+// POST /api/reclamaciones (reescrita a /api/checkout?op=reclamaciones) — pública. Guarda la hoja con número correlativo,
 // devuelve la hoja emitida (el consumidor la ve, imprime o guarda) y envía la
 // copia por correo al consumidor (si dejó correo) y el aviso al comercio.
 // Vars: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, RESEND_API_KEY, NOTIFY_FROM_EMAIL,
 //       RECLAMOS_NOTIFY_EMAIL (opcional; si falta, avisa a los admins activos).
 // Tabla: supabase/tienda_culqi.sql (libro_reclamaciones).
 
-import { COMERCIO } from "../tienda/comercio.js";
+import { COMERCIO } from "../../tienda/comercio.js";
 
 const TIPOS = new Set(["reclamo", "queja"]);
 const DOCUMENTOS = new Set(["DNI", "CE", "Pasaporte", "RUC"]);

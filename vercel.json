@@ -43,6 +43,14 @@
     {
       "source": "/libro-de-reclamaciones",
       "destination": "/libro-de-reclamaciones/index.html"
+    },
+    {
+      "source": "/api/culqi-charge",
+      "destination": "/api/checkout?op=culqi"
+    },
+    {
+      "source": "/api/reclamaciones",
+      "destination": "/api/checkout?op=reclamaciones"
     }
   ],
   "crons": [

@@ -40,7 +40,7 @@ create table if not exists libro_reclamaciones (
   )
 );
 
--- Sin políticas RLS = solo service_role (api/reclamaciones.js) lee y escribe.
+-- Sin políticas RLS = solo service_role (api/_tienda/reclamaciones.js) lee y escribe.
 alter table libro_reclamaciones enable row level security;
 
 create index if not exists libro_reclamaciones_estado_idx on libro_reclamaciones(estado, created_at desc);

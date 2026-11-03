@@ -119,6 +119,10 @@ assert.ok(shell, "service-worker.js debe declarar APP_SHELL");
 for (const [, ref] of shell[1].matchAll(/"\.\/([^"]*)"/g)) required.add(ref || "index.html");
 for (const icon of JSON.parse(read("manifest.webmanifest")).icons || []) required.add(icon.src.replace(/^\.?\//, ""));
 for (const file of files) if (/^api\/[^/]+\.js$/.test(file)) required.add(file);
+// Módulos privados de las funciones (api/_*/…, p. ej. la tienda de REQ-334) que estas importan.
+for (const file of files.filter((f) => /^api\/[^/]+\.js$/.test(f))) {
+  for (const [, ref] of read(file).matchAll(/(?:from\s*|import\()\s*"\.\/(_[^"]+\.js)"/g)) required.add("api/" + ref);
+}
 for (const file of EXTRA_PUBLIC) required.add(file);
 
 const missing = [...required].filter((file) => !deployed.has(file));

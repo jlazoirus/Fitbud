@@ -2,6 +2,23 @@
 // POST /api/checkout  Body: { planId: "monthly"|"semiannual" }
 // Requiere sesión autenticada.
 // Vars: STRIPE_SECRET_KEY, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_SEMIANNUAL, NOTIFY_APP_URL
+//
+// REQ-334: el plan Hobby de Vercel admite 12 funciones por deploy, así que la
+// tienda web comparte esta. vercel.json reescribe /api/culqi-charge y
+// /api/reclamaciones a /api/checkout?op=…; la lógica vive en api/_tienda/.
+
+// Import dinámico con ruta literal: Vercel lo incluye en el bundle y el flujo
+// de Stripe no carga la tienda.
+const TIENDA_OPS = {
+  culqi: () => import("./_tienda/culqi-charge.js"),
+  reclamaciones: () => import("./_tienda/reclamaciones.js"),
+};
+
+function tiendaOp(req) {
+  const q = req.query && req.query.op;
+  if (q) return String(q);
+  try { return new URL(req.url || "", "http://local").searchParams.get("op") || ""; } catch (_) { return ""; }
+}
 
 function env() {
   return {
@@ -35,6 +52,8 @@ async function verifyUser(req, e) {
 const VALID_PLANS = new Set(["monthly", "semiannual"]);
 
 export default async function handler(req, res) {
+  const tienda = TIENDA_OPS[tiendaOp(req)];
+  if (tienda) return (await tienda()).default(req, res);
   if (req.method !== "POST") {
     res.status(405).json({ error: "Método no permitido" });
     return;
