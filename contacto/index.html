@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Contacto · Evolv</title>
+  <meta name="description" content="Datos de contacto de Evolv: correo, teléfono, WhatsApp y dirección.">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=3">
+</head>
+<body>
+  <header id="t-header"></header>
+  <main class="wrap narrow legal">
+    <h1>Contacto</h1>
+    <p class="lead">Evolv arma tu plan de comidas y de entrenamiento y lo adapta contigo cada semana. Si tienes una duda sobre los planes, un pago o tu cuenta, escríbenos.</p>
+
+    <div class="hoja">
+      <dl>
+        <dt>Titular</dt><dd data-comercio="razonSocial"></dd>
+        <dt>RUC</dt><dd data-comercio="ruc"></dd>
+        <dt>Dirección</dt><dd data-comercio="direccion"></dd>
+        <dt>Correo</dt><dd><a data-comercio="correo"></a></dd>
+        <dt>Teléfono</dt><dd><a data-comercio="telefono"></a></dd>
+        <dt>WhatsApp</dt><dd><a data-comercio="whatsappUrl" target="_blank" rel="noopener noreferrer">Escríbenos por WhatsApp</a></dd>
+        <dt>Horario</dt><dd data-comercio="horario"></dd>
+      </dl>
+    </div>
+
+    <h2>Qué vendemos</h2>
+    <p>Acceso por período a la aplicación web Evolv (planes de 1, 3 y 6 meses, con pago único y sin renovación automática). Mira el detalle en <a href="/planes">Planes y precios</a>.</p>
+
+    <h2>¿Un reclamo?</h2>
+    <p>Puedes registrarlo en nuestro <a href="/libro-de-reclamaciones">Libro de Reclamaciones</a>. Para reembolsos, revisa la <a href="/devoluciones">Política de cambios y devoluciones</a>.</p>
+  </main>
+  <footer id="t-footer"></footer>
+  <script type="module">
+    import { mountLayout } from "/tienda/layout.js";
+    mountLayout();
+  </script>
+</body>
+</html>

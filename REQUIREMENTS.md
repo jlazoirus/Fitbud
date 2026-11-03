@@ -2214,3 +2214,7 @@ Dos botones de registro compitiendo, jerarquía confusa con la tarjeta «Menú o
 
 ### Verificación sugerida
 Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gramos desde él, recarga y totales; regresión del botón secundario y de los registros de Hoy. Detector Impeccable y release gate.
+
+## REQ-331 - Tienda: datos del comercio y páginas legales propias
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. Pendiente humano: reemplazar los marcadores `[COMPLETAR…]` de `tienda/comercio.js` con los datos del titular inscrito en Culqi (ver `CULQI_SETUP.md`).

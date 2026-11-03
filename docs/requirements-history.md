@@ -12692,3 +12692,25 @@ Playwright Home/menú opcional, nutrición, coach y regresiones de registro/entr
 Resultado: 9/9 casos nuevos y regresiones dirigidas de Hoy, Nutrición y coach verificadas. Capturas 320/390/1280 sin desbordes; detector Impeccable sin hallazgos, HTML/JS/accesibilidad, placeholders, macros primero, orden/saltos, caché PWA y secretos correctos. Gate integral posterior al commit antes de publicar. Sin migraciones ni llamadas pagadas.
 
 Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nueva de los slots vacíos coincidía con «o elige», prohibido por REQ-194; se cambió por «Registra lo que comiste. El menú es opcional.», sin relajar pruebas. Gate final con reintento oficial del caso de textos.
+
+## REQ-331 - Tienda: datos del comercio y páginas legales propias
+
+**Estado: implementado.**
+
+### Origen
+Culqi observó la afiliación de evolvapp.club (2026-11-02, correo a Sathya e infografía «Requisitos online»): faltaban información básica de la tienda e información legal.
+
+### Problema
+La portada solo ofrecía «Términos» y «Privacidad» como ventanas de tres líneas marcadas como «texto preliminar» (`openTermsNotice()`/`openPrivacyNotice()`), sin URL propia, sin política de cambios y devoluciones y sin razón social, RUC, dirección, correo ni teléfono.
+
+### Objetivo
+Páginas públicas con URL propia: `/terminos`, `/devoluciones` (reembolso completo dentro de 7 días calendario, decisión de Jonathan), `/privacidad` (Ley 29733) y `/contacto`, con cabecera y pie comunes que muestran los datos del comercio y el acceso al Libro de Reclamaciones.
+
+### Alcance
+`tienda/comercio.js` es la única fuente de los datos del titular (marcadores `[COMPLETAR…]` hasta tener los de Sathya). `tienda/layout.js` monta cabecera, pie y rellena `data-comercio`. `tienda/tienda.css` usa los tokens de marca. Páginas estáticas en carpetas (`terminos/index.html`, …) con rutas limpias en `vercel.json`; no hay build. Las ventanas de la app (registro y privacidad) no cambian.
+
+### Fuera de alcance
+Revisión legal profesional (REQ-49), emisión de comprobantes electrónicos.
+
+### Verificación
+`scripts/test-tienda-culqi.mjs` (páginas, rutas, pie con Libro) y `tests/e2e/tienda.spec.js`. El detector Impeccable marcaba contraste bajo porque su análisis estático asume fondo blanco; el contraste real se verificó en navegador sobre `#101010` y la excepción quedó acotada a las páginas de la tienda en `.impeccable/config.json`.

@@ -21,6 +21,16 @@
 !/assets
 /assets/ux-audit-2026-06-23/*
 
+# Tienda web con Culqi (REQ-331..334): páginas, datos y catálogo en soles
+!/tienda
+!/planes
+!/pago
+!/terminos
+!/devoluciones
+!/privacidad
+!/contacto
+!/libro-de-reclamaciones
+
 # Funciones serverless y su configuración
 !/api
 !/package.json
