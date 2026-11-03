@@ -185,13 +185,14 @@
         settings: { title: "Evolv", currency: MONEDA, amount: plan.montoCentimos },
         client: { email: datos.email, firstName: datos.firstName, lastName: datos.lastName },
         options: {
-          lang: "auto",
+          lang: "es",
           installments: false,
           modal: true,
           paymentMethods: { tarjeta: true, yape: false, billetera: false, bancaMovil: false, agente: false, cuotealo: false },
           paymentMethodsSort: ["tarjeta"],
         },
-        appearance: { theme: "default", menuType: "default", buttonCardPayText: textoPagar },
+        // Culqi agrega el monto al texto del botón: solo "Pagar" para no repetirlo.
+        appearance: { theme: "default", menuType: "default", buttonCardPayText: "Pagar" },
       });
       checkout.culqi = () => {
         if (checkout.token) {
