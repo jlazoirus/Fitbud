@@ -12692,3 +12692,75 @@ Playwright Home/menú opcional, nutrición, coach y regresiones de registro/entr
 Resultado: 9/9 casos nuevos y regresiones dirigidas de Hoy, Nutrición y coach verificadas. Capturas 320/390/1280 sin desbordes; detector Impeccable sin hallazgos, HTML/JS/accesibilidad, placeholders, macros primero, orden/saltos, caché PWA y secretos correctos. Gate integral posterior al commit antes de publicar. Sin migraciones ni llamadas pagadas.
 
 Verificación integral: 241/242 E2E correctas en la pasada completa. La frase nueva de los slots vacíos coincidía con «o elige», prohibido por REQ-194; se cambió por «Registra lo que comiste. El menú es opcional.», sin relajar pruebas. Gate final con reintento oficial del caso de textos.
+
+## REQ-331 - Tienda: datos del comercio y páginas legales propias
+
+**Estado: implementado.**
+
+### Origen
+Culqi observó la afiliación de evolvapp.club (2026-11-02, correo a Sathya e infografía «Requisitos online»): faltaban información básica de la tienda e información legal.
+
+### Problema
+La portada solo ofrecía «Términos» y «Privacidad» como ventanas de tres líneas marcadas como «texto preliminar» (`openTermsNotice()`/`openPrivacyNotice()`), sin URL propia, sin política de cambios y devoluciones y sin razón social, RUC, dirección, correo ni teléfono.
+
+### Objetivo
+Páginas públicas con URL propia: `/terminos`, `/devoluciones` (reembolso completo dentro de 7 días calendario, decisión de Jonathan), `/privacidad` (Ley 29733) y `/contacto`, con cabecera y pie comunes que muestran los datos del comercio y el acceso al Libro de Reclamaciones.
+
+### Alcance
+`tienda/comercio.js` es la única fuente de los datos del titular (marcadores `[COMPLETAR…]` hasta tener los de Sathya). `tienda/layout.js` monta cabecera, pie y rellena `data-comercio`. `tienda/tienda.css` usa los tokens de marca. Páginas estáticas en carpetas (`terminos/index.html`, …) con rutas limpias en `vercel.json`; no hay build. Las ventanas de la app (registro y privacidad) no cambian.
+
+### Fuera de alcance
+Revisión legal profesional (REQ-49), emisión de comprobantes electrónicos.
+
+### Verificación
+`scripts/test-tienda-culqi.mjs` (páginas, rutas, pie con Libro) y `tests/e2e/tienda.spec.js`. El detector Impeccable marcaba contraste bajo porque su análisis estático asume fondo blanco; el contraste real se verificó en navegador sobre `#101010` y la excepción quedó acotada a las páginas de la tienda en `.impeccable/config.json`.
+
+## REQ-332 - Tienda: Libro de Reclamaciones virtual integrado
+
+**Estado: implementado.**
+
+### Origen
+Requisito de Culqi: Libro de Reclamaciones integrado en la web según INDECOPI, sin depender de formularios, enlaces ni archivos externos. Se evaluó la herramienta gratuita «Tu Libro de Reclamaciones» de Indecopi: genera un enlace externo, que el requisito de Culqi excluye; se puede usar aparte.
+
+### Alcance
+`/libro-de-reclamaciones`: hoja con identificación del proveedor y fecha, consumidor (nombre, documento, domicilio, teléfono, correo, apoderado si es menor), bien contratado y monto, reclamo o queja con sus definiciones, detalle, pedido y las leyendas obligatorias. Basta un medio de contacto: INDECOPI sancionó exigir correo y domicilio a la vez (Res. Final 0187-2025). `api/_tienda/reclamaciones.js` (servida en `/api/reclamaciones` vía `/api/checkout?op=reclamaciones`) valida, guarda en `libro_reclamaciones` (numeración correlativa, código `EVOLV-LR-000001`, RLS sin políticas: solo service role), muestra la hoja emitida para imprimir y envía la copia al consumidor y el aviso al comercio (`RECLAMOS_NOTIFY_EMAIL` o admins activos) por Resend. Campo trampa contra bots. Ícono del aviso en el pie de todas las páginas y en la portada.
+
+### Fuera de alcance
+Vista de admin para responder (se responde por el medio indicado y se registra en la tabla); conservación automática más allá de la tabla.
+
+### Pendiente humano
+Ejecutar `supabase/tienda_culqi.sql` en producción antes de reenviar a Culqi.
+
+## REQ-333 - Tienda: planes en soles con imagen y botón Comprar, sin cerrar la beta
+
+**Estado: implementado.**
+
+### Origen
+Culqi pidió foto, descripción y precio de cada producto y un flujo de compra con botón Comprar. La portada mostraba precios en USD con «Los planes se abren al terminar la beta» y solo «Postular a la beta».
+
+### Alcance
+`tienda/planes.js` (fuente del precio que cobra el servidor): mensual S/ 29.90 (30 días), trimestral S/ 79.90 (90) y semestral S/ 149.90 (180), pago único sin renovación (decisión de Jonathan: 3 planes). Imágenes de marca en `assets/planes/*.svg`. `/planes` con foto, descripción, items, precio y «Comprar». Con la beta cerrada, la sección de precios de la portada carga el catálogo de la tienda (`loadStorePlans()`, import dinámico) y cada plan lleva a `/pago?plan=…`; «Postular a la beta» sigue en cabecera, hero, bajo «Elige tu ritmo» y cierre. El pie de la portada enlaza Planes, Contacto, Términos, Devoluciones, Privacidad y Libro, y muestra razón social y RUC. Si el catálogo de la tienda no carga, vuelve a los planes de la app. Con `SIGNUP_MODE=open` no cambia nada.
+
+### Fuera de alcance
+El paywall dentro de la app (sigue con `/api/catalog`, USD y Stripe sin activar); usuarios beta no ven precios dentro de la app (REQ-208 intacto).
+
+## REQ-334 - Tienda: pago con tarjeta por Culqi (pago único, 3DS, acceso por correo)
+
+**Estado: implementado — requiere acción humana.**
+
+### Origen
+Culqi como pasarela para vender las suscripciones con tarjeta en Perú; el checkout de Stripe (REQ-26) nunca se activó.
+
+### Alcance
+- `/pago?plan=…`: resumen del pedido, correo, nombre, apellido, celular opcional y aceptación de Términos y Devoluciones. Abre Culqi Checkout Custom (`https://js.culqi.com/checkout-js`, solo tarjeta, monto en céntimos) con la llave pública de `/api/config` (`culqi.enabled` solo si existen `CULQI_PUBLIC_KEY` y `CULQI_SECRET_KEY`); sin llaves, avisa y deriva a WhatsApp. Huella de dispositivo con Culqi3DS.
+- `api/_tienda/culqi-charge.js` (servida en `/api/culqi-charge` vía `/api/checkout?op=culqi`, porque Vercel Hobby admite 12 funciones): compra sin cuenta (decisión de Jonathan). Cobra el monto de `tienda/planes.js`, nunca el del navegador. La documentación de Culqi contradice el código HTTP de 3DS, así que se decide por el cuerpo: `object: "charge"` = pagado, `action_code: "REVIEW"` = autenticar con `Culqi3DS.initAuthentication()` y reintentar con `authentication_3DS`. Pagado: busca la cuenta por correo (perfil o Auth) o la invita (`/auth/v1/invite`, regreso a `/?auth=invite`), suma los días desde el vencimiento vigente (`user_entitlements`, `origin: checkout`, `payment_ref` = id del cargo, idempotente), registra en `billing_events` con `provider = 'culqi'` y envía el recibo. Si falla algo después de cobrar, nunca muestra error: responde `cuenta: "pendiente"` y deja el evento `failed` para resolverlo a mano.
+- El registro público sigue cerrado: solo quien paga recibe invitación.
+
+### Fuera de alcance
+Reembolsos automáticos (se hacen en CulqiPanel y el acceso se revoca a mano), Yape y otros medios, comprobantes electrónicos SUNAT, webhook de Culqi.
+
+### Pendiente humano
+Ver `CULQI_SETUP.md`: datos del comercio, SQL, llaves en Vercel, prueba con tarjeta de prueba y reenvío a Culqi.
+
+### Verificación
+`scripts/test-tienda-culqi.mjs` (catálogo, cuerpo del cargo, precio del servidor, cuenta existente, días sumados, invitación, 3DS, rechazo, falla tras cobro, Libro y SQL con PGlite) y `tests/e2e/tienda.spec.js` con Culqi simulado.

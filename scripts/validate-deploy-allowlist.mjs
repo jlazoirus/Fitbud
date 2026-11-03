@@ -76,12 +76,25 @@ assert.equal(runtimeFile("/unknown-file.js"),"unknown-file.js");
 // Lo que el runtime carga: referencias locales de las páginas, shell del SW,
 // íconos del manifest, funciones serverless y su configuración.
 const required = new Set(["index.html", "beta-reclutamiento.html", "service-worker.js", "manifest.webmanifest", "package.json", "package-lock.json", "vercel.json"]);
-for (const page of ["index.html", "beta-reclutamiento.html"]) {
+// REQ-331..334: las páginas de la tienda son destinos de reescrituras (carpeta/index.html).
+const pages = ["index.html", "beta-reclutamiento.html", ...rewrites.map((rule) => rule.destination.replace(/^\//, "")).filter((file) => file.endsWith("/index.html"))];
+for (const page of pages) {
+  required.add(page);
   for (const [, ref] of read(page).matchAll(/(?:src|href)="([^"]+)"/g)) {
-    if (/^[a-z]+:|^\/\/|^#|\$\{/.test(ref)) continue;
+    // Se omiten URLs externas, anclas y selectores armados en JS (p. ej. script[src="' + src + '"]).
+    if (/^[a-z]+:|^\/\/|^#|\$\{|['+ ]/.test(ref)) continue;
     // href="/" es la portada; ?source=… y #ancla no son parte del archivo
     required.add(runtimeFile(ref));
   }
+  // Módulos ES que cargan las páginas (import estático o dinámico con ruta absoluta).
+  for (const [, ref] of read(page).matchAll(/(?:from\s*|import\()\s*"(\/[^"]+\.js)"/g)) required.add(ref.slice(1));
+}
+// Módulos de la tienda: sus imports relativos y las imágenes de los planes.
+for (const file of [...required].filter((f) => /^tienda\/[^/]+\.js$/.test(f))) {
+  for (const [, ref] of read(file).matchAll(/from\s*"\.\/([^"]+\.js)"/g)) required.add("tienda/" + ref);
+}
+for (const file of [...required].filter((f) => /^tienda\/[^/]+\.js$/.test(f))) {
+  for (const [, ref] of read(file).matchAll(/"\/(assets\/[^"]+)"/g)) required.add(ref);
 }
 // Fotos de ejercicios servidas desde el propio deploy (REQ-259).
 for (const [, ref] of read("exercise-catalog.js").matchAll(/"(assets\/[^"]+)"/g)) required.add(ref);
@@ -106,6 +119,10 @@ assert.ok(shell, "service-worker.js debe declarar APP_SHELL");
 for (const [, ref] of shell[1].matchAll(/"\.\/([^"]*)"/g)) required.add(ref || "index.html");
 for (const icon of JSON.parse(read("manifest.webmanifest")).icons || []) required.add(icon.src.replace(/^\.?\//, ""));
 for (const file of files) if (/^api\/[^/]+\.js$/.test(file)) required.add(file);
+// Módulos privados de las funciones (api/_*/…, p. ej. la tienda de REQ-334) que estas importan.
+for (const file of files.filter((f) => /^api\/[^/]+\.js$/.test(f))) {
+  for (const [, ref] of read(file).matchAll(/(?:from\s*|import\()\s*"\.\/(_[^"]+\.js)"/g)) required.add("api/" + ref);
+}
 for (const file of EXTRA_PUBLIC) required.add(file);
 
 const missing = [...required].filter((file) => !deployed.has(file));

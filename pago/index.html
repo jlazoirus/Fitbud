@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pagar tu plan · Evolv</title>
+  <meta name="description" content="Paga tu plan de Evolv con tarjeta de crédito o débito a través de Culqi.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=3">
+</head>
+<body>
+  <header id="t-header"></header>
+  <main class="wrap">
+    <h1 id="titulo">Pagar tu plan</h1>
+
+    <div id="sinPlan" class="nota" hidden>Ese plan no existe. <a href="/planes">Vuelve a Planes y precios</a> para elegir uno.</div>
+
+    <div id="pago" class="pago" hidden>
+      <form id="compra" class="form" novalidate>
+        <fieldset>
+          <legend>Tus datos</legend>
+          <div class="field"><label for="email">Correo <span class="req">*</span></label><input id="email" name="email" type="email" autocomplete="email" required maxlength="160">
+            <p class="hint">Si ya tienes cuenta en Evolv, usa el mismo correo: el plan se suma a ella. Si no, te enviamos un correo para crear tu contraseña.</p></div>
+          <div class="dos">
+            <div class="field"><label for="firstName">Nombre <span class="req">*</span></label><input id="firstName" name="firstName" autocomplete="given-name" required maxlength="50"></div>
+            <div class="field"><label for="lastName">Apellido <span class="req">*</span></label><input id="lastName" name="lastName" autocomplete="family-name" required maxlength="50"></div>
+          </div>
+          <div class="field"><label for="phone">Celular</label><input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="20" placeholder="999 999 999"></div>
+        </fieldset>
+        <label class="check"><input type="checkbox" id="acepto" name="acepto" required><span>Leí y acepto los <a href="/terminos" target="_blank">Términos y condiciones</a> y la <a href="/devoluciones" target="_blank">Política de cambios y devoluciones</a>.</span></label>
+        <div id="resultado" class="alerta error" role="alert" hidden></div>
+        <button id="pagar" class="btn btn-accent btn-block" type="submit">Pagar</button>
+        <p class="seguro"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>Pago seguro con tarjeta de crédito o débito a través de Culqi. Evolv no ve ni guarda los datos de tu tarjeta.</p>
+      </form>
+
+      <aside class="resumen" aria-label="Resumen del pedido">
+        <img id="rImg" class="plan-img" src="/assets/planes/mensual.svg" alt="Plan de Evolv" width="1200" height="750">
+        <div class="plan-body">
+          <h2 class="plan-nombre" id="rNombre"></h2>
+          <p class="plan-desc" id="rDesc"></p>
+          <div class="fila"><span>Duración</span><span id="rPeriodo"></span></div>
+          <div class="fila"><span>Renovación</span><span>No se renueva sola</span></div>
+          <div class="fila total"><span>Total</span><span id="rTotal"></span></div>
+          <p class="hint">Precio en soles, impuestos incluidos. <a href="/planes">Cambiar de plan</a></p>
+        </div>
+      </aside>
+    </div>
+
+    <section id="listo" class="narrow" hidden tabindex="-1">
+      <div class="alerta ok"><b id="listoTitulo">¡Pago recibido!</b> <span id="listoTxt"></span></div>
+      <div class="hoja" style="margin-top:16px"><dl id="listoFilas"></dl></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <a class="btn btn-accent" href="/">Ir a Evolv</a>
+        <a class="btn" href="/contacto">¿Dudas? Escríbenos</a>
+      </div>
+    </section>
+  </main>
+  <footer id="t-footer"></footer>
+  <script type="module">
+    import { mountLayout, esc } from "/tienda/layout.js";
+    import { planPorId, formatoSoles, MONEDA } from "/tienda/planes.js";
+    mountLayout();
+
+    const plan = planPorId(new URLSearchParams(location.search).get("plan") || "");
+    const form = document.getElementById("compra");
+    const resultado = document.getElementById("resultado");
+    const pagar = document.getElementById("pagar");
+    const textoPagar = plan ? "Pagar " + formatoSoles(plan.montoCentimos) : "Pagar";
+
+    if (!plan) {
+      document.getElementById("sinPlan").hidden = false;
+    } else {
+      document.getElementById("titulo").textContent = "Pagar " + plan.nombre.toLowerCase();
+      document.getElementById("pago").hidden = false;
+      const img = document.getElementById("rImg");
+      img.src = plan.imagen;
+      img.alt = plan.nombre + ": " + plan.periodo + " de acceso a Evolv";
+      document.getElementById("rNombre").textContent = plan.nombre;
+      document.getElementById("rDesc").textContent = plan.descripcion;
+      document.getElementById("rPeriodo").textContent = plan.periodo + " (" + plan.duracionDias + " días)";
+      document.getElementById("rTotal").textContent = formatoSoles(plan.montoCentimos);
+      pagar.textContent = textoPagar;
+      prefillEmail();
+    }
+
+    // Si ya entró a la app en este navegador, propone su correo.
+    function prefillEmail() {
+      try {
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (!/^sb-.*-auth-token$/.test(key)) continue;
+          const email = JSON.parse(localStorage.getItem(key) || "{}")?.user?.email;
+          if (email) { document.getElementById("email").value = email; return; }
+        }
+      } catch (_) { /* sin almacenamiento: el campo queda vacío */ }
+    }
+
+    function leerDatos() {
+      const fd = new FormData(form);
+      return {
+        email: String(fd.get("email") || "").trim().toLowerCase(),
+        firstName: String(fd.get("firstName") || "").trim(),
+        lastName: String(fd.get("lastName") || "").trim(),
+        phone: String(fd.get("phone") || "").trim(),
+        acceptTerms: document.getElementById("acepto").checked,
+      };
+    }
+
+    function validar(d) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) return ["Revisa tu correo.", "email"];
+      if (!d.firstName) return ["Escribe tu nombre.", "firstName"];
+      if (!d.lastName) return ["Escribe tu apellido.", "lastName"];
+      if (!d.acceptTerms) return ["Para comprar, acepta los Términos y la Política de devoluciones.", "acepto"];
+      return null;
+    }
+
+    function error(msg, campo) {
+      resultado.className = "alerta error";
+      resultado.textContent = msg;
+      resultado.hidden = false;
+      const el = campo && document.getElementById(campo);
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus({ preventScroll: true }); }
+      else resultado.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function ocupado(on, texto) {
+      pagar.disabled = on;
+      pagar.textContent = on ? (texto || "Procesando…") : textoPagar;
+    }
+
+    function cargarScript(src) {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
+        const s = document.createElement("script");
+        s.src = src; s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("No se pudo cargar " + src));
+        document.head.appendChild(s);
+      });
+    }
+
+    let config = null;
+    async function culqiConfig() {
+      if (config) return config;
+      const r = await fetch("/api/config", { cache: "no-store" });
+      const data = await r.json().catch(() => ({}));
+      config = data.culqi || {};
+      return config;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      resultado.hidden = true;
+      const datos = leerDatos();
+      const fallo = validar(datos);
+      if (fallo) { error(fallo[0], fallo[1]); return; }
+      ocupado(true, "Abriendo el pago seguro…");
+      try {
+        const cfg = await culqiConfig();
+        if (!cfg.enabled || !cfg.publicKey) {
+          error("Los pagos con tarjeta no están disponibles en este momento. Escríbenos por WhatsApp y te ayudamos a comprar.");
+          ocupado(false);
+          return;
+        }
+        await Promise.all([cargarScript("https://js.culqi.com/checkout-js"), cargarScript("https://3ds.culqi.com")]);
+        let deviceId = null;
+        try {
+          window.Culqi3DS.publicKey = cfg.publicKey;
+          deviceId = await window.Culqi3DS.generateDevice();
+        } catch (_) { /* sin huella del dispositivo el cargo sigue; Culqi puede pedir 3DS */ }
+        abrirCheckout(cfg.publicKey, datos, deviceId);
+      } catch (_) {
+        error("No pudimos abrir el pago seguro. Revisa tu conexión e intenta de nuevo.");
+        ocupado(false);
+      }
+    });
+
+    function abrirCheckout(publicKey, datos, deviceId) {
+      const checkout = new window.CulqiCheckout(publicKey, {
+        settings: { title: "Evolv", currency: MONEDA, amount: plan.montoCentimos },
+        client: { email: datos.email, firstName: datos.firstName, lastName: datos.lastName },
+        options: {
+          lang: "auto",
+          installments: false,
+          modal: true,
+          paymentMethods: { tarjeta: true, yape: false, billetera: false, bancaMovil: false, agente: false, cuotealo: false },
+          paymentMethodsSort: ["tarjeta"],
+        },
+        appearance: { theme: "default", menuType: "default", buttonCardPayText: textoPagar },
+      });
+      checkout.culqi = () => {
+        if (checkout.token) {
+          const tokenId = checkout.token.id;
+          checkout.close();
+          cobrar({ ...datos, planId: plan.id, tokenId, deviceId });
+        } else if (checkout.error) {
+          checkout.close();
+          error(checkout.error.user_message || "No pudimos validar la tarjeta. Revisa los datos e intenta de nuevo.");
+          ocupado(false);
+        }
+      };
+      checkout.open();
+      ocupado(false);
+    }
+
+    async function cobrar(pedido) {
+      ocupado(true, "Procesando el pago…");
+      try {
+        const r = await fetch("/api/culqi-charge", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pedido) });
+        const out = await r.json().catch(() => ({}));
+        if (out.needs3ds) { autenticar(pedido); return; }
+        if (!r.ok || !out.ok) { error(out.error || "No pudimos procesar el pago. No se hizo ningún cobro."); ocupado(false); return; }
+        listo(out, pedido);
+      } catch (_) {
+        error("Se cortó la conexión mientras procesábamos el pago. Antes de reintentar, revisa tu correo o escríbenos: así evitamos un doble cobro.");
+        ocupado(false);
+      }
+    }
+
+    // Verificación 3DS: el banco pide confirmar la compra; luego se reintenta el mismo cargo.
+    function autenticar(pedido) {
+      ocupado(true, "Confirmando con tu banco…");
+      const C3 = window.Culqi3DS;
+      const alRecibir = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const resp = event.data || {};
+        if (resp.parameters3DS) {
+          window.removeEventListener("message", alRecibir);
+          cobrar({ ...pedido, authentication3DS: resp.parameters3DS });
+        } else if (resp.error) {
+          window.removeEventListener("message", alRecibir);
+          error("Tu banco no confirmó la compra. No se hizo ningún cobro; intenta de nuevo o usa otra tarjeta.");
+          ocupado(false);
+        }
+      };
+      window.addEventListener("message", alRecibir, false);
+      C3.settings = { charge: { totalAmount: plan.montoCentimos, returnUrl: location.href, currency: MONEDA }, card: { email: pedido.email } };
+      C3.options = { showModal: true, showLoading: true, showIcon: true, closeModalAction: () => { ocupado(false); } };
+      C3.initAuthentication(pedido.tokenId);
+    }
+
+    function listo(out, pedido) {
+      const txt = {
+        existente: "Tu plan ya está activo en tu cuenta de Evolv. Entra con tu correo de siempre.",
+        invitada: "Te enviamos un correo a " + pedido.email + " para crear tu contraseña. Al entrar, tu plan ya estará activo.",
+        pendiente: "Estamos activando tu acceso. Si en unas horas no lo ves, escríbenos con el número de operación.",
+      }[out.cuenta] || "";
+      document.getElementById("listoTxt").textContent = txt;
+      const filas = [["Plan", plan.nombre + " (" + plan.periodo + ")"], ["Monto", formatoSoles(plan.montoCentimos)], ["Correo", pedido.email], ["Operación", out.operacion || "—"]];
+      if (out.expiresAt) filas.splice(2, 0, ["Acceso hasta", new Date(out.expiresAt).toLocaleDateString("es-PE", { timeZone: "America/Lima", dateStyle: "long" })]);
+      document.getElementById("listoFilas").innerHTML = filas.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+      document.getElementById("pago").hidden = true;
+      document.getElementById("titulo").textContent = "¡Gracias por tu compra!";
+      const sec = document.getElementById("listo");
+      sec.hidden = false;
+      sec.focus({ preventScroll: true });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  </script>
+</body>
+</html>

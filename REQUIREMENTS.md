@@ -2214,3 +2214,19 @@ Dos botones de registro compitiendo, jerarquía confusa con la tarjeta «Menú o
 
 ### Verificación sugerida
 Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gramos desde él, recarga y totales; regresión del botón secundario y de los registros de Hoy. Detector Impeccable y release gate.
+
+## REQ-331 - Tienda: datos del comercio y páginas legales propias
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. Datos del titular (Sathya Bernedo Llerena, RUC 10758585960) cargados en `tienda/comercio.js` el 2026-11-02.
+
+## REQ-332 - Tienda: Libro de Reclamaciones virtual integrado
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. `supabase/tienda_culqi.sql` aplicado en producción por Jonathan (2026-11-02).
+
+## REQ-333 - Tienda: planes en soles con imagen y botón Comprar, sin cerrar la beta
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/tienda.spec.js`.
+
+## REQ-334 - Tienda: pago con tarjeta por Culqi (pago único, 3DS, acceso por correo)
+
+**Estado: implementado — requiere acción humana** (llaves de Culqi en Vercel; ver `CULQI_SETUP.md`). Detalle en `docs/requirements-history.md`. ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda.spec.js`.

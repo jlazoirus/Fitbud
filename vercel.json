@@ -15,6 +15,42 @@
     {
       "source": "/beta",
       "destination": "/beta-reclutamiento.html"
+    },
+    {
+      "source": "/planes",
+      "destination": "/planes/index.html"
+    },
+    {
+      "source": "/pago",
+      "destination": "/pago/index.html"
+    },
+    {
+      "source": "/terminos",
+      "destination": "/terminos/index.html"
+    },
+    {
+      "source": "/devoluciones",
+      "destination": "/devoluciones/index.html"
+    },
+    {
+      "source": "/privacidad",
+      "destination": "/privacidad/index.html"
+    },
+    {
+      "source": "/contacto",
+      "destination": "/contacto/index.html"
+    },
+    {
+      "source": "/libro-de-reclamaciones",
+      "destination": "/libro-de-reclamaciones/index.html"
+    },
+    {
+      "source": "/api/culqi-charge",
+      "destination": "/api/checkout?op=culqi"
+    },
+    {
+      "source": "/api/reclamaciones",
+      "destination": "/api/checkout?op=reclamaciones"
     }
   ],
   "crons": [

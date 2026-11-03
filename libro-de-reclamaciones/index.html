@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Libro de Reclamaciones · Evolv</title>
+  <meta name="description" content="Libro de Reclamaciones virtual de Evolv, conforme al Código de Protección y Defensa del Consumidor.">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=3">
+</head>
+<body>
+  <header id="t-header"></header>
+  <main class="wrap narrow">
+    <h1>Libro de Reclamaciones</h1>
+    <p class="lead">Conforme a lo establecido en el Código de Protección y Defensa del Consumidor, contamos con un Libro de Reclamaciones a tu disposición.</p>
+
+    <div class="hoja" style="margin:20px 0">
+      <dl>
+        <dt>Proveedor</dt><dd data-comercio="razonSocial"></dd>
+        <dt>RUC</dt><dd data-comercio="ruc"></dd>
+        <dt>Domicilio</dt><dd data-comercio="direccion"></dd>
+        <dt>Fecha</dt><dd id="hoy"></dd>
+      </dl>
+    </div>
+
+    <form id="libro" class="form" novalidate>
+      <fieldset>
+        <legend>1. Identificación del consumidor reclamante</legend>
+        <div class="field"><label for="nombre">Nombre completo <span class="req">*</span></label><input id="nombre" name="nombre" autocomplete="name" required maxlength="160"></div>
+        <div class="dos">
+          <div class="field"><label for="tipoDocumento">Tipo de documento <span class="req">*</span></label>
+            <select id="tipoDocumento" name="tipoDocumento" required><option value="DNI">DNI</option><option value="CE">Carné de extranjería</option><option value="Pasaporte">Pasaporte</option><option value="RUC">RUC</option></select></div>
+          <div class="field"><label for="numeroDocumento">Número de documento <span class="req">*</span></label><input id="numeroDocumento" name="numeroDocumento" required maxlength="20" autocomplete="off"></div>
+        </div>
+        <div class="field"><label for="domicilio">Domicilio</label><input id="domicilio" name="domicilio" autocomplete="street-address" maxlength="240"></div>
+        <div class="dos">
+          <div class="field"><label for="telefono">Teléfono</label><input id="telefono" name="telefono" type="tel" autocomplete="tel" maxlength="30"></div>
+          <div class="field"><label for="email">Correo electrónico</label><input id="email" name="email" type="email" autocomplete="email" maxlength="160"></div>
+        </div>
+        <p class="hint">Déjanos al menos un medio para responderte: correo, teléfono o domicilio. Si dejas tu correo, te enviamos una copia de esta hoja.</p>
+        <label class="check"><input type="checkbox" id="menorEdad" name="menorEdad"><span>Soy menor de edad</span></label>
+        <div class="field" id="apoderadoField" hidden><label for="apoderado">Nombre del padre, madre o apoderado <span class="req">*</span></label><input id="apoderado" name="apoderado" maxlength="160"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>2. Identificación del bien contratado</legend>
+        <div class="radios" role="radiogroup" aria-label="Tipo de bien">
+          <label><input type="radio" name="bienTipo" value="servicio" checked>Servicio</label>
+          <label><input type="radio" name="bienTipo" value="producto">Producto</label>
+        </div>
+        <div class="field"><label for="bienDescripcion">Descripción <span class="req">*</span></label><input id="bienDescripcion" name="bienDescripcion" required maxlength="300" placeholder="Ej.: Plan mensual de Evolv comprado el 2 de noviembre"></div>
+        <div class="field"><label for="montoReclamado">Monto reclamado (S/)</label><input id="montoReclamado" name="montoReclamado" inputmode="decimal" maxlength="12" placeholder="0.00"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>3. Detalle de la reclamación y pedido del consumidor</legend>
+        <div class="radios" role="radiogroup" aria-label="Tipo de reclamación">
+          <label><input type="radio" name="tipo" value="reclamo" checked>Reclamo</label>
+          <label><input type="radio" name="tipo" value="queja">Queja</label>
+        </div>
+        <p class="hint"><b>Reclamo:</b> disconformidad relacionada a los productos o servicios. <b>Queja:</b> disconformidad no relacionada a los productos o servicios, o malestar o descontento respecto a la atención al público.</p>
+        <div class="field"><label for="detalle">Detalle <span class="req">*</span></label><textarea id="detalle" name="detalle" required maxlength="3000"></textarea></div>
+        <div class="field"><label for="pedido">Pedido <span class="req">*</span></label><textarea id="pedido" name="pedido" required maxlength="1500" style="min-height:90px"></textarea></div>
+      </fieldset>
+
+      <div style="position:absolute;left:-9999px" aria-hidden="true"><label for="website">No llenar</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+
+      <p class="hint">La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI. El proveedor deberá dar respuesta al reclamo en un plazo no mayor a quince (15) días hábiles improrrogables.</p>
+      <div id="resultado" class="alerta error" role="alert" hidden></div>
+      <button id="enviar" class="btn btn-accent btn-block" type="submit">Enviar hoja de reclamación</button>
+    </form>
+
+    <section id="emitida" hidden tabindex="-1">
+      <div class="alerta ok" style="margin:8px 0 16px">Registramos tu hoja <b id="codigo"></b>. Te responderemos en un plazo máximo de 15 días hábiles. <span id="copiaTxt"></span></div>
+      <div class="hoja"><dl id="filas"></dl></div>
+      <div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <button class="btn" type="button" onclick="window.print()">Imprimir o guardar en PDF</button>
+        <a class="btn" href="/">Volver al inicio</a>
+      </div>
+    </section>
+  </main>
+  <footer id="t-footer"></footer>
+  <script type="module">
+    import { mountLayout } from "/tienda/layout.js";
+    mountLayout();
+
+    const form = document.getElementById("libro");
+    const resultado = document.getElementById("resultado");
+    const enviar = document.getElementById("enviar");
+    const menor = document.getElementById("menorEdad");
+    document.getElementById("hoy").textContent = new Date().toLocaleDateString("es-PE", { timeZone: "America/Lima", dateStyle: "long" });
+    menor.addEventListener("change", () => { document.getElementById("apoderadoField").hidden = !menor.checked; });
+
+    const CAMPOS = [[/nombre completo/, "nombre"], [/tipo de documento/, "tipoDocumento"], [/número de documento/, "numeroDocumento"], [/correo/, "email"],
+      [/medio para responderte/, "email"], [/apoderado/, "apoderado"], [/producto o servicio contratado/, "bienDescripcion"], [/monto/, "montoReclamado"],
+      [/detalle/, "detalle"], [/pedido/, "pedido"]];
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const fd = new FormData(form);
+      const data = Object.fromEntries(fd.entries());
+      data.menorEdad = menor.checked;
+      resultado.hidden = true;
+      enviar.disabled = true;
+      enviar.textContent = "Enviando…";
+      try {
+        const r = await fetch("/api/reclamaciones", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(data) });
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok || !payload.ok) {
+          mostrarError(payload.error || "No pudimos registrar la hoja. Intenta de nuevo en unos minutos.", r.status === 400);
+          return;
+        }
+        mostrarHoja(payload.hoja);
+      } catch (_) {
+        mostrarError("No hay conexión. Revisa tu internet e intenta de nuevo; lo que escribiste sigue aquí.", false);
+      } finally {
+        enviar.disabled = false;
+        enviar.textContent = "Enviar hoja de reclamación";
+      }
+    });
+
+    function mostrarError(msg, validacion) {
+      resultado.textContent = msg;
+      resultado.hidden = false;
+      const hit = validacion && CAMPOS.find(([re]) => re.test(msg.toLowerCase()));
+      const campo = hit && form.querySelector('[name="' + hit[1] + '"]');
+      if (campo) { campo.scrollIntoView({ behavior: "smooth", block: "center" }); campo.focus({ preventScroll: true }); }
+      else resultado.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function mostrarHoja(hoja) {
+      document.getElementById("codigo").textContent = hoja.codigo;
+      document.getElementById("copiaTxt").textContent = hoja.copiaEnviada ? "Te enviamos una copia a tu correo." : "Guarda o imprime esta hoja como constancia.";
+      const dl = document.getElementById("filas");
+      dl.replaceChildren(...hoja.filas.flatMap(([k, v]) => {
+        const dt = document.createElement("dt"); dt.textContent = k;
+        const dd = document.createElement("dd"); dd.textContent = v; dd.style.whiteSpace = "pre-wrap";
+        return [dt, dd];
+      }));
+      form.hidden = true;
+      const sec = document.getElementById("emitida");
+      sec.hidden = false;
+      sec.scrollIntoView({ behavior: "smooth", block: "start" });
+      sec.focus({ preventScroll: true });
+    }
+  </script>
+</body>
+</html>
