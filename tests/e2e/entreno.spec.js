@@ -497,6 +497,67 @@ test.describe("Última carga", () => {
   });
 });
 
+// REQ-337 (Jonathan): al repetir una rutina, peso y repeticiones vienen
+// precargados en las series, no solo como recordatorio encima.
+test.describe("Series precargadas", () => {
+  test("las series pendientes llegan con lo de la última vez; lo escrito se respeta y al sustituir cambia", async ({ page, context }) => {
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    await expect(app).toContainText(/Qué vas a hacer hoy/);
+
+    // La semana pasada: 2 series del primer ejercicio (8 × 40 kg, 7 × 42.5 kg).
+    await page.evaluate(() => {
+      const step = workoutPrescription(current).steps.find((item) => item.type === "strength");
+      const past = addDays(current, -7);
+      S.days[past] = { ...(S.days[past] || {}), workoutExecution: { status: "completed", steps: [{
+        type: "strength", exerciseSlug: step.exerciseSlug, unit: step.unit,
+        sets: [{ done: true, reps: 8, load: "40", rpe: 8 }, { done: true, reps: 7, load: "42.5", rpe: 9 }],
+      }] } };
+      render();
+    });
+    await startGuidedSession(page);
+    await completeTimedBlock(page);
+
+    const reps = (n) => app.locator(`input[aria-label^="Repeticiones, serie ${n}"]`);
+    const load = (n) => app.locator(`input[aria-label^="Carga o asistencia, serie ${n}"]`);
+    const rpe = (n) => app.locator(`input[aria-label^="Esfuerzo (RPE), serie ${n}"]`);
+    await expect(reps(1)).toHaveValue("8");
+    await expect(load(1)).toHaveValue("40");
+    await expect(reps(2)).toHaveValue("7");
+    await expect(load(2)).toHaveValue("42.5");
+    // Una tercera serie (hoy hay más que la última vez) repite la última; el esfuerzo no se copia.
+    await expect(load(3)).toHaveValue("42.5");
+    await expect(rpe(1)).toHaveValue("");
+
+    // Marcar hecha registra lo precargado.
+    await app.locator("button.set-done").first().click();
+    const firstSet = await page.evaluate(() => normalizedWorkoutExecution(current).steps.find((s) => s.type === "strength").sets[0]);
+    expect([firstSet.done, firstSet.reps, firstSet.load]).toEqual([true, 8, "40"]);
+
+    // Lo que escribe el usuario se queda aunque se vuelva a pintar.
+    await load(2).fill("45");
+    await load(2).blur();
+    await page.evaluate(() => render());
+    await expect(load(2)).toHaveValue("45");
+
+    // Al sustituir el ejercicio (sin historial) lo precargado se limpia; lo escrito se queda.
+    await page.evaluate(() => {
+      const ex = normalizedWorkoutExecution(current);
+      const step = ex.steps.find((s) => s.type === "strength");
+      const other = exerciseCatalog(false).find((e) => e.slug !== step.exerciseSlug && e.discipline !== "walking" && ["gym", "strength", "bodyweight"].includes(e.discipline) && !Object.values(S.days).some((d) => d && d.workoutExecution && (d.workoutExecution.steps || []).some((x) => x.exerciseSlug === e.slug)));
+      applyExerciseSubstitution(current, other.slug);
+    });
+    await expect(load(3)).toHaveValue("");
+    await expect(load(2)).toHaveValue("45");
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
 // REQ-236 (Jonathan): calentamiento y vuelta a la calma no se asignan por defecto.
 test.describe("Bloques opcionales", () => {
   test("'Ahora no' salta calentamiento y vuelta a la calma y la sesión queda completada", async ({ page, context }) => {

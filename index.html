@@ -5949,6 +5949,32 @@ function lastPerformanceHtml(ds,step,exercise){
   const noLoad=!bodyweight&&perf.sets.every(set=>!set.load);
   return `<div class="last-perf"><span class="last-perf-h">Última vez · ${esc(when)}${esc(variation)}</span><b>${esc(lastPerformanceSummary(perf))}</b>${rpe?`<span>${esc(rpe)}</span>`:""}${noLoad?'<span class="last-perf-note">Sin carga anotada</span>':""}</div>`;
 }
+// REQ-337: repeticiones y carga de la última vez como valores reales de cada
+// serie pendiente (no como texto de referencia), editables. La serie N toma la
+// N de la última vez (o la última si ahora hay más). El esfuerzo no se copia.
+// Cada serie recuerda para qué ejercicio se precargó: si se sustituye el
+// ejercicio, lo precargado cambia al del nuevo; lo que escribió el usuario se queda.
+function prefillStepFromLastTime(ds,step){
+  if(!step||step.type!=="strength"||!Array.isArray(step.sets))return false;
+  const slug=step.exerciseSlug;
+  const pending=step.sets.filter(set=>!set.done&&set.prefillFor!==slug);
+  if(!pending.length)return false;
+  const perf=lastWorkoutPerformance(ds,slug);
+  const sameUnit=perf&&(perf.unit||"reps")===(step.unit||"reps");
+  step.sets.forEach((set,index)=>{
+    if(set.done||set.prefillFor===slug)return;
+    const was=set.prefilled||{};
+    if(was.reps)set.reps=null;
+    if(was.load)set.load="";
+    const src=perf&&perf.sets.length?(perf.sets[index]||perf.sets[perf.sets.length-1]):null;
+    const now={};
+    if(src&&sameUnit&&set.reps==null&&src.reps!=null){set.reps=src.reps;now.reps=true;}
+    if(src&&!set.load&&src.load){set.load=src.load;now.load=true;}
+    if(now.reps||now.load)set.prefilled=now;else delete set.prefilled;
+    set.prefillFor=slug;
+  });
+  return true;
+}
 function lastLoadLabel(ds,exerciseSlug){
   const perf=lastWorkoutPerformance(ds,exerciseSlug);
   const loads=perf?perf.sets.map(set=>set.load).filter(Boolean):[];
@@ -6341,6 +6367,7 @@ function saveWorkoutSetField(ds,stepIndex,setIndex,field,value){
   const execution=normalizedWorkoutExecution(ds);if(!execution)return;
   const step=execution.steps[stepIndex],set=step&&step.sets&&step.sets[setIndex];if(!set)return;
   set[field]=field==="load"?String(value||""):((value===""||value==null)?null:Number(value));
+  if(set.prefilled)delete set.prefilled[field]; // REQ-337: lo escrito ya es del usuario
   persistWorkoutExecution(ds,execution,false);
 }
 function toggleWorkoutSet(ds,stepIndex,setIndex){
@@ -6790,6 +6817,8 @@ function renderCurrentWorkoutStep(ds,execution){
       </div>
     </div>`;
   }
+  // REQ-337: al repetir un ejercicio, sus series llegan con lo de la última vez.
+  if(execution.status!=="completed"&&prefillStepFromLastTime(ds,step))persistWorkoutExecution(ds,execution,false);
   const exercise=exerciseBySlug(step.exerciseSlug,true);
   const variation=workoutVariationLabel(step,exercise);
   const others=pendingStrengthStepIndexes(execution,stepIndex);

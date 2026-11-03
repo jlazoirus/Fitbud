@@ -2238,3 +2238,7 @@ Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gr
 ## REQ-336 - Primera semana: el coach trabaja en paralelo y el progreso se ve en la capa de espera
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/semana-rapida.spec.js`.
+
+## REQ-337 - Entreno: las series vienen precargadas con lo de la última vez
+
+**Estado: implementado.** Jonathan (2026-11-03): al repetir una rutina, peso y repeticiones deben venir en los campos, no solo como recordatorio encima. `prefillStepFromLastTime()` copia repeticiones y carga de la última vez (serie a serie; las de más repiten la última) en las series pendientes como valores editables; el esfuerzo no se copia. Lo escrito por el usuario se respeta; al sustituir el ejercicio lo precargado pasa al del nuevo. `CACHE_NAME` → `fitbud-pwa-v205`. ✓ `tests/e2e/entreno.spec.js` (Series precargadas).
