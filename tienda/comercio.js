@@ -11,7 +11,7 @@ export const COMERCIO = {
   ruc: "10758585960",
   direccion: "Av. Arequipa 4856, Miraflores, Lima",
   correo: "hola@evolvapp.club",
-  telefono: "+1 (830) 262-9397",
+  telefono: "+51 962 158 625",
   whatsappUrl: "https://wa.me/18302629397?text=Hola%2C+tengo+una+duda+sobre+Evolv",
   horario: "Lunes a viernes, de 9:00 a 18:00 (hora de Lima)",
   web: "https://evolvapp.club",
