@@ -12743,3 +12743,24 @@ Culqi pidió foto, descripción y precio de cada producto y un flujo de compra c
 
 ### Fuera de alcance
 El paywall dentro de la app (sigue con `/api/catalog`, USD y Stripe sin activar); usuarios beta no ven precios dentro de la app (REQ-208 intacto).
+
+## REQ-334 - Tienda: pago con tarjeta por Culqi (pago único, 3DS, acceso por correo)
+
+**Estado: implementado — requiere acción humana.**
+
+### Origen
+Culqi como pasarela para vender las suscripciones con tarjeta en Perú; el checkout de Stripe (REQ-26) nunca se activó.
+
+### Alcance
+- `/pago?plan=…`: resumen del pedido, correo, nombre, apellido, celular opcional y aceptación de Términos y Devoluciones. Abre Culqi Checkout Custom (`https://js.culqi.com/checkout-js`, solo tarjeta, monto en céntimos) con la llave pública de `/api/config` (`culqi.enabled` solo si existen `CULQI_PUBLIC_KEY` y `CULQI_SECRET_KEY`); sin llaves, avisa y deriva a WhatsApp. Huella de dispositivo con Culqi3DS.
+- `api/culqi-charge.js`: compra sin cuenta (decisión de Jonathan). Cobra el monto de `tienda/planes.js`, nunca el del navegador. La documentación de Culqi contradice el código HTTP de 3DS, así que se decide por el cuerpo: `object: "charge"` = pagado, `action_code: "REVIEW"` = autenticar con `Culqi3DS.initAuthentication()` y reintentar con `authentication_3DS`. Pagado: busca la cuenta por correo (perfil o Auth) o la invita (`/auth/v1/invite`, regreso a `/?auth=invite`), suma los días desde el vencimiento vigente (`user_entitlements`, `origin: checkout`, `payment_ref` = id del cargo, idempotente), registra en `billing_events` con `provider = 'culqi'` y envía el recibo. Si falla algo después de cobrar, nunca muestra error: responde `cuenta: "pendiente"` y deja el evento `failed` para resolverlo a mano.
+- El registro público sigue cerrado: solo quien paga recibe invitación.
+
+### Fuera de alcance
+Reembolsos automáticos (se hacen en CulqiPanel y el acceso se revoca a mano), Yape y otros medios, comprobantes electrónicos SUNAT, webhook de Culqi.
+
+### Pendiente humano
+Ver `CULQI_SETUP.md`: datos del comercio, SQL, llaves en Vercel, prueba con tarjeta de prueba y reenvío a Culqi.
+
+### Verificación
+`scripts/test-tienda-culqi.mjs` (catálogo, cuerpo del cargo, precio del servidor, cuenta existente, días sumados, invitación, 3DS, rechazo, falla tras cobro, Libro y SQL con PGlite) y `tests/e2e/tienda.spec.js` con Culqi simulado.

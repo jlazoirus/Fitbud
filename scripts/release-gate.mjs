@@ -163,6 +163,7 @@ run("supabase/validate.mjs (recetas y macros)", "node supabase/validate.mjs");
 run("validate-migrations.mjs", "node scripts/validate-migrations.mjs");
 run("test-referrals.mjs (PostgreSQL y campaña)", "node scripts/test-referrals.mjs");
 run("test-streak-friends.mjs (PostgreSQL/RLS)", "node scripts/test-streak-friends.mjs");
+run("test-tienda-culqi.mjs (tienda, Culqi y Libro de Reclamaciones)", "node scripts/test-tienda-culqi.mjs");
 
 // ── Auditorías de seguridad y calidad ───────────────────────────────────────
 console.log("\n[ Seguridad y calidad ]");

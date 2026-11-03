@@ -25,5 +25,11 @@ export default function handler(req, res) {
       // checkout no esta configurado, en vez de dejarlos fallar en /api/checkout.
       enabled: !!process.env.STRIPE_SECRET_KEY,
     },
+    culqi: {
+      // REQ-334: la llave pública de Culqi es pública por diseño (tokeniza la
+      // tarjeta en el navegador); la secreta solo vive en /api/culqi-charge.
+      publicKey: process.env.CULQI_PUBLIC_KEY || "",
+      enabled: !!process.env.CULQI_PUBLIC_KEY && !!process.env.CULQI_SECRET_KEY,
+    },
   });
 }

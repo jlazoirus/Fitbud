@@ -2226,3 +2226,7 @@ Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gr
 ## REQ-333 - Tienda: planes en soles con imagen y botón Comprar, sin cerrar la beta
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/tienda.spec.js`.
+
+## REQ-334 - Tienda: pago con tarjeta por Culqi (pago único, 3DS, acceso por correo)
+
+**Estado: implementado — requiere acción humana** (llaves de Culqi en Vercel y SQL en producción; ver `CULQI_SETUP.md`). Detalle en `docs/requirements-history.md`. ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda.spec.js`.
