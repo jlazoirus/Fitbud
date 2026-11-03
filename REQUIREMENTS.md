@@ -2266,3 +2266,9 @@ Cada plan muestra comidas, entreno o progreso además de su duración. ✓ `scri
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Términos y devoluciones siguen las secciones de las guías de Culqi; WhatsApp vuelve a enlazar. ✓ `tests/e2e/tienda.spec.js`.
+
+## REQ-344 - Tienda: Libro de Reclamaciones con todo lo que pide Culqi
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Contacto del proveedor, declaración jurada como firma, quién recibe y respuesta del proveedor en la hoja. ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda.spec.js`.

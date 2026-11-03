@@ -150,6 +150,10 @@ test.describe("Tienda web (Culqi)", () => {
     await page.goto("/libro-de-reclamaciones/");
     await expect(page.locator("h1")).toHaveText("Libro de Reclamaciones");
     await expect(page.locator("#libro")).toContainText("quince (15) días hábiles");
+    // REQ-344: contacto del proveedor y aviso del plazo junto al ícono del pie.
+    await expect(page.locator('.hoja [data-comercio="telefono"]')).not.toBeEmpty();
+    await expect(page.locator('.hoja [data-comercio="correo"]')).toHaveAttribute("href", /^mailto:/);
+    await expect(page.locator("#t-footer .libro-nota")).toContainText("15 días hábiles");
     await page.getByLabel("Nombre completo").fill("Ana Pérez");
     await page.getByLabel("Número de documento").fill("12345678");
     await page.getByLabel("Descripción").fill("Plan mensual");
@@ -161,10 +165,11 @@ test.describe("Tienda web (Culqi)", () => {
     await expect(page.locator("#email")).toBeFocused();
 
     await page.getByLabel("Teléfono").fill("999888777");
+    await page.getByLabel(/Declaro bajo juramento/).check();
     await page.getByRole("button", { name: "Enviar hoja de reclamación" }).click();
     await expect(page.locator("#emitida")).toContainText("EVOLV-LR-000007");
     await expect(page.locator("#emitida")).toContainText("Guarda o imprime esta hoja");
-    expect(sent).toMatchObject({ tipo: "queja", tipoDocumento: "DNI", numeroDocumento: "12345678", telefono: "999888777", menorEdad: false });
+    expect(sent).toMatchObject({ tipo: "queja", tipoDocumento: "DNI", numeroDocumento: "12345678", telefono: "999888777", menorEdad: false, conformidad: true });
     // El 400 de la validación simulada es esperado; ningún otro error.
     expect(errors.filter((e) => !/status of 400/.test(e))).toEqual([]);
   });

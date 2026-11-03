@@ -23,6 +23,8 @@
         <dt>Proveedor</dt><dd data-comercio="razonSocial"></dd>
         <dt>RUC</dt><dd data-comercio="ruc"></dd>
         <dt>Domicilio</dt><dd data-comercio="direccion"></dd>
+        <dt>Teléfono</dt><dd><a data-comercio="telefono"></a></dd>
+        <dt>Correo</dt><dd><a data-comercio="correo"></a></dd>
         <dt>Fecha</dt><dd id="hoy"></dd>
       </dl>
     </div>
@@ -69,6 +71,7 @@
 
       <div style="position:absolute;left:-9999px" aria-hidden="true"><label for="website">No llenar</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
 
+      <label class="check"><input type="checkbox" id="conformidad" name="conformidad"><span>Declaro bajo juramento que los datos de esta hoja son verdaderos. Esta declaración reemplaza mi firma. <span class="req">*</span></span></label>
       <p class="hint">La formulación del reclamo no impide acudir a otras vías de solución de controversias ni es requisito previo para interponer una denuncia ante el INDECOPI. El proveedor deberá dar respuesta al reclamo en un plazo no mayor a quince (15) días hábiles improrrogables.</p>
       <div id="resultado" class="alerta error" role="alert" hidden></div>
       <button id="enviar" class="btn btn-accent btn-block" type="submit">Enviar hoja de reclamación</button>
@@ -97,13 +100,14 @@
 
     const CAMPOS = [[/nombre completo/, "nombre"], [/tipo de documento/, "tipoDocumento"], [/número de documento/, "numeroDocumento"], [/correo/, "email"],
       [/medio para responderte/, "email"], [/apoderado/, "apoderado"], [/producto o servicio contratado/, "bienDescripcion"], [/monto/, "montoReclamado"],
-      [/detalle/, "detalle"], [/pedido/, "pedido"]];
+      [/detalle/, "detalle"], [/pedido/, "pedido"], [/declaración jurada/, "conformidad"]];
 
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const fd = new FormData(form);
       const data = Object.fromEntries(fd.entries());
       data.menorEdad = menor.checked;
+      data.conformidad = document.getElementById("conformidad").checked;
       resultado.hidden = true;
       enviar.disabled = true;
       enviar.textContent = "Enviando…";

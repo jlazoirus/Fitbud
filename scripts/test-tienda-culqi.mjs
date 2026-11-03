@@ -187,7 +187,7 @@ assert.equal(r.statusCode, 503);
 process.env.CULQI_SECRET_KEY = "sk_test_mock";
 
 // ── /api/reclamaciones ─────────────────────────────────────────────────────────
-const hoja = { tipo: "reclamo", nombre: "Ana Pérez", tipoDocumento: "DNI", numeroDocumento: "12345678", email: "ana@example.com", bienDescripcion: "Plan mensual", montoReclamado: "29,90", detalle: "Me cobraron dos veces el plan.", pedido: "Devolver el cobro duplicado." };
+const hoja = { tipo: "reclamo", nombre: "Ana Pérez", tipoDocumento: "DNI", numeroDocumento: "12345678", email: "ana@example.com", bienDescripcion: "Plan mensual", montoReclamado: "29,90", detalle: "Me cobraron dos veces el plan.", pedido: "Devolver el cobro duplicado.", conformidad: true };
 let h = parseHoja(hoja);
 assert.deepEqual(h.errors, []);
 assert.equal(h.data.montoReclamado, 29.9);
@@ -197,11 +197,16 @@ assert.match(parseHoja({ ...hoja, email: "" }).errors[0], /al menos un medio/);
 assert.match(parseHoja({ ...hoja, menorEdad: true }).errors[0], /apoderado/);
 assert.match(parseHoja({ ...hoja, tipo: "otro" }).errors[0], /reclamo o una queja/);
 assert.match(parseHoja({ ...hoja, numeroDocumento: "12" }).errors[0], /documento/);
+// REQ-344: sin la declaración jurada (firma del consumidor) no se registra.
+assert.match(parseHoja({ ...hoja, conformidad: false }).errors[0], /declaración jurada/);
 
 const filas = hojaRows({ codigo: "EVOLV-LR-000001", created_at: "2026-11-02T15:00:00Z", nombre: "Ana", tipo_documento: "DNI", numero_documento: "1", bien_tipo: "servicio", bien_descripcion: "Plan", monto_reclamado: null, tipo: "queja", detalle: "d", pedido: "p", menor_edad: false });
 assert.deepEqual(filas[0], ["Hoja N.°", "EVOLV-LR-000001"]);
 assert.ok(filas.some(([k, v]) => k === "Proveedor" && v.includes(COMERCIO.ruc)), "la hoja identifica al proveedor con su RUC");
 assert.ok(filas.some(([k, v]) => k === "Tipo" && v === "Queja"));
+assert.ok(filas.some(([k, v]) => k === "Contacto del proveedor" && v.includes(COMERCIO.telefono) && v.includes(COMERCIO.correo)), "la hoja trae teléfono y correo del proveedor");
+assert.ok(filas.some(([k]) => k === "Firma del consumidor") && filas.some(([k]) => k === "Recibido por"), "firma del consumidor y de quien recibe");
+assert.match(filas.find(([k]) => k === "Observaciones y acciones adoptadas por el proveedor")[1], /15 días hábiles/);
 
 const mails = [];
 let inserted = null;
@@ -221,6 +226,7 @@ assert.equal(r.statusCode, 201);
 assert.equal(r.payload.hoja.codigo, "EVOLV-LR-000001");
 assert.equal(r.payload.hoja.copiaEnviada, true);
 assert.equal(inserted.monto_reclamado, 29.9);
+assert.equal("conformidad" in inserted, false, "la declaración no necesita columna nueva en libro_reclamaciones");
 assert.deepEqual(mails.map((m) => m.to), ["ana@example.com", ["admin@evolv.test"]], "copia al consumidor y aviso al comercio");
 r = res();
 await reclamaciones(req({ ...hoja, website: "bot" }), r);

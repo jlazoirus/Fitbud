@@ -13002,3 +13002,33 @@ Cobro recurrente automático: la tienda sigue con pago único por período (REQ-
 
 - Términos y devoluciones muestran cada sección de la guía de Culqi, con RUC y horario cargados desde `tienda/comercio.js`. ✓ `tests/e2e/tienda.spec.js`.
 - WhatsApp en `/terminos`, `/devoluciones` y `/contacto` enlaza a `wa.me`, y el botón de reembolso abre un correo con asunto. ✓ `tests/e2e/tienda.spec.js`.
+
+## REQ-344 - Tienda: Libro de Reclamaciones con todo lo que pide Culqi
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión de Culqi a `evolvapp.club` (2026-11-03), contrastada con su guía "¿Qué datos debe incluir el libro de reclamaciones alojado en mi web o app?". A la hoja de REQ-332 le faltaban el teléfono y el correo del proveedor, las firmas (del consumidor y de quien recibe) y el espacio para la respuesta del proveedor.
+
+### Alcance
+
+1. `/libro-de-reclamaciones`:
+   - el bloque del proveedor muestra teléfono y correo;
+   - la casilla obligatoria "Declaro bajo juramento que los datos de esta hoja son verdaderos. Esta declaración reemplaza mi firma." hace de firma del consumidor en la hoja virtual. Si falta, el servidor la rechaza y la página lleva el foco a la casilla.
+2. `hojaRows()` (pantalla y copias por correo) agrega:
+   - "Contacto del proveedor";
+   - "Firma del consumidor" (declaración jurada aceptada);
+   - "Recibido por" (titular, en el Libro virtual);
+   - "Observaciones y acciones adoptadas por el proveedor": la respuesta, o "Pendiente" con el plazo.
+3. Pie de la tienda: junto al ícono del Libro, un aviso con el plazo de respuesta.
+4. Sin migración: la declaración no se guarda en columna propia, porque una hoja no se registra sin ella.
+
+### Decisiones
+
+El plazo se mantiene en **15 días hábiles improrrogables** (D.S. N.° 101-2022-PCM, que modificó el reglamento del Libro de Reclamaciones). La guía de Culqi aún cita los 30 días calendario de la norma anterior; 15 días hábiles son menos, así que cumple con ambos.
+
+### Criterios de aceptación
+
+- Sin la declaración jurada, `parseHoja` devuelve el error; la hoja emitida trae contacto del proveedor, firma, quién recibe y respuesta pendiente; el insert no lleva columnas nuevas. ✓ `scripts/test-tienda-culqi.mjs`.
+- La página muestra teléfono y correo del proveedor, el aviso del pie menciona el plazo y la hoja se envía con `conformidad: true`. ✓ `tests/e2e/tienda.spec.js`.
