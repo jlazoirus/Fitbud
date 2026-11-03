@@ -2218,3 +2218,7 @@ Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gr
 ## REQ-331 - Tienda: datos del comercio y páginas legales propias
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. Pendiente humano: reemplazar los marcadores `[COMPLETAR…]` de `tienda/comercio.js` con los datos del titular inscrito en Culqi (ver `CULQI_SETUP.md`).
+
+## REQ-332 - Tienda: Libro de Reclamaciones virtual integrado
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. Pendiente humano: ejecutar `supabase/tienda_culqi.sql` en producción.

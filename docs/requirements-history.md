@@ -12714,3 +12714,19 @@ Revisión legal profesional (REQ-49), emisión de comprobantes electrónicos.
 
 ### Verificación
 `scripts/test-tienda-culqi.mjs` (páginas, rutas, pie con Libro) y `tests/e2e/tienda.spec.js`. El detector Impeccable marcaba contraste bajo porque su análisis estático asume fondo blanco; el contraste real se verificó en navegador sobre `#101010` y la excepción quedó acotada a las páginas de la tienda en `.impeccable/config.json`.
+
+## REQ-332 - Tienda: Libro de Reclamaciones virtual integrado
+
+**Estado: implementado.**
+
+### Origen
+Requisito de Culqi: Libro de Reclamaciones integrado en la web según INDECOPI, sin depender de formularios, enlaces ni archivos externos. Se evaluó la herramienta gratuita «Tu Libro de Reclamaciones» de Indecopi: genera un enlace externo, que el requisito de Culqi excluye; se puede usar aparte.
+
+### Alcance
+`/libro-de-reclamaciones`: hoja con identificación del proveedor y fecha, consumidor (nombre, documento, domicilio, teléfono, correo, apoderado si es menor), bien contratado y monto, reclamo o queja con sus definiciones, detalle, pedido y las leyendas obligatorias. Basta un medio de contacto: INDECOPI sancionó exigir correo y domicilio a la vez (Res. Final 0187-2025). `api/reclamaciones.js` valida, guarda en `libro_reclamaciones` (numeración correlativa, código `EVOLV-LR-000001`, RLS sin políticas: solo service role), muestra la hoja emitida para imprimir y envía la copia al consumidor y el aviso al comercio (`RECLAMOS_NOTIFY_EMAIL` o admins activos) por Resend. Campo trampa contra bots. Ícono del aviso en el pie de todas las páginas y en la portada.
+
+### Fuera de alcance
+Vista de admin para responder (se responde por el medio indicado y se registra en la tabla); conservación automática más allá de la tabla.
+
+### Pendiente humano
+Ejecutar `supabase/tienda_culqi.sql` en producción antes de reenviar a Culqi.
