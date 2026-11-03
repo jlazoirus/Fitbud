@@ -2230,3 +2230,11 @@ Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gr
 ## REQ-334 - Tienda: pago con tarjeta por Culqi (pago único, 3DS, acceso por correo)
 
 **Estado: implementado — requiere acción humana** (llaves de Culqi en Vercel; ver `CULQI_SETUP.md`). Detalle en `docs/requirements-history.md`. ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda.spec.js`.
+
+## REQ-335 - Primera semana: "Otra actividad" o deporte en días de gimnasio ya no bloquean el entreno
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/semana-otra-actividad.spec.js`.
+
+## REQ-336 - Primera semana: el coach trabaja en paralelo y el progreso se ve en la capa de espera
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/semana-rapida.spec.js`.

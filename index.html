@@ -336,6 +336,8 @@
   .coach-busy[hidden]{display:none}
   .coach-busy-card{background:var(--surf2);border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:22px 20px;max-width:320px;width:100%;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center}
   .coach-busy-card .spinner{width:34px;height:34px}
+  .coach-busy-detail{font-size:14px;color:var(--txt);font-variant-numeric:tabular-nums}
+  .coach-busy-detail:empty{display:none}
   .temp-pass{font-family:var(--font-mono);font-size:20px;font-weight:700;letter-spacing:.04em;margin:8px 0;user-select:all}
   .welcome-msg{white-space:pre-wrap;font:inherit;font-size:12px;color:var(--muted);margin:6px 0 0;user-select:all}
   .domain-move{position:fixed;left:12px;right:12px;top:calc(10px + var(--safe-top));z-index:180;max-width:540px;margin:0 auto;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:var(--r-md);background:var(--surf2);border:1px solid var(--border-acc);font-size:13px;color:var(--muted)}
@@ -4032,6 +4034,7 @@ function firstWeekSetupStatusHtml(state){
 }
 function renderFirstWeekSetup(state){
   const s=state||{};
+  setCoachBusyDetail(s.message);
   $("#tabs").innerHTML="";
   $("#app").innerHTML=`<div class="onboarding">
     <div class="onboarding-brand">EVOLV · TU PLAN</div>
@@ -4050,6 +4053,27 @@ function deterministicDaysForWeek(week,days){
 function firstWeekLabel(week){
   return week&&week.num?("Semana "+week.num):"Semana de arranque";
 }
+// REQ-336: la primera semana pide al coach 7 días de comidas y hasta 10 semanas
+// de entreno. En serie eran minutos con un spinner fijo; ahora van en paralelo
+// (hasta FIRST_WEEK_COACH_CONCURRENCY a la vez) y ninguna parte nueva empieza
+// pasado FIRST_WEEK_COACH_START_BUDGET_MS: la que no empieza usa la alternativa
+// validada del catálogo, igual que si el coach hubiera fallado.
+const FIRST_WEEK_COACH_CONCURRENCY=4;
+const FIRST_WEEK_COACH_START_BUDGET_MS=60000;
+async function runFirstWeekCoachParts(count,task){
+  const results=new Array(count);
+  const started=Date.now();
+  let next=0;
+  const worker=async()=>{
+    while(next<count&&Date.now()-started<FIRST_WEEK_COACH_START_BUDGET_MS){
+      const index=next++;
+      try{results[index]={ok:true,value:await task(index)};}
+      catch(error){results[index]={ok:false,error};}
+    }
+  };
+  await Promise.all(Array.from({length:Math.min(FIRST_WEEK_COACH_CONCURRENCY,count)},worker));
+  return results;
+}
 async function prepareFirstWeekNutrition(ds,setup){
   const week=firstWeekForDate(ds);
   if(!week)return{ok:false,daysData:[],problems:["La semana inicial está fuera del plan."]};
@@ -4064,15 +4088,22 @@ async function prepareFirstWeekNutrition(ds,setup){
     const requestId=beginCoachAction(actionKey);
     if(requestId){
       try{
-        for(let i=0;i<days.length;i++){
+        let finished=0;
+        if(setup){setup.message=`Preparando comidas: 0 de ${days.length} días`;renderFirstWeekSetup(setup);}
+        const results=await runFirstWeekCoachParts(days.length,async i=>{
+          const out=await generateOneDay(days[i],{action:"diet_week",requestId,partKey:"day-"+(i+1)});
+          finished++;
+          if(setup){setup.message=`Preparando comidas: ${finished} de ${days.length} días`;renderFirstWeekSetup(setup);}
+          return out;
+        });
+        results.forEach((result,i)=>{
           const day=days[i];
-          if(setup){setup.message=`Preparando comidas: día ${i+1} de ${days.length}`;renderFirstWeekSetup(setup);}
-          try{
-            const {res}=await generateOneDay(day,{action:"diet_week",requestId,partKey:"day-"+(i+1)});
-            if(res&&res.ok&&Array.isArray(res.comidas)&&res.comidas.length)daysData.push({ds:day,comidas:res.comidas});
-            else problems.push(prettyDate(day)+": "+((res&&res.issues&&res.issues[0])||"no válido"));
-          }catch(e){problems.push(prettyDate(day)+": "+coachErrorMessage(e));}
-        }
+          if(!result)return; // no empezó a tiempo: lo completa el catálogo
+          if(!result.ok){problems.push(prettyDate(day)+": "+coachErrorMessage(result.error));return;}
+          const res=result.value&&result.value.res;
+          if(res&&res.ok&&Array.isArray(res.comidas)&&res.comidas.length)daysData.push({ds:day,comidas:res.comidas});
+          else problems.push(prettyDate(day)+": "+((res&&res.issues&&res.issues[0])||"no válido"));
+        });
       }finally{endCoachAction(actionKey);}
     }
   }
@@ -4110,27 +4141,40 @@ async function prepareFirstWeekTraining(setup){
   const weeks=[];const warnings=[];
   let fallbackOnly=!aiAvailable();
   try{
-    for(let index=0;index<expectedWeeks.length;index++){
+    // REQ-336: semanas en paralelo; una semana que falla (o no empieza a tiempo)
+    // usa la alternativa del catálogo y las siguientes ya no esperan al coach.
+    let finished=0;
+    const total=expectedWeeks.length;
+    if(setup){setup.message=`Preparando entrenamiento: 0 de ${total} semanas`;renderFirstWeekSetup(setup);}
+    const results=await runFirstWeekCoachParts(total,async index=>{
       const expected=expectedWeeks[index];
-      if(setup){setup.message=`Preparando entrenamiento: semana ${index+1} de ${expectedWeeks.length}`;renderFirstWeekSetup(setup);}
-      let result;
+      let result,warn=false;
       if(trialFirstWeekOnly&&index>0){
         result=await generateTrainingWeek(expected,prefs,{fallbackOnly:true});
-        warnings.push(`semana ${expected.week}`);
-        weeks.push(result.week);
-        continue;
+        warn=true;
+      }else{
+        try{
+          result=await generateTrainingWeek(expected,prefs,{
+            action:"training_plan",requestId,partKey:`week-${expected.week}`,fallbackOnly,
+          });
+          if(!result.ok)throw new Error(result.issues[0]||"La semana no pasó las validaciones.");
+        }catch(error){
+          fallbackOnly=true;
+          result=await generateTrainingWeek(expected,prefs,{fallbackOnly:true});
+          warn=true;
+        }
       }
-      try{
-        result=await generateTrainingWeek(expected,prefs,{
-          action:"training_plan",requestId,partKey:`week-${expected.week}`,fallbackOnly,
-        });
-        if(!result.ok)throw new Error(result.issues[0]||"La semana no pasó las validaciones.");
-      }catch(error){
-        fallbackOnly=true;
-        result=await generateTrainingWeek(expected,prefs,{fallbackOnly:true});
-        warnings.push(`semana ${expected.week}`);
-      }
-      weeks.push(result.week);
+      finished++;
+      if(setup){setup.message=`Preparando entrenamiento: ${finished} de ${total} semanas`;renderFirstWeekSetup(setup);}
+      return {result,warn};
+    });
+    for(let index=0;index<total;index++){
+      const expected=expectedWeeks[index];
+      let done=results[index]&&results[index].ok?results[index].value:null;
+      // No empezó a tiempo (o falló hasta la alternativa): semana del catálogo.
+      if(!done)done={result:await generateTrainingWeek(expected,prefs,{fallbackOnly:true}),warn:true};
+      if(done.warn)warnings.push(`semana ${expected.week}`);
+      weeks.push(done.result.week);
     }
   }finally{endCoachAction(actionKey);}
   const plan={
@@ -11890,6 +11934,14 @@ function coachBusyLabel(key){
 }
 let _coachBusyDepth=0;
 let _coachBusyWatchdog=null;
+// REQ-336: progreso visible dentro de la capa ("Preparando comidas: 3 de 7 días");
+// antes la capa tapaba el contador y la espera parecía colgada.
+let _coachBusyDetail="";
+function setCoachBusyDetail(text){
+  _coachBusyDetail=String(text||"");
+  const el=document.querySelector("#coach-busy .coach-busy-detail");
+  if(el)el.textContent=_coachBusyDetail;
+}
 // Salvaguarda: si algún camino no cerrara la acción, la app no queda bloqueada.
 const COACH_BUSY_MAX_MS=240000;
 function coachBusy(){return _coachBusyDepth>0;}
@@ -11901,7 +11953,7 @@ function showCoachBusy(action){
     el.setAttribute("role","alertdialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-live","polite");
     document.body.appendChild(el);
   }
-  el.innerHTML=`<div class="coach-busy-card"><div class="spinner"></div><b>${esc(coachBusyLabel(action))}</b><div class="muted small">Puede tardar unos segundos. No cierres la app.</div></div>`;
+  el.innerHTML=`<div class="coach-busy-card"><div class="spinner"></div><b>${esc(coachBusyLabel(action))}</b><div class="coach-busy-detail" aria-live="polite">${esc(_coachBusyDetail)}</div><div class="muted small">Puede tardar unos segundos. No cierres la app.</div></div>`;
   el.hidden=false;
   clearTimeout(_coachBusyWatchdog);
   _coachBusyWatchdog=setTimeout(()=>{
@@ -11913,6 +11965,7 @@ function showCoachBusy(action){
 function hideCoachBusy(){
   _coachBusyDepth=Math.max(0,_coachBusyDepth-1);
   if(!_coachBusyDepth){
+    _coachBusyDetail="";
     clearTimeout(_coachBusyWatchdog);
     const el=document.getElementById("coach-busy");if(el)el.hidden=true;
   }
@@ -12164,8 +12217,10 @@ function allowedExercisesForSession(spec,prefs,catalog){
     if(!exerciseLevelAllowed(exercise,prefs.trainingExperience))return false;
     if(exerciseConflictsWithProfile(exercise,prefs))return false;
     if(isGentleTrainingPlan(prefs)&&exerciseBlockedByGentleMode(exercise))return false;
+    // REQ-335: el lugar del día es donde se hace la fuerza; el deporte se hace
+    // donde corresponde (correr fuera o en cinta, nadar en piscina).
     const places=exerciseArray(exercise.places);
-    if(places.length&&!places.includes(spec.location))return false;
+    if(strength&&places.length&&!places.includes(spec.location))return false;
     if(strength){
       const disciplines=prefs.strengthMode==="bodyweight"
         ?new Set(["bodyweight","strength"])
@@ -12176,6 +12231,7 @@ function allowedExercisesForSession(spec,prefs,catalog){
     return exercise.discipline===prefs.primarySport&&(!cardioRoleIds||cardioRoleIds.has(exercise.slug));
   });
 }
+const TRAINING_CATALOG_SPORTS=new Set(["walking","running","cycling","swimming"]);
 function trainingExpectedWeeks(prefs){
   const p=migrateProfilePrefs(prefs||((profile&&profile.prefs)||{}));
   const training=trainingPrefsFromPrefs(p);
@@ -12192,6 +12248,10 @@ function trainingExpectedWeeks(prefs){
       if(!training.dayIds.includes(weekday))continue;
       const role=schedule[weekday];
       const type=strengthRoles.has(role)?"strength":training.primary;
+      // REQ-335: un día de "Otra actividad" (pádel, fútbol…) o de descanso no
+      // tiene ejercicios del catálogo: queda fuera del plan generado y el día
+      // muestra la actividad libre o el descanso de siempre.
+      if(type!=="strength"&&(role==="descanso"||!TRAINING_CATALOG_SPORTS.has(type)))continue;
       const spec={date,weekday,location:training.locations[weekday],role,type};
       spec.allowedExerciseIds=allowedExercisesForSession(spec,planPrefs,catalog).map(exercise=>exercise.slug);
       sessions.push(spec);

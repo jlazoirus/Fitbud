@@ -12764,3 +12764,53 @@ Ver `CULQI_SETUP.md`: datos del comercio, SQL, llaves en Vercel, prueba con tarj
 
 ### Verificación
 `scripts/test-tienda-culqi.mjs` (catálogo, cuerpo del cargo, precio del servidor, cuenta existente, días sumados, invitación, 3DS, rechazo, falla tras cobro, Libro y SQL con PGlite) y `tests/e2e/tienda.spec.js` con Culqi simulado.
+
+## REQ-335 - Primera semana: "Otra actividad" o deporte en días de gimnasio ya no bloquean el entreno
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-11-03, iPhone): al terminar el onboarding, "Preparando tu semana…" y después "Tu semana está casi lista · Faltan ejercicios compatibles con tus lugares o recursos". Diego juega pádel ("Otra actividad", REQ-253).
+
+### Causa raíz
+
+`prepareFirstWeekTraining()` aborta si alguna sesión de `trainingExpectedWeeks()` queda sin `allowedExerciseIds`. `allowedExercisesForSession()` pedía para cada sesión no de fuerza un ejercicio con `discipline===primarySport` y del lugar del día. Una prueba sobre todas las combinaciones de deporte × lugar × nivel × recursos × días mostró 199 combinaciones que fallaban:
+- `other` ("Otra actividad"): el catálogo no tiene esa disciplina; fallaba siempre.
+- `strength_only` con más días que sesiones: el día de `descanso` se trataba como sesión.
+- Correr, caminar, nadar o bici en un día marcado gimnasio o casa: el lugar del día es el de la fuerza, y el filtro de lugares lo dejaba sin ejercicio.
+
+### Alcance
+
+1. `trainingExpectedWeeks()` omite los días no de fuerza cuyo deporte no está en el catálogo (`TRAINING_CATALOG_SPORTS`) y los de `descanso`: quedan fuera del plan generado y el día muestra la actividad libre o el descanso de siempre (`effectiveWorkout` cae a la plantilla). `validatePlan` no exige una sesión por día.
+2. `allowedExercisesForSession()` aplica el lugar solo a la fuerza; el deporte conserva su lugar en la sesión.
+3. `CACHE_NAME` → `fitbud-pwa-v203`.
+
+### Verificación
+
+`tests/e2e/semana-otra-actividad.spec.js` (pádel + gimnasio, correr con días de gimnasio y solo fuerza en casa preparan la semana; sin el cambio reproduce el mensaje de Diego); la prueba combinatoria queda en 0 fallos; onboarding, entreno, lugar del día, actividad manual y niveles en verde.
+
+## REQ-336 - Primera semana: el coach trabaja en paralelo y el progreso se ve en la capa de espera
+
+**Estado: implementado.**
+
+### Origen
+
+Diego (beta, 2026-11-03): "Se quedó pegado como 10 min" en "Preparando tu semana…".
+
+### Diagnóstico
+
+Registros de producción (solo tiempos, sin contenido): plan guardado a las 11:36:50 UTC, siete días de comidas entre 11:36:55 y 11:38:33 (unos 7 s por día más pausas de hasta 36 s entre días) y error de entreno hacia las 11:38:47. Fueron unos 2 minutos, pero:
+- La capa "Preparando tu semana… Puede tardar unos segundos" tapaba el contador "Preparando comidas: día N de 7": parecía colgado.
+- Los días se pedían uno tras otro (`for … await generateOneDay`) y las semanas de entreno también. Con REQ-335 los perfiles como el de Diego pasan a generar 10 semanas (~15 s cada una): sin este cambio la espera habría sido aún mayor.
+
+### Alcance
+
+1. `runFirstWeekCoachParts()`: hasta 4 partes a la vez (`FIRST_WEEK_COACH_CONCURRENCY`) y ninguna parte nueva empieza pasados 60 s (`FIRST_WEEK_COACH_START_BUDGET_MS`). Lo que no empieza usa la alternativa validada del catálogo, igual que un fallo del coach (días deterministas; semanas `fallbackOnly`, con aviso). La reserva del proxy ya era segura en paralelo (bloqueo consultivo por usuario y acción; partes únicas por `partKey`).
+2. Comidas y entreno muestran "N de M días/semanas" y ese texto aparece dentro de la capa de espera (`setCoachBusyDetail`), que lo limpia al cerrarse.
+3. Se conserva la lógica de avisos de entreno: semanas de prueba después de la primera, fallos del coach y partes que no empezaron.
+4. `CACHE_NAME` → `fitbud-pwa-v204`.
+
+### Verificación
+
+`tests/e2e/semana-rapida.spec.js` (con 700 ms por llamada: más de una llamada a la vez, nunca más de 4, menos de 4 s para 7 días y el contador visible en la capa; sin el cambio, una sola llamada a la vez); onboarding, nutrición, avisos, espera del coach, bienvenida, Hoy y REQ-335 en verde; detector de diseño sin hallazgos.
