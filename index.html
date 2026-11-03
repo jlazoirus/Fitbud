@@ -772,6 +772,7 @@
   .streak-social label{display:block;font-size:14px;margin-bottom:8px}
   .streak-social input,.streak-social textarea{width:100%;font-size:16px;min-height:44px}
   .streak-alias-form{max-width:440px;margin-top:16px}
+  .notify-ask-actions{display:flex;flex-direction:column;gap:8px;margin-top:16px}
   .streak-steps{margin:14px 0 6px;padding-left:22px;line-height:1.5}
   .streak-steps li{margin-bottom:8px}
   .streak-you{margin:14px 0 4px}
@@ -9356,6 +9357,36 @@ function finishNotifySetup(reason){
   render();scrollAppTop();
   if(streakSocialPending)loadStreakFriendsAfterAuth();
 }
+/* ---------- REQ-341: pedir los avisos al celebrar la racha ---------- */
+// La tarjeta diaria de Hoy casi no convierte (98 vistas, 0 activaciones). El
+// mejor momento es justo después de sumar un día: se pregunta al cerrar la
+// celebración, como mucho dos veces por persona (la primera racha y, si dijo
+// que no, al llegar a 3 días). "Ahora no" en la tarjeta de hoy también lo calla.
+const NOTIFY_ASK_KEY="evolv_notify_ask_v1",NOTIFY_ASK_MAX=2;
+let _notifyAskPending=0;
+function notifyAskCount(){try{return Number(localStorage.getItem(NOTIFY_ASK_KEY+":"+uid()))||0;}catch(e){return NOTIFY_ASK_MAX;}}
+function notifyAskWanted(n){
+  if(!session||!profile||onboardingActive||notifPrefsCache===null||remindersCovered()||notifySnoozed())return false;
+  const asked=notifyAskCount();
+  return asked===0?n>=1:asked<NOTIFY_ASK_MAX&&n>=3;
+}
+function queueNotifyAsk(n){if(notifyAskWanted(n))_notifyAskPending=Math.max(_notifyAskPending,n);}
+function showQueuedNotifyAsk(){
+  const n=_notifyAskPending;_notifyAskPending=0;
+  if(!n||!notifyAskWanted(n)||$("#overlay"))return;
+  try{localStorage.setItem(NOTIFY_ASK_KEY+":"+uid(),String(notifyAskCount()+1));}catch(e){return;}
+  trackNotifyPrompt("streak","shown");
+  const st=devicePushState(),hour=notifyHourLabel();
+  const push=st==="off";
+  const title=n===1?"¡Empezó tu racha!":`¡${n} días seguidos!`;
+  const hint=st==="needs_install"?`<p class="muted small">Para avisos en el teléfono, instala Evolv: en Safari toca Compartir y luego Añadir a pantalla de inicio.</p>`:"";
+  modal(`<h3>${title}</h3>
+    <p>¿Te aviso mañana a las ${hour} si te falta algo para sumar el día ${n+1}? Un aviso al día como máximo.</p>${hint}
+    <div class="notify-ask-actions">
+      <button class="btn btn-accent" ${push?"data-notify-enable":""} onclick="closeModal();${push?"enableDevicePush('streak')":"enableEmailReminders('streak')"}">${push?"Sí, avísame":"Sí, por correo"}</button>
+      <button class="btn" data-notify-ask-dismiss onclick="closeModal();trackNotifyPrompt('streak','dismiss')">Ahora no</button>
+    </div>`);
+}
 // Tarjeta de Hoy: cada día, hasta que los avisos estén activos.
 function notifyNudgeDue(){
   if(notifPrefsCache===null||onboardingActive||!session||!profile)return false; // aún no se sabe: sin parpadeo
@@ -14233,6 +14264,7 @@ function renderStreakPop(o){
   const el=document.getElementById("streakPop");
   if(!el)return;
   const c=streakPopCopy(o),earned=o.kind!=="progress";
+  if(earned)queueNotifyAsk(o.to);
   const rolls=earned&&o.from!==o.to;
   clearTimeout(_streakPopTimer);
   clearTimeout(_streakExitTimer);
@@ -14260,11 +14292,12 @@ function hideStreakPop(){
   _streakExitTimer=setTimeout(()=>{
     el.innerHTML="";el.classList.remove("out");_streakActive=null;
     flushStreakCelebrations();
+    if(!_streakActive)showQueuedNotifyAsk();
   },180);
 }
 function resetStreakFeedback(){
   clearTimeout(_streakPopTimer);clearTimeout(_streakExitTimer);_streakSeen=null;_streakActive=null;
-  _streakCelebrations.length=0;_streakCelebrated.clear();
+  _streakCelebrations.length=0;_streakCelebrated.clear();_notifyAskPending=0;
   const el=document.getElementById("streakPop");
   if(el){el.innerHTML="";el.classList.remove("out","sp-paused");}
 }

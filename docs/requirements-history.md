@@ -12907,3 +12907,26 @@ Es parte del plan de Jonathan para que más personas activen sus avisos (2026-11
 ### Criterios de aceptación
 
 - En iPhone sin instalar, la tarjeta ofrece el correo; al tocarlo, guarda `email_opt_in` y desaparece. ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-341 - Avisos: pedirlos al sumar un día de racha
+
+**Estado: implementado.**
+
+### Origen
+
+Es parte del plan de Jonathan para que más personas activen sus avisos (2026-11-03). La tarjeta diaria de Hoy se mostró 98 veces y no consiguió ninguna activación. El momento en que más sentido tiene pedir un aviso es justo después de sumar un día a la racha.
+
+### Alcance
+
+1. Al cerrarse la celebración de un día sumado o recuperado (`renderStreakPop` → `hideStreakPop`, de REQ-304), la app pregunta: "¡Empezó tu racha!" o "¡N días seguidos!", y debajo "¿Te aviso mañana a las <hora> si te falta algo para sumar el día N+1? Un aviso al día como máximo."
+2. El botón depende del estado del dispositivo:
+   - con el push disponible: "Sí, avísame" (`enableDevicePush('streak')`);
+   - en iPhone sin instalar, con el permiso bloqueado o sin soporte: "Sí, por correo" (`enableEmailReminders('streak')`). En iPhone, además, explica cómo instalar.
+3. Cuándo se pregunta:
+   - como mucho dos veces por persona (`evolv_notify_ask_v1:<usuario>`): en la primera celebración y, si dijo que no, desde los 3 días de racha;
+   - nunca si los avisos ya están cubiertos, si eligió "Ahora no" en la tarjeta de hoy, durante el onboarding o con otra ventana abierta.
+4. Analítica con `source: "streak"` (shown, enable, enabled, email, dismiss y error), con las propiedades de REQ-339. `autoDismissNudges` de las pruebas E2E cierra el pedido.
+
+### Criterios de aceptación
+
+- Tras celebrar, el pedido aparece y "Sí, avísame" guarda `push_opt_in`. Si se cerró una vez, solo vuelve desde 3 días; con dos pedidos o con "Ahora no" de hoy, no aparece. En iPhone sin instalar ofrece el correo. ✓ `tests/e2e/avisos.spec.js`.

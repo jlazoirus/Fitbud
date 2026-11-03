@@ -458,6 +458,11 @@ export async function autoDismissNudges(page) {
   await page.addLocatorHandler(notifySetup, async () => {
     await notifySetup.click();
   });
+  // REQ-341: al cerrar una celebración de racha se piden los avisos.
+  const notifyAsk = page.locator("#overlay [data-notify-ask-dismiss]");
+  await page.addLocatorHandler(notifyAsk, async () => {
+    await notifyAsk.click();
+  });
 }
 
 /** Navega a la app y espera a que salga del splash. */

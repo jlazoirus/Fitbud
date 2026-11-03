@@ -2248,3 +2248,9 @@ Eventos con estado, plataforma e instalación; fallos con paso. ✓ `tests/e2e/a
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 La tarjeta ofrece el correo a la hora elegida; activado, cubre y la tarjeta se va. ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-341 - Avisos: pedirlos al sumar un día de racha
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Al cerrar la celebración, "¿Te aviso mañana?" (push o correo); máximo dos veces. ✓ `tests/e2e/avisos.spec.js`.
