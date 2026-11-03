@@ -180,6 +180,24 @@ test.describe("Tienda web (Culqi)", () => {
     }
     await page.goto("/devoluciones/");
     await expect(page.locator("main")).toContainText("7 días calendario");
+    // REQ-343: secciones que pide la revisión de Culqi, contacto con horario y enlaces que funcionan.
+    for (const h of ["Introducción", "Condiciones para cambios y devoluciones", "Cómo pedir un cambio o una devolución", "Opciones de reembolso y cambios", "Costos de envío", "Excepciones y garantías", "Contacto y atención al cliente"]) {
+      await expect(page.getByRole("heading", { name: new RegExp(h) })).toBeVisible();
+    }
+    await expect(page.locator('main [data-comercio="horario"]')).toHaveText(/Lunes a viernes/);
+    await expect(page.locator('main a[data-comercio="whatsappUrl"]').first()).toHaveAttribute("href", /^https:\/\/wa\.me\//);
+    await expect(page.getByRole("link", { name: "Pedir el reembolso por correo" })).toHaveAttribute("href", /^mailto:.+subject=Solicitud/);
+
+    await page.goto("/terminos/");
+    for (const h of ["Información general del comercio", "Aceptación de los términos", "Registro y cuenta de usuario", "Productos y servicios", "Precios y formas de pago", "Proceso de compra", "Entrega del servicio", "Protección de datos personales", "Propiedad intelectual", "Responsabilidad y limitaciones", "Legislación aplicable y resolución de conflictos", "Contacto y soporte"]) {
+      await expect(page.getByRole("heading", { name: new RegExp(h) })).toBeVisible();
+    }
+    await expect(page.locator('main [data-comercio="ruc"]').first()).toHaveText(/^\d{11}$/);
+    await expect(page.locator('main [data-comercio="horario"]').first()).toHaveText(/Lunes a viernes/);
+    await expect(page.locator('main a[data-comercio="whatsappUrl"]')).toHaveAttribute("href", /^https:\/\/wa\.me\//);
+
+    await page.goto("/contacto/");
+    await expect(page.locator('main a[data-comercio="whatsappUrl"]')).toHaveAttribute("href", /^https:\/\/wa\.me\//);
     expect(errors).toEqual([]);
   });
 });

@@ -2260,3 +2260,9 @@ Al cerrar la celebración, "¿Te aviso mañana?" (push o correo); máximo dos ve
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Cada plan muestra comidas, entreno o progreso además de su duración. ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda.spec.js`.
+
+## REQ-343 - Tienda: términos y devoluciones con todo lo que pide Culqi
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Términos y devoluciones siguen las secciones de las guías de Culqi; WhatsApp vuelve a enlazar. ✓ `tests/e2e/tienda.spec.js`.

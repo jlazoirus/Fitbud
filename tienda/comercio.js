@@ -18,7 +18,7 @@ export const COMERCIO = {
   // Solo cuentas reales: Culqi revisa que cada ícono lleve a la cuenta del comercio.
   redes: [],
   // Fecha de la versión vigente de términos, devoluciones y privacidad.
-  vigenciaLegal: "2 de noviembre de 2026",
+  vigenciaLegal: "3 de noviembre de 2026",
 };
 
 export function esMarcador(valor) {

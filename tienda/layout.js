@@ -71,7 +71,7 @@ export function fillComercio(root) {
     if (value == null) return;
     if (node.tagName === "A" && node.dataset.comercio === "correo") node.href = "mailto:" + value;
     if (node.tagName === "A" && node.dataset.comercio === "telefono") node.href = "tel:" + String(value).replace(/[^\d+]/g, "");
-    if (node.tagName === "A" && node.dataset.comercio === "whatsappUrl") return;
+    if (node.tagName === "A" && node.dataset.comercio === "whatsappUrl") { node.href = value; return; }
     node.textContent = value;
   });
 }
