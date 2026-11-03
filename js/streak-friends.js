@@ -90,16 +90,25 @@ async function loadStreakFriendsAfterAuth(){
   const owner=uid();
   await refreshStreakSocial();
   if(uid()===owner&&streakSocialPending&&!onboardingActive&&!notifySetupActive&&!privacyGateRequired()){
-    streakSocialOpen=true;setView("progreso");
+    streakSocialOpen=true;showStreakSection();
   }
 }
 function scheduleStreakSocialSync(){
   clearTimeout(streakSocialTimer);
   if(streakSocial.owner===uid()&&streakSocial.enabled)streakSocialTimer=setTimeout(()=>{if(!streakSocialBusy)refreshStreakSocial();},3000);
 }
+// REQ-342: amigos vive dentro de la sección "Racha" de Progreso; abrirla siempre
+// la despliega para que una invitación o el texto para copiar no queden ocultos.
+function showStreakSection(){
+  UI.collapsed=UI.collapsed||{};
+  if(UI.collapsed["pr.rachas"]){UI.collapsed["pr.rachas"]=false;uiSave();}
+  setView("progreso");
+}
 function openStreakFriends(){
-  streakSocialOpen=true;setView("progreso");
-  document.getElementById("streakFriends")?.scrollIntoView({behavior:"smooth",block:"start"});
+  // Desde Hoy se ve primero la racha; desde la propia tarjeta, se queda en amigos.
+  const target=view==="progreso"?document.getElementById("streakFriends"):null;
+  streakSocialOpen=true;showStreakSection();
+  (target?document.getElementById("streakFriends"):document.getElementById("streakPanel")?.closest(".csec"))?.scrollIntoView({behavior:"smooth",block:"start"});
   if(!streakSocialBusy)refreshStreakSocial();
 }
 function closeStreakInvite(){forgetStreakInvite();streakSocialError="";paintStreakSocial();}
@@ -149,7 +158,7 @@ async function shareStreakText(text,title){
     if(uid()===owner)toast("Texto copiado para compartir");
   }catch(e){
     if(uid()!==owner||e.name==="AbortError")return;
-    streakShareFallback=text;streakSocialOpen=true;setView("progreso");
+    streakShareFallback=text;streakSocialOpen=true;showStreakSection();
     const field=document.getElementById("streakShareText");if(field){field.focus();field.select();}
   }
 }
@@ -180,9 +189,10 @@ function streakAliasForm(enabled){
 function streakFriendsBody(){
   const mine=streakSocial.owner===uid()?streakSocial:{loaded:false,enabled:false,rows:[]};
   const busy=streakSocialBusy?"disabled":"";
-  const head=`<div class="streak-social-head"><h2>Rachas con amigos</h2><button type="button" class="btn btn-sm" onclick="shareStreak()">Compartir mi racha</button></div>`;
+  const head=`<div class="streak-social-head"><h3>Con amigos</h3><button type="button" class="btn btn-sm" onclick="shareStreak()">Compartir mi racha</button></div>`;
   const fallback=streakShareFallback?`<label for="streakShareText">Copia este texto para compartir</label><textarea id="streakShareText" readonly rows="4" onclick="this.select()">${esc(streakShareFallback)}</textarea>`:"";
-  if(!streakSocialOpen)return head+`<p class="muted small">Compara la racha actual con tus amigos y anímense a seguir.</p><button class="btn" type="button" onclick="openStreakFriends()">Comparar con amigos</button>`+fallback;
+  // REQ-342: cerrado, las dos acciones van juntas abajo (sin repetir "Compartir" en la cabecera).
+  if(!streakSocialOpen)return `<div class="streak-social-head"><h3>Con amigos</h3></div><p class="muted small">Compara tu racha con la de tus amigos y anímense a seguir.</p><div class="streak-social-actions stack"><button class="btn" type="button" onclick="openStreakFriends()">Comparar con amigos</button><button type="button" class="btn" onclick="shareStreak()">Compartir mi racha</button></div>`+fallback;
   const error=streakSocialError?`<p class="streak-social-status" role="status">${esc(streakSocialError)}</p>`:"";
   if(!mine.loaded)return head+`<p class="muted" role="status">Cargando rachas…</p>`+fallback;
   const retry=`<button class="btn" type="button" onclick="refreshStreakSocial()" ${busy}>Actualizar rachas</button>`;

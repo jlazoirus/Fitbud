@@ -2254,3 +2254,9 @@ La tarjeta ofrece el correo a la hora elegida; activado, cubre y la tarjeta se v
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Al cerrar la celebración, "¿Te aviso mañana?" (push o correo); máximo dos veces. ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-342 - Progreso: la racha en una sola tarjeta
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Número, hitos como paradas de una barra, desglose en una línea y amigos con un solo "Compartir". ✓ `tests/e2e/racha.spec.js`.

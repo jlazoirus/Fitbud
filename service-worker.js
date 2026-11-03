@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v207";
+const CACHE_NAME = "fitbud-pwa-v208";
 const APP_SHELL = [
   "./",
   "./index.html",
