@@ -2,7 +2,7 @@
 // avisos; después, Hoy lo recuerda cada día hasta que estén activos.
 import { test, expect } from "@playwright/test";
 import {
-  installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, profileFixture, completePrefs, daysFromToday,
+  installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, profileFixture, completePrefs, daysFromToday, USER_ID,
 } from "./helpers.js";
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
@@ -57,6 +57,27 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
+  // REQ-339: un fallo al activar deja rastro con el paso y el motivo, y cada
+  // evento dice qué tarjeta vio la persona, en qué teléfono y si está instalada.
+  test("si activar falla, el evento dice en qué paso y qué tarjeta se vio", async ({ page, context }) => {
+    await context.grantPermissions(["notifications"]);
+    const events = [];
+    page.on("request", (req) => {
+      if (req.url().includes("/api/analytics") && req.method() === "POST") {
+        try { const b = JSON.parse(req.postData() || "{}"); if (b.event_type === "notifications_prompt") events.push(b.properties); } catch (_) {}
+      }
+    });
+    const { errors } = await openHoy(page, context);
+    await expect(card(page)).toBeVisible();
+    await page.evaluate(() => { window.subscribePush = async () => { throw Object.assign(new Error("x"), { name: "AbortError" }); }; });
+    await card(page).getByRole("button", { name: "Activar avisos" }).click();
+    await expect.poll(() => events.find((e) => e.action === "error")).toBeTruthy();
+    const shown = events.find((e) => e.action === "shown");
+    expect(shown).toMatchObject({ source: "home", state: "off", platform: "desktop", standalone: false });
+    expect(events.find((e) => e.action === "error")).toMatchObject({ source: "home", error_code: "subscribe:AbortError", state: "off" });
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
   test("con los avisos bloqueados explica cómo permitirlos y ofrece el correo", async ({ page, context }) => {
     const { calls, errors } = await openHoy(page, context, {
       init: () => Object.defineProperty(Notification, "permission", { get: () => "denied" }),
@@ -87,6 +108,16 @@ test.describe("Avisos — iPhone fuera de la app instalada (REQ-289)", () => {
     await expect(card(page)).toContainText("Instala Evolv para recibir avisos");
     await expect(card(page)).toContainText("Añadir a pantalla de inicio");
     await expect(page.locator("#a2hs")).toHaveCount(0);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  // REQ-340: instalar en iPhone toma pasos; el correo es un toque y quita la tarjeta.
+  test("ofrece el correo con un toque y, activado, la tarjeta se va", async ({ page, context }) => {
+    const { calls, errors } = await openHoy(page, context);
+    await expect(card(page)).toContainText("O recibe el recordatorio por correo a las 20:00");
+    await card(page).getByRole("button", { name: "Recibir por correo" }).click();
+    await expect(card(page)).toHaveCount(0);
+    expect(prefsWrites(calls).some((r) => r.email_opt_in === true)).toBe(true);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
@@ -124,5 +155,70 @@ test.describe("Avisos — al terminar el onboarding (REQ-289)", () => {
     await page.getByRole("button", { name: "Ahora no, ir a mi plan" }).click();
     await expect(page.locator("#tabs")).toContainText("Hoy");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+});
+
+// REQ-341: al cerrar la celebración de un día de racha se piden los avisos.
+test.describe("Avisos — pedido al sumar un día de racha (REQ-341)", () => {
+  const meal = (done) => ({ done, ovr: { name: "Comida registrada", kcal: 500, p: 30, c: 50, f: 15 } });
+  const dayState = (complete) => ({ meals: { desayuno: meal(true), almuerzo: meal(complete), cena: meal(false) }, extras: [], workoutDone: true });
+  async function openWithStreak(page, context) {
+    const rows = [{ user_id: USER_ID, log_date: daysFromToday(-1), state: dayState(true), plan_version_id: null, updated_at: new Date().toISOString() },
+      { user_id: USER_ID, log_date: daysFromToday(0), state: dayState(false), plan_version_id: null, updated_at: new Date().toISOString() }];
+    const mocks = await installMocks(context, { tables: { day_log: { rows } } });
+    await seedLoggedInUser(page);
+    const cardio = page.locator('#overlay [onclick="dismissCardioNudge()"]');
+    await page.addLocatorHandler(cardio, async () => { await cardio.click(); });
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.waitForLoadState("networkidle");
+    // Sumar el día de hoy y cerrar la celebración.
+    await page.evaluate(() => toggleMeal(todayStr(), "almuerzo"));
+    await page.locator("#streakPop .sp-card").click();
+    return { ...mocks, errors };
+  }
+
+  test("pide los avisos tras celebrar y 'Sí, avísame' los activa", async ({ page, context }) => {
+    await context.grantPermissions(["notifications"]);
+    const { calls, errors } = await openWithStreak(page, context);
+    const ask = page.locator("#overlay .sheet");
+    await expect(ask).toContainText("¡2 días seguidos!");
+    await expect(ask).toContainText("¿Te aviso mañana a las 20:00 si te falta algo para sumar el día 3?");
+    await page.evaluate(() => { window.subscribePush = async () => { await _savePushOptInDb(true); }; });
+    await ask.getByRole("button", { name: "Sí, avísame" }).click();
+    await expect.poll(() => prefsWrites(calls).some((r) => r.push_opt_in === true)).toBe(true);
+    await expect(page.locator("#overlay")).toHaveCount(0);
+    expect(await page.evaluate(() => notifyAskCount())).toBe(1);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("como mucho dos veces: la segunda, desde 3 días; respeta 'Ahora no' de hoy", async ({ page, context }) => {
+    await context.grantPermissions(["notifications"]);
+    await openWithStreak(page, context);
+    await page.locator("#overlay [data-notify-ask-dismiss]").click();
+    await expect(page.locator("#overlay")).toHaveCount(0);
+    expect(await page.evaluate(() => [notifyAskWanted(2), notifyAskWanted(3)])).toEqual([false, true]);
+    expect(await page.evaluate(() => { localStorage.setItem(NOTIFY_ASK_KEY + ":" + uid(), "2"); return notifyAskWanted(9); })).toBe(false);
+    expect(await page.evaluate(() => { localStorage.setItem(NOTIFY_ASK_KEY + ":" + uid(), "0"); localStorage.setItem(NOTIFY_NUDGE_KEY + ":" + uid(), todayStr()); return notifyAskWanted(1); })).toBe(false);
+  });
+});
+
+test.describe("Avisos — pedido al sumar un día en iPhone sin instalar (REQ-341)", () => {
+  test.use({ userAgent: IPHONE_UA });
+  test("ofrece el correo y explica cómo instalar", async ({ page, context }) => {
+    const meal = (done) => ({ done, ovr: { name: "Comida registrada", kcal: 500, p: 30, c: 50, f: 15 } });
+    const st = (c) => ({ meals: { desayuno: meal(true), almuerzo: meal(c), cena: meal(false) }, extras: [], workoutDone: true });
+    const rows = [{ user_id: USER_ID, log_date: daysFromToday(0), state: st(false), plan_version_id: null, updated_at: new Date().toISOString() }];
+    const { calls } = await installMocks(context, { tables: { day_log: { rows } } });
+    await seedLoggedInUser(page);
+    await gotoApp(page);
+    await page.waitForLoadState("networkidle");
+    await page.evaluate(() => toggleMeal(todayStr(), "almuerzo"));
+    await page.locator("#streakPop .sp-card").click();
+    const ask = page.locator("#overlay .sheet");
+    await expect(ask).toContainText("¡Empezó tu racha!");
+    await expect(ask).toContainText("Añadir a pantalla de inicio");
+    await ask.getByRole("button", { name: "Sí, por correo" }).click();
+    await expect.poll(() => prefsWrites(calls).some((r) => r.email_opt_in === true)).toBe(true);
   });
 });

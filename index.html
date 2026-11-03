@@ -772,6 +772,7 @@
   .streak-social label{display:block;font-size:14px;margin-bottom:8px}
   .streak-social input,.streak-social textarea{width:100%;font-size:16px;min-height:44px}
   .streak-alias-form{max-width:440px;margin-top:16px}
+  .notify-ask-actions{display:flex;flex-direction:column;gap:8px;margin-top:16px}
   .streak-steps{margin:14px 0 6px;padding-left:22px;line-height:1.5}
   .streak-steps li{margin-bottom:8px}
   .streak-you{margin:14px 0 4px}
@@ -9125,16 +9126,22 @@ function renderPushSection(){
 
 async function requestPushPermission(btn){
   if(btn){btn.disabled=true;btn.textContent="Solicitando permiso…";}
+  trackNotifyPrompt("profile","enable");
+  let step="permission";
   try{
     const perm=await Notification.requestPermission();
     if(perm==="granted"){
+      step="subscribe";
       await subscribePush();
+      trackNotifyPrompt("profile","enabled");
       renderPushSection();
       toast("Avisos del dispositivo activados");
     }else{
+      trackNotifyPrompt("profile",perm==="denied"?"denied":"dismissed");
       renderPushSection();
     }
   }catch(e){
+    trackNotifyPrompt("profile","error",{error_code:notifyErrorCode(step,e)});
     if(btn){btn.disabled=false;btn.textContent="Activar avisos del dispositivo";}
     toast("No se pudo activar el aviso del dispositivo");
   }
@@ -9149,13 +9156,15 @@ async function subscribePush(quiet){
   });
   const subJson=sub.toJSON();
   const token=session&&session.access_token;
-  if(!token)return;
+  // REQ-339: errores con nombre para saber en qué paso falló activar.
+  const named=(name,msg)=>Object.assign(new Error(msg),{name});
+  if(!token)throw named("NoSession","Sin sesión para guardar la suscripción");
   const r=await fetch("/api/push-subscribe",{
     method:"POST",
     headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},
     body:JSON.stringify(subJson),
   });
-  if(!r.ok)throw new Error("No se pudo guardar la suscripción");
+  if(!r.ok)throw named("SaveFailed_"+r.status,"No se pudo guardar la suscripción");
   if(!quiet)await _savePushOptInDb(true);
 }
 // REQ-267: la clave VAPID cambió (la privada de la anterior nunca estuvo en el
@@ -9243,20 +9252,35 @@ function installPending(){return isMobileDevice()&&!isStandaloneMode();}
 function remindersCovered(){
   const st=devicePushState();
   if(st==="on")return true;
-  return (st==="denied"||st==="unsupported")&&!!(notifPrefsCache&&notifPrefsCache.email_opt_in);
+  // REQ-340: en iPhone sin instalar, el correo también cubre (la tarjeta diaria se va).
+  return (st==="denied"||st==="unsupported"||st==="needs_install")&&!!(notifPrefsCache&&notifPrefsCache.email_opt_in);
 }
 function notifyHourLabel(){
   const h=notifPrefsCache&&notifPrefsCache.notify_hour!=null?Number(notifPrefsCache.notify_hour):NOTIF_HOUR_DEFAULT;
   return String(h).padStart(2,"0")+":00";
 }
-function trackNotifyPrompt(source,action){trackEvent("notifications_prompt",{source,action});}
+// REQ-339: cada evento dice qué tarjeta vio la persona (estado del push), en
+// qué teléfono y si la app está instalada; los fallos, en qué paso. Sin datos
+// personales: solo categorías.
+function notifyPlatform(){return isIOSDevice()?"ios":/android/i.test(navigator.userAgent||"")?"android":isMobileDevice()?"mobile":"desktop";}
+function trackNotifyPrompt(source,action,extra){
+  let state="unknown";try{state=devicePushState();}catch(_){}
+  trackEvent("notifications_prompt",{source,action,state,platform:notifyPlatform(),standalone:isStandaloneMode(),...(extra||{})});
+}
+// Paso en que falló activar: permiso, service worker, suscripción o guardado.
+function notifyErrorCode(step,e){
+  const name=String(e&&(e.name&&e.name!=="Error"?e.name:e.message)||"error").replace(/[^A-Za-z_]+/g,"_").slice(0,40);
+  return step+":"+name;
+}
 function notifySnoozed(){try{return localStorage.getItem(NOTIFY_NUDGE_KEY+":"+uid())===todayStr();}catch(e){return false;}}
 async function enableDevicePush(source){
   trackNotifyPrompt(source,"enable");
   document.querySelectorAll("[data-notify-enable]").forEach(b=>{b.disabled=true;b.textContent="Activando…";});
+  let step="permission";
   try{
     const perm=await Notification.requestPermission();
     if(perm==="granted"){
+      step="subscribe";
       // Sin service worker activo la suscripción no llega nunca: no dejar el botón colgado.
       await Promise.race([subscribePush(),new Promise((_,rej)=>setTimeout(()=>rej(new Error("timeout")),15000))]);
       trackNotifyPrompt(source,"enabled");
@@ -9264,7 +9288,11 @@ async function enableDevicePush(source){
       trackNotifyPrompt(source,perm==="denied"?"denied":"dismissed");
       if(perm==="denied")toast("Los avisos quedaron bloqueados. Puedes permitirlos en los ajustes.");
     }
-  }catch(e){toast("No se pudieron activar los avisos. Intenta de nuevo.");}
+  }catch(e){
+    // REQ-339: antes este camino no dejaba rastro (un "enable" sin desenlace).
+    trackNotifyPrompt(source,"error",{error_code:notifyErrorCode(step,e)});
+    toast("No se pudieron activar los avisos. Intenta de nuevo.");
+  }
   render();
 }
 async function enableEmailReminders(source){
@@ -9303,7 +9331,7 @@ function notifyPushCopy(source){
   const st=devicePushState(),email=!!(notifPrefsCache&&notifPrefsCache.email_opt_in);
   const emailBtn=email?"":`<button class="btn" onclick="enableEmailReminders('${source}')">Recibir por correo</button>`;
   if(st==="on")return {done:true,icon:"bell",title:"Avisos activados",text:`Te avisamos a las ${notifyHourLabel()} si te falta algo. Cambia la hora en Perfil → Recordatorios.`};
-  if(st==="needs_install")return {icon:"bell",title:"Activa los avisos desde la app",text:"En iPhone los avisos solo llegan a la app instalada. Al abrirla desde el ícono te pediremos activarlos."};
+  if(st==="needs_install")return {done:email,icon:"bell",title:"Activa los avisos desde la app",text:"En iPhone los avisos solo llegan a la app instalada. Al abrirla desde el ícono te pediremos activarlos."+(email?" Mientras tanto te escribimos por correo.":` Mientras tanto, te recordamos por correo a las ${notifyHourLabel()}.`),action:email?"":`<button class="btn" onclick="enableEmailReminders('${source}')">Recibir por correo</button>`};
   if(st==="denied")return {icon:"bell",title:"Tus avisos están bloqueados",text:"Permite las notificaciones de Evolv en los ajustes. iPhone: Ajustes → Notificaciones → Evolv. Android: mantén presionado el ícono → Información → Notificaciones."+(email?" Mientras tanto te escribimos por correo.":""),action:emailBtn};
   if(st==="unsupported")return {done:email,icon:"mail",title:email?"Recordatorios por correo activados":"Recibe los recordatorios por correo",text:(email?"":"Este navegador no permite avisos. ")+"Te escribimos solo cuando sirve: un correo al día como máximo.",action:emailBtn};
   return {icon:"bell",title:"Activa los avisos",text:`Un aviso al día como máximo, a las ${notifyHourLabel()}: si te falta algo para sumar el día a tu racha, o si llevas días sin entrar.`,action:`<button class="btn btn-accent" data-notify-enable onclick="enableDevicePush('${source}')">Activar avisos</button>`};
@@ -9329,6 +9357,36 @@ function finishNotifySetup(reason){
   render();scrollAppTop();
   if(streakSocialPending)loadStreakFriendsAfterAuth();
 }
+/* ---------- REQ-341: pedir los avisos al celebrar la racha ---------- */
+// La tarjeta diaria de Hoy casi no convierte (98 vistas, 0 activaciones). El
+// mejor momento es justo después de sumar un día: se pregunta al cerrar la
+// celebración, como mucho dos veces por persona (la primera racha y, si dijo
+// que no, al llegar a 3 días). "Ahora no" en la tarjeta de hoy también lo calla.
+const NOTIFY_ASK_KEY="evolv_notify_ask_v1",NOTIFY_ASK_MAX=2;
+let _notifyAskPending=0;
+function notifyAskCount(){try{return Number(localStorage.getItem(NOTIFY_ASK_KEY+":"+uid()))||0;}catch(e){return NOTIFY_ASK_MAX;}}
+function notifyAskWanted(n){
+  if(!session||!profile||onboardingActive||notifPrefsCache===null||remindersCovered()||notifySnoozed())return false;
+  const asked=notifyAskCount();
+  return asked===0?n>=1:asked<NOTIFY_ASK_MAX&&n>=3;
+}
+function queueNotifyAsk(n){if(notifyAskWanted(n))_notifyAskPending=Math.max(_notifyAskPending,n);}
+function showQueuedNotifyAsk(){
+  const n=_notifyAskPending;_notifyAskPending=0;
+  if(!n||!notifyAskWanted(n)||$("#overlay"))return;
+  try{localStorage.setItem(NOTIFY_ASK_KEY+":"+uid(),String(notifyAskCount()+1));}catch(e){return;}
+  trackNotifyPrompt("streak","shown");
+  const st=devicePushState(),hour=notifyHourLabel();
+  const push=st==="off";
+  const title=n===1?"¡Empezó tu racha!":`¡${n} días seguidos!`;
+  const hint=st==="needs_install"?`<p class="muted small">Para avisos en el teléfono, instala Evolv: en Safari toca Compartir y luego Añadir a pantalla de inicio.</p>`:"";
+  modal(`<h3>${title}</h3>
+    <p>¿Te aviso mañana a las ${hour} si te falta algo para sumar el día ${n+1}? Un aviso al día como máximo.</p>${hint}
+    <div class="notify-ask-actions">
+      <button class="btn btn-accent" ${push?"data-notify-enable":""} onclick="closeModal();${push?"enableDevicePush('streak')":"enableEmailReminders('streak')"}">${push?"Sí, avísame":"Sí, por correo"}</button>
+      <button class="btn" data-notify-ask-dismiss onclick="closeModal();trackNotifyPrompt('streak','dismiss')">Ahora no</button>
+    </div>`);
+}
 // Tarjeta de Hoy: cada día, hasta que los avisos estén activos.
 function notifyNudgeDue(){
   if(notifPrefsCache===null||onboardingActive||!session||!profile)return false; // aún no se sabe: sin parpadeo
@@ -9339,6 +9397,11 @@ function notifyNudgeHtml(){
   if(_notifyShownToday!=="home:"+todayStr()){_notifyShownToday="home:"+todayStr();trackNotifyPrompt("home","shown");}
   const st=devicePushState();
   const c=st==="needs_install"?notifyInstallCopy("home"):notifyPushCopy("home");
+  // REQ-340: instalar en iPhone toma pasos; el correo es un toque y sirve desde hoy.
+  if(st==="needs_install"){
+    c.text+=` O recibe el recordatorio por correo a las ${notifyHourLabel()}.`;
+    c.action=`<button class="btn btn-accent" onclick="enableEmailReminders('home')">Recibir por correo</button>`+(c.action||"");
+  }
   const title={needs_install:"Instala Evolv para recibir avisos",denied:"Tus avisos están bloqueados",unsupported:"Recibe los recordatorios por correo"}[st]||"Activa los avisos para no perder tu racha";
   return `<section class="agenda-card notify-card" aria-labelledby="notifyCardTitle">
     <div class="agenda-head"><span class="notify-step-ic">${notifyIcon(c.icon)}</span><h2 class="agenda-title" id="notifyCardTitle">${title}</h2></div>
@@ -14201,6 +14264,7 @@ function renderStreakPop(o){
   const el=document.getElementById("streakPop");
   if(!el)return;
   const c=streakPopCopy(o),earned=o.kind!=="progress";
+  if(earned)queueNotifyAsk(o.to);
   const rolls=earned&&o.from!==o.to;
   clearTimeout(_streakPopTimer);
   clearTimeout(_streakExitTimer);
@@ -14228,11 +14292,12 @@ function hideStreakPop(){
   _streakExitTimer=setTimeout(()=>{
     el.innerHTML="";el.classList.remove("out");_streakActive=null;
     flushStreakCelebrations();
+    if(!_streakActive)showQueuedNotifyAsk();
   },180);
 }
 function resetStreakFeedback(){
   clearTimeout(_streakPopTimer);clearTimeout(_streakExitTimer);_streakSeen=null;_streakActive=null;
-  _streakCelebrations.length=0;_streakCelebrated.clear();
+  _streakCelebrations.length=0;_streakCelebrated.clear();_notifyAskPending=0;
   const el=document.getElementById("streakPop");
   if(el){el.innerHTML="";el.classList.remove("out","sp-paused");}
 }
@@ -16843,7 +16908,7 @@ async function boot(){
 }
 /* ---- Analitica de producto (REQ-27) ---- */
 // Solo claves seguras sin datos de salud, identidad ni prompts.
-const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","action"]);
+const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","action","state","platform","standalone"]); // REQ-339: state/platform/standalone de la tarjeta de avisos (igual que api/analytics.js)
 let _analyticsSessionId=null;
 // REQ-317: al retomar la PWA tras 30 minutos fuera comienza otro uso.
 let analyticsAwayAt=0;
