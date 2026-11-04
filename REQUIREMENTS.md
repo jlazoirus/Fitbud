@@ -2273,6 +2273,12 @@ Términos y devoluciones siguen las secciones de las guías de Culqi; WhatsApp v
 
 Contacto del proveedor, declaración jurada como firma, quién recibe y respuesta del proveedor en la hoja. ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda.spec.js`.
 
+## REQ-345 - Progreso: la racha en una sola tarjeta
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Número, hitos como paradas de una barra, desglose en una línea y amigos con un solo "Compartir". ✓ `tests/e2e/racha.spec.js`.
+
 ## REQ-346 - Entreno: repetir un entreno pasado y guardarlo para elegirlo otro día
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.

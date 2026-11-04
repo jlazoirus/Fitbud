@@ -778,9 +778,9 @@
   .hq-sub{font-size:10px;color:var(--muted)}
 
   /* REQ-300: lista privada de rachas, con el mismo sistema de controles. */
-  .streak-social{margin:14px 0 24px;padding:16px;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);scroll-margin-top:20px}
+  .streak-social{margin:12px 0 0;padding:16px;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);scroll-margin-top:20px}
   .streak-social-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-  .streak-social h2{font-family:var(--font-body);font-size:18px;margin:0;font-weight:700}
+  .streak-social-head h3{margin:0;font-size:16px;font-weight:700}
   .streak-social h3{font-size:16px;margin:0 0 8px}
   .streak-social p{line-height:1.5}
   .streak-social label{display:block;font-size:14px;margin-bottom:8px}
@@ -791,6 +791,7 @@
   .streak-steps li{margin-bottom:8px}
   .streak-you{margin:14px 0 4px}
   .streak-social-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .streak-social-actions.stack{display:grid}
   .streak-social .btn{min-height:44px}
   .streak-ranking{list-style:none;padding:0;margin:18px 0;font-variant-numeric:tabular-nums}
   .streak-ranking li{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
@@ -808,24 +809,38 @@
   .streak-social-settings[open] summary svg{transform:rotate(180deg)}
   .streak-social-settings[open] summary{margin-bottom:8px}
   .streak-social-settings .streak-alias-form{margin:0 0 16px}
-  .streak-share-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
-  /* Rachas e hitos (REQ-23) */
-  .streak-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
-  .streak-card{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-lg);padding:12px;text-align:center}
-  .streak-card.main{grid-column:1 / -1;background:linear-gradient(160deg,var(--accent-dim),var(--surf1));border-color:var(--border-acc)}
-  .streak-n{font-family:var(--font-display);font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1}
-  .streak-card.main .streak-n{font-size:38px}
-  .streak-lbl{font-size:11px;color:var(--muted);margin-top:4px}
-  .streak-best{font-size:10px;color:var(--muted2);margin-top:2px;font-family:var(--font-mono)}
-  .week-consist{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:12px;margin-bottom:10px}
-  .week-consist-bar{height:6px;background:var(--surf3);border-radius:999px;overflow:hidden;margin:7px 0 4px}
-  .week-consist-bar > i{display:block;height:100%;border-radius:999px;background:var(--terra-400);transition:width .5s}
-  .milestones{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-  .milestone{display:flex;align-items:center;gap:10px;background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:9px 12px;font-size:13px}
-  .milestone .ms-ic{font-size:18px;flex:0 0 auto}
-  .milestone .ms-lbl{font-weight:600}
-  .milestone .ms-date{font-size:11px;color:var(--muted);margin-top:2px}
-  .streak-recovery{background:var(--warn-dim);border:1px solid rgba(245,158,11,.32);border-radius:var(--r-md);padding:10px 12px;font-size:13px;color:#fcd34d;margin-bottom:10px}
+  /* Racha (REQ-23). REQ-345: una tarjeta; los hitos son paradas de una barra. */
+  .streak-panel{background:linear-gradient(160deg,var(--accent-dim),var(--surf1) 55%);border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:18px 16px 16px}
+  .streak-head{display:flex;align-items:center;gap:12px}
+  .streak-flame{flex:0 0 auto;width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:var(--accent-dim)}
+  .streak-flame svg{width:28px;height:28px;overflow:visible}
+  .streak-flame path{fill:var(--accent);stroke:var(--accent);stroke-width:1.7;stroke-linejoin:round}
+  .streak-flame.off{background:var(--surf3)}
+  .streak-flame.off path{fill:none;stroke:var(--muted)}
+  .streak-now{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+  .streak-count{display:flex;align-items:baseline;flex-wrap:wrap;column-gap:8px}
+  .streak-n{font-family:var(--font-display);font-size:40px;font-weight:800;letter-spacing:-.03em;line-height:1.1;font-variant-numeric:tabular-nums}
+  .streak-unit{font-size:15px;font-weight:600}
+  .streak-record{font-size:12px;font-weight:600;line-height:1.3;color:var(--muted);padding:3px 9px;border:1px solid var(--border-2);border-radius:999px}
+  .streak-record.best{color:var(--on-accent);background:var(--accent);border-color:transparent}
+  .streak-rule{margin:12px 0 0;font-size:13px;line-height:1.5;color:var(--muted)}
+  .streak-track{position:relative;margin:24px 8px 0;padding-bottom:26px}
+  .streak-rail{height:6px;border-radius:999px;background:var(--surf3);overflow:hidden}
+  .streak-rail > i{display:block;height:100%;border-radius:inherit;background:var(--accent);transition:width .5s cubic-bezier(.16,1,.3,1)}
+  .streak-stops{list-style:none;margin:0;padding:0}
+  .streak-stops li{position:absolute;top:0;left:var(--at);width:0}
+  .streak-dot{position:absolute;top:-4px;left:-7px;width:14px;height:14px;border-radius:50%;background:var(--surf1);border:2px solid var(--border-2)}
+  .streak-stops .done .streak-dot{background:var(--accent);border-color:var(--accent)}
+  .streak-stops .next .streak-dot{border-color:var(--accent)}
+  .streak-stop{position:absolute;top:18px;transform:translateX(-50%);white-space:nowrap;font-size:12px;color:var(--muted)}
+  .streak-stops li:last-child .streak-stop{transform:translateX(calc(-100% + 7px))}
+  .streak-stops .done .streak-stop,.streak-stops .next .streak-stop{color:var(--txt)}
+  .streak-stops .next .streak-stop{font-weight:600}
+  .streak-next{margin:12px 0 0;font-size:14px;font-weight:600}
+  .streak-split{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0 0;padding-top:14px;border-top:1px solid var(--border)}
+  .streak-split dt{font-size:12px;color:var(--muted)}
+  .streak-split dd{margin:2px 0 0;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+  .streak-recovery{background:var(--warn-dim);border:1px solid rgba(245,158,11,.32);border-radius:var(--r-md);padding:10px 12px;font-size:13px;color:#fcd34d;margin-bottom:14px}
 
   /* REQ-283: píldora de racha. La llama se llena con lo cumplido hoy; al
      sumar el día termina de llenarse y el número sube. */
@@ -849,7 +864,7 @@
   .sp-copy{display:flex;flex-direction:column;gap:2px;min-width:0;padding-left:12px;border-left:1px solid var(--border-2)}
   .sp-copy b{font-size:14px;font-weight:700;line-height:1.3}
   .sp-copy span{font-size:12.5px;color:var(--muted);line-height:1.35}
-  .sp-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .sp-sr,.streak-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
   /* REQ-304: el día ganado tiene más presencia que el avance parcial. */
   .sp-card.sp-earned{position:relative;display:grid;grid-template-columns:56px minmax(0,1fr);column-gap:16px;row-gap:6px;max-width:420px;min-height:148px;padding:18px 38px 18px 18px;background:var(--accent);border-color:transparent;box-shadow:none;color:var(--on-accent)}
   .sp-earned .sp-flame{grid-column:1;grid-row:1 / 3;width:56px;height:64px;background:transparent;align-self:center}
@@ -7703,8 +7718,8 @@ function renderProgress(){
     ${weeklyCheckinChip()}
     ${empty?weightSetupCard(true):startWeightNoteCard()}
     ${section("pr.stats","Tus números",progressStats(),null,empty)}
-    ${section("pr.rachas","Rachas e hitos",renderStreakSection(),null,empty)}
-    <section id="streakFriends" class="streak-social" aria-label="Rachas con amigos">${streakFriendsBody()}</section>
+    ${section("pr.rachas","Racha",renderStreakSection()
+      +`<section id="streakFriends" class="streak-social" aria-label="Rachas con amigos">${streakFriendsBody()}</section>`,null,empty&&!streakSocialOpen)}
     ${section("pr.ciclos","Tus ciclos",progressJourney(),`${cycleNumber()}`)}
     ${section("pr.peso","Peso corporal",
       (empty?"":weightSetupCard(false))
@@ -7735,75 +7750,85 @@ function progressJourney(){
     </div>`;
   }).join("");
 }
-// Tarjetas de estadísticas (kg, entrenos, racha, adherencia nutricional)
+// Tarjetas de estadísticas (kg, entrenos, semana, adherencia nutricional).
+// REQ-345: la racha ya no se repite aquí; su lugar lo ocupa la semana de entreno.
 function progressStats(){
   const outcomes=Object.values(S.days).map(day=>workoutOutcomeForState(day||{}));
   const entrenos=outcomes.filter(outcome=>outcome==="completed").length;
   const parciales=outcomes.filter(outcome=>outcome==="partial").length;
   const lastWk=lastWeighedWeek();
   const curKg=lastWk!=null?wkg(lastWk):null;
-  const stk=streak();
+  const ws=streakStats();
   const cs=cycleSummary(todayStr());
   const adherenceTxt=cs.plannedMeals>0?`${cs.mealAdherence}%`:`—`;
   return `<div class="summary" style="grid-template-columns:repeat(2,1fr)">
     <div class="scard"><div class="n" style="color:var(--good)">${curKg!=null?curKg.toFixed(1):"—"}</div><div class="l">Peso actual (kg)</div></div>
     <div class="scard"><div class="n">${entrenos}</div><div class="l">Entrenos completados${parciales?` · ${parciales} parciales`:""}</div></div>
-    <div class="scard"><div class="n" style="color:var(--terra-300)">${stk>0?"🔥 "+stk:"—"}</div><div class="l">Racha (días)</div></div>
+    <div class="scard"><div class="n" style="color:var(--terra-300)">${ws.weekPlanned>0?`${ws.weekDone}/${ws.weekPlanned}`:"—"}</div><div class="l">Sesiones esta semana</div></div>
     <div class="scard"><div class="n">${adherenceTxt}</div><div class="l">Adherencia a comidas</div></div>
   </div>`;
 }
 
-// Sección de rachas e hitos (REQ-23)
+// Sección de racha (REQ-23). REQ-345: una sola tarjeta. El número manda; los
+// hitos del ciclo son paradas de una barra (no una lista con fechas) y el
+// desglose es una línea. La consistencia semanal vive en "Tus números".
+const STREAK_MILESTONE_LABELS={3:"3 días",7:"1 semana",14:"2 semanas",30:"1 mes"};
+// Avance de la barra: cada hito ocupa un tramo igual para que las etiquetas no se pisen.
+function streakTrackPct(days){
+  const levels=STREAK_MILESTONE_LEVELS,step=100/levels.length;
+  let from=0;
+  for(let i=0;i<levels.length;i++){
+    if(days<levels[i])return Math.round(step*i+step*(days-from)/(levels[i]-from));
+    from=levels[i];
+  }
+  return 100;
+}
 function renderStreakSection(){
   const s=streakStats();
   const stk=s.combCur;
-  const MILESTONE_ICONS={3:"🌱",7:"⭐",14:"🔥",30:"🏆"};
-  const MILESTONE_LABELS={3:"3 días",7:"1 semana",14:"2 semanas",30:"1 mes"};
-  // Recuperación: si la mejor racha supera la actual y el actual es 0 (racha rota ayer o antes)
+  const plural=(n,one,many)=>`${n} ${n===1?one:many}`;
+  // Recuperación: hubo racha y hoy está en 0 (se rompió ayer o antes).
   const broken=s.combBest>0&&stk===0;
   const recoveryHtml=broken
-    ?`<div class="streak-recovery">Tu mejor racha fue de <b>${s.combBest} día${s.combBest>1?"s":""}</b>. Retoma hoy: el progreso que hiciste no desaparece.</div>`:"";
-  // Consistencia semanal
-  const weekPct=s.weekPlanned>0?Math.round(s.weekDone/s.weekPlanned*100):null;
-  const weekHtml=s.weekPlanned>0?`
-  <div class="week-consist">
-    <div class="row between"><span style="font-size:13px;font-weight:600">Consistencia esta semana</span><span class="muted small">${s.weekDone}/${s.weekPlanned} sesiones</span></div>
-    <div class="week-consist-bar"><i style="width:${weekPct}%"></i></div>
-    <div class="muted small">${weekPct===100?"Semana perfecta de entrenamiento":weekPct>=50?"Más de la mitad de las sesiones completadas":"Quedan sesiones por completar esta semana"}</div>
-  </div>`:"";
-  // Hitos alcanzados (del ciclo actual)
-  const milestones=getStreakMilestones().filter(m=>m.cycle===cycleNumber()).sort((a,b)=>b.level-a.level);
-  const milestonesHtml=milestones.length?`<div class="milestones">${milestones.map(m=>`
-    <div class="milestone">
-      <div class="ms-ic">${MILESTONE_ICONS[m.level]||"🏅"}</div>
-      <div><div class="ms-lbl">${MILESTONE_LABELS[m.level]||m.level+" días"} de racha</div><div class="ms-date">${prettyDate(m.date)}</div></div>
-    </div>`).join("")}</div>`:"";
-  // Próximo hito
+    ?`<div class="streak-recovery">Tu mejor racha fue de <b>${plural(s.combBest,"día","días")}</b>. Retoma hoy: el progreso que hiciste no desaparece.</div>`:"";
+  const record=stk===0?""
+    :stk>=s.combBest?`<span class="streak-record best">Tu mejor marca</span>`
+    :`<span class="streak-record">Mejor: ${plural(s.combBest,"día","días")}</span>`;
+  // Hitos del ciclo actual: siguen logrados aunque la racha se haya cortado después.
+  const reached=new Map(getStreakMilestones().filter(m=>m.cycle===cycleNumber()).map(m=>[m.level,m.date]));
   const nextLevel=STREAK_MILESTONE_LEVELS.find(l=>l>stk);
-  const nextHint=nextLevel&&stk>0?`<div class="muted small" style="margin-top:8px;text-align:center">${nextLevel-stk} día${nextLevel-stk>1?"s":""} más para el hito de ${MILESTONE_LABELS[nextLevel]||nextLevel+" días"}</div>`:"";
-  return `
-  ${recoveryHtml}
-  <div class="streak-grid">
-    <div class="streak-card main">
-      <div class="streak-n">${stk>0?"🔥 "+stk:"—"}</div>
-      <div class="streak-lbl">Racha actual (combinada)</div>
-      <div class="streak-best">Mejor: ${s.combBest} día${s.combBest!==1?"s":""}</div>
+  const stops=STREAK_MILESTONE_LEVELS.map((level,i)=>{
+    const done=reached.has(level)||stk>=level;
+    const date=reached.get(level);
+    const state=done?(date?`, logrado el ${prettyDate(date).toLowerCase()}`:", logrado"):level===nextLevel?", siguiente":"";
+    return `<li class="${done?"done":level===nextLevel?"next":""}" style="--at:${100/STREAK_MILESTONE_LEVELS.length*(i+1)}%"><span class="streak-dot" aria-hidden="true"></span><span class="streak-stop">${STREAK_MILESTONE_LABELS[level]}<span class="streak-sr">${state}</span></span></li>`;
+  }).join("");
+  const nextText=broken?""
+    :!nextLevel?`Superaste el hito de ${STREAK_MILESTONE_LABELS[STREAK_MILESTONE_LEVELS.at(-1)]}. Sigue sumando.`
+    :stk===0?`Tu primer hito: ${STREAK_MILESTONE_LABELS[nextLevel]}.`
+    :`${nextLevel-stk===1?"Falta 1 día":`Faltan ${nextLevel-stk} días`} para el hito de ${STREAK_MILESTONE_LABELS[nextLevel]}.`;
+  // Desglose: el entreno cuenta sesiones (los descansos no suman ni cortan), por eso no es "días".
+  const split=s.nutCur>0||s.trainCur>0?`<dl class="streak-split">
+      <div><dt>Comidas</dt><dd>${plural(s.nutCur,"día seguido","días seguidos")}</dd></div>
+      <div><dt>Entreno</dt><dd>${plural(s.trainCur,"sesión seguida","sesiones seguidas")}</dd></div>
+    </dl>`:"";
+  return `<div class="streak-panel" id="streakPanel">
+    ${recoveryHtml}
+    <div class="streak-head">
+      <span class="streak-flame${stk>0?"":" off"}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${STREAK_FLAME_PATH}"/></svg></span>
+      <div class="streak-now">
+        <div class="streak-count"><span class="streak-n">${stk}</span><span class="streak-unit">${stk===1?"día seguido":"días seguidos"}</span></div>
+        ${record}
+      </div>
     </div>
-    <div class="streak-card">
-      <div class="streak-n" style="font-size:20px">${s.nutCur}</div>
-      <div class="streak-lbl">Nutrición</div>
-      <div class="streak-best">Mejor: ${s.nutBest}</div>
+    <p class="streak-rule">Suma un día cuando cumples tus comidas y tu entreno. Los descansos planificados no la rompen.</p>
+    <div class="streak-track">
+      <div class="streak-rail" aria-hidden="true"><i style="width:${streakTrackPct(stk)}%"></i></div>
+      <ol class="streak-stops" aria-label="Hitos de racha">${stops}</ol>
     </div>
-    <div class="streak-card">
-      <div class="streak-n" style="font-size:20px">${s.trainCur}</div>
-      <div class="streak-lbl">Entrenamiento</div>
-      <div class="streak-best">Mejor: ${s.trainBest}</div>
-    </div>
-  </div>
-  ${weekHtml}
-  ${nextHint}
-  ${milestonesHtml}
-  <div class="streak-share-actions"><button type="button" class="btn" onclick="shareStreak()">Compartir mi racha</button><button type="button" class="btn" onclick="openStreakFriends()">Ver amigos</button></div>`;
+    ${nextText?`<p class="streak-next">${nextText}</p>`:""}
+    ${split}
+  </div>`;
 }
 // REQ-195: semana del ciclo en la que cae hoy (1 antes de empezar, la última al terminar).
 function currentWeightWeek(){
