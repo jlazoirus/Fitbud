@@ -42,7 +42,7 @@
 
     document.getElementById("planes").innerHTML = PLANES_TIENDA.map((p) => `
       <article class="plan${p.destacado ? " destacado" : ""}" aria-labelledby="plan-${p.id}">
-        <img class="plan-img" src="${p.imagen}" alt="${esc(p.nombre)}: ${esc(p.periodo)} de acceso a Evolv" width="1200" height="750" loading="lazy">
+        <img class="plan-img" src="${p.imagen}" alt="${esc(p.imagenAlt)}" width="1200" height="750" loading="lazy">
         <div class="plan-body">
           <div class="plan-top"><h2 class="plan-nombre" id="plan-${p.id}">${esc(p.nombre)}</h2>${p.destacado ? `<span class="plan-badge">${esc(p.destacado)}</span>` : ""}</div>
           <div class="plan-precio">${formatoSoles(p.montoCentimos)} <small>/ ${esc(p.periodo)}</small></div>

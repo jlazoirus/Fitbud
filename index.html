@@ -10039,7 +10039,7 @@ function landingPricingHtml(){
       const isHi=!!p.destacado;
       const items=p.incluye.map(f=>`<div class="l-plan-item">${tick}<span>${esc(f)}</span></div>`).join("");
       return`<div class="l-plan l-plan-store${isHi?" highlight":""}">
-        <img class="l-plan-img" src="${esc(p.imagen)}" alt="${esc(p.nombre)}: ${esc(p.periodo)} de acceso a Evolv" width="1200" height="750" loading="lazy">
+        <img class="l-plan-img" src="${esc(p.imagen)}" alt="${esc(p.imagenAlt)}" width="1200" height="750" loading="lazy">
         ${isHi?`<div class="l-plan-badge">${esc(p.destacado)}</div>`:""}
         <div class="l-plan-name">${esc(p.nombre)}</div>
         <div class="l-plan-price"><span class="l-plan-cur">S/</span>${(p.montoCentimos/100).toFixed(2)} <span class="l-plan-period">/ ${esc(p.periodo)}</span></div>
