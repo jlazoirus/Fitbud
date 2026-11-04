@@ -2283,4 +2283,8 @@ Número, hitos como paradas de una barra, desglose en una línea y amigos con un
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-En "Cambiar entrenamiento": tus guardados y los entrenos de los últimos 21 días, con sus ejercicios, series, repeticiones y carga. ✓ `tests/e2e/repetir-entreno.spec.js`.
+✓ `tests/e2e/repetir-entreno.spec.js`.
+
+## REQ-347 - Nutrición: "Registrar comida" alineado
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/registrar-comida-estilos.spec.js`.
