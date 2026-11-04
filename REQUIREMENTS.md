@@ -2272,3 +2272,9 @@ Términos y devoluciones siguen las secciones de las guías de Culqi; WhatsApp v
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Contacto del proveedor, declaración jurada como firma, quién recibe y respuesta del proveedor en la hoja. ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda.spec.js`.
+
+## REQ-346 - Entreno: repetir un entreno pasado y guardarlo para elegirlo otro día
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+En "Cambiar entrenamiento": tus guardados y los entrenos de los últimos 21 días, con sus ejercicios, series, repeticiones y carga. ✓ `tests/e2e/repetir-entreno.spec.js`.

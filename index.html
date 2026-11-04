@@ -378,6 +378,20 @@
   .routine-picker{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
   .routine-picker-h{font-size:13px;color:var(--muted);margin-bottom:6px}
   .routine-remember{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px;min-height:44px}
+  /* REQ-346: repetir un entreno pasado o uno guardado */
+  .wk-copy-row{display:flex;align-items:stretch;gap:8px;margin-bottom:8px}
+  .wk-copy-row .opt{flex:1 1 auto;min-width:0;margin:0}
+  .wk-copy-row > .btn{flex:0 0 auto;align-self:center}
+  .wk-copy-saved{flex:0 0 auto;align-self:center;font-size:12px;color:var(--muted);padding:0 6px}
+  .wk-repeat-line b{color:var(--txt);font-weight:600}
+  .wk-copy-done{margin-top:12px}
+  .saved-wk-label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px}
+  .saved-wk-input{width:100%;min-height:44px;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:11px;font-size:16px;font-family:inherit}
+  .saved-wk-input:focus{outline:none;border-color:var(--accent)}
+  .saved-wk-list{list-style:none;margin:14px 0;padding:0;display:flex;flex-direction:column;gap:6px;font-variant-numeric:tabular-nums}
+  .saved-wk-list li{display:flex;justify-content:space-between;gap:12px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1);font-size:14px}
+  .saved-wk-list li b{font-weight:600;min-width:0;overflow-wrap:anywhere}
+  .saved-wk-list li span{flex:0 0 auto;color:var(--muted)}
   .wk-planline{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;margin:0 0 10px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf1);color:var(--txt);font:inherit;text-align:left;cursor:pointer}
   .wk-planline-main{display:flex;flex-direction:column;gap:2px;min-width:0}
   .wk-planline-main b{font-size:14px;overflow-wrap:anywhere}
@@ -5706,7 +5720,9 @@ function workoutPrescription(ds){
   const custom=isStrengthWorkout(workout)?dayCustomExercises(ds):[];
   if(custom.length)prescribedIds=custom;
   const exercises=prescribedIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
-  return buildWorkoutPrescription(workout,exercises,workoutPlayerContext(ds));
+  const prescription=buildWorkoutPrescription(workout,exercises,workoutPlayerContext(ds));
+  // REQ-346: un entreno repetido trae sus series y repeticiones de entonces.
+  return custom.length?applyRepeatDoses(ds,prescription):prescription;
 }
 function buildWorkoutPrescription(workout,exercises,context){
   const input=workout&&workout.cardioRole?{...workout,id:workout.cardioRole}:workout;
@@ -5975,7 +5991,9 @@ function prefillStepFromLastTime(ds,step){
   const slug=step.exerciseSlug;
   const pending=step.sets.filter(set=>!set.done&&set.prefillFor!==slug);
   if(!pending.length)return false;
-  const perf=lastWorkoutPerformance(ds,slug);
+  // REQ-346: al repetir un entreno concreto, se precarga lo de ese día (no lo último).
+  const rep=dayRepeatWorkout(ds),src=rep&&rep.bySlug[slug];
+  const perf=src?{unit:src.unit,sets:src.sets}:lastWorkoutPerformance(ds,slug);
   const sameUnit=perf&&(perf.unit||"reps")===(step.unit||"reps");
   step.sets.forEach((set,index)=>{
     if(set.done||set.prefillFor===slug)return;
@@ -6887,6 +6905,7 @@ function renderWorkoutExecution(ds,execution){
       </div>
       <div class="muted small">${esc(painLabels[execution.pain]||"Cierre sin respuesta")} · ${esc(difficultyLabels[execution.difficulty]||"Dificultad sin respuesta")}</div>
       ${execution.notes?`<div class="exercise-copy"><b>Notas:</b> ${esc(execution.notes)}</div>`:""}
+      ${workoutSaveCopyHtml(ds)}
       ${execution.status==="partial"&&!execution.needsReview&&progress.remaining?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="resumePartialWorkout('${ds}')">Continuar sesión</button>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&execution.pain==="none"&&!progress.remaining&&!progress.skipped&&!pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="markWorkoutCompleted('${ds}')">Marcar como completada</button>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&!progress.remaining&&ds===todayStr()&&pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="reviewPendingWorkoutSets('${ds}')">Marcar ${seriesCount(pendingSets.length)} sin registrar</button>`:""}
@@ -6965,7 +6984,7 @@ function routineSuggestionHtml(ds,workout){
 function useSavedRoutine(ds){
   const saved=savedRoutineFor(routineFamily(effectiveWorkout(ds).workout));if(!saved)return;
   const st=dayState(ds);
-  st.customExercises=[...saved.exerciseIds];delete st.routineChoice;
+  st.customExercises=[...saved.exerciseIds];delete st.routineChoice;delete st.repeatWorkout;
   commitDay(ds);render();toast("Hoy haces tu rutina");
 }
 function dismissSavedRoutine(ds){
@@ -6975,7 +6994,7 @@ function dismissSavedRoutine(ds){
 }
 function resetDayRoutine(ds){
   const st=dayState(ds);
-  delete st.customExercises;st.routineChoice="plan";
+  delete st.customExercises;delete st.repeatWorkout;st.routineChoice="plan";
   commitDay(ds);render();toast("Vuelves a la rutina del plan");
 }
 let routineDraft=null;
@@ -7055,6 +7074,179 @@ async function saveRoutineDraft(){
     profile.prefs=prefs;
     try{await saveProfilePrefs(prefs,{source:"system",reason:"Rutina propia",skipPlanVersion:true});}catch(e){}
   }
+}
+/* ---- REQ-346: repetir un entreno pasado y guardarlo para elegirlo después ----
+   Una copia son los ejercicios en el orden en que se hicieron (con lo que se
+   sustituyó o añadió) y, de cada uno, las series registradas (reps y carga).
+   Aplicarla usa la rutina del día de REQ-338 (customExercises) y además
+   day_log.state.repeatWorkout, que fija cuántas series hay y con qué valores se
+   precargan. Las guardadas viven en profiles.prefs.savedWorkouts y aparecen en
+   "Cambiar entrenamiento". */
+const SAVED_WORKOUTS_MAX=12,REPEAT_RECENT_DAYS=21,REPEAT_RECENT_MAX=6;
+function cleanWorkoutCopyExercises(list){
+  const seen=new Set();
+  return (Array.isArray(list)?list:[]).filter(item=>{
+    if(!item||typeof item.slug!=="string"||seen.has(item.slug)||!exerciseBySlug(item.slug,true))return false;
+    seen.add(item.slug);return true;
+  }).map(item=>({slug:item.slug,unit:item.unit==="seg"?"seg":"reps",
+    sets:(Array.isArray(item.sets)?item.sets:[]).slice(0,10).map(set=>{
+      const reps=set&&set.reps!=null&&set.reps!==""&&Number.isFinite(+set.reps)?Math.max(0,Math.round(+set.reps)):null;
+      return {reps,load:String(set&&set.load!=null?set.load:"").trim().slice(0,24)};
+    })}))
+    .filter(item=>item.sets.length);
+}
+function workoutCopyFromDay(ds){
+  const ex=S.days[ds]&&S.days[ds].workoutExecution;
+  if(!ex||!Array.isArray(ex.steps)||(ex.sessionType&&ex.sessionType!=="strength"))return null;
+  const exercises=cleanWorkoutCopyExercises(ex.steps.filter(step=>step&&step.type==="strength"&&Array.isArray(step.sets))
+    .map(step=>({slug:step.exerciseSlug,unit:step.unit,sets:step.sets.filter(set=>set&&set.done)})));
+  // "Gimnasio · Full body A" → "Full body A": el tipo ya se sabe y el nombre se lee mejor.
+  const name=String(ex.prescriptionName||(ex.contentPrescription&&ex.contentPrescription.name)||"Entrenamiento").replace(/^(Gimnasio|Peso corporal)\s*·\s*/,"");
+  return exercises.length?{name:name.slice(0,40),workoutId:String(ex.workoutId||""),from:ds,exercises}:null;
+}
+function recentWorkoutCopies(ds){
+  const oldest=addDays(ds,-REPEAT_RECENT_DAYS);
+  return Object.keys(S.days).filter(d=>d<ds&&d>=oldest).sort().reverse()
+    .map(workoutCopyFromDay).filter(Boolean).slice(0,REPEAT_RECENT_MAX);
+}
+function savedWorkouts(){
+  const list=profile&&profile.prefs&&Array.isArray(profile.prefs.savedWorkouts)?profile.prefs.savedWorkouts:[];
+  return list.filter(w=>w&&typeof w.id==="string").map(w=>({...w,exercises:cleanWorkoutCopyExercises(w.exercises)})).filter(w=>w.exercises.length);
+}
+function dayRepeatWorkout(ds){
+  const rep=S.days[ds]&&S.days[ds].repeatWorkout;
+  if(!rep||!Array.isArray(rep.exercises))return null;
+  const bySlug={};cleanWorkoutCopyExercises(rep.exercises).forEach(item=>{bySlug[item.slug]=item;});
+  return {...rep,bySlug};
+}
+function workoutCopyDayLabel(ds){
+  const d=parseYmd(ds);
+  return `${DOW[d.getDay()].toLowerCase()} ${d.getDate()} ${MON[d.getMonth()]}`;
+}
+function workoutCopyNames(copy){return routineNamesLine(copy.exercises.map(item=>item.slug));}
+function workoutCopySetsLine(item){
+  const reps=item.sets.map(set=>set.reps).filter(Number.isFinite);
+  const loads=item.sets.map(set=>set.load).filter(Boolean);
+  const unit=item.unit==="seg"?" s":"";
+  const range=reps.length?(Math.min(...reps)===Math.max(...reps)?`${reps[0]}${unit}`:`${Math.min(...reps)}-${Math.max(...reps)}${unit}`):"";
+  return [range?`${item.sets.length} × ${range}`:seriesCount(item.sets.length),loads.length?workoutLoadLabel(loads[loads.length-1]):""].filter(Boolean).join(" · ");
+}
+// REQ-346: en la prescripción del día, cada ejercicio repetido lleva sus series de entonces.
+function applyRepeatDoses(ds,prescription){
+  const rep=dayRepeatWorkout(ds);if(!rep)return prescription;
+  prescription.steps.forEach(step=>{
+    const src=step.type==="strength"&&rep.bySlug[step.exerciseSlug];if(!src)return;
+    step.prescribedSets=Math.min(10,Math.max(1,src.sets.length));
+    const reps=src.sets.map(set=>set.reps).filter(Number.isFinite);
+    if(reps.length&&src.unit===(step.unit||"reps")){
+      const lo=Math.min(...reps),hi=Math.max(...reps);
+      const suffix=String(step.reps||"").replace(/^[\d\s-]+/,"").trim();
+      step.reps=`${lo===hi?lo:`${lo}-${hi}`}${suffix?" "+suffix:""}`;
+    }
+  });
+  return prescription;
+}
+function workoutChangeBlocked(ds){
+  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return true;}
+  const execution=normalizedWorkoutExecution(ds);
+  if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return true;}
+  if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return true;}
+  return false;
+}
+function applyWorkoutCopy(ds,copy,savedId){
+  if(!copy||workoutChangeBlocked(ds))return;
+  const d=dayState(ds);
+  // La sesión del original si existe en el plan de ese día; si hoy no toca fuerza, la primera de fuerza.
+  const same=copy.workoutId?workoutById(ds,copy.workoutId):null;
+  const target=same&&isStrengthWorkout(same)?same
+    :isStrengthWorkout(effectiveWorkout(ds).workout)?null:workoutOptions(ds).find(isStrengthWorkout);
+  if(!target&&!isStrengthWorkout(effectiveWorkout(ds).workout)){toast("Tu plan no tiene sesiones de fuerza para repetirlo");return;}
+  if(target){if(target.id!==plannedWorkoutId(ds))d.workoutOverride=target.id;else delete d.workoutOverride;}
+  d.customExercises=copy.exercises.map(item=>item.slug);
+  d.repeatWorkout={name:copy.name,exercises:copy.exercises,...(savedId?{savedId}:{from:copy.from})};
+  delete d.routineChoice;
+  commitDay(ds);closeModal();render();
+  toast(savedId?`Hoy haces «${copy.name}»`:`Hoy repites tu entreno del ${workoutCopyDayLabel(copy.from)}`);
+}
+function repeatRecentWorkout(ds,from){applyWorkoutCopy(ds,workoutCopyFromDay(from),null);}
+function useSavedWorkout(ds,id){
+  const saved=savedWorkouts().find(w=>w.id===id);
+  if(saved)applyWorkoutCopy(ds,{name:saved.name,workoutId:saved.workoutId||"",exercises:saved.exercises},saved.id);
+}
+function clearRepeatWorkout(d){if(d.repeatWorkout){delete d.repeatWorkout;delete d.customExercises;}}
+// Un solo "Volver al plan" deshace la repetición, también la sesión que se cambió para hacerla.
+function leaveRepeatWorkout(ds){
+  if(effectiveWorkout(ds).overridden){setWorkout(ds,null);return;}
+  resetDayRoutine(ds);
+}
+function repeatWorkoutLineHtml(ds){
+  const rep=dayRepeatWorkout(ds);if(!rep||!dayCustomExercises(ds).length)return "";
+  return `<span class="wk-repeat-line">${rep.savedId?`Tu entreno guardado: <b>${esc(rep.name)}</b>`:`Repites tu entreno del <b>${esc(workoutCopyDayLabel(rep.from))}</b>`}, con los mismos ejercicios, series y repeticiones.</span>`;
+}
+// REQ-346: al terminar (o después), el entreno hecho se puede guardar para repetirlo.
+function workoutSaveCopyHtml(ds){
+  if(!workoutCopyFromDay(ds))return "";
+  if(savedWorkouts().some(w=>w.from===ds))return `<div class="muted small wk-copy-done">Guardado en tus entrenamientos: lo encuentras en «Cambiar entrenamiento».</div>`;
+  return `<button class="btn" style="width:100%;margin-top:12px" onclick="openSaveWorkoutCopy('${ds}')">Guardar para repetirlo</button>`;
+}
+let workoutCopyDraft=null;
+function openSaveWorkoutCopy(from,returnTo){
+  const copy=workoutCopyFromDay(from);if(!copy)return;
+  workoutCopyDraft={copy,returnTo:returnTo||null};
+  const weekday=DOW[parseYmd(from).getDay()].toLowerCase();
+  modal(`<h3>Guardar entrenamiento</h3>
+    <p class="muted small">Lo verás en «Cambiar entrenamiento» para repetirlo cuando quieras, con los mismos ejercicios, series y repeticiones.</p>
+    <label class="saved-wk-label" for="saved_workout_name">Nombre</label>
+    <input class="saved-wk-input" id="saved_workout_name" maxlength="40" autocomplete="off" value="${esc(`${copy.name} del ${weekday}`.slice(0,40))}">
+    <ol class="saved-wk-list">${copy.exercises.map(item=>`<li><b>${esc((exerciseBySlug(item.slug,true)||{}).name||item.slug)}</b><span>${esc(workoutCopySetsLine(item))}</span></li>`).join("")}</ol>
+    <button class="btn btn-accent" style="width:100%" onclick="saveWorkoutCopy()">Guardar</button>
+    ${returnTo?`<button class="btn" style="width:100%;margin-top:8px" onclick="openWorkoutPicker('${returnTo}')">Volver</button>`:""}`);
+}
+async function saveWorkoutCopy(){
+  const draft=workoutCopyDraft;if(!draft||!profile||!profile.prefs)return;
+  const input=document.getElementById("saved_workout_name");
+  const name=String(input&&input.value||"").trim().slice(0,40)||draft.copy.name;
+  const prefs=migrateProfilePrefs(profile.prefs);
+  // Guardar dos veces el mismo día reemplaza la copia anterior en vez de duplicarla.
+  const others=(Array.isArray(prefs.savedWorkouts)?prefs.savedWorkouts:[]).filter(w=>w&&w.from!==draft.copy.from);
+  const entry={id:`sw-${Date.now().toString(36)}${Math.random().toString(36).slice(2,6)}`,name,workoutId:draft.copy.workoutId,
+    from:draft.copy.from,exercises:draft.copy.exercises,savedAt:new Date().toISOString()};
+  prefs.savedWorkouts=[entry,...others].slice(0,SAVED_WORKOUTS_MAX);
+  profile.prefs=prefs;workoutCopyDraft=null;
+  if(draft.returnTo)openWorkoutPicker(draft.returnTo);else{closeModal();render();}
+  toast(`Guardado: lo verás en «Cambiar entrenamiento»`);
+  try{await saveProfilePrefs(prefs,{source:"system",reason:"Entreno guardado",skipPlanVersion:true});}catch(e){}
+}
+async function removeSavedWorkout(ds,id){
+  const saved=savedWorkouts().find(w=>w.id===id);
+  if(!saved||!profile||!profile.prefs||!confirm(`¿Quitar «${saved.name}» de tus entrenamientos guardados?`))return;
+  const prefs=migrateProfilePrefs(profile.prefs);
+  prefs.savedWorkouts=(prefs.savedWorkouts||[]).filter(w=>w&&w.id!==id);
+  profile.prefs=prefs;
+  openWorkoutPicker(ds);
+  try{await saveProfilePrefs(prefs,{source:"system",reason:"Entreno guardado",skipPlanVersion:true});}catch(e){}
+}
+function workoutCopyPickerHtml(ds){
+  const saved=savedWorkouts(),recent=recentWorkoutCopies(ds);
+  const savedFrom=new Set(saved.map(w=>w.from));
+  const rep=dayRepeatWorkout(ds);
+  const row=(main,action)=>`<div class="wk-copy-row">${main}${action}</div>`;
+  let html="";
+  if(saved.length){
+    html+=`<div class="section-h" style="margin-left:0">Tus entrenamientos guardados</div>`+saved.map(w=>row(
+      `<button class="opt" onclick="useSavedWorkout('${ds}','${esc(w.id)}')"${rep&&rep.savedId===w.id?' style="border-color:var(--accent)"':""}><b>${esc(w.name)}</b>${rep&&rep.savedId===w.id?" ✓":""}<div class="o-meta">${w.exercises.length} ejercicios · ${esc(workoutCopyNames(w))}</div></button>`,
+      `<button class="btn btn-sm" onclick="removeSavedWorkout('${ds}','${esc(w.id)}')" aria-label="Quitar ${esc(w.name)}">Quitar</button>`)).join("");
+  }
+  if(recent.length){
+    html+=`<div class="section-h" style="margin-left:0">Repetir uno reciente</div>`+recent.map(c=>{
+      const day=workoutCopyDayLabel(c.from);
+      return row(
+        `<button class="opt" onclick="repeatRecentWorkout('${ds}','${c.from}')"${rep&&rep.from===c.from?' style="border-color:var(--accent)"':""}><b>${esc(day.charAt(0).toUpperCase()+day.slice(1))} · ${esc(c.name)}</b>${rep&&rep.from===c.from?" ✓":""}<div class="o-meta">${c.exercises.length} ejercicios · ${esc(workoutCopyNames(c))}</div></button>`,
+        savedFrom.has(c.from)?`<span class="wk-copy-saved">Guardado</span>`
+          :`<button class="btn btn-sm" onclick="openSaveWorkoutCopy('${c.from}','${ds}')" aria-label="Guardar el entreno del ${esc(day)}">Guardar</button>`);
+    }).join("");
+  }
+  return html;
 }
 function workoutPlanSummaryHtml(prescription,ds){
   const steps=(prescription&&prescription.steps)||[];
@@ -7193,6 +7385,8 @@ function renderWorkout(){
   const generatedVersion=activeGeneratedTrainingVersion();
   // REQ-291: en fuerza, el lugar es el de la sesión (también si se eligió en un día de deporte).
   const strengthDay=isStrengthWorkout(ew.workout);
+  // REQ-346: repitiendo un entreno, la tarjeta lo dice en lugar de la descripción del plan.
+  const repeating=strengthDay&&!!dayRepeatWorkout(ds)&&dayCustomExercises(ds).length>0;
   const dayPlace=strengthDay?dayTrainingPlace(ds):null;
   const plannedPlace=plannedStrengthPlace(ds);
   const location=strengthDay?(dayPlace||plannedPlace):plannedTrainingLocation(ds);
@@ -7227,8 +7421,8 @@ function renderWorkout(){
   const workoutCardHtml=section("wk.entreno","Entrenamiento",`<div class="workout">
     <div class="meal-head">
       <div>
-        <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}${strengthDay&&dayCustomExercises(ds).length?' <span class="pill routine-pill">tu rutina</span>':''}</div>
-        <div class="detail">${esc(ew.workout.detail)}</div>
+        <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden&&!repeating?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}${strengthDay&&dayCustomExercises(ds).length?` <span class="pill routine-pill">${repeating?"repetido":"tu rutina"}</span>`:''}</div>
+        <div class="detail">${repeating&&!execution?repeatWorkoutLineHtml(ds):esc(ew.workout.detail)}</div>
         ${location&&!restDay&&!freeDay?`<div class="muted small wk-location">Lugar: ${esc(TRAINING_LOCATION_LABELS[location])}${dayPlace?" · solo este día":""}</div>`:""}
         ${workoutStatusHtml(ds,execution)}
       </div>
@@ -7244,8 +7438,9 @@ function renderWorkout(){
       ${restDay?`<span class="muted small">${manualActivities(st).length?"Descanso planificado, pero entrenaste igual: cuenta como día entrenado.":"Descanso planificado: no cuenta como sesión incompleta."}</span>`:""}
       <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()||execution||st.workoutDone?"disabled":""}>Cambiar entrenamiento</button>
       ${strengthDay&&!execution&&!st.workoutDone&&!trainingSafetyHold()?`<button class="btn btn-sm" onclick="openRoutineEditor('${ds}')">Editar ejercicios</button>`:""}
-      ${strengthDay&&dayCustomExercises(ds).length&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="resetDayRoutine('${ds}')">Volver a la rutina del plan</button>`:""}
-      ${ew.overridden&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
+      ${strengthDay&&dayRepeatWorkout(ds)&&dayCustomExercises(ds).length&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="leaveRepeatWorkout('${ds}')">Volver al plan</button>`:""}
+      ${strengthDay&&!dayRepeatWorkout(ds)&&dayCustomExercises(ds).length&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="resetDayRoutine('${ds}')">Volver a la rutina del plan</button>`:""}
+      ${ew.overridden&&!(strengthDay&&dayRepeatWorkout(ds))&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
       ${dayPlace&&!execution&&!st.workoutDone&&!trainingSafetyHold()?`<button class="btn btn-sm" onclick="setDayTrainingPlace('${ds}',null)">${esc(dayPlaceBackLabel(plannedPlace))}</button>`:''}
       ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar ${adaptDayLabel(ds)}:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button>${strengthDay||training.strength!=="none"?`<button class="btn btn-sm" onclick="openDayTrainingPlace('${ds}')">${dayPlace?"Cambiar lugar":strengthDay&&plannedPlace!=="gym"?"En el gimnasio":"En casa"}</button>`:""}<button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
@@ -7447,11 +7642,13 @@ function openWorkoutPicker(ds){
   // El grupo de fuerza filtra por el tipo de sesión ("Peso corporal" en casa o aire libre).
   const groups=[[prefs.strength==="gym"?"Gimnasio":"Peso corporal","💪"],[SPORT_LABELS[prefs.primary],"◉"],["Descanso","☾"]];
   let html=`<h3>Cambiar entrenamiento</h3><p class="muted small">Tu plan combina <b>${SPORT_LABELS[prefs.primary]}</b> con <b>${STRENGTH_LABELS[prefs.strength]}</b>. La sesión planificada es <b>${esc(ew.planned.name)}</b>.</p>`;
+  // REQ-346: primero lo propio: guardados y los últimos entrenos, para repetirlos tal cual.
+  html+=workoutCopyPickerHtml(ds);
   groups.forEach(([k,ic])=>{
     const opts=options.filter(o=>o.kind===k);
     html+=`<div class="section-h" style="margin-left:0">${ic} ${k}</div>`;
     opts.forEach(o=>{
-      const cur=o.id===ew.id, plan=o.id===ew.plannedId;
+      const cur=o.id===ew.id&&!dayRepeatWorkout(ds), plan=o.id===ew.plannedId;
       html+=`<button class="opt" onclick="setWorkout('${ds}','${o.id}')" style="${cur?'border-color:var(--accent)':''}">${esc(o.name)}${cur?' ✓':''}${plan?' <span class="muted small">(plan)</span>':''}<div class="o-meta">${esc(o.detail)}</div></button>`;
     });
   });
@@ -7463,6 +7660,7 @@ function setWorkout(ds,id){
   if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
   if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
   const d=dayState(ds);if(id&&id!==plannedWorkoutId(ds))d.workoutOverride=id;else delete d.workoutOverride;
+  clearRepeatWorkout(d); // REQ-346: elegir una sesión del plan deja de repetir el entreno anterior.
   // REQ-291: volver a un plan de deporte deja también el lugar del día.
   if(!d.workoutOverride&&!isStrengthWorkout(effectiveWorkout(ds).workout))delete d.trainingPlace;
   commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");
