@@ -13104,3 +13104,45 @@ No se podía elegir un día concreto del historial, ni repetir su número de ser
 - Al empezar hoy, las series llegan con lo de ese día (10 × 40, …, 6 × 50) y no con lo de ayer (5 × 30).
 
 Además, `entreno.spec.js` y `rutina-propia.spec.js` en verde; detector de diseño sin hallazgos; capturas a 390 px.
+
+## REQ-347 - Racha: compartir envía tu invitación
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan, desde su iPhone en Progreso (2026-11-04): "El botón de compartir mi racha está mal, genera este link, es confuso, no sirve, y la interfaz no hace fácil compartir racha con amigos, es repetitiva". El texto compartido era "Llevo 9 días de racha en Evolv. ¿Te sumas? https://evolvapp.club/". El amigo llegaba a la portada sin ninguna invitación, así que no podía sumarse a la comparación. La tarjeta tenía "Compartir mi racha" en la cabecera, "Crear invitación", "Actualizar rachas" y, con el enlace creado, "Compartir invitación" y "Crear otro enlace": había cinco acciones para un mismo objetivo.
+
+### Causa raíz
+
+`shareStreak()` (`js/streak-friends.js`) componía el texto con la URL fija de la portada. La invitación personal (`streakInviteUrl()`) solo salía por un camino aparte. `streakFriendsBody()` sumaba los botones de los dos caminos.
+
+### Alcance
+
+1. Se elimina `shareStreak()`. Compartir envía "Llevo N días de racha en Evolv. Acepta mi invitación y comparemos rachas: https://evolvapp.club/#friend=<token>" ("Estoy empezando mi racha…" con 0 días).
+2. Hay una sola acción, "Invitar a un amigo" (`inviteStreakFriend`):
+   - Con la comparación activada, crea el enlace (o reutiliza el vigente) y abre el selector del dispositivo.
+   - Sin activar, lleva al alias. "Crear invitación" activa, crea el enlace y abre compartir.
+3. Con un enlace a la vista se muestran "Compartir enlace" y "Cancelar enlace". Se quitan "Crear otro enlace" y el "Compartir mi racha" de la cabecera.
+4. "Actualizar rachas" pasa a ser un botón pequeño, "Actualizar", en la cabecera. En el estado "estará disponible pronto" sigue como reintento.
+5. Si el navegador rechaza compartir tras esperar a la red (`NotAllowedError` en iOS), no se muestra error y "Compartir enlace" queda enfocado para un segundo toque.
+6. Cada enlace sirve para un amigo. Cuando aparece un amigo nuevo que no viene de aceptar una invitación propia, el enlace mostrado se da por usado y se oculta.
+7. Con la comparación activada, la tarjeta muestra la clasificación directamente, sin el paso "Comparar con amigos".
+8. `CACHE_NAME` → `fitbud-pwa-v211`.
+
+### Fuera de alcance
+
+Mostrar el enlace vigente tras recargar, que exigiría cambiar la RPC `streak_social`. Sin cambios de SQL.
+
+### Criterios de aceptación
+
+- El texto compartido lleva la racha real y el enlace `#friend=<64 hex>`. Volver a compartir reutiliza el mismo enlace. Cancelar no anuncia nada. Sin selector se copia el mensaje y, si copiar falla, queda el campo para copiarlo a mano. ✓ `tests/e2e/rachas-amigos.spec.js`.
+- En la tarjeta hay un solo botón de compartir y no aparecen "Compartir mi racha" ni "Crear otro enlace". Cerrada, la tarjeta muestra solo "Invitar a un amigo". ✓ `tests/e2e/rachas-amigos.spec.js`, `tests/e2e/racha.spec.js`.
+- Con `NotAllowedError`, "Compartir enlace" queda enfocado y el segundo toque comparte. ✓ `tests/e2e/rachas-amigos.spec.js`.
+- Cuando un amigo acepta, el enlace usado desaparece y "Invitar a un amigo" crea uno nuevo. ✓ `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-308 - Consola de administración separada en /admin
+
+**Estado: implementado.**
+
+Jonathan (2026-10-30): separar la consola de administración a otra URL y dar acceso a Sathya (b.ll.sathya@gmail.com, mismos permisos de administrador). La consola vive en `/admin` (rewrite de `vercel.json` al mismo `index.html`; el modo consola se activa por ruta). La app de usuarios ya no renderiza vistas de administración para nadie: `setView` las bloquea fuera del modo consola, el despachador de `render()` exige modo consola y Perfil solo enlaza a `/admin`. En `/admin`: sin sesión → login; sesión sin `is_admin` → pantalla "Sin acceso"; admin → consola con pestañas propias (Beta, Usuarios, Alimentos, Ejercicios, Analítica, Ajustes) y vuelta a la app. El enlace del correo de aviso de postulantes y la tarjeta de pendientes en Hoy apuntan a `/admin?ver=postulantes`. La autorización real no cambia: ya era server-side (`api/admin` valida JWT + `is_admin`; RLS protege los datos). El alta de Sathya es un paso operativo en Supabase (`is_admin=true` en su perfil), fuera del repo. ✓ `tests/e2e/admin-console.spec.js`; `tests/e2e/admin-beta.spec.js` actualizado.

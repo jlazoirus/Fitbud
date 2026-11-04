@@ -47,6 +47,10 @@ async function enable(page,alias='Mi alias',{invited=false}={}){
   if(invited)await expect(page.getByRole('button',{name:'Aceptar amistad'})).toBeVisible();
   else await expect(page.getByLabel(/Invitación para un amigo/)).toBeVisible();
 }
+const mockShare=page=>page.evaluate(()=>{
+  window.shared=[];
+  Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{window.shared.push(data);}});
+});
 
 test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,context,social})=>{
   const errors=collectConsoleErrors(page);
@@ -73,10 +77,13 @@ test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,co
   await expect(list.locator('.streak-place')).toHaveText(['1','2']);
   page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Eliminar amistad con Bruno'}).click();
   await expect(list.locator('li')).toHaveCount(1);expect((await social.rpc(FRIEND)).rows).toHaveLength(1);
-  // Cancelar también funciona después de que el primer enlace se haya usado.
-  await page.getByRole('button',{name:'Crear otro enlace'}).click();
+  // REQ-347: el enlace usado por Bruno desaparece; uno nuevo se crea con el mismo botón.
+  await expect(page.getByLabel(/Invitación para un amigo/)).toHaveCount(0);
+  await mockShare(page);
+  await page.getByRole('button',{name:'Invitar a un amigo'}).click();
+  await expect(page.getByLabel(/Invitación para un amigo/)).not.toHaveValue(link);
   await page.getByRole('button',{name:'Cancelar enlace'}).click();
-  await expect(page.getByRole('button',{name:'Crear invitación'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Invitar a un amigo'})).toBeVisible();
   await expect(page.getByLabel(/Invitación para un amigo/)).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -105,26 +112,75 @@ test('invitación persiste durante login y exige activar y aceptar antes de most
   expect((await social.rpc(FRIEND)).rows).toHaveLength(1);
 });
 
-test('compartir usa la racha real, copiar es fallback y cancelar no anuncia éxito',async({page,context,social})=>{
+// REQ-347: compartir la racha lleva siempre el enlace personal; no hay enlace genérico a la portada.
+test('compartir la racha envía la invitación personal con la racha real',async({page,context,social})=>{
   await setup(page,context,social,[row(-2),row(-1)]);
-  await page.evaluate(()=>{
-    window.shared=[];
-    Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{window.shared.push(data);}});
-  });
-  await page.locator('#streakFriends').getByRole('button',{name:'Compartir mi racha'}).click();
-  expect(await page.evaluate(()=>window.shared[0].text)).toBe('Llevo 2 días de racha en Evolv. ¿Te sumas? https://evolvapp.club/');
+  await mockShare(page);
+  await enable(page,'Ana');
+  // Al crear la invitación se abre compartir con la racha y el enlace.
+  const link=await page.getByLabel(/Invitación para un amigo/).inputValue();
+  expect(link).toMatch(/^https:\/\/evolvapp\.club\/#friend=[a-f0-9]{64}$/);
+  await expect.poll(()=>page.evaluate(()=>window.shared.length)).toBe(1);
+  expect(await page.evaluate(()=>window.shared[0].text)).toBe('Llevo 2 días de racha en Evolv. Acepta mi invitación y comparemos rachas: '+link);
+  // Un solo botón de compartir en la tarjeta, sin «Compartir mi racha» ni «Crear otro enlace».
+  const card=page.locator('#streakFriends');
+  await expect(card.getByRole('button',{name:/Compartir/})).toHaveCount(1);
+  await expect(card.getByRole('button',{name:'Compartir mi racha'})).toHaveCount(0);
+  await expect(card.getByRole('button',{name:'Crear otro enlace'})).toHaveCount(0);
+  // Volver a compartir reutiliza el mismo enlace (no lo revoca).
+  await card.getByRole('button',{name:'Compartir enlace'}).click();
+  await expect.poll(()=>page.evaluate(()=>window.shared.length)).toBe(2);
+  expect(await page.evaluate(()=>window.shared[1].text)).toContain(link);
+  await expect(page.getByLabel(/Invitación para un amigo/)).toHaveValue(link);
+  // Cancelar compartir no anuncia nada.
   await page.evaluate(()=>Object.defineProperty(navigator,'share',{configurable:true,value:async()=>{throw new DOMException('Cancelado','AbortError');}}));
-  await page.locator('#streakFriends').getByRole('button',{name:'Compartir mi racha'}).click();
+  await card.getByRole('button',{name:'Compartir enlace'}).click();
   await expect(page.locator('#streakShareText')).toHaveCount(0);
+  // Sin share nativo se copia el mensaje; si copiar falla, queda el texto para copiar a mano.
   await page.evaluate(()=>{
     Object.defineProperty(navigator,'share',{configurable:true,value:undefined});
     Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{window.copied=text;}}});
   });
-  await page.locator('#streakFriends').getByRole('button',{name:'Compartir mi racha'}).click();
-  expect(await page.evaluate(()=>window.copied)).toContain('Llevo 2 días');
+  await card.getByRole('button',{name:'Compartir enlace'}).click();
+  await expect.poll(()=>page.evaluate(()=>window.copied)).toContain(link);
   await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw new Error('denied');}}}));
-  await page.locator('#streakFriends').getByRole('button',{name:'Compartir mi racha'}).click();
-  await expect(page.getByLabel('Copia este texto para compartir')).toHaveValue(/Llevo 2 días/);
+  await card.getByRole('button',{name:'Compartir enlace'}).click();
+  await expect(page.getByLabel('Copia este texto para compartir')).toHaveValue(/Llevo 2 días.*#friend=/);
+});
+
+test('si el navegador pide otro toque tras crear el enlace, «Compartir enlace» queda listo',async({page,context,social})=>{
+  await setup(page,context,social,[row(-1)]);
+  await page.evaluate(()=>{
+    window.shared=[];let first=true;
+    Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{
+      if(first){first=false;throw new DOMException('Requiere gesto','NotAllowedError');}
+      window.shared.push(data);
+    }});
+  });
+  await enable(page,'Ana');
+  await expect(page.getByRole('button',{name:'Compartir enlace'})).toBeFocused();
+  await expect(page.locator('#streakShareText')).toHaveCount(0);
+  await page.getByRole('button',{name:'Compartir enlace'}).click();
+  await expect.poll(()=>page.evaluate(()=>window.shared.length)).toBe(1);
+  expect(await page.evaluate(()=>window.shared[0].text)).toContain('Llevo 1 día de racha');
+});
+
+test('cerrada, la tarjeta tiene una sola acción y quien ya compara ve su clasificación',async({page,context,social})=>{
+  await installMocks(context,{tables:{day_log:{rows:[row(-1)]}}});await social.route(context);
+  await seedLoggedInUser(page);await autoDismissNudges(page);await gotoApp(page);
+  await page.locator('#tabs').getByText('Progreso').click();
+  const card=page.locator('#streakFriends');
+  await expect(card.getByRole('button')).toHaveText(['Invitar a un amigo']);
+  await card.getByRole('button',{name:'Invitar a un amigo'}).click();
+  await expect(page.getByLabel('Tu alias para amigos')).toBeVisible();
+  await enable(page,'Ana');
+  // Tras recargar, ya activada, se muestra la clasificación sin pasos extra.
+  await gotoApp(page);await page.locator('#tabs').getByText('Progreso').click();
+  await expect(page.getByRole('list',{name:'Clasificación por racha actual'})).toContainText('Ana (tú)');
+  await mockShare(page);
+  await card.getByRole('button',{name:'Invitar a un amigo'}).click();
+  await expect.poll(()=>page.evaluate(()=>window.shared.length)).toBe(1);
+  expect(await page.evaluate(()=>window.shared[0].text)).toMatch(/Llevo 1 día de racha en Evolv\. .*#friend=[a-f0-9]{64}$/);
 });
 
 test('al registrar hoy sincroniza, empata y avisa cuando hay datos pendientes',async({page,context,social})=>{
@@ -171,11 +227,12 @@ test('un fallo de red muestra reintento y recuperarse borra el error',async({pag
   await expect(page.locator('.streak-person')).toContainText('Mi alias');
 });
 
-test('migración ausente ofrece compartir y explica disponibilidad sin vocabulario técnico',async({page,context,social})=>{
+test('migración ausente explica disponibilidad sin vocabulario técnico ni enlace genérico',async({page,context,social})=>{
   await installMocks(context);await social.route(context);await seedLoggedInUser(page);await autoDismissNudges(page);
   await context.route(`${SUPA_URL}/rest/v1/rpc/streak_social`,route=>route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({code:'PGRST202',message:'Could not find function'})}));
   await gotoApp(page);await page.getByRole('button',{name:'Ver mi racha y amigos'}).click();
   await expect(page.locator('#streakFriends')).toContainText('La comparación con amigos estará disponible pronto');
-  await expect(page.locator('#streakFriends').getByRole('button',{name:'Compartir mi racha'})).toBeVisible();
+  await expect(page.locator('#streakFriends').getByRole('button',{name:'Actualizar rachas'})).toBeVisible();
+  await expect(page.locator('#streakFriends').getByRole('button',{name:'Compartir mi racha'})).toHaveCount(0);
   await expect(page.locator('#streakFriends')).not.toContainText('PGRST');
 });

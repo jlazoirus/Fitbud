@@ -102,7 +102,7 @@ test.describe("Progreso — racha combinada (REQ-146)", () => {
 });
 
 // REQ-345: la racha cabe en una tarjeta. Sin la racha repetida en "Tus números",
-// sin la lista de hitos con fechas y con un solo "Compartir mi racha".
+// sin la lista de hitos con fechas y con una sola acción de amigos (REQ-347).
 test.describe("Progreso — racha en una tarjeta (REQ-345)", () => {
   const milestone = (level, offset) => ({ key: `combined-${level}-c1`, type: "combined", level, cycle: 1, date: daysFromToday(offset) });
 
@@ -139,10 +139,11 @@ test.describe("Progreso — racha en una tarjeta (REQ-345)", () => {
     await expect(page.locator(".scard", { hasText: "Racha" })).toHaveCount(0);
     await expect(page.locator(".scard", { hasText: "Sesiones esta semana" }).locator(".n")).toHaveText(/^\d+\/\d+$/);
 
-    // Amigos vive dentro de la sección y "Compartir mi racha" aparece una sola vez.
+    // Amigos vive dentro de la sección con una sola acción: invitar (REQ-347).
     const section = page.locator(".csec", { has: panel });
     await expect(section.locator("#streakFriends")).toHaveCount(1);
-    await expect(page.getByRole("button", { name: "Compartir mi racha" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Invitar a un amigo" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Compartir mi racha" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Ver amigos" })).toHaveCount(0);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
