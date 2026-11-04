@@ -70,7 +70,7 @@ async function refreshStreakSocial(){
       data=await streakSocialRpc("state");
     }
     if(uid()!==owner||request!==streakSocialRequest)return;
-    // REQ-347: cada enlace sirve para un amigo. Si apareció un amigo nuevo por él, ya se usó.
+    // REQ-348: cada enlace sirve para un amigo. Si apareció un amigo nuevo por él, ya se usó.
     if(streakSocialInvite&&Array.isArray(data.rows)&&data.rows.length>streakInviteBase)streakSocialInvite=null;
     streakSocial={...data,owner,loaded:true,unavailable:false};
     streakSocialError="";
@@ -158,7 +158,7 @@ function removeStreakFriend(id){
   if(confirm("¿Eliminar esta amistad? Dejarán de ver sus rachas mutuamente."))changeStreakSocial("remove",{friend:id});
 }
 function streakInviteUrl(){return streakSocialInvite?"https://evolvapp.club/#friend="+streakSocialInvite.token:"";}
-// REQ-347: compartir la racha siempre lleva el enlace personal de invitación.
+// REQ-348: compartir la racha siempre lleva el enlace personal de invitación.
 // Un enlace genérico a la portada no dejaba al amigo hacer nada con él.
 async function shareStreakText(text,title,{auto=false}={}){
   const owner=uid();
@@ -220,7 +220,7 @@ function streakFriendsBody(){
   const busy=streakSocialBusy?"disabled":"";
   const head=`<div class="streak-social-head"><h3>Con amigos</h3></div>`;
   const fallback=streakShareFallback?`<label for="streakShareText">Copia este texto para compartir</label><textarea id="streakShareText" readonly rows="4" onclick="this.select()">${esc(streakShareFallback)}</textarea>`:"";
-  // REQ-347: cerrado hay una sola acción. Quien ya compara ve directamente su clasificación.
+  // REQ-348: cerrado hay una sola acción. Quien ya compara ve directamente su clasificación.
   if(!streakSocialOpen&&!(mine.loaded&&mine.enabled))return head+`<p class="muted small">Envía tu enlace a un amigo y comparen sus rachas cada día.</p><div class="streak-social-actions stack"><button class="btn btn-accent" type="button" onclick="inviteStreakFriend(this)">Invitar a un amigo</button></div>`+fallback;
   const error=streakSocialError?`<p class="streak-social-status" role="status">${esc(streakSocialError)}</p>`:"";
   if(!mine.loaded)return head+`<p class="muted" role="status">Cargando rachas…</p>`+fallback;
@@ -246,7 +246,7 @@ function streakFriendsBody(){
   return refresh+error+invitation+youAre+`<p class="muted small">Gana la racha actual más larga. Los empates comparten posición. Se mantienen tus descansos y las reglas de tu racha.</p>`
     +(streakSocialSyncPending()?`<p class="streak-social-status" role="status">Actualización pendiente: la clasificación muestra la última racha guardada.</p>`:"")
     +ranking
-    // REQ-347: una sola acción para sumar amigos; con un enlace a la vista, la acción es compartirlo.
+    // REQ-348: una sola acción para sumar amigos; con un enlace a la vista, la acción es compartirlo.
     +invite
     +`<details class="streak-social-settings"><summary>${chevron()}Alias y privacidad</summary>${streakAliasForm(true)}<button class="btn" type="button" onclick="disableStreakSocial()" ${busy}>Dejar de comparar mi racha</button></details>`+fallback;
 }

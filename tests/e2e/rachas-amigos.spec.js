@@ -77,7 +77,7 @@ test('activar, crear enlace, aceptar desde otra cuenta y revocar',async({page,co
   await expect(list.locator('.streak-place')).toHaveText(['1','2']);
   page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Eliminar amistad con Bruno'}).click();
   await expect(list.locator('li')).toHaveCount(1);expect((await social.rpc(FRIEND)).rows).toHaveLength(1);
-  // REQ-347: el enlace usado por Bruno desaparece; uno nuevo se crea con el mismo botón.
+  // REQ-348: el enlace usado por Bruno desaparece; uno nuevo se crea con el mismo botón.
   await expect(page.getByLabel(/Invitación para un amigo/)).toHaveCount(0);
   await mockShare(page);
   await page.getByRole('button',{name:'Invitar a un amigo'}).click();
@@ -112,7 +112,7 @@ test('invitación persiste durante login y exige activar y aceptar antes de most
   expect((await social.rpc(FRIEND)).rows).toHaveLength(1);
 });
 
-// REQ-347: compartir la racha lleva siempre el enlace personal; no hay enlace genérico a la portada.
+// REQ-348: compartir la racha lleva siempre el enlace personal; no hay enlace genérico a la portada.
 test('compartir la racha envía la invitación personal con la racha real',async({page,context,social})=>{
   await setup(page,context,social,[row(-2),row(-1)]);
   await mockShare(page);
