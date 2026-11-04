@@ -13104,3 +13104,26 @@ No se podía elegir un día concreto del historial, ni repetir su número de ser
 - Al empezar hoy, las series llegan con lo de ese día (10 × 40, …, 6 × 50) y no con lo de ayer (5 × 30).
 
 Además, `entreno.spec.js` y `rutina-propia.spec.js` en verde; detector de diseño sin hallazgos; capturas a 390 px.
+
+## REQ-347 - Nutrición: "Registrar comida" alineado
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-11-04, iPhone): "Arregla los estilos de esta pantalla, está desalineado". En "¿Dónde lo registras?", el campo Día se salía por la derecha y su fecha iba centrada, mientras "Comida del día" iba alineada a la izquierda. Además, "Ya me lo comí" tenía otro tamaño que las opciones de arriba.
+
+### Causa
+
+- El `fieldset` (`.log-intent`) mantiene por defecto `min-width: min-content`.
+- En iOS, `input[type=date]` tiene un ancho propio y centra el texto.
+
+### Alcance
+
+- `.log-intent` pasa a `min-width:0`. La fecha y el select van a todo el ancho con la misma altura (46 px) y la fecha queda alineada a la izquierda, sin apariencia nativa.
+- "Ya me lo comí" usa el mismo tamaño (14 px) y la misma área táctil (44 px) que los radios.
+- `CACHE_NAME` → `fitbud-pwa-v211`.
+
+### Criterios de aceptación
+
+- A 320 y 390 px, la fecha y la comida del día tienen el mismo ancho y caben en el recuadro, la página no hace scroll lateral y la fecha queda alineada a la izquierda. ✓ `tests/e2e/registrar-comida-estilos.spec.js`.
