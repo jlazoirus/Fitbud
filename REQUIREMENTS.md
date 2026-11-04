@@ -1972,9 +1972,9 @@ Jonathan (2026-10-30): el customer service de Evolv se atiende en su WhatsApp de
 
 ## REQ-308 - Consola de administración separada en /admin
 
-**Estado: implementado.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Jonathan (2026-10-30): separar la consola de administración a otra URL y dar acceso a Sathya (b.ll.sathya@gmail.com, mismos permisos de administrador). La consola vive en `/admin` (rewrite de `vercel.json` al mismo `index.html`; el modo consola se activa por ruta). La app de usuarios ya no renderiza vistas de administración para nadie: `setView` las bloquea fuera del modo consola, el despachador de `render()` exige modo consola y Perfil solo enlaza a `/admin`. En `/admin`: sin sesión → login; sesión sin `is_admin` → pantalla "Sin acceso"; admin → consola con pestañas propias (Beta, Usuarios, Alimentos, Ejercicios, Analítica, Ajustes) y vuelta a la app. El enlace del correo de aviso de postulantes y la tarjeta de pendientes en Hoy apuntan a `/admin?ver=postulantes`. La autorización real no cambia: ya era server-side (`api/admin` valida JWT + `is_admin`; RLS protege los datos). El alta de Sathya es un paso operativo en Supabase (`is_admin=true` en su perfil), fuera del repo. ✓ `tests/e2e/admin-console.spec.js`; `tests/e2e/admin-beta.spec.js` actualizado.
+La consola vive en `/admin`; la app de usuarios no muestra vistas de administración. ✓ `tests/e2e/admin-console.spec.js`.
 
 ## REQ-311 - Lesión declarada: aviso con opción voluntaria, no bloqueo duro
 
@@ -2288,3 +2288,9 @@ Número, hitos como paradas de una barra, desglose en una línea y amigos con un
 ## REQ-347 - Nutrición: "Registrar comida" alineado
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `tests/e2e/registrar-comida-estilos.spec.js`.
+
+## REQ-348 - Racha: compartir envía tu invitación
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-amigos.spec.js`.

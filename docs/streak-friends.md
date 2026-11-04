@@ -1,10 +1,10 @@
 # REQ-300 — Compartir la racha y compararla con amigos
 
-Jonathan eligió comparar la **racha actual**, sin retos semanales. En Hoy, el botón «Racha N» lleva a Progreso → Racha (la despliega si estaba plegada). Desde REQ-345, «Con amigos» es la segunda tarjeta de esa sección y «Compartir mi racha» aparece una sola vez, en esa tarjeta.
+Jonathan eligió comparar la **racha actual**, sin retos semanales. En Hoy, el botón «Racha N» lleva a Progreso → Racha (la despliega si estaba plegada). Desde REQ-345, «Con amigos» es la segunda tarjeta de esa sección. Desde REQ-348 tiene una sola acción, «Invitar a un amigo»; ya no existe «Compartir mi racha» con un enlace genérico a la portada.
 
 ## Recorrido
 
-«Compartir mi racha» abre el selector del dispositivo con el número real calculado por `streak()`. Sin selector, copia el texto; si el portapapeles está bloqueado, ofrece un campo seleccionable. Cancelar no anuncia éxito. Compartir este texto no activa la comparación.
+REQ-348: compartir siempre envía «Llevo N días de racha en Evolv. Acepta mi invitación y comparemos rachas: <enlace personal>», con el número real de `streak()`. «Invitar a un amigo» crea el enlace (o reutiliza el vigente) y abre el selector del dispositivo; sin activar todavía, lleva al alias y «Crear invitación» activa, crea y abre compartir. Si el navegador exige otro toque tras esperar a la red, «Compartir enlace» queda enfocado. Sin selector, copia el mensaje; si el portapapeles está bloqueado, ofrece un campo seleccionable. Cancelar no anuncia éxito. Cuando aparece un amigo nuevo, el enlace mostrado se da por usado y se oculta. Con la comparación activada, la tarjeta muestra la clasificación sin pasos previos; «Actualizar» queda pequeño en la cabecera.
 
 Para comparar, cada participante elige un alias (2–24 caracteres) y activa voluntariamente la función. Antes de activar, la pantalla explica los tres pasos (alias → enlace → tu amigo acepta) y propone el primer nombre del perfil como alias. Sin una invitación recibida, «Crear invitación» activa la comparación y deja el enlace listo en un solo paso. Una vez activada, dice con qué alias te ven (REQ-318). No hay buscador de usuarios ni invitación por correo. «Crear invitación» prepara un enlace para un solo amigo, válido por 7 días. Un nuevo enlace cancela el anterior. El usuario decide dónde compartirlo; la app no envía mensajes automáticamente.
 
@@ -28,7 +28,7 @@ El resumen se calcula con los registros de la app, como la racha personal; el se
 2. Verificar con dos cuentas activas: activar con alias, crear enlace, aceptar, actualizar, quitar y desactivar. Una tercera cuenta solo debe verse a sí misma.
 3. Si PostgREST aún no descubre la RPC, recargar su esquema con `notify pgrst, 'reload schema';` y reintentar «Actualizar rachas».
 
-Sin esta migración, compartir texto funciona y la comparación muestra «estará disponible pronto». No se ejecutó SQL de producción durante la implementación.
+Sin esta migración, la tarjeta muestra «estará disponible pronto» y un botón para reintentar (no ofrece un enlace genérico). No se ejecutó SQL de producción durante la implementación.
 
 Recuperación: revocar `execute on function public.streak_social(text,jsonb) from authenticated`, deshabilitar los controles en el cliente y conservar las tablas. Restaurar el permiso tras corregir/reaplicar la función. Evitar borrar tablas para conservar datos; nunca reejecutar el `schema.sql` de instalación fresca como rollback.
 
