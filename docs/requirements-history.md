@@ -13032,3 +13032,33 @@ El plazo se mantiene en **15 días hábiles improrrogables** (D.S. N.° 101-2022
 
 - Sin la declaración jurada, `parseHoja` devuelve el error; la hoja emitida trae contacto del proveedor, firma, quién recibe y respuesta pendiente; el insert no lleva columnas nuevas. ✓ `scripts/test-tienda-culqi.mjs`.
 - La página muestra teléfono y correo del proveedor, el aviso del pie menciona el plazo y la hoja se envía con `conformidad: true`. ✓ `tests/e2e/tienda.spec.js`.
+
+## REQ-345 - Progreso: la racha en una sola tarjeta
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan revisó Progreso en su iPhone (2026-11-03): "Aquí hay demasiada info y no tiene una estructura clara". La racha aparecía dos veces seguidas ("Tus números" y la tarjeta grande). Debajo venían dos tarjetas de Nutrición y Entrenamiento con su mejor marca, en una rejilla de 3 columnas con un hueco vacío, y la consistencia semanal con una frase que repetía el 2/3. Luego un texto suelto con el próximo hito, una tarjeta por cada hito con su fecha y la fila "Compartir mi racha · Ver amigos". Justo debajo seguía otra tarjeta, "Rachas con amigos", con un segundo "Compartir mi racha". "Combinada" era jerga. Además, "Entrenamiento 4" junto a "8 días" confundía porque el entreno cuenta sesiones y los descansos no suman. Eligió la opción "una tarjeta".
+
+### Alcance
+
+1. La sección pasa a llamarse "Racha" (`pr.rachas`). La tarjeta (`#streakPanel`) muestra:
+   - la llama SVG de la celebración (REQ-304) en lugar del emoji, apagada en 0;
+   - "N días seguidos";
+   - "Tu mejor marca" si iguala el récord, o "Mejor: N días";
+   - una línea con la regla;
+   - la barra de hitos (3 días, 1 semana, 2 semanas, 1 mes) en tramos iguales: los logrados en el ciclo quedan marcados aunque la racha se corte después y el siguiente va resaltado;
+   - "Faltan N días para el hito de …";
+   - el desglose "Comidas N días seguidos · Entreno N sesiones seguidas".
+2. Las fechas de los hitos solo se anuncian al lector de pantalla. Se quitan las mejores marcas por tipo.
+3. "Tus números" deja de repetir la racha. Su lugar lo ocupa "Sesiones esta semana N/M", que reemplaza el bloque de consistencia.
+4. "Con amigos" (`#streakFriends`) pasa a ser la segunda tarjeta de la misma sección. Cerrada, muestra "Comparar con amigos" y "Compartir mi racha" juntos. Ya no hay fila de botones en la tarjeta de racha ni "Ver amigos".
+5. `showStreakSection()` despliega la sección antes de ir a Progreso desde el botón de Hoy, desde una invitación recibida o desde el texto para copiar. Así, si estaba plegada, no queda oculto.
+6. Se sube la caché del service worker a `fitbud-pwa-v209`.
+
+### Criterios de aceptación
+
+- Con 8 días: "8", "Tu mejor marca", los hitos 3 días y 1 semana logrados con su fecha accesible, 2 semanas como siguiente y "Faltan 6 días para el hito de 2 semanas.". No aparece "combinada" ni una tarjeta de racha en "Tus números", y hay un solo "Compartir mi racha". ✓ `tests/e2e/racha.spec.js`.
+- REQ-146 se mantiene: el botón de Hoy y la tarjeta muestran el mismo número, 0 cuando la racha se rompe, y aparece el aviso de recuperación. ✓ `tests/e2e/racha.spec.js`.
+- Con la sección plegada, "Racha N" de Hoy la despliega y muestra amigos. ✓ `tests/e2e/racha.spec.js`; el flujo de amigos sigue en verde. ✓ `tests/e2e/rachas-amigos.spec.js`.
