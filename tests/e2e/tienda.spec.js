@@ -36,7 +36,7 @@ test.describe("Tienda web (Culqi)", () => {
     const planes = page.locator(".l-plan");
     await expect(planes).toHaveCount(3);
     await expect(planes.first()).toContainText("S/29.90");
-    await expect(planes.first().locator("img")).toHaveAttribute("src", "/assets/planes/mensual.svg");
+    await expect(planes.first().locator("img")).toHaveAttribute("src", "/assets/planes/mensual.webp");
     await expect(page.locator(".l-plan a.l-btn")).toHaveText(["Comprar", "Comprar", "Comprar"]);
     await expect(page.getByRole("link", { name: "Postular a la beta" }).first()).toBeVisible();
     const footer = page.locator(".l-footer");
@@ -150,6 +150,10 @@ test.describe("Tienda web (Culqi)", () => {
     await page.goto("/libro-de-reclamaciones/");
     await expect(page.locator("h1")).toHaveText("Libro de Reclamaciones");
     await expect(page.locator("#libro")).toContainText("quince (15) días hábiles");
+    // REQ-344: contacto del proveedor y aviso del plazo junto al ícono del pie.
+    await expect(page.locator('.hoja [data-comercio="telefono"]')).not.toBeEmpty();
+    await expect(page.locator('.hoja [data-comercio="correo"]')).toHaveAttribute("href", /^mailto:/);
+    await expect(page.locator("#t-footer .libro-nota")).toContainText("15 días hábiles");
     await page.getByLabel("Nombre completo").fill("Ana Pérez");
     await page.getByLabel("Número de documento").fill("12345678");
     await page.getByLabel("Descripción").fill("Plan mensual");
@@ -161,10 +165,11 @@ test.describe("Tienda web (Culqi)", () => {
     await expect(page.locator("#email")).toBeFocused();
 
     await page.getByLabel("Teléfono").fill("999888777");
+    await page.getByLabel(/Declaro bajo juramento/).check();
     await page.getByRole("button", { name: "Enviar hoja de reclamación" }).click();
     await expect(page.locator("#emitida")).toContainText("EVOLV-LR-000007");
     await expect(page.locator("#emitida")).toContainText("Guarda o imprime esta hoja");
-    expect(sent).toMatchObject({ tipo: "queja", tipoDocumento: "DNI", numeroDocumento: "12345678", telefono: "999888777", menorEdad: false });
+    expect(sent).toMatchObject({ tipo: "queja", tipoDocumento: "DNI", numeroDocumento: "12345678", telefono: "999888777", menorEdad: false, conformidad: true });
     // El 400 de la validación simulada es esperado; ningún otro error.
     expect(errors.filter((e) => !/status of 400/.test(e))).toEqual([]);
   });
@@ -180,6 +185,24 @@ test.describe("Tienda web (Culqi)", () => {
     }
     await page.goto("/devoluciones/");
     await expect(page.locator("main")).toContainText("7 días calendario");
+    // REQ-343: secciones que pide la revisión de Culqi, contacto con horario y enlaces que funcionan.
+    for (const h of ["Introducción", "Condiciones para cambios y devoluciones", "Cómo pedir un cambio o una devolución", "Opciones de reembolso y cambios", "Costos de envío", "Excepciones y garantías", "Contacto y atención al cliente"]) {
+      await expect(page.getByRole("heading", { name: new RegExp(h) })).toBeVisible();
+    }
+    await expect(page.locator('main [data-comercio="horario"]')).toHaveText(/Lunes a viernes/);
+    await expect(page.locator('main a[data-comercio="whatsappUrl"]').first()).toHaveAttribute("href", /^https:\/\/wa\.me\//);
+    await expect(page.getByRole("link", { name: "Pedir el reembolso por correo" })).toHaveAttribute("href", /^mailto:.+subject=Solicitud/);
+
+    await page.goto("/terminos/");
+    for (const h of ["Información general del comercio", "Aceptación de los términos", "Registro y cuenta de usuario", "Productos y servicios", "Precios y formas de pago", "Proceso de compra", "Entrega del servicio", "Protección de datos personales", "Propiedad intelectual", "Responsabilidad y limitaciones", "Legislación aplicable y resolución de conflictos", "Contacto y soporte"]) {
+      await expect(page.getByRole("heading", { name: new RegExp(h) })).toBeVisible();
+    }
+    await expect(page.locator('main [data-comercio="ruc"]').first()).toHaveText(/^\d{11}$/);
+    await expect(page.locator('main [data-comercio="horario"]').first()).toHaveText(/Lunes a viernes/);
+    await expect(page.locator('main a[data-comercio="whatsappUrl"]')).toHaveAttribute("href", /^https:\/\/wa\.me\//);
+
+    await page.goto("/contacto/");
+    await expect(page.locator('main a[data-comercio="whatsappUrl"]')).toHaveAttribute("href", /^https:\/\/wa\.me\//);
     expect(errors).toEqual([]);
   });
 });

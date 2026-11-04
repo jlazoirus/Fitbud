@@ -97,7 +97,7 @@ function scheduleStreakSocialSync(){
   clearTimeout(streakSocialTimer);
   if(streakSocial.owner===uid()&&streakSocial.enabled)streakSocialTimer=setTimeout(()=>{if(!streakSocialBusy)refreshStreakSocial();},3000);
 }
-// REQ-342: amigos vive dentro de la sección "Racha" de Progreso; abrirla siempre
+// REQ-345: amigos vive dentro de la sección "Racha" de Progreso; abrirla siempre
 // la despliega para que una invitación o el texto para copiar no queden ocultos.
 function showStreakSection(){
   UI.collapsed=UI.collapsed||{};
@@ -191,7 +191,7 @@ function streakFriendsBody(){
   const busy=streakSocialBusy?"disabled":"";
   const head=`<div class="streak-social-head"><h3>Con amigos</h3><button type="button" class="btn btn-sm" onclick="shareStreak()">Compartir mi racha</button></div>`;
   const fallback=streakShareFallback?`<label for="streakShareText">Copia este texto para compartir</label><textarea id="streakShareText" readonly rows="4" onclick="this.select()">${esc(streakShareFallback)}</textarea>`:"";
-  // REQ-342: cerrado, las dos acciones van juntas abajo (sin repetir "Compartir" en la cabecera).
+  // REQ-345: cerrado, las dos acciones van juntas abajo (sin repetir "Compartir" en la cabecera).
   if(!streakSocialOpen)return `<div class="streak-social-head"><h3>Con amigos</h3></div><p class="muted small">Compara tu racha con la de tus amigos y anímense a seguir.</p><div class="streak-social-actions stack"><button class="btn" type="button" onclick="openStreakFriends()">Comparar con amigos</button><button type="button" class="btn" onclick="shareStreak()">Compartir mi racha</button></div>`+fallback;
   const error=streakSocialError?`<p class="streak-social-status" role="status">${esc(streakSocialError)}</p>`:"";
   if(!mine.loaded)return head+`<p class="muted" role="status">Cargando rachas…</p>`+fallback;

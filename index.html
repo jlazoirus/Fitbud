@@ -795,7 +795,7 @@
   .streak-social-settings[open] summary svg{transform:rotate(180deg)}
   .streak-social-settings[open] summary{margin-bottom:8px}
   .streak-social-settings .streak-alias-form{margin:0 0 16px}
-  /* Racha (REQ-23). REQ-342: una tarjeta; los hitos son paradas de una barra. */
+  /* Racha (REQ-23). REQ-345: una tarjeta; los hitos son paradas de una barra. */
   .streak-panel{background:linear-gradient(160deg,var(--accent-dim),var(--surf1) 55%);border:1px solid var(--border-acc);border-radius:var(--r-lg);padding:18px 16px 16px}
   .streak-head{display:flex;align-items:center;gap:12px}
   .streak-flame{flex:0 0 auto;width:48px;height:48px;display:grid;place-items:center;border-radius:14px;background:var(--accent-dim)}
@@ -7553,7 +7553,7 @@ function progressJourney(){
   }).join("");
 }
 // Tarjetas de estadísticas (kg, entrenos, semana, adherencia nutricional).
-// REQ-342: la racha ya no se repite aquí; su lugar lo ocupa la semana de entreno.
+// REQ-345: la racha ya no se repite aquí; su lugar lo ocupa la semana de entreno.
 function progressStats(){
   const outcomes=Object.values(S.days).map(day=>workoutOutcomeForState(day||{}));
   const entrenos=outcomes.filter(outcome=>outcome==="completed").length;
@@ -7571,7 +7571,7 @@ function progressStats(){
   </div>`;
 }
 
-// Sección de racha (REQ-23). REQ-342: una sola tarjeta. El número manda; los
+// Sección de racha (REQ-23). REQ-345: una sola tarjeta. El número manda; los
 // hitos del ciclo son paradas de una barra (no una lista con fechas) y el
 // desglose es una línea. La consistencia semanal vive en "Tus números".
 const STREAK_MILESTONE_LABELS={3:"3 días",7:"1 semana",14:"2 semanas",30:"1 mes"};
@@ -10064,7 +10064,7 @@ function landingPricingHtml(){
       const isHi=!!p.destacado;
       const items=p.incluye.map(f=>`<div class="l-plan-item">${tick}<span>${esc(f)}</span></div>`).join("");
       return`<div class="l-plan l-plan-store${isHi?" highlight":""}">
-        <img class="l-plan-img" src="${esc(p.imagen)}" alt="${esc(p.nombre)}: ${esc(p.periodo)} de acceso a Evolv" width="1200" height="750" loading="lazy">
+        <img class="l-plan-img" src="${esc(p.imagen)}" alt="${esc(p.imagenAlt)}" width="1200" height="750" loading="lazy">
         ${isHi?`<div class="l-plan-badge">${esc(p.destacado)}</div>`:""}
         <div class="l-plan-name">${esc(p.nombre)}</div>
         <div class="l-plan-price"><span class="l-plan-cur">S/</span>${(p.montoCentimos/100).toFixed(2)} <span class="l-plan-period">/ ${esc(p.periodo)}</span></div>

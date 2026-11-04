@@ -46,6 +46,7 @@ function footerHtml() {
         <p>${esc(COMERCIO.direccion)}</p>
         <p><a href="mailto:${esc(COMERCIO.correo)}">${esc(COMERCIO.correo)}</a> · <a href="tel:${esc(String(COMERCIO.telefono).replace(/[^\d+]/g, ""))}">${esc(COMERCIO.telefono)}</a></p>
         <a class="libro-link" href="/libro-de-reclamaciones">${LIBRO_ICONO}<span>Libro de Reclamaciones</span></a>
+        <p class="libro-nota">Contamos con un Libro de Reclamaciones virtual. Respondemos cada reclamo o queja en un plazo máximo de 15 días hábiles.</p>
       </div>
       <div>
         <h2>Tienda</h2>
@@ -71,7 +72,7 @@ export function fillComercio(root) {
     if (value == null) return;
     if (node.tagName === "A" && node.dataset.comercio === "correo") node.href = "mailto:" + value;
     if (node.tagName === "A" && node.dataset.comercio === "telefono") node.href = "tel:" + String(value).replace(/[^\d+]/g, "");
-    if (node.tagName === "A" && node.dataset.comercio === "whatsappUrl") return;
+    if (node.tagName === "A" && node.dataset.comercio === "whatsappUrl") { node.href = value; return; }
     node.textContent = value;
   });
 }

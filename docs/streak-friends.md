@@ -1,6 +1,6 @@
 # REQ-300 — Compartir la racha y compararla con amigos
 
-Jonathan eligió comparar la **racha actual**, sin retos semanales. En Hoy, el botón «Racha N» lleva a Progreso → Racha (la despliega si estaba plegada). Desde REQ-342, «Con amigos» es la segunda tarjeta de esa sección y «Compartir mi racha» aparece una sola vez, en esa tarjeta.
+Jonathan eligió comparar la **racha actual**, sin retos semanales. En Hoy, el botón «Racha N» lleva a Progreso → Racha (la despliega si estaba plegada). Desde REQ-345, «Con amigos» es la segunda tarjeta de esa sección y «Compartir mi racha» aparece una sola vez, en esa tarjeta.
 
 ## Recorrido
 

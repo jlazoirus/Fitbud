@@ -52,6 +52,8 @@ export function parseHoja(body) {
     detalle: cleanLong(b.detalle, 3000),
     pedido: cleanLong(b.pedido, 1500),
     website: clean(b.website, 80),
+    // REQ-344: la declaración jurada reemplaza la firma del consumidor en la hoja virtual.
+    conformidad: b.conformidad === true || b.conformidad === "si" || b.conformidad === "on",
   };
   const monto = String(b.montoReclamado == null ? "" : b.montoReclamado).replace(",", ".").trim();
   const errors = [];
@@ -73,6 +75,7 @@ export function parseHoja(body) {
   if (!TIPOS.has(data.tipo)) errors.push("Elige si es un reclamo o una queja.");
   if (data.detalle.length < 10) errors.push("Cuéntanos el detalle de tu reclamo o queja.");
   if (data.pedido.length < 3) errors.push("Escribe tu pedido: qué esperas que hagamos.");
+  if (!data.conformidad) errors.push("Marca la declaración jurada: reemplaza tu firma en la hoja.");
   return { errors, data };
 }
 
@@ -90,6 +93,7 @@ export function hojaRows(row) {
     ["Fecha", fechaLima(row.created_at)],
     ["Proveedor", COMERCIO.razonSocial + " · RUC " + COMERCIO.ruc],
     ["Domicilio del proveedor", COMERCIO.direccion],
+    ["Contacto del proveedor", COMERCIO.telefono + " · " + COMERCIO.correo],
     ["Consumidor", row.nombre],
     ["Documento", row.tipo_documento + " " + row.numero_documento],
     ["Domicilio", row.domicilio || "—"],
@@ -101,6 +105,10 @@ export function hojaRows(row) {
     ["Tipo", row.tipo === "queja" ? "Queja" : "Reclamo"],
     ["Detalle", row.detalle],
     ["Pedido", row.pedido],
+    // Solo se emite al registrar la hoja, y no se registra sin la declaración jurada.
+    ["Firma del consumidor", "Declaración jurada aceptada al registrar la hoja en la web"],
+    ["Recibido por", COMERCIO.razonSocial + ", en el Libro de Reclamaciones virtual"],
+    ["Observaciones y acciones adoptadas por el proveedor", row.respuesta || "Pendiente. Te responderemos por el medio que indicaste en un plazo máximo de 15 días hábiles."],
   ];
 }
 

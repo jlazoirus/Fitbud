@@ -46,7 +46,7 @@ async function openProgreso(page) {
   await page.locator("#tabs").getByText("Progreso").click();
 }
 
-// REQ-342: la racha ya no se repite en "Tus números"; la coherencia se comprueba
+// REQ-345: la racha ya no se repite en "Tus números"; la coherencia se comprueba
 // entre el botón de Hoy y la tarjeta de Progreso.
 const rachaHoyBoton = (page) => page.getByRole("button", { name: "Ver mi racha y amigos" });
 const rachaCombinadaCard = (page) => page.locator("#streakPanel .streak-n");
@@ -101,9 +101,9 @@ test.describe("Progreso — racha combinada (REQ-146)", () => {
   });
 });
 
-// REQ-342: la racha cabe en una tarjeta. Sin la racha repetida en "Tus números",
+// REQ-345: la racha cabe en una tarjeta. Sin la racha repetida en "Tus números",
 // sin la lista de hitos con fechas y con un solo "Compartir mi racha".
-test.describe("Progreso — racha en una tarjeta (REQ-342)", () => {
+test.describe("Progreso — racha en una tarjeta (REQ-345)", () => {
   const milestone = (level, offset) => ({ key: `combined-${level}-c1`, type: "combined", level, cycle: 1, date: daysFromToday(offset) });
 
   test("número, hitos en la barra, desglose y amigos sin duplicados", async ({ page, context }) => {

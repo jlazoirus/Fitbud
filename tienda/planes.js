@@ -13,7 +13,8 @@ export const PLANES_TIENDA = [
     montoCentimos: 2990,
     duracionDias: 30,
     periodo: "1 mes",
-    imagen: "/assets/planes/mensual.svg",
+    imagen: "/assets/planes/mensual.webp",
+    imagenAlt: "Plan mensual de Evolv: ejemplo de desayuno con ingredientes en gramos y macros, y de un ejercicio guiado",
     resumen: "Para empezar y probar el método con tu propio ritmo.",
     descripcion: "30 días de acceso completo a Evolv: plan de comidas personalizado según tus metas, rutinas de entrenamiento guiadas y seguimiento de tu progreso. Pago único, sin renovación automática.",
     incluye: [
@@ -31,7 +32,8 @@ export const PLANES_TIENDA = [
     montoCentimos: 7990,
     duracionDias: 90,
     periodo: "3 meses",
-    imagen: "/assets/planes/trimestral.svg",
+    imagen: "/assets/planes/trimestral.webp",
+    imagenAlt: "Plan trimestral de Evolv: ejemplo de entreno guiado serie por serie con descanso y de un check-in semanal",
     resumen: "Un ciclo completo de 10 semanas con margen para cerrarlo.",
     descripcion: "90 días de acceso completo a Evolv: alcanza para un ciclo de 10 semanas de nutrición y entrenamiento, con check-ins semanales y el resumen al cerrar el ciclo. Pago único, sin renovación automática.",
     incluye: [
@@ -49,7 +51,8 @@ export const PLANES_TIENDA = [
     montoCentimos: 14990,
     duracionDias: 180,
     periodo: "6 meses",
-    imagen: "/assets/planes/semestral.svg",
+    imagen: "/assets/planes/semestral.webp",
+    imagenAlt: "Plan semestral de Evolv: ejemplo del resumen de un ciclo de 10 semanas y de las fotos de progreso privadas",
     resumen: "Dos ciclos completos para consolidar el hábito.",
     descripcion: "180 días de acceso completo a Evolv: dos ciclos de nutrición y entrenamiento, con fotos de progreso privadas y el resumen detallado de cada ciclo. Pago único, sin renovación automática.",
     incluye: [
