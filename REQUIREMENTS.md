@@ -2278,3 +2278,9 @@ Contacto del proveedor, declaración jurada como firma, quién recibe y respuest
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Número, hitos como paradas de una barra, desglose en una línea y amigos con un solo "Compartir". ✓ `tests/e2e/racha.spec.js`.
+
+## REQ-346 - Entreno: repetir un entreno pasado y guardarlo para elegirlo otro día
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+En "Cambiar entrenamiento": tus guardados y los entrenos de los últimos 21 días, con sus ejercicios, series, repeticiones y carga. ✓ `tests/e2e/repetir-entreno.spec.js`.

@@ -13062,3 +13062,45 @@ Jonathan revisó Progreso en su iPhone (2026-11-03): "Aquí hay demasiada info y
 - Con 8 días: "8", "Tu mejor marca", los hitos 3 días y 1 semana logrados con su fecha accesible, 2 semanas como siguiente y "Faltan 6 días para el hito de 2 semanas.". No aparece "combinada" ni una tarjeta de racha en "Tus números", y hay un solo "Compartir mi racha". ✓ `tests/e2e/racha.spec.js`.
 - REQ-146 se mantiene: el botón de Hoy y la tarjeta muestran el mismo número, 0 cuando la racha se rompe, y aparece el aviso de recuperación. ✓ `tests/e2e/racha.spec.js`.
 - Con la sección plegada, "Racha N" de Hoy la despliega y muestra amigos. ✓ `tests/e2e/racha.spec.js`; el flujo de amigos sigue en verde. ✓ `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-346 - Entreno: repetir un entreno pasado y guardarlo para elegirlo otro día
+
+**Estado: implementado.**
+
+### Origen
+
+Jonathan (2026-11-04): "Deberías poder coger los entrenamientos pasados que has hecho con las repeticiones y los ejercicios que elegiste y replicarlo para volverlo a hacer… el entrenamiento que hice, por ejemplo, el martes, podría buscarlo en mis entrenamientos recientes y volver a replicarlo para mi entrenamiento de hoy… si es que quiero guardarlo como un entrenamiento recurrente, debería poder guardarlo y luego, dentro de unos días, verlo en la lista de entrenamientos a sustituir y elegirlo".
+
+### Qué había
+
+- REQ-338 guarda una rutina por tipo de sesión (Push, Pull, Pierna…) y la sugiere en la próxima de ese tipo, pero solo con la lista de ejercicios.
+- REQ-337 precarga lo último que se hizo de cada ejercicio.
+
+No se podía elegir un día concreto del historial, ni repetir su número de series, ni guardar varios entrenos con nombre para elegirlos desde "Cambiar entrenamiento".
+
+### Alcance
+
+1. **"Cambiar entrenamiento"** muestra primero dos grupos propios:
+   - **"Tus entrenamientos guardados"**, con "Quitar".
+   - **"Repetir uno reciente"**: los entrenos de fuerza con alguna serie registrada en los 21 días anteriores al día elegido, hasta 6, del más nuevo al más antiguo. Cada fila muestra el día y el nombre sin el tipo ("Domingo 1 nov · Full body A"), cuántos ejercicios tiene y cuáles son, y el botón "Guardar" (o "Guardado").
+2. **La copia** (`workoutCopyFromDay`) toma los ejercicios en el orden en que se hicieron, con los sustituidos y añadidos, y de cada uno las series registradas (repeticiones y carga, hasta 10). Si un ejercicio se repite, cuenta una sola vez.
+3. **Aplicarla** guarda dos cosas en el día:
+   - `customExercises`, la rutina del día de REQ-338;
+   - `day_log.state.repeatWorkout` (`{name, exercises, from | savedId}`, validado en `validateDayLogState`).
+
+   `applyRepeatDoses` pone en cada ejercicio las series de entonces (`prescribedSets`) y su rango de repeticiones. `prefillStepFromLastTime` precarga los valores de ese día, no los de la última vez. Si el día elegido no es de fuerza, pasa a la sesión del original cuando existe ese día, o a la primera de fuerza del plan.
+4. **La tarjeta** muestra la etiqueta "repetido" y "Repites tu entreno del domingo 1 nov…" o "Tu entreno guardado: …" en lugar de la descripción del plan. Un solo "Volver al plan" deshace todo. Elegir una sesión del plan, "Repetir mi rutina" o "Volver a la rutina del plan" también dejan de repetir.
+5. **Guardar** (desde la fila reciente o con "Guardar para repetirlo" en el resultado de una sesión) pide un nombre, que por defecto es "Full body A del domingo", y muestra cada ejercicio con sus series. Se guarda en `profiles.prefs.savedWorkouts`, hasta 12. Guardar otra vez el mismo día reemplaza la copia. Se sincroniza con el perfil sin crear versión de plan.
+6. `CACHE_NAME` → `fitbud-pwa-v210`.
+
+### Verificación
+
+`tests/e2e/repetir-entreno.spec.js` cubre:
+- Repetir el entreno de hace dos días: mismos ejercicios, 4 × 6-10 y 2 × 12, sincronizado en `day_log`.
+- Guardarlo como "Push pesado": aparece en guardados y se sincroniza en el perfil.
+- Usarlo en un día de descanso, que pasa a fuerza, y que "Volver al plan" lo deshaga.
+- Quitarlo.
+- Guardar desde el resultado de la sesión.
+- Al empezar hoy, las series llegan con lo de ese día (10 × 40, …, 6 × 50) y no con lo de ayer (5 × 30).
+
+Además, `entreno.spec.js` y `rutina-propia.spec.js` en verde; detector de diseño sin hallazgos; capturas a 390 px.

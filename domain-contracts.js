@@ -81,6 +81,13 @@
     // REQ-338: rutina propia del día (slugs del catálogo) y elección de la del plan.
     if(state.customExercises!==undefined&&(!Array.isArray(state.customExercises)||!state.customExercises.every(slug=>typeof slug==="string"&&slug)))errors.push("customExercises debe ser un array de slugs.");
     if(state.routineChoice!==undefined&&state.routineChoice!=="plan")errors.push("routineChoice solo admite \"plan\".");
+    // REQ-346: entreno repetido (de un día o guardado): ejercicios con sus series.
+    if(state.repeatWorkout!==undefined){
+      const rep=state.repeatWorkout;
+      const okExercises=rep&&typeof rep==="object"&&Array.isArray(rep.exercises)&&rep.exercises.length>0&&rep.exercises.length<=30
+        &&rep.exercises.every(item=>item&&typeof item.slug==="string"&&item.slug&&Array.isArray(item.sets)&&item.sets.length<=10);
+      if(!okExercises)errors.push("repeatWorkout debe tener ejercicios con slug y hasta 10 series.");
+    }
     return ok(errors);
   }
 
