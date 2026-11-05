@@ -2294,41 +2294,6 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-351 - Facturación: correos de vencimiento con enlace a los planes
 
-**Estado: pendiente.** Requiere aplicar un SQL en Supabase (acción humana).
+**Estado: implementado — requiere acción humana** (aplicar `supabase/notifications_plan_expiry.sql`). Detalle en `docs/requirements-history.md`.
 
-### Origen
-`docs/native-migration/COBRO-WEB.md`, Fase 0 (2026-11-05). Las apps no pueden mostrar precios ni enlaces para comprar fuera (App Store 3.1.1(a)/3.1.3, Google Play Pagos), pero las tiendas sí permiten avisar **por correo**. También sirve hoy en la web: los planes son pago único y nada avisa que el acceso se acaba.
-
-### Problema
-Nadie avisa que un plan está por vencer: la persona se entera cuando se le corta el coach o la generación de planes.
-
-### Causa raíz
-`api/notify.js` (cron horario de `.github/workflows/notify-hourly.yml`, `runJob()` en `api/notify.js:766`) solo envía recordatorios de racha y el resumen de la mañana a quien los activó. No lee `user_entitlements`, y no hay ningún registro de avisos de vencimiento.
-
-### Objetivo
-Dos correos transaccionales por plan pagado: 3 días antes de `expires_at` y el día del vencimiento. Cada uno dice el plan y la fecha, y lleva el botón "Renovar mi plan" a `https://evolvapp.club/planes` (o `/pago?plan=<mismo plan>`).
-
-### Alcance
-- `supabase/entitlement_notices.sql` (idempotente, RLS sin políticas: solo `service_role`): tabla `entitlement_notices(entitlement_id, kind in ('expiring_3d','expired'), sent_at)` con clave única `(entitlement_id, kind)`.
-- `api/notify.js`, en el mismo cron:
-  - buscar `user_entitlements` con `status = 'active'`, origen pagado (`checkout`) y `expires_at` en las próximas 72 h o vencido hace menos de 24 h;
-  - saltar si la persona ya tiene otro plan que empieza después;
-  - saltar si el aviso ya se envió;
-  - enviar con `sendEmail()` y una llave de idempotencia por aviso.
-- Correo en español, sin datos de salud ni de progreso, con el remitente de siempre. Se envía aunque la persona haya desactivado los recordatorios de racha, porque es sobre su compra.
-- La respuesta del cron cuenta los avisos enviados y saltados. Funciona en `dry_run`.
-
-### Fuera de alcance
-Avisos de fin de la semana gratis, push, recordatorios dentro de la app (REQ-350), cortesías y cupones (`origin` distinto de `checkout`), cobro recurrente.
-
-### Riesgos
-Enviar dos veces el mismo aviso (lo evitan la clave única y la idempotencia); avisar a quien ya renovó; zona horaria del vencimiento (usar la fecha de Lima); que sin el SQL aplicado el cron falle (debe saltar estos avisos y seguir con los demás).
-
-### Criterios de aceptación
-- Un plan que vence en 2 días recibe un solo aviso de 3 días, aunque el cron corra muchas veces. El día del vencimiento recibe el aviso de vencido.
-- Quien ya compró otro plan que empieza después no recibe avisos.
-- Las cortesías no reciben avisos.
-- Sin la tabla aplicada, los recordatorios de racha siguen saliendo.
-
-### Verificación sugerida
-Test Node con `fetch` simulado y PGlite para el SQL (como `scripts/test-tienda-culqi.mjs`): ventanas de tiempo, renovación, cortesía, repetición y `dry_run`. Release gate. Pendiente humano: aplicar `supabase/entitlement_notices.sql` en producción.
+✓ `scripts/test-plan-expiry.mjs`.

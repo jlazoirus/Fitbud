@@ -13328,3 +13328,61 @@ Playwright con `/api/config` simulado (Culqi activo y no), con `/api/entitlement
 
 `tests/e2e/paywall-tienda.spec.js` (3/3): planes en soles desde el límite de prueba con el correo precargado en `/pago`; "Renovar plan" en Perfil y vuelta con "atrás" que muestra el plan activo; acceso beta sin precios. `tests/e2e/beta-acceso.spec.js` sigue verde (sin Culqi el aviso mantiene USD). Detector Impeccable sin hallazgos.
 
+## REQ-351 - Facturación: correos de vencimiento con enlace a los planes
+
+**Estado: implementado — requiere acción humana** (aplicar `supabase/notifications_plan_expiry.sql` en Supabase).
+
+### Origen
+`docs/native-migration/COBRO-WEB.md`, Fase 0 (2026-11-05). Las apps no pueden mostrar precios ni enlaces para comprar fuera (App Store 3.1.1(a)/3.1.3, Google Play Pagos), pero las tiendas sí permiten avisar **por correo**. También sirve hoy en la web: los planes son pago único y nada avisa que el acceso se acaba.
+
+### Problema
+Nadie avisa que un plan está por vencer: la persona se entera cuando se le corta el coach o la generación de planes.
+
+### Causa raíz
+`api/notify.js` (cron horario de `.github/workflows/notify-hourly.yml`, `runJob()` en `api/notify.js:766`) solo envía recordatorios de racha y el resumen de la mañana a quien los activó. No lee `user_entitlements`, y no hay ningún registro de avisos de vencimiento.
+
+### Objetivo
+Dos correos transaccionales por plan pagado: 3 días antes de `expires_at` y el día del vencimiento. Cada uno dice el plan y la fecha, y lleva el botón "Renovar mi plan" a `https://evolvapp.club/planes` (o `/pago?plan=<mismo plan>`).
+
+### Alcance
+- `supabase/entitlement_notices.sql` (idempotente, RLS sin políticas: solo `service_role`): tabla `entitlement_notices(entitlement_id, kind in ('expiring_3d','expired'), sent_at)` con clave única `(entitlement_id, kind)`.
+- `api/notify.js`, en el mismo cron:
+  - buscar `user_entitlements` con `status = 'active'`, origen pagado (`checkout`) y `expires_at` en las próximas 72 h o vencido hace menos de 24 h;
+  - saltar si la persona ya tiene otro plan que empieza después;
+  - saltar si el aviso ya se envió;
+  - enviar con `sendEmail()` y una llave de idempotencia por aviso.
+- Correo en español, sin datos de salud ni de progreso, con el remitente de siempre. Se envía aunque la persona haya desactivado los recordatorios de racha, porque es sobre su compra.
+- La respuesta del cron cuenta los avisos enviados y saltados. Funciona en `dry_run`.
+
+### Fuera de alcance
+Avisos de fin de la semana gratis, push, recordatorios dentro de la app (REQ-350), cortesías y cupones (`origin` distinto de `checkout`), cobro recurrente.
+
+### Riesgos
+Enviar dos veces el mismo aviso (lo evitan la clave única y la idempotencia); avisar a quien ya renovó; zona horaria del vencimiento (usar la fecha de Lima); que sin el SQL aplicado el cron falle (debe saltar estos avisos y seguir con los demás).
+
+### Criterios de aceptación
+- Un plan que vence en 2 días recibe un solo aviso de 3 días, aunque el cron corra muchas veces. El día del vencimiento recibe el aviso de vencido.
+- Quien ya compró otro plan que empieza después no recibe avisos.
+- Las cortesías no reciben avisos.
+- Sin la tabla aplicada, los recordatorios de racha siguen saliendo.
+
+### Verificación sugerida
+Test Node con `fetch` simulado y PGlite para el SQL (como `scripts/test-tienda-culqi.mjs`): ventanas de tiempo, renovación, cortesía, repetición y `dry_run`. Release gate. Pendiente humano: aplicar `supabase/entitlement_notices.sql` en producción.
+
+### Implementación
+
+Cambio de diseño respecto del alcance: en vez de una tabla `entitlement_notices`, se reutiliza `notification_log`, que ya tiene la clave de idempotencia única y la lógica de `deliver()` (registro del intento, envío y marca `sent`). `supabase/notifications_plan_expiry.sql` solo agrega el tipo `plan_expiry` al CHECK, manteniendo los tipos anteriores.
+
+- `api/notify.js`, `runPlanExpiry()` al final de `runJob()`:
+  - lista `user_entitlements` con `origin=checkout`, `status in (active, expired)` y vencimiento entre 48 h atrás y 72 h adelante;
+  - `planExpiryNotice()` decide `3d` (72 h antes) o `expired` (48 h después), solo entre las 9:00 y las 20:00 de Lima;
+  - salta si hay otro acceso activo o de cortesía que termina después (las renovaciones crean una fila que empieza al vencer la anterior, `grantEntitlement()` de Culqi), o si el perfil está inactivo o sin correo;
+  - clave `plan_expiry:<id>:3d|expired`, también como llave de idempotencia de Resend.
+- `planExpiryMessage()`: asunto, título y textos sin datos de salud ni vocabulario interno; botón "Renovar mi plan" a `/pago?plan=<plan>` (o `/planes` si el plan ya no se vende) y, al vencer, "Ver planes".
+- `buildEmailHtml(..., { billing: true })`: pie transaccional ("compraste un plan de Evolv con este correo"), sin enlace de baja de recordatorios.
+- Sin el SQL aplicado, el primer registro se rechaza, no se envía nada, se registra `plan_expiry_log_unavailable` y el cron sigue con lo demás. La respuesta del cron incluye `planExpiry: { sent, skipped, errors }`.
+
+### Verificación
+
+`scripts/test-plan-expiry.mjs` (en el release gate): ventanas y horario, mensajes, pie transaccional, envío a quien corresponde (no a quien renovó ni fuera de ventana), no repite en la siguiente corrida, `dry_run`, SQL sin aplicar, Supabase caído, y el SQL en PGlite (idempotente, admite `plan_expiry` y los tipos anteriores, clave única, RLS). `validate-reminder-journey`, `validate-notify-schedule`, `validate-notify-push-ready`, `test-referrals` y `validate-migrations` siguen verdes.
+
