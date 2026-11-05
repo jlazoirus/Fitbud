@@ -1,8 +1,8 @@
-// REQ-87 — "Preparar mi semana" debe saltar días pasados o con comidas
-// ya consumidas, no sobrescribirlos. aiGenerateWeek debe filtrar con
-// weekPendingDays antes de iterar.
+// REQ-87/349: saltar pasado/días cerrados; completar franjas pendientes
+// de un día parcial sin sobrescribir el consumo ni elecciones manuales.
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import vm from "node:vm";
 
 const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
@@ -24,10 +24,19 @@ function extractFunctionSource(src, name) {
   return src.slice(start, i);
 }
 
-// 1. weekPendingDays existe y filtra por todayStr() y doneMeals
+// 1. Ejecutar el selector real: desayuno registrado no oculta almuerzo/cena.
 const wpd = extractFunctionSource(html, "weekPendingDays");
 assert.ok(wpd.includes("todayStr()"), "weekPendingDays debe comparar con todayStr().");
-assert.ok(wpd.includes("dayTotals") && wpd.includes("doneMeals"), "weekPendingDays debe verificar dayTotals().doneMeals.");
+const states={
+  "2026-11-05":[{done:true},{done:false},{done:false}],
+  "2026-11-06":[{done:true},{done:true},{done:true}],
+  "2026-11-07":[{skipped:true},{skipped:true},{skipped:true}],
+  "2026-11-08":[{ovr:{userSet:true}},{ovr:{userSet:true}},{ovr:{userSet:true}}],
+  "2026-11-09":[{done:true},{ovr:{userSet:true}},{done:false}],
+};
+const ctx=vm.createContext({todayStr:()=>"2026-11-05",buildDay:()=>({meals:[0,1,2].map(id=>({id}))}),mealState:(ds,id)=>states[ds]?.[id]||{done:false}});
+const selected=vm.runInContext(`(${wpd})`,ctx)(["2026-11-04",...Object.keys(states)]);
+assert.deepEqual(Array.from(selected),["2026-11-05","2026-11-09"]);
 
 // 2. aiGenerateWeek usa weekPendingDays, no itera allDays directamente
 const aiGW = extractFunctionSource(html, "aiGenerateWeek");

@@ -298,6 +298,19 @@
     return foodTextViolatesTerms(text,foodBlockTermsForProfile(prefs,includeSoft));
   }
 
+  // REQ-349: mismo veto para una prescripción existente y una propuesta nueva.
+  // Revisar también la receta evita que un nombre como "Bowl de fruta" oculte yogur.
+  function mealPreferenceConflict(meal,prefs,catalog){
+    if(!meal)return "";
+    if(mealNameBlockedByProfile(meal,prefs))return "plato rechazado";
+    const dish=findDishForMeal(meal,catalog||{});
+    const text=[meal.nombre||meal.name,...(Array.isArray(meal.ingredientes)?meal.ingredientes:[]).map(i=>i&&i.nombre||i&&i.name),
+      dish?dishText(dish,catalog,catalogMaps(catalog)):""].filter(Boolean).join(" ");
+    const conflict=foodTextConflictForProfile(text,prefs,{includeSoft:true});
+    if(conflict)return conflict;
+    return dish&&!dishDietAllowed(dish,prefs,catalog,catalogMaps(catalog))?"restricción alimentaria":"";
+  }
+
   // REQ-130: dislikedIngredients bloquea en el solver
   // determinista, igual que en el prompt de IA (coachFoodBlockTerms de index.html).
   // Antes el solver solo excluía alergias/patrón dietario y dejaba pasar disgustos
@@ -1630,6 +1643,7 @@
     foodTextViolatesTerms,
     foodBlockTermsForProfile,
     foodTextConflictForProfile,
+    mealPreferenceConflict,
     likedTermsForProfile,
     cuisineTagsForDish,
     preferredCuisineTags,

@@ -78,6 +78,7 @@ run("validate-training-plan-wiring.mjs", "node scripts/validate-training-plan-wi
 run("validate-macro-target-wiring.mjs", "node scripts/validate-macro-target-wiring.mjs");
 run("validate-macro-targets-invariant.mjs", "node scripts/validate-macro-targets-invariant.mjs");
 run("validate-nutrition-domain.mjs", "node scripts/validate-nutrition-domain.mjs");
+run("validate-nutrition-continuity.mjs", "node scripts/validate-nutrition-continuity.mjs");
 run("validate-finalize-nutrition-day.mjs", "node scripts/validate-finalize-nutrition-day.mjs");
 run("validate-nutrition-finalize-wiring.mjs", "node scripts/validate-nutrition-finalize-wiring.mjs");
 run("validate-global-close-objective.mjs", "node scripts/validate-global-close-objective.mjs");

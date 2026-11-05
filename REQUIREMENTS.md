@@ -2294,3 +2294,12 @@ Número, hitos como paradas de una barra, desglose en una línea y amigos con un
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-amigos.spec.js`.
+
+
+## REQ-349 - Nutrición: restricciones vigentes, rechazo con reemplazo y continuidad semanal
+
+**Estado: implementado.**
+
+Solicitud de Jonathan (2026-11-05), por feedback de Sathya. Preferencias guardadas reparan comidas pendientes; rechazos sustituyen apariciones futuras con Deshacer. Fechas/estado y preparación semanal visibles; renovación al abrir/reconectar opcional, desactivada por defecto y sin llamadas pagadas. Conserva consumo, pasado y elecciones compatibles; explica falta de alternativas. Guardados y resultados aislados por cuenta. PWA v213.
+
+Alcance, criterios y operación: `docs/nutrition-continuity.md`. Verificación: `tests/e2e/nutricion-continuidad.spec.js`, `scripts/validate-nutrition-continuity.mjs`, regresiones y release gate. Sin migraciones.

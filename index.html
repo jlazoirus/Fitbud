@@ -754,6 +754,14 @@
   .menu-suggestion-actions{display:flex;flex-wrap:wrap;gap:8px}
   .menu-suggestion-actions .btn{min-height:44px}
   .menu-suggestion button:focus-visible,.home-log-action button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .nutrition-week{padding:12px 0;margin-bottom:14px;border-bottom:1px solid var(--border)}
+  .nutrition-week h2{font-family:var(--font-body);font-size:16px;margin:0 0 4px;letter-spacing:0}
+  .nutrition-week p{font-size:13px;color:var(--muted);margin:4px 0 10px;line-height:1.5}
+  .nutrition-week .menu-suggestion-actions{align-items:center}
+  .nutrition-week .chip-check{white-space:normal;min-height:44px}
+  .nutrition-update{margin:0 0 14px;padding:12px;background:var(--surf2);border-radius:var(--r-sm)}
+  .nutrition-update p{margin:0 0 6px;font-size:14px;line-height:1.5}
+  .nutrition-update.has-undo{position:sticky;top:8px;z-index:4}
   /* REQ-292: tarjeta "Prepara tus comidas" colapsable en Nutrición */
   .nut-setup-toggle{display:inline-flex;align-items:center;gap:8px;min-height:44px;background:transparent;border:none;padding:0 4px;margin:0;color:var(--txt);font:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left}
   .nut-setup-toggle .chev{flex:0 0 auto;color:var(--muted);transition:transform .2s}
@@ -2335,7 +2343,9 @@ function buildNutritionPlanSnapshot(daysData,shoppingList){
 // Guarda un nutritionPlan como plan_versions activo. No-op silencioso si Supabase no está disponible.
 async function saveNutritionPlanVersion(draft){
   if(!supa||!uid())return null;
+  const owner=uid();
   if(!PLAN_VERSIONS_LOADED)await pullPlanVersions();
+  if(owner!==uid())return null;
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
   const cycleNo=cycleNumber();
   const dates=(draft.daysData||[]).map(d=>d.ds).filter(Boolean).sort();
@@ -2343,7 +2353,8 @@ async function saveNutritionPlanVersion(draft){
   const validFrom=dates[0],validTo=dates[dates.length-1];
   const shopping=draft.shoppingList&&draft.shoppingList.length?draft.shoppingList:buildShoppingList(draft.daysData);
   const nutritionPlan=buildNutritionPlanSnapshot(draft.daysData,shopping);
-  const digest=hashText(stableJson(nutritionPlan));
+  const {createdAt:preparedAt,...prescription}=nutritionPlan;
+  const digest=hashText(stableJson(prescription)); // mismo contenido, misma clave entre dispositivos
   const versionKey=`${cycleNo}:${validFrom}:nutrition:${digest.slice(0,12)}`;
   const existing=PLAN_VERSIONS.find(row=>row.version_key===versionKey&&row.status==="active");
   if(existing)return existing;
@@ -2361,6 +2372,7 @@ async function saveNutritionPlanVersion(draft){
       .select("id,user_id,cycle_number,version_number,version_key,source,status,valid_from,valid_to,reason,prompt,model,snapshot_hash,snapshot,activated_at,superseded_at,created_at,updated_at")
       .maybeSingle();
     if(result.error)throw result.error;
+    if(owner!==uid())return null;
     await pullPlanVersions();
     return result.data;
   }catch(e){
@@ -2430,6 +2442,8 @@ function buildDay(ds,prefsOverride){
         src:"nutritionPlan",
       };
     });
+    // Una semana parcial conserva sus franjas vacías para registrar o reintentar.
+    slotTimes.forEach(s=>{if(!meals.some(m=>m.id===s.id))meals.push({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null});});
   }else{
     meals=mealSlotsForPrefs(ctx.prefs).map(s=>({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
   }
@@ -2971,6 +2985,7 @@ function dishSlotMeta(dish){
 // 2) macros calculados desde la base de datos por nombre de plato
 // 3) fallback a los valores del plan hardcodeados (DB no conectada)
 function mealValue(base,ms){
+  if(ms&&ms.menuUnavailable&&!ms.done)return{name:"",kcal:0,p:0,c:0,f:0,src:"unavailable"};
   const o=ms&&ms.ovr;
   const name=o&&o.name!=null?o.name:base.name;
   // 1. Override manual del usuario (custom kcal o dishName explícito)
@@ -4536,6 +4551,7 @@ function render(){
   if(privacyGateRequired())return renderPrivacyGate();
   if(planNeedsRecap()){ $("#tabs").innerHTML="";return renderPlanRecap(); }
   if(notifySetupActive){ $("#tabs").innerHTML="";return renderNotifySetup(); } // REQ-289
+  scheduleNutritionWeek(); // REQ-349: solo después del arranque y con elección explícita
   primeStreakSeen(); // REQ-304: también antes de registrar desde el modo conversación
   if(chatModeActive())return renderChatMode();
   renderTabs();
@@ -4969,6 +4985,221 @@ function homeMenuSuggestionHtml(ds){
     <div class="menu-suggestion-actions"><button type="button" class="btn" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button><button type="button" class="btn btn-sm" onclick="dismissMenuSuggestion('${ds}')">Ahora no</button></div>
   </section>`;
 }
+// REQ-349: las preferencias se aplican al futuro; el registro ejecutado es inmutable.
+let nutritionUpdating=false,nutritionUpdate=null,nutritionUndo=null,nutritionReadyUser="";
+let nutritionAutoAttempt="",nutritionAutoTimer=null;
+function finishNutritionUpdate(){
+  nutritionUpdating=false;
+  const toggle=document.querySelector(".nutrition-week input");if(toggle)toggle.disabled=false;
+}
+function dismissNutritionUpdate(){
+  nutritionUpdate=null;nutritionUndo=null;render();
+  const out=$("#genOut"),draft=window._genDay;
+  if(out&&draft)out.innerHTML=genReviewHtml(validateGeneratedDay({comidas:draft.comidas},buildDay(draft.ds),effectiveDayTarget()),effectiveDayTarget());
+}
+function nutritionMealEntry(day,meal){
+  const ms=mealState(day.ds,meal.id);
+  if(ms.menuUnavailable&&ms.menuUnavailable.entry&&!ms.done)return structuredClone(ms.menuUnavailable.entry);
+  const entry=mealEntryForFinalize(meal,{...ms,menuUnavailable:null});
+  const recipe=mealRecipe(meal,ms);
+  if(recipe&&recipe.lines.length)entry.ingredientes=recipe.lines.map(l=>({nombre:l.name,gramos:l.grams}));
+  const dish=DB.loaded?dishByName(entry.nombre):null;
+  if(dish)entry.dishSlug=dishBlockKey(dish);
+  return entry;
+}
+function nutritionOverride(entry){
+  return{name:entry.nombre,kcal:entry.kcal,p:entry.proteina_g,c:entry.carbohidratos_g,f:entry.grasa_g,
+    ingredientes:structuredClone(entry.ingredientes||[]),gen:true,...(entry.dishSlug?{dishSlug:entry.dishSlug}:{})};
+}
+function nutritionFutureDates(){
+  const dates=new Set(Object.keys(S.days||{}));
+  PLAN_VERSIONS.filter(v=>v.status==="active"||v.status==="draft").forEach(v=>{
+    const plan=v.snapshot&&v.snapshot.nutritionPlan;
+    (plan&&plan.days||[]).forEach(d=>dates.add(d.date));
+  });
+  return[...dates].filter(ds=>validYmd(ds)&&ds>=todayStr()&&ds>=START&&ds<=END).sort();
+}
+async function persistNutritionEdits(){
+  const daysData=nutritionFutureDates().map(ds=>{
+    const day=buildDay(ds);
+    const comidas=day.meals.filter(m=>!mealState(ds,m.id).menuUnavailable||mealState(ds,m.id).done)
+      .map(m=>nutritionMealEntry(day,m)).filter(c=>mealHasContent({name:c.nombre,kcal:c.kcal}));
+    return{ds,comidas};
+  }).filter(d=>d.comidas.length);
+  if(daysData.length)try{await saveNutritionPlanVersion({daysData});}catch(_){/* day_log conserva las sustituciones y su cola offline */}
+}
+async function reconcilePendingNutrition(){
+  const owner=uid(),nd=window.FITBUD_NUTRITION_DOMAIN;
+  const result={changed:0,unresolved:0,changes:[]};
+  if(!owner||!nd||!nd.mealPreferenceConflict)return result;
+  const prefs=migrateProfilePrefs(profile.prefs||{});
+  for(const ds of nutritionFutureDates()){
+    const day=buildDay(ds),affected=[],locked=[];
+    day.meals.forEach(m=>{
+      const ms=mealState(ds,m.id),entry=nutritionMealEntry(day,m);
+      if(ms.done||ms.skipped){if(entry.nombre)locked.push(entry);return;}
+      const conflict=nd.mealPreferenceConflict(entry,prefs,DB);
+      if(conflict||ms.menuUnavailable)affected.push({m,entry,conflict,before:structuredClone(ms)});
+      else if(entry.nombre)locked.push(entry);
+    });
+    if(!affected.length)continue;
+    const ids=new Set([...affected.map(x=>x.m.id),...locked.map(c=>c.slot_id)]);
+    const finalized=finalizeDayWithGate(ds,{...day,meals:day.meals.filter(m=>ids.has(m.id))},day.target,prefs,[],{lockedMeals:locked});
+    affected.forEach(({m,entry,conflict,before})=>{
+      const ms=mealState(ds,m.id);
+      if(ms.done||ms.skipped)return;
+      const candidate=!conflict&&entry.nombre?entry:finalized&&finalized.comidas.find(c=>c.slot_id===m.id);
+      if(candidate&&!nd.mealPreferenceConflict(candidate,prefs,DB)){
+        ms.ovr=nutritionOverride(candidate);delete ms.menuUnavailable;result.changed++;
+      }else{
+        ms.menuUnavailable={entry,reason:conflict||"sin alternativa"};result.unresolved++;
+      }
+      const after=stableJson(ms);
+      if(after!==stableJson(before))result.changes.push({ds,id:m.id,before,entry,after});
+    });
+    if(result.changes.some(c=>c.ds===ds))commitDay(ds);
+  }
+  if(result.changes.length)await persistNutritionEdits();
+  return owner===uid()?result:{changed:0,unresolved:0,changes:[]};
+}
+function setNutritionUpdate(prefix,result){
+  const changed=result.changed?` Actualizamos ${result.changed===1?"1 comida pendiente":result.changed+" comidas pendientes"}.`:"";
+  const unresolved=result.unresolved?` ${result.unresolved===1?"1 comida necesita":result.unresolved+" comidas necesitan"} una alternativa compatible. Tus restricciones siguen activas.`:"";
+  nutritionUpdate={owner:uid(),text:prefix+changed+unresolved,retry:!!result.unresolved};
+}
+function nutritionUpdateHtml(){
+  if(!nutritionUpdate||nutritionUpdate.owner!==uid())return"";
+  return `<div class="nutrition-update${nutritionUndo&&nutritionUndo.owner===uid()?" has-undo":""}" role="status"><p>${esc(nutritionUpdate.text)}</p><div class="menu-suggestion-actions">
+    ${nutritionUndo&&nutritionUndo.owner===uid()?`<button class="btn btn-sm" onclick="undoNutritionRejection()">Deshacer</button>`:""}
+    ${nutritionUpdate.retry?`<button class="btn btn-sm" onclick="retryNutritionPreferences()">Buscar otra vez</button>`:""}
+    <button class="btn btn-sm" onclick="dismissNutritionUpdate()">Cerrar aviso</button></div></div>`;
+}
+async function retryNutritionPreferences(){
+  if(nutritionUpdating)return;
+  const owner=uid();
+  nutritionUpdating=true;
+  try{
+    if(navigator.onLine||!DB.loaded)await dbLoad();
+    if(owner!==uid())return;
+    const repaired=await reconcilePendingNutrition();
+    if(owner!==uid())return;
+    nutritionUndo=null;setNutritionUpdate("Revisamos tus comidas pendientes.",repaired);render();
+  }finally{finishNutritionUpdate();}
+  if(owner===uid()&&profile.prefs.autoNutritionWeeks===true){nutritionAutoAttempt="";await maybePrepareNutritionWeek();}
+}
+async function undoNutritionRejection(){
+  const undo=nutritionUndo;
+  if(nutritionUpdating||!undo||undo.owner!==uid())return;
+  nutritionUpdating=true;
+  try{
+    if(!undo.wasBlocked&&!await unblockDishFromProfile(undo.key)){toast("No pudimos guardar el cambio. Inténtalo otra vez.");return;}
+    if(undo.owner!==uid())return;
+    const dates=new Set();
+    undo.changes.forEach(change=>{
+      const ms=mealState(change.ds,change.id);
+      if(change.ds<todayStr()||ms.done||ms.skipped||stableJson(ms)!==change.after)return;
+      if(window.FITBUD_NUTRITION_DOMAIN.mealPreferenceConflict(change.entry,profile.prefs,DB))return;
+      // Materializar también la receta anterior cuando antes venía de un snapshot.
+      dayState(change.ds).meals[change.id]={...change.before,ovr:change.before.ovr||nutritionOverride(change.entry)};
+      dates.add(change.ds);
+    });
+    dates.forEach(commitDay);if(dates.size)await persistNutritionEdits();
+    if(undo.owner!==uid())return;
+    if(undo.draftBefore&&window._genDay&&stableJson(window._genDay.comidas)===undo.draftAfter)window._genDay.comidas=undo.draftBefore;
+    nutritionUndo=null;nutritionUpdate={owner:uid(),text:"Deshicimos el rechazo. Conservamos lo que registraste o cambiaste después."};render();
+    const out=$("#genOut"),draft=window._genDay;
+    if(out&&draft)out.innerHTML=genReviewHtml(validateGeneratedDay({comidas:draft.comidas},buildDay(draft.ds),effectiveDayTarget()),effectiveDayTarget());
+  }finally{finishNutritionUpdate();}
+}
+function nutritionDraftConflict(ds,comidas){
+  return(comidas||[]).some(c=>{
+    const ms=mealState(ds,c.slot_id);
+    return!ms.done&&!ms.skipped&&!(ms.ovr&&ms.ovr.userSet)&&window.FITBUD_NUTRITION_DOMAIN.mealPreferenceConflict(c,profile.prefs,DB);
+  });
+}
+function nutritionWeekStatus(ds){
+  const week=weekOf(ds,planPrefsForDate(ds))||weekOf(ds);
+  if(!week)return null;
+  const dates=weekDays(week),future=dates.filter(d=>d>=todayStr());
+  const missing=future.filter(d=>buildDay(d).meals.some(m=>{
+    const ms=S.days[d]&&S.days[d].meals&&S.days[d].meals[m.id]||{};
+    return!ms.done&&!ms.skipped&&!mealHasContent(mealValue(m,ms));
+  }));
+  const hasMenu=future.some(d=>buildDay(d).meals.some(m=>mealHasContent(mealValue(m,S.days[d]&&S.days[d].meals&&S.days[d].meals[m.id]))));
+  const hadMenu=PLAN_VERSIONS.some(v=>(v.snapshot&&v.snapshot.nutritionPlan&&v.snapshot.nutritionPlan.days||[]).some(d=>d.date<week.start))
+    ||Object.entries(S.days||{}).some(([date,state])=>date<week.start&&Object.values(state.meals||{}).some(m=>m.ovr&&m.ovr.gen));
+  return{week,missing,hadMenu,hasMenu,future};
+}
+function nutritionWeekHtml(ds){
+  const status=nutritionWeekStatus(ds);if(!status)return"";
+  const auto=profile.prefs.autoNutritionWeeks===true;
+  const title=!status.future.length?"Menú de esta semana":status.missing.length?(status.hadMenu&&!status.hasMenu?"Tu menú anterior terminó":status.hasMenu?"Puedes completar tu menú semanal":"¿Quieres un menú para esta semana?"):"Tu menú semanal está listo";
+  return `<section class="nutrition-week" aria-labelledby="nutritionWeekTitle">
+    <h2 id="nutritionWeekTitle">${title}</h2><p>Semana ${status.week.num||1} · ${esc(planWeekRangeLabel(status.week))}</p>
+    ${status.future.length?`<div class="menu-suggestion-actions"><button class="btn" onclick="aiGenerateWeek()">${status.missing.length?"Preparar mi semana":"Cambiar menú semanal"}</button></div>
+    <label class="chip-check"><input type="checkbox" ${auto?"checked":""} ${nutritionUpdating?"disabled":""} onchange="setAutomaticNutritionWeeks(this.checked)"><span>Preparar automáticamente mis próximas semanas</span></label>
+    <p>${auto?"Al abrir la app completaremos":"Si activas esta opción, al abrir la app completaremos"} las comidas que falten con tus preferencias. Puedes desactivarlo cuando quieras.</p>`:""}
+  </section>`;
+}
+async function setAutomaticNutritionWeeks(enabled){
+  if(nutritionUpdating)return;
+  nutritionUpdating=true;
+  const toggle=document.querySelector(".nutrition-week input");if(toggle)toggle.disabled=true;
+  try{
+    const result=await saveProfilePrefs({...profile.prefs,autoNutritionWeeks:enabled===true},{skipPlanVersion:true});
+    if(result.error){toast("No pudimos guardar tu elección. Inténtalo otra vez.");render();return;}
+    nutritionAutoAttempt="";
+    nutritionUpdate={owner:uid(),text:enabled?"Activaste la preparación semanal automática.":"Desactivaste la preparación semanal automática."};render();
+  }finally{finishNutritionUpdate();}
+  if(enabled)await maybePrepareNutritionWeek();
+}
+function scheduleNutritionWeek(){
+  if(nutritionAutoTimer||nutritionReadyUser!==uid()||!profile||profile.prefs.autoNutritionWeeks!==true)return;
+  nutritionAutoTimer=setTimeout(()=>{nutritionAutoTimer=null;maybePrepareNutritionWeek();},0);
+}
+async function maybePrepareNutritionWeek(){
+  const owner=uid();
+  if(!owner||nutritionReadyUser!==owner||nutritionUpdating||_authBusy||onboardingActive||mustChangePassword()||!isActive()||!hasRequiredConsents()||!hasCurrentScreening()||!navigator.onLine||!DB.loaded||profile.prefs.autoNutritionWeeks!==true)return;
+  const status=nutritionWeekStatus(todayStr());if(!status||!status.missing.length)return;
+  const key=owner+":"+cycleNumber()+":"+status.week.start;
+  if(nutritionAutoAttempt===key)return;
+  nutritionAutoAttempt=key;nutritionUpdating=true;
+  try{
+    // Refrescar antes de planificar evita repetir una semana ya preparada en otro dispositivo.
+    const [daysLoaded,plansLoaded]=await Promise.all([pullAllDays(),pullPlanVersions()]);
+    if(owner!==uid()||profile.prefs.autoNutritionWeeks!==true)return;
+    if(!daysLoaded||!plansLoaded){
+      nutritionUpdate={owner,text:"No pudimos revisar tu menú guardado. Revisa tu conexión y vuelve a preparar tu semana.",retry:true};render();return;
+    }
+    const latest=nutritionWeekStatus(todayStr());if(!latest||!latest.missing.length)return;
+    const prefs=migrateProfilePrefs(profile.prefs),nd=window.FITBUD_NUTRITION_DOMAIN;
+    let changed=0,unresolved=0;
+    latest.missing.forEach(ds=>{
+      const day=buildDay(ds),wanted=new Set(),locked=[];
+      day.meals.forEach(m=>{
+        const ms=mealState(ds,m.id),entry=nutritionMealEntry(day,m);
+        if(ms.done||ms.skipped||(ms.ovr&&ms.ovr.userSet)||entry.nombre&&!ms.menuUnavailable){if(entry.nombre)locked.push(entry);}
+        else wanted.add(m.id);
+      });
+      if(!wanted.size)return;
+      const finalized=finalizeDayWithGate(ds,day,day.target,prefs,[],{lockedMeals:locked});
+      wanted.forEach(id=>{
+        const ms=mealState(ds,id),entry=finalized&&finalized.comidas.find(c=>c.slot_id===id);
+        if(entry&&!nd.mealPreferenceConflict(entry,prefs,DB)){ms.ovr=nutritionOverride(entry);delete ms.menuUnavailable;changed++;}
+        else{ms.menuUnavailable=ms.menuUnavailable||{reason:"sin alternativa"};unresolved++;}
+      });
+      commitDay(ds);
+    });
+    if(changed)await persistNutritionEdits();
+    if(owner===uid()){
+      setNutritionUpdate(changed?"Preparamos lo que faltaba de tu semana.":"Tu semana necesita algunas alternativas.",{changed,unresolved});render();
+    }
+  }catch(_){
+    if(owner===uid()){nutritionUpdate={owner,text:"No pudimos completar tu semana. Puedes reintentar desde Preparar mi semana.",retry:true};render();}
+  }finally{finishNutritionUpdate();}
+}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)scheduleNutritionWeek();});
+window.addEventListener("online",()=>{nutritionAutoAttempt="";scheduleNutritionWeek();});
 function homeOpenWorkout(ds,action){
   homeTrackAction(ds,action||"workout_start");
   current=ds;
@@ -5374,6 +5605,7 @@ function renderHoy(){
   ${dayClosed?"":heroDash(ds,{compact:true})}
   <div class="home-log-action"><button type="button" class="btn btn-accent" onclick="homeLogFood('${ds}')">Registrar comida</button></div>
   ${homeAgendaHtml(ds)}
+  ${nutritionUpdateHtml()}
   ${planWeekNoticeHtml(ds)}
 
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
@@ -5426,6 +5658,8 @@ function renderNutrition(){
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
   ${section("nut.macros","Macros del día",heroDash(ds,{compact:"always"})+`<div class="muted small">${dbStatusNote()}</div>`)}
+  ${nutritionUpdateHtml()}
+  ${nutritionWeekHtml(ds)}
   ${emptyNutHtml}
   ${section("nut.plan","Comidas del día",
     itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
@@ -7550,6 +7784,12 @@ function mealCard(ds,b,order){
     </div>`;
   }
   const r=mealRecipe(b,ms);
+  if(ms.menuUnavailable&&!ms.done)return `<div class="meal">
+    <div class="slot">${esc(b.slot)}</div><div class="name">Sin alternativa compatible</div>
+    <p class="meal-empty-hint">Tus restricciones siguen activas. No encontramos un reemplazo para esta comida.</p>
+    <div class="meal-actions"><button class="btn btn-sm" onclick="retryNutritionPreferences()">Buscar otra vez</button>
+    <button class="btn btn-sm" onclick="openFoodRegistration('${ds}','${b.id}')">Registrar lo que comí</button>
+    <button class="btn btn-sm" onclick="setView('perfil')">Revisar preferencias</button></div></div>`;
   const recipeHtml=r?`
     <div class="recipe">
       ${r.lines.map(l=>`<div class="r-row"><span>${esc(l.name)}</span><span class="g">${esc(l.label||l.grams+" g")}</span></div>`).join("")}
@@ -8217,19 +8457,21 @@ async function blockDishFromProfile(name,dish){
   if(!profile.prefs)profile.prefs={};
   const existing=Array.isArray(profile.prefs.blockedDishes)?profile.prefs.blockedDishes:[];
   if(existing.some(b=>b&&b.key===key))return true;
-  profile.prefs.blockedDishes=normalizedBlockedDishes([...existing,{key,name:cleanName}]);
-  if(supa&&uid()){
-    try{await supa.from("profiles").update({prefs:profile.prefs,updated_at:new Date().toISOString()}).eq("id",uid());}catch(e){/* best-effort */}
-  }
-  return true;
+  const owner=uid();
+  try{
+    const result=await saveProfilePrefs({...profile.prefs,blockedDishes:normalizedBlockedDishes([...existing,{key,name:cleanName}])},{skipPlanVersion:true});
+    return owner===uid()&&!result.error;
+  }catch(_){return false;}
 }
 // REQ-120: quita un plato de la lista de bloqueados ("volver a sugerir").
 async function unblockDishFromProfile(key){
-  if(!profile||!profile.prefs||!Array.isArray(profile.prefs.blockedDishes))return;
-  profile.prefs.blockedDishes=profile.prefs.blockedDishes.filter(b=>b&&b.key!==key);
-  if(supa&&uid()){
-    try{await supa.from("profiles").update({prefs:profile.prefs,updated_at:new Date().toISOString()}).eq("id",uid());}catch(e){/* best-effort */}
-  }
+  if(!profile||!profile.prefs)return false;
+  try{
+    const result=await saveProfilePrefs({...profile.prefs,blockedDishes:(profile.prefs.blockedDishes||[]).filter(b=>b&&b.key!==key)},{skipPlanVersion:true});
+    if(result.error)return false;
+    SESSION_REJECTED_MEALS.forEach(list=>list.delete(key));
+    return true;
+  }catch(_){return false;}
 }
 function coachActionCurrentWeek(ds){
   const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||(WEEKS&&WEEKS[0]);
@@ -8781,7 +9023,7 @@ function blockedDishesHtml(p){
   return `<div class="chips">${list.map(b=>`<span class="chip-check" style="display:inline-flex;align-items:center;gap:6px">${esc(b.name)}<button type="button" class="btn btn-sm" style="padding:2px 8px" onclick="unblockDishFromProfileUi('${esc(b.key)}')">Volver a sugerir</button></span>`).join("")}</div>`;
 }
 async function unblockDishFromProfileUi(key){
-  await unblockDishFromProfile(key);
+  if(!await unblockDishFromProfile(key)){toast("No pudimos guardar el cambio. Inténtalo otra vez.");return;}
   render();
   toast("Ese plato puede volver a aparecer en tus sugerencias");
 }
@@ -8796,6 +9038,7 @@ function renderProfile(){
   const strengthChoice=strengthChoiceFromPrefs(p);
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
   ${referralNoticeHtml()}
+  ${nutritionUpdateHtml()}
   ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas.</span></div>`:""}
 
   <div class="pf-accordion-list">
@@ -9109,6 +9352,10 @@ function updateProfileMealCount(value){
   if(main)main.innerHTML=Array.from({length:count},(_,index)=>`<option value="${index+1}" ${Math.min(previous,count)===index+1?"selected":""}>Comida ${index+1}</option>`).join("");
 }
 async function saveProfile(){
+  if(nutritionUpdating)return;
+  const owner=uid();
+  nutritionUpdating=true;
+  try{
   const previous=migrateProfilePrefs((profile&&profile.prefs)||{});
   const draft={...previous};
   const diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#pf_diet_"+v);return el&&el.checked;});
@@ -9170,10 +9417,15 @@ async function saveProfile(){
   const result=await saveProfilePrefs(prefs);
   if(result&&result.error){toast("Error: "+result.error.message);return;}
   if(calendarChanged){await upsertActiveCycle();await pullCycleHistory();}
+  const repaired=await reconcilePendingNutrition();
+  if(owner!==uid())return;
+  nutritionUndo=null;
+  setNutritionUpdate("Preferencias guardadas.",repaired);
   current=clampDate(current);
   profileClearDirty();
   render();
-  toast(durationChanged?`Plan ajustado a ${planDurationWeeks} semanas`:"Preferencias guardadas");
+  toast(durationChanged?`Plan ajustado a ${planDurationWeeks} semanas`:nutritionUpdate.text);
+  }finally{finishNutritionUpdate();}
 }
 async function saveOptionalConsents(){
   const choices={
@@ -10710,6 +10962,7 @@ function openReplace(ds,id,reason){
 function applyReplace(ds,id,i,reason){
   const{options}=window._replaceOpts;const o=options[i];const ms=mealState(ds,id);
   const prev=ms.ovr?ms.ovr.name:null;
+  delete ms.menuUnavailable;
   ms.ovr={name:o.name,dishName:o.dishName||null,userSet:true};
   if(reason)ms.ovr.contingencyReason=reason;
   addContingencyEntry(ds,{type:"meal_replace",id,reason:reason||null,chosen:o.name,prev});
@@ -11040,6 +11293,7 @@ function applyChangeMeal(i){
         ({nombre,gramos,ingredientSlug,kcal,proteina_g,carbohidratos_g,grasa_g}));
     }
   }
+  delete ms.menuUnavailable;
   ms.ovr=newOvr;
   // Rebalanceo de comidas futuras (REQ-83) — conectado a finalizeNutritionDay()
   // (REQ-142): la comida cambiada y todo lo demás quedan lockedMeals, las
@@ -11121,17 +11375,30 @@ function openMealMore(ds,id){
 }
 // REQ-120: bloquea el plato actualmente asignado a esta comida desde el menú "···".
 async function blockCurrentMealDish(ds,id){
+  if(nutritionUpdating)return;
+  const owner=uid();
   const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);if(!base)return;
   const ms=mealState(ds,id);const v=mealValue(base,ms);
   if(!v.name){toast("No hay un plato asignado para bloquear");return;}
   const o=ms.ovr;
   const dishName=(o&&o.dishName!=null?o.dishName:base.dishName)||v.name;
   const dish=DB.loaded?dishByName(dishName):null;
+  nutritionUpdating=true;
+  try{
+  const key=dish?dishBlockKey(dish):coachKey(v.name);
+  const wasBlocked=(profile.prefs.blockedDishes||[]).some(b=>b.key===key);
   const ok=await blockDishFromProfile(v.name,dish);
   if(ok)rememberRejectedMeal(ds,v.name);
   closeModal();
-  if(ok)toast(`No volveremos a sugerir "${v.name}". Puedes deshacerlo en Perfil.`);
+  if(ok){
+    const repaired=await reconcilePendingNutrition();
+    if(owner!==uid())return;
+    nutritionUndo={owner:uid(),key,wasBlocked,changes:repaired.changes};
+    setNutritionUpdate(`Dejaremos de sugerir «${v.name}».`,repaired);
+    render();toast(nutritionUpdate.text);
+  }
   else toast("No se pudo bloquear el plato. Intenta de nuevo.");
+  }finally{finishNutritionUpdate();}
 }
 /* ---- Contingencia: entrenamiento ---- */
 function openWorkoutContingency(ds,reason){
@@ -12011,6 +12278,7 @@ function applyMealSubstitution(ds,id,v,eaten){
   const ms=mealState(ds,id);const day=buildDay(ds);const b=day.meals.find(m=>m.id===id);
   const before=mealValue(b,ms);
   const prev={ovr:ms.ovr?JSON.parse(JSON.stringify(ms.ovr)):null,done:!!ms.done,skipped:!!ms.skipped};
+  delete ms.menuUnavailable;
   ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},
     v.macrosUnknown?{macrosUnknown:true}:{},v.nutritionMeta?{nutritionMeta:v.nutritionMeta}:{},v.components?{components:v.components}:{});
   ms.done=!!eaten;delete ms.skipped;
@@ -12200,7 +12468,7 @@ function saveEditor(){
     commitDay(e.ds);closeModal();render();toast("Comida reemplazada · puedes deshacerlo en la comida");
     return;
   }
-  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},portion!==1?{portion}:{},v.macrosUnknown?{macrosUnknown:true}:{},meta?{nutritionMeta:meta}:{},components.length?{components}:{});}
+  if(e.kind==="meal"){const ms=mealState(e.ds,e.id);delete ms.menuUnavailable;ms.ovr=Object.assign({name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,userSet:true},portion!==1?{portion}:{},v.macrosUnknown?{macrosUnknown:true}:{},meta?{nutritionMeta:meta}:{},components.length?{components}:{});}
   else if(e.kind==="extra"){const d=dayState(e.ds);if(e.extraIdx!=null){const x=Object.assign(d.extras[e.extraIdx],v);if(portion===1)delete x.portion;if(!v.macrosUnknown)delete x.macrosUnknown;if(!components.length)delete x.components;}else d.extras.push(Object.assign({done:true,oid:nextExtraOid(d)},v));}
   commitDay(e.ds);closeModal();render();toast("Guardado");
 }
@@ -12517,7 +12785,7 @@ function lockedMealsForDay(ds,day){
   const locked=[];
   (day.meals||[]).forEach(m=>{
     const ms=st.meals[m.id];
-    if(!ms||!ms.done)return;
+    if(!ms||!(ms.done||ms.skipped||ms.ovr&&ms.ovr.userSet))return;
     locked.push(mealEntryForFinalize(m,ms));
   });
   return locked;
@@ -13527,12 +13795,11 @@ function weekPendingDays(allDays){
   const today=todayStr();
   return allDays.filter(ds=>{
     if(ds<today)return false;
-    const tot=dayTotals(ds);
-    if(tot.doneMeals>0)return false;
-    return true;
+    return buildDay(ds).meals.some(m=>{const s=mealState(ds,m.id);return!s.done&&!s.skipped&&!(s.ovr&&s.ovr.userSet);});
   });
 }
 async function aiGenerateWeek(){
+  if(nutritionUpdating){toast("Estamos actualizando tus comidas. Espera un momento.");return;}
   const w=weekOf(current,planPrefsForDate(current))||weekOf(current)||WEEKS[0];
   const allDays=weekDays(w);
   if(!allDays.length){toast("Esta semana está fuera del plan");return;}
@@ -13631,7 +13898,7 @@ function genReviewHtml(res,target){
       }
     }
   }
-  return `${res.explicacion?`<div class="ai-box">${esc(res.explicacion)}</div>`:""}
+  return `${nutritionUpdateHtml()}${res.explicacion?`<div class="ai-box">${esc(res.explicacion)}</div>`:""}
     <div class="muted small" style="margin:10px 2px 4px">Total del día: <b>${t.kcal}</b> kcal · P ${t.p} · C ${t.c} · G ${t.f} g <span class="muted">(meta ${target.kcal}/${target.p}/${target.c}/${target.f})</span></div>
     ${meals}
     ${issues}${snackHtml}${warns}${contractHtml}
@@ -13651,7 +13918,8 @@ function applyDayComidas(ds,comidas){
   let preserved=0;
   (comidas||[]).forEach(c=>{
     const ms=mealState(ds,c.slot_id); if(!ms)return;
-    if(ms.done||(ms.ovr&&ms.ovr.userSet)){preserved++;return;}
+    if(ms.done||ds<todayStr()||ms.skipped||(ms.ovr&&ms.ovr.userSet)){preserved++;return;}
+    delete ms.menuUnavailable;
     ms.ovr={name:c.nombre,kcal:c.kcal,p:c.proteina_g,c:c.carbohidratos_g,f:c.grasa_g,ingredientes:c.ingredientes,gen:true,...(c.dishSlug?{dishSlug:c.dishSlug}:{})};
   });
   commitDay(ds);
@@ -13669,12 +13937,20 @@ function addGapSnackToDay(){
 }
 // REQ-120: bloquea un plato sugerido en el borrador del día (antes de aplicarlo).
 async function blockGenDraftMeal(cIdx){
+  if(nutritionUpdating)return;
+  const owner=uid();
   const draft=window._genDay;if(!draft||!draft.comidas)return;
   const c=draft.comidas[cIdx];if(!c||!c.nombre)return;
   const dish=DB.loaded?(c.dishSlug?DB.dishes.find(d=>d.slug===c.dishSlug):dishByName(c.nombre)):null;
+  const key=dish?dishBlockKey(dish):coachKey(c.nombre),wasBlocked=(profile.prefs.blockedDishes||[]).some(b=>b.key===key);
+  const draftBefore=structuredClone(draft.comidas);
+  nutritionUpdating=true;
+  try{
   const ok=await blockDishFromProfile(c.nombre,dish);
   if(!ok){toast("No se pudo bloquear el plato. Intenta de nuevo.");return;}
   rememberRejectedMeal(draft.ds,c.nombre);
+  const repaired=await reconcilePendingNutrition();
+  if(owner!==uid())return;
   // REQ-169: sacarlo del borrador ya; antes seguía ahí y se podía aplicar igual.
   // El hueco lo llena el catálogo (sin consumir opciones del coach).
   const day=buildDay(draft.ds);const target=effectiveDayTarget();
@@ -13683,9 +13959,13 @@ async function blockGenDraftMeal(cIdx){
   const finalized=finalizeDayWithGate(draft.ds,day,target,prefs,[],{lockedMeals:others});
   const refilled=finalized&&Array.isArray(finalized.comidas)&&finalized.comidas.some(m=>m.slot_id===c.slot_id);
   draft.comidas=refilled?finalized.comidas:others;
+  nutritionUndo={owner:uid(),key,wasBlocked,changes:repaired.changes,draftBefore,draftAfter:stableJson(draft.comidas)};
+  setNutritionUpdate(`Dejaremos de sugerir «${c.nombre}».`,{changed:repaired.changed+(refilled?1:0),unresolved:repaired.unresolved+(refilled?0:1)});
   const res=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
+  if(!refilled){res.ok=false;res.issues.push("Falta una alternativa compatible para esta comida. Tus restricciones siguen activas.");}
   const out=$("#genOut");if(out)out.innerHTML=genReviewHtml(res,target);
-  toast(`No volveremos a sugerir "${c.nombre}".${refilled?" Lo cambiamos por otra opción.":""} Puedes deshacerlo en Perfil.`);
+  toast(nutritionUpdate.text);
+  }finally{finishNutritionUpdate();}
 }
 // REQ-90: editar gramos de ingredientes en el borrador del día y re-validar.
 function updateGenMealGrams(mealIdx,ingIdx,grams){
@@ -13704,6 +13984,7 @@ function updateGenMealGrams(mealIdx,ingIdx,grams){
 }
 function applyGeneratedDay(){
   const g=window._genDay; if(!g||!g.comidas){closeModal();return;}
+  if(g.ds<todayStr()||nutritionDraftConflict(g.ds,g.comidas)){window._genDay=null;closeModal();toast("Tus preferencias o la fecha cambiaron. Prepara un menú nuevo.");return;}
   const day=buildDay(g.ds);
   const slotIds=new Set(day.meals.map(m=>m.id));
   const slotComidas=g.comidas.filter(c=>slotIds.has(c.slot_id));
@@ -13787,6 +14068,16 @@ function updateGenWeekMealGrams(dayIdx,mealIdx,ingIdx,grams){
 }
 async function applyWeekPlan(){
   const draft=window._genWeek;if(!draft||!draft.daysData.length){closeModal();return;}
+  if(draft.daysData.some(d=>nutritionDraftConflict(d.ds,d.comidas))){window._genWeek=null;closeModal();toast("Tus preferencias cambiaron. Prepara un menú nuevo.");return;}
+  // La revisión puede seguir abierta mientras se registra una comida.
+  draft.daysData=draft.daysData.filter(d=>d.ds>=todayStr()).map(d=>{
+    const day=buildDay(d.ds);
+    return{...d,comidas:d.comidas.map(c=>{
+      const m=day.meals.find(m=>m.id===c.slot_id),s=m&&mealState(d.ds,m.id);
+      return s&&(s.done||s.skipped||s.ovr&&s.ovr.userSet)?nutritionMealEntry(day,m):c;
+    })};
+  });
+  if(!draft.daysData.length){closeModal();return;}
   // Guardar prescripción en plan_versions (fuente de verdad a partir de REQ-82)
   if(supa&&uid()){
     try{await saveNutritionPlanVersion(draft);}
@@ -14645,6 +14936,7 @@ async function loadProfile(){
 }
 async function saveProfilePrefs(prefs,meta){
   if(!supa||!uid())return{error:{message:"Sin sesión"}};
+  const owner=uid();
   if(!isActive())return{error:{message:"Cuenta desactivada"}};
   const normalized=migrateProfilePrefs(prefs||{});
   const result=await supa.from("profiles").upsert({
@@ -14653,6 +14945,7 @@ async function saveProfilePrefs(prefs,meta){
     prefs:normalized,
     updated_at:new Date().toISOString(),
   },{onConflict:"id"});
+  if(owner!==uid())return{error:{message:"La sesión cambió. Vuelve a intentarlo."}};
   if(!result.error){
     profile.prefs=normalized;
     refreshPlanCalendar();
@@ -14799,6 +15092,10 @@ async function onAuth(){
     passwordRecovery=true;passwordRecoveryError="";passwordRecoveryMode="first_login";authReady=true;render();
     return;
   }
+  const nutritionOwner=uid();
+  if(nutritionReadyUser!==nutritionOwner){PLAN_VERSIONS=[];PLAN_VERSIONS_LOADED=false;}
+  nutritionReadyUser="";
+  if(nutritionUpdate&&nutritionUpdate.owner!==uid()){nutritionUpdate=null;nutritionUndo=null;}
   _authBusy=true;
   try{
     await loadProfile();
@@ -14833,6 +15130,13 @@ async function onAuth(){
     const [,weightsPulled]=await Promise.all([pullAllDays(),pullWeights()]);
     reconcileAwayWorkouts(); // REQ-244: la app se reabrió tras cerrarse con una sesión en curso
     if(weightsPulled)await backfillStartWeightOnce();
+    if(!onboardingActive&&hasRequiredConsents()&&hasCurrentScreening()){
+      const repaired=await reconcilePendingNutrition();
+      if(nutritionOwner===uid()){
+        if(repaired.changed||repaired.unresolved)setNutritionUpdate("Revisamos tu menú con tus preferencias.",repaired);
+        nutritionReadyUser=uid();
+      }
+    }
     maybeUpdateLearnedPatterns(); // REQ-63: best-effort, sin await, sin notificación al usuario
     drainSyncQueue(); // vaciar cola offline pendiente al reconectar (no-await)
     onboardingStep=1;reviewPromptShown=false;
@@ -15106,16 +15410,18 @@ async function pullCycleHistory(){
 }
 
 async function pullPlanVersions(){
-  PLAN_VERSIONS=[];
   if(!supa||!uid())return false;
+  const owner=uid();
   try{
     const result=await supa.from("plan_versions").select("id,user_id,cycle_number,version_number,version_key,source,status,valid_from,valid_to,reason,prompt,model,snapshot_hash,snapshot,activated_at,superseded_at,created_at,updated_at").eq("user_id",uid()).order("cycle_number",{ascending:false}).order("version_number",{ascending:false});
+    if(owner!==uid())return false;
     if(result.error)throw result.error;
     PLAN_VERSIONS=Array.isArray(result.data)?result.data:[];
     PLAN_VERSIONS_LOADED=true;
     PLAN_VERSIONS_ERROR=null;
     return true;
   }catch(e){
+    if(owner!==uid())return false;
     PLAN_VERSIONS=[];
     PLAN_VERSIONS_LOADED=false;
     PLAN_VERSIONS_ERROR=(e&&e.message)||String(e);
@@ -15382,11 +15688,13 @@ async function pullDay(ds){
 // Baja TODOS los días del usuario. Días con mutaciones pendientes en la cola se omiten
 // para preservar los cambios offline hechos en este dispositivo.
 async function pullAllDays(){
-  if(!supa||!uid())return;
+  if(!supa||!uid())return false;
+  const owner=uid();
   const seqs={..._dayCommitSeq};
   try{
     let r=await supa.from("day_log").select("log_date,state,plan_version_id,updated_at").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
     if(r.error&&String((r.error&&r.error.message)||r.error).match(/plan_version_id|column/i))r=await supa.from("day_log").select("log_date,state,updated_at").eq("user_id",uid()).gte("log_date",START).lte("log_date",END);
+    if(owner!==uid())return false;
     if(!r.error&&Array.isArray(r.data)){
       r.data.forEach(row=>{
         if(_hasPendingDay(row.log_date))return; // preservar cambios offline pendientes
@@ -15402,8 +15710,10 @@ async function pullAllDays(){
       });
       save();
       await backfillDayVersions();
+      return true;
     }
   }catch(e){}
+  return false;
 }
 // REQ-186: cuenta los cambios locales por día; una lectura remota que empezó
 // antes de un cambio no debe pisarlo al llegar.
