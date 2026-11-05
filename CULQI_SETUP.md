@@ -71,4 +71,5 @@ Cambiar `CULQI_PUBLIC_KEY` y `CULQI_SECRET_KEY` por las de **Producción** y red
 - **Reembolsos:** CulqiPanel → la venta → Devolución. Luego, en Supabase, poner `status = 'revoked'` en la fila de `user_entitlements` con ese `payment_ref`.
 - **Cobro sin acceso:** si `billing_events` tiene `provider = culqi` y `status = failed`, la persona pagó y no recibió acceso. Crear o invitar la cuenta y otorgar el plan desde Admin.
 - **Comprobantes:** los términos prometen enviar el comprobante electrónico al correo de la compra. Emitirlo con el sistema de facturación del titular (SUNAT).
+- **Avisos de vencimiento (REQ-351):** el cron horario (`/api/notify`) manda un correo 3 días antes y otro al vencer cada plan pagado, entre las 9:00 y las 20:00 de Lima, con enlace para renovar. Requiere aplicar una vez `supabase/notifications_plan_expiry.sql`; sin él no se envían (el resto del cron sigue igual). La respuesta del cron trae el conteo en `planExpiry`.
 - **Libro de Reclamaciones:** responder cada hoja en máximo 15 días hábiles por el medio que indicó la persona y registrar la respuesta en `libro_reclamaciones` (`respuesta`, `respondido_en`, `estado = 'respondido'`).

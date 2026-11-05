@@ -1184,6 +1184,8 @@
   .paywall-features{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:4px}
   .paywall-features li{font-size:12px;color:var(--txt);display:flex;gap:6px;align-items:flex-start}
   .paywall-features li:before{content:'✓';color:var(--good);font-weight:700;flex:0 0 auto}
+  .paywall-buy{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;text-decoration:none;color:var(--txt);text-align:center}
+  .paywall-buy.btn-accent{color:var(--on-accent)}
   .l-footer-legal{font-size:11px;color:var(--muted);line-height:1.7}
   .l-footer-legal a{color:var(--muted);text-decoration:none;border-bottom:1px solid var(--border)}
   /* Cola offline y badge de sincronización (REQ-28) */
@@ -1300,7 +1302,7 @@ async function loadCatalog(){
 }
 function activeCatalogPlans(){return(catalogPlans||[]).filter(p=>p.active!==false);}
 // REQ-333: tienda web (soles, pago con Culqi). Con la beta cerrada, la portada
-// vende estos planes; la app y su paywall siguen con /api/catalog.
+// vende estos planes; con Culqi activo, el aviso de plan también (REQ-350).
 // null = cargando; false = no se pudo cargar (vuelve a los planes de la app).
 let storeModules=null;
 function loadStorePlans(){
@@ -1336,11 +1338,44 @@ let REMOTE={supabase:{url:"",publishableKey:""},anthropic:{model:"",proxy:false}
 async function loadRemoteConfig(){
   try{
     const r=await fetch("/api/config",{cache:"no-store"});
-    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{},checkout:j.checkout||{},signup:j.signup||{}};}
+    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{},checkout:j.checkout||{},signup:j.signup||{},culqi:j.culqi||{}};}
   }catch(e){/* sin funciones serverless (p.ej. GitHub Pages): se ignora */}
 }
 // REQ-104: checkout activo solo si el servidor confirma STRIPE_SECRET_KEY configurada.
 function checkoutAvailable(){return !!(REMOTE.checkout&&REMOTE.checkout.enabled);}
+// REQ-350: con Culqi activo, el aviso de plan vende los planes de la tienda en soles.
+function storeCheckoutAvailable(){return !!(REMOTE.culqi&&REMOTE.culqi.enabled);}
+// Al tocar "Comprar" se guarda el vencimiento vigente; al volver de /pago (atrás,
+// otra pestaña o "Ir a Evolv") se refresca el acceso y se avisa si cambió.
+const STORE_CHECKOUT_KEY="evolv_store_checkout_v1";
+function storeCheckoutStart(planId){
+  trackEvent("checkout_start",{source:"tienda",plan_type:String(planId||"")});
+  try{sessionStorage.setItem(STORE_CHECKOUT_KEY,JSON.stringify({at:Date.now(),exp:(entitlement&&entitlement.expires_at)||null}));}catch(_){}
+}
+function storeCheckoutPending(){
+  try{
+    const v=JSON.parse(sessionStorage.getItem(STORE_CHECKOUT_KEY)||"null");
+    if(!v||!v.at)return null;
+    if(Date.now()-v.at>6*3600000){sessionStorage.removeItem(STORE_CHECKOUT_KEY);return null;}
+    return v;
+  }catch(_){return null;}
+}
+// Devuelve true si el acceso cambió desde que se tocó "Comprar".
+function storeCheckoutResult(){
+  const pending=storeCheckoutPending();
+  if(!pending||!entitlement||entitlement.origin!=="checkout")return false;
+  if(entitlement.expires_at===pending.exp)return false;
+  try{sessionStorage.removeItem(STORE_CHECKOUT_KEY);}catch(_){}
+  toast("¡Listo! Tu plan está activo hasta el "+prettyDateTime(entitlement.expires_at).split(" ").slice(0,2).join(" ")+".");
+  return true;
+}
+async function refreshAfterStoreCheckout(){
+  if(!session||!storeCheckoutPending())return;
+  await loadEntitlement();
+  if(storeCheckoutResult()){closeModal();render();}
+}
+window.addEventListener("pageshow",e=>{if(e.persisted)refreshAfterStoreCheckout();});
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")refreshAfterStoreCheckout();});
 // REQ-205: beta cerrada salvo que el servidor diga lo contrario (SIGNUP_MODE=open).
 function inviteOnlySignup(){return !(REMOTE.signup&&REMOTE.signup.mode==="open");}
 function effectiveSettings(){
@@ -9942,16 +9977,14 @@ function showAccessNotice(){
 }
 function showPaywall(context){
   if(noPricesMode()){showAccessNotice();return;}
+  if(storeCheckoutAvailable()){
+    if(storeModules===null){loadStorePlans().then(()=>showPaywall(context));return;}
+    if(storeModules){showStorePaywall(context);return;}
+  }
   trackEvent("paywall_shown",{context:context||"generic"});
   const plans=activeCatalogPlans();
   const expired=entitlementExpired;
-  const msg=context==="trial_limit"
-    ?"Estás en tu semana gratis y ya usaste tus cambios incluidos. Activa un plan para seguir personalizando tu nutrición y entrenamiento."
-    :context==="training"
-    ?"Para acceder a tu plan de entrenamiento personalizado, activa tu suscripción."
-    :context==="nutrition"
-    ?"Para generar y adaptar tu nutrición personalizada, activa tu suscripción."
-    :"Activa tu suscripción para acceder a todas las funciones de tu coach.";
+  const msg=paywallMessage(context);
   const expiredBanner=expired
     ?`<div class="paywall-expired">Tu plan venció el ${prettyDateTime(expired.expires_at).split(" ").slice(0,2).join(" ")}. Tu historial, progreso y exportación siguen disponibles.</div>`:"";
   const checkoutOn=checkoutAvailable();
@@ -9977,6 +10010,40 @@ function showPaywall(context){
     <div class="paywall-plans">${plansHtml}</div>
     ${unavailableHtml}
     <div class="muted small" style="text-align:center;margin-top:12px">Tu progreso, historial y preferencias se conservan con cualquier plan.</div>`);
+}
+function paywallMessage(context){
+  return context==="trial_limit"
+    ?"Estás en tu semana gratis y ya usaste tus cambios incluidos. Activa un plan para seguir personalizando tu nutrición y entrenamiento."
+    :context==="training"
+    ?"Para acceder a tu plan de entrenamiento personalizado, activa tu suscripción."
+    :context==="nutrition"
+    ?"Para generar y adaptar tu nutrición personalizada, activa tu suscripción."
+    :"Activa tu suscripción para acceder a todas las funciones de tu coach.";
+}
+// REQ-350: planes de la tienda (tienda/planes.js, soles, Culqi). "Comprar" abre
+// /pago en la misma pestaña; /pago precarga el correo de la sesión.
+function showStorePaywall(context){
+  trackEvent("paywall_shown",{context:context||"generic",source:"tienda"});
+  const{PLANES_TIENDA,formatoSoles}=storeModules.planes;
+  const expired=entitlementExpired;
+  const expiredBanner=expired
+    ?`<div class="paywall-expired">Tu plan venció el ${prettyDateTime(expired.expires_at).split(" ").slice(0,2).join(" ")}. Tu historial, progreso y exportación siguen disponibles.</div>`:"";
+  const plansHtml=PLANES_TIENDA.map(p=>{
+    const isHi=!!p.destacado;
+    return`<div class="paywall-plan${isHi?" paywall-plan-hi":""}">
+      ${isHi?`<div class="paywall-badge">${esc(p.destacado)}</div>`:""}
+      <div class="paywall-plan-name">${esc(p.nombre)}</div>
+      <div class="paywall-plan-price">${esc(formatoSoles(p.montoCentimos))} <span class="paywall-period">/ ${esc(p.periodo)}</span></div>
+      <div class="paywall-plan-desc">${esc(p.resumen)}</div>
+      <ul class="paywall-features">${p.incluye.map(f=>`<li>${esc(f)}</li>`).join("")}</ul>
+      <a class="btn${isHi?" btn-accent":""} paywall-buy" href="/pago?plan=${encodeURIComponent(p.id)}" onclick="storeCheckoutStart('${esc(p.id)}')">Comprar ${esc(p.nombre.toLowerCase())}</a>
+    </div>`;
+  }).join("");
+  modal(`<h3>Activa tu plan</h3>
+    <div class="paywall-msg">${expiredBanner}${esc(paywallMessage(context))}</div>
+    <div class="paywall-plans">${plansHtml}</div>
+    <div class="muted small" style="text-align:center;margin-top:12px">Pago único con tarjeta, en soles y sin renovación automática. Tu progreso, historial y preferencias se conservan con cualquier plan.</div>
+    ${couponRedeemSectionHtml()}`);
 }
 async function activatePlanFromPaywall(planId){
   if(!session){toast("Sesión no disponible. Recarga la página.");return;}
@@ -15102,7 +15169,7 @@ async function onAuth(){
     await loadPrivacyState();
     entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
     billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
-    loadEntitlement().then(()=>{if(session){render();redeemPendingInvite();}}); // no-await: no debe bloquear el arranque (REQ-25)
+    loadEntitlement().then(()=>{if(session){render();redeemPendingInvite();storeCheckoutResult();}}); // no-await: no debe bloquear el arranque (REQ-25)
     S.days={};S.weights={};restorePendingFromQueue();save();   // descarta caché de otra sesión; la DB manda salvo lo pendiente de subir (REQ-242)
     if(!isActive()){
       onboardingActive=false;onboardingDraft=null;view="hoy";render();

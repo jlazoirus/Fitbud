@@ -165,6 +165,7 @@ run("validate-migrations.mjs", "node scripts/validate-migrations.mjs");
 run("test-referrals.mjs (PostgreSQL y campaña)", "node scripts/test-referrals.mjs");
 run("test-streak-friends.mjs (PostgreSQL/RLS)", "node scripts/test-streak-friends.mjs");
 run("test-tienda-culqi.mjs (tienda, Culqi y Libro de Reclamaciones)", "node scripts/test-tienda-culqi.mjs");
+run("test-plan-expiry.mjs (avisos de vencimiento de planes pagados)", "node scripts/test-plan-expiry.mjs");
 
 // ── Auditorías de seguridad y calidad ───────────────────────────────────────
 console.log("\n[ Seguridad y calidad ]");

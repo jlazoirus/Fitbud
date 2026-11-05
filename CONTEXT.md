@@ -97,7 +97,7 @@ REQ-316: Hoy prioriza registro/entreno y menú opcional. REQ-324: fechas/avisos 
 
 
 - Landing publica, catalogo de planes, paywall, Stripe Checkout, webhooks, entitlements, cupones y billing history estan implementados. Cobro real depende de variables y configuracion externa.
-- REQ-104: sin `STRIPE_SECRET_KEY`, `showPaywall` muestra "Disponible pronto" + canje de codigo. Pago unico, sin renovacion.
+- REQ-350: con Culqi, `showPaywall` vende `tienda/planes.js` → `/pago`; sin cobro, "Disponible pronto" (REQ-104).
 - **Cobro siempre en la web** (Culqi en `/planes` → `/pago`, REQ-331..334), tambien con app nativa: nada de compras dentro de la app. REQ-208: `noPricesMode()` (acceso beta/cupon/cortesia vigente o invitacion sin canjear) reemplaza el paywall por `showAccessNotice()` y Perfil no muestra precios; Admin "Crear cuenta"/"Invitar" con casilla beta da 90 dias de cortesia `quarterly`.
 - `api/notify.js`: correo y push cada hora (`notify-hourly.yml`, REQ-266); `planReminder()` elige etapa por ausencia (REQ-285, `docs/reminders-journey.md`).
 - `api/analytics.js` registra eventos permitidos por allowlist; no enviar datos de salud, alergias, fotos, prompts ni contenido de conversaciones.

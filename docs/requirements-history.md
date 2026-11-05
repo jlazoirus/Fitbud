@@ -13169,3 +13169,220 @@ Mostrar el enlace vigente tras recargar, que exigiría cambiar la RPC `streak_so
 **Estado: implementado.**
 
 Jonathan (2026-10-30): separar la consola de administración a otra URL y dar acceso a Sathya (b.ll.sathya@gmail.com, mismos permisos de administrador). La consola vive en `/admin` (rewrite de `vercel.json` al mismo `index.html`; el modo consola se activa por ruta). La app de usuarios ya no renderiza vistas de administración para nadie: `setView` las bloquea fuera del modo consola, el despachador de `render()` exige modo consola y Perfil solo enlaza a `/admin`. En `/admin`: sin sesión → login; sesión sin `is_admin` → pantalla "Sin acceso"; admin → consola con pestañas propias (Beta, Usuarios, Alimentos, Ejercicios, Analítica, Ajustes) y vuelta a la app. El enlace del correo de aviso de postulantes y la tarjeta de pendientes en Hoy apuntan a `/admin?ver=postulantes`. La autorización real no cambia: ya era server-side (`api/admin` valida JWT + `is_admin`; RLS protege los datos). El alta de Sathya es un paso operativo en Supabase (`is_admin=true` en su perfil), fuera del repo. ✓ `tests/e2e/admin-console.spec.js`; `tests/e2e/admin-beta.spec.js` actualizado.
+
+
+<!-- Compactación 2026-11-05: detalle movido desde REQUIREMENTS.md para mantenerlo bajo 15000 palabras. -->
+
+## REQ-122 - Fix Nutrición: dietas deben llegar a objetivos o completar con sugerencias aplicables
+
+**Estado: implementado.** Cuando el día generado no cumple objetivo, la revisión ofrece "Reintentar" y "Completar con opción práctica" (`deterministicFromModal`/`applyDeterministicDay`); `aiGenerateDay` cae a determinista tras 2 fallos (`_genDayFailStreak`, reiniciado por `homePrepareDay`); la revisión de semana ofrece completar días faltantes; las restricciones duras siguen bloqueando en toda ruta. Detalle en el commit. Verificado con `scripts/validate-diet-completion-fallback.mjs`.
+
+## REQ-148 - Fix billing: un reembolso parcial de Stripe revoca todo el entitlement pagado
+
+**Estado: implementado.**
+`handleRefund()` (`api/webhook.js`) solo revoca cuando `charge.refunded===true` o `Number(charge.amount_refunded)>=Number(charge.amount)`; un reembolso parcial devuelve `skipped` (queda auditado en `billing_events` con el payload completo, sin tocar el entitlement). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-webhook-refund.mjs`.
+
+## REQ-300 - Compartir la racha y compararla con amigos
+
+**Estado: implementado; requiere aplicar `supabase/streak_friends.sql`.**
+
+Jonathan (2026-10-28): eligió comparar la racha actual. Compartir desde Hoy/Progreso, alias voluntario, invitación privada de un uso/7 días, aceptación mutua y clasificación con empates. Baja y eliminación revocan acceso. Sin datos de salud ni analytics. Alcance, operación y límites: `docs/streak-friends.md`. ✓ PostgreSQL/RLS y E2E: `scripts/test-streak-friends.mjs`, `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-305 - Registro con invitación reconoce el correo ya registrado
+
+**Estado: implementado.**
+
+Al aceptar una postulación la cuenta ya existe (invitación por correo, REQ-225); si esa persona se registra con su enlace de código, GoTrue responde `{"code":422,"error_code":"email_exists",...}` y el `code` numérico tapaba el texto del error: caía en el 500 genérico "No pudimos crear tu cuenta" en vez del 409 útil. Ahora `invite-signup` lee todos los campos del error, devuelve 409 con instrucciones (iniciar sesión, "Olvidé mi contraseña", canjear en Perfil → Mi suscripción), distingue contraseña débil y deja el motivo real del alta rechazada y del canje fallido en los logs de Vercel. ✓ `tests/unit/invite-signup.test.mjs` (node, mocks, sin producción).
+
+## REQ-306 - Canje de cupones: columnas calificadas en redeem_redemption_code
+
+**Estado: implementado.**
+
+Los parámetros OUT del `returns table` (`status`, `expires_at`) chocaban con las columnas de `user_entitlements`: plpgsql fallaba siempre con 42702 "column reference is ambiguous" y NINGÚN canje de código funcionaba en producción (registro por invitación y "Canjear" en Mi suscripción). Confirmado en vivo ejecutando la función dentro de una transacción con rollback. Se califican las columnas con la tabla. Requiere re-aplicar `supabase/coupon_codes.sql` en producción (create or replace, sin tocar datos).
+
+## REQ-307 - Soporte por WhatsApp en app, onboarding y web pública
+
+**Estado: implementado.**
+
+Jonathan (2026-10-30): el customer service de Evolv se atiende en su WhatsApp de EE. UU. (+1 830 262-9397). Sin mensajes automáticos: cada persona abre WhatsApp y escribe voluntariamente. Widget flotante en la portada (sin tapar navegación ni formularios en móvil), bloque "¿Dudas antes de postular?" en /beta (no flotante para no tapar el formulario), sección "Ayuda y soporte" en Perfil y "Estamos contigo" en el último paso del onboarding. El enlace del pie de la portada migra del número peruano anterior al de soporte. Enlace único con mensaje prellenado sin datos personales: `https://wa.me/18302629397?text=Hola%2C+tengo+una+duda+sobre+Evolv`. ✓ `tests/e2e/soporte-whatsapp.spec.js`.
+
+## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
+
+**Estado: implementado.**
+
+Tras publicar REQ-307 y REQ-308 se detectó en producción que los navegadores con el service worker instalado seguían sirviendo la versión anterior de `index.html` desde caché (navegación cache-first por generación de caché, REQ-150). Al no cambiar el binario del SW no se disparaba actualización y los usuarios existentes no veían el widget de WhatsApp ni la consola. Se sube `CACHE_NAME` a `fitbud-pwa-v176`: en la próxima visita el SW nuevo se instala, `skipWaiting()` lo activa y `activate` borra los cachés anteriores, sirviendo el build actual.
+
+## REQ-312 - Curl predicador en banco Scott con barra EZ
+
+**Estado: implementado.**
+
+Solicitud directa: variante de la imagen con ficha completa, respiración, errores, alertas, contraindicaciones, nivel principiante, gimnasio, banco Scott y barra EZ. `preacher-curl` incluye alias Scott/predicador, regresión y progresión de carga tipadas, sustitutos de bíceps y secuencia animada con dos fotos locales exactas (Free Exercise DB, Preacher_Curl, Unlicense). No modifica planes ni historial. Caché v191. SQL regenerado, aplicación opcional/manual; el cliente incorpora la ficha sin migración de producción.
+
+Verificación: pruebas específicas de ficha/alias/animación/sustitutos en 390 y 1280 px (2/2), suite de ampliación gimnasio (2/2), sintaxis y diff correctos. Los fallos iniciales de los controles se corrigen en REQ-315. Integración autorizada por el usuario. No se ejecutó SQL en producción.
+
+## REQ-313 - Extensión de tríceps en polea alta con cuerda
+
+**Estado: implementado.**
+
+Solicitud directa del usuario con imagen. La ficha previa `triceps-pushdown` tiene barra; se conserva y se agrega `rope-triceps-pushdown`, variante propia con agarre neutro y cuerda. Incluye nivel principiante, equipo/lugar, técnica, respiración, errores, alertas, contraindicaciones, regresión/progresión de carga tipadas y sustitutos del mismo músculo. Dos fotografías locales exactas de Free Exercise DB, Triceps_Pushdown_-_Rope_Attachment (Unlicense), en secuencia animada. Caché v192. SQL opcional/manual; sin migraciones de producción ni modificación de planes/historial. Los controles generales se corrigen en REQ-315. Integración autorizada por el usuario.
+
+Verificación REQ-313: suite dirigida de ambos ejercicios y ampliación de gimnasio, 6/6 pruebas correctas en Chromium (390/1280 px): búsqueda, carga de ambas fotos, animación activa, nivel, progresión/regresión y sustitución por músculo. Sintaxis y `git diff --check` correctos. El validador general se actualiza en REQ-315.
+
+## REQ-322 - Entreno: el step-up con la animación del CDC (dominio público)
+
+**Estado: implementado.** De los ejercicios sin demostración de REQ-320, el step-up tiene una exacta y libre: la animación del CDC en Wikimedia Commons (escalón bajo, sin carga, con apoyo; obra del Gobierno de EE. UU.). Se sirve desde `assets/exercise-media/step-up.gif` con crédito y vuelve a elegirse en las sesiones; se retira `step-up.svg`. Siguen sin fuente libre exacta la búlgara (solo foto con carga), el peso muerto a una pierna, el curl deslizante y la flexión arquero. `CACHE_NAME` → `fitbud-pwa-v198`. ✓ `tests/e2e/sin-dibujos.spec.js`.
+
+## REQ-337 - Entreno: las series vienen precargadas con lo de la última vez
+
+**Estado: implementado.** Jonathan (2026-11-03): al repetir una rutina, peso y repeticiones deben venir en los campos, no solo como recordatorio encima. `prefillStepFromLastTime()` copia repeticiones y carga de la última vez (serie a serie; las de más repiten la última) en las series pendientes como valores editables; el esfuerzo no se copia. Lo escrito por el usuario se respeta; al sustituir el ejercicio lo precargado pasa al del nuevo. `CACHE_NAME` → `fitbud-pwa-v205`. ✓ `tests/e2e/entreno.spec.js` (Series precargadas).
+
+## REQ-349 - Nutrición: restricciones vigentes, rechazo con reemplazo y continuidad semanal
+
+**Estado: implementado.**
+
+Solicitud de Jonathan (2026-11-05), por feedback de Sathya. Preferencias guardadas reparan comidas pendientes; rechazos sustituyen apariciones futuras con Deshacer. Fechas/estado y preparación semanal visibles; renovación al abrir/reconectar opcional, desactivada por defecto y sin llamadas pagadas. Conserva consumo, pasado y elecciones compatibles; explica falta de alternativas. Guardados y resultados aislados por cuenta. PWA v213.
+
+Alcance, criterios y operación: `docs/nutrition-continuity.md`. Verificación: `tests/e2e/nutricion-continuidad.spec.js`, `scripts/validate-nutrition-continuity.mjs`, regresiones y release gate. Sin migraciones.
+
+## REQ-85 - Fix: fallbacks y IA generaban platos ficticios ("Desayuno práctica", "Alimento compatible")
+
+**Estado: implementado.** `validateGeneratedDay` rechaza nombres placeholder con regex `placeholderRe`; `regenerateGenMeal` usa el plato real más cercano del catálogo como fallback; ambos prompts prohíben nombres genéricos. 5 asserts en `scripts/validate-placeholder-meals.mjs`.
+
+## REQ-119 - Onboarding nutricional: capturar gustos y disgustos antes del primer plan
+
+**Estado: implementado.** Onboarding y Perfil capturan gustos/disgustos (`prefs.preferredDishes` nuevo + campos existentes). El prompt de IA recibe `coachLikesLine`; el fallback determinista aplica `preferenceScoreAdjustment` (`js/nutrition-domain.js`) para priorizar afines y penalizar disgustos en generación y reemplazos. Alergias/restricciones duras siguen bloqueando por separado. Detalle en el commit. Verificado con `scripts/release-gate.mjs`.
+
+## REQ-121 - Nutrición: cambios de preferencias regeneran solo futuro y se respetan de inmediato
+
+**Estado: implementado.** Editar preferencias (`preferredIngredients/Dishes/Cuisines`, `dislikedIngredients`, `blockedDishes`) cambia el `contextKey` y no reutiliza pooled/caché viejo; `COACH_PROMPT_VERSION=6` invalida lo previo; `applyDayComidas` no reescribe comidas `done=true`; `homePrepareDay` y "Volver a preparar" rechazan fechas pasadas. Detalle en el commit. Verificado con `scripts/validate-preference-cache-invalidation.mjs`.
+
+## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
+
+**Estado: implementado.** `scripts/diff-diet-contract.mjs` compara dos `seed.sql` y reporta el delta de `okDays` total, catálogo, causas y las 54 dimensiones; `scripts/validate-diet-contract-diff.mjs` lo valida y el release gate lo ejecuta. Detalle, motivación (REQ-143) y guía operativa: `docs/diet-contract-catalog-diff.md` y REQ-143 de `docs/requirements-history.md`.
+
+## REQ-277 - Publicar análisis MyFitnessPal para continuidad entre agentes
+
+**Estado: implementado.**
+
+Solicitud directa: compartir el análisis guardado localmente. Publica `docs/competitive/2026-10-22-myfitnesspal/README.md`, matriz de 48 dimensiones y propuestas MFP-00..17; añade entradas desde AGENTS, README y estrategia. Conserva evidencia del checkout anterior, declara diferencias con main y verificación externa pendiente. No incorpora las propuestas al selector ni reactiva el track nativo.
+
+## REQ-290 - Precios de lanzamiento: USD 7.99/mes y USD 39.90 por 6 meses
+
+**Estado: implementado.** Falta aplicar el seed de `supabase/entitlements.sql` y crear los precios en Stripe (`STRIPE_SETUP.md`).
+
+`semiannual` (180 días) reemplaza a `quarterly`, que queda `active=false` solo para cortesías beta e histórico.
+
+## REQ-321 - Entreno en casa: el día de tirón no se queda en un solo ejercicio
+
+**Estado: implementado.** Regresión de REQ-293: sin barra ni bandas, Pull A/B en casa quedaban solo con el remo invertido. Las plantillas de peso corporal suman core (dead bug y plancha lateral; plancha frontal y con toque de hombro). `CACHE_NAME` → `fitbud-pwa-v198`. ✓ `tests/e2e/entreno-casa.spec.js`.
+
+## REQ-350 - Facturación: el aviso de plan de la web vende los planes en soles con Culqi
+
+**Estado: implementado.**
+
+### Origen
+`docs/native-migration/COBRO-WEB.md`, Fase 0 (2026-11-05). Culqi aprobó el comercio el 2026-11-04 y, con apps nativas, toda compra será en la web.
+
+### Problema
+Con la prueba agotada o el plan vencido, la persona logueada ve "Activa tu plan" con planes en USD, "Disponible pronto" y el canje de código: no puede comprar aunque `/planes` → `/pago` ya cobra en soles. Igual en "Renovar plan" (Perfil → Mi suscripción).
+
+### Causa raíz
+`showPaywall()` (`index.html:9943`) arma los planes con `activeCatalogPlans()` (USD, `/api/catalog`) y su botón depende de `checkoutAvailable()` (`index.html:1343`), que mira `REMOTE.checkout.enabled`: Stripe, nunca activado. No consulta `REMOTE.culqi.enabled` ni el catálogo de la tienda (`tienda/planes.js`, que la portada ya carga con `loadStorePlans()`, REQ-333). Lo invocan 11 lugares, entre ellos el límite de la prueba, entreno, nutrición y Perfil (`index.html:10298`).
+
+### Objetivo
+Con Culqi activo, el aviso de plan muestra los 3 planes de la tienda (nombre, precio en soles, resumen y lo que incluye; sin la imagen, para que el aviso no se alargue en el teléfono) y "Comprar" lleva a `/pago?plan=<id>` en la misma pestaña, con el correo de la cuenta ya puesto (`prefillEmail()` de `/pago`). Al volver a la app tras pagar, el plan aparece activo sin cerrar sesión.
+
+### Alcance
+- `showPaywall()`: si `REMOTE.culqi.enabled` y el catálogo de la tienda cargó, usar `PLANES_TIENDA`. Sin Culqi, mantener el comportamiento actual (USD, Stripe o "Disponible pronto").
+- Mantener el mensaje por contexto (`trial_limit`, entreno, nutrición), el aviso de plan vencido y "Tu progreso… se conservan".
+- Canje de código: queda como opción secundaria ("¿Tienes un código?").
+- `noPricesMode()` (REQ-208, beta) sigue mostrando `showAccessNotice()` sin precios.
+- Al volver de `/pago` (foco o `pageshow`), refrescar el permiso con `loadEntitlement()`.
+- Analítica `paywall_shown` y `checkout_start` con `provider: "culqi"`, sin datos de salud.
+- Subir `CACHE_NAME`.
+
+### Fuera de alcance
+Apps nativas (no venden: `COBRO-WEB.md` §4), cobro recurrente, cambiar precios o el flujo de `/pago`, retirar el código de Stripe.
+
+### Riesgos
+Mostrar precios a usuarios beta (REQ-208); que un plan comprado no aparezca hasta recargar; romper el aviso cuando `tienda/planes.js` no carga (debe volver al comportamiento actual).
+
+### Criterios de aceptación
+- Con Culqi activo, una cuenta con la prueba agotada ve los 3 planes en soles y "Comprar" abre `/pago?plan=…` con su correo.
+- "Renovar plan" en Perfil abre el mismo aviso.
+- Una cuenta beta (`noPricesMode()`) no ve precios.
+- Sin Culqi, el aviso queda igual que hoy.
+- Tras pagar y volver, el plan figura activo sin recargar a mano.
+
+### Verificación sugerida
+Playwright con `/api/config` simulado (Culqi activo y no), con `/api/entitlement` sin plan y luego con plan: aviso desde el límite de prueba y desde Perfil, enlace a `/pago`, correo precargado, modo beta sin precios. Regresión de `tests/e2e/tienda.spec.js`, detector Impeccable y release gate.
+
+### Implementación
+
+- `loadRemoteConfig()` conserva `culqi` de `/api/config` (antes lo descartaba). `storeCheckoutAvailable()` = `REMOTE.culqi.enabled`.
+- `showPaywall()`: tras `noPricesMode()`, con Culqi activo usa `showStorePaywall()` (si el catálogo aún carga, espera `loadStorePlans()`; si no cargó, cae al aviso anterior). `paywallMessage()` comparte los textos por contexto.
+- "Comprar" es un enlace a `/pago?plan=<id>` en la misma pestaña; `storeCheckoutStart()` registra `checkout_start` (`source: "tienda"`, `plan_type`) y guarda en `sessionStorage` el vencimiento vigente. Al volver (`pageshow` desde bfcache, `visibilitychange` o el arranque tras "Ir a Evolv"), `loadEntitlement()` y `storeCheckoutResult()` avisan "¡Listo! Tu plan está activo hasta el …" si el vencimiento cambió.
+- Canje de código como opción secundaria (`couponRedeemSectionHtml()`). `CACHE_NAME` v214.
+
+### Verificación
+
+`tests/e2e/paywall-tienda.spec.js` (3/3): planes en soles desde el límite de prueba con el correo precargado en `/pago`; "Renovar plan" en Perfil y vuelta con "atrás" que muestra el plan activo; acceso beta sin precios. `tests/e2e/beta-acceso.spec.js` sigue verde (sin Culqi el aviso mantiene USD). Detector Impeccable sin hallazgos.
+
+## REQ-351 - Facturación: correos de vencimiento con enlace a los planes
+
+**Estado: implementado — requiere acción humana** (aplicar `supabase/notifications_plan_expiry.sql` en Supabase).
+
+### Origen
+`docs/native-migration/COBRO-WEB.md`, Fase 0 (2026-11-05). Las apps no pueden mostrar precios ni enlaces para comprar fuera (App Store 3.1.1(a)/3.1.3, Google Play Pagos), pero las tiendas sí permiten avisar **por correo**. También sirve hoy en la web: los planes son pago único y nada avisa que el acceso se acaba.
+
+### Problema
+Nadie avisa que un plan está por vencer: la persona se entera cuando se le corta el coach o la generación de planes.
+
+### Causa raíz
+`api/notify.js` (cron horario de `.github/workflows/notify-hourly.yml`, `runJob()` en `api/notify.js:766`) solo envía recordatorios de racha y el resumen de la mañana a quien los activó. No lee `user_entitlements`, y no hay ningún registro de avisos de vencimiento.
+
+### Objetivo
+Dos correos transaccionales por plan pagado: 3 días antes de `expires_at` y el día del vencimiento. Cada uno dice el plan y la fecha, y lleva el botón "Renovar mi plan" a `https://evolvapp.club/planes` (o `/pago?plan=<mismo plan>`).
+
+### Alcance
+- `supabase/entitlement_notices.sql` (idempotente, RLS sin políticas: solo `service_role`): tabla `entitlement_notices(entitlement_id, kind in ('expiring_3d','expired'), sent_at)` con clave única `(entitlement_id, kind)`.
+- `api/notify.js`, en el mismo cron:
+  - buscar `user_entitlements` con `status = 'active'`, origen pagado (`checkout`) y `expires_at` en las próximas 72 h o vencido hace menos de 24 h;
+  - saltar si la persona ya tiene otro plan que empieza después;
+  - saltar si el aviso ya se envió;
+  - enviar con `sendEmail()` y una llave de idempotencia por aviso.
+- Correo en español, sin datos de salud ni de progreso, con el remitente de siempre. Se envía aunque la persona haya desactivado los recordatorios de racha, porque es sobre su compra.
+- La respuesta del cron cuenta los avisos enviados y saltados. Funciona en `dry_run`.
+
+### Fuera de alcance
+Avisos de fin de la semana gratis, push, recordatorios dentro de la app (REQ-350), cortesías y cupones (`origin` distinto de `checkout`), cobro recurrente.
+
+### Riesgos
+Enviar dos veces el mismo aviso (lo evitan la clave única y la idempotencia); avisar a quien ya renovó; zona horaria del vencimiento (usar la fecha de Lima); que sin el SQL aplicado el cron falle (debe saltar estos avisos y seguir con los demás).
+
+### Criterios de aceptación
+- Un plan que vence en 2 días recibe un solo aviso de 3 días, aunque el cron corra muchas veces. El día del vencimiento recibe el aviso de vencido.
+- Quien ya compró otro plan que empieza después no recibe avisos.
+- Las cortesías no reciben avisos.
+- Sin la tabla aplicada, los recordatorios de racha siguen saliendo.
+
+### Verificación sugerida
+Test Node con `fetch` simulado y PGlite para el SQL (como `scripts/test-tienda-culqi.mjs`): ventanas de tiempo, renovación, cortesía, repetición y `dry_run`. Release gate. Pendiente humano: aplicar `supabase/entitlement_notices.sql` en producción.
+
+### Implementación
+
+Cambio de diseño respecto del alcance: en vez de una tabla `entitlement_notices`, se reutiliza `notification_log`, que ya tiene la clave de idempotencia única y la lógica de `deliver()` (registro del intento, envío y marca `sent`). `supabase/notifications_plan_expiry.sql` solo agrega el tipo `plan_expiry` al CHECK, manteniendo los tipos anteriores.
+
+- `api/notify.js`, `runPlanExpiry()` al final de `runJob()`:
+  - lista `user_entitlements` con `origin=checkout`, `status in (active, expired)` y vencimiento entre 48 h atrás y 72 h adelante;
+  - `planExpiryNotice()` decide `3d` (72 h antes) o `expired` (48 h después), solo entre las 9:00 y las 20:00 de Lima;
+  - salta si hay otro acceso activo o de cortesía que termina después (las renovaciones crean una fila que empieza al vencer la anterior, `grantEntitlement()` de Culqi), o si el perfil está inactivo o sin correo;
+  - clave `plan_expiry:<id>:3d|expired`, también como llave de idempotencia de Resend.
+- `planExpiryMessage()`: asunto, título y textos sin datos de salud ni vocabulario interno; botón "Renovar mi plan" a `/pago?plan=<plan>` (o `/planes` si el plan ya no se vende) y, al vencer, "Ver planes".
+- `buildEmailHtml(..., { billing: true })`: pie transaccional ("compraste un plan de Evolv con este correo"), sin enlace de baja de recordatorios.
+- Sin el SQL aplicado, el primer registro se rechaza, no se envía nada, se registra `plan_expiry_log_unavailable` y el cron sigue con lo demás. La respuesta del cron incluye `planExpiry: { sent, skipped, errors }`.
+
+### Verificación
+
+`scripts/test-plan-expiry.mjs` (en el release gate): ventanas y horario, mensajes, pie transaccional, envío a quien corresponde (no a quien renovó ni fuera de ventana), no repite en la siguiente corrida, `dry_run`, SQL sin aplicar, Supabase caído, y el SQL en PGlite (idempotente, admite `plan_expiry` y los tipos anteriores, clave única, RLS). `validate-reminder-journey`, `validate-notify-schedule`, `validate-notify-push-ready`, `test-referrals` y `validate-migrations` siguen verdes.
+

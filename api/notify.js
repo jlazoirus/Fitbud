@@ -25,6 +25,7 @@
 //   VAPID_PUBLIC_KEY    — clave pública (el cliente usa el literal; esta var es opcional)
 
 import webpush from "web-push";
+import { planPorId } from "../tienda/planes.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 const VAPID_PUBLIC_KEY =
@@ -583,12 +584,12 @@ export function buildEmailHtml(e, msg, unsubToken, opts = {}) {
     ${escHtml(msg.cta)}
   </a>
   <hr style="margin:36px 0;border:none;border-top:1px solid #eee">
-  <p style="font-size:12px;color:#777;margin:0">
+  ${opts.billing ? `<p style="font-size:12px;color:#777;margin:0">Te escribimos porque compraste un plan de Evolv con este correo. Es un aviso sobre tu compra, no un recordatorio.</p>` : `<p style="font-size:12px;color:#777;margin:0">
     ${opts.campaign ? "Recibes este beneficio por tener una cuenta activa en Evolv." : opts.followup
       ? "Te escribimos porque tienes una cuenta en Evolv y llevas días sin usar tu plan."
       : "Recibes estos recordatorios porque los activaste en tu perfil."}
     <a href="${unsubLink}" style="color:#1a1a1a">${opts.followup || opts.campaign ? "No recibir más estos correos" : "Desactivar recordatorios"}</a>
-  </p>
+  </p>`}
 </body></html>`;
 }
 
@@ -858,6 +859,7 @@ async function runJob(e, dryRun) {
 
   await runFollowups(e, dryRun, results);
   await runReferralCampaign(e, dryRun, results);
+  await runPlanExpiry(e, dryRun, results);
   return results;
 }
 
@@ -989,6 +991,111 @@ export async function runReferralCampaign(e, dryRun, results) {
       });
     }
     if (people.length < 200) break;
+  }
+}
+
+// ── REQ-351: avisos de vencimiento de planes pagados ──────────────────────────
+// Correo transaccional 3 días antes y al vencer, con enlace a la tienda web.
+// Es el canal que las tiendas permiten para recordar la renovación a quien usa
+// las apps (docs/native-migration/COBRO-WEB.md). Idempotencia: notification_log
+// (tipo plan_expiry, supabase/notifications_plan_expiry.sql). Sin ese SQL el
+// registro del intento falla, no se envía nada y el resto del cron sigue igual.
+const EXPIRY_TZ = "America/Lima";
+const EXPIRY_SEND_HOURS = [9, 20]; // ventana de envío en hora de Lima
+const HOUR_MS = 3600000;
+
+function limaParts(date) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: EXPIRY_TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(date).map((x) => [x.type, x.value]));
+  return { ymd: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
+}
+
+export function expiryDateText(iso) {
+  return new Intl.DateTimeFormat("es-PE", { timeZone: EXPIRY_TZ, day: "numeric", month: "long" }).format(new Date(iso));
+}
+
+// Qué aviso toca para un plan: "3d" en las 72 h previas, "expired" en las 48 h
+// posteriores; null fuera de esas ventanas o fuera del horario de envío.
+export function planExpiryNotice(ent, now = new Date()) {
+  const exp = new Date(ent && ent.expires_at).getTime();
+  if (!Number.isFinite(exp)) return null;
+  const hour = limaParts(now).hour;
+  if (hour < EXPIRY_SEND_HOURS[0] || hour > EXPIRY_SEND_HOURS[1]) return null;
+  const t = now.getTime();
+  const ref = limaParts(new Date(exp)).ymd;
+  if (exp > t && exp - t <= 72 * HOUR_MS) return { kind: "3d", ref };
+  if (exp <= t && t - exp < 48 * HOUR_MS) return { kind: "expired", ref };
+  return null;
+}
+
+export function planExpiryMessage(kind, ent, now = new Date()) {
+  const plan = planPorId(ent.plan_id);
+  const name = plan ? plan.nombre : "plan";
+  const date = expiryDateText(ent.expires_at);
+  if (kind === "3d") {
+    const daysLeft = Math.max(1, Math.ceil((new Date(ent.expires_at).getTime() - now.getTime()) / 86400000));
+    return {
+      subject: `Tu plan de Evolv vence el ${date}`,
+      title: daysLeft === 1 ? "Tu plan vence mañana" : `Tu plan vence en ${daysLeft} días`,
+      paragraphs: [
+        `Tu ${name.toLowerCase()} está activo hasta el ${date}.`,
+        "Para seguir con tu plan de comidas, tus rutinas y el ajuste de cada semana sin cortes, renuévalo antes de esa fecha. Si compras ahora, los días nuevos se suman desde el vencimiento: no pierdes ninguno.",
+        "Tu historial y tu progreso se conservan siempre.",
+      ],
+      cta: "Renovar mi plan",
+      url: plan ? `/pago?plan=${encodeURIComponent(plan.id)}` : "/planes",
+    };
+  }
+  return {
+    subject: "Tu plan de Evolv venció",
+    title: `Tu plan venció el ${date}`,
+    paragraphs: [
+      "Tu historial, tu progreso y tus fotos siguen guardados en tu cuenta.",
+      "Para volver a tener tu plan de comidas, tus rutinas y el ajuste semanal, elige un plan. Pagas una vez, sin renovación automática.",
+    ],
+    cta: "Ver planes",
+    url: "/planes",
+  };
+}
+
+export async function runPlanExpiry(e, dryRun, results, now = new Date()) {
+  const counter = { sent: 0, skipped: 0, errors: 0 };
+  results.planExpiry = counter;
+  const from = new Date(now.getTime() - 48 * HOUR_MS).toISOString();
+  const to = new Date(now.getTime() + 72 * HOUR_MS).toISOString();
+  let ents;
+  try {
+    ents = await supaGet(e, "/rest/v1/user_entitlements?origin=eq.checkout&status=in.(active,expired)"
+      + `&expires_at=gte.${encodeURIComponent(from)}&expires_at=lte.${encodeURIComponent(to)}`
+      + "&select=id,user_id,plan_id,expires_at&order=expires_at.asc&limit=500");
+  } catch (err) {
+    counter.errors++;
+    results.log.push({ action: "plan_expiry_list_error", error: err.message });
+    return;
+  }
+  for (const ent of ents) {
+    const notice = planExpiryNotice(ent, now);
+    if (!notice) continue;
+    // Ya renovó (u obtuvo otro acceso) que termina después: no hay nada que avisar.
+    const later = await supaGet(e, `/rest/v1/user_entitlements?user_id=eq.${encodeURIComponent(ent.user_id)}`
+      + `&status=in.(active,courtesy)&expires_at=gt.${encodeURIComponent(ent.expires_at)}&select=id&limit=1`).catch(() => null);
+    if (later === null) { counter.errors++; results.log.push({ user: ent.user_id, action: "plan_expiry_context_error" }); continue; }
+    if (later.length) { counter.skipped++; results.log.push({ user: ent.user_id, type: "plan_expiry", step: notice.kind, action: "renewed" }); continue; }
+    const prof = await supaGet(e, `/rest/v1/profiles?id=eq.${encodeURIComponent(ent.user_id)}&select=email,active`).catch(() => null);
+    const person = prof && prof[0];
+    if (!person || !person.email || person.active === false) { counter.skipped++; continue; }
+    const msg = planExpiryMessage(notice.kind, ent, now);
+    const key = `plan_expiry:${ent.id}:${notice.kind}`;
+    const status = await deliver(e, dryRun, results, counter, {
+      userId: ent.user_id, type: "plan_expiry", keys: [key], refDate: notice.ref, step: notice.kind,
+      send: async () => ({ emailId: await sendEmail(e, person.email, msg.subject, buildEmailHtml(e, msg, "", { billing: true }), key) }),
+    });
+    // Sin el SQL de plan_expiry el registro falla igual para todos: se corta aquí.
+    if (status === "log_failed" || status === "log_unavailable") {
+      results.log.push({ action: "plan_expiry_log_unavailable" });
+      return;
+    }
   }
 }
 

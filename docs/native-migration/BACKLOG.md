@@ -27,10 +27,11 @@ Convenciones para todas las tareas:
 
 ## NAT-H3 — Modelo de cobro dentro de las apps (compra integrada vs. sin compra in-app)
 
-- **Decide:** cómo se compra el acceso desde iOS/Android. Opciones: (a) compra integrada de cada tienda con intermediario (RevenueCat u otro), (b) compra integrada directa (StoreKit 2 / Play Billing + verificación en servidor), (c) app sin compra integrada en una primera beta, usando solo entitlements existentes.
-- **Insumos:** precios y duración de los planes actuales (`supabase/entitlements.sql`), políticas vigentes de App Store (3.1.1, 3.1.3) y Google Play (Payments) por país objetivo, comisiones.
-- **Recomendación del plan:** (a) o (b) para lanzamiento público; (c) aceptable solo para beta cerrada. Validar si los cupones propios pueden canjearse dentro de la app bajo la política vigente.
-- **Entrega:** decisión registrada en `docs/native-migration/decisions.md` con productos (ids) por plataforma.
+- **Decide:** cómo se compra el acceso desde iOS/Android. Opciones: (a) compra integrada de cada tienda con intermediario (RevenueCat u otro), (b) compra integrada directa (StoreKit 2 / Play Billing + verificación en servidor), (c) app sin compra integrada: se paga en la web y la app lee el acceso del servidor.
+- **Decisión de Jonathan (2026-11-05): (c), cobro solo en la web con Culqi.** Plan completo, reglas de tienda verificadas y contingencia en `docs/native-migration/COBRO-WEB.md`.
+- **Riesgo:** en Perú, App Store (3.1.1, 3.1.3(b)) y Google Play (Pagos) no permiten de forma explícita una app de suscripción que solo honra compras de la web. Si una tienda la rechaza en la validación de beta, se activa (a) o (b) solo para esa plataforma (Fase 3 de `COBRO-WEB.md`).
+- **Cupones:** se canjean solo en la web; dentro de la app iOS un código propio cuenta como "mecanismo propio de desbloqueo" (3.1.1).
+- **Entrega:** decisión registrada en `docs/native-migration/decisions.md`. Una persona la cierra (`--done NAT-H3 --human`) después de la validación con las tiendas, con el resultado y, si aplica, los ids de productos por plataforma.
 
 ## NAT-H4 — Revisión legal de privacidad para tiendas y excepción acotada a REQ-31
 
@@ -148,11 +149,12 @@ Convenciones para todas las tareas:
 - **Aceptación:** la web sigue manejando `?auth=` igual cuando la app no está.
 - **Verificación:** verde web; validador del AASA.
 
-## NAT-13 — Entitlements multi-origen y webhook de compras de tienda
+## NAT-13 — Contingencia: entitlements de compras de tienda (solo si NAT-H3 activa la compra integrada)
 
-- **Objetivo:** que una compra en App Store/Google Play active el mismo `entitlements` que Stripe.
-- **Alcance (según NAT-H3):** `supabase/native_entitlements.sql` (permitir `origin in ('apple','google')`, ids de transacción únicos, idempotencia de eventos), `api/store-webhook.js` (RevenueCat webhook o App Store Server Notifications v2 + Google RTDN, con verificación de firma), `api/entitlement.js` expone el origen en el estado; `scripts/test-store-webhook.mjs` con eventos simulados (compra, reembolso, expiración, evento duplicado).
-- **Aceptación:** reembolso revoca; evento repetido no duplica; Stripe sin cambios (`test-webhook-*.mjs` verdes).
+- **Estado del plan:** con el cobro solo en la web (NAT-H3, 2026-11-05) esta tarea **no se hace**. `GET /api/entitlement` ya devuelve plan, estado, vencimiento y origen, y basta para NAT-45. Se ejecuta solo si App Store o Google Play exigen su compra integrada (Fase 3 de `COBRO-WEB.md`).
+- **Objetivo (contingencia):** que una compra en App Store/Google Play active el mismo `user_entitlements` que una compra con Culqi.
+- **Alcance (contingencia):** `supabase/native_entitlements.sql` (permitir `origin in ('apple','google')`, ids de transacción únicos, idempotencia de eventos), `api/store-webhook.js` (RevenueCat webhook o App Store Server Notifications v2 + Google RTDN, con verificación de firma); `scripts/test-store-webhook.mjs` con eventos simulados (compra, reembolso, expiración, evento duplicado). Vigilar el límite de 12 funciones de Vercel Hobby (`scripts/test-tienda-culqi.mjs`): el webhook puede servirse por `/api/checkout?op=` como Culqi.
+- **Aceptación:** reembolso revoca; evento repetido no duplica; compras con Culqi sin cambios (`scripts/test-tienda-culqi.mjs` verde).
 - **Verificación:** verde web.
 
 ---
@@ -217,11 +219,11 @@ Convenciones para todas las tareas:
 - **Aceptación:** el workflow corre en un PR de prueba y falla si se rompe un test.
 - **Verificación:** run verde enlazado en el PR.
 
-## NAT-28 — Validador REQ-31 para textos de la app nativa
+## NAT-28 — Validador REQ-31 y de cobro fuera de la app para textos de la app nativa
 
-- **Objetivo:** que la UI nativa no mencione IA, Claude, Anthropic, modelo, prompt, token, cuota ni proveedor.
+- **Objetivo:** que la UI nativa no mencione IA, Claude, Anthropic, modelo, prompt, token, cuota ni proveedor, y que no empuje a pagar fuera de la app (`COBRO-WEB.md` §4): sin precios (`S/`, `USD`), sin "comprar", "planes", "suscríbete" ni "renueva" en textos visibles, y sin URLs a `/planes`, `/pago` ni al WhatsApp de ventas.
 - **Alcance:** `scripts/validate-native-copy.mjs` que recorre `native/app/**` y `native/src/**` (excluye tests y `src/core/types`) buscando literales visibles con ese vocabulario (insensible a mayúsculas/acentos, con lista de excepciones explícita y comentada para identificadores internos); se agrega al release gate y a NAT-27.
-- **Aceptación:** falla con un fixture que muestre "IA" en un `<Text>`; pasa con el scaffold.
+- **Aceptación:** falla con un fixture que muestre "IA" en un `<Text>` y con otro que enlace a `evolvapp.club/planes`; pasa con el scaffold.
 - **Verificación:** verde web.
 
 ---
@@ -325,11 +327,16 @@ Cada tarea de esta fase entrega pantallas completas con estados de carga, vacío
 - **Alcance:** pedir permiso en contexto (no al abrir la app), registrar/actualizar token en `/api/push-subscribe`, preferencias en Perfil → Recordatorios (`notification_preferences`), tocar la notificación abre Hoy/Entreno, baja al cerrar sesión. Pruebas de push real dependen de NAT-H5.
 - **Verificación:** verde nativo; prueba con Expo Go/dev build documentada.
 
-## NAT-45 — Suscripción: estado del plan, compra integrada y restaurar compras
+## NAT-45 — Mi plan sin compra dentro de la app: estado del acceso y actualizar
 
-- **Objetivo:** implementar lo que decida NAT-H3.
-- **Alcance:** estado del plan/trial desde `/api/entitlement`, paywall nativo sin vocabulario REQ-31, compra integrada y "Restaurar compras", sincronización con NAT-13; si NAT-H3 decide "sin compra in-app", mostrar solo estado y nada que dirija a pagar fuera si la política lo prohíbe.
-- **Verificación:** verde nativo; sandbox de tienda.
+- **Objetivo:** implementar el modelo de NAT-H3 (cobro solo en la web): la app muestra el acceso que el servidor tiene registrado y nunca vende ni empuja a pagar fuera.
+- **Alcance:**
+  - "Mi plan": plan, estado y fecha de vencimiento (o días de prueba) desde `GET /api/entitlement`.
+  - Sin acceso activo: pantalla neutral, sin precios ni enlaces, con **Actualizar**, **Cerrar sesión** y **Ayuda** (soporte, no compra). Funciones que piden permiso en el servidor (coach, generar planes): mismo mensaje neutral.
+  - Refresco del acceso al abrir la app, al volver a primer plano (`AppState`) y al tocar Actualizar. Último estado en caché con su fecha para usar la app sin conexión.
+  - Sin canje de cupones. Textos que respetan REQ-31 y `COBRO-WEB.md` §4 (los revisa NAT-28).
+  - Si NAT-H3 activa la contingencia, esta tarea agrega la compra integrada y "Restaurar compras" sobre NAT-13.
+- **Verificación:** verde nativo; prueba con una cuenta con plan, una vencida y una que paga en la web mientras la app está abierta (al volver a primer plano el acceso aparece sin reiniciar).
 
 ## NAT-46 — Coach conversacional
 
@@ -395,6 +402,7 @@ Cada tarea de esta fase entrega pantallas completas con estados de carga, vacío
 
 - **Objetivo:** dejar listo para aprobación humana (NAT-H7) todo lo que piden las tiendas.
 - **Alcance:** `docs/native-migration/store-listing.md`: nombre, subtítulo, descripción corta y larga (es), palabras clave, categoría, URL de soporte y de política de privacidad, lista de capturas a producir por pantalla, borrador de etiquetas de privacidad (App Store), Data safety y declaración de apps de salud (Google Play), clasificación de edad, notas para el revisor (cuenta demo QA, cómo probar). Copy respetando REQ-31 salvo lo que NAT-H4 exija divulgar.
+- **Cobro (NAT-H3):** la ficha no menciona precios, planes ni que se compra en la web. Las notas para el revisor explican que la app es el acceso al servicio de Evolv, que no vende nada dentro de la app, e incluyen una cuenta demo con plan de cortesía.
 - **Verificación:** revisión humana.
 
 ## NAT-63 — Preparar release beta: perfiles EAS, versionado, canal OTA y checklist
