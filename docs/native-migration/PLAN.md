@@ -12,6 +12,7 @@ Este documento es el plan maestro. Las piezas operativas están en:
 | `docs/native-migration/ADR-001-stack.md` | Decisión técnica (Expo / React Native) y alternativas descartadas. |
 | `docs/native-migration/BACKLOG.md` | Especificación de cada tarea `NAT-xx` (objetivo, alcance, aceptación, verificación). |
 | `docs/native-migration/PARITY.md` | Matriz de paridad web → nativo por journey; checklist para declarar la beta. |
+| `docs/native-migration/COBRO-WEB.md` | Plan de cobro solo en la web (Culqi) con apps sin compra integrada: reglas de tienda, flujos, fases y contingencia. |
 | `native-migration.json` | Backlog machine-readable: estado, dependencias, alcance de escritura y dueño de cada tarea. |
 | `NATIVE_AGENT.md` | Runbook para agentes que trabajan en paralelo en la migración. |
 | `scripts/native-next-task.mjs` | Selector/validador: lista tareas disponibles, reclama, libera y marca hechas. |
@@ -39,7 +40,7 @@ No es objetivo de esta migración:
 | Auth | Supabase email/contraseña (`signInWithPassword`, `signUp`, `resetPasswordForEmail`); enlaces de correo vuelven a `location.origin` (`authRedirectUrl()`, `index.html:7364`). | Necesita deep links / Universal Links (NAT-12). Sin login social → "Sign in with Apple" no es obligatorio hoy. |
 | Persistencia local | `localStorage`: `fitbud_v1` (estado `S`), `fitbud_syncq_v1` (cola offline), `fitbud_sync_meta_v1`, `fitbud_ui`, `fitbud_chat_v1_*`, `fitbud_meal_option_rerolls_v1`, `fitbros_tour_v1`. | Se reemplaza por un adaptador de almacenamiento inyectable (NAT-06, NAT-24). Mismo formato lógico para que web y nativo compartan reglas de sync. |
 | Push | Web Push VAPID con `web-push` (`api/notify.js`, tabla `push_subscriptions(endpoint, keys_p256dh, keys_auth)`). | Necesita tokens nativos (APNs/FCM vía Expo Push) y una tabla nueva (NAT-11). |
-| Cobro | Stripe Checkout de pago único (`api/checkout.js`, `success_url` web), webhooks, cupones, entitlements. | En iOS/Android vender acceso digital dentro de la app exige, por regla general, la compra integrada de la tienda. **Decisión humana NAT-H3.** |
+| Cobro | Tienda web con Culqi (`/planes` → `/pago`, pago único sin renovación, REQ-331..334; comercio aprobado por Culqi el 2026-11-04). Stripe Checkout (`api/checkout.js`) quedó sin activar. Cupones y entitlements en Supabase. | Las apps no venden: se paga solo en la web y la app lee el acceso de `/api/entitlement` (NAT-H3, decidido 2026-11-05). Las tiendas no lo permiten de forma explícita en Perú: ver riesgos y contingencia en `COBRO-WEB.md`. |
 | Cámara/voz | `<input type="file" capture="environment">` (foto de comida/progreso), Web Speech API (`toggleMic()`, `index.html:9803`). | `expo-image-picker`/cámara y reconocimiento de voz nativo (NAT-35, NAT-36). |
 | Fotos privadas | Storage `progress-photos/<user_id>/...` con URLs firmadas. | Igual en nativo con supabase-js. |
 | Analytics | `/api/analytics` con allowlist, sin datos de salud. | Reutilizar el mismo endpoint y allowlist; nada de SDKs de terceros con datos de salud. |
@@ -111,7 +112,7 @@ Las tareas `NAT-Hx` no las puede cerrar un agente. Un agente puede preparar el m
 |---|---|---|---|
 | NAT-H1 | Aprobar ADR-001 (Expo/React Native en `native/`). | NAT-20 en adelante. | Aprobar. |
 | NAT-H2 | Cuentas Apple Developer y Google Play Console; bundle id / package name; Team ID. | NAT-12 (Universal Links reales), NAT-63. | `club.evolvapp.app` en ambas plataformas. |
-| NAT-H3 | Modelo de cobro dentro de las apps. | NAT-13, NAT-45. | Compra integrada de la tienda (pago único → "non-renewing subscription" en iOS / producto equivalente en Play) gestionada con un intermediario tipo RevenueCat o directamente con StoreKit 2 / Play Billing, sincronizada a `entitlements` con `origin` `apple`/`google`. Stripe sigue para web. Confirmar las reglas vigentes de App Store (3.1.1, 3.1.3) y Google Play (Payments) por país antes de decidir; no ofrecer cupones propios ni enlaces de pago externos dentro de la app sin validar la política vigente. |
+| NAT-H3 | Modelo de cobro dentro de las apps. | NAT-45 (y NAT-13 si se activa la contingencia). | **Decidido por Jonathan (2026-11-05): cobro solo en la web (Culqi); las apps no venden ni enlazan a comprar y leen el acceso del servidor.** Contingencia: compra integrada ("non-renewing subscription" en iOS, producto equivalente en Play) solo si una tienda la exige. Plan, reglas de tienda verificadas y fases en `COBRO-WEB.md`. El cierre formal queda para después de validar en beta con las tiendas. |
 | NAT-H4 | Revisión legal de privacidad para tiendas. | NAT-30 (texto de consentimiento), NAT-50, NAT-62. | Las guías de App Store (5.1.2(i), actualizada a fines de 2025) exigen informar y pedir permiso explícito cuando datos personales se comparten con IA de terceros. Eso **choca con REQ-31** si se aplica a la UI normal. Propuesta: excepción acotada a REQ-31 solo para el texto legal de consentimiento y la política de privacidad, nunca en la UI de uso diario. También: URL de política de privacidad pública, etiquetas de privacidad (App Store) y Data safety + declaración de apps de salud (Google Play), disclaimer médico. |
 | NAT-H5 | Cuenta Expo/EAS, proyecto Firebase (FCM), llave APNs. | NAT-44, NAT-63. | Crear y guardar como secretos de EAS, nunca en el repo. |
 | NAT-H6 | Aplicar en producción las migraciones SQL de la migración nativa. | Beta (NAT-63). | Aplicar tras revisar `supabase/native_*.sql`. |
@@ -123,7 +124,8 @@ Las tareas `NAT-Hx` no las puede cerrar un agente. Un agente puede preparar el m
 - **REQ-31:** la UI nativa de usuario normal no menciona IA, Claude, modelos, prompts, tokens ni cuotas internas. Se valida automáticamente (NAT-28). La única excepción posible es la que apruebe NAT-H4 para texto legal.
 - **Privacidad por defecto:** fotos, salud, progreso y conversaciones son privados; nada de eso va a analytics ni a SDKs de terceros. Las fotos de comida para estimar no se guardan (REQ-172).
 - **Historial inmutable** y **el coach propone, el sistema valida**: los mismos módulos puros deciden en ambos clientes.
-- **Sin secretos en el cliente**: la key del proveedor del coach, Stripe, service role y VAPID privada siguen solo en servidor.
+- **Sin secretos en el cliente**: la key del proveedor del coach, la llave secreta de Culqi, service role y VAPID privada siguen solo en servidor.
+- **Cobro solo en la web:** la app no muestra precios ni enlaces o botones para comprar fuera, ni canjea cupones (`COBRO-WEB.md` §4).
 - **Migraciones SQL** idempotentes, con RLS, nunca aplicadas automáticamente a producción.
 - **La web no se rompe:** toda tarea que toque la raíz (`index.html`, `js/`, `api/`, `supabase/`) debe dejar `node scripts/release-gate.mjs` en verde y subir `CACHE_NAME` si cambia el shell PWA.
 
@@ -131,7 +133,7 @@ Las tareas `NAT-Hx` no las puede cerrar un agente. Un agente puede preparar el m
 
 | Riesgo | Prob. | Impacto | Mitigación |
 |---|---|---|---|
-| Rechazo de App Store por modelo de cobro. | Alta si se usa Stripe dentro de la app. | Bloquea lanzamiento. | NAT-H3 antes de NAT-45; la beta (TestFlight) puede salir sin compra integrada con entitlements existentes. |
+| Rechazo de App Store o Google Play por acceso comprado en la web sin compra integrada (App Store 3.1.1/3.1.3(b), Google Play Pagos). | Media-alta. | Bloquea lanzamiento. | Cero llamados a comprar dentro de la app (validador NAT-28), validación temprana en TestFlight y prueba cerrada, y contingencia de compra integrada lista (`COBRO-WEB.md` Fase 3). |
 | Choque REQ-31 vs. divulgación obligatoria de IA de terceros. | Alta. | Rechazo / riesgo legal. | NAT-H4 con excepción acotada al texto legal. |
 | Extraer dominio de `index.html` rompe la web. | Media. | Regresión en producción. | Extracciones pequeñas, una a la vez, release gate + E2E en verde, sin cambios de comportamiento. |
 | Divergencia de reglas entre web y nativo. | Media. | Datos inconsistentes. | Regla "un solo dominio"; prohibido duplicar lógica en `native/` (revisión en PR + NAT-02). |

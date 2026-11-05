@@ -36,9 +36,9 @@ Checklist para declarar la beta (criterio 2 de `PLAN.md` §10). Cada tarea `feat
 | Perfil | Secciones con aviso de cambios sin guardar (REQ-105/107/108) | NAT-42 | ⬜ | ⬜ | |
 | Perfil | Recalcular objetivos y preferencias | NAT-42 | ⬜ | ⬜ | |
 | Privacidad | Exportar datos, borrar cuenta, retirar consentimientos | NAT-43 | ⬜ | ⬜ | Borrado in-app exigido por tiendas |
-| Facturación | Estado del plan / trial | NAT-45 | ⬜ | ⬜ | |
-| Facturación | Compra y restaurar compras | NAT-45 | ⬜ | ⬜ | Según NAT-H3 |
-| Facturación | Stripe Checkout y canje de cupones | — | ➖ | ➖ | Web; en apps según NAT-H3 |
+| Facturación | Estado del plan / trial, actualizar acceso tras pagar en la web | NAT-45 | ⬜ | ⬜ | Sin precios ni enlaces a comprar (`COBRO-WEB.md` §4) |
+| Facturación | Compra y restaurar compras | — | ➖ | ➖ | Cobro solo en la web (NAT-H3, 2026-11-05); compra integrada solo si se activa la contingencia |
+| Facturación | Compra con Culqi (`/planes` → `/pago`) y canje de cupones | — | ➖ | ➖ | Solo web |
 | Plataforma | Funciona sin conexión y sincroniza al volver | NAT-24 | ⬜ | ⬜ | |
 | Plataforma | Versión mínima / actualización | NAT-49 | ⬜ | ⬜ | |
 | Plataforma | Accesibilidad | NAT-48 | ⬜ | ⬜ | |

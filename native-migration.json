@@ -76,7 +76,7 @@
       "owner": null,
       "claimedAt": null,
       "doneAt": null,
-      "note": ""
+      "note": "Decidido por Jonathan (2026-11-05): cobro solo en la web (Culqi), sin compra dentro de las apps. Contingencia y validación con tiendas en docs/native-migration/COBRO-WEB.md. Una persona lo cierra tras la beta."
     },
     {
       "id": "NAT-H4",
@@ -439,7 +439,7 @@
     },
     {
       "id": "NAT-13",
-      "title": "Entitlements multi-origen y webhook de compras de tienda",
+      "title": "Contingencia: entitlements de compras de tienda (solo si NAT-H3 activa la compra integrada)",
       "phase": 2,
       "track": "backend",
       "human": false,
@@ -457,7 +457,7 @@
       "owner": null,
       "claimedAt": null,
       "doneAt": null,
-      "note": ""
+      "note": "Con el cobro solo en la web no se hace; ver COBRO-WEB.md Fase 3."
     },
     {
       "id": "NAT-20",
@@ -621,7 +621,7 @@
     },
     {
       "id": "NAT-28",
-      "title": "Validador REQ-31 para textos de la app nativa",
+      "title": "Validador REQ-31 y de cobro fuera de la app para textos de la app nativa",
       "phase": 3,
       "track": "foundation",
       "human": false,
@@ -954,13 +954,12 @@
     },
     {
       "id": "NAT-45",
-      "title": "Suscripción: estado del plan, compra integrada y restaurar compras",
+      "title": "Mi plan sin compra dentro de la app: estado del acceso y actualizar",
       "phase": 4,
       "track": "feature",
       "human": false,
       "deps": [
         "NAT-H3",
-        "NAT-13",
         "NAT-42"
       ],
       "paths": [
