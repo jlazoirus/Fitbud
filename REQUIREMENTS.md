@@ -2288,44 +2288,9 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-350 - Facturación: el aviso de plan de la web vende los planes en soles con Culqi
 
-**Estado: pendiente.**
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
-`docs/native-migration/COBRO-WEB.md`, Fase 0 (2026-11-05). Culqi aprobó el comercio el 2026-11-04 y, con apps nativas, toda compra será en la web.
-
-### Problema
-Con la prueba agotada o el plan vencido, la persona logueada ve "Activa tu plan" con planes en USD, "Disponible pronto" y el canje de código: no puede comprar aunque `/planes` → `/pago` ya cobra en soles. Igual en "Renovar plan" (Perfil → Mi suscripción).
-
-### Causa raíz
-`showPaywall()` (`index.html:9943`) arma los planes con `activeCatalogPlans()` (USD, `/api/catalog`) y su botón depende de `checkoutAvailable()` (`index.html:1343`), que mira `REMOTE.checkout.enabled`: Stripe, nunca activado. No consulta `REMOTE.culqi.enabled` ni el catálogo de la tienda (`tienda/planes.js`, que la portada ya carga con `loadStorePlans()`, REQ-333). Lo invocan 11 lugares, entre ellos el límite de la prueba, entreno, nutrición y Perfil (`index.html:10298`).
-
-### Objetivo
-Con Culqi activo, el aviso de plan muestra los 3 planes de la tienda (imagen, nombre, precio en soles, descripción) y "Comprar" lleva a `/pago?plan=<id>` en la misma pestaña, con el correo de la cuenta ya puesto (`prefillEmail()` de `/pago`). Al volver a la app tras pagar, el plan aparece activo sin cerrar sesión.
-
-### Alcance
-- `showPaywall()`: si `REMOTE.culqi.enabled` y el catálogo de la tienda cargó, usar `PLANES_TIENDA`. Sin Culqi, mantener el comportamiento actual (USD, Stripe o "Disponible pronto").
-- Mantener el mensaje por contexto (`trial_limit`, entreno, nutrición), el aviso de plan vencido y "Tu progreso… se conservan".
-- Canje de código: queda como opción secundaria ("¿Tienes un código?").
-- `noPricesMode()` (REQ-208, beta) sigue mostrando `showAccessNotice()` sin precios.
-- Al volver de `/pago` (foco o `pageshow`), refrescar el permiso con `loadEntitlement()`.
-- Analítica `paywall_shown` y `checkout_start` con `provider: "culqi"`, sin datos de salud.
-- Subir `CACHE_NAME`.
-
-### Fuera de alcance
-Apps nativas (no venden: `COBRO-WEB.md` §4), cobro recurrente, cambiar precios o el flujo de `/pago`, retirar el código de Stripe.
-
-### Riesgos
-Mostrar precios a usuarios beta (REQ-208); que un plan comprado no aparezca hasta recargar; romper el aviso cuando `tienda/planes.js` no carga (debe volver al comportamiento actual).
-
-### Criterios de aceptación
-- Con Culqi activo, una cuenta con la prueba agotada ve los 3 planes en soles y "Comprar" abre `/pago?plan=…` con su correo.
-- "Renovar plan" en Perfil abre el mismo aviso.
-- Una cuenta beta (`noPricesMode()`) no ve precios.
-- Sin Culqi, el aviso queda igual que hoy.
-- Tras pagar y volver, el plan figura activo sin recargar a mano.
-
-### Verificación sugerida
-Playwright con `/api/config` simulado (Culqi activo y no), con `/api/entitlement` sin plan y luego con plan: aviso desde el límite de prueba y desde Perfil, enlace a `/pago`, correo precargado, modo beta sin precios. Regresión de `tests/e2e/tienda.spec.js`, detector Impeccable y release gate.
+✓ `tests/e2e/paywall-tienda.spec.js`.
 
 ## REQ-351 - Facturación: correos de vencimiento con enlace a los planes
 

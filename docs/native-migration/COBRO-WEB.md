@@ -76,7 +76,7 @@ Excepción posible más adelante: si la app se publica también en la tienda de 
 | # | Qué | Quién | Estado |
 |---|---|---|---|
 | 0.1 | Poner las llaves de **producción** de Culqi en Vercel (`CULQI_PUBLIC_KEY`, `CULQI_SECRET_KEY`), redesplegar, hacer una compra real de S/ 29.90 y reembolsarla el mismo día (`CULQI_SETUP.md` §6). Hasta entonces la web cobra con llaves de prueba. | Persona | Pendiente (el 2026-11-05 la web seguía con `pk_test_`) |
-| 0.2 | **REQ-350:** el aviso de plan de la web (`showPaywall()`) muestra los planes en soles y lleva a `/pago` con el correo de la cuenta. Hoy muestra el catálogo en USD de Stripe con "Disponible pronto". | Agente | Pendiente |
+| 0.2 | **REQ-350:** el aviso de plan de la web (`showPaywall()`) muestra los planes en soles y lleva a `/pago` con el correo de la cuenta. Antes mostraba el catálogo en USD de Stripe con "Disponible pronto". | Agente | Hecho (2026-11-05) |
 | 0.3 | **REQ-351:** correos de vencimiento (3 días antes y al vencer) con enlace a `/planes`. Es el canal permitido para recordar la renovación a quien usa las apps. | Agente | Pendiente (necesita SQL manual) |
 
 ### Fase 1 — Al reanudar la migración: la app lee el acceso

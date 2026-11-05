@@ -13275,3 +13275,56 @@ Solicitud directa: compartir el análisis guardado localmente. Publica `docs/com
 ## REQ-321 - Entreno en casa: el día de tirón no se queda en un solo ejercicio
 
 **Estado: implementado.** Regresión de REQ-293: sin barra ni bandas, Pull A/B en casa quedaban solo con el remo invertido. Las plantillas de peso corporal suman core (dead bug y plancha lateral; plancha frontal y con toque de hombro). `CACHE_NAME` → `fitbud-pwa-v198`. ✓ `tests/e2e/entreno-casa.spec.js`.
+
+## REQ-350 - Facturación: el aviso de plan de la web vende los planes en soles con Culqi
+
+**Estado: implementado.**
+
+### Origen
+`docs/native-migration/COBRO-WEB.md`, Fase 0 (2026-11-05). Culqi aprobó el comercio el 2026-11-04 y, con apps nativas, toda compra será en la web.
+
+### Problema
+Con la prueba agotada o el plan vencido, la persona logueada ve "Activa tu plan" con planes en USD, "Disponible pronto" y el canje de código: no puede comprar aunque `/planes` → `/pago` ya cobra en soles. Igual en "Renovar plan" (Perfil → Mi suscripción).
+
+### Causa raíz
+`showPaywall()` (`index.html:9943`) arma los planes con `activeCatalogPlans()` (USD, `/api/catalog`) y su botón depende de `checkoutAvailable()` (`index.html:1343`), que mira `REMOTE.checkout.enabled`: Stripe, nunca activado. No consulta `REMOTE.culqi.enabled` ni el catálogo de la tienda (`tienda/planes.js`, que la portada ya carga con `loadStorePlans()`, REQ-333). Lo invocan 11 lugares, entre ellos el límite de la prueba, entreno, nutrición y Perfil (`index.html:10298`).
+
+### Objetivo
+Con Culqi activo, el aviso de plan muestra los 3 planes de la tienda (nombre, precio en soles, resumen y lo que incluye; sin la imagen, para que el aviso no se alargue en el teléfono) y "Comprar" lleva a `/pago?plan=<id>` en la misma pestaña, con el correo de la cuenta ya puesto (`prefillEmail()` de `/pago`). Al volver a la app tras pagar, el plan aparece activo sin cerrar sesión.
+
+### Alcance
+- `showPaywall()`: si `REMOTE.culqi.enabled` y el catálogo de la tienda cargó, usar `PLANES_TIENDA`. Sin Culqi, mantener el comportamiento actual (USD, Stripe o "Disponible pronto").
+- Mantener el mensaje por contexto (`trial_limit`, entreno, nutrición), el aviso de plan vencido y "Tu progreso… se conservan".
+- Canje de código: queda como opción secundaria ("¿Tienes un código?").
+- `noPricesMode()` (REQ-208, beta) sigue mostrando `showAccessNotice()` sin precios.
+- Al volver de `/pago` (foco o `pageshow`), refrescar el permiso con `loadEntitlement()`.
+- Analítica `paywall_shown` y `checkout_start` con `provider: "culqi"`, sin datos de salud.
+- Subir `CACHE_NAME`.
+
+### Fuera de alcance
+Apps nativas (no venden: `COBRO-WEB.md` §4), cobro recurrente, cambiar precios o el flujo de `/pago`, retirar el código de Stripe.
+
+### Riesgos
+Mostrar precios a usuarios beta (REQ-208); que un plan comprado no aparezca hasta recargar; romper el aviso cuando `tienda/planes.js` no carga (debe volver al comportamiento actual).
+
+### Criterios de aceptación
+- Con Culqi activo, una cuenta con la prueba agotada ve los 3 planes en soles y "Comprar" abre `/pago?plan=…` con su correo.
+- "Renovar plan" en Perfil abre el mismo aviso.
+- Una cuenta beta (`noPricesMode()`) no ve precios.
+- Sin Culqi, el aviso queda igual que hoy.
+- Tras pagar y volver, el plan figura activo sin recargar a mano.
+
+### Verificación sugerida
+Playwright con `/api/config` simulado (Culqi activo y no), con `/api/entitlement` sin plan y luego con plan: aviso desde el límite de prueba y desde Perfil, enlace a `/pago`, correo precargado, modo beta sin precios. Regresión de `tests/e2e/tienda.spec.js`, detector Impeccable y release gate.
+
+### Implementación
+
+- `loadRemoteConfig()` conserva `culqi` de `/api/config` (antes lo descartaba). `storeCheckoutAvailable()` = `REMOTE.culqi.enabled`.
+- `showPaywall()`: tras `noPricesMode()`, con Culqi activo usa `showStorePaywall()` (si el catálogo aún carga, espera `loadStorePlans()`; si no cargó, cae al aviso anterior). `paywallMessage()` comparte los textos por contexto.
+- "Comprar" es un enlace a `/pago?plan=<id>` en la misma pestaña; `storeCheckoutStart()` registra `checkout_start` (`source: "tienda"`, `plan_type`) y guarda en `sessionStorage` el vencimiento vigente. Al volver (`pageshow` desde bfcache, `visibilitychange` o el arranque tras "Ir a Evolv"), `loadEntitlement()` y `storeCheckoutResult()` avisan "¡Listo! Tu plan está activo hasta el …" si el vencimiento cambió.
+- Canje de código como opción secundaria (`couponRedeemSectionHtml()`). `CACHE_NAME` v214.
+
+### Verificación
+
+`tests/e2e/paywall-tienda.spec.js` (3/3): planes en soles desde el límite de prueba con el correo precargado en `/pago`; "Renovar plan" en Perfil y vuelta con "atrás" que muestra el plan activo; acceso beta sin precios. `tests/e2e/beta-acceso.spec.js` sigue verde (sin Culqi el aviso mantiene USD). Detector Impeccable sin hallazgos.
+
