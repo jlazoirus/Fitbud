@@ -13169,3 +13169,109 @@ Mostrar el enlace vigente tras recargar, que exigiría cambiar la RPC `streak_so
 **Estado: implementado.**
 
 Jonathan (2026-10-30): separar la consola de administración a otra URL y dar acceso a Sathya (b.ll.sathya@gmail.com, mismos permisos de administrador). La consola vive en `/admin` (rewrite de `vercel.json` al mismo `index.html`; el modo consola se activa por ruta). La app de usuarios ya no renderiza vistas de administración para nadie: `setView` las bloquea fuera del modo consola, el despachador de `render()` exige modo consola y Perfil solo enlaza a `/admin`. En `/admin`: sin sesión → login; sesión sin `is_admin` → pantalla "Sin acceso"; admin → consola con pestañas propias (Beta, Usuarios, Alimentos, Ejercicios, Analítica, Ajustes) y vuelta a la app. El enlace del correo de aviso de postulantes y la tarjeta de pendientes en Hoy apuntan a `/admin?ver=postulantes`. La autorización real no cambia: ya era server-side (`api/admin` valida JWT + `is_admin`; RLS protege los datos). El alta de Sathya es un paso operativo en Supabase (`is_admin=true` en su perfil), fuera del repo. ✓ `tests/e2e/admin-console.spec.js`; `tests/e2e/admin-beta.spec.js` actualizado.
+
+
+<!-- Compactación 2026-11-05: detalle movido desde REQUIREMENTS.md para mantenerlo bajo 15000 palabras. -->
+
+## REQ-122 - Fix Nutrición: dietas deben llegar a objetivos o completar con sugerencias aplicables
+
+**Estado: implementado.** Cuando el día generado no cumple objetivo, la revisión ofrece "Reintentar" y "Completar con opción práctica" (`deterministicFromModal`/`applyDeterministicDay`); `aiGenerateDay` cae a determinista tras 2 fallos (`_genDayFailStreak`, reiniciado por `homePrepareDay`); la revisión de semana ofrece completar días faltantes; las restricciones duras siguen bloqueando en toda ruta. Detalle en el commit. Verificado con `scripts/validate-diet-completion-fallback.mjs`.
+
+## REQ-148 - Fix billing: un reembolso parcial de Stripe revoca todo el entitlement pagado
+
+**Estado: implementado.**
+`handleRefund()` (`api/webhook.js`) solo revoca cuando `charge.refunded===true` o `Number(charge.amount_refunded)>=Number(charge.amount)`; un reembolso parcial devuelve `skipped` (queda auditado en `billing_events` con el payload completo, sin tocar el entitlement). Detalle completo (Origen/Problema/Causa raíz/Alcance/Criterios) en el commit que lo implementó; compactado a su resumen de Estado para respetar el tope de `validate-docs-index.mjs`. Verificado con `scripts/test-webhook-refund.mjs`.
+
+## REQ-300 - Compartir la racha y compararla con amigos
+
+**Estado: implementado; requiere aplicar `supabase/streak_friends.sql`.**
+
+Jonathan (2026-10-28): eligió comparar la racha actual. Compartir desde Hoy/Progreso, alias voluntario, invitación privada de un uso/7 días, aceptación mutua y clasificación con empates. Baja y eliminación revocan acceso. Sin datos de salud ni analytics. Alcance, operación y límites: `docs/streak-friends.md`. ✓ PostgreSQL/RLS y E2E: `scripts/test-streak-friends.mjs`, `tests/e2e/rachas-amigos.spec.js`.
+
+## REQ-305 - Registro con invitación reconoce el correo ya registrado
+
+**Estado: implementado.**
+
+Al aceptar una postulación la cuenta ya existe (invitación por correo, REQ-225); si esa persona se registra con su enlace de código, GoTrue responde `{"code":422,"error_code":"email_exists",...}` y el `code` numérico tapaba el texto del error: caía en el 500 genérico "No pudimos crear tu cuenta" en vez del 409 útil. Ahora `invite-signup` lee todos los campos del error, devuelve 409 con instrucciones (iniciar sesión, "Olvidé mi contraseña", canjear en Perfil → Mi suscripción), distingue contraseña débil y deja el motivo real del alta rechazada y del canje fallido en los logs de Vercel. ✓ `tests/unit/invite-signup.test.mjs` (node, mocks, sin producción).
+
+## REQ-306 - Canje de cupones: columnas calificadas en redeem_redemption_code
+
+**Estado: implementado.**
+
+Los parámetros OUT del `returns table` (`status`, `expires_at`) chocaban con las columnas de `user_entitlements`: plpgsql fallaba siempre con 42702 "column reference is ambiguous" y NINGÚN canje de código funcionaba en producción (registro por invitación y "Canjear" en Mi suscripción). Confirmado en vivo ejecutando la función dentro de una transacción con rollback. Se califican las columnas con la tabla. Requiere re-aplicar `supabase/coupon_codes.sql` en producción (create or replace, sin tocar datos).
+
+## REQ-307 - Soporte por WhatsApp en app, onboarding y web pública
+
+**Estado: implementado.**
+
+Jonathan (2026-10-30): el customer service de Evolv se atiende en su WhatsApp de EE. UU. (+1 830 262-9397). Sin mensajes automáticos: cada persona abre WhatsApp y escribe voluntariamente. Widget flotante en la portada (sin tapar navegación ni formularios en móvil), bloque "¿Dudas antes de postular?" en /beta (no flotante para no tapar el formulario), sección "Ayuda y soporte" en Perfil y "Estamos contigo" en el último paso del onboarding. El enlace del pie de la portada migra del número peruano anterior al de soporte. Enlace único con mensaje prellenado sin datos personales: `https://wa.me/18302629397?text=Hola%2C+tengo+una+duda+sobre+Evolv`. ✓ `tests/e2e/soporte-whatsapp.spec.js`.
+
+## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
+
+**Estado: implementado.**
+
+Tras publicar REQ-307 y REQ-308 se detectó en producción que los navegadores con el service worker instalado seguían sirviendo la versión anterior de `index.html` desde caché (navegación cache-first por generación de caché, REQ-150). Al no cambiar el binario del SW no se disparaba actualización y los usuarios existentes no veían el widget de WhatsApp ni la consola. Se sube `CACHE_NAME` a `fitbud-pwa-v176`: en la próxima visita el SW nuevo se instala, `skipWaiting()` lo activa y `activate` borra los cachés anteriores, sirviendo el build actual.
+
+## REQ-312 - Curl predicador en banco Scott con barra EZ
+
+**Estado: implementado.**
+
+Solicitud directa: variante de la imagen con ficha completa, respiración, errores, alertas, contraindicaciones, nivel principiante, gimnasio, banco Scott y barra EZ. `preacher-curl` incluye alias Scott/predicador, regresión y progresión de carga tipadas, sustitutos de bíceps y secuencia animada con dos fotos locales exactas (Free Exercise DB, Preacher_Curl, Unlicense). No modifica planes ni historial. Caché v191. SQL regenerado, aplicación opcional/manual; el cliente incorpora la ficha sin migración de producción.
+
+Verificación: pruebas específicas de ficha/alias/animación/sustitutos en 390 y 1280 px (2/2), suite de ampliación gimnasio (2/2), sintaxis y diff correctos. Los fallos iniciales de los controles se corrigen en REQ-315. Integración autorizada por el usuario. No se ejecutó SQL en producción.
+
+## REQ-313 - Extensión de tríceps en polea alta con cuerda
+
+**Estado: implementado.**
+
+Solicitud directa del usuario con imagen. La ficha previa `triceps-pushdown` tiene barra; se conserva y se agrega `rope-triceps-pushdown`, variante propia con agarre neutro y cuerda. Incluye nivel principiante, equipo/lugar, técnica, respiración, errores, alertas, contraindicaciones, regresión/progresión de carga tipadas y sustitutos del mismo músculo. Dos fotografías locales exactas de Free Exercise DB, Triceps_Pushdown_-_Rope_Attachment (Unlicense), en secuencia animada. Caché v192. SQL opcional/manual; sin migraciones de producción ni modificación de planes/historial. Los controles generales se corrigen en REQ-315. Integración autorizada por el usuario.
+
+Verificación REQ-313: suite dirigida de ambos ejercicios y ampliación de gimnasio, 6/6 pruebas correctas en Chromium (390/1280 px): búsqueda, carga de ambas fotos, animación activa, nivel, progresión/regresión y sustitución por músculo. Sintaxis y `git diff --check` correctos. El validador general se actualiza en REQ-315.
+
+## REQ-322 - Entreno: el step-up con la animación del CDC (dominio público)
+
+**Estado: implementado.** De los ejercicios sin demostración de REQ-320, el step-up tiene una exacta y libre: la animación del CDC en Wikimedia Commons (escalón bajo, sin carga, con apoyo; obra del Gobierno de EE. UU.). Se sirve desde `assets/exercise-media/step-up.gif` con crédito y vuelve a elegirse en las sesiones; se retira `step-up.svg`. Siguen sin fuente libre exacta la búlgara (solo foto con carga), el peso muerto a una pierna, el curl deslizante y la flexión arquero. `CACHE_NAME` → `fitbud-pwa-v198`. ✓ `tests/e2e/sin-dibujos.spec.js`.
+
+## REQ-337 - Entreno: las series vienen precargadas con lo de la última vez
+
+**Estado: implementado.** Jonathan (2026-11-03): al repetir una rutina, peso y repeticiones deben venir en los campos, no solo como recordatorio encima. `prefillStepFromLastTime()` copia repeticiones y carga de la última vez (serie a serie; las de más repiten la última) en las series pendientes como valores editables; el esfuerzo no se copia. Lo escrito por el usuario se respeta; al sustituir el ejercicio lo precargado pasa al del nuevo. `CACHE_NAME` → `fitbud-pwa-v205`. ✓ `tests/e2e/entreno.spec.js` (Series precargadas).
+
+## REQ-349 - Nutrición: restricciones vigentes, rechazo con reemplazo y continuidad semanal
+
+**Estado: implementado.**
+
+Solicitud de Jonathan (2026-11-05), por feedback de Sathya. Preferencias guardadas reparan comidas pendientes; rechazos sustituyen apariciones futuras con Deshacer. Fechas/estado y preparación semanal visibles; renovación al abrir/reconectar opcional, desactivada por defecto y sin llamadas pagadas. Conserva consumo, pasado y elecciones compatibles; explica falta de alternativas. Guardados y resultados aislados por cuenta. PWA v213.
+
+Alcance, criterios y operación: `docs/nutrition-continuity.md`. Verificación: `tests/e2e/nutricion-continuidad.spec.js`, `scripts/validate-nutrition-continuity.mjs`, regresiones y release gate. Sin migraciones.
+
+## REQ-85 - Fix: fallbacks y IA generaban platos ficticios ("Desayuno práctica", "Alimento compatible")
+
+**Estado: implementado.** `validateGeneratedDay` rechaza nombres placeholder con regex `placeholderRe`; `regenerateGenMeal` usa el plato real más cercano del catálogo como fallback; ambos prompts prohíben nombres genéricos. 5 asserts en `scripts/validate-placeholder-meals.mjs`.
+
+## REQ-119 - Onboarding nutricional: capturar gustos y disgustos antes del primer plan
+
+**Estado: implementado.** Onboarding y Perfil capturan gustos/disgustos (`prefs.preferredDishes` nuevo + campos existentes). El prompt de IA recibe `coachLikesLine`; el fallback determinista aplica `preferenceScoreAdjustment` (`js/nutrition-domain.js`) para priorizar afines y penalizar disgustos en generación y reemplazos. Alergias/restricciones duras siguen bloqueando por separado. Detalle en el commit. Verificado con `scripts/release-gate.mjs`.
+
+## REQ-121 - Nutrición: cambios de preferencias regeneran solo futuro y se respetan de inmediato
+
+**Estado: implementado.** Editar preferencias (`preferredIngredients/Dishes/Cuisines`, `dislikedIngredients`, `blockedDishes`) cambia el `contextKey` y no reutiliza pooled/caché viejo; `COACH_PROMPT_VERSION=6` invalida lo previo; `applyDayComidas` no reescribe comidas `done=true`; `homePrepareDay` y "Volver a preparar" rechazan fechas pasadas. Detalle en el commit. Verificado con `scripts/validate-preference-cache-invalidation.mjs`.
+
+## REQ-144 - Medir impacto incremental de catálogo contra el canario antes de aceptar platos nuevos
+
+**Estado: implementado.** `scripts/diff-diet-contract.mjs` compara dos `seed.sql` y reporta el delta de `okDays` total, catálogo, causas y las 54 dimensiones; `scripts/validate-diet-contract-diff.mjs` lo valida y el release gate lo ejecuta. Detalle, motivación (REQ-143) y guía operativa: `docs/diet-contract-catalog-diff.md` y REQ-143 de `docs/requirements-history.md`.
+
+## REQ-277 - Publicar análisis MyFitnessPal para continuidad entre agentes
+
+**Estado: implementado.**
+
+Solicitud directa: compartir el análisis guardado localmente. Publica `docs/competitive/2026-10-22-myfitnesspal/README.md`, matriz de 48 dimensiones y propuestas MFP-00..17; añade entradas desde AGENTS, README y estrategia. Conserva evidencia del checkout anterior, declara diferencias con main y verificación externa pendiente. No incorpora las propuestas al selector ni reactiva el track nativo.
+
+## REQ-290 - Precios de lanzamiento: USD 7.99/mes y USD 39.90 por 6 meses
+
+**Estado: implementado.** Falta aplicar el seed de `supabase/entitlements.sql` y crear los precios en Stripe (`STRIPE_SETUP.md`).
+
+`semiannual` (180 días) reemplaza a `quarterly`, que queda `active=false` solo para cortesías beta e histórico.
+
+## REQ-321 - Entreno en casa: el día de tirón no se queda en un solo ejercicio
+
+**Estado: implementado.** Regresión de REQ-293: sin barra ni bandas, Pull A/B en casa quedaban solo con el remo invertido. Las plantillas de peso corporal suman core (dead bug y plancha lateral; plancha frontal y con toque de hombro). `CACHE_NAME` → `fitbud-pwa-v198`. ✓ `tests/e2e/entreno-casa.spec.js`.
