@@ -30,7 +30,7 @@ assert.equal(strength.restSeconds, 120, "el temporizador usa el mínimo");
 assert.equal(strength.prescribedSets, 4);
 assert.equal(strength.reps, "8–15");
 
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 assert.ok(html.includes("step.restLabel||`${step.restSeconds}s`"), "el reproductor muestra el rango de descanso");
 assert.ok(html.includes("prescription.durationLabel?"), "el resumen previo muestra la duración del coach");
 console.log("validate-coach-plan-labels: OK");

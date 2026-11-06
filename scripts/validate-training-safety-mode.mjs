@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import "../training-plan.js";
 
-const index = readFileSync("index.html", "utf8");
+const index = readFileSync("app/index.html", "utf8");
 const trainingPlan = readFileSync("training-plan.js", "utf8");
 const contracts = readFileSync("domain-contracts.js", "utf8");
 

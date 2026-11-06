@@ -17,7 +17,7 @@ const required = {
     "/auth/v1/admin/users/",
     "progress-photos",
   ],
-  "index.html": [
+  "app/index.html": [
     "renderPrivacyGate",
     "exportPersonalData",
     "deleteMyAccount",
@@ -38,7 +38,7 @@ for (const [file, needles] of Object.entries(required)) {
   }
 }
 
-const index = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const index = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 const removedConsentControls = [
   "ob_age_confirmed",
   "ob_consent_body",

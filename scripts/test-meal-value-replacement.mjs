@@ -18,7 +18,7 @@ import "../js/nutrition-domain.js";
 const d = globalThis.FITBUD_NUTRITION_DOMAIN;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const html = fs.readFileSync(path.join(HERE, "..", "index.html"), "utf8");
+const html = fs.readFileSync(path.join(HERE, "..", "app", "index.html"), "utf8");
 
 // Extrae el código fuente de una función de nivel superior por conteo de llaves
 // (misma técnica que test-service-worker-cache.mjs usa para service-worker.js).

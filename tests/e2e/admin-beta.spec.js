@@ -95,7 +95,7 @@ test("REQ-225: con correo, aceptar envía la invitación por correo y avisa de p
   await page.getByRole("button", { name: "Revisar" }).click();
   await expect(page).toHaveURL(/\/admin\?ver=postulantes$/);
   await page.addInitScript(() => { window.__forceAdminConsole = true; });
-  await page.goto("/index.html");
+  await page.goto("/app/");
   await page.waitForFunction(() => typeof profile !== "undefined" && profile && !_authBusy, { timeout: 15_000 });
   const card = page.locator("#betaList .meal").first();
   await expect(card).toContainText("ana@correo.test");
@@ -115,10 +115,10 @@ test("REQ-226: el enlace del correo de aviso abre Postulantes beta al admin", as
   await autoDismissNudges(page);
   await page.route("**/api/admin", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ applicants: [], counts: { pending: 0, invited: 0, closed: 0 } }) }));
   // REQ-308: el enlace apunta a la consola; si llega a la app, redirige a /admin
-  await page.goto("/index.html?ver=postulantes");
+  await page.goto("/app/?ver=postulantes");
   await page.waitForURL(/\/admin\?ver=postulantes$/, { timeout: 15_000 });
   await page.addInitScript(() => { window.__forceAdminConsole = true; });
-  await page.goto("/index.html?ver=postulantes");
+  await page.goto("/app/?ver=postulantes");
   await expect(page.getByRole("heading", { name: "Postulantes beta" })).toBeVisible();
   await page.waitForFunction(() => window.location.search === "");
 });

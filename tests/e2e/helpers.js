@@ -466,8 +466,14 @@ export async function autoDismissNudges(page) {
 }
 
 /** Navega a la app y espera a que salga del splash. */
+// REQ-352: la portada pública vive en "/" (index.html + web/portada.js), fuera de la app.
+export async function gotoPortada(page) {
+  await page.goto("/");
+  await page.waitForSelector(".landing .l-plan-store", { timeout: 15_000 });
+}
+
 export async function gotoApp(page) {
-  await page.goto("/index.html");
+  await page.goto("/app/");
   await page.waitForFunction(
     () => !document.querySelector("#app .splash") && document.querySelector("#app")?.childElementCount > 0,
     { timeout: 15_000 },

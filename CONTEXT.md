@@ -12,11 +12,11 @@ REQ-316: Hoy prioriza registro/entreno y menú opcional. REQ-324: fechas/avisos 
 
 ## Arquitectura vigente
 
-- Frontend vanilla sin framework ni build step. `index.html` es el shell principal; funciones publicas siguen expuestas para handlers inline.
+- Vanilla sin build step. REQ-352: app en `app/index.html` (`/app`, `<base href="/">`); portada en `index.html` + `web/`.
 - Modulos puros sin DOM: `js/nutrition-pure.js`, `js/nutrition-domain.js`, `domain-contracts.js`, `workout-player.js`, `training-plan.js`, `sync-conflicts.js`.
 - Vercel: estático y `api/*.js`; producción: `https://evolvapp.club/`.
 - Supabase es fuente de verdad. `localStorage` espeja/cachea para offline; no debe ser la unica ubicacion de datos personales.
-- PWA: `manifest.webmanifest`, `service-worker.js`, iconos en `assets/`. `index.html`/`config.js` son network-first; `/api/*` network-only.
+- PWA: `manifest.webmanifest`, `service-worker.js`, iconos en `assets/`. la app (`/app`) sale del cache; `config.js` network-first; `/api/*` network-only.
 
 ## Datos y seguridad
 
@@ -106,7 +106,7 @@ REQ-316: Hoy prioriza registro/entreno y menú opcional. REQ-324: fechas/avisos 
 
 | Archivo | Uso |
 |---|---|
-| `index.html` | Shell principal, render, estado, handlers inline y wiring de modulos. |
+| `app/index.html` | Shell de la app, render, estado, handlers inline y wiring de modulos. |
 | `api/claude.js` | Proxy del coach, cuota, validacion y fallback. |
 | `api/admin.js` | Admin de usuarios: listar, invitar por correo, reset, activacion, QA y politicas de consumo. |
 | `api/entitlement.js` | Entitlement, cortesia admin, billing history y cupones. |

@@ -12,7 +12,7 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const html = fs.readFileSync(path.join(HERE, "..", "index.html"), "utf8");
+const html = fs.readFileSync(path.join(HERE, "..", "app", "index.html"), "utf8");
 
 function extractFunctionSource(source, signature) {
   const start = source.indexOf(signature);

@@ -9,7 +9,7 @@ import { parseCatalog } from "./seed-catalog.mjs";
 
 const d = globalThis.FITBUD_NUTRITION_DOMAIN;
 const catalog = parseCatalog();
-const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 const prefs = { mealCount: 4, mainMealIndex: 2, diet: ["omnivoro"] };
 const target = { kcal: 1800, p: 128, c: 207, f: 51 };
 const slots = d.mealSlotTargets(target, prefs);

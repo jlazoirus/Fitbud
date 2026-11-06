@@ -18,7 +18,7 @@ import fs from "node:fs";
 import "../training-plan.js";
 
 const domain = globalThis.FITBUD_TRAINING_PLAN;
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 
 function extractFunctionSource(src, name) {
   const marker = `function ${name}(`;

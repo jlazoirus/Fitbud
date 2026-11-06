@@ -422,11 +422,11 @@ export function reminderMessage(d, kind) {
   const p = d.progress || {};
   const days = (n) => plural(n, "día", "días");
   let title, body, subject, paragraphs, cta = "Volver a mi plan";
-  let url = `/?r=${d.step}`;
+  let url = `/app?r=${d.step}`;
   if (kind === "last_call") {
     title = "Quedan pocas horas";
     body = `Registra lo de hoy y tu racha de ${days(d.streak)} sigue.`;
-    return { title, body, url: `/?date=${d.date}&r=last_call`, tag: "fitbros-streak" };
+    return { title, body, url: `/app?date=${d.date}&r=last_call`, tag: "fitbros-streak" };
   }
   if (d.step === "morning") {
     const mealsText = d.meals ? (d.first ? `${plural(d.meals, "comida", "comidas")}, empiezas con ${d.first}` : plural(d.meals, "comida", "comidas")) : "";
@@ -441,7 +441,7 @@ export function reminderMessage(d, kind) {
       streakText,
       "Abre tu plan para ver el detalle y marcar lo que vayas haciendo.",
     ].filter(Boolean);
-    return { title, body, subject, paragraphs, cta: "Ver mi plan de hoy", url: `/?date=${d.date}&r=morning`, tag: "fitbros-morning" };
+    return { title, body, subject, paragraphs, cta: "Ver mi plan de hoy", url: `/app?date=${d.date}&r=morning`, tag: "fitbros-morning" };
   }
   if (d.step === "day") {
     const missing = MISSING_TEXT[d.missing] || MISSING_TEXT.day;
@@ -460,14 +460,14 @@ export function reminderMessage(d, kind) {
       ? "Abre tu plan y marca lo que vayas comiendo: unos minutos bastan para que el día cuente."
       : "Unos minutos bastan: marca lo que ya hiciste y el día cuenta."];
     cta = "Ver mi plan de hoy";
-    url = `/?date=${d.date}&r=day`;
+    url = `/app?date=${d.date}&r=day`;
   } else if (d.step === "rescue") {
     title = "Ayer quedó sin registrar";
     body = `Si lo cumpliste, regístralo y tu racha de ${days(d.streak)} sigue.`;
     subject = `¿Cumpliste ayer? Tu racha de ${days(d.streak)} sigue en pie`;
     paragraphs = [body, "Puedes completar el día anterior hasta que termine hoy."];
     cta = "Registrar ayer";
-    url = `/?date=${d.date}&r=rescue`;
+    url = `/app?date=${d.date}&r=rescue`;
   } else if (d.step.startsWith("training_lapse")) {
     const first = d.step === "training_lapse_4";
     title = first ? "¿Retomamos el entreno?" : "Tu entreno te espera";
@@ -477,7 +477,7 @@ export function reminderMessage(d, kind) {
     subject = title;
     paragraphs = [body, "Los descansos planificados no cuentan: solo miramos los días en que te tocaba entrenar."];
     cta = "Ver mi entreno de hoy";
-    url = `/?date=${d.date}&r=${d.step}`;
+    url = `/app?date=${d.date}&r=${d.step}`;
   } else if (d.step === PUSH_INVITE.step) {
     title = "Activa los avisos en tu teléfono";
     body = "Te avisamos a tiempo de tus comidas y tu entreno, sin depender del correo.";
@@ -488,7 +488,7 @@ export function reminderMessage(d, kind) {
       "Tarda un minuto y puedes desactivarlos cuando quieras.",
     ];
     cta = "Activar avisos";
-    url = `/?r=${PUSH_INVITE.step}`;
+    url = `/app?r=${PUSH_INVITE.step}`;
   } else if (d.noPlan) {
     // REQ-296: no terminó el perfil; no hay plan todavía.
     const byStep = {
@@ -728,7 +728,7 @@ function unsubscribedPage(e) {
 <body style="font-family:sans-serif;max-width:400px;margin:60px auto;padding:24px;text-align:center;color:#1a1a1a">
   <p style="font-size:22px;font-weight:700">Recordatorios desactivados</p>
   <p style="color:#666;margin-bottom:28px">Ya no recibirás recordatorios de actividad. Puedes reactivarlos en tu perfil cuando quieras.</p>
-  <a href="${e.appUrl}" style="color:#7c3aed;font-weight:600;text-decoration:none">Volver a la app</a>
+  <a href="${e.appUrl}/app" style="color:#7c3aed;font-weight:600;text-decoration:none">Volver a la app</a>
 </body></html>`;
 }
 
@@ -967,7 +967,7 @@ export const REFERRAL_MESSAGE = {
   paragraphs: ["Gracias por ser parte activa de Evolv. Como beneficio, puedes invitar hasta a 3 amigos a la plataforma.",
     "Por cada amigo que se registre con tu enlace, ganas 3 meses extra gratis y tu amigo recibe sus primeros 3 meses gratis.",
     "Genera tus enlaces y compártelos por WhatsApp o correo. Desde tu página de invitaciones podrás ver cuántas te quedan y cuántas fueron exitosas."],
-  cta: "Invitar a mis amigos", url: "/?ver=invitaciones",
+  cta: "Invitar a mis amigos", url: "/app?ver=invitaciones",
 };
 export async function runReferralCampaign(e, dryRun, results) {
   if (!referralCampaignDue() || !e.cronSecret) return;

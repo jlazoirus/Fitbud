@@ -877,7 +877,7 @@ function betaAccessLength(days) {
 const BETA_SIGN_OFF = "Cualquier duda o problema, escríbeme por aquí.";
 
 export function betaInviteMessage({ name, code, days, validUntil, appUrl }) {
-  const link = appUrl.replace(/\/$/, "") + "/?codigo=" + code;
+  const link = appUrl.replace(/\/$/, "") + "/app?codigo=" + code;
   const until = new Date(validUntil).toLocaleDateString("es-PE", { day: "numeric", month: "long", timeZone: "America/Lima" });
   return {
     link,
@@ -895,7 +895,7 @@ export function betaInviteMessage({ name, code, days, validUntil, appUrl }) {
 
 // Mensaje de WhatsApp cuando la invitación salió por correo (o ya tenía cuenta).
 export function betaWelcomeMessage({ name, email, days, existing, appUrl }) {
-  const link = appUrl.replace(/\/$/, "");
+  const link = appUrl.replace(/\/$/, "") + "/app";
   const access = `Tienes ${betaAccessLength(days)} de acceso completo, sin costo.`;
   return [
     betaGreeting(name),

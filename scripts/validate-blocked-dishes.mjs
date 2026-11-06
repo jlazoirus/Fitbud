@@ -63,7 +63,7 @@ assert.ok(!resBlocked.comidas.some(c => c.dishSlug === "pollo-con-arroz" || c.no
 console.log("  Test 4 pasado: planDeterministicNutritionDay respeta el bloqueo persistente");
 
 // ── Test 5: migrateProfilePrefs (index.html) normaliza y dedupea blockedDishes ──
-const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 assert.ok(html.includes("function normalizedBlockedDishes("), "index.html debe definir normalizedBlockedDishes");
 assert.ok(html.includes("blockedDishes:normalizedBlockedDishes(p.blockedDishes)"), "migrateProfilePrefs debe normalizar blockedDishes");
 assert.ok(html.includes("function dishBlockedBySavedList("), "coachDishBlockedByProfile debe consultar la lista guardada");

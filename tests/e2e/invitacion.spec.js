@@ -6,7 +6,7 @@ import { installMocks, seedLoggedInUser, gotoApp, autoDismissNudges, collectCons
 test("el enlace con ?codigo= abre el registro, guarda el código y limpia la URL", async ({ page, context }) => {
   await installMocks(context);
   const errors = collectConsoleErrors(page);
-  await page.goto("/index.html?codigo=fit-ab12-cd34&source=whatsapp");
+  await page.goto("/app/?codigo=fit-ab12-cd34&source=whatsapp");
   await expect(page.locator("#au_email")).toBeVisible();
   await expect(page.getByRole("button", { name: "Registrarme" })).toBeVisible();
   await expect(page.locator(".auth-invite")).toContainText("Tu invitación a la beta está lista");
@@ -63,7 +63,7 @@ test("beta cerrada: registrarse pide el código y crea la cuenta con él (REQ-20
     sent.push(JSON.parse(route.request().postData() || "{}"));
     return route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify({ ok: true, entitlement: { duration_days: 90 } }) });
   });
-  await page.goto("/index.html?codigo=FIT-AB12-CD34");
+  await page.goto("/app/?codigo=FIT-AB12-CD34");
   await expect(page.locator("#au_code")).toHaveValue("FIT-AB12-CD34");
   await page.locator("#au_email").fill("ana@correo.test");
   await page.locator("#au_pwd").fill("ClaveSegura2026");

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const html = readFileSync("index.html", "utf8");
+const html = readFileSync("app/index.html", "utf8");
 
 function extractFunctionSource(source, name) {
   const start = source.indexOf(`function ${name}(`);

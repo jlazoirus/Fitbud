@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const index = readFileSync("index.html", "utf8");
+const index = readFileSync("app/index.html", "utf8");
 const pure = readFileSync("js/nutrition-pure.js", "utf8");
 
 assert.ok(index.includes('mantenimiento:{label:') && index.includes('value="${value}" ${sel(d.goal,value)}'), "El valor interno mantenimiento debe conservarse.");

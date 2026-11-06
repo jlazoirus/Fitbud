@@ -6,7 +6,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const client = readFileSync(new URL("../index.html", import.meta.url), "utf8").match(/const VAPID_PUBLIC_KEY="([^"]+)"/);
+const client = readFileSync(new URL("../app/index.html", import.meta.url), "utf8").match(/const VAPID_PUBLIC_KEY="([^"]+)"/);
 const server = readFileSync(new URL("../api/notify.js", import.meta.url), "utf8").match(/process\.env\.VAPID_PUBLIC_KEY \|\|\s*"([^"]+)"/);
 assert.ok(client && server, "no se encontró la clave pública en index.html o api/notify.js");
 assert.equal(client[1], server[1], "cliente y servidor usan claves públicas distintas");

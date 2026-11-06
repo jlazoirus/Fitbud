@@ -8,7 +8,7 @@ const WA = "https://wa.me/18302629397?text=Hola%2C+tengo+una+duda+sobre+Evolv";
 
 test("REQ-307: la portada tiene widget flotante y enlace de pie a WhatsApp", async ({ page, context }) => {
   await installMocks(context);
-  await page.goto("/index.html");
+  await page.goto("/"); // REQ-352: portada pública
   const fab = page.locator("a.wa-fab");
   await expect(fab).toBeVisible();
   await expect(fab).toHaveAttribute("href", WA);

@@ -113,7 +113,7 @@ async function findUserIdByEmail(e, email) {
 }
 
 async function inviteUser(e, email, data) {
-  const redirect = encodeURIComponent(e.appUrl + "/?auth=invite");
+  const redirect = encodeURIComponent(e.appUrl + "/app?auth=invite");
   const r = await fetch(e.url + "/auth/v1/invite?redirect_to=" + redirect, {
     method: "POST",
     headers: svc(e),

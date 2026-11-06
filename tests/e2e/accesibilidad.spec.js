@@ -1,7 +1,7 @@
 // REQ-192: nombres accesibles, landmarks y estado de la FAQ.
 import { test, expect } from "@playwright/test";
 import {
-  installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, profileFixture,
+  installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, gotoPortada, autoDismissNudges, profileFixture,
 } from "./helpers.js";
 
 test.describe("Accesibilidad", () => {
@@ -38,7 +38,7 @@ test.describe("Accesibilidad", () => {
 
   test("la FAQ de la portada usa <details> nativo (estado anunciado por el navegador)", async ({ page, context }) => {
     await installMocks(context);
-    await gotoApp(page);
+    await gotoPortada(page); // REQ-352
     const item = page.locator(".l-faq-item").first();
     await expect(item).toHaveJSProperty("tagName", "DETAILS");
     await expect(item).not.toHaveAttribute("open", "");

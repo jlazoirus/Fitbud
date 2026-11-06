@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const api = fs.readFileSync(new URL("../api/claude.js", import.meta.url), "utf8");
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 
 const pick = (re, label) => { const m = api.match(re); assert.ok(m, `falta ${label}`); return m[0]; };
 const validateCoachOutput = new Function([

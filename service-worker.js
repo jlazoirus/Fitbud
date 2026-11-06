@@ -1,7 +1,6 @@
-const CACHE_NAME = "fitbud-pwa-v214";
+const CACHE_NAME = "fitbud-pwa-v215";
 const APP_SHELL = [
-  "./",
-  "./index.html",
+  "./app/index.html", // REQ-352: la app vive en /app; "/" es la portada pública
   "./js/nutrition-pure.js",
   "./js/nutrition-domain.js",
   "./js/meal-log.js",
@@ -57,12 +56,13 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
 
   if (request.mode === "navigate") {
-    // REQ-201: solo la app (/ e /index.html) sale del cache. Las otras
-    // páginas del sitio (la postulación a la beta) no son parte del shell:
-    // antes recibían index.html y el visitante con la PWA instalada nunca
-    // llegaba al formulario. Red primero; sin red, la app.
-    if (url.origin === self.location.origin && url.pathname !== "/" && !url.pathname.endsWith("/index.html")) {
-      event.respondWith(fetch(request).catch(() => caches.match("./index.html")));
+    // REQ-201/352: solo la app (/app, /app/, /app/index.html) sale del cache.
+    // La portada pública ("/"), la tienda, las legales y la beta no son parte
+    // del shell: red primero; sin red, la app (la PWA instalada antes de
+    // REQ-352 abre "/" y la portada la manda a /app).
+    const isApp = url.origin === self.location.origin && /^\/app(\/|\/index\.html)?$/.test(url.pathname);
+    if (!isApp) {
+      event.respondWith(fetch(request).catch(() => caches.match("./app/index.html")));
       return;
     }
     // REQ-150: servir la navegación desde la MISMA generación de cache que
@@ -70,7 +70,7 @@ self.addEventListener("fetch", event => {
     // un index.html recién desplegado mientras los .js seguían saliendo del
     // cache de la versión anterior (mezcla de versiones). La versión nueva
     // llega completa (HTML+JS) recién cuando este SW se instala y activa.
-    event.respondWith(cacheFirst(request, "./index.html"));
+    event.respondWith(cacheFirst(request, "./app/index.html"));
     return;
   }
 
@@ -162,7 +162,7 @@ self.addEventListener("push", event => {
 
 self.addEventListener("notificationclick", event => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/";
+  const url = (event.notification.data && event.notification.data.url) || "/app";
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(list => {
       for (const client of list) {

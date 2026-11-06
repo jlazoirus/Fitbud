@@ -22,7 +22,7 @@ const SYNC_ENGINE = globalThis.FITBUD_SYNC_CONFLICTS;
 assert.ok(SYNC_ENGINE && SYNC_ENGINE.mergeDayLogStates, "sync-conflicts.js debe exponer mergeDayLogStates");
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const html = fs.readFileSync(path.join(HERE, "..", "index.html"), "utf8");
+const html = fs.readFileSync(path.join(HERE, "..", "app", "index.html"), "utf8");
 
 function extractFunctionSource(source, signature) {
   const start = source.indexOf(signature);

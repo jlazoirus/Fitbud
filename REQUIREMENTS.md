@@ -2300,30 +2300,9 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-352 - Web pública en / y app en /app
 
-**Estado: pendiente.** Plan: `docs/web-publica-y-suscripcion.md` §1.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
-Decisión de Jonathan (2026-11-06): separar la web pública de la app.
-### Problema
-La portada la dibuja la app (`renderLanding()` en `index.html`) y cada visita descarga la app entera.
-### Objetivo
-`/` sirve una portada propia y liviana. La app queda en `/app` (`app/index.html` con `<base href="/">`) y `/admin` apunta a ella.
-### Alcance
-- La portada redirige a `/app` (con consulta y hash) si hay sesión, si está abierta como app instalada o si trae parámetros o hash de la app (lista en el plan §1).
-- `start_url` pasa a `/app`. Service worker: precache y navegación de la app en `/app`.
-- Los enlaces que genera `api/*.js` pasan a `/app`.
-- La app sin sesión muestra su inicio de sesión; ya no hay portada dentro de la app.
-- Validadores, E2E, `.vercelignore`, `vercel.json` y `CACHE_NAME` al día.
-### Fuera de alcance
-Cambiar el contenido de la portada (REQ-353), subdominio.
-### Riesgos
-Sesiones perdidas, apps instaladas en iPhone (conservan `start_url` `/`) o enlaces de correo rotos.
-### Criterios de aceptación
-- `/` sin sesión muestra la portada sin cargar la app.
-- Con sesión, en modo instalado o con `?codigo=X`, `/` lleva a `/app` con los mismos parámetros.
-- `/app` y `/admin` funcionan y el release gate queda verde.
-### Verificación sugerida
-E2E de la portada y de las redirecciones; regresión completa de la app en `/app`; preview de Vercel.
+✓ `tests/e2e/portada.spec.js`, `scripts/test-service-worker-cache.mjs`.
 
 ## REQ-353 - Portada sin beta; la beta solo en /beta
 

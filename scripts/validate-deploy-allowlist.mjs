@@ -68,14 +68,14 @@ function runtimeFile(ref){
   const rewrite=rewrites.find(rule=>rule.source==="/"+pathname);
   return rewrite?rewrite.destination.replace(/^\//, ""):pathname||"index.html";
 }
-assert.equal(runtimeFile("/admin?tab=users"),"index.html");
+assert.equal(runtimeFile("/admin?tab=users"),"app/index.html");
 assert.equal(runtimeFile("/beta"),"beta-reclutamiento.html");
 assert.equal(runtimeFile("/assets/icon-180.png"),"assets/icon-180.png");
 assert.equal(runtimeFile("/unknown-file.js"),"unknown-file.js");
 
 // Lo que el runtime carga: referencias locales de las páginas, shell del SW,
 // íconos del manifest, funciones serverless y su configuración.
-const required = new Set(["index.html", "beta-reclutamiento.html", "service-worker.js", "manifest.webmanifest", "package.json", "package-lock.json", "vercel.json"]);
+const required = new Set(["index.html", "app/index.html", "web/portada.css", "web/portada.js", "beta-reclutamiento.html", "service-worker.js", "manifest.webmanifest", "package.json", "package-lock.json", "vercel.json"]);
 // REQ-331..334: las páginas de la tienda son destinos de reescrituras (carpeta/index.html).
 const pages = ["index.html", "beta-reclutamiento.html", ...rewrites.map((rule) => rule.destination.replace(/^\//, "")).filter((file) => file.endsWith("/index.html"))];
 for (const page of pages) {

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 
 function sliceBetween(startNeedle, endNeedle) {
   const start = html.indexOf(startNeedle);
