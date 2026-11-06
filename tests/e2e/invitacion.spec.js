@@ -81,8 +81,7 @@ test("beta cerrada: sin código no se crea la cuenta (REQ-205)", async ({ page, 
     if (route.request().method() === "POST") posted = true;
     return route.fallback();
   });
-  await gotoApp(page);
-  await page.getByRole("button", { name: "Ya tengo cuenta" }).click();
+  await gotoApp(page); // REQ-352: sin sesión, la app abre directo en el inicio de sesión
   await page.getByRole("button", { name: "¿No tienes cuenta? Regístrate" }).click();
   await expect(page.getByRole("link", { name: "Postula a la beta" })).toHaveAttribute("href", "beta-reclutamiento.html?source=registro");
   await page.locator("#au_email").fill("ana@correo.test");
