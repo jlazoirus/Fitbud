@@ -2297,3 +2297,92 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 **Estado: implementado — requiere acción humana** (aplicar `supabase/notifications_plan_expiry.sql`). Detalle en `docs/requirements-history.md`.
 
 ✓ `scripts/test-plan-expiry.mjs`.
+
+## REQ-352 - Web pública en / y app en /app
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+✓ `tests/e2e/portada.spec.js`, `scripts/test-service-worker-cache.mjs`.
+
+## REQ-353 - Portada sin beta; la beta solo en /beta
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+✓ `tests/e2e/portada.spec.js`.
+
+## REQ-354 - Legales de la suscripción con semana gratis
+
+**Estado: pendiente.** El texto lo aprueba una persona antes de abrir la inscripción. Plan §3, "Legales".
+
+### Origen
+La suscripción mensual con renovación automática (2026-11-06) contradice "pago único, sin renovación automática" de `/terminos`, `/devoluciones`, `/planes` y `/pago`.
+### Problema
+Cobrar automáticamente sin esos términos expone a reclamos ante INDECOPI y a contracargos.
+### Objetivo
+Términos y devoluciones que cubran la prueba de 7 días, el cobro mensual, la cancelación inmediata y el cobro fallido, conviviendo con los pagos únicos.
+### Alcance
+- Secciones nuevas en `/terminos` y `/devoluciones`.
+- `/planes` muestra la suscripción mensual junto a los pagos únicos.
+- `vigenciaLegal` se actualiza.
+### Fuera de alcance
+El motor de cobro (REQ-355).
+### Riesgos
+Prometer algo que el motor no hace; textos sin la aprobación de una persona.
+### Criterios de aceptación
+Cada punto de la lista del plan §3 aparece en los textos, y una persona los aprueba (queda registrado en el commit).
+### Verificación sugerida
+`tests/e2e/tienda.spec.js` con las secciones nuevas.
+
+## REQ-355 - Motor de suscripción mensual con Culqi
+
+**Estado: pendiente — requiere acción humana:** respuestas de Culqi y llaves de prueba (plan §5).
+
+Tabla `subscriptions`; inscripción en el servidor (cliente y tarjeta en Culqi, prueba de 7 días, una prueba por persona); cobros con suscripciones de Culqi; webhook verificado contra la API; acceso +30 días por cobro (idempotente); cancelación por API. Detalle en el plan §3, "Diseño".
+
+## REQ-356 - /registro con tarjeta y semana gratis
+
+**Estado: pendiente.** Implementar después de REQ-353, REQ-354 y REQ-355. Plan §3.
+
+### Origen
+Decisión de Jonathan (2026-11-06): la inscripción pide la tarjeta y da 7 días gratis.
+### Problema
+Hoy no existe una inscripción pública: la portada solo vende pagos únicos o lleva a postular.
+### Objetivo
+`/registro` en la web pública: datos, aceptación expresa de la renovación y tarjeta en el Checkout de Culqi sin cobro, con acceso inmediato por 7 días.
+### Alcance
+- Página `/registro` con la misma cabecera y pie de la tienda.
+- Llama a la inscripción de REQ-355 y reutiliza el flujo de invitación y "Ir a Evolv".
+- La portada, `/planes` y la app sin sesión invitan a "Empieza tu semana gratis".
+### Fuera de alcance
+Registro dentro de la app nativa (COBRO-WEB.md).
+### Riesgos
+Cobrar sin una aceptación clara; duplicar cuentas.
+### Criterios de aceptación
+Sin aceptar la renovación no se puede continuar; al terminar, la persona tiene 7 días de acceso y ve la fecha del primer cobro.
+### Verificación sugerida
+E2E con Culqi simulado, como `tests/e2e/tienda.spec.js`.
+
+## REQ-357 - Gestionar la suscripción y sus correos
+
+**Estado: pendiente.** Implementar después de REQ-355. Plan §3.
+
+### Origen
+Decisión de Jonathan (2026-11-06): cancelar en un toque y avisar antes de cada cobro.
+### Problema
+Sin cancelación fácil ni avisos llegan contracargos y reclamos.
+### Objetivo
+Ver el estado de la suscripción y cancelarla desde Perfil y desde la web pública, y recibir los correos del ciclo.
+### Alcance
+- Perfil → Mi suscripción: estado, próximo cobro, tarjeta (marca y últimos 4) y "Cancelar suscripción" con confirmación.
+- La misma acción en la web pública, para quien usa la app nativa.
+- Correos: inicio de la prueba, aviso 2 días antes del primer cobro, recibo de cada cobro, cobro fallido y cancelación. Se reutiliza `notification_log`.
+- REQ-351 no avisa a quien tiene una suscripción activa.
+### Fuera de alcance
+Cambiar de tarjeta (llega después), otros planes recurrentes.
+### Riesgos
+Correos duplicados; que el acceso se corte antes de tiempo al cancelar.
+### Criterios de aceptación
+- Al cancelar, no hay más cobros y el acceso dura hasta el fin del período.
+- Cada correo sale una sola vez.
+### Verificación sugerida
+Test Node con Culqi y Resend simulados, y E2E de Perfil.

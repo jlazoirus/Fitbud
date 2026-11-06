@@ -8,7 +8,7 @@ test("con el enlace de prueba: entreno, peso y comidas desde el hilo, y vuelta a
   await seedLoggedInUser(page);
   await autoDismissNudges(page);
   const errors = collectConsoleErrors(page);
-  await page.goto("/index.html?labs=conversacion");
+  await page.goto("/app/?labs=conversacion");
   await expect(page.locator("#tabs")).toContainText("Hoy");
   await expect(page.locator("#toast")).toContainText("Modo conversación disponible");
   expect(new URL(page.url()).search).toBe("");

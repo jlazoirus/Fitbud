@@ -68,7 +68,7 @@ test("el enlace del aviso abre su día y registra la etapa sin datos personales"
   const errors = collectConsoleErrors(page);
   const opened = page.waitForRequest((req) => req.url().includes("/api/analytics") && req.method() === "POST" && (req.postData() || "").includes("reminder_opened"));
   const yesterday = daysFromToday(-1);
-  await page.goto(`/index.html?date=${yesterday}&r=rescue`);
+  await page.goto(`/app/?date=${yesterday}&r=rescue`);
   await page.waitForFunction(() => typeof profile !== "undefined" && profile && !_authBusy);
   const body = JSON.parse((await opened).postData());
   expect(body.event_type).toBe("reminder_opened");

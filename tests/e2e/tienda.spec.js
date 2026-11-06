@@ -1,6 +1,6 @@
 // REQ-331..334: tienda web con Culqi (requisitos de afiliación) sin tocar la beta.
 import { test, expect } from "@playwright/test";
-import { installMocks, collectConsoleErrors, gotoApp } from "./helpers.js";
+import { installMocks, collectConsoleErrors, gotoApp, gotoPortada } from "./helpers.js";
 
 const CONFIG_CULQI = {
   supabase: { url: "https://e2emock.supabase.co", publishableKey: "e2e-publishable-key" },
@@ -32,13 +32,14 @@ test.describe("Tienda web (Culqi)", () => {
   test("la portada vende los planes en soles con imagen y lleva a pagar; la beta sigue a la vista", async ({ page, context }) => {
     await installMocks(context);
     const errors = collectConsoleErrors(page);
-    await gotoApp(page);
+    await gotoPortada(page); // REQ-352: la portada vive en "/", fuera de la app
     const planes = page.locator(".l-plan");
     await expect(planes).toHaveCount(3);
     await expect(planes.first()).toContainText("S/29.90");
     await expect(planes.first().locator("img")).toHaveAttribute("src", "/assets/planes/mensual.webp");
     await expect(page.locator(".l-plan a.l-btn")).toHaveText(["Comprar", "Comprar", "Comprar"]);
-    await expect(page.getByRole("link", { name: "Postular a la beta" }).first()).toBeVisible();
+    // REQ-353: la beta ya no se ofrece en la portada (vive solo en /beta).
+    await expect(page.locator(".landing")).not.toContainText(/beta/i);
     const footer = page.locator(".l-footer");
     for (const [name, href] of [["Planes", "/planes"], ["Términos", "/terminos"], ["Devoluciones", "/devoluciones"], ["Privacidad", "/privacidad"], ["Contacto", "/contacto"], ["Libro de Reclamaciones", "/libro-de-reclamaciones"]]) {
       await expect(footer.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);

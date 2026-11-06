@@ -103,7 +103,7 @@ const api = fs.readFileSync(new URL("../api/claude.js", import.meta.url), "utf8"
 assert(/NO_TEMPLATE_ACTIONS = new Set\(\["meal_estimate"\]\)/.test(api), "Solo meal_estimate deja de usar plantilla.");
 
 // 6. El cliente ya no fabrica una plantilla y valida lo que aplica.
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 const estimateCode = html.slice(html.indexOf("async function aiEstimate("), html.indexOf("function renderPhotoEstimate("));
 assert(!/kcal:500/.test(estimateCode) && !/Estimación de referencia/.test(estimateCode), "El cliente no envía la plantilla 500 kcal.");
 assert(/coachQuota\("meal_estimate",requestId,"estimate",""/.test(estimateCode), "La estimación por texto va sin fallback.");

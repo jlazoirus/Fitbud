@@ -53,7 +53,7 @@ assert.equal(d.missing, "both");
 let m = reminderMessage(d);
 assert.equal(m.title, "Tu racha de 5 días sigue en juego");
 assert.equal(m.body, "Falta registrar tus comidas y tu entreno para sumar el día 6.");
-assert.equal(m.url, `/?date=${T}&r=day`);
+assert.equal(m.url, `/app?date=${T}&r=day`);
 assert.equal(planReminder(base({ hour: 19 })), null, "antes de la hora elegida no sale");
 d = planReminder(base({ rows: [activeRow(-1)] }));
 assert.equal(d.step, "day", "sin abrir la app hoy (sin fila) la racha sigue en riesgo");
@@ -77,7 +77,7 @@ assert.equal(d.date, D(-1));
 m = reminderMessage(d);
 assert.equal(m.title, "Ayer quedó sin registrar");
 assert.equal(m.body, "Si lo cumpliste, regístralo y tu racha de 4 días sigue.");
-assert.equal(m.url, `/?date=${D(-1)}&r=rescue`);
+assert.equal(m.url, `/app?date=${D(-1)}&r=rescue`);
 d = planReminder(base({ rows: [activeRow(-2)], engagement: eng({ streakThrough: D(-2), streak: 1 }) }));
 assert.equal(d.step, "comeback_2", "con racha de 1 día no hay rescate: es un regreso");
 assert.equal(planReminder(base({ rows: [activeRow(-3)], engagement: eng({ streakThrough: D(-3), streak: 6 }) })).step, "comeback_2", "solo se rescata ayer");
@@ -149,7 +149,7 @@ for (const dec of decisions) {
     assert.doesNotMatch(lockScreen, /Bajar grasa|Recomponer|Ganar músculo/, `${dec.step}: sin objetivo en push/asunto`);
     assert.doesNotMatch(lockScreen + " " + (msg.paragraphs || []).join(" "), /\bkg\b|peso|grasa corporal|%/i, `${dec.step}: sin datos corporales`);
     assert.doesNotMatch(lockScreen + " " + (msg.paragraphs || []).join(" "), BANNED, `${dec.step}: REQ-31`);
-    assert.ok(msg.title && msg.body && msg.url.startsWith("/?"), `${dec.step}: mensaje completo`);
+    assert.ok(msg.title && msg.body && msg.url.startsWith("/app?"), `${dec.step}: mensaje completo`);
   }
 }
 console.log(`  ${decisions.length} variantes sin objetivo en push/asunto, sin datos corporales ni vocabulario técnico`);
@@ -213,7 +213,7 @@ assert.equal(r.out.sent, 1);
 assert.equal(r.out.push.sent, 1);
 assert.equal(state.emails[0].subject, "Tu racha de 5 días sigue en juego");
 assert.equal(pushes[0].title, "Tu racha de 5 días sigue en juego");
-assert.equal(pushes[0].url, `/?date=${r.today}&r=day`);
+assert.equal(pushes[0].url, `/app?date=${r.today}&r=day`);
 assert.deepEqual(state.inserted.map((x) => x.notification_type), ["nutrition", "push_streak"]);
 console.log("  handler: aviso del día por correo y push");
 
@@ -239,7 +239,7 @@ assert.equal(r.out.push.errors, 1);
 r = await run({ hour: 20, rows: away, engagement: null });
 assert.equal(state.emails[0].subject, "Una semana sin registrar");
 assert.equal(pushes[0].title, "Una semana sin registrar");
-assert.equal(pushes[0].url, "/?r=comeback_7");
+assert.equal(pushes[0].url, "/app?r=comeback_7");
 assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [
   ["comeback", `u1:comeback_7:${addDaysYmd(r.today, -7)}`],
   ["push_comeback", `u1:push_comeback_7:${addDaysYmd(r.today, -7)}`],
@@ -268,7 +268,7 @@ assert.equal(d.since, 5);
 m = reminderMessage(d);
 assert.equal(m.title, "¿Retomamos el entreno?");
 assert.match(m.body, /^Llevas 5 días sin entrenar\. Hoy te toca/);
-assert.equal(m.url, `/?date=${T}&r=training_lapse_4`);
+assert.equal(m.url, `/app?date=${T}&r=training_lapse_4`);
 assert.doesNotMatch(`${m.title} ${m.body} ${m.subject} ${m.paragraphs.join(" ")}`, /Bajar grasa|Recomponer|Ganar músculo|\bkg\b|peso/);
 assert.doesNotMatch(`${m.title} ${m.body} ${m.paragraphs.join(" ")}`, BANNED);
 assert.equal(planReminder(base({ rows: lapseRows(-12) })).step, "training_lapse_11");
@@ -288,7 +288,7 @@ r = await run({ hour: 20, rows: (today) => [
 ], engagement: null });
 assert.equal(state.emails.length, 1, "un solo correo: reemplaza el aviso del día");
 assert.equal(state.emails[0].subject, "¿Retomamos el entreno?");
-assert.equal(pushes[0].url, `/?date=${r.today}&r=training_lapse_4`);
+assert.equal(pushes[0].url, `/app?date=${r.today}&r=training_lapse_4`);
 assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [
   ["comeback", `u1:training_lapse_4:${addDaysYmd(r.today, -6)}`],
   ["push_comeback", `u1:push_training_lapse_4:${addDaysYmd(r.today, -6)}`],
@@ -411,7 +411,7 @@ m = reminderMessage(d);
 assert.equal(m.title, "Tu plan de hoy");
 assert.equal(m.body, "Entreno: Torso A · 4 comidas, empiezas con Avena con plátano. Hoy sumas el día 6 de tu racha.");
 assert.equal(m.subject, "Tu plan de hoy: Torso A");
-assert.equal(m.url, `/?date=${T}&r=morning`);
+assert.equal(m.url, `/app?date=${T}&r=morning`);
 assert.doesNotMatch(`${m.title} ${m.body} ${m.subject} ${m.paragraphs.join(" ")}`, BANNED);
 assert.doesNotMatch(`${m.title} ${m.body} ${m.subject}`, /Bajar grasa|Recomponer|Ganar músculo|\bkg\b|peso/);
 m = reminderMessage(morningPlan(mBase({ engagement: eng({ streakThrough: D(-3), plan: { [T]: dayPlan({ rest: true, w: null, first: null }) } }) })));
@@ -444,7 +444,7 @@ r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng
 assert.equal(pushes.length, 1, "con push activo, el resumen va por push");
 assert.equal(state.emails.length, 0, "y no por correo; el aviso del día espera a su hora");
 assert.equal(pushes[0].title, "Tu plan de hoy");
-assert.equal(pushes[0].url, `/?date=${r.today}&r=morning`);
+assert.equal(pushes[0].url, `/app?date=${r.today}&r=morning`);
 assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_key]), [["push_morning", `u1:push_morning:${r.today}`]]);
 r = await run({ hour: 7, notifyHour: 20, rows: yesterdayActive, engagement: mEng, prefExtra: morningPrefs, pushOptIn: false });
 assert.equal(state.emails.length, 1, "sin push, por correo");

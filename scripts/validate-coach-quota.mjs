@@ -3,7 +3,7 @@ import fs from "node:fs";
 const sql = fs.readFileSync(new URL("../supabase/coach_quota.sql", import.meta.url), "utf8");
 const api = fs.readFileSync(new URL("../api/claude.js", import.meta.url), "utf8");
 const admin = fs.readFileSync(new URL("../api/admin.js", import.meta.url), "utf8");
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

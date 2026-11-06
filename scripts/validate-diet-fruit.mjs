@@ -51,7 +51,7 @@ for (const [mealCount, target, expected] of [[4, { kcal: 2000, p: 150, c: 200, f
 }
 console.log("  plan sin modelo: 2 comidas con fruta desde 4 comidas, 1 con 3, sin salirse de la meta");
 
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 const fnSrc = html.slice(html.indexOf("function dietFruitPromptLine("), html.indexOf("function slotArchetypePromptLine("));
 const dietFruitPromptLine = new Function(fnSrc + "; return dietFruitPromptLine;")();
 assert.match(dietFruitPromptLine(4), /al menos dos comidas/);

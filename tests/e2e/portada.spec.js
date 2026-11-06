@@ -1,12 +1,13 @@
-// REQ-198: portada "Escalera de días".
+// REQ-198: portada "Escalera de días". REQ-352: la portada es una página propia
+// en "/" (index.html + web/portada.js), separada de la app, que vive en /app.
 import { test, expect } from "@playwright/test";
-import { installMocks, collectConsoleErrors, gotoApp } from "./helpers.js";
+import { installMocks, collectConsoleErrors, gotoPortada, seedLoggedInUser } from "./helpers.js";
 
 test.describe("Portada", () => {
   test("la demo del día cambia el plan con cada imprevisto y vuelve al tocarlo otra vez", async ({ page, context }) => {
     await installMocks(context);
     const errors = collectConsoleErrors(page);
-    await gotoApp(page);
+    await gotoPortada(page);
 
     const demo = page.locator(".l-demo");
     await expect(demo).toContainText("Ejemplo");
@@ -28,57 +29,74 @@ test.describe("Portada", () => {
     expect(errors).toEqual([]);
   });
 
-  test("sin emoji ni vocabulario interno; los CTA llevan a postular a la beta (REQ-202)", async ({ page, context }) => {
+  test("sin emoji ni vocabulario interno; planes de la tienda y acceso a la app (REQ-202, REQ-333)", async ({ page, context }) => {
     await installMocks(context);
-    await gotoApp(page);
+    await gotoPortada(page);
     const text = await page.locator(".landing").innerText();
     expect(text).not.toMatch(/\p{Emoji_Presentation}/u);
     expect(text).not.toMatch(/\b(IA|Claude|Anthropic|prompt|tokens?|modelo de lenguaje)\b/i);
     expect(text).not.toMatch(/Perú|Chile|México/); // REQ-223
     await expect(page.locator(".l-step")).toHaveCount(5);
-    const apply = page.getByRole("link", { name: "Postular a la beta" });
-    // hero + CTA final + enlace bajo "Elige tu ritmo" (REQ-205: beta cerrada)
-    expect(await apply.count()).toBeGreaterThanOrEqual(3);
-    await expect(page.locator(".l-pricing").getByRole("link", { name: "Postular a la beta" })).toHaveAttribute("href", "beta-reclutamiento.html?source=portada-planes");
-    // REQ-333: con la beta cerrada, cada plan de la tienda (soles) lleva a pagar con Culqi.
+    // REQ-333: cada plan de la tienda (soles, tienda/planes.js) lleva a pagar con Culqi.
+    await expect(page.locator(".l-plan-store")).toHaveCount(3);
+    await expect(page.locator(".l-plan-price").first()).toContainText("29.90");
     await expect(page.locator(".l-plan a.l-btn").first()).toHaveAttribute("href", "/pago?plan=monthly");
-    await expect(apply.first()).toHaveAttribute("href", "beta-reclutamiento.html?source=portada");
-    await apply.first().click();
-    await expect(page.locator("h1")).toContainText("Úsalo gratis tres meses");
-    await gotoApp(page);
-    await page.getByRole("button", { name: "Ya tengo cuenta" }).click();
+    await expect(page.locator("[data-lcomercio]")).toContainText("RUC");
+    // REQ-353: la beta vive solo en /beta: ni textos ni enlaces en la portada; los CTA llevan a los planes.
+    expect(text).not.toMatch(/beta|postula/i);
+    await expect(page.locator('a[href*="beta-reclutamiento"], a[href^="/beta"]')).toHaveCount(0);
+    await page.locator(".l-hero-ctas").getByRole("link", { name: "Ver planes" }).click();
+    await expect(page).toHaveURL(/#planes$/);
+    await expect(page.locator("#planes .l-plan-store").first()).toBeInViewport();
+    // "Ya tengo cuenta" e "Iniciar sesión" llevan a la app, que muestra su inicio de sesión.
+    await expect(page.locator(".landing-nav").getByRole("link", { name: "Iniciar sesión" })).toHaveAttribute("href", "/app");
+    await page.getByRole("link", { name: "Ya tengo cuenta" }).click();
+    await expect(page).toHaveURL(/\/app\/?$/);
     await expect(page.locator("#au_email")).toBeVisible();
   });
 
-  // REQ-219: con el registro abierto, toda la portada ofrece crear cuenta (no postular),
-  // también cuando el modo llega después del pintado optimista.
-  test("con SIGNUP_MODE=open, hero, navegación, planes y cierre llevan al registro", async ({ page, context }) => {
+  test("REQ-352: la portada no carga la app, Supabase ni /api/config", async ({ page, context }) => {
     await installMocks(context);
-    let release;
-    const gate = new Promise((r) => { release = r; });
-    await page.route("**/api/config", async (route) => {
-      await gate; // la portada se pinta antes de conocer el modo (REQ-197)
-      route.fulfill({ status: 200, contentType: "application/json",
-        body: JSON.stringify({ supabase: { url: "https://e2emock.supabase.co", publishableKey: "e2e-publishable-key" }, anthropic: { model: "", proxy: true }, signup: { mode: "open" } }) });
+    const requested = [];
+    page.on("request", (r) => requested.push(new URL(r.url()).pathname + (r.url().includes("supabase") ? " [supabase]" : "")));
+    await gotoPortada(page);
+    expect(requested.filter((u) => /\/app\/|\/api\/config|\[supabase\]|exercise-catalog|nutrition-domain/.test(u))).toEqual([]);
+    expect(await page.evaluate(() => typeof window.render === "undefined" && !document.querySelector("#app"))).toBe(true);
+  });
+
+  test("REQ-352: con sesión guardada, enlaces de la app o la app instalada, la portada lleva a /app con lo mismo", async ({ page, context }) => {
+    await installMocks(context);
+    // Enlace de invitación de un correo antiguo (/?codigo=…): llega a la app con la misma consulta,
+    // y la app guarda el código para canjearlo (y lo quita de la barra de direcciones).
+    const toApp = page.waitForRequest((r) => /\/app\/?\?codigo=FIT-AB12-CD34&source=whatsapp$/.test(r.url()));
+    await page.goto("/?codigo=FIT-AB12-CD34&source=whatsapp");
+    await toApp;
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("evolv_invite_code"))).toBe("FIT-AB12-CD34");
+    // Hash de Supabase (invitación o recuperación): se conserva al pasar a /app.
+    const urls = [];
+    page.on("framenavigated", (f) => { if (f === page.mainFrame()) urls.push(f.url()); });
+    await page.goto("/#access_token=x&type=invite");
+    await expect.poll(() => urls.some((u) => /\/app\/?#access_token=x&type=invite$/.test(u))).toBe(true);
+    // App instalada antes de REQ-352 (start_url "/").
+    const installed = await context.newPage();
+    await installed.addInitScript(() => {
+      const real = window.matchMedia.bind(window);
+      window.matchMedia = (q) => (q.includes("display-mode: standalone") ? { matches: true, media: q, addEventListener() {}, removeEventListener() {} } : real(q));
     });
-    await gotoApp(page);
-    await expect(page.getByRole("link", { name: "Postular a la beta" }).first()).toBeVisible();
-    await page.locator(".l-faq-item summary").first().click();
-    release();
-    await expect(page.locator('.landing a[href*="beta-reclutamiento.html"]')).toHaveCount(0);
-    await expect(page.locator(".landing")).not.toContainText(/beta/i);
-    await expect(page.locator(".l-hero-ctas").getByRole("button", { name: "Empezar ahora" })).toBeVisible();
-    await expect(page.locator(".landing-nav").getByRole("button", { name: "Empezar" })).toBeVisible();
-    await expect(page.locator(".l-faq-item").first()).toHaveAttribute("open", "");
-    await page.locator(".l-cta-final").getByRole("button", { name: "Empezar ahora" }).click();
-    await expect(page.locator("#au_email")).toBeVisible();
+    await installed.goto("/");
+    await expect(installed).toHaveURL(/\/app\/?$/);
+    await installed.close();
+    // Con sesión guardada, directo a la app.
+    await seedLoggedInUser(page);
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/app\/?$/);
   });
 
   test.describe("escritorio", () => {
     test.use({ viewport: { width: 1440, height: 900 } });
     test("la escalera se enciende peldaño a peldaño al bajar", async ({ page, context }) => {
       await installMocks(context);
-      await gotoApp(page);
+      await gotoPortada(page);
       const rail = page.locator(".l-stair-rail");
       await expect(rail).toBeVisible();
       await expect(rail).toHaveAttribute("data-lit", "1");

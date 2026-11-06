@@ -26,7 +26,8 @@ test("registro sin sesión muestra la pantalla de confirmar correo", async ({ pa
   await page.addInitScript(() => localStorage.setItem("fitbros_tour_v1", "done"));
   await gotoApp(page);
 
-  await page.getByRole("button", { name: "Empezar ahora" }).first().click();
+  // REQ-352: sin sesión la app abre en el inicio de sesión; se pasa al registro.
+  await page.getByRole("button", { name: "¿No tienes cuenta? Regístrate" }).click();
   const app = page.locator("#app");
   await app.locator("#au_email").fill("nuevo@correo.test");
   await app.locator("#au_pwd").fill("ClaveSegura2026");

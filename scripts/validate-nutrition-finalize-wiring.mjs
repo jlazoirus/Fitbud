@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(fileURLToPath(import.meta.url), "..", "..");
-const src = readFileSync(join(ROOT, "index.html"), "utf8");
+const src = readFileSync(join(ROOT, "app", "index.html"), "utf8");
 
 const errors = [];
 function fail(msg) { errors.push(msg); }

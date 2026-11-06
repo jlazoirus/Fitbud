@@ -107,7 +107,7 @@ El selector del auditor rota el journey automáticamente (estado en `.git/fitbro
 
 ## Diseño de interfaz: skill impeccable
 
-`.claude/skills/impeccable/` es la skill de diseño (pbakaus/impeccable, copia sin editar). En Claude Code, `.claude/settings.json` corre su detector tras cada Edit/Write de UI y una pasada completa al cerrar el turno; los hallazgos reales se corrigen, no se silencian. Cualquier agente puede correrlo a mano: `.claude/skills/impeccable/scripts/impeccable detect index.html`. Config compartida en `.impeccable/config.json` (telemetría apagada).
+`.claude/skills/impeccable/` es la skill de diseño (pbakaus/impeccable, copia sin editar). En Claude Code, `.claude/settings.json` corre su detector tras cada Edit/Write de UI y una pasada completa al cerrar el turno; los hallazgos reales se corrigen, no se silencian. Cualquier agente puede correrlo a mano: `.claude/skills/impeccable/scripts/impeccable detect app/index.html` (la portada pública es `index.html`, REQ-352). Config compartida en `.impeccable/config.json` (telemetría apagada).
 
 ## Autocomprobación de los selectores
 

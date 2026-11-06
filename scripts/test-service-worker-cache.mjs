@@ -105,13 +105,13 @@ function fakeFetchEvent(request) {
   };
   const { listeners, caches, CACHE_NAME_MATCH } = loadServiceWorker({ fetchImpl });
   const cache = await caches.open(CACHE_NAME_MATCH);
-  await cache.put("./index.html", fakeResponse("HTML-VIEJO"));
+  await cache.put("./app/index.html", fakeResponse("HTML-VIEJO")); // REQ-352: la app vive en /app
   await cache.put("./training-plan.js", fakeResponse("JS-VIEJO"));
 
   const fetchHandler = listeners.fetch;
   assert(typeof fetchHandler === "function", "El SW debe registrar un listener de 'fetch'.");
 
-  const navEvent = fakeFetchEvent({ method: "GET", mode: "navigate", url: "https://fitbud.test/" });
+  const navEvent = fakeFetchEvent({ method: "GET", mode: "navigate", url: "https://fitbud.test/app" });
   fetchHandler(navEvent);
   const navResponse = await navEvent.getResponse();
   assert(navResponse && (await navResponse.text()) === "HTML-VIEJO",
@@ -123,7 +123,13 @@ function fakeFetchEvent(request) {
   const jsResponse = await jsEvent.getResponse();
   assert(jsResponse && (await jsResponse.text()) === "JS-VIEJO", "El .js debe seguir sirviéndose desde el mismo cache (cacheFirst).");
 
-  console.log("  Test 1 pasado: navegación y .js salen de la MISMA generación de cache (sin mezcla HTML nuevo / JS viejo)");
+  // REQ-352: la portada pública ("/") no es parte del shell: va a la red aunque la app esté en cache.
+  const rootEvent = fakeFetchEvent({ method: "GET", mode: "navigate", url: "https://fitbud.test/" });
+  fetchHandler(rootEvent);
+  const rootResponse = await rootEvent.getResponse();
+  assert(rootResponse && (await rootResponse.text()) === "RED-FRESCA:https://fitbud.test/", "La portada en / se pide a la red, no sale del cache de la app.");
+
+  console.log("  Test 1 pasado: navegación de la app y .js salen de la MISMA generación de cache; la portada va a la red");
 }
 
 // ── Sin nada en cache (primera carga real): cacheFirst debe caer a red y
@@ -138,15 +144,15 @@ function fakeFetchEvent(request) {
   const { listeners, caches, CACHE_NAME_MATCH } = loadServiceWorker({ fetchImpl });
   const fetchHandler = listeners.fetch;
 
-  const navEvent = fakeFetchEvent({ method: "GET", mode: "navigate", url: "https://fitbud.test/" });
+  const navEvent = fakeFetchEvent({ method: "GET", mode: "navigate", url: "https://fitbud.test/app" });
   fetchHandler(navEvent);
   const navResponse = await navEvent.getResponse();
-  assert(navResponse && (await navResponse.text()) === "RED:https://fitbud.test/",
+  assert(navResponse && (await navResponse.text()) === "RED:https://fitbud.test/app",
     "Sin cache previo, la navegación debe caer a la red (offline-first no puede dejar la app en blanco).");
   assert(networkCalls === 1, "Debe haber ido a la red exactamente una vez.");
   const cache = await caches.open(CACHE_NAME_MATCH);
-  const cached = await cache.match("https://fitbud.test/");
-  assert(cached && (await cached.text()) === "RED:https://fitbud.test/", "La respuesta de red debe quedar cacheada para la próxima carga.");
+  const cached = await cache.match("https://fitbud.test/app");
+  assert(cached && (await cached.text()) === "RED:https://fitbud.test/app", "La respuesta de red debe quedar cacheada para la próxima carga.");
 
   console.log("  Test 2 pasado: sin cache previo, la navegación cae a red y cachea el resultado");
 }

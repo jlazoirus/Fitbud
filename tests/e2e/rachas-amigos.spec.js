@@ -93,7 +93,7 @@ test('invitación persiste durante login y exige activar y aceptar antes de most
   await social.rpc(FRIEND,'sync',{count:8,through:daysFromToday(0),timezone:'America/Lima'});
   const {token}=await social.rpc(FRIEND,'invite');
   await installMocks(context);await social.route(context);await autoDismissNudges(page);
-  await page.goto('/index.html#friend='+token);
+  await page.goto('/app/#friend='+token);
   await expect(page.getByText('Te invitaron a comparar rachas.')).toBeVisible();
   expect(await page.evaluate(()=>authRedirectUrl())).toContain('friend='+token);
   // Sesión posterior en la misma pestaña, como tras autenticar/confirmar correo.
@@ -210,7 +210,7 @@ test('logout limpia datos incluso con respuesta tardía',async({page,context,soc
   });
   await page.evaluate(()=>{refreshStreakSocial();clearSignedOutState();});
   release();
-  await expect(page.locator('.landing')).toBeVisible();
+  await expect(page.locator('#au_email')).toBeVisible(); // REQ-352: sin sesión, la app muestra su inicio de sesión
   expect(await page.evaluate(()=>({rows:streakSocial.rows,alias:streakSocial.alias,invite:streakSocialInvite}))).toEqual({rows:[],alias:'',invite:null});
   await expect(page.locator('body')).not.toContainText('Dato privado');
 });

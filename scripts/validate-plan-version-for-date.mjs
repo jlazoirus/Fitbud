@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 const start = html.indexOf("function planVersionForDate(");
 const src = html.slice(start, html.indexOf("\n}\n", start) + 2);
 const make = (versions, days) => new Function("PLAN_VERSIONS", "S", "validYmd", `${src}\nreturn planVersionForDate;`)(

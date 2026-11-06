@@ -37,7 +37,7 @@ test("REQ-308: un usuario normal ve Sin acceso en la consola", async ({ page, co
 test("REQ-308: sin sesión la consola pide iniciar sesión, no muestra la landing", async ({ page, context }) => {
   await installMocks(context);
   await forceConsole(page);
-  await page.goto("/index.html");
+  await page.goto("/app/");
   await expect(page.locator("#au_email")).toBeVisible();
   await expect(page.getByText("Tu mejor versión")).toHaveCount(0);
 });

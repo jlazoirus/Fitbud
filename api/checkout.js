@@ -90,8 +90,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  const successUrl = e.appUrl + "/?checkout=success&plan_id=" + planId;
-  const cancelUrl  = e.appUrl + "/?checkout=cancel";
+  const successUrl = e.appUrl + "/app?checkout=success&plan_id=" + planId;
+  const cancelUrl  = e.appUrl + "/app?checkout=cancel";
 
   const params = new URLSearchParams();
   params.set("mode",           "payment");

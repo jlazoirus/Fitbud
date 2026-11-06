@@ -87,7 +87,7 @@ const insert = codeInserts[0];
 assert(insert && /^FIT-[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(insert.code) && insert.plan_id === "quarterly" && insert.duration_days === 90, "Crea un código de 90 días del plan quarterly.");
 assert(insert.created_by === ADMIN_ID && Date.parse(insert.valid_until) > Date.now() + 29 * 86400000, "El código queda auditado y activable 30 días.");
 assert(patches[0].status === "beta_invited" && patches[0].contacted_at && patches[0].review_notes.includes(insert.code), "Marca beta_invited con nota del código.");
-assert(res.body.link === "https://evolvapp.club/?codigo=" + insert.code, "El enlace canjea el código.");
+assert(res.body.link === "https://evolvapp.club/app?codigo=" + insert.code, "El enlace canjea el código.");
 assert(res.body.message.startsWith("Hola Ana,") && res.body.message.includes("3 meses") && res.body.message.includes(insert.code), "Mensaje personalizado con el código.");
 assert(res.body.whatsappUrl.startsWith("https://wa.me/51999111222?text="), "Enlace de WhatsApp al número normalizado.");
 assert(!/\b(IA|prompt|tokens?|modelo)\b/i.test(res.body.message), "El mensaje no usa vocabulario interno (REQ-31).");

@@ -4,7 +4,7 @@ import fs from "node:fs";
 const api = fs.readFileSync(new URL("../api/claude.js", import.meta.url), "utf8");
 const admin = fs.readFileSync(new URL("../api/admin.js", import.meta.url), "utf8");
 const analytics = fs.readFileSync(new URL("../supabase/analytics.sql", import.meta.url), "utf8");
-const html = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 const readme = fs.readFileSync(new URL("../README.md", import.meta.url), "utf8");
 
 assert.ok(api.includes('"claude-sonnet-5"'), "ALLOWED_MODELS debe incluir claude-sonnet-5.");

@@ -16,7 +16,7 @@ for (const width of [390,1280]) {
       }
       return route.fulfill({json:{eligible:true,invitations,limit:3}});
     });
-    await page.goto('/index.html?ver=invitaciones');
+    await page.goto('/app/?ver=invitaciones');
     await expect(page.getByRole('heading',{name:'Invita a tus amigos'})).toBeVisible();
     await page.getByRole('button',{name:'Generar mi enlace'}).click();
     await expect(page.locator('#refLink0')).toHaveValue(/codigo=FIT-AB12-CD30/);
@@ -40,7 +40,7 @@ test('invitaciones: un fallo permite reintentar sin mostrar datos de otra cuenta
   await installMocks(context);await seedLoggedInUser(page);await autoDismissNudges(page);
   let fail=true;
   await page.route('**/api/entitlement?action=referrals',route=>route.fulfill(fail?{status:503,json:{error:'No pudimos cargar tus invitaciones.'}}:{json:{eligible:false}}));
-  await page.goto('/index.html?ver=invitaciones');
+  await page.goto('/app/?ver=invitaciones');
   await expect(page.getByRole('button',{name:'Reintentar',exact:true})).toBeVisible();
   fail=false;await page.getByRole('button',{name:'Reintentar',exact:true}).click();
   await expect(page.locator('#referralPanel')).toContainText('aún no está disponible');
@@ -49,7 +49,7 @@ test('invitaciones: un fallo permite reintentar sin mostrar datos de otra cuenta
 
 test('el enlace del correo pide iniciar sesión cuando no hay sesión',async({page,context})=>{
   await installMocks(context);
-  await page.goto('/index.html?ver=invitaciones');
+  await page.goto('/app/?ver=invitaciones');
   await expect(page.locator('#au_email')).toBeVisible();
   await expect(page.locator('#au_pwd')).toBeVisible();
   expect(new URL(page.url()).searchParams.get('ver')).toBe('invitaciones');
@@ -63,7 +63,7 @@ test('dos usos: retomar la app cuenta como otra sesión, un cambio breve no',asy
     if(body.event_type==='session_start')uses.push(body.session_id);
     return route.fulfill({json:{ok:true}});
   });
-  await page.goto('/index.html');
+  await page.goto('/app/');
   await expect.poll(()=>uses.length).toBeGreaterThan(0);
   const initial=uses.length;
   await page.evaluate(()=>{

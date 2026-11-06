@@ -13386,3 +13386,90 @@ Cambio de diseño respecto del alcance: en vez de una tabla `entitlement_notices
 
 `scripts/test-plan-expiry.mjs` (en el release gate): ventanas y horario, mensajes, pie transaccional, envío a quien corresponde (no a quien renovó ni fuera de ventana), no repite en la siguiente corrida, `dry_run`, SQL sin aplicar, Supabase caído, y el SQL en PGlite (idempotente, admite `plan_expiry` y los tipos anteriores, clave única, RLS). `validate-reminder-journey`, `validate-notify-schedule`, `validate-notify-push-ready`, `test-referrals` y `validate-migrations` siguen verdes.
 
+## REQ-352 - Web pública en / y app en /app
+
+**Estado: implementado.** Plan: `docs/web-publica-y-suscripcion.md` §1.
+
+### Origen
+Decisión de Jonathan (2026-11-06): separar la web pública de la app.
+### Problema
+La portada la dibuja la app (`renderLanding()` en `index.html`) y cada visita descarga la app entera.
+### Objetivo
+`/` sirve una portada propia y liviana. La app queda en `/app` (`app/index.html` con `<base href="/">`) y `/admin` apunta a ella.
+### Alcance
+- La portada redirige a `/app` (con consulta y hash) si hay sesión, si está abierta como app instalada o si trae parámetros o hash de la app (lista en el plan §1).
+- `start_url` pasa a `/app`. Service worker: precache y navegación de la app en `/app`.
+- Los enlaces que genera `api/*.js` pasan a `/app`.
+- La app sin sesión muestra su inicio de sesión; ya no hay portada dentro de la app.
+- Validadores, E2E, `.vercelignore`, `vercel.json` y `CACHE_NAME` al día.
+### Fuera de alcance
+Cambiar el contenido de la portada (REQ-353), subdominio.
+### Riesgos
+Sesiones perdidas, apps instaladas en iPhone (conservan `start_url` `/`) o enlaces de correo rotos.
+### Criterios de aceptación
+- `/` sin sesión muestra la portada sin cargar la app.
+- Con sesión, en modo instalado o con `?codigo=X`, `/` lleva a `/app` con los mismos parámetros.
+- `/app` y `/admin` funcionan y el release gate queda verde.
+### Verificación sugerida
+E2E de la portada y de las redirecciones; regresión completa de la app en `/app`; preview de Vercel.
+
+### Implementación
+
+- **Restricción.** Un preview de Vercel confirmó que el archivo `index.html` gana a cualquier reescritura de `/`. Por eso la app se movió con `git mv` a `app/index.html`, con `<base href="/">`; sus rutas relativas (`js/`, `assets/`, `service-worker.js`, `manifest.webmanifest`) siguen resolviendo a la raíz.
+- **Portada en `index.html`.**
+  - Se pintó la portada de la app sin sesión y se tomó su HTML.
+  - Su CSS (tokens, base y el bloque de la portada) pasó a `web/portada.css`.
+  - `web/portada.js` pinta los planes desde `tienda/planes.js` y los datos desde `tienda/comercio.js`, más la demo del día y la escalera.
+  - "Iniciar sesión" y "Ya tengo cuenta" llevan a `/app`.
+  - Hay un `<main>` entre la cabecera y el pie.
+  - No carga la app, Supabase ni `/api/config`.
+- **Redirección en el `<head>`.** Lleva a `/app` con la misma consulta y el mismo hash cuando hay:
+  - una sesión `sb-*-auth-token`;
+  - `display-mode: standalone` o `navigator.standalone`;
+  - alguno de los parámetros `codigo`, `invite`, `auth`, `ver`, `checkout`, `friend`, `labs`, `r`, `date`, `type`, `error`, `error_description`, `plan_id`;
+  - un hash de Supabase.
+- **La app** sin sesión muestra `renderAuth()`. Se quitaron unos 20 KB de JS de portada, su CSS (salvo `.brand-v`) y `showAuthFromLanding()`.
+- **Service worker** v215: el shell es `./app/index.html`; solo `/app`, `/app/` y `/app/index.html` salen del cache (REQ-150). Lo demás va a la red con la app como respaldo sin conexión, y una notificación sin URL abre `/app`.
+- **Manifest y Vercel.** `start_url` pasa a `/app`. `vercel.json` reescribe `/app`, `/admin` y `/admin/*` a `app/index.html`. `.vercelignore` publica `app/` y `web/`.
+- **Enlaces que pasan a `/app`:** recordatorios y push (`/app?date=…`, `/app?r=…`, `/app?ver=invitaciones`), invitación beta (`/app?codigo=`), bienvenida, Culqi (`/app?auth=invite`), Stripe (`/app?checkout=`) y "Ir a Evolv" en `/pago`.
+- **Validadores.** 45 se movieron a `app/index.html`. Se ajustaron `validate-privacy`, `validate-css-tokens` (que ahora lee la hoja enlazada), `validate-deploy-allowlist`, `validate-reminder-journey`, `test-admin-beta-api` y `test-service-worker-cache` (la portada `/` va a la red).
+- **E2E.**
+  - `gotoApp` abre `/app/` y `gotoPortada` abre `/`.
+  - `portada.spec.js` agrega que la portada no carga la app y prueba las redirecciones (código, hash, app instalada y sesión).
+  - Se quitó la prueba de REQ-219 (con el registro abierto la portada cambiaba): la portada ya no lee `/api/config`, y el registro llega con REQ-356.
+
+## REQ-353 - Portada sin beta; la beta solo en /beta
+
+**Estado: implementado.** Plan §2.
+
+### Origen
+Decisión de Jonathan (2026-11-06): esconder la beta en otra página.
+### Problema
+La portada invita a "Postular a la beta" en cuatro lugares y el registro de la app dice "Evolv está en beta cerrada".
+### Objetivo
+La portada vende Evolv sin mencionar la beta. La beta sigue en `/beta` para quien reciba el enlace.
+### Alcance
+- Quitar "Postular", "Beta" y los enlaces a `beta-reclutamiento.html` de la portada; la llamada a la acción es "Ver planes" hasta REQ-356.
+- El aviso del registro en la app pasa a "¿No tienes cuenta? Ver planes".
+- Se conservan `/beta`, los códigos (`/app?codigo=`), el canje en Perfil y REQ-208.
+### Fuera de alcance
+Cambiar `/beta` o el proceso de postulación.
+### Riesgos
+Romper los enlaces de invitación ya enviados.
+### Criterios de aceptación
+- La portada no contiene "beta" ni enlaces a `/beta`.
+- `/beta` y `/app?codigo=` siguen funcionando.
+### Verificación sugerida
+E2E de la portada (sin "beta"), de `/beta` y del canje con código.
+
+### Implementación
+
+- **`index.html`:**
+  - la cabecera y el hero dicen "Ver planes" (lleva a `#planes`, la sección de precios);
+  - la nota del hero dice "Pago único en soles · Sin renovación automática";
+  - bajo "Elige tu ritmo", el enlace a la beta pasa a los 7 días de reembolso (`/devoluciones`);
+  - el cierre "Sé de los primeros" pasa a "Empieza hoy", con "Ver planes".
+- **App:** el registro sin código dice "¿No tienes código? Ver planes" (`/planes`).
+- **Sin cambios:** `/beta`, `?source=`, `/app?codigo=`, el canje en Perfil y REQ-208.
+- **Pruebas:** `portada.spec.js` (sin "beta" ni enlaces a `/beta`; "Ver planes" lleva a los planes), `tienda.spec.js` e `invitacion.spec.js`.
+

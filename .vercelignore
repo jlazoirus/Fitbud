@@ -7,6 +7,8 @@
 
 # Páginas y shell PWA
 !/index.html
+!/app
+!/web
 !/beta-reclutamiento.html
 !/config.js
 !/service-worker.js
