@@ -38,7 +38,8 @@ test.describe("Tienda web (Culqi)", () => {
     await expect(planes.first()).toContainText("S/29.90");
     await expect(planes.first().locator("img")).toHaveAttribute("src", "/assets/planes/mensual.webp");
     await expect(page.locator(".l-plan a.l-btn")).toHaveText(["Comprar", "Comprar", "Comprar"]);
-    await expect(page.getByRole("link", { name: "Postular a la beta" }).first()).toBeVisible();
+    // REQ-353: la beta ya no se ofrece en la portada (vive solo en /beta).
+    await expect(page.locator(".landing")).not.toContainText(/beta/i);
     const footer = page.locator(".l-footer");
     for (const [name, href] of [["Planes", "/planes"], ["Términos", "/terminos"], ["Devoluciones", "/devoluciones"], ["Privacidad", "/privacidad"], ["Contacto", "/contacto"], ["Libro de Reclamaciones", "/libro-de-reclamaciones"]]) {
       await expect(footer.getByRole("link", { name, exact: true })).toHaveAttribute("href", href);

@@ -42,6 +42,12 @@ test.describe("Portada", () => {
     await expect(page.locator(".l-plan-price").first()).toContainText("29.90");
     await expect(page.locator(".l-plan a.l-btn").first()).toHaveAttribute("href", "/pago?plan=monthly");
     await expect(page.locator("[data-lcomercio]")).toContainText("RUC");
+    // REQ-353: la beta vive solo en /beta: ni textos ni enlaces en la portada; los CTA llevan a los planes.
+    expect(text).not.toMatch(/beta|postula/i);
+    await expect(page.locator('a[href*="beta-reclutamiento"], a[href^="/beta"]')).toHaveCount(0);
+    await page.locator(".l-hero-ctas").getByRole("link", { name: "Ver planes" }).click();
+    await expect(page).toHaveURL(/#planes$/);
+    await expect(page.locator("#planes .l-plan-store").first()).toBeInViewport();
     // "Ya tengo cuenta" e "Iniciar sesión" llevan a la app, que muestra su inicio de sesión.
     await expect(page.locator(".landing-nav").getByRole("link", { name: "Iniciar sesión" })).toHaveAttribute("href", "/app");
     await page.getByRole("link", { name: "Ya tengo cuenta" }).click();

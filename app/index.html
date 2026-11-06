@@ -10280,7 +10280,7 @@ function renderAuth(){
       <div class="field"><label for="au_email">Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
       ${passwordField({id:"au_pwd",label:"Contraseña",autocomplete:mode==="in"?"current-password":"new-password",placeholder:"••••••••"})}
       ${mode==="up"&&inviteOnlySignup()?`<div class="field"><label for="au_code">Código de invitación</label><input id="au_code" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="FIT-XXXX-XXXX" value="${esc(pendingInviteCode())}"></div>
-      ${pendingInviteCode()?"":`<p class="muted small" style="margin:-4px 0 12px">Evolv está en beta cerrada. ¿No tienes código? <a href="beta-reclutamiento.html?source=registro">Postula a la beta</a>.</p>`}`:""}
+      ${pendingInviteCode()?"":`<p class="muted small" style="margin:-4px 0 12px">¿No tienes código? <a href="/planes">Ver planes</a>.</p>`}`:""}
       <button class="btn btn-accent" style="width:100%" onclick="doAuth()">${mode==="in"?"Entrar":"Registrarme"}</button>
       ${mode==="up"?`<p class="muted small center" style="margin-top:10px;font-size:12px;line-height:1.5">Al crear tu cuenta aceptas nuestros <a href="#" onclick="openTermsNotice();return false">Términos</a> y el <a href="#" onclick="openPrivacyNotice();return false">Aviso de privacidad</a>.</p>`:""}
       <div id="auOut" class="muted small" style="margin-top:10px"></div>

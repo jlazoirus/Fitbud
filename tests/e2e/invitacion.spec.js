@@ -83,7 +83,7 @@ test("beta cerrada: sin código no se crea la cuenta (REQ-205)", async ({ page, 
   });
   await gotoApp(page); // REQ-352: sin sesión, la app abre directo en el inicio de sesión
   await page.getByRole("button", { name: "¿No tienes cuenta? Regístrate" }).click();
-  await expect(page.getByRole("link", { name: "Postula a la beta" })).toHaveAttribute("href", "beta-reclutamiento.html?source=registro");
+  await expect(page.getByRole("link", { name: "Ver planes" })).toHaveAttribute("href", "/planes"); // REQ-353: sin mención a la beta
   await page.locator("#au_email").fill("ana@correo.test");
   await page.locator("#au_pwd").fill("ClaveSegura2026");
   await page.getByRole("button", { name: "Registrarme" }).click();

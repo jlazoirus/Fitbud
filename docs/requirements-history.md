@@ -13438,3 +13438,38 @@ E2E de la portada y de las redirecciones; regresión completa de la app en `/app
   - `portada.spec.js` agrega que la portada no carga la app y prueba las redirecciones (código, hash, app instalada y sesión).
   - Se quitó la prueba de REQ-219 (con el registro abierto la portada cambiaba): la portada ya no lee `/api/config`, y el registro llega con REQ-356.
 
+## REQ-353 - Portada sin beta; la beta solo en /beta
+
+**Estado: implementado.** Plan §2.
+
+### Origen
+Decisión de Jonathan (2026-11-06): esconder la beta en otra página.
+### Problema
+La portada invita a "Postular a la beta" en cuatro lugares y el registro de la app dice "Evolv está en beta cerrada".
+### Objetivo
+La portada vende Evolv sin mencionar la beta. La beta sigue en `/beta` para quien reciba el enlace.
+### Alcance
+- Quitar "Postular", "Beta" y los enlaces a `beta-reclutamiento.html` de la portada; la llamada a la acción es "Ver planes" hasta REQ-356.
+- El aviso del registro en la app pasa a "¿No tienes cuenta? Ver planes".
+- Se conservan `/beta`, los códigos (`/app?codigo=`), el canje en Perfil y REQ-208.
+### Fuera de alcance
+Cambiar `/beta` o el proceso de postulación.
+### Riesgos
+Romper los enlaces de invitación ya enviados.
+### Criterios de aceptación
+- La portada no contiene "beta" ni enlaces a `/beta`.
+- `/beta` y `/app?codigo=` siguen funcionando.
+### Verificación sugerida
+E2E de la portada (sin "beta"), de `/beta` y del canje con código.
+
+### Implementación
+
+- **`index.html`:**
+  - la cabecera y el hero dicen "Ver planes" (lleva a `#planes`, la sección de precios);
+  - la nota del hero dice "Pago único en soles · Sin renovación automática";
+  - bajo "Elige tu ritmo", el enlace a la beta pasa a los 7 días de reembolso (`/devoluciones`);
+  - el cierre "Sé de los primeros" pasa a "Empieza hoy", con "Ver planes".
+- **App:** el registro sin código dice "¿No tienes código? Ver planes" (`/planes`).
+- **Sin cambios:** `/beta`, `?source=`, `/app?codigo=`, el canje en Perfil y REQ-208.
+- **Pruebas:** `portada.spec.js` (sin "beta" ni enlaces a `/beta`; "Ver planes" lleva a los planes), `tienda.spec.js` e `invitacion.spec.js`.
+

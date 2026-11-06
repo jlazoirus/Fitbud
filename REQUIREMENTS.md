@@ -2306,27 +2306,9 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-353 - Portada sin beta; la beta solo en /beta
 
-**Estado: pendiente.** Implementar después de REQ-352. Plan §2.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-### Origen
-Decisión de Jonathan (2026-11-06): esconder la beta en otra página.
-### Problema
-La portada invita a "Postular a la beta" en cuatro lugares y el registro de la app dice "Evolv está en beta cerrada".
-### Objetivo
-La portada vende Evolv sin mencionar la beta. La beta sigue en `/beta` para quien reciba el enlace.
-### Alcance
-- Quitar "Postular", "Beta" y los enlaces a `beta-reclutamiento.html` de la portada; la llamada a la acción es "Ver planes" hasta REQ-356.
-- El aviso del registro en la app pasa a "¿No tienes cuenta? Ver planes".
-- Se conservan `/beta`, los códigos (`/app?codigo=`), el canje en Perfil y REQ-208.
-### Fuera de alcance
-Cambiar `/beta` o el proceso de postulación.
-### Riesgos
-Romper los enlaces de invitación ya enviados.
-### Criterios de aceptación
-- La portada no contiene "beta" ni enlaces a `/beta`.
-- `/beta` y `/app?codigo=` siguen funcionando.
-### Verificación sugerida
-E2E de la portada (sin "beta"), de `/beta` y del canje con código.
+✓ `tests/e2e/portada.spec.js`.
 
 ## REQ-354 - Legales de la suscripción con semana gratis
 
