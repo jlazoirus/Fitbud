@@ -13385,4 +13385,3 @@ Cambio de diseño respecto del alcance: en vez de una tabla `entitlement_notices
 ### Verificación
 
 `scripts/test-plan-expiry.mjs` (en el release gate): ventanas y horario, mensajes, pie transaccional, envío a quien corresponde (no a quien renovó ni fuera de ventana), no repite en la siguiente corrida, `dry_run`, SQL sin aplicar, Supabase caído, y el SQL en PGlite (idempotente, admite `plan_expiry` y los tipos anteriores, clave única, RLS). `validate-reminder-journey`, `validate-notify-schedule`, `validate-notify-push-ready`, `test-referrals` y `validate-migrations` siguen verdes.
-
