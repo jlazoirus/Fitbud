@@ -78,7 +78,7 @@ test.describe("Hoy — tarjeta de regreso (REQ-284)", () => {
     await expect(card(page)).toContainText("Tu racha se reinició, tu progreso no: en este plan llevas 4 días registrados y 4 entrenos, con una mejor racha de 4 días.");
     await expect(card(page).locator(".return-goal")).toHaveText(/^Tu objetivo: Bajar grasa · semana \d+ de 10$/);
 
-    await page.locator(".agenda-item").getByRole("button", { name: "Registrar" }).first().click();
+    await page.locator(".home-primary").getByRole("button", { name: "Registrar este plato" }).click();
     await expect(card(page)).toHaveCount(0);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });

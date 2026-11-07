@@ -29,9 +29,12 @@ test.describe("Actividad registrada a mano", () => {
     await gotoApp(page);
     expect(await page.evaluate(() => trainingDayResult(todayStr()))).toBe("rest");
     // En Hoy, el descanso ofrece registrar que entrenó igual.
-    await expect(page.locator("#app")).toContainText("Descanso planificado");
+    const agenda = page.locator(".home-agenda");
+    await agenda.locator("summary").click();
+    await expect(agenda.locator(".kind-rest")).toBeVisible();
+    await expect(agenda.locator(".kind-rest")).toContainText("Descanso planificado");
     await expect(page.getByRole("button", { name: "Entrené igual" })).toBeVisible();
-    await expect(page.locator(".agenda-count")).toHaveText("1 pendiente"); // el descanso no cuenta
+    await expect(agenda.locator(".home-agenda-count")).toHaveText("2 pendientes"); // dos comidas, el descanso no cuenta
 
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
@@ -69,7 +72,8 @@ test.describe("Actividad registrada a mano", () => {
 
     // Hoy (Home) refleja que entrenó igual.
     await page.locator("#tabs").getByText("Hoy").click();
-    await expect(app).toContainText(/entrenaste igual/i);
+    await agenda.locator("summary").click();
+    await expect(agenda.locator(".kind-rest")).toContainText(/entrenaste igual/i);
 
     // Quitarla devuelve el día a descanso planificado.
     await page.locator("#tabs").getByText("Entreno").click();

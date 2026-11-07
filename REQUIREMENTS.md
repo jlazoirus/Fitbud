@@ -42,7 +42,7 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 
 ## Estado operativo actual
 
-- App PWA vanilla sin build step; `index.html` sigue siendo el shell principal con modulos puros en `js/`.
+- PWA vanilla sin build. Shell en `app/index.html`.
 - Supabase es fuente de verdad; `localStorage` es cache/offline. Datos personales van por usuario con RLS.
 - Login obligatorio, landing publica, paywall/checkout, cupones, historial de pagos, notificaciones, sync offline y roles admin ya existen.
 - Entrenamiento tiene catalogo, reproductor recuperable, planes personalizados 4/10 semanas, splits progresivos y adaptaciones.
@@ -892,11 +892,11 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-118`).
 
 Detalle archivado en [historial](docs/requirements-history.md#req-123).
 
-## REQ-124 - Home y Nutrición: anillo de macros primero y agenda/comidas debajo
+## REQ-124 - Resumen de macros antes de la agenda y comidas
 
 **Estado: implementado.**
 
-Detalle archivado en [historial](docs/requirements-history.md#req-124).
+[Historial](docs/requirements-history.md#req-124). Hoy evoluciona en REQ-364.
 
 ## REQ-125 - Nutrición: reordenar comidas y saltar comidas sin cambiar horarios históricos
 
@@ -2009,7 +2009,7 @@ Validadores, allowlist, invitaciones, seguridad y Playwright reparados sin relaj
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Registrar y entrenar sin menú; sugerencia de menú secundaria y descartable por día/cuenta/dispositivo. ✓ E2E de Hoy/menú opcional.
+Registro y entreno sin menú. Sugerencia descartable.
 
 ## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
 
@@ -2452,3 +2452,9 @@ Feedback de Marco. Huevo entero, ≈50 g sin cáscara por unidad. [USDA NDB 1123
 **Estado: implementado.**
 
 Configurar, editar o quitar gramos por pieza en catálogo o alimentos propios. Ajuste privado por perfil. Registro de enteros, cálculo en gramos y equivalencia histórica por línea. PWA v222. ✓ `tests/e2e/composicion.spec.js` y `tests/e2e/alimentos-propios.spec.js`.
+
+## REQ-364 - Hoy: acción principal y agenda plegable
+
+**Estado: implementado.**
+
+Solicitud de Jonathan, referencia Platzi. Consumo resumido con enlace a Nutrición, acción según estado y pendientes reales desplegables. Conserva registro sin menú, seguridad y vista de mañana. PWA v223. ✓ E2E de Hoy.

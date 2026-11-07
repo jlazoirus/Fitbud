@@ -37,14 +37,14 @@ test.describe("Racha — animación al registrar (REQ-283)", () => {
     await page.waitForLoadState("networkidle");
     await expect(pop(page)).toHaveCount(0);
 
-    const register = page.locator(".agenda-item").getByRole("button", { name: "Registrar" });
-    await register.first().click();
+    const register = page.locator(".home-primary").getByRole("button", { name: "Registrar este plato" });
+    await register.click();
     await expect(pop(page)).toBeVisible();
     await expect(pop(page)).toContainText("Faltan 1 comida y el entreno");
     await expect(pop(page)).toContainText("para sumar el día 4 de tu racha");
     await expect(page.locator("#streakPop")).toHaveAttribute("role", "status");
 
-    await register.first().click();
+    await register.click();
     await expect(pop(page)).toContainText("Falta el entreno");
 
     await page.locator("#tabs").getByText("Entreno").click();
@@ -77,7 +77,7 @@ test.describe("Racha — animación al registrar (REQ-283)", () => {
 
     await gotoApp(page);
     await page.waitForLoadState("networkidle");
-    await page.locator(".agenda-item").getByRole("button", { name: "Registrar" }).first().click();
+    await page.locator(".home-primary").getByRole("button", { name: "Registrar este plato" }).click();
     await expect(pop(page)).toContainText("Día 1");
     await expect(pop(page)).toContainText("Empezó tu racha.");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);

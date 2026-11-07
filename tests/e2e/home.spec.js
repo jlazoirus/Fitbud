@@ -93,7 +93,7 @@ test.describe("Nutrición — comidas sin asignar (REQ-161)", () => {
 });
 
 test.describe("Home — agenda (REQ-249)", () => {
-  test("los botones de 'Lo que sigue hoy' no quedan pegados al borde de su tarjeta", async ({ page, context }) => {
+  test("los botones del resto del día tienen espacio a los lados", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -105,16 +105,12 @@ test.describe("Home — agenda (REQ-249)", () => {
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
     await overlay.getByRole("button", { name: /Aplicar al día/i }).click();
     await page.locator("#tabs").getByText("Hoy").click();
-    await expect(page.locator(".agenda-item .agenda-actions .btn").first()).toBeVisible();
+    await page.locator(".home-agenda summary").click();
+    await expect(page.locator(".home-agenda .agenda-actions .btn").first()).toBeVisible();
 
-    // Para cada botón, el contenedor con borde más cercano debe dejarle aire a la
-    // derecha. Antes, la fila heredaba la tarjeta global .meal/.workout (borde)
-    // con relleno lateral 0 y "Ver detalle"/"Adaptar" tocaban el borde.
-    const gaps = await page.evaluate(() => [...document.querySelectorAll(".agenda-item .agenda-actions .btn")].map((btn) => {
-      let box = btn.parentElement;
-      while (box && parseFloat(getComputedStyle(box).borderRightWidth) === 0) box = box.parentElement;
-      const inner = box.getBoundingClientRect().right - parseFloat(getComputedStyle(box).borderRightWidth);
-      return { text: btn.textContent.trim(), gap: Math.round(inner - btn.getBoundingClientRect().right) };
+    const gaps = await page.evaluate(() => [...document.querySelectorAll(".home-agenda .agenda-actions .btn")].map((btn) => {
+      const container = btn.closest(".home-agenda").getBoundingClientRect();
+      return { text: btn.textContent.trim(), gap: Math.round(container.right - btn.getBoundingClientRect().right) };
     }));
     expect(gaps.length).toBeGreaterThan(0);
     for (const { text, gap } of gaps) expect(gap, `"${text}" queda a ${gap}px del borde`).toBeGreaterThanOrEqual(12);
@@ -207,7 +203,9 @@ test.describe("Home — día cerrado (REQ-258)", () => {
     await expect(card).toContainText("Todo listo por hoy");
     await expect(card.locator(".agenda-sub")).toContainText(/3\/3 comidas registradas · \d+ kcal · (entreno completado|descanso planificado)/);
     // El consumo detallado de hoy ya no ocupa la pantalla.
-    await expect(page.locator(".mini-macro-dash")).toHaveCount(0);
+    await expect(page.locator(".home-consumption")).toHaveCount(0);
+    await expect(card.locator(".btn-accent")).toHaveText("Ver mañana");
+    await expect(card.getByRole("button", { name: "Registrar comida" })).toBeVisible();
 
     // Mañana en resumen: qué entreno toca y si las comidas están listas.
     const tomorrow = await page.evaluate(() => addDays(todayStr(), 1));

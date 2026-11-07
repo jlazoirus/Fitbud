@@ -75,6 +75,7 @@ for(const width of [320,390,1280])test(`conversar, revisar y guardar una rutina 
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   expect(await page.evaluate(()=>effectiveWorkout(addDays(todayStr(),7)).workout.name)).toBe('Mi pierna en máquinas');
   await gotoApp(page);
+  await page.locator('.home-agenda summary').click();
   await expect(page.locator('.agenda-item.kind-workout .agenda-name')).toHaveText('Mi pierna en máquinas');
   await assertWorkout();
   await startGuidedSession(page);

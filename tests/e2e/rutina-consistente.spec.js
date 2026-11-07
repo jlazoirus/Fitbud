@@ -55,7 +55,9 @@ for (const width of [320, 390, 1280]) {
     };
     const assertHome = async name => {
       await page.locator("#tabs").getByText("Hoy", { exact: true }).click();
+      await app.locator(".home-agenda summary").click();
       const row = app.locator(".agenda-item.kind-workout");
+      await expect(row).toBeVisible();
       await expect(row.locator(".agenda-name")).toHaveText(name);
       await expect(row.locator(".agenda-meta")).toContainText("2 ejercicios");
       for (const name of seed.names) await expect(row).toContainText(name);
@@ -76,6 +78,7 @@ for (const width of [320, 390, 1280]) {
     await assertHome("Pull del viernes");
     await expect.poll(() => calls.filter(c => c.table === "day_log" && c.payload?.state?.repeatWorkout?.savedId === "saved-pull").length).toBeGreaterThan(0);
     await gotoApp(page);
+    await app.locator(".home-agenda summary").click();
     await expect(app.locator(".agenda-item.kind-workout .agenda-name")).toHaveText("Pull del viernes");
     await page.locator("#tabs").getByText("Entreno").click();
     await assertRoutine("Pull del viernes");
@@ -91,7 +94,7 @@ for (const width of [320, 390, 1280]) {
       ids: dayState(current).workoutExecution.steps.filter(s => s.type === "strength").map(s => s.exerciseSlug) }));
     expect(recorded).toEqual({ name: "Pull del viernes", ids: seed.ids });
     await page.locator("#tabs").getByText("Hoy", { exact: true }).click();
-    await expect(app.locator(".agenda-item.kind-resume .agenda-name")).toHaveText("Pull del viernes");
+    await expect(app.locator(".home-primary.kind-resume .agenda-title")).toHaveText("Pull del viernes");
     await page.locator("#tabs").getByText("Entreno").click();
     page.once("dialog", dialog => dialog.accept());
     await app.getByRole("button", { name: "Descartar", exact: true }).click();

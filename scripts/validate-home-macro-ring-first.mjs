@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// REQ-124 — el anillo/resumen de macros va primero en Home y Nutrición; en Nutrición,
-// "Más opciones" no puede aparecer antes del resumen y las comidas.
+// REQ-124 / REQ-364 — el consumo precede a la acción de Hoy y Nutrición
+// conserva el desglose antes de las comidas y de "Más opciones".
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
@@ -19,14 +19,15 @@ function extractFunctionSource(src, name) {
   return src.slice(start, i);
 }
 
-// 1. renderHoy: heroDash (anillo) debe aparecer antes que homeAgendaHtml (agenda).
+// 1. El resumen de Hoy precede a la tarjeta principal.
 const renderHoy = extractFunctionSource(html, "renderHoy");
-const heroIdx = renderHoy.indexOf("heroDash(ds,{compact:true})");
-const agendaIdx = renderHoy.indexOf("homeAgendaHtml(ds)");
-assert.ok(heroIdx !== -1, "renderHoy debe renderizar heroDash.");
+const summaryIdx = renderHoy.indexOf("homeConsumptionHtml(agenda.totals)");
+const agendaIdx = renderHoy.indexOf("homeAgendaHtml(ds,agenda)");
+assert.ok(summaryIdx !== -1, "renderHoy debe incluir el resumen de consumo.");
 assert.ok(agendaIdx !== -1, "renderHoy debe renderizar homeAgendaHtml.");
-assert.ok(heroIdx < agendaIdx, "En Home, el anillo de macros (heroDash) debe ir antes que la agenda (homeAgendaHtml).");
-console.log("  Test 1 pasado: en Home, el anillo de macros va antes que la agenda");
+assert.ok(summaryIdx < agendaIdx, "El resumen de Hoy debe preceder a la agenda.");
+assert.ok(!renderHoy.includes("heroDash("), "El desglose de macros vive en Nutrición.");
+console.log("  Test 1 pasado: el consumo va antes de la agenda en Hoy");
 
 // 2. renderNutrition: orden anillo/resumen -> comidas del día (incluye extras, REQ-125) -> más opciones.
 const renderNutrition = extractFunctionSource(html, "renderNutrition");
@@ -39,13 +40,12 @@ assert.ok(macrosIdx < planIdx && planIdx < moreBtnIdx,
   'En Nutrición, el orden debe ser: macros -> comidas del día -> "Más opciones".');
 console.log('  Test 2 pasado: en Nutrición, "Más opciones" aparece después del resumen y las comidas');
 
-// 3. El tour apunta primero al anillo de macros (nuevo primer elemento de Home).
+// 3. El tour sigue el orden de la pantalla.
 const stepsSrc = extractFunctionSource(html, "tourSteps");
-const miniMacroIdx = stepsSrc.indexOf(".mini-macro-dash");
-const agendaCardIdx = stepsSrc.indexOf(".agenda-card");
-assert.ok(miniMacroIdx !== -1, "tourSteps debe incluir un paso para .mini-macro-dash (el anillo de Home).");
-assert.ok(agendaCardIdx !== -1, "tourSteps debe seguir incluyendo un paso para .agenda-card.");
-assert.ok(miniMacroIdx < agendaCardIdx, "El paso del tour para el anillo de macros debe ir antes que el de la agenda.");
-console.log("  Test 3 pasado: el tour apunta primero al anillo de macros, luego a la agenda");
+const consumptionStep = stepsSrc.indexOf(".home-consumption");
+const actionStep = stepsSrc.indexOf(".home-primary");
+assert.ok(consumptionStep !== -1 && actionStep > consumptionStep,
+  "El tour debe presentar el consumo y luego la acción de Hoy.");
+console.log("  Test 3 pasado: el tour apunta al consumo y luego a la acción de Hoy");
 
 console.log("validate-home-macro-ring-first: todos los checks pasaron.");
