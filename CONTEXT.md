@@ -71,7 +71,7 @@ REQ-316: Hoy prioriza registro/entreno y menú opcional. REQ-324: fechas/avisos 
 - La primera nutricion posterior al onboarding usa las preferencias guardadas antes de aplicar comidas: `validateGeneratedDay` bloquea patrón alimentario, alergias, sin lácteos y sin gluten con `foodTextConflictForProfile`; si la generación semanal no pasa, `prepareFirstWeekNutrition()` completa faltantes con `deterministicDaysForWeek()`.
 - En `Cambiar comida`, el usuario puede tocar `Rehacer opciones` hasta 4 veces por día; usa `meal_option` con lista cerrada de platos candidatos y fallback determinista del catálogo. `regenerateGenMeal()` comparte ese límite para una comida individual. La acción no vive en `Más opciones`: ese menú queda solo para acciones globales de nutrición.
 
-- REQ-314: bienvenida del coach en Hoy para cinco días de uso dentro de los primeros 14 días del onboarding; preguntas locales con navegación contextual, descartes por usuario/dispositivo y sin llamadas automáticas. Mantiene la guía manual ?.
+- REQ-314: bienvenida opcional con guía local, sin llamadas automáticas. REQ-359: entrevista, propuesta semanal revisada, preferencias de equipo y plantilla privada por ciclo (`docs/coach-routine.md`).
 
 ## Entrenamiento
 

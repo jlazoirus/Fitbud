@@ -2417,3 +2417,26 @@ Nombre, resumen, orden, demostraciones y Hoy coinciden al elegir recientes/guard
 
 ### Verificación sugerida
 `tests/e2e/rutina-consistente.spec.js` (320/390/1280), `repetir-entreno.spec.js`, `rutina-propia.spec.js`, regresiones de entrenamiento y release gate. Reproducción previa: dos ejercicios elegidos, cinco tarjetas antiguas visibles.
+
+## REQ-359 - Coach: conocer, revisar y guardar la rutina semanal
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-06), feedback de Allison: máquinas, conservar su rutina y aplicar lo conversado.
+### Problema
+El chat describe rutinas sin guardarlas; no distingue preferencias de equipo y muestra escapes.
+### Causa raíz
+Acciones conversacionales limitadas a contingencias de hoy; gimnasio asume recursos; limpieza previa al análisis de JSON.
+### Objetivo
+Conversación → propuesta semanal revisable → confirmación → entrenamientos persistentes.
+### Alcance
+Entrevista opcional en Hoy/Entreno, preferencias en onboarding/Perfil, conservación explícita, contrato compartido con proxy, plantilla privada por ciclo y texto legible. PWA v218.
+### Fuera de alcance
+Onboarding enteramente conversacional, importar fotos, cambiar deportes, historial o migración nativa.
+### Riesgos
+Propuestas incompatibles, cambios de cuenta/perfil, doble guardado y pérdida de historial.
+### Criterios de aceptación
+Revisión sin mutaciones; guardado confirmado conserva ejercicios/dosis, persiste y coincide en Hoy/Entreno/reproductor. Respeta equipo, seguridad, registros y aislamiento.
+### Verificación sugerida
+`test-training-routine.mjs`, `coach-rutina.spec.js`, regresiones y release gate. Operación: `docs/coach-routine.md`.

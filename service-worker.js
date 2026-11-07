@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitbud-pwa-v217";
+const CACHE_NAME = "fitbud-pwa-v218";
 const APP_SHELL = [
   "./app/index.html", // REQ-352: la app vive en /app; "/" es la portada pública
   "./js/nutrition-pure.js",
@@ -8,6 +8,7 @@ const APP_SHELL = [
   "./exercise-catalog.js",
   "./workout-player.js",
   "./training-plan.js",
+  "./js/training-routine.js",
   "./domain-contracts.js",
   "./sync-conflicts.js",
   "./manifest.webmanifest",

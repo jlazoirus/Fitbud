@@ -1,9 +1,6 @@
-import fs from "node:fs";
 
 async function importHandler(path) {
-  const source = fs.readFileSync(new URL("../" + path, import.meta.url), "utf8");
-  const url = "data:text/javascript;base64," + Buffer.from(source).toString("base64");
-  return (await import(url)).default;
+  return (await import(new URL("../" + path, import.meta.url).href)).default;
 }
 
 function response(status, data) {

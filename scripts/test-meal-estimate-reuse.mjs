@@ -1,8 +1,6 @@
 // REQ-278: contrato real del proxy con Supabase/proveedor simulados.
 import assert from "node:assert/strict";
-import fs from "node:fs";
-const source = fs.readFileSync(new URL("../api/claude.js", import.meta.url), "utf8");
-const handler = (await import("data:text/javascript;base64," + Buffer.from(source).toString("base64"))).default;
+const handler = (await import(new URL("../api/claude.js", import.meta.url).href)).default;
 process.env.SUPABASE_URL = "https://estimate.test";
 process.env.SUPABASE_PUBLISHABLE_KEY = "public-test";
 process.env.SUPABASE_SERVICE_ROLE_KEY = "service-test";

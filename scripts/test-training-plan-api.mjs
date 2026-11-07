@@ -1,9 +1,7 @@
-import fs from "node:fs";
 import assert from "node:assert/strict";
 
 async function importHandler(){
-  const source=fs.readFileSync(new URL("../api/claude.js",import.meta.url),"utf8");
-  return (await import("data:text/javascript;base64,"+Buffer.from(source).toString("base64"))).default;
+  return (await import(new URL("../api/claude.js",import.meta.url).href)).default;
 }
 function response(status,data){
   return {ok:status>=200&&status<300,status,json:async()=>data};

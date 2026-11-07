@@ -1,6 +1,7 @@
 // Proxy serverless del coach (Vercel).
 // La credencial del proveedor y la service role viven exclusivamente aqui.
 import { createHash } from "node:crypto";
+import "../js/training-routine.js";
 const ALLOWED_MODELS = ["claude-haiku-4-5-20251001", "claude-sonnet-4-6", "claude-sonnet-5"];
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const PROMPT_VERSION = "v1";
@@ -54,6 +55,7 @@ const ALLOWED_COACH_ACTION_TYPES = new Set([
   "cambiar_plato",
   "adaptar_entreno",
   "registrar_peso",
+  "actualizar_rutina",
 ]);
 const ALLOWED_COACH_WORKOUT_REASONS = new Set(["tiempo", "casa", "equipo", "sesion_perdida"]);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -634,6 +636,10 @@ function validateCoachConversationAction(action, validation) {
     && (typeof action.slot !== "string" || !action.slot.trim())) return false;
   if (tipo === "cambiar_plato" && (typeof action.dishName !== "string" || !action.dishName.trim())) return false;
   if (tipo === "adaptar_entreno" && !ALLOWED_COACH_WORKOUT_REASONS.has(String(action.reason || ""))) return false;
+  if (tipo === "actualizar_rutina") {
+    if (!validation.routine || !Array.isArray(validation.routine.days) || !validation.routine.days.length) return false;
+    return globalThis.FITBUD_TRAINING_ROUTINE.validate(action, validation.routine).ok;
+  }
   if (tipo === "registrar_peso") {
     const kg = Number(action.kg);
     if (!Number.isFinite(kg) || kg < 30 || kg > 300) return false;

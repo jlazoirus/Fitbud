@@ -60,7 +60,7 @@ if (modifiedLines.length) {
 
 // ── Sintaxis de módulos JS ────────────────────────────────────────────────────
 console.log("\n[ Sintaxis de módulos JS ]");
-for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "js/meal-log.js", "js/streak-friends.js", "domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
+for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "js/meal-log.js", "js/streak-friends.js", "js/training-routine.js", "domain-contracts.js", "exercise-catalog.js", "workout-player.js", "training-plan.js", "sync-conflicts.js"]) {
   if (existsSync(join(ROOT, file))) {
     run(`node --check ${file}`, `node --check "${join(ROOT, file)}"`);
   }
@@ -74,6 +74,7 @@ run("validate-contracts.mjs", "node scripts/validate-contracts.mjs");
 run("validate-exercises.mjs", "node scripts/validate-exercises.mjs");
 run("validate-workout-player.mjs", "node scripts/validate-workout-player.mjs");
 run("validate-training-plan.mjs", "node scripts/validate-training-plan.mjs");
+run("test-training-routine.mjs", "node scripts/test-training-routine.mjs");
 run("validate-training-plan-wiring.mjs", "node scripts/validate-training-plan-wiring.mjs");
 run("validate-macro-target-wiring.mjs", "node scripts/validate-macro-target-wiring.mjs");
 run("validate-macro-targets-invariant.mjs", "node scripts/validate-macro-targets-invariant.mjs");

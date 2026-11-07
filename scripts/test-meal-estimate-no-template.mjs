@@ -6,8 +6,7 @@
 import fs from "node:fs";
 
 async function importHandler(path) {
-  const source = fs.readFileSync(new URL("../" + path, import.meta.url), "utf8");
-  return (await import("data:text/javascript;base64," + Buffer.from(source).toString("base64"))).default;
+  return (await import(new URL("../" + path, import.meta.url).href)).default;
 }
 const response = (status, data) => ({ ok: status >= 200 && status < 300, status, json: async () => data });
 function capture() {
