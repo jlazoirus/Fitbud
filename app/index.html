@@ -696,8 +696,6 @@
   .notify-step.done{border-color:rgba(34,197,94,.32)}
   .notify-step.done .notify-step-ic{background:var(--good-dim);border-color:rgba(34,197,94,.32);color:var(--good)}
   .notify-inline-ic{display:inline-flex;vertical-align:-3px;color:var(--txt)}
-  .notify-card .agenda-head{justify-content:flex-start;align-items:center}
-  .notify-card .notify-step-ic{flex:0 0 auto}
   .notify-card-text{margin:0;font-size:13.5px;line-height:1.5;color:var(--muted);max-width:62ch}
   .notify-card-text b{color:var(--txt)}
   .onboarding-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
@@ -805,6 +803,17 @@
   .home-technique-copy small{color:var(--muted);font-size:.75rem}
   .home-technique-hide{flex:none;width:44px;height:44px;display:grid;place-items:center;background:none;color:var(--muted)}
   .home-technique button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .home-notices{margin:12px 0 16px;border-bottom:1px solid var(--border)}
+  .home-notices>summary{display:flex;align-items:center;gap:8px;min-height:48px;padding:6px 2px;cursor:pointer;list-style:none;color:var(--muted)}
+  .home-notices>summary::-webkit-details-marker{display:none}
+  .home-notices>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .home-notices>summary>svg{flex:none}
+  .home-notices>summary>.chev{transform:rotate(90deg)}
+  .home-notices[open]>summary>.chev{transform:rotate(-90deg)}
+  .home-notices-summary-copy{display:flex;flex:1;flex-wrap:wrap;justify-content:space-between;align-items:baseline;min-width:0;gap:2px 12px;font-size:.8125rem;line-height:1.4}
+  .home-notices-summary-copy b{font-size:.875rem;color:var(--txt)}
+  .home-notices .plan-week-notice,.home-notices .notify-card{margin:0;padding:12px 2px;border:0;border-top:1px solid var(--border);border-radius:0;background:none}
+  .home-notices .notify-card .agenda-title{margin:0 0 4px;font-size:1rem}
   .home-welcome{margin:16px 0;border-bottom:1px solid var(--border)}
   .home-welcome .agenda-title{font-size:.9375rem;margin-bottom:4px}
   .home-welcome .return-body{font-size:.8125rem;color:var(--muted)}
@@ -4600,8 +4609,8 @@ function removeInstallPrompt(){const el=document.getElementById("a2hs");if(el)el
 function dismissInstall(){UI.installDismissed=true;uiSave();removeInstallPrompt();}
 function updateInstallPrompt(){
   const inApp=session&&profile&&(typeof isActive!=="function"||isActive())&&privacyReady&&!privacyError&&!privacyGateRequired()&&!onboardingActive&&!passwordRecovery&&!(typeof planNeedsRecap==="function"&&planNeedsRecap());
-  // REQ-289: la pantalla de avisos y la tarjeta de Hoy ya piden instalar en
-  // iPhone; mientras la tarjeta de avisos está en Hoy, no se apilan dos pedidos.
+  // REQ-289: la pantalla de avisos y el panel de Hoy ya ofrecen instalar en
+  // iPhone; mientras hay un recordatorio en Hoy, no se apilan dos pedidos.
   const show=inApp&&isMobileDevice()&&!isStandaloneMode()&&!installDismissed()&&!notifySetupActive&&!isIOSDevice()&&!(view==="hoy"&&notifyNudgeDue());
   if(!show){removeInstallPrompt();return;}
   if(document.getElementById("a2hs"))return;               // ya visible
@@ -5335,6 +5344,32 @@ function homeRemainingAgendaHtml(ds,items){
     <div class="agenda-list">${items.map(homeAgendaItemHtml).join("")}</div>
   </details>`;
 }
+// REQ-367: la semana y los recordatorios no compiten con la agenda diaria.
+let homeReminderShownKey="";
+function homeNoticesHtml(ds,today){
+  const week=planWeekNoticeHtml(ds),reminder=notifyNudgeHtml();
+  if(!week&&!reminder)return "";
+  const preview=week?(reminder?"Plan y recordatorios":"Semana del plan"):"Configura tus recordatorios";
+  const previous=$("#homeNotices");
+  const open=previous?.open&&previous.dataset.date===today;
+  return `<details id="homeNotices" class="home-notices" data-date="${today}" ontoggle="homeNoticesToggled(this)"${open?" open":""}>
+    <summary>${notifyIcon("bell",18)}<span class="home-notices-summary-copy"><b>Avisos</b><span>${preview}</span></span>${chevron()}</summary>
+    ${week}${reminder}
+  </details>`;
+}
+function homeNoticesToggled(panel){
+  if(!panel.isConnected||!panel.open||!panel.querySelector(".notify-card"))return;
+  const key=`${uid()}:${panel.dataset.date}`;
+  if(homeReminderShownKey===key)return;
+  homeReminderShownKey=key;
+  trackNotifyPrompt("home","shown");
+}
+function renderAfterHomeNotice(){
+  const panel=$("#homeNotices"),active=document.activeElement;
+  const restore=panel?.open&&(panel.contains(active)||active===document.body);
+  render();
+  if(restore&&view==="hoy"&&!$("#overlay"))($("#homeNotices>summary")||$(".home-primary-action"))?.focus();
+}
 function homeWorkoutTechniqueHtml(ds,agenda){
   if(ds!==todayStr()||UI.homeTechniqueDismissed?.[uid()]===ds||trainingInjuryNoticeActive())return "";
   if(!agenda.items.some(item=>item.kind==="workout"))return "";
@@ -5599,17 +5634,16 @@ function renderHoy(){
   ${restartNudgeCard()}
   ${adminBetaPendingCardHtml()}
   ${nutritionUpdateHtml()}
-  ${planWeekNoticeHtml(ds)}
 
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()&&!agenda.items.some(item=>item.kind==="safety")?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
+  ${homeNoticesHtml(ds,today)}
   ${weeklyCheckinBanner()}
   ${coachWelcomeHtml()}
   ${routineEntryHtml()}
   ${coachSection}
   ${menuSuggestion}
-  ${referralNoticeHtml()}
-  ${notifyNudgeHtml()}`;
+  ${referralNoticeHtml()}`;
   maybeStartFitbrosTour();
 }
 function renderCoach(){chatModeActive()?renderChatMode():renderHoy();}
@@ -7727,7 +7761,7 @@ function dismissPlanWeekNotice(ds){
   if(!key)return;
   planWeekNoticeHidden.add(key);
   try{localStorage.setItem(key,"1");}catch(_){}
-  render();
+  renderAfterHomeNotice();
 }
 function planWeekNoticeHtml(ds){
   if(ds!==todayStr())return ""; // no decir «mañana» al navegar por otras fechas
@@ -9967,7 +10001,7 @@ async function enableDevicePush(source){
     trackNotifyPrompt(source,"error",{error_code:notifyErrorCode(step,e)});
     toast("No se pudieron activar los avisos. Intenta de nuevo.");
   }
-  render();
+  if(source==="home")renderAfterHomeNotice();else render();
 }
 async function enableEmailReminders(source){
   if(!supa||!uid())return;
@@ -9979,17 +10013,17 @@ async function enableEmailReminders(source){
   _engagementSaved="";scheduleEngagementSave(0); // REQ-285: la fila puede ser nueva
   trackNotifyPrompt(source,"email");
   toast("Te enviaremos recordatorios por correo");
-  render();
+  if(source==="home")renderAfterHomeNotice();else render();
 }
 async function installFromNudge(source){
   trackNotifyPrompt(source,"install");
   await installApp();
-  render();
+  if(source==="home")renderAfterHomeNotice();else render();
 }
 function snoozeNotifyNudge(){
   try{localStorage.setItem(NOTIFY_NUDGE_KEY+":"+uid(),todayStr());}catch(e){/* sin almacenamiento: vuelve a mostrarse */}
   trackNotifyPrompt("home","dismiss");
-  render();
+  renderAfterHomeNotice();
 }
 // Textos y acción de cada estado; source = onboarding u home.
 function notifyInstallCopy(source){
@@ -10062,14 +10096,13 @@ function showQueuedNotifyAsk(){
       <button class="btn" data-notify-ask-dismiss onclick="closeModal();trackNotifyPrompt('streak','dismiss')">Ahora no</button>
     </div>`);
 }
-// Tarjeta de Hoy: cada día, hasta que los avisos estén activos.
+// Recordatorio en Hoy: cada día, hasta que los avisos estén activos.
 function notifyNudgeDue(){
   if(notifPrefsCache===null||onboardingActive||!session||!profile)return false; // aún no se sabe: sin parpadeo
   return hasCompleteOnboarding(profile.prefs||{})&&!remindersCovered()&&!notifySnoozed();
 }
 function notifyNudgeHtml(){
   if(!notifyNudgeDue())return "";
-  if(_notifyShownToday!=="home:"+todayStr()){_notifyShownToday="home:"+todayStr();trackNotifyPrompt("home","shown");}
   const st=devicePushState();
   const c=st==="needs_install"?notifyInstallCopy("home"):notifyPushCopy("home");
   // REQ-340: instalar en iPhone toma pasos; el correo es un toque y sirve desde hoy.
@@ -10077,9 +10110,9 @@ function notifyNudgeHtml(){
     c.text+=` O recibe el recordatorio por correo a las ${notifyHourLabel()}.`;
     c.action=`<button class="btn btn-accent" onclick="enableEmailReminders('home')">Recibir por correo</button>`+(c.action||"");
   }
-  const title={needs_install:"Instala Evolv para recibir avisos",denied:"Tus avisos están bloqueados",unsupported:"Recibe los recordatorios por correo"}[st]||"Activa los avisos para no perder tu racha";
+  const title={needs_install:"Instala Evolv para recibir avisos",denied:"Tus avisos están bloqueados",unsupported:"Recibe los recordatorios por correo"}[st]||"Activa tus recordatorios";
   return `<section class="agenda-card notify-card" aria-labelledby="notifyCardTitle">
-    <div class="agenda-head"><span class="notify-step-ic">${notifyIcon(c.icon)}</span><h2 class="agenda-title" id="notifyCardTitle">${title}</h2></div>
+    <h2 class="agenda-title" id="notifyCardTitle">${title}</h2>
     <p class="notify-card-text">${c.text}</p>
     <div class="agenda-actions">${c.action||""}<button class="btn" onclick="snoozeNotifyNudge()">Ahora no</button></div>
   </section>`;

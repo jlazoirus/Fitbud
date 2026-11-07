@@ -7,6 +7,7 @@ import {
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const card = (page) => page.locator(".notify-card");
+const notices = (page) => page.locator("#homeNotices > summary");
 const prefsWrites = (calls) => calls.filter((c) => c.table === "notification_preferences" && c.method === "POST").map((c) => (Array.isArray(c.payload) ? c.payload[0] : c.payload));
 
 async function openHoy(page, context, opts = {}) {
@@ -21,18 +22,34 @@ async function openHoy(page, context, opts = {}) {
 }
 
 test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
-  test("sin avisos activos, Hoy lo recuerda; 'Ahora no' lo oculta hasta mañana", async ({ page, context }) => {
+  test("Hoy agrupa la semana y el recordatorio; 'Ahora no' oculta solo el recordatorio hasta mañana", async ({ page, context }) => {
     // La prueba representa un permiso aún no solicitado. Chromium headless
     // puede arrancar con denied; no depender del valor del navegador anfitrión.
     const { errors } = await openHoy(page, context, {
       init: () => Object.defineProperty(Notification, "permission", { get: () => "default" }),
+      mocks: { prefs: completePrefs({ planStartDate: daysFromToday(-8), planEndDate: daysFromToday(61) }) },
     });
-    await expect(card(page)).toContainText("Activa los avisos para no perder tu racha");
+    const week = page.locator("#homeNotices .plan-week-notice");
+    await expect(notices(page)).toContainText("Plan y recordatorios");
+    await expect(page.locator(".home-primary-action")).toBeInViewport();
+    await expect(week).toBeHidden();
+    await expect(card(page)).toBeHidden();
+    await notices(page).press("Enter");
+    await expect(week).toBeVisible();
+    const calendar = week.getByRole("button", { name: "Ver calendario" });
+    await calendar.click();
+    await expect(page.getByRole("dialog", { name: "Tu plan de entrenamiento" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(calendar).toBeFocused();
+    await expect(card(page)).toContainText("Activa tus recordatorios");
     await expect(card(page)).toContainText("Un aviso al día como máximo, a las 20:00");
     await expect(card(page).getByRole("button", { name: "Activar avisos" })).toBeVisible();
 
     await card(page).getByRole("button", { name: "Ahora no" }).click();
     await expect(card(page)).toHaveCount(0);
+    await expect(week).toBeVisible();
+    await expect(notices(page)).toBeFocused();
+    await expect(notices(page)).toContainText("Semana del plan");
     await page.reload();
     await gotoApp(page);
     await page.waitForLoadState("networkidle");
@@ -41,6 +58,7 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
 
     // Al día siguiente vuelve a aparecer.
     await page.evaluate(() => { localStorage.setItem(NOTIFY_NUDGE_KEY + ":" + uid(), "2000-01-01"); render(); });
+    await notices(page).click();
     await expect(card(page)).toBeVisible();
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
@@ -48,6 +66,7 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
   test("'Activar avisos' pide el permiso, suscribe el dispositivo y la tarjeta desaparece", async ({ page, context }) => {
     await context.grantPermissions(["notifications"]);
     const { calls, errors } = await openHoy(page, context);
+    await notices(page).click();
     await expect(card(page)).toBeVisible();
     // La suscripción real necesita el service worker (bloqueado en E2E): se guarda la preferencia.
     await page.evaluate(() => { window.subscribePush = async () => { await _savePushOptInDb(true); }; });
@@ -68,12 +87,20 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
       }
     });
     const { errors } = await openHoy(page, context);
+    await expect(notices(page)).toBeVisible();
+    expect(events.some((e) => e.action === "shown")).toBe(false);
+    await notices(page).click();
     await expect(card(page)).toBeVisible();
+    await expect.poll(() => events.filter((e) => e.action === "shown").length).toBe(1);
+    await notices(page).click();
+    await expect(card(page)).toBeHidden();
+    await notices(page).click();
     await page.evaluate(() => { window.subscribePush = async () => { throw Object.assign(new Error("x"), { name: "AbortError" }); }; });
     await card(page).getByRole("button", { name: "Activar avisos" }).click();
     await expect.poll(() => events.find((e) => e.action === "error")).toBeTruthy();
     const shown = events.find((e) => e.action === "shown");
     expect(shown).toMatchObject({ source: "home", state: "off", platform: "desktop", standalone: false });
+    expect(events.filter((e) => e.action === "shown")).toHaveLength(1);
     expect(events.find((e) => e.action === "error")).toMatchObject({ source: "home", error_code: "subscribe:AbortError", state: "off" });
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
@@ -82,6 +109,7 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     const { calls, errors } = await openHoy(page, context, {
       init: () => Object.defineProperty(Notification, "permission", { get: () => "denied" }),
     });
+    await notices(page).click();
     await expect(card(page)).toContainText("Tus avisos están bloqueados");
     await expect(card(page)).toContainText("Ajustes → Notificaciones → Evolv");
     await card(page).getByRole("button", { name: "Recibir por correo" }).click();
@@ -93,10 +121,14 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
   test("con avisos activos no hay tarjeta", async ({ page, context }) => {
     await context.grantPermissions(["notifications"]);
     const { errors } = await openHoy(page, context, {
-      mocks: { tables: { notification_preferences: { row: { user_id: "x", push_opt_in: true, email_opt_in: false, notify_hour: 20 } } } },
+      mocks: {
+        prefs: completePrefs({ planStartDate: daysFromToday(0), planEndDate: daysFromToday(69) }),
+        tables: { notification_preferences: { row: { user_id: "x", push_opt_in: true, email_opt_in: false, notify_hour: 20 } } },
+      },
     });
     await expect(page.locator(".agenda-card").first()).toBeVisible();
     await expect(card(page)).toHaveCount(0);
+    await expect(notices(page)).toHaveCount(0);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
@@ -105,6 +137,7 @@ test.describe("Avisos — iPhone fuera de la app instalada (REQ-289)", () => {
   test.use({ userAgent: IPHONE_UA });
   test("pide instalar desde Compartir, sin el banner flotante duplicado", async ({ page, context }) => {
     const { errors } = await openHoy(page, context);
+    await notices(page).click();
     await expect(card(page)).toContainText("Instala Evolv para recibir avisos");
     await expect(card(page)).toContainText("Añadir a pantalla de inicio");
     await expect(page.locator("#a2hs")).toHaveCount(0);
@@ -114,6 +147,7 @@ test.describe("Avisos — iPhone fuera de la app instalada (REQ-289)", () => {
   // REQ-340: instalar en iPhone toma pasos; el correo es un toque y quita la tarjeta.
   test("ofrece el correo con un toque y, activado, la tarjeta se va", async ({ page, context }) => {
     const { calls, errors } = await openHoy(page, context);
+    await notices(page).click();
     await expect(card(page)).toContainText("O recibe el recordatorio por correo a las 20:00");
     await card(page).getByRole("button", { name: "Recibir por correo" }).click();
     await expect(card(page)).toHaveCount(0);
@@ -201,6 +235,7 @@ test.describe("Avisos — pedido al sumar un día de racha (REQ-341)", () => {
     await seedLoggedInUser(page);
     await gotoApp(page);
     await page.waitForLoadState("networkidle");
+    await notices(page).click();
     await page.locator(".notify-card").getByRole("button", { name: "Ahora no" }).click();
     await expect(page.locator(".notify-card")).toHaveCount(0);
     await page.evaluate(() => toggleMeal(todayStr(), "almuerzo"));

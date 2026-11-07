@@ -46,7 +46,7 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 - Supabase es fuente de verdad; `localStorage` es cache/offline. Datos personales van por usuario con RLS.
 - Login obligatorio, landing publica, paywall/checkout, cupones, historial de pagos, notificaciones, sync offline y roles admin ya existen.
 - Entrenamiento tiene catalogo, reproductor recuperable, planes personalizados 4/10 semanas, splits progresivos y adaptaciones.
-- Nutricion tiene catalogo con recetas, restricciones, dominio puro y metadata semantica de REQ-79. El foco pendiente es sacar la aritmetica nutricional del coach textual y pasarla a solver/planner determinista: serie "dieta exacta" REQ-128..REQ-136 (diagnostico en `docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`).
+- Nutricion: catalogo con recetas, restricciones y planificador determinista (REQ-79..84 y serie "dieta exacta").
 - Migraciones SQL nunca se ejecutan automaticamente en produccion; documentar acciones manuales.
 - Al tocar `index.html` o shell PWA, revisar si corresponde subir `CACHE_NAME` en `service-worker.js`.
 
@@ -2470,3 +2470,9 @@ Referencia Platzi. Cinco pestañas visibles, selección accesible y avisos sobre
 **Estado: implementado.**
 
 Con fuerza pendiente, muestra la demostración del primer ejercicio. El menú opcional tiene prioridad. Descarte por día y cuenta. PWA v225.
+
+## REQ-367 - Hoy: avisos plegables
+
+**Estado: implementado.**
+
+Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibles. PWA v226.
