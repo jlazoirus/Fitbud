@@ -796,6 +796,15 @@
   .home-agenda[open] .chev{transform:rotate(-90deg)}
   .home-agenda .agenda-list{border-top:1px solid var(--border);padding:8px 12px 0}
   .home-agenda .agenda-actions .btn{flex:0 1 auto}
+  .home-technique{display:flex;align-items:center;gap:4px;margin:12px 0 16px;padding:4px;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-md)}
+  .home-technique-open{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:6px;background:none;text-align:left}
+  .home-technique-preview{position:relative;width:44px;height:44px;flex:none;display:grid;place-items:center;overflow:hidden;border-radius:9px;background:var(--surf3);color:var(--txt)}
+  .home-technique-preview img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.75}
+  .home-technique-preview span{position:relative;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--black)}
+  .home-technique-copy{flex:1;min-width:0;display:grid;gap:2px;overflow-wrap:anywhere;font-size:.875rem;line-height:1.3}
+  .home-technique-copy small{color:var(--muted);font-size:.75rem}
+  .home-technique-hide{flex:none;width:44px;height:44px;display:grid;place-items:center;background:none;color:var(--muted)}
+  .home-technique button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
   .home-welcome{margin:16px 0;border-bottom:1px solid var(--border)}
   .home-welcome .agenda-title{font-size:.9375rem;margin-bottom:4px}
   .home-welcome .return-body{font-size:.8125rem;color:var(--muted)}
@@ -4539,6 +4548,8 @@ const TAB_ICONS={
   weight:'<path d="M12 3a2 2 0 0 0-2 2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2-2zM9 9h6"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
   chevron:'<path d="M9 6l6 6-6 6"/>',
+  play:'<path d="M9 5l11 7-11 7z"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3.5h2.6l2.3 11.2a1 1 0 0 0 1 .8h9.4a1 1 0 0 0 1-.8l1.7-7.7H6.1"/>',
   copy:'<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
@@ -5324,6 +5335,38 @@ function homeRemainingAgendaHtml(ds,items){
     <div class="agenda-list">${items.map(homeAgendaItemHtml).join("")}</div>
   </details>`;
 }
+function homeWorkoutTechniqueHtml(ds,agenda){
+  if(ds!==todayStr()||UI.homeTechniqueDismissed?.[uid()]===ds||trainingInjuryNoticeActive())return "";
+  if(!agenda.items.some(item=>item.kind==="workout"))return "";
+  const prescription=workoutPrescription(ds);
+  if(prescription.sessionType!=="strength"||workoutContentIssues(ds).length)return "";
+  const step=prescription.steps.find(item=>item.type==="strength");
+  const exercise=step&&exerciseBySlug(step.exerciseSlug);
+  if(!exerciseHasDemo(exercise))return "";
+
+  const media=exerciseMediaSources(exercise);
+  const thumbnail=[media.poster,media.frames[0],media.isImage?media.url:""].find(src=>
+    /^(?:\.\/|\/)?assets\/exercise-media\/[\w-]+\.(avif|jpe?g|png|webp)$/i.test(src||""));
+  const openGuide=`openExerciseGuide(${JSON.stringify(exercise.slug)})`;
+  return `<section class="home-technique" aria-label="Sugerencia para tu entreno de hoy">
+    <button type="button" class="home-technique-open" aria-haspopup="dialog" aria-label="Ver técnica de ${esc(exercise.name)}" onclick="${esc(openGuide)}">
+      <span class="home-technique-preview" aria-hidden="true">
+        ${thumbnail?`<img src="${esc(thumbnail)}" alt="" loading="lazy" onerror="this.remove()">`:""}
+        <span>${miniIcon("play",14)}</span>
+      </span>
+      <span class="home-technique-copy"><small>Ver técnica · Entreno</small><strong>${esc(exercise.name)}</strong></span>
+    </button>
+    <button type="button" class="home-technique-hide" aria-label="Ocultar sugerencia por hoy" onclick="dismissHomeWorkoutTechnique('${ds}')"><span aria-hidden="true">${miniIcon("close",16)}</span></button>
+  </section>`;
+}
+function dismissHomeWorkoutTechnique(ds){
+  const userId=uid();
+  if(!userId)return;
+  UI.homeTechniqueDismissed={...UI.homeTechniqueDismissed,[userId]:ds};
+  uiSave();
+  renderHoy();
+  ($(".home-agenda>summary")||$(".home-primary-action"))?.focus({preventScroll:true});
+}
 function homeAgendaHtml(ds,data){
   const register={id:"homeLogAction",label:"Registrar comida",handler:`homeLogFood('${ds}')`};
   const note=homeCacheNoticeHtml();
@@ -5514,6 +5557,7 @@ function renderHoy(){
   applyDueCheckinAdjustment(); // REQ-234: aplica el ajuste diferido si ya empezó su semana
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
   const agenda=homeAgendaData(ds);
+  const menuSuggestion=homeMenuSuggestionHtml(ds);
   const hasAI=aiAvailable();
   const canUse=hasAI&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
   const msgs=loadCoachChat();
@@ -5550,6 +5594,7 @@ function renderHoy(){
   </header>
   ${agenda.state==="done"?"":homeConsumptionHtml(agenda.totals)}
   ${homeAgendaHtml(ds,agenda)}
+  ${menuSuggestion?"":homeWorkoutTechniqueHtml(ds,agenda)}
   ${returnCardHtml()}
   ${restartNudgeCard()}
   ${adminBetaPendingCardHtml()}
@@ -5562,7 +5607,7 @@ function renderHoy(){
   ${coachWelcomeHtml()}
   ${routineEntryHtml()}
   ${coachSection}
-  ${homeMenuSuggestionHtml(ds)}
+  ${menuSuggestion}
   ${referralNoticeHtml()}
   ${notifyNudgeHtml()}`;
   maybeStartFitbrosTour();

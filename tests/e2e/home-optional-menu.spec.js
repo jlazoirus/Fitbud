@@ -190,3 +190,66 @@ test("Una pausa por seguridad sustituye la opción de continuar una sesión",asy
   expect(await page.evaluate(()=>JSON.stringify(dayState(todayStr()).workoutExecution))).toBe(before);
   expect(paid).toEqual([]);expect(errors).toEqual([]);
 });
+
+test("Hoy muestra la técnica del primer ejercicio previsto cuando no ofrece un menú",async({page,context})=>{
+  await page.setViewportSize({width:320,height:700});
+  const {paid,errors}=await boot(page,context);
+  const menu=page.locator(".menu-suggestion");
+  const technique=page.getByRole("region",{name:"Sugerencia para tu entreno de hoy"});
+  await expect(menu).toBeVisible();
+  await expect(technique).toHaveCount(0);
+  await menu.getByRole("button",{name:"Ahora no"}).click();
+
+  const before=await page.evaluate(()=>{
+    const state=dayState(todayStr());
+    state.customExercises=["bench-press","lat-pulldown"];
+    renderHoy();
+    return JSON.stringify(state);
+  });
+  const open=technique.getByRole("button",{name:"Ver técnica de Press de banca"});
+  await expect(open).toBeVisible();
+  await expect(menu).toHaveCount(0);
+  await expect(technique.locator("video")).toHaveCount(0);
+  await open.click();
+  const guide=page.getByRole("dialog",{name:"Press de banca"});
+  await expect(guide.locator(".guide-demo")).toBeVisible();
+  await expect(guide.locator(".exercise-steps li").first()).toBeVisible();
+  expect(await page.evaluate(()=>JSON.stringify(dayState(todayStr())))).toBe(before);
+  await page.keyboard.press("Escape");
+  await expect(open).toBeFocused();
+
+  await page.evaluate(()=>{dayState(todayStr()).customExercises.reverse();renderHoy();});
+  await expect(technique.getByRole("button",{name:"Ver técnica de Jalón al pecho"})).toBeVisible();
+  await page.locator('#tabs [data-tab="entreno"]').click();
+  await startGuidedSession(page);
+  await page.locator('#tabs [data-tab="hoy"]').click();
+  await expect(page.locator(".home-primary.kind-resume")).toBeVisible();
+  await expect(technique).toHaveCount(0);
+  expect(paid).toEqual([]);expect(errors).toEqual([]);
+});
+
+test("El descarte de técnica dura ese día y la pausa de seguridad impide sugerirla",async({page,context})=>{
+  const {paid,errors}=await boot(page,context);
+  const technique=page.getByRole("region",{name:"Sugerencia para tu entreno de hoy"});
+  await page.locator(".menu-suggestion").getByRole("button",{name:"Ahora no"}).click();
+  const setExercise=()=>page.evaluate(()=>{dayState(todayStr()).customExercises=["bench-press"];renderHoy();});
+  await setExercise();
+  await technique.getByRole("button",{name:"Ocultar sugerencia por hoy"}).click();
+  await expect(technique).toHaveCount(0);
+  await expect(page.locator(".home-agenda summary")).toBeFocused();
+  await gotoApp(page);
+  await setExercise();
+  await expect(technique).toHaveCount(0);
+  await page.evaluate(()=>{
+    UI.homeTechniqueDismissed[uid()]=addDays(todayStr(),-1);
+    renderHoy();
+  });
+  await expect(technique).toBeVisible();
+  await page.evaluate(()=>{
+    safetyScreening={...safetyScreening,has_red_flags:true,cleared_for_training:false,responses:{chest_pain:true}};
+    renderHoy();
+  });
+  await expect(page.locator(".home-primary.kind-safety")).toBeVisible();
+  await expect(technique).toHaveCount(0);
+  expect(paid).toEqual([]);expect(errors).toEqual([]);
+});

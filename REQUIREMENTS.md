@@ -1,6 +1,6 @@
 # Plan de requerimientos de producto - Fitbros
 
-Este es el backlog operativo compacto para agentes autonomos. El detalle historico vive en `docs/requirements-history.md` y no debe leerse en cada corrida salvo que el REQ activo lo necesite.
+Backlog operativo de Fitbros. Consulta `docs/requirements-history.md` cuando lo requiera el REQ activo.
 
 Regla base:
 
@@ -2464,3 +2464,9 @@ Referencia Platzi. Consumo enlazado a Nutrición, acción contextual, agenda ple
 **Estado: implementado.**
 
 Referencia Platzi. Cinco pestañas visibles, selección accesible y avisos sobre la barra. PWA v224.
+
+## REQ-366 - Hoy: sugerencia de técnica
+
+**Estado: implementado.**
+
+Con fuerza pendiente, muestra la demostración del primer ejercicio. El menú opcional tiene prioridad. Descarte por día y cuenta. PWA v225.

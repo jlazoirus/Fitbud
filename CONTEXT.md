@@ -8,7 +8,7 @@ PWA de nutrición y entrenamiento personalizados: planes de 4/10 semanas, regist
 
 Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservado.
 
-REQ-364: Hoy muestra consumo, acción y agenda plegable. REQ-365: navegación flotante. REQ-324: fechas (`docs/plan-weeks.md`). REQ-349: sustituciones y renovación opcional (`docs/nutrition-continuity.md`). REQ-360: hábitos (`docs/habitual-meals.md`).
+REQ-364: consumo, acción y agenda plegable. REQ-365: navegación flotante. REQ-366: técnica sugerida en Hoy. REQ-324: fechas (`docs/plan-weeks.md`). REQ-349: sustituciones y renovación opcional (`docs/nutrition-continuity.md`). REQ-360: hábitos (`docs/habitual-meals.md`).
 
 ## Arquitectura vigente
 
