@@ -2434,3 +2434,9 @@ Ignorar restricciones o repetir plato en el día: mandan las restricciones; sin 
 Con 7 días registrados y ≥3 en meta, el plato repetido en ≥ mitad de esos días vuelve a su franja; lo registrado no cambia.
 ### Verificación sugerida
 `validate-habitual-meals.mjs`, `comidas-habituales.spec.js` y release gate.
+
+## REQ-361 - Avisos: el "Ahora no" de la tarjeta no calla el pedido de la racha
+
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
+
+✓ `tests/e2e/avisos.spec.js`.

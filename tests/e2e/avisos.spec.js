@@ -192,14 +192,30 @@ test.describe("Avisos — pedido al sumar un día de racha (REQ-341)", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  test("como mucho dos veces: la segunda, desde 3 días; respeta 'Ahora no' de hoy", async ({ page, context }) => {
+  // REQ-361: quien cerró la tarjeta de Hoy igual ve el pedido al sumar su día.
+  test("tras 'Ahora no' en la tarjeta de Hoy, el pedido aparece al sumar el día", async ({ page, context }) => {
+    await context.grantPermissions(["notifications"]);
+    const rows = [{ user_id: USER_ID, log_date: daysFromToday(-1), state: dayState(true), plan_version_id: null, updated_at: new Date().toISOString() },
+      { user_id: USER_ID, log_date: daysFromToday(0), state: dayState(false), plan_version_id: null, updated_at: new Date().toISOString() }];
+    await installMocks(context, { tables: { day_log: { rows } } });
+    await seedLoggedInUser(page);
+    await gotoApp(page);
+    await page.waitForLoadState("networkidle");
+    await page.locator(".notify-card").getByRole("button", { name: "Ahora no" }).click();
+    await expect(page.locator(".notify-card")).toHaveCount(0);
+    await page.evaluate(() => toggleMeal(todayStr(), "almuerzo"));
+    await page.locator("#streakPop .sp-card").click();
+    await expect(page.locator("#overlay .sheet")).toContainText("¡2 días seguidos!");
+  });
+
+  test("como mucho dos veces: la segunda, desde 3 días; el 'Ahora no' de la tarjeta no lo calla", async ({ page, context }) => {
     await context.grantPermissions(["notifications"]);
     await openWithStreak(page, context);
     await page.locator("#overlay [data-notify-ask-dismiss]").click();
     await expect(page.locator("#overlay")).toHaveCount(0);
     expect(await page.evaluate(() => [notifyAskWanted(2), notifyAskWanted(3)])).toEqual([false, true]);
     expect(await page.evaluate(() => { localStorage.setItem(NOTIFY_ASK_KEY + ":" + uid(), "2"); return notifyAskWanted(9); })).toBe(false);
-    expect(await page.evaluate(() => { localStorage.setItem(NOTIFY_ASK_KEY + ":" + uid(), "0"); localStorage.setItem(NOTIFY_NUDGE_KEY + ":" + uid(), todayStr()); return notifyAskWanted(1); })).toBe(false);
+    expect(await page.evaluate(() => { localStorage.setItem(NOTIFY_ASK_KEY + ":" + uid(), "0"); localStorage.setItem(NOTIFY_NUDGE_KEY + ":" + uid(), todayStr()); return notifyAskWanted(1); })).toBe(true);
   });
 });
 

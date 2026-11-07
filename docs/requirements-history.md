@@ -13503,3 +13503,24 @@ Nombre, resumen, orden, demostraciones y Hoy coinciden al elegir recientes/guard
 
 ### Verificación sugerida
 `tests/e2e/rutina-consistente.spec.js` (320/390/1280), `repetir-entreno.spec.js`, `rutina-propia.spec.js`, regresiones de entrenamiento y release gate. Reproducción previa: dos ejercicios elegidos, cinco tarjetas antiguas visibles.
+
+## REQ-361 - Avisos: el "Ahora no" de la tarjeta no calla el pedido de la racha
+
+**Estado: implementado.**
+
+### Origen
+
+Revisión del 2026-11-07, con la medición de REQ-339, de los primeros días de REQ-339..341 (7 personas activas):
+
+- Las 2 personas de iPhone tienen la app instalada (estado `off`, `standalone`) y cerraron la tarjeta de Hoy con "Ahora no". Ninguna tocó "Activar avisos".
+- El pedido tras la racha (REQ-341) se mostró a 1 persona, que aceptó el correo.
+
+REQ-341 no mostraba el pedido si la persona había cerrado la tarjeta ese día (`notifySnoozed()`). Justo quienes podían activar con un toque se quedaban sin ver el pedido que sí convierte. Jonathan aprobó el cambio ("go").
+
+### Alcance
+
+`notifyAskWanted()` (`app/index.html`) ya no mira `notifySnoozed()`. Siguen vigentes el máximo de dos pedidos, la condición de 3 días para el segundo, no preguntar si ya está cubierto y no preguntar durante el onboarding ni con otra ventana abierta. La tarjeta de Hoy mantiene su "Ahora no" hasta mañana.
+
+### Criterios de aceptación
+
+- Tras "Ahora no" en la tarjeta de Hoy, al sumar el día aparece el pedido. ✓ `tests/e2e/avisos.spec.js` (falla con el código anterior).
