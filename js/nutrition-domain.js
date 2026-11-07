@@ -738,6 +738,93 @@
   const FRUIT_SLOTS=new Set(["desayuno","media_manana","merienda","snack","recena"]);
   const FRUIT_BONUS=0.12;
   function fruitMealsTarget(mealCount){return mealCount>=4?2:1;}
+
+  // ── REQ-360: comidas habituales de los días que llegaron a la meta ──────────
+  // Tras una semana con registros, lo que el usuario comió en cada franja los
+  // días que cumplió sus macros se vuelve a sugerir: si casi siempre desayuna
+  // lo mismo, el menú nuevo trae ese desayuno. Las restricciones vigentes, los
+  // descartes y los platos bloqueados siguen mandando (el plato habitual solo
+  // entra si sigue siendo candidato compatible de su franja).
+  const HABIT_RULES={
+    windowDays:28,      // historial que se mira hacia atrás
+    minLoggedDays:7,    // "una semana de dieta": días con alguna comida registrada
+    minQualifiedDays:3, // días que llegaron a la meta, como mínimo
+    minRepeats:3,       // veces que debe repetirse el plato en esa franja
+    minShare:0.5,       // y en al menos la mitad de los días en meta con esa franja
+    kcalPct:0.10,       // meta: kcal a ±10 %
+    proteinPct:0.90,    // y proteína ≥ 90 %
+  };
+  // Bonificación del plato habitual en su franja. El score del solver va de ~0.1
+  // (encaje perfecto) a ~1.5 (malo): con 1.0 el habitual gana siempre que su
+  // porción pueda ajustarse razonablemente a la franja.
+  const HABIT_BONUS=1.0;
+
+  // ¿El día consumido llegó a la meta? Criterio de registro real (más amplio que
+  // DIET_CONTRACT, que es para el menú prescrito): kcal ±10 % y proteína ≥ 90 %.
+  function dayMeetsMacroGoal(totals,target){
+    const tk=num(target&&target.kcal),tp=num(target&&target.p);
+    const k=num(totals&&totals.kcal),p=num(totals&&(totals.p!=null?totals.p:totals.proteina_g));
+    if(tk<=0||k<=0)return false;
+    if(Math.abs(k-tk)>tk*HABIT_RULES.kcalPct)return false;
+    if(tp>0&&p<tp*HABIT_RULES.proteinPct)return false;
+    return true;
+  }
+
+  // history: [{date:"YYYY-MM-DD", totals:{kcal,p,c,f}, target:{kcal,p,c,f},
+  //            meals:[{slot_id, dishSlug?, nombre}]}] — solo comidas registradas.
+  // Devuelve {ready, loggedDays, qualifiedDays, bySlot:{slot:{dishSlug,nombre,count,days,share}}}.
+  function learnHabitualMeals(history,opts){
+    const rules={...HABIT_RULES,...(opts||{})};
+    const rows=(Array.isArray(history)?history:[])
+      .filter(day=>day&&day.date&&Array.isArray(day.meals)&&day.meals.length)
+      .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    const seenDates=new Set();
+    const logged=rows.filter(day=>!seenDates.has(day.date)&&seenDates.add(day.date));
+    const qualified=logged.filter(day=>dayMeetsMacroGoal(day.totals,day.target));
+    const result={ready:false,loggedDays:logged.length,qualifiedDays:qualified.length,bySlot:{}};
+    if(logged.length<rules.minLoggedDays||qualified.length<rules.minQualifiedDays)return result;
+    const perSlot=new Map();
+    qualified.forEach((day,recency)=>{
+      const seenSlots=new Set();
+      day.meals.forEach(meal=>{
+        const slot=slotIdForMeal(meal);
+        const nombre=String(meal&&(meal.nombre||meal.name)||"").trim();
+        const slug=String(meal&&meal.dishSlug||"").trim();
+        const key=slug||solverKey(nombre);
+        if(!slot||!key||seenSlots.has(slot))return;
+        seenSlots.add(slot);
+        if(!perSlot.has(slot))perSlot.set(slot,{days:0,dishes:new Map()});
+        const entry=perSlot.get(slot);
+        entry.days++;
+        const prev=entry.dishes.get(key)||{dishSlug:slug||null,nombre,count:0,lastRecency:recency};
+        prev.count++;
+        if(!prev.dishSlug&&slug)prev.dishSlug=slug;
+        entry.dishes.set(key,prev);
+      });
+    });
+    perSlot.forEach((entry,slot)=>{
+      const best=[...entry.dishes.values()].sort((a,b)=>b.count-a.count||a.lastRecency-b.lastRecency)[0];
+      if(!best)return;
+      const share=best.count/entry.days;
+      if(best.count<rules.minRepeats||share<rules.minShare)return;
+      result.bySlot[slot]={dishSlug:best.dishSlug,nombre:best.nombre,count:best.count,days:entry.days,share:Number(share.toFixed(2))};
+    });
+    result.ready=Object.keys(result.bySlot).length>0;
+    return result;
+  }
+
+  // Normaliza ctx.habitualBySlot (objeto o Map) a Map slot → dishSlug.
+  function habitSlugMap(habitual){
+    const out=new Map();
+    if(!habitual)return out;
+    const entries=habitual instanceof Map?[...habitual.entries()]:Object.entries(habitual.bySlot||habitual);
+    entries.forEach(([slot,habit])=>{
+      const slug=typeof habit==="string"?habit:habit&&habit.dishSlug;
+      if(slot&&slug)out.set(solverKey(slot),String(slug));
+    });
+    return out;
+  }
+
   function dishHasFruit(dish,catalog,maps){
     return dishLines(dish,catalog,maps||catalogMaps(catalog)).some(line=>/fruta/i.test(String(line.ingredient&&line.ingredient.category||"")));
   }
@@ -776,10 +863,14 @@
       cuisineTagsForDish(dishBySlug.get(slug)).forEach(tag=>recentCuisines.set(tag,(recentCuisines.get(tag)||0)+1));
     });
     const used=new Set(),comidas=[],diagnostics=[],causes=[],cookingWarns=[];
+    const habits=habitSlugMap(ctx&&ctx.habitualBySlot);
     const userCooking=normalizedCookingLevel(prefs.cookingLevel);
     const fruitTarget=fruitMealsTarget(slots.length);
     let fruitMeals=0;
-    slots.forEach(slot=>{
+    // REQ-360: las franjas con plato habitual se resuelven primero, para que lo
+    // conserven aunque otra franja también lo hubiera elegido.
+    const solveOrder=habits.size?[...slots.filter(slot=>habits.has(slot.id)),...slots.filter(slot=>!habits.has(slot.id))]:slots;
+    solveOrder.forEach(slot=>{
       // REQ-254: si no hay nada al nivel de cocina elegido, se sube un nivel y se avisa.
       let level=userCooking;
       let candidates=compatibleDishesForSlot(slot.id,prefs,catalog,{cookingLevel:level});
@@ -798,32 +889,44 @@
       // platos que reciben solver completo son los de tamaño más apropiado,
       // no los primeros en orden arbitrario del catálogo.
       const targetKcal=num(slot.target&&slot.target.kcal);
+      const habitSlug=habits.get(slot.id)||"";
       let best=null;
-      candidates
+      const ranked=candidates
         .map(dish=>({dish,baseKcal:dishBaseKcal(dish,catalog,maps)}))
         .sort((a,b)=>{
           const da=a.baseKcal>0?Math.abs(a.baseKcal-targetKcal):Infinity;
           const db=b.baseKcal>0?Math.abs(b.baseKcal-targetKcal):Infinity;
           return da-db;
-        })
-        .slice(0,48)
-        .forEach(({dish})=>{
+        });
+      const shortlist=ranked.slice(0,48);
+      // REQ-360: el plato habitual de la franja siempre recibe solver aunque su
+      // receta base no esté entre las 48 de tamaño más parecido.
+      if(habitSlug&&!shortlist.some(({dish})=>slugFor(dish)===habitSlug)){
+        const habitual=ranked.find(({dish})=>slugFor(dish)===habitSlug);
+        if(habitual)shortlist.push(habitual);
+      }
+      shortlist.forEach(({dish})=>{
         const solved=solveDishPortion(dish,slot.target,{catalog});
         if(!solved.ok){
           diagnostics.push({slot:slot.id,dish:dish.name,reason:solved.no_solution});
           return;
         }
         const slug=slugFor(dish);
-        const reuse=used.has(slug)?0.18:0;
-        const yesterday=(!reuse&&prevDayUsed.size&&prevDayUsed.has(slug))?0.10:0;
-        const recent=(!reuse&&!yesterday&&recentUsed.size&&recentUsed.has(slug))?0.06:0;
-        const jitter=jitterSeed?seededJitter(jitterSeed+"|"+slot.id+"|"+slug)*VARIETY_JITTER_WEIGHT:0;
+        // El plato habitual de otra franja queda reservado para ella: aquí cuenta como repetido.
+        const reservedElsewhere=!!habits.size&&slug!==habitSlug&&[...habits.values()].includes(slug);
+        const reuse=used.has(slug)||reservedElsewhere?0.18:0;
+        // El habitual no paga la penalización de repetición entre días: repetirlo es la idea.
+        const isHabit=!reuse&&!!habitSlug&&slug===habitSlug;
+        const yesterday=(!isHabit&&!reuse&&prevDayUsed.size&&prevDayUsed.has(slug))?0.10:0;
+        const recent=(!isHabit&&!reuse&&!yesterday&&recentUsed.size&&recentUsed.has(slug))?0.06:0;
+        const jitter=!isHabit&&jitterSeed?seededJitter(jitterSeed+"|"+slot.id+"|"+slug)*VARIETY_JITTER_WEIGHT:0;
         const prefAdj=preferenceScoreAdjustment(dish,prefs,catalog,maps);
-        const cuisineAdj=cuisineRepeatPenalty(dish,preferredCuisines,dayCuisines,recentCuisines);
+        const cuisineAdj=isHabit?0:cuisineRepeatPenalty(dish,preferredCuisines,dayCuisines,recentCuisines);
         const hasFruit=FRUIT_SLOTS.has(slot.id)&&dishHasFruit(dish,catalog,maps);
         const fruitAdj=hasFruit&&fruitMeals<fruitTarget?-FRUIT_BONUS:0;
-        const score=solved.score+reuse+yesterday+recent+jitter+prefAdj+cuisineAdj+fruitAdj;
-        if(!best||score<best.rankScore)best={...solved,rankScore:score,hasFruit};
+        const habitAdj=isHabit?-HABIT_BONUS:0;
+        const score=solved.score+reuse+yesterday+recent+jitter+prefAdj+cuisineAdj+fruitAdj+habitAdj;
+        if(!best||score<best.rankScore)best={...solved,rankScore:score,hasFruit,isHabit};
       });
       if(!best){
         causes.push({slot:slot.id,reason:(diagnostics.find(d=>d.slot===slot.id)||{}).reason||"no_viable_candidate"});
@@ -847,8 +950,13 @@
         grasa_g:best.macros.f,
         residual:best.residual,
         score:Number(best.score.toFixed(4)),
+        ...(best.isHabit?{habit:true}:{}),
       });
     });
+    if(habits.size){
+      const order=new Map(slots.map(slot=>[slot.id,slot.index]));
+      comidas.sort((a,b)=>order.get(a.slot_id)-order.get(b.slot_id));
+    }
     const totals=roundMacros(comidas.reduce((sum,meal)=>addMacros(sum,{
       kcal:num(meal.kcal),p:num(meal.proteina_g),c:num(meal.carbohidratos_g),f:num(meal.grasa_g),
     }),{kcal:0,p:0,c:0,f:0}));
@@ -1466,6 +1574,13 @@
       }
     });
 
+    // REQ-360: un hábito cuyo plato ya ocupa otra franja (registrado o propuesto)
+    // no se aplica, para no repetir el plato dentro del día.
+    const habits=habitSlugMap(ctx&&ctx.habitualBySlot);
+    habits.forEach((habitSlug,slotId)=>{
+      const elsewhere=[...bySlot.entries()].some(([id,meal])=>id!==slotId&&meal&&meal.dishSlug===habitSlug);
+      if(elsewhere)habits.delete(slotId);
+    });
     const fallback=planDeterministicNutritionDay({
       prefs,
       dayTarget:target,
@@ -1476,8 +1591,24 @@
       varietySeed:ctx&&ctx.varietySeed,
       prevDayUsed:ctx&&ctx.prevDayUsed,
       recentUsed:ctx&&ctx.recentUsed,
+      habitualBySlot:habits,
     });
     const fallbackBySlot=new Map((fallback.comidas||[]).map(meal=>[slotIdForMeal(meal),meal]));
+    // REQ-360: si el motor pudo servir el plato habitual de una franja (sigue
+    // permitido y su porción encaja), gana sobre una propuesta distinta. Las
+    // comidas registradas (lockedMeals) nunca se tocan.
+    habits.forEach((habitSlug,slotId)=>{
+      if(lockedSlotIds.has(slotId)||!bySlot.has(slotId))return;
+      const current=bySlot.get(slotId);
+      const habitMeal=fallbackBySlot.get(slotId);
+      if(current&&current.dishSlug===habitSlug){current.habit=true;return;}
+      if(!habitMeal||!habitMeal.habit)return;
+      // Nunca dos veces el mismo plato en el día: si otra franja ya lo tiene, se respeta.
+      const elsewhere=[...bySlot.entries()].some(([id,meal])=>id!==slotId&&meal&&meal.dishSlug===habitSlug);
+      if(elsewhere)return;
+      bySlot.set(slotId,{...cloneMeal(habitMeal),source:"habit"});
+      diagnostics.push({slot:slotId,reason:"habit_preferred",detail:String(habitMeal.nombre||"")});
+    });
     slots.forEach(slot=>{
       if(bySlot.has(slot.id))return;
       const meal=fallbackBySlot.get(slot.id);
@@ -1558,12 +1689,14 @@
   // days: misma estructura que planNutritionWeek devuelve.
   // Devuelve {score:0-1, warnings:[{slot, message, type}]}.
   function scoreWeeklyVariety(days){
-    const slotSlugs={};
+    const slotSlugs={},habitSlots=new Set();
     (days||[]).forEach(day=>{
       const comidas=Array.isArray(day.comidas)?day.comidas:((day.result&&day.result.comidas)||[]);
       comidas.forEach(c=>{
         const slot=c.slot_id||c.slot;if(!slot)return;
         if(!slotSlugs[slot])slotSlugs[slot]=[];
+        // REQ-360: repetir el plato habitual de la franja es intencional, no falta de variedad.
+        if(c.habit){habitSlots.add(slot);slotSlugs[slot].push("");return;}
         slotSlugs[slot].push(c.dishSlug||slugFor(c)||"");
       });
     });
@@ -1572,6 +1705,7 @@
     Object.entries(slotSlugs).forEach(([slot,slugs])=>{
       totalSlots++;
       const filled=slugs.filter(Boolean);
+      if(!filled.length&&habitSlots.has(slot)){diverseSlots++;return;}
       const unique=new Set(filled).size;
       if(unique>1)diverseSlots++;
       const consecutive=filled.filter((s,i)=>i>0&&s&&s===filled[i-1]).length;
@@ -1603,6 +1737,7 @@
         prefs,dayTarget,catalog,workoutContext,prevDayUsed,recentUsed,
         date:weekSeed?weekSeed+"+"+i:"",
         varietySeed:ctx&&ctx.varietySeed,
+        habitualBySlot:ctx&&ctx.habitualBySlot,
       });
       prevDayUsed=new Set((result.comidas||[]).map(c=>c.dishSlug||"").filter(Boolean));
       prevDayUsed.forEach(slug=>recentUsed.add(slug));
@@ -1681,6 +1816,9 @@
     buildShoppingListFromNutritionPlan,
     scoreWeeklyVariety,
     planNutritionWeek,
+    HABIT_RULES,
+    dayMeetsMacroGoal,
+    learnHabitualMeals,
   };
   root.FITBUD_NUTRITION_DOMAIN=FITBUD_NUTRITION_DOMAIN;
   // Exponer selectos como globals para call-sites de index.html que lo necesiten.

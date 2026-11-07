@@ -2389,34 +2389,7 @@ Test Node con Culqi y Resend simulados, y E2E de Perfil.
 
 ## REQ-358 - Entreno: reemplazar una rutina actualiza el nombre, los visuales y Hoy
 
-**Estado: implementado.**
-
-### Origen
-Jonathan (2026-11-06), cuatro capturas de Claudia: elige «Pull del viernes», pero Entreno y Hoy conservan «Full body A» y las demostraciones del plan anterior.
-
-### Problema
-La selección se aplica parcialmente: el resumen y el reproductor leen la copia, mientras el título, la descripción de Hoy y las tarjetas visuales siguen mostrando el plan original.
-
-### Causa raíz
-`effectiveWorkout()` en `app/index.html` ignoraba `customExercises`/`repeatWorkout`; solo `workoutPrescription()` usaba esos ejercicios. Además, las dosis de un plan personalizado conservaban otra lista de ejercicios, y editar una copia dejaba su nombre y dosis anteriores.
-
-### Objetivo
-Una sola rutina efectiva por fecha, coherente en todas las vistas y persistente tras recargar.
-
-### Alcance
-`effectiveWorkout()` proyecta nombre, ejercicios ordenados y descripción de la rutina elegida sin mutar el plan. Copias recientes/guardadas conservan nombre y dosis; las propias sin nombre dicen «Tu rutina». Reemplazar un plan personalizado respeta los ejercicios elegidos. Editar la copia elimina sus metadatos anteriores. PWA v217.
-
-### Fuera de alcance
-Cambios semanales, migraciones y modificaciones del historial ejecutado.
-
-### Riesgos
-Mezclar ejercicios del plan con la copia o alterar sesiones iniciadas. El reproductor conserva su snapshot al empezar.
-
-### Criterios de aceptación
-Nombre, resumen, orden, demostraciones y Hoy coinciden al elegir recientes/guardadas o editar una rutina. La selección sobrevive a recarga; volver al plan restaura su contenido. Fuente histórica y snapshot del plan permanecen intactos.
-
-### Verificación sugerida
-`tests/e2e/rutina-consistente.spec.js` (320/390/1280), `repetir-entreno.spec.js`, `rutina-propia.spec.js`, regresiones de entrenamiento y release gate. Reproducción previa: dos ejercicios elegidos, cinco tarjetas antiguas visibles.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-359 - Coach: conocer, revisar y guardar la rutina semanal
 
@@ -2440,3 +2413,24 @@ Propuestas incompatibles, cambios de cuenta/perfil, doble guardado y pérdida de
 Revisión sin mutaciones; guardado confirmado conserva ejercicios/dosis, persiste y coincide en Hoy/Entreno/reproductor. Respeta equipo, seguridad, registros y aislamiento.
 ### Verificación sugerida
 `test-training-routine.mjs`, `coach-rutina.spec.js`, regresiones y release gate. Operación: `docs/coach-routine.md`.
+
+## REQ-360 - Nutrición: la semana nueva repite lo que comes los días que cumples tu meta
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-07): tras una semana de dieta, generar según lo comido los días que llegaron a los macros; si siempre desayunas lo mismo, sugerir lo mismo.
+### Problema
+El menú rotaba platos y penalizaba repetir; REQ-63 solo pasaba ingredientes sueltos al coach.
+### Objetivo
+Cada franja repite el plato habitual de los días en meta.
+### Alcance
+`learnHabitualMeals()` y gate común; ver `docs/habitual-meals.md`. Coach v14, PWA v219.
+### Fuera de alcance
+Platos fuera del catálogo para el motor local, migraciones, analytics.
+### Riesgos
+Ignorar restricciones o repetir plato en el día: mandan las restricciones; sin duplicados.
+### Criterios de aceptación
+Con 7 días registrados y ≥3 en meta, el plato repetido en ≥ mitad de esos días vuelve a su franja; lo registrado no cambia.
+### Verificación sugerida
+`validate-habitual-meals.mjs`, `comidas-habituales.spec.js` y release gate.

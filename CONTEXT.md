@@ -8,7 +8,7 @@ PWA de nutrición y entrenamiento personalizados: planes de 4/10 semanas, regist
 
 Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservado.
 
-REQ-316: Hoy prioriza registro/entreno y menú opcional. REQ-324: fechas/avisos (`docs/plan-weeks.md`). REQ-349: restricciones, rechazos con sustitución y renovación semanal opcional (`docs/nutrition-continuity.md`).
+REQ-316: Hoy prioriza registro/entreno y menú opcional. REQ-324: fechas/avisos (`docs/plan-weeks.md`). REQ-349: restricciones, rechazos con sustitución y renovación semanal opcional (`docs/nutrition-continuity.md`). REQ-360: hábitos de días en meta (`docs/habitual-meals.md`).
 
 ## Arquitectura vigente
 
