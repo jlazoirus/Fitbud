@@ -33,6 +33,7 @@ Se instalan en NAT-20 (las de feature, en la tarea de fundación que las use pri
 | Necesidad | Paquete |
 |---|---|
 | Runtime/navegación | `expo`, `expo-router`, `react`, `react-native`, `react-native-safe-area-context`, `react-native-screens`, `expo-linking`, `expo-constants`, `expo-status-bar`, `expo-splash-screen`, `expo-font` |
+| Actualizaciones por aire | `expo-updates` (va desde el primer binario; sin él no hay OTA, ver `PUBLICACION.md` §5) |
 | Backend | `@supabase/supabase-js`, `react-native-url-polyfill` |
 | Almacenamiento | `expo-secure-store` (llaves/sesión), `react-native-mmkv` o `expo-sqlite` (caché offline; la elección se registra en NAT-24) |
 | Red/estado del dispositivo | `@react-native-community/netinfo`, `expo-application`, `expo-device` |

@@ -159,7 +159,8 @@
       "human": true,
       "deps": [
         "NAT-63",
-        "NAT-H7"
+        "NAT-H7",
+        "NAT-64"
       ],
       "paths": [
         "docs/native-migration/decisions.md"
@@ -458,6 +459,29 @@
       "claimedAt": null,
       "doneAt": null,
       "note": "Con el cobro solo en la web no se hace; ver COBRO-WEB.md Fase 3."
+    },
+    {
+      "id": "NAT-14",
+      "title": "Compatibilidad del servidor y los datos con versiones anteriores de la app",
+      "phase": 2,
+      "track": "backend",
+      "human": false,
+      "deps": [
+        "NAT-06",
+        "NAT-07",
+        "NAT-10",
+        "NAT-08"
+      ],
+      "paths": [
+        "scripts/validate-client-compat.mjs",
+        "tests/fixtures/client-compat/**",
+        "scripts/release-gate.mjs"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
     },
     {
       "id": "NAT-20",
@@ -1199,6 +1223,33 @@
         "docs/native-migration/release-checklist.md"
       ],
       "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-64",
+      "title": "Publicación OTA escalonada con controles previos",
+      "phase": 6,
+      "track": "release",
+      "human": false,
+      "deps": [
+        "NAT-14",
+        "NAT-26",
+        "NAT-27",
+        "NAT-28",
+        "NAT-49",
+        "NAT-63"
+      ],
+      "paths": [
+        "scripts/native-ota-check.mjs",
+        ".github/workflows/native-ota.yml",
+        "scripts/release-gate.mjs",
+        "docs/native-migration/release-checklist.md",
+        "AUTONOMOUS_AGENT.md"
+      ],
       "status": "pendiente",
       "owner": null,
       "claimedAt": null,
