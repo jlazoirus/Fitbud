@@ -9922,12 +9922,13 @@ function finishNotifySetup(reason){
 // La tarjeta diaria de Hoy casi no convierte (98 vistas, 0 activaciones). El
 // mejor momento es justo después de sumar un día: se pregunta al cerrar la
 // celebración, como mucho dos veces por persona (la primera racha y, si dijo
-// que no, al llegar a 3 días). "Ahora no" en la tarjeta de hoy también lo calla.
+// que no, al llegar a 3 días). REQ-361: el "Ahora no" de la tarjeta de Hoy ya
+// no lo calla: quien cierra la tarjeta igual ve el pedido al sumar su día.
 const NOTIFY_ASK_KEY="evolv_notify_ask_v1",NOTIFY_ASK_MAX=2;
 let _notifyAskPending=0;
 function notifyAskCount(){try{return Number(localStorage.getItem(NOTIFY_ASK_KEY+":"+uid()))||0;}catch(e){return NOTIFY_ASK_MAX;}}
 function notifyAskWanted(n){
-  if(!session||!profile||onboardingActive||notifPrefsCache===null||remindersCovered()||notifySnoozed())return false;
+  if(!session||!profile||onboardingActive||notifPrefsCache===null||remindersCovered())return false;
   const asked=notifyAskCount();
   return asked===0?n>=1:asked<NOTIFY_ASK_MAX&&n>=3;
 }
