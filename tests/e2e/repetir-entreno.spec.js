@@ -55,6 +55,8 @@ test("repetir el entreno de otro día, guardarlo, usarlo otro día y quitarlo", 
   await expect(recentRow.locator("button.opt b")).toHaveText(new RegExp(`^${seed.weekday} \\d+ \\w+ · ${seed.name}$`));
   await recentRow.locator("button.opt").click();
   await expect(app.locator(".routine-pill")).toHaveText("repetido");
+  await expect(app.locator(".workout .name")).toContainText(seed.name);
+  expect(await app.locator(".exercise-card").evaluateAll(cards => cards.map(card => card.dataset.exercise))).toEqual([seed.a, seed.b]);
   await expect(app.locator(".wk-repeat-line")).toContainText(`Repites tu entreno del ${seed.weekday.toLowerCase()}`);
   expect(await strengthSlugs(page)).toEqual([seed.a, seed.b]);
   // Mismas series y repeticiones que ese día (4 series de 6-10; 2 de 12).
@@ -93,6 +95,8 @@ test("repetir el entreno de otro día, guardarlo, usarlo otro día y quitarlo", 
   await app.getByRole("button", { name: "Cambiar entrenamiento" }).click();
   await overlay.locator(".wk-copy-row").filter({ hasText: "Push pesado" }).locator("button.opt").click();
   await expect(app.locator(".wk-repeat-line")).toContainText("Tu entreno guardado: Push pesado");
+  await expect(app.locator(".workout .name")).toContainText("Push pesado");
+  expect(await app.locator(".exercise-card").evaluateAll(cards => cards.map(card => card.dataset.exercise))).toEqual([seed.a, seed.b]);
   expect(await strengthSlugs(page)).toEqual([seed.a, seed.b]);
   // Elegir una sesión del plan deja de repetirlo.
   await app.getByRole("button", { name: "Volver al plan" }).click();

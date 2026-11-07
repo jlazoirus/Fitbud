@@ -43,6 +43,8 @@ test("editar la rutina de una vez, guardarla y que la próxima sesión del mismo
   expect(custom).toHaveLength(2);
   expect(await page.evaluate(() => workoutPrescription(current).steps.filter((s) => s.type === "strength").map((s) => s.exerciseSlug))).toEqual(custom);
   await expect(app.locator(".routine-pill")).toHaveText("tu rutina");
+  await expect(app.locator(".workout .name")).toContainText("Tu rutina");
+  expect(await app.locator(".exercise-card").evaluateAll(cards => cards.map(card => card.dataset.exercise))).toEqual(custom);
   // Se recuerda en el perfil (sincronizado) y el día lo lleva en day_log.
   await expect.poll(() => {
     const posts = calls.filter((c) => c.table === "profiles" && c.method === "POST");
@@ -66,6 +68,8 @@ test("editar la rutina de una vez, guardarla y que la próxima sesión del mismo
   await expect(suggest).toContainText("La última vez hiciste tu rutina de");
   await suggest.getByRole("button", { name: "Repetir mi rutina" }).click();
   await expect(suggest).toHaveCount(0);
+  await expect(app.locator(".workout .name")).toContainText("Tu rutina");
+  expect(await app.locator(".exercise-card").evaluateAll(cards => cards.map(card => card.dataset.exercise))).toEqual(custom);
   expect(await page.evaluate(() => workoutPrescription(current).steps.filter((s) => s.type === "strength").map((s) => s.exerciseSlug))).toEqual(custom);
   expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
 });

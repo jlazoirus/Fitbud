@@ -1991,7 +1991,19 @@ function effectiveWorkout(ds,prefs){
   const ovrId=st&&st.workoutOverride;
   const valid=ovrId&&workoutById(ds,ovrId,resolvedPrefs);
   const id=valid?ovrId:plannedId;
-  return {id,workout:valid||planned,plannedId,planned,overridden:!!(valid&&ovrId!==plannedId)};
+  return {id,workout:dayRoutineWorkout(ds,valid||planned),plannedId,planned,overridden:!!(valid&&ovrId!==plannedId)};
+}
+// REQ-358: todas las vistas leen la misma rutina efectiva del día. El plan
+// original sigue disponible en planned para comparar y volver a él.
+function dayRoutineWorkout(ds,workout){
+  if(!isStrengthWorkout(workout))return workout;
+  const ids=dayCustomExercises(ds);
+  if(!ids.length)return workout;
+  const st=S.days[ds],rep=dayRepeatWorkout(ds);
+  const snapshot=st.workoutExecution&&st.workoutExecution.contentPrescription;
+  const name=snapshot&&snapshot.workoutId===workout.id?snapshot.name:rep&&rep.name;
+  return {...workout,name:name||"Tu rutina",exerciseIds:ids,
+    detail:`${ids.length} ejercicios · ${routineNamesLine(ids)}`};
 }
 
 function profileMacroTargets(){
@@ -5830,7 +5842,9 @@ function workoutPrescription(ds){
   const custom=isStrengthWorkout(workout)?dayCustomExercises(ds):[];
   if(custom.length)prescribedIds=custom;
   const exercises=prescribedIds.map(slug=>exerciseBySlug(slug,true)).filter(Boolean);
-  const prescription=buildWorkoutPrescription(workout,exercises,workoutPlayerContext(ds));
+  // Una rutina propia reemplaza también los ejercicios del plan personalizado;
+  // sus dosis siguen la fase, o las series de la copia si se está repitiendo.
+  const prescription=buildWorkoutPrescription(custom.length?{...workout,generatedPrescription:null}:workout,exercises,workoutPlayerContext(ds));
   // REQ-346: un entreno repetido trae sus series y repeticiones de entonces.
   return custom.length?applyRepeatDoses(ds,prescription):prescription;
 }
@@ -7174,7 +7188,7 @@ function routineClear(){if(routineDraft){routineDraft.ids=[];routineDraft.replac
 async function saveRoutineDraft(){
   const d=routineDraft;if(!d||!d.ids.length)return;
   const st=dayState(d.ds);
-  st.customExercises=[...d.ids];delete st.routineChoice;
+  st.customExercises=[...d.ids];delete st.routineChoice;delete st.repeatWorkout;
   commitDay(d.ds);
   routineDraft=null;closeModal();render();
   toast("Rutina guardada para hoy");

@@ -2386,3 +2386,34 @@ Correos duplicados; que el acceso se corte antes de tiempo al cancelar.
 - Cada correo sale una sola vez.
 ### Verificación sugerida
 Test Node con Culqi y Resend simulados, y E2E de Perfil.
+
+## REQ-358 - Entreno: reemplazar una rutina actualiza el nombre, los visuales y Hoy
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-06), cuatro capturas de Claudia: elige «Pull del viernes», pero Entreno y Hoy conservan «Full body A» y las demostraciones del plan anterior.
+
+### Problema
+La selección se aplica parcialmente: el resumen y el reproductor leen la copia, mientras el título, la descripción de Hoy y las tarjetas visuales siguen mostrando el plan original.
+
+### Causa raíz
+`effectiveWorkout()` en `app/index.html` ignoraba `customExercises`/`repeatWorkout`; solo `workoutPrescription()` usaba esos ejercicios. Además, las dosis de un plan personalizado conservaban otra lista de ejercicios, y editar una copia dejaba su nombre y dosis anteriores.
+
+### Objetivo
+Una sola rutina efectiva por fecha, coherente en todas las vistas y persistente tras recargar.
+
+### Alcance
+`effectiveWorkout()` proyecta nombre, ejercicios ordenados y descripción de la rutina elegida sin mutar el plan. Copias recientes/guardadas conservan nombre y dosis; las propias sin nombre dicen «Tu rutina». Reemplazar un plan personalizado respeta los ejercicios elegidos. Editar la copia elimina sus metadatos anteriores. PWA v217.
+
+### Fuera de alcance
+Cambios semanales, migraciones y modificaciones del historial ejecutado.
+
+### Riesgos
+Mezclar ejercicios del plan con la copia o alterar sesiones iniciadas. El reproductor conserva su snapshot al empezar.
+
+### Criterios de aceptación
+Nombre, resumen, orden, demostraciones y Hoy coinciden al elegir recientes/guardadas o editar una rutina. La selección sobrevive a recarga; volver al plan restaura su contenido. Fuente histórica y snapshot del plan permanecen intactos.
+
+### Verificación sugerida
+`tests/e2e/rutina-consistente.spec.js` (320/390/1280), `repetir-entreno.spec.js`, `rutina-propia.spec.js`, regresiones de entrenamiento y release gate. Reproducción previa: dos ejercicios elegidos, cinco tarjetas antiguas visibles.
