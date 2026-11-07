@@ -5294,7 +5294,7 @@ function homeAgendaData(ds){
 }
 function homeActionHtml(action,buttonClass="btn"){
   if(!action)return "";
-  return `<button type="button" class="${buttonClass}"${action.id?` id="${action.id}"`:""} onclick="${esc(action.handler)}">${esc(action.label)}</button>`;
+  return `<button type="button" class="${buttonClass}"${action.id?` id="${action.id}"`:""}${action.dialog?' aria-haspopup="dialog"':""} onclick="${esc(action.handler)}">${esc(action.label)}</button>`;
 }
 // REQ-249: el tipo va con prefijo; "meal"/"workout" a secas son las tarjetas
 // globales y metían un borde sin relleno lateral que pegaba los botones al borde.
@@ -5404,6 +5404,10 @@ function dismissHomeWorkoutTechnique(ds){
 }
 function homeAgendaHtml(ds,data){
   const register={id:"homeLogAction",label:"Registrar comida",handler:`homeLogFood('${ds}')`};
+  // REQ-368: en descanso se puede elegir una sesión antes de registrar actividad.
+  const restWorkout=data.restDay&&ds===todayStr()&&workoutContentCanUpdate(ds)&&!trainingSafetyHold()
+    ?{label:"Elegir entrenamiento",handler:`openWorkoutPicker('${ds}')`,dialog:true}
+    :null;
   const note=homeCacheNoticeHtml();
   const workoutStatus=workoutStatusLabel(data.workoutOutcome).toLowerCase();
   if(data.state==="done"){
@@ -5424,31 +5428,35 @@ function homeAgendaHtml(ds,data){
       <div class="home-secondary-actions">
         ${homeActionHtml(register,"home-secondary-action")}
         ${next?homeActionHtml(progress,"home-secondary-action"):""}
+        ${homeActionHtml(restWorkout,"home-secondary-action")}
       </div>
     </section>${note}`;
   }
   const first=data.items[0];
   const promote=first&&first.kind!=="rest"&&(first.kind!=="workout"||!data.hasOpenMeals);
   const workoutLink={label:"Ver entreno",handler:`homeOpenWorkout('${ds}','workout_detail')`};
+  let logMeta="Añade una comida o un extra de hoy.";
+  if(restWorkout)logMeta="Hoy toca descanso. Añade una comida o un extra.";
+  else if(!first)logMeta=`Entreno ${workoutStatus}. ${logMeta}`;
   const primary=promote?first:{
     kind:"log",title:"Registra lo que comiste",action:register,
-    meta:first?"Añade una comida o un extra de hoy.":`Entreno ${workoutStatus}. Añade una comida o un extra de hoy.`
+    meta:logMeta
   };
   let secondary=null;
   if(promote){
     secondary=first.kind==="meal"
       ?{...register,label:"Registrar otra comida",handler:`homeLogFood('${ds}','${first.mealId}')`}
       :register;
-  }else if(first?.kind==="workout"||!first){
+  }else if(!restWorkout&&(first?.kind==="workout"||!first)){
     secondary=workoutLink;
   }
-  const alternative=promote&&first.kind==="workout"?first.alternative:null;
+  const alternative=restWorkout||(promote&&first.kind==="workout"?first.alternative:null);
   const meta=[primary.label,primary.meta].filter(Boolean).join(" · ");
   return `<section class="agenda-card home-primary kind-${primary.kind}" aria-labelledby="homePrimaryTitle">
     <h2 class="agenda-title" id="homePrimaryTitle">${esc(primary.title)}</h2>
     ${meta?`<div class="agenda-sub">${esc(meta)}</div>`:""}
     ${homeActionHtml(primary.action,"btn btn-accent home-primary-action")}
-    ${secondary?`<div class="home-secondary-actions">${homeActionHtml(secondary,"home-secondary-action")}${homeActionHtml(alternative,"home-secondary-action")}</div>`:""}
+    ${secondary||alternative?`<div class="home-secondary-actions">${homeActionHtml(secondary,"home-secondary-action")}${homeActionHtml(alternative,"home-secondary-action")}</div>`:""}
   </section>${note}${homeRemainingAgendaHtml(ds,promote?data.items.slice(1):data.items)}`;
 }
 
@@ -7594,8 +7602,13 @@ function applyRepeatDoses(ds,prescription){
 function workoutChangeBlocked(ds){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return true;}
   const execution=normalizedWorkoutExecution(ds);
-  if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return true;}
+  const st=dayState(ds);
+  if(st.workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return true;}
   if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return true;}
+  if(view==="hoy"&&(ds!==todayStr()||!workoutContentCanUpdate(ds))){
+    toast("Elige una sesión para hoy antes de registrar actividad.");
+    return true;
+  }
   return false;
 }
 function applyWorkoutCopy(ds,copy,savedId){
@@ -7610,7 +7623,7 @@ function applyWorkoutCopy(ds,copy,savedId){
   d.customExercises=copy.exercises.map(item=>item.slug);
   d.repeatWorkout={name:copy.name,exercises:copy.exercises,...(savedId?{savedId}:{from:copy.from})};
   delete d.routineChoice;
-  commitDay(ds);closeModal();render();
+  commitDay(ds);showSelectedWorkout(ds);
   toast(savedId?`Hoy haces «${copy.name}»`:`Hoy repites tu entreno del ${workoutCopyDayLabel(copy.from)}`);
 }
 function repeatRecentWorkout(ds,from){applyWorkoutCopy(ds,workoutCopyFromDay(from),null);}
@@ -8084,21 +8097,22 @@ function toggleWorkout(){
   setView("entreno");
 }
 function openWorkoutPicker(ds){
-  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
   if(trainingSafetySoftHold()){openInjuryTrainingNotice(ds,"picker");return;}
-  const execution=normalizedWorkoutExecution(ds);
-  if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
-  if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
+  if(workoutChangeBlocked(ds))return;
   const ew=effectiveWorkout(ds);
   const prefs=trainingPrefsFromPrefs(trainingPrefsForDate(ds));
   const options=workoutOptions(ds);
   // El grupo de fuerza filtra por el tipo de sesión ("Peso corporal" en casa o aire libre).
   const groups=[[prefs.strength==="gym"?"Gimnasio":"Peso corporal","💪"],[SPORT_LABELS[prefs.primary],"◉"],["Descanso","☾"]];
-  let html=`<h3>Cambiar entrenamiento</h3><p class="muted small">Tu plan combina <b>${SPORT_LABELS[prefs.primary]}</b> con <b>${STRENGTH_LABELS[prefs.strength]}</b>. La sesión planificada es <b>${esc(ew.planned.name)}</b>.</p>`;
+  const choosingFromHome=view==="hoy";
+  let html=choosingFromHome
+    ?`<h3>Elegir entrenamiento para hoy</h3><p class="muted small">Hoy toca descanso. Puedes elegir una sesión solo para este día.</p>`
+    :`<h3>Cambiar entrenamiento</h3><p class="muted small">Tu plan combina <b>${SPORT_LABELS[prefs.primary]}</b> con <b>${STRENGTH_LABELS[prefs.strength]}</b>. La sesión planificada es <b>${esc(ew.planned.name)}</b>.</p>`;
   // REQ-346: primero lo propio: guardados y los últimos entrenos, para repetirlos tal cual.
   html+=workoutCopyPickerHtml(ds);
   groups.forEach(([k,ic])=>{
-    const opts=options.filter(o=>o.kind===k);
+    const opts=options.filter(o=>o.kind===k&&(!choosingFromHome||o.id!=="descanso"));
+    if(!opts.length)return;
     html+=`<div class="section-h" style="margin-left:0">${ic} ${k}</div>`;
     opts.forEach(o=>{
       const cur=o.id===ew.id&&!dayRepeatWorkout(ds), plan=o.id===ew.plannedId;
@@ -8107,16 +8121,20 @@ function openWorkoutPicker(ds){
   });
   modal(html);
 }
+function showSelectedWorkout(ds){
+  closeModal();
+  if(view==="hoy"){
+    homeOpenWorkout(ds,"workout_detail");
+    $("#app .workout .btn-accent:enabled")?.focus();
+  }else render();
+}
 function setWorkout(ds,id){
-  if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
-  const execution=normalizedWorkoutExecution(ds);
-  if(dayState(ds).workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return;}
-  if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
+  if(workoutChangeBlocked(ds))return;
   const d=dayState(ds);if(id&&id!==plannedWorkoutId(ds))d.workoutOverride=id;else delete d.workoutOverride;
   clearRepeatWorkout(d); // REQ-346: elegir una sesión del plan deja de repetir el entreno anterior.
   // REQ-291: volver a un plan de deporte deja también el lugar del día.
   if(!d.workoutOverride&&!isStrengthWorkout(effectiveWorkout(ds).workout))delete d.trainingPlace;
-  commitDay(ds);closeModal();render();toast("Entrenamiento actualizado");
+  commitDay(ds);showSelectedWorkout(ds);toast("Entrenamiento actualizado");
 }
 function delExtra(ds,i){if(!confirm("¿Eliminar esta comida extra?"))return;const d=dayState(ds);d.extras.splice(i,1);commitDay(ds);render();}
 

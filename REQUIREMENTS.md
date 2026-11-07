@@ -1353,9 +1353,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-205`).
 
 ## REQ-206 - Entreno: registrar a mano lo entrenado (también en días de descanso) con estimación de calorías
 
-**Estado: implementado.** Registrar a mano lo entrenado (también en días de descanso) en `dayState(ds).manualActivities`, con kcal estimadas por MET × kg × horas; editar y quitar desde Entreno y "Entrené igual" en Hoy.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-206`).
+**Estado: implementado.** Actividad manual con kcal estimadas, edición y borrado. «Entrené igual» en Hoy. Detalle en `docs/requirements-history.md`.
 
 ## REQ-207 - Fix: "Estimar con foto" no deja elegir una foto de la galería
 
@@ -2476,3 +2474,7 @@ Con fuerza pendiente, muestra la demostración del primer ejercicio. El menú op
 **Estado: implementado.**
 
 Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibles. PWA v226.
+
+## REQ-368 - Hoy: elegir entrenamiento en descanso
+
+**Estado: implementado.** Selector de sesiones para hoy con las restricciones de seguridad. PWA v227.

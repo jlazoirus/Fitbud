@@ -1,7 +1,7 @@
 // REQ-206: registrar a mano lo que entrenaste (también en un día de descanso),
 // con estimación de calorías determinista (MET × kg × horas; 0 llamadas pagadas).
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, todayYmd, USER_ID, trainingDaysIncludingToday } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, todayYmd, USER_ID, trainingDaysIncludingToday, startGuidedSession } from "./helpers.js";
 
 // Día de hoy ya preparado (comidas pendientes) para que Hoy muestre la agenda.
 const meal = (name) => ({ done: false, ovr: { name, kcal: 600, p: 40, c: 60, f: 20 } });
@@ -20,6 +20,35 @@ function restTodayPrefs() {
   return completePrefs({ trainingDays: days, trainingLocations: Object.fromEntries(days.map((d) => [d, "gym"])) });
 }
 
+test("en un descanso, desde Hoy se puede elegir y empezar una sesión guiada", async ({ page, context }) => {
+  await installMocks(context, { prefs: restTodayPrefs() });
+  await seedLoggedInUser(page);
+  await autoDismissNudges(page);
+  const errors = collectConsoleErrors(page);
+  await gotoApp(page);
+
+  const choose = page.getByRole("button", { name: "Elegir entrenamiento", exact: true });
+  await expect(choose).toBeInViewport();
+  await choose.click();
+  const picker = page.getByRole("dialog", { name: "Elegir entrenamiento para hoy" });
+  await expect(picker).toBeVisible();
+  await picker.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await expect(choose).toBeFocused();
+  expect(await page.evaluate(() => effectiveWorkout(todayStr()).id)).toBe("descanso");
+
+  await choose.click();
+  await picker.getByRole("button", { name: /^Gimnasio · Full body A/ }).click();
+  await expect(page.locator('#tabs [data-tab="entreno"]')).toHaveAttribute("aria-current", "page");
+  await expect(page.locator(".workout .name")).toContainText("Gimnasio · Full body A");
+  expect(await page.evaluate(() => {
+    const { id, plannedId } = effectiveWorkout(todayStr());
+    return [id, plannedId, dayState(todayStr()).workoutExecution ?? null];
+  })).toEqual(["fullA", "descanso", null]);
+  await startGuidedSession(page);
+  expect(await page.evaluate(() => dayState(todayStr()).workoutExecution?.status)).toBe("in_progress");
+  expect(errors).toEqual([]);
+});
+
 test.describe("Actividad registrada a mano", () => {
   test("en un día de descanso se registra lo entrenado, estima kcal y cuenta como entrenado", async ({ page, context }) => {
     const { calls } = await installMocks(context, { prefs: restTodayPrefs(), tables: { day_log: { rows: [preparedToday()] } } });
@@ -33,7 +62,10 @@ test.describe("Actividad registrada a mano", () => {
     await agenda.locator("summary").click();
     await expect(agenda.locator(".kind-rest")).toBeVisible();
     await expect(agenda.locator(".kind-rest")).toContainText("Descanso planificado");
-    await expect(page.getByRole("button", { name: "Entrené igual" })).toBeVisible();
+    await agenda.getByRole("button", { name: "Entrené igual", exact: true }).click();
+    const registerFromHome = page.getByRole("dialog", { name: "Registrar actividad" });
+    await expect(registerFromHome).toBeVisible();
+    await registerFromHome.getByRole("button", { name: "Cerrar", exact: true }).click();
     await expect(agenda.locator(".home-agenda-count")).toHaveText("2 pendientes"); // dos comidas, el descanso no cuenta
 
     await page.locator("#tabs").getByText("Entreno").click();
