@@ -22,7 +22,7 @@ Lectura bajo demanda:
 - `docs/requirements-history.md`: detalle de REQ implementados, decisiones antiguas, evidencia historica y criterios originales.
 - `docs/architecture-reference.md`: mapa extendido de archivos, variables, migraciones y contexto operativo historico.
 
-La verdad final sigue siendo el codigo en `HEAD`. Si un documento contradice el codigo, confirmar contra el codigo y actualizar la documentacion en el mismo commit del REQ.
+Prima el código en `HEAD`. Corrige discrepancias en el mismo commit.
 
 ## Vision compacta
 
@@ -2457,4 +2457,10 @@ Configurar, editar o quitar gramos por pieza en catálogo o alimentos propios. A
 
 **Estado: implementado.**
 
-Solicitud de Jonathan, referencia Platzi. Consumo resumido con enlace a Nutrición, acción según estado y pendientes reales desplegables. Conserva registro sin menú, seguridad y vista de mañana. PWA v223. ✓ E2E de Hoy.
+Referencia Platzi. Consumo enlazado a Nutrición, acción contextual, agenda plegable, registro sin menú y vista de mañana. PWA v223.
+
+## REQ-365 - Navegación inferior flotante
+
+**Estado: implementado.**
+
+Referencia Platzi. Cinco pestañas visibles, selección accesible y avisos sobre la barra. PWA v224.
