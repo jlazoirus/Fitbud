@@ -2,7 +2,7 @@
 // que se pueden editar o quitar; los totales salen de las líneas y la lista de
 // compra usa esas cantidades. Registrar no toca el catálogo global.
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, USER_ID, todayYmd } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, profileFixture, USER_ID, todayYmd } from "./helpers.js";
 import { INGREDIENTS } from "./fixtures/catalog.js";
 
 const tenth = (n) => String(Math.round(n * 10) / 10).replace(".", ",");
@@ -33,18 +33,18 @@ for (const width of [320, 1280]) {
     await overlay.locator('.qp-tab[data-tab="food"]').click();
     await overlay.locator("#qpSearch").fill("avena");
     await expect(overlay.getByLabel("Gramos de Avena")).toHaveValue("100");
-    await expect(overlay.getByLabel("Unidad de Avena")).toHaveCount(0);
+    await expect(overlay.getByLabel("Unidad de Avena").locator('option[value="units"]')).toHaveCount(0);
     await overlay.locator("#qpSearch").fill("huevo entero");
     const unit = overlay.getByLabel("Unidad de Huevo entero", { exact: true });
     await unit.selectOption("units");
     const quantity = overlay.getByLabel("Unidades de Huevo entero");
     await expect(quantity).toHaveValue("2");
-    await quantity.fill("1,5");
-    await expect(overlay.locator("#qpEquiv0")).toHaveText("≈ 75 g");
+    await quantity.fill("3");
+    await expect(overlay.locator("#qpUnit0Hint")).toHaveText("≈ 150 g");
     await unit.selectOption("g");
-    await expect(overlay.getByLabel("Gramos de Huevo entero")).toHaveValue("75");
+    await expect(overlay.getByLabel("Gramos de Huevo entero")).toHaveValue("150");
     await unit.selectOption("units");
-    await expect(quantity).toHaveValue("1,5");
+    await expect(quantity).toHaveValue("3");
     const row = overlay.locator(".qp-food", { hasText: "Huevo entero" });
     await quantity.fill("2");
     expect(await row.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
@@ -64,7 +64,7 @@ for (const width of [320, 1280]) {
 
     // Forzar que la reapertura use el snapshot del servidor simulado.
     await page.evaluate(() => localStorage.removeItem("fitbud_v1"));
-    await page.reload();
+    await gotoApp(page);
     await page.locator("#tabs").getByText("Nutrición").click();
     await page.locator(".meal", { hasText: "Huevo entero 2 unidades" })
       .getByRole("button", { name: "Editar", exact: true }).click();
@@ -78,6 +78,82 @@ for (const width of [320, 1280]) {
     expect(errors).toEqual([]);
   });
 }
+
+test("REQ-363: configurar unidades privadas del catálogo, recuperar el ajuste y quitarlo sin cambiar registros", async ({ page, context }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  const { overlay, errors, calls } = await setup(page, context);
+  const plantainId = INGREDIENTS.find(f => f.name === "Plátano").id;
+  const avocadoId = INGREDIENTS.find(f => f.name === "Palta").id;
+  const server = { ...profileFixture(), updated_at: "2026-10-10T00:00:00.000Z" };
+  let patches = 0;
+  await page.route("**/rest/v1/profiles?*", async route => {
+    const request = route.request();
+    const params = new URL(request.url()).searchParams;
+    if (request.method() === "GET" && params.has("id")) return route.fulfill({ json: [server] });
+    if (request.method() !== "PATCH" || !params.has("updated_at")) return route.fallback();
+    expect(params.get("id")).toBe(`eq.${USER_ID}`);
+    if (++patches === 1) {
+      // Otro dispositivo guardó entre la lectura y la escritura.
+      server.updated_at = "2026-10-10T00:00:01.000Z";
+      server.prefs.catalogUnitWeights = { [avocadoId]: 120 };
+    }
+    if (params.get("updated_at") !== `eq.${server.updated_at}`) return route.fulfill({ json: [] });
+    Object.assign(server, request.postDataJSON());
+    return route.fulfill({ json: [{ id: USER_ID }] });
+  });
+
+  const open = async () => {
+    await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+    await overlay.locator('.qp-tab[data-tab="food"]').click();
+    await overlay.locator("#qpSearch").fill("platano");
+  };
+  await open();
+  const unit = overlay.getByLabel("Unidad de Plátano", { exact: true });
+  await unit.selectOption("configure");
+  const weight = overlay.getByLabel("Gramos por unidad", { exact: true });
+  await expect(weight).toBeFocused();
+  await weight.fill("0");
+  await overlay.getByRole("button", { name: "Guardar unidad" }).click();
+  await expect(overlay.locator("#qpUnitError")).toContainText("Indica un peso");
+  expect(patches).toBe(0);
+  await weight.fill("118,5");
+  if (process.env.REQ363_SCREENSHOTS === "1") {
+    await overlay.locator(".sheet").screenshot({ path: testInfo.outputPath("configurar-unidades-320.png") });
+  }
+  await overlay.getByRole("button", { name: "Guardar unidad" }).click();
+  await expect(unit).toHaveValue("units");
+  expect(patches).toBe(2);
+  expect(server.prefs.catalogUnitWeights).toEqual({ [plantainId]: 118.5, [avocadoId]: 120 });
+  const quantity = overlay.getByLabel("Unidades de Plátano");
+  await expect(quantity).toHaveValue("1");
+  await quantity.fill("1,5");
+  await overlay.getByRole("button", { name: "Añadir", exact: true }).click();
+  await expect(overlay.locator(".comp-row")).toHaveCount(0);
+  await expect(page.locator("#toast")).toContainText("cantidad entera");
+  await quantity.fill("2");
+  await expect(overlay.locator("#qpUnit0Hint")).toHaveText("≈ 237 g");
+  await overlay.getByRole("button", { name: "Añadir", exact: true }).click();
+  await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(89 * 2.37));
+  await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
+  await expect.poll(() => calls.some(c => c.table === "day_log" &&
+    c.payload?.state?.extras?.some(extra => extra.components?.[0]?.unitGrams === 118.5))).toBe(true);
+
+  await gotoApp(page);
+  await page.locator("#tabs").getByText("Nutrición").click();
+  await open();
+  await unit.selectOption("configure");
+  await expect(weight).toHaveValue("118,5");
+  await overlay.getByRole("button", { name: "Quitar unidades" }).click();
+  await expect(unit.locator('option[value="units"]')).toHaveCount(0);
+  await expect(unit).toHaveValue("g");
+  expect(server.prefs.catalogUnitWeights).toEqual({ [plantainId]: 0, [avocadoId]: 120 });
+  expect(calls.some(c => c.table === "ingredients" && c.method !== "GET")).toBe(false);
+  await overlay.getByRole("button", { name: "Cerrar" }).click();
+  await page.locator(".meal", { hasText: "Plátano 2 unidades" }).getByRole("button", { name: "Editar", exact: true }).click();
+  await expect(overlay.getByLabel("Cantidad de Plátano (unidades)")).toHaveValue("2");
+  await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(89 * 2.37));
+  expect(errors).toEqual([]);
+});
 
 test("gramos decimales sin redondear, editar y quitar líneas, y reabrir con su snapshot", async ({ page, context }) => {
   const { overlay, errors, calls } = await setup(page, context);

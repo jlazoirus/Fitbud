@@ -161,6 +161,19 @@
   // suman con precisión completa y solo se redondean al guardar/mostrar.
   const COMPONENTS_MAX=30;
   const COMPONENT_AMOUNT_MAX={"100g":2000,"100ml":2000,portion:20};
+  function validUnitGrams(grams){
+    return Number.isFinite(grams)&&grams>=0.001&&grams<=COMPONENT_AMOUNT_MAX["100g"];
+  }
+  function parseUnitGrams(raw){
+    const parsed=parseNutrientInput(raw);
+    if(parsed.empty)return {empty:true};
+    if(!parsed.ok||!validUnitGrams(parsed.value))return {error:"Indica un peso entre 0,001 y 2000 g por unidad."};
+    return {value:Math.round(parsed.value*1000)/1000};
+  }
+  function normalizedCatalogUnitWeights(input){
+    if(!input||typeof input!=="object"||Array.isArray(input))return {};
+    return Object.fromEntries(Object.entries(input).filter(([id,grams])=>/^\d{1,20}$/.test(id)&&(grams===0||validUnitGrams(grams))));
+  }
   function normalizeComponent(c){
     if(!c||typeof c!=="object")return null;
     const name=cleanText(c.name,160);
@@ -177,8 +190,7 @@
     }
     // REQ-362: amount y base siguen en gramos. La equivalencia del registro
     // se conserva para editar unidades sin depender del catálogo vigente.
-    if(unit==="100g"&&out.ref?.kind==="ingredient"&&Number.isFinite(c.unitGrams)
-      &&c.unitGrams>=1&&c.unitGrams<=COMPONENT_AMOUNT_MAX["100g"])out.unitGrams=c.unitGrams;
+    if(unit==="100g"&&(out.ref?.kind==="ingredient"||out.ref?.kind==="food")&&validUnitGrams(c.unitGrams))out.unitGrams=c.unitGrams;
     return out;
   }
   function normalizeComponents(list){
@@ -286,8 +298,10 @@
     let gtin="";
     const g=parseGtin(input&&input.gtin);
     if(!g.empty){if(g.ok)gtin=g.value;else errors.gtin=gtinErrorText(g.error);}
+    const weight=unit==="100g"?parseUnitGrams(input&&input.unitGrams):{};
+    if(weight.error)errors.unitGrams=weight.error;
     const ok=!Object.keys(errors).length;
-    const value=ok?Object.assign({name,unit,base},brand?{brand}:{},portion?{portion}:{},gtin?{gtin}:{}):null;
+    const value=ok?Object.assign({name,unit,base},brand?{brand}:{},portion?{portion}:{},gtin?{gtin}:{},weight.value?{unitGrams:weight.value}:{}):null;
     return {ok,value,errors};
   }
   function normalizeCustomFood(f){
@@ -307,6 +321,7 @@
       else if(label&&Number.isFinite(amount)&&amount>0&&amount<=COMPONENT_AMOUNT_MAX[unit])out.portion={label,amount:roundTenth(amount)};
     }
     if(unit==="portion"&&!out.portion)out.portion={label:"1 porción"};
+    if(unit==="100g"&&validUnitGrams(f.unitGrams))out.unitGrams=f.unitGrams;
     const gtin=normalizeGtin(f.gtin);if(gtin)out.gtin=gtin;
     const version=Number(f.version);out.version=Number.isInteger(version)&&version>0?version:1;
     const at=Date.parse(f.updatedAt);if(Number.isFinite(at))out.updatedAt=new Date(at).toISOString();
@@ -443,6 +458,7 @@
     NUTRITION_META_VERSION,normalizeNutritionMeta,nutritionMetaFor,finalizeNutritionMeta,
     metaComputedValues,sameMacros,nutritionMetaLabel,
     COMPONENTS_MAX,COMPONENT_AMOUNT_MAX,normalizeComponent,normalizeComponents,componentValues,componentsTotals,
+    parseUnitGrams,normalizedCatalogUnitWeights,
     componentUnitCount,componentAmountLabel,componentsName,componentsSource,
     copyEntrySnapshot,
     CUSTOM_FOODS_MAX,CUSTOM_FOOD_DELETED_MAX,validateCustomFoodInput,normalizeCustomFood,normalizedCustomFoods,

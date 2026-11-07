@@ -23,7 +23,7 @@ const savedFoods = (calls) => {
 };
 async function fillForm(overlay, v) {
   if (v.unit) await overlay.locator("#cf_unit").selectOption(v.unit);
-  for (const k of ["name", "brand", "kcal", "p", "c", "f", "portionLabel", "portionAmount"]) {
+  for (const k of ["name", "brand", "kcal", "p", "c", "f", "portionLabel", "portionAmount", "unitGrams"]) {
     if (v[k] != null) await overlay.locator("#cf_" + k).fill(v[k]);
   }
 }
@@ -62,6 +62,32 @@ test("yogur por 100 g con pote de 125 g: crear desde la búsqueda, registrar y g
   // Nada se envía a analytics con el alimento.
   expect(JSON.stringify(calls.filter((c) => /analytics/.test(c.table)))).not.toContain("Yogur");
   expect(errors).toEqual([]);
+});
+
+test("REQ-363: definir el peso por unidad de un alimento propio y registrar piezas enteras", async ({ page, context }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 900 });
+  const { overlay, calls } = await setup(page, context);
+  await overlay.getByRole("button", { name: "＋ Crear alimento propio" }).click();
+  await fillForm(overlay, { name: "Tostada de centeno", kcal: "250", p: "8", c: "48", f: "3", unitGrams: "22,25" });
+  await overlay.getByRole("button", { name: "Guardar alimento" }).click();
+  const row = overlay.locator(".qp-food", { hasText: "Tostada de centeno" });
+  await row.getByLabel("Unidad de Tostada de centeno", { exact: true }).selectOption("units");
+  await row.getByLabel("Unidades de Tostada de centeno").fill("3");
+  await expect(row).toContainText("≈ 66,75 g");
+  expect(await row.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  if (process.env.REQ363_SCREENSHOTS === "1") {
+    await overlay.locator(".sheet").screenshot({ path: testInfo.outputPath("alimento-propio-320.png") });
+  }
+  await row.getByRole("button", { name: "Añadir" }).click();
+  await expect(overlay.locator("#f_kcal")).toHaveValue(tenth(250 * 0.6675));
+  expect(savedFoods(calls)[0]).toMatchObject({ unitGrams: 22.25 });
+  const amount = overlay.getByLabel("Cantidad de Tostada de centeno (unidades)");
+  await amount.fill("2,5");
+  await amount.blur();
+  await expect(amount).toHaveValue("3");
+  await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
+  const extra = await page.evaluate(() => dayState(todayStr()).extras[0]);
+  expect(extra.components[0]).toMatchObject({ unit: "100g", amount: 66.75, unitGrams: 22.25 });
 });
 
 test("bebida por 100 ml y barra por porción sin peso (no se convierte a gramos)", async ({ page, context }) => {

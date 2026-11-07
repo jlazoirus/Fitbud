@@ -2445,4 +2445,10 @@ Con 7 días registrados y ≥3 en meta, el plato repetido en ≥ mitad de esos d
 
 **Estado: implementado.**
 
-Feedback de Marco: registrar huevos sin pesarlos. Huevo entero admite gramos o unidades. Una unidad equivale aproximadamente a 50 g sin cáscara, redondeados de [USDA FoodData Central, NDB 1123](https://fdc.nal.usda.gov/food-search/?component=1100). `unitGrams` conserva la elección en cada registro, con cálculo en gramos y edición en unidades tras recargar. PWA v221. ✓ `tests/e2e/composicion.spec.js`.
+Feedback de Marco. Huevo entero, ≈50 g sin cáscara por unidad. [USDA NDB 1123](https://fdc.nal.usda.gov/food-search/?component=1100). PWA v221.
+
+## REQ-363 - Nutrición: configurar unidades enteras por alimento
+
+**Estado: implementado.**
+
+Configurar, editar o quitar gramos por pieza en catálogo o alimentos propios. Ajuste privado por perfil. Registro de enteros, cálculo en gramos y equivalencia histórica por línea. PWA v222. ✓ `tests/e2e/composicion.spec.js` y `tests/e2e/alimentos-propios.spec.js`.
