@@ -2440,3 +2440,9 @@ Con 7 días registrados y ≥3 en meta, el plato repetido en ≥ mitad de esos d
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ✓ `tests/e2e/avisos.spec.js`.
+
+## REQ-362 - Nutrición: registrar alimentos por unidades
+
+**Estado: implementado.**
+
+Feedback de Marco: registrar huevos sin pesarlos. Huevo entero admite gramos o unidades. Una unidad equivale aproximadamente a 50 g sin cáscara, redondeados de [USDA FoodData Central, NDB 1123](https://fdc.nal.usda.gov/food-search/?component=1100). `unitGrams` conserva la elección en cada registro, con cálculo en gramos y edición en unidades tras recargar. PWA v221. ✓ `tests/e2e/composicion.spec.js`.

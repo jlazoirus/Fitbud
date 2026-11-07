@@ -175,6 +175,10 @@
       const version=Number(c.ref.version);if(Number.isInteger(version)&&version>0)ref.version=version;
       out.ref=ref;
     }
+    // REQ-362: amount y base siguen en gramos. La equivalencia del registro
+    // se conserva para editar unidades sin depender del catálogo vigente.
+    if(unit==="100g"&&out.ref?.kind==="ingredient"&&Number.isFinite(c.unitGrams)
+      &&c.unitGrams>=1&&c.unitGrams<=COMPONENT_AMOUNT_MAX["100g"])out.unitGrams=c.unitGrams;
     return out;
   }
   function normalizeComponents(list){
@@ -190,7 +194,11 @@
     normalizeComponents(list).forEach(c=>{const v=componentValues(c);t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;});
     return t;
   }
+  function componentUnitCount(c){
+    return String(Number((c.amount/c.unitGrams).toFixed(6))).replace(".",",");
+  }
   function componentAmountLabel(c){
+    if(c.unitGrams)return `${componentUnitCount(c)} ${c.amount===c.unitGrams?"unidad":"unidades"}`;
     if(c.unit==="portion")return c.amount===1?"1 porción":`${fmtQty(c.amount)} porciones`;
     return `${fmtQty(c.amount)} ${c.unit==="100ml"?"ml":"g"}`;
   }
@@ -435,7 +443,7 @@
     NUTRITION_META_VERSION,normalizeNutritionMeta,nutritionMetaFor,finalizeNutritionMeta,
     metaComputedValues,sameMacros,nutritionMetaLabel,
     COMPONENTS_MAX,COMPONENT_AMOUNT_MAX,normalizeComponent,normalizeComponents,componentValues,componentsTotals,
-    componentAmountLabel,componentsName,componentsSource,
+    componentUnitCount,componentAmountLabel,componentsName,componentsSource,
     copyEntrySnapshot,
     CUSTOM_FOODS_MAX,CUSTOM_FOOD_DELETED_MAX,validateCustomFoodInput,normalizeCustomFood,normalizedCustomFoods,
     mergeCustomFoods,customFoodLabel,customFoodBaseLabel,

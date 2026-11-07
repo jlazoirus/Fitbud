@@ -3,6 +3,7 @@
 // compra usa esas cantidades. Registrar no toca el catálogo global.
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, completePrefs, USER_ID, todayYmd } from "./helpers.js";
+import { INGREDIENTS } from "./fixtures/catalog.js";
 
 const tenth = (n) => String(Math.round(n * 10) / 10).replace(".", ",");
 async function setup(page, context, opts = {}) {
@@ -19,6 +20,63 @@ async function addFood(overlay, query, grams) {
   await overlay.locator("#qpSearch").fill(query);
   await overlay.locator("#qpGrams0").fill(grams);
   await overlay.getByRole("button", { name: "Añadir" }).first().click();
+}
+
+for (const width of [320, 1280]) {
+  test(`REQ-362: registrar huevos en unidades y editarlos tras recargar (${width}px)`, async ({ page, context }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    const egg = { id: 362, name: "Huevo entero", kcal: 143, protein_g: 13, carbs_g: 1, fat_g: 9.5 };
+    const { overlay, errors, calls } = await setup(page, context, {
+      tables: { ingredients: { rows: [egg, ...INGREDIENTS] } },
+    });
+    await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+    await overlay.locator('.qp-tab[data-tab="food"]').click();
+    await overlay.locator("#qpSearch").fill("avena");
+    await expect(overlay.getByLabel("Gramos de Avena")).toHaveValue("100");
+    await expect(overlay.getByLabel("Unidad de Avena")).toHaveCount(0);
+    await overlay.locator("#qpSearch").fill("huevo entero");
+    const unit = overlay.getByLabel("Unidad de Huevo entero", { exact: true });
+    await unit.selectOption("units");
+    const quantity = overlay.getByLabel("Unidades de Huevo entero");
+    await expect(quantity).toHaveValue("2");
+    await quantity.fill("1,5");
+    await expect(overlay.locator("#qpEquiv0")).toHaveText("≈ 75 g");
+    await unit.selectOption("g");
+    await expect(overlay.getByLabel("Gramos de Huevo entero")).toHaveValue("75");
+    await unit.selectOption("units");
+    await expect(quantity).toHaveValue("1,5");
+    const row = overlay.locator(".qp-food", { hasText: "Huevo entero" });
+    await quantity.fill("2");
+    expect(await row.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    if (process.env.REQ362_SCREENSHOTS === "1") {
+      await overlay.locator(".sheet").screenshot({ path: testInfo.outputPath(`huevos-${width}.png`) });
+    }
+    await quantity.fill("41");
+    await row.getByRole("button", { name: "Añadir" }).click();
+    await expect(overlay.locator(".comp-row")).toHaveCount(0);
+    await quantity.fill("2");
+    await row.getByRole("button", { name: "Añadir" }).click();
+    await expect(overlay.locator("#f_kcal")).toHaveValue("143");
+    await expect(overlay.locator("#f_name")).toHaveValue("Huevo entero 2 unidades");
+    await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
+    await expect.poll(() => calls.some(c => c.table === "day_log" &&
+      c.payload?.state?.extras?.some(extra => extra.components?.[0]?.unitGrams === 50))).toBe(true);
+
+    // Forzar que la reapertura use el snapshot del servidor simulado.
+    await page.evaluate(() => localStorage.removeItem("fitbud_v1"));
+    await page.reload();
+    await page.locator("#tabs").getByText("Nutrición").click();
+    await page.locator(".meal", { hasText: "Huevo entero 2 unidades" })
+      .getByRole("button", { name: "Editar", exact: true }).click();
+    const savedQuantity = overlay.getByLabel("Cantidad de Huevo entero (unidades)", { exact: true });
+    await expect(savedQuantity).toHaveValue("2");
+    await savedQuantity.fill("3");
+    await savedQuantity.blur();
+    await expect(overlay.locator("#f_kcal")).toHaveValue("214,5");
+    await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
+    await expect(page.locator(".meal", { hasText: "Huevo entero 3 unidades" })).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 }
 
 test("gramos decimales sin redondear, editar y quitar líneas, y reabrir con su snapshot", async ({ page, context }) => {

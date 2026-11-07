@@ -552,6 +552,10 @@
   .scan{display:flex;flex-direction:column;gap:6px;margin:6px 0}
   .scan video{width:100%;max-height:220px;object-fit:cover;border-radius:var(--r-md);background:var(--surf3)}
   .qp-unit{flex:0 0 auto;background:var(--surf3);border:1px solid var(--border-2);border-radius:var(--r-sm);color:var(--txt);padding:6px 4px;font-family:inherit;font-size:14px}
+  .qp-item.has-unit-measure{flex-wrap:wrap}
+  .has-unit-measure .qp-main{flex:1 1 132px}
+  .qp-measure-controls{display:flex;align-items:center;gap:8px}
+  .has-unit-measure .qp-grams,.has-unit-measure .qp-unit,.has-unit-measure .btn{min-height:44px}
   .copy-list{margin:6px 0;padding-left:18px;font-size:14px}
   .components{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r-md)}
   .comp-head{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;margin-bottom:6px}
@@ -11479,14 +11483,10 @@ function renderQuickPicks(){
       +(qp.custom.length?`<div class="qp-sub muted small">Tus alimentos</div>${qp.custom.map(customFoodRowHtml).join("")}`:"");
     let msg="";
     const own=qp.custom.length+qp.recipes.length;
-    if(!q)msg=mine.length||recipes.length?"":"Escribe para buscar y elige los gramos.";
+    if(!q)msg=mine.length||recipes.length?"":"Escribe para buscar y elige la cantidad.";
     else if(!foods.length&&!own)msg="El catálogo de alimentos no está disponible ahora.";
     else if(!qp.items.length&&!own)msg="No encontramos ese alimento. Puedes crearlo con los datos de la etiqueta.";
-    box.innerHTML=customHtml+(qp.items.length&&own?`<div class="qp-sub muted small">Catálogo</div>`:"")+qp.items.map((ing,i)=>`<div class="qp-item qp-food">
-        <div class="qp-main"><b>${esc(ing.name)}</b><div class="o-meta">${Math.round(+ing.kcal||0)} kcal · P ${Math.round(+ing.protein_g||0)} · C ${Math.round(+ing.carbs_g||0)} · G ${Math.round(+ing.fat_g||0)} por 100 g</div></div>
-        <input class="qp-grams" id="qpGrams${i}" type="text" inputmode="decimal" autocomplete="off" value="100" aria-label="Gramos de ${esc(ing.name)}"><span class="muted small">g</span>
-        <button class="btn btn-sm" onclick="addFoodToEditor(${i})">Añadir</button>
-      </div>`).join("")+(msg?`<div class="muted small">${msg}</div>`:"")+create;
+    box.innerHTML=customHtml+(qp.items.length&&own?`<div class="qp-sub muted small">Catálogo</div>`:"")+qp.items.map(catalogFoodRowHtml).join("")+(msg?`<div class="muted small">${msg}</div>`:"")+create;
     return;
   }
   const source=qp.tab==="fav"?savedMeals():recentCustomMeals(20);
@@ -11578,12 +11578,50 @@ function setQuickPickPortion(factor){
 }
 // REQ-271: un alimento del catálogo entra como línea con su base por 100 g;
 // los totales salen de las líneas, con gramos decimales y redondeo solo al mostrar.
+// REQ-362: USDA FoodData Central, Foundation NDB 1123: huevo grande sin
+// cáscara 50,3 g. Referencia redondeada a 50 g para el registro por unidades.
+function catalogUnitGrams(ing){
+  return catalogSlug(ing?.name)==="huevo-entero"?50:0;
+}
+function catalogFoodRowHtml(ing,i){
+  const unitGrams=catalogUnitGrams(ing);
+  const name=esc(ing.name);
+  const hint=unitGrams?`<div class="muted small" id="qpEquiv${i}">1 unidad ≈ ${unitGrams} g</div>`:"";
+  const controls=`<input class="qp-grams" id="qpGrams${i}" type="text" inputmode="decimal" autocomplete="off" value="100" aria-label="Gramos de ${name}" ${unitGrams?`aria-describedby="qpEquiv${i}" oninput="updateCatalogMeasure(${i})"`:""}>
+    ${unitGrams?`<select class="qp-unit" id="qpUnit${i}" aria-label="Unidad de ${name}" aria-describedby="qpEquiv${i}" onchange="updateCatalogMeasure(${i},true)"><option value="g">g</option><option value="units">unidades</option></select>`:'<span class="muted small">g</span>'}
+    <button class="btn btn-sm" onclick="addFoodToEditor(${i})">Añadir</button>`;
+  return `<div class="qp-item qp-food${unitGrams?" has-unit-measure":""}">
+    <div class="qp-main"><b>${name}</b><div class="o-meta">${Math.round(+ing.kcal||0)} kcal · P ${Math.round(+ing.protein_g||0)} · C ${Math.round(+ing.carbs_g||0)} · G ${Math.round(+ing.fat_g||0)} por 100 g</div>${hint}</div>
+    ${unitGrams?`<div class="qp-measure-controls">${controls}</div>`:controls}
+  </div>`;
+}
+function updateCatalogMeasure(i,switched=false){
+  const ing=window._qp?.items?.[i],unitGrams=catalogUnitGrams(ing);
+  const input=$("#qpGrams"+i),select=$("#qpUnit"+i),hint=$("#qpEquiv"+i);
+  if(!unitGrams||!input||!select||!hint)return;
+  const inUnits=select.value==="units";
+  const parsed=parseNutrientInput(input.value);
+  let quantity=parsed.value;
+  if(switched&&parsed.ok&&!parsed.empty){
+    quantity=inUnits?quantity/unitGrams:quantity*unitGrams;
+    input.value=String(Number(quantity.toFixed(6))).replace(".",",");
+  }
+  input.setAttribute("aria-label",`${inUnits?"Unidades":"Gramos"} de ${ing.name}`);
+  hint.textContent=inUnits&&parsed.ok&&quantity>0
+    ?`≈ ${formatEditorNumber(quantity*unitGrams)} g`
+    :`1 unidad ≈ ${unitGrams} g`;
+}
 function addFoodToEditor(i){
   const qp=window._qp,ing=qp&&qp.items&&qp.items[i];const e=window._editor;if(!ing||!e)return;
   const r=parseNutrientInput($("#qpGrams"+i).value);
-  if(!r.ok||r.value<=0||r.value>COMPONENT_AMOUNT_MAX["100g"]){toast("Indica los gramos (más de 0 y hasta 2000)");return;}
-  if(editorMode()==="kcal_only"){toast("Quita «Solo conozco las calorías» para sumar alimentos por gramos");return;}
-  const line=normalizeComponent({name:ing.name,unit:"100g",amount:r.value,base:{kcal:+ing.kcal||0,p:+ing.protein_g||0,c:+ing.carbs_g||0,f:+ing.fat_g||0},ref:{kind:"ingredient",id:String(ing.id!=null?ing.id:"")}});
+  const unitGrams=$("#qpUnit"+i)?.value==="units"?catalogUnitGrams(ing):0;
+  const grams=r.value*(unitGrams||1);
+  if(!r.ok||Math.round(grams*1000)<=0||grams>COMPONENT_AMOUNT_MAX["100g"]){
+    toast(unitGrams?`Indica más de 0 y hasta ${COMPONENT_AMOUNT_MAX["100g"]/unitGrams} unidades`:"Indica los gramos (más de 0 y hasta 2000)");
+    return;
+  }
+  if(editorMode()==="kcal_only"){toast("Quita «Solo conozco las calorías» para sumar alimentos");return;}
+  const line=normalizeComponent({name:ing.name,unit:"100g",amount:grams,unitGrams,base:{kcal:+ing.kcal||0,p:+ing.protein_g||0,c:+ing.carbs_g||0,f:+ing.fat_g||0},ref:{kind:"ingredient",id:String(ing.id!=null?ing.id:"")}});
   if(!line){toast("Este alimento no tiene valores completos");return;}
   if(!addEditorComponent(line))return;
   toast(`${line.name} ${componentAmountLabel(line)} añadido`);
@@ -11617,12 +11655,14 @@ function addEditorComponent(line){
 function setComponentAmount(i,raw){
   const e=window._editor,c=e&&e.components&&e.components[i];if(!c)return;
   const r=parseNutrientInput(raw);
-  if(!r.ok||r.value<=0||r.value>COMPONENT_AMOUNT_MAX[c.unit]){
-    toast(c.unit==="portion"?"Indica las porciones (más de 0 y hasta 20)":"Indica los gramos (más de 0 y hasta 2000)");
-    const el=$("#comp_amt_"+i);if(el)el.value=formatEditorNumber(c.amount);
+  const amount=r.value*(c.unitGrams||1);
+  if(!r.ok||Math.round(amount*1000)<=0||amount>COMPONENT_AMOUNT_MAX[c.unit]){
+    const label=c.unitGrams?"unidades":c.unit==="portion"?"porciones":c.unit==="100ml"?"ml":"g";
+    toast(`Indica más de 0 y hasta ${COMPONENT_AMOUNT_MAX[c.unit]/(c.unitGrams||1)} ${label}`);
+    const el=$("#comp_amt_"+i);if(el)el.value=c.unitGrams?componentUnitCount(c):formatEditorNumber(c.amount);
     return;
   }
-  c.amount=Math.round(r.value*1000)/1000;
+  c.amount=Math.round(amount*1000)/1000;
   applyEditorComponents();
 }
 function removeComponent(i){
@@ -11660,11 +11700,15 @@ function renderEditorComponents(){
   const t=componentsTotals(list);
   box.innerHTML=`<div class="comp-head"><b>Ingredientes</b><span class="muted small">Los totales salen de estas cantidades.</span></div>
     ${list.map((c,i)=>{
-      const v=componentValues(c),unit=c.unit==="portion"?"porc.":c.unit==="100ml"?"ml":"g";
-      return `<div class="qp-item comp-row">
-        <div class="qp-main"><b>${esc(c.name)}</b><div class="o-meta">${Math.round(v.kcal)} kcal · P ${r1(v.p)} · C ${r1(v.c)} · G ${r1(v.f)}${c.unit==="portion"?" · por porción":""}</div></div>
-        <input class="qp-grams" id="comp_amt_${i}" type="text" inputmode="decimal" autocomplete="off" value="${formatEditorNumber(c.amount)}" aria-label="Cantidad de ${esc(c.name)} (${c.unit==="portion"?"porciones":unit})" onchange="setComponentAmount(${i},this.value)"><span class="muted small">${unit}</span>
-        <button class="btn btn-sm" aria-label="Quitar ${esc(c.name)}" onclick="removeComponent(${i})">Quitar</button>
+      const v=componentValues(c),unit=c.unitGrams?"unid.":c.unit==="portion"?"porc.":c.unit==="100ml"?"ml":"g";
+      const amountLabel=c.unitGrams?"unidades":c.unit==="portion"?"porciones":unit;
+      const amount=c.unitGrams?componentUnitCount(c):formatEditorNumber(c.amount);
+      const controls=`<input class="qp-grams" id="comp_amt_${i}" type="text" inputmode="decimal" autocomplete="off" value="${amount}" aria-label="Cantidad de ${esc(c.name)} (${amountLabel})" onchange="setComponentAmount(${i},this.value)"><span class="muted small">${unit}</span>
+        <button class="btn btn-sm" aria-label="Quitar ${esc(c.name)}" onclick="removeComponent(${i})">Quitar</button>`;
+      return `<div class="qp-item comp-row${c.unitGrams?" has-unit-measure":""}">
+        <div class="qp-main"><b>${esc(c.name)}</b><div class="o-meta">${Math.round(v.kcal)} kcal · P ${r1(v.p)} · C ${r1(v.c)} · G ${r1(v.f)}${c.unit==="portion"?" · por porción":""}</div>
+        ${c.unitGrams?`<div class="muted small">≈ ${r1(c.amount)} g</div>`:""}</div>
+        ${c.unitGrams?`<div class="qp-measure-controls">${controls}</div>`:controls}
       </div>`;}).join("")}
     <div class="muted small comp-total">Total: ${Math.round(t.kcal)} kcal · P ${r1(t.p)} · C ${r1(t.c)} · G ${r1(t.f)} g</div>`;
 }
