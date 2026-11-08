@@ -22,7 +22,7 @@ Convenciones para todas las tareas:
 
 ## NAT-H2 — Cuentas Apple Developer y Google Play; bundle id y Team ID
 
-- **Decide:** titular de las cuentas (persona o empresa), bundle id / package name (sugerido `club.evolvapp.app`), nombre comercial en tiendas.
+- **Decide:** titular de las cuentas (persona o empresa), bundle id / package name (sugerido `club.evolvapp.app`), nombre comercial en tiendas. El titular importa en Google Play: una cuenta personal nueva exige 12 testers durante 14 días antes de producción (`PUBLICACION.md` §5); confirmar qué pide una de organización al crearla.
 - **Entrega para agentes:** Team ID de Apple y huella SHA-256 del certificado de firma de Android anotados en `docs/native-migration/decisions.md` (son públicos; nunca credenciales ni llaves privadas).
 
 ## NAT-H3 — Modelo de cobro dentro de las apps (compra integrada vs. sin compra in-app)
@@ -55,7 +55,7 @@ Convenciones para todas las tareas:
 
 ## NAT-H8 — Go/no-go: envío a beta y a público; convivencia con la PWA
 
-- **Hace:** ejecutar `eas build`/`eas submit` con la checklist de NAT-63, invitar testers, decidir paso a público y la política de convivencia de la PWA (recomendado: mantenerla).
+- **Hace:** ejecutar `eas build`/`eas submit` con la checklist de NAT-63, invitar testers, decidir paso a público y la política de convivencia de la PWA (recomendado: mantenerla). Decidir también qué cliente recibe los cambios de producto (`PUBLICACION.md` §7).
 
 ---
 
@@ -130,7 +130,7 @@ Convenciones para todas las tareas:
 ## NAT-10 — API lista para clientes nativos: cabeceras de cliente/versión, config nativa y analytics
 
 - **Objetivo:** que el backend distinga web/iOS/Android, pueda exigir una versión mínima y mida por plataforma.
-- **Alcance:** `api/config.js` agrega `native: { minVersion, latestVersion, adminUrl }` (desde env, con defaults seguros); `api/analytics.js` acepta `platform` (`web|ios|android`) y `app_version` en la allowlist sin otros campos nuevos; documentar en `supabase/analytics.sql` si se necesita columna (idempotente). Revisar que ningún endpoint de usuario dependa de `Origin`/cookies (hoy `api/admin.js:710` lee `origin`; admin queda web). `scripts/test-native-api-headers.mjs` en el release gate.
+- **Alcance:** `api/config.js` agrega `native: { minVersion, latestVersion, adminUrl }` (desde env, con defaults seguros); `api/analytics.js` acepta `platform` (`web|ios|android`), `app_version` y `update_id` en la allowlist sin otros campos nuevos; documentar en `supabase/analytics.sql` si se necesita columna (idempotente). Revisar que ningún endpoint de usuario dependa de `Origin`/cookies (hoy `api/admin.js:710` lee `origin`; admin queda web). `scripts/test-native-api-headers.mjs` en el release gate.
 - **Aceptación:** peticiones sin `Origin` con Bearer válido funcionan en todos los endpoints de usuario; analytics rechaza campos fuera de allowlist.
 - **Verificación:** verde web.
 
@@ -155,6 +155,14 @@ Convenciones para todas las tareas:
 - **Objetivo (contingencia):** que una compra en App Store/Google Play active el mismo `user_entitlements` que una compra con Culqi.
 - **Alcance (contingencia):** `supabase/native_entitlements.sql` (permitir `origin in ('apple','google')`, ids de transacción únicos, idempotencia de eventos), `api/store-webhook.js` (RevenueCat webhook o App Store Server Notifications v2 + Google RTDN, con verificación de firma); `scripts/test-store-webhook.mjs` con eventos simulados (compra, reembolso, expiración, evento duplicado). Vigilar el límite de 12 funciones de Vercel Hobby (`scripts/test-tienda-culqi.mjs`): el webhook puede servirse por `/api/checkout?op=` como Culqi.
 - **Aceptación:** reembolso revoca; evento repetido no duplica; compras con Culqi sin cambios (`scripts/test-tienda-culqi.mjs` verde).
+- **Verificación:** verde web.
+
+## NAT-14 — Compatibilidad del servidor y los datos con versiones anteriores de la app
+
+- **Objetivo:** que un cambio en `api/*` o en los datos compartidos no rompa una versión de la app que sigue instalada (`PUBLICACION.md` §6).
+- **Alcance:** `scripts/validate-client-compat.mjs` en el release gate. Compara las respuestas de los endpoints de usuario con contratos guardados en `tests/fixtures/client-compat/`: quitar un campo o cambiarle el tipo falla; agregar uno opcional pasa. Prueba de ida y vuelta de `day_log.state`, `plan_versions.snapshot` y `profiles.prefs` con la capa que los escribe: los campos desconocidos se conservan al reescribir.
+- **Fuera de alcance:** corregir lo que la prueba encuentre en la web; cada hallazgo va en su propia tarea o REQ.
+- **Aceptación:** falla con un fixture que quita un campo y con otro que pierde un campo desconocido; pasa con uno que agrega un campo opcional.
 - **Verificación:** verde web.
 
 ---
@@ -207,7 +215,7 @@ Convenciones para todas las tareas:
 ## NAT-26 — Telemetría y reporte de errores sin datos sensibles
 
 - **Objetivo:** medir activación/retención y detectar errores por plataforma sin violar privacidad.
-- **Alcance:** cliente de `/api/analytics` (vía `js/api-client.js`) con los mismos eventos que la web + `platform`/`app_version`; captura de errores JS no controlados enviada como evento técnico sin stack con datos de usuario; cola de eventos offline con límite.
+- **Alcance:** cliente de `/api/analytics` (vía `js/api-client.js`) con los mismos eventos que la web + `platform`/`app_version`/`update_id` (permite observar cada tren OTA, `PUBLICACION.md` §3); captura de errores JS no controlados enviada como evento técnico sin stack con datos de usuario; cola de eventos offline con límite.
 - **Fuera de alcance:** SDKs de analytics/crash de terceros (prohibidos por ADR-001 salvo decisión explícita).
 - **Aceptación:** test que verifica que ningún evento lleva campos fuera de la allowlist.
 - **Verificación:** verde nativo.
@@ -358,7 +366,7 @@ Cada tarea de esta fase entrega pantallas completas con estados de carga, vacío
 ## NAT-49 — Aviso de versión mínima y actualización
 
 - **Objetivo:** poder exigir actualización si el backend cambia.
-- **Alcance:** leer `native.minVersion`/`latestVersion` de `/api/config` (NAT-10); bloqueo con enlace a la tienda si la versión es menor que la mínima; aviso suave si hay una más reciente; compatible con actualizaciones OTA.
+- **Alcance:** leer `native.minVersion`/`latestVersion` de `/api/config` (NAT-10); bloqueo con enlace a la tienda si la versión es menor que la mínima; aviso suave si hay una más reciente; compatible con actualizaciones OTA. Buscar actualizaciones al abrir y al volver a primer plano. `minVersion` es el último recurso (`PUBLICACION.md` §6).
 - **Verificación:** verde nativo.
 
 ---
@@ -408,6 +416,14 @@ Cada tarea de esta fase entrega pantallas completas con estados de carga, vacío
 ## NAT-63 — Preparar release beta: perfiles EAS, versionado, canal OTA y checklist
 
 - **Objetivo:** que el envío de NAT-H8 sea mecánico.
-- **Alcance:** `eas.json` y `app.config.ts` finales (versión y build number, `runtimeVersion` por política de fingerprint, canales `preview`/`production` de EAS Update, permisos y textos), `docs/native-migration/release-checklist.md` (pasos de build/submit, verificación post-instalación, rollback de OTA, quién aprueba).
+- **Alcance:** `eas.json` y `app.config.ts` finales (versión y build number, `runtimeVersion` por política de fingerprint, canales `preview`/`production` de EAS Update, permisos y textos), `docs/native-migration/release-checklist.md` (pasos de build/submit, verificación post-instalación, rollback de OTA, quién aprueba, notas de revisión y etiqueta Git por binario según `PUBLICACION.md` §5). Confirmar que el primer binario incluye `expo-updates`.
 - **Fuera de alcance:** ejecutar builds o envíos con credenciales (NAT-H8).
 - **Verificación:** `npx expo config --type public` sin errores; verde nativo.
+
+## NAT-64 — Publicación OTA escalonada con controles previos
+
+- **Objetivo:** que publicar por aire sea rápido y que nada llegue a todos los usuarios sin pasar los controles de `PUBLICACION.md` §3 y §4.
+- **Alcance:** `scripts/native-ota-check.mjs` (release gate, checks de `native/`, `validate-native-copy` y `validate-client-compat`; falla si la huella de runtime cambió respecto del binario vigente o si hay un despliegue activo, salvo `--urgente`), con `--self-test` en el release gate. `.github/workflows/native-ota.yml`, de ejecución manual y programada, publica en `preview` y luego en `production` al 10 %, nunca directo al 100 %. `release-checklist.md` agrega trenes, umbrales, ampliación, reversión y quién aprueba. `AUTONOMOUS_AGENT.md` agrega la regla: el loop puede iniciar un tren, no ampliarlo al 100 %.
+- **Fuera de alcance:** publicar con credenciales reales y decidir el cliente principal (ambas en NAT-H8).
+- **Aceptación:** el check falla con un fixture que cambia la huella, con otro que agrega "comprar" en un `<Text>` y con otro que quita un campo de la API; una corrida en seco del workflow muestra `preview` → 10 % sin llegar al 100 %.
+- **Verificación:** verde web y nativo.
