@@ -1,112 +1,268 @@
-# 03 · Estrategia de Redes Sociales — Fitbros
+# 03 · Estrategia de Redes Sociales — Evolv
 
-> El motor de adquisición orgánica sostenible y la construcción de marca. A diferencia de la adquisición pagada, **el contenido orgánico SÍ puedes empezarlo durante la validación** (construir audiencia antes de lanzar es una ventaja). Lo que esperas al GO es *empujar al producto*; lo que empiezas ya es *construir presencia y aprender el mensaje*.
-
----
-
-## 1. Voz de marca (no negociable)
-
-Coherente con la identidad del producto: **coach cercano, claro, no técnico, no punitivo.**
-
-- **Hablas como un coach que te quiere bien, no como una app.** Cercano, directo, sin floro. Tuteo.
-- **Tecnología invisible — también en redes.** Nunca vendas "IA" ni "app con inteligencia artificial". Vendes *"tu coach"*, *"tu plan"*, *resultados*. El mercado está saturado de "powered by AI"; tu diferencia es que se siente humano. (Esto te separa de la ola genérica.)
-- **No punitivo.** Nada de culpa, "cheat meal", "te lo ganaste", cuerpos como castigo. Constancia amable: los descansos y los días flojos no castigan.
-- **Honesto y anti-humo.** En un nicho lleno de promesas mágicas y suplementos milagrosos, la honestidad es diferenciación. "Esto toma tiempo, pero no tienes que hacerlo solo."
-- **Identidad visual:** oscuro púrpura + terracota, tipografías Syne (títulos) y DM Sans (texto). Consistencia visual = reconocimiento.
+> Actualizada el 9 nov 2026. Reemplaza la versión de junio, escrita cuando la marca era Fitbros y todavía no había usuarios. Esta versión parte de los datos reales de la beta. El calendario para ejecutarla está en `09-Calendario-Redes-Nov-Dic-2026.md`.
 
 ---
 
-## 2. Prioridad de plataformas
+## 1. Dónde estamos
 
-No estés en todas. Domina 1–2, recicla al resto.
+Línea base al 9 nov 2026, leída de producción (solo totales):
 
-| Plataforma | Rol | Prioridad | Por qué |
+| Indicador | Valor |
+|---|---|
+| Postulaciones a la beta | 18, todas en los últimos 30 días |
+| Invitadas | 17 de 18 |
+| Postulaciones que vinieron de redes | 0 (9 de la portada, 9 sin origen) |
+| Cuentas creadas | 29 |
+| Cuentas activas en los últimos 30 días | 14 |
+| Tienda | En vivo con Culqi, en soles, en `/planes` |
+| Registro público | Cerrado: se entra por invitación o por compra |
+
+Qué significa:
+
+- El primer grupo de la beta (15-20 personas) está prácticamente completo. Lo que traigan las redes es para el **siguiente grupo**.
+- Empezamos de cero en redes. No hay audiencia ni historial con qué comparar, así que el primer mes sirve para aprender.
+
+---
+
+## 2. A quién le hablamos
+
+Esto marcaron las 18 personas que postularon:
+
+| Dolor | Personas |
+|---|---|
+| Mi plan se rompe cuando como fuera o cambia mi semana | 10 |
+| Registrar todo me da pereza | 10 |
+| No sé qué comer o entrenar hoy | 6 |
+| Me abruma decidir o empezar | 6 |
+| Abandono después de 1-3 semanas | 5 |
+| Tengo miedo a hacer mal los ejercicios | 4 |
+
+Y su perfil:
+
+- 16 de 18 tienen entre 25 y 34 años.
+- 14 de 18 ya entrenan o quieren retomar (9 constantes, 5 retomando). Solo 2 son principiantes.
+- El objetivo más común es bajar grasa (8 personas).
+- 8 han usado coach o nutricionista, y 7 no han sostenido nada.
+
+**Cambio frente a junio.** Antes suponíamos que la cabeza de playa eran principiantes abrumados. Quienes de verdad levantaron la mano ya entrenan o quieren volver, y su problema es sostener el plan en una semana real.
+
+**A quién le escribimos cada pieza:** una persona de 25 a 34 años que ya entrena o quiere retomar, quiere bajar grasa y ve caerse su plan cada vez que la semana cambia.
+
+Es una muestra chica. Sirve para ordenar prioridades y la vamos a corregir con lo que respondan en redes.
+
+---
+
+## 3. Objetivo de los primeros 30 días
+
+Construir comunidad y que la gente se inscriba, en ese orden.
+
+1. **Comunidad:** gente que vuelve, comenta, cuenta su caso y etiqueta a alguien.
+2. **Inscripción:** quien ya se siente parte deja sus datos en `evolvapp.club/unete`, un formulario corto con origen medible.
+
+Viralidad y venta directa no son objetivos de este mes.
+
+**Meta inicial:** 24 piezas publicadas, 30 comentarios o respuestas que cuenten un caso real y 10 inscripciones con origen en redes. Las cifras son hipótesis, porque no hay historial. Se revisan en la semana 2.
+
+**Indicadores principales:** personas distintas que comentan o responden cada semana, e inscripciones con `source` de redes. Cuando exista REQ-370, también compras por origen.
+
+---
+
+## 4. Voz de marca
+
+Coach cercano, claro, no técnico y no punitivo.
+
+- **Hablas como un coach que te quiere bien.** Directo, sin floro, con tuteo.
+- **Tecnología invisible.** Nunca vendas "IA" ni "app con inteligencia artificial". Vendes tu coach, tu plan y un día que sigue en pie. La etiqueta de IA que pide cada plataforma se pone igual cuando corresponde (sección 11).
+- **No punitivo.** Nada de culpa, "cheat meal", "te lo ganaste" ni cuerpos como castigo. La comida no se paga con ejercicio.
+- **Honesto.** En un nicho lleno de promesas mágicas, decir "esto toma tiempo" es diferenciarse.
+
+Frases propias, ya usadas en la web:
+
+- "Tu mejor versión, un día a la vez."
+- "Cuando el día se tuerce, lo ajusta contigo."
+- "Un escalón cada día."
+- "El plan se adapta. Tú no lo abandonas."
+
+---
+
+## 5. Identidad visual
+
+| Elemento | Valor |
+|---|---|
+| Fondo | Casi negro `#101010` |
+| Acento | Lima `#D6FF3A`, con texto `#101010` encima |
+| Superficies | `#161616`, `#1E1E1E`, `#262626` |
+| Títulos | Unbounded |
+| Texto | Manrope |
+| Logo | Tres chevrones lima y "evolv" con la v en lima (`assets/og-image.png`) |
+
+El lima se usa poco y a propósito: una palabra, una línea, un dato. Las pantallas que aparecen en video son siempre de la app real.
+
+---
+
+## 6. Plataformas
+
+| Plataforma | Rol | Prioridad |
+|---|---|---|
+| **Instagram** (Reels, carruseles, historias) | Casa de la marca. Las historias llevan enlace medible | Alta |
+| **TikTok** | Alcance en frío con el mismo video vertical | Alta |
+| **WhatsApp** | Grupo de fundadores y conversación uno a uno, ya en uso | Media |
+| **YouTube Shorts** | Reciclar verticales cuando haya ritmo | Baja |
+
+No abrimos más frentes hasta sostener 4 semanas seguidas de publicación.
+
+---
+
+## 7. Comunidad, series y mezcla semanal
+
+**Idea central (propuesta): el Club del Plan B.** Es para quienes ven caerse su plan y vuelven igual. Tiene un enemigo común que no eres tú: **Don Imprevisto**, un personaje que aparece cada semana a romperte el plan. Así la culpa sale de la persona, que es justo la voz no punitiva de la marca.
+
+La gente avanza por tres escalones:
+
+1. **Se reconoce:** "esto me pasa a mí".
+2. **Participa:** comenta, responde la pregunta de la semana, etiqueta a alguien o usa `#MiPlanB`.
+3. **Se inscribe:** deja sus datos en `evolvapp.club/unete`. Desde ahí puede postular a la beta.
+
+Seis piezas por semana, sobre todo reels, siempre el mismo día para crear costumbre:
+
+| Día | Serie | Formato | Para qué |
 |---|---|---|---|
-| **Instagram (Reels + carruseles)** | Casa principal de marca | 🥇 Alta | Donde está tu público fitness en Perú/LatAm; Reels = alcance, carruseles = guardar/educar |
-| **TikTok** | Alcance frío / principiantes (Segmento B) | 🥇 Alta | Mejor alcance orgánico para cuentas nuevas; B vive ahí; el creativo manda sobre el presupuesto |
-| **YouTube (Shorts + long-form)** | Autoridad + SEO perdurable | 🥈 Media | Long-form construye confianza y rankea en Google por años; Shorts reciclan verticales |
-| **WhatsApp (comunidad/canal)** | Retención + cercanía | 🥈 Media | Es EL canal en Perú; comunidad de beta/founders, acompañamiento, referidos |
-| **Pinterest / blog SEO** | Tráfico de cola larga | 🥉 Baja | Recetas y rutinas rankean y traen tráfico pasivo en español |
+| Lun | **Esto / Esto** | Carrusel | Dar algo útil que se guarde |
+| Mar | **Confesiones** | Reel de texto | Que digan "me pasa" y etiqueten |
+| Mié | **La pregunta** | Historia | Escuchar y juntar material |
+| Jue | **Don Imprevisto** | Reel de personaje | El humor y la marca que se recuerda |
+| Vie | **Detrás del club** | Reel del equipo | Leer lo que escribió la gente y contar cómo se construye |
+| Dom | **Encontré mi Plan B** | Reel con la app real | Mostrar Evolv e invitar a inscribirse |
 
-**Recomendación de arranque:** **Instagram + TikTok** como punta de lanza (el mismo Reel/vertical sirve para ambos + Shorts), y un **canal de WhatsApp** para los más cercanos. YouTube y blog cuando tengas ritmo.
+**Reglas para que sea comunidad y no solo contenido:**
 
----
+- La pregunta del miércoles alimenta el reel del viernes. La gente ve que la leen.
+- Se responden todos los comentarios durante las primeras horas de cada publicación. Una cuenta nueva no crece sin esto.
+- Cada pieza da un motivo concreto para etiquetar a alguien.
+- El primer grupo de la beta siembra los primeros comentarios. Se le pide, sin obligar.
+- Una historia o un comentario de alguien solo se usa con su permiso.
 
-## 3. Pilares de contenido (la regla 3-2-1 por semana)
+Cada semana se concentra en un dolor, en el orden de los datos:
 
-Cuatro pilares; rota para no ser monótono. Sugerencia de mezcla semanal: **3 educativos · 2 de conexión/marca · 1 de producto/llamado.**
-
-1. **EDUCA (resuelve el dolor gratis)** — el pilar #1. Da valor real; deja a Fitbros como "el que hace esto por ti".
-   - "Qué desayunar para llegar a 180g de proteína (siendo vegetariano)."
-   - "3 errores que arruinan tu sentadilla (y cómo arreglarlos)."
-   - "Qué hacer cuando comes fuera y estás en déficit."
-   - Carruseles "guardables": menús, listas de compras, progresiones para principiantes.
-
-2. **INSPIRA / PRUEBA (transformación y constancia)** — credibilidad.
-   - Tu propio progreso (eres Cliente 0: documenta tu recomposición de 10 semanas — antes/durante/después).
-   - Testimonios y antes/después de la beta (con permiso).
-   - "Cómo se ve la constancia real" (no perfección): semanas buenas y flojas.
-
-3. **CONECTA / MARCA (build in public + personalidad)** — construye comunidad antes del lanzamiento.
-   - **Construye en público:** "Estoy creando un coach de fitness, semana 3: esto aprendí de hablar con 10 personas." La gente se engancha con el viaje del fundador y se vuelve tu primera audiencia.
-   - Detrás de cámaras, por qué lo haces, la filosofía no-punitiva, mitos del fitness que odias.
-   - Encuestas/preguntas: "¿Qué es lo que más te cuesta de comer bien?" (= research + engagement).
-
-4. **CONVIERTE (producto y llamado)** — el menos frecuente, el más directo.
-   - Demo del "qué te toca hoy" y del reproductor guiado.
-   - "Adaptar hoy": muestra la magia de cambiar el plan cuando la vida se mete.
-   - Lista de espera / "primeros founders" / reto en pareja.
-
-> **Regla 80/20:** 80% valor y conexión, 20% venta. Si solo vendes, la gente se va.
+1. El plan se rompe.
+2. Registrar todo da pereza.
+3. Volver sin empezar de cero.
+4. Diciembre sin culpa.
 
 ---
 
-## 4. Formatos que funcionan (y son baratos de producir)
+## 8. Producción
 
-- **Reels/TikToks de 15–40s:** un tip por video, hook en los primeros 2 segundos, texto en pantalla, formato vertical. El 80% de tu alcance.
-- **Carruseles de Instagram (6–10 slides):** lo más "guardado/compartido" = lo que el algoritmo premia. Ideales para menús, progresiones, listas.
-- **Antes/después y time-lapses:** tu propio progreso narrado.
-- **"Pregúntale al coach":** respondes dudas reales de comentarios/DMs en video (= contenido + research + cercanía).
-- **Long-form YouTube (cuando haya ritmo):** "Cómo bajar grasa siendo vegetariano sin pasar hambre — guía completa." Rankea por años.
+Primero lo real. Lo generado solo acompaña.
 
-### Ganchos (hooks) de ejemplo — los primeros 2 segundos lo son todo
-- "Si entrenas y no bajas grasa, probablemente es esto 👇"
-- "Vegetariano y no llegas a tu proteína? Mira esto."
-- "Dejé de usar [app de tracking] por una razón."
-- "Lo que tu plan de dieta no te dice sobre comer fuera."
-- "Empezar el gym sin saber nada: por dónde empezar de verdad."
+| Pieza | De dónde sale el visual |
+|---|---|
+| Pantallas de producto | Grabación real de la app. Nunca interfaz generada |
+| Técnica de ejercicios | Demos de la app (`assets/exercise-media`) o video real revisado |
+| Comida y día a día | Celular: tu plato, tu menú, tu gym |
+| Historia del equipo | Tu voz o tu cara, con material real |
+| Don Imprevisto | Higgsfield: personaje de plastilina, claramente ficticio |
+| Carruseles | Canva con la identidad de la sección 5, con fotos reales |
 
----
+**Reglas para lo generado con Higgsfield:**
 
-## 5. Calendario y producción
+- No copiar piezas ni personajes de otras marcas. Se toma el formato, no la creatividad.
+- Nunca personas realistas, clientes, testimonios, cuerpos, antes y después, ni coaches inventados.
+- Nunca técnica de ejercicios: un video generado puede enseñar mala ejecución.
+- Nunca pantallas de la app ni logos.
+- Sin texto dentro de la imagen: se agrega en edición, porque los modelos deforman las palabras.
+- Toda pieza con material generado realista lleva la etiqueta de IA de la plataforma.
 
-- **Cadencia realista (solo, sin quemarte):** 4–5 piezas cortas/semana + 1–2 carruseles. Más vale constante que perfecto.
-- **Batching:** graba 1 día a la semana 8–10 piezas; edita y programa. No produzcas a diario.
-- **1 idea → muchos formatos:** un tip se vuelve Reel + TikTok + Short + slide de carrusel + tweet/estado. Reutiliza siempre.
-- **Banco de ideas:** lleva una lista viva; cada duda de tu beta/comentarios es una pieza de contenido.
-- **Herramientas:** CapCut (edición vertical), Canva (carruseles con tu identidad púrpura/terracota), un programador (Metricool/Buffer/Later) para no postear a mano.
-
----
-
-## 6. Métricas (mira las correctas, ignora las vanidosas)
-
-- **Vanidad (ignora en gran medida):** número de seguidores, likes.
-- **Lo que importa (señal de que el contenido mueve gente):**
-  - **Guardados y compartidos** (el contenido educativo bueno se guarda; el algoritmo lo premia).
-  - **Clics al perfil → clics al link** (¿el contenido lleva a la landing?).
-  - **DMs y comentarios con preguntas reales** (intención).
-  - **Registros atribuidos** (códigos/UTM por pieza o campaña).
-  - **Retención de visualización** en Reels/TikTok (¿ven hasta el final?).
-- **North star de redes:** registros en Fitbros originados por contenido orgánico / mes. Todo lo demás es medio.
+**Créditos.** El plan Basic tiene 80 créditos al 9 nov 2026, y la conexión no muestra cuánto cuesta cada generación. Antes de producir, se genera una imagen y un clip de prueba para medir el costo real. El calendario lista los recursos por prioridad y una alternativa sin créditos para cada uno.
 
 ---
 
-## 7. Cómo encaja con la validación
+## 9. Cadencia
 
-- **Durante la validación:** empieza con el pilar **CONECTA (build in public)** + algo de **EDUCA**. Construyes audiencia y, de paso, las publicaciones te traen más gente para entrevistar/beta. **No prometas funciones ni empujes registro masivo aún.**
-- **Al GO:** activas **CONVIERTE** con fuerza, lanzas lista de espera → founders, y conectas el contenido con la landing y el bucle de referidos de `02-Adquisicion.md`.
+- 6 piezas por semana, de lunes a domingo, según el calendario.
+- Una sesión de producción los sábados para la semana siguiente.
+- Una idea, varios formatos: el mismo vertical va a Reels y TikTok.
+- Hora inicial: 19:30 de Lima. Es una suposición hasta tener datos de mejor horario por red.
+- Cada comentario, DM o respuesta de encuesta va al banco de ideas.
 
 ---
 
-### ¿Quieres que lo aterrice?
-Cuando quieras puedo ayudarte a producir lo concreto: un **calendario editorial de 4 semanas** con piezas específicas, **guiones de 10 Reels**, **plantillas de carrusel** con tu identidad de marca, o el **copy y wireframe de la landing**. Dime por dónde y lo armo.
+## 10. Medición y ajuste
+
+### Cómo medimos el origen
+
+El formulario corto `/unete` guarda el parámetro `source` en cada inscripción, igual que `/beta` en cada postulación.
+
+| Dónde | Enlace | Qué permite saber |
+|---|---|---|
+| Perfil de Instagram | `https://evolvapp.club/unete?source=ig-bio-s1` | Plataforma y semana |
+| Perfil de TikTok | `https://evolvapp.club/unete?source=tt-bio-s1` | Plataforma y semana |
+| Historia con enlace | `https://evolvapp.club/unete?source=ig-st-s1p6` | La pieza exacta |
+| WhatsApp | `https://evolvapp.club/unete?source=wsp-s1` | Canal y semana |
+
+Instagram y TikTok no dan enlaces clicables en el texto de cada video. Por eso los videos se miden por plataforma y semana, y solo las historias con enlace miden la pieza exacta. El enlace del perfil se cambia cada lunes. Si TikTok aún no permite enlace en el perfil, se invita a pedirlo por mensaje directo.
+
+Para el camino de la tienda (portada, `/planes`, `/pago`) todavía no se guarda el origen. Eso lo cubre REQ-370.
+
+Lectura semanal, solo totales:
+
+```sql
+select source, count(*)
+from community_signups
+where created_at >= '2026-11-16' and source ~ '^(ig|tt|wsp)-'
+group by 1 order by 2 desc;
+```
+
+### Qué mirar
+
+- **Personas distintas que comentan o responden, y cuántas repiten:** el tamaño real de la comunidad.
+- **Comentarios con etiquetas o con un caso propio:** señal de que la pieza conecta.
+- **Guardados y compartidos por cada 1000 vistas:** el valor real de la pieza.
+- **Retención de los primeros 3 segundos y vista completa:** la fuerza del gancho y del guion.
+- **Visitas al perfil y clics al enlace:** si la pieza mueve a la acción.
+- **Preguntas reales en comentarios y DMs:** intención e ideas nuevas.
+- **Inscripciones por `source`:** el resultado.
+
+Seguidores y likes no deciden nada.
+
+### Cómo ajustar cada lunes
+
+Cada pieza se evalúa a las 72 horas o más, siempre contra las demás piezas propias. Las primeras semanas son pistas y no conclusiones.
+
+| Lo que pasó | Qué hacer |
+|---|---|
+| Muchos guardados y compartidos | Dos variantes del mismo tema la semana siguiente |
+| Muchas vistas, pocos guardados | El gancho sirve. Mejorar lo que se entrega |
+| Pocas vistas, muchos guardados | El contenido sirve. Probar otro gancho |
+| Pocas vistas y pocos guardados | Dejar ese ángulo |
+| Preguntas repetidas | Convertirlas en la siguiente pieza |
+| Inscripciones que no responden después | Revisar a quién le habla ese llamado |
+
+El resultado se agrega como "Revisión semana N" al final del calendario, y los cambios se aplican a la semana que sigue.
+
+---
+
+## 11. Guardarraíles
+
+- Nada se publica sin aprobación explícita de Jonathan.
+- No prometer resultados físicos ni plazos.
+- No promover déficits agresivos, ayunos de compensación ni pesos objetivo.
+- Ante dolor, lesión o condición médica, la indicación es parar y consultar con un profesional.
+- Sin testimonios, cifras o historias que no sean reales. Lo que sale de la beta va con permiso escrito.
+- Fotos, salud y conversaciones de usuarios nunca se usan como contenido.
+- Mientras el llamado sea la beta, no se mencionan precios.
+- "Cupos limitados" solo si es cierto en ese momento. No se inventan fechas de cierre.
+- TikTok exige etiquetar el contenido realista hecho con IA y Meta exige etiquetar video fotorrealista. Regla simple: toda pieza con material de Higgsfield activa la etiqueta en ambas.
+
+---
+
+## 12. Herramientas
+
+| Herramienta | Uso | Estado al 9 nov 2026 |
+|---|---|---|
+| Higgsfield | Ganchos e imágenes | Conectado para consulta. La generación desde el agente no está disponible aún |
+| Canva | Carruseles | Conectado. Falta crear el kit de marca |
+| Metricool | Programar y leer métricas | Pendiente de conectar |
+| Supabase | Inscripciones por `source` (`community_signups`) | Conectado |
+| CapCut | Edición vertical | Manual |

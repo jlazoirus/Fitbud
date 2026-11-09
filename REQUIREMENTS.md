@@ -2391,47 +2391,11 @@ Test Node con Culqi y Resend simulados, y E2E de Perfil.
 
 ## REQ-359 - Coach: conocer, revisar y guardar la rutina semanal
 
-**Estado: implementado.**
-
-### Origen
-Jonathan (2026-11-06), feedback de Allison: máquinas, conservar su rutina y aplicar lo conversado.
-### Problema
-El chat describe rutinas sin guardarlas; no distingue preferencias de equipo y muestra escapes.
-### Causa raíz
-Acciones conversacionales limitadas a contingencias de hoy; gimnasio asume recursos; limpieza previa al análisis de JSON.
-### Objetivo
-Conversación → propuesta semanal revisable → confirmación → entrenamientos persistentes.
-### Alcance
-Entrevista opcional en Hoy/Entreno, preferencias en onboarding/Perfil, conservación explícita, contrato compartido con proxy, plantilla privada por ciclo y texto legible. PWA v218.
-### Fuera de alcance
-Onboarding enteramente conversacional, importar fotos, cambiar deportes, historial o migración nativa.
-### Riesgos
-Propuestas incompatibles, cambios de cuenta/perfil, doble guardado y pérdida de historial.
-### Criterios de aceptación
-Revisión sin mutaciones; guardado confirmado conserva ejercicios/dosis, persiste y coincide en Hoy/Entreno/reproductor. Respeta equipo, seguridad, registros y aislamiento.
-### Verificación sugerida
-`test-training-routine.mjs`, `coach-rutina.spec.js`, regresiones y release gate. Operación: `docs/coach-routine.md`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-360 - Nutrición: la semana nueva repite lo que comes los días que cumples tu meta
 
-**Estado: implementado.**
-
-### Origen
-Jonathan (2026-11-07): tras una semana de dieta, generar según lo comido los días que llegaron a los macros; si siempre desayunas lo mismo, sugerir lo mismo.
-### Problema
-El menú rotaba platos y penalizaba repetir; REQ-63 solo pasaba ingredientes sueltos al coach.
-### Objetivo
-Cada franja repite el plato habitual de los días en meta.
-### Alcance
-`learnHabitualMeals()` y gate común; ver `docs/habitual-meals.md`. Coach v14, PWA v219.
-### Fuera de alcance
-Platos fuera del catálogo para el motor local, migraciones, analytics.
-### Riesgos
-Ignorar restricciones o repetir plato en el día: mandan las restricciones; sin duplicados.
-### Criterios de aceptación
-Con 7 días registrados y ≥3 en meta, el plato repetido en ≥ mitad de esos días vuelve a su franja; lo registrado no cambia.
-### Verificación sugerida
-`validate-habitual-meals.mjs`, `comidas-habituales.spec.js` y release gate.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-361 - Avisos: "Ahora no" no calla la racha
 
@@ -2480,3 +2444,34 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 ## REQ-369 - Perfil: Entreno vuelve al alto de REQ-279
 
 **Estado: implementado.** PWA v228.
+
+## REQ-370 - Web pública: conservar el origen de campaña hasta la compra
+
+**Estado: pendiente.**
+
+### Origen
+Plan de redes de noviembre 2026 (`estrategia/03-Redes-Sociales.md`, sección 10).
+### Problema
+`/beta?source=` ya guarda el origen, pero quien llega por campaña a la portada o `/planes` y compra no deja rastro.
+### Causa raíz
+`index.html`, `planes/index.html` y `pago/index.html` no conservan `source` ni `utm_*`. `pago/index.html:215` no envía origen; `parseCompra` (`api/_tienda/culqi-charge.js:40`), la metadata (línea 76) y el `payload` de `billing_events` (línea 282) no lo contemplan.
+### Objetivo
+Saber qué canal originó cada compra, sin datos personales.
+### Alcance
+- Módulo compartido en `/web` o `/tienda` (ya publicadas), cargado en portada, `/planes` y `/pago`.
+- Lee `source` y `utm_source|medium|campaign|content`; solo letras, números, `-` y `_`, hasta 120 caracteres.
+- Primer contacto durante 30 días en `localStorage`, con `try/catch`.
+- `/pago` lo envía; `parseCompra` lo revalida; va como `campana` en el `payload` y la metadata de Culqi. Sin migración.
+- Revisar si `/privacidad` necesita una frase.
+### Fuera de alcance
+Panel de Analítica, píxeles de terceros, cambios en `/beta` e invitaciones.
+### Riesgos
+Viene del navegador: nunca influye en precio, plan ni acceso. Un fallo de origen nunca bloquea un pago.
+### Criterios de aceptación
+- `/?source=ig-bio-s1` → `/planes` → compra deja `campana.source` en el `payload`.
+- Gana el primer contacto dentro de 30 días; después se reemplaza.
+- Valores inválidos se descartan en cliente y servidor.
+- Comprar sin origen funciona igual y no agrega el campo.
+- El origen nunca guarda correo, nombre, teléfono ni salud.
+### Verificación sugerida
+Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de prueba de Culqi, nunca reales; release gate.

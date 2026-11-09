@@ -13504,6 +13504,50 @@ Nombre, resumen, orden, demostraciones y Hoy coinciden al elegir recientes/guard
 ### Verificación sugerida
 `tests/e2e/rutina-consistente.spec.js` (320/390/1280), `repetir-entreno.spec.js`, `rutina-propia.spec.js`, regresiones de entrenamiento y release gate. Reproducción previa: dos ejercicios elegidos, cinco tarjetas antiguas visibles.
 
+## REQ-359 - Coach: conocer, revisar y guardar la rutina semanal
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-06), feedback de Allison: máquinas, conservar su rutina y aplicar lo conversado.
+### Problema
+El chat describe rutinas sin guardarlas; no distingue preferencias de equipo y muestra escapes.
+### Causa raíz
+Acciones conversacionales limitadas a contingencias de hoy; gimnasio asume recursos; limpieza previa al análisis de JSON.
+### Objetivo
+Conversación → propuesta semanal revisable → confirmación → entrenamientos persistentes.
+### Alcance
+Entrevista opcional en Hoy/Entreno, preferencias en onboarding/Perfil, conservación explícita, contrato compartido con proxy, plantilla privada por ciclo y texto legible. PWA v218.
+### Fuera de alcance
+Onboarding enteramente conversacional, importar fotos, cambiar deportes, historial o migración nativa.
+### Riesgos
+Propuestas incompatibles, cambios de cuenta/perfil, doble guardado y pérdida de historial.
+### Criterios de aceptación
+Revisión sin mutaciones; guardado confirmado conserva ejercicios/dosis, persiste y coincide en Hoy/Entreno/reproductor. Respeta equipo, seguridad, registros y aislamiento.
+### Verificación sugerida
+`test-training-routine.mjs`, `coach-rutina.spec.js`, regresiones y release gate. Operación: `docs/coach-routine.md`.
+
+## REQ-360 - Nutrición: la semana nueva repite lo que comes los días que cumples tu meta
+
+**Estado: implementado.**
+
+### Origen
+Jonathan (2026-11-07): tras una semana de dieta, generar según lo comido los días que llegaron a los macros; si siempre desayunas lo mismo, sugerir lo mismo.
+### Problema
+El menú rotaba platos y penalizaba repetir; REQ-63 solo pasaba ingredientes sueltos al coach.
+### Objetivo
+Cada franja repite el plato habitual de los días en meta.
+### Alcance
+`learnHabitualMeals()` y gate común; ver `docs/habitual-meals.md`. Coach v14, PWA v219.
+### Fuera de alcance
+Platos fuera del catálogo para el motor local, migraciones, analytics.
+### Riesgos
+Ignorar restricciones o repetir plato en el día: mandan las restricciones; sin duplicados.
+### Criterios de aceptación
+Con 7 días registrados y ≥3 en meta, el plato repetido en ≥ mitad de esos días vuelve a su franja; lo registrado no cambia.
+### Verificación sugerida
+`validate-habitual-meals.mjs`, `comidas-habituales.spec.js` y release gate.
+
 ## REQ-361 - Avisos: el "Ahora no" de la tarjeta no calla el pedido de la racha
 
 **Estado: implementado.**
