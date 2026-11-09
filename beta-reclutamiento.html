@@ -542,11 +542,14 @@
             <legend>Dónde se rompe</legend>
             <p class="hint">Elige de 1 a 3, las que más te pasan en la vida real.</p>
             <p class="field-hint" id="painCount" aria-live="polite">Ninguna elegida todavía.</p>
+            <p class="field-hint" id="painDraftHint" hidden>Actualizamos algunas opciones de tu borrador. Revisa cuáles te pasan.</p>
             <div class="options" id="painOptions">
-              <label class="option"><input type="checkbox" name="pains" value="No se que comer o entrenar hoy" data-type="b"><span>No sé qué comer o entrenar hoy</span></label>
+              <label class="option"><input type="checkbox" name="pains" value="No se que comer hoy" data-type="b"><span>No sé qué comer hoy</span></label>
+              <label class="option"><input type="checkbox" name="pains" value="No se que entrenar hoy" data-type="b"><span>No sé qué entrenar hoy</span></label>
               <label class="option"><input type="checkbox" name="pains" value="Me abruma decidir o empezar" data-type="b"><span>Me abruma decidir o empezar</span></label>
               <label class="option"><input type="checkbox" name="pains" value="Tengo miedo a hacer mal los ejercicios" data-type="b"><span>Tengo miedo a hacer mal los ejercicios</span></label>
-              <label class="option"><input type="checkbox" name="pains" value="Mi plan se rompe cuando como fuera o cambia mi semana" data-type="a"><span>Mi plan se rompe cuando como fuera o cambia mi semana</span></label>
+              <label class="option"><input type="checkbox" name="pains" value="Me cuesta seguir el plan cuando como fuera" data-type="a"><span>Me cuesta seguir el plan cuando como fuera</span></label>
+              <label class="option"><input type="checkbox" name="pains" value="Me cuesta seguir el plan cuando cambia mi semana" data-type="a"><span>Me cuesta seguir el plan cuando cambia mi semana</span></label>
               <label class="option"><input type="checkbox" name="pains" value="Uso demasiadas herramientas" data-type="a"><span>Uso demasiadas herramientas</span></label>
               <label class="option"><input type="checkbox" name="pains" value="Registrar todo me da pereza" data-type="both"><span>Registrar todo me da pereza</span></label>
               <label class="option"><input type="checkbox" name="pains" value="Abandono despues de 1-3 semanas" data-type="b"><span>Abandono después de 1-3 semanas</span></label>
@@ -647,6 +650,11 @@
     const done = document.getElementById("done");
     const painCount = document.getElementById("painCount");
     const DRAFT_KEY = "evolv_beta_draft";
+    const LEGACY_PAIN_CHOICES = new Set([
+      "No se que comer o entrenar hoy",
+      "Mi plan se rompe cuando como fuera o cambia mi semana",
+    ]);
+    let reviewPainChoices = false;
 
     // Máximo 3: si se marca una cuarta, se desmarca esa misma (no otra).
     painOptions.addEventListener("change", (event) => {
@@ -664,12 +672,21 @@
 
     // Borrador en este dispositivo: refrescar o salir a WhatsApp no borra lo escrito.
     function saveDraft(){
-      try { const d = readForm(); delete d.website; delete d.source; localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); } catch (_) {}
+      try {
+        const draft = readForm();
+        delete draft.website;
+        delete draft.source;
+        if (reviewPainChoices) draft.reviewPainChoices = true;
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch (_) {}
     }
     function restoreDraft(){
       let d = null;
       try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); } catch (_) {}
       if (!d || typeof d !== "object") return;
+      reviewPainChoices = d.reviewPainChoices === true
+        || (Array.isArray(d.pains) && d.pains.some(pain => LEGACY_PAIN_CHOICES.has(pain)));
+      document.getElementById("painDraftHint").hidden = !reviewPainChoices;
       for (const [key, value] of Object.entries(d)) {
         const values = Array.isArray(value) ? value : [value];
         for (const el of form.querySelectorAll('[name="' + key + '"]')) {

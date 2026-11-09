@@ -68,32 +68,48 @@ let res = capture();
 await handler({ method: "GET", headers: {} }, res);
 assert(res.statusCode === 405, "Debe rechazar metodos que no sean POST.");
 
+const completeApplication = {
+  name: "Ana Test",
+  email: "Ana@Correo.test",
+  whatsapp: "+51 999 888 777",
+  age: "25-34",
+  city: "Lima, Peru",
+  stage: "beginner",
+  goal: "Bajar grasa",
+  recentAttempt: "yes",
+  tools: ["Nada sostenido", "YouTube o redes"],
+  pains: [
+    "No se que comer o entrenar hoy",
+    "Mi plan se rompe cuando como fuera o cambia mi semana",
+    "Abandono despues de 1-3 semanas",
+  ],
+  story: "La ultima vez me inscribi al gimnasio y abandone porque no sabia que hacer cada dia ni como ordenar mi comida.",
+  investment: "time",
+  availability: "interview_beta",
+  health: "clear",
+  clientScore: "Alta",
+};
+
 res = capture();
-await handler({
-  method: "POST",
-  headers: {},
-  body: {
-    name: "Ana Test",
-    email: "Ana@Correo.test",
-    whatsapp: "+51 999 888 777",
-    age: "25-34",
-    city: "Lima, Peru",
-    stage: "beginner",
-    goal: "Bajar grasa",
-    recentAttempt: "yes",
-    tools: ["Nada sostenido", "YouTube o redes"],
-    pains: ["No se que comer o entrenar hoy", "Me abruma decidir o empezar", "Abandono despues de 1-3 semanas"],
-    story: "La ultima vez me inscribi al gimnasio y abandone porque no sabia que hacer cada dia ni como ordenar mi comida.",
-    investment: "time",
-    availability: "interview_beta",
-    health: "clear",
-    clientScore: "Alta",
-  },
-}, res);
+await handler({ method: "POST", headers: {}, body: completeApplication }, res);
 assert(res.statusCode === 200 && res.body.ok === true, "Debe guardar una postulacion valida.");
 assert(res.body.submission.id === 12, "Debe devolver el id guardado.");
 assert(requests.some((item) => item.url.includes("on_conflict=whatsapp_normalized")), "Debe deduplicar por WhatsApp normalizado.");
 assert(requests.some((item) => item.body && JSON.parse(item.body).raw_payload?.email === "ana@correo.test"), "REQ-225: guarda el correo normalizado para la invitación.");
+assert(JSON.stringify(JSON.parse(requests[0].body).pains) === JSON.stringify(completeApplication.pains), "Conserva las opciones de formularios abiertos antes del cambio.");
+
+for (const pains of [
+  ["No se que comer hoy", "Me cuesta seguir el plan cuando como fuera"],
+  ["No se que entrenar hoy", "Me cuesta seguir el plan cuando cambia mi semana"],
+]) {
+  const writeIndex = requests.length;
+  res = capture();
+  await handler({ method: "POST", headers: {}, body: { ...completeApplication, pains } }, res);
+  assert(res.statusCode === 200, "Acepta las opciones de fricción separadas.");
+  const row = JSON.parse(requests[writeIndex].body);
+  assert(JSON.stringify(row.pains) === JSON.stringify(pains), "Guarda los dos valores elegidos por separado.");
+  assert(row.segment_scores.a === 2 && row.segment_scores.b === 8, "Cada opción conserva el tipo de su opción original.");
+}
 
 res = capture();
 await handler({

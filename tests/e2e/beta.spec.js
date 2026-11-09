@@ -33,7 +33,8 @@ test("REQ-201: postular muestra la confirmación sin segmento ni prioridad", asy
   await page.getByLabel("¿Qué te describe mejor?").selectOption("returning");
   await page.getByLabel("Objetivo principal").selectOption({ label: "Ganar músculo" });
   await page.locator('input[name="recentAttempt"][value="yes"]').check();
-  await page.locator('input[name="pains"]').first().check();
+  await page.getByRole("checkbox", { name: "No sé qué entrenar hoy", exact: true }).check();
+  await page.getByRole("checkbox", { name: "Me cuesta seguir el plan cuando cambia mi semana", exact: true }).check();
   await page.getByLabel("Cuéntanos la última vez que te pasó").fill("Dejé el gym cuando cambió mi horario.");
   await page.getByLabel("¿Cuánto inviertes hoy en resolver esto?").selectOption("time");
   await page.getByLabel("Disponibilidad").selectOption({ label: "Llamada de 15-20 min y beta de 3 meses" });
@@ -49,7 +50,13 @@ test("REQ-201: postular muestra la confirmación sin segmento ni prioridad", asy
   await expect(page.locator("body")).not.toContainText(/Prioridad|Principiante|Número de postulación/);
   await expect(done).toBeFocused();
   expect(await page.evaluate(() => localStorage.getItem("evolv_beta_draft"))).toBeNull();
-  expect(sent).toMatchObject({ email: "ana@correo.test", goal: "Ganar musculo", availability: "interview_beta", source: "portada" });
+  expect(sent).toMatchObject({
+    email: "ana@correo.test",
+    goal: "Ganar musculo",
+    availability: "interview_beta",
+    source: "portada",
+    pains: ["No se que entrenar hoy", "Me cuesta seguir el plan cuando cambia mi semana"],
+  });
   expect(errors).toEqual([]);
 });
 
@@ -63,17 +70,43 @@ test("REQ-217: sin fricciones no se envía, el límite de 3 respeta la elegida y
   await page.getByRole("button", { name: "Enviar postulación" }).click();
   expect(posts).toBe(0);
 
-  const pains = page.locator('input[name="pains"]');
-  for (const i of [0, 1, 6]) await pains.nth(i).check();
+  const selectedPains = ["No sé qué comer hoy", "No sé qué entrenar hoy", "Me cuesta seguir el plan cuando como fuera"];
+  for (const name of selectedPains) await page.getByRole("checkbox", { name, exact: true }).check();
   await expect(page.locator("#painCount")).toHaveText("3 de 3 elegidas.");
-  await pains.nth(2).click();
-  await expect(pains.nth(2)).not.toBeChecked();
-  await expect(pains.nth(6)).toBeChecked();
+  const fourthPain = page.getByRole("checkbox", { name: "Me cuesta seguir el plan cuando cambia mi semana", exact: true });
+  await fourthPain.click();
+  await expect(fourthPain).not.toBeChecked();
   await expect(page.locator("#painCount")).toHaveText("Ya elegiste 3. Desmarca una para cambiarla.");
 
   await page.reload();
   await expect(page.getByLabel("Nombre")).toHaveValue("Ana Prueba");
-  await expect(pains.nth(6)).toBeChecked();
+  for (const name of selectedPains) await expect(page.getByRole("checkbox", { name, exact: true })).toBeChecked();
+});
+
+test("REQ-374: un borrador anterior conserva sus datos y pide revisar las opciones divididas", async ({ page, context }) => {
+  await installMocks(context);
+  await page.goto("/beta-reclutamiento.html");
+  await expect(page.locator("#painDraftHint")).toBeHidden();
+  await page.evaluate(() => localStorage.setItem("evolv_beta_draft", JSON.stringify({
+    name: "Ana",
+    pains: [
+      "No se que comer o entrenar hoy",
+      "Mi plan se rompe cuando como fuera o cambia mi semana",
+      "Registrar todo me da pereza",
+    ],
+  })));
+
+  await page.reload();
+  await expect(page.getByLabel("Nombre")).toHaveValue("Ana");
+  await expect(page.locator("#painDraftHint")).toBeVisible();
+  await expect(page.locator("#painOptions input:checked")).toHaveCount(1);
+  await expect(page.getByRole("checkbox", { name: "Registrar todo me da pereza", exact: true })).toBeChecked();
+
+  const foodPain = page.getByRole("checkbox", { name: "No sé qué comer hoy", exact: true });
+  await foodPain.check();
+  await page.reload();
+  await expect(foodPain).toBeChecked();
+  await expect(page.locator("#painDraftHint")).toBeVisible();
 });
 
 test("REQ-217: un error de la API se explica y lleva al campo", async ({ page, context }) => {

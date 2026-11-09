@@ -24,13 +24,18 @@ const ALLOWED_TOOLS = new Set([
 ]);
 
 const ALLOWED_PAINS = new Map([
-  ["No se que comer o entrenar hoy", "b"],
+  ["No se que comer hoy", "b"],
+  ["No se que entrenar hoy", "b"],
   ["Me abruma decidir o empezar", "b"],
   ["Tengo miedo a hacer mal los ejercicios", "b"],
-  ["Mi plan se rompe cuando como fuera o cambia mi semana", "a"],
+  ["Me cuesta seguir el plan cuando como fuera", "a"],
+  ["Me cuesta seguir el plan cuando cambia mi semana", "a"],
   ["Uso demasiadas herramientas", "a"],
   ["Registrar todo me da pereza", "both"],
   ["Abandono despues de 1-3 semanas", "b"],
+  // Compatibilidad con formularios de beta abiertos antes del cambio.
+  ["No se que comer o entrenar hoy", "b"],
+  ["Mi plan se rompe cuando como fuera o cambia mi semana", "a"],
 ]);
 
 function env() {
