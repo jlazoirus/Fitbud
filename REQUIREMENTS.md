@@ -940,9 +940,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-132`).
 
 ## REQ-133 - API del coach: structured outputs, límites y modelo por acción con gate de telemetría para Sonnet 5
 
-**Estado: implementado.** `/api/claude` usa `output_config.format` (JSON Schema) para `diet_day`/`diet_week`/`meal_option` con fallback si Anthropic lo rechaza; capea `maxTokens` en 4096, resuelve modelo por acción vía env (default Haiku 4.5) e incluye `claude-sonnet-5`. `v_coach_model_gate` (`supabase/analytics.sql`, re-ejecutar en Supabase) gatea subir dieta a Sonnet 5 solo con >10% de degradación sostenida.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-133`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-134 - Pipeline de crecimiento del catálogo validado por el motor
 
@@ -986,10 +984,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-138`).
 
 ## REQ-139 - Activar `DIET_CONTRACT` en runtime con aviso suave no bloqueante
 
-**Estado: implementado.**
-`DIET_CONTRACT.runtimeActive=true`. `dietContractNoticeText(totals,target)` (index.html) evalúa el día ya cerrado (nunca la propuesta cruda) vía `nd.validateDietContractTotals()` y muestra "Tu día quedó cerca de tu meta, no exacto." en `genReviewHtml`/`genWeekReviewHtml` y en los toasts de `applyGeneratedDay`/`applyWeekPlan`/`applyDeterministicDay`. `finalizedDayIsComplete()` sigue siendo el único criterio de "aplicable" (cobertura de slots); ningún flujo bloquea aplicar/guardar por incumplir el contrato. Validador: `scripts/validate-diet-contract-runtime-notice.mjs`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-139`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`
 
@@ -2475,3 +2470,7 @@ Viene del navegador: nunca influye en precio, plan ni acceso. Un fallo de origen
 - El origen nunca guarda correo, nombre, teléfono ni salud.
 ### Verificación sugerida
 Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de prueba de Culqi, nunca reales; release gate.
+
+## REQ-371 - Web pública: inscripción corta al club en /unete
+
+**Estado: implementado.** Página `/unete` con nombre, correo, WhatsApp opcional y una pregunta opcional. Guarda `source` en `community_signups` vía `/api/unete`, reescrita a `/api/beta-recruitment?op=unete` por el tope de 12 funciones. Sin panel de admin. `supabase/comunidad.sql` aplicada en producción el 2026-11-09. Origen: `estrategia/09-Calendario-Redes-Nov-Dic-2026.md`.

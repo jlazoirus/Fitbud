@@ -345,21 +345,104 @@ async function handlePost(req, res, e) {
   });
 }
 
+// ── Inscripción corta al club (REQ-371) ───────────────────────────────────────
+// Comparte esta función por el tope de 12 del plan Hobby de Vercel: vercel.json
+// reescribe /api/unete a /api/beta-recruitment?op=unete.
+
+const ALLOWED_PLAN_BREAKERS = new Set(["comer_fuera", "horarios", "anotar", "no_saber", "ganas"]);
+
+function requestOp(req) {
+  const q = req.query && req.query.op;
+  if (q) return String(q);
+  try { return new URL(req.url || "", "http://local").searchParams.get("op") || ""; } catch (_) { return ""; }
+}
+
+export function parseSignup(body) {
+  const b = body && typeof body === "object" ? body : {};
+  const name = clean(b.name, 90);
+  const email = clean(b.email, 254).toLowerCase();
+  const { raw: whatsapp, digits } = normalizeWhatsapp(b.whatsapp);
+  const pain = clean(b.pain, 40);
+  const source = clean(b.source, 120);
+
+  const errors = [];
+  if (clean(b.website, 120)) errors.push("No pudimos procesar tu inscripción.");
+  if (name.length < 2) errors.push("Escribe tu nombre.");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.push("Revisa tu correo: ahí te vamos a escribir.");
+  if (digits && (digits.length < 8 || digits.length > 15)) errors.push("Revisa tu WhatsApp: incluye el código de tu país (empieza con +).");
+  if (b.consent !== true) errors.push("Marca la casilla para que podamos escribirte.");
+
+  return {
+    errors,
+    data: {
+      name,
+      email,
+      whatsapp: digits ? whatsapp : null,
+      pain: ALLOWED_PLAN_BREAKERS.has(pain) ? pain : null,
+      source: /^[a-zA-Z0-9_-]+$/.test(source) ? source.toLowerCase() : "unete",
+    },
+  };
+}
+
+async function handleSignup(req, res, e) {
+  let body;
+  try {
+    body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
+  } catch (_) {
+    res.status(400).json({ error: "Cuerpo invalido." });
+    return;
+  }
+
+  const { errors, data } = parseSignup(body);
+  if (errors.length) {
+    res.status(400).json({ error: errors[0], errors });
+    return;
+  }
+
+  const now = new Date().toISOString();
+  // Quien repite su correo conserva su primer origen y recibe la misma respuesta.
+  const response = await fetch(e.url + "/rest/v1/community_signups?on_conflict=email", {
+    method: "POST",
+    headers: serviceHeaders(e, {
+      "content-type": "application/json",
+      prefer: "resolution=ignore-duplicates,return=minimal",
+    }),
+    body: JSON.stringify({ ...data, consent_at: now, updated_at: now }),
+  });
+
+  if (!response.ok) {
+    const payload = await responseJson(response);
+    if (response.status === 404 || String(payload && payload.code) === "42P01") {
+      res.status(503).json({ error: "Las inscripciones no están disponibles en este momento. Intenta más tarde.", setup_pending: true });
+      return;
+    }
+    res.status(500).json({ error: "No pudimos guardar tu inscripción. Intenta de nuevo en unos minutos." });
+    return;
+  }
+
+  res.status(200).json({ ok: true });
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Método no permitido." });
     return;
   }
 
+  const signup = requestOp(req) === "unete";
   const e = env();
   if (!e.url || !e.service) {
-    res.status(500).json({ error: "Las postulaciones no están disponibles en este momento. Intenta más tarde." });
+    res.status(500).json({ error: signup
+      ? "Las inscripciones no están disponibles en este momento. Intenta más tarde."
+      : "Las postulaciones no están disponibles en este momento. Intenta más tarde." });
     return;
   }
 
   try {
-    await handlePost(req, res, e);
+    await (signup ? handleSignup : handlePost)(req, res, e);
   } catch (error) {
-    res.status(500).json({ error: "No pudimos guardar tu postulación. Intenta de nuevo en unos minutos." });
+    res.status(500).json({ error: signup
+      ? "No pudimos guardar tu inscripción. Intenta de nuevo en unos minutos."
+      : "No pudimos guardar tu postulación. Intenta de nuevo en unos minutos." });
   }
 }

@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // REQ-352: la portada pública (index.html) usa su hoja enlazada web/portada.css; la app vive en app/index.html.
-const PAGES = ["index.html", "app/index.html", "beta-reclutamiento.html"];
+const PAGES = ["index.html", "app/index.html", "beta-reclutamiento.html", "unete/index.html"];
 const errors = [];
 
 for (const page of PAGES) {

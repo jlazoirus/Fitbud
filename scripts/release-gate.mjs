@@ -154,6 +154,7 @@ run("test-admin-beta-api.mjs", "node scripts/test-admin-beta-api.mjs");
 run("test-admin-beta-signup.mjs", "node scripts/test-admin-beta-signup.mjs");
 run("test-admin-reset.mjs", "node scripts/test-admin-reset.mjs");
 run("test-beta-recruitment-api.mjs", "node scripts/test-beta-recruitment-api.mjs");
+run("test-unete-api.mjs", "node scripts/test-unete-api.mjs");
 run("invite-beta-tester.mjs --self-test", "node scripts/invite-beta-tester.mjs --self-test");
 run("test-invite-signup-api.mjs", "node scripts/test-invite-signup-api.mjs");
 run("test-webhook-refund.mjs", "node scripts/test-webhook-refund.mjs");
