@@ -54,3 +54,34 @@ test("REQ-308: en la app el admin no abre vistas admin y su Perfil enlaza a /adm
   await page.locator("#pfSecAdmin summary").click();
   await expect(page.getByRole("link", { name: /Abrir consola de administración/ })).toHaveAttribute("href", "/admin");
 });
+
+test("REQ-373: la consola reacomoda la navegación y los diálogos según el ancho", async ({ page, context }) => {
+  await installMocks(context, { tables: { profiles: { row: { ...profileFixture(), is_admin: true } } } });
+  // Reproduce el rewrite de Vercel sobre el servidor estático del test.
+  await page.route("**/admin", (route) => route.fulfill({ path: "app/index.html", contentType: "text/html" }));
+  await mockAdminApi(page);
+  await seedLoggedInUser(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/admin");
+  await page.waitForFunction(() => typeof _authBusy !== "undefined" && profile && !_authBusy);
+  await expect(page.getByRole("heading", { name: "Postulantes beta" })).toBeVisible();
+  const navigation = page.getByRole("navigation", { name: "Administración" });
+  const workspace = page.locator("#app");
+  await expect(navigation).toHaveCSS("flex-direction", "column");
+  expect((await workspace.boundingBox()).width).toBeGreaterThan(900);
+  const users = navigation.getByRole("button", { name: "Usuarios" });
+  await users.focus();
+  await users.press("Enter");
+  await expect(users).toBeFocused();
+  await expect(users).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: "Usuarios" })).toBeVisible();
+  await page.getByRole("button", { name: "Crear cuenta", exact: true }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.locator(".overlay")).toHaveCSS("align-items", "center");
+  await page.keyboard.press("Escape");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(navigation).toHaveCSS("flex-direction", "row");
+  expect((await navigation.boundingBox()).y).toBeGreaterThan((await workspace.boundingBox()).y);
+  await expect(users).toHaveAttribute("aria-current", "page");
+});

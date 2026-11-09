@@ -2478,3 +2478,7 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 ## REQ-372 - Avisos: la prueba del horario no depende de la fecha
 
 **Estado: implementado.** Ver historial. ✓ `validate-notify-schedule.mjs`.
+
+## REQ-373 - Consola de administración para escritorio
+
+**Estado: implementado.** Desde 1024 px, `/admin` muestra navegación lateral, listados de Beta y Ejercicios en dos columnas y diálogos centrados. En móvil conserva la navegación inferior.

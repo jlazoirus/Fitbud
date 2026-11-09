@@ -146,10 +146,10 @@ test("al volver en la siguiente semana la prepara una sola vez",async({page,cont
 
 test("fallo al guardar un rechazo no cambia preferencias ni comidas",async({page,context})=>{
   const {errors}=await boot(page,context,{days:[row(today,{desayuno:{done:false,ovr:entry()}})]});
-  const before=await page.evaluate(()=>JSON.stringify({prefs:profile.prefs,days:S.days}));
   await context.route(`${SUPA_URL}/rest/v1/profiles**`,route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({message:"Sin conexión"})}));
   await page.locator('[data-tab="nutricion"]').click();
   await page.getByRole("button",{name:/^Más opciones de desayuno$/i}).click();
+  const before=await page.evaluate(()=>JSON.stringify({prefs:profile.prefs,days:S.days}));
   await page.getByRole("button",{name:/No me gusta este plato/}).click();
   await expect(page.locator("#toast")).toContainText("No se pudo bloquear");
   expect(await page.evaluate(()=>JSON.stringify({prefs:profile.prefs,days:S.days}))).toBe(before);

@@ -492,6 +492,59 @@
   .tabs:not(.tabs-main) button.active{font-weight:600}
   .tabs:not(.tabs-main) button.active .ic{background:var(--accent-dim)}
 
+  .admin-nav-brand{display:none}
+  .admin-toolbar{justify-content:space-between;margin-bottom:12px}
+  .admin-user-tools>.row+.row{margin-top:14px}
+  .admin-user-tool-copy{flex:1;min-width:210px}
+  @media(min-width:1024px){
+    body:has(>.admin-nav:not(:empty)){flex-direction:row-reverse}
+    body:has(>.admin-nav:not(:empty))>#app{
+      min-width:0;max-width:1520px;padding:32px clamp(24px,3vw,48px);
+    }
+    #tabs.admin-nav:not(:empty){
+      width:216px;max-width:none;margin:0;padding:24px 14px 16px;gap:4px;
+      flex-direction:column;overflow-y:auto;
+      background:var(--surf1);border:0;border-right:1px solid var(--border);
+      backdrop-filter:none;
+    }
+    .admin-nav-brand{
+      display:flex;flex-direction:column;gap:5px;
+      padding:4px 12px 22px;margin-bottom:8px;border-bottom:1px solid var(--border);
+    }
+    .admin-nav-brand b{font-family:var(--font-display);font-size:18px}
+    #tabs.admin-nav button{
+      flex:none;flex-direction:row;min-height:44px;gap:10px;
+      padding:6px 12px;border-radius:var(--r-sm);font-size:14px;text-align:left;
+    }
+    #tabs.admin-nav button .ic{width:24px;height:24px;flex:none;background:none}
+    #tabs.admin-nav button.active{background:var(--accent-dim)}
+    #tabs.admin-nav button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+    #tabs.admin-nav button:not(.active):hover{background:var(--surf3);color:var(--txt)}
+    #tabs.admin-nav button:last-child{margin-top:auto}
+    .admin-nav:not(:empty)~.overlay{align-items:center;padding:24px}
+    .admin-nav:not(:empty)~.overlay .sheet{border-radius:var(--r-lg);border-bottom:1px solid var(--border-2)}
+    body:has(>.admin-nav:not(:empty)) #app .shead{margin-bottom:24px}
+    .admin-shead .shead-sub{display:none}
+    .admin-toolbar{justify-content:flex-end;margin-bottom:16px}
+    .admin-toolbar .admin-back{display:none}
+    .admin-user-tools{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+    .admin-user-tools>.row{
+      flex-direction:column;align-items:flex-start;justify-content:space-between;
+      padding:0 16px;
+    }
+    .admin-user-tools>.row:first-child{padding-left:0}
+    .admin-user-tools>.row:last-child{padding-right:0}
+    .admin-user-tools>.row+.row{margin-top:0;border-left:1px solid var(--border-2)}
+    .admin-user-tool-copy{flex:none;min-width:0}
+    #betaList,#exerciseAdminList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    #betaList>.meal{margin:0}
+    #betaList>.ai-box,#betaList>.muted{grid-column:1/-1}
+    #app:has(#exerciseAdminList) .exercise-filters{grid-template-columns:repeat(3,minmax(0,1fr))}
+    #app:has(#exerciseAdminList) .exercise-filters>*{min-width:0}
+    #app:has(#betaList)>.ai-box{max-width:78ch}
+    #app:has(#set_key)>.dash{max-width:760px}
+  }
+
   /* Week view */
   .wk-day{display:flex;justify-content:space-between;align-items:center;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-md);padding:13px 15px;margin-bottom:8px;transition:.15s}
   .wk-day.today{border-color:var(--border-acc);background:var(--accent-dim)}
@@ -4443,7 +4496,7 @@ function showMacroInfo(key){
 }
 // Cabecera de pantalla (eyebrow + título display + chip de ícono a la derecha)
 function screenHeader(title,sub,icon){
-  return `<header class="shead">
+  return `<header class="shead${ADMIN_CONSOLE&&sub==="Administración"?" admin-shead":""}">
     <div>${sub?`<div class="shead-sub">${sub}</div>`:""}<h1>${esc(title)}</h1></div>
     ${icon?`<div class="shead-ic">${tabIcon(icon)}</div>`:""}
   </header>`;
@@ -4459,10 +4512,19 @@ const ADMIN_VIEWS=["adminBeta","admin","foods","exercises","analytics","settings
 const ADMIN_TABS=[["adminBeta","Beta","mail"],["admin","Usuarios","perfil"],["foods","Alimentos","foods"],["exercises","Ejercicios","entreno"],["analytics","Analítica","progreso"],["settings","Ajustes","settings"]];
 function renderAdminTabs(){
   const bar=$("#tabs");
-  bar.classList.remove("tabs-main");
+  bar.classList.replace("tabs-main","admin-nav");
   bar.setAttribute("aria-label","Administración");
-  bar.innerHTML=ADMIN_TABS.map(([v,l,ic])=>`<button data-tab="${v}" class="${view===v?'active':''}" onclick="setView('${v}')"><span class="ic">${tabIcon(ic)}</span><span>${l}</span></button>`).join("")
-    +`<button onclick="location.href='/'"><span class="ic">${tabIcon("hoy")}</span><span>App</span></button>`;
+  if(!bar.firstChild){
+    bar.innerHTML=`<div class="admin-nav-brand"><b>EVOLV</b><span class="muted small">Administración</span></div>`
+      +ADMIN_TABS.map(([v,l,ic])=>`<button data-tab="${v}" onclick="setView('${v}')"><span class="ic" aria-hidden="true">${tabIcon(ic)}</span><span>${l}</span></button>`).join("")
+      +`<button onclick="location.href='/'"><span class="ic" aria-hidden="true">${tabIcon("hoy")}</span><span>App</span></button>`;
+  }
+  for(const tab of bar.querySelectorAll("[data-tab]")){
+    const active=tab.dataset.tab===view;
+    tab.classList.toggle("active",active);
+    if(active)tab.setAttribute("aria-current","page");
+    else tab.removeAttribute("aria-current");
+  }
 }
 function renderAdminConsole(){
   if(!isAdmin()){
@@ -16041,27 +16103,27 @@ async function adminApi(action,payload){
 }
 async function renderAdminUsers(){
   $("#app").innerHTML=`${screenHeader("Usuarios","Administración","perfil")}
-    <div class="row between wrap" style="margin-bottom:12px">
-      <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
+    <div class="row wrap admin-toolbar">
+      <button class="btn btn-sm admin-back" onclick="setView('perfil')">‹ Volver a Perfil</button>
       <button class="btn btn-sm" onclick="renderAdminUsers()">Actualizar</button>
     </div>
-    <div class="dash" style="margin-bottom:14px">
-      <div class="row between wrap" style="gap:10px;margin-bottom:14px">
-        <div style="flex:1;min-width:210px">
+    <div class="dash admin-user-tools" style="margin-bottom:14px">
+      <div class="row between wrap" style="gap:10px">
+        <div class="admin-user-tool-copy">
           <b>Crear cuenta</b>
           <div class="muted small" style="margin-top:5px">Sin correo: te damos una contraseña temporal para enviarla por WhatsApp. Al entrar, la persona crea la suya.</div>
         </div>
         <button class="btn btn-accent" onclick="openAdminCreateUser()">Crear cuenta</button>
       </div>
-      <div class="row between wrap" style="gap:10px;margin-bottom:14px">
-        <div style="flex:1;min-width:210px">
+      <div class="row between wrap" style="gap:10px">
+        <div class="admin-user-tool-copy">
           <b>Invitar usuario</b>
           <div class="muted small" style="margin-top:5px">Envía un correo para activar la cuenta y crear contraseña desde Evolv.</div>
         </div>
         <button class="btn btn-accent" onclick="openAdminInviteUser()">Enviar invitación</button>
       </div>
       <div class="row between wrap" style="gap:10px">
-        <div style="flex:1;min-width:210px">
+        <div class="admin-user-tool-copy">
           <b>Usuario de prueba reiniciable</b>
           <div class="muted small" style="margin-top:5px">Conserva el mismo acceso, pero vuelve a onboarding sin perfil, progreso, planes, consentimientos ni fotos.</div>
         </div>
@@ -16425,8 +16487,8 @@ const BETA_AVAIL_LABELS={interview_beta:"Llamada y beta de 3 meses",interview:"S
 const BETA_INVEST_LABELS={none:"Nada por ahora",time:"Tiempo",app:"Paga o pagó una app",coach:"Paga o pagó coach, nutricionista o gym"};
 async function renderAdminBeta(){
   $("#app").innerHTML=`${screenHeader("Postulantes beta","Administración","perfil")}
-    <div class="row between wrap" style="margin-bottom:12px">
-      <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
+    <div class="row wrap admin-toolbar">
+      <button class="btn btn-sm admin-back" onclick="setView('perfil')">‹ Volver a Perfil</button>
       <button class="btn btn-sm" onclick="loadAdminBeta()">Actualizar</button>
     </div>
     <div class="ai-box" style="margin-bottom:14px">Al aceptar a alguien le llega un correo de invitación para crear su contraseña, y su cuenta nace con 90 días de plan completo y el coach sin tope de uso. Si el correo no sale, te dejamos un enlace para copiar.</div>
@@ -16674,8 +16736,8 @@ function renderExerciseAdmin(){
   const disciplines=[...new Set(catalog.map(ex=>ex.discipline).filter(Boolean))].sort();
   const places=[...new Set(catalog.flatMap(ex=>exerciseArray(ex.places)))].sort();
   $("#app").innerHTML=`${screenHeader("Ejercicios",`${catalog.filter(ex=>ex.active!==false).length} activos · contenido propio`,"entreno")}
-    <div class="row between wrap" style="margin-bottom:12px">
-      <button class="btn btn-sm" onclick="setView('perfil')">‹ Volver a Perfil</button>
+    <div class="row wrap admin-toolbar">
+      <button class="btn btn-sm admin-back" onclick="setView('perfil')">‹ Volver a Perfil</button>
       <button class="btn btn-sm" onclick="dbLoad().then(render)">Actualizar</button>
     </div>
     ${DB.exerciseReady?"":`<div class="alert"><b>Catálogo en modo local.</b><br>Aplica <code>supabase/exercises.sql</code> para habilitar edición y convertir Supabase en la fuente compartida.</div>`}
