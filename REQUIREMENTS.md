@@ -2474,3 +2474,7 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 ## REQ-371 - Web pública: inscripción corta al club en /unete
 
 **Estado: implementado.** Página `/unete` con nombre, correo, WhatsApp opcional y una pregunta opcional. Guarda `source` en `community_signups` vía `/api/unete`, reescrita a `/api/beta-recruitment?op=unete` por el tope de 12 funciones. Sin panel de admin. `supabase/comunidad.sql` aplicada en producción el 2026-11-09. Origen: `estrategia/09-Calendario-Redes-Nov-Dic-2026.md`.
+
+## REQ-372 - Avisos: la prueba del horario no depende de la fecha
+
+**Estado: implementado.** Ver historial. ✓ `validate-notify-schedule.mjs`.
