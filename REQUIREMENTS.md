@@ -2433,11 +2433,9 @@ Con 7 días registrados y ≥3 en meta, el plato repetido en ≥ mitad de esos d
 ### Verificación sugerida
 `validate-habitual-meals.mjs`, `comidas-habituales.spec.js` y release gate.
 
-## REQ-361 - Avisos: el "Ahora no" de la tarjeta no calla el pedido de la racha
+## REQ-361 - Avisos: "Ahora no" no calla la racha
 
-**Estado: implementado.** Detalle en `docs/requirements-history.md`.
-
-✓ `tests/e2e/avisos.spec.js`.
+**Estado: implementado.** Ver historial.
 
 ## REQ-362 - Nutrición: registrar alimentos por unidades
 
@@ -2478,3 +2476,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 ## REQ-368 - Hoy: elegir entrenamiento en descanso
 
 **Estado: implementado.** Selector de sesiones para hoy con las restricciones de seguridad. PWA v227.
+
+## REQ-369 - Perfil: Entreno vuelve al alto de REQ-279
+
+**Estado: implementado.** PWA v228.

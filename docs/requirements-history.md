@@ -13524,3 +13524,20 @@ REQ-341 no mostraba el pedido si la persona había cerrado la tarjeta ese día (
 ### Criterios de aceptación
 
 - Tras "Ahora no" en la tarjeta de Hoy, al sumar el día aparece el pedido. ✓ `tests/e2e/avisos.spec.js` (falla con el código anterior).
+
+## REQ-369 - Perfil: Entreno vuelve al alto de REQ-279
+
+**Estado: implementado.**
+
+### Origen
+
+`tests/e2e/perfil.spec.js` fallaba en `main`: la sección Entreno medía 1512 px y el tope de REQ-279 es 1500. El bisect marcó `c86ba43` (REQ-359), que agregó el selector "¿Con qué prefieres entrenar?" con una nota debajo cuando la fuerza es en gimnasio.
+
+### Alcance
+
+`trainingStyleField()` (`app/index.html`) omite la nota "Lo que prefieres usar, además del equipo disponible." cuando se pinta en Perfil (`pf`). El onboarding y el cambio de rutina la siguen mostrando. El selector y su valor no cambian. No se sube el tope de la prueba.
+
+### Criterios de aceptación
+
+- `tests/e2e/perfil.spec.js` pasa sin cambiar el tope. ✓
+- `tests/e2e/coach-rutina.spec.js` sigue pasando. ✓
