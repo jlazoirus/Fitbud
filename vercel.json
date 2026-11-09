@@ -49,6 +49,14 @@
       "destination": "/libro-de-reclamaciones/index.html"
     },
     {
+      "source": "/unete",
+      "destination": "/unete/index.html"
+    },
+    {
+      "source": "/api/unete",
+      "destination": "/api/beta-recruitment?op=unete"
+    },
+    {
       "source": "/api/culqi-charge",
       "destination": "/api/checkout?op=culqi"
     },

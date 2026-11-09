@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101010">
+  <title>Club del Plan B · Evolv</title>
+  <meta name="description" content="Para quienes ven caerse el plan y vuelven igual. Inscríbete en 20 segundos y te avisamos primero cuando abra la beta.">
+  <link rel="canonical" href="https://evolvapp.club/unete">
+  <meta property="og:title" content="Club del Plan B · Evolv">
+  <meta property="og:description" content="Para quienes ven caerse el plan y vuelven igual.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://evolvapp.club/unete">
+  <meta property="og:site_name" content="Evolv">
+  <meta property="og:image" content="https://evolvapp.club/assets/og-image.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://evolvapp.club/assets/og-image.png">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" sizes="180x180" href="/assets/icon-180.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* REQ-371: mismos tokens de marca que /beta. */
+    :root{
+      color-scheme:dark;
+      --bg:#101010; --surf2:#1e1e1e; --surf3:#262626;
+      --line-2:rgba(255,255,255,.16);
+      --txt:#f2f2ee; --muted:#a8a8a0;
+      --accent:#d6ff3a; --accent-hover:#e2ff73; --on-accent:#101010; --accent-dim:rgba(214,255,58,.12);
+      --bad-dim:rgba(239,68,68,.14);
+      --font-display:'Unbounded',system-ui,sans-serif;
+      --font-body:'Manrope',system-ui,sans-serif;
+      --r-sm:12px;
+    }
+    *{box-sizing:border-box}
+    ::selection{background:var(--accent);color:var(--on-accent)}
+    :focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+    [hidden]{display:none!important}
+    body{
+      margin:0;
+      min-height:100vh;
+      min-height:100dvh;
+      background:var(--bg);
+      color:var(--txt);
+      font-family:var(--font-body);
+      line-height:1.5;
+      -webkit-font-smoothing:antialiased;
+      caret-color:var(--accent);
+    }
+    a{color:inherit;text-underline-offset:3px}
+    .page{
+      width:min(1080px,100%);
+      margin:0 auto;
+      padding:16px 16px 32px;
+    }
+    .brand{
+      display:inline-flex;
+      align-items:center;
+      gap:9px;
+      min-height:44px;
+      font-family:var(--font-display);
+      font-size:20px;
+      font-weight:800;
+      letter-spacing:-.02em;
+      text-decoration:none;
+    }
+    .brand-v{color:var(--accent)}
+    .layout{display:grid;gap:24px;margin-top:20px}
+    h1{
+      margin:0;
+      font-family:var(--font-display);
+      font-size:clamp(50px,15.5vw,104px);
+      font-weight:800;
+      line-height:1;
+      letter-spacing:-.04em;
+    }
+    h1 span{display:block}
+    /* El plan A se tacha y se cae: el único movimiento de la página. */
+    h1 s{
+      position:relative;
+      display:inline-block;
+      color:var(--muted);
+      text-decoration:none;
+      transform:rotate(-3deg) translateY(.03em);
+      transform-origin:0 100%;
+      animation:caer .9s cubic-bezier(.16,1,.3,1);
+    }
+    h1 s::after{
+      content:"";
+      position:absolute;
+      left:-.04em;
+      right:-.04em;
+      top:54%;
+      height:.09em;
+      border-radius:99px;
+      background:var(--accent);
+      transform-origin:0 50%;
+      animation:tachar .55s cubic-bezier(.16,1,.3,1);
+    }
+    h1 .b{color:var(--accent);margin-top:.08em}
+    @keyframes caer{from{transform:none}}
+    @keyframes tachar{from{transform:scaleX(0)}}
+    @media (prefers-reduced-motion:reduce){
+      h1 s,h1 s::after{animation:none}
+    }
+    .lead{margin:16px 0 0;max-width:42ch;color:var(--muted);font-size:17px;line-height:1.5}
+    .lead b{color:var(--txt);font-weight:700}
+    form{display:grid;gap:16px}
+    label,.q{display:block;margin:0 0 6px;font-size:14px;font-weight:700}
+    .opt{color:var(--muted);font-weight:500}
+    input[type=text],input[type=email],input[type=tel]{
+      width:100%;
+      min-height:50px;
+      padding:12px 14px;
+      border:1px solid var(--line-2);
+      border-radius:var(--r-sm);
+      background:var(--surf2);
+      color:var(--txt);
+      font:inherit;
+      font-size:16px;
+      outline:none;
+      transition:border-color .15s;
+    }
+    input::placeholder{color:#8f8f87}
+    input:hover{border-color:rgba(255,255,255,.3)}
+    input:focus{border-color:var(--accent)}
+    input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+    .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+    fieldset{margin:0;padding:0;border:0;min-width:0}
+    legend{padding:0}
+    .chips{display:flex;flex-wrap:wrap;gap:8px}
+    .chip{position:relative;margin:0;cursor:pointer}
+    .chip input{position:absolute;inset:0;margin:0;opacity:0;cursor:pointer}
+    .chip span{
+      display:flex;
+      align-items:center;
+      min-height:44px;
+      padding:0 15px;
+      border:1px solid var(--line-2);
+      border-radius:999px;
+      font-size:15px;
+      font-weight:600;
+      transition:border-color .15s,background .15s,color .15s;
+    }
+    .chip:hover span{border-color:rgba(255,255,255,.3)}
+    .chip input:checked + span{border-color:var(--accent);background:var(--accent-dim);color:var(--accent)}
+    .chip input:focus-visible + span{outline:2px solid var(--accent);outline-offset:2px}
+    .consent{
+      display:flex;
+      gap:11px;
+      align-items:flex-start;
+      margin:0;
+      font-size:14px;
+      font-weight:500;
+      line-height:1.45;
+      color:var(--muted);
+      cursor:pointer;
+    }
+    .consent input{flex:0 0 auto;width:22px;height:22px;margin:0;accent-color:var(--accent)}
+    button,.button{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      width:100%;
+      min-height:54px;
+      padding:0 24px;
+      border:1px solid transparent;
+      border-radius:999px;
+      background:var(--accent);
+      color:var(--on-accent);
+      font:inherit;
+      font-size:16px;
+      font-weight:800;
+      text-decoration:none;
+      cursor:pointer;
+      transition:background .15s,border-color .15s,transform .1s;
+    }
+    button:hover,.button:hover{background:var(--accent-hover)}
+    button:active,.button:active{transform:scale(.98)}
+    button:disabled{opacity:.55;cursor:not-allowed;transform:none}
+    .button.secondary{background:transparent;color:var(--txt);border-color:var(--line-2)}
+    .button.secondary:hover{background:transparent;border-color:var(--txt)}
+    .error{margin:0;padding:13px 15px;border-radius:var(--r-sm);background:var(--bad-dim);color:#fca5a5;font-size:14px}
+    .done:focus{outline:none}
+    .done h2{margin:0;font-family:var(--font-display);font-size:clamp(30px,8vw,44px);font-weight:800;line-height:1.05;letter-spacing:-.03em;text-wrap:balance}
+    .done p{margin:14px 0 22px;color:var(--muted);font-size:17px;line-height:1.5;overflow-wrap:anywhere}
+    .done-actions{display:grid;gap:10px}
+    .foot{margin:32px 0 0;color:var(--muted);font-size:13px}
+    @media (min-width:900px){
+      .page{padding:24px 40px 40px}
+      .layout{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:64px;align-items:center;margin-top:56px}
+      .lead{font-size:19px;margin-top:22px}
+      button,.button{width:auto}
+      .done-actions{display:flex;flex-wrap:wrap}
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <a class="brand" href="/" aria-label="Evolv, ir al inicio">
+      <svg width="30" height="30" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="112" fill="#1e1e1e"/><g transform="translate(0 35)" fill="none" stroke="#d6ff3a" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"><path d="M146 352 L256 262 L366 352" stroke-opacity=".35"/><path d="M146 266 L256 176 L366 266" stroke-opacity=".65"/><path d="M146 180 L256 90 L366 180"/></g></svg>
+      <span>evol<span class="brand-v">v</span></span>
+    </a>
+
+    <div class="layout">
+      <section>
+        <h1><s>Plan A.</s> <span class="b">Plan B.</span></h1>
+        <p class="lead" id="lead"><b>Club del Plan B:</b> para quienes ven caerse el plan y vuelven igual. Te avisamos primero cuando abra la beta, tres meses gratis y sin tarjeta.</p>
+      </section>
+
+      <section aria-label="Inscripción">
+        <form id="signupForm" novalidate>
+          <div class="hp" aria-hidden="true">
+            <label for="website">Sitio web</label>
+            <input id="website" name="website" type="text" tabindex="-1" autocomplete="off">
+          </div>
+
+          <div>
+            <label for="name">Nombre</label>
+            <input id="name" name="name" type="text" autocomplete="given-name" maxlength="90" required>
+          </div>
+          <div>
+            <label for="email">Correo</label>
+            <input id="email" name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" placeholder="tu@correo.com" required>
+          </div>
+          <div>
+            <label for="whatsapp">WhatsApp <span class="opt">(opcional)</span></label>
+            <input id="whatsapp" name="whatsapp" type="tel" autocomplete="tel" inputmode="tel" placeholder="+51 999 999 999">
+          </div>
+
+          <fieldset>
+            <legend class="q">¿Qué te rompe más el plan? <span class="opt">(opcional)</span></legend>
+            <div class="chips">
+              <label class="chip"><input type="radio" name="pain" value="comer_fuera"><span>Comer fuera</span></label>
+              <label class="chip"><input type="radio" name="pain" value="horarios"><span>Cambios de horario</span></label>
+              <label class="chip"><input type="radio" name="pain" value="anotar"><span>Anotar todo</span></label>
+              <label class="chip"><input type="radio" name="pain" value="no_saber"><span>No saber qué toca</span></label>
+              <label class="chip"><input type="radio" name="pain" value="ganas"><span>Las ganas</span></label>
+            </div>
+          </fieldset>
+
+          <label class="consent">
+            <input id="consent" name="consent" type="checkbox" required>
+            <span>Tengo 18 años o más y acepto que Evolv me escriba sobre el club y la beta. Puedo pedir que me saquen cuando quiera. <a href="/privacidad" target="_blank" rel="noopener">Privacidad</a></span>
+          </label>
+
+          <p id="error" class="error" role="alert" hidden></p>
+          <button type="submit" id="submitBtn">Inscribirme</button>
+        </form>
+
+        <div id="done" class="done" tabindex="-1" hidden>
+          <h2 id="doneTitle">Ya estás dentro.</h2>
+          <p id="doneLead">Te escribimos apenas abra el próximo grupo de la beta.</p>
+          <div class="done-actions">
+            <a class="button" id="shareLink" href="#" target="_blank" rel="noopener">Invitar a alguien por WhatsApp</a>
+            <a class="button secondary" href="/beta?source=unete">Postular ahora a la beta</a>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <p class="foot">Evolv · Tu mejor versión, un día a la vez.</p>
+  </main>
+
+  <script>
+    const form = document.getElementById("signupForm");
+    const errorBox = document.getElementById("error");
+    const submitBtn = document.getElementById("submitBtn");
+    const done = document.getElementById("done");
+
+    const clean = (value) => String(value || "").replace(/\s+/g, " ").trim();
+
+    // Pregunta opcional: tocar de nuevo la opción elegida la desmarca.
+    let lastPain = "";
+    form.addEventListener("click", (event) => {
+      if (event.target.name !== "pain") return;
+      if (event.target.value === lastPain) {
+        event.target.checked = false;
+        lastPain = "";
+      } else {
+        lastPain = event.target.value;
+      }
+    });
+
+    function showError(message, field) {
+      errorBox.textContent = message;
+      errorBox.hidden = false;
+      if (field) field.focus();
+    }
+
+    function validate(data) {
+      if (data.name.length < 2) return ["Escribe tu nombre.", form.elements.name];
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) return ["Revisa tu correo: ahí te vamos a escribir.", form.elements.email];
+      const digits = data.whatsapp.replace(/\D/g, "").length;
+      if (digits && (digits < 8 || digits > 15)) return ["Revisa tu WhatsApp: incluye el código de tu país (empieza con +).", form.elements.whatsapp];
+      if (!data.consent) return ["Marca la casilla para que podamos escribirte.", form.elements.consent];
+      return null;
+    }
+
+    function readForm() {
+      const fd = new FormData(form);
+      return {
+        name: clean(fd.get("name")),
+        email: clean(fd.get("email")).toLowerCase(),
+        whatsapp: clean(fd.get("whatsapp")),
+        pain: clean(fd.get("pain")),
+        consent: form.elements.consent.checked,
+        website: clean(fd.get("website")),
+        source: clean(new URLSearchParams(location.search).get("source") || "unete"),
+      };
+    }
+
+    function renderDone(data) {
+      const first = data.name.split(" ")[0];
+      document.getElementById("doneTitle").textContent = "Ya estás dentro, " + first + ".";
+      document.getElementById("doneLead").textContent = "Te escribimos a " + data.email + " apenas abra el próximo grupo de la beta.";
+      const text = "Te paso esto: un club para quienes ven caerse el plan y vuelven igual. https://evolvapp.club/unete?source=compartido";
+      document.getElementById("shareLink").href = "https://wa.me/?text=" + encodeURIComponent(text);
+      form.hidden = true;
+      document.getElementById("lead").hidden = true;
+      done.hidden = false;
+      done.focus({ preventScroll: true });
+      done.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function setSubmitting(isSubmitting) {
+      submitBtn.disabled = isSubmitting;
+      submitBtn.textContent = isSubmitting ? "Inscribiendo…" : "Inscribirme";
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      const data = readForm();
+      const invalid = validate(data);
+      if (invalid) {
+        showError(invalid[0], invalid[1]);
+        return;
+      }
+      setSubmitting(true);
+      try {
+        const response = await fetch("/api/unete", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) {
+          showError(payload.error || "No pudimos guardar tu inscripción. Intenta de nuevo en unos minutos.");
+          return;
+        }
+        renderDone(data);
+      } catch (_) {
+        showError("No hay conexión. Revisa tu internet e intenta de nuevo; lo que escribiste sigue aquí.");
+      } finally {
+        setSubmitting(false);
+      }
+    });
+  </script>
+</body>
+</html>

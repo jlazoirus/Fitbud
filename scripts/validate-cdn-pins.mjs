@@ -8,7 +8,7 @@ import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const PAGES = ["index.html", "beta-reclutamiento.html"];
+const PAGES = ["index.html", "beta-reclutamiento.html", "unete/index.html"];
 const VENDOR = { "@supabase/supabase-js": "tests/e2e/vendor/supabase-js-2.min.js" };
 const errors = [];
 
