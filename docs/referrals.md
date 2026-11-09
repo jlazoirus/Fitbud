@@ -31,6 +31,8 @@ Correo de campaña una vez por usuario, respeta email_opt_in=false y lleva baja 
 
 Para pausar, retirar `runReferralCampaign` del job y ocultar los accesos al panel. Conservar códigos canjeados, miembros y accesos ya otorgados. No retirar el trigger mientras existan enlaces de referidos habilitados, pues se perdería el control del beneficio. No borrar datos de producción como rollback.
 
+Si la campaña falla en un disparo, el job responde 200, suma el fallo en `errors` (`referral_campaign_error` en el log) y el siguiente disparo reintenta sin duplicar. El workflow horario queda en verde en ese caso: revisar su conteo `errors`.
+
 ## Verificación local
 
 `node scripts/test-referrals.mjs` comprueba SQL real en PGlite, idempotencia de migración, audiencia, persistencia de elegibilidad, límites, rollback, ausencia de premios duplicados, meses de ambos lados, permisos y campaña con red simulada. Playwright cubre móvil/escritorio, enlaces, generación, límites, contadores y reintento. Pruebas existentes de invitación cubren compatibilidad del registro cerrado.

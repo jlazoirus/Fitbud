@@ -32,7 +32,7 @@ const hour = localHour(tz);
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
 const yesterday = () => { const d = new Date(today() + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
 
-let state;
+let state, cohortDown = false;
 globalThis.fetch = async (url, init = {}) => {
   const u = String(url), method = init.method || "GET";
   state.calls.push(`${method} ${u}`);
@@ -41,6 +41,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes("/notification_preferences?")) return json([state.pref]);
   if (u.includes("/profiles?id=")) return json([{ email: "ana@example.com", active: true, goal: "deficit", planStartDate: null, planEndDate: null }]);
   if (u.includes("/profiles?select=id")) return json([{ id: "u1" }]);
+  if (cohortDown && u.includes("/profiles?active=eq.true")) return { ok: false, status: 503, json: async () => ({ message: "Supabase no responde" }) };
   // Seguimientos (REQ-296) y cohorte de la campaña de referidos (REQ-317): sin
   // personas, porque aquí solo se prueba el aviso del día.
   if (u.includes("/profiles?active=")) return json([]);
@@ -123,6 +124,17 @@ frozenNow = campaignWeek.getTime();
 out = await run(hour);
 assert.ok(state.calls.some((c) => c.includes("/profiles?active=eq.true&created_at=lte.")), "esa semana el job consulta la cohorte de la campaña");
 assert.equal(out.sent, 1, "con la campaña activa el aviso del día sale igual");
+assert.equal(out.errors, 0, "sin errores ocultos en el job");
 assert.equal(state.emails[0].subject, "Tu plan de hoy te espera");
 console.log("  semana de la campaña de referidos → el aviso del día sale igual");
+// REQ-373: si la campaña falla, el job responde 200 (lo exige run), el aviso
+// sale, el fallo queda contado y los vencimientos corren igual.
+cohortDown = true;
+out = await run(hour);
+cohortDown = false;
+assert.equal(out.sent, 1, "el aviso del día no depende de la campaña");
+assert.equal(out.errors, 1, "el fallo de la campaña queda contado");
+assert.ok(out.log.some((l) => l.action === "referral_campaign_error"), "y registrado");
+assert.ok(state.calls.some((c) => c.includes("/user_entitlements?")), "los vencimientos corren igual");
+console.log("  campaña caída → job 200, aviso enviado, fallo contado y vencimientos corren");
 console.log("validate-notify-schedule: OK");

@@ -2478,3 +2478,7 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 ## REQ-372 - Avisos: la prueba del horario no depende de la fecha
 
 **Estado: implementado.** Ver historial. ✓ `validate-notify-schedule.mjs`.
+
+## REQ-373 - Avisos: un fallo de la campaña no tumba el job
+
+**Estado: implementado.** Ver historial. ✓ `validate-notify-schedule.mjs`.

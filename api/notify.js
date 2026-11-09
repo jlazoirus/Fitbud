@@ -858,7 +858,12 @@ async function runJob(e, dryRun) {
   }
 
   await runFollowups(e, dryRun, results);
-  await runReferralCampaign(e, dryRun, results);
+  // REQ-373: un fallo de la campaña no tumba el job ni salta los vencimientos.
+  // El siguiente disparo reintenta sin duplicar (notification_log).
+  await runReferralCampaign(e, dryRun, results).catch((err) => {
+    results.errors++;
+    results.log.push({ action: "referral_campaign_error", error: err.message });
+  });
   await runPlanExpiry(e, dryRun, results);
   return results;
 }

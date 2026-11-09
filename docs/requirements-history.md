@@ -13626,3 +13626,25 @@ Atrapar errores en `runReferralCampaign`: cambia producción durante una campañ
 - `node scripts/validate-notify-schedule.mjs` pasa con el reloj simulado en las 24 horas de un día antes, durante y después de la ventana, en sus cuatro bordes, en 15 arranques justo antes de las :00 y en 80 instantes entre 2026 y 2029. ✓
 - Sin la línea del doble de `fetch` la prueba falla en cualquier fecha. Sin el reloj fijo vuelve a fallar al cruzar la hora. ✓
 - El release gate deja de fallar en este check. ✓
+
+## REQ-373 - Avisos: un fallo de la campaña no tumba el job
+
+**Estado: implementado.**
+
+### Origen
+
+Hallado en REQ-372. `runFollowups` y `runPlanExpiry` atrapan sus errores, pero `runReferralCampaign` no. Hasta el cierre de la campaña (16/11/2026 14:00 UTC), un fallo pasajero de Supabase al listar la cohorte o leer preferencias hacía que el job respondiera 500 y saltara los avisos de vencimiento de esa corrida.
+
+### Alcance
+
+`runJob` (`api/notify.js`) atrapa el error de la campaña, lo suma en `results.errors` y lo registra como `referral_campaign_error`. La lógica de la campaña no cambia. Reintentar es seguro: cada envío usa su clave en `notification_log`. Si no se pueden leer las preferencias de una persona, no se le envía.
+
+### Riesgos
+
+El workflow horario ya no queda en rojo por este fallo. Su log imprime el conteo `errors`, igual que con los otros dos trabajos.
+
+### Criterios de aceptación
+
+- Con la cohorte respondiendo 503, el job responde 200, el aviso del día sale, `errors` es 1 y se consultan los vencimientos. ✓ `validate-notify-schedule.mjs`
+- Sin el `.catch` en `runJob`, esa prueba falla. ✓
+- `test-referrals.mjs` sigue pasando. ✓
