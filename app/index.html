@@ -7237,9 +7237,10 @@ function formatRestShort(seconds){
   return r?`${m} min ${r} s`:`${m} min`;
 }
 /* ---- REQ-359: conocer al usuario y aplicar una propuesta semanal revisada ---- */
+// REQ-369: en Perfil se omite la nota para que Entreno no supere el alto de REQ-279.
 function trainingStyleField(prefix,prefs){
   const selected=FITBUD_TRAINING_ROUTINE.style(prefs.trainingStyle);
-  return `<div class="field"><label for="${prefix}_training_style">¿Con qué prefieres entrenar?</label><select id="${prefix}_training_style" onchange="${prefix==='pf'?'updateTrainingSummary()':prefix==='ob'?'readOnboardingTrainingStyle(this.value)':''}">${Object.entries(FITBUD_TRAINING_ROUTINE.STYLES).map(([value,label])=>`<option value="${value}" ${value===selected?'selected':''}>${label}</option>`).join('')}</select><div class="field-note">Lo que prefieres usar, además del equipo disponible.</div></div>`;
+  return `<div class="field"><label for="${prefix}_training_style">¿Con qué prefieres entrenar?</label><select id="${prefix}_training_style" onchange="${prefix==='pf'?'updateTrainingSummary()':prefix==='ob'?'readOnboardingTrainingStyle(this.value)':''}">${Object.entries(FITBUD_TRAINING_ROUTINE.STYLES).map(([value,label])=>`<option value="${value}" ${value===selected?'selected':''}>${label}</option>`).join('')}</select>${prefix==='pf'?'':'<div class="field-note">Lo que prefieres usar, además del equipo disponible.</div>'}</div>`;
 }
 function readOnboardingTrainingStyle(value){if(onboardingDraft)onboardingDraft.trainingStyle=FITBUD_TRAINING_ROUTINE.style(value);}
 function routineContext(selectedStyle,preserve){
