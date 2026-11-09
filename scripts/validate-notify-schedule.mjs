@@ -14,6 +14,15 @@ process.env.RESEND_API_KEY = "test-resend";
 process.env.CRON_SECRET = "secret";
 delete process.env.VAPID_PRIVATE_KEY;
 
+// REQ-372: reloj fijo toda la corrida. Si cruzara las :00 a la mitad, `hour` ya
+// no sería la hora que ve el job.
+const RealDate = Date;
+let frozenNow = RealDate.now();
+globalThis.Date = class extends RealDate {
+  constructor(...args) { super(...(args.length ? args : [frozenNow])); }
+  static now() { return frozenNow; }
+};
+
 // Una zona donde ahora sea entre las 02:00 y las 22:00, para probar una hora
 // ya pasada y una por venir sin cruzar el día.
 const localHour = (tz) => Number(new Intl.DateTimeFormat("en-US", { timeZone: tz, hour: "numeric", hour12: false }).format(new Date())) % 24;
@@ -32,6 +41,9 @@ globalThis.fetch = async (url, init = {}) => {
   if (u.includes("/notification_preferences?")) return json([state.pref]);
   if (u.includes("/profiles?id=")) return json([{ email: "ana@example.com", active: true, goal: "deficit", planStartDate: null, planEndDate: null }]);
   if (u.includes("/profiles?select=id")) return json([{ id: "u1" }]);
+  // Seguimientos (REQ-296) y cohorte de la campaña de referidos (REQ-317): sin
+  // personas, porque aquí solo se prueba el aviso del día.
+  if (u.includes("/profiles?active=")) return json([]);
   // Ayer con actividad y la fila de hoy (formato de columnas de loadUserContext).
   if (u.includes("/day_log?")) return json([...(state.day === null ? [] : [{ log_date: today(), ...state.day }]), { log_date: yesterday(), meals: { cena: { done: true } }, workoutDone: true }]);
   if (u.includes("/notification_log")) {
@@ -102,4 +114,15 @@ assert.equal(out.sent, 0, "comidas registradas y entreno hecho: sin aviso");
 out = await run(hour, [], { meals: {}, extras: [{ name: "fruta" }], workoutDone: false, restDay: true });
 assert.equal(out.sent, 0, "con algo registrado (un extra) ya empezó: sin aviso de no empezado");
 console.log("  sin el día o sin nada registrado → \"Tu plan de hoy te espera\"; con algo registrado → no");
+// REQ-372: la campaña de referidos solo corre del 09/11 al 16/11/2026, en el
+// mismo job. Se fuerza esa semana, a la misma hora del día, para probarla en
+// cualquier fecha.
+const campaignWeek = new RealDate(frozenNow);
+campaignWeek.setUTCFullYear(2026, 10, 10);
+frozenNow = campaignWeek.getTime();
+out = await run(hour);
+assert.ok(state.calls.some((c) => c.includes("/profiles?active=eq.true&created_at=lte.")), "esa semana el job consulta la cohorte de la campaña");
+assert.equal(out.sent, 1, "con la campaña activa el aviso del día sale igual");
+assert.equal(state.emails[0].subject, "Tu plan de hoy te espera");
+console.log("  semana de la campaña de referidos → el aviso del día sale igual");
 console.log("validate-notify-schedule: OK");

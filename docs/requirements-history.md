@@ -13598,3 +13598,31 @@ REQ-341 no mostraba el pedido si la persona había cerrado la tarjeta ese día (
 
 - `tests/e2e/perfil.spec.js` pasa sin cambiar el tope. ✓
 - `tests/e2e/coach-rutina.spec.js` sigue pasando. ✓
+
+## REQ-372 - Avisos: la prueba del horario no depende de la fecha
+
+**Estado: implementado.**
+
+### Origen
+
+`scripts/validate-notify-schedule.mjs` fallaba con `500 !== 200` desde el 09/11/2026 a las 14:00 UTC, también en una copia limpia de `main`, y dejaba el release gate en rojo. REQ-317 (`a0b06ef`, 02/11) agregó `runReferralCampaign` al job, que solo consulta `profiles?active=eq.true&created_at=lte…` mientras `referralCampaignDue()` es verdadero (del 09/11 14:00 UTC al 16/11 14:00 UTC). El doble de `fetch` no conocía esa URL y lanzaba "fetch inesperado". La campaña no atrapa errores, a diferencia de `runFollowups` y `runPlanExpiry`, así que el handler respondía 500. Con el reloj simulado fallaba 24 de 24 horas dentro de la ventana y pasaba 24 de 24 fuera: dependía de la fecha, no de la hora del día ni de un cambio reciente en `api/notify.js`.
+
+Había un segundo defecto de reloj: si la hora cambiaba durante la corrida, `hour` dejaba de ser la hora que ve el job y fallaba "antes de la hora elegida no se envía".
+
+### Alcance
+
+Solo `scripts/validate-notify-schedule.mjs`. No cambia `api/notify.js`.
+
+- El doble de `fetch` responde sin personas a `/profiles?active=`, igual que `validate-reminder-journey.mjs`. Las URL desconocidas siguen lanzando error.
+- `Date` queda fijo durante toda la corrida.
+- Un caso nuevo fuerza la semana de la campaña, a la misma hora del día: el job consulta la cohorte y el aviso del día sale igual. Así la regresión se prueba en cualquier fecha, no solo esa semana.
+
+### Fuera de alcance
+
+Atrapar errores en `runReferralCampaign`: cambia producción durante una campaña viva y va en otro REQ.
+
+### Criterios de aceptación
+
+- `node scripts/validate-notify-schedule.mjs` pasa con el reloj simulado en las 24 horas de un día antes, durante y después de la ventana, en sus cuatro bordes, en 15 arranques justo antes de las :00 y en 80 instantes entre 2026 y 2029. ✓
+- Sin la línea del doble de `fetch` la prueba falla en cualquier fecha. Sin el reloj fijo vuelve a fallar al cruzar la hora. ✓
+- El release gate deja de fallar en este check. ✓
