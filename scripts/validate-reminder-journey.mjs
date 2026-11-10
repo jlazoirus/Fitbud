@@ -159,6 +159,14 @@ const localHour = (tz) => Number(new Intl.DateTimeFormat("en-US", { timeZone: tz
 const zones = ["UTC", ...Array.from({ length: 12 }, (_, i) => `Etc/GMT-${i + 1}`), ...Array.from({ length: 12 }, (_, i) => `Etc/GMT+${i + 1}`)];
 const tzAt = (h) => zones.find((z) => localHour(z) === h);
 const localToday = (tz) => new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date());
+// NAT-15: las zonas del fixture tienen offset fijo. Mantener la hora local
+// del escenario evita que un timestamp UTC fijo cambie el día de alta.
+const createdDaysAgo = (days, tz) => {
+  const timestamp = new Date(Date.now() - days * 86400000).toISOString();
+  const localDate = new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(timestamp));
+  assert.equal(localDate, addDaysYmd(localToday(tz), -days), "edad local del fixture de alta");
+  return timestamp;
+};
 
 let state;
 globalThis.fetch = async (url, init = {}) => {
@@ -332,7 +340,7 @@ const followup = async ({ people, rows, log = [], prefUser = null }) => {
 };
 const UID = "11111111-2222-3333-4444-555555555555";
 r = await followup({
-  people: (today, tz) => [{ id: UID, email: "beto@example.com", created_at: `${addDaysYmd(today, -2)}T15:00:00Z`, timeZone: tz }],
+  people: (today, tz) => [{ id: UID, email: "beto@example.com", created_at: createdDaysAgo(2, tz), timeZone: tz }],
   rows: () => [],
 });
 assert.equal(state.emails.length, 1);
@@ -342,7 +350,7 @@ assert.deepEqual(state.inserted.map((x) => [x.notification_type, x.idempotency_k
 const token = followupUnsubToken({ cronSecret: "secret" }, UID);
 assert.ok(state.emails[0].html.includes(`unsubscribe=${token}`), "el correo trae la baja firmada");
 assert.match(state.emails[0].html, /No recibir más estos correos/);
-const newcomer = (today, tz) => [{ id: UID, email: "beto@example.com", created_at: `${addDaysYmd(today, -2)}T15:00:00Z`, timeZone: tz }];
+const newcomer = (today, tz) => [{ id: UID, email: "beto@example.com", created_at: createdDaysAgo(2, tz), timeZone: tz }];
 r = await followup({ people: newcomer, rows: () => [], log: [(today) => `${UID}:comeback_2:${addDaysYmd(today, -2)}`] });
 assert.equal(state.emails.length, 0, "la misma etapa no se repite");
 r = await followup({ people: newcomer, rows: () => [], prefUser: UID });
@@ -390,7 +398,7 @@ assert.equal(state.emails.length, 0, "una sola vez por plan");
 r = await run({ hour: 20, rows: (today) => [{ log_date: addDaysYmd(today, -1), meals: { a: { done: true } }, workoutDone: true }, { log_date: today, meals: { a: { done: false } }, workoutDone: true }], engagement: null, pushOptIn: false, subs: [], planDaysAgo: 8 });
 assert.equal(state.emails.length, 1, "un correo por día: si hoy toca el aviso del día, la invitación espera");
 assert.notEqual(state.emails[0].subject, "Activa los avisos en tu teléfono");
-const weekOld = (today, tz) => [{ id: UID, email: "beto@example.com", created_at: `${addDaysYmd(today, -9)}T15:00:00Z`, timeZone: tz, planStartDate: addDaysYmd(today, -8) }];
+const weekOld = (today, tz) => [{ id: UID, email: "beto@example.com", created_at: createdDaysAgo(9, tz), timeZone: tz, planStartDate: addDaysYmd(today, -8) }];
 r = await followup({ people: weekOld, rows: allDone });
 assert.equal(state.emails.length, 1, "también a quien nunca eligió sus avisos");
 assert.equal(state.emails[0].subject, "Activa los avisos en tu teléfono");

@@ -489,10 +489,10 @@
         "scripts/validate-reminder-journey.mjs"
       ],
       "exclusiveGroup": null,
-      "status": "en_curso",
+      "status": "hecho",
       "owner": "codex-native-kickoff",
       "claimedAt": "2026-11-10T11:26:07.681Z",
-      "doneAt": null,
+      "doneAt": "2026-11-10",
       "note": "Hallazgo al verificar NAT-20; solo fixtures, sin cambios de producción."
     },
     {
