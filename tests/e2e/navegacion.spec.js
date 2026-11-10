@@ -1,6 +1,6 @@
 // Journey (e): navegación entre tabs y estados vacíos sin errores de consola.
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, SUPA_URL, USER_EMAIL } from "./helpers.js";
 
 test.describe("Navegación", () => {
   test("usuario logueado recorre las 5 tabs sin errores de consola", async ({ page, context }) => {
@@ -50,6 +50,66 @@ test.describe("Navegación", () => {
     expect(bodyText).not.toMatch(/\b(Claude|Anthropic|prompt|tokens?)\b/i);
 
     expect(errors, `Errores de consola en la landing:\n${errors.join("\n")}`).toEqual([]);
+  });
+
+  test("REQ-375: Entrar muestra progreso, evita duplicados y permite reintentar", async ({ page, context }) => {
+    await installMocks(context);
+    let attempts = 0;
+    let releaseFirstAttempt;
+    const firstAttemptReleased = new Promise(resolve => { releaseFirstAttempt = resolve; });
+    await context.route(url => url.href === SUPA_URL + "/auth/v1/token?grant_type=password", async route => {
+      attempts += 1;
+      if (attempts > 1) return route.fallback();
+      await firstAttemptReleased;
+      await route.fulfill({
+        status: 400,
+        json: { code: "invalid_credentials", message: "Invalid login credentials" },
+      });
+    });
+
+    await gotoApp(page);
+    const button = page.locator("#auSubmit");
+    const email = page.getByLabel("Correo", { exact: true });
+    const password = page.getByLabel("Contraseña", { exact: true });
+    try {
+      await button.click();
+      await expect(page.locator("#auOut")).toHaveText("Pon correo y contraseña");
+      await expect(button).toBeEnabled();
+      expect(attempts).toBe(0);
+
+      await email.fill(USER_EMAIL);
+      await password.fill("ClaveDePrueba");
+      await button.click();
+      await expect(button).toHaveAccessibleName("Iniciando sesión…");
+      await expect(button).toHaveAttribute("aria-busy", "true");
+      await expect(button).toBeDisabled();
+      await expect(button.locator(".spinner")).toBeVisible();
+      await expect(page.locator("#auStatus")).toHaveText("Iniciando sesión…");
+      await expect(page.getByRole("button", { name: "Olvidé mi contraseña" })).toBeDisabled();
+      await expect.poll(() => attempts).toBe(1);
+
+      await page.evaluate(() => {
+        document.getElementById("auSubmit").click();
+        return doAuth();
+      });
+      expect(attempts).toBe(1);
+    } finally {
+      releaseFirstAttempt();
+    }
+
+    await expect(page.locator("#auOut")).toContainText("Invalid login credentials");
+    await expect(button).toHaveAccessibleName("Entrar");
+    await expect(button).toBeEnabled();
+    await expect(button.locator(".spinner")).toBeHidden();
+    await expect(page.locator("#auStatus")).toBeEmpty();
+    await expect(page.getByRole("button", { name: "Olvidé mi contraseña" })).toBeEnabled();
+    await expect(email).toHaveValue(USER_EMAIL);
+    await expect(password).toHaveValue("ClaveDePrueba");
+
+    await button.click();
+    await expect(page.locator("#tabs").getByText("Hoy")).toBeVisible();
+    await expect(button).toHaveCount(0);
+    expect(attempts).toBe(2);
   });
 
   test("REQ-151/352: la portada pinta los planes de la tienda aunque su catálogo llegue tarde", async ({ page, context }) => {

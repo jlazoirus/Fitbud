@@ -836,9 +836,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-112`).
 
 ## REQ-113 - UX Auth: mostrar/ocultar contraseña en todos los campos de password
 
-**Estado: implementado.** passwordField() centraliza los campos de contraseña de usuario/admin con toggle accesible de mostrar/ocultar sin cambiar ids, autocomplete ni validaciones. Validadores: `scripts/validate-password-toggle.mjs` y E2E de navegación.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-113`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`. ✓ `validate-password-toggle.mjs`.
 
 ## REQ-114 - UX Onboarding: copy sin jerga en objetivo, grasa, ciclo y patrón de comida
 
@@ -2486,3 +2484,7 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 ## REQ-374 - Beta: separar las opciones de «Dónde se rompe»
 
 **Estado: implementado.** Comida, entrenamiento, comer fuera y cambios de semana se guardan por separado. Máximo tres. Compatibilidad con envíos anteriores y aviso de revisión en borradores.
+
+## REQ-375 - Acceso: mostrar el progreso al entrar
+
+**Estado: implementado.** Indicador de carga al entrar o registrarse. Bloquea envíos repetidos y permite reintentar tras errores. PWA v230.
