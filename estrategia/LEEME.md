@@ -37,7 +37,7 @@ FASE 1 · VALIDAR  →  FASE 2 · DECIDIR  →  FASE 3 · ADQUIRIR  →  FASE 4 
 
 7. **`07-Kit-Reclutamiento-Beta-REQ70.md`** — Material listo para reclutar candidatos por redes: brief para un amigo con audiencia fitness, copies de stories/post/reel, respuestas por WhatsApp, formulario publico y scoring para separar Segmento A/B.
 
-8. **`09-Calendario-Redes-Nov-Dic-2026.md`** — Calendario de redes del 16 nov al 13 dic de 2026: 24 piezas con guiones, recursos visuales y medición por `source`. Se ejecuta con la estrategia actualizada de `03-Redes-Sociales.md`.
+8. **`09-Calendario-Redes-Nov-Dic-2026.md`** — Calendario de redes vigente desde el 11 nov 2026: 4 piezas por semana, sin nadie en cámara, ajustadas cada lunes con Metricool. Reemplaza el calendario del 9 nov (Club del Plan B).
 
 ---
 
