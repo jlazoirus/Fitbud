@@ -13780,3 +13780,48 @@ El planificador rota platos de porciones nutricionalmente comparables, cuenta re
 Nutrición ofrece una entrada semanal y permite cambiar un día desde su revisión. Se retiran los accesos diarios y el semanal duplicado de Más opciones; el registro libre sigue disponible. El aviso sobre alternativas pasa del toast a la revisión, donde permanece mientras se revisa. Promedios, variedad y compra se recalculan al editar el borrador. Caché PWA v232.
 
 Verificación: `scripts/validate-meal-variety.mjs` cubre tres patrones dietarios, días únicos y rotación equilibrada con catálogo limitado. `tests/e2e/nutricion-variedad.spec.js` cubre regeneración, respuestas idénticas reutilizadas y aviso persistente en móvil/escritorio. Regresiones de continuidad, consumo y menú opcional. No requiere migración ni altera menús guardados hasta confirmar un nuevo borrador.
+
+## REQ-370 - Web pública: conservar el origen de campaña hasta la compra
+
+**Estado: implementado.** PWA v234.
+
+### Origen
+Plan de redes de noviembre 2026 (`estrategia/03-Redes-Sociales.md`, sección 10).
+### Problema
+`/beta?source=` ya guarda el origen, pero quien llega por campaña a la portada o `/planes` y compra no deja rastro.
+### Causa raíz
+`index.html`, `planes/index.html` y `pago/index.html` no conservan `source` ni `utm_*`. `pago/index.html:215` no envía origen; `parseCompra` (`api/_tienda/culqi-charge.js:40`), la metadata (línea 76) y el `payload` de `billing_events` (línea 282) no lo contemplan.
+### Objetivo
+Saber qué canal originó cada compra, sin datos personales.
+### Alcance
+- Módulo compartido en `/web` o `/tienda` (ya publicadas), cargado en portada, `/planes` y `/pago`.
+- Lee `source` y `utm_source|medium|campaign|content`; solo letras, números, `-` y `_`, hasta 120 caracteres.
+- Primer contacto durante 30 días en `localStorage`, con `try/catch`.
+- `/pago` lo envía; `parseCompra` lo revalida; va como `campana` en el `payload` y la metadata de Culqi. Sin migración.
+- Revisar si `/privacidad` necesita una frase.
+### Fuera de alcance
+Panel de Analítica, píxeles de terceros, cambios en `/beta` e invitaciones.
+### Riesgos
+Viene del navegador: nunca influye en precio, plan ni acceso. Un fallo de origen nunca bloquea un pago.
+### Criterios de aceptación
+- `/?source=ig-bio-s1` → `/planes` → compra deja `campana.source` en el `payload`.
+- Gana el primer contacto dentro de 30 días; después se reemplaza.
+- Valores inválidos se descartan en cliente y servidor.
+- Comprar sin origen funciona igual y no agrega el campo.
+- El origen nunca guarda correo, nombre, teléfono ni salud.
+### Verificación sugerida
+Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de prueba de Culqi, nunca reales; release gate.
+
+### Implementación
+
+- `web/origen.js`: lee `source` y `utm_source|medium|campaign|content` de la URL; acepta solo `[A-Za-z0-9_-]{1,120}` y descarta el resto. Guarda `{ campana, at }` en `localStorage` (`evolv_origen`) con `try/catch`: gana el primer contacto vigente y, a los 30 días, un origen nuevo lo reemplaza (vencido y sin origen nuevo, se borra). Sin almacenamiento queda en memoria para la página actual.
+- Portada (`<script type="module">`), `/planes` y `/pago` (`import()` dinámico, como `web/medicion.js`): si el módulo no carga, la página y el pago siguen igual.
+- `/pago` agrega `campana` al pedido solo si hay origen vigente.
+- `api/_tienda/culqi-charge.js`: `parseCompra` revalida con `limpiarCampana` (el mismo módulo); un origen inválido se descarta sin errores. Va como `payload.campana` en `billing_events` (también en los registros `failed`) y en la metadata de Culqi como claves planas de texto `campana_source`, `campana_utm_*` (la metadata de Culqi es clave-valor de texto). Sin origen no se agrega nada. Nunca influye en precio, plan, acceso ni respuesta. Sin migración.
+- `/privacidad` no cambia en este REQ: la frase propuesta queda para aprobación humana (ver commit).
+- `CACHE_NAME` sube a `fitbud-pwa-v234` (cambia `index.html`).
+
+### Verificación
+
+- `node scripts/test-origen-campana.mjs` (en el release gate): limpieza, primer contacto y vencimiento a 30 días, almacenamiento roto, `parseCompra`, payload y metadata con `fetch` simulado. ✓
+- `tests/e2e/campana-origen.spec.js`: `/?source=ig-bio-s1` → `/planes` → `/pago` envía `campana.source`; primer contacto y reemplazo tras 30 días; sin origen o con valores inválidos no va el campo; con el módulo bloqueado se paga igual. Culqi falso, sin llaves reales. ✓

@@ -71,6 +71,10 @@
     let medicion = { track() {}, metaCookies() { return {}; } };
     import("/web/medicion.js").then((m) => { medicion = m; }).catch(() => {});
 
+    // REQ-370: origen de campaña (primer contacto, 30 días). Si no carga, se paga igual sin él.
+    let origen = { campanaActual() { return null; } };
+    import("/web/origen.js").then((m) => { origen = m; }).catch(() => {});
+
     const plan = planPorId(new URLSearchParams(location.search).get("plan") || "");
     const form = document.getElementById("compra");
     const resultado = document.getElementById("resultado");
@@ -203,7 +207,7 @@
         if (checkout.token) {
           const tokenId = checkout.token.id;
           checkout.close();
-          cobrar({ ...datos, planId: plan.id, tokenId, deviceId, ...idsMeta() });
+          cobrar({ ...datos, planId: plan.id, tokenId, deviceId, ...idsMeta(), ...campanaPedido() });
         } else if (checkout.error) {
           checkout.close();
           error(checkout.error.user_message || "No pudimos validar la tarjeta. Revisa los datos e intenta de nuevo.");
@@ -219,6 +223,11 @@
     // Cookies del píxel (_fbp, _fbc) para la API de conversiones. Sin píxel no hay nada.
     function idsMeta() {
       try { return medicion.metaCookies(document.cookie); } catch (_) { return {}; }
+    }
+
+    // Origen de la compra para el registro interno; sin origen no se envía el campo.
+    function campanaPedido() {
+      try { const campana = origen.campanaActual(); return campana ? { campana } : {}; } catch (_) { return {}; }
     }
 
     async function cobrar(pedido) {

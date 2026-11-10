@@ -2434,34 +2434,9 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-370 - Web pública: conservar el origen de campaña hasta la compra
 
-**Estado: pendiente.**
+**Estado: implementado.** `web/origen.js` guarda `source`/`utm_*` (primer contacto, 30 días) y `/pago` lo envía; queda como `campana` en `billing_events` y en la metadata de Culqi. PWA v234. Detalle en `docs/requirements-history.md`.
 
-### Origen
-Plan de redes de noviembre 2026 (`estrategia/03-Redes-Sociales.md`, sección 10).
-### Problema
-`/beta?source=` ya guarda el origen, pero quien llega por campaña a la portada o `/planes` y compra no deja rastro.
-### Causa raíz
-`index.html`, `planes/index.html` y `pago/index.html` no conservan `source` ni `utm_*`. `pago/index.html:215` no envía origen; `parseCompra` (`api/_tienda/culqi-charge.js:40`), la metadata (línea 76) y el `payload` de `billing_events` (línea 282) no lo contemplan.
-### Objetivo
-Saber qué canal originó cada compra, sin datos personales.
-### Alcance
-- Módulo compartido en `/web` o `/tienda` (ya publicadas), cargado en portada, `/planes` y `/pago`.
-- Lee `source` y `utm_source|medium|campaign|content`; solo letras, números, `-` y `_`, hasta 120 caracteres.
-- Primer contacto durante 30 días en `localStorage`, con `try/catch`.
-- `/pago` lo envía; `parseCompra` lo revalida; va como `campana` en el `payload` y la metadata de Culqi. Sin migración.
-- Revisar si `/privacidad` necesita una frase.
-### Fuera de alcance
-Panel de Analítica, píxeles de terceros, cambios en `/beta` e invitaciones.
-### Riesgos
-Viene del navegador: nunca influye en precio, plan ni acceso. Un fallo de origen nunca bloquea un pago.
-### Criterios de aceptación
-- `/?source=ig-bio-s1` → `/planes` → compra deja `campana.source` en el `payload`.
-- Gana el primer contacto dentro de 30 días; después se reemplaza.
-- Valores inválidos se descartan en cliente y servidor.
-- Comprar sin origen funciona igual y no agrega el campo.
-- El origen nunca guarda correo, nombre, teléfono ni salud.
-### Verificación sugerida
-Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de prueba de Culqi, nunca reales; release gate.
+✓ `scripts/test-origen-campana.mjs`, `tests/e2e/campana-origen.spec.js`.
 
 ## REQ-371 - Web pública: inscripción corta al club en /unete
 
