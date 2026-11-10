@@ -2,7 +2,7 @@
 
 Fecha: 2026-11-05. Decisión de Jonathan: **en las apps de iOS y Android no se compra; se paga en `evolvapp.club` (Culqi) y la app lee el acceso del servidor.** Este documento dice cómo se implementa, qué riesgo tiene frente a las tiendas y qué hacer si una tienda lo rechaza.
 
-Relación con el resto del plan: reemplaza la recomendación original de NAT-H3 (compra integrada) en `PLAN.md` §7 y redefine NAT-13 y NAT-45 (`BACKLOG.md`). La migración nativa sigue en pausa (`native-migration.json`). La Fase 0 de abajo es trabajo **web** y no depende de esa pausa.
+Relación con el resto del plan: reemplaza la recomendación original de NAT-H3 (compra integrada) en `PLAN.md` §7 y redefine NAT-13 y NAT-45 (`BACKLOG.md`). Jonathan reanudó la migración el 2026-11-10 (`native-migration.json`, `decisions.md`). La Fase 0 de abajo es trabajo **web**.
 
 ## 1. Qué permiten hoy las tiendas en Perú (verificado el 2026-11-05)
 

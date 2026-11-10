@@ -2,7 +2,7 @@
 
 Fecha: 2026-11-07. Pedido de Jonathan: **pasar a apps nativas no debe quitarnos la capacidad de hacer cambios y mejoras rápidas.** Este documento dice por qué vía sale cada cambio, qué controles pasa y qué hacer si algo se rompe.
 
-Relación con el resto del plan: complementa `PLAN.md` y define el trabajo de NAT-14 y NAT-64 (`BACKLOG.md`). La migración sigue en pausa (`native-migration.json`); esta política se aplica al reanudarla. Los plazos y umbrales marcados como "inicial" se ajustan con datos de la beta.
+Relación con el resto del plan: complementa `PLAN.md` y define el trabajo de NAT-14 y NAT-64 (`BACKLOG.md`). Jonathan reanudó la migración el 2026-11-10 (`native-migration.json`, `decisions.md`); esta política está vigente. Los plazos y umbrales marcados como "inicial" se ajustan con datos de la beta.
 
 ## 1. Qué permiten hoy Expo y las tiendas (verificado el 2026-11-07)
 

@@ -479,6 +479,21 @@
       "note": ""
     },
     {
+      "id": "NAT-15",
+      "title": "Estabilizar los fixtures temporales del gate de recordatorios",
+      "phase": 2,
+      "track": "backend",
+      "human": false,
+      "deps": [],
+      "paths": ["scripts/validate-reminder-journey.mjs"],
+      "exclusiveGroup": null,
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": "Hallazgo al verificar NAT-20; solo fixtures, sin cambios de producción."
+    },
+    {
       "id": "NAT-20",
       "title": "Scaffold de la app Expo en native/ con TS, expo-router, lint, tests y perfiles EAS",
       "phase": 3,

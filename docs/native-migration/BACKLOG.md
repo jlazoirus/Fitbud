@@ -167,6 +167,14 @@ Convenciones para todas las tareas:
 
 ---
 
+## NAT-15 — Fechas de fixtures de recordatorios independientes de la hora del gate
+
+- **Origen:** el gate de NAT-20 falla en `scripts/validate-reminder-journey.mjs:338` con código de aplicación intacto. La zona elegida para simular las 20:00 convierte el `created_at` fijo a las 15:00 UTC al día siguiente cuando su offset es ≥9; el fixture de dos días pasa a tener uno.
+- **Alcance:** corregir únicamente los timestamps de alta de esos fixtures en `scripts/validate-reminder-journey.mjs`, conservando las aserciones del handler y comprobando el día local para las 24 horas UTC.
+- **Fuera de alcance:** cambiar recordatorios, envíos, preferencias o lógica de producción.
+- **Aceptación:** el validador pasa a cualquier hora UTC; el resto del gate conserva su cobertura.
+- **Verificación:** ejecutar el validador con reloj simulado en las 24 horas UTC y el gate completo.
+
 ## Fase 3 — Fundación nativa
 
 ## NAT-20 — Scaffold de la app Expo en native/ con TS, expo-router, lint, tests y perfiles EAS
