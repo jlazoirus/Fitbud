@@ -25,7 +25,7 @@ Ningún evento lleva correo, teléfono, nombre ni datos de salud. `web/medicion.
 
 ## Lo que hace una persona
 
-1. **Aprobar el texto de `/privacidad`** (borrador abajo) y publicarlo **antes** de configurar `META_PIXEL_ID` en producción.
+1. ~~Aprobar el texto de `/privacidad`~~: aprobado y publicado el 10 nov 2026 (ver abajo).
 2. **Crear el píxel** (conjunto de datos) en el Administrador de eventos de Meta. En su configuración, dejar **apagada** la "Coincidencia avanzada automática": si se enciende, el script de Meta lee correos y teléfonos de los formularios por su cuenta.
 3. **Generar el token** de la API de conversiones (Administrador de eventos → Configuración → API de conversiones).
 4. **Configurar en Vercel** (Production):
@@ -34,23 +34,15 @@ Ningún evento lleva correo, teléfono, nombre ni datos de salud. `web/medicion.
    - `META_CAPI_TEST_CODE` (opcional): código de "Probar eventos" para verificar sin ensuciar datos. Quitarlo después de probar.
 5. **Verificar** en "Probar eventos": PageView en cada página, ViewContent en `/planes`, InitiateCheckout al abrir el pago, Lead al inscribirse, y un pago con llaves de prueba de Culqi que muestre un único Purchase "deduplicado" (navegador + servidor).
 
-## Borrador para `/privacidad` (pendiente de aprobación)
+## Texto de `/privacidad` (aprobado el 10 nov 2026)
 
-No está publicado: `privacidad/index.html` sigue igual hasta que una persona apruebe el texto. Cambios propuestos:
+Jonathan aprobó y se publicó en `privacidad/index.html`:
 
-- **Reemplazar** "No vendemos tus datos ni los usamos para publicidad. Tus datos de salud, fotos, progreso y conversaciones no se envían a herramientas de analítica." por:
+> No vendemos tus datos. Los datos de la app (salud, fotos, progreso y conversaciones) nunca se usan para publicidad ni se envían a herramientas de analítica. En la web pública usamos cookies de Meta para medir nuestros anuncios.
 
-  > No vendemos tus datos. Tus datos de salud, fotos, progreso y conversaciones no se envían a herramientas de analítica ni de publicidad.
-
-- **Agregar** en "Qué datos tratamos y para qué":
-
-  > **Medición de anuncios en la web:** en la portada, Planes, Pago, Únete y Beta usamos el píxel de Meta (Facebook e Instagram) para saber qué anuncio trajo una visita, una inscripción o una compra. Meta recibe la página visitada, el tipo de acción (visita, inscripción, inicio de pago o compra), el plan y su monto, tu dirección IP, tu navegador y sus propias cookies. No le enviamos tu nombre, correo, teléfono ni datos de salud. La app de Evolv no usa el píxel. Puedes bloquearlo desde la configuración de tu navegador y revisar tus preferencias de anuncios en Meta.
-
-- **Agregar** a la lista de "Con quién los compartimos": "medición de anuncios en la web pública (Meta)".
-- **Actualizar** `vigenciaLegal` en `tienda/comercio.js` al publicar.
-- **Revisar** la frase del consentimiento de la app ("No vendemos tus datos ni los usamos para publicidad", `app/index.html`, exigida por `scripts/validate-privacy.mjs`). Sigue siendo cierta para los datos de la app, pero conviene que Legal la confirme.
-
-Una ventana de consentimiento de cookies queda fuera de este REQ; se evalúa aparte si Legal la pide.
+- "Con quién los compartimos" suma "medición de anuncios en la web pública (Meta)".
+- `vigenciaLegal` en `tienda/comercio.js` pasa a "10 de noviembre de 2026".
+- La frase del consentimiento de la app ("No vendemos tus datos ni los usamos para publicidad", `app/index.html`, exigida por `scripts/validate-privacy.mjs`) no cambia: sigue siendo cierta para los datos de la app.
 
 ## Riesgos
 
