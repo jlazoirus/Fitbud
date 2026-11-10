@@ -34,6 +34,23 @@ const base = (over = {}) => ({
   wantNutrition: true, wantTraining: true, ...over,
 });
 
+// REQ-379: un aviso no declara perdida una racha que hoy puede recuperarse.
+for(const missed of [1,2]){
+  const through=D(-missed-1);
+  for(const snapshot of [eng({streak:7,streakThrough:through}),eng({streak:0,streakThrough:null,recoveryThrough:through,recoveryStreak:7})]){
+    const decision=planReminder(base({rows:[activeRow(-missed-1)],engagement:snapshot}));
+    assert.equal(decision.recovery,true);
+    assert.equal(decision.date,T);
+    const message=reminderMessage(decision);
+    assert.match(message.title,/7 días.*recuperar/);
+    assert.doesNotMatch(message.title,/reinició/);
+    assert.match(message.url,/date=2026-10-26/);
+  }
+}
+assert.notEqual(planReminder(base({engagement:eng({streak:6,streakThrough:D(-2)})})).recovery,true);
+assert.notEqual(planReminder(base({rows:[activeRow(-4)],engagement:eng({streak:7,streakThrough:D(-4)})}))?.recovery,true);
+assert.equal(planReminder(base({engagement:eng({streak:8,streakThrough:T,recoveryThrough:D(-2),recoveryStreak:7})})),null);
+
 // ── Actividad y pendiente ───────────────────────────────────────────────────
 assert.equal(dayHasActivity({ meals: { a: { done: true } } }), true);
 assert.equal(dayHasActivity({ extras: [{ done: true }] }), true);

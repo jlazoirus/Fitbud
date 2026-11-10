@@ -13697,3 +13697,86 @@ Medir PageView, ViewContent, Lead, InitiateCheckout y Purchase en la web públic
 
 - `node scripts/validate-meta-pixel.mjs` y `node scripts/test-meta-capi.mjs`. ✓
 - `tests/e2e/medicion.spec.js`: sin ID no hay peticiones a Meta; con un ID de prueba salen PageView, ViewContent, InitiateCheckout, Purchase (valor e id del servidor, una sola vez) y Lead solo con éxito; la app no carga nada; con el píxel bloqueado se paga igual. ✓
+
+
+## REQ-378 - Coach: espera conversacional y sugerencias que respetan la petición
+
+**Estado: implementado.**
+
+Origen: reporte de Jonathan con capturas: capa bloqueante al conversar y recomendación repetida de un bowl con 32 g de carbohidratos tras pedir cero.
+
+La conversación usa una burbuja «Pensando…» con puntos animados, estado accesible y alternativa para movimiento reducido en ambas vistas. Conserva el estado al renderizar y evita mensajes duplicados durante la espera. Las acciones que generan planes mantienen su capa de espera. El límite de la consulta incluye leer el cuerpo de la respuesta.
+
+Las instrucciones de conversación del cliente y servidor distinguen consejos de acciones ejecutables: permiten preparaciones simples fuera del catálogo, respetan restricciones y correcciones recientes, aclaran trazas y estimaciones sin prometer cero absoluto, y no presentan consejos como cambios aplicados. La validación de acciones existentes sigue vigente. Versión de compatibilidad 15; app en `/app` y caché PWA v231.
+
+Verificación: `tests/e2e/coach-conversation.spec.js` (móvil/escritorio, espera, duplicados, movimiento reducido, error y cuerpo detenido), regresiones `semana-rapida.spec.js` y `coach-welcome.spec.js`. Servicios simulados: no se certifica aquí la calidad de respuestas reales del proveedor.
+
+Publicación solicitada por Jonathan el 10 nov 2026. Integración sobre `main` conserva la portada pública, la app en `/app` y las rutinas del coach. Comprobación completa de publicación antes del despliegue.
+
+## REQ-379 - Recuperar la racha después de uno o dos días fallados
+
+**Estado: implementado.**
+
+Origen: Jonathan, 10 nov 2026. Una racha de al menos siete días se puede retomar al cumplir el día de regreso después de uno o dos días fallados. Los días fallados no suman ni cambian sus registros; con seis días previos o tres días fallados comienza una racha nueva.
+
+Cálculo compartido para Hoy, Progreso, mejores marcas/resumen del ciclo, amigos, hitos y recordatorios. Oferta visible antes de cumplir hoy, celebración al recuperar y soporte para recarga, sincronización y deshacer sin nuevos datos persistentes ni SQL. La corrección de registros reales de ayer sigue disponible.
+
+Verificación: `tests/e2e/racha-recuperacion.spec.js` (móvil/escritorio, límites 6/7 días y 1/2/3 fallos, historial intacto, recarga, deshacer y coherencia entre superficies), suites existentes de racha, regreso y celebración y `scripts/validate-reminder-journey.mjs`. Integrado sobre la versión actual de `main`.
+
+## REQ-380 - Compartir una imagen de la racha en redes sociales
+
+**Estado: implementado.**
+
+Origen: Jonathan, 10 nov 2026. Botón «Compartir imagen» en la tarjeta de Racha de Progreso. Prepara localmente un PNG 1080 × 1350 con la racha actual, la llama y marca Evolv; admite rachas recuperadas y no incluye nombre, fotos ni datos de salud.
+
+Vista previa antes de compartir. Usa Web Share con un archivo cuando el navegador lo permite; ofrece descarga para subirlo manualmente a redes. Cancelar conserva la vista previa; cerrar o salir libera la imagen. No activa comparación con amigos ni publica automáticamente. La invitación privada a amigos conserva su comportamiento. El botón queda desactivado cuando aún no hay racha. El archivo nuevo forma parte del shell offline; caché v231.
+
+Verificación: `tests/e2e/racha-compartir-imagen.spec.js` comprueba PNG real/dimensiones/nombre, móvil/escritorio, envío de archivo, cancelación, limpieza al salir y racha recuperada. Regresión `rachas-amigos.spec.js`, validaciones de HTML, shell y allowlist. Integrado sobre la versión actual de `main`.
+
+
+## REQ-373 - Consola de administración para escritorio
+
+**Estado: implementado.** Desde 1024 px, `/admin` muestra navegación lateral, listados de Beta y Ejercicios en dos columnas y diálogos centrados. En móvil conserva la navegación inferior.
+
+
+## REQ-374 - Beta: separar las opciones de «Dónde se rompe»
+
+**Estado: implementado.** Comida, entrenamiento, comer fuera y cambios de semana se guardan por separado. Máximo tres. Compatibilidad con envíos anteriores y aviso de revisión en borradores.
+
+
+## REQ-375 - Acceso: mostrar el progreso al entrar
+
+**Estado: implementado.** Indicador de carga al entrar o registrarse. Bloquea envíos repetidos y permite reintentar tras errores. PWA v230.
+
+
+## REQ-362 - Nutrición: registrar alimentos por unidades
+
+**Estado: implementado.**
+
+Feedback de Marco. Huevo entero, ≈50 g sin cáscara por unidad. [USDA NDB 1123](https://fdc.nal.usda.gov/food-search/?component=1100). PWA v221.
+
+
+## REQ-363 - Nutrición: configurar unidades enteras por alimento
+
+**Estado: implementado.**
+
+Configurar, editar o quitar gramos por pieza en catálogo o alimentos propios. Ajuste privado por perfil. Registro de enteros, cálculo en gramos y equivalencia histórica por línea. PWA v222. ✓ `tests/e2e/composicion.spec.js` y `tests/e2e/alimentos-propios.spec.js`.
+
+
+## REQ-364 - Hoy: acción principal y agenda plegable
+
+**Estado: implementado.**
+
+Referencia Platzi. Consumo enlazado a Nutrición, acción contextual, agenda plegable, registro sin menú y vista de mañana. PWA v223.
+
+## REQ-377 - Nutrición: variedad semanal y una sola entrada de preparación
+
+**Estado: implementado.**
+
+Origen: Jonathan, 10 nov 2026, capturas de días idénticos, alternativas demasiado similares y aviso fugaz. Autorizó implementar en la rama `work`.
+
+El planificador rota platos de porciones nutricionalmente comparables, cuenta repeticiones y compara ingredientes principales con el día anterior. La generación y regeneración semanal consideran también los días del borrador sin guardar; una respuesta reutilizada no fija los mismos platos para todas las fechas. Se conservan hábitos en la propuesta inicial; pedir cambiar un día permite salir de esos hábitos. Las restricciones, comidas registradas, saltadas y elecciones manuales se conservan siempre. Catálogos limitados siguen ofreciendo opciones válidas, con advertencias de variedad visibles.
+
+Nutrición ofrece una entrada semanal y permite cambiar un día desde su revisión. Se retiran los accesos diarios y el semanal duplicado de Más opciones; el registro libre sigue disponible. El aviso sobre alternativas pasa del toast a la revisión, donde permanece mientras se revisa. Promedios, variedad y compra se recalculan al editar el borrador. Caché PWA v232.
+
+Verificación: `scripts/validate-meal-variety.mjs` cubre tres patrones dietarios, días únicos y rotación equilibrada con catálogo limitado. `tests/e2e/nutricion-variedad.spec.js` cubre regeneración, respuestas idénticas reutilizadas y aviso persistente en móvil/escritorio. Regresiones de continuidad, consumo y menú opcional. No requiere migración ni altera menús guardados hasta confirmar un nuevo borrador.

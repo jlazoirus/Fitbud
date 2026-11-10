@@ -1102,6 +1102,7 @@
   .coach-input-row textarea:focus{outline:none;border-color:var(--accent)}
   .coach-input-row button{height:44px;width:44px;flex-shrink:0;border-radius:var(--r-sm);background:var(--accent);color:var(--on-accent);font-size:18px;align-self:flex-end;display:flex;align-items:center;justify-content:center}
   .coach-input-row button:disabled{opacity:.4}
+  .coach-thinking{display:flex;align-items:center;gap:10px;color:var(--txt);font-size:14px}
   .coach-typing{display:flex;gap:4px;padding:4px 2px;align-items:center}
   .coach-typing span{width:7px;height:7px;background:var(--muted);border-radius:50%;animation:bounce 1.1s infinite}
   .coach-typing span:nth-child(2){animation-delay:.18s}
@@ -1218,6 +1219,7 @@
 <!-- Motor puro de resolución de conflictos offline. -->
 <script src="sync-conflicts.js"></script>
 <script src="js/streak-friends.js"></script>
+<script src="js/streak-share.js"></script>
 <!-- Cliente Supabase (única dependencia externa; carga la base de datos de alimentos) -->
 <!-- REQ-197: versión exacta + SRI; defer para no bloquear el primer render (boot() espera supabaseLibReady()). -->
 <script id="supabase-js" src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous" defer onerror="window._supabaseLoadFailed=true"></script>
@@ -3090,7 +3092,7 @@ function planNeedsRecap(){
 function cycleSummary(untilDs){
   // REQ-214: un ciclo interrumpido se resume hasta el día en que se deja.
   const last=validYmd(untilDs)&&untilDs<END?untilDs:END;
-  let ds=START,activeDays=0,bestStreak=0,currentStreak=0,workouts=0,partialWorkouts=0,doneMeals=0,plannedMeals=0;
+  let ds=START,activeDays=0,workouts=0,partialWorkouts=0,doneMeals=0,plannedMeals=0;
   while(ds<=last){
     const st=S.days[ds]||{};
     const day=buildDay(ds);
@@ -3098,12 +3100,10 @@ function cycleSummary(untilDs){
     const dayMeals=day.meals.reduce((n,m)=>n+(mealStates[m.id]&&mealStates[m.id].done?1:0),0);
     const workoutOutcome=workoutOutcomeForState(st);
     const dayAny=dayMeals>0||workoutHasRecordedActivity(st)||(Array.isArray(st.extras)&&st.extras.some(x=>x&&x.done));
-    const dayCombined=combinedDayDone(ds);
     plannedMeals+=day.meals.length;doneMeals+=dayMeals;
     if(workoutOutcome==="completed")workouts++;
     if(workoutOutcome==="partial")partialWorkouts++;
     if(dayAny)activeDays++;
-    if(dayCombined){currentStreak++;bestStreak=Math.max(bestStreak,currentStreak);}else currentStreak=0;
     ds=addDays(ds,1);
   }
   const weighted=Object.keys(WEIGHT_RANGES).map(Number).filter(n=>wkg(n)!=null).sort((a,b)=>a-b);
@@ -3115,7 +3115,7 @@ function cycleSummary(untilDs){
   const startBf=Number.isFinite(initialBf)&&initialBf>0?initialBf:(firstWeek!=null?wbf(firstWeek):null);
   const endWeight=lastWeek!=null?wkg(lastWeek):null,endBf=lastWeek!=null?wbf(lastWeek):null;
   return {
-    activeDays,bestStreak,workouts,partialWorkouts,doneMeals,plannedMeals,
+    activeDays,bestStreak:combinedStreakState(last).best,workouts,partialWorkouts,doneMeals,plannedMeals,
     mealAdherence:plannedMeals?Math.round(doneMeals/plannedMeals*100):0,
     startWeight,endWeight,weightChange:startWeight!=null&&endWeight!=null?+(endWeight-startWeight).toFixed(1):null,
     startBodyFat:startBf,endBodyFat:endBf,bodyFatChange:startBf!=null&&endBf!=null?+(endBf-startBf).toFixed(1):null,
@@ -5677,7 +5677,7 @@ function renderHoy(){
   const canUse=hasAI&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
   const msgs=loadCoachChat();
   const msgsHtml=msgs.map(renderCoachMessage).join("");
-  const typingHtml=`<div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="loading-row" style="padding:6px 2px"><div class="spinner"></div><span>Tu coach está pensando…</span></div></div></div>`;
+  const typingHtml=coachTypingHtml();
   const chips=canUse?buildContextualChips(ds):[];
   const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${esc(JSON.stringify(s))})">${esc(s)}</button>`).join("")}</div>`:"";
   const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
@@ -5691,7 +5691,7 @@ function renderHoy(){
       <textarea id="coachInput" aria-label="Pregunta a tu coach" placeholder="Escribe tu pregunta…" rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();coachSendFromInput();}"
         oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
-      <button onclick="coachSendFromInput()" title="Enviar" aria-label="Enviar pregunta"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <button ${coachActionsInFlight.has("coach-convo")?"disabled":""} onclick="coachSendFromInput()" title="Enviar" aria-label="Enviar pregunta"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </div>`
     :localGuides?`<div class="coach-home-sep">Tu coach te acompaña</div><div class="coach-msgs-home" id="coachMsgs">${localGuides}</div>`
     :hasAI?`<div class="coach-home-sep">Tu coach</div><div class="ai-box" style="margin:0 0 12px">⚠️ ${!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`
@@ -8298,7 +8298,10 @@ function renderStreakSection(){
   const plural=(n,one,many)=>`${n} ${n===1?one:many}`;
   // Recuperación: hubo racha y hoy está en 0 (se rompió ayer o antes).
   const broken=s.combBest>0&&stk===0;
-  const recoveryHtml=broken
+  const recoveryHtml=s.recovery
+    ?`<div class="streak-recovery" role="status">Puedes recuperar tu racha de <b>${plural(s.recovery.count,"día","días")}</b>: cumple el día de hoy. Los ${s.recovery.missed===1?"registros de ayer no cambian":"dos días que faltaste no se suman"}.</div>`
+    :s.recovered?`<div class="streak-recovery">Racha recuperada. Los días que faltaste no se suman.</div>`
+    :broken
     ?`<div class="streak-recovery">Tu mejor racha fue de <b>${plural(s.combBest,"día","días")}</b>. Retoma hoy: el progreso que hiciste no desaparece.</div>`:"";
   const record=stk===0?""
     :stk>=s.combBest?`<span class="streak-record best">Tu mejor marca</span>`
@@ -8326,17 +8329,18 @@ function renderStreakSection(){
     <div class="streak-head">
       <span class="streak-flame${stk>0?"":" off"}" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${STREAK_FLAME_PATH}"/></svg></span>
       <div class="streak-now">
-        <div class="streak-count"><span class="streak-n">${stk}</span><span class="streak-unit">${stk===1?"día seguido":"días seguidos"}</span></div>
+        <div class="streak-count"><span class="streak-n">${stk}</span><span class="streak-unit">${s.recovered?(stk===1?"día de racha":"días de racha"):(stk===1?"día seguido":"días seguidos")}</span></div>
         ${record}
       </div>
     </div>
-    <p class="streak-rule">Suma un día cuando cumples tus comidas y tu entreno. Los descansos planificados no la rompen.</p>
+    <p class="streak-rule">Suma un día cuando cumples tus comidas y tu entreno. Los descansos planificados no la rompen. Con al menos 7 días de racha, puedes recuperarla al volver tras faltar 1 o 2 días.</p>
     <div class="streak-track">
       <div class="streak-rail" aria-hidden="true"><i style="width:${streakTrackPct(stk)}%"></i></div>
       <ol class="streak-stops" aria-label="Hitos de racha">${stops}</ol>
     </div>
     ${nextText?`<p class="streak-next">${nextText}</p>`:""}
     ${split}
+    <button type="button" class="btn" style="margin-top:16px;width:100%" onclick="openStreakImage(this)" ${stk<1?"disabled":""}>Compartir imagen</button>
   </div>`;
 }
 // REQ-195: semana del ciclo en la que cae hoy (1 antes de empezar, la última al terminar).
@@ -8920,6 +8924,11 @@ function parseCoachReply(raw){
   return{type:"educativo",text:cleaned.startsWith("{")?"No pude preparar la propuesta completa. Intenta de nuevo con un día de tu rutina.":coachDisplayText(raw),accion:null};
 }
 
+function coachTypingHtml(){
+  const pending=coachActionsInFlight.has("coach-convo");
+  return `<div id="coachTyping" class="coach-msg coach" style="display:${pending?"flex":"none"}" role="status" aria-live="polite"><div class="chat-bubble coach-thinking"><div class="coach-typing" aria-hidden="true"><span></span><span></span><span></span></div><span>Pensando…</span></div></div>`;
+}
+
 // Envía un mensaje al coach y actualiza la vista.
 async function sendCoachMessage(userText,routineBrief){
   if(!userText||!userText.trim())return;
@@ -8932,6 +8941,9 @@ async function sendCoachMessage(userText,routineBrief){
   }
   if(aiAvailable()&&!hasEntitlement()){showPaywall("ai");return;} // REQ-25
   const owner=uid(),base=routineBaseKey();
+  const actionKey="coach-convo";
+  const rid=beginCoachAction(actionKey);
+  if(!rid)return;
   const msgs=loadCoachChat();
   const userMsg={id:coachRequestId(),role:"user",text:userText.trim(),ts:Date.now()};
   msgs.push(userMsg);
@@ -8939,13 +8951,6 @@ async function sendCoachMessage(userText,routineBrief){
   renderCoach();          // muestra el mensaje del usuario inmediatamente
   scrollCoachToBottom();
 
-  // Indicador de escritura
-  const typingEl=document.getElementById("coachTyping");
-  if(typingEl)typingEl.style.display="flex";
-
-  const actionKey="coach-convo";
-  const rid=beginCoachAction(actionKey);
-  if(!rid){if(typingEl)typingEl.style.display="none";return;}
 
   try{
     // Historial reciente (sin resúmenes, máx 10 intercambios)
@@ -8957,7 +8962,7 @@ async function sendCoachMessage(userText,routineBrief){
       "Tu coach no puede responder ahora. Revisa la sección de Nutrición o Entrenamiento.",
       {schema:"coach_conversation_v3",allowedActionTypes:actionContext.allowed_actions,hardRestrictions:coachFoodBlockTerms(true),routine:{...routineContext(null,routineBrief&&routineBrief.preserve),requiredStyle:routineBrief&&routineBrief.requiredStyle}},null);
 
-    const prompt=`[Contexto actual del usuario]\n${contextText}${historyText}\n\n[Nueva pregunta]\n${userText.trim()}\n\nResponde EXCLUSIVAMENTE con JSON válido:\n{"type":"educativo","respuesta":"texto de respuesta"}\n\nSi conviene proponer una acción, usa solo una de estas formas y solo para el día ${actionContext.today}:\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"marcar_descanso","descripcion":"Convertir hoy en descanso"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"registrar_comida","slot":"desayuno","descripcion":"Registrar desayuno"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"cambiar_plato","slot":"almuerzo","dishName":"Nombre exacto del plato del catálogo","descripcion":"Cambiar almuerzo"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"adaptar_entreno","reason":"tiempo","descripcion":"Adaptar entrenamiento"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"registrar_peso","kg":82.4,"bf_pct":19,"descripcion":"Registrar peso"}}\nPara adaptar entreno, reason debe ser: tiempo, casa, equipo o sesion_perdida. Para cambiar plato usa un dishName exacto listado en executable_actions.meals[].options y del mismo slot. Si la acción violaría restricciones, cambiaría un día cerrado, requiere un dato que no tienes o no aparece en el contexto, responde educativo sin accion. No uses markdown fuera del JSON. Usa lenguaje de coach, no menciones tecnología.`;
+    const prompt=`[Contexto actual del usuario]\n${contextText}${historyText}\n\n[Nueva pregunta]\n${userText.trim()}\n\nResponde primero a la petición concreta, usando las correcciones y exclusiones de los mensajes recientes. No repitas una opción rechazada. Las opciones de executable_actions limitan solo los botones que cambian el plan, no tus consejos. Puedes sugerir alimentos y preparaciones simples fuera del catálogo, con cantidad, preparación y macros aproximados, respetando alergias y patrón alimentario. Por ejemplo, si son compatibles: 100 g de pechuga de pollo cocida sin empanizar ni salsa, o huevos hervidos indicando unidades y tamaño. No inventes un plato del catálogo ni afirmes haber cambiado el plan. Si pide cero carbohidratos, no ofrezcas un bowl con 32 g ni lo llames cero; ofrece una opción compatible con carbohidratos prácticamente nulos y aclara trazas y estimaciones (los huevos pueden tener trazas). No afirmes que una comida simple es insegura solo por no estar en el catálogo. Distingue una comida puntual de cambiar la dieta completa y no fuerces la meta diaria de carbohidratos en cada comida. Responde breve: una o dos opciones útiles, sin sermones ni preguntas innecesarias. Si no hay acción ejecutable compatible, da el consejo con type educativo y sin accion.\n\nResponde EXCLUSIVAMENTE con JSON válido:\n{"type":"educativo","respuesta":"texto de respuesta"}\n\nSi conviene proponer una acción, usa solo una de estas formas y solo para el día ${actionContext.today}:\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"marcar_descanso","descripcion":"Convertir hoy en descanso"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"registrar_comida","slot":"desayuno","descripcion":"Registrar desayuno"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"cambiar_plato","slot":"almuerzo","dishName":"Nombre exacto del plato del catálogo","descripcion":"Cambiar almuerzo"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"adaptar_entreno","reason":"tiempo","descripcion":"Adaptar entrenamiento"}}\n{"type":"propuesta","respuesta":"explicación clara","accion":{"tipo":"registrar_peso","kg":82.4,"bf_pct":19,"descripcion":"Registrar peso"}}\nPara adaptar entreno, reason debe ser: tiempo, casa, equipo o sesion_perdida. Para cambiar plato usa un dishName exacto listado en executable_actions.meals[].options y del mismo slot. Si la acción violaría restricciones, cambiaría un día cerrado, requiere un dato que no tienes o no aparece en el contexto, responde educativo sin accion. No uses markdown fuera del JSON. Usa lenguaje de coach, no menciones tecnología.`;
 
     const routineInstructions=`
 Para crear o cambiar la rutina semanal puedes devolver {"type":"propuesta","respuesta":"Resumen breve de los cambios, sin afirmar que ya se guardaron","accion":{"tipo":"actualizar_rutina","style":"machines","sessions":[{"weekday":1,"name":"Pierna en máquinas","exercises":[{"exerciseId":"slug exacto del catálogo","sets":3,"reps":"10-12","restSeconds":90}]}]}}.
@@ -9162,14 +9167,14 @@ function renderChatMode(){
     <div class="chat-thread" id="coachMsgs">
       <div class="coach-msg coach"><div class="chat-bubble">${esc(chatGreeting(ds))}</div></div>
       ${thread}
-      <div id="coachTyping" class="coach-msg coach" style="display:none"><div class="chat-bubble"><div class="loading-row" style="padding:6px 2px"><div class="spinner"></div><span>Tu coach está escribiendo…</span></div></div></div>
+      ${coachTypingHtml()}
     </div>
     <div class="chat-chips">${chips}</div>
     ${canUse?`<div class="coach-input-row" style="margin:0 -14px;border-radius:0">
       <textarea id="coachInput" aria-label="Escribe a tu coach" placeholder="Pregunta o cuéntale qué estás comiendo…" rows="1"
         onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();coachSendFromInput();}"
         oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
-      <button onclick="coachSendFromInput()" title="Enviar" aria-label="Enviar mensaje"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg></button>
+      <button ${coachActionsInFlight.has("coach-convo")?"disabled":""} onclick="coachSendFromInput()" title="Enviar" aria-label="Enviar mensaje"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg></button>
     </div>`:`<div class="muted small">Tu coach por escrito no está disponible ahora; las tarjetas de arriba siguen funcionando.</div>`}`;
 }
 function renderCoachMessage(m){
@@ -9222,7 +9227,7 @@ function coachSendFromInput(){
   const ta=document.getElementById("coachInput");
   if(!ta)return;
   const txt=ta.value.trim();
-  if(!txt)return;
+  if(!txt||coachActionsInFlight.has("coach-convo"))return;
   ta.value="";ta.style.height="42px";
   sendCoachMessage(txt);
 }
@@ -9791,7 +9796,7 @@ async function loadNotifPrefs(){
   if(!supa||!uid())return;
   try{
     const{data,error}=await supa.from("notification_preferences").select("*").eq("user_id",uid()).maybeSingle();
-    if(!error)notifPrefsCache=data||{};
+    if(!error){notifPrefsCache=data||{};if(!_streakActive)showQueuedNotifyAsk();}
   }catch(e){/* silent */}
 }
 
@@ -10150,8 +10155,9 @@ function notifyAskWanted(n){
   const asked=notifyAskCount();
   return asked===0?n>=1:asked<NOTIFY_ASK_MAX&&n>=3;
 }
-function queueNotifyAsk(n){if(notifyAskWanted(n))_notifyAskPending=Math.max(_notifyAskPending,n);}
+function queueNotifyAsk(n){if(notifPrefsCache===null||notifyAskWanted(n))_notifyAskPending=Math.max(_notifyAskPending,n);}
 function showQueuedNotifyAsk(){
+  if(notifPrefsCache===null)return; // esperar a conocer los avisos de esta cuenta
   const n=_notifyAskPending;_notifyAskPending=0;
   if(!n||!notifyAskWanted(n)||$("#overlay"))return;
   try{localStorage.setItem(NOTIFY_ASK_KEY+":"+uid(),String(notifyAskCount()+1));}catch(e){return;}
@@ -12777,9 +12783,9 @@ const coachActionsInFlight=new Set();
 // huecos donde tocar la X del modal y dejar una generación corriendo detrás.
 function beginCoachAction(key){
   if(coachActionsInFlight.has(key)){toast("Esta acción ya está en proceso");return null;}
-  coachActionsInFlight.add(key);showCoachBusy(key);return coachRequestId();
+  coachActionsInFlight.add(key);if(key!=="coach-convo")showCoachBusy(key);return coachRequestId();
 }
-function endCoachAction(key){if(coachActionsInFlight.delete(key))hideCoachBusy();}
+function endCoachAction(key){if(coachActionsInFlight.delete(key)&&key!=="coach-convo")hideCoachBusy();}
 function coachHardRestrictions(){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const terms=String(p.allergies||"").split(/[,;]/).map(x=>x.trim()).filter(Boolean);
@@ -12804,8 +12810,8 @@ function coachHardRestrictions(){
 // REQ-169/170/171: bump a 10 — descartes de la sesión, desayuno reforzado y meta ±50 kcal en el prompt.
 // Bump a 11 — referencia de platos rotada por usuario y regla de variedad de cocina.
 // REQ-254: bump a 12 — el prompt incluye el nivel de cocina y los platos se filtran por cooking_level.
-// REQ-360: bump a 14 — el prompt de día incluye las comidas habituales de los días en meta.
-const COACH_PROMPT_VERSION=15;
+// REQ-360: hábitos; REQ-377: variedad; REQ-378: consejos simples en conversación.
+const COACH_PROMPT_VERSION=16;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -12858,17 +12864,19 @@ async function coachProxyFetch(payload){
       // REQ-175: tope por intento para que la capa de espera nunca quede colgada.
       const controller=new AbortController();
       const timer=setTimeout(()=>controller.abort(),COACH_FETCH_TIMEOUT_MS);
-      let res;
+      let res,data;
       try{
         res=await fetch("/api/claude",{
           method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+session.access_token},
           body:JSON.stringify(payload),signal:controller.signal
         });
+        // El límite incluye el cuerpo: recibir cabeceras no termina la respuesta.
+        data=await res.json().catch(e=>{if(controller.signal.aborted)throw e;return {};});
+        if(controller.signal.aborted)throw new DOMException("Timeout","AbortError");
       }catch(fetchError){
         if(fetchError&&fetchError.name==="AbortError")throw new Error("Tu coach tardó demasiado en responder. Inténtalo de nuevo en un momento.");
         throw fetchError;
       }finally{clearTimeout(timer);}
-      const data=await res.json().catch(()=>({}));
       if(res.status===409&&attempt===0){await new Promise(resolve=>setTimeout(resolve,350));continue;}
       if(res.status===402){
         const err=new Error(data.error||"Activa tu plan para usar esta función.");
@@ -12948,7 +12956,8 @@ function hideCoachBusy(){
 }
 async function callClaude(userText,maxTokens,quota,opts){
   const image=opts&&opts.image||null;
-  showCoachBusy(quota&&quota.action);
+  const blocking=!(quota&&quota.action==="coach_conversation");
+  if(blocking)showCoachBusy(quota&&quota.action);
   try{
     if(!isActive())throw new Error("Tu cuenta está desactivada.");
     if(!hasRequiredConsents()||!hasCurrentScreening())throw new Error("Revisa privacidad y seguridad antes de usar tu coach.");
@@ -12978,7 +12987,7 @@ async function callClaude(userText,maxTokens,quota,opts){
     lastCoachCallReused=!!data.reused;
     lastCoachCallOrigin=data.reused?String(data.origin||"reused"):"fresh";
     return data.text||"";
-  }finally{hideCoachBusy();}
+  }finally{if(blocking)hideCoachBusy();}
 }
 function parseJSON(txt){
   let t=txt.trim().replace(/^```(json)?/i,"").replace(/```$/,"").trim();
@@ -14931,6 +14940,35 @@ function combinedDayDone(ds){
   return nutritionDayDone(ds)&&(trainRes==="done"||trainRes==="rest");
 }
 
+// REQ-379: una racha de al menos 7 días admite recuperar 1–2 días fallados
+// al cumplir el día de regreso. Se cuentan solo días cumplidos: no se escribe
+// nada sobre los días fallados. El historial permite recalcularlo tras sync,
+// recarga, correcciones y deshacer, sin banderas persistentes por dispositivo.
+function combinedStreakState(until){
+  const today=todayStr(),last=[until||today,today,END].sort()[0];
+  let current=0,best=0,missed=0,previous=0,recovered=false,recoveredOn=null;
+  let lastDone=null,lastCount=0;
+  for(let ds=START;ds<=last;ds=addDays(ds,1)){
+    if(combinedDayDone(ds)){
+      if(missed){
+        const canRecover=missed<=2&&previous>=7;
+        current=canRecover?previous+1:1;
+        recovered=canRecover;
+        recoveredOn=canRecover?ds:null;
+      }else current++;
+      missed=0;previous=0;
+      best=Math.max(best,current);lastDone=ds;lastCount=current;
+    }else if(ds!==today){
+      if(!missed)previous=current;
+      missed++;current=0;
+    }
+  }
+  if(today>END&&(!until||until>=today))current=0;
+  const recovery=last===today&&today>=START&&today<=END&&missed>=1&&missed<=2&&previous>=7
+    ?{count:previous,missed}:null;
+  return {current,best,recovery,recovered:current>0&&recovered,recoveredOn,lastDone,lastCount};
+}
+
 // Métricas completas de rachas: pase hacia adelante desde START hasta hoy.
 // El día en curso (hoy) aún no cumplido no rompe la racha, igual que streak():
 // "pendiente" (hoy sin registrar todavía) es distinto de "rota" (un día ya
@@ -14938,7 +14976,7 @@ function combinedDayDone(ds){
 function streakStats(){
   const today=todayStr();
   let ds=START;
-  let nutCur=0,nutBest=0,trainCur=0,trainBest=0,combCur=0,combBest=0;
+  let nutCur=0,nutBest=0,trainCur=0,trainBest=0;
   while(ds<=today&&ds<=END){
     const isToday=ds===today;
     const nutDone=nutritionDayDone(ds);
@@ -14947,9 +14985,6 @@ function streakStats(){
     else if(!isToday)nutCur=0;
     if(trainRes==="done"){trainCur++;if(trainCur>trainBest)trainBest=trainCur;}
     else if(trainRes!=="rest"&&!isToday)trainCur=0;
-    const combOk=nutDone&&(trainRes==="done"||trainRes==="rest");
-    if(combOk){combCur++;if(combCur>combBest)combBest=combCur;}
-    else if(!isToday)combCur=0;
     ds=addDays(ds,1);
   }
   // Consistencia de la semana actual (sesiones de entrenamiento)
@@ -14964,7 +14999,8 @@ function streakStats(){
       d=addDays(d,1);
     }
   }
-  return{nutCur,nutBest,trainCur,trainBest,combCur,combBest,weekPlanned,weekDone};
+  const combined=combinedStreakState(today);
+  return{nutCur,nutBest,trainCur,trainBest,combCur:combined.current,combBest:combined.best,recovery:combined.recovery,recovered:combined.recovered,weekPlanned,weekDone};
 }
 
 const STREAK_MILESTONE_LEVELS=[3,7,14,30];
@@ -15003,16 +15039,11 @@ function checkAndSaveMilestones(){
   });
 }
 
-// Racha combinada: días consecutivos cumplidos hasta hoy (ventana de 1 día).
-function streak(){
-  const ds=todayStr();
-  return streakEndingAt(combinedDayDone(ds)?ds:addDays(ds,-1));
-}
-// Días cumplidos seguidos que terminan en ds (incluido).
+// Mismo cálculo para Hoy, Progreso, amigos, hitos y recordatorios.
+function streak(){return combinedStreakState().current;}
+// Racha que termina en una fecha cumplida (incluidas recuperaciones previas).
 function streakEndingAt(ds){
-  let n=0;
-  while(ds>=START&&combinedDayDone(ds)){n++;ds=addDays(ds,-1);}
-  return n;
+  return combinedDayDone(ds)?combinedStreakState(ds).current:0;
 }
 
 /* ---------- REQ-283: la racha se mueve a la vista ---------- */
@@ -15069,12 +15100,12 @@ function streakFeedbackAfterCommit(ds){
     return;
   }
   if(after>prev.streak){
-    showStreakPop({kind:isToday?"day":"recovered",date:ds,from:prev.streak,to:after,fillFrom:fill(before),fillTo:1});
+    showStreakPop({kind:!isToday||combinedStreakState().recoveredOn===today?"recovered":"day",date:ds,gapRecovery:isToday&&combinedStreakState().recoveredOn===today,from:prev.streak,to:after,fillFrom:fill(before),fillTo:1});
     return;
   }
   if(p.done||p.doneSteps<=before.doneSteps)return;
   // Ayer a medias: lo que está en juego es la racha que terminaba anteayer.
-  const recover=isToday?0:streakEndingAt(addDays(ds,-1));
+  const recover=isToday?(combinedStreakState().recovery?.count||0):streakEndingAt(addDays(ds,-1));
   if(!isToday&&!recover)return;
   showStreakPop({kind:"progress",from:after,to:after,recover,progress:p,fillFrom:fill(before),fillTo:fill(p)});
 }
@@ -15091,7 +15122,7 @@ function streakPopCopy(o){
     const sub=o.recover?`para recuperar tu racha de ${days(o.recover)}`:n>0?`para sumar el día ${n+1} de tu racha`:"para empezar tu racha";
     return {title:streakMissingText(o.progress),sub};
   }
-  if(o.kind==="recovered")return {title:"Racha recuperada",sub:`Vuelves a llevar ${days(n)} seguidos.`};
+  if(o.kind==="recovered")return {title:"Racha recuperada",sub:`Vuelves a llevar ${days(n)} ${o.gapRecovery?"de racha":"seguidos"}.`};
   if(n===1)return {title:"Día 1",sub:"Empezó tu racha."};
   if(STREAK_MILESTONE_LEVELS.includes(n))return {title:`${n} días seguidos`,sub:"Nuevo hito de constancia."};
   return {title:`Día ${n} sumado`,sub:"Este día lo sumaste tú. Sigue a tu ritmo."};
@@ -15184,11 +15215,13 @@ document.addEventListener("visibilitychange",()=>{
 let _engagementTimer=null,_engagementSaved="",_engagementUnsupported=false;
 function engagementSnapshot(){
   const today=todayStr(),yesterday=addDays(today,-1);
-  const stk=streak();
+  const combined=combinedStreakState();
+  const stk=combined.current;
   const s=cycleSummary(today);
   const rescue=yesterday>=START&&!combinedDayDone(yesterday)?streakEndingAt(addDays(yesterday,-1)):0;
   return {
-    v:1,cycleStart:START,
+    v:2,cycleStart:START,
+    recoveryThrough:combined.lastDone,recoveryStreak:combined.lastCount,
     streak:stk,streakThrough:stk>0?(combinedDayDone(today)?today:yesterday):null,
     rescueDate:rescue>=2?yesterday:null,rescueStreak:rescue>=2?rescue:0,
     bestStreak:s.bestStreak,activeDays:s.activeDays,workouts:s.workouts+s.partialWorkouts,
@@ -15655,6 +15688,11 @@ function returnCardData(){
   const today=todayStr();
   if(today<START||today>END)return null;
   const yesterday=addDays(today,-1);
+  const recovery=combinedStreakState().recovery;
+  if(recovery){
+    const key="recovery:"+today;
+    return returnCardDismissed(key)?null:{kind:"recovery",key,streak:recovery.count};
+  }
   if(yesterday>=START&&!combinedDayDone(yesterday)){
     const rescue=streakEndingAt(addDays(yesterday,-1));
     if(rescue>=2){
@@ -15681,6 +15719,13 @@ function returnCardHtml(){
   const data=returnCardData();
   if(!data)return "";
   const flame=`<span class="return-flame" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="${STREAK_FLAME_PATH}"/></svg></span>`;
+  if(data.kind==="recovery"){
+    return `<section class="agenda-card agenda-state return-card" aria-labelledby="returnCardTitle">
+      <div class="agenda-head">${flame}<h2 class="agenda-title" id="returnCardTitle">Tu racha todavía se puede recuperar</h2></div>
+      <p class="return-body">Cumple tus comidas y tu entreno de hoy, o tu descanso planificado, y retomas tu racha de ${data.streak} días. Los días que faltaste no se suman.</p>
+      <div class="agenda-actions"><button class="btn btn-accent" onclick="returnStartToday('${data.key}')">Continuar hoy</button></div>
+    </section>`;
+  }
   if(data.kind==="rescue"){
     return `<section class="agenda-card agenda-state return-card" aria-labelledby="returnCardTitle">
       <div class="agenda-head">${flame}<h2 class="agenda-title" id="returnCardTitle">Ayer quedó sin registrar</h2></div>

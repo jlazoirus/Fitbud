@@ -44,7 +44,8 @@ test("la app guarda el resumen de racha que leen los recordatorios", async ({ pa
   // Ayer quedó roto: racha 0, pero el rescate de 3 días sigue abierto hasta hoy.
   const { plan, ...summary } = saved().at(-1);
   expect(summary).toEqual({
-    v: 1, cycleStart: start, streak: 0, streakThrough: null,
+    v: 2, cycleStart: start, streak: 0, streakThrough: null,
+    recoveryThrough: daysFromTodayInPage(-2), recoveryStreak: 3,
     rescueDate: daysFromTodayInPage(-1), rescueStreak: 3,
     bestStreak: 3, activeDays: 3, workouts: 3,
   });

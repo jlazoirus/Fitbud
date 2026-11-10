@@ -332,6 +332,17 @@ export function planReminder(ctx) {
     progress.week = progress.weeks ? Math.min(w, progress.weeks) : w;
   }
 
+  // REQ-379: volver hoy tras 1–2 fallos recupera una racha de 7+ días.
+  // Se admite el snapshot previo al cambio; su fecha limita la oferta aunque
+  // no haya vuelto a abrir la app. No se proponen registros de días fallados.
+  const recoveryThrough = eng && (eng.recoveryThrough || eng.streakThrough);
+  const recoveryCount = eng ? Math.max(0, Number(eng.recoveryStreak ?? eng.streak) || 0) : 0;
+  const missed = recoveryThrough ? daysBetweenYmd(recoveryThrough, today) - 1 : -1;
+  const recovery = !planEnded && eng && eng.streakThrough !== today && recoveryCount >= 7 && missed >= 1 && missed <= 2;
+  if (recovery && !ctx.followupOnly) {
+    return { step: "day", ref: today, date: today, streak: recoveryCount, recovery: true, missing: "day", gap, progress };
+  }
+
   // Rescate: ayer quedó sin cumplir y hasta anteayer había racha de 2+ días.
   // La ventana de corrección (REQ-23) es solo el día anterior. La app lo deja
   // calculado (rescueDate) si se abrió hoy; si no, la racha llega a anteayer.
@@ -373,7 +384,7 @@ export function planReminder(ctx) {
   const stage = COMEBACK_STEPS.find((s) => gap >= s.from && gap <= s.to);
   if (!stage) return null;
   if (noPlan && !NO_PLAN_STEPS.has(stage.step)) return null;
-  return { step: stage.step, ref, gap, never: !last, noPlan, planEnded, progress };
+  return { step: stage.step, ref, gap, never: !last, noPlan, planEnded, progress, ...(recovery ? { recovery: true, streak: recoveryCount, date: today } : {}) };
 }
 
 // ── Textos (REQ-31: plan, racha, coach; sin datos corporales) ─────────────────
@@ -442,6 +453,11 @@ export function reminderMessage(d, kind) {
       "Abre tu plan para ver el detalle y marcar lo que vayas haciendo.",
     ].filter(Boolean);
     return { title, body, subject, paragraphs, cta: "Ver mi plan de hoy", url: `/app?date=${d.date}&r=morning`, tag: "fitbros-morning" };
+  }
+  if (d.recovery) {
+    title = `Tu racha de ${days(d.streak)} todavía se puede recuperar`;
+    body = "Cumple el día de hoy para retomarla. Los días que faltaste no se suman.";
+    return { title, body, subject: title, paragraphs: [body], cta: "Continuar hoy", url: `/app?date=${d.date}&r=recovery`, tag: "fitbros-streak" };
   }
   if (d.step === "day") {
     const missing = MISSING_TEXT[d.missing] || MISSING_TEXT.day;

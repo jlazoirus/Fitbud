@@ -833,12 +833,15 @@ async function providerResponse(e, body, privacy, quota) {
   const safetyContext = privacy.safetyHold
     ? " La evaluacion del usuario tiene una senal de alerta: no propongas rutinas ni progresiones de ejercicio; limita la respuesta a detener actividad y buscar evaluacion profesional."
     : "";
+  const conversationRules = quota && quota.action === "coach_conversation"
+    ? " En conversación, respeta las exclusiones y correcciones recientes sin repetir opciones rechazadas. El catálogo limita las acciones que modifican el plan, no los consejos: puedes sugerir alimentos simples y preparaciones fuera del catálogo con porciones y macros aproximados, respetando alergias, restricciones y patrón alimentario. No inventes acciones ni afirmes haber aplicado cambios. Si pide cero carbohidratos, ofrece opciones prácticamente sin carbohidratos, aclara trazas sin prometer cero absoluto y no sustituyas la petición por un plato con 32 g. Pollo sin empanizar ni salsas o huevos hervidos son ejemplos solo si el perfil los permite; los huevos pueden contener trazas. No declares insegura una comida puntual solo por no estar en el catálogo ni fuerces todas las metas diarias en una comida. Responde de forma breve, práctica y sin sermones."
+    : "";
   const clientSystem = typeof body.system === "string" ? body.system : "";
   const callStart = Date.now();
   const payload = {
     model,
     max_tokens: maxTokens,
-    system: clientSystem + " REGLAS OBLIGATORIAS DEL SERVIDOR: " + SERVER_GUARDRAILS + safetyContext,
+    system: clientSystem + " REGLAS OBLIGATORIAS DEL SERVIDOR: " + SERVER_GUARDRAILS + safetyContext + conversationRules,
     messages: [{ role: "user", content: userContent(body, quota) }],
   };
   const schema = STRUCTURED_OUTPUT_ACTIONS.has(quota && quota.action) ? structuredSchemaForAction(quota.action) : null;

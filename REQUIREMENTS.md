@@ -2396,21 +2396,15 @@ Test Node con Culqi y Resend simulados, y E2E de Perfil.
 
 ## REQ-362 - Nutrición: registrar alimentos por unidades
 
-**Estado: implementado.**
-
-Feedback de Marco. Huevo entero, ≈50 g sin cáscara por unidad. [USDA NDB 1123](https://fdc.nal.usda.gov/food-search/?component=1100). PWA v221.
+**Estado: implementado.** Ver `docs/requirements-history.md`.
 
 ## REQ-363 - Nutrición: configurar unidades enteras por alimento
 
-**Estado: implementado.**
-
-Configurar, editar o quitar gramos por pieza en catálogo o alimentos propios. Ajuste privado por perfil. Registro de enteros, cálculo en gramos y equivalencia histórica por línea. PWA v222. ✓ `tests/e2e/composicion.spec.js` y `tests/e2e/alimentos-propios.spec.js`.
+**Estado: implementado.** Ver `docs/requirements-history.md`.
 
 ## REQ-364 - Hoy: acción principal y agenda plegable
 
-**Estado: implementado.**
-
-Referencia Platzi. Consumo enlazado a Nutrición, acción contextual, agenda plegable, registro sin menú y vista de mañana. PWA v223.
+**Estado: implementado.** Ver `docs/requirements-history.md`.
 
 ## REQ-365 - Navegación inferior flotante
 
@@ -2479,15 +2473,15 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 
 ## REQ-373 - Consola de administración para escritorio
 
-**Estado: implementado.** Desde 1024 px, `/admin` muestra navegación lateral, listados de Beta y Ejercicios en dos columnas y diálogos centrados. En móvil conserva la navegación inferior.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-374 - Beta: separar las opciones de «Dónde se rompe»
 
-**Estado: implementado.** Comida, entrenamiento, comer fuera y cambios de semana se guardan por separado. Máximo tres. Compatibilidad con envíos anteriores y aviso de revisión en borradores.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-375 - Acceso: mostrar el progreso al entrar
 
-**Estado: implementado.** Indicador de carga al entrar o registrarse. Bloquea envíos repetidos y permite reintentar tras errores. PWA v230.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-376 - Web pública: píxel de Meta para medir la campaña de diciembre
 
@@ -2497,12 +2491,16 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 
 ## REQ-377 - Nutrición: variedad semanal y una sola entrada de preparación
 
-**Estado: implementado.**
+**Estado: implementado.** Ver `docs/requirements-history.md`.
 
-Origen: Jonathan, 10 nov 2026, capturas de días idénticos, alternativas demasiado similares y aviso fugaz. Autorizó implementar en la rama `work`.
+## REQ-378 - Coach: espera conversacional y sugerencias que respetan la petición
 
-El planificador rota platos de porciones nutricionalmente comparables, cuenta repeticiones y compara ingredientes principales con el día anterior. La generación y regeneración semanal consideran también los días del borrador sin guardar; una respuesta reutilizada no fija los mismos platos para todas las fechas. Se conservan hábitos en la propuesta inicial; pedir cambiar un día permite salir de esos hábitos. Las restricciones, comidas registradas, saltadas y elecciones manuales se conservan siempre. Catálogos limitados siguen ofreciendo opciones válidas, con advertencias de variedad visibles.
+**Estado: implementado.** Ver `docs/requirements-history.md`.
 
-Nutrición ofrece una entrada semanal y permite cambiar un día desde su revisión. Se retiran los accesos diarios y el semanal duplicado de Más opciones; el registro libre sigue disponible. El aviso sobre alternativas pasa del toast a la revisión, donde permanece mientras se revisa. Promedios, variedad y compra se recalculan al editar el borrador. Caché PWA v232.
+## REQ-379 - Recuperar la racha después de uno o dos días fallados
 
-Verificación: `scripts/validate-meal-variety.mjs` cubre tres patrones dietarios, días únicos y rotación equilibrada con catálogo limitado. `tests/e2e/nutricion-variedad.spec.js` cubre regeneración, respuestas idénticas reutilizadas y aviso persistente en móvil/escritorio. Regresiones de continuidad, consumo y menú opcional. No requiere migración ni altera menús guardados hasta confirmar un nuevo borrador.
+**Estado: implementado.** Ver `docs/requirements-history.md`.
+
+## REQ-380 - Compartir una imagen de la racha en redes sociales
+
+**Estado: implementado.** Ver `docs/requirements-history.md`.

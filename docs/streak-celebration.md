@@ -22,3 +22,7 @@ Se conserva el componente existente, la tipografía y la paleta. El estado ganad
 `tests/e2e/streak-celebration.spec.js` verifica días ordinarios (2, 4 y 8), estado y lectura accesible, orden de dos incrementos, espera al primer plano, cancelación de un evento deshecho, deduplicación y recarga, limpieza al salir, movimiento reducido, teclado y duración. `tests/e2e/racha-animacion.spec.js` conserva los recorridos originales de comidas, descanso, primer día y recuperación.
 
 Revisión visual conjunta en 390 y 1280 px, pantalla de 320 px con contador de cuatro cifras y movimiento reducido: sin desbordamientos y contraste de texto verificado de al menos 4.5:1. La prueba visual temporal no se incorpora a la suite ni al deploy. El cache de PWA se incrementa a v175.
+
+## Imagen para redes (REQ-380)
+
+Desde Progreso → Racha → Compartir imagen se prepara una tarjeta PNG 1080 × 1350. `js/streak-share.js` dibuja el número que devuelve `streak()` (incluida recuperación), la llama y marca Evolv, sin datos personales adicionales. Se genera en memoria en el dispositivo y se previsualiza antes de abrir Web Share; descargar permite subirla a cualquier red que admita imágenes. No se envía nada a terceros automáticamente ni se crea una invitación de amigos. Cancelar no descarga ni cierra; cerrar o cambiar de cuenta revoca la URL temporal. Sin racha, la acción está desactivada. Pruebas: `tests/e2e/racha-compartir-imagen.spec.js`.

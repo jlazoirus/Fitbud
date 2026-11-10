@@ -25,6 +25,10 @@ function forgetStreakInvite(){
   try{sessionStorage.removeItem(STREAK_INVITE_KEY);}catch(e){}
 }
 function resetStreakSocial(){
+  if(typeof resetStreakImage==="function"){
+    if(document.getElementById("streakSharePreview"))closeModal();
+    else resetStreakImage();
+  }
   clearTimeout(streakSocialTimer);streakSocialRequest++;
   streakSocial={owner:null,loaded:false,enabled:false,alias:"",rows:[],unavailable:false};
   streakSocialOpen=false;streakSocialBusy=false;streakSocialError="";streakSocialInvite=null;streakShareFallback="";

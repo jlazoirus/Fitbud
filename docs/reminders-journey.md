@@ -106,3 +106,7 @@ En Perfil → Recordatorios se elige la hora del aviso del día (06:00–23:00, 
 - Migración `supabase/notifications_morning.sql` (REQ-298, aplicada en producción el 2026-10-28): columnas `morning_opt_in` y `morning_hour`, y tipos `morning` y `push_morning`. Sin ella, la app guarda Recordatorios sin el resumen de la mañana y este no se envía.
 - Cada envío lee y registra su intento antes de enviar; si no puede (registro caído o tipo rechazado), no envía: sin registro, el disparo de la hora siguiente lo repetiría.
 - Las variables y el disparo horario son los de REQ-24/38/266/267.
+
+### Recuperación tras fallos (REQ-379, 10 nov 2026)
+
+Con una racha previa de al menos siete días y uno o dos días fallados, cumplir hoy retoma la racha y suma solo el día de regreso. `combinedStreakState()` es la fuente de Hoy, Progreso, amigos y resúmenes; nunca rellena los días fallados. La tarjeta de Hoy y el aviso diario priorizan «Tu racha todavía se puede recuperar» sobre corregir ayer o decir que se reinició. `engagement` v2 añade `recoveryThrough` y `recoveryStreak`; el servidor valida la ventana por fecha y admite snapshots antiguos. Los mensajes de regreso a quien solo recibe seguimiento también conservan esta posibilidad. Tras tres fallos o con menos de siete días previos comienza una racha nueva. No cambia el umbral de cumplimiento ni requiere SQL.
