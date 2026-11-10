@@ -1,7 +1,7 @@
 // REQ-334: cobro de un plan de la tienda web con Culqi (pago único, en soles).
 // POST /api/culqi-charge (reescrita a /api/checkout?op=culqi) — pública: la compra no exige cuenta (REQ-333).
 // Body: { planId, tokenId, email, firstName, lastName, phone, deviceId,
-//         acceptTerms: true, authentication3DS? }
+//         acceptTerms: true, authentication3DS?, campana? }
 // El monto sale de tienda/planes.js, nunca del navegador. Si el cargo sale bien:
 // busca la cuenta por correo (o la invita), suma los días del plan desde el
 // vencimiento vigente y registra el cobro en billing_events (provider = culqi).
@@ -10,9 +10,13 @@
 // REQ-376: con META_PIXEL_ID y META_CAPI_TOKEN, el cargo confirmado también va como
 // Purchase a la API de conversiones de Meta (api/_tienda/meta-capi.js), con el mismo
 // eventId que la respuesta entrega a /pago para el Purchase del navegador.
+// REQ-370: `campana` (origen de campaña de web/origen.js) es opcional; se revalida aquí
+// y solo se guarda en el payload de billing_events y en la metadata de Culqi. Nunca
+// cambia precio, plan ni acceso, y si es inválida se descarta sin frenar el pago.
 
 import { MONEDA, planPorId, formatoSoles } from "../../tienda/planes.js";
 import { COMERCIO } from "../../tienda/comercio.js";
+import { limpiarCampana, CLAVES as CLAVES_CAMPANA } from "../../web/origen.js";
 import { metaEnv, metaIds, clientInfo, compraMedicion, purchaseEvent, sendPurchase } from "./meta-capi.js";
 
 const CULQI_CHARGES_URL = "https://api.culqi.com/v2/charges";
@@ -53,7 +57,9 @@ export function parseCompra(body) {
     deviceId: clean(b.deviceId, 80),
     acceptTerms: b.acceptTerms === true,
     authentication3DS: null,
+    campana: null,
   };
+  try { data.campana = limpiarCampana(b.campana); } catch (_) { data.campana = null; }
   const a = b.authentication3DS;
   if (a && typeof a === "object") {
     data.authentication3DS = {};
@@ -77,7 +83,7 @@ export function chargeBody(data) {
     email: data.email,
     source_id: data.tokenId,
     description: ("Evolv " + data.plan.nombre).slice(0, 80),
-    metadata: { plan_id: data.plan.id, origen: "tienda_web" },
+    metadata: { plan_id: data.plan.id, origen: "tienda_web", ...metadataCampana(data.campana) },
     antifraud_details: {
       first_name: data.firstName,
       last_name: data.lastName,
@@ -87,6 +93,14 @@ export function chargeBody(data) {
   };
   if (data.authentication3DS) body.authentication_3DS = data.authentication3DS;
   return body;
+}
+
+// La metadata de Culqi es plana (texto por clave): campana_source, campana_utm_source…
+export function metadataCampana(campana) {
+  const out = {};
+  if (!campana) return out;
+  for (const key of CLAVES_CAMPANA) if (campana[key]) out["campana_" + key] = campana[key];
+  return out;
 }
 
 // Culqi responde con object "charge" si autorizó, con action_code "REVIEW" si
@@ -297,6 +311,7 @@ export default async function handler(req, res) {
   const plan = data.plan;
   const chargeId = outcome.chargeId;
   const payload = { email: data.email, amount: plan.montoCentimos, currency: MONEDA, plan_id: plan.id };
+  if (data.campana) payload.campana = data.campana; // REQ-370: sin origen, el campo no existe
   // REQ-376: corre en paralelo con la activación y nunca cambia la respuesta del pago.
   const compra = compraMedicion(chargeId, plan);
   const capi = enviarCompraMeta(req, body, plan, compra, e.appUrl);

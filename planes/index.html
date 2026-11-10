@@ -57,6 +57,9 @@
     import("/web/medicion.js")
       .then((m) => m.track("ViewContent", { content_type: "product", content_ids: PLANES_TIENDA.map((p) => p.id), currency: MONEDA }))
       .catch(() => {});
+
+    // REQ-370: conserva el origen de campaña (source/utm_*) hasta /pago. Si no carga, nada cambia.
+    import("/web/origen.js").catch(() => {});
   </script>
 </body>
 </html>
