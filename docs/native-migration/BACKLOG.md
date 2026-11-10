@@ -61,10 +61,10 @@ Convenciones para todas las tareas:
 
 ## Fase 1 — Núcleo compartido
 
-## NAT-01 — Inventario del dominio que vive en index.html y plan de extracción
+## NAT-01 — Inventario del dominio que vive en app/index.html y plan de extracción
 
-- **Objetivo:** mapa verificable de toda la lógica no visual de `index.html` que una pantalla nativa necesitaría, para que NAT-03..09 extraigan sin adivinar.
-- **Alcance:** crear `docs/native-migration/core-inventory.md` con, por función: nombre, línea, módulo destino (`day-model`, `plan-calendar`, `progress-metrics`, `sync-queue`, `api-client`, `profile-model`, `plan-orchestrator` o "se queda en UI"), globals que lee/escribe (`S`, `DB`, `REMOTE`, `profile`, `supa`, `current`, `view`, `UI`), efectos (DOM, `localStorage`, red, `Date.now`) y llamadores. Punto de partida: `buildDay` (`index.html:1784`), `dayState` (`:2206`), `mealValue` (`:2310`), `dayTotals` (`:2344`), `effectiveDayTarget` (`:1525`), `effectiveWorkout` (`:1498`), `weekOf` (`:1774`), `migrateProfilePrefs` (`:997`), `hasCompleteOnboarding` (`:2638`), `profileReviewDue` (`:2649`), `streakStats`/`streak` (`:10099`/`:10167`), `prepareFirstCycleWeek` (`:3468`), `finalizeDayWithGate` (`:8471`), `callClaude` (`:8389`), `pushDay`/`pullDay`/`commitDay`/`syncDay` (`:10717`-`:10806`), `workoutPrescription` (`:4540`), `activateTrainingPlanDraft` (`:10644`).
+- **Objetivo:** mapa verificable de toda la lógica no visual de `app/index.html` que una pantalla nativa necesitaría, para que NAT-03..09 extraigan sin adivinar.
+- **Alcance:** crear `docs/native-migration/core-inventory.md` con, por función: nombre, línea, módulo destino (`day-model`, `plan-calendar`, `progress-metrics`, `sync-queue`, `api-client`, `profile-model`, `plan-orchestrator` o "se queda en UI"), globals que lee/escribe (`S`, `DB`, `REMOTE`, `profile`, `supa`, `current`, `view`, `UI`), efectos (DOM, `localStorage`, red, `Date.now`) y llamadores. Punto de partida: `buildDay` (`app/index.html:1784`), `dayState` (`:2206`), `mealValue` (`:2310`), `dayTotals` (`:2344`), `effectiveDayTarget` (`:1525`), `effectiveWorkout` (`:1498`), `weekOf` (`:1774`), `migrateProfilePrefs` (`:997`), `hasCompleteOnboarding` (`:2638`), `profileReviewDue` (`:2649`), `streakStats`/`streak` (`:10099`/`:10167`), `prepareFirstCycleWeek` (`:3468`), `finalizeDayWithGate` (`:8471`), `callClaude` (`:8389`), `pushDay`/`pullDay`/`commitDay`/`syncDay` (`:10717`-`:10806`), `workoutPrescription` (`:4540`), `activateTrainingPlanDraft` (`:10644`).
 - **Fuera de alcance:** mover código.
 - **Aceptación:** cada módulo destino tiene lista de funciones, orden de extracción sin ciclos y riesgos; las líneas citadas existen en `HEAD`.
 - **Verificación:** muestreo de 10 referencias contra `HEAD`; `node scripts/native-next-task.mjs --validate`.
@@ -79,7 +79,7 @@ Convenciones para todas las tareas:
 ## NAT-03 — Extraer modelo de día a js/day-model.js
 
 - **Objetivo:** `dayState`, `mealValue`, `dayTotals` y el núcleo de `buildDay` como funciones puras que reciben `state`, `catalog`, `planVersions` y `prefs` explícitos.
-- **Alcance:** nuevo `js/day-model.js` (IIFE, `FITBUD_DAY_MODEL`, comentario `// shared-module`), `index.html` delega en él manteniendo nombres públicos, `<script src>` y `APP_SHELL`/`CACHE_NAME` en `service-worker.js`, validador `scripts/validate-day-model.mjs` (casos: override > nutritionPlan > vacío, totales solo `done`, comidas saltadas, porciones escaladas REQ-154/162) en el release gate.
+- **Alcance:** nuevo `js/day-model.js` (IIFE, `FITBUD_DAY_MODEL`, comentario `// shared-module`), `app/index.html` delega en él manteniendo nombres públicos, `<script src>` y `APP_SHELL`/`CACHE_NAME` en `service-worker.js`, validador `scripts/validate-day-model.mjs` (casos: override > nutritionPlan > vacío, totales solo `done`, comidas saltadas, porciones escaladas REQ-154/162) en el release gate.
 - **Fuera de alcance:** render, sync, cambios de comportamiento.
 - **Aceptación:** E2E sin cambios; NAT-02 pasa con el módulo nuevo.
 - **Verificación:** verde web.
@@ -87,7 +87,7 @@ Convenciones para todas las tareas:
 ## NAT-04 — Extraer calendario de ciclo y metas a js/plan-calendar.js
 
 - **Objetivo:** fechas de ciclo (`planStartDate`/`planEndDate`/`planCycleNumber`/`planDurationWeeks`), `weekOf`, tipo de día, `effectiveDayTarget` y la resolución pura de `effectiveWorkout` desde snapshot, con la fecha "hoy" inyectada (sin `Date` UTC accidental).
-- **Alcance:** `js/plan-calendar.js`, delegación en `index.html`, `service-worker.js`, `scripts/validate-plan-calendar.mjs` (zonas horarias, ciclos 4/10, día fuera de ciclo, `safety_hold`).
+- **Alcance:** `js/plan-calendar.js`, delegación en `app/index.html`, `service-worker.js`, `scripts/validate-plan-calendar.mjs` (zonas horarias, ciclos 4/10, día fuera de ciclo, `safety_hold`).
 - **Aceptación/verificación:** como NAT-03.
 
 ## NAT-05 — Extraer racha, adherencia y recap a js/progress-metrics.js
@@ -99,14 +99,14 @@ Convenciones para todas las tareas:
 ## NAT-06 — Extraer cola offline y sync de day_log/weight_log a js/sync-queue.js con storage inyectado
 
 - **Objetivo:** cola `fitbud_syncq_v1`, metadatos y `pushDay`/`pullDay`/`pushWeight`/`pullWeights` como lógica pura sobre dos puertos: `storage` (get/set/remove asíncronos) y `remote` (upsert/select). Usa `sync-conflicts.js`.
-- **Alcance:** `js/sync-queue.js`, adaptadores web (`localStorage`, supabase-js) dentro de `index.html`, `service-worker.js`, `scripts/validate-sync-queue.mjs` (pending/failed/conflict, reintentos, purga al cambiar de usuario — REQ-156, aislamiento por `user_id`).
+- **Alcance:** `js/sync-queue.js`, adaptadores web (`localStorage`, supabase-js) dentro de `app/index.html`, `service-worker.js`, `scripts/validate-sync-queue.mjs` (pending/failed/conflict, reintentos, purga al cambiar de usuario — REQ-156, aislamiento por `user_id`).
 - **Aceptación:** `test-sync-conflicts.mjs` y `sync-isolation.spec.js` siguen verdes; el módulo no conoce `localStorage` ni `supa`.
 - **Verificación:** verde web.
 
 ## NAT-07 — Extraer cliente de /api/* a js/api-client.js con baseUrl y token inyectados
 
 - **Objetivo:** un cliente único para `/api/config`, `/api/claude`, `/api/entitlement`, `/api/privacy`, `/api/push-subscribe`, `/api/analytics`, `/api/catalog`, `/api/checkout` con `baseUrl` (web: `""`, nativo: `https://evolvapp.club`), `getAccessToken()` y cabeceras de cliente (`X-Evolv-Client`, `X-Evolv-App-Version`) inyectados. Incluye `requestId` idempotente y manejo de paywall/cuota que hoy hace `callClaude` (sin la parte de UI).
-- **Alcance:** `js/api-client.js`, delegación en `index.html`, `service-worker.js` (sin cachear `/api/*`), `scripts/validate-api-client.mjs` con `fetch` simulado (401, 402/paywall, timeout, JSON inválido).
+- **Alcance:** `js/api-client.js`, delegación en `app/index.html`, `service-worker.js` (sin cachear `/api/*`), `scripts/validate-api-client.mjs` con `fetch` simulado (401, 402/paywall, timeout, JSON inválido).
 - **Fuera de alcance:** `/api/admin` (admin queda web).
 - **Aceptación/verificación:** como NAT-03; ninguna clave secreta en el módulo.
 
@@ -187,7 +187,7 @@ Convenciones para todas las tareas:
 ## NAT-22 — Design system Evolv nativo: tokens, tipografías y componentes base
 
 - **Objetivo:** misma identidad que la web (REQ-180): acento lima `--accent`, `--on-accent`, fondo `#101010`, Unbounded (títulos) y Manrope (texto), marca `brandMark()`.
-- **Alcance:** `native/src/ui/tokens.ts` derivado de las variables CSS de `index.html`; fuentes con `expo-font`; componentes `Screen`, `Text`, `Button`, `Card`, `Sheet` (bottom sheet), `ListRow`, `Field`, `PasswordField` (equivalente a `passwordField()`/REQ-113), `MacroRing`, `ProgressBar`, `Toast`, `Chip`, `EmptyState`; página de catálogo de componentes en una ruta de desarrollo.
+- **Alcance:** `native/src/ui/tokens.ts` derivado de las variables CSS de `app/index.html`; fuentes con `expo-font`; componentes `Screen`, `Text`, `Button`, `Card`, `Sheet` (bottom sheet), `ListRow`, `Field`, `PasswordField` (equivalente a `passwordField()`/REQ-113), `MacroRing`, `ProgressBar`, `Toast`, `Chip`, `EmptyState`; página de catálogo de componentes en una ruta de desarrollo.
 - **Aceptación:** contraste AA, objetivos táctiles ≥44 pt, respeta safe areas; snapshots de componentes.
 - **Verificación:** verde nativo + capturas iOS/Android adjuntas al PR.
 

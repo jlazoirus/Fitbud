@@ -4,8 +4,9 @@ Aquí se anotan las respuestas a las tareas `NAT-Hx` (ver `BACKLOG.md`). Solo in
 
 | ID | Decisión | Fecha | Quién | Resultado |
 |---|---|---|---|---|
-| — | Aplazar la ejecución hasta validar con usuarios en la web; reanudar con decisión GO (`estrategia/01-Plan-de-Validacion.md` §5) | 2026-10-19 | Jonathan | en pausa |
-| NAT-H1 | Aprobar ADR-001 (Expo / React Native) | | | pendiente |
+| — | Aplazar la ejecución hasta validar con usuarios en la web | 2026-10-19 | Jonathan | pausa finalizada el 2026-11-10 |
+| — | Iniciar la migración, con opción de nuevo repositorio si fuera necesario | 2026-11-10 | Jonathan | Autorización explícita en el chat «ok inicia con la migracion, si es necesario trabaja sobre un nuevo repo». Codex registra la reanudación en su nombre. Se conserva el repositorio para compartir dominio, con worktree aislado. Esta decisión autoriza desarrollo y no certifica los umbrales de validación web. |
+| NAT-H1 | Aprobar ADR-001 (Expo / React Native) | 2026-11-10 | Jonathan | Aprobado con la instrucción de iniciar tras revisar la elección de Expo frente a Flutter. |
 | NAT-H2 | Cuentas de tienda, bundle id, Team ID, huella SHA-256 Android | | | pendiente |
 | NAT-H3 | Modelo de cobro dentro de las apps | 2026-11-05 | Jonathan | Decidido: cobro solo en la web (Culqi); las apps no venden, no enlazan a comprar y no canjean cupones; leen el acceso del servidor. Contingencia de compra integrada si una tienda la exige (`COBRO-WEB.md`). Cierre formal pendiente de la validación en beta con App Store y Google Play. |
 | NAT-H4 | Privacidad para tiendas y excepción acotada a REQ-31 | | | pendiente |

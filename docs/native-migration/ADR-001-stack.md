@@ -1,12 +1,12 @@
 # ADR-001 — Stack de las apps nativas de Evolv
 
-- Estado: **propuesto** (se acepta al cerrar NAT-H1).
+- Estado: **aceptado por Jonathan el 2026-11-10** (NAT-H1, instrucción de iniciar la migración tras revisar Expo / React Native).
 - Fecha: 2026-10-16.
 - Contexto completo: `docs/native-migration/PLAN.md`.
 
 ## Contexto
 
-Evolv es una PWA vanilla sin build step. La UI vive en un `index.html` de ~12.4k líneas con render por template strings y handlers inline; no es portable a ningún framework nativo. En cambio, el dominio crítico ya está en módulos puros sin DOM (`js/nutrition-pure.js`, `js/nutrition-domain.js`, `domain-contracts.js`, `training-plan.js`, `workout-player.js`, `sync-conflicts.js`, `exercise-catalog.js`) cubiertos por ~100 validadores Node. El backend (Supabase + funciones Vercel con auth Bearer) es independiente del cliente.
+Evolv es una PWA vanilla sin build step. La UI vive en un `app/index.html` de ~12.4k líneas con render por template strings y handlers inline; no es portable a ningún framework nativo. En cambio, el dominio crítico ya está en módulos puros sin DOM (`js/nutrition-pure.js`, `js/nutrition-domain.js`, `domain-contracts.js`, `training-plan.js`, `workout-player.js`, `sync-conflicts.js`, `exercise-catalog.js`) cubiertos por ~100 validadores Node. El backend (Supabase + funciones Vercel con auth Bearer) es independiente del cliente.
 
 Restricciones: equipo pequeño apoyado por agentes autónomos, mismo idioma (JS) que el resto del repo, iOS y Android a la vez, sin reescribir reglas de negocio, backend sin cambios de proveedor.
 
@@ -48,7 +48,7 @@ Prohibido en `native/`: SDKs de analytics/ads de terceros, SDKs que reciban dato
 ## Consecuencias
 
 - Positivas: una sola fuente de reglas de negocio; los validadores existentes protegen ambos clientes; tareas por journey paralelizables entre agentes.
-- Negativas: la UI se escribe dos veces (web y nativo) mientras convivan; hay que extraer dominio de `index.html` (Fase 1) antes de varias pantallas; aparece un toolchain con build (solo en `native/`).
+- Negativas: la UI se escribe dos veces (web y nativo) mientras convivan; hay que extraer dominio de `app/index.html` (Fase 1) antes de varias pantallas; aparece un toolchain con build (solo en `native/`).
 - Neutras: la app nativa depende de que `https://evolvapp.club/api/*` siga siendo estable → se versiona por cabecera de cliente (NAT-10).
 
 ## Versiones fijadas

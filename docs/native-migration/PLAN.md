@@ -1,8 +1,8 @@
 # Plan de migración de Evolv (web/PWA) a apps nativas iOS y Android
 
-Fecha de creación: 2026-10-16. Estado: **aplazado desde 2026-10-19** — plan aprobado como referencia, ejecución en pausa.
+Fecha de creación: 2026-10-16. Estado: **ejecución reanudada por Jonathan el 2026-11-10**.
 
-> **Ejecución aplazada.** Por decisión de Jonathan (2026-10-19), la migración no se ejecuta hasta validar el producto con usuarios en la web/PWA. El foco actual es la validación descrita en `estrategia/01-Plan-de-Validacion.md`. Se reanuda solo con una decisión **GO** de esa validación (§5 de ese documento): entonces una persona ejecuta `node scripts/native-next-task.mjs --resume --human`, revisa que el plan siga vigente frente al código (`PLAN.md` §2 cita líneas de `index.html` que habrán cambiado) y arranca por las decisiones NAT-H1..H5. Mientras dure la pausa, `native-next-task.mjs` no ofrece ni deja reclamar tareas (`reason: "plan_paused"`), y lo que aprenda la validación (journeys que importan, disposición a pagar, plataforma de los usuarios) debe usarse para re-priorizar el backlog antes de reanudar.
+> Jonathan autorizó iniciar la migración tras revisar Expo y React Native el 2026-11-10. Se registra su instrucción como reanudación y aprobación de NAT-H1, sin atribuir resultados a la validación web. La app se construye en `native/` dentro del mismo repositorio para compartir dominio. NAT-H2..H8 conservan sus decisiones pendientes. La base web actual es `app/index.html` (REQ-352). NAT-01 debe actualizar el inventario y todas las referencias de funciones antes de extraerlas.
 
 Este documento es el plan maestro. Las piezas operativas están en:
 
@@ -34,15 +34,15 @@ No es objetivo de esta migración:
 
 | Aspecto | Hoy | Implicación para nativo |
 |---|---|---|
-| UI | `index.html` monolítico (~12.4k líneas, ~780 funciones, handlers inline, render por template strings). | La UI **no** se puede reutilizar en React Native; se reescribe por pantalla. |
+| UI | `app/index.html` monolítico (~12.4k líneas, ~780 funciones, handlers inline, render por template strings). | La UI **no** se puede reutilizar en React Native; se reescribe por pantalla. |
 | Dominio | Módulos puros sin DOM en IIFE que publican en `globalThis`: `js/nutrition-pure.js`, `js/nutrition-domain.js`, `domain-contracts.js`, `training-plan.js`, `workout-player.js`, `sync-conflicts.js`, `exercise-catalog.js` (~170 KB). | **Reutilizables tal cual** en Hermes. Se cargan como módulos compartidos (NAT-02, NAT-21). |
-| Lógica de dominio aún dentro de `index.html` | `buildDay()` (`index.html:1784`), `dayState()` (`:2206`), `mealValue()` (`:2310`), `dayTotals()` (`:2344`), `effectiveDayTarget()` (`:1525`), `weekOf()` (`:1774`), `migrateProfilePrefs()` (`:997`), `hasCompleteOnboarding()` (`:2638`), `streakStats()` (`:10099`), `prepareFirstCycleWeek()` (`:3468`), `finalizeDayWithGate()` (`:8471`), `pushDay/pullDay/commitDay` (`:10717-10806`), `callClaude()` (`:8389`). | Hay que **extraerla** a módulos puros antes de construir las pantallas nativas que la usan (Fase 1). La extracción también mejora la web. |
+| Lógica de dominio aún dentro de `app/index.html` | `buildDay()` (`app/index.html:1784`), `dayState()` (`:2206`), `mealValue()` (`:2310`), `dayTotals()` (`:2344`), `effectiveDayTarget()` (`:1525`), `weekOf()` (`:1774`), `migrateProfilePrefs()` (`:997`), `hasCompleteOnboarding()` (`:2638`), `streakStats()` (`:10099`), `prepareFirstCycleWeek()` (`:3468`), `finalizeDayWithGate()` (`:8471`), `pushDay/pullDay/commitDay` (`:10717-10806`), `callClaude()` (`:8389`). | Hay que **extraerla** a módulos puros antes de construir las pantallas nativas que la usan (Fase 1). La extracción también mejora la web. |
 | Backend | `api/*.js` autentican con `Authorization: Bearer <supabase access token>` (p. ej. `api/claude.js:110`). | Funciona desde nativo sin cambios de auth. Falta base URL absoluta, identificación de cliente/versión y push nativo. |
-| Auth | Supabase email/contraseña (`signInWithPassword`, `signUp`, `resetPasswordForEmail`); enlaces de correo vuelven a `location.origin` (`authRedirectUrl()`, `index.html:7364`). | Necesita deep links / Universal Links (NAT-12). Sin login social → "Sign in with Apple" no es obligatorio hoy. |
+| Auth | Supabase email/contraseña (`signInWithPassword`, `signUp`, `resetPasswordForEmail`); enlaces de correo vuelven a `location.origin` (`authRedirectUrl()`, `app/index.html:7364`). | Necesita deep links / Universal Links (NAT-12). Sin login social → "Sign in with Apple" no es obligatorio hoy. |
 | Persistencia local | `localStorage`: `fitbud_v1` (estado `S`), `fitbud_syncq_v1` (cola offline), `fitbud_sync_meta_v1`, `fitbud_ui`, `fitbud_chat_v1_*`, `fitbud_meal_option_rerolls_v1`, `fitbros_tour_v1`. | Se reemplaza por un adaptador de almacenamiento inyectable (NAT-06, NAT-24). Mismo formato lógico para que web y nativo compartan reglas de sync. |
 | Push | Web Push VAPID con `web-push` (`api/notify.js`, tabla `push_subscriptions(endpoint, keys_p256dh, keys_auth)`). | Necesita tokens nativos (APNs/FCM vía Expo Push) y una tabla nueva (NAT-11). |
 | Cobro | Tienda web con Culqi (`/planes` → `/pago`, pago único sin renovación, REQ-331..334; comercio aprobado por Culqi el 2026-11-04). Stripe Checkout (`api/checkout.js`) quedó sin activar. Cupones y entitlements en Supabase. | Las apps no venden: se paga solo en la web y la app lee el acceso de `/api/entitlement` (NAT-H3, decidido 2026-11-05). Las tiendas no lo permiten de forma explícita en Perú: ver riesgos y contingencia en `COBRO-WEB.md`. |
-| Cámara/voz | `<input type="file" capture="environment">` (foto de comida/progreso), Web Speech API (`toggleMic()`, `index.html:9803`). | `expo-image-picker`/cámara y reconocimiento de voz nativo (NAT-35, NAT-36). |
+| Cámara/voz | `<input type="file" capture="environment">` (foto de comida/progreso), Web Speech API (`toggleMic()`, `app/index.html:9803`). | `expo-image-picker`/cámara y reconocimiento de voz nativo (NAT-35, NAT-36). |
 | Fotos privadas | Storage `progress-photos/<user_id>/...` con URLs firmadas. | Igual en nativo con supabase-js. |
 | Analytics | `/api/analytics` con allowlist, sin datos de salud. | Reutilizar el mismo endpoint y allowlist; nada de SDKs de terceros con datos de salud. |
 | Pruebas | ~100 validadores Node + Playwright E2E con fixtures (`tests/e2e`), `scripts/release-gate.mjs`. | Los validadores de dominio cubren también nativo porque es el mismo código. Se añade CI nativo (NAT-27) y E2E con Maestro (NAT-60). |
@@ -64,8 +64,8 @@ Descartadas: envolver la PWA con Capacitor (no es nativo, hereda el monolito y a
 
 ```
 Fitbud/ (este repo)
-├── index.html, js/, *.js           ← web/PWA (sin build step; no cambia de stack)
-├── js/<módulos puros nuevos>.js    ← Fase 1: dominio extraído de index.html (IIFE, sin DOM)
+├── app/index.html, js/, *.js           ← web/PWA (sin build step; no cambia de stack)
+├── js/<módulos puros nuevos>.js    ← Fase 1: dominio extraído de app/index.html (IIFE, sin DOM)
 ├── api/*.js                        ← backend compartido (Vercel), extendido en Fase 2
 ├── supabase/*.sql                  ← migraciones idempotentes (aplicación manual)
 └── native/                         ← app Expo (NO se publica en Vercel; .vercelignore ya lo excluye)
@@ -79,7 +79,7 @@ Fitbud/ (este repo)
 
 Reglas de arquitectura:
 
-- **Un solo dominio.** Ninguna regla de negocio (macros, contratos, progresión, sync, metas) se reimplementa en `native/`. Si hace falta y vive en `index.html`, primero se extrae a un módulo puro de la raíz (tarea `core`) y ambos clientes lo consumen.
+- **Un solo dominio.** Ninguna regla de negocio (macros, contratos, progresión, sync, metas) se reimplementa en `native/`. Si hace falta y vive en `app/index.html`, primero se extrae a un módulo puro de la raíz (tarea `core`) y ambos clientes lo consumen.
 - **Los módulos puros siguen el patrón actual**: IIFE que publica en `globalThis`, sin `window`/`document`/`localStorage`/`location`/`navigator`, cargables en Node y en Hermes. Los efectos (storage, red, reloj) se inyectan como parámetros.
 - **Mismo contrato de datos.** `day_log.state`, `plan_versions.snapshot`, `profiles.prefs` (schema v3) y la cola offline se escriben con el mismo formato desde web y nativo. Un usuario puede alternar entre ambos sin perder ni duplicar datos (NAT-61).
 - **El backend no confía en el cliente.** Cuotas, entitlements, validación del coach y privacidad siguen en servidor; nativo no recibe secretos nuevos.
@@ -90,7 +90,7 @@ Reglas de arquitectura:
 | Fase | Contenido | Hito de salida | Paraleliza |
 |---|---|---|---|
 | 0 — Decisiones | NAT-H1..H5: aprobar stack, cuentas de tienda, modelo de cobro, revisión legal de privacidad, credenciales push/EAS. | ADR aprobado y cuentas creadas. | Humano; en paralelo con Fases 1–3. |
-| 1 — Núcleo compartido | NAT-01..09: inventario y extracción del dominio de `index.html` a módulos puros, con validadores. | Las pantallas nativas pueden construirse sin tocar `index.html`. | Media: las extracciones que tocan `index.html` van de una en una (`exclusiveGroup: index-html`). |
+| 1 — Núcleo compartido | NAT-01..09: inventario y extracción del dominio de `app/index.html` a módulos puros, con validadores. | Las pantallas nativas pueden construirse sin tocar `app/index.html`. | Media: las extracciones que tocan `app/index.html` van de una en una (`exclusiveGroup: index-html`). |
 | 2 — Backend para clientes nativos | NAT-10..14: identificación de cliente/versión, push nativo, deep links, entitlements multi-origen, compatibilidad con versiones anteriores. | API lista para iOS/Android. | Alta. |
 | 3 — Fundación nativa | NAT-20..28: scaffold, puente de dominio, design system, auth, datos offline, navegación, telemetría, CI, lint REQ-31. | App que inicia sesión, sincroniza y navega entre tabs vacías. | Media. |
 | 4 — Paridad por journey | NAT-30..49: onboarding, primer ciclo, Hoy, nutrición, entreno, reproductor, progreso, cierre de ciclo, perfil, privacidad, notificaciones, suscripción, coach. | `PARITY.md` 100 % en verde para usuario normal. | **Alta**: una tarea = un journey con carpeta propia. |
@@ -130,7 +130,7 @@ Las tareas `NAT-Hx` no las puede cerrar un agente. Un agente puede preparar el m
 - **Migraciones SQL** idempotentes, con RLS, nunca aplicadas automáticamente a producción.
 - **Publicación por aire con controles:** por OTA se corrige y se pule; lo nuevo pasa por revisión de tienda. Ningún OTA llega al 100 % sin los controles de `PUBLICACION.md` §3.
 - **Versiones anteriores siguen funcionando:** la API y los datos compartidos no rompen una versión soportada de la app (`PUBLICACION.md` §6).
-- **La web no se rompe:** toda tarea que toque la raíz (`index.html`, `js/`, `api/`, `supabase/`) debe dejar `node scripts/release-gate.mjs` en verde y subir `CACHE_NAME` si cambia el shell PWA.
+- **La web no se rompe:** toda tarea que toque la raíz (`app/index.html`, `js/`, `api/`, `supabase/`) debe dejar `node scripts/release-gate.mjs` en verde y subir `CACHE_NAME` si cambia el shell PWA.
 
 ## 9. Riesgos y mitigaciones
 
@@ -138,7 +138,7 @@ Las tareas `NAT-Hx` no las puede cerrar un agente. Un agente puede preparar el m
 |---|---|---|---|
 | Rechazo de App Store o Google Play por acceso comprado en la web sin compra integrada (App Store 3.1.1/3.1.3(b), Google Play Pagos). | Media-alta. | Bloquea lanzamiento. | Cero llamados a comprar dentro de la app (validador NAT-28), validación temprana en TestFlight y prueba cerrada, y contingencia de compra integrada lista (`COBRO-WEB.md` Fase 3). |
 | Choque REQ-31 vs. divulgación obligatoria de IA de terceros. | Alta. | Rechazo / riesgo legal. | NAT-H4 con excepción acotada al texto legal. |
-| Extraer dominio de `index.html` rompe la web. | Media. | Regresión en producción. | Extracciones pequeñas, una a la vez, release gate + E2E en verde, sin cambios de comportamiento. |
+| Extraer dominio de `app/index.html` rompe la web. | Media. | Regresión en producción. | Extracciones pequeñas, una a la vez, release gate + E2E en verde, sin cambios de comportamiento. |
 | Divergencia de reglas entre web y nativo. | Media. | Datos inconsistentes. | Regla "un solo dominio"; prohibido duplicar lógica en `native/` (revisión en PR + NAT-02). |
 | Conflictos entre agentes en archivos calientes. | Alta sin coordinación. | Trabajo perdido. | `paths` por tarea, `exclusiveGroup`, reclamo atómico vía `origin/main` (ver `NATIVE_AGENT.md`). |
 | Timers del reproductor en segundo plano (la app se suspende). | Media. | Descansos/duración incorrectos. | Tiempos por timestamp (lección de REQ-155/186) + notificaciones locales programadas al fin del descanso. |

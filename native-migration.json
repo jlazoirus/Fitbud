@@ -5,12 +5,7 @@
   "plan": "docs/native-migration/PLAN.md",
   "backlog": "docs/native-migration/BACKLOG.md",
   "runbook": "NATIVE_AGENT.md",
-  "paused": {
-    "since": "2026-10-19",
-    "by": "Jonathan",
-    "reason": "La ejecución de la migración nativa queda aplazada hasta validar el producto con usuarios en la web.",
-    "resumeWhen": "Decisión GO de la validación con usuarios (estrategia/01-Plan-de-Validacion.md §5) tomada sobre la PWA; la reanuda una persona con --resume --human."
-  },
+  "paused": null,
   "statuses": [
     "pendiente",
     "en_curso",
@@ -38,10 +33,10 @@
       "paths": [
         "docs/native-migration/ADR-001-stack.md"
       ],
-      "status": "pendiente",
+      "status": "hecho",
       "owner": null,
       "claimedAt": null,
-      "doneAt": null,
+      "doneAt": "2026-11-10",
       "note": ""
     },
     {
@@ -217,7 +212,7 @@
       "paths": [
         "js/day-model.js",
         "scripts/validate-day-model.mjs",
-        "index.html",
+        "app/index.html",
         "service-worker.js",
         "scripts/release-gate.mjs"
       ],
@@ -241,7 +236,7 @@
       "paths": [
         "js/plan-calendar.js",
         "scripts/validate-plan-calendar.mjs",
-        "index.html",
+        "app/index.html",
         "service-worker.js",
         "scripts/release-gate.mjs"
       ],
@@ -265,7 +260,7 @@
       "paths": [
         "js/progress-metrics.js",
         "scripts/validate-progress-metrics.mjs",
-        "index.html",
+        "app/index.html",
         "service-worker.js",
         "scripts/release-gate.mjs"
       ],
@@ -289,7 +284,7 @@
       "paths": [
         "js/sync-queue.js",
         "scripts/validate-sync-queue.mjs",
-        "index.html",
+        "app/index.html",
         "service-worker.js",
         "scripts/release-gate.mjs"
       ],
@@ -313,7 +308,7 @@
       "paths": [
         "js/api-client.js",
         "scripts/validate-api-client.mjs",
-        "index.html",
+        "app/index.html",
         "service-worker.js",
         "scripts/release-gate.mjs"
       ],
@@ -337,7 +332,7 @@
       "paths": [
         "js/profile-model.js",
         "scripts/validate-profile-model.mjs",
-        "index.html",
+        "app/index.html",
         "service-worker.js",
         "scripts/release-gate.mjs"
       ],
@@ -363,7 +358,7 @@
       "paths": [
         "js/plan-orchestrator.js",
         "scripts/validate-plan-orchestrator.mjs",
-        "index.html",
+        "app/index.html",
         "service-worker.js",
         "scripts/release-gate.mjs"
       ],
@@ -493,7 +488,9 @@
         "NAT-H1"
       ],
       "paths": [
-        "native/**"
+        "native/**",
+        ".gitignore",
+        "docs/native-migration/ADR-001-stack.md"
       ],
       "exclusiveGroup": "native-config",
       "status": "pendiente",

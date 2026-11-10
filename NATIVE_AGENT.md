@@ -1,6 +1,6 @@
 # Runbook — agentes de la migración nativa
 
-> **En pausa desde 2026-10-19.** La ejecución está aplazada hasta validar el producto con usuarios en la web (`docs/native-migration/PLAN.md`, aviso inicial). Si `node scripts/native-next-task.mjs --next` devuelve `reason: "plan_paused"`, **no trabajes en tareas NAT**: no reclames, no crees `native/` ni extraigas código de `index.html` por esta vía. Solo una persona reanuda con `--resume --human`.
+> **Reanudada el 2026-11-10 por instrucción explícita de Jonathan.** Expo / React Native aprobado en NAT-H1. Ver `docs/native-migration/decisions.md`. Si el selector devuelve `plan_paused` en una futura corrida, respetar esa pausa.
 
 Este runbook gobierna a los agentes (Codex, Claude Code u otro) que trabajan en la migración de Evolv a apps nativas. A diferencia de los loops desarrollador y auditor (`AGENTS.md`), **varios agentes de migración pueden trabajar a la vez**: se coordinan por el estado de `native-migration.json` en `origin/main`, no por el lock local `.git/fitbros-agent-loop.lock`.
 
@@ -38,7 +38,7 @@ git push origin HEAD:main
 - Rama de trabajo: `native/NAT-xx-<slug>` (o la rama que imponga tu entorno). Basada en `origin/main` con tu reclamo incluido.
 - **Escribe solo dentro de los `paths` de tu tarea.** Si necesitas tocar algo fuera, detente: o es otra tarea (créala, ver §5) o el alcance está mal definido (corrígelo en un PR documental aparte).
 - `exclusiveGroup`:
-  - `index-html`: tocan `index.html`/`service-worker.js` (extracciones de Fase 1). Solo una a la vez para evitar conflictos con el loop desarrollador y entre agentes.
+  - `index-html`: tocan `app/index.html`/`service-worker.js` (extracciones de Fase 1). Solo una a la vez para evitar conflictos con el loop desarrollador y entre agentes.
   - `native-config`: tocan `native/package.json` o `native/app.config.ts` (dependencias, plugins, permisos). Solo una a la vez.
 - No dupliques lógica de dominio en `native/` (ver `PLAN.md` §4). Si falta, crea una tarea `core`.
 - Respeta los invariantes de `AGENTS.md`: REQ-31, privacidad, historial inmutable, sin dependencias runtime nuevas en la web, migraciones SQL idempotentes con RLS y nunca aplicadas a producción.
@@ -50,7 +50,7 @@ Según lo que toque la tarea (detalle en `BACKLOG.md`):
 
 ```bash
 git diff --check
-node scripts/release-gate.mjs                     # si tocaste la raíz (index.html, js/, api/, supabase/, scripts/)
+node scripts/release-gate.mjs                     # si tocaste la raíz (app/index.html, js/, api/, supabase/, scripts/)
 (cd native && npm run typecheck && npm run lint && npm test)   # si tocaste native/
 node scripts/native-next-task.mjs --validate
 ```
