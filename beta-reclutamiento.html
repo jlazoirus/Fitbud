@@ -723,6 +723,8 @@
           return;
         }
         renderDone(data);
+        // REQ-376: Lead solo con la postulación confirmada, sin datos de la persona.
+        try { if (window.evolvPixel) window.evolvPixel.track("Lead"); } catch (_) {}
       } catch (_) {
         renderError("No hay conexión. Revisa tu internet e intenta de nuevo; tus respuestas siguen aquí.", false);
       } finally {
@@ -794,5 +796,6 @@
       return String(value || "").replace(/\s+/g, " ").trim();
     }
   </script>
+  <script type="module" src="/web/medicion.js"></script>
 </body>
 </html>

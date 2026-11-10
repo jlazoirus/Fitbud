@@ -352,6 +352,8 @@
           return;
         }
         renderDone(data);
+        // REQ-376: Lead solo con la inscripción confirmada, sin datos de la persona.
+        try { if (window.evolvPixel) window.evolvPixel.track("Lead"); } catch (_) {}
       } catch (_) {
         showError("No hay conexión. Revisa tu internet e intenta de nuevo; lo que escribiste sigue aquí.");
       } finally {
@@ -359,5 +361,6 @@
       }
     });
   </script>
+  <script type="module" src="/web/medicion.js"></script>
 </body>
 </html>

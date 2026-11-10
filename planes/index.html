@@ -37,7 +37,7 @@
   <footer id="t-footer"></footer>
   <script type="module">
     import { mountLayout, esc } from "/tienda/layout.js";
-    import { PLANES_TIENDA, formatoSoles } from "/tienda/planes.js";
+    import { PLANES_TIENDA, formatoSoles, MONEDA } from "/tienda/planes.js";
     mountLayout();
 
     document.getElementById("planes").innerHTML = PLANES_TIENDA.map((p) => `
@@ -51,6 +51,12 @@
           <a class="btn ${p.destacado ? "btn-accent" : ""} btn-block" href="/pago?plan=${encodeURIComponent(p.id)}">Comprar ${esc(p.nombre.toLowerCase())}</a>
         </div>
       </article>`).join("");
+
+    // REQ-376: medición de la campaña (solo si hay píxel configurado). Import dinámico:
+    // si un bloqueador o la red lo impiden, la página sigue igual.
+    import("/web/medicion.js")
+      .then((m) => m.track("ViewContent", { content_type: "product", content_ids: PLANES_TIENDA.map((p) => p.id), currency: MONEDA }))
+      .catch(() => {});
   </script>
 </body>
 </html>

@@ -172,15 +172,18 @@ test.describe("Navegación", () => {
 
   test("REQ-197/352: la portada se pinta sin esperar a /api/config ni a Supabase", async ({ page, context }) => {
     await installMocks(context);
-    let configRequested = false;
-    await context.route("**/api/config", async () => { configRequested = true; }); // colgada a propósito
+    let configAt = 0;
+    await context.route("**/api/config", async () => { configAt = Date.now(); }); // colgada a propósito
     const errors = collectConsoleErrors(page);
     await page.goto("/");
     await expect(page.locator(".landing h1")).toBeVisible({ timeout: 3_000 });
     const item = page.locator(".l-faq-item").first();
     await item.locator("summary").click();
     await expect(item).toHaveAttribute("open", "");
-    expect(configRequested).toBe(false);
+    // REQ-376: la medición pide /api/config recién después de `load` y la portada no la espera.
+    await expect.poll(() => configAt).toBeGreaterThan(0);
+    const loadAt = await page.evaluate(() => performance.timeOrigin + performance.getEntriesByType("navigation")[0].loadEventEnd);
+    expect(configAt).toBeGreaterThanOrEqual(Math.floor(loadAt) - 50);
     expect(errors).toEqual([]);
   });
 
