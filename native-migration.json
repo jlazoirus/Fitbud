@@ -534,9 +534,9 @@
         "native/app/_layout.tsx",
         "native/README.md"
       ],
-      "status": "pendiente",
-      "owner": null,
-      "claimedAt": null,
+      "status": "en_curso",
+      "owner": "codex-native-kickoff",
+      "claimedAt": "2026-11-10T11:39:41.854Z",
       "doneAt": null,
       "note": ""
     },
