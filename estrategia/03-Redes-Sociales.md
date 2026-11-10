@@ -1,6 +1,6 @@
 # 03 · Estrategia de Redes Sociales — Evolv
 
-> Actualizada el 9 nov 2026. Reemplaza la versión de junio, escrita cuando la marca era Fitbros y todavía no había usuarios. Esta versión parte de los datos reales de la beta. El calendario vigente está en `09-Calendario-Redes-Nov-Dic-2026.md` (desde el 10 nov reemplaza al de la serie Club del Plan B).
+> Actualizada el 9 nov 2026. Reemplaza la versión de junio, escrita cuando la marca era Fitbros y todavía no había usuarios. Esta versión parte de los datos reales de la beta. El calendario para ejecutarla está en `09-Calendario-Redes-Nov-Dic-2026.md` (desde el 10 nov junta esta estrategia con las métricas de Metricool).
 
 ---
 
