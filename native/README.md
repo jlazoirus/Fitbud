@@ -46,7 +46,27 @@ Las credenciales de firma se gestionan en EAS. El repositorio solo guarda identi
 
 ## Alcance de esta base
 
-Se reutilizan el icono y los colores existentes. NAT-22 desarrollará los componentes y la tipografía de la interfaz. El icono actual de 512 px sirve para desarrollo, y NAT-62 debe preparar los recursos de tienda con sus dimensiones finales. NAT-21 incorporará el puente a los módulos de dominio, evitando copias de la lógica web.
+Se reutilizan el icono y los colores existentes. NAT-22 desarrollará los componentes y la tipografía de la interfaz. El icono actual de 512 px sirve para desarrollo, y NAT-62 debe preparar los recursos de tienda con sus dimensiones finales.
+
+## Dominio compartido (NAT-21)
+
+`src/core/index.ts` importa los siete módulos originales del repositorio. Se carga desde el layout raíz y exporta `nutritionPure`, `nutrition`, `contracts`, `exercises`, `trainingPlan`, `workoutPlayer` y `sync`. Los tipos de `src/core/types/domain.d.ts` cubren las funciones verificadas; cada feature amplía esa superficie desde el código real, sin reimplementar las reglas.
+
+```ts
+import { nutrition, sync } from './src/core';
+
+const kcal = nutrition.kcalFromMacros(160, 284, 64);
+const result = sync.mergeDayLogStates(base, local, remote);
+// Si result.ok es false, conservar el conflicto para resolverlo en la UI.
+```
+
+Las instalaciones npm de la raíz y de `native/` son independientes. `metro.config.js` extiende la configuración de Expo y agrega la raíz a `watchFolders` para resolver los módulos compartidos. La base web mantiene su despliegue y sus dependencias runtime.
+
+Verificación del puente: TypeScript y ESLint verdes, 10 pruebas Jest en total (6 del puente), exportación de iOS/Android a bytecode Hermes y web completada. La vista web arranca a 390 × 844 sin errores ni desbordamiento, con los siete namespaces presentes y un cálculo de macros comprobado. Los casos de dominio cubren recetas, metas, plan de cuatro semanas, restauración de series/temporizador, pausa por ausencia y merge/conflicto entre dispositivos, conservando los snapshots de entrada.
+
+**NAT-21 conserva pendiente la aceptación en un dispositivo o simulador con Hermes.** Este Mac tiene Command Line Tools, pero no Xcode completo, Android SDK ni una sesión Expo/EAS vinculada. El compilador `hermesc` incluido permite generar bytecode; no ejecuta la app. Tras NAT-H2/H5, generar un cliente de desarrollo, iniciar la app y comprobar el arranque sin errores en iOS y Android antes de cerrar la tarea. La migración aún no tiene autenticación ni pantallas de producto.
+
+La regresión web que precede al puente pasó 333/333 E2E y todos los checks funcionales del gate (120/121; el único fallo es la rama de trabajo, excepción documentada en `NATIVE_AGENT.md`). El fixture de recordatorios se verificó en las 24 horas UTC. Las evidencias locales están en `/Users/jonathan/.fitbros/qa-archive/native-kickoff/`.
 
 ## Verificación inicial del 10 de noviembre de 2026
 

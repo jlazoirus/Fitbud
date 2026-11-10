@@ -534,11 +534,11 @@
         "native/app/_layout.tsx",
         "native/README.md"
       ],
-      "status": "en_curso",
+      "status": "bloqueado",
       "owner": "codex-native-kickoff",
       "claimedAt": "2026-11-10T11:39:41.854Z",
       "doneAt": null,
-      "note": ""
+      "note": "Puente implementado y probado: 10 Jest, TypeScript/lint, preview web y export Hermes iOS/Android verdes. Falta ejecutar la app en un dispositivo/simulador con Hermes; este Mac no tiene Xcode completo ni Android SDK y Expo/EAS aún no está vinculado. Retomar validación al habilitar ese entorno; no se certifica arranque nativo."
     },
     {
       "id": "NAT-22",
