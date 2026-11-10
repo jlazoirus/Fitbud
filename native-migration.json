@@ -485,11 +485,13 @@
       "track": "backend",
       "human": false,
       "deps": [],
-      "paths": ["scripts/validate-reminder-journey.mjs"],
+      "paths": [
+        "scripts/validate-reminder-journey.mjs"
+      ],
       "exclusiveGroup": null,
-      "status": "pendiente",
-      "owner": null,
-      "claimedAt": null,
+      "status": "en_curso",
+      "owner": "codex-native-kickoff",
+      "claimedAt": "2026-11-10T11:26:07.681Z",
       "doneAt": null,
       "note": "Hallazgo al verificar NAT-20; solo fixtures, sin cambios de producción."
     },
