@@ -893,6 +893,8 @@
   .nutrition-week p{font-size:13px;color:var(--muted);margin:4px 0 10px;line-height:1.5}
   .nutrition-week .menu-suggestion-actions{align-items:center}
   .nutrition-week .chip-check{white-space:normal;min-height:44px}
+  .meal-alternative-note{margin:12px 0;font-size:14px;line-height:1.5}
+  .meal-alternative-note p{margin:4px 0 0;color:var(--muted)}
   .nutrition-update{margin:0 0 14px;padding:12px;background:var(--surf2);border-radius:var(--r-sm)}
   .nutrition-update p{margin:0 0 6px;font-size:14px;line-height:1.5}
   .nutrition-update.has-undo{position:sticky;top:8px;z-index:4}
@@ -4168,7 +4170,7 @@ async function prepareFirstWeekNutrition(ds,setup){
         let finished=0;
         if(setup){setup.message=`Preparando comidas: 0 de ${days.length} días`;renderFirstWeekSetup(setup);}
         const results=await runFirstWeekCoachParts(days.length,async i=>{
-          const out=await generateOneDay(days[i],{action:"diet_week",requestId,partKey:"day-"+(i+1)});
+          const out=await generateOneDay(days[i],{action:"diet_week",requestId,partKey:"day-"+(i+1),draftDays:daysData});
           finished++;
           if(setup){setup.message=`Preparando comidas: ${finished} de ${days.length} días`;renderFirstWeekSetup(setup);}
           return out;
@@ -4178,7 +4180,7 @@ async function prepareFirstWeekNutrition(ds,setup){
           if(!result)return; // no empezó a tiempo: lo completa el catálogo
           if(!result.ok){problems.push(prettyDate(day)+": "+coachErrorMessage(result.error));return;}
           const res=result.value&&result.value.res;
-          if(res&&res.ok&&Array.isArray(res.comidas)&&res.comidas.length)daysData.push({ds:day,comidas:res.comidas});
+          if(res&&res.ok&&Array.isArray(res.comidas)&&res.comidas.length)daysData.push(variedWeekDraftDay(day,res.comidas,daysData));
           else problems.push(prettyDate(day)+": "+((res&&res.issues&&res.issues[0])||"no válido"));
         });
       }finally{endCoachAction(actionKey);}
@@ -5738,20 +5740,8 @@ function renderNutrition(){
     const order={key,canUp:idx>0,canDown:idx<orderedItems.length-1};
     return it.type==="meal"?mealCard(ds,it.base,order):extraCard(ds,it.data,it.idx,order);
   }).join("");
-  // REQ-316: menú opcional, compacto por defecto; conserva el control de REQ-292.
-  const setupCollapsed=isCollapsed("nut.setup",true);
-  const emptyNutHtml=!prepared?(setupCollapsed?`<section class="agenda-card nut-setup is-collapsed">
-    <div class="nut-setup-row">
-      <button class="nut-setup-toggle" onclick="toggleNutSetup()" aria-expanded="false" aria-label="Mostrar sugerencia de menú">${chevron()}<span>Menú opcional</span></button>
-      <button class="btn btn-sm" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button>
-    </div>
-  </section>`:`<section class="agenda-card nut-setup">
-    <div class="agenda-head"><div>
-      <h2 class="agenda-title">¿Quieres ideas para tus comidas?</h2>
-      <div class="agenda-sub">Puedes registrar lo que comiste sin preparar un menú. Si quieres ideas, te proponemos comidas según tus preferencias.</div>
-    </div><button class="nut-setup-toggle icon-only" onclick="toggleNutSetup()" aria-expanded="true" aria-label="Ocultar tarjeta" title="Ocultar">${chevron()}</button></div>
-    <div class="agenda-actions"><button class="btn" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button></div>
-  </section>`):"";
+  // The weekly entry above is the only menu generator on this screen.
+  const emptyNutHtml=!prepared?`<p class="muted small">Puedes registrar lo que comiste sin preparar un menú.</p>`:"";
   // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
   // REQ-231: la lista de compra (de la semana, no del día) va en esta fila, con la misma forma.
   const shopWeek=shoppingWeek();
@@ -5868,7 +5858,7 @@ function shoppingSheetHtml(){
     ${items.length?`<div class="shop-h">Por comprar · ${toBuy.length}</div>${toBuy.length?grouped(toBuy):`<div class="muted small">Ya tienes todo lo necesario.</div>`}
       ${owned.length?`<div class="shop-h">Ya lo tengo · ${owned.length}</div>${grouped(owned)}`:""}
       <button class="btn btn-accent" style="width:100%;margin-top:14px" onclick="shareShoppingList()" ${toBuy.length?"":"disabled"}>Compartir lo que falta</button>`
-      :`<p class="muted small" style="margin-top:12px">Aún no hay comidas preparadas para estos días. Prepara tu semana desde Nutrición → Más opciones y la lista se arma sola.</p>`}`;
+      :`<p class="muted small" style="margin-top:12px">Aún no hay comidas preparadas para estos días. Pulsa «Preparar mi semana» en Nutrición y confirma el menú para crear la lista.</p>`}`;
 }
 async function toggleShoppingHave(key){
   const w=shoppingWeek();if(!w||!profile)return;
@@ -5894,19 +5884,11 @@ async function shareShoppingList(){
 }
 // Menú de acciones secundarias de Nutrición: solo acciones globales, no reemplazos de comidas.
 function openNutritionMoreMenu(){
-  const ds=current;
-  const day=buildDay(ds);
-  const prepared=homeDayHasPreparedMeals(ds,day);
-  const w=weekOf(ds,planPrefsForDate(ds))||weekOf(ds)||WEEKS[0];
-  const hasPlan=weekHasGeneratedPlan(w);
   const item=(icon,label,onclick)=>`<button class="btn" style="width:100%;display:flex;align-items:center;gap:10px;justify-content:flex-start" onclick="closeModal();${onclick}">${miniIcon(icon)}<span>${label}</span></button>`;
   const items=[
-    // REQ-121: no ofrecer "volver a preparar" en días pasados; ya están ejecutados/cerrados.
-    (prepared&&ds>=todayStr())?item("refresh","Volver a preparar este día","homePrepareDay(current)"):"",
     item("copy","Copiar comidas a otro día","openCopyMeals(current)"),
     item("foods","Mis recetas","openRecipes()"),
     item("progreso","Revisar mis macros","aiReview()"),
-    item("week",hasPlan?"Preparar otra semana":"Preparar semana","aiGenerateWeek()"),
   ].filter(Boolean).join("");
   modal(`<h3>Más opciones</h3><div style="display:flex;flex-direction:column;gap:8px;margin-top:10px">${items}</div>`);
 }
@@ -11246,7 +11228,7 @@ function _buildChangeMealOpts(cv){
   // Usar candidatos rankeados cuando están disponibles (REQ-83)
   if(ranked&&ranked.length){
     const st=dayState(mDs);
-    return ranked.map((r,i)=>{
+    return mealAlternativeNoticeHtml(window._changeMeal.alternativeNotice)+(ranked.map((r,i)=>{
       const dk=r.deltaKcal;
       const dkStr=` <span class="muted">(${dk>0?"+":""}${dk} kcal)</span>`;
       const dpStr=r.deltaP!==0?` P${r.deltaP>0?"+":""}${r.deltaP}`:"";
@@ -11254,15 +11236,15 @@ function _buildChangeMealOpts(cv){
         ?`<span class="muted small"> · ajusta ${r.futureMeals.length} comida${r.futureMeals.length>1?"s":""} futura${r.futureMeals.length>1?"s":""}</span>`:"";
       const meta=`${r.macros.kcal} kcal${dkStr}${dpStr}${rebalInfo}`;
       return `<button class="opt" onclick="applyChangeMeal(${i})">${esc(r.dish.name)}<div class="o-meta">${meta}</div></button>`;
-    }).join("")||'<p class="muted small">No hay platos compatibles en la base para este espacio.</p>';
+    }).join("")||'<p class="muted small">No hay platos compatibles en la base para este espacio.</p>');
   }
-  return options.map((o,i)=>{
+  return mealAlternativeNoticeHtml(window._changeMeal.alternativeNotice)+(options.map((o,i)=>{
     const d=o.dishName?dishByName(o.dishName):null;const m=d?dishMacros(d.id):null;
     const dk=m&&cur.kcal?m.kcal-cur.kcal:null;
     const dkStr=dk!=null?` <span class="muted">(${dk>0?"+":""}${dk} kcal)</span>`:"";
     const meta=m?`${m.kcal} kcal · P ${m.p} · C ${m.c} · G ${m.f} g${dkStr}`:"";
     return `<button class="opt" onclick="applyChangeMeal(${i})">${esc(o.name)}<div class="o-meta">${meta}</div></button>`;
-  }).join("")||'<p class="muted small">No hay platos en la base para este espacio.</p>';
+  }).join("")||'<p class="muted small">No hay platos en la base para este espacio.</p>');
 }
 async function rerollChangeMealOptions(){
   const cm=window._changeMeal;if(!cm)return;
@@ -11325,8 +11307,9 @@ Evita repetir los platos ya mostrados. Responde SOLO JSON válido:
     }else{
       cm.ranked=fallbackPool.ranked;cm.options=fallbackPool.options;
     }
-    const out=$("#chg-opts");if(out)out.innerHTML=_buildChangeMealOpts();
-    if(wasReused)toast("Ya usaste tus opciones nuevas de hoy; te mostramos las alternativas más parecidas disponibles.");
+    const out=$("#chg-opts");
+    cm.alternativeNotice=wasReused;
+    if(out)out.innerHTML=_buildChangeMealOpts();
   }finally{
     const loading=$("#chg-reroll-loading");if(loading)loading.remove();
     if(button)button.textContent="Rehacer opciones";
@@ -12822,7 +12805,7 @@ function coachHardRestrictions(){
 // Bump a 11 — referencia de platos rotada por usuario y regla de variedad de cocina.
 // REQ-254: bump a 12 — el prompt incluye el nivel de cocina y los platos se filtran por cooking_level.
 // REQ-360: bump a 14 — el prompt de día incluye las comidas habituales de los días en meta.
-const COACH_PROMPT_VERSION=14;
+const COACH_PROMPT_VERSION=15;
 function coachCompatibilityContext(action){
   const p=migrateProfilePrefs((profile&&profile.prefs)||{});
   const target=effectiveDayTarget(p);
@@ -13118,10 +13101,10 @@ function finalizeDayWithGate(ds,day,target,prefs,proposalComidas,extra){
     date:ds,
     varietySeed:uid()||"",
     workoutContext:opts.workoutContext,
-    prevDayUsed:recentDishSlugs(ds,1),
-    recentUsed:recentDishSlugs(ds,3),
+    prevDayUsed:opts.prevDayUsed||recentDishSlugs(ds,1),
+    recentUsed:opts.recentUsed||recentDishSlugs(ds,3),
     // REQ-360: los días futuros repiten lo que el usuario come en cada franja cuando cumple su meta.
-    habitualBySlot:ds>=todayStr()?habitualBySlotForPrefs(prefs):null,
+    habitualBySlot:!opts.ignoreHabits&&ds>=todayStr()?habitualBySlotForPrefs(prefs):null,
   };
   return nd.finalizeNutritionDay(ctx);
 }
@@ -13962,7 +13945,7 @@ async function generateOneDay(ds,coachRequest){
   // pide como base del menú, y deja de figurar entre las comidas a no repetir.
   const habits=habitualBySlotForPrefs(prefs);
   const habitNames=new Set(habits?Object.values(habits).map(h=>coachKey(h.nombre)):[]);
-  const recent=recentMealNames(ds,5).filter(n=>!habitNames.has(coachKey(n)));
+  const recent=[...recentMealNames(ds,5),...((coachRequest&&coachRequest.draftDays)||[]).flatMap(d=>(d.comidas||[]).map(c=>c.nombre))].filter(n=>!habitNames.has(coachKey(n)));
   const habitList=habits?Object.entries(habits).filter(([slot])=>day.meals.some(m=>m.id===slot)).map(([slot,h])=>`${slot}: ${h.nombre}`):[];
   const habitLine=habitList.length?`\nComidas habituales del usuario en los días que cumplió su meta (repítelas en su franja, con el mismo nombre, y ajusta solo los gramos): ${habitList.join(" | ")}.`:"";
   const lp=(profile&&profile.prefs&&profile.prefs.learnedPatterns)||null;
@@ -14089,13 +14072,46 @@ async function aiGenerateDay(){
 // --- Plan semanal personalizado (se guarda como overrides por día, por usuario) ---
 function weekDays(w){const days=[];let d=w.start;while(d<=w.end){if(d>=START&&d<=END)days.push(d);d=addDays(d,1);}return days;}
 function weekHasGeneratedPlan(w){return weekDays(w).some(ds=>{const st=S.days&&S.days[ds];return st&&st.meals&&Object.values(st.meals).some(m=>m&&m.ovr&&m.ovr.gen);});}
+// A draft is not in day_log yet: carry its dishes into every following choice.
+function weekDraftVariety(ds,daysData,previous){
+  const recentUsed=new Map([...recentDishSlugs(ds,5)].map(slug=>[slug,1]));
+  const prevDayUsed=new Set();
+  const mealNames=new Set(recentMealNames(ds,5).map(coachKey));
+  [...(daysData||[]),...(previous?[previous]:[])].forEach(d=>{
+    (d.comidas||[]).forEach(c=>{
+      if(c.nombre)mealNames.add(coachKey(c.nombre));
+      const dish=c.dishSlug?DB.dishes.find(x=>x.slug===c.dishSlug):dishByName(c.nombre);
+      const slug=dish&&(dish.slug||coachKey(dish.name));
+      if(!slug)return;
+      recentUsed.set(slug,(recentUsed.get(slug)||0)+1);
+      if(previous===d||d.ds===addDays(ds,-1))prevDayUsed.add(slug);
+    });
+  });
+  return{recentUsed,prevDayUsed,recentMealNames:mealNames,ignoreHabits:!!previous};
+}
+function variedWeekDraftDay(ds,comidas,daysData,previous){
+  const day=buildDay(ds),target=effectiveDayTarget();
+  const prefs=prefsWithSessionRejections(migrateProfilePrefs((profile&&profile.prefs)||{}),ds);
+  const context=weekDraftVariety(ds,daysData,previous);
+  // Reused responses must not lock repeated dishes into the new week.
+  const proposal=(comidas||[]).filter(c=>{
+    const dish=c.dishSlug?DB.dishes.find(x=>x.slug===c.dishSlug):dishByName(c.nombre);
+    return !context.recentMealNames.has(coachKey(c.nombre))&&(!dish||!context.recentUsed.has(dish.slug||coachKey(dish.name)));
+  });
+  const finalized=finalizeDayWithGate(ds,day,target,prefs,proposal,context);
+  return{ds,comidas:finalized&&finalized.comidas||comidas||[]};
+}
+function mealAlternativeNoticeHtml(show){
+  return show?`<div class="meal-alternative-note" role="status"><b>Por qué algunas opciones se parecen</b><p>Elegimos platos compatibles con tus preferencias y metas. Cuando hay pocas alternativas compatibles, algunas pueden repetirse. Puedes cambiar una comida o revisar tus preferencias para ampliar la variedad.</p></div>`:"";
+}
 // Modo determinista: genera semana con planNutritionWeek sin llamada externa.
 function generateDeterministicWeek(w,days){
   const nd=window.FITBUD_NUTRITION_DOMAIN;
   if(!nd||!nd.planNutritionWeek||!DB.loaded)return null;
   const target=effectiveDayTarget();
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
-  const result=nd.planNutritionWeek({prefs,dayTarget:target,catalog:DB,numDays:days.length,startDate:days[0],varietySeed:uid()||"",habitualBySlot:habitualBySlotForPrefs(prefs)});
+  const history=weekDraftVariety(days[0],window._genWeek&&window._genWeek.daysData);
+  const result=nd.planNutritionWeek({prefs,dayTarget:target,catalog:DB,numDays:days.length,startDate:days[0],varietySeed:uid()||"",habitualBySlot:habitualBySlotForPrefs(prefs),recentUsed:history.recentUsed});
   if(!result||!result.days||!result.days.length)return null;
   // Mapear días del plan a fechas reales de la semana y cerrar cada día por
   // finalizeNutritionDay() (REQ-138) para aplicar el cierre global de macros.
@@ -14142,23 +14158,24 @@ async function aiGenerateWeek(){
   const label=w.num?("Semana "+w.num):"Semana de arranque";
   const skipNote=skipped?` (${skipped} día${skipped>1?"s":""} ya registrado${skipped>1?"s":""})`:"";
   modal(`<h3>Preparar mi semana</h3><div id="genwOut"><div class="ai-box">Estamos preparando ${days.length} días a tu medida${skipNote}…</div></div>`);
-  const daysData=[]; const problems=[];
+  const daysData=[]; const problems=[];let alternativeNotice=false;
   try{
     for(let i=0;i<days.length;i++){
       const ds=days[i];
       const el=$("#genwOut"); if(el)el.innerHTML=`<div class="ai-box">Preparando ${label}: día ${i+1} de ${days.length}${skipNote}<br><span class="muted small">${prettyDate(ds)}…</span></div>`;
       try{
-        const {res}=await generateOneDay(ds,{action:"diet_week",requestId,partKey:"day-"+(i+1)});
-        if(res.ok)daysData.push({ds,comidas:res.comidas});
+        const {res,reused}=await generateOneDay(ds,{action:"diet_week",requestId,partKey:"day-"+(i+1),draftDays:daysData});
+        alternativeNotice=alternativeNotice||reused;
+        if(res.ok)daysData.push(variedWeekDraftDay(ds,res.comidas,daysData));
         else problems.push(prettyDate(ds)+": "+(res.issues[0]||"no válido"));
       }catch(e){problems.push(prettyDate(ds)+": "+coachErrorMessage(e));}
     }
-    window._genWeek={week:w,label,daysData,problems};
+    window._genWeek={week:w,label,daysData,problems,alternativeNotice};
     const el=$("#genwOut");if(el)el.innerHTML=genWeekReviewHtml();
   }catch(e){
     // Nunca dejar al usuario en un callejón sin salida: conservar los días ya
     // generados y ofrecer completar el resto por ruta determinista, o reintentar.
-    window._genWeek={week:w,label,daysData,problems};
+    window._genWeek={week:w,label,daysData,problems,alternativeNotice};
     const el=$("#genwOut");
     if(el)el.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>
       <div class="row" style="gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -14223,7 +14240,7 @@ function genReviewHtml(res,target){
       }
     }
   }
-  return `${nutritionUpdateHtml()}${res.explicacion?`<div class="ai-box">${esc(res.explicacion)}</div>`:""}
+  return `${nutritionUpdateHtml()}${mealAlternativeNoticeHtml(window._genDay&&window._genDay.alternativeNotice)}${res.explicacion?`<div class="ai-box">${esc(res.explicacion)}</div>`:""}
     <div class="muted small" style="margin:10px 2px 4px">Total del día: <b>${t.kcal}</b> kcal · P ${t.p} · C ${t.c} · G ${t.f} g <span class="muted">(meta ${target.kcal}/${target.p}/${target.c}/${target.f})</span></div>
     ${meals}
     ${issues}${snackHtml}${warns}${contractHtml}
@@ -14330,8 +14347,13 @@ function applyGeneratedDay(){
 // --- Revisión de semana: borrador → confirmar → aplicar ---
 function genWeekReviewHtml(){
   const draft=window._genWeek;if(!draft)return '<div class="ai-box">El borrador ya no está disponible.</div>';
-  // Resumen de kcal/proteína promedio (disponible en ruta determinista)
-  const ws=draft.weekSummary;
+  // Recompute after changing a day or grams; stale summaries hide repetition.
+  const nd=window.FITBUD_NUTRITION_DOMAIN;
+  const totals=draft.daysData.map(d=>comidasMacroTotals(d.comidas)),n=totals.length||1;
+  const ws={avgKcal:Math.round(totals.reduce((s,t)=>s+t.kcal,0)/n),avgProt:Math.round(totals.reduce((s,t)=>s+t.p,0)/n),target:effectiveDayTarget()};
+  draft.weekSummary=ws;
+  if(nd&&nd.scoreWeeklyVariety)draft.variety=nd.scoreWeeklyVariety(draft.daysData);
+  if(nd&&nd.buildShoppingListFromNutritionPlan)draft.shoppingList=nd.buildShoppingListFromNutritionPlan(draft.daysData);
   const summaryHtml=ws
     ?`<div class="muted small" style="margin:6px 2px 10px">Promedio semanal: <b>${ws.avgKcal} kcal</b> · P ${ws.avgProt} g (meta ${ws.target&&ws.target.kcal||"—"} kcal / ${ws.target&&ws.target.p||"—"} g prot)</div>`
     :"";
@@ -14353,7 +14375,7 @@ function genWeekReviewHtml(){
       <div class="o-meta">${c.kcal} kcal · P ${c.proteina_g} · C ${c.carbohidratos_g} · G ${c.grasa_g} g</div>
       <div class="muted small" style="margin-top:4px">${c.ingredientes.map((g,gIdx)=>`${esc(g.nombre)} <input type="number" inputmode="numeric" min="5" step="5" value="${g.gramos}" style="${wkIgStyle}" onchange="updateGenWeekMealGrams(${index},${mIdx},${gIdx},+this.value)">g`).join(" · ")}</div>
     </div>`).join("")}
-    <button class="btn btn-sm" style="margin-top:6px" onclick="regenerateDayInWeekDraft(${index})">Preparar otro ${esc(prettyDate(d.ds).split(",")[0])}</button>
+    <button class="btn btn-sm" style="margin-top:6px" onclick="regenerateDayInWeekDraft(${index})">Cambiar comidas de este día</button>
   </details>`;
   }).join("");
   // REQ-122: un día que no cumplió el objetivo queda fuera de daysData (no bloqueado, pero
@@ -14369,7 +14391,7 @@ function genWeekReviewHtml(){
       <div style="columns:2;gap:12px;margin-top:8px">${shopping.map(item=>`<div class="muted small">${esc(item.nombre)} <b>${item.gramos} g</b></div>`).join("")}</div>
     </details>`:"";
   return `<div class="ai-box"><b>${draft.daysData.length} días preparados.</b> Revisa cada día antes de aplicar; los cambios no se guardan hasta confirmar.</div>
-    ${summaryHtml}${varietyHtml}${problems}${days}${shopHtml}
+    ${mealAlternativeNoticeHtml(draft.alternativeNotice)}${summaryHtml}${varietyHtml}${problems}${days}${shopHtml}
     <div class="row wrap" style="margin-top:12px">
       <button class="btn btn-accent" onclick="applyWeekPlan()">Aplicar semana</button>
       <button class="btn" onclick="aiGenerateWeek()">Preparar otra semana</button>
@@ -14429,7 +14451,7 @@ async function regenerateDayInWeekDraft(index){
       const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
       const day=buildDay(d.ds);
       // REQ-138: puerta única finalizeNutritionDay() también en el regenerado determinista.
-      const finalized=finalizeDayWithGate(d.ds,day,target,prefs,[]);
+      const finalized=finalizeDayWithGate(d.ds,day,target,prefs,[],weekDraftVariety(d.ds,draft.daysData.filter((_,i)=>i!==index),d));
       draft.daysData[index]={ds:d.ds,comidas:(finalized&&finalized.comidas)||[]};
       // Recalcular shoppingList con slug-aggregation
       const nd2=window.FITBUD_NUTRITION_DOMAIN;
@@ -14441,11 +14463,11 @@ async function regenerateDayInWeekDraft(index){
   const actionKey="diet_week_regen_"+index;
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
   try{
-    const {res,reused}=await generateOneDay(d.ds,{action:"diet_week",requestId,partKey:"day-regen"});
+    const {res,reused}=await generateOneDay(d.ds,{action:"diet_week",requestId,partKey:"day-regen",draftDays:draft.daysData});
     if(res.ok){
-      draft.daysData[index]={ds:d.ds,comidas:res.comidas};
+      draft.daysData[index]=variedWeekDraftDay(d.ds,res.comidas,draft.daysData.filter((_,i)=>i!==index),d);
+      draft.alternativeNotice=reused;
       if(out)out.innerHTML=genWeekReviewHtml();
-      if(reused)toast("Ya usaste tus opciones nuevas de hoy; te mostramos la alternativa más parecida disponible.");
     }else{
       if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(res.issues[0]||"El día no pasó las validaciones.")}</div>
         <div class="row" style="gap:8px;margin-top:8px;flex-wrap:wrap">
@@ -14544,7 +14566,7 @@ Responde SOLO JSON (formato de un día con un slot): {"explicacion":"breve","com
     draft.comidas=(finalized&&finalized.comidas)||draft.comidas.map(c=>c.slot_id===slotId?meal:c);
     const updatedRes=validateGeneratedDay({comidas:draft.comidas,explicacion:""},day,target);
     if(out)out.innerHTML=genReviewHtml(updatedRes,target);
-    if(wasReused)toast("Ya usaste tus opciones nuevas de hoy; te mostramos la alternativa más parecida disponible.");
+    if(wasReused){draft.alternativeNotice=true;if(out)out.innerHTML=genReviewHtml(updatedRes,target);}
   }catch(e){
     if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(coachErrorMessage(e))}</div>
       <div style="margin-top:8px"><button class="btn btn-sm" onclick="regenerateGenMealRestore()">Volver al borrador</button></div>`;

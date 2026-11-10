@@ -70,3 +70,35 @@ assert.deepEqual(d.preferredCuisineTags({ preferredCuisines: Object.keys(globalT
   "todas las cocinas que ofrece el perfil deben mapear a un tag del catálogo");
 
 console.log("Variedad de comidas validada: planes por usuario, balance de cocina y claves de perfil.");
+
+// Regression: a high-carb vegetarian week previously converged on the same
+// lunch, snack and dinner, and changing grams hid identical dish selections.
+for(const diet of ["omnivoro","vegetariano","vegano"]){
+  const week=d.planNutritionWeek({prefs:{mealCount:4,diet:[diet]},dayTarget:{kcal:2800,p:160,c:400,f:62},catalog:seedCatalog,startDate:"2026-11-10",varietySeed:"repeated-week-regression"});
+  const signatures=week.days.map(day=>day.comidas.map(c=>c.dishSlug).join("|"));
+  assert.equal(new Set(signatures).size,7,`${diet}: no two complete days should be identical`);
+  for(const slot of ["almuerzo","cena"]){
+    const meals=week.days.map(day=>day.comidas.find(c=>c.slot_id===slot).dishSlug);
+    assert.ok(new Set(meals).size>=4,`${diet}: ${slot} should rotate through at least four dishes`);
+    assert.ok(meals.every((slug,i)=>!i||slug!==meals[i-1]),`${diet}: avoid consecutive identical ${slot}`);
+  }
+}
+
+// A limited pool must stay usable and distribute repeats rather than always
+// falling back to the same winner. All portions are nutritionally identical.
+const rotating={ingredients,dishes:Array.from({length:3},(_,i)=>({id:i+11,slug:`rotation-${i}`,name:`Pollo con arroz ${i}`,compatible_slots:["almuerzo"],diet_tags:["omnivoro"]})),dishIng:Array.from({length:3},(_,i)=>[line(i+11,1,180),line(i+11,2,220),line(i+11,3,8)]).flat()};
+const history=new Map();let previous=new Set();const picked=[];
+for(let i=0;i<9;i++){
+  const day=d.planDeterministicNutritionDay({prefs:{mealCount:2,diet:["omnivoro"]},dayTarget,catalog:rotating,slots:[{id:"almuerzo",slot:"Almuerzo"}],recentUsed:history,prevDayUsed:previous,date:`day-${i}`});
+  const slug=day.comidas[0]?.dishSlug;assert.ok(slug,"a small pool must still offer a meal");
+  picked.push(slug);history.set(slug,(history.get(slug)||0)+1);previous=new Set([slug]);
+}
+assert.equal(history.size,3,"use all compatible alternatives");
+assert.ok(Math.max(...history.values())-Math.min(...history.values())<=1,"balance repeats after exhausting new dishes");
+assert.ok(picked.every((slug,i)=>!i||slug!==picked[i-1]),"no consecutive repetition with equivalent alternatives");
+console.log("Weekly repetition regressions validated, including a limited catalog.");
+// Two names for the same ingredients are less varied than a genuinely different
+// composition, even when all three portions have identical nutritional values.
+const similarCatalog={...rotating,ingredients:[...ingredients,{...ingredients[1],id:5,slug:"otro-cereal",name:"Otro cereal"}],dishIng:rotating.dishIng.map(l=>l.dish_id===13&&l.ingredient_id===2?{...l,ingredient_id:5}:l)};
+const differentIngredients=d.planDeterministicNutritionDay({prefs:{mealCount:2,diet:["omnivoro"]},dayTarget,catalog:similarCatalog,slots:[{id:"almuerzo",slot:"Almuerzo"}],prevDayUsed:new Set(["rotation-0"])});
+assert.equal(differentIngredients.comidas[0].dishSlug,"rotation-2","prefer a different composition over renamed identical ingredients");

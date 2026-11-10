@@ -2494,3 +2494,15 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 **Estado: implementado — requiere acción humana** (configurar `META_PIXEL_ID` y `META_CAPI_TOKEN` en Vercel; el píxel ya existe y el texto de `/privacidad` se aprobó el 10 nov 2026). PWA v231. Ver `docs/medicion-campana.md` y `docs/requirements-history.md`.
 
 ✓ `scripts/validate-meta-pixel.mjs`, `scripts/test-meta-capi.mjs`, `tests/e2e/medicion.spec.js`.
+
+## REQ-377 - Nutrición: variedad semanal y una sola entrada de preparación
+
+**Estado: implementado.**
+
+Origen: Jonathan, 10 nov 2026, capturas de días idénticos, alternativas demasiado similares y aviso fugaz. Autorizó implementar en la rama `work`.
+
+El planificador rota platos de porciones nutricionalmente comparables, cuenta repeticiones y compara ingredientes principales con el día anterior. La generación y regeneración semanal consideran también los días del borrador sin guardar; una respuesta reutilizada no fija los mismos platos para todas las fechas. Se conservan hábitos en la propuesta inicial; pedir cambiar un día permite salir de esos hábitos. Las restricciones, comidas registradas, saltadas y elecciones manuales se conservan siempre. Catálogos limitados siguen ofreciendo opciones válidas, con advertencias de variedad visibles.
+
+Nutrición ofrece una entrada semanal y permite cambiar un día desde su revisión. Se retiran los accesos diarios y el semanal duplicado de Más opciones; el registro libre sigue disponible. El aviso sobre alternativas pasa del toast a la revisión, donde permanece mientras se revisa. Promedios, variedad y compra se recalculan al editar el borrador. Caché PWA v232.
+
+Verificación: `scripts/validate-meal-variety.mjs` cubre tres patrones dietarios, días únicos y rotación equilibrada con catálogo limitado. `tests/e2e/nutricion-variedad.spec.js` cubre regeneración, respuestas idénticas reutilizadas y aviso persistente en móvil/escritorio. Regresiones de continuidad, consumo y menú opcional. No requiere migración ni altera menús guardados hasta confirmar un nuevo borrador.

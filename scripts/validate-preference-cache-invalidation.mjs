@@ -50,7 +50,7 @@ console.log("  Test 4 pasado: homePrepareDay excluye días pasados");
 
 // 5. El menú de Nutrición no ofrece "volver a preparar" para un día pasado.
 const menu = extractFunctionSource(html, "openNutritionMoreMenu");
-assert.ok(/ds\s*>=\s*todayStr\(\)/.test(menu), '"Volver a preparar este día" debe exigir ds>=todayStr().');
+assert.ok(!menu.includes("homePrepareDay")&&!menu.includes("aiGenerateWeek"), "Más opciones no debe duplicar los generadores ni ofrecer regenerar días pasados.");
 console.log("  Test 5 pasado: menú de Nutrición no ofrece regenerar días pasados");
 
 console.log("validate-preference-cache-invalidation: todos los checks pasaron.");

@@ -40,9 +40,14 @@ console.log("  Test 2 pasado: callClaude expone lastCoachCallReused");
 ["rerollChangeMealOptions", "regenerateGenMeal", "regenerateDayInWeekDraft"].forEach((name) => {
   const src = extractFunctionSource(html, name);
   assert.ok(/reused/i.test(src), `${name} debe usar la señal de reutilización (reused).`);
-  assert.ok(/toast\(/.test(src), `${name} debe mostrar feedback (toast) al usuario.`);
+  assert.ok(/alternativeNotice/.test(src), `${name} debe conservar el aviso en la revisión.`);
 });
 console.log("  Test 3 pasado: rerollChangeMealOptions, regenerateGenMeal y regenerateDayInWeekDraft avisan cuando se reutiliza una respuesta");
+
+const notice=extractFunctionSource(html,"mealAlternativeNoticeHtml");
+assert.ok(notice.includes('role="status"'),"El aviso persistente debe anunciarse de forma accesible.");
+assert.ok(notice.includes("preferencias")&&notice.includes("compatibles"),"El aviso explica la similitud y cómo ampliar opciones.");
+assert.ok(!html.includes("Ya usaste tus opciones nuevas de hoy"),"No debe quedar el aviso fugaz anterior.");
 
 // 4. Ningún botón de reintento deja un modal muerto: siempre hay una acción hacia
 //    adelante (reintentar y/o volver al borrador) en el estado de error.

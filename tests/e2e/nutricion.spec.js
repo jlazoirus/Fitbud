@@ -107,7 +107,7 @@ test.describe("Nutrición", () => {
   // REQ-256: editar una comida a mano sin marcarla hecha y "Volver a preparar
   // este día" no debe pisar la edición en silencio (antes solo se conservaban
   // las comidas marcadas como hechas).
-  test("editar una comida sin marcarla hecha se conserva al volver a preparar el día", async ({ page, context }) => {
+  test("editar una comida sin marcarla hecha se conserva al preparar la semana", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -131,10 +131,9 @@ test.describe("Nutrición", () => {
     await expect(app).toContainText("Dos huevos con pan");
     await expect(app).toContainText("777");
 
-    // Volver a preparar el día: la edición manual sigue en pie.
-    await page.getByRole("button", { name: "Más opciones de nutrición" }).click();
-    await overlay.getByRole("button", { name: "Volver a preparar este día" }).click();
-    await overlay.getByRole("button", { name: /Aplicar al día/i }).click({ timeout: 15_000 });
+    // La entrada semanal conserva la edición manual pendiente.
+    await app.getByRole("button", { name: /Cambiar menú semanal|Preparar mi semana/ }).click();
+    await overlay.getByRole("button", { name: "Aplicar semana", exact:true }).click({ timeout: 15_000 });
 
     await expect(app).toContainText("Dos huevos con pan");
     await expect(app).toContainText("777");

@@ -16,10 +16,10 @@ test("arma la lista de la semana, mueve lo que ya tengo y lo recuerda al reabrir
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  const prepare = page.getByRole("button", { name: "Sugerirme un menú" });
+  const prepare = page.getByRole("button", { name: "Preparar mi semana",exact:true });
   if (await prepare.isVisible().catch(() => false)) {
     await prepare.click();
-    await page.getByRole("button", { name: "Aplicar al día" }).click();
+    await page.getByRole("button", { name: "Aplicar semana",exact:true }).click();
     await expect(page.locator("#overlay")).toHaveCount(0);
   }
   // REQ-231: la lista vive en la fila de herramientas, con lo que queda por comprar.
@@ -54,10 +54,10 @@ test("una comida saltada deja de sumar en la lista", async ({ page, context }) =
   await autoDismissNudges(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  const prepare = page.getByRole("button", { name: "Sugerirme un menú" });
+  const prepare = page.getByRole("button", { name: "Preparar mi semana",exact:true });
   if (await prepare.isVisible().catch(() => false)) {
     await prepare.click();
-    await page.getByRole("button", { name: "Aplicar al día" }).click();
+    await page.getByRole("button", { name: "Aplicar semana",exact:true }).click();
     await expect(page.locator("#overlay")).toHaveCount(0);
   }
   const grams = () => page.evaluate(() => shoppingList("rest").items.reduce((s, i) => s + i.grams, 0));

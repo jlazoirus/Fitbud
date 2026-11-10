@@ -46,7 +46,7 @@ for(const width of [320,390,1280]) test(`Hoy prioriza registro, entreno y coach 
   }
   await app.getByRole("button",{name:/Ver consumo/}).click();
   await expect(app.locator(".mini-macro-dash")).toContainText("Proteínas");
-  await expect(app.locator(".nut-setup")).toHaveClass(/is-collapsed/);
+  await expect(app.locator(".nutrition-week").getByRole("button",{name:"Preparar mi semana",exact:true})).toBeVisible();
   if(process.env.CAPTURE_OPTIONAL_MENU){
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:`/tmp/req-316-nutrition-${width}.png`});
@@ -90,7 +90,7 @@ test("Ahora no persiste por cuenta y por día, sin quitar la opción de Nutrici�
   await gotoApp(page);
   await expect(page.locator(".menu-suggestion")).toHaveCount(0);
   await page.locator('[data-tab="nutricion"]').click();
-  await expect(page.locator(".nut-setup").getByRole("button",{name:"Sugerirme un menú"})).toBeVisible();
+  await expect(page.locator(".nutrition-week").getByRole("button",{name:"Preparar mi semana",exact:true})).toBeVisible();
   await expect(page.locator("#app")).not.toContainText("Prepara tu día");
   await page.getByRole("button",{name:"Registrar Almuerzo",exact:true}).click();
   await expect(page.locator("#f_target")).toHaveValue("almuerzo");

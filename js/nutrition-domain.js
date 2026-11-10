@@ -857,9 +857,17 @@
     const jitterSeed=varietySeed?varietySeed+"|"+dateSeed:dateSeed;
     const preferredCuisines=preferredCuisineTags(prefs);
     const dishBySlug=new Map((Array.isArray(catalog.dishes)?catalog.dishes:[]).map(dish=>[slugFor(dish),dish]));
+    const mainIngredientCache=new Map();
+    const mainIngredients=dish=>{
+      const key=slugFor(dish);
+      if(!mainIngredientCache.has(key))mainIngredientCache.set(key,new Set(dishLines(dish,catalog,maps)
+        .filter(line=>line.ingredient&&num(line.grams)>=30).map(line=>slugFor(line.ingredient))));
+      return mainIngredientCache.get(key);
+    };
     const recentCuisines=new Map(),dayCuisines=new Map();
-    const recentForCuisine=ctx&&ctx.recentUsed instanceof Set?ctx.recentUsed:new Set();
-    recentForCuisine.forEach(slug=>{
+    const recentForCuisine=ctx&&(ctx.recentUsed instanceof Set||ctx.recentUsed instanceof Map)?ctx.recentUsed:new Set();
+    recentForCuisine.forEach((value,key)=>{
+      const slug=recentForCuisine instanceof Map?key:value;
       cuisineTagsForDish(dishBySlug.get(slug)).forEach(tag=>recentCuisines.set(tag,(recentCuisines.get(tag)||0)+1));
     });
     const used=new Set(),comidas=[],diagnostics=[],causes=[],cookingWarns=[];
@@ -884,21 +892,29 @@
         return;
       }
       const prevDayUsed=ctx&&ctx.prevDayUsed instanceof Set?ctx.prevDayUsed:new Set();
-      const recentUsed=ctx&&ctx.recentUsed instanceof Set?ctx.recentUsed:new Set();
+      const recentUsed=ctx&&(ctx.recentUsed instanceof Set||ctx.recentUsed instanceof Map)?ctx.recentUsed:new Set();
       // Pre-rankeo por cercanía calórica al slot: con catálogos grandes, los 48
       // platos que reciben solver completo son los de tamaño más apropiado,
       // no los primeros en orden arbitrario del catálogo.
       const targetKcal=num(slot.target&&slot.target.kcal);
       const habitSlug=habits.get(slot.id)||"";
       let best=null;
+      const viable=[];
       const ranked=candidates
         .map(dish=>({dish,baseKcal:dishBaseKcal(dish,catalog,maps)}))
         .sort((a,b)=>{
+          const fresh=Number(recentUsed.has(slugFor(a.dish)))-Number(recentUsed.has(slugFor(b.dish)));
+          if(fresh)return fresh;
           const da=a.baseKcal>0?Math.abs(a.baseKcal-targetKcal):Infinity;
           const db=b.baseKcal>0?Math.abs(b.baseKcal-targetKcal):Infinity;
           return da-db;
         });
       const shortlist=ranked.slice(0,48);
+      // Retain the closest portions too: novelty must not discard the only
+      // solvable recipes when many unused dishes have unsuitable base sizes.
+      [...ranked].sort((a,b)=>Math.abs(a.baseKcal-targetKcal)-Math.abs(b.baseKcal-targetKcal)).slice(0,8).forEach(candidate=>{
+        if(!shortlist.includes(candidate))shortlist.push(candidate);
+      });
       // REQ-360: el plato habitual de la franja siempre recibe solver aunque su
       // receta base no esté entre las 48 de tamaño más parecido.
       if(habitSlug&&!shortlist.some(({dish})=>slugFor(dish)===habitSlug)){
@@ -926,8 +942,24 @@
         const fruitAdj=hasFruit&&fruitMeals<fruitTarget?-FRUIT_BONUS:0;
         const habitAdj=isHabit?-HABIT_BONUS:0;
         const score=solved.score+reuse+yesterday+recent+jitter+prefAdj+cuisineAdj+fruitAdj+habitAdj;
-        if(!best||score<best.rankScore)best={...solved,rankScore:score,hasFruit,isHabit};
+        const repeats=isHabit?0:(recentUsed instanceof Map?(recentUsed.get(slug)||0):Number(recentUsed.has(slug)));
+        // Ingredient overlap distinguishes genuinely different dishes from renamed bowls.
+        const own=mainIngredients(dish);
+        let similarity=0;
+        prevDayUsed.forEach(previous=>{
+          const other=dishBySlug.get(previous);if(!other)return;
+          const theirs=mainIngredients(other),union=new Set([...own,...theirs]);
+          if(union.size)similarity=Math.max(similarity,[...own].filter(id=>theirs.has(id)).length/union.size);
+        });
+        viable.push({...solved,rankScore:score,hasFruit,isHabit,
+          repeats:repeats+(prevDayUsed.has(slug)?2:0)+(used.has(slug)||reservedElsewhere?4:0),similarity});
       });
+      // Rotate among nutritionally comparable portions; never trade restrictions
+      // or a large nutritional error for novelty. Habits remain intentional repeats.
+      const minScore=Math.min(...viable.map(candidate=>candidate.rankScore));
+      best=viable.filter(candidate=>candidate.rankScore<=minScore+0.20).sort((a,b)=>
+        Number(b.isHabit)-Number(a.isHabit)||a.repeats-b.repeats||
+        (a.rankScore+a.similarity*0.15)-(b.rankScore+b.similarity*0.15))[0];
       if(!best){
         causes.push({slot:slot.id,reason:(diagnostics.find(d=>d.slot===slot.id)||{}).reason||"no_viable_candidate"});
         return;
@@ -1730,7 +1762,7 @@
     const workoutContext=ctx&&ctx.workoutContext||null;
     const days=[];
     let prevDayUsed=new Set();
-    const recentUsed=new Set();
+    const recentUsed=ctx&&ctx.recentUsed instanceof Map?new Map(ctx.recentUsed):new Map();
     const weekSeed=ctx&&ctx.startDate?String(ctx.startDate):"";
     for(let i=0;i<numDays;i++){
       const result=planDeterministicNutritionDay({
@@ -1740,7 +1772,7 @@
         habitualBySlot:ctx&&ctx.habitualBySlot,
       });
       prevDayUsed=new Set((result.comidas||[]).map(c=>c.dishSlug||"").filter(Boolean));
-      prevDayUsed.forEach(slug=>recentUsed.add(slug));
+      prevDayUsed.forEach(slug=>recentUsed.set(slug,(recentUsed.get(slug)||0)+1));
       days.push({
         dayIndex:i,
         comidas:result.comidas||[],
