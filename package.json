@@ -9,6 +9,8 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.13",
-    "@playwright/test": "^1.61.1"
+    "@playwright/test": "^1.61.1",
+    "acorn": "8.19.0",
+    "eslint-scope": "9.1.2"
   }
 }
