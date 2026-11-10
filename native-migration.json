@@ -191,7 +191,9 @@
       "deps": [],
       "paths": [
         "scripts/validate-shared-modules.mjs",
-        "scripts/release-gate.mjs"
+        "scripts/release-gate.mjs",
+        "package.json",
+        "package-lock.json"
       ],
       "status": "pendiente",
       "owner": null,
@@ -528,7 +530,9 @@
       ],
       "paths": [
         "native/src/core/**",
-        "native/metro.config.js"
+        "native/metro.config.js",
+        "native/app/_layout.tsx",
+        "native/README.md"
       ],
       "status": "pendiente",
       "owner": null,

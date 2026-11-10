@@ -74,6 +74,7 @@ Convenciones para todas las tareas:
 - **Objetivo:** garantizar que los módulos compartidos cargan fuera del navegador y no usan APIs web.
 - **Alcance:** `scripts/validate-shared-modules.mjs` que, para cada módulo compartido (los 7 actuales + los nuevos de `js/` que declaren el comentario `// shared-module`): (1) falla si el código usa `window.`, `document`, `localStorage`, `sessionStorage`, `location`, `navigator`, `fetch(` o `XMLHttpRequest` fuera de la detección `typeof window!=="undefined"?window:globalThis`; (2) los carga con `node:vm` en un contexto con solo `globalThis`/`console`/`Intl`/`Date`/`Math`/`JSON` y verifica que publican su namespace (`FITBUD_*`). Agregarlo a `scripts/release-gate.mjs`.
 - **Aceptación:** pasa con los módulos actuales; falla con un fixture que use `document`.
+- **Herramienta de análisis:** Acorn como dependencia exclusiva de desarrollo de la raíz, con versión fijada. Analizar el AST evita confundir comentarios, strings o campos de datos (`location`) con accesos al navegador. No añade una dependencia runtime a la web ni a la app.
 - **Verificación:** verde web; el script incluye un auto-test del caso negativo.
 
 ## NAT-03 — Extraer modelo de día a js/day-model.js
@@ -187,7 +188,7 @@ Convenciones para todas las tareas:
 ## NAT-21 — Puente tipado hacia los módulos de dominio de la raíz
 
 - **Objetivo:** importar el dominio compartido desde nativo sin copiarlo.
-- **Alcance:** `native/metro.config.js` con `watchFolders` a la raíz del repo; `native/src/core/index.ts` importa por efecto lateral `../../../js/nutrition-pure.js` (y los demás, en el orden que exige cada módulo) y exporta fachadas tipadas desde `globalThis.FITBUD_*`; `native/src/core/types/*.d.ts` para las funciones usadas; tests jest que ejecutan casos reales (macros de un plato, validación de plan de entreno, reducer del reproductor, merge de sync).
+- **Alcance:** `native/metro.config.js` con `watchFolders` a la raíz del repo; `native/src/core/index.ts` importa por efecto lateral `../../../js/nutrition-pure.js` (y los demás, en el orden que exige cada módulo) y exporta fachadas tipadas desde `globalThis.FITBUD_*`; `native/src/core/types/*.d.ts` para las funciones usadas; tests Jest colocados en `native/src/core/` con casos reales (macros de un plato, validación de plan de entreno, creación/restauración del reproductor, merge de sync). Cargar el puente desde `native/app/_layout.tsx` y documentar su uso y verificación en `native/README.md`. El reproductor actual expone funciones de ejecución y normalización; no existe un reducer exportado.
 - **Fuera de alcance:** módulos aún no extraídos (se agregan en la tarea feature que los necesite, una línea).
 - **Aceptación:** tests verdes en jest y la app arranca en Hermes con los módulos cargados.
 - **Verificación:** verde nativo.
