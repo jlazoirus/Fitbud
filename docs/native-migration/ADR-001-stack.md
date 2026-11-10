@@ -42,6 +42,7 @@ Se instalan en NAT-20 (las de feature, en la tarea de fundación que las use pri
 | Compra integrada | Según NAT-H3 (`react-native-purchases` si se elige RevenueCat; `expo-iap`/`react-native-iap` si se va directo). |
 | Salud (Fase 5) | `react-native-health` (iOS), `react-native-health-connect` (Android) — solo tras NAT-H4. |
 | Dev/test | `typescript`, `jest-expo`, `@testing-library/react-native`, `eslint` + config de Expo, `prettier`. E2E: Maestro (CLI externo, no dependencia npm). |
+| Arranque y verificación NAT-20 | `expo-dev-client` para instalar un cliente de desarrollo, `react-dom`, `react-native-web` y `@expo/metro-runtime` para comprobar localmente la interfaz compartida. `jest`, `@types/jest` y `@types/react` para ejecutar las pruebas tipadas. |
 
 Prohibido en `native/`: SDKs de analytics/ads de terceros, SDKs que reciban datos de salud, fotos o conversaciones, y cualquier SDK del proveedor del coach (la llamada sigue por `/api/claude`).
 
@@ -53,4 +54,4 @@ Prohibido en `native/`: SDKs de analytics/ads de terceros, SDKs que reciban dato
 
 ## Versiones fijadas
 
-Completar en NAT-20: versión de Expo SDK, React Native, TypeScript y Node usada en CI.
+NAT-20, 2026-11-10. Expo 58.0.23, Expo Router 58.0.30, React Native 0.88.1, React 19.3.0, TypeScript 6.0.3, Jest 30.5.2 y jest-expo 58.0.14. Verificación local con Node 22.22.0 y npm 10.9.4. Las versiones de instalación quedan fijadas en `native/package-lock.json`. Node mínimo 22.14.0. El job de CI se implementa en NAT-27.

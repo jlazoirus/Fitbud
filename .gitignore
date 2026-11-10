@@ -12,6 +12,11 @@
 # Dependencies / build (por si se usa Vercel CLI)
 node_modules/
 .vercel/
+native/.expo/
+native/dist/
+native/coverage/
+native/ios/
+native/android/
 
 # Archivos de auditoría y capturas locales
 assets/ux-audit-*/

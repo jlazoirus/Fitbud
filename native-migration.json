@@ -510,10 +510,10 @@
         "docs/native-migration/ADR-001-stack.md"
       ],
       "exclusiveGroup": "native-config",
-      "status": "en_curso",
+      "status": "hecho",
       "owner": "codex-native-kickoff",
       "claimedAt": "2026-11-10T06:47:36.808Z",
-      "doneAt": null,
+      "doneAt": "2026-11-10",
       "note": ""
     },
     {
