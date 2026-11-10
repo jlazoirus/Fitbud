@@ -493,9 +493,9 @@
         "docs/native-migration/ADR-001-stack.md"
       ],
       "exclusiveGroup": "native-config",
-      "status": "pendiente",
-      "owner": null,
-      "claimedAt": null,
+      "status": "en_curso",
+      "owner": "codex-native-kickoff",
+      "claimedAt": "2026-11-10T06:47:36.808Z",
       "doneAt": null,
       "note": ""
     },
