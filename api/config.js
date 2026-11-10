@@ -31,5 +31,8 @@ export default function handler(req, res) {
       publicKey: process.env.CULQI_PUBLIC_KEY || "",
       enabled: !!process.env.CULQI_PUBLIC_KEY && !!process.env.CULQI_SECRET_KEY,
     },
+    // REQ-376: el ID del píxel de Meta es público. Sin él, la web pública no carga
+    // el píxel (web/medicion.js). El token de la API de conversiones nunca sale de aquí.
+    metaPixelId: /^\d{5,20}$/.test(String(process.env.META_PIXEL_ID || "").trim()) ? String(process.env.META_PIXEL_ID).trim() : "",
   });
 }

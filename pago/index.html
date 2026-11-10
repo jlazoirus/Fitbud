@@ -66,6 +66,11 @@
     import { planPorId, formatoSoles, MONEDA } from "/tienda/planes.js";
     mountLayout();
 
+    // REQ-376: medición de la campaña. Import dinámico: si un bloqueador o la red
+    // impiden cargarla, el pago funciona igual (las funciones vacías no hacen nada).
+    let medicion = { track() {}, metaCookies() { return {}; } };
+    import("/web/medicion.js").then((m) => { medicion = m; }).catch(() => {});
+
     const plan = planPorId(new URLSearchParams(location.search).get("plan") || "");
     const form = document.getElementById("compra");
     const resultado = document.getElementById("resultado");
@@ -198,7 +203,7 @@
         if (checkout.token) {
           const tokenId = checkout.token.id;
           checkout.close();
-          cobrar({ ...datos, planId: plan.id, tokenId, deviceId });
+          cobrar({ ...datos, planId: plan.id, tokenId, deviceId, ...idsMeta() });
         } else if (checkout.error) {
           checkout.close();
           error(checkout.error.user_message || "No pudimos validar la tarjeta. Revisa los datos e intenta de nuevo.");
@@ -207,6 +212,13 @@
       };
       checkout.open();
       ocupado(false);
+      // REQ-376: medición de la campaña; el píxel nunca interrumpe el pago.
+      try { medicion.track("InitiateCheckout", { value: plan.montoCentimos / 100, currency: MONEDA, content_type: "product", content_ids: [plan.id], num_items: 1 }); } catch (_) {}
+    }
+
+    // Cookies del píxel (_fbp, _fbc) para la API de conversiones. Sin píxel no hay nada.
+    function idsMeta() {
+      try { return medicion.metaCookies(document.cookie); } catch (_) { return {}; }
     }
 
     async function cobrar(pedido) {
@@ -261,6 +273,9 @@
       sec.hidden = false;
       sec.focus({ preventScroll: true });
       window.scrollTo({ top: 0, behavior: "smooth" });
+      // REQ-376: Purchase con el valor y el eventId del servidor (el mismo de la API de conversiones).
+      const compra = out.compra || {};
+      try { medicion.track("Purchase", { value: compra.value, currency: compra.currency, content_type: "product", content_ids: [plan.id], num_items: 1 }, { eventId: compra.eventId }); } catch (_) {}
     }
   </script>
 </body>

@@ -123,6 +123,11 @@ for (const file of files) if (/^api\/[^/]+\.js$/.test(file)) required.add(file);
 for (const file of files.filter((f) => /^api\/[^/]+\.js$/.test(f))) {
   for (const [, ref] of read(file).matchAll(/(?:from\s*|import\()\s*"\.\/(_[^"]+\.js)"/g)) required.add("api/" + ref);
 }
+// …y los módulos hermanos que esos módulos privados importan (p. ej. api/_tienda/meta-capi.js, REQ-376).
+for (const file of [...required].filter((f) => /^api\/_[^/]+\/[^/]+\.js$/.test(f))) {
+  const dir = file.slice(0, file.lastIndexOf("/") + 1);
+  for (const [, ref] of read(file).matchAll(/(?:from\s*|import\()\s*"\.\/([^"/]+\.js)"/g)) required.add(dir + ref);
+}
 for (const file of EXTRA_PUBLIC) required.add(file);
 
 const missing = [...required].filter((file) => !deployed.has(file));

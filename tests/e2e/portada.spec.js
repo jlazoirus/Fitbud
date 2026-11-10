@@ -55,12 +55,13 @@ test.describe("Portada", () => {
     await expect(page.locator("#au_email")).toBeVisible();
   });
 
-  test("REQ-352: la portada no carga la app, Supabase ni /api/config", async ({ page, context }) => {
+  test("REQ-352: la portada no carga la app ni Supabase", async ({ page, context }) => {
     await installMocks(context);
     const requested = [];
     page.on("request", (r) => requested.push(new URL(r.url()).pathname + (r.url().includes("supabase") ? " [supabase]" : "")));
     await gotoPortada(page);
-    expect(requested.filter((u) => /\/app\/|\/api\/config|\[supabase\]|exercise-catalog|nutrition-domain/.test(u))).toEqual([]);
+    // REQ-376: /api/config sí se pide, después de `load`, solo para saber si hay píxel (medicion.spec.js).
+    expect(requested.filter((u) => /\/app\/|\[supabase\]|exercise-catalog|nutrition-domain/.test(u))).toEqual([]);
     expect(await page.evaluate(() => typeof window.render === "undefined" && !document.querySelector("#app"))).toBe(true);
   });
 

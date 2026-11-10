@@ -7,9 +7,13 @@
 // vencimiento vigente y registra el cobro en billing_events (provider = culqi).
 // Vars: CULQI_SECRET_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
 //       NOTIFY_APP_URL, RESEND_API_KEY, NOTIFY_FROM_EMAIL.
+// REQ-376: con META_PIXEL_ID y META_CAPI_TOKEN, el cargo confirmado también va como
+// Purchase a la API de conversiones de Meta (api/_tienda/meta-capi.js), con el mismo
+// eventId que la respuesta entrega a /pago para el Purchase del navegador.
 
 import { MONEDA, planPorId, formatoSoles } from "../../tienda/planes.js";
 import { COMERCIO } from "../../tienda/comercio.js";
+import { metaEnv, metaIds, clientInfo, compraMedicion, purchaseEvent, sendPurchase } from "./meta-capi.js";
 
 const CULQI_CHARGES_URL = "https://api.culqi.com/v2/charges";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -226,6 +230,19 @@ async function sendReceipt(email, mail) {
   }
 }
 
+// Purchase por la API de conversiones: solo si está configurada y sin datos personales.
+// sendPurchase nunca rechaza; el catch cubre cualquier otro imprevisto.
+async function enviarCompraMeta(req, body, plan, compra, appUrl) {
+  try {
+    const env = metaEnv();
+    if (!env.pixelId || !env.token) return;
+    const event = purchaseEvent({ eventId: compra.eventId, plan, ids: metaIds(body), client: clientInfo(req), sourceUrl: appUrl + "/pago" });
+    await sendPurchase(env, event);
+  } catch (err) {
+    console.error("meta-capi: error inesperado", String(err && err.message || err));
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Método no permitido." });
@@ -280,6 +297,9 @@ export default async function handler(req, res) {
   const plan = data.plan;
   const chargeId = outcome.chargeId;
   const payload = { email: data.email, amount: plan.montoCentimos, currency: MONEDA, plan_id: plan.id };
+  // REQ-376: corre en paralelo con la activación y nunca cambia la respuesta del pago.
+  const compra = compraMedicion(chargeId, plan);
+  const capi = enviarCompraMeta(req, body, plan, compra, e.appUrl);
   let userId = null;
   let cuenta = "existente";
   try {
@@ -293,11 +313,13 @@ export default async function handler(req, res) {
     const ent = await grantEntitlement(e, userId, plan, chargeId);
     await logBilling(e, chargeId, userId, plan, ent && ent.id, "processed", payload);
     await sendReceipt(data.email, receiptEmail(plan, chargeId, ent && ent.expires_at, cuenta, e.appUrl));
-    res.status(200).json({ ok: true, cuenta, plan: plan.id, expiresAt: ent && ent.expires_at, operacion: chargeId });
+    await capi;
+    res.status(200).json({ ok: true, cuenta, plan: plan.id, expiresAt: ent && ent.expires_at, operacion: chargeId, compra });
   } catch (err) {
     console.error("culqi-charge: cobro sin acceso", chargeId, String(err && err.message || err));
     await logBilling(e, chargeId, userId, plan, null, "failed", payload, String(err && err.message || err));
     await sendReceipt(data.email, receiptEmail(plan, chargeId, null, "pendiente", e.appUrl));
-    res.status(200).json({ ok: true, cuenta: "pendiente", plan: plan.id, operacion: chargeId });
+    await capi;
+    res.status(200).json({ ok: true, cuenta: "pendiente", plan: plan.id, operacion: chargeId, compra });
   }
 }

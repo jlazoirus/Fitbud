@@ -2488,3 +2488,9 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 ## REQ-375 - Acceso: mostrar el progreso al entrar
 
 **Estado: implementado.** Indicador de carga al entrar o registrarse. Bloquea envíos repetidos y permite reintentar tras errores. PWA v230.
+
+## REQ-376 - Web pública: píxel de Meta para medir la campaña de diciembre
+
+**Estado: implementado — requiere acción humana** (configurar `META_PIXEL_ID` y `META_CAPI_TOKEN` en Vercel; el píxel ya existe y el texto de `/privacidad` se aprobó el 10 nov 2026). PWA v231. Ver `docs/medicion-campana.md` y `docs/requirements-history.md`.
+
+✓ `scripts/validate-meta-pixel.mjs`, `scripts/test-meta-capi.mjs`, `tests/e2e/medicion.spec.js`.

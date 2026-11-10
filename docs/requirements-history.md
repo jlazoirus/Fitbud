@@ -13630,3 +13630,70 @@ Atrapar errores en `runReferralCampaign`: cambia producción durante una campañ
 - `node scripts/validate-notify-schedule.mjs` pasa con el reloj simulado en las 24 horas de un día antes, durante y después de la ventana, en sus cuatro bordes, en 15 arranques justo antes de las :00 y en 80 instantes entre 2026 y 2029. ✓
 - Sin la línea del doble de `fetch` la prueba falla en cualquier fecha. Sin el reloj fijo vuelve a fallar al cruzar la hora. ✓
 - El release gate deja de fallar en este check. ✓
+
+## REQ-376 - Web pública: píxel de Meta para medir la campaña de diciembre
+
+**Estado: implementado — requiere acción humana.** Ver `docs/medicion-campana.md`.
+
+### Origen
+Campaña de venta en Meta (Instagram y Facebook) que arranca el 16 dic 2026, con un tope de USD 200. La sección "Campaña de lanzamiento" del documento de estrategia de redes tiene el detalle.
+### Problema
+La web pública no tiene ninguna medición de anuncios: no hay `fbq(` en `index.html`, `planes/index.html`, `pago/index.html`, `unete/index.html` ni `beta-reclutamiento.html`. Sin el píxel, Meta no sabe qué anuncio trajo una visita, una inscripción o una compra. Sin ese dato, la prueba A/B no se puede decidir y la campaña no puede optimizar.
+### Causa raíz
+REQ-370 dejó los píxeles de terceros fuera de alcance. Hoy ningún módulo carga `connect.facebook.net`. `/api/config` entrega la configuración pública (Culqi) pero no un ID de píxel.
+### Objetivo
+Medir PageView, ViewContent, Lead, InitiateCheckout y Purchase en la web pública. La app (`/app`, `/admin`) no recibe nada de Meta, y no se envían datos de salud ni datos personales en claro.
+### Alcance
+- **Módulo compartido** (en `/web` o `/tienda`, que ya se publican) que carga el píxel solo si `/api/config` entrega `metaPixelId`. Si no hay ID, no carga nada ni hace llamadas a Meta.
+- **`api/config.js`** agrega `metaPixelId` leído de la variable de entorno `META_PIXEL_ID`. El ID de un píxel es público, no es un secreto.
+- **Eventos:**
+  - PageView en portada, `/planes`, `/pago`, `/unete` y `/beta`.
+  - ViewContent en `/planes`.
+  - InitiateCheckout cuando `/pago` abre el checkout.
+  - Purchase solo después de que `/api/culqi-charge` confirma el cargo, con `value` y `currency: "PEN"` tomados de la respuesta del servidor.
+  - Lead cuando `/unete` o `/beta` confirman el envío.
+- **Purchase también por API de conversiones**, solo si existen `META_PIXEL_ID` y `META_CAPI_TOKEN` (el token es secreto y vive solo en Vercel):
+  - Se envía desde `api/_tienda/culqi-charge.js`, sin crear una función nueva, por el tope de 12 funciones de Vercel.
+  - Lleva el mismo `event_id` que el evento del navegador, para que Meta no lo cuente dos veces.
+  - Datos de usuario: solo `fbp`, `fbc`, IP y user agent. Sin correo, teléfono ni nombre, ni siquiera cifrados.
+  - Si Meta falla, se registra el error y el pago no se ve afectado.
+- **`/privacidad`:** borrador de la frase que explica la medición publicitaria. La aprueba una persona antes de configurar `META_PIXEL_ID` en producción.
+- **Si ya existe REQ-370** (`campana` con `source`/`utm`), los eventos pueden llevar `campana` como parámetro personalizado.
+### Fuera de alcance
+- Crear el píxel o la campaña en Meta, y configurar las variables en Vercel. Lo hace una persona.
+- El píxel de TikTok.
+- Cambios en `/app`, `/admin` o el service worker.
+- Una ventana de consentimiento de cookies (se evalúa aparte si Legal lo pide).
+### Riesgos
+- **Privacidad:** el píxel nunca debe cargarse en la app ni recibir datos de salud, comidas, peso o progreso. Un validador lo comprueba.
+- **Rendimiento:** el script se carga de forma diferida y nunca bloquea el render ni el checkout.
+- **Doble conteo:** Purchase sin `event_id` compartido se duplicaría.
+- **Pago:** un error del píxel o de la API de conversiones nunca impide pagar.
+### Criterios de aceptación
+- Sin `META_PIXEL_ID`, ninguna página hace peticiones a `facebook.net` ni a `facebook.com`.
+- Con un ID de prueba, la portada, `/planes`, `/pago`, `/unete` y `/beta` disparan PageView. `/planes` dispara ViewContent y `/pago` dispara InitiateCheckout al abrir el checkout.
+- Purchase se dispara una sola vez por cargo confirmado, con el `value` del servidor. Con el token configurado, el servidor envía el mismo `event_id`.
+- Lead se dispara solo cuando `/unete` o `/beta` responden con éxito.
+- `app/index.html` y todo lo que carga la app no contienen `fbq` ni `connect.facebook.net`. Lo comprueba un validador nuevo incluido en `scripts/release-gate.mjs`.
+- Ningún evento lleva correo, teléfono, nombre ni datos de salud.
+- El pago con llaves de prueba de Culqi funciona igual con el píxel activo, inactivo o fallando.
+### Verificación sugerida
+- Validador estático, incluido en el release gate: el píxel solo aparece en páginas públicas y no lleva campos personales.
+- Prueba unitaria del armado del evento de la API de conversiones: `event_id`, `value`, sin datos personales y con un `fetch` simulado.
+- Recorrido local con un ID de prueba, revisando en DevTools que los eventos salen en el orden correcto.
+- Release gate en verde.
+
+### Implementación
+
+- `web/medicion.js`: carga el píxel después de `load` y solo si `/api/config` entrega `metaPixelId`. Lista blanca de eventos y parámetros (`value`, `currency`, `content_type`, `content_ids`, `num_items`). `fbq("init", id)` sin datos de usuario y `autoConfig` apagado. Purchase una sola vez por `eventId`. `/planes` y `/pago` lo cargan con `import()` dinámico: un bloqueador no rompe el pago.
+- `api/config.js`: `metaPixelId` desde `META_PIXEL_ID` (solo dígitos).
+- `api/_tienda/meta-capi.js` + `api/_tienda/culqi-charge.js`: con el cargo confirmado, la respuesta trae `compra: { eventId, value, currency }`, con `eventId = "compra-" + id del cargo`. Con `META_PIXEL_ID` y `META_CAPI_TOKEN`, el servidor manda el Purchase con ese `event_id`, en paralelo con la activación, con un límite de 3 s y sin lanzar. `user_data`: `fbp`, `fbc`, IP y user agent. `META_CAPI_TEST_CODE` es opcional.
+- `scripts/validate-deploy-allowlist.mjs` sigue los imports entre módulos de `api/_*/`.
+- `tests/e2e/portada.spec.js` y `navegacion.spec.js` aceptan que la portada pida `/api/config` después de `load`, sin esperarla.
+- `/privacidad` no cambia: el borrador espera aprobación en `docs/medicion-campana.md`.
+- No toca `/app` ni `/admin`. Sube `CACHE_NAME` a `fitbud-pwa-v231` (PWA v231): el service worker tiene alcance `/` y sirve `/web/*.js` desde cache, y `validate-sw-cache-bump.mjs` cuenta `index.html` como shell.
+
+### Verificación
+
+- `node scripts/validate-meta-pixel.mjs` y `node scripts/test-meta-capi.mjs`. ✓
+- `tests/e2e/medicion.spec.js`: sin ID no hay peticiones a Meta; con un ID de prueba salen PageView, ViewContent, InitiateCheckout, Purchase (valor e id del servidor, una sola vez) y Lead solo con éxito; la app no carga nada; con el píxel bloqueado se paga igual. ✓
