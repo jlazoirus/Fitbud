@@ -656,7 +656,8 @@
         "NAT-20"
       ],
       "paths": [
-        ".github/workflows/native-ci.yml"
+      ".github/workflows/native-ci.yml",
+      "native/jest.config.js"
       ],
       "status": "en_curso",
       "owner": "codex-native-20261111",
