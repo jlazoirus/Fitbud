@@ -2434,7 +2434,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-370 - Web pública: conservar el origen de campaña hasta la compra
 
-**Estado: implementado.** `web/origen.js` guarda `source`/`utm_*` (primer contacto, 30 días) y `/pago` lo envía; queda como `campana` en `billing_events` y en la metadata de Culqi. PWA v234. Detalle en `docs/requirements-history.md`.
+**Estado: implementado.** `web/origen.js` guarda `source`/`utm_*` (primer contacto, 30 días) y `/pago` lo envía; queda como `campana` en `billing_events` y en la metadata de Culqi. PWA v234. `/privacidad` lo menciona en "Datos de compra" (aprobado el 11 nov 2026). Detalle en `docs/requirements-history.md`.
 
 ✓ `scripts/test-origen-campana.mjs`, `tests/e2e/campana-origen.spec.js`.
 
