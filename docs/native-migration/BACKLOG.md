@@ -234,6 +234,7 @@ Convenciones para todas las tareas:
 
 - **Objetivo:** que cada PR que toque `native/`, `js/` o los módulos compartidos corra los checks.
 - **Alcance:** `.github/workflows/native-ci.yml`: Node LTS, caché npm, `npm ci` en `native/`, typecheck/lint/test, `node scripts/validate-shared-modules.mjs`, `node scripts/native-next-task.mjs --validate`, `node scripts/validate-native-copy.mjs` (si existe). Sin secretos ni builds EAS.
+- **Instalación limpia:** `native/jest.config.js` declara la ruta de dependencias de la app para transformar módulos compartidos fuera de `native/`. La primera corrida Linux del PR #113 detectó que Babel buscaba su runtime en la raíz; en este Mac se resolvía accidentalmente desde `/Users/jonathan/node_modules`. Corregir la configuración, sin añadir dependencias runtime a la web ni omitir las pruebas del puente.
 - **Aceptación:** el workflow corre en un PR de prueba y falla si se rompe un test.
 - **Verificación:** run verde enlazado en el PR.
 
