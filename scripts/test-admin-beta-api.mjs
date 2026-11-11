@@ -62,6 +62,7 @@ global.fetch = async (url, options = {}) => {
   if (/\/rest\/v1\/profiles\?id=eq\.[0-9a-f-]+&select=prefs$/.test(value) && method === "GET") return response(200, [{ prefs: profilePrefs }]);
   if (/\/rest\/v1\/profiles\?id=eq\.[0-9a-f-]+$/.test(value) && method === "PATCH") { profilePatches.push({ url: value, body }); return response(204, null); }
   if (value.endsWith("/rest/v1/user_entitlements") && method === "POST") { entitlements.push(body); return response(201, [body]); }
+  if (value.includes("/rest/v1/coach_quota_overrides?user_id=eq.") && method === "GET") return response(200, []);
   if (value.includes("/rest/v1/coach_quota_overrides?on_conflict=user_id,action") && method === "POST") { overrides.push(body); return response(201, null); }
   if (value.endsWith("/rest/v1/redemption_codes") && method === "POST") {
     assert(options.headers.Authorization === "Bearer service", "El código se crea con service role.");

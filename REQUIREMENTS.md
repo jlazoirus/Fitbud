@@ -2479,3 +2479,12 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 ## REQ-380 - Compartir una imagen de la racha en redes sociales
 
 **Estado: implementado.** Ver `docs/requirements-history.md`.
+
+## REQ-381 - Administración: acciones de usuarios con estado visible, reset por correo y cortesía con coach
+
+**Estado: implementado.** Pedido por Jonathan el 11 nov 2026 tras usar Usuarios desde el móvil. PWA v236.
+
+- Problema: Activar/Desactivar, Reiniciar usuario y Cortesía no mostraban que estaban en curso; el aviso duraba 1,6 s, se partía en tres líneas y casi no se leía; tras activar se recargaba la lista entera. "Cambiar contraseña" dejaba al admin fijar la contraseña de otra persona. La cortesía (`/api/entitlement` `grant`) solo creaba el acceso: el coach seguía con las cuotas normales y había que cargar cada acción a mano en Consumo (en producción, una cortesía de 6 meses del 10 nov quedó con 7 de 8 acciones y sin vencimiento).
+- Implementación: `adminBusy` (spinner + verbo, botón bloqueado, `aria-busy`) en activar, restablecer contraseña, cortesía, regenerar plan y reiniciar; confirmación que queda en pantalla (`adminDoneModal`) y errores dentro del diálogo; la lista se repinta en su sitio y resalta la tarjeta. `toast(msg,{tone,ms})` dura según el largo del texto, ocupa el ancho disponible y marca éxito/error. Se quitó `setPassword` (UI y API); "Restablecer contraseña" envía el correo de recuperación. Nueva acción `grantCourtesy` en `api/admin.js`: crea el acceso y aplica `grantUnlimitedQuota` (misma regla que la beta, REQ-248: cada acción sin tope hasta que vence, sin acortar topes ilimitados más largos). El modal de cortesía toma los días del plan elegido.
+- ✓ `scripts/test-admin-api.mjs`, `scripts/test-admin-beta-api.mjs`, `tests/e2e/admin-usuarios.spec.js`.
+- Operación manual: las cortesías dadas antes de este cambio no se corrigen solas; volver a otorgarlas (o ajustar Consumo) para dejarlas sin tope con vencimiento.

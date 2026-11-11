@@ -681,8 +681,21 @@
   .scard{background:var(--surf2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;text-align:center}
   .scard .n{font-family:var(--font-body);font-size:24px;font-weight:800;letter-spacing:-.02em}
   .scard .l{font-size:11px;color:var(--muted);margin-top:3px}
-  .toast{position:fixed;bottom:calc(var(--tabs-clearance) + 12px);left:50%;transform:translateX(-50%);background:var(--surf3);border:1px solid var(--border-2);padding:10px 16px;border-radius:999px;font-size:13px;font-weight:500;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-  .toast.show{opacity:1}
+  .toast{position:fixed;bottom:calc(var(--tabs-clearance) + 12px);left:50%;transform:translate(-50%,8px);width:max-content;max-width:min(460px,calc(100vw - 32px));background:var(--surf4);color:var(--txt);border:1px solid var(--border-2);padding:12px 18px;border-radius:16px;font-size:14px;line-height:1.4;font-weight:500;text-align:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  /* REQ-381: el resultado de una acción se distingue por color y signo, no solo por texto */
+  .toast.ok{border-color:var(--good)}
+  .toast.err{border-color:var(--bad)}
+  .toast.ok::before{content:"✓";color:var(--good);font-weight:700;margin-right:8px}
+  .toast.err::before{content:"!";color:var(--bad);font-weight:700;margin-right:8px}
+  @media(prefers-reduced-motion:reduce){.toast{transition:opacity .2s;transform:translateX(-50%)}.toast.show{transform:translateX(-50%)}}
+  /* REQ-381: botón con acción en curso */
+  .btn.is-busy,.btn.is-busy:disabled{display:inline-flex;align-items:center;justify-content:center;gap:8px;opacity:.9;cursor:progress}
+  .btn.is-busy .spinner{width:14px;height:14px;border-color:transparent;border-top-color:currentColor;border-right-color:currentColor}
+  .admin-done{text-align:center;padding:6px 0 2px}
+  .admin-done-ic{width:52px;height:52px;margin:0 auto 12px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:var(--good);border:2px solid var(--good)}
+  .admin-done p{margin:6px 0 16px;line-height:1.5}
+  .admin-action-error{margin-top:10px;border-color:var(--bad)}
 
   /* Sugerencia "agregar a pantalla de inicio" (solo móvil) */
   .a2hs{position:fixed;left:10px;right:10px;bottom:calc(var(--tabs-clearance) + 12px);max-width:540px;margin:0 auto;z-index:60;
@@ -3022,7 +3035,19 @@ function dbStatusNote(){
    RENDER
    ============================================================ */
 const $=s=>document.querySelector(s);
-function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1600);}
+// REQ-381: el aviso dura según lo que hay que leer (antes 1,6 s fijos) y puede
+// marcar éxito o error: toast(msg,{tone:"ok"|"err",ms}).
+function toast(msg,opts){
+  const t=$("#toast");if(!t)return;
+  const o=opts&&typeof opts==="object"?opts:{};
+  const text=String(msg==null?"":msg);
+  t.textContent=text;
+  t.classList.remove("ok","err");
+  if(o.tone==="ok"||o.tone==="err")t.classList.add(o.tone);
+  t.classList.add("show");clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove("show"),o.ms||Math.max(2200,Math.min(6500,900+text.length*50)));
+}
+function hideToast(){const t=$("#toast");if(t){clearTimeout(t._t);t.classList.remove("show");}}
 
 /* ---------- Cierre de ciclo: recap + siguiente desafío ---------- */
 let recapPhotoFile=null;
@@ -16185,13 +16210,7 @@ async function renderAdminUsers(){
     const out=await adminApi("list");
     adminUsersCache=out.users||[];
     const list=$("#adminList");if(!list)return;
-    const active=adminUsersCache.filter(u=>u.active).length;
-    const admins=adminUsersCache.filter(u=>u.is_admin&&u.active).length;
-    list.innerHTML=`<div class="summary" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
-        <div class="scard"><div class="n">${adminUsersCache.length}</div><div class="l">usuarios</div></div>
-        <div class="scard"><div class="n">${active}</div><div class="l">activos</div></div>
-        <div class="scard"><div class="n">${admins}</div><div class="l">admins activos</div></div>
-      </div>
+    list.innerHTML=`<div id="adminSummary" class="summary" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">${adminSummaryHtml()}</div>
       <div class="row" style="align-items:flex-end;margin-bottom:12px">
         <div class="field" style="flex:1;margin:0"><label for="adminSearch">Buscar</label><input id="adminSearch" type="search" placeholder="correo" oninput="filterAdminUsers()"></div>
         <div class="field" style="width:130px;margin:0"><label for="adminStatus">Estado</label><select id="adminStatus" onchange="filterAdminUsers()"><option value="all">Todos</option><option value="active">Activos</option><option value="inactive">Inactivos</option></select></div>
@@ -16203,6 +16222,48 @@ async function renderAdminUsers(){
   }
   await loadAdminQuotaOverview();
 }
+function adminSummaryHtml(){
+  const active=adminUsersCache.filter(u=>u.active).length;
+  const admins=adminUsersCache.filter(u=>u.is_admin&&u.active).length;
+  return `<div class="scard"><div class="n">${adminUsersCache.length}</div><div class="l">usuarios</div></div>
+    <div class="scard"><div class="n">${active}</div><div class="l">activos</div></div>
+    <div class="scard"><div class="n">${admins}</div><div class="l">admins activos</div></div>`;
+}
+// REQ-381: tras una acción se repinta solo la lista (sin volver arriba ni
+// mostrar "Cargando…") y se resalta la tarjeta del usuario afectado.
+function refreshAdminUserCards(userId){
+  const summary=$("#adminSummary");if(summary)summary.innerHTML=adminSummaryHtml();
+  filterAdminUsers();
+  const card=userId&&document.querySelector(`[data-admin-user="${userId}"]`);
+  if(card){card.classList.remove("field-updated");void card.offsetWidth;card.classList.add("field-updated");}
+}
+// REQ-381: estado "en curso" de un botón: spinner + verbo y bloqueado para no
+// repetir la acción. Devuelve la función que lo restaura (o null si ya corría).
+function adminBusy(btn,label){
+  if(!btn||btn.getAttribute("aria-busy")==="true")return btn?null:()=>{};
+  const html=btn.innerHTML,wasDisabled=btn.disabled;
+  hideToast(); // el aviso de la acción anterior no tapa la nueva
+  btn.disabled=true;btn.setAttribute("aria-busy","true");btn.classList.add("is-busy");
+  btn.innerHTML=`<span class="spinner" aria-hidden="true"></span><span>${esc(label)}</span>`;
+  return ()=>{btn.disabled=wasDisabled;btn.removeAttribute("aria-busy");btn.classList.remove("is-busy");btn.innerHTML=html;};
+}
+// REQ-381: confirmación que se queda en pantalla hasta que el admin la cierra.
+function adminDoneModal(title,detailHtml){
+  hideToast();
+  modal(`<div class="admin-done" role="status"><div class="admin-done-ic" aria-hidden="true">✓</div>
+    <h3>${esc(title)}</h3><p class="muted">${detailHtml}</p>
+    <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Listo</button></div>`);
+}
+function adminActionError(id,message){
+  const out=$("#"+id);if(!out){toast(message,{tone:"err"});return;}
+  out.innerHTML=`<div class="ai-box admin-action-error" role="alert">⚠️ ${esc(message)}</div>`;
+}
+function adminFriendlyError(e){
+  const msg=String((e&&e.message)||e||"");
+  if(/rate limit|too many|over_email_send_rate/i.test(msg))return "Se alcanzó el límite de correos por hora. Intenta de nuevo en un rato.";
+  if(/failed to fetch|network/i.test(msg))return "Sin conexión. Revisa tu internet e intenta de nuevo.";
+  return msg||"No se pudo completar la acción.";
+}
 function filterAdminUsers(){
   const search=($("#adminSearch")&&$("#adminSearch").value||"").trim().toLowerCase();
   const status=($("#adminStatus")&&$("#adminStatus").value)||"all";
@@ -16213,15 +16274,14 @@ function adminUsersHtml(users){
   if(!users.length)return '<div class="muted small">No hay usuarios que coincidan.</div>';
   return users.map(u=>{
     const me=u.id===uid();
-    return `<div class="meal">
+    return `<div class="meal" data-admin-user="${u.id}">
       <div class="meal-head"><div>
         <div class="name">${esc(u.email||u.id)} ${u.is_test_user?'<span class="pill" style="background:var(--terra-dim);color:var(--terra-200)">prueba</span>':''}${u.is_admin?'<span class="pill" style="background:var(--accent-dim);color:var(--purple-200)">admin</span>':''}${u.active?'':' <span class="pill" style="background:var(--bad);color:#fff">inactivo</span>'}${me?' <span class="pill">tú</span>':''}</div>
         <div class="nums muted">creado ${prettyDateTime(u.created_at)} · último acceso ${u.last_sign_in_at?prettyDateTime(u.last_sign_in_at):"nunca"}</div>
       </div></div>
       <div class="meal-actions">
-        <button class="btn btn-sm" ${me?'disabled style="opacity:.4"':''} onclick="adminToggleActive('${u.id}',${u.active?'false':'true'})">${u.active?'Desactivar':'Activar'}</button>
-        <button class="btn btn-sm" ${(u.is_admin&&!me)?'disabled style="opacity:.4" title="No puedes cambiar la contraseña de otro administrador"':''} onclick="adminSetPassword('${u.id}')">Cambiar contraseña</button>
-        <button class="btn btn-sm" onclick="adminResetLink('${u.id}')">Enviar reset</button>
+        <button class="btn btn-sm" ${me?'disabled style="opacity:.4"':''} onclick="adminToggleActive('${u.id}',${u.active?'false':'true'},this)">${u.active?'Desactivar':'Activar'}</button>
+        <button class="btn btn-sm" ${u.email?'':'disabled style="opacity:.4" title="Sin correo"'} onclick="openAdminResetPassword('${u.id}')">Restablecer contraseña</button>
         <button class="btn btn-sm" onclick="openAdminUserQuota('${u.id}')">Consumo</button>
         <button class="btn btn-sm" onclick="openAdminCourtesy('${u.id}')">Cortesía</button>
         <button class="btn btn-sm" ${(me||u.is_admin)?'disabled style="opacity:.4"':''} onclick="openAdminResetPlan('${u.id}')">Regenerar plan</button>
@@ -16232,36 +16292,39 @@ function adminUsersHtml(users){
 }
 async function openAdminCourtesy(userId){
   const plans=activeCatalogPlans();
-  const options=plans.map(p=>`<option value="${esc(p.id)}">${esc(p.name)} (${p.duration_days} días)</option>`).join("");
+  const user=adminUsersCache.find(u=>u.id===userId)||{id:userId,email:userId};
+  const options=plans.map(p=>`<option value="${esc(p.id)}" data-days="${Math.min(365,+p.duration_days||30)}">${esc(p.name)} (${p.duration_days} días)</option>`).join("");
+  const firstDays=plans.length?Math.min(365,+plans[0].duration_days||30):30;
   modal(`<h3>Acceso de cortesía</h3>
-    <div class="muted small" style="margin-bottom:14px">Otorga acceso temporal sin cobro. El entitlement queda auditado con tu usuario.</div>
-    <div class="field"><label for="courtesyPlan">Plan</label><select id="courtesyPlan">${options}</select></div>
-    <div class="field"><label for="courtesyDays">Días de acceso</label><input id="courtesyDays" type="number" inputmode="numeric" min="1" max="365" value="30"></div>
+    <div class="muted small" style="margin-bottom:14px">${esc(user.email||userId)}. Acceso completo sin cobro, con el coach sin tope de uso hasta que vence. Queda auditado con tu usuario.</div>
+    <div class="field"><label for="courtesyPlan">Plan</label><select id="courtesyPlan" onchange="const o=this.selectedOptions[0];if(o&&o.dataset.days)$('#courtesyDays').value=o.dataset.days">${options}</select></div>
+    <div class="field"><label for="courtesyDays">Días de acceso</label><input id="courtesyDays" type="number" inputmode="numeric" min="1" max="365" value="${firstDays}"></div>
     <div class="field" style="margin-bottom:0"><label for="courtesyNotes">Nota interna (opcional)</label><input id="courtesyNotes" placeholder="Ej. beta tester, promo especial"></div>
     <div class="row wrap" style="margin-top:14px">
       <button class="btn btn-accent" onclick="grantCourtesy('${userId}',this)">Otorgar acceso</button>
       <button class="btn" onclick="closeModal()">Cancelar</button>
-    </div>`);
+    </div>
+    <div id="courtesyOut"></div>`);
 }
 async function grantCourtesy(userId,btn){
-  if(btn){btn.disabled=true;btn.textContent="Otorgando…";}
   const planId=($("#courtesyPlan")&&$("#courtesyPlan").value)||"monthly";
   const days=Math.max(1,Math.min(365,+($("#courtesyDays")&&$("#courtesyDays").value)||30));
   const notes=($("#courtesyNotes")&&$("#courtesyNotes").value.trim())||"";
-  const token=session&&session.access_token;
-  if(!token){toast("Sesión requerida");if(btn){btn.disabled=false;btn.textContent="Otorgar acceso";}return;}
+  const done=adminBusy(btn,"Otorgando…");if(!done)return;
+  const user=adminUsersCache.find(u=>u.id===userId)||{email:userId};
+  const plan=activeCatalogPlans().find(p=>p.id===planId);
   try{
-    const r=await fetch("/api/entitlement",{
-      method:"POST",
-      headers:{"content-type":"application/json","Authorization":"Bearer "+token},
-      body:JSON.stringify({action:"grant",userId,planId,days,notes})
-    });
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(data.error||"No se pudo otorgar el acceso.");
-    closeModal();toast("Acceso de cortesía otorgado por "+days+" días");
+    const data=await adminApi("grantCourtesy",{userId,planId,days,notes});
+    const until=data.entitlement&&data.entitlement.expires_at?prettyDateTime(data.entitlement.expires_at).split(" ").slice(0,2).join(" "):"";
+    const coach=data.quotaError
+      ?`<br><br><b style="color:var(--warn)">El acceso quedó dado, pero no se pudo quitar el tope del coach</b> (${esc(data.quotaError)}). Ajústalo desde Consumo.`
+      :"<br>Incluye el coach sin tope de uso durante todo el periodo.";
+    adminDoneModal("Cortesía activa",`<b>${esc(user.email||userId)}</b> tiene ${esc(plan?plan.name:planId)} por ${days} días${until?` (hasta el ${esc(until)})`:""}.${coach}`);
+    refreshAdminUserCards(userId);
+    loadAdminQuotaOverview();
   }catch(e){
-    if(btn){btn.disabled=false;btn.textContent="Otorgar acceso";}
-    toast(String(e.message||e));
+    done();
+    adminActionError("courtesyOut",adminFriendlyError(e));
   }
 }
 // REQ-126: resetear futuro / regenerar nutrición y/o entrenamiento de cualquier usuario.
@@ -16297,20 +16360,21 @@ async function adminPreviewResetPlan(userId){
       ${preview.protectedDates&&preview.protectedDates.length?`<div class="muted small" style="margin-top:6px">Protegidos: ${preview.protectedDates.map(esc).join(", ")}</div>`:""}
     </div>
     <div class="row wrap" style="margin-top:10px">
-      <button class="btn btn-accent" ${preview.clearedCount?"":'disabled style="opacity:.4"'} onclick="adminApplyResetPlan()">Aplicar</button>
-    </div>`;
+      <button class="btn btn-accent" ${preview.clearedCount?"":'disabled style="opacity:.4"'} onclick="adminApplyResetPlan(this)">Aplicar</button>
+    </div>
+    <div id="arpApplyOut"></div>`;
   }catch(e){if(out)out.innerHTML=`<div class="ai-box">⚠️ ${esc(e.message)}</div>`;}
 }
-async function adminApplyResetPlan(){
+async function adminApplyResetPlan(btn){
   const st=window._adminReset;
   if(!st||!st.preview){toast("Primero genera la vista previa.");return;}
   if(!confirm(`¿Aplicar el reseteo? Esto limpiará ${st.preview.clearedCount} día(s) futuros desde ${st.preview.fromDate}. Esta acción no se puede deshacer.`))return;
+  const done=adminBusy(btn,"Aplicando…");if(!done)return;
   try{
     const result=await adminApi("applyResetPlan",{userId:st.userId,scope:st.scope,fromDate:st.fromDate});
     window._adminReset=null;
-    closeModal();
-    toast(`Listo: ${result.daysCleared} día(s) reseteados, ${result.daysProtected} protegidos.`);
-  }catch(e){toast(e.message);}
+    adminDoneModal("Plan regenerado",`${result.daysCleared} día(s) futuros limpiados desde ${esc(st.fromDate||"")} · ${result.daysProtected} protegidos por tener algo registrado.`);
+  }catch(e){done();adminActionError("arpApplyOut",adminFriendlyError(e));}
 }
 // REQ-126 item 7: reiniciar cualquier usuario normal a onboarding (sin convertirlo en QA).
 function openAdminResetUser(userId){
@@ -16318,16 +16382,25 @@ function openAdminResetUser(userId){
   modal(`<h3>Reiniciar usuario — ${esc(user.email||userId)}</h3>
     <div class="ai-box" style="border-color:var(--bad)">⚠️ Borra perfil, planes, progreso, consentimientos y fotos, y lo devuelve a onboarding. No se puede deshacer.</div>
     <div class="row wrap" style="margin-top:10px">
-      <button class="btn" style="border-color:var(--bad);color:var(--bad)" onclick="adminConfirmResetUser('${userId}')">Sí, reiniciar usuario</button>
-      <button class="btn" onclick="closeModal()">Cancelar</button>
-    </div>`);
+      <button class="btn" style="border-color:var(--bad);color:var(--bad)" onclick="adminConfirmResetUser('${userId}',this)">Sí, reiniciar usuario</button>
+      <button class="btn" id="arUserCancel" onclick="closeModal()">Cancelar</button>
+    </div>
+    <div id="arUserOut"></div>`);
 }
-async function adminConfirmResetUser(userId){
+async function adminConfirmResetUser(userId,btn){
   if(!confirm("Esta acción es irreversible. ¿Confirmas el reinicio completo de este usuario?"))return;
+  const done=adminBusy(btn,"Reiniciando…");if(!done)return;
+  const cancel=$("#arUserCancel");if(cancel)cancel.disabled=true;
+  const out=$("#arUserOut");if(out)out.innerHTML='<div class="muted small" style="margin-top:10px" role="status">Borrando sus datos. Puede tardar unos segundos; no cierres esta ventana.</div>';
+  const user=adminUsersCache.find(u=>u.id===userId)||{email:userId};
   try{
     await adminApi("resetUserToOnboarding",{userId});
-    closeModal();toast("Usuario reiniciado. Volverá a onboarding en su próximo acceso.");
-  }catch(e){toast(e.message);}
+    adminDoneModal("Usuario reiniciado",`<b>${esc(user.email||userId)}</b> volverá a onboarding en su próximo acceso. Se borraron su perfil, planes, progreso, consentimientos y fotos.`);
+    refreshAdminUserCards(userId);
+  }catch(e){
+    done();if(cancel)cancel.disabled=false;
+    adminActionError("arUserOut",adminFriendlyError(e));
+  }
 }
 async function loadAdminQuotaOverview(){
   const panel=$("#adminQuotaPanel");if(!panel)return;
@@ -16723,35 +16796,40 @@ async function prepareAdminTestUser(enterAfter){
     buttons.forEach(button=>button.disabled=false);
   }
 }
-async function adminToggleActive(id,active){
+async function adminToggleActive(id,active,btn){
   const user=adminUsersCache.find(u=>u.id===id);
-  if(!active&&!confirm(`¿Desactivar ${user&&user.email?user.email:"este usuario"}? Se cerrará su acceso y no podrá escribir ni usar IA.`))return;
-  try{await adminApi("setActive",{userId:id,active});toast(active?"Usuario activado":"Usuario desactivado");renderAdminUsers();}
-  catch(e){toast(e.message);}
+  const who=user&&user.email?user.email:"este usuario";
+  if(!active&&!confirm(`¿Desactivar ${who}? Se cerrará su acceso y no podrá escribir ni usar el coach.`))return;
+  const done=adminBusy(btn,active?"Activando…":"Desactivando…");if(!done)return;
+  try{
+    await adminApi("setActive",{userId:id,active});
+    if(user)user.active=active;
+    refreshAdminUserCards(id);
+    toast(active?`${who} está activo. Ya puede entrar.`:`${who} quedó desactivado.`,{tone:"ok"});
+  }catch(e){done();toast(adminFriendlyError(e),{tone:"err"});}
 }
-function adminSetPassword(id){
-  const user=adminUsersCache.find(u=>u.id===id);window._adminPasswordUser=user||{id};
-  modal(`<h3>Cambiar contraseña</h3>
-    <p class="muted small">${esc((user&&user.email)||id)}</p>
-    ${passwordField({id:"adminPwd",label:"Nueva contraseña",autocomplete:"new-password",minlength:"8"})}
-    ${passwordField({id:"adminPwdConfirm",label:"Confirmar contraseña",autocomplete:"new-password",minlength:"8"})}
-    <button class="btn btn-accent" style="width:100%" onclick="saveAdminPassword()">Actualizar contraseña</button>
-    <div id="adminPwdOut" class="muted small" style="margin-top:8px"></div>`);
-}
-async function saveAdminPassword(){
-  const user=window._adminPasswordUser,pwd=$("#adminPwd").value,confirmPwd=$("#adminPwdConfirm").value,out=$("#adminPwdOut");
-  if(pwd.length<8){out.textContent="Usa al menos 8 caracteres.";return;}
-  if(pwd!==confirmPwd){out.textContent="Las contraseñas no coinciden.";return;}
-  out.textContent="Actualizando…";
-  try{await adminApi("setPassword",{userId:user.id,password:pwd});closeModal();toast("Contraseña actualizada");}
-  catch(e){toast(e.message);}
-}
-async function adminResetLink(id){
+// REQ-381: el admin no fija contraseñas ajenas; le envía a la persona un
+// correo para que cree la suya.
+function openAdminResetPassword(id){
   const user=adminUsersCache.find(u=>u.id===id);
-  if(!user||!user.email){toast("Ese usuario no tiene correo");return;}
-  if(!confirm("¿Enviar un enlace de recuperación a "+user.email+"?"))return;
-  try{await adminApi("resetPassword",{userId:id,redirectTo:authRedirectUrl("recovery")});toast("Correo de recuperación enviado");}
-  catch(e){toast(e.message);}
+  if(!user||!user.email){toast("Ese usuario no tiene correo",{tone:"err"});return;}
+  modal(`<h3>Restablecer contraseña</h3>
+    <p class="muted small">Le enviaremos a <b>${esc(user.email)}</b> un correo con un enlace para crear una nueva contraseña. Tú no la ves ni la eliges.</p>
+    ${user.active?"":'<div class="ai-box" style="margin-bottom:12px">Esta cuenta está inactiva: actívala para que pueda entrar con la nueva contraseña.</div>'}
+    <div class="row wrap">
+      <button class="btn btn-accent" onclick="adminResetLink('${id}',this)">Enviar correo</button>
+      <button class="btn" onclick="closeModal()">Cancelar</button>
+    </div>
+    <div id="adminResetPwdOut"></div>`);
+}
+async function adminResetLink(id,btn){
+  const user=adminUsersCache.find(u=>u.id===id);
+  if(!user||!user.email){toast("Ese usuario no tiene correo",{tone:"err"});return;}
+  const done=adminBusy(btn,"Enviando…");if(!done)return;
+  try{
+    await adminApi("resetPassword",{userId:id,redirectTo:authRedirectUrl("recovery")});
+    adminDoneModal("Correo enviado",`<b>${esc(user.email)}</b> recibirá un enlace para crear su nueva contraseña. Si no lo ve, que revise spam.`);
+  }catch(e){done();adminActionError("adminResetPwdOut",adminFriendlyError(e));}
 }
 
 /* ============================================================

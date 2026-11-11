@@ -179,17 +179,32 @@ async function grantBetaAccess(userId, caller, e) {
   const entitlement = Array.isArray(data) ? data[0] : data;
   // REQ-248: la beta no tiene tope de uso del coach mientras dure el acceso.
   // Si falla, el acceso queda dado y el admin lo ve (quotaError).
-  try { await grantBetaUnlimitedQuota(userId, entitlement && entitlement.expires_at, caller, e); }
+  try { await grantUnlimitedQuota(userId, entitlement && entitlement.expires_at, caller, e); }
   catch (error) { return Object.assign({}, entitlement, { quotaError: String(error.message || error) }); }
   return entitlement;
 }
 
 // REQ-248: un override por acción con el máximo diario permitido, que vence
 // junto con el acceso beta; al vencer, vuelven las cuotas de su plan.
-async function grantBetaUnlimitedQuota(userId, expiresAt, caller, e) {
+// REQ-381: la cortesía manual usa la misma regla. Nunca acorta una cortesía
+// sin tope que ya vence después (o que no vence).
+async function grantUnlimitedQuota(userId, expiresAt, caller, e) {
   if (!expiresAt) throw new Error("Falta la fecha de fin del acceso.");
+  const target = new Date(expiresAt).getTime();
+  let current = [];
+  try {
+    const existing = await fetch(
+      e.url + "/rest/v1/coach_quota_overrides?user_id=eq." + encodeURIComponent(userId) + "&select=action,daily_limit,expires_at",
+      { headers: serviceHeaders(e) }
+    );
+    if (existing.ok) current = await responseJson(existing);
+  } catch (_) { current = []; } // sin lectura, se escribe todo: mejor dar el acceso que dejarlo con tope
+  const keep = new Set((Array.isArray(current) ? current : [])
+    .filter((row) => Number(row.daily_limit) >= QUOTA_OVERRIDE_MAX
+      && (!row.expires_at || new Date(row.expires_at).getTime() >= target))
+    .map((row) => row.action));
   const now = new Date().toISOString();
-  const rows = [...COACH_ACTIONS].map((action) => ({
+  const rows = [...COACH_ACTIONS].filter((action) => !keep.has(action)).map((action) => ({
     user_id: userId,
     action,
     daily_limit: QUOTA_OVERRIDE_MAX,
@@ -199,6 +214,7 @@ async function grantBetaUnlimitedQuota(userId, expiresAt, caller, e) {
     updated_by: caller,
     updated_at: now,
   }));
+  if (!rows.length) return;
   const response = await fetch(e.url + "/rest/v1/coach_quota_overrides?on_conflict=user_id,action", {
     method: "POST",
     headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }),
@@ -236,6 +252,52 @@ async function seedProfileFromApplication(userId, sub, e) {
     body: JSON.stringify({ prefs: next, updated_at: new Date().toISOString() }),
   });
   return patch.ok;
+}
+
+// REQ-381: cortesía manual desde Usuarios. Antes solo creaba el acceso y el
+// coach quedaba con las cuotas normales; ahora incluye el coach sin tope hasta
+// que vence, igual que la beta (REQ-248).
+async function grantCourtesy(body, caller, e) {
+  const userId = String(body.userId || "");
+  const planId = String(body.planId || "monthly").trim();
+  const days = Math.max(1, Math.min(365, Number.parseInt(body.days, 10) || 30));
+  const notes = String(body.notes || "").slice(0, 500);
+  if (!UUID_RE.test(userId) || !/^[a-z0-9_-]{1,64}$/i.test(planId)) {
+    const error = new Error("Usuario o plan no válido.");
+    error.status = 400;
+    throw error;
+  }
+  if (!await profileById(userId, e)) {
+    const error = new Error("Usuario no encontrado.");
+    error.status = 404;
+    throw error;
+  }
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + days * 86400000).toISOString();
+  const response = await fetch(e.url + "/rest/v1/user_entitlements", {
+    method: "POST",
+    headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "return=representation" }),
+    body: JSON.stringify({
+      user_id: userId,
+      plan_id: planId,
+      status: "courtesy",
+      starts_at: now.toISOString(),
+      expires_at: expiresAt,
+      origin: "admin_courtesy",
+      notes: notes || "Acceso de cortesía otorgado por administrador",
+      granted_by: caller,
+    }),
+  });
+  const data = await responseJson(response);
+  if (!response.ok) throw new Error(apiError(data, "No se pudo crear el acceso de cortesía."));
+  const entitlement = Array.isArray(data) ? data[0] : data;
+  // Si falla, el acceso queda dado y el admin lo ve para ajustarlo en Consumo.
+  try {
+    await grantUnlimitedQuota(userId, (entitlement && entitlement.expires_at) || expiresAt, caller, e);
+    return { ok: true, entitlement, coachUnlimited: true };
+  } catch (error) {
+    return { ok: true, entitlement, coachUnlimited: false, quotaError: String(error.message || error) };
+  }
 }
 
 const BETA_QUOTA_ERROR = "Tiene el acceso, pero no se pudo quitar el tope de uso del coach. Ajústalo desde Usuarios → Consumo y cortesía.";
@@ -1155,29 +1217,9 @@ export default async function handler(req, res) {
       return;
     }
 
-    if (body.action === "setPassword") {
-      const userId = String(body.userId || "");
-      const password = String(body.password || "");
-      if (!UUID_RE.test(userId) || password.length < 8 || password.length > 128) {
-        res.status(400).json({ error: "userId y contraseña de 8 a 128 caracteres requeridos." });
-        return;
-      }
-      const [targetUser, targetProfile] = await Promise.all([authUserById(userId, e), profileById(userId, e)]);
-      if (!targetUser) {
-        res.status(404).json({ error: "Usuario no encontrado." });
-        return;
-      }
-      // REQ-158: cambiar contraseña habilita impersonación — mismo invariante
-      // que ya protege setActive/resetUserToOnboarding: nunca sobre OTRO admin
-      // (uno mismo sigue permitido).
-      if (userId !== caller && targetProfile && targetProfile.is_admin) {
-        res.status(409).json({ error: "No puedes cambiar la contraseña de otro administrador." });
-        return;
-      }
-      await updateAuthUser(userId, { password }, e);
-      res.status(200).json({ ok: true });
-      return;
-    }
+    // REQ-381: el admin ya no fija contraseñas ajenas (habilitaba entrar
+    // como el usuario). Para recuperar acceso se usa "resetPassword", que le
+    // envía un correo para que la persona cree la suya.
 
     if (body.action === "prepareTestUser") {
       const email = String(body.email || "").trim().toLowerCase();
@@ -1232,7 +1274,7 @@ export default async function handler(req, res) {
         return;
       }
       if (await authUserByEmail(email, e)) {
-        res.status(409).json({ error: "Ese correo ya tiene una cuenta. Usa “Contraseña” en la lista para darle una nueva." });
+        res.status(409).json({ error: "Ese correo ya tiene una cuenta. Usa “Restablecer contraseña” en la lista para enviarle un correo." });
         return;
       }
       const password = tempPassword();
@@ -1296,6 +1338,11 @@ export default async function handler(req, res) {
         return;
       }
       res.status(200).json({ ok: true });
+      return;
+    }
+
+    if (body.action === "grantCourtesy") {
+      res.status(201).json(await grantCourtesy(body, caller, e));
       return;
     }
 
