@@ -1,0 +1,106 @@
+# NAT-27 — comprueba la app y el dominio compartido sin credenciales de Expo.
+name: Native CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "native/**"
+      - "js/**"
+      - "app/index.html"
+      - "service-worker.js"
+      - "domain-contracts.js"
+      - "exercise-catalog.js"
+      - "workout-player.js"
+      - "training-plan.js"
+      - "sync-conflicts.js"
+      - "package*.json"
+      - "native-migration.json"
+      - "docs/native-migration/**"
+      - "scripts/native-next-task.mjs"
+      - "scripts/validate-shared-modules.mjs"
+      - "scripts/validate-day-model.mjs"
+      - "scripts/validate-native-copy.mjs"
+      - ".github/workflows/native-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "native/**"
+      - "js/**"
+      - "app/index.html"
+      - "service-worker.js"
+      - "domain-contracts.js"
+      - "exercise-catalog.js"
+      - "workout-player.js"
+      - "training-plan.js"
+      - "sync-conflicts.js"
+      - "package*.json"
+      - "native-migration.json"
+      - "docs/native-migration/**"
+      - "scripts/native-next-task.mjs"
+      - "scripts/validate-shared-modules.mjs"
+      - "scripts/validate-day-model.mjs"
+      - "scripts/validate-native-copy.mjs"
+      - ".github/workflows/native-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: TypeScript, lint y tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CI: "true"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Node LTS y caché npm
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            native/package-lock.json
+      - name: Instalar herramientas compartidas
+        run: npm ci --no-fund
+      - name: Instalar app nativa
+        working-directory: native
+        run: npm ci --no-fund
+      - name: Validadores compartidos y plan
+        run: |
+          node scripts/validate-shared-modules.mjs
+          node scripts/validate-day-model.mjs
+          node scripts/native-next-task.mjs --validate
+          if [ -f scripts/validate-native-copy.mjs ]; then
+            node scripts/validate-native-copy.mjs
+          fi
+      - name: TypeScript
+        working-directory: native
+        run: npm run typecheck
+      - name: Lint
+        working-directory: native
+        run: npm run lint
+      - name: Formato
+        working-directory: native
+        run: npm run format:check
+      - name: Fixture temporal de aceptación negativa (retirar antes de integrar)
+        run: |
+          cat > native/tests/ci-negative.test.ts <<'TEST'
+          test('NAT-27 detecta una aserción rota', () => {
+            expect(1).toBe(2);
+          });
+          TEST
+      - name: Tests nativos
+        working-directory: native
+        run: npm test -- --ci
