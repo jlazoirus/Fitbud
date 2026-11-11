@@ -22,7 +22,7 @@ export const EVENTS = Object.freeze(["PageView", "ViewContent", "InitiateCheckou
 // Única puerta de salida de datos hacia Meta: lo que no está aquí no se envía.
 const PARAMS = {
   value: (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 && v < 100000 ? Math.round(v * 100) / 100 : undefined),
-  currency: (v) => (v === "PEN" ? v : undefined),
+  currency: (v) => (v === "PEN" || v === "USD" ? v : undefined), // REQ-381: soles o dólares
   content_type: (v) => (v === "product" ? v : undefined),
   content_ids: (v) => {
     if (!Array.isArray(v)) return undefined;

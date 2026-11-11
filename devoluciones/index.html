@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tienda/tienda.css?v=3">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=4">
 </head>
 <body>
   <header id="t-header"></header>
@@ -39,9 +39,9 @@
 
     <h2>4. Opciones de reembolso y cambios</h2>
     <ul>
-      <li><b>Modalidad de reembolso:</b> devolución del dinero a la misma tarjeta con la que pagaste, a través de Culqi. No damos saldo a favor ni tarjetas de regalo en lugar del dinero.</li>
+      <li><b>Modalidad de reembolso:</b> devolución del dinero a la misma tarjeta con la que pagaste, a través de Culqi<span id="reembolsoMoneda"></span>. No damos saldo a favor ni tarjetas de regalo en lugar del dinero.</li>
       <li><b>Tiempo de proceso:</b> procesamos la devolución en Culqi en un máximo de 5 días hábiles desde que la confirmamos. El abono en tu tarjeta depende de tu banco y suele tomar entre 7 y 15 días hábiles más.</li>
-      <li><b>Cambio de plan:</b> dentro de los mismos 7 días puedes pasar a otro plan. Si eliges uno de mayor precio, pagas solo la diferencia; si eliges uno de menor precio, te devolvemos la diferencia.</li>
+      <li><b>Cambio de plan:</b> dentro de los mismos 7 días puedes pasar a otro plan. Si eliges uno de mayor precio, pagas solo la diferencia; si eliges uno de menor precio, te devolvemos la diferencia<span id="cambioMoneda"></span>.</li>
       <li>Al reembolsarse un plan, su acceso se desactiva. Tus datos y tu historial se conservan en tu cuenta, salvo que pidas borrarla.</li>
     </ul>
 
@@ -77,6 +77,12 @@
     // Solicitud de reembolso con los datos que necesitamos para ubicar la compra.
     const cuerpo = "Hola, quiero pedir el reembolso (o el cambio) de mi plan de Evolv.\n\nCorreo con el que compré:\nFecha de la compra:\nNúmero de operación (chr_…):\nPlan comprado:\n¿Reembolso o cambio de plan?:\n";
     document.getElementById("solicitar").href = "mailto:" + COMERCIO.correo + "?subject=" + encodeURIComponent("Solicitud de reembolso o cambio de plan") + "&body=" + encodeURIComponent(cuerpo);
+    // REQ-381: solo cuando la tienda vende también en dólares (TIENDA_USD_ENABLED).
+    import("/tienda/moneda.js").then((m) => m.cargarConfig()).then((cfg) => {
+      if (!(cfg && cfg.tienda && cfg.tienda.usd === true)) return;
+      document.getElementById("reembolsoMoneda").textContent = ", en la misma moneda en la que se cobró (soles o dólares) y por el mismo monto";
+      document.getElementById("cambioMoneda").textContent = ", en la moneda de tu compra original";
+    }).catch(() => {});
   </script>
 </body>
 </html>

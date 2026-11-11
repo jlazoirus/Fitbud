@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tienda/tienda.css?v=3">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=4">
 </head>
 <body>
   <header id="t-header"></header>
@@ -54,7 +54,8 @@
 
     <h2>5. Precios y formas de pago</h2>
     <ul>
-      <li>Los precios están en soles (S/) e <b>incluyen los impuestos aplicables</b>.</li>
+      <li><span id="preciosMoneda">Los precios están en soles (S/)</span> e <b>incluyen los impuestos aplicables</b>.</li>
+      <li id="monedaElegida" hidden>La tienda propone la moneda según el país desde el que nos visitas y puedes cambiarla antes de pagar. Se cobra el precio publicado en la moneda elegida, sin conversión.</li>
       <li>Aceptamos pagos con <b>tarjeta de crédito o débito</b> a través de <b>Culqi</b>, pasarela de pagos autorizada en el Perú. Por ahora no aceptamos transferencias, depósitos ni billeteras digitales.</li>
       <li>Cada plan es un <b>pago único por un período de acceso</b>. <b>No hay renovación automática ni cobros recurrentes</b>: al terminar el período, decides si compras otro.</li>
       <li><b>Seguridad:</b> los datos de tu tarjeta los ingresas en el formulario de Culqi y los recibe directamente Culqi, que cumple el estándar de seguridad de la industria de tarjetas (PCI DSS). Evolv no ve ni guarda esos datos. Si tu banco lo pide, el pago se autentica con 3-D Secure. Toda la web usa conexión cifrada (HTTPS).</li>
@@ -124,6 +125,12 @@
   <script type="module">
     import { mountLayout } from "/tienda/layout.js";
     mountLayout();
+    // REQ-381: solo cuando la tienda vende también en dólares (TIENDA_USD_ENABLED).
+    import("/tienda/moneda.js").then((m) => m.cargarConfig()).then((cfg) => {
+      if (!(cfg && cfg.tienda && cfg.tienda.usd === true)) return;
+      document.getElementById("preciosMoneda").textContent = "Los precios están en soles (S/) o en dólares estadounidenses (USD)";
+      document.getElementById("monedaElegida").hidden = false;
+    }).catch(() => {});
   </script>
 </body>
 </html>

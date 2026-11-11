@@ -3,7 +3,9 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { PLANES_TIENDA, planPorId, formatoSoles, MONEDA } from "../tienda/planes.js";
+import { PLANES_TIENDA, planPorId, formatoSoles, MONEDA, MONEDAS, montoPlan, formatoPrecio, monedasPermitidas, monedaValida, incluyePlan, usdHabilitado, monedaPorPais } from "../tienda/planes.js";
+import configHandler, { tiendaConfig } from "../api/config.js";
+import { purchaseEvent, compraMedicion } from "../api/_tienda/meta-capi.js";
 import { COMERCIO, esMarcador } from "../tienda/comercio.js";
 import { parseCompra, chargeBody, interpretCharge } from "../api/_tienda/culqi-charge.js";
 import { parseHoja, hojaRows } from "../api/_tienda/reclamaciones.js";
@@ -33,6 +35,53 @@ for (const p of PLANES_TIENDA) {
 assert.equal(formatoSoles(2990), "S/ 29.90");
 assert.equal(planPorId("semiannual").duracionDias, 180);
 assert.equal(planPorId("annual"), null);
+
+// ── REQ-381: catálogo por moneda, formato, bandera y país ────────────────────────
+assert.deepEqual(MONEDAS, ["PEN", "USD"]);
+assert.deepEqual(PLANES_TIENDA.map((p) => [p.id, p.precios.PEN, p.precios.USD]), [["monthly", 2990, 899], ["quarterly", 7990, 2199], ["semiannual", 14990, 3999]], "precios propios en soles y dólares (decisión del 11 nov 2026)");
+for (const p of PLANES_TIENDA) {
+  assert.equal(p.precios.PEN, p.montoCentimos, p.id + ": montoCentimos sigue siendo el precio en soles");
+  assert.equal(montoPlan(p, "PEN"), p.montoCentimos);
+  assert.ok(Number.isInteger(montoPlan(p, "USD")) && montoPlan(p, "USD") >= 300, p.id + ": monto en dólares en centavos");
+  assert.deepEqual(incluyePlan(p, "PEN"), p.incluye, p.id + ": en soles, el ahorro publicado coincide con los precios");
+}
+assert.equal(montoPlan(planPorId("monthly"), "EUR"), null);
+assert.equal(montoPlan(null, "PEN"), null);
+assert.equal(incluyePlan(planPorId("quarterly"), "USD").at(-1), "Ahorro del 18 % frente a 3 meses sueltos");
+assert.equal(incluyePlan(planPorId("semiannual"), "USD").at(-1), "Ahorro del 26 % frente a 6 meses sueltos");
+assert.equal(formatoPrecio(2990, "PEN"), "S/ 29.90");
+assert.equal(formatoPrecio(899, "USD"), "USD 8.99");
+assert.equal(formatoPrecio(2990), "S/ 29.90");
+assert.equal(monedaValida("USD"), "USD");
+assert.equal(monedaValida("usd"), "");
+assert.deepEqual(monedasPermitidas(false), ["PEN"]);
+assert.deepEqual(monedasPermitidas(true), ["PEN", "USD"]);
+for (const [valor, esperado] of [["1", true], ["true", true], [" TRUE ", true], ["0", false], ["yes", false], ["", false], [undefined, false]]) {
+  assert.equal(usdHabilitado(valor), esperado, "TIENDA_USD_ENABLED=" + JSON.stringify(valor));
+}
+for (const [pais, esperado] of [["PE", "PEN"], ["pe", "PEN"], ["CL", "USD"], ["CO", "USD"], ["US", "USD"], ["", "PEN"], [undefined, "PEN"], ["XX", "PEN"], ["Chile", "PEN"]]) {
+  assert.equal(monedaPorPais(pais), esperado, "país " + JSON.stringify(pais));
+}
+// /api/config: sin bandera, soles para todos y caché pública; con bandera, sugerencia por país sin caché compartida.
+const reqPais = (pais) => ({ method: "GET", headers: pais ? { "x-vercel-ip-country": pais } : {} });
+assert.deepEqual(tiendaConfig(reqPais("CL"), {}), { usd: false, monedas: ["PEN"], monedaSugerida: "PEN" });
+assert.deepEqual(tiendaConfig(reqPais("CL"), { TIENDA_USD_ENABLED: "1" }), { usd: true, monedas: ["PEN", "USD"], monedaSugerida: "USD" });
+assert.equal(tiendaConfig(reqPais("CO"), { TIENDA_USD_ENABLED: "true" }).monedaSugerida, "USD");
+assert.equal(tiendaConfig(reqPais("PE"), { TIENDA_USD_ENABLED: "1" }).monedaSugerida, "PEN");
+assert.equal(tiendaConfig(reqPais(""), { TIENDA_USD_ENABLED: "1" }).monedaSugerida, "PEN", "país desconocido → soles");
+{
+  const headers = {};
+  const out = { status() { return this; }, json(o) { this.body = o; return this; }, setHeader(k, v) { headers[k] = v; } };
+  delete process.env.TIENDA_USD_ENABLED;
+  configHandler(reqPais("CL"), out);
+  assert.deepEqual(out.body.tienda, { usd: false, monedas: ["PEN"], monedaSugerida: "PEN" });
+  assert.match(headers["Cache-Control"], /s-maxage/);
+  process.env.TIENDA_USD_ENABLED = "1";
+  configHandler(reqPais("CL"), out);
+  assert.equal(out.body.tienda.monedaSugerida, "USD");
+  assert.match(headers["Cache-Control"], /^private/, "con dólares, la respuesta por país no se guarda en la CDN");
+  delete process.env.TIENDA_USD_ENABLED;
+}
 
 // ── Páginas: existen, se enlazan desde la portada y llevan pie con el Libro ─────
 const PAGINAS = ["planes", "pago", "terminos", "devoluciones", "privacidad", "contacto", "libro-de-reclamaciones"];
@@ -186,6 +235,58 @@ await charge(req(compra), r);
 assert.equal(r.statusCode, 503);
 process.env.CULQI_SECRET_KEY = "sk_test_mock";
 
+// ── REQ-381: moneda del pedido ───────────────────────────────────────────────────
+// Sin bandera: sin moneda o "PEN" cobra soles; "USD" y monedas desconocidas se rechazan antes de cobrar.
+delete process.env.TIENDA_USD_ENABLED;
+assert.deepEqual([parseCompra(compra).data.moneda, parseCompra(compra).data.monto], ["PEN", 7990]);
+assert.deepEqual(parseCompra({ ...compra, moneda: "PEN" }).errors, []);
+assert.match(parseCompra({ ...compra, moneda: "USD" }).errors[0], /solo puedes pagar en soles/);
+assert.match(parseCompra({ ...compra, moneda: "USD" }, { usd: false }).errors[0], /solo puedes pagar en soles/);
+assert.match(parseCompra({ ...compra, moneda: "EUR" }, { usd: true }).errors[0], /moneda no está disponible/);
+assert.match(parseCompra({ ...compra, moneda: { x: 1 } }, { usd: true }).errors[0], /moneda no está disponible/);
+// Con bandera: el monto y currency_code salen del catálogo para ese plan y esa moneda.
+let usd = parseCompra({ ...compra, moneda: "usd", amount: 1, monto: 1 }, { usd: true });
+assert.deepEqual(usd.errors, []);
+assert.deepEqual([chargeBody(usd.data).amount, chargeBody(usd.data).currency_code], [2199, "USD"], "el navegador no puede cambiar el precio en dólares");
+assert.deepEqual([chargeBody(parseCompra({ ...compra, moneda: "PEN" }, { usd: true }).data).currency_code], ["PEN"]);
+
+calls = mockChargeFetch({ profile: true });
+r = res();
+await charge(req({ ...compra, moneda: "USD" }), r);
+assert.equal(r.statusCode, 400, "sin TIENDA_USD_ENABLED el servidor rechaza dólares");
+assert.equal(calls.culqi.length, 0, "y no llama a Culqi");
+r = res();
+await charge(req({ ...compra, moneda: "JPY" }), r);
+assert.equal(r.statusCode, 400);
+assert.equal(calls.culqi.length, 0);
+
+process.env.TIENDA_USD_ENABLED = "1";
+calls = mockChargeFetch({ profile: true });
+r = res();
+await charge(req({ ...compra, planId: "semiannual", moneda: "USD" }), r);
+assert.equal(r.statusCode, 200);
+assert.deepEqual([calls.culqi[0].body.amount, calls.culqi[0].body.currency_code], [3999, "USD"]);
+assert.deepEqual([r.payload.moneda, r.payload.monto], ["USD", 3999]);
+assert.deepEqual(r.payload.compra, { eventId: "compra-chr_test_99", value: 39.99, currency: "USD" }, "el Purchase del navegador usa la moneda real");
+assert.deepEqual([calls.billing[0].payload.amount, calls.billing[0].payload.currency], [3999, "USD"], "billing_events guarda monto y moneda cobrados");
+assert.match(calls.entitlements[0].notes, /USD 39\.99$/);
+assert.match(calls.mails[0].html, /USD 39\.99/, "el comprobante por correo muestra dólares");
+// 3DS en dólares: el reintento mantiene moneda y monto.
+calls = mockChargeFetch({ profile: true, culqi: "3ds" });
+await charge(req({ ...compra, moneda: "USD" }), res());
+await charge(req({ ...compra, moneda: "USD", authentication3DS: { eci: "05", xid: "x", cavv: "c" } }), res());
+assert.deepEqual(calls.culqi.map((c) => [c.body.amount, c.body.currency_code]), [[2199, "USD"], [2199, "USD"]]);
+// Con la bandera encendida, soles sigue igual.
+calls = mockChargeFetch({ profile: true });
+r = res();
+await charge(req(compra), r);
+assert.deepEqual([calls.culqi[0].body.amount, calls.culqi[0].body.currency_code, r.payload.compra.currency, calls.billing[0].payload.currency], [7990, "PEN", "PEN", "PEN"]);
+delete process.env.TIENDA_USD_ENABLED;
+// API de conversiones: valor y moneda del cobro.
+const capiUsd = purchaseEvent({ eventId: "e", plan: planPorId("monthly"), ids: {}, client: {}, cobro: { monto: 899, moneda: "USD" }, sourceUrl: "x" });
+assert.deepEqual([capiUsd.custom_data.value, capiUsd.custom_data.currency], [8.99, "USD"]);
+assert.deepEqual(compraMedicion("chr_1", planPorId("monthly")), { eventId: "compra-chr_1", value: 29.9, currency: "PEN" }, "sin cobro, soles como antes");
+
 // ── /api/reclamaciones ─────────────────────────────────────────────────────────
 const hoja = { tipo: "reclamo", nombre: "Ana Pérez", tipoDocumento: "DNI", numeroDocumento: "12345678", email: "ana@example.com", bienDescripcion: "Plan mensual", montoReclamado: "29,90", detalle: "Me cobraron dos veces el plan.", pedido: "Devolver el cobro duplicado.", conformidad: true };
 let h = parseHoja(hoja);
@@ -255,4 +356,4 @@ await db.query("insert into billing_events(stripe_event_id,event_type,status) va
 assert.equal((await db.query("select provider from billing_events where stripe_event_id='evt_x'")).rows[0].provider, "stripe", "Stripe sigue con su valor por defecto");
 assert.equal((await db.query("select relrowsecurity from pg_class where relname='libro_reclamaciones'")).rows[0].relrowsecurity, true, "RLS activo");
 
-console.log("  ✓ tienda Culqi: catálogo, páginas, cobro, 3DS, Libro de Reclamaciones y SQL");
+console.log("  ✓ tienda Culqi: catálogo, páginas, cobro, 3DS, dólares con bandera (REQ-381), Libro de Reclamaciones y SQL");

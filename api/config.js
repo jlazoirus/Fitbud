@@ -2,8 +2,30 @@
 // entorno en Vercel. NO incluye la API key de Claude (esa solo se usa
 // server-side en /api/claude). La publishable key de Supabase es pública
 // por diseño; lo que protege la escritura es el RLS.
+import { usdHabilitado, monedaPorPais } from "../tienda/planes.js";
+
+function header(req, name) {
+  const value = req && req.headers ? req.headers[name] : "";
+  return Array.isArray(value) ? value[0] : value == null ? "" : String(value);
+}
+
+// REQ-381: con TIENDA_USD_ENABLED, la tienda ofrece dólares y sugiere la moneda
+// por el país del visitante (x-vercel-ip-country: Perú o desconocido → soles).
+// Apagada, todos ven soles y /api/culqi-charge rechaza dólares.
+export function tiendaConfig(req, source = process.env) {
+  const usd = usdHabilitado(source.TIENDA_USD_ENABLED);
+  return {
+    usd,
+    monedas: usd ? ["PEN", "USD"] : ["PEN"],
+    monedaSugerida: usd ? monedaPorPais(header(req, "x-vercel-ip-country")) : "PEN",
+  };
+}
+
 export default function handler(req, res) {
-  res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60");
+  const tienda = tiendaConfig(req);
+  // Con dólares encendidos la respuesta depende del país: no se guarda en la CDN
+  // (si no, un visitante de Lima podría recibir la sugerencia de uno de Santiago).
+  res.setHeader("Cache-Control", tienda.usd ? "private, max-age=60" : "public, max-age=60, s-maxage=60");
   res.status(200).json({
     supabase: {
       url: process.env.SUPABASE_URL || "",
@@ -31,6 +53,7 @@ export default function handler(req, res) {
       publicKey: process.env.CULQI_PUBLIC_KEY || "",
       enabled: !!process.env.CULQI_PUBLIC_KEY && !!process.env.CULQI_SECRET_KEY,
     },
+    tienda,
     // REQ-376: el ID del píxel de Meta es público. Sin él, la web pública no carga
     // el píxel (web/medicion.js). El token de la API de conversiones nunca sale de aquí.
     metaPixelId: /^\d{5,20}$/.test(String(process.env.META_PIXEL_ID || "").trim()) ? String(process.env.META_PIXEL_ID).trim() : "",
