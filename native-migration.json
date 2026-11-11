@@ -176,10 +176,10 @@
       "paths": [
         "docs/native-migration/core-inventory.md"
       ],
-      "status": "en_curso",
+      "status": "hecho",
       "owner": "codex-native-20261111",
       "claimedAt": "2026-11-11T05:35:22.731Z",
-      "doneAt": null,
+      "doneAt": "2026-11-11",
       "note": ""
     },
     {
