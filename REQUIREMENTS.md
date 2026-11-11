@@ -2479,3 +2479,9 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 ## REQ-380 - Compartir una imagen de la racha en redes sociales
 
 **Estado: implementado.** Ver `docs/requirements-history.md`.
+
+## REQ-381 - Tienda: cobro en dólares para Chile y Colombia
+
+**Estado: implementado — requiere acción humana** (Culqi habilita USD y cuenta en dólares; contador; aprobar textos legales; `TIENDA_USD_ENABLED=1` en Production). Apagado, todo sigue en soles. Pasos en `docs/tienda-usd.md`; detalle en `docs/requirements-history.md`.
+
+✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda-dolares.spec.js`.

@@ -38,9 +38,15 @@ export function compraEventId(chargeId) {
   return ("compra-" + String(chargeId || "")).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 100);
 }
 
+// REQ-381: el monto y la moneda realmente cobrados; sin `cobro`, el precio en soles.
+function cobroDe(plan, cobro) {
+  return cobro && Number.isInteger(cobro.monto) && cobro.moneda ? cobro : { monto: plan.montoCentimos, moneda: MONEDA };
+}
+
 // Lo que /pago necesita para el Purchase del navegador: valor del servidor, no del navegador.
-export function compraMedicion(chargeId, plan) {
-  return { eventId: compraEventId(chargeId), value: plan.montoCentimos / 100, currency: MONEDA };
+export function compraMedicion(chargeId, plan, cobro) {
+  const c = cobroDe(plan, cobro);
+  return { eventId: compraEventId(chargeId), value: c.monto / 100, currency: c.moneda };
 }
 
 // Identificadores de Meta que manda /pago (cookies _fbp y _fbc). Lo demás se descarta.
@@ -69,7 +75,8 @@ export function clientInfo(req) {
   };
 }
 
-export function purchaseEvent({ eventId, plan, ids, client, sourceUrl, now }) {
+export function purchaseEvent({ eventId, plan, cobro, ids, client, sourceUrl, now }) {
+  const c = cobroDe(plan, cobro);
   const userData = {};
   if (client && client.ip) userData.client_ip_address = client.ip;
   if (client && client.userAgent) userData.client_user_agent = client.userAgent;
@@ -83,8 +90,8 @@ export function purchaseEvent({ eventId, plan, ids, client, sourceUrl, now }) {
     event_source_url: sourceUrl,
     user_data: userData,
     custom_data: {
-      value: plan.montoCentimos / 100,
-      currency: MONEDA,
+      value: c.monto / 100,
+      currency: c.moneda,
       content_type: "product",
       content_ids: [plan.id],
       num_items: 1,

@@ -13825,3 +13825,46 @@ Pruebas de limpieza, vencimiento y `parseCompra`; recorrido local con llaves de 
 
 - `node scripts/test-origen-campana.mjs` (en el release gate): limpieza, primer contacto y vencimiento a 30 días, almacenamiento roto, `parseCompra`, payload y metadata con `fetch` simulado. ✓
 - `tests/e2e/campana-origen.spec.js`: `/?source=ig-bio-s1` → `/planes` → `/pago` envía `campana.source`; primer contacto y reemplazo tras 30 días; sin origen o con valores inválidos no va el campo; con el módulo bloqueado se paga igual. Culqi falso, sin llaves reales. ✓
+
+## REQ-381 - Tienda: cobro en dólares para Chile y Colombia
+
+**Estado: implementado — requiere acción humana.** PWA v236. Guía operativa: `docs/tienda-usd.md`.
+
+### Origen
+Jonathan, 11 nov 2026: vender en Santiago y Bogotá en enero–febrero 2027 y cobrar en USD con Culqi (Culqi acepta PEN y USD con `currency_code` en el cargo).
+### Problema
+La tienda solo vende en soles: un comprador de Chile o Colombia ve S/ y paga con conversión de su banco.
+### Causa raíz
+`tienda/planes.js` tenía un solo precio y `MONEDA = "PEN"` fijo; `api/_tienda/culqi-charge.js` (`chargeBody`, `payload`), `api/_tienda/meta-capi.js` (`compraMedicion`, `purchaseEvent`), `/planes`, `/pago` y `web/medicion.js` (lista blanca de `currency`) asumían soles.
+### Objetivo
+Cobrar en dólares a quien no compra desde Perú, con precios propios y sin riesgo mientras Culqi no habilite USD.
+### Alcance
+- Decisiones de Jonathan: precios propios USD 8.99 / 21.99 / 39.99 (soles sin cambio); moneda por país (Perú → PEN, resto → USD, desconocido → PEN) con `x-vercel-ip-country`; selector visible «Soles / Dólares» en `/planes` y `/pago`, recordado y llevado a `/pago`.
+- Bandera `TIENDA_USD_ENABLED` (solo `1`/`true`): apagada, soles para todos, sin selector, y el servidor rechaza USD. `/api/config` expone `tienda` (sin función nueva).
+- El navegador solo envía `moneda`; el servidor valida, toma el monto del catálogo y usa la moneda en cargo, 3DS, `billing_events`, correo, CAPI y respuesta.
+- Textos «en soles» condicionados a la bandera.
+### Fuera de alcance
+Aviso de plan de la app (sigue en soles; beta sin precios, REQ-208), `og:description`, otros medios de pago o monedas, comprobantes electrónicos.
+### Riesgos
+Culqi sin USD habilitado (mitigado por la bandera); caché CDN de `/api/config` por país (con la bandera, `private`); impuestos y comprobantes para extranjeros (contador); textos legales (aprobación humana).
+### Criterios de aceptación
+- Bandera apagada: precios, textos y cobro idénticos a hoy; `moneda: "USD"` → 400 sin llamar a Culqi.
+- Bandera encendida: CL/CO ven USD por defecto, PE y país desconocido PEN; el cambio manual persiste y llega a `/pago`; el cargo lleva el monto del catálogo y `currency_code` de la moneda elegida.
+- Moneda desconocida → 400. Un monto enviado por el navegador se ignora.
+- `billing_events.payload` guarda `amount` y `currency`; Purchase (servidor y navegador), InitiateCheckout y ViewContent usan la moneda real.
+### Verificación sugerida
+`scripts/test-tienda-culqi.mjs`, E2E con Culqi falso, release gate.
+
+### Implementación
+- `tienda/planes.js`: `precios: { PEN, USD }` por plan (`montoCentimos` sigue siendo soles), `MONEDAS`, `monedaValida`, `monedasPermitidas`, `montoPlan`, `formatoPrecio` («S/ 29.90» / «USD 8.99»; `formatoSoles` se conserva), `incluyePlan` (ahorro por moneda: 18 % y 26 % en dólares), `usdHabilitado`, `monedaPorPais`.
+- `api/config.js`: `tiendaConfig(req)` → `tienda: { usd, monedas, monedaSugerida }`; con la bandera, `Cache-Control: private, max-age=60` (antes `s-maxage` en la CDN, que mezclaría países).
+- `tienda/moneda.js` (navegador): `cargarConfig` (una sola consulta, 2,5 s de tope, nunca rechaza), `monedaTienda` (URL `?moneda=` > elección guardada `evolv_moneda` > sugerida; sin bandera siempre PEN), selector de radios nativos accesible.
+- `/planes`: precios, ahorro, nota y enlaces `?moneda=` según la moneda; ViewContent con la moneda. `/pago`: total, botón, Culqi Checkout, 3DS (`currency`, `totalAmount`), InitiateCheckout y confirmación con la moneda; el pedido lleva `moneda`; el selector se bloquea mientras se paga. Portada: precios y «Pago único en dólares» si la moneda es USD.
+- `api/_tienda/culqi-charge.js`: `parseCompra(body, { usd })` valida `moneda` (sin ella, PEN) y fija `monto` desde el catálogo; errores claros para USD apagado y monedas desconocidas. Cargo, notas del acceso, correo, `payload` y respuesta (`moneda`, `monto`, `compra.currency`) con la moneda cobrada. `meta-capi.js`: `compraMedicion` y `purchaseEvent` aceptan `cobro`.
+- `web/medicion.js`: la lista blanca admite `currency` USD.
+- `/terminos` y `/devoluciones`: frase sobre dólares solo si `/api/config` dice `tienda.usd` (sin bandera, el texto legal no cambia; `vigenciaLegal` sin cambios). Textos para aprobación en `docs/tienda-usd.md`.
+- `tienda.css?v=4`, `portada.js?v=2`, `CACHE_NAME` v236.
+
+### Verificación
+- `scripts/test-tienda-culqi.mjs`: catálogo por moneda, formato, bandera, país, `/api/config` (contenido y caché), USD rechazado sin bandera y aceptado con ella (monto, `currency_code`, 3DS), moneda desconocida, monto del navegador ignorado, `billing_events`, notas, correo y CAPI.
+- `tests/e2e/tienda-dolares.spec.js`: bandera apagada (soles, sin selector, aunque se recuerde USD), CL → USD, PE → PEN, cambio manual recordado hasta `/pago` y cobro con `moneda: "USD"` y el plan elegido. Culqi falso.

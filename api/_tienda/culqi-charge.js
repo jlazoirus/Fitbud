@@ -1,7 +1,8 @@
-// REQ-334: cobro de un plan de la tienda web con Culqi (pago único, en soles).
+// REQ-334: cobro de un plan de la tienda web con Culqi (pago único, en soles;
+// en dólares solo con TIENDA_USD_ENABLED, REQ-381).
 // POST /api/culqi-charge (reescrita a /api/checkout?op=culqi) — pública: la compra no exige cuenta (REQ-333).
 // Body: { planId, tokenId, email, firstName, lastName, phone, deviceId,
-//         acceptTerms: true, authentication3DS?, campana? }
+//         acceptTerms: true, authentication3DS?, campana?, moneda? }
 // El monto sale de tienda/planes.js, nunca del navegador. Si el cargo sale bien:
 // busca la cuenta por correo (o la invita), suma los días del plan desde el
 // vencimiento vigente y registra el cobro en billing_events (provider = culqi).
@@ -13,8 +14,12 @@
 // REQ-370: `campana` (origen de campaña de web/origen.js) es opcional; se revalida aquí
 // y solo se guarda en el payload de billing_events y en la metadata de Culqi. Nunca
 // cambia precio, plan ni acceso, y si es inválida se descarta sin frenar el pago.
+// REQ-381: `moneda` ("PEN" | "USD"; sin ella, soles) se valida contra las monedas
+// permitidas: "USD" solo con TIENDA_USD_ENABLED = "1" | "true". El monto sale del
+// catálogo para ese plan y esa moneda, y la moneda va al cargo, a billing_events,
+// al correo y a la API de conversiones.
 
-import { MONEDA, planPorId, formatoSoles } from "../../tienda/planes.js";
+import { MONEDA, planPorId, montoPlan, formatoPrecio, monedasPermitidas, usdHabilitado } from "../../tienda/planes.js";
 import { COMERCIO } from "../../tienda/comercio.js";
 import { limpiarCampana, CLAVES as CLAVES_CAMPANA } from "../../web/origen.js";
 import { metaEnv, metaIds, clientInfo, compraMedicion, purchaseEvent, sendPurchase } from "./meta-capi.js";
@@ -30,6 +35,7 @@ function env() {
     service: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
     culqiSecret: process.env.CULQI_SECRET_KEY || "",
     appUrl: (process.env.NOTIFY_APP_URL || "https://evolvapp.club").replace(/\/$/, ""),
+    usd: usdHabilitado(process.env.TIENDA_USD_ENABLED),
   };
 }
 
@@ -45,10 +51,17 @@ function clean(value, max) {
   return String(value == null ? "" : value).replace(/\s+/g, " ").trim().slice(0, max || 120);
 }
 
-export function parseCompra(body) {
+// `opciones.usd`: si la tienda acepta dólares (por defecto, la bandera del servidor).
+export function parseCompra(body, opciones = {}) {
   const b = body && typeof body === "object" ? body : {};
+  const usd = opciones.usd !== undefined ? !!opciones.usd : usdHabilitado(process.env.TIENDA_USD_ENABLED);
+  const monedaPedida = b.moneda == null || b.moneda === "" ? MONEDA : clean(b.moneda, 8).toUpperCase();
+  const moneda = monedasPermitidas(usd).includes(monedaPedida) ? monedaPedida : "";
+  const plan = planPorId(clean(b.planId, 40));
   const data = {
-    plan: planPorId(clean(b.planId, 40)),
+    plan,
+    moneda: moneda || MONEDA,
+    monto: plan && moneda ? montoPlan(plan, moneda) : null,
     tokenId: clean(b.tokenId, 80),
     email: clean(b.email, 160).toLowerCase(),
     firstName: clean(b.firstName, 50),
@@ -69,6 +82,7 @@ export function parseCompra(body) {
   }
   const errors = [];
   if (!data.plan) errors.push("El plan elegido no existe. Vuelve a Planes y elige uno.");
+  else if (!moneda || data.monto == null) errors.push(monedaPedida === "USD" ? "Por ahora solo puedes pagar en soles. Vuelve a Planes y elige Soles." : "Esa moneda no está disponible. Vuelve a Planes y elige otra vez tu plan.");
   if (!EMAIL_RE.test(data.email)) errors.push("Revisa tu correo.");
   if (!data.firstName || !data.lastName) errors.push("Escribe tu nombre y apellido.");
   if (!data.acceptTerms) errors.push("Para comprar, acepta los Términos y la Política de devoluciones.");
@@ -78,8 +92,8 @@ export function parseCompra(body) {
 
 export function chargeBody(data) {
   const body = {
-    amount: data.plan.montoCentimos,
-    currency_code: MONEDA,
+    amount: data.monto,
+    currency_code: data.moneda,
     email: data.email,
     source_id: data.tokenId,
     description: ("Evolv " + data.plan.nombre).slice(0, 80),
@@ -144,7 +158,7 @@ async function inviteUser(e, email, data) {
 
 // Mismo criterio que el webhook de Stripe: los días nuevos se suman desde el
 // vencimiento vigente para no perder días pagados.
-async function grantEntitlement(e, userId, plan, chargeId) {
+async function grantEntitlement(e, userId, plan, chargeId, cobro) {
   const existing = await fetch(e.url + "/rest/v1/user_entitlements?payment_ref=eq." + encodeURIComponent(chargeId) + "&select=id,expires_at&limit=1", { headers: svc(e) });
   const prev = await rj(existing);
   if (existing.ok && Array.isArray(prev) && prev[0]) return prev[0];
@@ -170,7 +184,7 @@ async function grantEntitlement(e, userId, plan, chargeId) {
       expires_at: expires.toISOString(),
       origin: "checkout",
       payment_ref: chargeId,
-      notes: "Culqi cargo " + chargeId + " · " + formatoSoles(plan.montoCentimos),
+      notes: "Culqi cargo " + chargeId + " · " + formatoPrecio(cobro.monto, cobro.moneda),
     }),
   });
   const data = await rj(r);
@@ -202,7 +216,9 @@ function escHtml(value) {
   return String(value == null ? "" : value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-export function receiptEmail(plan, chargeId, expiresAt, cuenta, appUrl) {
+// `cobro` = { monto, moneda } del cargo; sin él, el precio en soles del plan.
+export function receiptEmail(plan, chargeId, expiresAt, cuenta, appUrl, cobro) {
+  const pagado = cobro && Number.isInteger(cobro.monto) ? cobro : { monto: plan.montoCentimos, moneda: MONEDA };
   const vence = expiresAt ? new Date(expiresAt).toLocaleDateString("es-PE", { timeZone: "America/Lima", dateStyle: "long" }) : "";
   const paso = cuenta === "invitada"
     ? "Te llegará otro correo para crear tu contraseña. Al entrar, tu plan ya estará activo."
@@ -217,7 +233,7 @@ export function receiptEmail(plan, chargeId, expiresAt, cuenta, appUrl) {
   <p style="color:#555;margin:0 0 18px">${escHtml(paso)}</p>
   <table style="border-collapse:collapse;width:100%;font-size:14px;margin:0 0 18px">
     <tr><td style="padding:6px 10px 6px 0;color:#666">Plan</td><td>${escHtml(plan.nombre)} (${escHtml(plan.periodo)})</td></tr>
-    <tr><td style="padding:6px 10px 6px 0;color:#666">Monto</td><td>${escHtml(formatoSoles(plan.montoCentimos))}</td></tr>
+    <tr><td style="padding:6px 10px 6px 0;color:#666">Monto</td><td>${escHtml(formatoPrecio(pagado.monto, pagado.moneda))}</td></tr>
     ${vence ? `<tr><td style="padding:6px 10px 6px 0;color:#666">Acceso hasta</td><td>${escHtml(vence)}</td></tr>` : ""}
     <tr><td style="padding:6px 10px 6px 0;color:#666">Operación</td><td>${escHtml(chargeId)}</td></tr>
   </table>
@@ -246,11 +262,11 @@ async function sendReceipt(email, mail) {
 
 // Purchase por la API de conversiones: solo si está configurada y sin datos personales.
 // sendPurchase nunca rechaza; el catch cubre cualquier otro imprevisto.
-async function enviarCompraMeta(req, body, plan, compra, appUrl) {
+async function enviarCompraMeta(req, body, plan, compra, appUrl, cobro) {
   try {
     const env = metaEnv();
     if (!env.pixelId || !env.token) return;
-    const event = purchaseEvent({ eventId: compra.eventId, plan, ids: metaIds(body), client: clientInfo(req), sourceUrl: appUrl + "/pago" });
+    const event = purchaseEvent({ eventId: compra.eventId, plan, ids: metaIds(body), client: clientInfo(req), cobro, sourceUrl: appUrl + "/pago" });
     await sendPurchase(env, event);
   } catch (err) {
     console.error("meta-capi: error inesperado", String(err && err.message || err));
@@ -274,7 +290,7 @@ export default async function handler(req, res) {
     res.status(400).json({ error: "No pudimos leer el pedido. Intenta de nuevo." });
     return;
   }
-  const { errors, data } = parseCompra(body);
+  const { errors, data } = parseCompra(body, { usd: e.usd });
   if (errors.length) {
     res.status(400).json({ error: errors[0], errors });
     return;
@@ -310,11 +326,12 @@ export default async function handler(req, res) {
   // persona nunca ve un error después de haber pagado.
   const plan = data.plan;
   const chargeId = outcome.chargeId;
-  const payload = { email: data.email, amount: plan.montoCentimos, currency: MONEDA, plan_id: plan.id };
+  const cobro = { monto: data.monto, moneda: data.moneda };
+  const payload = { email: data.email, amount: cobro.monto, currency: cobro.moneda, plan_id: plan.id };
   if (data.campana) payload.campana = data.campana; // REQ-370: sin origen, el campo no existe
   // REQ-376: corre en paralelo con la activación y nunca cambia la respuesta del pago.
-  const compra = compraMedicion(chargeId, plan);
-  const capi = enviarCompraMeta(req, body, plan, compra, e.appUrl);
+  const compra = compraMedicion(chargeId, plan, cobro);
+  const capi = enviarCompraMeta(req, body, plan, compra, e.appUrl, cobro);
   let userId = null;
   let cuenta = "existente";
   try {
@@ -325,16 +342,16 @@ export default async function handler(req, res) {
       if (!userId) userId = await findUserIdByEmail(e, data.email);
     }
     if (!userId) throw new Error("No se pudo crear ni encontrar la cuenta de " + data.email);
-    const ent = await grantEntitlement(e, userId, plan, chargeId);
+    const ent = await grantEntitlement(e, userId, plan, chargeId, cobro);
     await logBilling(e, chargeId, userId, plan, ent && ent.id, "processed", payload);
-    await sendReceipt(data.email, receiptEmail(plan, chargeId, ent && ent.expires_at, cuenta, e.appUrl));
+    await sendReceipt(data.email, receiptEmail(plan, chargeId, ent && ent.expires_at, cuenta, e.appUrl, cobro));
     await capi;
-    res.status(200).json({ ok: true, cuenta, plan: plan.id, expiresAt: ent && ent.expires_at, operacion: chargeId, compra });
+    res.status(200).json({ ok: true, cuenta, plan: plan.id, moneda: cobro.moneda, monto: cobro.monto, expiresAt: ent && ent.expires_at, operacion: chargeId, compra });
   } catch (err) {
     console.error("culqi-charge: cobro sin acceso", chargeId, String(err && err.message || err));
     await logBilling(e, chargeId, userId, plan, null, "failed", payload, String(err && err.message || err));
-    await sendReceipt(data.email, receiptEmail(plan, chargeId, null, "pendiente", e.appUrl));
+    await sendReceipt(data.email, receiptEmail(plan, chargeId, null, "pendiente", e.appUrl, cobro));
     await capi;
-    res.status(200).json({ ok: true, cuenta: "pendiente", plan: plan.id, operacion: chargeId, compra });
+    res.status(200).json({ ok: true, cuenta: "pendiente", plan: plan.id, moneda: cobro.moneda, monto: cobro.monto, operacion: chargeId, compra });
   }
 }

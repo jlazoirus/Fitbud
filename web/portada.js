@@ -1,30 +1,44 @@
 // Portada pública (REQ-352). Pinta los planes desde tienda/planes.js (el mismo
 // catálogo que cobra /api/culqi-charge), los datos del comercio, la demo del día
 // y la escalera del recorrido. No carga la app ni Supabase.
-import { PLANES_TIENDA } from "/tienda/planes.js";
+import { PLANES_TIENDA, MONEDA, montoPlan, incluyePlan } from "/tienda/planes.js";
 import { COMERCIO } from "/tienda/comercio.js";
+import { monedaTienda } from "/tienda/moneda.js";
 
 const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const TICK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
-export function planesHtml(planes = PLANES_TIENDA) {
+// REQ-381: `moneda` "USD" solo llega con dólares habilitados en el servidor; entonces
+// el enlace a /pago lleva la moneda (`conMoneda`).
+export function planesHtml(planes = PLANES_TIENDA, moneda = MONEDA, conMoneda = false) {
+  const simbolo = moneda === "USD" ? "USD " : "S/";
   return planes.map((p) => {
     const isHi = !!p.destacado;
-    const items = p.incluye.map((f) => `<div class="l-plan-item">${TICK}<span>${esc(f)}</span></div>`).join("");
+    const items = incluyePlan(p, moneda).map((f) => `<div class="l-plan-item">${TICK}<span>${esc(f)}</span></div>`).join("");
     return `<div class="l-plan l-plan-store${isHi ? " highlight" : ""}">
         <img class="l-plan-img" src="${esc(p.imagen)}" alt="${esc(p.imagenAlt)}" width="1200" height="750" loading="lazy">
         ${isHi ? `<div class="l-plan-badge">${esc(p.destacado)}</div>` : ""}
         <div class="l-plan-name">${esc(p.nombre)}</div>
-        <div class="l-plan-price"><span class="l-plan-cur">S/</span>${(p.montoCentimos / 100).toFixed(2)} <span class="l-plan-period">/ ${esc(p.periodo)}</span></div>
+        <div class="l-plan-price"><span class="l-plan-cur">${simbolo}</span>${(montoPlan(p, moneda) / 100).toFixed(2)} <span class="l-plan-period">/ ${esc(p.periodo)}</span></div>
         <div class="l-plan-desc">${esc(p.descripcion)}</div>
         <div class="l-plan-items">${items}</div>
-        <a class="l-btn l-btn-lg ${isHi ? "l-btn-ink" : "l-btn-lime"}" href="/pago?plan=${encodeURIComponent(p.id)}">Comprar</a>
+        <a class="l-btn l-btn-lg ${isHi ? "l-btn-ink" : "l-btn-lime"}" href="/pago?plan=${encodeURIComponent(p.id)}${conMoneda ? "&moneda=" + moneda : ""}">Comprar</a>
       </div>`;
   }).join("");
 }
 
 const plans = document.querySelector(".l-plans");
 if (plans) plans.innerHTML = planesHtml();
+// REQ-381: con dólares habilitados, quien llega desde fuera de Perú ve sus precios en
+// dólares (el selector vive en /planes y /pago). Sin dólares o sin red, todo sigue en soles.
+monedaTienda().then(({ usd, moneda }) => {
+  if (!usd) return;
+  if (plans) plans.innerHTML = planesHtml(PLANES_TIENDA, moneda, true);
+  if (moneda !== "USD") return;
+  document.querySelectorAll('[data-lmode="heroNote"], [data-lmode="sub"], .l-cta-note').forEach((n) => {
+    for (const t of n.childNodes) if (t.nodeType === 3) t.textContent = t.textContent.replace("Pago único en soles", "Pago único en dólares");
+  });
+}).catch(() => {});
 document.querySelectorAll("[data-lcomercio]").forEach((n) => { n.textContent = `${COMERCIO.razonSocial} · RUC ${COMERCIO.ruc}`; });
 
 // Demo del día: tres imprevistos reales de la app sobre datos de ejemplo.
