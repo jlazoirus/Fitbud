@@ -186,7 +186,7 @@ async function grantBetaAccess(userId, caller, e) {
 
 // REQ-248: un override por acción con el máximo diario permitido, que vence
 // junto con el acceso beta; al vencer, vuelven las cuotas de su plan.
-// REQ-381: la cortesía manual usa la misma regla. Nunca acorta una cortesía
+// REQ-382: la cortesía manual usa la misma regla. Nunca acorta una cortesía
 // sin tope que ya vence después (o que no vence).
 async function grantUnlimitedQuota(userId, expiresAt, caller, e) {
   if (!expiresAt) throw new Error("Falta la fecha de fin del acceso.");
@@ -254,7 +254,7 @@ async function seedProfileFromApplication(userId, sub, e) {
   return patch.ok;
 }
 
-// REQ-381: cortesía manual desde Usuarios. Antes solo creaba el acceso y el
+// REQ-382: cortesía manual desde Usuarios. Antes solo creaba el acceso y el
 // coach quedaba con las cuotas normales; ahora incluye el coach sin tope hasta
 // que vence, igual que la beta (REQ-248).
 async function grantCourtesy(body, caller, e) {
@@ -1217,7 +1217,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    // REQ-381: el admin ya no fija contraseñas ajenas (habilitaba entrar
+    // REQ-382: el admin ya no fija contraseñas ajenas (habilitaba entrar
     // como el usuario). Para recuperar acceso se usa "resetPassword", que le
     // envía un correo para que la persona cree la suya.
 

@@ -1,4 +1,4 @@
-// REQ-381: las acciones del panel de usuarios muestran que están en curso,
+// REQ-382: las acciones del panel de usuarios muestran que están en curso,
 // confirman el resultado de forma visible y la cortesía incluye el coach.
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, gotoApp, autoDismissNudges, profileFixture } from "./helpers.js";
@@ -38,7 +38,7 @@ async function openUsers(page, context) {
   return { calls, card, finish: async () => { await expect.poll(() => !!release).toBe(true); release(); release = null; } };
 }
 
-test("REQ-381: activar muestra que está en curso y confirma sin recargar la lista", async ({ page, context }) => {
+test("REQ-382: activar muestra que está en curso y confirma sin recargar la lista", async ({ page, context }) => {
   const { calls, card, finish } = await openUsers(page, context);
   await expect(card.getByRole("button", { name: "Cambiar contraseña" })).toHaveCount(0);
   await expect(card.getByRole("button", { name: "Restablecer contraseña" })).toBeVisible();
@@ -59,7 +59,7 @@ test("REQ-381: activar muestra que está en curso y confirma sin recargar la lis
   await expect(page.locator("#toast")).toHaveClass(/show/);
 });
 
-test("REQ-381: reiniciar usuario muestra el progreso y deja la confirmación en pantalla", async ({ page, context }) => {
+test("REQ-382: reiniciar usuario muestra el progreso y deja la confirmación en pantalla", async ({ page, context }) => {
   const { card, finish } = await openUsers(page, context);
   page.on("dialog", (dialog) => dialog.accept());
   await card.getByRole("button", { name: "Reiniciar usuario" }).click();
@@ -77,7 +77,7 @@ test("REQ-381: reiniciar usuario muestra el progreso y deja la confirmación en 
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 
-test("REQ-381: restablecer contraseña envía un correo y explica los errores", async ({ page, context }) => {
+test("REQ-382: restablecer contraseña envía un correo y explica los errores", async ({ page, context }) => {
   const { calls, card, finish } = await openUsers(page, context);
   await card.getByRole("button", { name: "Restablecer contraseña" }).click();
   const sheet = page.getByRole("dialog");
@@ -91,7 +91,7 @@ test("REQ-381: restablecer contraseña envía un correo y explica los errores", 
   expect(calls.some((c) => c.action === "setPassword")).toBe(false);
 });
 
-test("REQ-381: la cortesía usa la duración del plan e incluye el coach sin tope", async ({ page, context }) => {
+test("REQ-382: la cortesía usa la duración del plan e incluye el coach sin tope", async ({ page, context }) => {
   const { calls, card, finish } = await openUsers(page, context);
   await card.getByRole("button", { name: "Cortesía" }).click();
   const sheet = page.getByRole("dialog");

@@ -183,7 +183,7 @@ await handler({
 assert(res.statusCode === 409, "No debe invitar un correo que ya tiene cuenta.");
 assert(!requests.some((item) => item.url.includes("/auth/v1/invite")), "No debe llamar invite si el correo ya existe.");
 
-// ── REQ-381: el admin ya no fija contraseñas ajenas ──
+// ── REQ-382: el admin ya no fija contraseñas ajenas ──
 const normalUser2 = { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", email: "user2@example.com" };
 requests = [];
 global.fetch = async (url, options = {}) => {
@@ -203,9 +203,9 @@ await handler({
 }, res);
 assert(res.statusCode === 400, "setPassword ya no debe existir.");
 assert(!requests.some((item) => item.method === "PUT" && item.url.includes("/auth/v1/admin/users/")), "No debe tocar la contraseña en Auth.");
-console.log("  REQ-381: el admin no puede fijar la contraseña de otra persona.");
+console.log("  REQ-382: el admin no puede fijar la contraseña de otra persona.");
 
-// ── REQ-381: la cortesía incluye el coach sin tope hasta que vence ──
+// ── REQ-382: la cortesía incluye el coach sin tope hasta que vence ──
 function courtesyMocks(existingOverrides) {
   requests = [];
   return async (url, options = {}) => {
@@ -285,6 +285,6 @@ await handler({
   body: { action: "grantCourtesy", userId: "no-uuid", planId: "monthly", days: 30 },
 }, res);
 assert(res.statusCode === 400, "Rechaza un usuario inválido.");
-console.log("  REQ-381: la cortesía da el coach sin tope hasta que vence, sin acortar topes más largos.");
+console.log("  REQ-382: la cortesía da el coach sin tope hasta que vence, sin acortar topes más largos.");
 
 console.log("API admin: invitación y usuario QA reiniciable verificados con mocks.");

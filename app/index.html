@@ -683,13 +683,13 @@
   .scard .l{font-size:11px;color:var(--muted);margin-top:3px}
   .toast{position:fixed;bottom:calc(var(--tabs-clearance) + 12px);left:50%;transform:translate(-50%,8px);width:max-content;max-width:min(460px,calc(100vw - 32px));background:var(--surf4);color:var(--txt);border:1px solid var(--border-2);padding:12px 18px;border-radius:16px;font-size:14px;line-height:1.4;font-weight:500;text-align:center;z-index:200;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;box-shadow:0 10px 30px rgba(0,0,0,.55)}
   .toast.show{opacity:1;transform:translate(-50%,0)}
-  /* REQ-381: el resultado de una acción se distingue por color y signo, no solo por texto */
+  /* REQ-382: el resultado de una acción se distingue por color y signo, no solo por texto */
   .toast.ok{border-color:var(--good)}
   .toast.err{border-color:var(--bad)}
   .toast.ok::before{content:"✓";color:var(--good);font-weight:700;margin-right:8px}
   .toast.err::before{content:"!";color:var(--bad);font-weight:700;margin-right:8px}
   @media(prefers-reduced-motion:reduce){.toast{transition:opacity .2s;transform:translateX(-50%)}.toast.show{transform:translateX(-50%)}}
-  /* REQ-381: botón con acción en curso */
+  /* REQ-382: botón con acción en curso */
   .btn.is-busy,.btn.is-busy:disabled{display:inline-flex;align-items:center;justify-content:center;gap:8px;opacity:.9;cursor:progress}
   .btn.is-busy .spinner{width:14px;height:14px;border-color:transparent;border-top-color:currentColor;border-right-color:currentColor}
   .admin-done{text-align:center;padding:6px 0 2px}
@@ -3035,7 +3035,7 @@ function dbStatusNote(){
    RENDER
    ============================================================ */
 const $=s=>document.querySelector(s);
-// REQ-381: el aviso dura según lo que hay que leer (antes 1,6 s fijos) y puede
+// REQ-382: el aviso dura según lo que hay que leer (antes 1,6 s fijos) y puede
 // marcar éxito o error: toast(msg,{tone:"ok"|"err",ms}).
 function toast(msg,opts){
   const t=$("#toast");if(!t)return;
@@ -16229,7 +16229,7 @@ function adminSummaryHtml(){
     <div class="scard"><div class="n">${active}</div><div class="l">activos</div></div>
     <div class="scard"><div class="n">${admins}</div><div class="l">admins activos</div></div>`;
 }
-// REQ-381: tras una acción se repinta solo la lista (sin volver arriba ni
+// REQ-382: tras una acción se repinta solo la lista (sin volver arriba ni
 // mostrar "Cargando…") y se resalta la tarjeta del usuario afectado.
 function refreshAdminUserCards(userId){
   const summary=$("#adminSummary");if(summary)summary.innerHTML=adminSummaryHtml();
@@ -16237,7 +16237,7 @@ function refreshAdminUserCards(userId){
   const card=userId&&document.querySelector(`[data-admin-user="${userId}"]`);
   if(card){card.classList.remove("field-updated");void card.offsetWidth;card.classList.add("field-updated");}
 }
-// REQ-381: estado "en curso" de un botón: spinner + verbo y bloqueado para no
+// REQ-382: estado "en curso" de un botón: spinner + verbo y bloqueado para no
 // repetir la acción. Devuelve la función que lo restaura (o null si ya corría).
 function adminBusy(btn,label){
   if(!btn||btn.getAttribute("aria-busy")==="true")return btn?null:()=>{};
@@ -16247,7 +16247,7 @@ function adminBusy(btn,label){
   btn.innerHTML=`<span class="spinner" aria-hidden="true"></span><span>${esc(label)}</span>`;
   return ()=>{btn.disabled=wasDisabled;btn.removeAttribute("aria-busy");btn.classList.remove("is-busy");btn.innerHTML=html;};
 }
-// REQ-381: confirmación que se queda en pantalla hasta que el admin la cierra.
+// REQ-382: confirmación que se queda en pantalla hasta que el admin la cierra.
 function adminDoneModal(title,detailHtml){
   hideToast();
   modal(`<div class="admin-done" role="status"><div class="admin-done-ic" aria-hidden="true">✓</div>
@@ -16808,7 +16808,7 @@ async function adminToggleActive(id,active,btn){
     toast(active?`${who} está activo. Ya puede entrar.`:`${who} quedó desactivado.`,{tone:"ok"});
   }catch(e){done();toast(adminFriendlyError(e),{tone:"err"});}
 }
-// REQ-381: el admin no fija contraseñas ajenas; le envía a la persona un
+// REQ-382: el admin no fija contraseñas ajenas; le envía a la persona un
 // correo para que cree la suya.
 function openAdminResetPassword(id){
   const user=adminUsersCache.find(u=>u.id===id);

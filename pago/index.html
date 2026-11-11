@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tienda/tienda.css?v=3">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=4">
 </head>
 <body>
   <header id="t-header"></header>
@@ -45,8 +45,9 @@
           <p class="plan-desc" id="rDesc"></p>
           <div class="fila"><span>Duración</span><span id="rPeriodo"></span></div>
           <div class="fila"><span>Renovación</span><span>No se renueva sola</span></div>
+          <div id="selectorMoneda" class="moneda-box" hidden></div>
           <div class="fila total"><span>Total</span><span id="rTotal"></span></div>
-          <p class="hint">Precio en soles, impuestos incluidos. <a href="/planes">Cambiar de plan</a></p>
+          <p class="hint"><span id="notaMoneda">Precio en soles</span>, impuestos incluidos. <a id="cambiarPlan" href="/planes">Cambiar de plan</a></p>
         </div>
       </aside>
     </div>
@@ -63,7 +64,8 @@
   <footer id="t-footer"></footer>
   <script type="module">
     import { mountLayout, esc } from "/tienda/layout.js";
-    import { planPorId, formatoSoles, MONEDA } from "/tienda/planes.js";
+    import { planPorId, formatoPrecio, montoPlan } from "/tienda/planes.js";
+    import { monedaTienda, montarSelector, cargarConfig } from "/tienda/moneda.js";
     mountLayout();
 
     // REQ-376: medición de la campaña. Import dinámico: si un bloqueador o la red
@@ -79,7 +81,20 @@
     const form = document.getElementById("compra");
     const resultado = document.getElementById("resultado");
     const pagar = document.getElementById("pagar");
-    const textoPagar = plan ? "Pagar " + formatoSoles(plan.montoCentimos) : "Pagar";
+    // REQ-381: soles, o dólares si el servidor los habilita. El navegador solo pide la
+    // moneda; /api/culqi-charge cobra el monto del catálogo para ese plan y esa moneda.
+    const tienda = await monedaTienda();
+    let moneda = tienda.moneda;
+    const monto = () => montoPlan(plan, moneda);
+    const precio = () => formatoPrecio(monto(), moneda);
+    let textoPagar = "Pagar";
+
+    function pintarPrecio() {
+      textoPagar = "Pagar " + precio();
+      document.getElementById("rTotal").textContent = precio();
+      if (!pagar.disabled) pagar.textContent = textoPagar;
+      if (tienda.usd) document.getElementById("cambiarPlan").href = "/planes?moneda=" + moneda;
+    }
 
     if (!plan) {
       document.getElementById("sinPlan").hidden = false;
@@ -92,8 +107,15 @@
       document.getElementById("rNombre").textContent = plan.nombre;
       document.getElementById("rDesc").textContent = plan.descripcion;
       document.getElementById("rPeriodo").textContent = plan.periodo + " (" + plan.duracionDias + " días)";
-      document.getElementById("rTotal").textContent = formatoSoles(plan.montoCentimos);
-      pagar.textContent = textoPagar;
+      if (tienda.usd) {
+        document.getElementById("notaMoneda").textContent = moneda === "USD" ? "Precio en dólares (USD)" : "Precio en soles";
+        montarSelector(document.getElementById("selectorMoneda"), moneda, (m) => {
+          moneda = m;
+          document.getElementById("notaMoneda").textContent = m === "USD" ? "Precio en dólares (USD)" : "Precio en soles";
+          pintarPrecio();
+        });
+      }
+      pintarPrecio();
       prefillEmail();
     }
 
@@ -139,6 +161,7 @@
 
     function ocupado(on, texto) {
       pagar.disabled = on;
+      document.querySelectorAll("#selectorMoneda input").forEach((i) => { i.disabled = on; });
       pagar.textContent = on ? (texto || "Procesando…") : textoPagar;
     }
 
@@ -153,13 +176,9 @@
       });
     }
 
-    let config = null;
     async function culqiConfig() {
-      if (config) return config;
-      const r = await fetch("/api/config", { cache: "no-store" });
-      const data = await r.json().catch(() => ({}));
-      config = data.culqi || {};
-      return config;
+      const data = await cargarConfig();
+      return data.culqi || {};
     }
 
     form.addEventListener("submit", async (event) => {
@@ -191,7 +210,7 @@
 
     function abrirCheckout(publicKey, datos, deviceId) {
       const checkout = new window.CulqiCheckout(publicKey, {
-        settings: { title: "Evolv", currency: MONEDA, amount: plan.montoCentimos },
+        settings: { title: "Evolv", currency: moneda, amount: monto() },
         client: { email: datos.email, firstName: datos.firstName, lastName: datos.lastName },
         options: {
           lang: "es",
@@ -207,7 +226,7 @@
         if (checkout.token) {
           const tokenId = checkout.token.id;
           checkout.close();
-          cobrar({ ...datos, planId: plan.id, tokenId, deviceId, ...idsMeta(), ...campanaPedido() });
+          cobrar({ ...datos, planId: plan.id, moneda, tokenId, deviceId, ...idsMeta(), ...campanaPedido() });
         } else if (checkout.error) {
           checkout.close();
           error(checkout.error.user_message || "No pudimos validar la tarjeta. Revisa los datos e intenta de nuevo.");
@@ -217,7 +236,7 @@
       checkout.open();
       ocupado(false);
       // REQ-376: medición de la campaña; el píxel nunca interrumpe el pago.
-      try { medicion.track("InitiateCheckout", { value: plan.montoCentimos / 100, currency: MONEDA, content_type: "product", content_ids: [plan.id], num_items: 1 }); } catch (_) {}
+      try { medicion.track("InitiateCheckout", { value: monto() / 100, currency: moneda, content_type: "product", content_ids: [plan.id], num_items: 1 }); } catch (_) {}
     }
 
     // Cookies del píxel (_fbp, _fbc) para la API de conversiones. Sin píxel no hay nada.
@@ -261,7 +280,7 @@
         }
       };
       window.addEventListener("message", alRecibir, false);
-      C3.settings = { charge: { totalAmount: plan.montoCentimos, returnUrl: location.href, currency: MONEDA }, card: { email: pedido.email } };
+      C3.settings = { charge: { totalAmount: montoPlan(plan, pedido.moneda), returnUrl: location.href, currency: pedido.moneda }, card: { email: pedido.email } };
       C3.options = { showModal: true, showLoading: true, showIcon: true, closeModalAction: () => { ocupado(false); } };
       C3.initAuthentication(pedido.tokenId);
     }
@@ -273,7 +292,7 @@
         pendiente: "Estamos activando tu acceso. Si en unas horas no lo ves, escríbenos con el número de operación.",
       }[out.cuenta] || "";
       document.getElementById("listoTxt").textContent = txt;
-      const filas = [["Plan", plan.nombre + " (" + plan.periodo + ")"], ["Monto", formatoSoles(plan.montoCentimos)], ["Correo", pedido.email], ["Operación", out.operacion || "—"]];
+      const filas = [["Plan", plan.nombre + " (" + plan.periodo + ")"], ["Monto", Number.isInteger(out.monto) && out.moneda ? formatoPrecio(out.monto, out.moneda) : formatoPrecio(montoPlan(plan, pedido.moneda), pedido.moneda)], ["Correo", pedido.email], ["Operación", out.operacion || "—"]];
       if (out.expiresAt) filas.splice(2, 0, ["Acceso hasta", new Date(out.expiresAt).toLocaleDateString("es-PE", { timeZone: "America/Lima", dateStyle: "long" })]);
       document.getElementById("listoFilas").innerHTML = filas.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
       document.getElementById("pago").hidden = true;

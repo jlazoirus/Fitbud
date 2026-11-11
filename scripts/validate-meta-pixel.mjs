@@ -114,7 +114,8 @@ const dirty = cleanParams({
   name: "Ana", external_id: "u1", weight: 80, health: "x", user_data: { em: "x" }, content_name: "Ana",
 });
 assert.deepEqual(dirty, { value: 79.9, currency: "PEN", content_type: "product", content_ids: ["quarterly"], num_items: 1 });
-assert.deepEqual(cleanParams({ currency: "USD", value: -1, content_ids: "x" }), {});
+assert.deepEqual(cleanParams({ currency: "EUR", value: -1, content_ids: "x" }), {});
+assert.deepEqual(cleanParams({ currency: "USD", value: 8.99 }), { currency: "USD", value: 8.99 }, "REQ-381: dólares de la tienda");
 assert.equal(validPixelId("123456789012345"), "123456789012345");
 assert.equal(validPixelId("<script>"), "");
 assert.equal(validPixelId(""), "");

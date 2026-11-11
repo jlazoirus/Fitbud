@@ -469,7 +469,7 @@ export default async function handler(req, res) {
     }
     const action = String(body.action || "");
 
-    // REQ-381: la cortesía se otorga desde api/admin.js (action "grantCourtesy"),
+    // REQ-382: la cortesía se otorga desde api/admin.js (action "grantCourtesy"),
     // que además quita el tope del coach mientras dure el acceso.
 
     // POST action:"revoke"  → admin: revocar acceso
