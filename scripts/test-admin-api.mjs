@@ -183,54 +183,108 @@ await handler({
 assert(res.statusCode === 409, "No debe invitar un correo que ya tiene cuenta.");
 assert(!requests.some((item) => item.url.includes("/auth/v1/invite")), "No debe llamar invite si el correo ya existe.");
 
-// ── setPassword (REQ-158): nunca sobre OTRO admin; sí sobre uno mismo o un usuario normal ──
-const otherAdmin = { id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", email: "otheradmin@example.com" };
+// ── REQ-382: el admin ya no fija contraseñas ajenas ──
 const normalUser2 = { id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", email: "user2@example.com" };
-function setPasswordMocks(profilesById) {
-  return async (url, options = {}) => {
-    const value = String(url);
-    if (value.endsWith("/auth/v1/user")) return response(200, admin);
-    if (value.includes("/rest/v1/profiles?id=eq." + admin.id)) {
-      return response(200, [{ id: admin.id, email: admin.email, is_admin: true, active: true }]);
-    }
-    for (const [id, profile] of Object.entries(profilesById)) {
-      if (value.includes("/rest/v1/profiles?id=eq." + id)) return response(200, [profile]);
-      if (value.includes("/auth/v1/admin/users/" + id) && (!options.method || options.method === "GET")) {
-        return response(200, { user: { id, email: profile.email } });
-      }
-      if (value.includes("/auth/v1/admin/users/" + id) && options.method === "PUT") return response(200, { user: { id } });
-    }
-    throw new Error("Ruta no simulada: " + value);
-  };
-}
-
-global.fetch = setPasswordMocks({ [otherAdmin.id]: { id: otherAdmin.id, email: otherAdmin.email, is_admin: true, active: true } });
-res = capture();
-await handler({
-  method: "POST",
-  headers: { authorization: "Bearer admin-token" },
-  body: { action: "setPassword", userId: otherAdmin.id, password: "NuevaClave123" },
-}, res);
-assert(res.statusCode === 409, "No debe permitir cambiar la contraseña de otro administrador.");
-
-global.fetch = setPasswordMocks({ [admin.id]: { id: admin.id, email: admin.email, is_admin: true, active: true } });
-res = capture();
-await handler({
-  method: "POST",
-  headers: { authorization: "Bearer admin-token" },
-  body: { action: "setPassword", userId: admin.id, password: "NuevaClave123" },
-}, res);
-assert(res.statusCode === 200 && res.body.ok === true, "Un admin sí debe poder cambiar su propia contraseña.");
-
-global.fetch = setPasswordMocks({ [normalUser2.id]: { id: normalUser2.id, email: normalUser2.email, is_admin: false, active: true } });
+requests = [];
+global.fetch = async (url, options = {}) => {
+  const value = String(url);
+  requests.push({ url: value, method: options.method || "GET", body: options.body || "" });
+  if (value.endsWith("/auth/v1/user")) return response(200, admin);
+  if (value.includes("/rest/v1/profiles?id=eq." + admin.id)) {
+    return response(200, [{ id: admin.id, email: admin.email, is_admin: true, active: true }]);
+  }
+  throw new Error("Ruta no simulada: " + value);
+};
 res = capture();
 await handler({
   method: "POST",
   headers: { authorization: "Bearer admin-token" },
   body: { action: "setPassword", userId: normalUser2.id, password: "NuevaClave123" },
 }, res);
-assert(res.statusCode === 200 && res.body.ok === true, "Cambiar la contraseña de un usuario normal sigue funcionando.");
+assert(res.statusCode === 400, "setPassword ya no debe existir.");
+assert(!requests.some((item) => item.method === "PUT" && item.url.includes("/auth/v1/admin/users/")), "No debe tocar la contraseña en Auth.");
+console.log("  REQ-382: el admin no puede fijar la contraseña de otra persona.");
 
-console.log("  setPassword (REQ-158): rechaza sobre otro admin, permite sobre uno mismo y sobre usuarios normales.");
+// ── REQ-382: la cortesía incluye el coach sin tope hasta que vence ──
+function courtesyMocks(existingOverrides) {
+  requests = [];
+  return async (url, options = {}) => {
+    const value = String(url);
+    const method = options.method || "GET";
+    requests.push({ url: value, method, body: options.body || "" });
+    if (value.endsWith("/auth/v1/user")) return response(200, admin);
+    if (value.includes("/rest/v1/profiles?id=eq." + admin.id)) {
+      return response(200, [{ id: admin.id, email: admin.email, is_admin: true, active: true }]);
+    }
+    if (value.includes("/rest/v1/profiles?id=eq." + normalUser2.id)) {
+      return response(200, [{ id: normalUser2.id, email: normalUser2.email, is_admin: false, active: true }]);
+    }
+    if (value.includes("/rest/v1/user_entitlements") && method === "POST") {
+      const row = JSON.parse(options.body);
+      return response(201, [{ id: "ffffffff-ffff-4fff-8fff-ffffffffffff", ...row }]);
+    }
+    if (value.includes("/rest/v1/coach_quota_overrides?user_id=eq.") && method === "GET") return response(200, existingOverrides);
+    if (value.includes("/rest/v1/coach_quota_overrides?on_conflict=") && method === "POST") return response(201, {});
+    throw new Error("Ruta no simulada: " + method + " " + value);
+  };
+}
+global.fetch = courtesyMocks([]);
+res = capture();
+const before = Date.now();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "grantCourtesy", userId: normalUser2.id, planId: "semiannual", days: 180, notes: "promo" },
+}, res);
+assert(res.statusCode === 201 && res.body.ok && res.body.coachUnlimited === true, "La cortesía debe quedar con el coach sin tope: " + JSON.stringify(res.body));
+const ent = JSON.parse(requests.find((r) => r.url.includes("/user_entitlements") && r.method === "POST").body);
+assert(ent.status === "courtesy" && ent.plan_id === "semiannual" && ent.granted_by === admin.id, "Debe crear el acceso de cortesía auditado.");
+const expMs = new Date(ent.expires_at).getTime() - before;
+assert(Math.abs(expMs - 180 * 86400000) < 60000, "El acceso debe durar los días pedidos.");
+const quotaRows = JSON.parse(requests.find((r) => r.url.includes("coach_quota_overrides?on_conflict=")).body);
+assert(quotaRows.length === 8, "Debe cubrir todas las acciones del coach.");
+assert(quotaRows.every((row) => row.daily_limit === 10000 && row.enabled === true && row.expires_at === ent.expires_at && row.user_id === normalUser2.id),
+  "Cada acción queda sin tope y vence junto con el acceso.");
+
+// Nunca acorta una cortesía sin tope que vence después.
+const later = new Date(Date.now() + 400 * 86400000).toISOString();
+global.fetch = courtesyMocks([
+  { action: "coach_conversation", daily_limit: 10000, expires_at: later },
+  { action: "diet_day", daily_limit: 10000, expires_at: null },
+  { action: "meal_option", daily_limit: null, expires_at: null },
+]);
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "grantCourtesy", userId: normalUser2.id, planId: "quarterly", days: 90 },
+}, res);
+const kept = JSON.parse(requests.find((r) => r.url.includes("coach_quota_overrides?on_conflict=")).body).map((row) => row.action);
+assert(kept.length === 6 && !kept.includes("coach_conversation") && !kept.includes("diet_day") && kept.includes("meal_option"),
+  "Conserva los topes ya ilimitados más largos y reemplaza los manuales: " + kept.join(","));
+
+// Si falla la cuota, el acceso queda y el admin lo ve.
+global.fetch = (() => {
+  const base = courtesyMocks([]);
+  return async (url, options = {}) => String(url).includes("coach_quota_overrides?on_conflict=")
+    ? response(500, { message: "boom" })
+    : base(url, options);
+})();
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "grantCourtesy", userId: normalUser2.id, planId: "monthly", days: 30 },
+}, res);
+assert(res.statusCode === 201 && res.body.coachUnlimited === false && /boom/.test(res.body.quotaError), "Debe informar si no se pudo quitar el tope.");
+
+res = capture();
+await handler({
+  method: "POST",
+  headers: { authorization: "Bearer admin-token" },
+  body: { action: "grantCourtesy", userId: "no-uuid", planId: "monthly", days: 30 },
+}, res);
+assert(res.statusCode === 400, "Rechaza un usuario inválido.");
+console.log("  REQ-382: la cortesía da el coach sin tope hasta que vence, sin acortar topes más largos.");
 
 console.log("API admin: invitación y usuario QA reiniciable verificados con mocks.");

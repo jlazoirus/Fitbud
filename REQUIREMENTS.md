@@ -2485,3 +2485,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 **Estado: implementado — requiere acción humana** (Culqi habilita USD y cuenta en dólares; contador; aprobar textos legales; `TIENDA_USD_ENABLED=1` en Production). Apagado, todo sigue en soles. Pasos en `docs/tienda-usd.md`; detalle en `docs/requirements-history.md`.
 
 ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda-dolares.spec.js`.
+
+## REQ-382 - Administración: acciones de usuarios con estado visible, reset por correo y cortesía con coach
+
+**Estado: implementado.** PWA v237. Detalle en `docs/requirements-history.md`. ✓ `scripts/test-admin-api.mjs`, `tests/e2e/admin-usuarios.spec.js`.

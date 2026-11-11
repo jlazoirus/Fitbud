@@ -11,8 +11,6 @@ const expectedFields = [
   { id: "recovery_confirm", autocomplete: '"new-password"', minlength: '"8"' },
   { id: "adminTestPwd", autocomplete: '"new-password"', minlength: '"8"' },
   { id: "adminTestPwdConfirm", autocomplete: '"new-password"', minlength: '"8"' },
-  { id: "adminPwd", autocomplete: '"new-password"', minlength: '"8"' },
-  { id: "adminPwdConfirm", autocomplete: '"new-password"', minlength: '"8"' },
 ];
 
 assert.ok(html.includes("function passwordField({id,label"), "Falta helper passwordField().");
@@ -33,6 +31,11 @@ for (const field of expectedFields) {
   const src = html.slice(start, end + 2);
   assert.ok(src.includes(`autocomplete:${field.autocomplete}`), `${field.id} debe conservar autocomplete.`);
   if (field.minlength) assert.ok(src.includes(`minlength:${field.minlength}`), `${field.id} debe conservar minlength.`);
+}
+
+// REQ-382: el admin ya no fija contraseñas ajenas; esos campos no deben volver.
+for (const removedId of ["adminPwd", "adminPwdConfirm"]) {
+  assert.ok(!html.includes(`passwordField({id:"${removedId}"`), `${removedId} se quitó en REQ-382 (el admin no fija contraseñas ajenas).`);
 }
 
 for (const technicalId of ["au_key", "set_key", "set_supakey"]) {
