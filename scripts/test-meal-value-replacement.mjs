@@ -19,6 +19,7 @@ const d = globalThis.FITBUD_NUTRITION_DOMAIN;
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const html = fs.readFileSync(path.join(HERE, "..", "app", "index.html"), "utf8");
+const dayModelSrc = fs.readFileSync(path.join(HERE, "..", "js", "day-model.js"), "utf8");
 
 // Extrae el código fuente de una función de nivel superior por conteo de llaves
 // (misma técnica que test-service-worker-cache.mjs usa para service-worker.js).
@@ -73,6 +74,7 @@ function runMealValue(base, ms) {
   function dishByName(name) { return DB.byName[name] || null; }
   function dishMacros(_dishId) { return { kcal: Math.round(baseKcal), p: 62, c: 68, f: 12 }; } // receta base, NO escalada
   const context = vm.createContext({ DB, dishByName, dishMacros, base, ms, console });
+  vm.runInContext(dayModelSrc, context, { filename: "js/day-model.js" });
   vm.runInContext(mealValueSrc, context, { filename: "mealValue.js" });
   return vm.runInContext("mealValue(base, ms)", context);
 }

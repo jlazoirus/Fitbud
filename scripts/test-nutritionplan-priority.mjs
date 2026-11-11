@@ -54,6 +54,7 @@ const DB = {
 function macrosFromLines() { return { kcal: 165, p: 31, c: 43, f: 4 }; } // receta BASE (100g), NO escalada
 
 const context = vm.createContext({ DB, macrosFromLines, console });
+vm.runInContext(fs.readFileSync(path.join(HERE, "..", "js", "day-model.js"), "utf8"), context, { filename: "js/day-model.js" });
 vm.runInContext(fullSrc, context, { filename: "meal-functions.js" });
 function mealValue(base, ms) { context.base = base; context.ms = ms; return vm.runInContext("mealValue(base, ms)", context); }
 function mealRecipe(b, ms) { context.b = b; context.ms = ms; return vm.runInContext("mealRecipe(b, ms)", context); }

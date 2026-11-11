@@ -69,6 +69,7 @@ for (const file of ["js/nutrition-pure.js", "js/nutrition-domain.js", "js/meal-l
 // ── Validadores de dominio ───────────────────────────────────────────────────
 console.log("\n[ Validadores de dominio ]");
 run("validate-shared-modules.mjs", "node scripts/validate-shared-modules.mjs");
+run("validate-day-model.mjs", "node scripts/validate-day-model.mjs");
 run("test-nutrition-pure.mjs", "node scripts/test-nutrition-pure.mjs");
 run("test-meal-log.mjs", "node scripts/test-meal-log.mjs");
 run("validate-contracts.mjs", "node scripts/validate-contracts.mjs");

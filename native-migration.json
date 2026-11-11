@@ -222,10 +222,10 @@
         "scripts/release-gate.mjs"
       ],
       "exclusiveGroup": "index-html",
-      "status": "en_curso",
+      "status": "hecho",
       "owner": "codex-native-20261111",
       "claimedAt": "2026-11-11T05:45:35.985Z",
-      "doneAt": null,
+      "doneAt": "2026-11-11",
       "note": ""
     },
     {

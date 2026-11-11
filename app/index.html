@@ -1212,6 +1212,7 @@
 <script src="js/nutrition-pure.js"></script>
 <!-- Dominio nutricional puro: tolerancias, macros de recetas, restricciones, slots, validadores. -->
 <script src="js/nutrition-domain.js"></script>
+<script src="js/day-model.js"></script>
 <!-- REQ-269..276: registro nutricional puro (validación, origen, composición, alimentos y recetas propios). -->
 <script src="js/meal-log.js"></script>
 <!-- Contratos de dominio: validadores sin DOM para perfil, macros, día, entitlement, sync y coach. -->
@@ -2435,33 +2436,11 @@ function weekOf(ds,prefs){
 function buildDay(ds,prefsOverride){
   const ctx=planContextForDate(ds,prefsOverride);
   const nutritionDay=!prefsOverride?activeNutritionPlanDay(ds):null;
-  let meals;
-  if(nutritionDay&&Array.isArray(nutritionDay.meals)&&nutritionDay.meals.length){
-    const slotTimes=mealSlotsForPrefs(ctx.prefs);
-    meals=nutritionDay.meals.map(m=>{
-      const meta=slotTimes.find(s=>s.id===(m.slot||m.id))||{};
-      return{
-        id:m.slot||m.id,slot:m.slot||m.id,time:meta.time||null,
-        kcal:(m.macros&&m.macros.kcal)||0,
-        p:(m.macros&&m.macros.p)||0,
-        c:(m.macros&&m.macros.c)||0,
-        f:(m.macros&&m.macros.f)||0,
-        name:m.dishName||"",
-        dishName:m.dishName||null,
-        dishSlug:m.dishSlug||null,
-        ingredientes:(m.ingredients||[]).map(i=>({
-          nombre:i.name,gramos:i.grams,ingredientSlug:i.ingredientSlug||null,
-          kcal:i.kcal||0,proteina_g:i.protein_g||0,carbohidratos_g:i.carbs_g||0,grasa_g:i.fat_g||0,
-        })),
-        src:"nutritionPlan",
-      };
-    });
-    // Una semana parcial conserva sus franjas vacías para registrar o reintentar.
-    slotTimes.forEach(s=>{if(!meals.some(m=>m.id===s.id))meals.push({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null});});
-  }else{
-    meals=mealSlotsForPrefs(ctx.prefs).map(s=>({id:s.id,slot:s.slot,time:s.time,kcal:0,p:0,c:0,f:0,name:"",dishName:null}));
-  }
-  return{ds,wd:parseYmd(ds).getDay(),type:null,week:ctx.week,target:effectiveDayTarget(),meals,workout:effectiveWorkout(ds,prefsOverride||null).workout,planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null};
+  return FITBUD_DAY_MODEL.buildDay({
+    ds,weekday:parseYmd(ds).getDay(),week:ctx.week,slots:mealSlotsForPrefs(ctx.prefs),nutritionDay,
+    target:effectiveDayTarget(),workout:effectiveWorkout(ds,prefsOverride||null).workout,
+    planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null,
+  });
 }
 
 /* ---------- ESTADO / PERSISTENCIA (localStorage) ---------- */
@@ -2890,7 +2869,13 @@ function premiumTrialDaysLeft(){
   const exp=new Date(premiumTrial.expires_at).getTime();
   return Math.max(1,Math.ceil((exp-Date.now())/86400000));
 }
-function dayState(ds){if(!S.days[ds])S.days[ds]={meals:{},extras:[],workoutDone:false};const d=S.days[ds];if(!d.meals)d.meals={};if(!d.extras)d.extras=[];return d;}
+function dayState(ds){
+  const previous=S.days[ds];
+  const normalized=FITBUD_DAY_MODEL.dayState(previous);
+  // La UI conserva referencias al día y sus comidas durante las mutaciones.
+  if(previous){Object.assign(previous,normalized);return previous;}
+  return S.days[ds]=normalized;
+}
 function mealState(ds,id){const d=dayState(ds);if(!d.meals[id])d.meals[id]={done:false};return d.meals[id];}
 // REQ-125: orden visual del día (comidas + extras), independiente de slot/horario/historial.
 function nextExtraOid(st){st.extraSeq=(st.extraSeq||0)+1;return st.extraSeq;}
@@ -2994,56 +2979,18 @@ function dishSlotMeta(dish){
   const slots=dishCompatibleSlots(dish);
   return slots.length?slots.join(", "):(dish&&dish.slot)||"?";
 }
-// Resuelve los macros de una comida:
-// 1) override manual con macros (editar valores / personalizada)
-// 2) macros calculados desde la base de datos por nombre de plato
-// 3) fallback a los valores del plan hardcodeados (DB no conectada)
+// El modelo compartido prioriza overrides y snapshots antes del catálogo.
 function mealValue(base,ms){
-  if(ms&&ms.menuUnavailable&&!ms.done)return{name:"",kcal:0,p:0,c:0,f:0,src:"unavailable"};
-  const o=ms&&ms.ovr;
-  const name=o&&o.name!=null?o.name:base.name;
-  // 1. Override manual del usuario (custom kcal o dishName explícito)
-  if(o&&o.kcal!=null&&o.dishName==null){
-    return Object.assign({name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"custom"},o.macrosUnknown?{macrosUnknown:true}:{});
-  }
-  // 1b. Reemplazo materializado (REQ-83/131/142, "Cambiar comida"/rebalanceo
-  // de futuras): el candidato ya trae sus propios macros sobre la porción
-  // ESCALADA al target del slot. Recalcular con dishMacros() de la receta
-  // BASE sin escalar contradice al encabezado con la receta/ingredientes ya
-  // escalados que se despliegan debajo y descuadra dayTotals() (REQ-154).
-  if(o&&o.gen&&o.dishName!=null&&o.kcal!=null){
-    return{name,kcal:+o.kcal||0,p:+o.p||0,c:+o.c||0,f:+o.f||0,src:"replacement"};
-  }
-  // 2. Prescripción del nutritionPlan (snapshot materializado, REQ-82) — tiene
-  // prioridad sobre la resolución por nombre de plato en el catálogo: el
-  // snapshot ya trae la porción ESCALADA al target del slot, y el catálogo
-  // puede tener un plato del mismo nombre con macros de receta BASE distintos
-  // (REQ-162). Solo se salta cuando el override cambió de plato (o.dishName
-  // presente): ahí sí debe resolver por catálogo la comida NUEVA elegida.
-  if((!o||o.dishName==null)&&base.src==="nutritionPlan"&&base.kcal>0){
-    return{name:base.name||name,kcal:base.kcal,p:base.p,c:base.c,f:base.f,src:"nutritionPlan"};
-  }
-  const dn=o&&o.dishName!=null?o.dishName:base.dishName;
-  if(dn&&DB.loaded){const d=dishByName(dn);if(d){const m=dishMacros(d.id);return{name,kcal:m.kcal,p:m.p,c:m.c,f:m.f,src:"db"};}}
-  // 3. Fallback: plan/slot vacío
-  return{name,kcal:base.kcal,p:base.p,c:base.c,f:base.f,src:"plan"};
+  return FITBUD_DAY_MODEL.mealValue(base,ms,{loaded:DB.loaded,dishByName,dishMacros});
 }
 // Un slot "Sin asignar" (sin nombre ni macros) no es contenido real: no debe
 // poder registrarse como hecho ni contar como comida cumplida (REQ-161).
-function mealHasContent(v){return!!(v&&(v.name||v.kcal||v.p||v.c||v.f));}
+function mealHasContent(v){return FITBUD_DAY_MODEL.mealHasContent(v);}
 
 // totales CONSUMIDOS (solo comidas marcadas como hechas)
 function dayTotals(ds){
   const day=buildDay(ds); const st=dayState(ds);
-  // REQ-125: una comida saltada no cuenta como pendiente ni como consumida.
-  const skippedCount=day.meals.filter(b=>st.meals[b.id]&&st.meals[b.id].skipped).length;
-  let t={kcal:0,p:0,c:0,f:0}, doneMeals=0, totMeals=day.meals.length-skippedCount+st.extras.length, partial=0;
-  day.meals.forEach(b=>{const ms=st.meals[b.id];if(ms&&ms.done){const v=mealValue(b,ms);if(mealHasContent(v)){t.kcal+=v.kcal;t.p+=v.p;t.c+=v.c;t.f+=v.f;doneMeals++;if(v.macrosUnknown)partial++;}}});
-  st.extras.forEach(e=>{if(e.done){t.kcal+=+e.kcal||0;t.p+=+e.p||0;t.c+=+e.c||0;t.f+=+e.f||0;doneMeals++;if(e.macrosUnknown)partial++;}});
-  // REQ-269/271: se suma con la precisión guardada y se redondea solo al final.
-  t={kcal:Math.round(t.kcal),p:Math.round(t.p),c:Math.round(t.c),f:Math.round(t.f)};
-  // REQ-269: `partial` cuenta comidas registradas solo con calorías (macros incompletos).
-  return {t,doneMeals,totMeals,target:day.target,partial};
+  return FITBUD_DAY_MODEL.dayTotals(day,st,{loaded:DB.loaded,dishByName,dishMacros});
 }
 
 /* ---------- ESTADO DE NAVEGACIÓN ---------- */

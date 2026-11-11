@@ -3,6 +3,7 @@
 // slot/horario/macros/historial) y saltar una comida sin que cuente como consumida.
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import vm from "node:vm";
 
 const html = fs.readFileSync(new URL("../app/index.html", import.meta.url), "utf8");
 
@@ -56,7 +57,20 @@ console.log("  Test 4 pasado: skipMeal/unskipMeal implementan saltar y deshacer 
 
 // 5. dayTotals no cuenta una comida saltada como pendiente (no infla el denominador).
 const totals = extractFunctionSource(html, "dayTotals");
-assert.ok(/skipped/.test(totals), "dayTotals debe excluir comidas saltadas del conteo de totMeals.");
+const day = {
+  target:{kcal:2000},
+  meals:["done","skipped","pending"].map(id=>({id,name:id,kcal:300,p:20,c:40,f:7})),
+};
+const state = {meals:{done:{done:true},skipped:{skipped:true}},extras:[]};
+const totalsContext = vm.createContext({
+  buildDay:()=>day,dayState:()=>state,DB:{loaded:false},dishByName:()=>null,dishMacros:()=>null,
+});
+vm.runInContext(fs.readFileSync(new URL("../js/day-model.js",import.meta.url),"utf8"),totalsContext);
+vm.runInContext(totals,totalsContext);
+const result = vm.runInContext('dayTotals("2026-11-11")',totalsContext);
+assert.equal(result.totMeals,2,"Una comida saltada no infla el denominador.");
+assert.equal(result.doneMeals,1,"Solo la comida registrada cuenta como consumida.");
+assert.equal(result.t.kcal,300,"Ni las comidas saltadas ni las pendientes suman calorías.");
 console.log("  Test 5 pasado: dayTotals excluye comidas saltadas del total de comidas del día");
 
 // 6. Home usa el orden visual para elegir la próxima comida pendiente y excluye las
