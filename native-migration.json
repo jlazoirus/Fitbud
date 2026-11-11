@@ -214,6 +214,9 @@
       "paths": [
         "js/day-model.js",
         "scripts/validate-day-model.mjs",
+      "scripts/test-meal-value-replacement.mjs",
+      "scripts/test-nutritionplan-priority.mjs",
+      "scripts/validate-meal-reorder-skip.mjs",
         "app/index.html",
         "service-worker.js",
         "scripts/release-gate.mjs"

@@ -81,6 +81,7 @@ Convenciones para todas las tareas:
 
 - **Objetivo:** `dayState`, `mealValue`, `dayTotals` y el núcleo de `buildDay` como funciones puras que reciben `state`, `catalog`, `planVersions` y `prefs` explícitos.
 - **Alcance:** nuevo `js/day-model.js` (IIFE, `FITBUD_DAY_MODEL`, comentario `// shared-module`), `app/index.html` delega en él manteniendo nombres públicos, `<script src>` y `APP_SHELL`/`CACHE_NAME` en `service-worker.js`, validador `scripts/validate-day-model.mjs` (casos: override > nutritionPlan > vacío, totales solo `done`, comidas saltadas, porciones escaladas REQ-154/162) en el release gate.
+- **Adaptación de pruebas:** `test-meal-value-replacement.mjs`, `test-nutritionplan-priority.mjs` y `validate-meal-reorder-skip.mjs` cargan el módulo real junto a los adaptadores web; mantienen las comprobaciones funcionales de REQ-125/154/162. El calendario sigue en el adaptador hasta NAT-04: `buildDay` recibe sus datos ya resueltos (franjas, snapshot, semana, fecha, meta actual y entrenamiento). La normalización pura no muta el estado; el adaptador conserva la identidad de los objetos que usa la UI.
 - **Fuera de alcance:** render, sync, cambios de comportamiento.
 - **Aceptación:** E2E sin cambios; NAT-02 pasa con el módulo nuevo.
 - **Verificación:** verde web.
