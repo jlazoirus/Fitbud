@@ -95,6 +95,7 @@ run("validate-sw-cache-bump.mjs", "node scripts/validate-sw-cache-bump.mjs");
 run("validate-admin-create-user.mjs", "node scripts/validate-admin-create-user.mjs");
 run("validate-supabase-keepalive.mjs", "node scripts/validate-supabase-keepalive.mjs");
 run("validate-notify-schedule.mjs", "node scripts/validate-notify-schedule.mjs");
+run("test-notify-latency.mjs", "node scripts/test-notify-latency.mjs");
 run("validate-reminder-journey.mjs", "node scripts/validate-reminder-journey.mjs");
 run("validate-vapid-key.mjs", "node scripts/validate-vapid-key.mjs");
 run("validate-notify-push-ready.mjs", "node scripts/validate-notify-push-ready.mjs");

@@ -14,7 +14,7 @@ REQ-364..367: Hoy con consumo, acción, agenda, técnica, avisos plegables y nav
 
 - Vanilla sin build step. REQ-352: app en `app/index.html` (`/app`, `<base href="/">`); portada en `index.html` + `web/`.
 - Modulos puros sin DOM: `js/nutrition-pure.js`, `js/nutrition-domain.js`, `domain-contracts.js`, `workout-player.js`, `training-plan.js`, `sync-conflicts.js`.
-- Vercel: estático y `api/*.js`; producción: `https://evolvapp.club/`.
+- Vercel: estático y `api/*.js`; `https://evolvapp.club/`. Avisos: `docs/notify-runtime.md`.
 - Supabase es fuente de verdad. `localStorage` espeja/cachea para offline; no debe ser la unica ubicacion de datos personales.
 - PWA: `manifest.webmanifest`, `service-worker.js`, iconos en `assets/`. la app (`/app`) sale del cache; `config.js` network-first; `/api/*` network-only.
 

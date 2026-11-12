@@ -27,6 +27,62 @@
 import webpush from "web-push";
 import { planPorId } from "../tienda/planes.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { Agent } from "node:https";
+
+// REQ-383: cron-job.org corta a los 30 s. El presupuesto incluye keep-alive,
+// lecturas, cuerpos HTTP y envíos; un timeout aborta la conexión, no solo la espera.
+const JOB_BUDGET_MS = 24000;
+const REQUEST_TIMEOUT_MS = 5000;
+const USER_CONCURRENCY = 4;
+const EMAIL_INTERVAL_MS = 600; // Cadencia conservadora: menos de 2 correos/s.
+const remainingMs = (e) => Math.max(0, (e.deadline ?? Infinity) - performance.now());
+
+async function boundedRequest(e, perform) {
+  const timeout = Math.min(REQUEST_TIMEOUT_MS, remainingMs(e));
+  if (timeout <= 0) { e.timedOut = true; throw new Error("notify_budget_exhausted"); }
+  const controller = new AbortController();
+  let timer;
+  try {
+    return await Promise.race([
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          e.timedOut = true;
+          const error = new Error("notify_upstream_timeout");
+          controller.abort(error);
+          reject(error);
+        }, timeout);
+      }),
+      perform(controller.signal),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchJson(e, url, init = {}) {
+  return boundedRequest(e, async (signal) => {
+    const r = await fetch(url, { ...init, signal });
+    const data = await r.json().catch((err) => {
+      if (signal.aborted) throw err;
+      return {};
+    });
+    signal.throwIfAborted();
+    if (!r.ok) throw new Error(data.message || data.error || "HTTP " + r.status);
+    return data;
+  });
+}
+
+async function forEachUser(e, items, visit) {
+  let next = 0;
+  const workers = await Promise.allSettled(Array.from({ length: Math.min(USER_CONCURRENCY, items.length) }, async () => {
+    while (next < items.length && remainingMs(e) > 0) {
+      await visit(items[next++]);
+    }
+  }));
+  // Esperar a todos antes de responder: no quedan envíos sueltos tras un error.
+  const failed = workers.find((r) => r.status === "rejected");
+  if (failed) throw failed.reason;
+}
 
 const VAPID_PUBLIC_KEY =
   process.env.VAPID_PUBLIC_KEY ||
@@ -74,33 +130,24 @@ function mutateHeaders(e, extra) {
 }
 
 async function supaGet(e, path) {
-  const r = await fetch(e.url + path, { headers: getHeaders(e) });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.message || data.error || "HTTP " + r.status);
+  const data = await fetchJson(e, e.url + path, { headers: getHeaders(e) });
   return Array.isArray(data) ? data : [data];
 }
 
 async function supaPatch(e, path, body) {
-  const r = await fetch(e.url + path, {
+  await fetchJson(e, e.url + path, {
     method: "PATCH",
     headers: mutateHeaders(e),
     body: JSON.stringify(body),
   });
-  if (!r.ok) {
-    const data = await r.json().catch(() => ({}));
-    throw new Error(data.message || data.error || "HTTP " + r.status);
-  }
 }
 
 async function supaPost(e, path, body, extraHeaders) {
-  const r = await fetch(e.url + path, {
+  return fetchJson(e, e.url + path, {
     method: "POST",
     headers: mutateHeaders(e, extraHeaders),
     body: JSON.stringify(body),
   });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.message || data.error || "HTTP " + r.status);
-  return Array.isArray(data) ? data : data;
 }
 
 // ── Helpers de zona horaria ───────────────────────────────────────────────────
@@ -564,18 +611,26 @@ export function reminderMessage(d, kind) {
 
 async function sendEmail(e, to, subject, html, idempotencyKey) {
   if (!e.resendKey) throw new Error("RESEND_API_KEY no configurada");
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: "Bearer " + e.resendKey,
-      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ from: e.fromEmail, to, subject, html }),
+  // Los usuarios se consultan en paralelo; los correos conservan una cola
+  // limitada para no cambiar latencia por errores 429 del proveedor.
+  const delivery = (e.emailQueue || Promise.resolve()).catch(() => {}).then(async () => {
+    const wait = Math.max(0, (e.nextEmailAt || 0) - performance.now());
+    if (remainingMs(e) <= wait) { e.timedOut = true; throw new Error("notify_budget_exhausted"); }
+    if (wait) await new Promise((resolve) => setTimeout(resolve, wait));
+    e.nextEmailAt = performance.now() + EMAIL_INTERVAL_MS;
+    const data = await fetchJson(e, "https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + e.resendKey,
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ from: e.fromEmail, to, subject, html }),
+    });
+    return data.id || "sent";
   });
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(data.message || data.error || "Resend HTTP " + r.status);
-  return data.id || "sent";
+  e.emailQueue = delivery;
+  return delivery;
 }
 
 // Todo el texto sale de reminderMessage(): ningún dato escrito por el usuario.
@@ -679,7 +734,7 @@ async function deliver(e, dryRun, results, counter, job) {
     return "log_failed";
   }
   try {
-    const out = await send();
+    const out = await send(keys[0]);
     await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
       { status: "sent", delivered_at: new Date().toISOString() }
     ).catch(() => null);
@@ -701,15 +756,25 @@ async function sendPush(e, subs, msg) {
   let ok = false;
   for (const sub of subs) {
     try {
-      await webpush.sendNotification(
-        { endpoint: sub.endpoint, keys: { p256dh: sub.keys_p256dh, auth: sub.keys_auth } },
-        payload
-      );
+      await boundedRequest(e, async (signal) => {
+        const agent = new Agent({ keepAlive: false });
+        const abort = () => agent.destroy();
+        signal.addEventListener("abort", abort, { once: true });
+        try {
+          return await webpush.sendNotification(
+            { endpoint: sub.endpoint, keys: { p256dh: sub.keys_p256dh, auth: sub.keys_auth } },
+            payload, { agent, timeout: REQUEST_TIMEOUT_MS }
+          );
+        } finally {
+          signal.removeEventListener("abort", abort);
+          agent.destroy();
+        }
+      });
       ok = true;
     } catch (err) {
       if (err.statusCode === 410) {
         // Suscripción caducada: eliminarla
-        await fetch(
+        await fetchJson(e,
           `${e.url}/rest/v1/push_subscriptions?endpoint=eq.${encodeURIComponent(sub.endpoint)}`,
           { method: "DELETE", headers: mutateHeaders(e) }
         ).catch(() => null);
@@ -791,11 +856,11 @@ async function runJob(e, dryRun) {
     "/rest/v1/notification_preferences?or=(email_opt_in.eq.true,push_opt_in.eq.true)&select=*"
   );
 
-  for (const pref of prefs) {
+  await forEachUser(e, prefs, async (pref) => {
     const { user_id, notify_hour, enabled_days, unsubscribe_token } = pref;
     const wantEmail = !!pref.email_opt_in;
     const wantPush = !!pref.push_opt_in && vapidReady;
-    if (!wantEmail && !wantPush) continue;
+    if (!wantEmail && !wantPush) return;
     const tz = safeTimezone(pref.timezone || "UTC");
     const today = todayInTz(tz);
     const hour = currentHourInTz(tz);
@@ -803,11 +868,11 @@ async function runJob(e, dryRun) {
     // 1. ¿Día habilitado? ¿Toca el resumen de la mañana (REQ-298) o ya llegó
     // la hora del aviso del día?
     const days = Array.isArray(enabled_days) ? enabled_days.map(Number) : [0, 1, 2, 3, 4, 5, 6];
-    if (!days.includes(dayOfWeekInTz(tz))) continue;
+    if (!days.includes(dayOfWeekInTz(tz))) return;
     const evening = isNotifyTime(notify_hour, tz);
     const mAt = morningHour(pref.morning_hour);
     const morning = !!pref.morning_opt_in && hour >= mAt && hour <= mAt + MORNING_LATE_HOURS && hour < (notify_hour ?? 20);
-    if (!evening && !morning) continue;
+    if (!evening && !morning) return;
 
     // 2. Perfil activo, objetivo y plan, y actividad de los últimos 60 días.
     const ctx = await loadUserContext(e, user_id, today).catch((err) => {
@@ -815,11 +880,11 @@ async function runJob(e, dryRun) {
       results.log.push({ user: user_id, date: today, action: "context_error", error: err.message });
       return null;
     });
-    if (!ctx) continue;
+    if (!ctx) return;
 
     const p = ctx.profile;
     if (morning) await sendMorning(e, dryRun, results, { pref, profile: p, rows: ctx.rows, today, hour, wantEmail, wantPush });
-    if (!evening) continue;
+    if (!evening) return;
 
     // 3. Etapa del journey.
     const decision = planReminder({
@@ -832,7 +897,7 @@ async function runJob(e, dryRun) {
       if (wantEmail && !pref.push_opt_in && p.email) {
         await maybePushInvite(e, dryRun, results, { userId: user_id, email: p.email, today, planStart: p.planStartDate, unsubToken: unsubscribe_token });
       }
-      continue;
+      return;
     }
     results.processed++;
 
@@ -848,7 +913,7 @@ async function runJob(e, dryRun) {
         : [`${user_id}:${decision.step}:${decision.ref}`];
       await deliver(e, dryRun, results, results, {
         userId: user_id, type: emailType, keys, refDate: daily ? today : decision.ref, step: decision.step,
-        send: async () => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, unsubscribe_token)) }),
+        send: async (key) => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, unsubscribe_token), key) }),
       });
     }
 
@@ -871,10 +936,15 @@ async function runJob(e, dryRun) {
         });
       }
     }
-  }
+  });
 
   await runFollowups(e, dryRun, results);
-  await runReferralCampaign(e, dryRun, results);
+  try {
+    await runReferralCampaign(e, dryRun, results);
+  } catch (err) {
+    results.errors++;
+    results.log.push({ action: "referral_campaign_error", error: err.message });
+  }
   await runPlanExpiry(e, dryRun, results);
   return results;
 }
@@ -903,7 +973,7 @@ async function sendMorning(e, dryRun, results, { pref, profile: p, rows, today, 
   } else if (wantEmail && p.email) {
     await deliver(e, dryRun, results, results, {
       userId: uid, type: "morning", keys: [`${uid}:morning:${today}`, `${uid}:push_morning:${today}`], refDate: today, step: "morning",
-      send: async () => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, pref.unsubscribe_token)) }),
+      send: async (key) => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, pref.unsubscribe_token), key) }),
     });
   }
 }
@@ -919,7 +989,7 @@ async function maybePushInvite(e, dryRun, results, { userId, email, today, planS
   const msg = reminderMessage(invite);
   await deliver(e, dryRun, results, results, {
     userId, type: "comeback", keys: [`${userId}:${invite.step}:${invite.ref}`], refDate: invite.ref, step: invite.step,
-    send: async () => ({ emailId: await sendEmail(e, email, msg.subject, buildEmailHtml(e, msg, unsubToken, { followup })) }),
+    send: async (key) => ({ emailId: await sendEmail(e, email, msg.subject, buildEmailHtml(e, msg, unsubToken, { followup }), key) }),
   });
 }
 
@@ -943,16 +1013,16 @@ async function runFollowups(e, dryRun, results) {
     return;
   }
   const hasPrefs = new Set(chose.map((r) => r.user_id));
-  for (const p of people) {
-    if (hasPrefs.has(p.id) || !p.email) continue;
+  await forEachUser(e, people, async (p) => {
+    if (hasPrefs.has(p.id) || !p.email) return;
     const tz = safeTimezone(p.timeZone || FOLLOWUP_DEFAULT_TZ);
-    if (!isNotifyTime(FOLLOWUP_HOUR, tz)) continue;
+    if (!isNotifyTime(FOLLOWUP_HOUR, tz)) return;
     const today = todayInTz(tz);
     const rows = await loadRows(e, p.id, today).catch(() => null);
     if (!rows) {
       results.errors++;
       results.log.push({ user: p.id, date: today, action: "context_error" });
-      continue;
+      return;
     }
     const created = p.created_at ? new Intl.DateTimeFormat("en-CA", { timeZone: tz }).format(new Date(p.created_at)) : null;
     const decision = planReminder({
@@ -962,15 +1032,15 @@ async function runFollowups(e, dryRun, results) {
     });
     if (!decision) {
       await maybePushInvite(e, dryRun, results, { userId: p.id, email: p.email, today, planStart: p.planStartDate, unsubToken: followupUnsubToken(e, p.id), followup: true });
-      continue;
+      return;
     }
     results.processed++;
     const msg = reminderMessage(decision);
     await deliver(e, dryRun, results, results, {
       userId: p.id, type: "comeback", keys: [`${p.id}:${decision.step}:${decision.ref}`], refDate: decision.ref, step: decision.step,
-      send: async () => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, followupUnsubToken(e, p.id), { followup: true })) }),
+      send: async (key) => ({ emailId: await sendEmail(e, p.email, msg.subject, buildEmailHtml(e, msg, followupUnsubToken(e, p.id), { followup: true }), key) }),
     });
-  }
+  });
 }
 
 // REQ-317: campaña única, 09/11/2026 09:00 Lima, con recuperación por siete días.
@@ -988,24 +1058,42 @@ export const REFERRAL_MESSAGE = {
 export async function runReferralCampaign(e, dryRun, results) {
   if (!referralCampaignDue() || !e.cronSecret) return;
   for (let offset = 0; ; offset += 200) {
+    if (remainingMs(e) <= 0) return;
     const people = await supaGet(e, "/rest/v1/profiles?active=eq.true&created_at=lte.2026-11-09T14:00:00Z&select=id,email&order=id&limit=200&offset=" + offset);
-    for (const p of people) {
+    // Lecturas por lote descartan envíos confirmados ANTES del RPC de
+    // elegibilidad. Las claves pendientes/error siguen siendo reintentables.
+    const keyFor = (p) => `${p.id}:referral_campaign:2026-11-09`;
+    const alreadySent = new Set();
+    // 50 claves mantienen la URL bajo 8 KB incluso con UUID y escapes.
+    for (let i = 0; i < people.length; i += 50) {
+      const keys = people.slice(i, i + 50).map((p) => encodeURIComponent(keyFor(p))).join(",");
+      const sent = await supaGet(e, `/rest/v1/notification_log?idempotency_key=in.(${keys})&status=eq.sent&select=idempotency_key`);
+      for (const row of sent) alreadySent.add(row.idempotency_key);
+    }
+    let migrationUnavailable = false;
+    await forEachUser(e, people, async (p) => {
+      if (migrationUnavailable) return;
+      if (alreadySent.has(keyFor(p))) { results.skipped++; return; }
+      if (!p.email) return;
       const benefit = await supaPost(e, "/rest/v1/rpc/referral_dashboard", { p_user_id: p.id, p_generate: false })
         .catch(() => null);
       if (!benefit) {
-        results.errors++; results.log.push({ action: "referral_migration_unavailable" }); return;
+        if (!migrationUnavailable) { results.errors++; results.log.push({ action: "referral_migration_unavailable" }); }
+        migrationUnavailable = true;
+        return;
       }
-      if (!benefit.eligible) continue;
+      if (!benefit.eligible) return;
       const prefs = await supaGet(e, `/rest/v1/notification_preferences?user_id=eq.${p.id}&select=email_opt_in,unsubscribe_token`);
-      if (!p.email || prefs[0]?.email_opt_in === false) continue;
+      if (prefs[0]?.email_opt_in === false) return;
       const token = prefs[0]?.unsubscribe_token || followupUnsubToken(e, p.id);
-      const key = `${p.id}:referral_campaign:2026-11-09`;
+      const key = keyFor(p);
       await deliver(e, dryRun, results, results, {
         userId: p.id, type: "comeback", keys: [key], refDate: "2026-11-09", step: "referral_campaign",
         send: async () => ({ emailId: await sendEmail(e, p.email, REFERRAL_MESSAGE.subject,
           buildEmailHtml(e, REFERRAL_MESSAGE, token, { campaign: true }), key) }),
       });
-    }
+    });
+    if (migrationUnavailable) return;
     if (people.length < 200) break;
   }
 }
@@ -1124,8 +1212,8 @@ export async function runPlanExpiry(e, dryRun, results, now = new Date()) {
 async function keepSupabaseAwake(e) {
   if (!e.url || !e.service) return false;
   try {
-    const r = await fetch(e.url + "/rest/v1/profiles?select=id&limit=1", { headers: getHeaders(e) });
-    return r.ok;
+    await supaGet(e, "/rest/v1/profiles?select=id&limit=1");
+    return true;
   } catch (_) {
     return false;
   }
@@ -1142,6 +1230,8 @@ function cronAuthorized(e, authHeader) {
 
 export default async function handler(req, res) {
   const e = env();
+  const startedAt = performance.now();
+  e.deadline = startedAt + JOB_BUDGET_MS;
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   const url = new URL(req.url, "https://x");
@@ -1167,8 +1257,15 @@ export default async function handler(req, res) {
   const dryRun = url.searchParams.get("dry_run") === "true";
   try {
     const results = await runJob(e, dryRun);
-    return res.status(200).json({ ok: true, ...results });
+    const timedOut = !!e.timedOut || remainingMs(e) <= 0;
+    const durationMs = Math.round(performance.now() - startedAt);
+    console.info(JSON.stringify({ event: "notify_job", durationMs, timedOut, processed: results.processed,
+      sent: results.sent, errors: results.errors, pushSent: results.push.sent || 0, pushErrors: results.push.errors || 0 }));
+    return res.status(timedOut ? 503 : 200).json({ ok: !timedOut, ...results, durationMs,
+      ...(timedOut ? { timedOut: true, error: "notify_timeout", retryable: true } : {}) });
   } catch (err) {
-    return res.status(500).json({ ok: false, error: err.message });
+    const timedOut = !!e.timedOut || remainingMs(e) <= 0;
+    return res.status(timedOut ? 503 : 500).json({ ok: false, error: timedOut ? "notify_timeout" : err.message,
+      durationMs: Math.round(performance.now() - startedAt), ...(timedOut ? { timedOut: true, retryable: true } : {}) });
   }
 }

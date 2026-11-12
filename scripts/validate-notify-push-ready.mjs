@@ -13,6 +13,7 @@ const keys = webpush.generateVAPIDKeys();
 
 function pushResult(extraEnv) {
   const code = `
+    console.info = () => {}; // El job registra conteos; stdout aquí es solo el fixture JSON.
     globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => [] });
     const { default: handler } = await import(${JSON.stringify(notifyUrl)});
     const res = { code: 0, body: null, status(c) { this.code = c; return this; }, json(b) { this.body = b; return this; }, setHeader() {} };

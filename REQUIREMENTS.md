@@ -2489,3 +2489,9 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 ## REQ-382 - Administración: acciones de usuarios con estado visible, reset por correo y cortesía con coach
 
 **Estado: implementado.** PWA v237. Detalle en `docs/requirements-history.md`. ✓ `scripts/test-admin-api.mjs`, `tests/e2e/admin-usuarios.spec.js`.
+
+## REQ-383 - Recordatorios: resolver el timeout recurrente del cron
+
+**Estado: implementado.**
+
+Origen: captura de Jonathan del 11/11/2026, 20:00 Lima. Problema: `/api/notify` supera los 30 s que espera cron-job.org. Causa: usuarios en serie, referidos ya enviados recalculados y red sin límite. Objetivo: completar con margen y cancelar dependencias colgadas. Alcance: cuatro usuarios concurrentes, claves enviadas por lotes, correos espaciados, presupuesto de 24 s y HTTP 503 explícito si se agota; prueba manual sin envíos. Fuera de alcance: horarios, mensajes, SQL y secretos. Riesgo: respuesta ambigua del proveedor; se conservan claves y se propagan a Resend. Aceptación y evidencia: `docs/notify-runtime.md`; fixture baja de 31,7 a 3,2 s. Verificación: `scripts/test-notify-latency.mjs`, validadores de notificaciones y release gate.

@@ -65,6 +65,9 @@
       "destination": "/api/checkout?op=reclamaciones"
     }
   ],
+  "functions": {
+    "api/notify.js": { "maxDuration": 30 }
+  },
   "crons": [
     {
       "path": "/api/notify",

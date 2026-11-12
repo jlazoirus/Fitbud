@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: "7 * * * *"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Comprobar sin enviar correos ni push"
+        type: boolean
+        default: true
 
 permissions: {}
 
@@ -20,15 +25,22 @@ jobs:
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           NOTIFY_URL: ${{ vars.NOTIFY_URL || 'https://evolvapp.club/api/notify' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
         run: |
           if [ -z "$CRON_SECRET" ]; then
             echo "::error::Falta el secreto CRON_SECRET (Settings → Secrets and variables → Actions)."
             exit 1
           fi
+          if [ "$DRY_RUN" = "true" ]; then
+            case "$NOTIFY_URL" in
+              *\?*) NOTIFY_URL="${NOTIFY_URL}&dry_run=true" ;;
+              *) NOTIFY_URL="${NOTIFY_URL}?dry_run=true" ;;
+            esac
+          fi
           status=$(curl -sS -o response.json -w "%{http_code}" --max-time 60 \
             -H "Authorization: Bearer $CRON_SECRET" "$NOTIFY_URL")
           # Solo conteos: el log del job no debe exponer usuarios ni correos.
-          node -e 'const r=JSON.parse(require("fs").readFileSync("response.json","utf8"));console.log(JSON.stringify({ok:r.ok,error:r.error,processed:r.processed,sent:r.sent,skipped:r.skipped,errors:r.errors,push:r.push}))' || cat response.json
+          node -e 'const r=JSON.parse(require("fs").readFileSync("response.json","utf8"));console.log(JSON.stringify({ok:r.ok,error:r.error,dryRun:r.dryRun,durationMs:r.durationMs,timedOut:r.timedOut,processed:r.processed,sent:r.sent,skipped:r.skipped,errors:r.errors,push:r.push,planExpiry:r.planExpiry}))'
           if [ "$status" != "200" ]; then
             echo "::error::/api/notify respondió HTTP $status"
             exit 1
