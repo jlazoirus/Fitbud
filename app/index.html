@@ -1226,6 +1226,7 @@
 <!-- Dominio nutricional puro: tolerancias, macros de recetas, restricciones, slots, validadores. -->
 <script src="js/nutrition-domain.js"></script>
 <script src="js/day-model.js"></script>
+<script src="js/api-client.js"></script>
 <!-- REQ-269..276: registro nutricional puro (validación, origen, composición, alimentos y recetas propios). -->
 <script src="js/meal-log.js"></script>
 <!-- Contratos de dominio: validadores sin DOM para perfil, macros, día, entitlement, sync y coach. -->
@@ -1256,10 +1257,21 @@ function scrollAppBottom(){const a=document.getElementById("app");if(a)a.scrollT
    ============================================================ */
 
 /* ---------- CATÁLOGO DE PLANES (REQ-25: cargado desde /api/catalog) ---------- */
+let _webApiClient=null;
+function webApiClient(){
+  if(!_webApiClient)_webApiClient=FITBUD_API_CLIENT.createApiClient({
+    baseUrl:"",client:"web",getAccessToken:()=>session&&session.access_token,
+    fetch:(url,init)=>fetch(url,init),AbortController,
+    setTimeout:(fn,ms)=>setTimeout(fn,ms),clearTimeout:id=>clearTimeout(id),
+  });
+  return _webApiClient;
+}
+// Los llamadores web conservan sus cabeceras y su lectura de Response.
+function apiFetch(route,init){return webApiClient().fetch(route,init,{auth:false});}
 let catalogPlans=null; // null=no cargado; []=sin planes; [...]= planes activos
 async function loadCatalog(){
   try{
-    const r=await fetch("/api/catalog");
+    const r=await apiFetch("/api/catalog");
     if(r.ok){const data=await r.json();if(data&&Array.isArray(data.plans)&&data.plans.length){catalogPlans=data.plans;return;}}
   }catch(_){}
   // Fallback inline para cuando /api/catalog no existe aún (local dev, GitHub Pages)
@@ -1309,7 +1321,7 @@ const CONFIG = {
 let REMOTE={supabase:{url:"",publishableKey:""},anthropic:{model:"",proxy:false},checkout:{enabled:false}};
 async function loadRemoteConfig(){
   try{
-    const r=await fetch("/api/config",{cache:"no-store"});
+    const r=await apiFetch("/api/config",{cache:"no-store"});
     if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{},checkout:j.checkout||{},signup:j.signup||{},culqi:j.culqi||{}};}
   }catch(e){/* sin funciones serverless (p.ej. GitHub Pages): se ignora */}
 }
@@ -2819,7 +2831,7 @@ async function loadEntitlement(){
   if(!session)return;
   const token=session&&session.access_token;if(!token)return;
   try{
-    const r=await fetch("/api/entitlement",{headers:{Authorization:"Bearer "+token}});
+    const r=await apiFetch("/api/entitlement",{headers:{Authorization:"Bearer "+token}});
     if(!r.ok){
       // 404=endpoint no existe aún; >=500=config faltante → no bloquear (permisivo)
       if(r.status===404||r.status>=500)return;
@@ -2844,7 +2856,7 @@ async function loadBillingHistory(){
   billingHistoryError="";
   renderBillingHistoryBox();
   try{
-    const r=await fetch("/api/entitlement?action=billing-history",{headers:{Authorization:"Bearer "+token}});
+    const r=await apiFetch("/api/entitlement?action=billing-history",{headers:{Authorization:"Bearer "+token}});
     const data=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error("No pudimos cargar tu historial ahora.");
     billingHistory=Array.isArray(data.history)?data.history:[];
@@ -9730,7 +9742,7 @@ async function saveOptionalConsents(){
 async function privacyRequest(method,body){
   const token=session&&session.access_token;
   if(!token)throw new Error("Vuelve a iniciar sesión.");
-  const response=await fetch("/api/privacy",{
+  const response=await apiFetch("/api/privacy",{
     method,
     headers:{"authorization":"Bearer "+token,...(body?{"content-type":"application/json"}:{})},
     body:body?JSON.stringify(body):undefined,
@@ -9915,7 +9927,7 @@ async function subscribePush(quiet){
   // REQ-339: errores con nombre para saber en qué paso falló activar.
   const named=(name,msg)=>Object.assign(new Error(msg),{name});
   if(!token)throw named("NoSession","Sin sesión para guardar la suscripción");
-  const r=await fetch("/api/push-subscribe",{
+  const r=await apiFetch("/api/push-subscribe",{
     method:"POST",
     headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},
     body:JSON.stringify(subJson),
@@ -9956,7 +9968,7 @@ async function savePushOptIn(checkbox){
       }
       const token=session&&session.access_token;
       if(token){
-        await fetch("/api/push-subscribe",{method:"DELETE",headers:{Authorization:"Bearer "+token}});
+        await apiFetch("/api/push-subscribe",{method:"DELETE",headers:{Authorization:"Bearer "+token}});
       }
     }catch(_){}
   }
@@ -10286,7 +10298,7 @@ async function activatePlanFromPaywall(planId){
   const btn=event&&event.target instanceof HTMLButtonElement?event.target:null;
   if(btn){btn.disabled=true;btn.textContent="Redirigiendo…";}
   try{
-    const r=await fetch("/api/checkout",{
+    const r=await apiFetch("/api/checkout",{
       method:"POST",
       headers:{"content-type":"application/json","Authorization":"Bearer "+session.access_token},
       body:JSON.stringify({planId}),
@@ -10354,7 +10366,7 @@ async function redeemCoupon(btn){
   if(!code){toast("Ingresa tu código de acceso.");if(input)input.focus();return;}
   if(btn){btn.disabled=true;btn.textContent="Canjeando…";}
   try{
-    const r=await fetch("/api/entitlement",{
+    const r=await apiFetch("/api/entitlement",{
       method:"POST",
       headers:{"content-type":"application/json","Authorization":"Bearer "+token},
       body:JSON.stringify({action:"redeem",code})
@@ -10375,7 +10387,7 @@ let referralState=null;
 async function referralRequest(generate=false){
   const token=session&&session.access_token;
   if(!token)throw new Error("Inicia sesión para ver tus invitaciones.");
-  const r=await fetch("/api/entitlement"+(generate?"":"?action=referrals"),{
+  const r=await apiFetch("/api/entitlement"+(generate?"":"?action=referrals"),{
     method:generate?"POST":"GET",headers:{Authorization:"Bearer "+token,...(generate?{"content-type":"application/json"}:{})},
     ...(generate?{body:JSON.stringify({action:"referral-generate"})}:{})
   });
@@ -10480,7 +10492,7 @@ async function redeemPendingInvite(){
   if(!code||!token||_inviteRedeeming)return;
   _inviteRedeeming=true;
   try{
-    const r=await fetch("/api/entitlement",{
+    const r=await apiFetch("/api/entitlement",{
       method:"POST",
       headers:{"content-type":"application/json","Authorization":"Bearer "+token},
       body:JSON.stringify({action:"redeem",code})
@@ -10844,7 +10856,7 @@ async function inviteSignUp(email,pwd,out){
   if(!code){if(out)out.textContent="Escribe tu código de invitación.";const c=$("#au_code");if(c)c.focus();return;}
   let data={};
   try{
-    const r=await fetch("/api/entitlement",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"invite-signup",code,email,password:pwd})});
+    const r=await apiFetch("/api/entitlement",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"invite-signup",code,email,password:pwd})});
     data=await r.json().catch(()=>({}));
     if(!r.ok){if(out)out.textContent="⚠️ "+(data.error||"No pudimos crear tu cuenta. Intenta de nuevo.");return;}
   }catch(e){if(out)out.textContent="⚠️ Sin conexión. Intenta de nuevo.";return;}
@@ -12830,44 +12842,11 @@ function coachQuota(action,requestId,partKey,fallbackText,validation,scope){
 }
 const COACH_FETCH_TIMEOUT_MS=90000;
 async function coachProxyFetch(payload){
-  let lastError=null;
-  for(let attempt=0;attempt<2;attempt++){
-    try{
-      // REQ-175: tope por intento para que la capa de espera nunca quede colgada.
-      const controller=new AbortController();
-      const timer=setTimeout(()=>controller.abort(),COACH_FETCH_TIMEOUT_MS);
-      let res,data;
-      try{
-        res=await fetch("/api/claude",{
-          method:"POST",headers:{"content-type":"application/json","authorization":"Bearer "+session.access_token},
-          body:JSON.stringify(payload),signal:controller.signal
-        });
-        // El límite incluye el cuerpo: recibir cabeceras no termina la respuesta.
-        data=await res.json().catch(e=>{if(controller.signal.aborted)throw e;return {};});
-        if(controller.signal.aborted)throw new DOMException("Timeout","AbortError");
-      }catch(fetchError){
-        if(fetchError&&fetchError.name==="AbortError")throw new Error("Tu coach tardó demasiado en responder. Inténtalo de nuevo en un momento.");
-        throw fetchError;
-      }finally{clearTimeout(timer);}
-      if(res.status===409&&attempt===0){await new Promise(resolve=>setTimeout(resolve,350));continue;}
-      if(res.status===402){
-        const err=new Error(data.error||"Activa tu plan para usar esta función.");
-        err.paywall=true;err.expired=!!(data&&data.expired);err.trialLimit=!!(data&&data.trialLimit);err.trial=(data&&data.trial)||null;
-        throw err;
-      }
-      if(res.status===404)throw new Error("El proxy /api/claude no está disponible. Despliega en Vercel o usa una configuración local de desarrollo.");
-      if(!res.ok){const err=new Error(data.error||("Error "+res.status));err.status=res.status;if(data.code)err.code=String(data.code);throw err;}
-      return data;
-    }catch(e){
-      lastError=e;
-      if(attempt===0&&/fetch|network|conexi|proceso/i.test(String(e&&e.message||e))){
-        await new Promise(resolve=>setTimeout(resolve,250));
-        continue;
-      }
-      throw e;
-    }
-  }
-  throw lastError||new Error("No se pudo contactar al coach.");
+  return webApiClient().coach(payload,{
+    timeoutMs:COACH_FETCH_TIMEOUT_MS,
+    notFoundMessage:"El proxy /api/claude no está disponible. Despliega en Vercel o usa una configuración local de desarrollo.",
+    paywallMessage:"Activa tu plan para usar esta función.",
+  });
 }
 // REQ-123: expone si la última respuesta fue "reutilizada" (cupo de frescas agotado)
 // para que los botones de "otra opción" puedan avisar en vez de parecer no hacer nada.
@@ -17880,7 +17859,7 @@ function trackEvent(type,props){
   if(!session)return;
   try{
     const safe=filterEventProps(props||{});
-    fetch("/api/analytics",{
+    apiFetch("/api/analytics",{
       method:"POST",
       headers:{"content-type":"application/json","Authorization":"Bearer "+session.access_token},
       body:JSON.stringify({event_type:type,properties:safe,session_id:analyticsSessionId()}),
@@ -17891,7 +17870,7 @@ async function renderAnalytics(){
   if(!isAdmin()){setView("hoy");return;}
   $("#app").innerHTML=`${screenHeader("Analítica","Producto, IA y costos","perfil")}<div class="dash muted small">Cargando métricas…</div>`;
   try{
-    const r=await fetch("/api/analytics",{headers:{Authorization:"Bearer "+session.access_token}});
+    const r=await apiFetch("/api/analytics",{headers:{Authorization:"Bearer "+session.access_token}});
     const data=await r.json().catch(()=>({}));
     if(!r.ok){
       $("#app").innerHTML=`${screenHeader("Analítica","Producto, IA y costos","perfil")}<div class="ai-box">⚠️ ${esc(data.error||"Error al cargar analítica")}</div>`;

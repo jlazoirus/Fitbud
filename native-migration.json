@@ -318,10 +318,10 @@
         "scripts/release-gate.mjs"
       ],
       "exclusiveGroup": "index-html",
-      "status": "en_curso",
+      "status": "hecho",
       "owner": "codex-native-api-20261113",
       "claimedAt": "2026-11-13T22:14:11.400Z",
-      "doneAt": null,
+      "doneAt": "2026-11-13",
       "note": ""
     },
     {
