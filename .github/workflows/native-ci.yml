@@ -94,13 +94,6 @@ jobs:
       - name: Formato
         working-directory: native
         run: npm run format:check
-      - name: Fixture temporal de aceptación negativa (retirar antes de integrar)
-        run: |
-          cat > native/tests/ci-negative.test.ts <<'TEST'
-          test('NAT-27 detecta una aserción rota', () => {
-            expect(1).toBe(2);
-          });
-          TEST
       - name: Tests nativos
         working-directory: native
         run: npm test -- --ci
