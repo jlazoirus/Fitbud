@@ -49,7 +49,7 @@ Estado al 13 nov, leído del planificador de Metricool. Todas las piezas van a F
 | Mar 24 nov, 18:00 | Registrar da pereza | Confesiones 02 | S2-P2 · "Tengo 3 apps. No uso ninguna" | Programado |
 | Mié 25 nov, 12:00 | Registrar da pereza | Consejo | S2-C · "El error que frena tu progreso" (todo o nada) | Programado |
 | Jue 26 nov, 18:00 | Registrar da pereza | Don Imprevisto 02 | S2-P4 · La torta de la oficina | Programado · depende de la prueba |
-| Vie 27 nov, 18:00 | Registrar da pereza | Detrás del club 02 | S2-P5 · La beta que cobraba el primer día | **Borrador: espera aprobación** |
+| Vie 27 nov, 18:00 | Registrar da pereza | Detrás del club 02 | S2-P5 · La beta que cobraba el primer día | Programado |
 | Dom 29 nov, 18:00 | Registrar da pereza | Encontré mi Plan B 02 | S2-P6 · "Domingo en la noche: tu semana ya armada" | Programado |
 | Lun 30 nov, 18:00 | Volver sin empezar de cero | Esto / Esto | S3-P1 · Volver al gym sin romperte | Programado |
 | Mar 1 dic, 18:00 | Volver sin empezar de cero | Confesiones 03 | S3-P2 · Las zapatillas nuevas | Programado |
