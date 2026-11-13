@@ -680,10 +680,10 @@
         "package.json",
         "package-lock.json"
       ],
-      "status": "en_curso",
+      "status": "hecho",
       "owner": "codex-native-20261113",
       "claimedAt": "2026-11-13T22:06:53.019Z",
-      "doneAt": null,
+      "doneAt": "2026-11-13",
       "note": ""
     },
     {
