@@ -2482,7 +2482,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-381 - Tienda: cobro en dólares para Chile y Colombia
 
-**Estado: implementado — requiere acción humana** (Culqi habilita USD y cuenta en dólares; contador; aprobar textos legales; `TIENDA_USD_ENABLED=1` en Production). Apagado, todo sigue en soles. Pasos en `docs/tienda-usd.md`; detalle en `docs/requirements-history.md`.
+**Estado: implementado y activo** (13 nov 2026: Culqi habilitó USD y acepta tarjetas extranjeras con 3DS; el contador confirmó que no hay IGV para compradores del extranjero; Jonathan aprobó los textos de `/terminos` y `/devoluciones`; `TIENDA_USD_ENABLED=1` en Production). Pasos en `docs/tienda-usd.md`; detalle en `docs/requirements-history.md`.
 
 ✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda-dolares.spec.js`.
 

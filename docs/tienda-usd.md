@@ -1,5 +1,8 @@
 # Tienda en dólares (REQ-381)
 
+
+> **Estado (13 nov 2026): activo.** Culqi habilitó USD y acepta tarjetas extranjeras con 3DS; el contador confirmó que no hay IGV para compradores del extranjero (los precios publicados no cambian); Jonathan aprobó los textos de `/terminos` y `/devoluciones` (`vigenciaLegal` = 13 nov 2026); `TIENDA_USD_ENABLED=1` en Production. `/privacidad` no cambia.
+
 Para vender en Santiago y Bogotá (enero–febrero 2027), la tienda web cobra también en dólares (USD) con Culqi. Todo el camino en dólares está apagado hasta que Culqi lo habilite en la cuenta del comercio y se encienda la bandera `TIENDA_USD_ENABLED` en Vercel.
 
 ## Precios
