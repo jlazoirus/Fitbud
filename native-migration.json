@@ -680,9 +680,9 @@
         "package.json",
         "package-lock.json"
       ],
-      "status": "pendiente",
-      "owner": null,
-      "claimedAt": null,
+      "status": "en_curso",
+      "owner": "codex-native-20261113",
+      "claimedAt": "2026-11-13T22:06:53.019Z",
       "doneAt": null,
       "note": ""
     },
