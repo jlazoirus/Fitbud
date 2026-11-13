@@ -130,9 +130,9 @@ Seis piezas por semana, sobre todo reels, siempre el mismo día para crear costu
 |---|---|---|---|
 | Lun | **Esto / Esto** | Carrusel | Dar algo útil que se guarde |
 | Mar | **Confesiones** | Reel de texto | Que digan "me pasa" y etiqueten |
-| Mié | **La pregunta** | Historia | Escuchar y juntar material |
+| Mié | **Consejo** + **La pregunta** | Reel e historia | Lo práctico que más vistas trae, y escuchar |
 | Jue | **Don Imprevisto** | Reel de personaje | El humor y la marca que se recuerda |
-| Vie | **Detrás del club** | Reel del equipo | Leer lo que escribió la gente y contar cómo se construye |
+| Vie | **Detrás del club** | Reel de texto | Leer lo que escribió la gente y contar cómo se construye |
 | Dom | **Encontré mi Plan B** | Reel con la app real | Mostrar Evolv e invitar a inscribirse |
 
 **Reglas para que sea comunidad y no solo contenido:**
@@ -180,10 +180,10 @@ Primero lo real. Lo generado solo acompaña.
 
 ## 9. Cadencia
 
-- 6 piezas por semana, de lunes a domingo, según el calendario.
+- 6 piezas por semana según el calendario, dentro de las 20 publicaciones al mes del plan gratis de Metricool.
 - Una sesión de producción los sábados para la semana siguiente.
 - Una idea, varios formatos: el mismo vertical va a Reels y TikTok.
-- Hora inicial: 19:30 de Lima. Es una suposición hasta tener datos de mejor horario por red.
+- Horas de Lima según el mapa de mejores horas de Metricool: 18:00 de lunes a viernes, 12:00 para los Consejos y 10:00 los domingos.
 - Cada comentario, DM o respuesta de encuesta va al banco de ideas.
 
 ---
