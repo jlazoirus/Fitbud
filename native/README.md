@@ -33,14 +33,25 @@ La exportación genera JavaScript, recursos y bytecode Hermes para iOS y Android
 
 Los perfiles `development`, `preview` y `production` tienen canales separados. `development` usa un cliente de desarrollo. `preview` distribuye internamente y `production` incrementa la numeración de builds gestionada por EAS.
 
-Después de que Jonathan habilite las cuentas, registrar el proyecto con `npx eas-cli@latest init` y configurar el identificador público `EAS_PROJECT_ID` en el entorno local y en los tres entornos de EAS. La configuración dinámica lee ese valor. Los identificadores provisionales `club.evolvapp.app` se sustituyen con `IOS_BUNDLE_IDENTIFIER` y `ANDROID_PACKAGE_NAME` cuando NAT-H2 los confirme.
+NAT-29 vincula el código con [@jlazo/evolv](https://expo.dev/accounts/jlazo/projects/evolv), creado y verificado en Expo el 2026-11-13. `app.config.ts` fija el owner `jlazo` y el projectId público `8ca822d7-81ed-4428-969d-bbcd1f586b0b`. El mismo ID determina `extra.eas.projectId` y `updates.url`. No hace falta un `.env` para esta vinculación.
+
+La sesión del navegador y la del terminal son independientes. Para autenticar EAS CLI y comprobar la asociación desde este directorio:
 
 ```sh
-npx eas-cli@latest build --profile development --platform android
-npx eas-cli@latest build --profile preview --platform all
+npx eas-cli@27.9.0 login --device
+npx eas-cli@27.9.0 project:info
 ```
 
-Las credenciales de firma se gestionan en EAS. El repositorio solo guarda identificadores públicos. La configuración bloquea un build de EAS sin `EAS_PROJECT_ID`. Localmente las actualizaciones permanecen desactivadas hasta vincularlo.
+`native/.env.example` documenta los overrides públicos `EAS_PROJECT_ID` y `EXPO_OWNER` para un proyecto aislado de QA; configurar ambos al cambiar de cuenta. Un UUID inválido o un owner vacío detiene la configuración. No guardar credenciales en esos archivos.
+
+Los identificadores provisionales `club.evolvapp.app` se sustituyen con `IOS_BUNDLE_IDENTIFIER` y `ANDROID_PACKAGE_NAME` cuando NAT-H2 los confirme. Crear el proyecto no cierra NAT-H2/H5: aún faltan cuentas de tiendas, firma y credenciales push. Después de esos gates:
+
+```sh
+npx eas-cli@27.9.0 build --profile development --platform android
+npx eas-cli@27.9.0 build --profile preview --platform all
+```
+
+Las credenciales de firma se gestionan en EAS. El repositorio solo guarda identificadores públicos. Las actualizaciones quedan asociadas al proyecto de Evolv y conservan la política de compatibilidad `fingerprint`; la vinculación no publica un build ni una actualización OTA.
 
 `expo-updates` está instalado desde el primer hito, con compatibilidad basada en `fingerprint`. La publicación gradual y las aprobaciones están previstas en NAT-64. Sus reglas viven en `../docs/native-migration/PUBLICACION.md`.
 
@@ -64,7 +75,7 @@ Las instalaciones npm de la raíz y de `native/` son independientes. `metro.conf
 
 Verificación del puente: TypeScript y ESLint verdes, 10 pruebas Jest en total (6 del puente), exportación de iOS/Android a bytecode Hermes y web completada. La vista web arranca a 390 × 844 sin errores ni desbordamiento, con los siete namespaces presentes y un cálculo de macros comprobado. Los casos de dominio cubren recetas, metas, plan de cuatro semanas, restauración de series/temporizador, pausa por ausencia y merge/conflicto entre dispositivos, conservando los snapshots de entrada.
 
-**NAT-21 conserva pendiente la aceptación en un dispositivo o simulador con Hermes.** Este Mac tiene Command Line Tools, pero no Xcode completo, Android SDK ni una sesión Expo/EAS vinculada. El compilador `hermesc` incluido permite generar bytecode; no ejecuta la app. Tras NAT-H2/H5, generar un cliente de desarrollo, iniciar la app y comprobar el arranque sin errores en iOS y Android antes de cerrar la tarea. La migración aún no tiene autenticación ni pantallas de producto.
+**NAT-21 conserva pendiente la aceptación en un dispositivo o simulador con Hermes.** Este Mac tiene Command Line Tools, pero no Xcode completo ni Android SDK. La cuenta y el proyecto Expo/EAS ya existen (NAT-29); la autenticación del terminal se comprueba por separado. El compilador `hermesc` incluido permite generar bytecode; no ejecuta la app. Tras NAT-H2/H5, generar un cliente de desarrollo, iniciar la app y comprobar el arranque sin errores en iOS y Android antes de cerrar la tarea. La migración aún no tiene autenticación ni pantallas de producto.
 
 La regresión web que precede al puente pasó 333/333 E2E y todos los checks funcionales del gate (120/121; el único fallo es la rama de trabajo, excepción documentada en `NATIVE_AGENT.md`). El fixture de recordatorios se verificó en las 24 horas UTC. Las evidencias locales están en `/Users/jonathan/.fitbros/qa-archive/native-kickoff/`.
 

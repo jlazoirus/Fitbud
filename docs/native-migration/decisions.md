@@ -10,7 +10,7 @@ Aquí se anotan las respuestas a las tareas `NAT-Hx` (ver `BACKLOG.md`). Solo in
 | NAT-H2 | Cuentas de tienda, bundle id, Team ID, huella SHA-256 Android | | | pendiente |
 | NAT-H3 | Modelo de cobro dentro de las apps | 2026-11-05 | Jonathan | Decidido: cobro solo en la web (Culqi); las apps no venden, no enlazan a comprar y no canjean cupones; leen el acceso del servidor. Contingencia de compra integrada si una tienda la exige (`COBRO-WEB.md`). Cierre formal pendiente de la validación en beta con App Store y Google Play. |
 | NAT-H4 | Privacidad para tiendas y excepción acotada a REQ-31 | | | pendiente |
-| NAT-H5 | Expo/EAS (projectId), Firebase, APNs | | | pendiente |
+| NAT-H5 | Expo/EAS (projectId), Firebase, APNs | 2026-11-13 | Jonathan / Codex | Parcial: cuenta `jlazo` activa; proyecto `@jlazo/evolv` creado por instrucción de Jonathan y verificado en el panel. Firebase, APNs, firma y cierre humano siguen pendientes. |
 | NAT-H6 | Migraciones nativas aplicadas en producción | | | pendiente |
 | NAT-H7 | Fichas de tienda y formularios aprobados | | | pendiente |
 | NAT-H8 | Go/no-go beta y público; convivencia PWA | | | pendiente |
@@ -20,5 +20,7 @@ Aquí se anotan las respuestas a las tareas `NAT-Hx` (ver `BACKLOG.md`). Solo in
 - Bundle id iOS / package Android: _(pendiente NAT-H2)_
 - Apple Team ID: _(pendiente NAT-H2)_
 - SHA-256 del certificado de firma Android: _(pendiente NAT-H2)_
-- EAS projectId: _(pendiente NAT-H5)_
+- Cuenta Expo: `jlazo` (Jonathan Lazo).
+- Proyecto: [@jlazo/evolv](https://expo.dev/accounts/jlazo/projects/evolv).
+- EAS projectId: `8ca822d7-81ed-4428-969d-bbcd1f586b0b` (público; creado y verificado el 2026-11-13, NAT-29).
 - Productos de compra integrada por plataforma: ninguno (cobro solo en la web); solo se definen si se activa la contingencia de NAT-H3.

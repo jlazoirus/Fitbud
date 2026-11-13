@@ -1,16 +1,22 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 export default function appConfig({ config }: ConfigContext): ExpoConfig {
-  const projectId = process.env.EAS_PROJECT_ID;
+  // Identificadores públicos del proyecto creado y verificado en Expo (NAT-29).
+  const projectId = (process.env.EAS_PROJECT_ID ?? '8ca822d7-81ed-4428-969d-bbcd1f586b0b').trim();
+  const owner = (process.env.EXPO_OWNER ?? 'jlazo').trim();
 
-  if (process.env.EAS_BUILD === 'true' && !projectId) {
-    throw new Error('Configura EAS_PROJECT_ID antes de generar un build en EAS.');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+    throw new Error('EAS_PROJECT_ID debe ser el UUID público del proyecto de Expo.');
+  }
+  if (!/^[a-z0-9][a-z0-9_-]*$/i.test(owner)) {
+    throw new Error('EXPO_OWNER debe ser el nombre de la cuenta o equipo de Expo.');
   }
 
   return {
     ...config,
     name: 'Evolv',
     slug: 'evolv',
+    owner,
     version: '0.1.0',
     scheme: 'evolv',
     orientation: 'portrait',
@@ -37,11 +43,11 @@ export default function appConfig({ config }: ConfigContext): ExpoConfig {
     ],
     runtimeVersion: { policy: 'fingerprint' },
     updates: {
-      enabled: Boolean(projectId),
-      ...(projectId ? { url: `https://u.expo.dev/${projectId}` } : {}),
+      enabled: true,
+      url: `https://u.expo.dev/${projectId}`,
     },
     extra: {
-      ...(projectId ? { eas: { projectId } } : {}),
+      eas: { projectId },
     },
   };
 }
