@@ -58,52 +58,17 @@ Automatizable por el agente desarrollador:
 
 REQ-81..84 (planner determinista, versionado en `plan_versions`, reemplazos con rebalanceo, coach auxiliar validado) ya implementados — detalle en `docs/requirements-history.md`.
 
-Serie UX (auditoría 1 jul 2026, `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md`, REQ-97..112) y serie "dieta exacta" (4 jul 2026, REQ-128..139 + REQ-140/141/144; diagnóstico en `docs/nutrition-generation-architecture-diagnostic-2026-07-04.md`, decisiones: tolerancias estrictas sujetas a canario, Sonnet 5 solo tras gate de telemetría, ampliación de catálogo, aviso suave no bloqueante) ya están implementadas — su detalle vive en el ledger de abajo y en `docs/requirements-history.md`. Pendientes de esa secuencia:
+Las series UX (REQ-97..112) y «dieta exacta» (REQ-128..141 y 144) ya están implementadas; detalle en `docs/requirements-history.md`. Queda pendiente:
 
 - REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
 
-Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que hoy le impide cerrar bien su entreno primero, luego lo que lo hace más cómodo, luego nutrición:
-
-- REQ-185 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
-- REQ-186 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; implementado)
-- REQ-187 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable). (P1; implementado)
-- REQ-188 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1; implementado)
-
-Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la beta primero (cobro), luego lo que confunde en el alta y el entreno, luego funciones nuevas:
-
-- REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días; cobro siempre en la web. (P0; implementado)
-- REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (descartado: no se reprodujo; mitigación en REQ-221)
-- REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1; implementado)
-- REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1; implementado)
-- REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1; implementado)
-- REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1; implementado)
-- REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1; implementado)
-- REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar". (P2; implementado)
-- REQ-216 - Modo conversacional (beta oculta). (P2; fase 1 implementada)
-
-Feedback Sathya (beta, 2026-10-21, iPhone):
-
-- REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado. (P0; implementado)
-
-Feedback Jonathan (2026-10-21, iPhone):
-
-- REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes. (P1; implementado)
-- REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir. (P1; implementado)
-
-Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/Recordatorios y audio sobre la próxima comida):
-
-- REQ-252 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total". (P0; implementado)
-- REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente. (P1; implementado)
-- REQ-254 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
-- REQ-255 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
-
-- REQ-258 - Home: día cerrado muestra mañana. (Jonathan; implementado)
+Pendientes de decisión del feedback de Diego (2026-10-21): REQ-254 y REQ-255 (ver abajo). Las series ya cerradas (Claudia, flujo beta, Sathya, Jonathan 10-21, Diego) están en `docs/requirements-history.md`, en «Series cerradas de la secuencia activa».
 
 Journey de recordatorios y racha (Jonathan, 2026-10-26; diseño en `docs/reminders-journey.md`): REQ-283 animación de racha, REQ-284 regreso en Hoy, REQ-285 recordatorios por ausencia.
 
 Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
 
-- REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato. Dos lotes medidos con el diff de REQ-144 (2026-07-05 y 2026-07-08) confirman un techo cercano a 32%-33% bajo la selección actual; ver actualización 2026-07-08 en el REQ y REQ-147.
+- REQ-143 - Catálogo lote 3. Dos lotes medidos confirman un techo de 32-33 %; ver el REQ y REQ-147.
 
 Pendiente no automatizable por agentes:
 
@@ -1630,42 +1595,7 @@ Detalle archivado en [historial](docs/requirements-history.md#req-254).
 
 ## REQ-255 - Recordatorios por WhatsApp
 
-**Estado: pendiente — requiere acción humana:** elegir canal, proveedor y presupuesto mensual.
-
-### Origen
-
-Diego (beta, 2026-10-21), sobre Perfil → Recordatorios: "Esto también está chévere, pero no veo mi correo; sería cool que sea al WhatsApp."
-
-### Problema
-
-El único recordatorio fuera de la app es por correo (REQ-24) y muchos usuarios no revisan su correo. Los avisos del dispositivo (push, REQ-38) existen, pero en iPhone solo funcionan con la app instalada en la pantalla de inicio y viven en otra sección plegada ("Avisos del dispositivo"), aparte de Recordatorios: quien abre Recordatorios solo ve el correo.
-
-### Causa raíz
-
-- `api/notify.js` solo envía correo (Resend) y push VAPID; no hay canal WhatsApp.
-- REQ-225 sacó WhatsApp del flujo beta a propósito; la postulación beta sí guarda el número (`beta_applications.whatsapp`), pero no hay consentimiento para recordatorios ni número verificado en el perfil.
-
-### Opciones
-
-1. **WhatsApp Business Cloud API (Meta) directo:** plantilla "utility" aprobada por Meta, número de empresa verificado, costo por mensaje según país (Perú/LatAm: centavos de dólar por conversación de utilidad). Requiere guardar el teléfono con consentimiento explícito y baja con "STOP".
-2. **Vía proveedor (Twilio, 360dialog):** misma plantilla y aprobación de Meta, más margen del proveedor; integración más simple.
-3. **Sin WhatsApp por ahora:** hacer visible el push. En Recordatorios, ofrecer "Avisos en este teléfono" junto al correo y explicar en iPhone "Añade la app a tu pantalla de inicio para recibir avisos".
-
-### Alcance (si se aprueba la opción 1 o 2)
-
-1. Perfil → Recordatorios: canal "WhatsApp" con número (prefijo de país) y verificación por código; consentimiento y aviso de privacidad actualizados.
-2. `api/notify.js`: envío por plantilla con el mismo criterio que el correo (solo si hay pendiente, nunca dos veces el mismo día), límite diario y registro de envíos sin contenido personal.
-3. Baja con un toque (responder "STOP" o desde Perfil).
-
-### Riesgos
-
-- Costo por mensaje y dependencia de la aprobación de plantillas de Meta.
-- El teléfono es dato personal: RLS, no va a analytics, se borra con la cuenta.
-- Lenguaje REQ-31 en la plantilla.
-
-### Decisión pendiente (Jonathan)
-
-- ¿WhatsApp (opción 1 o 2, con presupuesto mensual) o primero la opción 3?
+**Estado: pendiente — requiere acción humana:** elegir canal, proveedor y presupuesto mensual. Detalle en `docs/requirements-history.md` (buscar `## REQ-255`).
 
 ## REQ-256 - Fix Nutrición: "Volver a preparar este día" pisa comidas personalizadas sin marcar como hechas
 
@@ -2495,3 +2425,129 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 **Estado: implementado.**
 
 Origen: captura de Jonathan del 11/11/2026, 20:00 Lima. Problema: `/api/notify` supera los 30 s que espera cron-job.org. Causa: usuarios en serie, referidos ya enviados recalculados y red sin límite. Objetivo: completar con margen y cancelar dependencias colgadas. Alcance: cuatro usuarios concurrentes, claves enviadas por lotes, correos espaciados, presupuesto de 24 s y HTTP 503 explícito si se agota; prueba manual sin envíos. Fuera de alcance: horarios, mensajes, SQL y secretos. Riesgo: respuesta ambigua del proveedor; se conservan claves y se propagan a Resend. Aceptación y evidencia: `docs/notify-runtime.md`; fixture baja de 31,7 a 3,2 s. Verificación: `scripts/test-notify-latency.mjs`, validadores de notificaciones y release gate.
+
+## REQ-385 - Onboarding: entrenar sin fuerza es una opción más
+
+**Estado: pendiente.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+### Origen
+Jonathan, 2026-11-11.
+### Problema
+El paso 3 da por hecha la fuerza («¿Haces otro deporte además de la fuerza?», `app/index.html:3843`). «Otro deporte» sin fuerza se bloquea (`:3754`).
+### Objetivo
+Preguntar «¿qué quieres entrenar?»: fuerza, actividad o ambas. Solo una actividad, incluida «Otro deporte», es un camino válido.
+### Alcance
+Paso 3 y Perfil → Entrenamiento: texto neutro y validación, sin migrar valores.
+### Fuera de alcance
+Elegir qué hacer cada día (REQ-386) y acortar el flujo (REQ-389).
+### Riesgos
+No volver a «Descanso total» (REQ-252).
+### Criterios de aceptación
+Ningún texto presupone fuerza. Solo fútbol 3 días termina el onboarding con 3 días de su deporte.
+### Verificación sugerida
+`validate-training-onboarding-decisions.mjs`, e2e de onboarding y release gate.
+
+## REQ-386 - Onboarding: elegir qué entrenas cada día
+
+**Estado: pendiente.** Implementar después de REQ-385. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+### Origen
+Jonathan, 2026-11-11.
+### Problema
+Solo se marcan días. El tipo de sesión sale de la plantilla por posición (`js/nutrition-pure.js:245`). `workoutSchedule` (`app/index.html:1761`) usa el lugar como señal indirecta, escondido en «Ajustar lugar por día».
+### Objetivo
+Selector visible «Fuerza / actividad» por día, respetado por la semana.
+### Alcance
+Usar `prefs.trainingDayKinds`, prellenado con el reparto actual, en `workoutSchedule`, en el onboarding y en Perfil.
+### Fuera de alcance
+Mover un día de una semana ya generada.
+### Riesgos
+Historial inmutable: solo afecta la próxima versión del plan.
+### Criterios de aceptación
+Fuerza lunes, miércoles y viernes y bici martes y sábado → Entreno muestra eso. Sin tocar el selector, la semana es la misma que hoy.
+### Verificación sugerida
+Pruebas puras de `workoutSchedule`, e2e y release gate.
+
+## REQ-387 - Entreno: indoor cycling como actividad
+
+**Estado: pendiente.** Implementar después de REQ-386. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+### Origen
+Jonathan, 2026-11-11.
+### Problema
+Solo existe «Bicicleta», de ruta y en exterior (`app/index.html:1945`).
+### Objetivo
+Poder elegir «Indoor cycling / spinning» como actividad, con sesiones de interior.
+### Alcance
+`indoor_cycling` en etiquetas y opciones; sesiones de 30 a 60 minutos por RPE y cadencia; lugar gimnasio o casa; MET de spinning.
+### Fuera de alcance
+Peloton, Zwift y potencia.
+### Riesgos
+Las preferencias con `cycling` siguen igual.
+### Criterios de aceptación
+Indoor 3 días y fuerza 2 → 3 sesiones de 60 minutos o menos bajo techo. «Bicicleta» sin cambios.
+### Verificación sugerida
+Prueba de plantilla y lugar, e2e y release gate.
+
+## REQ-388 - Onboarding: volver atrás en cada paso sin buscar el botón
+
+**Estado: pendiente.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+### Origen
+Jonathan, 2026-11-11.
+### Problema
+«Atrás» solo aparece al pie (`app/index.html:3584`). En el paso 4 queda a 2,65 pantallas. El atrás del sistema sale de la app: no hay `pushState` ni `popstate`.
+### Objetivo
+Volver al paso anterior desde cualquier paso, sin desplazarse y sin perder lo escrito.
+### Alcance
+«Atrás» arriba desde el paso 2; atrás del sistema con `popstate`; «Salir sin cambios» en la revisión de ciclo.
+### Fuera de alcance
+La pantalla de avisos de REQ-289.
+### Riesgos
+Que no choque con los modales ni con las pestañas.
+### Criterios de aceptación
+En los pasos 2 a 4, «Atrás» se ve sin desplazarse. En el paso 4, el atrás del sistema vuelve al paso 3 con los valores intactos.
+### Verificación sugerida
+e2e con `page.goBack()` y release gate.
+
+## REQ-389 - Onboarding corto: primera semana en 3 pantallas
+
+**Estado: pendiente.** Implementar después de REQ-385, REQ-386 y REQ-388. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+### Origen
+Jonathan, 2026-11-11.
+### Problema
+Hoy son 4 pasos y unos 46 controles. Lo opcional está en un `summary` gris de 13 px (`app/index.html:772`) que nadie abre.
+### Objetivo
+Tres pantallas (tú, tu semana, antes de empezar) y unos 90 segundos hasta la primera semana.
+### Alcance
+Lo demás queda con valores por defecto documentados. Lo opcional en Perfil, visible.
+### Fuera de alcance
+Las preguntas posteriores (REQ-390).
+### Riesgos
+Seguridad, consentimiento y alergias siguen antes del plan; kcal = suma de macros; REQ-31.
+### Criterios de aceptación
+20 campos o menos en total y ningún paso de más de 1,5 pantallas.
+### Verificación sugerida
+e2e, validadores de onboarding y release gate.
+
+## REQ-390 - Completar el perfil de a pocos desde Hoy
+
+**Estado: pendiente.** Implementar después de REQ-389. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+### Origen
+Jonathan, 2026-11-11.
+### Problema
+Tras el onboarding esencial solo queda el aviso fijo «Afina tu plan» en Perfil (`app/index.html:9350`), sin acción.
+### Objetivo
+Hoy muestra como mucho una pregunta corta al día, después de un momento de valor, con «Ahora no».
+### Alcance
+Preguntas ordenadas por impacto, guardadas en `prefs` y aplicadas desde la próxima generación; `profileRefinedAt` al terminar.
+### Fuera de alcance
+Push y preferencias nuevas.
+### Riesgos
+Que no se junte el mismo día con REQ-341 ni REQ-366; REQ-31.
+### Criterios de aceptación
+Una sola pregunta tras la primera comida registrada; «Ahora no» la pospone 3 días; las metas pasadas no cambian.
+### Verificación sugerida
+e2e con reloj controlado y release gate.

@@ -13880,3 +13880,81 @@ Origen: Jonathan, 11 nov 2026, tras usar Usuarios desde el móvil.
 - Implementación: `adminBusy` (spinner + verbo, botón bloqueado, `aria-busy`) en activar, restablecer contraseña, cortesía, regenerar plan y reiniciar; confirmación que queda en pantalla (`adminDoneModal`) y errores dentro del diálogo; la lista se repinta en su sitio y resalta la tarjeta. `toast(msg,{tone,ms})` dura según el largo del texto, ocupa el ancho disponible y marca éxito/error. Se quitó `setPassword` (UI y API); "Restablecer contraseña" envía el correo de recuperación. Nueva acción `grantCourtesy` en `api/admin.js`: crea el acceso y aplica `grantUnlimitedQuota` (misma regla que la beta, REQ-248: cada acción sin tope hasta que vence, sin acortar topes ilimitados más largos). El modal de cortesía toma los días del plan elegido.
 - ✓ `scripts/test-admin-api.mjs`, `scripts/test-admin-beta-api.mjs`, `tests/e2e/admin-usuarios.spec.js`.
 - Operación manual: las cortesías dadas antes de este cambio no se corrigen solas; volver a otorgarlas (o ajustar Consumo) para dejarlas sin tope con vencimiento.
+
+## Series cerradas de la secuencia activa (archivadas 2026-11-11)
+
+Serie "feedback Claudia" (beta, 2026-10-16, día Pull en iPhone). Orden: lo que hoy le impide cerrar bien su entreno primero, luego lo que lo hace más cómodo, luego nutrición:
+
+- REQ-185 - Fix Entreno: una serie sin marcar deja la sesión "parcial" sin forma de corregirla. (P0; implementado)
+- REQ-186 - Fix Entreno: el cronómetro de descanso se queda congelado. (P0; implementado)
+- REQ-187 - Entreno: descanso cronometrado entre ejercicios (2:00 por defecto, configurable). (P1; implementado)
+- REQ-188 - Nutrición: reutilizar comidas recientes y favoritas, y registrar alimentos sueltos por gramos. (P1; implementado)
+
+Serie "feedback flujo beta" (Jonathan, 2026-10-18). Orden: lo que hoy rompe la beta primero (cobro), luego lo que confunde en el alta y el entreno, luego funciones nuevas:
+
+- REQ-208 - Beta: quien entra a la beta no ve precios ni cobro durante sus 90 días; cobro siempre en la web. (P0; implementado)
+- REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll. (descartado: no se reprodujo; mitigación en REQ-221)
+- REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding. (P1; implementado)
+- REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera. (P1; implementado)
+- REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional. (P1; implementado)
+- REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe. (P1; implementado)
+- REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento. (P1; implementado)
+- REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar". (P2; implementado)
+- REQ-216 - Modo conversacional (beta oculta). (P2; fase 1 implementada)
+
+Feedback Sathya (beta, 2026-10-21, iPhone):
+
+- REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado. (P0; implementado)
+
+Feedback Jonathan (2026-10-21, iPhone):
+
+- REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes. (P1; implementado)
+- REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir. (P1; implementado)
+
+Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/Recordatorios y audio sobre la próxima comida):
+
+- REQ-252 - Fix Entreno: con "Otra actividad" los días de tu deporte salían como "Descanso total". (P0; implementado)
+- REQ-253 - Entreno: "Actividad física principal" se entiende y cambiar el gimnasio por otro deporte un día es evidente. (P1; implementado)
+- REQ-254 - Nutrición: el plan respeta cuánto cocinas. (P1; pendiente de decisión, ver abajo)
+- REQ-255 - Recordatorios por WhatsApp. (P2; pendiente de decisión, ver abajo)
+
+- REQ-258 - Home: día cerrado muestra mañana. (Jonathan; implementado)
+
+## REQ-255 - Recordatorios por WhatsApp
+
+**Estado: pendiente — requiere acción humana:** elegir canal, proveedor y presupuesto mensual.
+
+### Origen
+
+Diego (beta, 2026-10-21), sobre Perfil → Recordatorios: "Esto también está chévere, pero no veo mi correo; sería cool que sea al WhatsApp."
+
+### Problema
+
+El único recordatorio fuera de la app es por correo (REQ-24) y muchos usuarios no revisan su correo. Los avisos del dispositivo (push, REQ-38) existen, pero en iPhone solo funcionan con la app instalada en la pantalla de inicio y viven en otra sección plegada ("Avisos del dispositivo"), aparte de Recordatorios: quien abre Recordatorios solo ve el correo.
+
+### Causa raíz
+
+- `api/notify.js` solo envía correo (Resend) y push VAPID; no hay canal WhatsApp.
+- REQ-225 sacó WhatsApp del flujo beta a propósito; la postulación beta sí guarda el número (`beta_applications.whatsapp`), pero no hay consentimiento para recordatorios ni número verificado en el perfil.
+
+### Opciones
+
+1. **WhatsApp Business Cloud API (Meta) directo:** plantilla "utility" aprobada por Meta, número de empresa verificado, costo por mensaje según país (Perú/LatAm: centavos de dólar por conversación de utilidad). Requiere guardar el teléfono con consentimiento explícito y baja con "STOP".
+2. **Vía proveedor (Twilio, 360dialog):** misma plantilla y aprobación de Meta, más margen del proveedor; integración más simple.
+3. **Sin WhatsApp por ahora:** hacer visible el push. En Recordatorios, ofrecer "Avisos en este teléfono" junto al correo y explicar en iPhone "Añade la app a tu pantalla de inicio para recibir avisos".
+
+### Alcance (si se aprueba la opción 1 o 2)
+
+1. Perfil → Recordatorios: canal "WhatsApp" con número (prefijo de país) y verificación por código; consentimiento y aviso de privacidad actualizados.
+2. `api/notify.js`: envío por plantilla con el mismo criterio que el correo (solo si hay pendiente, nunca dos veces el mismo día), límite diario y registro de envíos sin contenido personal.
+3. Baja con un toque (responder "STOP" o desde Perfil).
+
+### Riesgos
+
+- Costo por mensaje y dependencia de la aprobación de plantillas de Meta.
+- El teléfono es dato personal: RLS, no va a analytics, se borra con la cuenta.
+- Lenguaje REQ-31 en la plantilla.
+
+### Decisión pendiente (Jonathan)
+
+- ¿WhatsApp (opción 1 o 2, con presupuesto mensual) o primero la opción 3?
