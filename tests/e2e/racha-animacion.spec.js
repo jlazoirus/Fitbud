@@ -40,7 +40,7 @@ test.describe("Racha — animación al registrar (REQ-283)", () => {
     const register = page.locator(".home-primary").getByRole("button", { name: "Registrar este plato" });
     await register.click();
     await expect(pop(page)).toBeVisible();
-    await expect(pop(page)).toContainText("Faltan 1 comida y el entreno");
+    await expect(pop(page)).toContainText("Falta 1 comida y el entreno");
     await expect(pop(page)).toContainText("para sumar el día 4 de tu racha");
     await expect(page.locator("#streakPop")).toHaveAttribute("role", "status");
 

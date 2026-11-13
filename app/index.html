@@ -15063,7 +15063,7 @@ function streakFeedbackAfterCommit(ds){
 function streakMissingText(p){
   const meals=p.need-p.meals,train=p.trainNeeded&&!p.trainOk;
   const m=meals>0?`${meals} comida${meals===1?"":"s"}`:"";
-  if(m&&train)return `Faltan ${m} y el entreno`;
+  if(m&&train)return `${meals===1?"Falta":"Faltan"} ${m} y el entreno`;
   if(m)return `${meals===1?"Falta":"Faltan"} ${m}`;
   return train?"Falta el entreno":"Falta registrar tu día";
 }
