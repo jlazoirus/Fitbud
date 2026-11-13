@@ -676,7 +676,9 @@
       ],
       "paths": [
         "scripts/validate-native-copy.mjs",
-        "scripts/release-gate.mjs"
+        "scripts/release-gate.mjs",
+        "package.json",
+        "package-lock.json"
       ],
       "status": "pendiente",
       "owner": null,

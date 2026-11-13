@@ -242,6 +242,7 @@ Convenciones para todas las tareas:
 
 - **Objetivo:** que la UI nativa no mencione IA, Claude, Anthropic, modelo, prompt, token, cuota ni proveedor, y que no empuje a pagar fuera de la app (`COBRO-WEB.md` §4): sin precios (`S/`, `USD`), sin "comprar", "planes", "suscríbete" ni "renueva" en textos visibles, y sin URLs a `/planes`, `/pago` ni al WhatsApp de ventas.
 - **Alcance:** `scripts/validate-native-copy.mjs` que recorre `native/app/**` y `native/src/**` (excluye tests y `src/core/types`) buscando literales visibles con ese vocabulario (insensible a mayúsculas/acentos, con lista de excepciones explícita y comentada para identificadores internos); se agrega al release gate y a NAT-27.
+- **Análisis:** usar el AST de TypeScript/TSX para leer texto JSX, props, strings y plantillas (incluidas concatenaciones literales), sin confundir comentarios, identificadores, tipos ni imports con copy. TypeScript 6.0.3 se fija también como dependencia **solo de desarrollo de la raíz** (`package.json`/lock), para que el gate web funcione sin instalar `native/node_modules`. No añade dependencias runtime a la web. Incluir auto-tests positivos/negativos y rutas excluidas; la revisión visual y del contenido remoto sigue en la QA de cada pantalla.
 - **Aceptación:** falla con un fixture que muestre "IA" en un `<Text>` y con otro que enlace a `evolvapp.club/planes`; pasa con el scaffold.
 - **Verificación:** verde web.
 
