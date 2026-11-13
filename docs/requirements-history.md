@@ -13958,3 +13958,15 @@ El único recordatorio fuera de la app es por correo (REQ-24) y muchos usuarios 
 ### Decisión pendiente (Jonathan)
 
 - ¿WhatsApp (opción 1 o 2, con presupuesto mensual) o primero la opción 3?
+
+## REQ-384 - Administración: el correo de recuperación abre la app
+
+**Estado: implementado.**
+
+Origen: cierre del feedback de Jonathan sobre administración, 13 nov 2026. REQ-382 ya estaba publicado, pero la comprobación del contrato de recuperación encontró un fallo restante.
+
+Causa: `api/admin.js` enviaba `redirect_to` dentro del JSON de `/auth/v1/recover`. Supabase lo lee de la query de la URL: [implementación oficial](https://github.com/supabase/auth-js/blob/master/src/lib/fetch.ts). El destino se ignoraba y podía caer en la portada pública, que no procesa la recuperación. Además, el cliente administrativo proponía `/admin`, donde el usuario normal no puede continuar tras cambiar la contraseña.
+
+La API valida el origen con `safeRedirect`, fija `/app/?auth=recovery` y lo envía en la query; el cuerpo solo contiene el correo de la cuenta. Un destino ajeno o sin origen seguro devuelve 400 antes de enviar correo. Se conservan los errores del proveedor, incluida la espera por límite de correos. No permite fijar contraseñas desde administración.
+
+Verificación: casos de API con destino administrativo, destino omitido, origen ajeno y error 429; recorrido de nueva contraseña desde el enlace en la app. Sin envíos reales, dependencias ni migraciones. No altera la duración de las cortesías.

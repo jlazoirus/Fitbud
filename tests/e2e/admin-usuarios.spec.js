@@ -106,3 +106,25 @@ test("REQ-382: la cortesía usa la duración del plan e incluye el coach sin top
   const grant = calls.find((c) => c.action === "grantCourtesy");
   expect(grant).toMatchObject({ userId: USER.id, planId: "semiannual", days: 180 });
 });
+
+test("REQ-384: el enlace de recuperación permite al usuario crear su contraseña en la app", async ({ page, context }) => {
+  await installMocks(context);
+  let passwordUpdate = null;
+  await context.route("**/auth/v1/user**", async (route) => {
+    if (route.request().method() !== "PUT") return route.fallback();
+    passwordUpdate = JSON.parse(route.request().postData() || "{}");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ id: USER.id, email: USER.email, user_metadata: {} }) });
+  });
+  await seedLoggedInUser(page);
+  await autoDismissNudges(page);
+  // Destino que la API incluye en el correo, con la sesión validada por Supabase.
+  await page.goto("/app/?auth=recovery");
+  await expect(page.locator("#recovery_pwd")).toBeVisible();
+  await page.getByLabel("Nueva contraseña", { exact: true }).fill("MiClavePrivada2026");
+  await page.getByLabel("Confirmar contraseña", { exact: true }).fill("MiClavePrivada2026");
+  await page.getByRole("button", { name: "Actualizar contraseña" }).click();
+  await expect.poll(() => passwordUpdate && passwordUpdate.password).toBe("MiClavePrivada2026");
+  await expect(page.locator("#recovery_pwd")).toHaveCount(0);
+  await expect(page.locator("#toast")).toContainText("Contraseña actualizada");
+  await expect(page.getByRole("heading", { name: "Sin acceso" })).toHaveCount(0);
+});

@@ -21,7 +21,7 @@ REQ-364..367: Hoy con consumo, acción, agenda, técnica, avisos plegables y nav
 ## Datos y seguridad
 
 - Auth obligatorio con Supabase Auth. `profiles`, `day_log`, `weight_log` y `plan_versions` estan aislados por `user_id` y RLS.
-- Auth/password UX (REQ-113): `passwordField()` en `index.html` es el helper unico para campos de contrasena de usuario/admin; conserva ids/autocomplete/minlength y `togglePasswordVisibility()` alterna ojo/ojo tachado sin submit. Las llaves tecnicas locales siguen enmascaradas sin toggle.
+- Contraseñas (REQ-113): `passwordField()` conserva ids/autocomplete/minlength; `togglePasswordVisibility()` alterna visibilidad sin submit. Llaves técnicas sin toggle. Recuperación administrativa → `/app/?auth=recovery`, con `redirect_to` en query (REQ-384).
 - `profiles.prefs` usa `profileSchemaVersion: 3`: zona horaria, 2-6 comidas, horarios/logistica, restricciones, disponibilidad, equipo, experiencia, prioridad y limitaciones.
 - Copy de onboarding/perfil (REQ-114): los valores internos no cambian (`mantenimiento`, `omnivoro`, duracion 4/10), pero el UI muestra lenguaje cotidiano: "Recomponer mi cuerpo" (REQ-211: ayuda en `GOAL_OPTIONS`/`TRAINING_SAFETY_MODE_HELP`), "Como de todo", "Grasa corporal (opcional)" y "Ciclo de seguimiento"; 10 semanas sigue siendo el default recomendado.
 - Perfil (REQ-105) usa acordeon nativo: `renderProfile()` monta secciones `<details class="pf-accordion">` y `profileAccordionToggle()` deja una sola abierta; los campos no se desmontan y `#pfEditableBody` conserva el guardado global solo para Objetivo/Comidas/Entreno. Detalle y operación en `docs/architecture-reference.md` (compactación 2026-10-31).

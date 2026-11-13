@@ -205,6 +205,50 @@ assert(res.statusCode === 400, "setPassword ya no debe existir.");
 assert(!requests.some((item) => item.method === "PUT" && item.url.includes("/auth/v1/admin/users/")), "No debe tocar la contraseña en Auth.");
 console.log("  REQ-382: el admin no puede fijar la contraseña de otra persona.");
 
+// REQ-384: el correo lleva a la app; Supabase solo lee el destino en la URL.
+function recoveryMocks(status = 200) {
+  requests = [];
+  return async (url, options = {}) => {
+    const value = String(url), method = options.method || "GET";
+    requests.push({ url: value, method, body: options.body || "" });
+    if (value.endsWith("/auth/v1/user")) return response(200, admin);
+    if (value.includes("/rest/v1/profiles?id=eq." + admin.id)) {
+      return response(200, [{ id: admin.id, is_admin: true, active: true }]);
+    }
+    if (value.endsWith("/auth/v1/admin/users/" + normalUser2.id)) return response(200, normalUser2);
+    if (new URL(value).pathname === "/auth/v1/recover") return response(status, status === 200 ? {} : { message: "Email rate limit exceeded" });
+    throw new Error("Ruta no simulada: " + method + " " + value);
+  };
+}
+for (const redirectTo of ["https://evolvapp.club/admin?auth=recovery", undefined]) {
+  global.fetch = recoveryMocks();
+  res = capture();
+  await handler({
+    method: "POST", headers: { authorization: "Bearer admin-token", origin: "https://evolvapp.club" },
+    body: { action: "resetPassword", userId: normalUser2.id, redirectTo },
+  }, res);
+  assert(res.statusCode === 200 && res.body.ok, "Debe solicitar la recuperación por correo.");
+  const request = requests.find((r) => new URL(r.url).pathname === "/auth/v1/recover");
+  assert(new URL(request.url).searchParams.get("redirect_to") === "https://evolvapp.club/app/?auth=recovery",
+    "El enlace debe abrir la recuperación en la app, fuera de la consola administrativa.");
+  assert(JSON.stringify(JSON.parse(request.body)) === JSON.stringify({ email: normalUser2.email }), "El JSON solo incluye el correo, nunca una contraseña ni el destino.");
+}
+global.fetch = recoveryMocks();
+res = capture();
+await handler({
+  method: "POST", headers: { authorization: "Bearer admin-token", origin: "https://evolvapp.club" },
+  body: { action: "resetPassword", userId: normalUser2.id, redirectTo: "https://otro.test/app/" },
+}, res);
+assert(res.statusCode === 400 && !requests.some((r) => r.url.includes("/recover")), "Un destino ajeno no debe enviar correos.");
+global.fetch = recoveryMocks(429);
+res = capture();
+await handler({
+  method: "POST", headers: { authorization: "Bearer admin-token", host: "evolvapp.club" },
+  body: { action: "resetPassword", userId: normalUser2.id },
+}, res);
+assert(res.statusCode === 429 && /rate limit/.test(res.body.error), "Se conservan los errores del proveedor para permitir el reintento.");
+console.log("  REQ-384: recuperación por correo con destino seguro en la app y errores del proveedor.");
+
 // ── REQ-382: la cortesía incluye el coach sin tope hasta que vence ──
 function courtesyMocks(existingOverrides) {
   requests = [];

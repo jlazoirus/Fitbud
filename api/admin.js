@@ -1323,14 +1323,18 @@ export default async function handler(req, res) {
         res.status(404).json({ error: "Usuario sin correo disponible." });
         return;
       }
-      const redirectTo = safeRedirect(req, body.redirectTo);
-      const response = await fetch(e.url + "/auth/v1/recover", {
+      const redirectBase = safeRedirect(req, body.redirectTo);
+      if (!redirectBase) {
+        res.status(400).json({ error: "No se pudo determinar una dirección segura para recuperar la contraseña." });
+        return;
+      }
+      // REQ-384: Supabase lee redirect_to de la query, no del JSON.
+      // La persona recupera su cuenta en la app, aunque lo pida el admin.
+      const redirectTo = new URL("/app/?auth=recovery", redirectBase).toString();
+      const response = await fetch(e.url + "/auth/v1/recover?redirect_to=" + encodeURIComponent(redirectTo), {
         method: "POST",
         headers: { apikey: e.anon, "content-type": "application/json" },
-        body: JSON.stringify(Object.assign(
-          { email: targetUser.email },
-          redirectTo ? { redirect_to: redirectTo } : {}
-        )),
+        body: JSON.stringify({ email: targetUser.email }),
       });
       const data = await responseJson(response);
       if (!response.ok) {
