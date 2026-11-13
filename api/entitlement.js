@@ -1,7 +1,6 @@
 // Serverless: entitlements, historial de pagos y códigos de canje.
 // GET                            → entitlement activo (o null) + último vencido
 // GET  ?action=billing-history   → historial de pagos del usuario
-// POST action:"grant"            → admin: otorgar acceso de cortesía
 // POST action:"revoke"           → admin: revocar acceso de cortesía
 // POST action:"generate"         → admin: generar código de canje
 // POST action:"redeem"           → usuario autenticado: canjear código
@@ -470,48 +469,8 @@ export default async function handler(req, res) {
     }
     const action = String(body.action || "");
 
-    // POST action:"grant"  → admin: otorgar acceso de cortesía
-    if (action === "grant") {
-      if (!auth.profile.is_admin) {
-        res.status(403).json({ error: "Solo administradores pueden gestionar entitlements." });
-        return;
-      }
-      const targetUserId = String(body.userId || "");
-      if (!UUID_RE.test(targetUserId)) {
-        res.status(400).json({ error: "userId inválido." });
-        return;
-      }
-      const planId = String(body.planId || "monthly");
-      const days = Math.max(1, Math.min(365, Number(body.days) || 30));
-      const notes = String(body.notes || "").slice(0, 500);
-      const now = new Date();
-      const exp = new Date(now.getTime() + days * 86400000);
-      try {
-        const r = await fetch(e.url + "/rest/v1/user_entitlements", {
-          method: "POST",
-          headers: svcHeaders(e, { "content-type": "application/json", "Prefer": "return=representation" }),
-          body: JSON.stringify({
-            user_id:   targetUserId,
-            plan_id:   planId,
-            status:    "courtesy",
-            starts_at: now.toISOString(),
-            expires_at: exp.toISOString(),
-            origin:    "admin_courtesy",
-            notes:     notes || "Acceso de cortesía otorgado por administrador",
-            granted_by: auth.user.id,
-          }),
-        });
-        const data = await rj(r);
-        if (!r.ok) {
-          res.status(500).json({ error: (data && data.message) || "No se pudo crear el acceso de cortesía." });
-          return;
-        }
-        res.status(201).json({ entitlement: Array.isArray(data) ? data[0] : data });
-      } catch (err) {
-        res.status(500).json({ error: String(err.message || err) });
-      }
-      return;
-    }
+    // REQ-382: la cortesía se otorga desde api/admin.js (action "grantCourtesy"),
+    // que además quita el tope del coach mientras dure el acceso.
 
     // POST action:"revoke"  → admin: revocar acceso
     if (action === "revoke") {

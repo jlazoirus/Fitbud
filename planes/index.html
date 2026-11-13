@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tienda/tienda.css?v=3">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=4">
 </head>
 <body>
   <header id="t-header"></header>
@@ -21,10 +21,11 @@
     <h1>Planes y precios</h1>
     <p class="lead">Evolv arma lo que comes y entrenas cada día con tu cuerpo, tus horarios y lo que tienes a mano, y lo ajusta contigo cada semana. Elige cuánto tiempo quieres acceso.</p>
 
+    <div id="selectorMoneda" class="moneda-box" hidden></div>
     <div id="planes" class="planes" aria-live="polite"></div>
 
     <div class="nota">
-      <b>Pago único, sin renovación automática.</b> Pagas una vez con tarjeta de crédito o débito a través de Culqi y tienes acceso completo durante el período elegido. Precios en soles, impuestos incluidos. Si no te convence, tienes <a href="/devoluciones">7 días para pedir el reembolso completo</a>.
+      <b>Pago único, sin renovación automática.</b> Pagas una vez con tarjeta de crédito o débito a través de Culqi y tienes acceso completo durante el período elegido. <span id="notaMoneda">Precios en soles</span>, impuestos incluidos. Si no te convence, tienes <a href="/devoluciones">7 días para pedir el reembolso completo</a>.
     </div>
 
     <h2>Cómo funciona la compra</h2>
@@ -37,25 +38,37 @@
   <footer id="t-footer"></footer>
   <script type="module">
     import { mountLayout, esc } from "/tienda/layout.js";
-    import { PLANES_TIENDA, formatoSoles, MONEDA } from "/tienda/planes.js";
+    import { PLANES_TIENDA, formatoPrecio, montoPlan, incluyePlan } from "/tienda/planes.js";
+    import { monedaTienda, montarSelector } from "/tienda/moneda.js";
     mountLayout();
 
+    // REQ-381: soles, o dólares si el servidor los habilita (sugeridos por país, con selector).
+    const tienda = await monedaTienda();
+    let moneda = tienda.moneda;
+    pintar();
+    if (tienda.usd) {
+      document.getElementById("notaMoneda").textContent = "Precios en soles o dólares según tu país (puedes cambiar la moneda)";
+      montarSelector(document.getElementById("selectorMoneda"), moneda, (m) => { moneda = m; pintar(); });
+    }
+
+    function pintar() {
     document.getElementById("planes").innerHTML = PLANES_TIENDA.map((p) => `
       <article class="plan${p.destacado ? " destacado" : ""}" aria-labelledby="plan-${p.id}">
         <img class="plan-img" src="${p.imagen}" alt="${esc(p.imagenAlt)}" width="1200" height="750" loading="lazy">
         <div class="plan-body">
           <div class="plan-top"><h2 class="plan-nombre" id="plan-${p.id}">${esc(p.nombre)}</h2>${p.destacado ? `<span class="plan-badge">${esc(p.destacado)}</span>` : ""}</div>
-          <div class="plan-precio">${formatoSoles(p.montoCentimos)} <small>/ ${esc(p.periodo)}</small></div>
+          <div class="plan-precio">${formatoPrecio(montoPlan(p, moneda), moneda)} <small>/ ${esc(p.periodo)}</small></div>
           <p class="plan-desc">${esc(p.descripcion)}</p>
-          <ul class="ticks">${p.incluye.map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
-          <a class="btn ${p.destacado ? "btn-accent" : ""} btn-block" href="/pago?plan=${encodeURIComponent(p.id)}">Comprar ${esc(p.nombre.toLowerCase())}</a>
+          <ul class="ticks">${incluyePlan(p, moneda).map((i) => `<li>${esc(i)}</li>`).join("")}</ul>
+          <a class="btn ${p.destacado ? "btn-accent" : ""} btn-block" href="/pago?plan=${encodeURIComponent(p.id)}${tienda.usd ? "&moneda=" + moneda : ""}">Comprar ${esc(p.nombre.toLowerCase())}</a>
         </div>
       </article>`).join("");
+    }
 
     // REQ-376: medición de la campaña (solo si hay píxel configurado). Import dinámico:
     // si un bloqueador o la red lo impiden, la página sigue igual.
     import("/web/medicion.js")
-      .then((m) => m.track("ViewContent", { content_type: "product", content_ids: PLANES_TIENDA.map((p) => p.id), currency: MONEDA }))
+      .then((m) => m.track("ViewContent", { content_type: "product", content_ids: PLANES_TIENDA.map((p) => p.id), currency: moneda }))
       .catch(() => {});
 
     // REQ-370: conserva el origen de campaña (source/utm_*) hasta /pago. Si no carga, nada cambia.
