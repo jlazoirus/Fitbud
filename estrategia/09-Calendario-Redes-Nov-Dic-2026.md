@@ -32,7 +32,7 @@ Historias: las sube Jonathan a mano, una hora después de cada video, con el sti
 
 ## Calendario
 
-Estado al 13 nov, leído del planificador de Metricool. Las piezas producidas el 9 nov van a Facebook, Instagram, TikTok y YouTube.
+Estado al 13 nov, leído del planificador de Metricool. Todas las piezas van a Facebook, Instagram, TikTok y YouTube. Los Consejos del 18 nov al 9 dic siguen el formato de los ya publicados y usan clips de Higgsfield detrás del texto, así que llevan la etiqueta de IA.
 
 | Fecha (Lima) | Tema | Serie | Pieza | Estado |
 |---|---|---|---|---|
@@ -41,30 +41,30 @@ Estado al 13 nov, leído del planificador de Metricool. Las piezas producidas el
 | Sáb 14 nov, 10:00 | Arranque | Consejo | "¿Se te cayó el gym? Haz la versión corta" | Programado |
 | Lun 16 nov, 18:00 | El plan se rompe | Esto / Esto | S1-P1 · Menú, desayuno, lonche y noche | Programado |
 | Mar 17 nov, 18:00 | El plan se rompe | Confesiones 01 | S1-P2 · "Empiezo todos los lunes" | Programado |
-| Mié 18 nov, 12:00 | El plan se rompe | Consejo | "¿Qué comer después de entrenar?" | **Por producir** |
+| Mié 18 nov, 12:00 | El plan se rompe | Consejo | S1-C · "¿Qué comer después de entrenar?" | Programado |
 | Jue 19 nov, 18:00 | El plan se rompe | Don Imprevisto 01 (prueba) | S1-P4 · "Este es tu plan. Y este es Don Imprevisto" | Programado |
 | Vie 20 nov, 18:00 | El plan se rompe | Detrás del club 01 | S1-P5 · "18 personas nos contaron qué les rompe el plan" | Programado |
 | Dom 22 nov, 10:00 | El plan se rompe | Encontré mi Plan B 01 | S1-P6 · "Te invitan a almorzar y el día no se cae" | Programado |
 | Lun 23 nov, 18:00 | Registrar da pereza | Esto / Esto | S2-P1 · Proteína sin anotar | Programado |
 | Mar 24 nov, 18:00 | Registrar da pereza | Confesiones 02 | S2-P2 · "Tengo 3 apps. No uso ninguna" | Programado |
-| Mié 25 nov, 12:00 | Registrar da pereza | Consejo | "El error que frena tu progreso" | **Por producir** |
+| Mié 25 nov, 12:00 | Registrar da pereza | Consejo | S2-C · "El error que frena tu progreso" (todo o nada) | Programado |
 | Jue 26 nov, 18:00 | Registrar da pereza | Don Imprevisto 02 | S2-P4 · La torta de la oficina | Programado · depende de la prueba |
 | Vie 27 nov, 18:00 | Registrar da pereza | Detrás del club 02 | S2-P5 · La beta que cobraba el primer día | **Borrador: espera aprobación** |
 | Dom 29 nov, 18:00 | Registrar da pereza | Encontré mi Plan B 02 | S2-P6 · "Domingo en la noche: tu semana ya armada" | Programado |
 | Lun 30 nov, 18:00 | Volver sin empezar de cero | Esto / Esto | S3-P1 · Volver al gym sin romperte | Programado |
 | Mar 1 dic, 18:00 | Volver sin empezar de cero | Confesiones 03 | S3-P2 · Las zapatillas nuevas | Programado |
-| Mié 2 dic, 12:00 | Volver sin empezar de cero | Consejo | "No esperes a enero: empieza con esta semana" | **Por producir** |
+| Mié 2 dic, 12:00 | Volver sin empezar de cero | Consejo | S3-C · "No esperes a enero" | Programado |
 | Jue 3 dic, 18:00 | Volver sin empezar de cero | Don Imprevisto 03 | S3-P4 · La máquina ocupada | Programado · depende de la prueba |
 | Vie 4 dic, 18:00 | Volver sin empezar de cero | Detrás del club 03 | S3-P5 · Ahora puedes entrenar en tu descanso | Programado |
 | Dom 6 dic, 10:00 | Volver sin empezar de cero | Encontré mi Plan B 03 | S3-P6 · "Así se ve un entreno cuando no tienes que adivinar" | Programado |
 | Lun 7 dic, 18:00 | Diciembre sin culpa | Esto / Esto | S4-P1 · Las fiestas: esto o esto | Programado |
 | Mar 8 dic, 18:00 | Diciembre sin culpa | Confesiones 04 | S4-P2 · "Ya voy por el tercer panetón" | Programado |
-| Mié 9 dic, 12:00 | Diciembre sin culpa | Consejo | "Tu plan B para la semana de fiestas" | **Por producir** |
+| Mié 9 dic, 12:00 | Diciembre sin culpa | Consejo | S4-C · "Semana de fiestas" | Programado |
 | Jue 10 dic, 18:00 | Diciembre sin culpa | Don Imprevisto 04 | S4-P4 · Horas extra en diciembre | Programado · depende de la prueba |
 | Vie 11 dic, 18:00 | Diciembre sin culpa | Detrás del club 04 | Resumen del mes con los números reales | **Por producir tras la revisión del 7 dic** |
 | Dom 13 dic, 10:00 | Diciembre sin culpa | Encontré mi Plan B 04 | S4-P6 · "Se me fue una semana" | Programado |
 
-Los archivos de las piezas S1 a S4 y su generador están en la carpeta local `redes-contenido/`, fuera del repo.
+Los archivos de las piezas y su generador están en la carpeta local `redes-contenido/`, fuera del repo.
 
 ## Reglas
 
