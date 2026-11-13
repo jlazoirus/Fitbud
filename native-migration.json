@@ -687,6 +687,29 @@
       "note": ""
     },
     {
+      "id": "NAT-29",
+      "title": "Vincular el proyecto Expo/EAS real de Evolv",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20"
+      ],
+      "paths": [
+        "native/app.config.ts",
+        "native/.env.example",
+        "native/README.md",
+        "native/tests/app-config.test.ts",
+        "docs/native-migration/decisions.md"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
       "id": "NAT-30",
       "title": "Onboarding, consentimientos y evaluación de seguridad",
       "phase": 4,

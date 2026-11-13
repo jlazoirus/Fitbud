@@ -248,6 +248,15 @@ Convenciones para todas las tareas:
 
 ---
 
+## NAT-29 — Vincular el proyecto Expo/EAS real de Evolv
+
+- **Objetivo:** que la configuración del repositorio corresponda a `@jlazo/evolv`, creado por instrucción de Jonathan y confirmado en el panel de Expo.
+- **Alcance:** `native/app.config.ts` fija el owner y el projectId públicos como valores predeterminados, conserva overrides explícitos para entornos aislados y rechaza IDs inválidos; `native/.env.example`, `native/README.md`, pruebas de configuración y `docs/native-migration/decisions.md` registran la vinculación real.
+- **Aceptación:** `expo config` publica el owner, `extra.eas.projectId` y `updates.url` del mismo proyecto; tests positivos/negativos, typecheck, lint, formato y export iOS/Android/web verdes. Comprobar la identidad en el panel autenticado de Expo y conservar evidencia.
+- **Fuera de alcance:** cerrar NAT-H2/H5, crear credenciales de firma/push, contratar un plan, publicar un build o una actualización OTA. La autenticación de EAS CLI se comprueba por separado; una sesión web no implica sesión de terminal.
+
+---
+
 ## Fase 4 — Paridad por journey
 
 Cada tarea de esta fase entrega pantallas completas con estados de carga, vacío, error y offline, y adjunta capturas iOS y Android al PR. Marca su fila en `PARITY.md`.
