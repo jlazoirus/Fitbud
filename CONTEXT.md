@@ -18,7 +18,7 @@ REQ-364..367: Hoy con consumo, acción, agenda, técnica, avisos plegables y nav
 - Supabase es fuente de verdad. `localStorage` espeja/cachea para offline; no debe ser la unica ubicacion de datos personales.
 - PWA: `manifest.webmanifest`, `service-worker.js`, iconos en `assets/`. la app (`/app`) sale del cache; `config.js` network-first; `/api/*` network-only.
 
-REQ-385..387: solo deporte, días en snapshots e indoor cycling 30–60 min.
+REQ-385..388: deporte, días explícitos, indoor cycling y atrás con historial.
 
 ## Datos y seguridad
 

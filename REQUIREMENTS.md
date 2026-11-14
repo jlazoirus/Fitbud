@@ -2519,7 +2519,7 @@ Prueba de plantilla y lugar, e2e y release gate.
 
 ## REQ-388 - Onboarding: volver atrás en cada paso sin buscar el botón
 
-**Estado: pendiente.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+**Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
 
 ### Origen
 Jonathan, 2026-11-11.

@@ -749,7 +749,9 @@
   .onboarding-brand{font-family:var(--font-body);font-size:14px;font-weight:800;color:var(--purple-200);margin-bottom:22px}
   .onboarding h1{font-size:30px;line-height:1.08;margin-bottom:8px}
   .onboarding-copy{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:18px}
-  .steps{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:24px}
+  .onboarding-nav{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:8px 0;background:var(--bg);margin-bottom:20px}
+  .onboarding-nav .steps{flex:1;margin-bottom:0}
+  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:24px}
   .step{height:5px;background:var(--surf3);border-radius:999px;overflow:hidden}
   .step.on{background:var(--accent)}
   .setup-steps{display:grid;gap:10px;margin-top:18px}
@@ -3299,6 +3301,40 @@ let onboardingActive=false;
 let onboardingStep=1;
 let onboardingDraft=null;
 let reviewPromptShown=false;
+// REQ-388: history contains only step numbers, never personal draft values.
+let onboardingHistoryId=null;
+function onboardingHistoryEntry(){return history.state&&history.state.evolvOnboarding;}
+function onboardingHistoryWrite(kind,push){
+  if(!onboardingHistoryId)onboardingHistoryId=String(Date.now())+"-"+Math.random().toString(36).slice(2);
+  const state={...(history.state||{}),evolvOnboarding:{id:onboardingHistoryId,step:onboardingStep,kind:kind||"step"}};
+  history[push?"pushState":"replaceState"](state,"");
+}
+function endOnboardingHistory(){
+  onboardingHistoryId=null;
+  const state={...(history.state||{})};delete state.evolvOnboarding;
+  history.replaceState(state,"");
+}
+function canExitOnboardingReview(){
+  const prefs=profile&&profile.prefs||{};
+  return hasCompleteOnboarding(prefs)&&!prefs.onboardingPending;
+}
+function exitOnboardingReview(){
+  if(!canExitOnboardingReview())return;
+  endOnboardingHistory();onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
+  closeModal();view="hoy";render();scrollAppTop();
+}
+function onboardingHistoryPop(event){
+  if(!onboardingActive||!onboardingDraft||!onboardingHistoryId)return;
+  const entry=event.state&&event.state.evolvOnboarding;
+  if(!entry||entry.id!==onboardingHistoryId||!Number.isInteger(entry.step)||entry.step<1||entry.step>4)return;
+  readOnboardingStep();
+  // The nudge owns a history entry: back first closes it at the same step.
+  const nudge=!!document.getElementById("nudge_light_cardio");
+  if(document.getElementById("overlay"))closeModal();
+  if(nudge&&entry.step===onboardingStep)return;
+  onboardingStep=entry.step;renderOnboarding();scrollAppTop();
+}
+window.addEventListener("popstate",onboardingHistoryPop);
 function latestLoggedWeight(){
   const weeks=Object.keys(S.weights||{}).map(Number).filter(Number.isFinite).sort((a,b)=>b-a);
   if(!weeks.length)return null;
@@ -3605,6 +3641,7 @@ function openTermsNotice(){
     <button class="btn btn-accent" style="width:100%" onclick="closeModal()">Entendido</button>`);
 }
 function startOnboarding(){
+  endOnboardingHistory();
   onboardingDraft=onboardingDefaults();
   onboardingActive=true;
   onboardingStep=1;
@@ -3613,7 +3650,8 @@ function startOnboarding(){
   scrollAppTop();
 }
 function onboardingSteps(){
-  return `<div class="steps" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="${onboardingStep}" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div>`;
+  const back=onboardingStep>1?'<button type="button" class="btn btn-sm" data-onboarding-back onclick="onboardingBack()">Atrás</button>':canExitOnboardingReview()?'<button type="button" class="btn btn-sm" onclick="exitOnboardingReview()">Salir sin cambios</button>':"";
+  return `<div class="onboarding-nav">${back}<div class="steps" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="${onboardingStep}" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div></div>`;
 }
 function onboardingButtons(last){
   return `<div class="onboarding-actions">
@@ -3897,6 +3935,7 @@ function validateFoodPreferences(d){
 }
 function renderOnboarding(){
   if(!onboardingDraft)onboardingDraft=onboardingDefaults();
+  if(!onboardingHistoryId)onboardingHistoryWrite("step",false);
   const d=onboardingDraft;
   const sel=(a,b)=>a===b?"selected":"";
   let body="";
@@ -4144,12 +4183,19 @@ function onboardingNext(){
   if(onboardingStep===1)applyCalculatedMacros();
   const prevStep=onboardingStep;
   onboardingStep=Math.min(4,onboardingStep+1);
+  onboardingHistoryWrite("step",true);
   renderOnboarding();scrollAppTop();
   if(prevStep===3&&onboardingDraft&&onboardingDraft.primarySport==="strength_only"){
     showCardioNudge("onboarding");
   }
 }
-function onboardingBack(){readOnboardingStep();onboardingStep=Math.max(1,onboardingStep-1);renderOnboarding();scrollAppTop();}
+function onboardingBack(){
+  if(onboardingStep<=1)return;
+  readOnboardingStep();
+  const entry=onboardingHistoryEntry();
+  if(entry&&entry.id===onboardingHistoryId){history.back();return;}
+  onboardingStep=Math.max(1,onboardingStep-1);onboardingHistoryWrite("step",false);renderOnboarding();scrollAppTop();
+}
 function onboardingGoalChanged(goal){onboardingDraft.goal=goal;applyCalculatedMacros();renderOnboarding();}
 function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();renderOnboarding();toast("Metas recalculadas");}
 function updateOnboardingTrainingSummary(){
@@ -4532,6 +4578,7 @@ async function saveOnboarding(){
     await pullCycleHistory();
   }
   if(newCycle||firstCycle)seedStartWeight();
+  endOnboardingHistory();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
   view="hoy";current=clampDate(todayStr());
   trackEvent(firstCycle||newCycle?"onboarding_complete":"onboarding_review",{cycle:planCycleNumber,duration_weeks:duration,source:newCycle?"new_cycle":firstCycle?"first":"review"});
@@ -4821,6 +4868,7 @@ let _cardioNudgeCtx=null;
 function showCardioNudge(ctx){
   if(UI.cardioNudgeDismissed)return;
   _cardioNudgeCtx=ctx;
+  if(ctx==="onboarding"&&onboardingHistoryId)onboardingHistoryWrite("nudge",true);
   modal(`<h3>Actividad ligera para tu salud</h3>
     <p class="muted small">Las guías de salud pública recomiendan sumar actividad moderada durante la semana. La fuerza es una base excelente; combinarla con caminatas u otra actividad regular puede ampliar sus beneficios. Esta es información general — consulta a un profesional de salud para orientación personalizada.</p>
     <label class="chip-check" style="display:flex;margin:14px 0">
@@ -4829,7 +4877,11 @@ function showCardioNudge(ctx){
     </label>
     <button class="btn btn-accent" style="width:100%;margin-top:4px" onclick="dismissCardioNudge()">Continuar</button>`,
     // REQ-191: cerrar con ✕, Esc o tocando fuera también cuenta como visto.
-    {onClose:()=>{UI.cardioNudgeDismissed=true;uiSave();}});
+    {onClose:()=>{
+      UI.cardioNudgeDismissed=true;uiSave();
+      const entry=onboardingHistoryEntry();
+      if(ctx==="onboarding"&&onboardingHistoryId&&entry&&entry.id===onboardingHistoryId&&entry.kind==="nudge")history.back();
+    }});
 }
 function dismissCardioNudge(){
   const enabled=!!(document.getElementById("nudge_light_cardio")&&document.getElementById("nudge_light_cardio").checked);
@@ -15499,6 +15551,7 @@ function clearSignedOutState(prevUid){
   entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
   billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
   refreshPlanCalendar();
+  endOnboardingHistory();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;passwordRecoveryError="";passwordRecoveryMode="recovery";
   notifPrefsCache=null;notifySetupActive=false; // REQ-289: avisos de la próxima cuenta
   cycleHistory=[];recapPhotoFile=null;recapChallenge="";
