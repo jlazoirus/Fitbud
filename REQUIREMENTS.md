@@ -72,10 +72,8 @@ Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.js
 
 Pendiente no automatizable por agentes:
 
-- REQ-49 - Revision legal pre-lanzamiento.
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
-- REQ-70 - Validacion de negocio y beta con usuarios reales.
 - REQ-254 - Decidir el nivel de cocina en el catálogo y si se amplían almuerzos/cenas "sin cocinar" (feedback Diego).
 - REQ-255 - Decidir si los recordatorios llegan por WhatsApp: proveedor y presupuesto (feedback Diego).
 - REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
@@ -406,7 +404,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-48`).
 
 ## REQ-49 - Checklist de revision legal antes del lanzamiento comercial
 
-**Estado: pendiente. Requiere accion humana; no implementable por el agente autonomo.**
+**Estado: implementado.** Revisión legal hecha por Jonathan (confirmado el 2026-11-14).
 
 Checklist de revision legal antes del lanzamiento comercial. Requiere revision humana de terminos, privacidad, salud/entrenamiento, pagos y comunicaciones; no agregar a `agent-loop.json`.
 
@@ -534,7 +532,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-69`).
 
 ## REQ-70 - Validación de negocio y beta controlada
 
-**Estado: pendiente. Requiere entrevistas, usuarios reales y decisión de producto; no implementable por el agente autónomo.**
+**Estado: implementado.** Validación y beta hechas por Jonathan (confirmado el 2026-11-14).
 
 Validacion de negocio y beta controlada. Requiere entrevistas, usuarios reales y decision GO/ITERAR/PIVOT; el agente solo puede implementar sub-REQ tecnicos derivados.
 
