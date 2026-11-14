@@ -184,7 +184,8 @@ async function activePaidEntitlement(auth, e) {
     const now = new Date().toISOString();
     const r = await fetch(
       e.url + "/rest/v1/user_entitlements?user_id=eq." + auth.user.id
-        + "&status=in.(active,courtesy)&expires_at=gt." + now + "&limit=1&select=id,status,origin",
+        + "&status=in.(active,courtesy)&starts_at=lte." + now + "&expires_at=gt." + now
+        + "&order=expires_at.desc&select=id,status,origin,starts_at,expires_at,granted_by",
       { headers: serviceHeaders(e) }
     );
     if (!r.ok) {
@@ -193,10 +194,53 @@ async function activePaidEntitlement(auth, e) {
       return { ok: false };
     }
     const rows = await r.json().catch(() => []);
-    if (Array.isArray(rows) && rows.length) return { ok: true, access: "paid" };
+    if (Array.isArray(rows) && rows.length) {
+      // REQ-391: una compra más larga no oculta una cortesía vigente.
+      const courtesy = rows.filter((row) => row.status === "courtesy"
+        && Date.parse(row.starts_at) <= Date.now() && Date.parse(row.expires_at) > Date.now())
+        .sort((a, b) => Date.parse(b.expires_at) - Date.parse(a.expires_at))[0];
+      return { ok: true, access: "paid", courtesy };
+    }
     return { ok: false };
   } catch (_) {
     return { ok: true, access: "setup" }; // error de red → no bloquear
+  }
+}
+
+// REQ-391: repara también cortesías antiguas y permisos borrados al reiniciar.
+// No crea ni prolonga el acceso; solo materializa lo que ya concedió el admin.
+async function ensureCourtesyQuota(e, userId, courtesy) {
+  if (!courtesy || Date.parse(courtesy.expires_at) <= Date.now()) return;
+  const limit = 10000; // Misma regla de beta y cortesía manual (REQ-248/382).
+  try {
+    const response = await fetch(e.url + "/rest/v1/coach_quota_overrides?user_id=eq." + encodeURIComponent(userId)
+      + "&select=action,daily_limit,enabled,expires_at", { headers: serviceHeaders(e) });
+    const current = await responseJson(response);
+    if (!response.ok || !Array.isArray(current)) throw new Error("courtesy_read_failed");
+    const keep = new Set(current.filter((row) => row.enabled === true && Number(row.daily_limit) >= limit
+      && (!row.expires_at || Date.parse(row.expires_at) >= Date.parse(courtesy.expires_at)))
+      .map((row) => row.action));
+    const rows = [...ALLOWED_ACTIONS].filter((action) => !keep.has(action)).map((action) => ({
+      user_id: userId,
+      action,
+      daily_limit: limit,
+      bonus_units: 0,
+      enabled: true,
+      expires_at: courtesy.expires_at,
+      updated_by: UUID_RE.test(courtesy.granted_by || "") ? courtesy.granted_by : null,
+      updated_at: new Date().toISOString(),
+    }));
+    if (!rows.length) return;
+    const saved = await fetch(e.url + "/rest/v1/coach_quota_overrides?on_conflict=user_id,action", {
+      method: "POST",
+      headers: serviceHeaders(e, { "content-type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" }),
+      body: JSON.stringify(rows),
+    });
+    if (!saved.ok) throw new Error("courtesy_write_failed");
+  } catch (_) {
+    const error = new Error("Tu acceso está activo, pero no pudimos preparar el coach. Intenta nuevamente en unos segundos.");
+    error.status = 503;
+    throw error;
   }
 }
 
@@ -930,10 +974,11 @@ export default async function handler(req, res) {
 
   let reservation;
   try {
+    await ensureCourtesyQuota(e, auth.user.id, entitlement.courtesy);
     reservation = await reserveCoachAction(e, auth, quota);
   } catch (error) {
     const setup = error.status === 404 || /reserve_coach_action|schema cache|function/i.test(error.message);
-    res.status(setup ? 503 : 500).json({
+    res.status(setup || error.status === 503 ? 503 : 500).json({
       error: setup
         ? "El control de uso del coach todavia no esta configurado."
         : String(error.message || error),

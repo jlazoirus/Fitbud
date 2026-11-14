@@ -2422,9 +2422,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-383 - Recordatorios: resolver el timeout recurrente del cron
 
-**Estado: implementado.**
-
-Origen: captura de Jonathan del 11/11/2026, 20:00 Lima. Problema: `/api/notify` supera los 30 s que espera cron-job.org. Causa: usuarios en serie, referidos ya enviados recalculados y red sin límite. Objetivo: completar con margen y cancelar dependencias colgadas. Alcance: cuatro usuarios concurrentes, claves enviadas por lotes, correos espaciados, presupuesto de 24 s y HTTP 503 explícito si se agota; prueba manual sin envíos. Fuera de alcance: horarios, mensajes, SQL y secretos. Riesgo: respuesta ambigua del proveedor; se conservan claves y se propagan a Resend. Aceptación y evidencia: `docs/notify-runtime.md`; fixture baja de 31,7 a 3,2 s. Verificación: `scripts/test-notify-latency.mjs`, validadores de notificaciones y release gate.
+**Estado: implementado.** Presupuesto de ejecución y consultas acotadas; fixture de 31,7 a 3,2 s. Detalle en `docs/notify-runtime.md` y `docs/requirements-history.md`.
 
 ## REQ-384 - Administración: el correo de recuperación abre la app
 
@@ -2555,3 +2553,7 @@ Que no se junte el mismo día con REQ-341 ni REQ-366; REQ-31.
 Una sola pregunta tras la primera comida registrada; «Ahora no» la pospone 3 días; las metas pasadas no cambian.
 ### Verificación sugerida
 e2e con reloj controlado y release gate.
+
+## REQ-391 - Cortesías anteriores: coach completo sin volver a otorgar acceso
+
+**Estado: implementado.** Las cortesías vigentes completan automáticamente los permisos del coach antes de usarlo, también tras reiniciar la cuenta. Conserva el vencimiento y permisos suficientes más largos. Sin migración ni acción manual. Detalle en `docs/requirements-history.md`. ✓ `scripts/test-coach-quota.mjs`.

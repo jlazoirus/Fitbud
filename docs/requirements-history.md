@@ -13879,7 +13879,7 @@ Origen: Jonathan, 11 nov 2026, tras usar Usuarios desde el móvil.
 - Problema: Activar/Desactivar, Reiniciar usuario y Cortesía no mostraban que estaban en curso; el aviso duraba 1,6 s, se partía en tres líneas y casi no se leía; tras activar se recargaba la lista entera. "Cambiar contraseña" dejaba al admin fijar la contraseña de otra persona. La cortesía (`/api/entitlement` `grant`) solo creaba el acceso: el coach seguía con las cuotas normales y había que cargar cada acción a mano en Consumo (en producción, una cortesía de 6 meses del 10 nov quedó con 7 de 8 acciones y sin vencimiento).
 - Implementación: `adminBusy` (spinner + verbo, botón bloqueado, `aria-busy`) en activar, restablecer contraseña, cortesía, regenerar plan y reiniciar; confirmación que queda en pantalla (`adminDoneModal`) y errores dentro del diálogo; la lista se repinta en su sitio y resalta la tarjeta. `toast(msg,{tone,ms})` dura según el largo del texto, ocupa el ancho disponible y marca éxito/error. Se quitó `setPassword` (UI y API); "Restablecer contraseña" envía el correo de recuperación. Nueva acción `grantCourtesy` en `api/admin.js`: crea el acceso y aplica `grantUnlimitedQuota` (misma regla que la beta, REQ-248: cada acción sin tope hasta que vence, sin acortar topes ilimitados más largos). El modal de cortesía toma los días del plan elegido.
 - ✓ `scripts/test-admin-api.mjs`, `scripts/test-admin-beta-api.mjs`, `tests/e2e/admin-usuarios.spec.js`.
-- Operación manual: las cortesías dadas antes de este cambio no se corrigen solas; volver a otorgarlas (o ajustar Consumo) para dejarlas sin tope con vencimiento.
+- Operación original: las cortesías anteriores requerían volver a otorgarse. REQ-391 elimina esa tarea manual: los permisos se completan al usar el coach durante el acceso vigente.
 
 ## Series cerradas de la secuencia activa (archivadas 2026-11-11)
 
@@ -13970,3 +13970,37 @@ Causa: `api/admin.js` enviaba `redirect_to` dentro del JSON de `/auth/v1/recover
 La API valida el origen con `safeRedirect`, fija `/app/?auth=recovery` y lo envía en la query; el cuerpo solo contiene el correo de la cuenta. Un destino ajeno o sin origen seguro devuelve 400 antes de enviar correo. Se conservan los errores del proveedor, incluida la espera por límite de correos. No permite fijar contraseñas desde administración.
 
 Verificación: casos de API con destino administrativo, destino omitido, origen ajeno y error 429; recorrido de nueva contraseña desde el enlace en la app. Sin envíos reales, dependencias ni migraciones. No altera la duración de las cortesías.
+
+## REQ-383 - Recordatorios: resolver el timeout recurrente del cron
+
+**Estado: implementado.**
+
+Origen: captura de Jonathan del 11/11/2026, 20:00 Lima. Problema: `/api/notify` supera los 30 s que espera cron-job.org. Causa: usuarios en serie, referidos ya enviados recalculados y red sin límite. Objetivo: completar con margen y cancelar dependencias colgadas. Alcance: cuatro usuarios concurrentes, claves enviadas por lotes, correos espaciados, presupuesto de 24 s y HTTP 503 explícito si se agota; prueba manual sin envíos. Fuera de alcance: horarios, mensajes, SQL y secretos. Riesgo: respuesta ambigua del proveedor; se conservan claves y se propagan a Resend. Aceptación y evidencia: `docs/notify-runtime.md`; fixture baja de 31,7 a 3,2 s. Verificación: `scripts/test-notify-latency.mjs`, validadores de notificaciones y release gate.
+
+## REQ-391 - Cortesías anteriores: coach completo sin volver a otorgar acceso
+
+**Estado: implementado.**
+
+### Origen
+Jonathan, 13 nov 2026: «implementa lo que falta», tras advertir que las cortesías anteriores a REQ-382 debían volver a otorgarse.
+
+### Problema y causa raíz
+El acceso de cortesía y los permisos por acción estaban separados. REQ-382 solo daba los ocho permisos al otorgar una nueva cortesía; las anteriores seguían limitadas o incompletas. Reiniciar una cuenta conserva su acceso, pero elimina `coach_quota_overrides`, reproduciendo el problema. `api/claude.js` comprobaba el acceso sin completar esos permisos antes de reservar.
+
+### Objetivo y alcance
+Una cortesía vigente incluye todas las funciones del coach hasta su vencimiento original, sin que el admin tenga que reotorgarla. El servidor consulta accesos ya iniciados y no vencidos, considerando la cortesía aunque coexista con una compra más larga. Antes de reservar una petición válida completa los permisos faltantes, cortos o desactivados, con el mismo límite de 10.000 por acción/día de REQ-248/382. Conserva permisos explícitos suficientes que vencen después o que no vencen.
+
+La reparación usa la cuenta autenticada y la credencial del servidor, es idempotente y cubre las ocho acciones. No crea accesos ni cambia fechas, planes, historial o uso consumido. Un fallo de lectura/escritura responde 503 con reintento, sin reservar, llamar al proveedor ni servir una alternativa limitada por el fallo.
+
+### Fuera de alcance y riesgos
+No cambia los límites de compras o trial, la UI, pagos ni datos históricos. Una cortesía futura, vencida o revocada no autoriza la reparación; tampoco lo hacen campos del cliente. Se mantienen autenticación, cuenta activa, privacidad y reserva idempotente. El beneficio se materializa en el siguiente uso del coach; no hace falta un proceso masivo sobre cuentas reales.
+
+### Criterios de aceptación y verificación
+- Cortesía antigua de 90 días sin permisos: primer uso completo, con ocho acciones y el vencimiento original.
+- Cortesía de 180 días con siete permisos de 3.000 sin vencimiento: se completan las ocho acciones, sin reotorgar acceso.
+- Reintentar la misma petición no repite generación ni escritura; una petición nueva después de reiniciar vuelve a completar permisos.
+- Permisos suficientes más largos se conservan; una compra más larga no oculta la cortesía.
+- Accesos vencidos, futuros o revocados y declaraciones del cliente no crean permisos. Compras normales conservan su comportamiento.
+- Fallos de lectura/escritura permiten reintentar sin consumo ni exposición de errores internos.
+
+Pruebas: `scripts/test-coach-quota.mjs`, regresiones de administración, trial y coach; release gate. Fixtures locales y proveedor simulado, sin llamadas pagadas ni cambios a cuentas reales. No requiere migración, volver a otorgar cortesías ni otra acción manual.

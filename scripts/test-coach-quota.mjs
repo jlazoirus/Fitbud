@@ -708,3 +708,99 @@ assert(res.statusCode === 200, "REQ-66: 'repollo' no debe activar el término 'p
 assert(completedCalls === 1 && failedCalls === 0, "REQ-66: el día con repollo debe completarse sin fallo.");
 
 console.log("REQ-66: carne para vegetariano rechazada, omnivoro permitido y regresion repollo/pollo verificadas.");
+
+// REQ-391: las cortesías antiguas se completan antes de reservar, sin reotorgar acceso.
+const COURTESY_ACTIONS = ["diet_day", "diet_week", "meal_option", "meal_estimate", "macro_review", "training_plan", "training_replacement", "coach_conversation"];
+const courtesyFor = (days, extra = {}) => ({
+  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", status: "courtesy", origin: "admin_courtesy",
+  starts_at: new Date(Date.now() - 86400000).toISOString(),
+  expires_at: new Date(Date.now() + days * 86400000).toISOString(), granted_by: admin.id, ...extra,
+});
+function courtesyScenario({ entitlements = [courtesyFor(90)], overrides = [], failRead = false, failWrite = false, defaultFresh = false } = {}) {
+  const state = { overrides: new Map(overrides.map((r) => [r.action, { ...r }])), calls: [], writes: [], providerCalls: 0, reservations: 0, completed: new Set(), usageId: 500, requestIds: new Map() };
+  global.fetch = async (url, options = {}) => {
+    const value = String(url), path = new URL(value).pathname;
+    const payload = options.body ? JSON.parse(options.body) : null;
+    state.calls.push({ url: value, method: options.method || "GET", payload, headers: options.headers });
+    const auth = authRoutes(value);
+    if (auth) return auth;
+    if (path === "/rest/v1/user_entitlements") {
+      assert(value.includes("user_id=eq." + user.id) && value.includes("starts_at=lte.") && !value.includes("limit=1"), "La consulta debe usar la cuenta autenticada y considerar cortesías solapadas ya iniciadas.");
+      return response(200, entitlements.filter((r) => ["active", "courtesy"].includes(r.status) && Date.parse(r.starts_at) <= Date.now() && Date.parse(r.expires_at) > Date.now()));
+    }
+    if (path === "/rest/v1/coach_quota_overrides") {
+      assert(options.headers.Authorization === "Bearer service", "La reparación solo se escribe desde el servidor.");
+      if (options.method === "POST") {
+        if (failWrite) return response(500, { message: "internal quota detail" });
+        state.writes.push(payload);
+        for (const row of payload) {
+          assert(row.user_id === user.id && row.updated_by === admin.id, "Los permisos corresponden al usuario autenticado y al admin que dio acceso.");
+          state.overrides.set(row.action, { ...row });
+        }
+        return response(204, {});
+      }
+      assert(value.includes("user_id=eq." + user.id), "Nunca se leen permisos de otra cuenta.");
+      return failRead ? response(500, {}) : response(200, [...state.overrides.values()]);
+    }
+    if (path === "/rest/v1/rpc/get_or_create_coach_trial") return response(200, [{ status: "expired", expires_at: new Date(Date.now() - 1000).toISOString() }]);
+    if (path === "/rest/v1/rpc/reserve_coach_action") {
+      state.reservations++;
+      assert(payload.p_user_id === user.id, "La reserva conserva el aislamiento por usuario.");
+      const row = state.overrides.get(payload.p_action);
+      const full = row?.enabled === true && row.daily_limit >= 10000 && (!row.expires_at || Date.parse(row.expires_at) > Date.now());
+      if (!state.requestIds.has(payload.p_request_id)) state.requestIds.set(payload.p_request_id, ++state.usageId);
+      return response(200, [{ usage_id: state.requestIds.get(payload.p_request_id), mode: full || defaultFresh ? "fresh" : "reuse", policy_enabled: true }]);
+    }
+    if (path === "/rest/v1/rpc/claim_coach_generation_part") return response(200, [{ claimed: !state.completed.has(payload.p_usage_id), part_status: state.completed.has(payload.p_usage_id) ? "completed" : "processing", response_text: state.completed.has(payload.p_usage_id) ? optionText : null }]);
+    if (path === "/rest/v1/rpc/complete_fresh_coach_part") { state.completed.add(payload.p_usage_id); return response(200, [{ stored_result_id: 500 }]); }
+    if (path === "/rest/v1/rpc/select_reusable_coach_part") return response(200, [{ selected_text: optionText, selected_origin: "template" }]);
+    if (path === "/rest/v1/rpc/fail_coach_generation_part") return response(200, true);
+    if (value.includes("api.anthropic.com")) { state.providerCalls++; return response(200, { content: [{ text: optionText }], usage: { input_tokens: 100, output_tokens: 50 } }); }
+    throw new Error("Ruta cortesía no simulada: " + value);
+  };
+  state.run = async (n = 1, extra = {}) => {
+    const out = capture();
+    await handler({ method: "POST", headers: { authorization: "Bearer token" }, body: { ...quotaBody, ...extra, quota: { ...quotaBody.quota, requestId: "77777777-7777-4777-8777-" + String(n).padStart(12, "0") } } }, out);
+    return out;
+  };
+  return state;
+}
+for (const days of [90, 180]) {
+  const entitlement = courtesyFor(days);
+  const state = courtesyScenario({ entitlements: [entitlement], overrides: days === 180 ? COURTESY_ACTIONS.filter((action) => action !== "meal_estimate").map((action) => ({ action, daily_limit: 3000, bonus_units: 3000, enabled: true, expires_at: null })) : [] });
+  const result = await state.run();
+  assert(result.statusCode === 200 && state.providerCalls === 1, "Cortesía antigua de " + days + " días permite el coach completo desde el primer uso.");
+  assert(state.writes.length === 1 && state.writes[0].length === 8, "Se completan las ocho acciones, incluida estimación.");
+  assert(state.writes[0].every((r) => r.expires_at === entitlement.expires_at && r.daily_limit === 10000 && r.enabled === true), "Los permisos vencen junto al acceso original.");
+  await state.run();
+  assert(state.writes.length === 1 && state.providerCalls === 1, "Reintentar no repite la escritura ni la generación ya completada.");
+  state.overrides.clear(); // Reiniciar borra permisos, pero conserva el acceso.
+  const resetResult = await state.run(2);
+  assert(resetResult.statusCode === 200 && state.writes.length === 2 && state.providerCalls === 2, "Después de reiniciar se recupera el beneficio sin reotorgar la cortesía.");
+  assert(!state.calls.some((c) => c.method === "DELETE" || (c.url.includes("/user_entitlements") && c.method !== "GET")), "No se toca el acceso, su fecha ni el historial.");
+}
+const longExpiry = new Date(Date.now() + 365 * 86400000).toISOString();
+const partial = courtesyScenario({
+  entitlements: [courtesyFor(360, { status: "active", origin: "checkout" }), courtesyFor(180)],
+  overrides: COURTESY_ACTIONS.filter((a) => a !== "meal_estimate").map((action) => ({
+    action, daily_limit: action === "diet_day" ? 20000 : 10000, enabled: action !== "training_plan",
+    expires_at: action === "diet_day" ? longExpiry : action === "diet_week" ? null : new Date(Date.now() + 1000).toISOString(),
+  })),
+});
+await partial.run();
+assert(partial.providerCalls === 1 && partial.writes[0].length === 6, "Completa la acción faltante, los permisos cortos y el desactivado aunque haya una compra más larga.");
+assert(partial.overrides.get("diet_day").daily_limit === 20000 && partial.overrides.get("diet_day").expires_at === longExpiry && partial.overrides.get("diet_week").expires_at === null, "Conserva permisos explícitos suficientes y más largos.");
+for (const invalid of [courtesyFor(-1), courtesyFor(90, { status: "revoked" }), courtesyFor(90, { starts_at: new Date(Date.now() + 86400000).toISOString() })]) {
+  const state = courtesyScenario({ entitlements: [invalid] });
+  const result = await state.run(1, { courtesy: courtesyFor(365), coachUnlimited: true });
+  assert(result.statusCode === 402 && !state.writes.length && !state.reservations && !state.providerCalls, "Una cortesía vencida, revocada o futura, o declarada por el cliente, no autoriza acceso.");
+}
+const normal = courtesyScenario({ entitlements: [courtesyFor(90, { status: "active", origin: "checkout" })], defaultFresh: true });
+assert((await normal.run()).statusCode === 200 && normal.providerCalls === 1 && !normal.writes.length, "La compra normal conserva su comportamiento sin crear permisos de cortesía.");
+for (const failure of [{ failRead: true }, { failWrite: true }]) {
+  const state = courtesyScenario(failure);
+  const result = await state.run();
+  assert(result.statusCode === 503 && !state.providerCalls && !state.reservations, "Un fallo de reparación permite reintentar sin consumir ni mostrar un resultado limitado.");
+  assert(!/quota|override|token|modelo|IA|internal/i.test(result.body.error), "El error no revela términos internos.");
+}
+console.log("REQ-391: cortesías antiguas de 3/6 meses, reinicio, ocho acciones, reintentos, aislamiento, vencimientos y fallos verificados sin red real.");
