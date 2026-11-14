@@ -57,12 +57,27 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
   - Culqi cobra cada día las suscripciones que vencen ese día y avisa por webhook;
   - cancelar una suscripción es inmediato e irreversible.
 - **Captura de tarjeta:** el Checkout de Culqi puede usarse solo para capturar la tarjeta.
-- **Sin documentar** (se le pregunta a Culqi, ver §5):
-  - si `initial_cycles` sirve para 7 días gratis y cómo se traduce `interval_unit_time`;
-  - si guardar la tarjeta hace un cargo de validación;
-  - si los cobros recurrentes piden 3DS;
-  - los nombres exactos de los eventos del webhook;
-  - si las suscripciones necesitan activación comercial.
+- **Confirmado en la referencia de la API** (`https://apidocs.culqi.com/apiculqi.yaml`, revisada el 2026-11-14). Todas las llamadas usan `Authorization: Bearer <llave secreta>` sobre `https://api.culqi.com`.
+  - **Endpoints:** `POST /v2/customers`; `POST /v2/cards` (`customer_id`, `token_id`); `POST /v2/recurrent/plans/create`; `POST /v2/recurrent/subscriptions/create` (`card_id`, `plan_id`, `tyc: true`, `metadata`); `GET`, `PATCH` y `DELETE /v2/recurrent/subscriptions/{id}`; `GET /v2/events/{id}`.
+  - **Plan:**
+    - `amount` va en céntimos, entre 300 y 5.000.000;
+    - `currency` es `PEN` o `USD`;
+    - `interval_unit_time`: 1 = diario, 2 = semanal, 3 = mensual, 4 = anual, 5 = trimestral, 6 = semestral;
+    - `interval_count`: con 0 se cobra de forma indefinida;
+    - `initial_cycles` (`count`, `has_initial_charge`, `amount`, `interval_unit_time`) son los ciclos iniciales del plan.
+  - **Semana gratis:** la prueba es nativa. Existen el estado de suscripción 2 («Periodo de prueba»), `trial_start` y `trial_end`, y el evento `subscription.trial.end`. El plan mensual queda con `interval_unit_time: 3`, `interval_count: 0` e `initial_cycles: {count: 7, interval_unit_time: 1, has_initial_charge: false, amount: 0}`. Lo primero que hace REQ-355 en integración es confirmar que eso da `trial_end` a 7 días y ningún cobro antes. Si no lo da, se usa la alternativa del diseño.
+  - **Tarjeta:** `POST /v2/cards` acepta `validate`, que por defecto es `true`. Con `true`, Culqi hace un cargo mínimo de S/ 3 y lo devuelve al instante. Se mantiene en `true`, porque detecta antes las tarjetas inválidas, y REQ-354 lo menciona. La misma llamada acepta `authentication_3DS`: si Culqi pide 3DS, se completa como en `culqi-charge.js`. La referencia no dice que los cobros recurrentes pidan 3DS.
+  - **Estados de la suscripción:** 1 creada, 2 prueba, 3 activa, 4 cancelada, 5 en cola, 6 finalizada.
+  - **Eventos del webhook:**
+    - `subscription.creation.succeeded` / `.failed`;
+    - `subscription.charge.succeeded` / `.failed`;
+    - `subscription.cancel.succeeded` / `.failed`;
+    - `subscription.trial.end`;
+    - y, para cargos, `charge.creation.succeeded` / `.failed`.
+
+    No hay firma documentada: cada evento se verifica con `GET /v2/events/{id}`.
+  - **Cobro fallido:** Culqi reintenta un número no documentado de veces y después cancela la suscripción sola.
+  - **Pendiente con Culqi** (no bloquea probar en integración): que la cuenta live tenga la recurrencia activa y con qué comisión.
 
 ### Diseño (sirve con o sin prueba gratuita nativa de Culqi)
 
@@ -76,7 +91,7 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
   3. Busca la cuenta o la invita (mismo criterio que `culqi-charge.js`).
   4. Crea la suscripción y un `user_entitlements` de prueba (`origin: 'trial'`, 7 días).
 - **Una sola prueba por persona.** Quien ya tuvo una prueba o un plan pagado se suscribe sin días gratis (cobro inmediato). Se controla por cuenta y por correo, y se puede sumar marca y últimos 4 dígitos de la tarjeta como señal débil.
-- **Cobros.** La opción preferida es la suscripción de Culqi con prueba vía `initial_cycles`, si Culqi confirma que funciona. La alternativa es crear la suscripción de Culqi al terminar la prueba, desde el cron (el primer cobro sale ese día y los siguientes los hace Culqi). En ambos casos los cobros los hace Culqi, no un cron propio con la tarjeta guardada.
+- **Cobros.** La opción elegida es la suscripción de Culqi con prueba nativa vía `initial_cycles` (ver arriba), confirmada primero en integración. La alternativa es crear la suscripción de Culqi al terminar la prueba, desde el cron (el primer cobro sale ese día y los siguientes los hace Culqi). En ambos casos los cobros los hace Culqi, no un cron propio con la tarjeta guardada.
 - **Webhook.** `POST /api/checkout?op=culqi-webhook`. No se confía en el cuerpo: se consulta el cargo o la suscripción en la API de Culqi con la llave secreta antes de actuar.
   - **Cobro exitoso:** `user_entitlements` +30 días (`origin: 'subscription'`, `payment_ref` = id del cargo, idempotente), registro en `billing_events` y recibo por correo.
   - **Cobro fallido:** `past_due` y aviso por correo. Culqi reintenta.
@@ -107,7 +122,7 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
 | 1 | REQ-352: web pública en `/` y app en `/app` | — |
 | 2 | REQ-353: portada sin beta; la beta solo en `/beta` | REQ-352 |
 | 3 | REQ-354: términos y devoluciones de la suscripción | Revisión de una persona |
-| 4 | REQ-355: motor de suscripción con Culqi (SQL, inscripción en el servidor, webhook, cancelación por API) | Respuestas de Culqi y llaves de prueba |
+| 4 | REQ-355: motor de suscripción con Culqi (SQL, inscripción en el servidor, webhook, cancelación por API) | — (API confirmada el 2026-11-14) |
 | 5 | REQ-356: `/registro` con tarjeta y semana gratis, y la llamada a la acción en la portada y la app | REQ-353, REQ-354, REQ-355 |
 | 6 | REQ-357: gestionar la suscripción (estado, cancelar) y sus correos | REQ-355 |
 
@@ -115,13 +130,8 @@ La inscripción se abre al público (la portada cambia "Ver planes" por "Empieza
 
 ## 5. Lo que hace una persona
 
-1. **Preguntar a Culqi** (soporte o ejecutivo):
-   - si la cuenta tiene habilitadas las suscripciones y los cargos recurrentes, y con qué comisión;
-   - cómo configurar 7 días gratis (`initial_cycles`) y qué significa `interval_unit_time`;
-   - si guardar una tarjeta hace un cargo de validación;
-   - si los cobros recurrentes piden 3DS;
-   - los nombres de los eventos del webhook para cobro exitoso, cobro fallido y suscripción cancelada.
-2. **Llaves de prueba de Culqi** (integración), para probar en el entorno de pruebas sin tocar producción. Se cargan como credencial de la sesión, nunca en el chat.
+1. ~~Preguntar a Culqi cómo funciona la API~~: resuelto con la referencia de la API (§3, 2026-11-14). Solo queda confirmar con Culqi que la cuenta live tenga la recurrencia activa y su comisión, antes de abrir la inscripción.
+2. ~~Llaves de prueba de Culqi~~: ya existen; la tienda las usa. Nunca se pegan en el chat.
 3. **Configurar el webhook** en CulqiPanel (Eventos → Webhook) con la URL que deje REQ-355.
 4. **Revisar y aprobar** los textos de REQ-354.
 5. **Aplicar** el SQL de REQ-355 en Supabase.

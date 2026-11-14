@@ -406,8 +406,6 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-48`).
 
 **Estado: implementado.** Revisión legal hecha por Jonathan (confirmado el 2026-11-14).
 
-Checklist de revision legal antes del lanzamiento comercial. Requiere revision humana de terminos, privacidad, salud/entrenamiento, pagos y comunicaciones; no agregar a `agent-loop.json`.
-
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-49`).
 
 ## REQ-50 - Cupones de acceso gratuito (duración configurable) sin Stripe
@@ -533,8 +531,6 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-69`).
 ## REQ-70 - Validación de negocio y beta controlada
 
 **Estado: implementado.** Validación y beta hechas por Jonathan (confirmado el 2026-11-14).
-
-Validacion de negocio y beta controlada. Requiere entrevistas, usuarios reales y decision GO/ITERAR/PIVOT; el agente solo puede implementar sub-REQ tecnicos derivados.
 
 Detalle historico: `docs/requirements-history.md` (buscar `## REQ-70`).
 
@@ -2254,9 +2250,27 @@ Cada punto de la lista del plan §3 aparece en los textos, y una persona los apr
 
 ## REQ-355 - Motor de suscripción mensual con Culqi
 
-**Estado: pendiente — requiere acción humana:** respuestas de Culqi y llaves de prueba (plan §5).
+**Estado: pendiente.** API confirmada el 2026-11-14 (endpoints, campos y eventos en el plan §3). Solo llaves de integración.
 
-Tabla `subscriptions`; inscripción en el servidor (cliente y tarjeta en Culqi, prueba de 7 días, una prueba por persona); cobros con suscripciones de Culqi; webhook verificado contra la API; acceso +30 días por cobro (idempotente); cancelación por API. Detalle en el plan §3, "Diseño".
+### Origen
+Decisión de Jonathan (2026-11-06): suscripción mensual con 7 días gratis.
+### Problema
+La tienda solo cobra pagos únicos; no existe cobro recurrente.
+### Objetivo
+Inscribir, cobrar cada mes con suscripciones de Culqi y cancelar, con el acceso sincronizado.
+### Alcance
+- Tabla `subscriptions` (SQL idempotente, RLS).
+- `op=subscribe`: cliente, tarjeta, suscripción al plan con `initial_cycles` de 7 días, prueba única por persona.
+- `op=culqi-webhook`: verifica con `GET /v2/events/{id}`; +30 días por cobro, idempotente.
+- Cancelar con `DELETE`.
+### Fuera de alcance
+`/registro` (REQ-356); Perfil y correos (REQ-357).
+### Riesgos
+Cobro doble, prueba repetida, webhook falso.
+### Criterios de aceptación
+7 días sin cobro; cada cobro exitoso suma 30 días una vez; cancelar detiene los cobros.
+### Verificación sugerida
+Test Node con Culqi simulado e inscripción real en integración.
 
 ## REQ-356 - /registro con tarjeta y semana gratis
 
