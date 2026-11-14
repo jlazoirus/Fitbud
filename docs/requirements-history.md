@@ -7313,6 +7313,8 @@ Se conservó `rebalanceFutureMeals()` (y `rankReplacementCandidates()`/`solveRep
 - JS embebido: se extrajo el último bloque `<script>` de `index.html` y se validó con `new Function(...)` (parsea sin errores de sintaxis).
 - No hay migraciones SQL ni cambios de shell PWA (no aplica subir `CACHE_NAME`).
 
+<a id="req-145"></a>
+
 ## REQ-145 - Fix E2E: el fixture de entreno deja "hoy" sin sesión de fuerza los domingos y pone el release-gate en rojo
 
 **Estado: implementado (2026-07-30).**
@@ -12516,6 +12518,8 @@ Tras REQ-310 seguían 5 ejercicios con dibujo SVG (`bulgarian-split-squat`, `sin
 ### Verificación
 
 `tests/e2e/sin-dibujos.spec.js`; specs de entreno, sustitución y expansión de ejercicios; `validate-exercises`, `validate-deploy-allowlist`.
+
+<a id="req-310"></a>
 
 ## REQ-310 - Fotos reales en todo el catálogo de ejercicios (adiós al monigote)
 

@@ -958,7 +958,7 @@ Detalle archivado en [historial](docs/requirements-history.md#req-143).
 
 ## REQ-145 - Fix E2E: el fixture de entreno deja "hoy" sin sesión de fuerza los domingos y pone el release-gate en rojo
 
-**Estado: implementado.** El perfil E2E usa `trainingPriority:"strength"` para que los 4 slots sean de fuerza aun cuando Domingo quede ultimo tras la normalizacion Lunes..Domingo; `trainingDaysIncludingToday(referenceDate)` permite validar los 7 dias y `scripts/validate-e2e-training-fixture.mjs` queda en el release gate. No se modifico runtime de la app. Detalle historico: `docs/requirements-history.md` (buscar `## REQ-145`).
+**Estado: implementado.** Detalle archivado en [historial](docs/requirements-history.md#req-145).
 
 ## REQ-146 - Unificar el cálculo de racha: Progreso muestra "0 / racha rota" mientras hoy no se registra
 
@@ -1908,9 +1908,7 @@ Una lesión declarada muestra un aviso y permite entrenar si la persona lo decid
 
 ## REQ-310 - Fotos reales en todo el catálogo de ejercicios (adiós al monigote)
 
-**Estado: implementado.** Detalle en `docs/requirements-history.md`.
-
-Jonathan (2026-10-30). Fotos de Free Exercise DB (dominio público) en `assets/exercise-media/<slug>-{0,1}.jpg` para el catálogo local y para las filas remotas vía `normalize`; demostraciones exactas de Wikimedia Commons y Flickr con crédito visible en "Ver técnica". Lo que no tenía fuente libre exacta lo cierra REQ-320 (sin demostración, solo pasos).
+**Estado: implementado.** Detalle archivado en [historial](docs/requirements-history.md#req-310).
 
 ## REQ-309 - Bump de caché del service worker (fitbud-pwa-v176)
 
