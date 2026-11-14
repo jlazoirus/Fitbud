@@ -145,6 +145,7 @@ run("test-coach-quota.mjs", "node scripts/test-coach-quota.mjs");
 run("validate-privacy.mjs", "node scripts/validate-privacy.mjs");
 run("validate-password-toggle.mjs", "node scripts/validate-password-toggle.mjs");
 run("validate-onboarding-copy.mjs", "node scripts/validate-onboarding-copy.mjs");
+run("test-onboarding-analytics.mjs", "node scripts/test-onboarding-analytics.mjs");
 run("validate-onboarding-first-week.mjs", "node scripts/validate-onboarding-first-week.mjs");
 run("validate-onboarding-macro-reconcile.mjs", "node scripts/validate-onboarding-macro-reconcile.mjs");
 run("validate-training-onboarding-decisions.mjs", "node scripts/validate-training-onboarding-decisions.mjs");

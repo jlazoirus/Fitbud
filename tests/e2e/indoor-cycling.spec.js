@@ -1,16 +1,17 @@
+import {selectOnboardingDays,selectOnboardingKind} from "./onboarding-actions.js";
 import {test,expect} from '@playwright/test';
 import {installMocks,seedLoggedInUser,autoDismissNudges,gotoApp,profileFixture,completePrefs} from './helpers.js';
 for(const width of [390,1280])test(`REQ-387: indoor 3 días y fuerza 2, en casa, sesiones y registro sin duplicar (${width})`,async({page,context})=>{
  await page.setViewportSize({width,height:844});await page.clock.install({time:new Date('2026-11-17T12:00:00-05:00')});
  const {calls,tables}=await installMocks(context,{tables:{profiles:{row:profileFixture({})}}});await seedLoggedInUser(page);await autoDismissNudges(page);await gotoApp(page);
  await page.fill('#ob_name','Ana');await page.selectOption('#ob_sex','female');await page.fill('#ob_age','30');await page.fill('#ob_height','165');await page.fill('#ob_weight','70');
- await page.getByRole('button',{name:'Continuar'}).click();await page.getByRole('button',{name:'Continuar'}).click();
+ await page.getByRole('button',{name:'Continuar'}).click();
  await page.selectOption('#ob_sport','indoor_cycling');await page.selectOption('#ob_strength','home');
  await page.selectOption('#ob_indoor_place','home');
- for(const day of [0,1,2,3,4,5,6])await page.locator(`#ob_day_${day}`).setChecked([1,2,3,5,6].includes(day));
- for(const day of [1,2,3,5,6])await page.selectOption(`#ob_kind_${day}`,[1,5].includes(day)?'strength':'sport');
+ await selectOnboardingDays(page,[1,2,3,5,6]);
+ for(const day of [1,2,3,5,6])await selectOnboardingKind(page,day,[1,5].includes(day)?'strength':'sport');
  await page.locator('#obDayKinds').scrollIntoViewIfNeeded();await page.screenshot({path:`/Users/jonathan/.fitbros/qa-archive/req-387/onboarding-${width}.png`});
- await page.getByRole('button',{name:'Continuar'}).click();await page.check('#ob_diet_omnivoro');await page.check('#ob_consent_core');for(const s of await page.locator('#app select[id^="ob_safety_"]').all())await s.selectOption('no');
+ await page.getByRole('button',{name:'Continuar'}).click();await page.selectOption('#ob_diet_pattern','omnivoro');await page.check('#ob_consent_core');for(const s of await page.locator('#app select[id^="ob_safety_"]').all())await s.selectOption('no');
  await page.getByRole('button',{name:'Guardar mi plan'}).click();await expect(page.locator('#tabs')).toContainText('Hoy');
  const result=await page.evaluate(()=>{
    const prefs=profile.prefs;const weeks=trainingExpectedWeeks(prefs);
@@ -32,7 +33,8 @@ for(const width of [390,1280])test(`REQ-387: indoor 3 días y fuerza 2, en casa,
  await expect(page.locator('#app')).toContainText(`${saved.expected} kcal`);
  const post=calls.filter(c=>c.table==='profiles'&&c.method==='POST').at(-1).payload;
  tables.profiles.row=Array.isArray(post)?post[0]:post;
- await page.reload();await page.locator('[data-tab="entreno"]').click();await expect(page.locator('#app')).toContainText('Sesión completada');
+ await expect.poll(()=>calls.filter(c=>c.table==='day_log'&&c.method==='POST'&&c.payload?.state?.workoutExecution?.status==='completed').length).toBeGreaterThan(0);
+ await page.reload();await page.waitForFunction(()=>typeof profile!=='undefined'&&profile&&!_authBusy);await page.locator('[data-tab="entreno"]').click();await expect(page.locator('#app')).toContainText('Sesión completada');
  expect(calls.some(c=>c.table==='day_log'&&c.method==='POST')).toBeTruthy();
 });
 test('REQ-387: solo indoor usa gimnasio por defecto y Perfil permite casa',async({page,context})=>{

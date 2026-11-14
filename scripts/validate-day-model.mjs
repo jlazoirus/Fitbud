@@ -129,7 +129,7 @@ const ctx=vm.createContext({
   activeNutritionPlanDay:()=>{nutritionReads++;return nutritionDay;},
   mealSlotsForPrefs:actual=>{assert.equal(actual,prefs);return slots;},
   parseYmd:ds=>{assert.equal(ds,input.ds);return{getDay:()=>3};},
-  effectiveDayTarget:(...args)=>{assert.equal(args.length,0,"Usar meta actual, no snapshot");return input.target;},
+  effectiveDayTarget:(source,date)=>{assert.equal(source,null,"Usar meta del perfil, no snapshot");assert.equal(date,input.ds,"Resolver vigencia para la fecha del día");return input.target;},
   effectiveWorkout:(ds,override)=>{workoutPrefs=override;return{workout:input.workout};},
 });
 vm.runInContext(readFileSync(new URL("../js/day-model.js",import.meta.url),"utf8"),ctx);

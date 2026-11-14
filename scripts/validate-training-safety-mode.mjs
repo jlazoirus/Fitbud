@@ -10,7 +10,7 @@ const contracts = readFileSync("domain-contracts.js", "utf8");
 
 assert.ok(index.includes("TRAINING_SAFETY_MODE_LABELS"), "La UI debe declarar opciones de ritmo del plan.");
 assert.ok(index.includes("trainingSafetyRecommendation"), "Debe existir recomendacion por edad/restricciones.");
-assert.ok(index.includes('trainingSafetyModeHtml("ob"'), "Onboarding debe mostrar ritmo del plan.");
+assert.ok(index.includes("trainingSafetyRecommendation(d).active") && index.includes("d.trainingSafetyMode=normalizedTrainingSafetyMode(d.trainingSafetyMode)"), "Onboarding esencial conserva la intensidad recomendada y muestra su motivo; Perfil permite editarla.");
 assert.ok(index.includes('trainingSafetyModeHtml("pf"'), "Perfil debe mostrar ritmo del plan.");
 assert.ok(index.includes("trainingSafetyMode:d.trainingSafetyMode"), "Onboarding debe persistir trainingSafetyMode.");
 assert.ok(index.includes("trainingSafetyMode:draft.trainingSafetyMode"), "Perfil debe persistir trainingSafetyMode.");

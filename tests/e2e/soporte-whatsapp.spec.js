@@ -37,12 +37,12 @@ test("REQ-307: Perfil tiene Ayuda y soporte con el botón de WhatsApp", async ({
   await expect(sec.getByRole("link", { name: "Escríbenos por WhatsApp" })).toHaveAttribute("href", WA);
 });
 
-test("REQ-307: el último paso del onboarding avisa que hay soporte", async ({ page, context }) => {
+test("REQ-389: el onboarding esencial reserva el soporte para Perfil", async ({ page, context }) => {
   await installMocks(context);
   await seedLoggedInUser(page);
   await autoDismissNudges(page);
   await gotoApp(page);
-  await page.evaluate(() => { onboardingActive = true; onboardingStep = 4; onboardingDraft = onboardingDefaults(); renderOnboarding(); });
-  await expect(page.getByText("Estamos contigo")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Escríbenos por WhatsApp" })).toHaveAttribute("href", WA);
+  await page.evaluate(() => { onboardingActive = true; onboardingStep = 3; onboardingDraft = onboardingDefaults(); renderOnboarding(); });
+  await expect(page.locator(".onboarding h1")).toHaveText("Antes de empezar");
+  await expect(page.locator(".onboarding a.wa-btn")).toHaveCount(0);
 });

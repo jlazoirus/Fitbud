@@ -1,3 +1,4 @@
+import {selectOnboardingDays,selectOnboardingKind} from "./onboarding-actions.js";
 import {test,expect} from '@playwright/test';
 import {installMocks,seedLoggedInUser,autoDismissNudges,gotoApp,profileFixture,completePrefs} from './helpers.js';
 async function boot(page,context,prefs={}){
@@ -7,15 +8,15 @@ async function boot(page,context,prefs={}){
 for(const width of [390,1280])test(`REQ-386: asigna fuerza y bici por día desde onboarding (${width})`,async({page,context})=>{
  await page.setViewportSize({width,height:844});const {calls}=await boot(page,context);
  await page.fill('#ob_name','Ana');await page.selectOption('#ob_sex','female');await page.fill('#ob_age','30');await page.fill('#ob_height','165');await page.fill('#ob_weight','62');
- await page.getByRole('button',{name:'Continuar'}).click();await page.getByRole('button',{name:'Continuar'}).click();
+ await page.getByRole('button',{name:'Continuar'}).click();
  await page.selectOption('#ob_sport','cycling');await page.selectOption('#ob_strength','outdoor');
- for(const d of [0,1,2,3,4,5,6])await page.locator(`#ob_day_${d}`).setChecked([1,2,3,5,6].includes(d));
- for(const d of [1,2,3,5,6])await page.selectOption(`#ob_kind_${d}`,[1,3,5].includes(d)?'strength':'sport');
- expect(await page.locator('#obDayKinds select').count()).toBe(5);
+ await selectOnboardingDays(page,[1,2,3,5,6]);
+ for(const d of [1,2,3,5,6])await selectOnboardingKind(page,d,[1,3,5].includes(d)?'strength':'sport');
+ expect(await page.locator('#obDayKinds button').count()).toBe(5);
  await page.locator('#obDayKinds').scrollIntoViewIfNeeded();
  await page.screenshot({path:`/Users/jonathan/.fitbros/qa-archive/req-386/onboarding-${width}.png`});
  await page.getByRole('button',{name:'Continuar'}).click();await expect(page.locator('#ob_allergies')).toBeVisible();
- await page.check('#ob_consent_core');await page.check('#ob_diet_omnivoro');
+ await page.check('#ob_consent_core');await page.selectOption('#ob_diet_pattern','omnivoro');
  for(const s of await page.locator('#app select[id^="ob_safety_"]').all())await s.selectOption('no');
  await page.getByRole('button',{name:'Guardar mi plan'}).click();await expect(page.locator('#tabs')).toContainText('Hoy');
  const prefs=await page.evaluate(()=>profile.prefs);

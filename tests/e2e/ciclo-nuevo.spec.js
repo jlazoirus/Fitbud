@@ -39,8 +39,8 @@ test("en la semana 5, 'Empezar de nuevo' con 4 semanas arranca hoy el ciclo 2 y 
   }
   await expect(page.locator("#ob_duration")).toHaveCount(0); // ya pasó el paso de entrenamiento
   for (const s of await page.locator('#app select[id^="ob_safety_"]').all()) await s.selectOption("no");
-  const omni = page.locator("#ob_diet_omnivoro");
-  if (await omni.count() && !(await omni.isChecked())) await omni.check();
+  const omni = page.locator("#ob_diet_pattern");
+  if (await omni.count()) await omni.selectOption("omnivoro");
   const consent = page.locator("#ob_consent_core");
   if (await consent.count() && !(await consent.isChecked())) await consent.check();
   await page.getByRole("button", { name: "Guardar mi plan" }).click();

@@ -6,6 +6,7 @@
 const ALLOWED_EVENT_TYPES = new Set([
   "session_start",
   "onboarding_complete",
+  "onboarding_step_view",
   "onboarding_review",
   "plan_restart",
   "shopping_list_opened",
@@ -34,7 +35,7 @@ const ALLOWED_EVENT_TYPES = new Set([
 const ALLOWED_PROP_KEYS = new Set([
   "week", "cycle", "day_of_week", "slot", "count",
   "source", "outcome", "plan_type", "sport",
-  "context", "step", "error_code", "duration_weeks", "action",
+  "context", "step", "error_code", "duration_weeks", "duration_s", "action",
   // REQ-339: tarjeta de avisos (estado del push, tipo de teléfono, app instalada).
   "state", "platform", "standalone",
 ]);

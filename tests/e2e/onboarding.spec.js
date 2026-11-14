@@ -2,12 +2,13 @@
 // Verifica el invariante nº1 del auditor: macros MOSTRADOS = macros GUARDADOS,
 // y que el cálculo coincida con la fórmula declarada (Mifflin-St Jeor).
 import { test, expect } from "@playwright/test";
+import {selectOnboardingDays} from "./onboarding-actions.js";
 import {
   installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, profileFixture, completePrefs,
 } from "./helpers.js";
 
 // Datos del usuario de prueba y su cálculo esperado, independiente de la app
-const USUARIO = { sexo: "male", edad: 30, estatura: 175, peso: 75, actividad: 1.55 };
+const USUARIO = { sexo: "male", edad: 30, estatura: 175, peso: 75, actividad: 1.35 };
 const BMR = 10 * USUARIO.peso + 6.25 * USUARIO.estatura - 5 * USUARIO.edad + 5; // Mifflin hombre
 const TDEE = BMR * USUARIO.actividad;
 
@@ -20,11 +21,8 @@ async function reachTrainingStep(page, age) {
   await page.fill("#ob_age", String(age));
   await page.fill("#ob_height", String(USUARIO.estatura));
   await page.fill("#ob_weight", String(USUARIO.peso));
-  await page.selectOption("#ob_activity", "moderate");
   await page.getByRole("button", { name: "Continuar" }).click();
-  await expect(page.locator("#ob_goal")).toBeVisible();
-  await page.getByRole("button", { name: "Continuar" }).click();
-  await expect(page.locator("#ob_safety_mode")).toBeVisible();
+  await expect(page.locator("#ob_sport")).toBeVisible();
   return app;
 }
 
@@ -39,8 +37,9 @@ test.describe("Onboarding", () => {
     await gotoApp(page);
     const app = page.locator("#app");
     await expect(app).toContainText(/punto de partida/i);
-    await expect(app).toContainText("Grasa corporal (opcional)");
-    await expect(app).toContainText("Déjalo vacío si no lo sabes");
+    await expect(page.locator("#ob_bf, #ob_activity")).toHaveCount(0);
+    await expect(page.locator("#ob_goal")).toContainText("Recomponer mi cuerpo");
+    await expect(page.locator("#obGoalHelp")).toContainText("Comes un poco menos");
 
     // Paso 1: datos corporales
     await page.fill("#ob_name", "Bro Nuevo");
@@ -48,51 +47,32 @@ test.describe("Onboarding", () => {
     await page.fill("#ob_age", String(USUARIO.edad));
     await page.fill("#ob_height", String(USUARIO.estatura));
     await page.fill("#ob_weight", String(USUARIO.peso));
-    await page.selectOption("#ob_activity", "moderate");
-    await page.getByRole("button", { name: "Continuar" }).click();
-
-    // Paso 2: macros calculados. La fórmula (Mifflin-St Jeor) vive en el tooltip "¿Cómo lo calculamos?" (REQ-103).
-    // REQ-211: cada objetivo dice qué consigue
-    await expect(page.locator("#ob_goal")).toContainText("Recomponer mi cuerpo");
-    await expect(page.locator("#obGoalHelp")).toContainText("Comes un poco menos de lo que gastas");
-    await page.getByRole("button", { name: "¿Cómo lo calculamos?" }).click();
-    const formulaModal = page.locator("#overlay");
-    await expect(formulaModal).toContainText(/Mifflin-St Jeor/i);
-    await formulaModal.getByRole("button", { name: "Entendido" }).click();
-    const kcalShown = Number(await page.inputValue("#ob_kcal"));
-    const protShown = Number(await page.inputValue("#ob_protein"));
-    const carbShown = Number(await page.inputValue("#ob_carbs"));
-    const fatShown = Number(await page.inputValue("#ob_fat"));
-    // Déficit razonable: entre el 70 % y el 95 % del TDEE calculado aparte (±redondeos)
-    expect(kcalShown).toBeGreaterThan(TDEE * 0.7);
-    expect(kcalShown).toBeLessThan(TDEE * 0.95);
-    // Piso de proteína en déficit: ≥1.6 g/kg
-    expect(protShown).toBeGreaterThanOrEqual(USUARIO.peso * 1.6);
-    // Coherencia interna: kcal ≈ 4P + 4C + 9G (±12 %)
-    const kcalFromMacros = 4 * protShown + 4 * carbShown + 9 * fatShown;
-    expect(Math.abs(kcalFromMacros - kcalShown) / kcalShown).toBeLessThan(0.12);
-    await page.getByRole("button", { name: "Continuar" }).click();
+      await page.getByRole("button", { name: "Continuar" }).click();
 
     // Paso 3: semana de entrenamiento (caminata, sin fuerza por ahora, 10 semanas, ≥3 días)
-    await expect(app).toContainText("Ciclo de seguimiento");
+    await expect(page.locator("#ob_duration, #ob_experience, #ob_minutes")).toHaveCount(0);
     await expect(app).toContainText("¿Qué actividad quieres practicar?");
     await expect(page.locator("#ob_sport")).toContainText("Caminar");
     await expect(page.locator("#ob_strength")).toContainText("Sin fuerza");
-    await expect(page.locator("#ob_duration")).toContainText("10 semanas · recomendado");
-    await expect(app).toContainText("10 semanas es el proceso completo recomendado");
+
     await page.selectOption("#ob_sport", "walking");
     await page.selectOption("#ob_strength", "none");
-    await page.selectOption("#ob_duration", "10");
-    for (const d of [1, 3, 5]) {
-      const cb = page.locator(`#ob_day_${d}`);
-      if (!(await cb.isChecked())) await cb.check();
-    }
+
+    await selectOnboardingDays(page,[1,3,5]);
     await page.getByRole("button", { name: "Continuar" }).click();
 
     // Paso 4: dieta + privacidad + evaluación de seguridad
-    await expect(app).toContainText("Cómo comes y restricciones generales");
+    await expect(app).toContainText("Antes de empezar");
     await expect(app).toContainText("Como de todo");
-    await page.check("#ob_diet_omnivoro");
+    await page.selectOption("#ob_diet_pattern","omnivoro");
+    const shown=await page.locator('#obMacroResult').textContent();
+    const parts=shown.match(/(\d+) kcal · P (\d+) · C (\d+) · G (\d+)/);
+    expect(parts).toBeTruthy();
+    const [kcalShown,protShown,carbShown,fatShown]=parts.slice(1).map(Number);
+    expect(kcalShown).toBeGreaterThan(TDEE*.7);expect(kcalShown).toBeLessThan(TDEE*.95);
+    expect(kcalShown).toBe(4*protShown+4*carbShown+9*fatShown);
+    await page.getByRole('button',{name:'¿Cómo lo calculamos?'}).click();
+    await expect(page.locator('#overlay')).toContainText('Mifflin-St Jeor');await page.locator('#overlay').getByRole('button',{name:'Entendido'}).click();
     await page.check("#ob_consent_core");
     for (const s of await page.locator('#app select[id^="ob_safety_"]').all()) {
       await s.selectOption("no");
@@ -150,12 +130,10 @@ test.describe("Onboarding", () => {
     await page.getByRole("button", { name: "Continuar" }).click();
     await expect(page.getByText("Elige una actividad o una opción de fuerza para preparar tu semana", { exact: true })).toBeVisible();
     await page.selectOption("#ob_sport", "other");
-    for (const day of [0, 1, 2, 3, 4, 5, 6]) {
-      await page.locator(`#ob_day_${day}`).setChecked([1, 3, 5].includes(day));
-    }
+    await selectOnboardingDays(page,[1,3,5]);
     await expect(page.locator("#obTrainingSummary")).toContainText("3 días para tu deporte");
     await page.getByRole("button", { name: "Continuar" }).click();
-    await page.check("#ob_diet_omnivoro");
+    await page.selectOption("#ob_diet_pattern","omnivoro");
     await page.check("#ob_consent_core");
     for (const field of await page.locator('#app select[id^="ob_safety_"]').all()) await field.selectOption("no");
     await page.getByRole("button", { name: "Guardar mi plan" }).click();
@@ -217,14 +195,8 @@ test.describe("Onboarding", () => {
 
       const app = await reachTrainingStep(page, scenario.age);
       await expect(app).toContainText(scenario.text);
-      await expect(page.locator("#ob_safety_mode")).toContainText("Completa");
-      await page.selectOption("#ob_safety_mode", "full");
-      await expect(page.locator("#ob_safety_mode")).toHaveValue("full");
-      // REQ-211: la opción elegida explica qué cambia, y "¿Qué cambia?" detalla las tres
-      await expect(page.locator("#ob_safety_help")).toContainText("Series y esfuerzo normales");
-      await page.getByRole("button", { name: "¿Qué cambia?" }).click();
-      await expect(page.locator("#overlay")).toContainText("Menos series, esfuerzo moderado");
-      await page.locator("#overlay").getByRole("button", { name: "Entendido" }).click();
+      await expect(page.locator("#ob_safety_mode")).toHaveCount(0);
+      expect(await page.evaluate(()=>onboardingDraft.trainingSafetyMode)).toBe('auto');
       if (scenario.age >= 55) {
         await expect(page.locator("#ob_sport")).toContainText("Caminar");
         await expect(page.locator("#ob_strength")).toContainText("Sin fuerza");
@@ -246,9 +218,8 @@ test.describe("Onboarding", () => {
     await page.fill("#ob_age", "28");
     await page.fill("#ob_height", "165");
     await page.fill("#ob_weight", "62");
-    await page.getByRole("button", { name: "Continuar" }).click();
     await expect(page.locator("#ob_goal")).toHaveValue("volumen");
     await page.getByRole("button", { name: "Continuar" }).click();
-    await expect(page.locator("#ob_experience")).toHaveValue("intermediate");
+    expect(await page.evaluate(()=>onboardingDraft.trainingExperience)).toBe("intermediate");
   });
 });

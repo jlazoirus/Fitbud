@@ -7,8 +7,8 @@
 // activo para esa fecha. Si el usuario editaba sus macros en el perfil sin
 // regenerar el plan, effectiveDayTarget usaba los valores viejos del snapshot.
 //
-// Fix: buildDay llama effectiveDayTarget() sin argumentos, por lo que la
-// función lee siempre (profile&&profile.prefs)||{} — los valores actuales.
+// REQ-389: buildDay pasa la fecha sin ctx.prefs. El perfil actual conserva
+// prioridad, salvo la vigencia futura explícita de una edición de metas.
 //
 // Este test extrae buildDay del fuente real de index.html y verifica
 // estructuralmente que la llamada no pasa ctx.prefs.
@@ -46,11 +46,10 @@ assert.ok(
   "el objetivo del día use el snapshot del plan en vez del perfil actual del usuario."
 );
 
-// Después del fix: effectiveDayTarget() sin args lee (profile&&profile.prefs)||{},
-// que siempre refleja los valores más recientes que el usuario guardó.
+// El resolver recibe una fecha, nunca el snapshot nutricional obsoleto.
 assert.ok(
-  buildDaySrc.includes("effectiveDayTarget()"),
-  "REQ-69: buildDay debe llamar effectiveDayTarget() sin argumentos."
+  buildDaySrc.includes("effectiveDayTarget(null,ds)"),
+  "REQ-69: buildDay resuelve metas desde el perfil para la fecha, sin usar ctx.prefs."
 );
 
-console.log("Wiring de macro targets: buildDay usa effectiveDayTarget() sin snapshot — perfil actual siempre priorizado.");
+console.log("Wiring de macro targets: perfil actual priorizado, con fecha explícita para cambios que comienzan mañana.");

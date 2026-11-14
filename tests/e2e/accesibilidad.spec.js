@@ -29,11 +29,11 @@ test.describe("Accesibilidad", () => {
     await gotoApp(page);
 
     await expect(page.getByLabel("Sexo para la fórmula")).toHaveAttribute("id", "ob_sex");
-    await expect(page.getByLabel("Nivel de actividad habitual")).toHaveAttribute("id", "ob_activity");
+    await expect(page.getByLabel("Objetivo principal")).toHaveAttribute("id", "ob_goal");
     await expect(page.getByLabel("Edad")).toHaveAttribute("id", "ob_age");
     const progress = page.getByRole("progressbar");
     await expect(progress).toHaveAttribute("aria-valuenow", "1");
-    await expect(progress).toHaveAttribute("aria-valuemax", "4");
+    await expect(progress).toHaveAttribute("aria-valuemax", "3");
   });
 
   test("la FAQ de la portada usa <details> nativo (estado anunciado por el navegador)", async ({ page, context }) => {

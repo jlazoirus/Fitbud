@@ -21,11 +21,11 @@ assert.ok(!index.includes("Omnívoro"), "El shell visible no debe mostrar Omnív
 
 // REQ-192: los labels del onboarding van asociados a su campo con for="…".
 const label = (text, id) => index.includes(`<label for="${id}">${text}</label>`);
-assert.ok(label("Grasa corporal (opcional)", "ob_bf"), "El campo de grasa corporal debe ser claramente opcional.");
-assert.ok(index.includes("Déjalo vacío si no lo sabes; no bloquea tu plan."), "El campo opcional debe explicar que puede quedar vacío.");
+assert.ok(label("Grasa corporal (opcional)", "pf_bf"), "El campo de grasa corporal debe ser claramente opcional.");
+assert.ok(!index.includes('id="ob_bf"'), "La grasa corporal se difiere a Perfil en el onboarding esencial.");
 assert.ok(!index.includes("Grasa corporal % (opcional)"), "El label anterior de grasa corporal no debe volver.");
 
-assert.ok(label("Ciclo de seguimiento", "ob_duration"), "Onboarding debe hablar de ciclo de seguimiento.");
+assert.ok(!index.includes('id="ob_duration"'), "El ciclo se ajusta en Perfil, no en el onboarding esencial.");
 assert.ok(index.includes('<label for="pf_duration">Ciclo de seguimiento</label>'), "Perfil debe hablar de ciclo de seguimiento.");
 assert.ok(pure.includes('4 semanas · ciclo corto'), "La opción de 4 semanas debe explicar el ciclo corto.");
 assert.ok(pure.includes('10 semanas · recomendado'), "La opción de 10 semanas debe quedar como recomendada.");

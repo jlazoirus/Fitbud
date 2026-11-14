@@ -2523,7 +2523,7 @@ e2e con `page.goBack()` y release gate.
 
 ## REQ-389 - Onboarding corto: primera semana en 3 pantallas
 
-**Estado: pendiente.** Implementar después de REQ-385, REQ-386 y REQ-388. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+**Estado: implementado.** Implementar después de REQ-385, REQ-386 y REQ-388. Detalle: `docs/onboarding/2026-11-11-feedback.md`. Defaults: `docs/onboarding/essential-defaults.md`.
 
 ### Origen
 Jonathan, 2026-11-11.

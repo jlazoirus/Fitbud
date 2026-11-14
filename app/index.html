@@ -751,9 +751,23 @@
   .onboarding-copy{color:var(--muted);font-size:14px;line-height:1.5;margin-bottom:18px}
   .onboarding-nav{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:8px 0;background:var(--bg);margin-bottom:20px}
   .onboarding-nav .steps{flex:1;margin-bottom:0}
-  .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:24px}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:24px}
   .step{height:5px;background:var(--surf3);border-radius:999px;overflow:hidden}
   .step.on{background:var(--accent)}
+  .onboarding-essential .btn{min-height:44px}
+  .onboarding-essential .field{margin:10px 0}
+  .onboarding-essential .onboarding-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .onboarding-essential h1{margin-top:0}
+  .onboarding-week-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:8px 0 12px}
+  .onboarding-week-days .btn{min-width:0;padding:10px 0;min-height:44px;font-size:12px}
+  .onboarding-kind-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:8px 0}
+  .onboarding-kind-grid .btn{min-width:0;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
+  .onboarding-kind-grid span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .onboarding-safety-row{display:grid;grid-template-columns:minmax(0,1fr) 116px;align-items:center;gap:12px;margin:10px 0}
+  .onboarding-safety-row label{font-size:13px;line-height:1.35}
+  .onboarding-essential .onboarding-copy{margin-bottom:12px}
+  .onboarding-essential .onboarding-actions{margin-top:16px}
+  .pf-accordion .adv-settings>summary{font-size:16px;color:var(--txt);padding:10px 12px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--surf2)}
   .setup-steps{display:grid;gap:10px;margin-top:18px}
   .setup-step{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf2);color:var(--muted)}
   .setup-step span{width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:var(--surf3);font-weight:800;color:var(--txt)}
@@ -2234,10 +2248,19 @@ function profileMacroTargetsFromPrefs(source){
   const target={kcal:+p.calorieTarget,p:+p.proteinTarget,c:+p.carbTarget,f:+p.fatTarget};
   return Object.values(target).every(v=>Number.isFinite(v)&&v>0)?target:null;
 }
-// Meta del día = las metas personales del usuario (onboarding), iguales todos
-// los días. Sin plan estático: si aún no hay onboarding, un objetivo neutro.
-function effectiveDayTarget(source){
-  return profileMacroTargetsFromPrefs(source||((profile&&profile.prefs)||{}))||{kcal:2000,p:150,c:200,f:65};
+// Metas del perfil; los ajustes explícitos pueden tener vigencia desde mañana.
+// Sin plan estático: si aún no hay onboarding, un objetivo neutro.
+function effectiveDayTarget(source,ds){
+  let prefs=source||((profile&&profile.prefs)||{});
+  // Explicit edits start tomorrow; legacy profiles still use their current targets.
+  if(!source&&prefs.macroTargetsValidFrom&&validYmd(prefs.macroTargetsValidFrom)){
+    const date=validYmd(ds)?ds:(typeof current!=="undefined"&&validYmd(current)?current:todayStr());
+    if(date<prefs.macroTargetsValidFrom){
+      const version=planVersionForDate(date);
+      prefs=version&&version.snapshot&&version.snapshot.prefs||prefs.previousMacroTargets||prefs;
+    }
+  }
+  return profileMacroTargetsFromPrefs(prefs)||{kcal:2000,p:150,c:200,f:65};
 }
 // Slots reales del día a partir del perfil: cantidad de comidas + sus horarios.
 function mealSlotsForPrefs(prefs){
@@ -2400,14 +2423,13 @@ function activeNutritionPlanDay(ds){
 }
 // Materializa daysData como snapshot nutritionPlan (slugs, nombres, gramos, macros en el momento).
 function buildNutritionPlanSnapshot(daysData,shoppingList){
-  const target=effectiveDayTarget();
   return{
     version:1,
     catalogVersion:DB.loaded?(DB.dishIng&&DB.dishIng.length)||0:null,
     createdAt:new Date().toISOString(),
     days:(daysData||[]).map(d=>({
       date:d.ds,
-      target,
+      target:effectiveDayTarget(null,d.ds),
       meals:(d.comidas||[]).map(c=>({
         id:c.slot_id,
         slot:c.slot_id,
@@ -2512,7 +2534,7 @@ function buildDay(ds,prefsOverride){
   const nutritionDay=!prefsOverride?activeNutritionPlanDay(ds):null;
   return FITBUD_DAY_MODEL.buildDay({
     ds,weekday:parseYmd(ds).getDay(),week:ctx.week,slots:mealSlotsForPrefs(ctx.prefs),nutritionDay,
-    target:effectiveDayTarget(),workout:effectiveWorkout(ds,prefsOverride||null).workout,
+    target:effectiveDayTarget(null,ds),workout:effectiveWorkout(ds,prefsOverride||null).workout,
     planVersionId:ctx.version&&ctx.version.id?ctx.version.id:null,
   });
 }
@@ -3303,6 +3325,8 @@ let onboardingDraft=null;
 let reviewPromptShown=false;
 // REQ-388: history contains only step numbers, never personal draft values.
 let onboardingHistoryId=null;
+let onboardingStartedAt=null;
+let onboardingLastViewedStep=null;
 function onboardingHistoryEntry(){return history.state&&history.state.evolvOnboarding;}
 function onboardingHistoryWrite(kind,push){
   if(!onboardingHistoryId)onboardingHistoryId=String(Date.now())+"-"+Math.random().toString(36).slice(2);
@@ -3310,7 +3334,7 @@ function onboardingHistoryWrite(kind,push){
   history[push?"pushState":"replaceState"](state,"");
 }
 function endOnboardingHistory(){
-  onboardingHistoryId=null;
+  onboardingHistoryId=null;onboardingStartedAt=null;onboardingLastViewedStep=null;
   const state={...(history.state||{})};delete state.evolvOnboarding;
   history.replaceState(state,"");
 }
@@ -3326,7 +3350,7 @@ function exitOnboardingReview(){
 function onboardingHistoryPop(event){
   if(!onboardingActive||!onboardingDraft||!onboardingHistoryId)return;
   const entry=event.state&&event.state.evolvOnboarding;
-  if(!entry||entry.id!==onboardingHistoryId||!Number.isInteger(entry.step)||entry.step<1||entry.step>4)return;
+  if(!entry||entry.id!==onboardingHistoryId||!Number.isInteger(entry.step)||entry.step<1||entry.step>3)return;
   readOnboardingStep();
   // The nudge owns a history entry: back first closes it at the same step.
   const nudge=!!document.getElementById("nudge_light_cardio");
@@ -3372,6 +3396,7 @@ function onboardingDefaults(){
     equipment:p.equipment.slice(),
     trainingStyle:p.trainingStyle,
     trainingExperience:p.trainingExperience,
+    workoutSplit:p.workoutSplit,
     trainingPriority:p.trainingPriority,
     trainingSafetyMode:p.trainingSafetyMode,
     preferredTrainingTime:p.preferredTrainingTime,
@@ -3651,7 +3676,7 @@ function startOnboarding(){
 }
 function onboardingSteps(){
   const back=onboardingStep>1?'<button type="button" class="btn btn-sm" data-onboarding-back onclick="onboardingBack()">Atrás</button>':canExitOnboardingReview()?'<button type="button" class="btn btn-sm" onclick="exitOnboardingReview()">Salir sin cambios</button>':"";
-  return `<div class="onboarding-nav">${back}<div class="steps" role="progressbar" aria-valuemin="1" aria-valuemax="4" aria-valuenow="${onboardingStep}" aria-label="Paso ${onboardingStep} de 4">${[1,2,3,4].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div></div>`;
+  return `<div class="onboarding-nav">${back}<div class="steps" role="progressbar" aria-valuemin="1" aria-valuemax="3" aria-valuenow="${onboardingStep}" aria-label="Paso ${onboardingStep} de 3">${[1,2,3].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div></div>`;
 }
 function onboardingButtons(last){
   return `<div class="onboarding-actions">
@@ -3697,6 +3722,10 @@ function trainingDayKindDefaults(d){
 function trainingDayKindsHtml(prefix,d){
   if(d.strengthMode==="none"||d.primarySport==="strength_only")return "";
   const kinds=trainingDayKindDefaults(d);
+  if(prefix==="ob")return `<label class="muted small">Qué entrenas cada día · toca para cambiar</label><div class="onboarding-kind-grid">${WEEKDAY_OPTIONS.filter(day=>d.trainingDays.includes(day.value)).map(day=>{
+    const kind=kinds[day.value],label=kind==="strength"?"Fuerza":SPORT_LABELS[d.primarySport];
+    return `<button type="button" class="btn btn-sm" id="ob_kind_${day.value}" value="${kind}" aria-label="${day.label}: ${esc(label)}. Cambiar actividad" onclick="onboardingToggleKind(${day.value})"><span>${day.short}</span><span>${esc(label)}</span></button>`;
+  }).join("")}</div>`;
   return `<label class="muted small">Qué entrenas cada día</label><div class="availability">${WEEKDAY_OPTIONS.filter(day=>d.trainingDays.includes(day.value)).map(day=>`<div class="availability-day"><label for="${prefix}_kind_${day.value}">${day.label}</label><select id="${prefix}_kind_${day.value}" onchange="trainingDayKindChanged('${prefix}',${day.value})"><option value="strength" ${kinds[day.value]==="strength"?"selected":""}>Fuerza</option><option value="sport" ${kinds[day.value]==="sport"?"selected":""}>${esc(SPORT_LABELS[d.primarySport])}</option></select></div>`).join("")}</div><p class="field-note">Elige al menos un día de cada actividad. Se aplicará a tu próxima versión del plan.</p>`;
 }
 function readTrainingDayKinds(prefix,d){
@@ -3710,7 +3739,7 @@ function readTrainingDayKinds(prefix,d){
 }
 function refreshTrainingDayKinds(prefix){
   const d=prefix==="ob"?onboardingDraft:{...migrateProfilePrefs(profile&&profile.prefs)};
-  d.trainingDays=WEEKDAY_OPTIONS.filter(day=>$("#"+prefix+"_day_"+day.value)?.checked).map(day=>day.value);
+  d.trainingDays=prefix==="ob"?onboardingSelectedDays():WEEKDAY_OPTIONS.filter(day=>$("#"+prefix+"_day_"+day.value)?.checked).map(day=>day.value);
   d.primarySport=$("#"+prefix+"_sport").value;
   d.strengthPlace=normalizeStrengthPlace($("#"+prefix+"_strength").value);
   d.strengthMode=strengthModeFromChoice(d.strengthPlace);
@@ -3757,33 +3786,15 @@ function onboardingDefaultLocation(d){
   return known||defaults[days[0]]||(d.primarySport==="swimming"?"pool":d.strengthMode==="bodyweight"?"home":"gym");
 }
 function onboardingSelectedDays(){
-  return WEEKDAY_OPTIONS.filter(day=>{const el=$("#ob_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
+  return WEEKDAY_OPTIONS.filter(day=>$("#ob_day_"+day.value)?.getAttribute("aria-pressed")==="true").map(day=>day.value);
 }
-function onboardingLocationRowsHtml(days,locationFor){
-  if(!days.length)return '<p class="muted small">Elige al menos un día para personalizar el lugar.</p>';
-  return `<div class="availability">${days.map(day=>{
-    const label=WEEKDAY_OPTIONS.find(option=>option.value===day).label;
-    const location=locationFor(day);
-    return `<div class="availability-day">
-      <label>${label}</label>
-      <select id="ob_location_${day}" aria-label="Lugar para ${label}">
-        ${Object.entries(TRAINING_LOCATION_LABELS).map(([value,l])=>`<option value="${value}" ${location===value?"selected":""}>${l}</option>`).join("")}
-      </select>
-    </div>`;
-  }).join("")}</div>`;
+function onboardingToggleDay(day){
+  const el=$("#ob_day_"+day);if(el)el.setAttribute("aria-pressed",el.getAttribute("aria-pressed")!=="true"?"true":"false");
+  readOnboardingStep();renderOnboarding();
 }
-function onboardingToggleDay(){
-  const days=onboardingSelectedDays();
-  const def=$("#ob_location_default");
-  const fallback=(def&&TRAINING_LOCATION_LABELS[def.value])?def.value:onboardingDefaultLocation(onboardingDraft);
-  const defaults=defaultTrainingLocations(onboardingDraft.primarySport,onboardingDraft.strengthMode,days,onboardingDraft.trainingPriority,onboardingDraft.trainingExperience,onboardingDraft.workoutSplit,onboardingDraft.strengthPlace);
-  const list=$("#obLocationList");
-  if(list)list.innerHTML=onboardingLocationRowsHtml(days,day=>{
-    const existing=$("#ob_location_"+day);
-    return (existing&&TRAINING_LOCATION_LABELS[existing.value])?existing.value:(defaults[day]||fallback);
-  });
-  refreshTrainingDayKinds("ob");
-  updateOnboardingTrainingSummary();
+function onboardingToggleKind(day){
+  const el=$("#ob_kind_"+day);if(el)el.value=el.value==="strength"?"sport":"strength";
+  readOnboardingStep();renderOnboarding();
 }
 function onboardingApplyDefaultLocation(value){
   const days=onboardingSelectedDays();
@@ -3933,191 +3944,82 @@ function validateFoodPreferences(d){
   if(d.diet.includes("omnivoro")&&(d.diet.includes("vegetariano")||d.diet.includes("vegano")))return "Como de todo no puede combinarse con vegetariano o vegano";
   return "";
 }
+// REQ-389: only first-time profiles infer activity: ≤3 days light, 4–5 moderate, 6 high.
+// Existing activity, experience, equipment, food logistics and explicit cycle length are retained.
+function applyOnboardingEssentialDefaults(){
+  const d=onboardingDraft,p=profile&&profile.prefs||{};
+  if(!hasCompleteOnboarding(p))d.activityLevel=d.trainingDays.length<=3?"light":d.trainingDays.length<=5?"moderate":"high";
+  if(!validPlanDuration(d.planDurationWeeks))d.planDurationWeeks=10;
+  d.trainingSafetyMode=normalizedTrainingSafetyMode(d.trainingSafetyMode);
+  applyCalculatedMacros();
+}
 function renderOnboarding(){
   if(!onboardingDraft)onboardingDraft=onboardingDefaults();
   if(!onboardingHistoryId)onboardingHistoryWrite("step",false);
-  const d=onboardingDraft;
-  const sel=(a,b)=>a===b?"selected":"";
+  if(onboardingStartedAt==null)onboardingStartedAt=Date.now();
+  if(onboardingLastViewedStep!==onboardingStep){trackEvent("onboarding_step_view",{step:onboardingStep});onboardingLastViewedStep=onboardingStep;}
+  const d=onboardingDraft,sel=(a,b)=>a===b?"selected":"";
   let body="";
   if(onboardingStep===1){
-    body=`<h1>Primero, conozcamos tu punto de partida</h1>
-      <p class="onboarding-copy">Estos datos se usan para estimar tu gasto energético. Si no conoces tu grasa corporal, puedes dejarla vacía y completarla después.</p>
-      <div class="dash">
-        <div class="field" style="margin-top:0"><label for="ob_name">Nombre</label><input id="ob_name" value="${esc(d.name)}" autocomplete="name" placeholder="Tu nombre"></div>
-        <div class="onboarding-grid">
-          <div class="field"><label for="ob_sex">Sexo para la fórmula</label><select id="ob_sex">
-            <option value="">Selecciona</option><option value="male" ${sel(d.sex,"male")}>Masculino</option><option value="female" ${sel(d.sex,"female")}>Femenino</option>
-          </select></div>
-          <div class="field"><label for="ob_age">Edad</label><input id="ob_age" type="number" inputmode="numeric" min="${MINIMUM_AGE}" max="90" value="${d.age}" placeholder="30"></div>
-          <div class="field"><label for="ob_height">Estatura (cm)</label><input id="ob_height" type="number" inputmode="decimal" min="130" max="230" value="${d.heightCm}" placeholder="175"></div>
-          <div class="field"><label for="ob_weight">Peso actual (kg)</label><input id="ob_weight" type="number" inputmode="decimal" min="35" max="250" step=".1" value="${d.weightKg}" placeholder="80"></div>
-          <div class="field"><label for="ob_bf">Grasa corporal (opcional)</label><input id="ob_bf" type="number" inputmode="decimal" min="3" max="60" step=".1" value="${d.bodyFatPct}" placeholder="Ej. 20"><div class="field-note">Déjalo vacío si no lo sabes; no bloquea tu plan.</div></div>
-          <div class="field"><label for="ob_activity">Nivel de actividad habitual</label><select id="ob_activity" onchange="updateOnboardingActivity(this.value)">
-            ${Object.entries(ACTIVITY_LEVELS).map(([v,o])=>`<option value="${v}" ${sel(d.activityLevel,v)}>${o.label}</option>`).join("")}
-          </select></div>
-        </div>
-        <div class="muted small" id="obActivityDescription">${esc(ACTIVITY_LEVELS[d.activityLevel].description)}</div>
-      </div>${onboardingButtons(false)}`;
+    body=`<h1>Tú</h1><p class="onboarding-copy">Conozcamos tu punto de partida para calcular una primera referencia.</p>
+      <div class="field"><label for="ob_name">Nombre</label><input id="ob_name" value="${esc(d.name)}" autocomplete="name" placeholder="Tu nombre"></div>
+      <div class="onboarding-grid">
+        <div class="field"><label for="ob_sex">Sexo para la fórmula</label><select id="ob_sex"><option value="">Selecciona</option><option value="male" ${sel(d.sex,"male")}>Masculino</option><option value="female" ${sel(d.sex,"female")}>Femenino</option></select></div>
+        <div class="field"><label for="ob_age">Edad</label><input id="ob_age" type="number" inputmode="numeric" min="${MINIMUM_AGE}" max="90" value="${d.age}"></div>
+        <div class="field"><label for="ob_height">Estatura (cm)</label><input id="ob_height" type="number" inputmode="decimal" min="130" max="230" value="${d.heightCm}"></div>
+        <div class="field"><label for="ob_weight">Peso actual (kg)</label><input id="ob_weight" type="number" inputmode="decimal" min="35" max="250" step=".1" value="${d.weightKg}"></div>
+      </div>
+      <div class="field"><label for="ob_goal">Objetivo principal</label><select id="ob_goal" onchange="onboardingGoalChanged(this.value)">${Object.entries(GOAL_OPTIONS).map(([value,o])=>`<option value="${value}" ${sel(d.goal,value)}>${o.label}</option>`).join("")}</select><div class="field-note" id="obGoalHelp">${esc((GOAL_OPTIONS[d.goal]||GOAL_OPTIONS.deficit).help)}</div></div>
+      ${onboardingButtons(false)}`;
   }else if(onboardingStep===2){
-    body=`<h1>Define tu objetivo y tus macros</h1>
-      <p class="onboarding-copy">Calculamos una referencia inicial a partir de tus datos. Puedes ajustarla si quieres.</p>
-      <div class="dash">
-        <div class="field" style="margin-top:0"><label for="ob_goal">Objetivo principal</label><select id="ob_goal" onchange="onboardingGoalChanged(this.value)">
-          ${Object.entries(GOAL_OPTIONS).map(([value,o])=>`<option value="${value}" ${sel(d.goal,value)}>${o.label}</option>`).join("")}
-        </select><div class="field-note" id="obGoalHelp">${esc((GOAL_OPTIONS[d.goal]||GOAL_OPTIONS.deficit).help)}</div></div>
-        <div class="ai-box"><b>Tu referencia: ${d.calorieTarget||"—"} kcal · ${d.proteinTarget||"—"} g proteína.</b> Ajustada a tu objetivo y tus datos personales.
-          <div style="margin-top:8px"><button type="button" class="btn btn-sm" onclick="openMacroFormulaInfo()">¿Cómo lo calculamos?</button></div>
-        </div>
-        <details class="adv-settings">
-          <summary>Ajustar valores (opcional)</summary>
-          <div class="onboarding-grid" style="margin-top:8px">
-            <div class="field"><label for="ob_kcal">Calorías</label><input id="ob_kcal" type="number" inputmode="numeric" value="${d.calorieTarget}"></div>
-            <div class="field"><label for="ob_protein">Proteína (g)</label><input id="ob_protein" type="number" inputmode="numeric" value="${d.proteinTarget}"></div>
-            <div class="field"><label for="ob_carbs">Carbohidratos (g)</label><input id="ob_carbs" type="number" inputmode="numeric" value="${d.carbTarget}"></div>
-            <div class="field"><label for="ob_fat">Grasas (g)</label><input id="ob_fat" type="number" inputmode="numeric" value="${d.fatTarget}"></div>
-          </div>
-          <button class="btn btn-sm" style="margin-top:8px" onclick="recalculateOnboarding()">Recalcular valores</button>
-        </details>
-      </div>${onboardingButtons(false)}`;
-  }else if(onboardingStep===3){
-    const strengthChoice=strengthChoiceFromPrefs(d);
-    const locationDefaults=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays||[],d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
-    body=`<h1>Arma tu semana de entrenamiento</h1>
-      <p class="onboarding-copy">Elige fuerza, una actividad o ambas. Recomendamos al menos tres días para que tu semana tenga estructura y descanso.</p>
-      <div class="dash">
-        <div class="onboarding-grid training-choice-grid">
-          <div class="field" style="margin-top:0">
-            <label for="ob_sport">¿Qué actividad quieres practicar?</label>
-            <select id="ob_sport" onchange="updateOnboardingTrainingChoice()">
-              ${TRAINING_ACTIVITY_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(d.primarySport,v)}>${l}</option>`).join("")}
-            </select>
-            <div class="field-note" id="ob_sport_help">${esc(primarySportHelp(d.primarySport))}</div>
-          </div>
-          <div class="field" style="margin-top:0"><label for="ob_strength">¿Quieres incluir fuerza?</label><select id="ob_strength" onchange="updateOnboardingStrengthChoice()">
-            ${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(strengthChoice,v)}>${l}</option>`).join("")}
-          </select></div>
-          ${strengthResourceHtml("ob",strengthChoice,d.equipment)}
-          ${indoorCyclingLocationHtml("ob",d)}
-          <div class="field" style="grid-column:1 / -1"><label for="ob_duration">Ciclo de seguimiento</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
-            ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
-          </select><div class="field-note">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado.</div></div>
-        </div>
-        <label class="muted small">Días disponibles</label>
-        <div class="chips" style="margin:6px 0 12px">${WEEKDAY_OPTIONS.map(day=>{
-          const checked=(d.trainingDays||[]).includes(day.value);
-          return `<label class="chip-check"><input type="checkbox" id="ob_day_${day.value}" ${checked?"checked":""} onchange="onboardingToggleDay()"><span>${day.label}</span></label>`;
-        }).join("")}</div>
-        <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled,d.strengthMode,d.trainingDayKinds)}</div>
-        <div class="onboarding-grid training-choice-grid">${trainingSafetyModeHtml("ob",d)}</div>
-        <div id="obDayKinds">${trainingDayKindsHtml("ob",d)}</div>
-        <details class="adv-settings">
-          <summary>Opciones avanzadas (opcional)</summary>
-          <div class="onboarding-grid" style="margin-top:8px">
-            <div class="field"><label for="ob_experience">Experiencia</label><select id="ob_experience">
-              ${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([v,l])=>`<option value="${v}" ${sel(d.trainingExperience,v)}>${l}</option>`).join("")}
-            </select></div>
-            <div class="field"><label for="ob_minutes">Minutos por sesión</label><input id="ob_minutes" type="number" inputmode="numeric" min="20" max="180" step="5" value="${d.sessionMinutes}"></div>
-          </div>
-        </details>
-      </div>${onboardingButtons(false)}`;
+    const choice=strengthChoiceFromPrefs(d);
+    body=`<h1>Tu semana</h1><p class="onboarding-copy">Elige fuerza, una actividad o ambas.</p>
+      <div class="onboarding-grid">
+        <div class="field"><label for="ob_sport">¿Qué actividad quieres practicar?</label><select id="ob_sport" onchange="updateOnboardingTrainingChoice()">${TRAINING_ACTIVITY_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(d.primarySport,v)}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label for="ob_strength">¿Quieres incluir fuerza?</label><select id="ob_strength" onchange="updateOnboardingStrengthChoice()">${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(choice,v)}>${l}</option>`).join("")}</select></div>
+      </div>${indoorCyclingLocationHtml("ob",d)}
+      <div class="field-note" id="ob_sport_help">${esc(primarySportHelp(d.primarySport))}</div>
+      <div style="margin-top:12px"><label class="muted small">Días disponibles · de 3 a 6</label><div class="onboarding-week-days">${WEEKDAY_OPTIONS.map(day=>`<button type="button" id="ob_day_${day.value}" class="btn ${(d.trainingDays||[]).includes(day.value)?"btn-accent":""}" aria-label="${day.label}" aria-pressed="${(d.trainingDays||[]).includes(day.value)}" onclick="onboardingToggleDay(${day.value})">${day.short}</button>`).join("")}</div></div>
+      <div id="obDayKinds">${trainingDayKindsHtml("ob",d)}</div>
+      <div class="field-note" id="obTrainingSummary">${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled,d.strengthMode,d.trainingDayKinds)}</div>
+      ${trainingSafetyRecommendation(d).active?`<p class="field-note">${esc(trainingSafetyRecommendation(d).title)}. Puedes revisar la intensidad en Perfil.</p>`:""}
+      ${onboardingButtons(false)}`;
   }else{
-    const dietOptions=[["vegetariano","Vegetariano"],["vegano","Vegano"],["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"],["omnivoro","Como de todo"]];
-    body=`<h1>Casi listo — tus preferencias y seguridad</h1>
-      <p class="onboarding-copy">Solo lo imprescindible para calcular tus comidas. Después podrás afinar cocinas, horarios y presupuesto desde tu Perfil.</p>
-      <div class="dash">
-        <label class="muted small">Cómo comes y restricciones generales</label>
-        <div class="chips" style="margin:9px 0 4px">
-          ${dietOptions.map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}
-        </div>
-        <div class="field"><label for="ob_allergies">Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos..."><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
-        ${cookingLevelFieldHtml("ob",d.cookingLevel)}
-        <details class="adv-settings" open>
-          <summary>Tus gustos (opcional)</summary>
-          <div class="onboarding-grid" style="margin-top:8px">
-            <div class="field"><label for="ob_preferred_ingredients">Ingredientes favoritos</label><input id="ob_preferred_ingredients" value="${esc(d.preferredIngredients)}" placeholder="avena, lentejas, yogur..."></div>
-            <div class="field"><label for="ob_preferred_dishes">Platos que te gustan</label><input id="ob_preferred_dishes" value="${esc(d.preferredDishes)}" placeholder="lomo saltado, pollo a la plancha..."></div>
-            <div class="field"><label for="ob_disliked">No quieres que aparezca</label><input id="ob_disliked" value="${esc(d.dislikedIngredients)}" placeholder="tofu, aceitunas..."></div>
-          </div>
-          <div class="field-note">Tus favoritos guían las propuestas; lo que no quieres se excluye.</div>
-        </details>
-        <details class="adv-settings" ${d.mealCount===2?"open":""}>
-          <summary>Ajustar número de comidas (opcional)</summary>
-          <div class="onboarding-grid" style="margin-top:8px">
-            <div class="field"><label for="ob_meal_count">Comidas al día</label><select id="ob_meal_count" onchange="updateOnboardingMealCount(this.value)">
-              ${[2,3,4,5,6].map(value=>`<option value="${value}" ${d.mealCount===value?"selected":""}>${value} comidas</option>`).join("")}
-            </select></div>
-          </div>
-          ${twoMealNoticeHtml(d.mealCount)}
-        </details>
-        <div class="ai-box"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} g · C ${d.carbTarget} g · G ${d.fatTarget} g<br><b>Entrenamiento:</b> ${d.planDurationWeeks} semanas · ${d.trainingDays.length} días · ${SPORT_LABELS[d.primarySport]||""} + ${STRENGTH_LABELS[d.strengthMode]||""}</div>
-      </div>
-      <div class="section-h" style="margin-left:0">Privacidad y seguridad</div>
-      <div class="dash">
-        <div class="alert violet"><b>Tus datos trabajan para ti.</b><br>No los vendemos ni los usamos para publicidad. Solo los procesamos para adaptar tu plan y ayudarte a revisar tu progreso.</div>
-        <label class="chip-check" style="display:flex;margin-bottom:12px"><input type="checkbox" id="ob_consent_core" ${d.consentCore?"checked":""}><span>Acepto que Evolv use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
-        <div class="muted small" style="margin-bottom:8px"><b>Antes de entrenar:</b> responde estas preguntas para evitar recomendaciones que podrían no ser adecuadas para ti.</div>
-        ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field"><label>${label}</label>${safetySelect("ob_safety_"+key,d.safetyResponses[key])}</div>`).join("")}
-        <div class="alert"><b>Evolv es bienestar, no atención médica.</b><br>Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</div>
-        <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
-      </div>
-      <div class="section-h" style="margin-left:0">Estamos contigo</div>
-      <div class="dash">
-        <div class="alert violet"><b>¿Dudas?</b> Nuestro equipo te acompaña por WhatsApp en lo que necesites.</div>
-        ${waSupportButtonHtml()}
-      </div>${onboardingButtons(true)}`;
+    applyOnboardingEssentialDefaults();
+    const pattern=d.diet.find(v=>["omnivoro","vegetariano","vegano"].includes(v))||"";
+    body=`<h1>Antes de empezar</h1>
+      <div class="field"><label for="ob_diet_pattern">Cómo comes</label><select id="ob_diet_pattern"><option value="">Selecciona</option>${[["omnivoro","Como de todo"],["vegetariano","Vegetariano"],["vegano","Vegano"]].map(([v,l])=>`<option value="${v}" ${sel(pattern,v)}>${l}</option>`).join("")}</select></div>
+      <div class="chips">${[["sin_huevo","Sin huevo"],["sin_lacteos","Sin lácteos"],["sin_gluten","Sin gluten"]].map(([v,l])=>`<label class="chip-check"><input type="checkbox" id="ob_diet_${v}" ${d.diet.includes(v)?"checked":""}><span>${l}</span></label>`).join("")}</div>
+      <div class="field"><label for="ob_allergies">Alergias y restricciones duras</label><input id="ob_allergies" value="${esc(d.allergies)}" placeholder="maní, mariscos…"><div class="field-note">Se excluyen siempre de las propuestas.</div></div>
+      <div class="muted small"><b>Tus datos trabajan para ti.</b> No los vendemos ni los usamos para publicidad. Solo los procesamos para adaptar tu plan y ayudarte a revisar tu progreso.</div>
+      <label class="chip-check" style="display:flex;margin:12px 0"><input type="checkbox" id="ob_consent_core" ${d.consentCore?"checked":""}><span>Acepto que Evolv use mis datos corporales, preferencias y progreso para crear y mejorar mi plan.</span></label>
+      ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field onboarding-safety-row"><label for="ob_safety_${key}">${label}</label>${safetySelect("ob_safety_"+key,d.safetyResponses[key])}</div>`).join("")}
+      <p class="field-note"><b>Evolv es bienestar, no atención médica.</b> Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</p>
+      <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
+      <p class="field-note" id="obMacroResult"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} · C ${d.carbTarget} · G ${d.fatTarget} g.<br>${hasCompleteOnboarding(profile&&profile.prefs||{})?"Conservamos el nivel de actividad de tu Perfil.":"Actividad estimada según tu semana."} Podrás cambiarla y ajustar estos valores en Perfil. <button type="button" class="btn btn-sm" onclick="openMacroFormulaInfo()">¿Cómo lo calculamos?</button></p>
+      ${onboardingButtons(true)}`;
   }
   $("#tabs").innerHTML="";
-  const challengeNote=d.challenge&&CHALLENGE_LABELS[d.challenge]
-    ? `<div class="alert violet"><b>Siguiente desafío:</b> ${CHALLENGE_LABELS[d.challenge]}. Revisaremos todos tus datos antes de crear las próximas ${d.planDurationWeeks} semanas.</div>`
-    :"";
-  $("#app").innerHTML=`<div class="onboarding"><div class="onboarding-brand">EVOLV · TU PLAN</div>${onboardingSteps()}${challengeNote}${body}</div>`;
+  $("#app").innerHTML=`<div class="onboarding onboarding-essential"><div class="onboarding-brand">EVOLV · TU PLAN</div>${onboardingSteps()}${body}</div>`;
 }
 function readOnboardingStep(){
   const d=onboardingDraft;
   if(onboardingStep===1){
     d.name=$("#ob_name").value.trim();d.sex=$("#ob_sex").value;d.age=+$("#ob_age").value;
-    d.heightCm=+$("#ob_height").value;d.weightKg=+$("#ob_weight").value;
-    d.bodyFatPct=$("#ob_bf").value?+$("#ob_bf").value:"";d.activityLevel=$("#ob_activity").value;
+    d.heightCm=+$("#ob_height").value;d.weightKg=+$("#ob_weight").value;d.goal=$("#ob_goal").value;
   }else if(onboardingStep===2){
-    const prevMacros={calorieTarget:d.calorieTarget,proteinTarget:d.proteinTarget,carbTarget:d.carbTarget,fatTarget:d.fatTarget};
-    d.goal=$("#ob_goal").value;d.calorieTarget=+$("#ob_kcal").value;d.proteinTarget=+$("#ob_protein").value;
-    d.carbTarget=+$("#ob_carbs").value;d.fatTarget=+$("#ob_fat").value;
-    const reconciled=reconcileOnboardingMacros(prevMacros,d);
-    d.calorieTarget=reconciled.calorieTarget;d.carbTarget=reconciled.carbTarget;d.fatTarget=reconciled.fatTarget;
-    if(reconciled.adjusted==="kcal")toast("Ajustamos tus calorías para que cuadren con tus macros");
-    else if(reconciled.adjusted==="macros")toast("Ajustamos tus carbohidratos y grasas a tu nuevo presupuesto");
-  }else if(onboardingStep===3){
-    d.primarySport=$("#ob_sport")?$("#ob_sport").value:"walking";
-    d.strengthPlace=normalizeStrengthPlace($("#ob_strength")&&$("#ob_strength").value);
-    d.strengthMode=strengthModeFromChoice(d.strengthPlace);
-    d.planDurationWeeks=+$("#ob_duration").value;
-    const _obSafetyMode=$("#ob_safety_mode");if(_obSafetyMode)d.trainingSafetyMode=normalizedTrainingSafetyMode(_obSafetyMode.value);
-    const _obExp=$("#ob_experience");if(_obExp)d.trainingExperience=_obExp.value;
-    const _obMin=$("#ob_minutes");if(_obMin)d.sessionMinutes=+_obMin.value;
-    d.trainingDays=onboardingSelectedDays();
-    d.trainDays=d.trainingDays.length;
+    const previousChoice=d.strengthPlace;
+    d.primarySport=$("#ob_sport").value;d.strengthPlace=normalizeStrengthPlace($("#ob_strength").value);d.strengthMode=strengthModeFromChoice(d.strengthPlace);
+    d.trainingDays=onboardingSelectedDays();d.trainDays=d.trainingDays.length;
     d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
-    if(d.strengthMode!=="none")d.trainingDays.forEach(day=>{
-      const el=$("#ob_location_"+day);
-      if(el&&TRAINING_LOCATION_LABELS[el.value])d.trainingLocations[day]=el.value;
-    });
-    readTrainingDayKinds("ob",d);
-    readIndoorCyclingPlace("ob",d);
-    // Rellenar campos diferidos con defaults válidos
+    readTrainingDayKinds("ob",d);readIndoorCyclingPlace("ob",d);
+    if(previousChoice!==d.strengthPlace||!d.equipment.length)d.equipment=defaultEquipmentForStrengthChoice(d.strengthPlace);
+    if(d.strengthMode==="none")d.equipment=[];
     if(!TRAINING_PRIORITY_LABELS[d.trainingPriority])d.trainingPriority=inferredTrainingPriority(d);
     if(!TRAINING_TIME_LABELS[d.preferredTrainingTime])d.preferredTrainingTime="flexible";
-    d.equipment=checkedValues("ob_equipment",d.strengthMode==="bodyweight"?STRENGTH_RESOURCE_LABELS:EQUIPMENT_LABELS);
-    if(!d.equipment.length)d.equipment=defaultEquipmentForStrengthChoice(d.strengthPlace);
   }else{
-    // Nuevo paso 4 combinado: restricciones + privacidad; comidas en sección opcional
-    const _obMc=$("#ob_meal_count");if(_obMc)d.mealCount=Math.min(6,Math.max(2,+_obMc.value||d.mealCount));
-    d.diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#ob_diet_"+v);return el&&el.checked;});
-    d.allergies=$("#ob_allergies").value.trim();
-    const _obCl=$("#ob_cooking_level");if(_obCl&&COOKING_LEVEL_LABELS[_obCl.value])d.cookingLevel=_obCl.value;
-    d.preferredIngredients=$("#ob_preferred_ingredients").value.trim();
-    d.preferredDishes=$("#ob_preferred_dishes").value.trim();
-    d.dislikedIngredients=$("#ob_disliked").value.trim();
-    d.consentCore=$("#ob_consent_core").checked;
+    d.diet=[$("#ob_diet_pattern").value,...["sin_huevo","sin_lacteos","sin_gluten"].filter(v=>$("#ob_diet_"+v).checked)].filter(Boolean);
+    d.allergies=$("#ob_allergies").value.trim();d.consentCore=$("#ob_consent_core").checked;
     d.safetyResponses=Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,$("#ob_safety_"+key).value]));
   }
 }
@@ -4129,14 +4031,13 @@ function validateOnboardingStep(){
     if(d.age<MINIMUM_AGE||d.age>90)return `Debes tener entre ${MINIMUM_AGE} y 90 años`;
     if(d.heightCm<130||d.heightCm>230)return "Revisa tu estatura";
     if(d.weightKg<35||d.weightKg>250)return "Revisa tu peso";
-    if(d.bodyFatPct!==""&&(d.bodyFatPct<3||d.bodyFatPct>60))return "El porcentaje de grasa debe estar entre 3% y 60%";
+    if(!GOAL_OPTIONS[d.goal])return "Elige tu objetivo";
   }
-  if(onboardingStep===2&&[d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].some(v=>!Number.isFinite(v)||v<=0))return "Completa las cuatro metas de nutrición";
-  if(onboardingStep===3)return validateTrainingProfileCore(d);
-  if(onboardingStep===4){
-    const foodError=validateFoodPreferences(d);
-    if(foodError)return foodError;
-    if(d.age<MINIMUM_AGE)return `Debes tener al menos ${MINIMUM_AGE} años`;
+  if(onboardingStep===2)return validateTrainingProfileCore(d);
+  if(onboardingStep===3){
+    if(!["omnivoro","vegetariano","vegano"].some(value=>d.diet.includes(value)))return "Elige cómo comes";
+    const foodError=validateFoodPreferences(d);if(foodError)return foodError;
+    if(![d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].every(v=>Number.isFinite(v)&&v>0))return "Revisa tus datos para calcular las metas";
     if(!d.consentCore)return "Acepta el uso esencial de datos para crear tu plan";
     if(SAFETY_QUESTIONS.some(([key])=>!["yes","no"].includes(d.safetyResponses&&d.safetyResponses[key])))return "Responde las cuatro preguntas de seguridad";
   }
@@ -4182,10 +4083,10 @@ function onboardingNext(){
   if(error){toast(error);return;}
   if(onboardingStep===1)applyCalculatedMacros();
   const prevStep=onboardingStep;
-  onboardingStep=Math.min(4,onboardingStep+1);
+  onboardingStep=Math.min(3,onboardingStep+1);
   onboardingHistoryWrite("step",true);
   renderOnboarding();scrollAppTop();
-  if(prevStep===3&&onboardingDraft&&onboardingDraft.primarySport==="strength_only"){
+  if(prevStep===2&&onboardingDraft&&onboardingDraft.primarySport==="strength_only"){
     showCardioNudge("onboarding");
   }
 }
@@ -4196,20 +4097,11 @@ function onboardingBack(){
   if(entry&&entry.id===onboardingHistoryId){history.back();return;}
   onboardingStep=Math.max(1,onboardingStep-1);onboardingHistoryWrite("step",false);renderOnboarding();scrollAppTop();
 }
-function onboardingGoalChanged(goal){onboardingDraft.goal=goal;applyCalculatedMacros();renderOnboarding();}
+function onboardingGoalChanged(goal){onboardingDraft.goal=goal;const help=$("#obGoalHelp");if(help)help.textContent=(GOAL_OPTIONS[goal]||GOAL_OPTIONS.deficit).help;}
 function recalculateOnboarding(){readOnboardingStep();applyCalculatedMacros();renderOnboarding();toast("Metas recalculadas");}
 function updateOnboardingTrainingSummary(){
-  const out=$("#obTrainingSummary"),duration=$("#ob_duration");
-  if(!out||!duration)return;
-  const sportValue=$("#ob_sport")?$("#ob_sport").value:"walking";
-  const strength=strengthModeFromChoice(normalizeStrengthPlace($("#ob_strength")&&$("#ob_strength").value));
-  const dayIds=WEEKDAY_OPTIONS.filter(day=>{const el=$("#ob_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
-  const labels=dayIds.map(day=>WEEKDAY_OPTIONS.find(option=>option.value===day).short).join(", ");
-  const lc=onboardingDraft&&onboardingDraft.lightCardioEnabled;
-  const impact=dayIds.length<MIN_TRAINING_DAYS
-    ?`Elige al menos ${MIN_TRAINING_DAYS} días para tu plan de entrenamiento.`
-    :trainingPlanSummary(dayIds.length,sportValue,undefined,lc,strength,Object.fromEntries(dayIds.map(day=>[day,$("#ob_kind_"+day)?.value]).filter(([,value])=>value)));
-  out.innerHTML=`<b>${duration.value} semanas · ${dayIds.length} días${labels?" ("+labels+")":""}.</b> ${impact}`;
+  const out=$("#obTrainingSummary");if(!out||!onboardingDraft)return;
+  const d=onboardingDraft;out.textContent=trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled,d.strengthMode,d.trainingDayKinds);
 }
 function updateOnboardingTrainingChoice(){
   if(onboardingDraft)readOnboardingStep();
@@ -4578,10 +4470,11 @@ async function saveOnboarding(){
     await pullCycleHistory();
   }
   if(newCycle||firstCycle)seedStartWeight();
+  const onboardingDurationSeconds=Math.max(0,Math.round((Date.now()-(onboardingStartedAt||Date.now()))/1000));
   endOnboardingHistory();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=true;
   view="hoy";current=clampDate(todayStr());
-  trackEvent(firstCycle||newCycle?"onboarding_complete":"onboarding_review",{cycle:planCycleNumber,duration_weeks:duration,source:newCycle?"new_cycle":firstCycle?"first":"review"});
+  trackEvent(firstCycle||newCycle?"onboarding_complete":"onboarding_review",{cycle:planCycleNumber,duration_weeks:duration,duration_s:onboardingDurationSeconds,source:newCycle?"new_cycle":firstCycle?"first":"review"});
   const firstWeekSummary=(firstCycle||newCycle)?await prepareFirstCycleWeek(current):null;
   const weekIssues=!!(firstWeekSummary&&firstWeekSummary.errors&&firstWeekSummary.errors.length);
   // REQ-289: con la semana lista, instalar la app y activar avisos antes de Hoy.
@@ -9516,6 +9409,18 @@ function renderProfile(){
           <div class="scard"><div class="n">${macros.f} g</div><div class="l">grasas</div></div>
         </div>
         <div class="muted small" style="margin-bottom:12px">${p.weightKg?`${p.weightKg} kg · `:""}${esc((GOAL_OPTIONS[p.goal]||GOAL_OPTIONS.deficit).label.toLowerCase())}${p.macroMethod?` · ${esc(p.macroMethod)}`:""}</div>`:'<div class="muted small" style="margin-bottom:12px">Aún no has calculado tus metas personales.</div>'}
+        <div class="onboarding-grid">
+          <div class="field"><label for="pf_activity">Nivel de actividad habitual</label><select id="pf_activity">${Object.entries(ACTIVITY_LEVELS).map(([v,o])=>`<option value="${v}" ${p.activityLevel===v?"selected":""}>${o.label}</option>`).join("")}</select></div>
+          <div class="field"><label for="pf_bf">Grasa corporal (opcional)</label><input id="pf_bf" type="number" min="3" max="60" step=".1" value="${p.bodyFatPct==null?"":p.bodyFatPct}" placeholder="Déjalo vacío si no lo sabes"></div>
+        </div>
+        <button type="button" class="btn" onclick="recalculateProfileMacros()">Recalcular con estos datos</button>
+        <div class="onboarding-grid" style="margin-top:8px">
+          <div class="field"><label for="pf_kcal">Calorías</label><input id="pf_kcal" type="number" value="${p.calorieTarget||""}"></div>
+          <div class="field"><label for="pf_protein">Proteína (g)</label><input id="pf_protein" type="number" value="${p.proteinTarget||""}"></div>
+          <div class="field"><label for="pf_carbs">Carbohidratos (g)</label><input id="pf_carbs" type="number" value="${p.carbTarget||""}"></div>
+          <div class="field"><label for="pf_fat">Grasas (g)</label><input id="pf_fat" type="number" value="${p.fatTarget||""}"></div>
+        </div>
+        <p class="field-note">Las nuevas metas se aplican desde mañana. Tus registros anteriores se conservan.</p>
         <button class="btn" style="width:100%" onclick="startOnboarding()">Recalcular objetivos y preferencias</button>
         <button class="btn" style="width:100%;margin-top:8px" onclick="openRestartPlan()">Empezar de nuevo mi plan</button>
       </div>
@@ -9616,7 +9521,7 @@ function renderProfile(){
     <div class="field-note">Tu semana de referencia: puedes cambiar una sesión o registrar otro deporte desde Entreno. Recomendamos entre 3 y 6 días y al menos uno de descanso.</div>
     <div class="field"><label for="pf_duration">Ciclo de seguimiento</label><select id="pf_duration" onchange="updateTrainingSummary()">
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
-    </select><div class="muted small" style="margin-top:6px">Cambiar el ciclo ajusta su fecha final y conserva tus registros.</div></div>
+    </select><div class="muted small" style="margin-top:6px">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado. Cambiar el ciclo conserva tus registros.</div></div>
     <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled,p.strengthMode,p.trainingDayKinds)}</div>
     <div class="onboarding-grid training-choice-grid">${trainingSafetyModeHtml("pf",p)}</div>
     <details class="adv-settings">
@@ -9821,6 +9726,29 @@ function updateProfileMealCount(value){
   const main=$("#pf_main_meal"),previous=main?+main.value:Math.min(2,count);
   if(main)main.innerHTML=Array.from({length:count},(_,index)=>`<option value="${index+1}" ${Math.min(previous,count)===index+1?"selected":""}>Comida ${index+1}</option>`).join("");
 }
+function profileCalculationInputs(){
+  return {activityLevel:$("#pf_activity").value,bodyFatPct:$("#pf_bf").value===""?"":+$("#pf_bf").value};
+}
+function recalculateProfileMacros(){
+  const p={...profile.prefs,...profileCalculationInputs()},result=calculateMacroTargets(p);
+  for(const [id,key] of [["pf_kcal","kcal"],["pf_protein","p"],["pf_carbs","c"],["pf_fat","f"]])$("#"+id).value=result[key];
+  profileMarkDirty();
+}
+function readProfileCalculationFields(d,previous){
+  Object.assign(d,profileCalculationInputs());
+  if(d.bodyFatPct!==""&&(!Number.isFinite(d.bodyFatPct)||d.bodyFatPct<3||d.bodyFatPct>60))return "El porcentaje de grasa debe estar entre 3% y 60%";
+  const values={calorieTarget:+$("#pf_kcal").value,proteinTarget:+$("#pf_protein").value,carbTarget:+$("#pf_carbs").value,fatTarget:+$("#pf_fat").value};
+  if(!Object.values(values).every(v=>Number.isFinite(v)&&v>0))return "Revisa las cuatro metas de nutrición";
+  const edited=Object.keys(values).some(key=>values[key]!==Number(previous[key]));
+  if(!edited&&(d.activityLevel!==previous.activityLevel||String(d.bodyFatPct)!==String(previous.bodyFatPct==null?"":previous.bodyFatPct))){
+    const result=calculateMacroTargets(d);Object.assign(d,{calorieTarget:result.kcal,proteinTarget:result.p,carbTarget:result.c,fatTarget:result.f,maintenanceCalories:result.maintenance,macroMethod:result.method});
+  }else Object.assign(d,reconcileOnboardingMacros(previous,values));
+  if(edited||d.activityLevel!==previous.activityLevel||String(d.bodyFatPct)!==String(previous.bodyFatPct==null?"":previous.bodyFatPct)){
+    const calc=calculateMacroTargets(d);d.maintenanceCalories=calc.maintenance;
+    d.macroMethod=d.calorieTarget===calc.kcal&&d.proteinTarget===calc.p&&d.carbTarget===calc.c&&d.fatTarget===calc.f?calc.method:"Ajuste personal";
+  }
+  return "";
+}
 async function saveProfile(){
   if(nutritionUpdating)return;
   const owner=uid();
@@ -9828,6 +9756,8 @@ async function saveProfile(){
   try{
   const previous=migrateProfilePrefs((profile&&profile.prefs)||{});
   const draft={...previous};
+  const calculationError=readProfileCalculationFields(draft,previous);if(calculationError){toast(calculationError);return;}
+  const targetsChanged=["calorieTarget","proteinTarget","carbTarget","fatTarget"].some(key=>Number(draft[key])!==Number(previous[key]));
   const diet=["vegetariano","vegano","sin_huevo","sin_lacteos","sin_gluten","omnivoro"].filter(v=>{const el=$("#pf_diet_"+v);return el&&el.checked;});
   draft.diet=diet;
   readFoodScheduleFields("pf",draft);
@@ -9847,6 +9777,9 @@ async function saveProfile(){
   const prefs={...previous,
     profileSchemaVersion:PROFILE_SCHEMA_VERSION,
     name:$("#pf_name").value.trim(),
+    activityLevel:draft.activityLevel,bodyFatPct:draft.bodyFatPct===""?null:draft.bodyFatPct,
+    calorieTarget:draft.calorieTarget,proteinTarget:draft.proteinTarget,carbTarget:draft.carbTarget,fatTarget:draft.fatTarget,
+    maintenanceCalories:draft.maintenanceCalories,macroMethod:draft.macroMethod,
     betweenExerciseRestSeconds:normalizedBetweenExerciseRest($("#pf_between_rest")&&$("#pf_between_rest").value),
     diet,
     mealCount:draft.mealCount,mealTimes:draft.mealTimes,
@@ -9883,16 +9816,21 @@ async function saveProfile(){
     planStartDate,
     planEndDate,
   };
+  if(targetsChanged){
+    const previousTarget=effectiveDayTarget(null,todayStr());
+    prefs.macroTargetsValidFrom=addDays(todayStr(),1);
+    prefs.previousMacroTargets={calorieTarget:previousTarget.kcal,proteinTarget:previousTarget.p,carbTarget:previousTarget.c,fatTarget:previousTarget.f};
+  }
   prefs.avoid=[prefs.allergies,prefs.dislikedIngredients].filter(Boolean).join(", ");
   prefs.trainNote=[prefs.injuries,prefs.limitations,prefs.avoidMovements].filter(Boolean).join(". ");
   if(prefs.onboardingEssentialOnly&&!prefs.profileRefinedAt)prefs.profileRefinedAt=new Date().toISOString();
-  const result=await saveProfilePrefs(prefs);
+  const result=await saveProfilePrefs(prefs,targetsChanged?{validFrom:addDays(todayStr(),1)}:undefined);
   if(result&&result.error){toast("Error: "+result.error.message);return;}
   if(calendarChanged){await upsertActiveCycle();await pullCycleHistory();}
   const repaired=await reconcilePendingNutrition();
   if(owner!==uid())return;
   nutritionUndo=null;
-  setNutritionUpdate("Preferencias guardadas.",repaired);
+  setNutritionUpdate(targetsChanged?"Preferencias guardadas. Tus nuevas metas se aplican desde mañana.":"Preferencias guardadas.",repaired);
   current=clampDate(current);
   profileClearDirty();
   render();
@@ -18023,7 +17961,7 @@ async function boot(){
 }
 /* ---- Analitica de producto (REQ-27) ---- */
 // Solo claves seguras sin datos de salud, identidad ni prompts.
-const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","action","state","platform","standalone"]); // REQ-339: state/platform/standalone de la tarjeta de avisos (igual que api/analytics.js)
+const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","duration_s","action","state","platform","standalone"]); // REQ-339: state/platform/standalone de la tarjeta de avisos (igual que api/analytics.js)
 let _analyticsSessionId=null;
 // REQ-317: al retomar la PWA tras 30 minutos fuera comienza otro uso.
 let analyticsAwayAt=0;

@@ -82,8 +82,8 @@ assert.ok(
 );
 
 assert.ok(
-  html.includes("No quieres que aparezca") && html.includes("Se excluyen de tus próximas propuestas."),
-  "Onboarding y Perfil deben describir dislikedIngredients como exclusión, no preferencia blanda."
+  html.includes("Ingredientes que no quieres ver") && html.includes("Se excluyen de tus próximas propuestas.") && html.includes("Se excluyen siempre de las propuestas."),
+  "Perfil conserva los gustos excluidos; el onboarding esencial mantiene alergias como exclusión dura."
 );
 
 const regenerateMeal = sliceBetween("async function regenerateGenMeal(", "function regenerateGenMealRestore(");
