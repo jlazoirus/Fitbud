@@ -13922,7 +13922,7 @@ Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/R
 
 ## REQ-255 - Recordatorios por WhatsApp
 
-**Estado: pendiente — requiere acción humana:** elegir canal, proveedor y presupuesto mensual.
+**Estado: pendiente.** Propuesta original; las decisiones de Jonathan (2026-11-14) y la especificación implementable están en [`docs/whatsapp-reminders.md`](whatsapp-reminders.md).
 
 ### Origen
 
@@ -13955,9 +13955,9 @@ El único recordatorio fuera de la app es por correo (REQ-24) y muchos usuarios 
 - El teléfono es dato personal: RLS, no va a analytics, se borra con la cuenta.
 - Lenguaje REQ-31 en la plantilla.
 
-### Decisión pendiente (Jonathan)
+### Decisión (Jonathan, 2026-11-14)
 
-- ¿WhatsApp (opción 1 o 2, con presupuesto mensual) o primero la opción 3?
+- Opción 1: WhatsApp Business Cloud API de Meta directa, solo el aviso diario de la noche, tope de US$20 al mes. Jonathan tiene número dedicado y RUC. Detalle en [`docs/whatsapp-reminders.md`](whatsapp-reminders.md).
 
 ## REQ-384 - Administración: el correo de recuperación abre la app
 

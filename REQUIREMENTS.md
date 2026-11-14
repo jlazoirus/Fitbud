@@ -62,7 +62,7 @@ Las series UX (REQ-97..112) y «dieta exacta» (REQ-128..141 y 144) ya están im
 
 - REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
 
-Pendientes de decisión del feedback de Diego (2026-10-21): REQ-254 y REQ-255 (ver abajo). Las series ya cerradas (Claudia, flujo beta, Sathya, Jonathan 10-21, Diego) están en `docs/requirements-history.md`, en «Series cerradas de la secuencia activa».
+Pendiente de decisión del feedback de Diego (2026-10-21): REQ-254 (ver abajo). Las series ya cerradas (Claudia, flujo beta, Sathya, Jonathan 10-21, Diego) están en `docs/requirements-history.md`, en «Series cerradas de la secuencia activa».
 
 Journey de recordatorios y racha (Jonathan, 2026-10-26; diseño en `docs/reminders-journey.md`): REQ-283 animación de racha, REQ-284 regreso en Hoy, REQ-285 recordatorios por ausencia.
 
@@ -75,7 +75,6 @@ Pendiente no automatizable por agentes:
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-254 - Decidir el nivel de cocina en el catálogo y si se amplían almuerzos/cenas "sin cocinar" (feedback Diego).
-- REQ-255 - Decidir si los recordatorios llegan por WhatsApp: proveedor y presupuesto (feedback Diego).
 - REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
@@ -1589,7 +1588,24 @@ Detalle archivado en [historial](docs/requirements-history.md#req-254).
 
 ## REQ-255 - Recordatorios por WhatsApp
 
-**Estado: pendiente — requiere acción humana:** elegir canal, proveedor y presupuesto mensual. Detalle en `docs/requirements-history.md` (buscar `## REQ-255`).
+**Estado: pendiente.** Decidido por Jonathan (2026-11-14); spec en [whatsapp-reminders](docs/whatsapp-reminders.md).
+
+### Origen
+Diego (beta): «que sea al WhatsApp».
+### Problema
+Solo correo y push; nadie invita a activarlos.
+### Objetivo
+Aviso diario por WhatsApp (Cloud API de Meta, tope US$20/mes).
+### Alcance
+Vinculación por el usuario, webhook firmado, envío, baja e invitación semanal.
+### Fuera de alcance
+Otros avisos, BSP, chat.
+### Riesgos
+Clasificación de plantilla, número personal, 12 funciones.
+### Criterios de aceptación
+Los 14 del spec.
+### Verificación sugerida
+Meta simulado y release gate.
 
 ## REQ-256 - Fix Nutrición: "Volver a preparar este día" pisa comidas personalizadas sin marcar como hechas
 
