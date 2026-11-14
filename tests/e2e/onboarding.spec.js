@@ -75,9 +75,9 @@ test.describe("Onboarding", () => {
 
     // Paso 3: semana de entrenamiento (caminata, sin fuerza por ahora, 10 semanas, ≥3 días)
     await expect(app).toContainText("Ciclo de seguimiento");
-    await expect(app).toContainText("¿Haces otro deporte además de la fuerza?");
+    await expect(app).toContainText("¿Qué actividad quieres practicar?");
     await expect(page.locator("#ob_sport")).toContainText("Caminar");
-    await expect(page.locator("#ob_strength")).toContainText("No quiero fuerza por ahora");
+    await expect(page.locator("#ob_strength")).toContainText("Sin fuerza");
     await expect(page.locator("#ob_duration")).toContainText("10 semanas · recomendado");
     await expect(app).toContainText("10 semanas es el proceso completo recomendado");
     await page.selectOption("#ob_sport", "walking");
@@ -140,6 +140,39 @@ test.describe("Onboarding", () => {
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
+  test("REQ-385: solo otro deporte completa el alta con tres días para su deporte", async ({ page, context }) => {
+    const { calls } = await installMocks(context, { tables: { profiles: { row: profileFixture({}) } } });
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    await reachTrainingStep(page, 30);
+    await page.selectOption("#ob_sport", "strength_only");
+    await page.selectOption("#ob_strength", "none");
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await expect(page.getByText("Elige una actividad o una opción de fuerza para preparar tu semana", { exact: true })).toBeVisible();
+    await page.selectOption("#ob_sport", "other");
+    for (const day of [0, 1, 2, 3, 4, 5, 6]) {
+      await page.locator(`#ob_day_${day}`).setChecked([1, 3, 5].includes(day));
+    }
+    await expect(page.locator("#obTrainingSummary")).toContainText("3 días para tu deporte");
+    await page.getByRole("button", { name: "Continuar" }).click();
+    await page.check("#ob_diet_omnivoro");
+    await page.check("#ob_consent_core");
+    for (const field of await page.locator('#app select[id^="ob_safety_"]').all()) await field.selectOption("no");
+    await page.getByRole("button", { name: "Guardar mi plan" }).click();
+    await expect(page.locator("#tabs")).toContainText("Hoy");
+    const posts = calls.filter(c => c.table === "profiles" && c.method === "POST");
+    const row = posts.at(-1).payload;
+    const prefs = (Array.isArray(row) ? row[0] : row).prefs;
+    expect(prefs.primarySport).toBe("other");
+    expect(prefs.strengthMode).toBe("none");
+    expect(prefs.trainingDays).toEqual([1, 3, 5]);
+    const sessions = await page.evaluate(() => {
+      const p = trainingPrefs();
+      return workoutSchedule(p.days,p.dayIds,p.priority,p.locations,p.primary,p.experience,p.workoutSplit,p.strength,p.lightCardioEnabled);
+    });
+    for (const day of [1, 3, 5]) expect(sessions[day]).toBe("facil");
+  });
+
   test("REQ-152: 'Mantenerlo por ahora' en el aviso de revisión cierra el modal y pospone sin errores", async ({ page, context }) => {
     // onboardingReviewedAt de hace 40 días (> PROFILE_REVIEW_DAYS=28) dispara el aviso.
     const staleReview = new Date(Date.now() - 40 * 24 * 3600 * 1000).toISOString();
@@ -194,7 +227,7 @@ test.describe("Onboarding", () => {
       await page.locator("#overlay").getByRole("button", { name: "Entendido" }).click();
       if (scenario.age >= 55) {
         await expect(page.locator("#ob_sport")).toContainText("Caminar");
-        await expect(page.locator("#ob_strength")).toContainText("No quiero fuerza por ahora");
+        await expect(page.locator("#ob_strength")).toContainText("Sin fuerza");
       }
 
       expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);

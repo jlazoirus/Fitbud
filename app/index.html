@@ -1660,14 +1660,14 @@ const TRAINING_ACTIVITY_OPTIONS=[
   ["cycling","Bicicleta"],
   ["swimming","Natación"],
   ["other","Otro deporte"],
-  ["strength_only","Ninguno, solo fuerza"],
+  ["strength_only","Ninguna actividad"],
 ];
 // REQ-253: qué cambia en tu semana según el deporte que elijas.
 function primarySportHelp(value){
-  if(value==="other")return "Pádel, fútbol u otro: los días que no son de fuerza quedan para tu deporte; lo juegas y lo registras en Entreno.";
+  if(value==="other")return "Pádel, fútbol u otro: tendrás días para practicar tu deporte y registrarlo en Entreno.";
   if(value==="strength_only")return "Tu semana es solo fuerza; los demás días son descanso.";
   const label=SPORT_LABELS[value];
-  return label?`Tu semana suma sesiones guiadas de ${label.toLowerCase()} entre las de fuerza.`:"";
+  return label?`Tendrás sesiones guiadas de ${label.toLowerCase()}. Puedes combinarlas con fuerza.`:"";
 }
 function updateSportHelp(prefix){
   const el=$("#"+prefix+"_sport"),help=$("#"+prefix+"_sport_help");
@@ -1677,7 +1677,7 @@ const STRENGTH_CHOICE_OPTIONS=[
   ["gym","Fuerza en gimnasio"],
   ["home","Fuerza en casa"],
   ["outdoor","Fuerza al aire libre"],
-  ["none","No quiero fuerza por ahora"],
+  ["none","Sin fuerza"],
 ];
 const STRENGTH_RESOURCE_LABELS={
   bodyweight:"Ninguno / peso corporal",
@@ -1900,8 +1900,8 @@ function plannedWorkoutId(ds,prefs){
 function trainingPlanSummary(days,primary,priority,lightCardio,strength){
   if(strength==="none"){
     if(primary==="strength_only")return "Elige una actividad o agrega fuerza para preparar tu semana.";
-    if(primary==="other")return "Para pausar fuerza, elige caminar, correr, bicicleta o natación.";
-    return `${days} sesiones de ${SPORT_LABELS[primary]||"actividad"} sin fuerza por ahora.`;
+    if(primary==="other")return `${days} días para tu deporte. Registra cada sesión en Entreno.`;
+    return `${days} sesiones de ${SPORT_LABELS[primary]||"actividad"}.`;
   }
   if(primary==="other")return "Actividad libre + fuerza — sin plan estructurado para tu actividad.";
   if(primary==="strength_only")return lightCardio
@@ -3722,7 +3722,6 @@ function timeMinutes(value){
 function validateTrainingProfile(d){
   if(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validPlanDuration(d.planDurationWeeks))return "Completa la base de tu plan de entrenamiento";
   if(d.primarySport==="strength_only"&&d.strengthMode==="none")return "Elige una actividad o una opción de fuerza para preparar tu semana";
-  if(d.primarySport==="other"&&d.strengthMode==="none")return "Si pausas fuerza, elige caminar, correr, bicicleta o natación como actividad principal";
   if(!validTrainingDays((d.trainingDays||[]).length))return `Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días exactos para entrenar`;
   if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))return "Elige el lugar de entrenamiento para cada día disponible";
   if(d.primarySport==="swimming"){
@@ -3738,7 +3737,6 @@ function validateTrainingProfile(d){
 function validateTrainingProfileCore(d){
   if(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validPlanDuration(d.planDurationWeeks))return "Completa la base de tu plan de entrenamiento";
   if(d.primarySport==="strength_only"&&d.strengthMode==="none")return "Elige una actividad o una opción de fuerza para preparar tu semana";
-  if(d.primarySport==="other"&&d.strengthMode==="none")return "Si pausas fuerza, elige caminar, correr, bicicleta o natación como actividad principal";
   if(!validTrainingDays((d.trainingDays||[]).length))return `Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días exactos para entrenar`;
   if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))return "Elige el lugar de entrenamiento para cada día disponible";
   if(d.primarySport==="swimming"){
@@ -3822,17 +3820,17 @@ function renderOnboarding(){
     const strengthChoice=strengthChoiceFromPrefs(d);
     const locationDefaults=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays||[],d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
     body=`<h1>Arma tu semana de entrenamiento</h1>
-      <p class="onboarding-copy">Elige qué actividad quieres practicar y si harás fuerza. Recomendamos al menos tres días para que tu semana tenga estructura y descanso.</p>
+      <p class="onboarding-copy">Elige fuerza, una actividad o ambas. Recomendamos al menos tres días para que tu semana tenga estructura y descanso.</p>
       <div class="dash">
         <div class="onboarding-grid training-choice-grid">
           <div class="field" style="margin-top:0">
-            <label for="ob_sport">¿Haces otro deporte además de la fuerza?</label>
+            <label for="ob_sport">¿Qué actividad quieres practicar?</label>
             <select id="ob_sport" onchange="updateOnboardingTrainingChoice()">
               ${TRAINING_ACTIVITY_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(d.primarySport,v)}>${l}</option>`).join("")}
             </select>
             <div class="field-note" id="ob_sport_help">${esc(primarySportHelp(d.primarySport))}</div>
           </div>
-          <div class="field" style="margin-top:0"><label for="ob_strength">¿Dónde quieres entrenar fuerza?</label><select id="ob_strength" onchange="updateOnboardingStrengthChoice()">
+          <div class="field" style="margin-top:0"><label for="ob_strength">¿Quieres incluir fuerza?</label><select id="ob_strength" onchange="updateOnboardingStrengthChoice()">
             ${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(strengthChoice,v)}>${l}</option>`).join("")}
           </select></div>
           ${strengthResourceHtml("ob",strengthChoice,d.equipment)}
@@ -9398,13 +9396,13 @@ function renderProfile(){
     <div class="muted small" style="margin-bottom:10px">Elige días y lugares para tus próximas sesiones.</div>
     <div class="onboarding-grid">
       <div class="field">
-        <label for="pf_sport">¿Haces otro deporte además de la fuerza?</label>
+        <label for="pf_sport">¿Qué actividad quieres practicar?</label>
         <select id="pf_sport" onchange="updatePfSportSelector()">
           ${TRAINING_ACTIVITY_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(p.primarySport,v)}>${l}</option>`).join("")}
         </select>
         <div class="field-note" id="pf_sport_help">${esc(primarySportHelp(p.primarySport))}</div>
       </div>
-      <div class="field"><label for="pf_strength">¿Dónde quieres entrenar fuerza?</label><select id="pf_strength" onchange="updatePfStrengthChoice()">
+      <div class="field"><label for="pf_strength">¿Quieres incluir fuerza?</label><select id="pf_strength" onchange="updatePfStrengthChoice()">
         ${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(strengthChoice,v)}>${l}</option>`).join("")}
       </select></div>
       <div id="pfStrengthResources" style="display:contents">${strengthResourceHtml("pf",strengthChoice,p.equipment)}</div>

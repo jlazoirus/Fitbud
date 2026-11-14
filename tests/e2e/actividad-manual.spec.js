@@ -199,11 +199,11 @@ test.describe("Actividad registrada a mano", () => {
 
     await page.locator("#tabs").getByText("Perfil").click();
     await page.locator("#pfSecEntreno > summary").click();
-    await expect(page.locator('label[for="pf_sport"]')).toHaveText("¿Haces otro deporte además de la fuerza?");
+    await expect(page.locator('label[for="pf_sport"]')).toHaveText("¿Qué actividad quieres practicar?");
     await expect(page.locator("#pf_sport option:checked")).toHaveText("Otro deporte");
-    await expect(page.locator("#pf_sport_help")).toContainText("quedan para tu deporte");
+    await expect(page.locator("#pf_sport_help")).toContainText("días para practicar tu deporte");
     await page.selectOption("#pf_sport", "running");
-    await expect(page.locator("#pf_sport_help")).toHaveText("Tu semana suma sesiones guiadas de correr entre las de fuerza.");
+    await expect(page.locator("#pf_sport_help")).toHaveText("Tendrás sesiones guiadas de correr. Puedes combinarlas con fuerza.");
     await expect(page.locator("#pfSecEntreno")).toContainText("puedes cambiar una sesión o registrar otro deporte desde Entreno");
 
     // Hoy toca fuerza: juega pádel en su lugar.

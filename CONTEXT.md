@@ -18,6 +18,8 @@ REQ-364..367: Hoy con consumo, acción, agenda, técnica, avisos plegables y nav
 - Supabase es fuente de verdad. `localStorage` espeja/cachea para offline; no debe ser la unica ubicacion de datos personales.
 - PWA: `manifest.webmanifest`, `service-worker.js`, iconos en `assets/`. la app (`/app`) sale del cache; `config.js` network-first; `/api/*` network-only.
 
+REQ-385: solo deporte, sin fuerza, es válido en onboarding y Perfil.
+
 ## Datos y seguridad
 
 - Auth obligatorio con Supabase Auth. `profiles`, `day_log`, `weight_log` y `plan_versions` estan aislados por `user_id` y RLS.

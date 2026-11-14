@@ -12,8 +12,8 @@ const catalog = readFileSync("exercise-catalog.js", "utf8");
 const exerciseSql = readFileSync("supabase/exercises.sql", "utf8");
 
 // REQ-253: "Actividad física principal" no se entendía; onboarding y Perfil usan la misma pregunta.
-assert.ok(index.includes('<label for="ob_sport">¿Haces otro deporte además de la fuerza?</label>'), "Onboarding debe preguntar por otro deporte, no por cardio.");
-assert.ok(index.includes('<label for="pf_sport">¿Haces otro deporte además de la fuerza?</label>'), "Perfil debe editar el otro deporte con la misma pregunta.");
+assert.ok(index.includes('<label for="ob_sport">¿Qué actividad quieres practicar?</label>'), "Onboarding debe preguntar por otro deporte, no por cardio.");
+assert.ok(index.includes('<label for="pf_sport">¿Qué actividad quieres practicar?</label>'), "Perfil debe editar el otro deporte con la misma pregunta.");
 assert.ok(!index.includes("Actividad física principal"), "No debe volver el label Actividad física principal.");
 assert.ok(!index.includes("¿Tienes un deporte cardio como actividad principal?"), "No debe volver la pregunta de deporte cardio.");
 assert.ok(!index.includes(">Deporte cardio<"), "No debe volver el label Deporte cardio.");
@@ -29,7 +29,7 @@ for (const value of ["gym", "home", "outdoor", "none"]) {
 }
 
 assert.ok(pure.includes("activityOnlyTemplate"), "El dominio puro debe soportar plantillas sin fuerza.");
-assert.ok(pure.includes('none:"Sin fuerza por ahora"'), "El dominio puro debe validar fuerza pausada.");
+assert.ok(pure.includes('none:"Sin fuerza"'), "El dominio puro debe validar fuerza pausada.");
 assert.ok(
   pure.includes('strength==="none"?activityLocation'),
   "Sin fuerza, defaultTrainingLocations debe usar el lugar de la actividad para no bloquear caminata/running.",
@@ -51,3 +51,5 @@ assert.ok(catalog.includes('"walk-brisk"') && catalog.includes("walking:{"), "El
 assert.ok(exerciseSql.includes("'walk-brisk'") && exerciseSql.includes("'walk-mobility'"), "SQL de ejercicios debe incluir caminata.");
 
 console.log("validate-training-onboarding-decisions: REQ-115 verificado.");
+
+assert.ok(!index.includes('Si pausas fuerza'), "Solo otro deporte debe ser válido.");

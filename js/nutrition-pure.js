@@ -28,7 +28,7 @@
 
   // ── Constantes de perfil ────────────────────────────────────────────────────
   const SPORT_LABELS={walking:"Caminar",running:"Correr",cycling:"Bicicleta",swimming:"Natación",other:"Otro deporte",strength_only:"Ninguna actividad"};
-  const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Casa o aire libre",none:"Sin fuerza por ahora"};
+  const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Casa o aire libre",none:"Sin fuerza"};
   const PROFILE_SCHEMA_VERSION=3;
   const PROFILE_REVIEW_DAYS=28;
   const PROFILE_REVIEW_MS=PROFILE_REVIEW_DAYS*24*60*60*1000;

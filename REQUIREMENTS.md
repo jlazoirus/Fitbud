@@ -2456,7 +2456,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-385 - Onboarding: entrenar sin fuerza es una opción más
 
-**Estado: pendiente.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+**Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
 
 ### Origen
 Jonathan, 2026-11-11.
