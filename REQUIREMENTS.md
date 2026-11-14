@@ -2498,7 +2498,7 @@ Pruebas puras de `workoutSchedule`, e2e y release gate.
 
 ## REQ-387 - Entreno: indoor cycling como actividad
 
-**Estado: pendiente.** Implementar después de REQ-386. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+**Estado: implementado.** Implementar después de REQ-386. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
 
 ### Origen
 Jonathan, 2026-11-11.

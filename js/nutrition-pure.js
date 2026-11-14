@@ -27,7 +27,7 @@
   const BASE_SLOTS=MEAL_SLOT_TEMPLATES[4].map(([id,slot])=>({id,slot}));
 
   // ── Constantes de perfil ────────────────────────────────────────────────────
-  const SPORT_LABELS={walking:"Caminar",running:"Correr",cycling:"Bicicleta",swimming:"Natación",other:"Otro deporte",strength_only:"Ninguna actividad"};
+  const SPORT_LABELS={walking:"Caminar",running:"Correr",cycling:"Bicicleta",indoor_cycling:"Indoor cycling / spinning",swimming:"Natación",other:"Otro deporte",strength_only:"Ninguna actividad"};
   const STRENGTH_LABELS={gym:"Gimnasio",bodyweight:"Casa o aire libre",none:"Sin fuerza"};
   const PROFILE_SCHEMA_VERSION=3;
   const PROFILE_REVIEW_DAYS=28;
@@ -251,7 +251,7 @@
     const bodyweightLocation=strengthPlace==="outdoor"?"outdoor":"home";
     return Object.fromEntries(dayIds.map((day,index)=>{
       const session=sessions[index];
-      const activityLocation=primary==="swimming"?"pool":"outdoor";
+      const activityLocation=primary==="swimming"?"pool":primary==="indoor_cycling"?(strengthPlace==="home"?"home":"gym"):"outdoor";
       const location=strength==="none"?activityLocation:STRENGTH_SESSION_IDS.has(session)?(strength==="bodyweight"?bodyweightLocation:"gym"):activityLocation;
       return [day,location];
     }));

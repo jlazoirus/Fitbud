@@ -10,6 +10,9 @@
 update exercises as ex
 set level = reviewed.level, updated_at = now()
 from (values
+  ('indoor-cycle-intervals', 'intermediate'),
+  ('indoor-cycle-endurance', 'beginner'),
+  ('indoor-cycle-cadence', 'beginner'),
   ('rope-triceps-pushdown', 'beginner'),
   ('preacher-curl', 'beginner'),
   ('quadruped-glute-kickback', 'beginner'),

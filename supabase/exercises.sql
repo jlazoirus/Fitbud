@@ -1045,6 +1045,30 @@ insert into exercises (
   'Free Exercise DB', '', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
 ),
 (
+  'indoor-cycle-intervals', 'Intervalos en bici estática', '[]'::jsonb, 'indoor_cycling', 'intermediate',
+  '["stationary_bike"]'::jsonb, '["gym","home"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'cycle',
+  'Bici estática estable, sillín ajustado y manos relajadas.', '["Pedalea suave hasta encontrar una cadencia estable.","Completa los bloques sin balancear excesivamente el tronco.","Recupera con resistencia baja y termina con pedaleo fácil."]'::jsonb, 'Mantén respiración rítmica; baja la intensidad si no puedes recuperarla.', '["Resistencia excesiva","Caderas balanceándose","Bloquear hombros y manos"]'::jsonb,
+  '["Dolor de pecho, mareo o adormecimiento persistente","Dolor agudo de rodilla"]'::jsonb, 'Bloques cortos con resistencia moderada', 'Aumentar duración antes que resistencia', '["indoor-cycle-endurance","indoor-cycle-cadence"]'::jsonb,
+  '["dolor agudo de rodilla","señales cardiovasculares no evaluadas"]'::jsonb, 'image', 'cycle', 'cycle',
+  'Free Exercise DB', '', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
+),
+(
+  'indoor-cycle-endurance', 'Clase de indoor cycling de 45 min', '[]'::jsonb, 'indoor_cycling', 'beginner',
+  '["stationary_bike"]'::jsonb, '["gym","home"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'cycle',
+  'Bici estática estable, sillín ajustado y manos relajadas.', '["Pedalea suave hasta encontrar una cadencia estable.","Completa los bloques sin balancear excesivamente el tronco.","Recupera con resistencia baja y termina con pedaleo fácil."]'::jsonb, 'Mantén respiración rítmica; baja la intensidad si no puedes recuperarla.', '["Resistencia excesiva","Caderas balanceándose","Bloquear hombros y manos"]'::jsonb,
+  '["Dolor de pecho, mareo o adormecimiento persistente","Dolor agudo de rodilla"]'::jsonb, 'Sesión más corta y resistencia baja', 'Aumentar tiempo en zona cómoda', '["indoor-cycle-intervals","indoor-cycle-cadence"]'::jsonb,
+  '["dolor agudo de rodilla","señales cardiovasculares no evaluadas"]'::jsonb, 'image', 'cycle', 'cycle',
+  'Free Exercise DB', '', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
+),
+(
+  'indoor-cycle-cadence', 'Técnica en bici estática', '[]'::jsonb, 'indoor_cycling', 'beginner',
+  '["stationary_bike"]'::jsonb, '["gym","home"]'::jsonb, '["piernas","sistema cardiovascular"]'::jsonb, 'cycle',
+  'Bici estática estable, sillín ajustado y manos relajadas.', '["Pedalea suave hasta encontrar una cadencia estable.","Completa los bloques sin balancear excesivamente el tronco.","Recupera con resistencia baja y termina con pedaleo fácil."]'::jsonb, 'Mantén respiración rítmica; baja la intensidad si no puedes recuperarla.', '["Resistencia excesiva","Caderas balanceándose","Bloquear hombros y manos"]'::jsonb,
+  '["Dolor de pecho, mareo o adormecimiento persistente","Dolor agudo de rodilla"]'::jsonb, 'Cadencia cómoda con bloques breves', 'Bloques más largos sin balancear el tronco', '["indoor-cycle-endurance"]'::jsonb,
+  '["dolor agudo de rodilla","señales cardiovasculares no evaluadas"]'::jsonb, 'image', 'cycle', 'cycle',
+  'Free Exercise DB', '', 'Public Domain (Unlicense)', 'Free Exercise DB (yuhonas) — dominio público', true
+),
+(
   'swim-intervals', 'Intervalos de natación', '[]'::jsonb, 'swimming', 'intermediate',
   '["pool"]'::jsonb, '["pool"]'::jsonb, '["cuerpo completo"]'::jsonb, 'swim',
   'Cuerpo alineado, cuello relajado y respiración preparada.', '["Nada suave hasta estabilizar la técnica.","Mantén alineación y agarre antes de aumentar el ritmo.","Usa las pausas indicadas y sal del agua ante cualquier señal de alerta."]'::jsonb, 'Exhala dentro del agua y toma aire sin levantar en exceso la cabeza.', '["Acelerar perdiendo alineación","Contener el aire","Cruzar la mano delante de la cabeza"]'::jsonb,
@@ -1191,3 +1215,8 @@ update exercises set media_type='image', media_url='assets/exercise-media/cyclin
 update exercises set media_type='image', media_url='assets/exercise-media/swimming.jpg', poster_url='assets/exercise-media/swimming.jpg', frames='[]'::jsonb where slug='swim-intervals';
 update exercises set media_type='image', media_url='assets/exercise-media/swimming.jpg', poster_url='assets/exercise-media/swimming.jpg', frames='[]'::jsonb where slug='swim-endurance';
 update exercises set media_type='image', media_url='assets/exercise-media/swimming.jpg', poster_url='assets/exercise-media/swimming.jpg', frames='[]'::jsonb where slug='swim-drills';
+
+-- REQ-387: nuevas fichas opcionales; cliente local operativo sin aplicar SQL.
+update exercises set media_type='image', media_url='assets/exercise-media/cycling.jpg', poster_url='assets/exercise-media/cycling.jpg', frames='[]'::jsonb where slug='indoor-cycle-intervals';
+update exercises set media_type='image', media_url='assets/exercise-media/cycling.jpg', poster_url='assets/exercise-media/cycling.jpg', frames='[]'::jsonb where slug='indoor-cycle-endurance';
+update exercises set media_type='image', media_url='assets/exercise-media/cycling.jpg', poster_url='assets/exercise-media/cycling.jpg', frames='[]'::jsonb where slug='indoor-cycle-cadence';

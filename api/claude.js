@@ -604,11 +604,13 @@ function validateTrainingPlanWeek(data, validation) {
     const duration = Number(session.duration_minutes);
     if (type !== spec.type || role !== spec.role || location !== spec.location) return false;
     if (Number(session.weekday) !== Number(spec.weekday)) return false;
-    if (!["strength", "running", "cycling", "swimming"].includes(type)) return false;
+    if (!["strength", "running", "cycling", "indoor_cycling", "swimming"].includes(type)) return false;
     if (!String(session.name || "").trim() || !String(session.objective || "").trim() || !String(session.intensity || "").trim()) return false;
+    if (type === "indoor_cycling" && (duration < 30 || duration > 60 || !["gym", "home"].includes(location))) return false;
     if (!Number.isFinite(duration) || duration < 20 || duration > Number(validation.sessionMinutes || 60)) return false;
     const exercises = Array.isArray(session.exercises) ? session.exercises : [];
     const blocks = Array.isArray(session.blocks) ? session.blocks : [];
+    if (type === "indoor_cycling" && blocks.reduce((sum, block) => sum + Number(block.duration_seconds || block.durationSeconds || 0), 0) > 3600) return false;
     if (type === "strength") {
       if (exercises.length < 2 || exercises.length > 8 || blocks.length) return false;
     } else if (exercises.length !== 1 || blocks.length < 3

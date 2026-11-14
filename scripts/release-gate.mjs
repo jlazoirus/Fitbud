@@ -152,6 +152,7 @@ run("validate-training-safety-mode.mjs", "node scripts/validate-training-safety-
 run("validate-splits.mjs", "node scripts/validate-splits.mjs");
 run("validate-strength-only-schedule.mjs", "node scripts/validate-strength-only-schedule.mjs");
 run("validate-training-day-kinds.mjs", "node scripts/validate-training-day-kinds.mjs");
+run("validate-indoor-cycling.mjs", "node scripts/validate-indoor-cycling.mjs");
 run("validate-e2e-training-fixture.mjs", "node scripts/validate-e2e-training-fixture.mjs");
 run("test-sync-conflicts.mjs", "node scripts/test-sync-conflicts.mjs");
 run("validate-sync-safe-merge.mjs", "node scripts/validate-sync-safe-merge.mjs");

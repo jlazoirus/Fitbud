@@ -55,7 +55,7 @@ visit(workouts,"workouts");
 const variants=context.globalThis.FITBUD_EXERCISE_VARIANTS||{};
 const LEVEL={beginner:0,intermediate:1,advanced:2};
 const bySlug=new Map(catalog.map(exercise=>[exercise.slug,exercise]));
-for(const exercise of catalog.filter(item=>!["walking","running","cycling","swimming"].includes(item.discipline))){
+for(const exercise of catalog.filter(item=>!["walking","running","cycling","indoor_cycling","swimming"].includes(item.discipline))){
   const entry=variants[exercise.slug];
   if(!entry){errors.push(`${exercise.slug}: sin versión más fácil ni progresión definidas`);continue;}
   for(const direction of ["regression","progression"]){
@@ -74,7 +74,7 @@ for(const slug of Object.keys(variants))if(!bySlug.has(slug))errors.push(`Varian
 // REQ-247: cada ejercicio de fuerza tiene músculo principal, y tanto los
 // sustitutos como las versiones más fácil/progresión trabajan ese mismo músculo.
 const substitution=context.globalThis.FITBUD_EXERCISE_SUBSTITUTION;
-const strength=catalog.filter(item=>!["walking","running","cycling","swimming"].includes(item.discipline));
+const strength=catalog.filter(item=>!["walking","running","cycling","indoor_cycling","swimming"].includes(item.discipline));
 for(const exercise of strength){
   if(!substitution.primaryMuscles[exercise.slug]){errors.push(`${exercise.slug}: sin músculo principal`);continue;}
   const muscle=substitution.primaryMuscle(exercise);

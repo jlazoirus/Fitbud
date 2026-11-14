@@ -35,7 +35,7 @@ assert.ok(
   "Sin fuerza, defaultTrainingLocations debe usar el lugar de la actividad para no bloquear caminata/running.",
 );
 assert.ok(
-  index.includes('if(strength!=="none"&&p.trainingLocations') &&
+  index.includes('if((strength!=="none"||primary==="indoor_cycling")&&p.trainingLocations') &&
     index.includes('if(d.strengthMode!=="none")d.trainingDays.forEach'),
   "Los overrides de lugar por día no deben sobrescribir el lugar de actividad cuando strengthMode es none.",
 );

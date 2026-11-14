@@ -913,13 +913,16 @@
     ["cycle-intervals","Intervalos de cycling","cycling","cycle","Bloques cortos con resistencia moderada","Aumentar duración antes que resistencia",["cycle-endurance","cycle-cadence"],"intermediate"],
     ["cycle-endurance","Cycling aeróbico fácil","cycling","cycle","Sesión más corta y resistencia baja","Aumentar tiempo en zona cómoda",["cycle-intervals","cycle-cadence"],"beginner"],
     ["cycle-cadence","Técnica y cadencia en bicicleta","cycling","cycle","Cadencia cómoda con bloques breves","Bloques más largos sin balancear el tronco",["cycle-endurance"],"beginner"],
+    ["indoor-cycle-intervals","Intervalos en bici estática","indoor_cycling","cycle","Bajar resistencia y esfuerzo","Aumentar control a 80-95 rpm",["indoor-cycle-endurance","indoor-cycle-cadence"],"intermediate"],
+    ["indoor-cycle-endurance","Clase de indoor cycling de 45 min","indoor_cycling","cycle","Pedalear suave a RPE 3","Mantener 70-90 rpm a RPE 3-5",["indoor-cycle-cadence"],"beginner"],
+    ["indoor-cycle-cadence","Técnica en bici estática","indoor_cycling","cycle","Cadencia cómoda sentado","Mantener postura estable a 70-90 rpm",["indoor-cycle-endurance"],"beginner"],
     ["swim-intervals","Intervalos de natación","swimming","swim","Bloques más cortos con pausa amplia","Aumentar distancia manteniendo técnica",["swim-endurance","swim-drills"],"intermediate"],
     ["swim-endurance","Natación aeróbica fácil","swimming","swim","Alternar largos suaves y pausas","Aumentar distancia sin perder alineación",["swim-intervals","swim-drills"],"beginner"],
     ["swim-drills","Técnica de natación","swimming","swim","Un ejercicio técnico por bloque","Combinar ejercicios manteniendo respiración estable",["swim-endurance"],"beginner"],
   ].map(row=>exercise({
     slug:row[0],name:row[1],aliases:[],discipline:row[2],pattern:row[3],
-    equipment:row[2]==="cycling"?["bicycle"]:row[2]==="swimming"?["pool"]:[],
-    places:row[2]==="swimming"?["pool"]:row[2]==="cycling"?["outdoor","gym"]:["outdoor"],
+    equipment:row[2]==="indoor_cycling"?["stationary_bike"]:row[2]==="cycling"?["bicycle"]:row[2]==="swimming"?["pool"]:[],
+    places:row[2]==="indoor_cycling"?["gym","home"]:row[2]==="swimming"?["pool"]:row[2]==="cycling"?["outdoor","gym"]:["outdoor"],
     muscles:row[2]==="swimming"?["cuerpo completo"]:["piernas","sistema cardiovascular"],
     regression:row[4],progression:row[5],substitutes:row[6],level:row[7],
   }));
@@ -939,6 +942,7 @@
     walking:["assets/exercise-media/walking.jpg",FREE_EXERCISE_DB],
     running:["assets/exercise-media/running.jpg",FREE_EXERCISE_DB],
     cycling:["assets/exercise-media/cycling.jpg",FREE_EXERCISE_DB],
+    indoor_cycling:["assets/exercise-media/cycling.jpg",FREE_EXERCISE_DB],
     swimming:["assets/exercise-media/swimming.jpg",{source_name:"DoD Warrior Games 2016 (U.S. Army)",source_url:"https://commons.wikimedia.org/wiki/Category:2016_Warrior_Games",license_name:"Public Domain (obra del Gobierno de EE. UU.)",attribution:"U.S. Army vía Wikimedia Commons — dominio público"}],
   };
   endurance.forEach(ex=>{
@@ -1336,6 +1340,7 @@
     },
     walking:{calidad:["walk-brisk"],facil:["walk-easy"],tecnica:["walk-mobility"]},
     running:{calidad:["run-intervals"],facil:["run-easy"],tecnica:["run-drills"]},
+    indoor_cycling:{calidad:["indoor-cycle-intervals"],facil:["indoor-cycle-endurance"],tecnica:["indoor-cycle-cadence"]},
     cycling:{calidad:["cycle-intervals"],facil:["cycle-endurance"],tecnica:["cycle-cadence"]},
     swimming:{calidad:["swim-intervals"],facil:["swim-endurance"],tecnica:["swim-drills"]},
   };

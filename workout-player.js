@@ -3,7 +3,7 @@
 
   const VERSION=1;
   const STRENGTH_KINDS=new Set(["Gimnasio","Peso corporal"]);
-  const CARDIO_KINDS=new Set(["Caminata","Correr","Running","Bicicleta","Cycling","Natación"]);
+  const CARDIO_KINDS=new Set(["Caminata","Correr","Running","Bicicleta","Cycling","Indoor cycling","Natación"]);
 
   function number(value,fallback){
     const parsed=Number(value);
@@ -137,7 +137,30 @@
     if(sport==="walking")return {warmup:"Caminata suave",cooldown:"Caminata tranquila",easy:"Caminata aeróbica"};
     return {warmup:"Calentamiento",cooldown:"Enfriamiento",easy:"Carrera aeróbica"};
   }
+  // REQ-387: bounded indoor blocks, with resistance chosen by perceived effort.
+  function indoorCyclingSpecs(sessionId,phaseIndex,sessionMinutes){
+    const available=clamp(sessionMinutes,30,60);
+    const minutes=sessionId==="facil"?Math.min(45,available):sessionId==="tecnica"?Math.min(45,available):available;
+    const steps=[timedStep("warmup","warmup","Pedaleo de calentamiento","5 min a 60-75 rpm","RPE 2-3",300)];
+    const mainSeconds=minutes*60-600;
+    if(sessionId==="calidad"){
+      const rpe=phaseIndex===2?4:phaseIndex===4?6:7;
+      for(let i=1;i<=5;i++){
+        steps.push(timedStep(`work-${i}`,"main",`Intervalo ${i} de 5`,"2 min a 80-95 rpm",`RPE ${rpe}`,120));
+        steps.push(timedStep(`recovery-${i}`,"recovery",`Recuperación ${i}`,"2 min a 60-75 rpm","RPE 2-3",120));
+      }
+      if(mainSeconds>1200)steps.push(timedStep("steady","main","Pedaleo estable","70-90 rpm, ajusta la resistencia","RPE 3-5",mainSeconds-1200));
+    }else if(sessionId==="tecnica"){
+      const block=Math.round(mainSeconds/3);
+      ["Postura estable a 70-80 rpm","Pedaleo fluido a 80-90 rpm","Control sin balancear el tronco"].forEach((target,i)=>steps.push(timedStep(`technique-${i}`,"main",`Técnica ${i+1}`,target,"RPE 3-5",i===2?mainSeconds-block*2:block)));
+    }else{
+      steps.push(timedStep("endurance","main",minutes===45?"Clase de 45 min":"Pedaleo fácil","70-90 rpm, resistencia cómoda","RPE 3-5",mainSeconds));
+    }
+    steps.push(timedStep("cooldown","cooldown","Pedaleo suave","5 min a 60-70 rpm","RPE 1-2",300));
+    return steps;
+  }
   function cardioSpecs(sport,sessionId,phaseIndex,sessionMinutes){
+    if(sport==="indoor_cycling")return indoorCyclingSpecs(sessionId,phaseIndex,sessionMinutes);
     const phase=clamp(phaseIndex,0,4);
     const minutes=clamp(sessionMinutes,30,120);
     const labels=cardioLabels(sport);
@@ -145,7 +168,7 @@
     const cooldownSeconds=sport==="swimming"?300:600;
     const warmupTarget=sport==="swimming"?"200-300 m suaves":`${Math.round(warmupSeconds/60)} min suaves`;
     const cooldownTarget=sport==="swimming"?"200 m suaves":`${Math.round(cooldownSeconds/60)} min suaves`;
-    const easyVerb=sport==="swimming"?"Nado suave":sport==="cycling"?"Pedaleo suave":sport==="walking"?"Caminata suave":"Trote suave";
+    const easyVerb=sport==="swimming"?"Nado suave":["cycling","indoor_cycling"].includes(sport)?"Pedaleo suave":sport==="walking"?"Caminata suave":"Trote suave";
     const steps=[timedStep("warmup","warmup",labels.warmup,warmupTarget,"RPE 2-3",warmupSeconds,{movements:cardioMovements("warmup",sport,easyVerb,warmupTarget)})];
 
     if(sessionId==="calidad"){
@@ -266,7 +289,7 @@
     const blocks=workout.generatedPrescription&&Array.isArray(workout.generatedPrescription.blocks)
       ?workout.generatedPrescription.blocks:[];
     const sport=String(workout.sport||workout.kind||"").toLowerCase();
-    const easyVerb=sport==="swimming"?"Nado suave":sport==="cycling"?"Pedaleo suave":sport==="walking"?"Caminata suave":"Trote suave";
+    const easyVerb=sport==="swimming"?"Nado suave":["cycling","indoor_cycling"].includes(sport)?"Pedaleo suave":sport==="walking"?"Caminata suave":"Trote suave";
     return blocks.map((block,index)=>timedStep(
       `generated-${index+1}`,
       block.phase,

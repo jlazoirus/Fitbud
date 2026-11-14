@@ -1517,7 +1517,7 @@ function migrateProfilePrefs(source){
   const workoutSplitNorm=(trainingExperienceNorm==="advanced"&&WORKOUT_SPLIT_LABELS[p.workoutSplit])?p.workoutSplit:undefined;
   const locationDefaults=defaultTrainingLocations(primary,strength,trainingDays,trainingPriority,trainingExperienceNorm,workoutSplitNorm,strengthPlace);
   const trainingLocations={...locationDefaults};
-  if(strength!=="none"&&p.trainingLocations&&typeof p.trainingLocations==="object"){
+  if((strength!=="none"||primary==="indoor_cycling")&&p.trainingLocations&&typeof p.trainingLocations==="object"){
     trainingDays.forEach(day=>{
       const value=p.trainingLocations[day];
       if(TRAINING_LOCATION_LABELS[value])trainingLocations[day]=value;
@@ -1527,6 +1527,10 @@ function migrateProfilePrefs(source){
     trainingDays.forEach(day=>{
       if(["strength","sport"].includes(p.trainingDayKinds[day])&&!TRAINING_LOCATION_LABELS[p.trainingLocations&&p.trainingLocations[day]])trainingLocations[day]=trainingKindLocation(p.trainingDayKinds[day],primary,strengthPlace);
     });
+  }
+  if(primary==="indoor_cycling"){
+    const schedule=workoutSchedule(trainingDays.length,trainingDays,trainingPriority,trainingLocations,primary,trainingExperienceNorm,workoutSplitNorm,strength,p.lightCardioEnabled,p.trainingDayKinds);
+    trainingDays.forEach(day=>{if(!STRENGTH_SESSION_IDS.has(schedule[day])&&!["gym","home"].includes(trainingLocations[day]))trainingLocations[day]=strengthPlace==="home"?"home":"gym";});
   }
   const mealCount=Math.min(6,Math.max(2,Number.parseInt(p.mealCount,10)||4));
   const allergies=String(p.allergies!=null?p.allergies:(p.avoid||"")).trim();
@@ -1664,12 +1668,14 @@ const TRAINING_ACTIVITY_OPTIONS=[
   ["walking","Caminar"],
   ["running","Correr"],
   ["cycling","Bicicleta"],
+  ["indoor_cycling","Indoor cycling / spinning"],
   ["swimming","Natación"],
   ["other","Otro deporte"],
   ["strength_only","Ninguna actividad"],
 ];
 // REQ-253: qué cambia en tu semana según el deporte que elijas.
 function primarySportHelp(value){
+  if(value==="indoor_cycling")return "Sesiones de bici estática en casa o gimnasio, de 30 a 60 min, guiadas por esfuerzo y cadencia.";
   if(value==="other")return "Pádel, fútbol u otro: tendrás días para practicar tu deporte y registrarlo en Entreno.";
   if(value==="strength_only")return "Tu semana es solo fuerza; los demás días son descanso.";
   const label=SPORT_LABELS[value];
@@ -2013,6 +2019,21 @@ function sportSessions(primary,ds,prefs){
       techniqueName:"Bicicleta · técnica y cadencia",
       technique:"45-60 min suaves con 6 bloques de 2 min de cadencia alta y pedaleo estable.",
     },
+    indoor_cycling:{
+      kind:"Indoor cycling",
+      quality:[
+        "30-60 min en bici estática: 5 min suaves · 5×2 min a RPE 7 y 80-95 rpm, 2 min suaves · pedaleo cómodo · 5 min suaves.",
+        "30-60 min en bici estática: 5 min suaves · 5×2 min a RPE 7-8 y 80-95 rpm, 2 min suaves · termina a RPE 4 · 5 min suaves.",
+        "Descarga: 30-60 min a RPE 3-4 y 70-85 rpm, con entrada y vuelta a la calma.",
+        "30-60 min en bici estática: 5 min suaves · 5×2 min a RPE 7-8 y 80-95 rpm, 2 min suaves · pedaleo estable · 5 min suaves.",
+        "30-60 min de pedaleo controlado, RPE 4-6 y 70-90 rpm, sin buscar fatiga.",
+      ],
+      endurance:Array(5).fill("Clase de 30-60 min en bici estática: 5 min suaves, 35 min a RPE 3-5 y 70-90 rpm, 5 min de vuelta a la calma. Ajusta la resistencia a tu esfuerzo."),
+      qualityName:"Indoor cycling · intervalos",
+      enduranceName:"Indoor cycling · clase de 45 min",
+      techniqueName:"Indoor cycling · técnica y cadencia",
+      technique:"30-30-60 min en bici estática a RPE 3-5: postura estable, pedaleo fluido y bloques de 70-90 rpm. Sin balancear el tronco.",
+    },
     walking:{
       kind:"Caminata",
       quality:[
@@ -2083,6 +2104,11 @@ function sportSessions(primary,ds,prefs){
     return sessions;
   }
   const p=plans[primary]||plans.running;
+  if(primary==="indoor_cycling"&&ctx.sessionMinutes<45){
+    const minutes=Math.max(30,ctx.sessionMinutes);
+    p.enduranceName=`Indoor cycling · ${minutes} min fáciles`;
+    p.endurance=Array(5).fill(`${minutes} min en bici estática: 5 min suaves, pedaleo a 70-90 rpm y RPE 3-5, 5 min de vuelta a la calma.`);
+  }
   const sessions={
     quality:{id:"calidad",kind:p.kind,name:p.qualityName,detail:p.quality[phase]},
     endurance:{id:"facil",kind:p.kind,name:p.enduranceName,detail:p.endurance[phase]},
@@ -3601,7 +3627,30 @@ function checkChips(prefix,labels,selected){
 }
 // REQ-386: the untouched selectors mirror the legacy template, including location overrides.
 function trainingKindLocation(kind,primary,place){
-  return kind==="strength"?(place==="none"?"gym":place):(primary==="swimming"?"pool":"outdoor");
+  return kind==="strength"?(place==="none"?"gym":place):(primary==="swimming"?"pool":primary==="indoor_cycling"?(place==="home"?"home":"gym"):"outdoor");
+}
+function indoorCyclingLocationHtml(prefix,d){
+  if(d.primarySport!=="indoor_cycling")return "";
+  const day=(d.trainingDays||[]).find(day=>!d.trainingDayKinds||d.trainingDayKinds[day]==="sport");
+  const place=d.trainingLocations&&d.trainingLocations[day];
+  const home=place==="home"||(!place&&d.strengthPlace==="home");
+  return `<div class="field"><label for="${prefix}_indoor_place">Dónde haces indoor cycling</label><select id="${prefix}_indoor_place" onchange="updateIndoorCyclingPlace('${prefix}')"><option value="gym" ${home?"":"selected"}>Gimnasio</option><option value="home" ${home?"selected":""}>Casa</option></select></div>`;
+}
+function updateIndoorCyclingPlace(prefix){
+  if(prefix==="ob"){updateOnboardingTrainingChoice();return;}
+  const place=$("#pf_indoor_place").value,strength=$("#pf_strength").value;
+  WEEKDAY_OPTIONS.forEach(({value:day})=>{
+    if(!$("#pf_day_"+day)?.checked)return;
+    const kind=$("#pf_kind_"+day)?.value;
+    if(strength==="none"||kind==="sport"){const loc=$("#pf_location_"+day);if(loc)loc.value=place;}
+  });
+  updateTrainingSummary();
+}
+function readIndoorCyclingPlace(prefix,d){
+  if(d.primarySport!=="indoor_cycling")return;
+  const el=$("#"+prefix+"_indoor_place");
+  const place=el&&el.value==="home"?"home":"gym";
+  d.trainingDays.forEach(day=>{if(d.strengthMode==="none"||d.trainingDayKinds&&d.trainingDayKinds[day]==="sport")d.trainingLocations[day]=place;});
 }
 function trainingDayKindDefaults(d){
   const schedule=workoutSchedule(d.trainingDays.length,d.trainingDays,d.trainingPriority,d.trainingLocations,d.primarySport,d.trainingExperience,d.workoutSplit,d.strengthMode,d.lightCardioEnabled);
@@ -3765,6 +3814,7 @@ function readTrainingFields(prefix,d){
   d.trainDays=d.trainingDays.length;
   d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
   readTrainingDayKinds(prefix,d);
+  readIndoorCyclingPlace(prefix,d);
   if(d.strengthMode!=="none")d.trainingDays.forEach(day=>{
     const el=$("#"+prefix+"_location_"+day);
     if(el&&TRAINING_LOCATION_LABELS[el.value])d.trainingLocations[day]=el.value;
@@ -3908,6 +3958,7 @@ function renderOnboarding(){
             ${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(strengthChoice,v)}>${l}</option>`).join("")}
           </select></div>
           ${strengthResourceHtml("ob",strengthChoice,d.equipment)}
+          ${indoorCyclingLocationHtml("ob",d)}
           <div class="field" style="grid-column:1 / -1"><label for="ob_duration">Ciclo de seguimiento</label><select id="ob_duration" onchange="updateOnboardingTrainingSummary()">
             ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${+d.planDurationWeeks===o.value?"selected":""}>${o.label}</option>`).join("")}
           </select><div class="field-note">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado.</div></div>
@@ -4012,6 +4063,7 @@ function readOnboardingStep(){
       if(el&&TRAINING_LOCATION_LABELS[el.value])d.trainingLocations[day]=el.value;
     });
     readTrainingDayKinds("ob",d);
+    readIndoorCyclingPlace("ob",d);
     // Rellenar campos diferidos con defaults válidos
     if(!TRAINING_PRIORITY_LABELS[d.trainingPriority])d.trainingPriority=inferredTrainingPriority(d);
     if(!TRAINING_TIME_LABELS[d.preferredTrainingTime])d.preferredTrainingTime="flexible";
@@ -5976,14 +6028,14 @@ const EXERCISE_EQUIPMENT_LABELS={
   dumbbells_or_cable:"mancuernas o polea",leg_press:"prensa",leg_curl:"máquina de femoral",bench_or_wall:"banco o pared",
   resistance_band:"banda elástica",pullup_bar:"barra de dominadas",step_or_bench:"escalón o banco",
   sliders_or_towel:"deslizadores o toalla",weight_belt:"cinturón de lastre",bench_or_anchor:"banco o anclaje",
-  table_or_low_bar:"mesa firme o barra baja",bicycle:"bicicleta",pool:"piscina",
+  table_or_low_bar:"mesa firme o barra baja",stationary_bike:"bici estática",bicycle:"bicicleta",pool:"piscina",
 };
 function exerciseEquipmentText(items){
   return exerciseArray(items).map(item=>EXERCISE_EQUIPMENT_LABELS[item]||String(item).replace(/_/g," ")).join(", ");
 }
 const EXERCISE_DISCIPLINE_LABELS={
   gym:"Gimnasio",bodyweight:"Peso corporal",strength:"Fuerza",
-  walking:"Caminata",running:"Correr",cycling:"Bicicleta",swimming:"Natación",
+  walking:"Caminata",running:"Correr",cycling:"Bicicleta",indoor_cycling:"Indoor cycling",swimming:"Natación",
 };
 // Normaliza la media disponible de un ejercicio a una forma consistente (REQ-15).
 function exerciseMediaSources(exercise){
@@ -6185,7 +6237,7 @@ const ACTIVITY_INTENSITIES=[["light","Suave"],["moderate","Moderada"],["vigorous
 function manualActivities(st){
   return Array.isArray(st&&st.manualActivities)?st.manualActivities.filter(a=>a&&typeof a==="object"&&a.sport):[];
 }
-function activitySport(id){return MANUAL_ACTIVITY_SPORTS.find(s=>s[0]===id)||MANUAL_ACTIVITY_SPORTS[MANUAL_ACTIVITY_SPORTS.length-1];}
+function activitySport(id){if(id==="indoor_cycling")id="spinning";return MANUAL_ACTIVITY_SPORTS.find(s=>s[0]===id)||MANUAL_ACTIVITY_SPORTS[MANUAL_ACTIVITY_SPORTS.length-1];}
 function activityIntensityLabel(id){return (ACTIVITY_INTENSITIES.find(i=>i[0]===id)||ACTIVITY_INTENSITIES[1])[1];}
 function activityWeightKg(){
   const kg=latestLoggedWeight()||Number(profile&&profile.prefs&&profile.prefs.weightKg);
@@ -6255,7 +6307,7 @@ function openManualActivity(ds,index){
   const workout=effectiveWorkout(ds).workout;
   const instead=workout.id!=="descanso";
   const last=instead?lastManualActivitySport():"";
-  const fallback=MANUAL_ACTIVITY_SPORTS.some(s=>s[0]===primary)&&primary!=="other"?primary
+  const fallback=primary==="indoor_cycling"?"spinning":MANUAL_ACTIVITY_SPORTS.some(s=>s[0]===primary)&&primary!=="other"?primary
     :instead?(primary==="strength_only"&&isFreeActivityWorkout(workout)?"walking":"other"):"strength";
   const sport=prev?prev.sport:(last&&last!=="strength"?last:fallback);
   const w=activityWeightKg();
@@ -6509,6 +6561,10 @@ function captureWorkoutElapsed(execution){
 function persistWorkoutExecution(ds,execution,rerender){
   const st=dayState(ds);
   execution.updatedAt=new Date().toISOString();
+  if(execution.status==="completed"&&effectiveWorkout(ds).workout.sport==="indoor_cycling"){
+    execution.estimatedKcal=estimateActivityKcal("spinning",execution.elapsedSeconds/60,"moderate",activityWeightKg().kg);
+    execution.energySource="spinning";
+  }
   st.workoutExecution=execution;
   st.workoutDone=execution.status==="completed";
   commitDay(ds);
@@ -7297,6 +7353,7 @@ function renderWorkoutExecution(ds,execution){
     return `<div class="dash">
       <div class="row between"><div><div class="slot">Resultado real</div><div class="cl-title">${execution.status==="completed"?"Sesión completada":"Sesión parcial"}</div></div>${workoutStatusHtml(ds,execution)}</div>
       ${execution.needsReview?'<div class="alert" style="margin-top:12px"><b>No repitas la sesión por ahora.</b><br>La señal registrada requiere orientación profesional antes de volver a exigir esa zona o intensidad.</div>':""}
+      ${execution.energySource==="spinning"?`<div class="muted small">≈ ${execution.estimatedKcal} kcal estimadas según duración y esfuerzo moderado.</div>`:""}
       <div class="player-summary">
         <div class="scard"><div class="n">${formatWorkoutTime(elapsed)}</div><div class="l">duración total</div></div>
         <div class="scard"><div class="n">${progress.completed}/${progress.total}</div><div class="l">bloques completados</div></div>
@@ -8007,7 +8064,7 @@ function renderWorkout(){
       ${strengthDay&&!dayRepeatWorkout(ds)&&dayCustomExercises(ds).length&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="resetDayRoutine('${ds}')">Volver a la rutina del plan</button>`:""}
       ${ew.overridden&&!(strengthDay&&dayRepeatWorkout(ds))&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
       ${dayPlace&&!execution&&!st.workoutDone&&!trainingSafetyHold()?`<button class="btn btn-sm" onclick="setDayTrainingPlace('${ds}',null)">${esc(dayPlaceBackLabel(plannedPlace))}</button>`:''}
-      ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar ${adaptDayLabel(ds)}:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Solo 20 min</button>${strengthDay||training.strength!=="none"?`<button class="btn btn-sm" onclick="openDayTrainingPlace('${ds}')">${dayPlace?"Cambiar lugar":strengthDay&&plannedPlace!=="gym"?"En el gimnasio":"En casa"}</button>`:""}<button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
+      ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar ${adaptDayLabel(ds)}:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">${ew.workout.sport==="indoor_cycling"?"Tengo poco tiempo":"Solo 20 min"}</button>${strengthDay||training.strength!=="none"?`<button class="btn btn-sm" onclick="openDayTrainingPlace('${ds}')">${dayPlace?"Cambiar lugar":strengthDay&&plannedPlace!=="gym"?"En el gimnasio":"En casa"}</button>`:""}<button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
     </div>
   </div>`);
   // REQ-239: con la sesión en curso, el reproductor va primero y el plan y la
@@ -9477,6 +9534,7 @@ function renderProfile(){
       <div class="field"><label for="pf_strength">¿Quieres incluir fuerza?</label><select id="pf_strength" onchange="updatePfStrengthChoice()">
         ${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(strengthChoice,v)}>${l}</option>`).join("")}
       </select></div>
+      <div id="pfIndoorPlace" style="display:contents">${indoorCyclingLocationHtml("pf",p)}</div>
       <div id="pfStrengthResources" style="display:contents">${strengthResourceHtml("pf",strengthChoice,p.equipment)}</div>
       <div class="field"><label for="pf_priority">Prioridad</label><select id="pf_priority" onchange="updateTrainingSummary()">
         ${Object.entries(TRAINING_PRIORITY_LABELS).map(([v,l])=>`<option value="${v}" ${sel(p.trainingPriority,v)}>${l}</option>`).join("")}
@@ -9672,6 +9730,8 @@ function updatePfStrengthChoice(){
   updateTrainingSummary();
 }
 function updatePfSportSelector(){
+  const sport=$("#pf_sport").value,box=$("#pfIndoorPlace");
+  if(box)box.innerHTML=indoorCyclingLocationHtml("pf",{primarySport:sport,strengthPlace:$("#pf_strength").value});
   updateSportHelp("pf");
   updateTrainingLocationDefaults("pf");
   refreshTrainingDayKinds("pf");
@@ -13304,7 +13364,7 @@ function allowedExercisesForSession(spec,prefs,catalog){
     return exercise.discipline===prefs.primarySport&&(!cardioRoleIds||cardioRoleIds.has(exercise.slug));
   });
 }
-const TRAINING_CATALOG_SPORTS=new Set(["walking","running","cycling","swimming"]);
+const TRAINING_CATALOG_SPORTS=new Set(["walking","running","cycling","indoor_cycling","swimming"]);
 function trainingExpectedWeeks(prefs){
   const p=migrateProfilePrefs(prefs||((profile&&profile.prefs)||{}));
   const training=trainingPrefsFromPrefs(p);
@@ -13346,7 +13406,7 @@ function trainingPlanValidationConfig(expected,prefs){
     expectedWeek:expected.week,
     expectedPhase:expected.phase,
     expectedSessions:expected.sessions.map(({date,weekday,location,role,type})=>({date,weekday,location,role,type})),
-    sessionMinutes:prefs.sessionMinutes,
+    sessionMinutes:prefs.primarySport==="indoor_cycling"?Math.max(30,prefs.sessionMinutes):prefs.sessionMinutes,
     allowedExerciseIds:allowed,
     hardRestrictions:trainingBlockedTerms(prefs),
     gentleMode:isGentleTrainingPlan(prefs),
@@ -13404,7 +13464,7 @@ function deterministicTrainingWeekPayload(expected,prefs){
     }));
     return {
       date:spec.date,weekday:spec.weekday,location:spec.location,role:spec.role,type:spec.type,
-      name:workout.name,objective:prescription.objective,duration_minutes:Math.min(prefs.sessionMinutes,prescription.estimatedMinutes),
+      name:workout.name,objective:prescription.objective,duration_minutes:spec.type==="indoor_cycling"?prescription.estimatedMinutes:Math.min(prefs.sessionMinutes,prescription.estimatedMinutes),
       intensity:strength?`RPE ${dose.rpe}`:workout.cardioRole==="facil"?"RPE 3-5":(gentle?(spec.role==="calidad"?"RPE 5":spec.role==="tecnica"?"RPE 3-4":"RPE 2-4"):(spec.role==="calidad"?"RPE 7":spec.role==="tecnica"?"RPE 5":"RPE 3-5")),
       exercises:prescribed,blocks,
     };
@@ -16973,7 +17033,7 @@ function editExercise(slug){
     <div class="onboarding-grid">
       <div class="field"><label for="ex_slug">ID estable</label><input id="ex_slug" value="${esc(ex.slug)}" ${existing?"disabled":""} placeholder="sentadilla-copa"></div>
       <div class="field"><label for="ex_name">Nombre</label><input id="ex_name" value="${esc(ex.name)}"></div>
-      <div class="field"><label for="ex_discipline">Disciplina</label><select id="ex_discipline">${["gym","bodyweight","strength","running","cycling","swimming"].map(value=>`<option value="${value}" ${ex.discipline===value?"selected":""}>${value}</option>`).join("")}</select></div>
+      <div class="field"><label for="ex_discipline">Disciplina</label><select id="ex_discipline">${["gym","bodyweight","strength","running","cycling","indoor_cycling","swimming"].map(value=>`<option value="${value}" ${ex.discipline===value?"selected":""}>${value}</option>`).join("")}</select></div>
       <div class="field"><label for="ex_level">Nivel</label><select id="ex_level">${Object.entries(TRAINING_EXPERIENCE_LABELS).map(([value,label])=>`<option value="${value}" ${ex.level===value?"selected":""}>${label}</option>`).join("")}</select></div>
       <div class="field"><label for="ex_pattern">Patrón</label><input id="ex_pattern" value="${esc(ex.movement_pattern)}"></div>
       <div class="field"><label for="ex_media_key">SVG fallback (patrón)</label><select id="ex_media_key">${mediaKeys.map(value=>`<option value="${value}" ${ex.media_key===value?"selected":""}>${value}</option>`).join("")}</select></div>

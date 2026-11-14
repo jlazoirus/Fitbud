@@ -213,3 +213,5 @@ El nivel describe la ejecución base de la demostración local. Los aumentos de 
 - `preacher-curl`: principiante; curl de bíceps sentado en banco Scott con barra EZ, brazos apoyados. Ajustar el asiento, usar poca carga al aprender y evitar bloquear los codos.
 
 - `rope-triceps-pushdown`: principiante; extensión de codos en polea alta con cuerda, agarre neutro y brazos junto al cuerpo. Aprender con carga ligera, sin balanceo.
+
+REQ-387: `indoor-cycle-intervals` es intermedio por el control de resistencia, esfuerzo y cadencia entre intervalos. `indoor-cycle-endurance` y `indoor-cycle-cadence` son principiantes por el esfuerzo moderado y la postura estable en bici estática. Las tres fichas se incluyen localmente; no requieren aplicar SQL para usarlas. El seed idempotente opcional conserva las políticas RLS; para revertir, desactivar solo los tres slugs nuevos, conservando los registros existentes.

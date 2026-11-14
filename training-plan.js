@@ -2,7 +2,7 @@
   "use strict";
 
   const VERSION=1;
-  const SESSION_TYPES=new Set(["strength","walking","running","cycling","swimming"]);
+  const SESSION_TYPES=new Set(["strength","walking","running","cycling","indoor_cycling","swimming"]);
   const BLOCK_PHASES=new Set(["warmup","main","recovery","cooldown"]);
 
   function number(value,fallback){
@@ -117,6 +117,7 @@
       if(spec&&role!==spec.role)issues.push(`${label}: objetivo distinto al plan combinado.`);
       if(spec&&location!==spec.location)issues.push(`${label}: lugar distinto a la disponibilidad.`);
       if(spec&&integer(rawSession&&rawSession.weekday,-1)!==Number(spec.weekday))issues.push(`${label}: día de semana inválido.`);
+      if(type==="indoor_cycling"&&(durationMinutes<30||durationMinutes>60||!["gym","home"].includes(location)))issues.push(`${label}: indoor cycling requiere 30-60 minutos en casa o gimnasio.`);
       if(durationMinutes<20||durationMinutes>Math.max(20,integer(config&&config.sessionMinutes,60)))issues.push(`${label}: duración fuera del tiempo disponible.`);
       if(!text(rawSession&&rawSession.name)||!text(rawSession&&rawSession.objective)||!intensity)issues.push(`${label}: faltan nombre, objetivo o intensidad.`);
 
@@ -139,6 +140,7 @@
           issues.push(`${label}: la sesión aeróbica requiere calentamiento, trabajo y vuelta a la calma.`);
         }
         const blockSeconds=blocks.reduce((sum,block)=>sum+block.durationSeconds,0);
+        if(type==="indoor_cycling"&&blockSeconds>3600)issues.push(`${label}: los bloques de indoor cycling superan 60 minutos.`);
         if(durationMinutes>0&&(blockSeconds>durationMinutes*60*1.1||blockSeconds<durationMinutes*60*.45)){
           issues.push(`${label}: los bloques no coinciden con la duración declarada.`);
         }
@@ -175,7 +177,7 @@
     const strength=session.type==="strength";
     const kind=strength
       ?(strengthMode==="bodyweight"?"Peso corporal":"Gimnasio")
-      :session.type==="swimming"?"Natación":session.type==="cycling"?"Bicicleta":session.type==="walking"?"Caminata":"Correr";
+      :session.type==="indoor_cycling"?"Indoor cycling":session.type==="swimming"?"Natación":session.type==="cycling"?"Bicicleta":session.type==="walking"?"Caminata":"Correr";
     return {
       id:session.id,
       kind,
