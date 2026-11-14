@@ -21,6 +21,10 @@ async function setup(page, context, { scanner, codes } = {}) {
         return stream;
       };
     }, { mode: scanner, codes });
+  } else {
+    // Chromium reciente trae BarcodeDetector nativo (macOS, Android): se quita
+    // para probar el camino de un navegador sin escaneo.
+    await page.addInitScript(() => { delete window.BarcodeDetector; });
   }
   const mocks = await installMocks(context, { prefs: completePrefs({ customFoods: [YOGUR] }) });
   await seedLoggedInUser(page);
