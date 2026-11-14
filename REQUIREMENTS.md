@@ -2477,7 +2477,7 @@ Ningún texto presupone fuerza. Solo fútbol 3 días termina el onboarding con 3
 
 ## REQ-386 - Onboarding: elegir qué entrenas cada día
 
-**Estado: pendiente.** Implementar después de REQ-385. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+**Estado: implementado.** Implementar después de REQ-385. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
 
 ### Origen
 Jonathan, 2026-11-11.

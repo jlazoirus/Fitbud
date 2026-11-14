@@ -48,7 +48,7 @@ console.log("  Test 2 pasado: trainingPrefsFromPrefs propaga lightCardioEnabled"
 
 // 3. Ambos llamadores de workoutSchedule (plannedWorkoutId y trainingExpectedWeeks)
 //    pasan training.lightCardioEnabled — si alguno se queda atrás, regresa el bug.
-const callSites = [...html.matchAll(/workoutSchedule\(training\.days,training\.dayIds,training\.priority,training\.locations,training\.primary,training\.experience,training\.workoutSplit,training\.strength(,training\.lightCardioEnabled)?\)/g)];
+const callSites = [...html.matchAll(/workoutSchedule\(training\.days,training\.dayIds,training\.priority,training\.locations,training\.primary,training\.experience,training\.workoutSplit,training\.strength(,training\.lightCardioEnabled)?(?:,training\.dayKinds)?\)/g)];
 assert.ok(callSites.length >= 2, "Debe haber al menos 2 llamadas a workoutSchedule con los parámetros de training.");
 callSites.forEach((m) => {
   assert.ok(m[1], "Cada llamada a workoutSchedule debe incluir training.lightCardioEnabled.");

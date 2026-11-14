@@ -1523,6 +1523,11 @@ function migrateProfilePrefs(source){
       if(TRAINING_LOCATION_LABELS[value])trainingLocations[day]=value;
     });
   }
+  if(p.trainingDayKinds&&strength!=="none"&&primary!=="strength_only"){
+    trainingDays.forEach(day=>{
+      if(["strength","sport"].includes(p.trainingDayKinds[day])&&!TRAINING_LOCATION_LABELS[p.trainingLocations&&p.trainingLocations[day]])trainingLocations[day]=trainingKindLocation(p.trainingDayKinds[day],primary,strengthPlace);
+    });
+  }
   const mealCount=Math.min(6,Math.max(2,Number.parseInt(p.mealCount,10)||4));
   const allergies=String(p.allergies!=null?p.allergies:(p.avoid||"")).trim();
   const dislikedIngredients=String(p.dislikedIngredients||"").trim();
@@ -1589,6 +1594,7 @@ function trainingPrefsFromPrefs(source){
   return {
     primary,
     selectedPrimary:p.primarySport,
+    dayKinds:p.trainingDayKinds,
     strength:p.strengthMode,
     strengthPlace:p.strengthPlace,
     days:p.trainingDays.length,
@@ -1788,7 +1794,7 @@ function strengthResourceHtml(prefix,choice,selected){
   const values=Array.isArray(selected)&&selected.length?selected:defaultEquipmentForStrengthChoice(choice);
   return `<div class="field" id="${prefix}_strength_resources" style="grid-column:1 / -1"><label>Recursos disponibles</label><div class="chips">${checkChips(prefix+"_equipment",STRENGTH_RESOURCE_LABELS,values)}</div></div>`;
 }
-function workoutSchedule(days,dayIds,priority,locations,primary,experience,workoutSplit,strength,lightCardioEnabled){
+function workoutSchedule(days,dayIds,priority,locations,primary,experience,workoutSplit,strength,lightCardioEnabled,dayKinds){
   const selected=normalizedTrainingDays(dayIds,days);
   let sessions=trainingTemplateForModes(selected.length,priority,experience,workoutSplit,strength,primary);
   const sportIds=new Set(["calidad","facil","tecnica"]);
@@ -1811,6 +1817,16 @@ function workoutSchedule(days,dayIds,priority,locations,primary,experience,worko
     const index=remaining.findIndex(id=>sportIds.has(id)===prefersSport);
     assigned[day]=remaining.splice(index>=0?index:0,1)[0];
   });
+  // REQ-386: preserve the old schedule exactly when its prefilled choices are unchanged.
+  if(dayKinds&&strength!=="none"&&primary!=="strength_only"){
+    const kinds=Object.fromEntries(selected.map(day=>[day,["strength","sport"].includes(dayKinds[day])?dayKinds[day]:(STRENGTH_SESSION_IDS.has(assigned[day])?"strength":"sport")]));
+    if(selected.some(day=>(kinds[day]==="strength")!==STRENGTH_SESSION_IDS.has(assigned[day]))){
+      const strengthRoles=baseWorkoutTemplate(6,"strength",experience,workoutSplit).filter(id=>STRENGTH_SESSION_IDS.has(id));
+      const sportRoles=activityOnlyTemplate(selected.filter(day=>kinds[day]==="sport").length,primary);
+      let a=0,b=0;
+      return Object.fromEntries(selected.map(day=>[day,kinds[day]==="strength"?strengthRoles[a++%strengthRoles.length]:(primary==="other"?"facil":sportRoles[b++%sportRoles.length])]));
+    }
+  }
   return assigned;
 }
 function generatedTrainingPlanForDate(ds){
@@ -1895,9 +1911,13 @@ function plannedWorkoutId(ds,prefs){
   }
   const training=trainingPrefsFromPrefs(prefs||planPrefsForDate(ds));
   const wd=parseYmd(ds).getDay();
-  return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength,training.lightCardioEnabled)[wd]||"descanso";
+  return workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength,training.lightCardioEnabled,training.dayKinds)[wd]||"descanso";
 }
-function trainingPlanSummary(days,primary,priority,lightCardio,strength){
+function trainingPlanSummary(days,primary,priority,lightCardio,strength,dayKinds){
+  if(dayKinds&&strength!=="none"&&primary!=="strength_only"){
+    const values=Object.values(dayKinds),a=values.filter(v=>v==="strength").length,b=values.filter(v=>v==="sport").length;
+    return `${a} ${a===1?"día":"días"} de fuerza + ${b} de ${SPORT_LABELS[primary]||"tu actividad"}.`;
+  }
   if(strength==="none"){
     if(primary==="strength_only")return "Elige una actividad o agrega fuerza para preparar tu semana.";
     if(primary==="other")return `${days} días para tu deporte. Registra cada sesión en Entreno.`;
@@ -2245,6 +2265,7 @@ function planSnapshotFields(prefs){
     trainDays:p.trainDays,
     trainingDays:[...(p.trainingDays||[])],
     trainingLocations:{...(p.trainingLocations||{})},
+    ...(p.trainingDayKinds?{trainingDayKinds:{...p.trainingDayKinds}}:{}),
     sessionMinutes:p.sessionMinutes,
     equipment:[...(p.equipment||[])],
     trainingStyle:p.trainingStyle,
@@ -3284,6 +3305,7 @@ function onboardingDefaults(){
     trainDays:p.trainingDays.length,
     trainingDays:p.trainingDays.slice(),
     trainingLocations:{...p.trainingLocations},
+    ...(p.trainingDayKinds?{trainingDayKinds:{...p.trainingDayKinds}}:{}),
     sessionMinutes:p.sessionMinutes,
     equipment:p.equipment.slice(),
     trainingStyle:p.trainingStyle,
@@ -3577,6 +3599,54 @@ function checkChips(prefix,labels,selected){
   const values=Array.isArray(selected)?selected:[];
   return Object.entries(labels).map(([value,label])=>`<label class="chip-check"><input type="checkbox" id="${prefix}_${value}" ${values.includes(value)?"checked":""}><span>${label}</span></label>`).join("");
 }
+// REQ-386: the untouched selectors mirror the legacy template, including location overrides.
+function trainingKindLocation(kind,primary,place){
+  return kind==="strength"?(place==="none"?"gym":place):(primary==="swimming"?"pool":"outdoor");
+}
+function trainingDayKindDefaults(d){
+  const schedule=workoutSchedule(d.trainingDays.length,d.trainingDays,d.trainingPriority,d.trainingLocations,d.primarySport,d.trainingExperience,d.workoutSplit,d.strengthMode,d.lightCardioEnabled);
+  return Object.fromEntries(d.trainingDays.map(day=>[day,["strength","sport"].includes(d.trainingDayKinds&&d.trainingDayKinds[day])?d.trainingDayKinds[day]:(STRENGTH_SESSION_IDS.has(schedule[day])?"strength":"sport")]));
+}
+function trainingDayKindsHtml(prefix,d){
+  if(d.strengthMode==="none"||d.primarySport==="strength_only")return "";
+  const kinds=trainingDayKindDefaults(d);
+  return `<label class="muted small">Qué entrenas cada día</label><div class="availability">${WEEKDAY_OPTIONS.filter(day=>d.trainingDays.includes(day.value)).map(day=>`<div class="availability-day"><label for="${prefix}_kind_${day.value}">${day.label}</label><select id="${prefix}_kind_${day.value}" onchange="trainingDayKindChanged('${prefix}',${day.value})"><option value="strength" ${kinds[day.value]==="strength"?"selected":""}>Fuerza</option><option value="sport" ${kinds[day.value]==="sport"?"selected":""}>${esc(SPORT_LABELS[d.primarySport])}</option></select></div>`).join("")}</div><p class="field-note">Elige al menos un día de cada actividad. Se aplicará a tu próxima versión del plan.</p>`;
+}
+function readTrainingDayKinds(prefix,d){
+  if(d.strengthMode==="none"||d.primarySport==="strength_only"){delete d.trainingDayKinds;return;}
+  const defaults=trainingDayKindDefaults(d);
+  d.trainingDayKinds=Object.fromEntries(d.trainingDays.map(day=>{
+    const el=$("#"+prefix+"_kind_"+day);
+    return [day,el?el.value:defaults[day]];
+  }));
+  d.trainingDays.forEach(day=>{d.trainingLocations[day]=trainingKindLocation(d.trainingDayKinds[day],d.primarySport,d.strengthPlace);});
+}
+function refreshTrainingDayKinds(prefix){
+  const d=prefix==="ob"?onboardingDraft:{...migrateProfilePrefs(profile&&profile.prefs)};
+  d.trainingDays=WEEKDAY_OPTIONS.filter(day=>$("#"+prefix+"_day_"+day.value)?.checked).map(day=>day.value);
+  d.primarySport=$("#"+prefix+"_sport").value;
+  d.strengthPlace=normalizeStrengthPlace($("#"+prefix+"_strength").value);
+  d.strengthMode=strengthModeFromChoice(d.strengthPlace);
+  d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
+  readTrainingDayKinds(prefix,d);
+  const box=$("#"+prefix+"DayKinds");if(box)box.innerHTML=trainingDayKindsHtml(prefix,d);
+  if(prefix==="pf")d.trainingDays.forEach(day=>{const el=$("#pf_location_"+day);if(el)el.value=d.trainingLocations[day];});
+}
+function trainingDayKindChanged(prefix,day){
+  if(prefix==="ob"){readOnboardingStep();updateOnboardingTrainingSummary();}
+  else{
+    const kind=$("#pf_kind_"+day).value,primary=$("#pf_sport").value,place=$("#pf_strength").value;
+    const loc=$("#pf_location_"+day);if(loc)loc.value=trainingKindLocation(kind,primary,place);
+    updateTrainingSummary();
+  }
+}
+function validateTrainingDayKinds(d){
+  if(d.trainingDayKinds&&d.strengthMode!=="none"&&d.primarySport!=="strength_only"){
+    const kinds=d.trainingDays.map(day=>d.trainingDayKinds[day]);
+    if(!kinds.includes("strength")||!kinds.includes("sport"))return "Elige al menos un día de fuerza y uno de tu actividad";
+  }
+  return "";
+}
 function trainingAvailabilityHtml(prefix,d){
   const defaults=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays||[],d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
   return `<div class="availability">${WEEKDAY_OPTIONS.map(day=>{
@@ -3625,6 +3695,7 @@ function onboardingToggleDay(){
     const existing=$("#ob_location_"+day);
     return (existing&&TRAINING_LOCATION_LABELS[existing.value])?existing.value:(defaults[day]||fallback);
   });
+  refreshTrainingDayKinds("ob");
   updateOnboardingTrainingSummary();
 }
 function onboardingApplyDefaultLocation(value){
@@ -3693,6 +3764,7 @@ function readTrainingFields(prefix,d){
   d.trainingDays=WEEKDAY_OPTIONS.filter(day=>{const el=$("#"+prefix+"_day_"+day.value);return el&&el.checked;}).map(day=>day.value);
   d.trainDays=d.trainingDays.length;
   d.trainingLocations=defaultTrainingLocations(d.primarySport,d.strengthMode,d.trainingDays,d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthPlace);
+  readTrainingDayKinds(prefix,d);
   if(d.strengthMode!=="none")d.trainingDays.forEach(day=>{
     const el=$("#"+prefix+"_location_"+day);
     if(el&&TRAINING_LOCATION_LABELS[el.value])d.trainingLocations[day]=el.value;
@@ -3724,9 +3796,10 @@ function validateTrainingProfile(d){
   if(d.primarySport==="strength_only"&&d.strengthMode==="none")return "Elige una actividad o una opción de fuerza para preparar tu semana";
   if(!validTrainingDays((d.trainingDays||[]).length))return `Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días exactos para entrenar`;
   if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))return "Elige el lugar de entrenamiento para cada día disponible";
+  const kindError=validateTrainingDayKinds(d);if(kindError)return kindError;
   if(d.primarySport==="swimming"){
     const poolDays=d.trainingDays.filter(day=>d.trainingLocations[day]==="pool").length;
-    const swimSessions=trainingTemplateForModes(d.trainingDays.length,d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthMode,d.primarySport).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
+    const swimSessions=d.trainingDayKinds?d.trainingDays.filter(day=>d.trainingDayKinds[day]==="sport").length:trainingTemplateForModes(d.trainingDays.length,d.trainingPriority,d.trainingExperience,d.workoutSplit,d.strengthMode,d.primarySport).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
     if(poolDays<swimSessions)return `Con esta prioridad necesitas acceso a piscina ${swimSessions} ${swimSessions===1?"día":"días"} por semana`;
   }
   if(!Number.isFinite(d.sessionMinutes)||d.sessionMinutes<20||d.sessionMinutes>180)return "Los minutos por sesión deben estar entre 20 y 180";
@@ -3739,10 +3812,11 @@ function validateTrainingProfileCore(d){
   if(d.primarySport==="strength_only"&&d.strengthMode==="none")return "Elige una actividad o una opción de fuerza para preparar tu semana";
   if(!validTrainingDays((d.trainingDays||[]).length))return `Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días exactos para entrenar`;
   if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))return "Elige el lugar de entrenamiento para cada día disponible";
+  const kindError=validateTrainingDayKinds(d);if(kindError)return kindError;
   if(d.primarySport==="swimming"){
     const priority=TRAINING_PRIORITY_LABELS[d.trainingPriority]?d.trainingPriority:"composition";
     const poolDays=d.trainingDays.filter(day=>d.trainingLocations[day]==="pool").length;
-    const swimSessions=trainingTemplateForModes(d.trainingDays.length,priority,d.trainingExperience,d.workoutSplit,d.strengthMode,d.primarySport).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
+    const swimSessions=d.trainingDayKinds?d.trainingDays.filter(day=>d.trainingDayKinds[day]==="sport").length:trainingTemplateForModes(d.trainingDays.length,priority,d.trainingExperience,d.workoutSplit,d.strengthMode,d.primarySport).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
     if(poolDays<swimSessions)return `Con natación necesitas piscina ${swimSessions} ${swimSessions===1?"día":"días"} por semana`;
   }
   if(!Number.isFinite(d.sessionMinutes)||d.sessionMinutes<20||d.sessionMinutes>180)return "Los minutos por sesión deben estar entre 20 y 180";
@@ -3843,12 +3917,9 @@ function renderOnboarding(){
           const checked=(d.trainingDays||[]).includes(day.value);
           return `<label class="chip-check"><input type="checkbox" id="ob_day_${day.value}" ${checked?"checked":""} onchange="onboardingToggleDay()"><span>${day.label}</span></label>`;
         }).join("")}</div>
-        <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled,d.strengthMode)}</div>
+        <div class="ai-box" id="obTrainingSummary"><b>${d.planDurationWeeks} semanas.</b> ${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled,d.strengthMode,d.trainingDayKinds)}</div>
         <div class="onboarding-grid training-choice-grid">${trainingSafetyModeHtml("ob",d)}</div>
-        <details class="adv-settings">
-          <summary>Ajustar lugar por día (opcional)</summary>
-          <div id="obLocationList" style="margin-top:8px">${onboardingLocationRowsHtml(d.trainingDays||[],day=>TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]?d.trainingLocations[day]:(locationDefaults[day]||onboardingDefaultLocation(d)))}</div>
-        </details>
+        <div id="obDayKinds">${trainingDayKindsHtml("ob",d)}</div>
         <details class="adv-settings">
           <summary>Opciones avanzadas (opcional)</summary>
           <div class="onboarding-grid" style="margin-top:8px">
@@ -3940,6 +4011,7 @@ function readOnboardingStep(){
       const el=$("#ob_location_"+day);
       if(el&&TRAINING_LOCATION_LABELS[el.value])d.trainingLocations[day]=el.value;
     });
+    readTrainingDayKinds("ob",d);
     // Rellenar campos diferidos con defaults válidos
     if(!TRAINING_PRIORITY_LABELS[d.trainingPriority])d.trainingPriority=inferredTrainingPriority(d);
     if(!TRAINING_TIME_LABELS[d.preferredTrainingTime])d.preferredTrainingTime="flexible";
@@ -4038,7 +4110,7 @@ function updateOnboardingTrainingSummary(){
   const lc=onboardingDraft&&onboardingDraft.lightCardioEnabled;
   const impact=dayIds.length<MIN_TRAINING_DAYS
     ?`Elige al menos ${MIN_TRAINING_DAYS} días para tu plan de entrenamiento.`
-    :trainingPlanSummary(dayIds.length,sportValue,undefined,lc,strength);
+    :trainingPlanSummary(dayIds.length,sportValue,undefined,lc,strength,Object.fromEntries(dayIds.map(day=>[day,$("#ob_kind_"+day)?.value]).filter(([,value])=>value)));
   out.innerHTML=`<b>${duration.value} semanas · ${dayIds.length} días${labels?" ("+labels+")":""}.</b> ${impact}`;
 }
 function updateOnboardingTrainingChoice(){
@@ -4053,7 +4125,7 @@ function toggleTrainingDay(prefix,day){
   const checkbox=$("#"+prefix+"_day_"+day),location=$("#"+prefix+"_location_"+day);
   if(location)location.disabled=!(checkbox&&checkbox.checked);
   if(prefix==="ob")updateOnboardingTrainingSummary();
-  else{if(checkbox&&checkbox.checked)updateTrainingLocationDefaults(prefix);updateTrainingSummary();}
+  else{if(checkbox&&checkbox.checked)updateTrainingLocationDefaults(prefix);refreshTrainingDayKinds(prefix);updateTrainingSummary();}
 }
 function updateOnboardingMealCount(value){
   const previousCount=onboardingDraft.mealCount;
@@ -4371,7 +4443,7 @@ async function saveOnboarding(){
     challenge:d.challenge||previous.pendingChallenge||previous.challenge||(d.goal==="mantenimiento"?"maintain":d.goal==="volumen"?"strength":"continue"),
     primarySport:d.primarySport,strengthMode:d.strengthMode,strengthPlace:d.strengthPlace,trainType:d.primarySport,
     lightCardioEnabled:!!d.lightCardioEnabled,
-    trainDays:d.trainingDays.length,trainingDays:d.trainingDays,trainingLocations:d.trainingLocations,
+    trainDays:d.trainingDays.length,trainingDays:d.trainingDays,trainingLocations:d.trainingLocations,trainingDayKinds:d.trainingDayKinds,
     sessionMinutes:d.sessionMinutes,equipment:d.equipment,trainingStyle:d.trainingStyle,trainingExperience:d.trainingExperience,
     trainingPriority:d.trainingPriority,trainingSafetyMode:d.trainingSafetyMode,preferredTrainingTime:d.preferredTrainingTime,
     injuries:d.injuries,limitations:d.limitations,avoidMovements:d.avoidMovements,
@@ -7280,7 +7352,7 @@ function readOnboardingTrainingStyle(value){if(onboardingDraft)onboardingDraft.t
 function routineContext(selectedStyle,preserve){
   const prefs=migrateProfilePrefs((profile&&profile.prefs)||{});
   const training=trainingPrefsFromPrefs(prefs);
-  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength,training.lightCardioEnabled);
+  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength,training.lightCardioEnabled,training.dayKinds);
   const catalog=activeTrainingCatalog();
   const days=training.dayIds.filter(weekday=>STRENGTH_SESSION_IDS.has(schedule[weekday])).map(weekday=>{
     const location=training.locations[weekday];
@@ -9430,11 +9502,12 @@ function renderProfile(){
     </div>
     <label class="muted small">Tu semana tipo: días y lugar</label>
     ${trainingAvailabilityHtml("pf",p)}
+    <div id="pfDayKinds">${trainingDayKindsHtml("pf",p)}</div>
     <div class="field-note">Tu semana de referencia: puedes cambiar una sesión o registrar otro deporte desde Entreno. Recomendamos entre 3 y 6 días y al menos uno de descanso.</div>
     <div class="field"><label for="pf_duration">Ciclo de seguimiento</label><select id="pf_duration" onchange="updateTrainingSummary()">
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">Cambiar el ciclo ajusta su fecha final y conserva tus registros.</div></div>
-    <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled,p.strengthMode)}</div>
+    <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled,p.strengthMode,p.trainingDayKinds)}</div>
     <div class="onboarding-grid training-choice-grid">${trainingSafetyModeHtml("pf",p)}</div>
     <details class="adv-settings">
       <summary>Limitaciones</summary>
@@ -9567,7 +9640,7 @@ function updateTrainingSummary(){
   const lc=migrateProfilePrefs((profile&&profile.prefs)||{}).lightCardioEnabled;
   const impact=dayIds.length<MIN_TRAINING_DAYS
     ?`Elige al menos ${MIN_TRAINING_DAYS} días para sostener un plan combinado.`
-    :trainingPlanSummary(dayIds.length,sportValue,priority.value,lc,strength);
+    :trainingPlanSummary(dayIds.length,sportValue,priority.value,lc,strength,Object.fromEntries(dayIds.map(day=>[day,$("#pf_kind_"+day)?.value]).filter(([,value])=>value)));
   out.innerHTML=`<b>${duration.value} semanas · ${dayIds.length} días${labels?" ("+labels+")":""}.</b> ${impact}`;
 }
 function updateTrainingLocationDefaults(prefix){
@@ -9595,11 +9668,13 @@ function updatePfStrengthChoice(){
     if(nextStyle&&box.dataset.trainingStyle)nextStyle.value=box.dataset.trainingStyle;
   }
   updateTrainingLocationDefaults("pf");
+  refreshTrainingDayKinds("pf");
   updateTrainingSummary();
 }
 function updatePfSportSelector(){
   updateSportHelp("pf");
   updateTrainingLocationDefaults("pf");
+  refreshTrainingDayKinds("pf");
   updateTrainingSummary();
 }
 function updatePfSplitVisibility(){
@@ -9679,6 +9754,7 @@ async function saveProfile(){
     trainDays:draft.trainingDays.length,
     trainingDays:draft.trainingDays,
     trainingLocations:draft.trainingLocations,
+    trainingDayKinds:draft.trainingDayKinds,
     sessionMinutes:draft.sessionMinutes,
     equipment:draft.equipment,
     trainingStyle:draft.trainingStyle,
@@ -13234,7 +13310,7 @@ function trainingExpectedWeeks(prefs){
   const training=trainingPrefsFromPrefs(p);
   const planPrefs={...p,primarySport:training.primary};
   const calendar=planCalendarForPrefs(p);
-  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength,training.lightCardioEnabled);
+  const schedule=workoutSchedule(training.days,training.dayIds,training.priority,training.locations,training.primary,training.experience,training.workoutSplit,training.strength,training.lightCardioEnabled,training.dayKinds);
   const strengthRoles=STRENGTH_SESSION_IDS;
   const catalog=activeTrainingCatalog();
   return calendar.weeks.map((week,index)=>{
