@@ -2004,7 +2004,7 @@ Pie: "No recibir más estos correos". ✓ `scripts/test-referrals.mjs`.
 
 ## REQ-328 - Entreno: ver el siguiente ejercicio sin salir del actual
 
-**Estado: pendiente.**
+**Estado: implementado.** Vista «A continuación» de solo lectura, con el siguiente pendiente real, nombre vigente, dosis y descanso o duración/opcionalidad. Una línea, sin desbordes a 320/360/390/1280 px; las series permanecen en la primera pantalla. Sin cambios de ejecución ni registros. ✓ `tests/e2e/next-exercise.spec.js`.
 
 ### Origen
 Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): durante la sesión quieren saber qué viene después sin tocar nada.

@@ -307,6 +307,11 @@
   .player-phase{font-size:10px;color:var(--terra-300);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
   .player-step h3{font-size:21px;margin-top:5px}
   .player-target{font-size:14px;line-height:1.45;margin-top:8px}
+  .player-next{display:flex;gap:6px;align-items:baseline;min-width:0;margin-top:8px;padding:6px 8px;background:var(--surf3);border-radius:var(--r-sm);white-space:nowrap}
+  .player-next>b{flex:none;color:var(--txt)}
+  .player-next-detail{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
+  .player-next-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .player-next-dose{flex:none;max-width:70%;overflow:hidden;text-overflow:ellipsis}
   .player-dose{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
   .player-dose .scard{padding:10px 6px;min-width:0}
   .player-dose .scard .n{font-size:16px;line-height:1.15;overflow-wrap:anywhere}
@@ -7340,6 +7345,19 @@ function renderActiveWorkoutStep(ds,execution){
   if(reviewing!=null)return renderReviewedWorkoutStep(ds,execution,reviewing);
   return renderCurrentWorkoutStep(ds,execution)+workoutBackButton(ds,execution);
 }
+// REQ-328: preview the same pending step that completion will actually open.
+function nextWorkoutStepHtml(execution){
+  const index=nextWorkoutStepIndex(execution,execution.currentStep);
+  if(index<0)return "";
+  const step=execution.steps[index];
+  const name=step.type==="strength"?workoutStepName(step):step.label;
+  const rest=step.restLabel||`${step.restSeconds}s`;
+  const dose=step.type==="strength"
+    ?`${step.prescribedSets} × ${step.reps} · ${rest}`
+    :[step.optional&&!step.optIn?"opcional":"",step.durationSeconds?`${Math.round(step.durationSeconds/60*10)/10} min`:step.target||""].filter(Boolean).join(" · ");
+  const detail=[name,step.optional&&!step.optIn?"opcional":"",step.type==="strength"?`${step.prescribedSets} × ${step.reps} · descanso ${rest}`:step.durationSeconds?`${Math.round(step.durationSeconds/60*10)/10} min`:step.target||""].filter(Boolean).join(" · ");
+  return `<div class="player-next muted small" role="note" aria-label="${esc("A continuación: "+detail)}" title="${esc(detail)}"><b>A continuación</b><span class="player-next-detail"><span class="player-next-name">${esc(name)}</span><span class="player-next-dose">${esc(dose)}</span></span></div>`;
+}
 function renderCurrentWorkoutStep(ds,execution){
   const step=currentWorkoutStep(execution);
   if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza la sesión para guardar el resultado.</div>';
@@ -7367,6 +7385,7 @@ function renderCurrentWorkoutStep(ds,execution){
   return `<div class="player-step">
     <div class="player-phase">${step.added?"Añadido por ti":workoutPhaseLabel(step.phase)} · ejercicio ${stepIndex} de ${execution.steps.length-2}</div>
     <div class="player-title"><h3>${esc(workoutStepTitle(step,exercise))}</h3>${exercise?`<button class="btn btn-sm player-howto" onclick="openExerciseGuide('${esc(exercise.slug)}')" aria-label="Cómo se hace ${esc(exercise.name)}: demostración y pasos">▶ Cómo se hace</button>`:""}</div>
+    ${nextWorkoutStepHtml(execution)}
     <div class="player-dose">
       <div class="scard"><div class="n">${step.prescribedSets}</div><div class="l">series</div></div>
       <div class="scard"><div class="n">${esc(step.reps)}</div><div class="l">reps objetivo</div></div>
