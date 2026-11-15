@@ -40,7 +40,7 @@ function fixture(handler,extra){
   assert.equal(tokenReads,2);
   await f.client.request("/api/entitlement",{}, {auth:false});
   assert.equal(f.calls.at(-1).init.headers.Authorization,undefined,"Invitación anónima no agrega sesión.");
-  for(const route of ["/api/checkout","/api/push-subscribe","/api/claude","/api/entitlement?action=billing-history"]){
+  for(const route of ["/api/checkout","/api/push-subscribe","/api/whatsapp","/api/claude","/api/entitlement?action=billing-history"]){
     await f.client.fetch(route);
   }
   const before=f.calls.length,reads=tokenReads;

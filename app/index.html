@@ -966,6 +966,9 @@
   .streak-social input,.streak-social textarea{width:100%;font-size:16px;min-height:44px}
   .streak-alias-form{max-width:440px;margin-top:16px}
   .notify-ask-actions{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+  .reminder-invite .link-btn{align-self:center;min-height:44px}
+  .wa-row{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--border)}
+  .wa-row p{margin:0}
   .streak-steps{margin:14px 0 6px;padding-left:22px;line-height:1.5}
   .streak-steps li{margin-bottom:8px}
   .streak-you{margin:14px 0 4px}
@@ -1338,7 +1341,7 @@ let REMOTE={supabase:{url:"",publishableKey:""},anthropic:{model:"",proxy:false}
 async function loadRemoteConfig(){
   try{
     const r=await apiFetch("/api/config",{cache:"no-store"});
-    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{},checkout:j.checkout||{},signup:j.signup||{},culqi:j.culqi||{}};}
+    if(r.ok){const j=await r.json();if(j&&typeof j==="object")REMOTE={supabase:j.supabase||{},anthropic:j.anthropic||{},checkout:j.checkout||{},signup:j.signup||{},culqi:j.culqi||{},whatsapp:j.whatsapp||{}};}
   }catch(e){/* sin funciones serverless (p.ej. GitHub Pages): se ignora */}
 }
 // REQ-104: checkout activo solo si el servidor confirma STRIPE_SECRET_KEY configurada.
@@ -3446,6 +3449,7 @@ let privacyError="";
 let consentRecords=[];
 let safetyScreening=null;
 let notifPrefsCache=null;
+let whatsappLinkCache=null; // REQ-255: null = sin cargar; {} = sin WhatsApp
 function consentRecord(type){
   return consentRecords.find(row=>row.consent_type===type&&row.policy_version===CONSENT_POLICY_VERSION)||null;
 }
@@ -9595,6 +9599,7 @@ function renderProfile(){
       <span>Activar recordatorios por correo</span>
     </label>
     <div id="notifOptions" class="muted small" style="display:none;margin-top:8px">Como máximo un recordatorio por correo al día, más el resumen de la mañana si lo activaste y no tienes avisos del dispositivo.</div>
+    <div id="whatsappSection" style="margin-top:14px"><!-- REQ-255: renderWhatsappSection() --></div>
     <div id="pfNotifDirtyHint" class="muted small" style="display:none;margin-top:14px">Cambios sin guardar</div>
     <button id="notifSaveBtn" class="btn btn-accent" style="width:100%;margin-top:14px" onclick="saveNotifPrefs()">Guardar recordatorios</button>
   </div></div>
@@ -9640,6 +9645,7 @@ function renderProfile(){
   // Cargar preferencias de recordatorios y poblar el formulario + sección push
   if(supa&&uid()){
     loadNotifPrefs().then(()=>{populateNotifPrefsForm();renderPushSection();});
+    loadWhatsappLink().then(renderWhatsappSection); // REQ-255
   }else{
     renderPushSection();
   }
@@ -10143,7 +10149,7 @@ function installPending(){return isMobileDevice()&&!isStandaloneMode();}
 // (bloqueado o sin soporte), recordatorios por correo.
 function remindersCovered(){
   const st=devicePushState();
-  if(st==="on")return true;
+  if(st==="on"||whatsappLinked())return true;
   // REQ-340: en iPhone sin instalar, el correo también cubre (la tarjeta diaria se va).
   return (st==="denied"||st==="unsupported"||st==="needs_install")&&!!(notifPrefsCache&&notifPrefsCache.email_opt_in);
 }
@@ -10164,7 +10170,10 @@ function notifyErrorCode(step,e){
   const name=String(e&&(e.name&&e.name!=="Error"?e.name:e.message)||"error").replace(/[^A-Za-z_]+/g,"_").slice(0,40);
   return step+":"+name;
 }
-function notifySnoozed(){try{return localStorage.getItem(NOTIFY_NUDGE_KEY+":"+uid())===todayStr();}catch(e){return false;}}
+// REQ-255: "Ahora no" la oculta una semana (antes, hasta mañana).
+function notifySnoozed(){
+  try{const d=localStorage.getItem(NOTIFY_NUDGE_KEY+":"+uid());return validYmd(d)&&daysBetween(d,todayStr())<REMINDER_INVITE_DAYS;}catch(e){return false;}
+}
 async function enableDevicePush(source){
   trackNotifyPrompt(source,"enable");
   document.querySelectorAll("[data-notify-enable]").forEach(b=>{b.disabled=true;b.textContent="Activando…";});
@@ -10245,6 +10254,7 @@ function renderNotifySetup(){
 }
 function finishNotifySetup(reason){
   trackNotifyPrompt("onboarding",reason==="done"?"done":"skip");
+  markReminderInvite({last:new Date().toISOString()}); // REQ-255: no repetir el pedido esta semana
   notifySetupActive=false;
   render();scrollAppTop();
   if(streakSocialPending)loadStreakFriendsAfterAuth();
@@ -10259,7 +10269,7 @@ const NOTIFY_ASK_KEY="evolv_notify_ask_v1",NOTIFY_ASK_MAX=2;
 let _notifyAskPending=0;
 function notifyAskCount(){try{return Number(localStorage.getItem(NOTIFY_ASK_KEY+":"+uid()))||0;}catch(e){return NOTIFY_ASK_MAX;}}
 function notifyAskWanted(n){
-  if(!session||!profile||onboardingActive||notifPrefsCache===null||remindersCovered())return false;
+  if(!session||!profile||onboardingActive||notifPrefsCache===null||remindersCovered()||reminderInviteState().declined)return false;
   const asked=notifyAskCount();
   return asked===0?n>=1:asked<NOTIFY_ASK_MAX&&n>=3;
 }
@@ -10284,7 +10294,7 @@ function showQueuedNotifyAsk(){
 // Recordatorio en Hoy: cada día, hasta que los avisos estén activos.
 function notifyNudgeDue(){
   if(notifPrefsCache===null||onboardingActive||!session||!profile)return false; // aún no se sabe: sin parpadeo
-  return hasCompleteOnboarding(profile.prefs||{})&&!remindersCovered()&&!notifySnoozed();
+  return hasCompleteOnboarding(profile.prefs||{})&&!remindersCovered()&&!notifySnoozed()&&!reminderInviteState().declined;
 }
 function notifyNudgeHtml(){
   if(!notifyNudgeDue())return "";
@@ -10302,6 +10312,174 @@ function notifyNudgeHtml(){
     <div class="agenda-actions">${c.action||""}<button class="btn" onclick="snoozeNotifyNudge()">Ahora no</button></div>
   </section>`;
 }
+
+/* ---------- REQ-255: recordatorios por WhatsApp ---------- */
+// El usuario abre WhatsApp con "EVOLV <código>" ya escrito; al enviarlo, el
+// servidor vincula su número (prueba de que es suyo y consentimiento). Un
+// aviso al día como máximo, el de la noche, solo si falta algo.
+let _whatsappPending=null; // {code,url} mientras espera que envíe el mensaje
+function whatsappAvailable(){return !!(REMOTE.whatsapp&&REMOTE.whatsapp.enabled&&REMOTE.whatsapp.number);}
+function whatsappLinked(){return !!(whatsappLinkCache&&whatsappLinkCache.opted_in);}
+function whatsappPaused(){const w=whatsappLinkCache;return !!(w&&!w.opted_in&&w.paused_at&&!(w.opted_out_at&&w.opted_out_at>w.paused_at));}
+function maskWhatsappPhone(p){const d=String(p||"").replace(/\D/g,"");return d.length<10?"":`+${d.slice(0,d.length-9)} ${d[d.length-9]}•• ••• ${d.slice(-3)}`;}
+async function loadWhatsappLink(){
+  if(!supa||!uid()||!whatsappAvailable()){whatsappLinkCache={};return;}
+  const owner=uid();
+  try{
+    const{data,error}=await supa.from("whatsapp_links").select("phone_e164,opted_in,paused_at,opted_out_at").eq("user_id",owner).maybeSingle();
+    if(owner===uid())whatsappLinkCache=error?{}:(data||{});
+  }catch(_){if(owner===uid())whatsappLinkCache={};}
+}
+const WHATSAPP_CONSENT="Te enviaremos por WhatsApp un aviso al día como máximo, a tu hora de recordatorio, solo si te falta algo. WhatsApp (Meta) recibe tu número y el texto del aviso. Puedes darte de baja respondiendo BAJA.";
+function whatsappPendingHtml(){
+  const w=_whatsappPending;if(!w)return "";
+  return `<p class="muted small wa-pending" role="status">Envía el mensaje <b>EVOLV ${esc(w.code)}</b> que se abrió en WhatsApp. El código vale 30 minutos.</p>
+    <a class="btn" style="width:100%" href="${esc(w.url)}" target="_blank" rel="noopener">Abrir WhatsApp</a>`;
+}
+function whatsappSectionHtml(){
+  if(!whatsappAvailable()||whatsappLinkCache===null)return "";
+  if(whatsappLinked()){
+    const phone=maskWhatsappPhone(whatsappLinkCache.phone_e164);
+    return `<div class="wa-row"><b>WhatsApp</b>
+      <p class="muted small">Vinculado${phone?": "+phone:""}. Un aviso al día como máximo, a la hora del aviso del día.</p>
+      <button class="btn" style="width:100%" onclick="stopWhatsapp()">Desactivar WhatsApp</button></div>`;
+  }
+  const paused=whatsappPaused()?`<div class="alert violet small">No pudimos entregarte avisos por WhatsApp; vuelve a activarlos.</div>`:"";
+  return `<div class="wa-row"><b>WhatsApp</b>${paused}
+    <p class="muted small">${WHATSAPP_CONSENT}</p>
+    ${_whatsappPending?whatsappPendingHtml():`<button class="btn btn-accent" style="width:100%" data-wa-link onclick="startWhatsappLink('profile')">Activar en WhatsApp</button>`}</div>`;
+}
+function renderWhatsappSection(){const el=document.getElementById("whatsappSection");if(el)el.innerHTML=whatsappSectionHtml();}
+function whatsappTimezone(){
+  try{return Intl.DateTimeFormat().resolvedOptions().timeZone||"";}catch(_){return (profile&&profile.prefs&&profile.prefs.timeZone)||"";}
+}
+async function whatsappRequest(body){
+  const token=session&&session.access_token;
+  if(!token)throw new Error("Sin sesión");
+  const r=await apiFetch("/api/whatsapp",{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify(body)});
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(data.error||"HTTP "+r.status);
+  return data;
+}
+async function startWhatsappLink(source){
+  document.querySelectorAll("[data-wa-link]").forEach(b=>{b.disabled=true;b.textContent="Abriendo WhatsApp…";});
+  try{
+    const data=await whatsappRequest({action:"link",timezone:whatsappTimezone()});
+    if(!data.code||!/^https:\/\/wa\.me\//.test(data.url||""))throw new Error("respuesta incompleta");
+    _whatsappPending={code:data.code,url:data.url};
+    trackNotifyPrompt(source,"whatsapp_start");
+    window.open(data.url,"_blank","noopener");
+  }catch(e){
+    toast("No se pudo abrir WhatsApp. Intenta de nuevo.");
+  }
+  renderWhatsappSection();
+  // Desde la invitación, el enlace queda a mano por si el navegador no abrió WhatsApp.
+  if(source!=="profile"&&_whatsappPending)modal(`<h3>Activa los avisos en WhatsApp</h3>${whatsappPendingHtml()}`);
+}
+async function refreshWhatsappAfterReturn(){
+  if(!_whatsappPending||!session)return;
+  await loadWhatsappLink();
+  if(!whatsappLinked())return;
+  _whatsappPending=null;
+  trackNotifyPrompt("whatsapp","whatsapp_linked");
+  toast("Listo: te avisaremos por WhatsApp");
+  const o=$("#overlay");if(o&&o.querySelector(".wa-pending"))closeModal();
+  renderWhatsappSection();
+  if(view==="hoy")render();
+}
+async function stopWhatsapp(){
+  try{await whatsappRequest({action:"unlink"});}
+  catch(e){toast("No se pudo desactivar WhatsApp. Intenta de nuevo.");return;}
+  whatsappLinkCache={...(whatsappLinkCache||{}),opted_in:false,opted_out_at:new Date().toISOString()};
+  trackNotifyPrompt("profile","whatsapp_unlinked");
+  toast("Ya no te enviaremos avisos por WhatsApp");
+  renderWhatsappSection();
+}
+
+/* ---------- REQ-255: invitación semanal a activar los recordatorios ---------- */
+// Al entrar, a quien no tiene ningún recordatorio activo: como máximo una vez
+// por semana y nunca más tras "No me interesa". Se guarda en profiles.prefs
+// (viaja entre dispositivos) y NO en notification_preferences: esa fila corta
+// los correos del journey (REQ-296). localStorage es solo caché.
+const REMINDER_INVITE_DAYS=7,REMINDER_INVITE_KEY="evolv_reminder_invite_v1";
+let _reminderInviteTimer=0,_reminderInviteAnswered=false;
+function reminderInviteState(){
+  const p=(profile&&profile.prefs)||{};
+  let local={};
+  try{local=JSON.parse(localStorage.getItem(REMINDER_INVITE_KEY+":"+uid())||"{}")||{};}catch(_){}
+  const last=[p.reminderInviteLastShownAt,local.last].filter(v=>typeof v==="string"&&Number.isFinite(Date.parse(v))).sort().pop()||"";
+  return {last,declined:!!(p.reminderInviteDeclined||local.declined)};
+}
+function remindersActive(){return devicePushState()==="on"||!!(notifPrefsCache&&notifPrefsCache.email_opt_in)||whatsappLinked();}
+function reminderInviteDue(){
+  if(!session||!profile||onboardingActive||notifySetupActive||view!=="hoy")return false;
+  if(notifPrefsCache===null||whatsappLinkCache===null)return false; // aún no se sabe qué tiene activo
+  if(!hasCompleteOnboarding(profile.prefs||{})||remindersActive())return false;
+  const st=reminderInviteState();
+  if(st.declined)return false;
+  const last=Date.parse(st.last||"");
+  return !(Number.isFinite(last)&&Date.now()-last<REMINDER_INVITE_DAYS*864e5);
+}
+async function markReminderInvite(patch){
+  if(!uid())return;
+  try{
+    const k=REMINDER_INVITE_KEY+":"+uid();
+    const cur=JSON.parse(localStorage.getItem(k)||"{}")||{};
+    localStorage.setItem(k,JSON.stringify({...cur,...(patch.last?{last:patch.last}:{}),...(patch.declined?{declined:true}:{})}));
+  }catch(_){}
+  if(!profile||!profile.prefs)return;
+  const prefs={...profile.prefs};
+  if(patch.last)prefs.reminderInviteLastShownAt=patch.last;
+  if(patch.declined)prefs.reminderInviteDeclined=true;
+  try{await saveProfilePrefs(prefs,{skipPlanVersion:true});}catch(_){/* queda la caché local */}
+}
+function scheduleReminderInvite(delay){
+  clearTimeout(_reminderInviteTimer);
+  _reminderInviteTimer=setTimeout(showReminderInvite,delay==null?1500:delay);
+}
+function showReminderInvite(){
+  // Nunca encima de otro modal, hoja o celebración: espera a la siguiente apertura.
+  if(document.hidden||$("#overlay")||_streakActive||!reminderInviteDue())return;
+  _reminderInviteAnswered=false;
+  markReminderInvite({last:new Date().toISOString()});
+  trackNotifyPrompt("invite","shown");
+  const st=devicePushState();
+  const push=st==="off";
+  const wa=whatsappAvailable();
+  const hint=st==="needs_install"?`<p class="muted small">Para avisos en este teléfono, instala Evolv: en Safari toca Compartir y luego Añadir a pantalla de inicio.</p>`:"";
+  const buttons=[
+    push?`<button class="btn btn-accent" data-notify-enable onclick="reminderInviteChoose('push')">Avisos en este teléfono</button>`:"",
+    wa?`<button class="btn${push?"":" btn-accent"}" onclick="reminderInviteChoose('whatsapp')">WhatsApp</button>`:"",
+    `<button class="btn${push||wa?"":" btn-accent"}" onclick="reminderInviteChoose('email')">Correo</button>`,
+    `<button class="btn" data-reminder-invite-later onclick="closeModal()">Ahora no</button>`,
+  ].join("");
+  modal(`<h3>¿Te recordamos tu día?</h3>
+    <p>Un aviso al día como máximo, a la hora que elijas, solo si te falta tu entreno o tus comidas.</p>${hint}
+    <div class="notify-ask-actions reminder-invite">${buttons}
+      <button class="link-btn" data-reminder-invite-decline onclick="reminderInviteDecline()">No me interesa</button>
+    </div>`,{onClose:()=>{if(!_reminderInviteAnswered)trackNotifyPrompt("invite","later");}});
+}
+function reminderInviteChoose(channel){
+  _reminderInviteAnswered=true;
+  closeModal();
+  trackNotifyPrompt("invite","choose_"+channel);
+  if(channel==="push")enableDevicePush("invite");
+  else if(channel==="email")enableEmailReminders("invite");
+  else if(channel==="whatsapp")startWhatsappLink("invite");
+}
+function reminderInviteDecline(){
+  _reminderInviteAnswered=true;
+  closeModal();
+  trackNotifyPrompt("invite","declined");
+  markReminderInvite({declined:true});
+  if(view==="hoy")render();
+  toast("Listo, no volveremos a preguntarte. Puedes activarlos en Perfil → Recordatorios.");
+}
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden)return;
+  refreshWhatsappAfterReturn();
+  if(session&&!_whatsappPending)scheduleReminderInvite(800);
+});
 
 function openDeleteAccount(){
   const email=(session&&session.user&&session.user.email)||"";
@@ -15492,6 +15670,7 @@ function clearSignedOutState(prevUid){
   endOnboardingHistory();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;passwordRecoveryError="";passwordRecoveryMode="recovery";
   notifPrefsCache=null;notifySetupActive=false; // REQ-289: avisos de la próxima cuenta
+  whatsappLinkCache=null;_whatsappPending=null;clearTimeout(_reminderInviteTimer); // REQ-255
   cycleHistory=[];recapPhotoFile=null;recapChallenge="";
   PLAN_VERSIONS=[];PLAN_VERSIONS_LOADED=false;PLAN_VERSIONS_ERROR=null;
   privacyReady=false;privacyError="";consentRecords=[];safetyScreening=null;
@@ -15605,7 +15784,10 @@ async function onAuth(){
     refreshAdminBetaPending(); // REQ-225: aviso de postulaciones nuevas (solo admin, no-await)
     openAdminBetaFromLink(); // REQ-226: el botón del correo de aviso abre Postulantes beta
     openReminderLink(); // REQ-285: el aviso abre su día y registra la etapa
-    loadNotifPrefs().then(()=>{if(session&&view==="hoy"&&!onboardingActive&&!notifySetupActive)render();}); // REQ-289
+    Promise.all([loadNotifPrefs(),loadWhatsappLink()]).then(()=>{
+      if(session&&view==="hoy"&&!onboardingActive&&!notifySetupActive)render(); // REQ-289
+      scheduleReminderInvite(); // REQ-255
+    });
     scheduleEngagementSave(1500); // REQ-285: resumen para los recordatorios
     loadStreakFriendsAfterAuth(); // REQ-300
     loadReferralBenefit(); // REQ-317

@@ -276,6 +276,14 @@ export async function installMocks(context, opts = {}) {
     ...(opts.tables || {}),
   };
 
+  // REQ-255: la invitación semanal a activar recordatorios saldría al entrar en
+  // cada suite. Se da por mostrada hoy; sus pruebas pasan { reminderInvite: true }.
+  if (!opts.reminderInvite) {
+    await context.addInitScript((key) => {
+      try { localStorage.setItem(key, JSON.stringify({ last: new Date().toISOString() })); } catch {}
+    }, `evolv_reminder_invite_v1:${USER_ID}`);
+  }
+
   // 1) Catch-all: nada sale a internet. Registrado primero = se evalúa último.
   await context.route("**/*", (route) => {
     const url = route.request().url();
@@ -308,6 +316,7 @@ export async function installMocks(context, opts = {}) {
       body: JSON.stringify({
         supabase: { url: SUPA_URL, publishableKey: "e2e-publishable-key" },
         anthropic: { model: "", proxy: true },
+        ...(opts.config || {}),
       }),
     }),
   );

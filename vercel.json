@@ -5,6 +5,10 @@
   "outputDirectory": ".",
   "rewrites": [
     {
+      "source": "/api/whatsapp",
+      "destination": "/api/push-subscribe?channel=whatsapp"
+    },
+    {
       "source": "/app",
       "destination": "/app/index.html"
     },

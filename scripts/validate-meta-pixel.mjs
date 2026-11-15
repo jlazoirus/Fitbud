@@ -4,6 +4,8 @@
 //   fbq, connect.facebook.net ni el módulo de medición.
 // - Solo web/medicion.js carga el píxel y solo api/_tienda/meta-capi.js llama a la API
 //   de conversiones. Ninguna página precarga dominios de Meta.
+// - REQ-255: api/_whatsapp/core.js usa la Graph API solo para mensajes de WhatsApp
+//   que el usuario activó (/messages); nunca eventos de conversión ni cookies del píxel.
 // - Los eventos de las páginas y la lista blanca del módulo no llevan correo, teléfono,
 //   nombre ni datos de salud; el píxel se inicia sin datos de usuario.
 import assert from "node:assert/strict";
@@ -19,6 +21,7 @@ const fail = (msg) => errors.push(msg);
 
 const MODULE = "web/medicion.js";
 const CAPI = "api/_tienda/meta-capi.js";
+const WHATSAPP = "api/_whatsapp/core.js";
 const PIXEL_PAGES = ["index.html", "planes/index.html", "pago/index.html", "unete/index.html", "beta-reclutamiento.html"];
 const PIXEL_CODE = /\bfbq\b|connect\.facebook\.net|fbevents/;
 const META_ANY = /\bfbq\b|facebook\.(?:net|com)|fbevents|\/?web\/medicion\.js|evolvPixel|_fbp|_fbc|metaPixelId|META_PIXEL|META_CAPI/;
@@ -59,7 +62,9 @@ for (const file of runtime) {
   const text = read(file);
   if (file !== MODULE && PIXEL_PAGES.indexOf(file) < 0 && /["']\/?web\/medicion\.js/.test(text)) fail(`${file} carga el módulo de medición y no es una página pública con píxel`);
   if (file !== MODULE && PIXEL_CODE.test(text)) fail(`${file} contiene código del píxel; solo ${MODULE} puede cargarlo`);
-  if (file !== CAPI && /graph\.facebook\.com/.test(text)) fail(`${file} llama a la API de Meta; solo ${CAPI} puede`);
+  if (file === WHATSAPP) {
+    if (!/\/messages`/.test(text) || /\/events\b|_fbp|_fbc|fbclid|event_name|user_data/.test(text)) fail(`${file} solo puede enviar mensajes de WhatsApp, no eventos de Meta`);
+  } else if (file !== CAPI && /graph\.facebook\.com/.test(text)) fail(`${file} llama a la API de Meta; solo ${CAPI} (conversiones) y ${WHATSAPP} (mensajes) pueden`);
   if (/<link\b[^>]*facebook/i.test(text)) fail(`${file} precarga un dominio de Meta (haría peticiones sin ID de píxel)`);
 }
 

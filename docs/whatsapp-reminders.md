@@ -76,9 +76,9 @@ Quien lo active desde Perfil → Recordatorios recibe, por WhatsApp, el aviso di
 ### 5. Plantilla (Jonathan la registra en WhatsApp Manager)
 
 - Nombre: `recordatorio_diario`. Categoría: **Utility**. Idioma: `es`.
-- Cuerpo: `Hola {{1}}, hoy te falta registrar {{2}} en Evolv. Responde BAJA si ya no quieres estos avisos.`
-- Botón URL: «Abrir Evolv» → `https://evolvapp.club/app`.
-- `{{1}}` es el nombre de pila del usuario, o «hola» si no lo tiene. `{{2}}` es «tus comidas», «tu entreno» o «tus comidas y tu entreno».
+- Cuerpo: `Hola, hoy te falta registrar {{1}} en Evolv. Responde BAJA si ya no quieres estos avisos.`
+- Botón URL (opcional, sin variables): «Abrir Evolv» → `https://evolvapp.club/app`.
+- `{{1}}` puede ser «tus comidas», «tu entreno», «tus comidas y tu entreno», «tu día» (si aún no registró nada hoy) o «lo pendiente de ayer» (si queda algo por rescatar del día anterior). No se envía el nombre: Meta recibe el mínimo de datos (`pendingLabel` en `api/_whatsapp/core.js`).
 - Lo que **no** debe incluir (para que Meta la clasifique como utilidad y por privacidad): precios, ofertas, emojis de urgencia, rachas, «no pierdas», peso, calorías, fotos, metas corporales ni ningún dato de salud. Tampoco menciones de IA, coach automático, modelos ni cuotas (REQ-31).
 
 ### 6. Interfaz y textos
@@ -86,7 +86,7 @@ Quien lo active desde Perfil → Recordatorios recibe, por WhatsApp, el aviso di
 - Perfil → Recordatorios: fila «WhatsApp» con estado (sin activar, vinculado o pausado por fallos). El texto de consentimiento junto al botón dice: «Te enviaremos por WhatsApp un aviso al día como máximo, a tu hora de recordatorio, solo si te falta algo. WhatsApp (Meta) recibe tu número y el texto del aviso. Puedes darte de baja respondiendo BAJA.»
 - Si el servidor no tiene WhatsApp configurado (`api/config.js` no expone el número público), la fila no aparece.
 - Privacidad (`/privacidad`): añadir a Meta Platforms como encargado de los avisos por WhatsApp, indicar qué datos recibe (número y texto del aviso) y explicar la baja.
-- Sin eventos de analytics con el número ni con el contenido del mensaje. Como máximo, `whatsapp_linked` y `whatsapp_unlinked` sin propiedades personales.
+- Sin eventos de analytics con el número ni con el contenido del mensaje (ver la sección 8).
 
 ### 7. Solo para quien los activa (invariante, ya vigente)
 
@@ -108,9 +108,20 @@ Quien lo active desde Perfil → Recordatorios recibe, por WhatsApp, el aviso di
 - **«Ahora no»**, la X, Escape o tocar fuera: no vuelve a mostrarse en 7 días.
 - **«No me interesa»:** no vuelve a mostrarse nunca. El usuario aún puede activarlos desde Perfil → Recordatorios. Si después activa un canal y lo apaga, sigue sin mostrarse.
 - **Dónde se guarda:** `reminderInviteLastShownAt` y `reminderInviteDeclined` en `profiles.prefs`, para que viajen entre dispositivos; `localStorage` sirve solo como caché si falla la red. **No** debe crear una fila en `notification_preferences`: según REQ-296, esa fila corta los correos del journey.
-- **La tarjeta diaria de Hoy:** la tarjeta «Activa tus recordatorios» dentro de «Avisos» (`notifyNudgeHtml`, REQ-367) hoy se pospone solo por un día. Debe seguir la misma cadencia y la misma baja que el pop-up, para que no reaparezca a diario.
+- **La tarjeta de Hoy:** la tarjeta «Activa tus recordatorios» dentro de «Avisos», que está plegado (`notifyNudgeHtml`, REQ-367), es pasiva y no depende de cuándo apareció el pop-up. Su «Ahora no» la oculta 7 días (antes, hasta el día siguiente) y «No me interesa» la oculta para siempre, igual que el pedido tras la racha (REQ-341).
 - **Accesibilidad:** `role="dialog"`, foco dentro del diálogo mientras está abierto y devuelto al cerrar, y se cierra con Escape. Respeta `prefers-reduced-motion`.
-- **Analytics:** solo `reminder_invite` con `{action: shown|activated|later|declined, channel}`, sin datos personales. El texto no menciona IA (REQ-31).
+- **Analytics:** reutiliza el evento permitido `notifications_prompt`: `source:"invite"` con `action` `shown|later|declined|choose_push|choose_email|choose_whatsapp`, y `whatsapp_start|whatsapp_linked|whatsapp_unlinked` para el canal. No incluye datos personales y no hace falta ampliar la lista de eventos de `api/analytics.js`. El texto no menciona IA (REQ-31).
+
+## Implementación (2026-11-14)
+
+- `supabase/whatsapp.sql`: crea `whatsapp_links` (RLS de solo lectura propia y escritura solo del servidor), `notification_log.provider_message_id` y el tipo `whatsapp`.
+- `api/_whatsapp/core.js`: configuración, firma, códigos, clasificación de textos, plantilla, envío y tope.
+- `api/push-subscribe.js`: atiende `/api/whatsapp` (rewrite en `vercel.json`). Ahí están la verificación GET, el webhook firmado, `link` y `unlink`. Así se mantienen 12 funciones.
+- `api/notify.js`: aviso del día y rescate por WhatsApp, con tope mensual reservado antes de enviar y sin reintentos el mismo día tras un fallo.
+- `api/config.js`: expone `whatsapp: {enabled, number}`. `api/privacy.js` exporta el número y el consentimiento.
+- `app/index.html`: fila de WhatsApp en Perfil → Recordatorios e invitación semanal. `js/api-client.js` admite `/api/whatsapp`.
+- `privacidad/index.html`: Meta como encargado de los avisos por WhatsApp.
+- Pruebas: `scripts/test-whatsapp-reminders.mjs` (release gate) y `tests/e2e/recordatorios-whatsapp.spec.js`. `E2E_PORT` permite correr la suite E2E si otra copia del repo ya ocupa el puerto 8923.
 
 ## Fuera de alcance
 

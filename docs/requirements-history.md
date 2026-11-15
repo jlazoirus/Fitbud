@@ -13926,7 +13926,7 @@ Feedback Diego (beta, 2026-10-21, iPhone; capturas de Perfil → Entrenamiento/R
 
 ## REQ-255 - Recordatorios por WhatsApp
 
-**Estado: pendiente.** Propuesta original; las decisiones de Jonathan (2026-11-14) y la especificación implementable están en [`docs/whatsapp-reminders.md`](whatsapp-reminders.md).
+**Estado: implementado — requiere acción humana:** activación en Meta. Esta es la propuesta original; las decisiones de Jonathan (2026-11-14), la implementación y los pasos de activación están en [`docs/whatsapp-reminders.md`](whatsapp-reminders.md).
 
 ### Origen
 

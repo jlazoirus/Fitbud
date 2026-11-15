@@ -84,7 +84,7 @@ async function listPhotos(e, userId) {
 
 async function exportUser(user, e) {
   const userFilter = { user_id: "eq." + user.id };
-  const [profiles, days, weights, versions, cycles, consents, screenings, coachUsage, coachOptions, photos] = await Promise.all([
+  const [profiles, days, weights, versions, cycles, consents, screenings, coachUsage, coachOptions, photos, whatsapp] = await Promise.all([
     restRows(e, "profiles", { id: "eq." + user.id }, "*"),
     restRows(e, "day_log", userFilter, "*"),
     restRows(e, "weight_log", userFilter, "*"),
@@ -95,6 +95,9 @@ async function exportUser(user, e) {
     restRows(e, "coach_usage", userFilter, "*"),
     restRows(e, "coach_option_pool", userFilter, "*"),
     listPhotos(e, user.id),
+    // REQ-255: número y consentimiento de WhatsApp (sin códigos de vinculación).
+    // Antes de aplicar supabase/whatsapp.sql la tabla no existe: se exporta vacía.
+    restRows(e, "whatsapp_links", userFilter, "phone_e164,opted_in,consent_at,opted_out_at,paused_at,created_at,updated_at").catch(() => []),
   ]);
   return {
     format: "fitbros-personal-data-v1",
@@ -114,6 +117,7 @@ async function exportUser(user, e) {
     safety_screenings: screenings,
     coach_usage: coachUsage,
     coach_options: coachOptions,
+    whatsapp_reminders: whatsapp,
     progress_photos: photos.map((photo) => ({
       path: photo.path || null,
       created_at: photo.created_at || null,

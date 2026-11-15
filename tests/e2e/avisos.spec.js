@@ -22,7 +22,7 @@ async function openHoy(page, context, opts = {}) {
 }
 
 test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
-  test("Hoy agrupa la semana y el recordatorio; 'Ahora no' oculta solo el recordatorio hasta mañana", async ({ page, context }) => {
+  test("Hoy agrupa la semana y el recordatorio; 'Ahora no' oculta solo el recordatorio durante una semana", async ({ page, context }) => {
     // La prueba representa un permiso aún no solicitado. Chromium headless
     // puede arrancar con denied; no depender del valor del navegador anfitrión.
     const { errors } = await openHoy(page, context, {
@@ -56,8 +56,10 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     await expect(page.locator(".agenda-card").first()).toBeVisible();
     await expect(card(page)).toHaveCount(0);
 
-    // Al día siguiente vuelve a aparecer.
-    await page.evaluate(() => { localStorage.setItem(NOTIFY_NUDGE_KEY + ":" + uid(), "2000-01-01"); render(); });
+    // REQ-255: a los 6 días sigue oculto; a los 7 vuelve a aparecer.
+    await page.evaluate(() => { localStorage.setItem(NOTIFY_NUDGE_KEY + ":" + uid(), addDays(todayStr(), -6)); render(); });
+    await expect(card(page)).toHaveCount(0); // no se renderiza, con el panel abierto o cerrado
+    await page.evaluate(() => { localStorage.setItem(NOTIFY_NUDGE_KEY + ":" + uid(), addDays(todayStr(), -7)); render(); });
     await notices(page).click();
     await expect(card(page)).toBeVisible();
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);

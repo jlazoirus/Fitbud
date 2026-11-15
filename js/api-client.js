@@ -2,7 +2,7 @@
 // NAT-07 — transporte compartido. Red, sesión, reloj y plataforma inyectados.
 (function(root){
   "use strict";
-  const ENDPOINT=/^\/api\/(config|claude|entitlement|privacy|push-subscribe|analytics|catalog|checkout)(?:\?[^#\s]*)?$/;
+  const ENDPOINT=/^\/api\/(config|claude|entitlement|privacy|push-subscribe|whatsapp|analytics|catalog|checkout)(?:\?[^#\s]*)?$/;
   function apiError(message,status,data){
     const error=new Error(message);
     if(status!=null)error.status=status;

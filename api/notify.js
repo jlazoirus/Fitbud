@@ -23,10 +23,15 @@
 //   VAPID_PRIVATE_KEY   — clave privada VAPID (solo servidor; nunca en cliente/repo)
 //   VAPID_SUBJECT       — ej: mailto:j.lazo.ir@gmail.com
 //   VAPID_PUBLIC_KEY    — clave pública (el cliente usa el literal; esta var es opcional)
+//
+// WhatsApp (REQ-255, docs/whatsapp-reminders.md): solo el aviso del día por la
+// noche, a quien vinculó su número; tope mensual WHATSAPP_MONTHLY_CAP. Variables
+// en api/_whatsapp/core.js.
 
 import webpush from "web-push";
 import { planPorId } from "../tienda/planes.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { whatsappEnv, sendWhatsapp, templateBody, pendingLabel, wantsWhatsapp, monthStartLima, failurePatch } from "./_whatsapp/core.js";
 import { Agent } from "node:https";
 
 // REQ-383: cron-job.org corta a los 30 s. El presupuesto incluye keep-alive,
@@ -114,6 +119,7 @@ function env() {
     fromEmail: process.env.NOTIFY_FROM_EMAIL || "recordatorios@fitbros.app",
     appUrl: (process.env.NOTIFY_APP_URL || "https://evolvapp.club").replace(/\/$/, ""),
     cronSecret: process.env.CRON_SECRET || "",
+    wa: whatsappEnv(),
   };
 }
 
@@ -695,7 +701,7 @@ async function loadUserContext(e, userId, today) {
 // sin registro, el disparo de la hora siguiente lo repetiría.
 
 async function deliver(e, dryRun, results, counter, job) {
-  const { userId, type, keys, refDate, step, send } = job;
+  const { userId, type, keys, refDate, step, send, noRetry } = job;
   const entry = { user: userId, type, step, date: refDate };
   const inList = keys.map((k) => encodeURIComponent(k)).join(",");
   const existing = await supaGet(e,
@@ -710,6 +716,12 @@ async function deliver(e, dryRun, results, counter, job) {
     counter.skipped++;
     results.log.push({ ...entry, action: "already_sent" });
     return "already_sent";
+  }
+  // REQ-255: un WhatsApp rechazado no se reintenta el mismo día (cada intento cuesta).
+  if (noRetry && existing.some((r) => r.status === "error")) {
+    counter.skipped++;
+    results.log.push({ ...entry, action: "already_failed" });
+    return "already_failed";
   }
   if (dryRun) {
     counter.skipped++;
@@ -735,8 +747,9 @@ async function deliver(e, dryRun, results, counter, job) {
   }
   try {
     const out = await send(keys[0]);
+    const providerId = out && typeof out === "object" && out.providerMessageId;
     await supaPatch(e, `/rest/v1/notification_log?id=eq.${logId}`,
-      { status: "sent", delivered_at: new Date().toISOString() }
+      { status: "sent", delivered_at: new Date().toISOString(), ...(providerId ? { provider_message_id: providerId } : {}) }
     ).catch(() => null);
     counter.sent++;
     results.log.push({ ...entry, action: "sent", ...(out && typeof out === "object" ? out : {}) });
@@ -849,18 +862,22 @@ async function runJob(e, dryRun) {
   const results = { processed: 0, sent: 0, skipped: 0, errors: 0, dryRun, log: [] };
   // REQ-281: la respuesta siempre dice si el push está listo.
   results.push = vapidReady ? { ready: true, sent: 0, skipped: 0, errors: 0 } : { ready: false, issue: vapidIssue };
+  const waLinks = await loadWhatsappLinks(e, results);
 
   // select=*: la columna engagement (resumen de racha que escribe la app) llega
   // con supabase/notifications_journey.sql; sin ella la consulta sigue valiendo.
+  const waIds = [...waLinks.keys()];
   const prefs = await supaGet(e,
-    "/rest/v1/notification_preferences?or=(email_opt_in.eq.true,push_opt_in.eq.true)&select=*"
+    "/rest/v1/notification_preferences?or=(email_opt_in.eq.true,push_opt_in.eq.true" +
+    (waIds.length ? `,user_id.in.(${waIds.join(",")})` : "") + ")&select=*"
   );
 
   await forEachUser(e, prefs, async (pref) => {
     const { user_id, notify_hour, enabled_days, unsubscribe_token } = pref;
     const wantEmail = !!pref.email_opt_in;
     const wantPush = !!pref.push_opt_in && vapidReady;
-    if (!wantEmail && !wantPush) return;
+    const waLink = waLinks.get(user_id) || null;
+    if (!wantEmail && !wantPush && !waLink) return;
     const tz = safeTimezone(pref.timezone || "UTC");
     const today = todayInTz(tz);
     const hour = currentHourInTz(tz);
@@ -917,7 +934,12 @@ async function runJob(e, dryRun) {
       });
     }
 
-    // 5. Push: el del día (o la etapa de regreso) y, si toca, la última
+    // 5. WhatsApp (REQ-255): solo el aviso del día o el rescate, uno por día.
+    if (waLink && wantsWhatsapp(decision)) {
+      await deliverWhatsapp(e, dryRun, results, { userId: user_id, link: waLink, decision, today });
+    }
+
+    // 6. Push: el del día (o la etapa de regreso) y, si toca, la última
     // llamada, solo cuando el aviso del día ya salió en un disparo anterior.
     const subs = wantPush
       ? await supaGet(e, `/rest/v1/push_subscriptions?user_id=eq.${user_id}&select=endpoint,keys_p256dh,keys_auth`).catch(() => [])
@@ -947,6 +969,52 @@ async function runJob(e, dryRun) {
   }
   await runPlanExpiry(e, dryRun, results);
   return results;
+}
+
+// ── WhatsApp (REQ-255) ────────────────────────────────────────────────────────
+// Vinculados y conteo del mes. Sin conteo no se puede respetar el tope: ese
+// disparo no envía WhatsApp (correo y push siguen igual).
+async function loadWhatsappLinks(e, results) {
+  const wa = e.wa;
+  if (!wa.ready) { results.whatsapp = { ready: false, issue: wa.issue }; return new Map(); }
+  results.whatsapp = { ready: true, sent: 0, skipped: 0, errors: 0, capped: 0, cap: wa.monthlyCap };
+  try {
+    const [links, sent] = await Promise.all([
+      supaGet(e, "/rest/v1/whatsapp_links?opted_in=is.true&phone_e164=not.is.null&select=user_id,phone_e164,fail_count"),
+      supaGet(e, `/rest/v1/notification_log?notification_type=eq.whatsapp&status=eq.sent&delivered_at=gte.${encodeURIComponent(monthStartLima())}&select=id`),
+    ]);
+    wa.used = sent.length;
+    results.whatsapp.usedThisMonth = wa.used;
+    return new Map(links.filter((l) => l && /^[0-9a-f-]{36}$/.test(l.user_id)).map((l) => [l.user_id, l]));
+  } catch (err) {
+    results.whatsapp = { ready: false, issue: "whatsapp_links no disponible: " + err.message };
+    return new Map();
+  }
+}
+
+async function deliverWhatsapp(e, dryRun, results, { userId, link, decision, today }) {
+  const wa = e.wa, counter = results.whatsapp;
+  if (wa.used >= wa.monthlyCap) {
+    counter.capped++;
+    results.log.push({ user: userId, type: "whatsapp", date: today, action: "whatsapp_cap" });
+    return "capped";
+  }
+  wa.used++; // reserva antes de enviar: los usuarios se procesan en paralelo
+  const status = await deliver(e, dryRun, results, counter, {
+    userId, type: "whatsapp", keys: [`${userId}:whatsapp:${today}`], refDate: today, step: decision.step, noRetry: true,
+    send: async () => {
+      try {
+        const id = await boundedRequest(e, (signal) =>
+          sendWhatsapp(wa, templateBody(wa, link.phone_e164, pendingLabel(decision)), (url, init) => fetch(url, { ...init, signal })));
+        return { channel: "whatsapp", providerMessageId: id };
+      } catch (err) {
+        await supaPatch(e, `/rest/v1/whatsapp_links?user_id=eq.${userId}&opted_in=is.true`, failurePatch(link.fail_count)).catch(() => null);
+        throw err;
+      }
+    },
+  });
+  if (status !== "sent") wa.used--;
+  return status;
 }
 
 // REQ-298: resumen de la mañana, uno por día y por un solo canal: push si el
@@ -1260,7 +1328,9 @@ export default async function handler(req, res) {
     const timedOut = !!e.timedOut || remainingMs(e) <= 0;
     const durationMs = Math.round(performance.now() - startedAt);
     console.info(JSON.stringify({ event: "notify_job", durationMs, timedOut, processed: results.processed,
-      sent: results.sent, errors: results.errors, pushSent: results.push.sent || 0, pushErrors: results.push.errors || 0 }));
+      sent: results.sent, errors: results.errors, pushSent: results.push.sent || 0, pushErrors: results.push.errors || 0,
+      whatsappSent: (results.whatsapp && results.whatsapp.sent) || 0, whatsappErrors: (results.whatsapp && results.whatsapp.errors) || 0,
+      whatsappCapped: (results.whatsapp && results.whatsapp.capped) || 0 }));
     return res.status(timedOut ? 503 : 200).json({ ok: !timedOut, ...results, durationMs,
       ...(timedOut ? { timedOut: true, error: "notify_timeout", retryable: true } : {}) });
   } catch (err) {

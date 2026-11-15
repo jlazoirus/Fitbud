@@ -3,6 +3,12 @@
 // server-side en /api/claude). La publishable key de Supabase es pública
 // por diseño; lo que protege la escritura es el RLS.
 import { usdHabilitado, monedaPorPais, suscripcionHabilitada } from "../tienda/planes.js";
+import { whatsappEnv } from "./_whatsapp/core.js";
+
+export function whatsappPublic(source = process.env) {
+  const wa = whatsappEnv(source);
+  return wa.ready ? { enabled: true, number: wa.publicNumber } : { enabled: false };
+}
 
 function header(req, name) {
   const value = req && req.headers ? req.headers[name] : "";
@@ -57,6 +63,9 @@ export default function handler(req, res) {
       enabled: !!process.env.CULQI_PUBLIC_KEY && !!process.env.CULQI_SECRET_KEY,
     },
     tienda,
+    // REQ-255: el número de WhatsApp de Evolv es público (wa.me). Sin la
+    // configuración completa, la app no ofrece el canal.
+    whatsapp: whatsappPublic(),
     // REQ-376: el ID del píxel de Meta es público. Sin él, la web pública no carga
     // el píxel (web/medicion.js). El token de la API de conversiones nunca sale de aquí.
     metaPixelId: /^\d{5,20}$/.test(String(process.env.META_PIXEL_ID || "").trim()) ? String(process.env.META_PIXEL_ID).trim() : "",
