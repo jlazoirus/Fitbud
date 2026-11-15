@@ -1,6 +1,6 @@
 // REQ-376: píxel de Meta solo en la web pública, solo con ID configurado y sin datos personales.
 import { test, expect } from "@playwright/test";
-import { installMocks, collectConsoleErrors, gotoApp } from "./helpers.js";
+import { installMocks, collectConsoleErrors, gotoApp, LOCAL_ORIGIN } from "./helpers.js";
 
 const PIXEL_ID = "123456789012345";
 const CONFIG = {
@@ -89,7 +89,7 @@ test.describe("Medición de la campaña (REQ-376)", () => {
   test("/pago: InitiateCheckout al abrir el checkout y un solo Purchase con el valor y el id del servidor", async ({ page, context }) => {
     await installMocks(context);
     await withPixel(context);
-    await context.addCookies([{ name: "_fbp", value: "fb.1.1700000000000.1234567890", url: "http://127.0.0.1:8923" }]);
+    await context.addCookies([{ name: "_fbp", value: "fb.1.1700000000000.1234567890", url: LOCAL_ORIGIN }]);
     const charges = [];
     await context.route("**/api/culqi-charge", async (r) => {
       charges.push(JSON.parse(r.request().postData()));

@@ -126,6 +126,28 @@ export function usdHabilitado(valor) {
   return v === "1" || v === "true";
 }
 
+// REQ-354: suscripción mensual con 7 días gratis (motor: REQ-355). Los textos de
+// /terminos, /devoluciones y /planes la muestran solo con TIENDA_SUSCRIPCION_ENABLED,
+// que se enciende cuando REQ-355..357 están en producción. Un cambio de monto se
+// avisa por correo con `diasAvisoPrecio` de anticipación (términos, punto 4.1):
+// por eso no se deriva del precio del Plan mensual.
+export const SUSCRIPCION = Object.freeze({
+  planId: "monthly",
+  nombre: "Suscripción mensual",
+  moneda: "PEN",
+  montoCentimos: 2990,
+  diasPrueba: 7,
+  diasAvisoCobro: 2,
+  diasAvisoPrecio: 30,
+  horasDevolucionPrimerCobro: 48,
+  // Culqi valida la tarjeta al guardarla con un cargo mínimo que anula al instante.
+  validacionCentimos: 300,
+});
+
+export function suscripcionHabilitada(valor) {
+  return usdHabilitado(valor);
+}
+
 // Moneda sugerida por el país del visitante (cabecera x-vercel-ip-country):
 // Perú o país desconocido → soles; cualquier otro país → dólares.
 export function monedaPorPais(pais) {

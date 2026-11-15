@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tienda/tienda.css?v=4">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=5">
 </head>
 <body>
   <header id="t-header"></header>
@@ -24,8 +24,12 @@
     <div id="selectorMoneda" class="moneda-box" hidden></div>
     <div id="planes" class="planes" aria-live="polite"></div>
 
+    <div class="nota-sus" id="notaSuscripcion" data-con-suscripcion hidden>
+      <b>Suscripción mensual con <span data-suscripcion="diasPrueba">7</span> días gratis.</b> Pruebas Evolv completo sin costo y, desde el día <span data-suscripcion="diaPrimerCobro">8</span>, se cobran <span data-suscripcion="monto">S/ 29.90</span> al mes a tu tarjeta hasta que canceles. Cancelas cuando quieras, sin costo, y te avisamos <span data-suscripcion="diasAvisoCobro">2</span> días antes del primer cobro. <a href="/terminos#suscripcion">Condiciones de la suscripción</a>.
+    </div>
+
     <div class="nota">
-      <b>Pago único, sin renovación automática.</b> Pagas una vez con tarjeta de crédito o débito a través de Culqi y tienes acceso completo durante el período elegido. <span id="notaMoneda">Precios en soles</span>, impuestos incluidos. Si no te convence, tienes <a href="/devoluciones">7 días para pedir el reembolso completo</a>.
+      <b><span data-con-suscripcion hidden>Planes de 1, 3 y 6 meses: </span>Pago único, sin renovación automática.</b> Pagas una vez con tarjeta de crédito o débito a través de Culqi y tienes acceso completo durante el período elegido. <span id="notaMoneda">Precios en soles</span>, impuestos incluidos. Si no te convence, tienes <a href="/devoluciones">7 días para pedir el reembolso completo</a>.
     </div>
 
     <h2>Cómo funciona la compra</h2>
@@ -45,6 +49,10 @@
     // REQ-381: soles, o dólares si el servidor los habilita (sugeridos por país, con selector).
     const tienda = await monedaTienda();
     let moneda = tienda.moneda;
+    // REQ-354: la suscripción mensual solo con TIENDA_SUSCRIPCION_ENABLED (la inscripción llega con REQ-356).
+    import("/tienda/moneda.js").then((m) => m.cargarConfig())
+      .then(async (cfg) => (await import("/tienda/suscripcion.js")).aplicarSuscripcion(cfg))
+      .catch(() => {});
     pintar();
     if (tienda.usd) {
       document.getElementById("notaMoneda").textContent = "Precios en soles o dólares según tu país (puedes cambiar la moneda)";

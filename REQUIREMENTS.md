@@ -2241,26 +2241,9 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-354 - Legales de la suscripción con semana gratis
 
-**Estado: pendiente.** El texto lo aprueba una persona antes de abrir la inscripción. Plan §3, "Legales".
+**Estado: implementado.** Textos aprobados por Jonathan en el chat (2026-11-14). `/terminos` 4.1, `/devoluciones` 2.1 y una nota en `/planes`, visibles solo con `TIENDA_SUSCRIPCION_ENABLED`; apagada, nada cambia. Encenderla cuando REQ-355..357 estén en producción (plan §3, "Legales").
 
-### Origen
-La suscripción mensual con renovación automática (2026-11-06) contradice "pago único, sin renovación automática" de `/terminos`, `/devoluciones`, `/planes` y `/pago`.
-### Problema
-Cobrar automáticamente sin esos términos expone a reclamos ante INDECOPI y a contracargos.
-### Objetivo
-Términos y devoluciones que cubran la prueba de 7 días, el cobro mensual, la cancelación inmediata y el cobro fallido, conviviendo con los pagos únicos.
-### Alcance
-- Secciones nuevas en `/terminos` y `/devoluciones`.
-- `/planes` muestra la suscripción mensual junto a los pagos únicos.
-- `vigenciaLegal` se actualiza.
-### Fuera de alcance
-El motor de cobro (REQ-355).
-### Riesgos
-Prometer algo que el motor no hace; textos sin la aprobación de una persona.
-### Criterios de aceptación
-Cada punto de la lista del plan §3 aparece en los textos, y una persona los aprueba (queda registrado en el commit).
-### Verificación sugerida
-`tests/e2e/tienda.spec.js` con las secciones nuevas.
+✓ `tests/e2e/legales-suscripcion.spec.js`, `scripts/test-tienda-culqi.mjs`.
 
 ## REQ-355 - Motor de suscripción mensual con Culqi
 

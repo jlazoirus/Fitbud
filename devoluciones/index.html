@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tienda/tienda.css?v=4">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=5">
 </head>
 <body>
   <header id="t-header"></header>
@@ -19,15 +19,27 @@
     <p class="vigencia">Vigente desde el <span data-comercio="vigenciaLegal"></span>.</p>
 
     <h2>1. Introducción</h2>
-    <p>Esta política establece las condiciones para cambios y devoluciones de los planes de Evolv comprados en nuestra tienda online (<a href="/planes">Planes y precios</a>). Los planes son acceso a un servicio digital por un período (30, 90 o 180 días), con pago único y sin renovación automática. No hay productos físicos ni envíos.</p>
+    <p>Esta política establece las condiciones para cambios y devoluciones de los planes de Evolv comprados en nuestra tienda online (<a href="/planes">Planes y precios</a>). Los planes son acceso a un servicio digital por un período (30, 90 o 180 días), con pago único y sin renovación automática.<span data-con-suscripcion hidden> La Suscripción mensual con 7 días gratis se renueva cada mes hasta que la canceles; sus reglas propias están en el punto 2.1.</span> No hay productos físicos ni envíos.</p>
 
     <h2>2. Condiciones para cambios y devoluciones</h2>
+    <p data-con-suscripcion hidden>Este punto se aplica a los planes de pago único (30, 90 y 180 días).</p>
     <ul>
       <li><b>Plazo:</b> puedes pedir el reembolso o el cambio de plan dentro de los <b>7 días calendario</b> siguientes a la compra.</li>
       <li><b>Reembolso completo:</b> dentro de ese plazo te devolvemos el <b>100 % del monto pagado</b>, aunque ya hayas usado el plan. No necesitas explicar el motivo.</li>
       <li><b>Estado del producto:</b> al ser un servicio digital, no hay producto que devolver, empaque que conservar ni etiquetas que mantener. Basta con pedirlo dentro del plazo.</li>
       <li><b>Qué no es elegible:</b> pasados los 7 días no reembolsamos el período en curso, salvo en los casos del punto 6. Tampoco hay reembolso de accesos de cortesía o del programa beta, porque no tienen costo.</li>
     </ul>
+    <section id="suscripcion" data-con-suscripcion hidden>
+      <h3>2.1 Suscripción mensual</h3>
+      <ul>
+        <li><b>Cancelar evita los cobros siguientes:</b> puedes cancelar cuando quieras, sin costo, y conservas el acceso hasta el final del período ya pagado. No reembolsamos la parte no usada del mes en curso, salvo en los casos de este punto y del punto 6.</li>
+        <li><b>Durante los días gratis</b> no hay nada que devolver: si cancelas antes del día <span data-suscripcion="diaPrimerCobro">8</span>, no se cobra nada.</li>
+        <li><b>Si olvidaste cancelar:</b> si pides la devolución del primer cobro dentro de las <span data-suscripcion="horasDevolucion">48</span> horas siguientes, te devolvemos el 100 % y cancelamos la suscripción.</li>
+        <li><b>Cobro después de cancelar o por error:</b> si se te cobró después de una cancelación registrada, o por un error nuestro, te lo devolvemos completo en cualquier momento.</li>
+        <li><b>La validación de la tarjeta no es un cobro:</b> el cargo de <span data-suscripcion="validacion">S/ 3.00</span> que hace Culqi al guardar tu tarjeta se anula al instante. Si tu banco lo sigue mostrando después de 15 días, escríbenos y lo revisamos.</li>
+        <li><b>Cómo pedirlo:</b> como en el punto 3, con el número de operación que aparece en el correo del cobro.</li>
+      </ul>
+    </section>
 
     <h2>3. Cómo pedir un cambio o una devolución</h2>
     <ol>
@@ -78,7 +90,9 @@
     const cuerpo = "Hola, quiero pedir el reembolso (o el cambio) de mi plan de Evolv.\n\nCorreo con el que compré:\nFecha de la compra:\nNúmero de operación (chr_…):\nPlan comprado:\n¿Reembolso o cambio de plan?:\n";
     document.getElementById("solicitar").href = "mailto:" + COMERCIO.correo + "?subject=" + encodeURIComponent("Solicitud de reembolso o cambio de plan") + "&body=" + encodeURIComponent(cuerpo);
     // REQ-381: solo cuando la tienda vende también en dólares (TIENDA_USD_ENABLED).
-    import("/tienda/moneda.js").then((m) => m.cargarConfig()).then((cfg) => {
+    // REQ-354: la suscripción mensual solo con TIENDA_SUSCRIPCION_ENABLED.
+    import("/tienda/moneda.js").then((m) => m.cargarConfig()).then(async (cfg) => {
+      try { (await import("/tienda/suscripcion.js")).aplicarSuscripcion(cfg); } catch (_) { /* sin módulo: textos sin suscripción */ }
       if (!(cfg && cfg.tienda && cfg.tienda.usd === true)) return;
       document.getElementById("reembolsoMoneda").textContent = ", en la misma moneda en la que se cobró (soles o dólares) y por el mismo monto";
       document.getElementById("cambioMoneda").textContent = ", en la moneda de tu compra original";

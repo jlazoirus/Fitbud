@@ -2,7 +2,7 @@
 // entorno en Vercel. NO incluye la API key de Claude (esa solo se usa
 // server-side en /api/claude). La publishable key de Supabase es pública
 // por diseño; lo que protege la escritura es el RLS.
-import { usdHabilitado, monedaPorPais } from "../tienda/planes.js";
+import { usdHabilitado, monedaPorPais, suscripcionHabilitada } from "../tienda/planes.js";
 
 function header(req, name) {
   const value = req && req.headers ? req.headers[name] : "";
@@ -12,12 +12,15 @@ function header(req, name) {
 // REQ-381: con TIENDA_USD_ENABLED, la tienda ofrece dólares y sugiere la moneda
 // por el país del visitante (x-vercel-ip-country: Perú o desconocido → soles).
 // Apagada, todos ven soles y /api/culqi-charge rechaza dólares.
+// REQ-354: TIENDA_SUSCRIPCION_ENABLED muestra la suscripción con 7 días gratis en
+// /planes y sus condiciones en /terminos y /devoluciones. No depende del país.
 export function tiendaConfig(req, source = process.env) {
   const usd = usdHabilitado(source.TIENDA_USD_ENABLED);
   return {
     usd,
     monedas: usd ? ["PEN", "USD"] : ["PEN"],
     monedaSugerida: usd ? monedaPorPais(header(req, "x-vercel-ip-country")) : "PEN",
+    suscripcion: suscripcionHabilitada(source.TIENDA_SUSCRIPCION_ENABLED),
   };
 }
 

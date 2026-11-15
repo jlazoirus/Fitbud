@@ -107,13 +107,15 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
   Se reutiliza `notification_log` para no repetir envíos (REQ-351).
 - **Avisos de vencimiento (REQ-351):** no se envían a quien tiene una suscripción activa, porque no tiene nada que renovar a mano.
 
-### Legales (REQ-354, antes de abrir la inscripción)
+### Legales (REQ-354, textos aprobados por Jonathan el 2026-11-14)
 
-- **Términos:** prueba gratuita de 7 días, renovación automática mensual, monto, fecha de cobro, cómo cancelar (inmediato y sin costo), qué pasa al cancelar y con un cobro fallido, y que la aceptación se pide de forma expresa al inscribirse.
-- **Cambios y devoluciones:** para la suscripción, cancelar evita los cobros siguientes. Se devuelve un cobro hecho por error, o hecho después de una cancelación registrada.
-  - **Propuesta, para confirmar por una persona:** devolver también el primer cobro tras la prueba si se pide dentro de las 48 h y casi no se usó.
-  - Los pagos únicos siguen con 7 días de reembolso.
+- **Detrás de una bandera.** Los textos de la suscripción solo se ven con `TIENDA_SUSCRIPCION_ENABLED` (`1` o `true` en Vercel → `tienda.suscripcion` en `/api/config`). Apagada, que es como queda hoy, `/terminos`, `/devoluciones` y `/planes` no cambian y siguen diciendo «pago único, sin renovación automática», que es lo cierto mientras no se pueda suscribir. Montos y plazos salen de `SUSCRIPCION` en `tienda/planes.js`, y el código está en `tienda/suscripcion.js`.
+- **Términos, punto 4.1:** 7 días gratis; S/ 29.90 desde el día 8 y luego cada mes; aviso 2 días antes del primer cobro; una prueba por persona; validación de la tarjeta (S/ 3.00 anulados al instante); aceptación expresa; cancelación inmediata y sin costo, en Perfil, en la cuenta web o por correo; acceso hasta el fin del período; cobro fallido (reintentos de Culqi y luego cancelación automática); comprobante de cada cobro; aviso de 30 días ante un cambio de precio. Los puntos 4, 5, 6, 7 y 8 distinguen los pagos únicos de la suscripción.
+- **Devoluciones, punto 2.1:** cancelar evita los cobros siguientes, sin reembolso del mes en curso; nada que devolver durante la prueba; primer cobro devuelto al 100 % si se pide dentro de las 48 h; se devuelve cualquier cobro posterior a una cancelación o hecho por error; la validación de S/ 3 no es un cobro. Los pagos únicos siguen con 7 días de reembolso.
+- **`/planes`:** una nota con las condiciones de la suscripción, junto a los pagos únicos. El botón de inscripción lo agrega REQ-356.
+- **Vigencia:** con la bandera encendida, las páginas muestran `vigenciaLegalSuscripcion` (`tienda/comercio.js`) en lugar de `vigenciaLegal`. Al encender la bandera se pone ahí la fecha de ese despliegue.
 - **Libro de Reclamaciones:** sin cambios.
+- **Encender la bandera** solo cuando REQ-355, REQ-356 y REQ-357 estén en producción: los textos prometen inscripción, cancelación en Perfil y correos que esos REQ construyen.
 
 ## 4. Fases y REQ
 
@@ -121,7 +123,7 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
 |---|---|---|
 | 1 | REQ-352: web pública en `/` y app en `/app` | — |
 | 2 | REQ-353: portada sin beta; la beta solo en `/beta` | REQ-352 |
-| 3 | REQ-354: términos y devoluciones de la suscripción | Revisión de una persona |
+| 3 | REQ-354: términos y devoluciones de la suscripción (hecho, tras `TIENDA_SUSCRIPCION_ENABLED`) | — |
 | 4 | REQ-355: motor de suscripción con Culqi (SQL, inscripción en el servidor, webhook, cancelación por API) | — (API confirmada el 2026-11-14) |
 | 5 | REQ-356: `/registro` con tarjeta y semana gratis, y la llamada a la acción en la portada y la app | REQ-353, REQ-354, REQ-355 |
 | 6 | REQ-357: gestionar la suscripción (estado, cancelar) y sus correos | REQ-355 |
@@ -133,7 +135,7 @@ La inscripción se abre al público (la portada cambia "Ver planes" por "Empieza
 1. ~~Preguntar a Culqi cómo funciona la API~~: resuelto con la referencia de la API (§3, 2026-11-14). Solo queda confirmar con Culqi que la cuenta live tenga la recurrencia activa y su comisión, antes de abrir la inscripción.
 2. ~~Llaves de prueba de Culqi~~: ya existen; la tienda las usa. Nunca se pegan en el chat.
 3. **Configurar el webhook** en CulqiPanel (Eventos → Webhook) con la URL que deje REQ-355.
-4. **Revisar y aprobar** los textos de REQ-354.
+4. ~~Revisar y aprobar los textos de REQ-354~~: aprobados por Jonathan (2026-11-14). Cuando REQ-355..357 estén en producción, encender `TIENDA_SUSCRIPCION_ENABLED` y actualizar `vigenciaLegalSuscripcion`.
 5. **Aplicar** el SQL de REQ-355 en Supabase.
 
 ## 6. Riesgos

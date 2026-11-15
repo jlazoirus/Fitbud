@@ -19,6 +19,10 @@ export const COMERCIO = {
   redes: [],
   // Fecha de la versión vigente de términos, devoluciones y privacidad.
   vigenciaLegal: "13 de noviembre de 2026",
+  // REQ-354: fecha de la versión con la suscripción mensual. Se muestra en lugar de
+  // vigenciaLegal solo con TIENDA_SUSCRIPCION_ENABLED; al encender la bandera, se
+  // pone aquí la fecha de ese despliegue.
+  vigenciaLegalSuscripcion: "14 de noviembre de 2026",
 };
 
 export function esMarcador(valor) {

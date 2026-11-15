@@ -68,8 +68,9 @@ h3{margin:22px 0 6px;font-size:17px;font-weight:800}
 .ticks li{position:relative;padding-left:26px;font-size:15px;color:#d6d6d0}
 .ticks li::before{content:"";position:absolute;left:3px;top:.45em;width:11px;height:6px;border-left:2.5px solid var(--accent);border-bottom:2.5px solid var(--accent);transform:rotate(-45deg)}
 .plan .btn{margin-top:auto}
-.nota{background:var(--surf1);border:1px solid var(--surf3);border-radius:var(--r-md);padding:16px 18px;color:var(--muted);font-size:15px}
-.nota b{color:var(--txt)}
+.nota,.nota-sus{background:var(--surf1);border:1px solid var(--surf3);border-radius:var(--r-md);padding:16px 18px;color:var(--muted);font-size:15px}
+.nota b,.nota-sus b{color:var(--txt)}
+.nota-sus{margin-bottom:12px}
 
 /* REQ-381: selector «Soles / Dólares» (solo con dólares habilitados) */
 .moneda-box{margin:20px 0 0}

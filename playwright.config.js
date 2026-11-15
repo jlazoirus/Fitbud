@@ -14,6 +14,11 @@ process.env.TZ = "America/Lima";
 const chromiumPath=process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||
   (existsSync(chromium.executablePath())?chromium.executablePath():["/usr/bin/chromium","/usr/bin/chromium-browser","/usr/bin/google-chrome"].find(existsSync));
 
+// E2E_PORT permite que dos checkouts (worktrees) prueben a la vez: el servidor
+// que se reutiliza en 8923 puede ser de otra copia del repo. Por defecto, 8923.
+const port = Number(process.env.E2E_PORT) || 8923;
+const origin = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 45_000,
@@ -26,7 +31,7 @@ export default defineConfig({
     launchOptions: chromiumPath
       ? { executablePath: chromiumPath }
       : {},
-    baseURL: "http://127.0.0.1:8923",
+    baseURL: origin,
     viewport: { width: 390, height: 844 }, // móvil: el formato real de la PWA
     locale: "es-PE",
     timezoneId: "America/Lima",
@@ -35,8 +40,8 @@ export default defineConfig({
 
   },
   webServer: {
-    command: "python3 -m http.server 8923 --bind 127.0.0.1",
-    url: "http://127.0.0.1:8923/index.html",
+    command: `python3 -m http.server ${port} --bind 127.0.0.1`,
+    url: `${origin}/index.html`,
     reuseExistingServer: true,
     timeout: 15_000,
   },

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { PLANES_TIENDA, planPorId, formatoSoles, MONEDA, MONEDAS, montoPlan, formatoPrecio, monedasPermitidas, monedaValida, incluyePlan, usdHabilitado, monedaPorPais } from "../tienda/planes.js";
+import { PLANES_TIENDA, planPorId, formatoSoles, MONEDA, MONEDAS, montoPlan, formatoPrecio, monedasPermitidas, monedaValida, incluyePlan, usdHabilitado, monedaPorPais, SUSCRIPCION, suscripcionHabilitada } from "../tienda/planes.js";
 import configHandler, { tiendaConfig } from "../api/config.js";
 import { purchaseEvent, compraMedicion } from "../api/_tienda/meta-capi.js";
 import { COMERCIO, esMarcador } from "../tienda/comercio.js";
@@ -64,8 +64,15 @@ for (const [pais, esperado] of [["PE", "PEN"], ["pe", "PEN"], ["CL", "USD"], ["C
 }
 // /api/config: sin bandera, soles para todos y caché pública; con bandera, sugerencia por país sin caché compartida.
 const reqPais = (pais) => ({ method: "GET", headers: pais ? { "x-vercel-ip-country": pais } : {} });
-assert.deepEqual(tiendaConfig(reqPais("CL"), {}), { usd: false, monedas: ["PEN"], monedaSugerida: "PEN" });
-assert.deepEqual(tiendaConfig(reqPais("CL"), { TIENDA_USD_ENABLED: "1" }), { usd: true, monedas: ["PEN", "USD"], monedaSugerida: "USD" });
+assert.deepEqual(tiendaConfig(reqPais("CL"), {}), { usd: false, monedas: ["PEN"], monedaSugerida: "PEN", suscripcion: false });
+assert.deepEqual(tiendaConfig(reqPais("CL"), { TIENDA_USD_ENABLED: "1" }), { usd: true, monedas: ["PEN", "USD"], monedaSugerida: "USD", suscripcion: false });
+// REQ-354: la suscripción mensual se muestra solo con su propia bandera, sin depender de la de dólares.
+assert.equal(tiendaConfig(reqPais("PE"), { TIENDA_SUSCRIPCION_ENABLED: "1" }).suscripcion, true);
+assert.equal(tiendaConfig(reqPais("PE"), { TIENDA_SUSCRIPCION_ENABLED: "true", TIENDA_USD_ENABLED: "0" }).usd, false);
+for (const v of [undefined, "", "0", "false", "yes"]) assert.equal(suscripcionHabilitada(v), false, "bandera apagada con " + v);
+assert.equal(SUSCRIPCION.moneda, "PEN");
+assert.ok(SUSCRIPCION.diasPrueba === 7 && SUSCRIPCION.montoCentimos >= 300, "7 días gratis y un monto que Culqi acepta (mínimo 300 céntimos)");
+assert.ok(planPorId(SUSCRIPCION.planId), "la suscripción da el mismo acceso que un plan del catálogo");
 assert.equal(tiendaConfig(reqPais("CO"), { TIENDA_USD_ENABLED: "true" }).monedaSugerida, "USD");
 assert.equal(tiendaConfig(reqPais("PE"), { TIENDA_USD_ENABLED: "1" }).monedaSugerida, "PEN");
 assert.equal(tiendaConfig(reqPais(""), { TIENDA_USD_ENABLED: "1" }).monedaSugerida, "PEN", "país desconocido → soles");
@@ -74,7 +81,8 @@ assert.equal(tiendaConfig(reqPais(""), { TIENDA_USD_ENABLED: "1" }).monedaSugeri
   const out = { status() { return this; }, json(o) { this.body = o; return this; }, setHeader(k, v) { headers[k] = v; } };
   delete process.env.TIENDA_USD_ENABLED;
   configHandler(reqPais("CL"), out);
-  assert.deepEqual(out.body.tienda, { usd: false, monedas: ["PEN"], monedaSugerida: "PEN" });
+  delete process.env.TIENDA_SUSCRIPCION_ENABLED;
+  assert.deepEqual(out.body.tienda, { usd: false, monedas: ["PEN"], monedaSugerida: "PEN", suscripcion: false });
   assert.match(headers["Cache-Control"], /s-maxage/);
   process.env.TIENDA_USD_ENABLED = "1";
   configHandler(reqPais("CL"), out);

@@ -18,7 +18,7 @@ export const SUPA_URL = `https://${SUPA_REF}.supabase.co`;
 export const STORAGE_KEY = `sb-${SUPA_REF}-auth-token`;
 export const USER_ID = "e2e00000-0000-4000-8000-000000000001";
 export const USER_EMAIL = "e2e@fitbros.test";
-const LOCAL_ORIGIN = "http://127.0.0.1:8923";
+export const LOCAL_ORIGIN = `http://127.0.0.1:${Number(process.env.E2E_PORT) || 8923}`;
 
 const iso = (offsetMs = 0) => new Date(Date.now() + offsetMs).toISOString();
 const ymd = (d) =>

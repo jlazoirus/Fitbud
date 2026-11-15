@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tienda/tienda.css?v=4">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=5">
 </head>
 <body>
   <header id="t-header"></header>
@@ -44,12 +44,30 @@
 
     <h2>4. Productos y servicios</h2>
     <p>Evolv es una aplicación web que arma y adapta planes personalizados de alimentación y entrenamiento según tus datos, metas, horarios y preferencias, y te permite registrar tu progreso. Se usa desde el navegador en <span data-comercio="web"></span> y puede instalarse en el celular como aplicación web.</p>
-    <p>Vendemos acceso completo a Evolv por un período: <b>Plan mensual</b> (30 días), <b>Plan trimestral</b> (90 días) y <b>Plan semestral</b> (180 días). Lo que incluye cada uno y su precio se muestran en <a href="/planes">Planes y precios</a>.</p>
+    <p>Vendemos acceso completo a Evolv por un período: <b>Plan mensual</b> (30 días), <b>Plan trimestral</b> (90 días) y <b>Plan semestral</b> (180 días). Lo que incluye cada uno y su precio se muestran en <a href="/planes">Planes y precios</a>.<span data-con-suscripcion hidden> También ofrecemos la <b>Suscripción mensual con 7 días gratis</b>, que se renueva cada mes hasta que la canceles (punto 4.1).</span></p>
     <ul>
       <li>Al ser un servicio digital, no hay stock: los planes están disponibles mientras se muestren en Planes y precios. Podemos dejar de ofrecer un plan o cambiar lo que incluye a futuro, sin afectar los planes ya pagados.</li>
       <li>Cada compra es de un plan, para una cuenta (el correo que indicas al pagar). No vendemos planes a menores de 18 años.</li>
-      <li>Los planes <b>no tienen período de prueba pagado ni renovación automática</b>. Si te damos acceso de cortesía (por ejemplo, en el programa beta), te indicamos cuánto dura, y al terminar no se cobra nada.</li>
+      <li data-sin-suscripcion>Los planes <b>no tienen período de prueba pagado ni renovación automática</b>. Si te damos acceso de cortesía (por ejemplo, en el programa beta), te indicamos cuánto dura, y al terminar no se cobra nada.</li>
+      <li data-con-suscripcion hidden>Los planes de 30, 90 y 180 días <b>no tienen período de prueba ni renovación automática</b>. La única modalidad que se renueva sola es la Suscripción mensual (punto 4.1), y solo si la contratas de forma expresa. Si te damos acceso de cortesía (por ejemplo, en el programa beta), te indicamos cuánto dura, y al terminar no se cobra nada.</li>
     </ul>
+    <section id="suscripcion" data-con-suscripcion hidden>
+      <h3>4.1 Suscripción mensual con 7 días gratis</h3>
+      <ul>
+        <li><b>Qué es:</b> acceso completo a Evolv, igual que el Plan mensual, que se renueva automáticamente cada mes hasta que la canceles.</li>
+        <li><b><span data-suscripcion="diasPrueba">7</span> días gratis:</b> al inscribirte tienes <span data-suscripcion="diasPrueba">7</span> días de acceso completo sin costo. Si cancelas dentro de esos días, no se te cobra nada.</li>
+        <li><b>Monto y fecha de cobro:</b> si no cancelas, el día <span data-suscripcion="diaPrimerCobro">8</span> se cobran <b><span data-suscripcion="monto">S/ 29.90</span></b> a tu tarjeta y, después, el mismo monto cada mes, contado desde la fecha de ese primer cobro. Al inscribirte ves la fecha exacta del primer cobro, y te la recordamos por correo <span data-suscripcion="diasAvisoCobro">2</span> días antes.</li>
+        <li><b>Una sola prueba por persona:</b> los días gratis son para quien nunca tuvo una prueba ni un plan pagado en Evolv. Si ya los tuviste, la suscripción empieza con el cobro del primer mes el mismo día en que te inscribes.</li>
+        <li><b>Tu tarjeta:</b> la ingresas en el formulario de Culqi, que la guarda para los cobros mensuales; Evolv no ve ni guarda sus datos. Para comprobar que la tarjeta es válida, Culqi hace un cargo de <span data-suscripcion="validacion">S/ 3.00</span> y lo anula al instante. Ese monto no es un cobro de la suscripción, aunque tu banco puede mostrarlo unos días como movimiento pendiente.</li>
+        <li><b>Aceptación expresa:</b> para inscribirte debes marcar que aceptas la renovación automática, el monto y la fecha del primer cobro. Sin esa aceptación no se crea la suscripción.</li>
+        <li><b>Cómo cancelar:</b> cuando quieras, desde Perfil → Mi suscripción en la aplicación, desde tu cuenta en <span data-comercio="web"></span> o escribiéndonos a <a data-comercio="correo"></a>. La cancelación es inmediata y sin costo, y te llega un correo que la confirma.</li>
+        <li><b>Qué pasa al cancelar:</b> no se hacen más cobros. Conservas el acceso hasta el final del período ya pagado o, si cancelas durante la prueba, hasta el final de los días gratis. Tus datos y tu historial se conservan, salvo que borres tu cuenta.</li>
+        <li><b>Si un cobro falla:</b> te avisamos por correo y Culqi lo reintenta en los días siguientes. Si los reintentos también fallan, la suscripción se cancela sola y el acceso termina al final del último período pagado. Puedes volver a suscribirte con otra tarjeta, sin días gratis.</li>
+        <li><b>Comprobantes:</b> cada cobro mensual llega con su comprobante por correo.</li>
+        <li><b>Cambios de precio:</b> si cambiamos el monto de la suscripción, te avisamos por correo al menos <span data-suscripcion="diasAvisoPrecio">30</span> días antes de que se aplique. Si no estás de acuerdo, puedes cancelarla sin costo antes de esa fecha.</li>
+        <li><b>Devoluciones:</b> están en la <a href="/devoluciones#suscripcion">Política de cambios y devoluciones</a>.</li>
+      </ul>
+    </section>
     <p>Evolv es una herramienta de bienestar. <b>No diagnostica enfermedades, no prescribe tratamientos y no reemplaza a un médico, nutricionista u otro profesional de salud.</b> Las recomendaciones son orientativas. Si tienes una condición médica, estás embarazada o tomas medicación, consulta a un profesional antes de empezar. Detén el ejercicio ante dolor, mareo, falta de aire inusual u otro síntoma preocupante.</p>
 
     <h2>5. Precios y formas de pago</h2>
@@ -57,7 +75,8 @@
       <li><span id="preciosMoneda">Los precios están en soles (S/)</span> e <b>incluyen los impuestos aplicables</b>.</li>
       <li id="monedaElegida" hidden>La tienda propone la moneda según el país desde el que nos visitas y puedes cambiarla antes de pagar. Se cobra el precio publicado en la moneda elegida, sin conversión.</li>
       <li>Aceptamos pagos con <b>tarjeta de crédito o débito</b> a través de <b>Culqi</b>, pasarela de pagos autorizada en el Perú. Por ahora no aceptamos transferencias, depósitos ni billeteras digitales.</li>
-      <li>Cada plan es un <b>pago único por un período de acceso</b>. <b>No hay renovación automática ni cobros recurrentes</b>: al terminar el período, decides si compras otro.</li>
+      <li data-sin-suscripcion>Cada plan es un <b>pago único por un período de acceso</b>. <b>No hay renovación automática ni cobros recurrentes</b>: al terminar el período, decides si compras otro.</li>
+      <li data-con-suscripcion hidden>Los planes de 30, 90 y 180 días son un <b>pago único por un período de acceso</b>, sin renovación automática: al terminar el período, decides si compras otro. La <b>Suscripción mensual se cobra cada mes de forma automática</b> hasta que la canceles (punto 4.1).</li>
       <li><b>Seguridad:</b> los datos de tu tarjeta los ingresas en el formulario de Culqi y los recibe directamente Culqi, que cumple el estándar de seguridad de la industria de tarjetas (PCI DSS). Evolv no ve ni guarda esos datos. Si tu banco lo pide, el pago se autentica con 3-D Secure. Toda la web usa conexión cifrada (HTTPS).</li>
       <li><b>Tu responsabilidad:</b> paga solo con una tarjeta propia o que estés autorizado a usar, no compartas sus datos ni tus códigos de verificación, revisa el plan y el monto antes de pagar y avísanos de inmediato si ves un cargo que no reconoces.</li>
       <li>Podemos cambiar los precios a futuro. Un cambio nunca afecta un plan ya pagado.</li>
@@ -74,6 +93,7 @@
     <p><b>Confirmación y validación del pedido:</b> el pedido queda confirmado cuando Culqi aprueba el pago. Si el banco o Culqi lo rechazan, no se hace ningún cobro y puedes intentarlo de nuevo con otra tarjeta.</p>
     <p><b>Cancelación por parte de Evolv:</b> podemos anular una compra si detectamos un uso no autorizado de la tarjeta o sospecha de fraude, un error evidente en el precio publicado, o que la compra incumple estos términos (por ejemplo, la hizo un menor de edad). En esos casos te avisamos por correo y te devolvemos el 100 % del monto a la misma tarjeta.</p>
     <p>Te enviamos el comprobante de pago electrónico al correo que indicaste al pagar.</p>
+    <p data-con-suscripcion hidden><b>Suscripción mensual:</b> la inscripción sigue los mismos pasos, pero en lugar de pagar guardas tu tarjeta y aceptas de forma expresa la renovación automática. No se cobra nada durante los días gratis, salvo la validación de la tarjeta que Culqi anula al instante (punto 4.1).</p>
 
     <h2>7. Entrega del servicio</h2>
     <ul>
@@ -81,11 +101,13 @@
       <li><b>Cobertura:</b> lo usas desde cualquier lugar con conexión a internet, en el navegador de tu celular o computadora.</li>
       <li><b>Tiempo de entrega:</b> el acceso se activa en cuanto Culqi aprueba el pago, normalmente en menos de un minuto. Si ya tienes cuenta con ese correo, el plan se suma a ella; si no, te enviamos un correo para crear tu contraseña con el plan ya activo.</li>
       <li>Si compras un plan mientras tienes uno vigente, los días nuevos se suman a partir del vencimiento del actual. No pierdes días pagados.</li>
+      <li data-con-suscripcion hidden>En la Suscripción mensual, el acceso se activa al terminar la inscripción y cada cobro mensual lo extiende un mes.</li>
       <li><b>Retrasos o problemas:</b> si en 15 minutos no te llega el correo (revisa también la carpeta de spam) o no ves el plan activo, escríbenos con el correo de la compra. Lo resolvemos en un máximo de un día hábil y, si no pudiéramos activarlo, te devolvemos el 100 % del monto.</li>
     </ul>
 
     <h2>8. Cambios, devoluciones y cancelación</h2>
-    <p>Tienes 7 días calendario desde la compra para pedir el reembolso completo, sin explicar el motivo. Las condiciones, los casos especiales y cómo pedirlo están en la <a href="/devoluciones">Política de cambios y devoluciones</a>. Como no hay renovación automática, no tienes que cancelar nada para que no se te vuelva a cobrar: el plan termina solo al final de su período.</p>
+    <p data-sin-suscripcion>Tienes 7 días calendario desde la compra para pedir el reembolso completo, sin explicar el motivo. Las condiciones, los casos especiales y cómo pedirlo están en la <a href="/devoluciones">Política de cambios y devoluciones</a>. Como no hay renovación automática, no tienes que cancelar nada para que no se te vuelva a cobrar: el plan termina solo al final de su período.</p>
+    <p data-con-suscripcion hidden>En los planes de pago único tienes 7 días calendario desde la compra para pedir el reembolso completo, sin explicar el motivo. Como esos planes no se renuevan solos, no tienes que cancelar nada: terminan al final de su período. La Suscripción mensual se cancela como indica el punto 4.1. Las condiciones, los casos especiales y cómo pedir una devolución de ambas modalidades están en la <a href="/devoluciones">Política de cambios y devoluciones</a>.</p>
 
     <h2>9. Uso adecuado del servicio</h2>
     <ul>
@@ -126,7 +148,9 @@
     import { mountLayout } from "/tienda/layout.js";
     mountLayout();
     // REQ-381: solo cuando la tienda vende también en dólares (TIENDA_USD_ENABLED).
-    import("/tienda/moneda.js").then((m) => m.cargarConfig()).then((cfg) => {
+    // REQ-354: la suscripción mensual solo con TIENDA_SUSCRIPCION_ENABLED.
+    import("/tienda/moneda.js").then((m) => m.cargarConfig()).then(async (cfg) => {
+      try { (await import("/tienda/suscripcion.js")).aplicarSuscripcion(cfg); } catch (_) { /* sin módulo: textos sin suscripción */ }
       if (!(cfg && cfg.tienda && cfg.tienda.usd === true)) return;
       document.getElementById("preciosMoneda").textContent = "Los precios están en soles (S/) o en dólares estadounidenses (USD)";
       document.getElementById("monedaElegida").hidden = false;
