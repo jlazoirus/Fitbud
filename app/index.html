@@ -931,6 +931,9 @@
   .menu-suggestion-actions{display:flex;flex-wrap:wrap;gap:8px}
   .menu-suggestion-actions .btn{min-height:44px}
   .menu-suggestion button:focus-visible,.home-consumption:focus-visible,.home-primary button:focus-visible,.home-agenda summary:focus-visible,.home-welcome button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .nutrition-register{margin:0 0 14px}
+  .nutrition-register .btn{width:100%;min-height:48px}
+  .nutrition-register p{margin:6px 0 0}
   .nutrition-week{padding:12px 0;margin-bottom:14px;border-bottom:1px solid var(--border)}
   .nutrition-week h2{font-family:var(--font-body);font-size:16px;margin:0 0 4px;letter-spacing:0}
   .nutrition-week p{font-size:13px;color:var(--muted);margin:4px 0 10px;line-height:1.5}
@@ -5908,7 +5911,10 @@ function renderNutrition(){
     return it.type==="meal"?mealCard(ds,it.base,order):extraCard(ds,it.data,it.idx,order);
   }).join("");
   // The weekly entry above is the only menu generator on this screen.
-  const emptyNutHtml=!prepared?`<p class="muted small">Puedes registrar lo que comiste sin preparar un menú.</p>`:"";
+  const registerHtml=`<div class="nutrition-register">
+    <button type="button" class="btn btn-accent" onclick="openEditor('extra','${ds}',null,{title:'Registrar algo que comí',registration:true,intent:'extra',initialTab:'food'})">Registrar algo que comí</button>
+    <p class="muted small">${prepared?"Aunque no esté en tu menú de hoy.":"Busca un alimento y registra cuánto comiste."}</p>
+  </div>`;
   // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
   // REQ-231: la lista de compra (de la semana, no del día) va en esta fila, con la misma forma.
   const shopWeek=shoppingWeek();
@@ -5923,7 +5929,7 @@ function renderNutrition(){
   ${section("nut.macros","Macros del día",heroDash(ds,{compact:"always"})+`<div class="muted small">${dbStatusNote()}</div>`)}
   ${nutritionUpdateHtml()}
   ${nutritionWeekHtml(ds)}
-  ${emptyNutHtml}
+  ${registerHtml}
   ${section("nut.plan","Comidas del día",
     itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
     `${orderedItems.length}`)}

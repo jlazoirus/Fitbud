@@ -2084,7 +2084,7 @@ Playwright a 360/390/1280: registro por gramos con dos alimentos, recarga, doble
 
 ## REQ-330 - Nutrición: acceso evidente para registrar algo fuera del plan
 
-**Estado: pendiente.** Implementar después de REQ-329.
+**Estado: implementado.** Acceso principal visible antes de la lista, con y sin menú; abre Alimento como extra y persiste sin cambiar comidas. Secundario conservado. ✓ `tests/e2e/registro-extra-visible.spec.js`.
 
 ### Origen
 Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): «le puedo dar click a registrar, pero no logro encontrar el camino» para anotar algo fuera del plan (ej. «cené 10 makis»).
