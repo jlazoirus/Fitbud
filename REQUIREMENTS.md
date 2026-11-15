@@ -2544,7 +2544,7 @@ e2e, validadores de onboarding y release gate.
 
 ## REQ-390 - Completar el perfil de a pocos desde Hoy
 
-**Estado: pendiente.** Implementar después de REQ-389. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+**Estado: implementado.** Una pregunta diaria después de registrar comida o entreno; posposición de tres días, coordinación con avisos/técnica y acceso desde Perfil. Respuestas privadas, metas desde mañana e historial conservado. Detalle: `docs/onboarding/progressive-profile.md`; especificación: `docs/onboarding/2026-11-11-feedback.md`. ✓ `scripts/test-profile-questions.mjs`, `tests/e2e/profile-questions.spec.js`.
 
 ### Origen
 Jonathan, 2026-11-11.

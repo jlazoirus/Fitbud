@@ -1,0 +1,15 @@
+# Preguntas progresivas en Hoy (REQ-390)
+
+Aplica a los perfiles de onboarding esencial (`onboardingEssentialOnly` sin `profileRefinedAt`). No abre un formulario al iniciar la app: después de registrar una comida o completar un entreno, Hoy abre una pregunta dentro de Avisos. Perfil ofrece «Continuar en Hoy» para iniciarla explícitamente. Una pregunta por fecha local; recargar conserva la pregunta pendiente y no inicia otra.
+
+Orden: actividad cotidiana, ingredientes que evita, ingredientes y platos favoritos, cocina, número de comidas, horarios, experiencia de entrenamiento, minutos disponibles, molestias/limitaciones y grasa corporal opcional. Se usan preferencias existentes; «No lo sé» cuenta como respuesta para grasa corporal. No añade un cuestionario de seguridad ni sustituye el cribado inicial.
+
+`js/profile-questions.js` contiene las transiciones puras. `prefs.profileQuestions` guarda claves respondidas, contador de omisiones por clave, última pregunta/fecha/estado, próxima fecha elegible y fecha bloqueada por otro aviso. «Ahora no» pospone tres días completos; tras la segunda omisión, la cola automática pasa a la siguiente clave. Las omitidas dos veces siguen disponibles mediante Perfil al agotar el resto. Omitir no equivale a responder: `profileRefinedAt` se fija únicamente cuando se responden todas. Guardar otros ajustes en Perfil no cierra este recorrido. Iniciar otro ciclo conserva las respuestas y la fecha de finalización.
+
+La pregunta tiene prioridad sobre la sugerencia de técnica en días elegibles. Si ya se mostró técnica o el pedido de avisos de racha o la invitación semanal a recordatorios, se bloquea el resto del día. Si existe un pedido de avisos pendiente, este conserva su prioridad. El registro local por cuenta `UI.profilePromptDays` reserva el día incluso mientras se guarda; el estado persistente en preferencias conserva la coordinación tras recargar.
+
+Las respuestas usan `saveProfilePrefs`; las marcas de presentación/posposición no crean versiones del plan. Las respuestas que cambian el plan crean una versión con vigencia desde mañana, conservando la versión anterior. Los cambios de actividad/grasa recalculan metas, guardan `macroTargetsValidFrom` y `previousMacroTargets`, e indican que comienzan mañana. No se reescriben consumos ni sesiones ejecutados. Las preferencias alimentarias y de entrenamiento entran en futuras propuestas; el usuario conserva lo que ya aplicó.
+
+`profile_question_shown`, `profile_question_answered` y `profile_question_skipped` solo contienen `question`, validada contra las once claves tanto en cliente como en API. Nunca contienen respuestas, texto libre, medidas corporales ni molestias. Sin migración SQL ni llamadas pagadas.
+
+Verificación: `node scripts/test-profile-questions.mjs`, `tests/e2e/profile-questions.spec.js` (móvil/escritorio, recarga, reloj, tres días/dos omisiones, coordinación, metas/historial, finalización, errores y privacidad) y release gate. El módulo está en el shell PWA y el detector de módulos compartidos verifica que funciona sin navegador.

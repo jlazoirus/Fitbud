@@ -7,6 +7,9 @@ const ALLOWED_EVENT_TYPES = new Set([
   "session_start",
   "onboarding_complete",
   "onboarding_step_view",
+  "profile_question_shown",
+  "profile_question_answered",
+  "profile_question_skipped",
   "onboarding_review",
   "plan_restart",
   "shopping_list_opened",
@@ -35,12 +38,14 @@ const ALLOWED_EVENT_TYPES = new Set([
 const ALLOWED_PROP_KEYS = new Set([
   "week", "cycle", "day_of_week", "slot", "count",
   "source", "outcome", "plan_type", "sport",
-  "context", "step", "error_code", "duration_weeks", "duration_s", "action",
+  "context", "step", "error_code", "duration_weeks", "duration_s", "question", "action",
   // REQ-339: tarjeta de avisos (estado del push, tipo de teléfono, app instalada).
   "state", "platform", "standalone",
 ]);
 
-function filterProps(props) {
+const PROFILE_QUESTION_KEYS=new Set(['activityLevel','dislikedIngredients','preferredIngredients','preferredDishes','cookingLevel','mealCount','mealTimes','trainingExperience','sessionMinutes','limitations','bodyFatPct']);
+function filterProps(props,type) {
+  if(type.startsWith('profile_question_'))return PROFILE_QUESTION_KEYS.has(props?.question)?{question:props.question}:{};
   const out = {};
   for (const [k, v] of Object.entries(props || {})) {
     if (
@@ -112,7 +117,7 @@ async function handlePost(req, res, e, user) {
   }
 
   const sessionId = String(body.session_id || "").slice(0, 64) || null;
-  const properties = filterProps(body.properties);
+  const properties = filterProps(body.properties,eventType);
 
   const response = await fetch(e.url + "/rest/v1/product_events", {
     method: "POST",

@@ -884,6 +884,10 @@
   .home-agenda[open] .chev{transform:rotate(-90deg)}
   .home-agenda .agenda-list{border-top:1px solid var(--border);padding:8px 12px 0}
   .home-agenda .agenda-actions .btn{flex:0 1 auto}
+  .profile-question{padding:14px 0}
+  .profile-question h2{font-size:18px;line-height:1.3;margin:0 0 8px}
+  .profile-question-choices{display:grid;gap:8px}
+  .profile-question .btn{min-height:44px;margin:4px 4px 4px 0}
   .home-technique{display:flex;align-items:center;gap:4px;margin:12px 0 16px;padding:4px;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-md)}
   .home-technique-open{flex:1;min-width:0;display:flex;align-items:center;gap:10px;min-height:56px;padding:6px;background:none;text-align:left}
   .home-technique-preview{position:relative;width:44px;height:44px;flex:none;display:grid;place-items:center;overflow:hidden;border-radius:9px;background:var(--surf3);color:var(--txt)}
@@ -1245,6 +1249,7 @@
 <!-- Dominio nutricional puro: tolerancias, macros de recetas, restricciones, slots, validadores. -->
 <script src="js/nutrition-domain.js"></script>
 <script src="js/day-model.js"></script>
+<script src="js/profile-questions.js"></script>
 <script src="js/api-client.js"></script>
 <!-- REQ-269..276: registro nutricional puro (validación, origen, composición, alimentos y recetas propios). -->
 <script src="js/meal-log.js"></script>
@@ -2343,6 +2348,7 @@ function planSnapshotFields(prefs){
     preferredCuisines:[...(p.preferredCuisines||[])],
     preferredPreparations:[...(p.preferredPreparations||[])],
     preferredIngredients:p.preferredIngredients||"",
+    preferredDishes:p.preferredDishes||"",
     foodNotes:p.foodNotes||"",
     allergies:p.allergies||"",
     dislikedIngredients:p.dislikedIngredients||"",
@@ -3926,6 +3932,96 @@ function validateTrainingProfileCore(d){
   if(!TRAINING_EXPERIENCE_LABELS[d.trainingExperience])return "Selecciona tu nivel de experiencia";
   return "";
 }
+// REQ-390: one small preference question after a meaningful action, never on launch.
+const PROFILE_QUESTIONS=window.FITBUD_PROFILE_QUESTIONS;
+let profileQuestionBusy=false,profileQuestionValueSeen=null,profileQuestionMomentOn='',profileQuestionManual=false,profileQuestionOpenKey='';
+function profileQuestionDayKind(){const d=UI.profilePromptDays&&UI.profilePromptDays[uid()];return d&&d.date===todayStr()?d.kind:'';}
+function setProfileQuestionDayKind(kind){
+  UI.profilePromptDays={...(UI.profilePromptDays||{}),[uid()]:{date:todayStr(),kind}};uiSave();
+}
+function profileQuestionBlockDay(kind){
+  if(!needsProfileTuning(profile&&profile.prefs)||profileQuestionDayKind()===kind)return;
+  setProfileQuestionDayKind(kind);
+  const p=profile.prefs,s=PROFILE_QUESTIONS.state(p);
+  void saveProfilePrefs({...p,profileQuestions:{...s,blockedOn:todayStr()}},{skipPlanVersion:true}).catch(()=>{});
+}
+function profileQuestionReservesDay(){
+  if(!profile||!needsProfileTuning(profile.prefs))return false;
+  const s=PROFILE_QUESTIONS.state(profile.prefs),kind=profileQuestionDayKind();
+  return kind==='profile'||s.lastAskedOn===todayStr()||(!kind&&PROFILE_QUESTIONS.eligible(profile.prefs,todayStr(),false));
+}
+function profileQuestionValueCounts(ds){
+  const st=S.days[ds]||{};
+  return {meals:Object.values(st.meals||{}).filter(m=>m&&m.done).length+(st.extras||[]).filter(m=>m&&m.done!==false).length,workout:st.workoutExecution?.status==='completed'||!!st.workoutDone};
+}
+function primeProfileQuestionValue(){
+  const key=uid()+':'+todayStr();if(profileQuestionValueSeen?.key!==key)profileQuestionValueSeen={key,...profileQuestionValueCounts(todayStr())};
+}
+function profileQuestionAfterCommit(ds){
+  if(ds!==todayStr()||!profile||onboardingActive||!needsProfileTuning(profile.prefs))return;
+  const key=uid()+':'+ds,now=profileQuestionValueCounts(ds),before=profileQuestionValueSeen?.key===key?profileQuestionValueSeen:{meals:0,workout:false};
+  profileQuestionValueSeen={key,...now};
+  if(now.meals>before.meals||now.workout&&!before.workout){profileQuestionMomentOn=ds;void maybeClaimProfileQuestion();}
+}
+async function maybeClaimProfileQuestion(){
+  if(profileQuestionBusy||!profile||!session||onboardingActive||view!=='hoy'||!needsProfileTuning(profile.prefs)||profileQuestionMomentOn!==todayStr())return;
+  const kind=profileQuestionDayKind();if(kind&&kind!=='profile')return;
+  if(_notifyAskPending&&notifyAskWanted(_notifyAskPending))return;
+  const owner=uid(),prefs=PROFILE_QUESTIONS.claim(profile.prefs,todayStr(),profileQuestionManual);if(!prefs)return;
+  profileQuestionBusy=true;setProfileQuestionDayKind('profile');
+  try{
+    const result=await saveProfilePrefs(prefs,{skipPlanVersion:true});
+    if(owner!==uid())return;
+    if(result?.error){setProfileQuestionDayKind('');return;}
+    trackEvent('profile_question_shown',{question:prefs.profileQuestions.lastQuestion});
+    if(view==='hoy')renderHoy();
+  }catch(e){if(owner===uid())setProfileQuestionDayKind('');}
+  finally{profileQuestionBusy=false;}
+}
+function profileQuestionCardHtml(){
+  if(!profile||!needsProfileTuning(profile.prefs))return '';
+  const p=profile.prefs,s=PROFILE_QUESTIONS.state(p);
+  if(s.lastAskedOn!==todayStr()||s.status!=='open'||s.blockedOn===todayStr()||['notifications','technique'].includes(profileQuestionDayKind()))return '';
+  const q=PROFILE_QUESTIONS.questions.find(q=>q.key===s.lastQuestion);if(!q)return '';
+  const value=q.key==='mealTimes'?(p.mealTimes||[]).join(', '):p[q.key]??'';
+  const controls=q.choices?`<div class="profile-question-choices">${q.choices.map(([v,label])=>`<button type="button" class="btn" onclick="answerProfileQuestion('${q.key}','${v}')">${esc(label)}</button>`).join('')}</div>`:`<div class="field"><label for="profileQuestionValue">${q.type==='number'?q.key==='bodyFatPct'?'Porcentaje (opcional)':'Minutos':'Tu respuesta'}</label><input id="profileQuestionValue" type="${q.type||'text'}" ${q.type==='number'?`min="${q.min}" max="${q.max}" step="${q.key==='bodyFatPct'?'.1':'1'}"`:''} value="${esc(value)}" placeholder="${esc(q.placeholder||'')}"></div><button type="button" class="btn btn-accent" onclick="answerProfileQuestion('${q.key}')">Guardar respuesta</button>${q.empty?`<button type="button" class="btn" onclick="answerProfileQuestion('${q.key}','')">${esc(q.empty)}</button>`:''}`;
+  return `<section id="profileQuestion" class="profile-question" aria-labelledby="profileQuestionTitle"><h2 id="profileQuestionTitle">${esc(q.title)}</h2><p class="field-note">${q.hint?esc(q.hint)+' ':''}Lo usaremos en tus próximas propuestas${['activityLevel','bodyFatPct'].includes(q.key)?'; las metas nuevas comienzan mañana':''}.</p>${controls}<p class="field-note" id="profileQuestionStatus" role="status"></p><button type="button" class="btn btn-sm" onclick="skipProfileQuestion('${q.key}')">Ahora no</button></section>`;
+}
+async function answerProfileQuestion(key,value){
+  if(profileQuestionBusy)return;
+  if(value===undefined)value=$('#profileQuestionValue')?.value||'';
+  const owner=uid(),today=todayStr(),result=PROFILE_QUESTIONS.answer(profile.prefs,key,value,{today,now:new Date().toISOString(),calculateMacroTargets,defaultMealTimes,currentTargets:effectiveDayTarget(null,today)});
+  if(result.error){const status=$('#profileQuestionStatus');if(status)status.textContent=result.error;return;}
+  profileQuestionBusy=true;document.querySelectorAll('#profileQuestion button').forEach(b=>b.disabled=true);
+  try{
+    const before=profile.prefs;
+    if(!planVersionForDate(today))await ensurePlanVersion({prefs:before,validFrom:before.planStartDate||START});
+    const saved=await saveProfilePrefs(result.prefs,{validFrom:addDays(today,1),reason:'Preferencias para próximas propuestas'});
+    if(owner!==uid())return;
+    if(saved?.error){const status=$('#profileQuestionStatus');if(status)status.textContent='No se pudo guardar. Puedes reintentar.';return;}
+    trackEvent('profile_question_answered',{question:key});
+    render();toast(['activityLevel','bodyFatPct'].includes(key)?'Guardado. Tus nuevas metas se aplican desde mañana.':'Guardado para tus próximas propuestas.');
+  }catch(e){if(owner===uid()){const status=$('#profileQuestionStatus');if(status)status.textContent='No se pudo guardar. Puedes reintentar.';}}
+  finally{profileQuestionBusy=false;document.querySelectorAll('#profileQuestion button').forEach(b=>b.disabled=false);}
+}
+async function skipProfileQuestion(key){
+  if(profileQuestionBusy)return;const owner=uid(),prefs=PROFILE_QUESTIONS.skip(profile.prefs,key,todayStr());if(!prefs)return;
+  profileQuestionBusy=true;
+  try{
+    const saved=await saveProfilePrefs(prefs,{skipPlanVersion:true});if(owner!==uid())return;
+    if(saved?.error){toast('No se pudo posponer. Inténtalo de nuevo.');return;}
+    trackEvent('profile_question_skipped',{question:key});render();toast('Lo dejamos para dentro de tres días.');
+  }catch(e){if(owner===uid())toast('No se pudo posponer. Inténtalo de nuevo.');}
+  finally{profileQuestionBusy=false;}
+}
+function openProfileQuestion(){
+  profileQuestionManual=true;profileQuestionMomentOn=todayStr();setView('hoy');
+  const s=PROFILE_QUESTIONS.state(profile.prefs);
+  if(s.lastAskedOn===todayStr()&&s.status!=='open')toast('Por hoy está listo. Puedes continuar otro día.');
+  else if(s.nextEligibleOn>todayStr())toast('Podrás continuar el '+prettyDate(s.nextEligibleOn)+'.');
+  void maybeClaimProfileQuestion();
+}
+
 function needsProfileTuning(prefs){
   const p=prefs||{};
   return !!(p.onboardingEssentialOnly && !p.profileRefinedAt);
@@ -4456,7 +4552,7 @@ async function saveOnboarding(){
     onboardingPending:false,pendingChallenge:null,restartCycle:false,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
     ...(firstCycle||newCycle?{cycleFirstDayPreparedAt:null,cycleFirstWeekPreparedAt:null}:{}),
-    ...(firstCycle||newCycle?{onboardingEssentialOnly:true,profileRefinedAt:null}:{}),
+    ...(firstCycle||newCycle?{onboardingEssentialOnly:true,profileRefinedAt:PROFILE_QUESTIONS.complete(PROFILE_QUESTIONS.state(previous))?(previous.profileRefinedAt||now):null}:{}),
   };
   const result=await saveProfilePrefs(prefs,{
     source:newCycle?"new_cycle":"onboarding",
@@ -5474,14 +5570,17 @@ function homeRemainingAgendaHtml(ds,items){
 // REQ-367: la semana y los recordatorios no compiten con la agenda diaria.
 let homeReminderShownKey="";
 function homeNoticesHtml(ds,today){
-  const week=planWeekNoticeHtml(ds),reminder=notifyNudgeHtml();
-  if(!week&&!reminder)return "";
-  const preview=week?(reminder?"Plan y recordatorios":"Semana del plan"):"Configura tus recordatorios";
+  const question=ds===today?profileQuestionCardHtml():"";
+  const week=planWeekNoticeHtml(ds),reminder=question?"":notifyNudgeHtml();
+  if(!week&&!reminder&&!question)return "";
+  const preview=question?"Afina tu plan":week?(reminder?"Plan y recordatorios":"Semana del plan"):"Configura tus recordatorios";
   const previous=$("#homeNotices");
-  const open=previous?.open&&previous.dataset.date===today;
+  const questionKey=question?uid()+":"+today+":"+PROFILE_QUESTIONS.state(profile.prefs).lastQuestion:"";
+  const open=(question&&profileQuestionOpenKey!==questionKey)||(previous?.open&&previous.dataset.date===today);
+  if(question)profileQuestionOpenKey=questionKey;
   return `<details id="homeNotices" class="home-notices" data-date="${today}" ontoggle="homeNoticesToggled(this)"${open?" open":""}>
     <summary>${notifyIcon("bell",18)}<span class="home-notices-summary-copy"><b>Avisos</b><span>${preview}</span></span>${chevron()}</summary>
-    ${week}${reminder}
+    ${question}${week}${reminder}
   </details>`;
 }
 function homeNoticesToggled(panel){
@@ -5498,6 +5597,7 @@ function renderAfterHomeNotice(){
   if(restore&&view==="hoy"&&!$("#overlay"))($("#homeNotices>summary")||$(".home-primary-action"))?.focus();
 }
 function homeWorkoutTechniqueHtml(ds,agenda){
+  if(profileQuestionReservesDay())return "";
   if(ds!==todayStr()||UI.homeTechniqueDismissed?.[uid()]===ds||trainingInjuryNoticeActive())return "";
   if(!agenda.items.some(item=>item.kind==="workout"))return "";
   const prescription=workoutPrescription(ds);
@@ -5506,6 +5606,7 @@ function homeWorkoutTechniqueHtml(ds,agenda){
   const exercise=step&&exerciseBySlug(step.exerciseSlug);
   if(!exerciseHasDemo(exercise))return "";
 
+  profileQuestionBlockDay("technique");
   const media=exerciseMediaSources(exercise);
   const thumbnail=[media.poster,media.frames[0],media.isImage?media.url:""].find(src=>
     /^(?:\.\/|\/)?assets\/exercise-media\/[\w-]+\.(avif|jpe?g|png|webp)$/i.test(src||""));
@@ -5780,6 +5881,7 @@ function renderHoy(){
   ${menuSuggestion}
   ${referralNoticeHtml()}`;
   maybeStartFitbrosTour();
+  void maybeClaimProfileQuestion();
 }
 function renderCoach(){chatModeActive()?renderChatMode():renderHoy();}
 
@@ -9394,7 +9496,7 @@ function renderProfile(){
   $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
   ${referralNoticeHtml()}
   ${nutritionUpdateHtml()}
-  ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Completa tus preferencias de cocina, horarios de comidas, presupuesto y lesiones para que el coach proponga opciones más precisas.</span></div>`:""}
+  ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Una pregunta breve cada día para ajustar tus próximas propuestas.</span><button type="button" class="btn" onclick="openProfileQuestion()">Continuar en Hoy</button></div>`:""}
 
   <div class="pf-accordion-list">
   <div id="pfEditableBody" oninput="profileMarkDirty()" onchange="profileMarkDirty()">
@@ -9829,7 +9931,6 @@ async function saveProfile(){
   }
   prefs.avoid=[prefs.allergies,prefs.dislikedIngredients].filter(Boolean).join(", ");
   prefs.trainNote=[prefs.injuries,prefs.limitations,prefs.avoidMovements].filter(Boolean).join(". ");
-  if(prefs.onboardingEssentialOnly&&!prefs.profileRefinedAt)prefs.profileRefinedAt=new Date().toISOString();
   const result=await saveProfilePrefs(prefs,targetsChanged?{validFrom:addDays(todayStr(),1)}:undefined);
   if(result&&result.error){toast("Error: "+result.error.message);return;}
   if(calendarChanged){await upsertActiveCycle();await pullCycleHistory();}
@@ -10162,6 +10263,8 @@ function notifyHourLabel(){
 // personales: solo categorías.
 function notifyPlatform(){return isIOSDevice()?"ios":/android/i.test(navigator.userAgent||"")?"android":isMobileDevice()?"mobile":"desktop";}
 function trackNotifyPrompt(source,action,extra){
+  if(source==="streak"&&action==="shown")profileQuestionBlockDay("notifications");
+  if(source==="invite"&&action==="shown"&&needsProfileTuning(profile&&profile.prefs))setProfileQuestionDayKind("notifications");
   let state="unknown";try{state=devicePushState();}catch(_){}
   trackEvent("notifications_prompt",{source,action,state,platform:notifyPlatform(),standalone:isStandaloneMode(),...(extra||{})});
 }
@@ -10269,6 +10372,7 @@ const NOTIFY_ASK_KEY="evolv_notify_ask_v1",NOTIFY_ASK_MAX=2;
 let _notifyAskPending=0;
 function notifyAskCount(){try{return Number(localStorage.getItem(NOTIFY_ASK_KEY+":"+uid()))||0;}catch(e){return NOTIFY_ASK_MAX;}}
 function notifyAskWanted(n){
+  if(profileQuestionDayKind()==="profile"||profile&&PROFILE_QUESTIONS.state(profile.prefs).lastAskedOn===todayStr())return false;
   if(!session||!profile||onboardingActive||notifPrefsCache===null||remindersCovered()||reminderInviteState().declined)return false;
   const asked=notifyAskCount();
   return asked===0?n>=1:asked<NOTIFY_ASK_MAX&&n>=3;
@@ -10293,6 +10397,7 @@ function showQueuedNotifyAsk(){
 }
 // Recordatorio en Hoy: cada día, hasta que los avisos estén activos.
 function notifyNudgeDue(){
+  if(profileQuestionDayKind()==="profile"||profile&&PROFILE_QUESTIONS.state(profile.prefs).lastAskedOn===todayStr())return false;
   if(notifPrefsCache===null||onboardingActive||!session||!profile)return false; // aún no se sabe: sin parpadeo
   return hasCompleteOnboarding(profile.prefs||{})&&!remindersCovered()&&!notifySnoozed()&&!reminderInviteState().declined;
 }
@@ -10412,6 +10517,7 @@ function reminderInviteState(){
 }
 function remindersActive(){return devicePushState()==="on"||!!(notifPrefsCache&&notifPrefsCache.email_opt_in)||whatsappLinked();}
 function reminderInviteDue(){
+  if(profileQuestionDayKind()==="profile"||profile&&PROFILE_QUESTIONS.state(profile.prefs).lastAskedOn===todayStr())return false;
   if(!session||!profile||onboardingActive||notifySetupActive||view!=="hoy")return false;
   if(notifPrefsCache===null||whatsappLinkCache===null)return false; // aún no se sabe qué tiene activo
   if(!hasCompleteOnboarding(profile.prefs||{})||remindersActive())return false;
@@ -10430,6 +10536,7 @@ async function markReminderInvite(patch){
   if(!profile||!profile.prefs)return;
   const prefs={...profile.prefs};
   if(patch.last)prefs.reminderInviteLastShownAt=patch.last;
+  if(patch.last&&profileQuestionDayKind()==="notifications"&&needsProfileTuning(prefs))prefs.profileQuestions={...PROFILE_QUESTIONS.state(prefs),blockedOn:todayStr()};
   if(patch.declined)prefs.reminderInviteDeclined=true;
   try{await saveProfilePrefs(prefs,{skipPlanVersion:true});}catch(_){/* queda la caché local */}
 }
@@ -10441,8 +10548,8 @@ function showReminderInvite(){
   // Nunca encima de otro modal, hoja o celebración: espera a la siguiente apertura.
   if(document.hidden||$("#overlay")||_streakActive||!reminderInviteDue())return;
   _reminderInviteAnswered=false;
-  markReminderInvite({last:new Date().toISOString()});
   trackNotifyPrompt("invite","shown");
+  markReminderInvite({last:new Date().toISOString()});
   const st=devicePushState();
   const push=st==="off";
   const wa=whatsappAvailable();
@@ -15327,6 +15434,7 @@ function streakSeenState(){
   return {today,user:uid(),cycle:START,t,y,sig:sig(t)+"|"+sig(y)};
 }
 function primeStreakSeen(){
+  primeProfileQuestionValue();
   try{
     const cur=streakSeenState();
     if(_streakSeen&&(_streakSeen.user!==cur.user||_streakSeen.cycle!==cur.cycle))resetStreakFeedback();
@@ -15659,6 +15767,7 @@ let _recoveryBusy=false;
 // porque ahí la sesión todavía está seteada en ese momento.
 function clearSignedOutState(prevUid){
   if(prevUid===undefined)prevUid=uid(); // capturar antes de limpiar la sesión para aislar la cola
+  profileQuestionValueSeen=null;profileQuestionMomentOn="";profileQuestionManual=false;profileQuestionOpenKey="";
   resetStreakFeedback(); // REQ-304: ninguna celebración pasa a otra cuenta
   routineConversation=null;routineReview=null; // REQ-359: borradores privados de la cuenta
   referralState=null; // REQ-317: aislar invitaciones por cuenta
@@ -16388,6 +16497,7 @@ function commitDay(ds){
   save();
   pushDay(ds);
   try{streakFeedbackAfterCommit(ds);}catch(e){/* REQ-283: la animación nunca bloquea el guardado */}
+  profileQuestionAfterCommit(ds);
   scheduleEngagementSave(); // REQ-285
   scheduleStreakSocialSync(); // REQ-300
 }
@@ -18143,7 +18253,7 @@ async function boot(){
 }
 /* ---- Analitica de producto (REQ-27) ---- */
 // Solo claves seguras sin datos de salud, identidad ni prompts.
-const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","duration_s","action","state","platform","standalone"]); // REQ-339: state/platform/standalone de la tarjeta de avisos (igual que api/analytics.js)
+const ANALYTICS_SAFE_PROPS=new Set(["week","cycle","day_of_week","slot","count","source","outcome","plan_type","sport","context","step","error_code","duration_weeks","duration_s","question","action","state","platform","standalone"]); // REQ-339: state/platform/standalone de la tarjeta de avisos (igual que api/analytics.js)
 let _analyticsSessionId=null;
 // REQ-317: al retomar la PWA tras 30 minutos fuera comienza otro uso.
 let analyticsAwayAt=0;
@@ -18165,7 +18275,7 @@ function filterEventProps(props){
 function trackEvent(type,props){
   if(!session)return;
   try{
-    const safe=filterEventProps(props||{});
+    const safe=type.startsWith("profile_question_")?(PROFILE_QUESTIONS.keys.includes(props?.question)?{question:props.question}:{}):filterEventProps(props||{});
     apiFetch("/api/analytics",{
       method:"POST",
       headers:{"content-type":"application/json","Authorization":"Bearer "+session.access_token},
