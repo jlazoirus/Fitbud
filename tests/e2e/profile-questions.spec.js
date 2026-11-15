@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 import {test,expect} from '@playwright/test';
 import {installMocks,seedLoggedInUser,autoDismissNudges,gotoApp,completePrefs,todayYmd,collectConsoleErrors} from './helpers.js';
 const archive='/Users/jonathan/.fitbros/qa-archive/req-390';
@@ -9,7 +10,7 @@ async function boot(page,context,overrides={},mockOptions={}){
  const errors=collectConsoleErrors(page);await seedLoggedInUser(page);await autoDismissNudges(page);await gotoApp(page);return {...mock,events,errors};
 }
 async function register(page){
- await page.getByRole('button',{name:'Registrar comida',exact:true}).click();await page.fill('#f_name','Mi comida privada');
+ await page.getByRole('button',{name:'Registrar comida',exact:true}).click();await openManualEntry(page);await page.fill('#f_name','Mi comida privada');
  for(const [key,value] of Object.entries({f_kcal:'400',f_p:'25',f_c:'45',f_f:'13'}))await page.fill('#'+key,value);
  await page.locator('#overlay').getByRole('button',{name:'Guardar',exact:true}).click();await expect(page.locator('#overlay')).toHaveCount(0);
 }

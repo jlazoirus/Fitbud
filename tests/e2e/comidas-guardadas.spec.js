@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-188: reutilizar comidas recientes y favoritas, y registrar alimentos
 // sueltos por gramos desde el catálogo (0 llamadas pagadas).
 import { test, expect } from "@playwright/test";
@@ -81,6 +82,7 @@ test.describe("Comidas guardadas", () => {
 
     let overlay = await openAddMeal(page);
     await overlay.locator('.qp-tab[data-tab="food"]').click();
+    await openManualEntry(overlay);
     await overlay.locator("#f_name").fill("Shake proteina");
     for (const [id, v] of [["#f_kcal", "300"], ["#f_p", "24"], ["#f_c", "36"], ["#f_f", "3"]]) await overlay.locator(id).fill(v);
     await overlay.getByRole("button", { name: "Guardar", exact: true }).click();

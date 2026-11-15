@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-242 (feedback Sathya, beta): lo registrado ayer cuya subida falló no
 // desaparece al abrir la app al día siguiente, ni se pisa al completar el día.
 import { test, expect } from "@playwright/test";
@@ -16,6 +17,7 @@ async function openAppOn(context, when) {
 
 async function editMeal(page, ds, id, name, kcal) {
   await page.evaluate(([d, m]) => openEditor("meal", d, m), [ds, id]);
+  await openManualEntry(page);
   await page.locator("#f_name").fill(name);
   await page.locator("#f_kcal").fill(String(kcal));
   await page.locator("#overlay").getByRole("button", { name: "Guardar", exact: true }).click();

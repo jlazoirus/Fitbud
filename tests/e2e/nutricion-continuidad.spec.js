@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, gotoApp, autoDismissNudges, completePrefs, daysFromToday, todayYmd, SUPA_URL, USER_ID, collectConsoleErrors } from "./helpers.js";
 
@@ -104,6 +105,7 @@ test("sin alternativas explica el hueco, persiste y permite registrar lo realmen
   if(process.env.CAPTURE_NUTRITION_CONTINUITY)await page.screenshot({path:"/tmp/req-349-sin-alternativa.png",fullPage:true});
   await gotoApp(page);await page.locator('[data-tab="nutricion"]').click();
   await page.getByRole("button",{name:"Registrar lo que comí",exact:true}).first().click();
+  await openManualEntry(page);
   await page.locator("#f_name").fill("Mi desayuno real");
   for(const [id,value]of Object.entries({f_kcal:"400",f_p:"20",f_c:"40",f_f:"10"}))await page.locator("#"+id).fill(value);
   await page.locator("#overlay").getByRole("button",{name:"Guardar",exact:true}).click();

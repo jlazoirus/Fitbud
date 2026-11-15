@@ -642,7 +642,12 @@
   .copy-list{margin:6px 0;padding-left:18px;font-size:14px}
   .components{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:var(--r-md)}
   .comp-head{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;margin-bottom:6px}
-  .comp-total{margin-top:6px}
+  .comp-total{margin-top:10px;padding-top:8px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline}
+  .comp-total b{font-size:20px;color:var(--txt)}
+  .comp-total span{font-size:13px;color:var(--muted)}
+  .editor-manual{margin-top:12px;border-block:1px solid var(--line)}
+  .editor-manual>summary{min-height:44px;display:list-item;padding:12px 0;font-size:14px;font-weight:600;cursor:pointer}
+  .editor-manual[open]>summary{margin-bottom:4px}
   .qp-save-fav input{accent-color:var(--accent);width:17px;height:17px}
   .closebar{display:flex;justify-content:flex-end;margin-bottom:4px}
   .closebar button{background:var(--surf3);width:36px;height:36px;border-radius:999px;font-size:16px;color:var(--muted)}
@@ -5156,7 +5161,7 @@ function homeLogFood(ds,id){
 function openFoodRegistration(ds,id){
   current=ds;
   const next=dayEffectiveOrder(ds).find(it=>it.type==="meal"&&(!id||it.base.id===id)&&!mealState(ds,it.base.id).done&&!mealState(ds,it.base.id).skipped);
-  openEditor("extra",ds,null,{title:"Registrar comida",registration:true,intent:next?"replace":"extra",target:next?next.base.id:null});
+  openEditor("extra",ds,null,{title:"Registrar comida",registration:true,initialTab:"food",intent:next?"replace":"extra",target:next?next.base.id:null});
 }
 // Solo una fecha por cuenta/dispositivo; no guarda comidas ni datos de salud.
 const menuSuggestionMemory={};
@@ -12025,7 +12030,7 @@ function openEditor(kind,ds,id,options={}){
   let title="Agregar comida / snack";
   if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,macrosUnknown:v.macrosUnknown};title="Editar — "+base.slot;}
   // REQ-229: el nombre precargado de una comida del plan es lo planeado, no lo que comió.
-  window._editor={kind,ds,id,extraIdx:null,registration:!!options.registration,intent:options.intent,target:options.target,planName:kind==="meal"?String(pre.name||""):"",...editorMetaDraft(kind==="meal"?mealState(ds,id).ovr:null,pre,kind==="meal")};
+  window._editor={kind,ds,id,extraIdx:null,registration:!!options.registration,initialTab:options.initialTab,intent:options.intent,target:options.target,planName:kind==="meal"?String(pre.name||""):"",...editorMetaDraft(kind==="meal"?mealState(ds,id).ovr:null,pre,kind==="meal")};
   editorSheet(options.title||title,pre);
 }
 function editExtra(ds,i){const e=dayState(ds).extras[i];window._editor={kind:"extra",ds,id:null,extraIdx:i,...editorMetaDraft(e,e,false)};editorSheet("Editar comida extra",e);}
@@ -12166,6 +12171,7 @@ async function toggleQuickPickFavorite(i){
   await toggleSavedMeal(item);renderQuickPicks();
 }
 function setEditorValues(v){
+  openEditorManual();
   $("#f_name").value=v.name;
   setKcalOnlyMode(!!v.macrosUnknown);
   [["kcal","f_kcal"],["p","f_p"],["c","f_c"],["f","f_f"]].forEach(([k,id])=>{$("#"+id).value=v.macrosUnknown&&k!=="kcal"?"":formatEditorNumber(v[k]);});
@@ -12187,6 +12193,7 @@ function setKcalOnlyMode(on){
   });
   const errs=window._editor&&window._editor.errors;
   if(on&&errs){["p","c","f"].forEach(k=>delete errs[k]);renderEditorErrors(errs);}
+  renderEditorTotal();
 }
 function editorMode(){const box=$("#f_kcalOnly");return box&&box.checked?"kcal_only":"full";}
 const EDITOR_FIELD_IDS={name:"f_name",kcal:"f_kcal",p:"f_p",c:"f_c",f:"f_f"};
@@ -12200,6 +12207,7 @@ function renderEditorErrors(errors){
   if(!box)return;
   const labels={name:"Descripción",kcal:"kcal",p:"Proteína",c:"Carbohidratos",f:"Grasa"};
   const list=Object.keys(EDITOR_FIELD_IDS).filter(k=>errors&&errors[k]);
+  if(list.length)openEditorManual();
   box.innerHTML=list.length?`<ul>${list.map(k=>`<li><b>${labels[k]}:</b> ${esc(errors[k])}</li>`).join("")}</ul>`:"";
   box.hidden=!list.length;
 }
@@ -12452,7 +12460,7 @@ function applyEditorComponents(){
     if(auto&&e.autoName){name.value="";e.autoName="";}
     ["f_kcal","f_p","f_c","f_f"].forEach(id=>{const el=$("#"+id);if(el)el.value="";});
     if(!e.recipeLoaded)e.meta={source:"manual"};
-    renderEditorComponents();return;
+    renderEditorComponents();renderEditorImpact();return;
   }
   const t=componentsTotals(list);
   setKcalOnlyMode(false);
@@ -12463,13 +12471,27 @@ function applyEditorComponents(){
   renderEditorComponents();
   renderEditorImpact();
 }
+function openEditorManual(){const panel=$("#f_manual");if(panel)panel.open=true;}
+function renderEditorTotal(){
+  const box=$("#f_total"),e=window._editor;if(!box||!e)return;
+  const partial=editorMode()==="kcal_only",v={};
+  for(const k of ["kcal","p","c","f"]){
+    const parsed=parseNutrientInput(($("#f_"+k)||{}).value);
+    if(partial&&k!=="kcal"){v[k]=null;continue;}
+    if(!parsed.ok||parsed.value<0){box.innerHTML='<span>Revisa los valores en «Ingresar o ajustar a mano».</span>';return;}
+    v[k]=parsed.value;
+  }
+  const base=componentsTotals(e.components||[]);
+  const corrected=!partial&&!sameMacros(v,{kcal:roundTenth(base.kcal),p:roundTenth(base.p),c:roundTenth(base.c),f:roundTenth(base.f)});
+  const label=partial?"Total parcial":corrected?"Total ajustado a mano":"Total";
+  box.innerHTML=`<b>${esc(formatEditorNumber(v.kcal))} kcal</b><span>${label} · Proteína ${partial?"—":esc(formatEditorNumber(v.p))+" g"} · Carbohidratos ${partial?"—":esc(formatEditorNumber(v.c))+" g"} · Grasa ${partial?"—":esc(formatEditorNumber(v.f))+" g"}</span>`;
+}
 function renderEditorComponents(){
   const e=window._editor,box=$("#f_components");if(!e||!box)return;
   const list=e.components||[];
   if(!list.length){box.innerHTML="";box.hidden=true;return;}
   box.hidden=false;
   const r1=x=>formatEditorNumber(x);
-  const t=componentsTotals(list);
   box.innerHTML=`<div class="comp-head"><b>Ingredientes</b><span class="muted small">Los totales salen de estas cantidades.</span></div>
     ${list.map((c,i)=>{
       const v=componentValues(c),unit=c.unitGrams?"unid.":c.unit==="portion"?"porc.":c.unit==="100ml"?"ml":"g";
@@ -12482,7 +12504,8 @@ function renderEditorComponents(){
         ${c.unitGrams?`<div class="muted small">≈ ${r1(c.amount)} g</div>`:""}</div>
         ${c.unitGrams?`<div class="qp-measure-controls">${controls}</div>`:controls}
       </div>`;}).join("")}
-    <div class="muted small comp-total">Total: ${Math.round(t.kcal)} kcal · P ${r1(t.p)} · C ${r1(t.c)} · G ${r1(t.f)} g</div>`;
+    <div id="f_total" class="comp-total" role="status" aria-atomic="true"></div>`;
+  renderEditorTotal();
 }
 // REQ-271: los ingredientes de la receta de una comida del plan, si todos están en el catálogo.
 function recipeComponentsFor(ds,id){
@@ -12845,9 +12868,9 @@ function applyScannedCode(code){
   if(qp){qp.query=code;renderQuickPicks();}
   toast("Código leído: confirma el producto y la cantidad");
 }
-function quickPicksHtml(){
+function quickPicksHtml(initialTab){
   const hasRecent=recentCustomMeals(1).length,hasFav=savedMeals().length;
-  window._qp={tab:hasRecent?"recent":hasFav?"fav":"food",query:"",items:[],base:null,portion:1};
+  window._qp={tab:["recent","fav","food"].includes(initialTab)?initialTab:hasRecent?"recent":hasFav?"fav":"food",query:"",items:[],base:null,portion:1};
   return `<div class="qp">
     <div class="qp-tabs" role="group" aria-label="Elegir una comida">
       <button class="qp-tab" data-tab="recent" onclick="quickPickTab('recent')">Recientes</button>
@@ -13042,20 +13065,23 @@ function editorSheet(title,pre){
   const aiOn=aiAvailable();
   const e0=window._editor;
   window._photoEstimate=null;
+  const manualOpen=!!(pre.macrosUnknown||(e0&&e0.meta&&e0.meta.corrected)||(pre.name&&!(e0&&e0.components&&e0.components.length)));
   modal(`<h3>${title}</h3>
-    ${e0&&e0.kind==="extra"&&e0.extraIdx==null?logIntentHtml():""}
-    ${quickPicksHtml()}
+    ${quickPicksHtml(e0&&e0.initialTab)}
     <div id="f_components" class="components" hidden></div>
     ${e0&&e0.kind==="meal"&&!(e0.components&&e0.components.length)&&recipeComponentsFor(e0.ds,e0.id)?`<button class="btn btn-sm" id="f_loadRecipe" style="margin-top:8px" onclick="loadRecipeComponents()">Ajustar ingredientes de la receta</button>`:""}
-    <div class="field"><label>Descripción</label>
+    ${e0&&e0.kind==="extra"&&e0.extraIdx==null?logIntentHtml():""}
+    <details id="f_manual" class="editor-manual"${manualOpen?" open":""}>
+    <summary>Ingresar o ajustar a mano</summary>
+    <div class="field"><label for="f_name">Descripción</label>
       <div class="row"><textarea id="f_name" rows="2" placeholder="Ej. 2 panes con palta y café">${esc(pre.name||"")}</textarea>
       <button class="mic" id="micBtn" onclick="toggleMic()" title="${aiOn?'Dictar':'El dictado no está disponible ahora'}">🎤</button></div>
     </div>
     <div class="grid4">
-      <div class="field"><label for="f_kcal">kcal</label><input id="f_kcal" type="text" inputmode="decimal" autocomplete="off" value="${formatEditorNumber(pre.kcal)}" oninput="renderEditorImpact()"></div>
-      <div class="field"><label for="f_p">Prot g</label><input id="f_p" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.p)}"></div>
-      <div class="field"><label for="f_c">Carb g</label><input id="f_c" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.c)}"></div>
-      <div class="field"><label for="f_f">Grasa g</label><input id="f_f" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.f)}"></div>
+      <div class="field"><label for="f_kcal">kcal</label><input id="f_kcal" type="text" inputmode="decimal" autocomplete="off" value="${formatEditorNumber(pre.kcal)}" oninput="renderEditorImpact();renderEditorTotal()"></div>
+      <div class="field"><label for="f_p">Prot g</label><input id="f_p" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.p)}" oninput="renderEditorTotal()"></div>
+      <div class="field"><label for="f_c">Carb g</label><input id="f_c" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.c)}" oninput="renderEditorTotal()"></div>
+      <div class="field"><label for="f_f">Grasa g</label><input id="f_f" type="text" inputmode="decimal" autocomplete="off" value="${pre.macrosUnknown?"":formatEditorNumber(pre.f)}" oninput="renderEditorTotal()"></div>
     </div>
     <label class="qp-save-fav"><input type="checkbox" id="f_kcalOnly" onchange="setKcalOnlyMode(this.checked)"> Solo conozco las calorías</label>
     <div id="f_errors" class="field-errors" role="alert" hidden></div>
@@ -13066,6 +13092,7 @@ function editorSheet(title,pre){
     <input id="f_photo" type="file" accept="image/*" hidden onchange="onMealPhotoSelected(this)">
     <img id="f_photo_preview" class="meal-photo-preview" alt="Foto de la comida" hidden>`:`<div class="muted small">Puedes ingresar los macros manualmente. La estimación y el dictado no están disponibles ahora.</div>`}
     <div id="aiOut"></div>
+    </details>
     ${editorOriginHtml()}
     <label class="qp-save-fav"><input type="checkbox" id="f_fav" ${pre.name&&isSavedMeal(pre.name)?"checked disabled":""}> Guardar en favoritas</label>
     <button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="saveEditor()">Guardar</button>`);
@@ -14125,6 +14152,7 @@ function applyEstimatedMacros(j,kind){
     const el=$("#"+id);if(!el)return;
     el.value=v;el.classList.remove("field-updated");void el.offsetWidth;el.classList.add("field-updated");
   });
+  renderEditorTotal();renderEditorImpact();
   return `<div class="estimate-applied">Aplicado: ${vals.f_kcal} kcal · P ${vals.f_p} g · C ${vals.f_c} g · G ${vals.f_f} g</div>`;
 }
 function renderPhotoEstimate(j,canAsk){

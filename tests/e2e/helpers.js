@@ -511,3 +511,9 @@ export async function completeTimedBlock(page) {
   if (await yes.isVisible().catch(() => false)) await yes.click();
   await page.getByRole("button", { name: /^(Ya calenté|Ya terminé|Marcar completado)$/ }).click();
 }
+
+// REQ-329: el ingreso manual es un camino explícito dentro del editor existente.
+export async function openManualEntry(root) {
+  const panel = root.locator('#f_manual');
+  if (!(await panel.evaluate(el => el.open))) await panel.locator('summary').click();
+}

@@ -2042,7 +2042,7 @@ Playwright a 360/390/1280: sesión con ≥3 ejercicios, comprobar la tarjeta en 
 
 ## REQ-329 - Nutrición: registrar alimentos por gramos sin sentir que armas una comida
 
-**Estado: pendiente.**
+**Estado: implementado.** Hoy abre Alimento; totales derivados visibles y entrada manual plegable, con reapertura automática para registros antiguos/corregidos y errores. Conserva gramos, porciones, favoritas y guardado. Detalle: `docs/food-registration.md`. ✓ `tests/e2e/registro-gramos.spec.js` y regresiones del editor.
 
 ### Origen
 Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): registrar comida se siente complejo, como armar una «comida»; piden buscar un alimento, poner los gramos y que la app calcule.

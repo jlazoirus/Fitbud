@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-175: mientras el coach responde, una capa bloquea la app y dice qué pasa.
 // REQ-176: una cuenta creada por el admin pide crear la contraseña propia al entrar.
 import { test, expect } from "@playwright/test";
@@ -19,7 +20,9 @@ test("la consulta al coach bloquea la app con un aviso hasta que responde", asyn
   await page.locator("#tabs").getByText("Nutrición").click();
   await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
   const overlay = page.locator("#overlay");
+  await openManualEntry(overlay);
   await overlay.locator("#f_name").fill("2 panes con palta");
+  await openManualEntry(overlay);
   await overlay.getByRole("button", { name: /Estimar macros/i }).click();
 
   const busy = page.locator("#coach-busy");

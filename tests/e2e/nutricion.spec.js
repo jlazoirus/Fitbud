@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // Journey (b): objetivos del día en Nutrición + preparar el día y aplicarlo.
 // El "coach" está mockeado en helpers.js: responde comidas construidas con el
 // catálogo fixture que cumplen exactamente las metas del perfil (2200/160/220/65).
@@ -125,7 +126,9 @@ test.describe("Nutrición", () => {
     // Editar el desayuno a mano, sin marcarlo como hecho.
     await card.getByRole("button", { name: /^Más opciones de / }).click();
     await overlay.getByRole("button", { name: /Editar valores \/ comida personalizada/ }).click();
+    await openManualEntry(page);
     await page.locator("#f_name").fill("Dos huevos con pan");
+    await openManualEntry(page);
     await page.locator("#f_kcal").fill("777");
     await overlay.getByRole("button", { name: "Guardar" }).click();
     await expect(app).toContainText("Dos huevos con pan");

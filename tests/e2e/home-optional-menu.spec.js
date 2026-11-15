@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, gotoApp, autoDismissNudges, collectConsoleErrors, screeningFixture, startGuidedSession } from "./helpers.js";
 
@@ -62,6 +63,7 @@ test("Registrar comida guarda y suma el consumo sin generar un menú",async({pag
   await expect(overlay.locator("h3")).toHaveText("Registrar comida");
   await expect(overlay.locator("#f_target")).toHaveValue("desayuno");
   await expect(overlay).toContainText("Una comida del día");
+  await openManualEntry(page);
   await page.locator("#f_name").fill("Mi desayuno con avena");
   for(const [id,value] of Object.entries({f_kcal:"400",f_p:"25",f_c:"45",f_f:"13"}))await page.locator("#"+id).fill(value);
   await overlay.getByRole("button",{name:"Guardar",exact:true}).click();

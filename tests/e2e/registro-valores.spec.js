@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-269: el editor de comidas valida los números antes de tocar el día, las
 // favoritas o la cola. Vacío ≠ 0; «Solo conozco las calorías» deja los macros
 // como desconocidos y los totales se marcan como parciales.
@@ -20,6 +21,7 @@ const snapshot = (page) => page.evaluate(() => ({
   saved: JSON.stringify((profile.prefs || {}).savedMeals || []),
 }));
 async function fill(overlay, v) {
+  await openManualEntry(overlay);
   for (const [id, value] of Object.entries(v)) await overlay.locator("#" + id).fill(value);
 }
 

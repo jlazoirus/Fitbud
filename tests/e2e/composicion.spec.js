@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-271: una comida se compone de líneas reales (alimento + gramos decimales)
 // que se pueden editar o quitar; los totales salen de las líneas y la lista de
 // compra usa esas cantidades. Registrar no toca el catálogo global.
@@ -252,6 +253,7 @@ test("una entrada antigua sin líneas sigue editándose a mano", async ({ page, 
   });
   await expect(overlay.locator(".comp-row")).toHaveCount(0);
   await expect(overlay.locator("#f_components")).toBeHidden();
+  await openManualEntry(overlay);
   await overlay.locator("#f_kcal").fill("250");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   const saved = await page.evaluate(() => dayState(todayStr()).extras[0]);

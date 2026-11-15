@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-272: al registrar algo se elige «Además de lo previsto» o «En lugar de» una
 // comida concreta. La sustitución modifica solo esa comida, el total cambia una
 // sola vez y se puede deshacer sin pisar cambios posteriores.
@@ -19,6 +20,7 @@ async function setup(page, context, meals) {
   return { overlay: page.locator("#overlay"), errors };
 }
 async function fillMeal(overlay, name, kcal) {
+  await openManualEntry(overlay);
   await overlay.locator("#f_name").fill(name);
   for (const [id, v] of Object.entries({ f_kcal: kcal, f_p: "30", f_c: "40", f_f: "20" })) await overlay.locator("#" + id).fill(v);
 }

@@ -1,0 +1,11 @@
+# Registrar por alimento y gramos (REQ-329)
+
+El registro usa el editor existente y sus mismos valores, validación, metadatos y guardado. `openEditor(kind, ds, id, {initialTab:"food", ...})` abre Alimento aunque haya recientes o favoritas; `recent` y `fav` también son opciones válidas. Si no se indica una pestaña se conserva la selección anterior por disponibilidad. Hoy pasa `initialTab:"food"` desde `openFoodRegistration()`. El acceso libre de Nutrición puede reutilizar esta opción (REQ-330).
+
+Buscar alimento, indicar gramos y añadir completa la descripción y los cuatro campos existentes. Las líneas conservan sus bases por 100 g. No se exige escribir un nombre ni hacer cuentas; `componentsTotals()` sigue siendo el cálculo. Cambiar o quitar líneas actualiza cantidades, descripción automática y total destacado. Los valores guardados conservan una décima; los totales del día mantienen su presentación redondeada habitual.
+
+«Ingresar o ajustar a mano» agrupa descripción, macros, solo calorías y estimación por texto/foto. Está cerrado al crear un registro vacío o reabrir uno derivado de alimentos; abre al editar valores manuales/antiguos, valores corregidos o solo calorías, y al elegir una reciente/favorita para ajustar su porción. Los errores lo abren antes de enfocar el campo, sin borrar nada. La entrada manual, foto y estimación mantienen sus acciones, límites y privacidad.
+
+El total muestra lo que se va a guardar. Si se corrigen manualmente los valores derivados se identifica como «Total ajustado a mano»; si solo se conocen calorías, marca los macros desconocidos con guiones. El origen y la corrección se conservan mediante el contrato existente de `nutritionMeta`. «Guardar en favoritas» permanece como opción sin marcar en registros nuevos. No cambian destino, sustitución, fecha, persistencia ni protección contra doble envío.
+
+Verificación: `tests/e2e/registro-gramos.spec.js` cubre 150 g de pollo + 80 g de avena, recarga, doble toque, cantidades inválidas, cambios/eliminación, errores, valores manuales y porciones; `composicion`, `comidas-guardadas`, `registro-valores`, `origen-registro`, `estimacion` y `foto-comida` mantienen sus regresiones. Las pruebas manuales eligen explícitamente el plegable mediante `openManualEntry()`; las nuevas pruebas comprueban su estado inicial cerrado. Sin backend, migración o dependencia nuevos.

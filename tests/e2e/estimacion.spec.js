@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-268: "Estimar macros" solo aplica una estimación real de la comida descrita.
 // Una plantilla genérica, un valor negativo o la ausencia de resultado compatible
 // se informan como fallo y los campos del formulario no cambian.
@@ -25,6 +26,7 @@ async function openFreeEditor(page, context, replies) {
   await page.locator("#tabs").getByText("Nutrición").click();
   await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
   const overlay = page.locator("#overlay");
+  await openManualEntry(overlay);
   return { overlay, calls, errors };
 }
 

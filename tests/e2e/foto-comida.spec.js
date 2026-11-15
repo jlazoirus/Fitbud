@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-172: estimar los macros de una comida con una foto, con preguntas de aclaración.
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, todayYmd, USER_ID } from "./helpers.js";
@@ -28,11 +29,13 @@ test("foto → estimación con pregunta → respuesta → estimación final", as
   await page.locator("#tabs").getByText("Nutrición").click();
   await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
   const overlay = page.locator("#overlay");
+  await openManualEntry(overlay);
   await expect(overlay.getByRole("button", { name: /Estimar con foto/i })).toBeVisible();
   // REQ-207: sin `capture`, el móvil deja elegir entre cámara y galería.
   await expect(overlay.locator("#f_photo")).not.toHaveAttribute("capture", /.*/);
   await expect(overlay.locator("#f_photo")).toHaveAttribute("accept", "image/*");
 
+  await openManualEntry(overlay);
   await overlay.locator("#f_photo").setInputFiles({ name: "plato.png", mimeType: "image/png", buffer: PNG });
   await expect(overlay).toContainText("Supuse una porción mediana.");
   await expect(overlay.locator("#f_kcal")).toHaveValue("820");
@@ -82,6 +85,7 @@ test("foto → fallo con motivo claro → reintentar con la misma foto", async (
   await page.locator("#tabs").getByText("Nutrición").click();
   await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
   const overlay = page.locator("#overlay");
+  await openManualEntry(overlay);
   await overlay.locator("#f_photo").setInputFiles({ name: "plato.png", mimeType: "image/png", buffer: PNG });
 
   await expect(overlay.locator("#aiOut")).toContainText("Ahora mismo hay mucha demanda");
@@ -119,6 +123,7 @@ test("comida del plan + foto de otro plato → estima lo que se ve, no lo planea
   await page.evaluate(() => openEditor("meal", todayStr(), "almuerzo"));
   const overlay = page.locator("#overlay");
   await expect(overlay.locator("#f_name")).toHaveValue("Tacos de frijol negro y queso fresco");
+  await openManualEntry(overlay);
   await overlay.locator("#f_photo").setInputFiles({ name: "pasta.png", mimeType: "image/png", buffer: PNG });
 
   await expect(overlay.locator("#f_kcal")).toHaveValue("780");
@@ -131,7 +136,9 @@ test("comida del plan + foto de otro plato → estima lo que se ve, no lo planea
   expect(coachCalls[0].userText).toContain("Identifica el plato por lo que se ve en la foto");
 
   // Lo que escribe el usuario sí se envía, pero la foto manda si no coincide.
+  await openManualEntry(overlay);
   await overlay.locator("#f_name").fill("Pasta alfredo con parmesano");
+  await openManualEntry(overlay);
   await overlay.locator("#f_photo").setInputFiles({ name: "pasta2.png", mimeType: "image/png", buffer: Buffer.concat([PNG, Buffer.from([0])]) });
   await expect.poll(() => coachCalls.length).toBe(2);
   expect(coachCalls[1].userText).toContain('El usuario la describe así: "Pasta alfredo con parmesano"');
@@ -166,7 +173,9 @@ test("estimar por texto → fallo con motivo y código → reintentar", async ({
   await expect(overlay.locator("#f_photo_preview")).toBeHidden();
   await expect(overlay.getByAltText("Foto de la comida")).toBeHidden();
 
+  await openManualEntry(overlay);
   await overlay.locator("#f_name").fill("Sopa ramen vegetariana");
+  await openManualEntry(overlay);
   await overlay.getByRole("button", { name: /Estimar macros/i }).click();
   await expect(overlay.locator("#aiOut")).toContainText("(código 500)");
   await overlay.getByRole("button", { name: "Reintentar" }).click();

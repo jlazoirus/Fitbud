@@ -1,3 +1,4 @@
+import { openManualEntry } from "./helpers.js";
 // REQ-270: cada consumo guarda su origen (manual, estimación, favorita/reciente,
 // receta del plan) y un snapshot de los valores. Editar la fuente no cambia el
 // pasado; una corrección manual conserva la base; lo antiguo se lee como legacy.
@@ -27,7 +28,9 @@ test("estimación guardada conserva su supuesto; corregirla a mano mantiene la b
     estimate: { nombre: "Ceviche", kcal: 380, proteina_g: 40, carbohidratos_g: 30, grasa_g: 8, nota: "Supuse un plato mediano sin camote.", preguntas: [] },
   });
   await openAdd(page);
+  await openManualEntry(overlay);
   await overlay.locator("#f_name").fill("Ceviche de pescado");
+  await openManualEntry(overlay);
   await overlay.getByRole("button", { name: /Estimar macros/ }).click();
   await expect(overlay.locator("#f_kcal")).toHaveValue("380");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
@@ -38,6 +41,7 @@ test("estimación guardada conserva su supuesto; corregirla a mano mantiene la b
 
   await page.evaluate(() => editExtra(todayStr(), 0));
   await expect(overlay.locator("#f_origin")).toHaveText("Origen: Estimado por tu coach a partir de la descripción — Supuse un plato mediano sin camote.");
+  await openManualEntry(overlay);
   await overlay.locator("#f_kcal").fill("450");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   const fixed = await extra(page, 0);
@@ -70,6 +74,7 @@ test("favorita ×2: snapshot con base y cantidad; editar la favorita no cambia l
 test("lo nuevo escrito a mano es manual; un registro antiguo se lee como tal y no se reescribe", async ({ page, context }) => {
   const { overlay } = await setup(page, context);
   await openAdd(page);
+  await openManualEntry(overlay);
   for (const [id, v] of Object.entries({ f_name: "Manzana", f_kcal: "80", f_p: "0,3", f_c: "21", f_f: "0,2" })) await overlay.locator("#" + id).fill(v);
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   expect((await extra(page, 0)).nutritionMeta).toEqual({ v: 1, source: "manual" });
@@ -83,6 +88,7 @@ test("lo nuevo escrito a mano es manual; un registro antiguo se lee como tal y n
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   expect((await extra(page, 1)).nutritionMeta).toBeUndefined();
   await page.evaluate(() => editExtra(todayStr(), 1));
+  await openManualEntry(overlay);
   await overlay.locator("#f_kcal").fill("15");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   expect((await extra(page, 1)).nutritionMeta).toEqual({ v: 1, source: "manual" });
@@ -96,6 +102,7 @@ test("comida del plan editada: el detalle muestra que parte de la receta y la co
   }] } } });
   await page.evaluate(() => openEditor("meal", todayStr(), "almuerzo"));
   await expect(overlay.locator("#f_kcal")).toHaveValue("600");
+  await openManualEntry(overlay);
   await overlay.locator("#f_kcal").fill("700");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   const ovr = await page.evaluate(() => mealState(todayStr(), "almuerzo").ovr);
@@ -116,6 +123,7 @@ test("reestimar un registro de una favorita ×2 actualiza su origen", async ({ p
     commitDay(todayStr()); render(); editExtra(todayStr(), 0);
   });
   await expect(overlay.locator("#f_origin")).toHaveText("Origen: Ingresado a mano · favorita «Shake proteina gloria pro» · porción ×2");
+  await openManualEntry(overlay);
   await overlay.getByRole("button", { name: /Estimar macros/ }).click();
   await expect(overlay.locator("#f_kcal")).toHaveValue("210");
   await expect(overlay.locator("#f_origin")).toHaveText("Origen: Estimado por tu coach a partir de la descripción — Estimé un batido listo para tomar de 320 ml.");
