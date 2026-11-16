@@ -916,8 +916,8 @@
   .home-notices[open]>summary>.chev{transform:rotate(-90deg)}
   .home-notices-summary-copy{display:flex;flex:1;flex-wrap:wrap;justify-content:space-between;align-items:baseline;min-width:0;gap:2px 12px;font-size:.8125rem;line-height:1.4}
   .home-notices-summary-copy b{font-size:.875rem;color:var(--txt)}
-  .home-notices .plan-week-notice,.home-notices .notify-card{margin:0;padding:12px 2px;border:0;border-top:1px solid var(--border);border-radius:0;background:none}
-  .home-notices .notify-card .agenda-title{margin:0 0 4px;font-size:1rem}
+  .home-notices .plan-week-notice,.home-notices .agenda-card,.home-notices .ci-banner{margin:0!important;padding:12px 2px;border:0;border-top:1px solid var(--border);border-radius:0;background:none}
+  .home-notices .agenda-title{margin:0 0 4px;font-size:1rem}
   .home-welcome{margin:16px 0;border-bottom:1px solid var(--border)}
   .home-welcome .agenda-title{font-size:.9375rem;margin-bottom:4px}
   .home-welcome .return-body{font-size:.8125rem;color:var(--muted)}
@@ -925,10 +925,10 @@
     .home-consumption{flex-wrap:wrap;column-gap:12px;row-gap:2px}
   }
   /* REQ-316: el menú es una sugerencia secundaria. */
-  .menu-suggestion{margin:20px 0 14px;padding:14px 0;border-top:1px solid var(--border)}
-  .menu-suggestion h2{margin:0;font-family:var(--font-body);font-size:15px;line-height:1.4;letter-spacing:0}
-  .menu-suggestion p{margin:4px 0 8px;color:var(--muted);font-size:13px;line-height:1.5}
+  .menu-suggestion{margin:12px 0 -8px;padding-top:10px;border-top:1px solid var(--border)}
+  .menu-suggestion p{margin:0;color:var(--muted);font-size:.8125rem;line-height:1.45}
   .menu-suggestion-actions{display:flex;flex-wrap:wrap;gap:8px}
+  .menu-suggestion .menu-suggestion-actions{column-gap:18px}
   .menu-suggestion-actions .btn{min-height:44px}
   .menu-suggestion button:focus-visible,.home-consumption:focus-visible,.home-primary button:focus-visible,.home-agenda summary:focus-visible,.home-welcome button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   .nutrition-register{margin:0 0 14px}
@@ -1134,11 +1134,9 @@
   .chat-type.fallback{background:var(--surf3);color:var(--muted)}
   .coach-action-bar{margin-top:8px;display:flex;gap:8px}
   .coach-action-note{margin-top:8px;padding:9px 10px;border-radius:var(--r-sm);background:rgba(245,158,11,.10);border:1px solid rgba(245,158,11,.24);color:#fcd34d;font-size:12px;line-height:1.4}
-  .coach-chips{display:flex;flex-wrap:wrap;gap:7px;padding:0 0 10px}
   .coach-chip{background:var(--surf1);border:1px solid var(--border-acc);border-radius:999px;padding:7px 13px;font-size:13px;color:var(--purple-200);cursor:pointer;transition:.15s;text-align:left}
   .coach-chip:active{transform:scale(.97)}
-  .coach-home-sep{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:var(--muted2);font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:600}
-  .coach-home-sep::before,.coach-home-sep::after{content:"";flex:1;height:1px;background:var(--border)}
+  .coach-home-title{margin:24px 0 10px;font-family:var(--font-body);font-size:.9375rem;font-weight:800;line-height:1.3;letter-spacing:0}
   .coach-msgs-home{display:flex;flex-direction:column;gap:10px;margin-bottom:10px}
   /* REQ-216: modo conversacional (beta oculta) */
   .chat-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
@@ -5183,11 +5181,11 @@ function dismissMenuSuggestion(ds){
 }
 function homeMenuSuggestionHtml(ds){
   if(ds!==todayStr()||homeDayHasPreparedMeals(ds,buildDay(ds))||menuSuggestionDismissed(ds))return "";
-  return `<section class="menu-suggestion" aria-labelledby="menuSuggestionTitle">
-    <h2 id="menuSuggestionTitle">¿Quieres ideas para tus comidas de hoy?</h2>
-    <p>Te proponemos un menú según tus preferencias. Tú eliges si lo usas.</p>
-    <div class="menu-suggestion-actions"><button type="button" class="btn" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button><button type="button" class="btn btn-sm" onclick="dismissMenuSuggestion('${ds}')">Ahora no</button></div>
-  </section>`;
+  // REQ-392: una fila dentro de la tarjeta principal, no una tarjeta más.
+  return `<div class="menu-suggestion" role="group" aria-labelledby="menuSuggestionTitle">
+    <p id="menuSuggestionTitle">¿Sin ideas? Te proponemos un menú y tú eliges.</p>
+    <div class="menu-suggestion-actions"><button type="button" class="home-secondary-action" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button><button type="button" class="home-secondary-action" onclick="dismissMenuSuggestion('${ds}')">Ahora no</button></div>
+  </div>`;
 }
 // REQ-349: las preferencias se aplican al futuro; el registro ejecutado es inmutable.
 let nutritionUpdating=false,nutritionUpdate=null,nutritionUndo=null,nutritionReadyUser="";
@@ -5582,19 +5580,49 @@ function homeRemainingAgendaHtml(ds,items){
 }
 // REQ-367: la semana y los recordatorios no compiten con la agenda diaria.
 let homeReminderShownKey="";
-function homeNoticesHtml(ds,today){
+// REQ-392: también guarda los mensajes que no ganaron el espacio contextual.
+function homeNoticesHtml(ds,today,extra=[]){
   const question=ds===today?profileQuestionCardHtml():"";
   const week=planWeekNoticeHtml(ds),reminder=question?"":notifyNudgeHtml();
-  if(!week&&!reminder&&!question)return "";
-  const preview=question?"Afina tu plan":week?(reminder?"Plan y recordatorios":"Semana del plan"):"Configura tus recordatorios";
+  if(!week&&!reminder&&!question&&!extra.length)return "";
+  const count=[question,week,reminder].filter(Boolean).length+extra.length;
+  const preview=extra.length?(count===1?extra[0].label:`${extra[0].label} y ${count-1} más`)
+    :question?"Afina tu plan":week?(reminder?"Plan y recordatorios":"Semana del plan"):"Configura tus recordatorios";
   const previous=$("#homeNotices");
   const questionKey=question?uid()+":"+today+":"+PROFILE_QUESTIONS.state(profile.prefs).lastQuestion:"";
   const open=(question&&profileQuestionOpenKey!==questionKey)||(previous?.open&&previous.dataset.date===today);
   if(question)profileQuestionOpenKey=questionKey;
   return `<details id="homeNotices" class="home-notices" data-date="${today}" ontoggle="homeNoticesToggled(this)"${open?" open":""}>
     <summary>${notifyIcon("bell",18)}<span class="home-notices-summary-copy"><b>Avisos</b><span>${preview}</span></span>${chevron()}</summary>
-    ${question}${week}${reminder}
+    ${question}${extra.map(item=>item.html).join("")}${week}${reminder}
   </details>`;
+}
+// REQ-392: bajo la acción principal cabe un solo mensaje. Lo que salva la
+// racha va primero; después, lo que ayuda con el día. Retomar y el check-in
+// que pierden esperan en Avisos; técnica y bienvenida del coach son del día.
+function homeContextData(ds,agenda,menuSuggestion){
+  const notices=[];
+  const back=returnCardData();
+  const welcomeBack=!!back&&back.kind==="welcome";
+  const due=weeklyCheckinDue();
+  const queue=[
+    {html:()=>welcomeBack?"":returnCardHtml()},
+    {html:()=>restartNudgeCard(),label:"Retomar tu plan"},
+    {html:()=>menuSuggestion?"":homeWorkoutTechniqueHtml(ds,agenda)},
+    {html:()=>coachWelcomeHtml()},
+    {html:()=>weeklyCheckinBanner(),label:due?`Check-in de la semana ${due.num}`:""},
+  ];
+  let slot="";
+  for(const item of queue){
+    // Las sugerencias del día solo se calculan si pueden mostrarse: registran que se vieron.
+    if(slot&&!item.label)continue;
+    const html=item.html();
+    if(!html)continue;
+    if(slot)notices.push({html,label:item.label});else slot=html;
+  }
+  const referral=referralNoticeHtml();
+  if(referral)notices.push({html:referral,label:"Invita a tus amigos"});
+  return {slot,notices,welcome:welcomeBack?returnCardHtml():""};
 }
 function homeNoticesToggled(panel){
   if(!panel.isConnected||!panel.open||!panel.querySelector(".notify-card"))return;
@@ -5643,7 +5671,7 @@ function dismissHomeWorkoutTechnique(ds){
   renderHoy();
   ($(".home-agenda>summary")||$(".home-primary-action"))?.focus({preventScroll:true});
 }
-function homeAgendaHtml(ds,data){
+function homeAgendaHtml(ds,data,menuSuggestion=""){
   const register={id:"homeLogAction",label:"Registrar comida",handler:`homeLogFood('${ds}')`};
   // REQ-368: en descanso se puede elegir una sesión antes de registrar actividad.
   const restWorkout=data.restDay&&ds===todayStr()&&workoutContentCanUpdate(ds)&&!trainingSafetyHold()
@@ -5698,6 +5726,7 @@ function homeAgendaHtml(ds,data){
     ${meta?`<div class="agenda-sub">${esc(meta)}</div>`:""}
     ${homeActionHtml(primary.action,"btn btn-accent home-primary-action")}
     ${secondary||alternative?`<div class="home-secondary-actions">${homeActionHtml(secondary,"home-secondary-action")}${homeActionHtml(alternative,"home-secondary-action")}</div>`:""}
+    ${menuSuggestion}
   </section>${note}${homeRemainingAgendaHtml(ds,promote?data.items.slice(1):data.items)}`;
 }
 
@@ -5798,38 +5827,6 @@ function coachWelcomeNavigate(topic){
 }
 
 /* ---------- HOME (Hoy + Coach integrado): REQ-42 ---------- */
-function buildContextualChips(ds){
-  const day=buildDay(ds);
-  const st=dayState(ds);
-  const {t,target,doneMeals,totMeals}=dayTotals(ds);
-  // Igual que homeAgendaData (REQ-125): una comida saltada no es una acción
-  // pendiente, así que el coach no debe sugerirla (REQ-153).
-  const pendingMeals=day.meals.filter(m=>{const ms=mealState(ds,m.id);return!ms.done&&!ms.skipped;});
-  const ew=effectiveWorkout(ds);
-  const restDay=ew.workout&&ew.workout.id==="descanso";
-  const workoutOutcome=workoutOutcomeForState(st);
-  // Con pausa por seguridad (trainingSafetyHold) el entreno no cuenta como
-  // pendiente, igual que en homeAgendaData — el coach no debe ofrecerlo (REQ-153).
-  const workoutPending=!restDay&&!trainingSafetyHold()&&!st.workoutDone&&workoutOutcome==="pending";
-  const kcalRem=Math.max(0,Math.round(target.kcal-t.kcal));
-  const chips=[];
-  if(pendingMeals.length>0){
-    chips.push(`¿Qué como para ${esc(pendingMeals[0].slot)}? Me quedan ${kcalRem} kcal`);
-  }
-  if(workoutPending){
-    chips.push("¿Cómo hago el entrenamiento de hoy?");
-    if(!isFreeActivityWorkout(ew.workout))chips.push("Adapta el entreno de hoy por falta de tiempo");
-  }
-  if(!workoutPending&&workoutOutcome==="missed"){
-    chips.push("Perdí la sesión de hoy — ¿qué hago?");
-  }
-  if(doneMeals===totMeals&&totMeals>0){
-    chips.push("¿Cómo estoy avanzando en la semana?");
-  }
-  const fallbacks=COACH_SUGGESTIONS.filter(s=>!chips.includes(s));
-  while(chips.length<2&&fallbacks.length)chips.push(fallbacks.shift());
-  return chips.slice(0,4);
-}
 // REQ-364: el resumen compacto precede a la acción principal. Los macros se ven en Nutrición.
 function renderHoy(){
   const today=todayStr();
@@ -5842,18 +5839,17 @@ function renderHoy(){
   const wdName=DOW[parseYmd(ds).getDay()]; const dayMon=parseYmd(ds).getDate()+" "+MON[parseYmd(ds).getMonth()];
   const agenda=homeAgendaData(ds);
   const menuSuggestion=homeMenuSuggestionHtml(ds);
+  const context=homeContextData(ds,agenda,menuSuggestion);
   const hasAI=aiAvailable();
   const canUse=hasAI&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
   const msgs=loadCoachChat();
   const msgsHtml=msgs.map(renderCoachMessage).join("");
   const typingHtml=coachTypingHtml();
-  const chips=canUse?buildContextualChips(ds):[];
-  const chipsHtml=chips.length?`<div class="coach-chips">${chips.map(s=>`<button class="coach-chip" onclick="sendCoachMessage(${esc(JSON.stringify(s))})">${esc(s)}</button>`).join("")}</div>`:"";
   const clearBtn=msgs.length>0?`<div style="display:flex;justify-content:flex-end;margin-bottom:6px"><button class="btn btn-sm" style="font-size:11px;padding:4px 10px;color:var(--muted)" onclick="clearCoachChat()">Limpiar conversación</button></div>`:"";
   const localGuides=msgs.filter(m=>m.localGuide||m.role==="user").map(renderCoachMessage).join("");
+  // REQ-392: el coach es una fila con su pregunta; sin chips que compitan con el día.
   const coachSection=canUse?`
-    <div class="coach-home-sep">Pregúntale a tu coach</div>
-    ${chipsHtml}
+    <h2 class="coach-home-title">Pregúntale a tu coach</h2>
     ${clearBtn}
     <div class="coach-msgs-home" id="coachMsgs">${msgsHtml}${typingHtml}</div>
     <div class="coach-input-row" style="margin:0 -14px;border-radius:0">
@@ -5862,8 +5858,8 @@ function renderHoy(){
         oninput="this.style.height='42px';this.style.height=Math.min(this.scrollHeight,120)+'px'"></textarea>
       <button ${coachActionsInFlight.has("coach-convo")?"disabled":""} onclick="coachSendFromInput()" title="Enviar" aria-label="Enviar pregunta"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </div>`
-    :localGuides?`<div class="coach-home-sep">Tu coach te acompaña</div><div class="coach-msgs-home" id="coachMsgs">${localGuides}</div>`
-    :hasAI?`<div class="coach-home-sep">Tu coach</div><div class="ai-box" style="margin:0 0 12px">⚠️ ${!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`
+    :localGuides?`<h2 class="coach-home-title">Tu coach te acompaña</h2><div class="coach-msgs-home" id="coachMsgs">${localGuides}</div>`
+    :hasAI?`<h2 class="coach-home-title">Tu coach</h2><div class="ai-box" style="margin:0 0 12px">⚠️ ${!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`
     :"";
   $("#app").innerHTML=`
   <header class="shead">
@@ -5877,22 +5873,15 @@ function renderHoy(){
     </div>
   </header>
   ${agenda.state==="done"?"":homeConsumptionHtml(agenda.totals)}
-  ${homeAgendaHtml(ds,agenda)}
-  ${menuSuggestion?"":homeWorkoutTechniqueHtml(ds,agenda)}
-  ${returnCardHtml()}
-  ${restartNudgeCard()}
-  ${adminBetaPendingCardHtml()}
+  ${homeAgendaHtml(ds,agenda,menuSuggestion)}
   ${nutritionUpdateHtml()}
-
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()&&!agenda.items.some(item=>item.kind==="safety")?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
-  ${homeNoticesHtml(ds,today)}
-  ${weeklyCheckinBanner()}
-  ${coachWelcomeHtml()}
-  ${routineEntryHtml()}
-  ${coachSection}
-  ${menuSuggestion}
-  ${referralNoticeHtml()}`;
+  ${context.slot}
+  ${context.welcome}
+  ${adminBetaPendingCardHtml()}
+  ${homeNoticesHtml(ds,today,context.notices)}
+  ${coachSection}`;
   maybeStartFitbrosTour();
   void maybeClaimProfileQuestion();
 }
@@ -8158,7 +8147,7 @@ function renderWorkout(){
   ${renderWorkoutExecution(ds,execution)}
   <details class="wk-context" ${wkContextOpen?"open":""} ontoggle="wkContextOpen=this.open">
     <summary>Plan y detalles de hoy<span class="wk-context-sub">${esc(ew.workout.name)}</span></summary>
-    <div class="wk-context-body">${planCardHtml}${workoutCardHtml}</div>
+    <div class="wk-context-body">${planCardHtml}${routineEntryHtml()}${workoutCardHtml}</div>
   </details>
   ${manualActivityBlock(ds,restDay)}
   ${daySummary(ds)}

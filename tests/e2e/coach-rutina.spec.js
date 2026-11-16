@@ -35,6 +35,9 @@ for(const width of [320,390,1280])test(`conversar, revisar y guardar una rutina 
   const {calls,tables}=await boot(page,context),errors=collectConsoleErrors(page);
   const {action,requests}=await proposal(page,context);
   const before=await page.evaluate(()=>({prefs:JSON.stringify(profile.prefs),past:JSON.stringify(S.days)}));
+  // REQ-392: la conversación de rutina vive en Entreno, no en Hoy.
+  await expect(page.locator('#app').getByRole('button',{name:'Cuéntame cómo entrenas',exact:true})).toHaveCount(0);
+  await page.locator('[data-tab="entreno"]').click();
   await page.getByRole('button',{name:'Cuéntame cómo entrenas',exact:true}).click();
   await expect(page.locator('#overlay')).toContainText('¿Cómo es tu rutina actual?');
   await page.locator('#rc_training_style').selectOption('machines');
@@ -179,7 +182,8 @@ test('ajustar un día conserva el resto de la rutina y volver al plan no borra s
   await page.locator('[data-tab="entreno"]').click();
   await startGuidedSession(page);
   const before=await page.evaluate(()=>JSON.stringify(workoutPrescription(current)));
-  await page.locator('[data-tab="hoy"]').click();
+  // Con la sesión en curso, la rutina sigue a mano dentro de "Plan y detalles de hoy".
+  await page.locator('.wk-context>summary').click();
   page.once('dialog',dialog=>dialog.accept());
   await page.getByRole('button',{name:'Volver al plan sugerido',exact:true}).click();
   await expect.poll(()=>tables.profiles.row.prefs.weeklyRoutine).toBeNull();

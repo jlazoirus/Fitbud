@@ -28,12 +28,13 @@ for(const width of [320,390,1280]) test(`Hoy prioriza registro, entreno y coach 
   await expect(agenda.getByRole("button",{name:"Iniciar entreno",exact:true})).toBeVisible();
   await agenda.locator("summary").press("Space");
   await expect(agenda).toHaveJSProperty("open",false);
-  await expect(suggestion).toContainText("Tú eliges si lo usas");
+  // REQ-392: la sugerencia es una fila dentro de la tarjeta principal.
+  await expect(primary.locator(".menu-suggestion")).toContainText("tú eliges");
   await expect(suggestion.getByRole("button",{name:"Sugerirme un menú"})).not.toHaveClass(/btn-accent/);
   await expect(app).not.toContainText("Aún falta preparar");
   await expect(app).not.toContainText("Afina tu plan");
   const layout=await page.evaluate(()=>{
-    const selectors=[".home-consumption",".home-primary",".home-agenda",".coach-welcome","#coachInput",".menu-suggestion"];
+    const selectors=[".home-consumption",".home-primary",".home-agenda",".coach-welcome","#coachInput"];
     const boxes=selectors.map(s=>document.querySelector(s).getBoundingClientRect());
     return {ordered:boxes.every((b,i)=>!i||b.top>=boxes[i-1].bottom),overflow:document.documentElement.scrollWidth>innerWidth,
       controls:[...document.querySelectorAll(".home-consumption,.home-primary button,.home-agenda summary,.menu-suggestion button")].map(b=>b.getBoundingClientRect().height)};
