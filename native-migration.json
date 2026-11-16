@@ -1412,9 +1412,9 @@
         "NATIVE_AGENT.md"
       ],
       "exclusiveGroup": "plan-docs",
-      "status": "pendiente",
-      "owner": null,
-      "claimedAt": null,
+      "status": "en_curso",
+      "owner": "codex-native-20261116",
+      "claimedAt": "2026-11-16T19:29:01.958Z",
       "doneAt": null,
       "note": ""
     },
