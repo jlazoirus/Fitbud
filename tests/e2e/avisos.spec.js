@@ -30,7 +30,8 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
       mocks: { prefs: completePrefs({ planStartDate: daysFromToday(-8), planEndDate: daysFromToday(61) }) },
     });
     const week = page.locator("#homeNotices .plan-week-notice");
-    await expect(notices(page)).toContainText("Plan y recordatorios");
+    // REQ-392: el check-in que pierde el espacio contextual también espera aquí.
+    await expect(notices(page)).toContainText("Check-in de la semana 1 y 2 más");
     await expect(page.locator(".home-primary-action")).toBeInViewport();
     await expect(week).toBeHidden();
     await expect(card(page)).toBeHidden();
@@ -49,7 +50,7 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     await expect(card(page)).toHaveCount(0);
     await expect(week).toBeVisible();
     await expect(notices(page)).toBeFocused();
-    await expect(notices(page)).toContainText("Semana del plan");
+    await expect(notices(page)).toContainText("Check-in de la semana 1 y 1 más");
     await page.reload();
     await gotoApp(page);
     await page.waitForLoadState("networkidle");

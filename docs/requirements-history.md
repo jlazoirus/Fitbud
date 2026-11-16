@@ -14008,3 +14008,133 @@ No cambia los límites de compras o trial, la UI, pagos ni datos históricos. Un
 - Fallos de lectura/escritura permiten reintentar sin consumo ni exposición de errores internos.
 
 Pruebas: `scripts/test-coach-quota.mjs`, regresiones de administración, trial y coach; release gate. Fixtures locales y proveedor simulado, sin llamadas pagadas ni cambios a cuentas reales. No requiere migración, volver a otorgar cortesías ni otra acción manual.
+
+## Compactación 2026-11-16: REQ-385..390 (onboarding esencial)
+
+Detalle movido desde `REQUIREMENTS.md` para dejar espacio a REQ-392..395 (Hoy).
+
+### REQ-385 - Onboarding: entrenar sin fuerza es una opción más
+
+**Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+#### Origen
+Jonathan, 2026-11-11.
+#### Problema
+El paso 3 da por hecha la fuerza («¿Haces otro deporte además de la fuerza?», `app/index.html:3843`). «Otro deporte» sin fuerza se bloquea (`:3754`).
+#### Objetivo
+Preguntar «¿qué quieres entrenar?»: fuerza, actividad o ambas. Solo una actividad, incluida «Otro deporte», es un camino válido.
+#### Alcance
+Paso 3 y Perfil → Entrenamiento: texto neutro y validación, sin migrar valores.
+#### Fuera de alcance
+Elegir qué hacer cada día (REQ-386) y acortar el flujo (REQ-389).
+#### Riesgos
+No volver a «Descanso total» (REQ-252).
+#### Criterios de aceptación
+Ningún texto presupone fuerza. Solo fútbol 3 días termina el onboarding con 3 días de su deporte.
+#### Verificación sugerida
+`validate-training-onboarding-decisions.mjs`, e2e de onboarding y release gate.
+
+### REQ-386 - Onboarding: elegir qué entrenas cada día
+
+**Estado: implementado.** Implementar después de REQ-385. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+#### Origen
+Jonathan, 2026-11-11.
+#### Problema
+Solo se marcan días. El tipo de sesión sale de la plantilla por posición (`js/nutrition-pure.js:245`). `workoutSchedule` (`app/index.html:1761`) usa el lugar como señal indirecta, escondido en «Ajustar lugar por día».
+#### Objetivo
+Selector visible «Fuerza / actividad» por día, respetado por la semana.
+#### Alcance
+Usar `prefs.trainingDayKinds`, prellenado con el reparto actual, en `workoutSchedule`, en el onboarding y en Perfil.
+#### Fuera de alcance
+Mover un día de una semana ya generada.
+#### Riesgos
+Historial inmutable: solo afecta la próxima versión del plan.
+#### Criterios de aceptación
+Fuerza lunes, miércoles y viernes y bici martes y sábado → Entreno muestra eso. Sin tocar el selector, la semana es la misma que hoy.
+#### Verificación sugerida
+Pruebas puras de `workoutSchedule`, e2e y release gate.
+
+### REQ-387 - Entreno: indoor cycling como actividad
+
+**Estado: implementado.** Implementar después de REQ-386. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+#### Origen
+Jonathan, 2026-11-11.
+#### Problema
+Solo existe «Bicicleta», de ruta y en exterior (`app/index.html:1945`).
+#### Objetivo
+Poder elegir «Indoor cycling / spinning» como actividad, con sesiones de interior.
+#### Alcance
+`indoor_cycling` en etiquetas y opciones; sesiones de 30 a 60 minutos por RPE y cadencia; lugar gimnasio o casa; MET de spinning.
+#### Fuera de alcance
+Peloton, Zwift y potencia.
+#### Riesgos
+Las preferencias con `cycling` siguen igual.
+#### Criterios de aceptación
+Indoor 3 días y fuerza 2 → 3 sesiones de 60 minutos o menos bajo techo. «Bicicleta» sin cambios.
+#### Verificación sugerida
+Prueba de plantilla y lugar, e2e y release gate.
+
+### REQ-388 - Onboarding: volver atrás en cada paso sin buscar el botón
+
+**Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
+
+#### Origen
+Jonathan, 2026-11-11.
+#### Problema
+«Atrás» solo aparece al pie (`app/index.html:3584`). En el paso 4 queda a 2,65 pantallas. El atrás del sistema sale de la app: no hay `pushState` ni `popstate`.
+#### Objetivo
+Volver al paso anterior desde cualquier paso, sin desplazarse y sin perder lo escrito.
+#### Alcance
+«Atrás» arriba desde el paso 2; atrás del sistema con `popstate`; «Salir sin cambios» en la revisión de ciclo.
+#### Fuera de alcance
+La pantalla de avisos de REQ-289.
+#### Riesgos
+Que no choque con los modales ni con las pestañas.
+#### Criterios de aceptación
+En los pasos 2 a 4, «Atrás» se ve sin desplazarse. En el paso 4, el atrás del sistema vuelve al paso 3 con los valores intactos.
+#### Verificación sugerida
+e2e con `page.goBack()` y release gate.
+
+### REQ-389 - Onboarding corto: primera semana en 3 pantallas
+
+**Estado: implementado.** Implementar después de REQ-385, REQ-386 y REQ-388. Detalle: `docs/onboarding/2026-11-11-feedback.md`. Defaults: `docs/onboarding/essential-defaults.md`.
+
+#### Origen
+Jonathan, 2026-11-11.
+#### Problema
+Hoy son 4 pasos y unos 46 controles. Lo opcional está en un `summary` gris de 13 px (`app/index.html:772`) que nadie abre.
+#### Objetivo
+Tres pantallas (tú, tu semana, antes de empezar) y unos 90 segundos hasta la primera semana.
+#### Alcance
+Lo demás queda con valores por defecto documentados. Lo opcional en Perfil, visible.
+#### Fuera de alcance
+Las preguntas posteriores (REQ-390).
+#### Riesgos
+Seguridad, consentimiento y alergias siguen antes del plan; kcal = suma de macros; REQ-31.
+#### Criterios de aceptación
+20 campos o menos en total y ningún paso de más de 1,5 pantallas.
+#### Verificación sugerida
+e2e, validadores de onboarding y release gate.
+
+### REQ-390 - Completar el perfil de a pocos desde Hoy
+
+**Estado: implementado.** Una pregunta diaria después de registrar comida o entreno; posposición de tres días, coordinación con avisos/técnica y acceso desde Perfil. Respuestas privadas, metas desde mañana e historial conservado. Detalle: `docs/onboarding/progressive-profile.md`; especificación: `docs/onboarding/2026-11-11-feedback.md`. ✓ `scripts/test-profile-questions.mjs`, `tests/e2e/profile-questions.spec.js`.
+
+#### Origen
+Jonathan, 2026-11-11.
+#### Problema
+Tras el onboarding esencial solo queda el aviso fijo «Afina tu plan» en Perfil (`app/index.html:9350`), sin acción.
+#### Objetivo
+Hoy muestra como mucho una pregunta corta al día, después de un momento de valor, con «Ahora no».
+#### Alcance
+Preguntas ordenadas por impacto, guardadas en `prefs` y aplicadas desde la próxima generación; `profileRefinedAt` al terminar.
+#### Fuera de alcance
+Push y preferencias nuevas.
+#### Riesgos
+Que no se junte el mismo día con REQ-341 ni REQ-366; REQ-31.
+#### Criterios de aceptación
+Una sola pregunta tras la primera comida registrada; «Ahora no» la pospone 3 días; las metas pasadas no cambian.
+#### Verificación sugerida
+e2e con reloj controlado y release gate.

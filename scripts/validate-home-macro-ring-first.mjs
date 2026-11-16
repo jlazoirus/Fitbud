@@ -22,7 +22,7 @@ function extractFunctionSource(src, name) {
 // 1. El resumen de Hoy precede a la tarjeta principal.
 const renderHoy = extractFunctionSource(html, "renderHoy");
 const summaryIdx = renderHoy.indexOf("homeConsumptionHtml(agenda.totals)");
-const agendaIdx = renderHoy.indexOf("homeAgendaHtml(ds,agenda)");
+const agendaIdx = renderHoy.indexOf("homeAgendaHtml(ds,agenda"); // REQ-392: también recibe la fila de menú
 assert.ok(summaryIdx !== -1, "renderHoy debe incluir el resumen de consumo.");
 assert.ok(agendaIdx !== -1, "renderHoy debe renderizar homeAgendaHtml.");
 assert.ok(summaryIdx < agendaIdx, "El resumen de Hoy debe preceder a la agenda.");

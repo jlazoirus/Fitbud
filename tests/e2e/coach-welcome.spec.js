@@ -102,7 +102,10 @@ test("Ayuda opcional en lugar del tour automático; guía manual disponible",asy
   await installMocks(context);await seedLoggedInUser(page,{skipTour:false});await autoDismissNudges(page);await gotoApp(page);
   await expect(page.locator(".coach-welcome")).toBeVisible();
   await expect(page.locator(".tour-tip")).toHaveCount(0);
-  await page.getByRole("button",{name:"Ver guía rápida",exact:true}).click();
+  // REQ-393: la guía vive en Perfil › Ayuda y soporte.
+  await page.locator('[data-tab="perfil"]').click();
+  await page.locator("#pfSecAyuda > summary").click();
+  await page.getByRole("button",{name:"Ver guía rápida de Hoy",exact:true}).click();
   await expect(page.locator(".tour-tip")).toBeVisible();
   await page.locator(".tour-skip").click();
   await expect(page.locator(".coach-welcome")).toBeVisible();

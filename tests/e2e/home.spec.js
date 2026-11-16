@@ -1,57 +1,53 @@
-// Journey Home (Hoy): los chips del coach deben reflejar el mismo estado que
-// la agenda — REQ-153 (una comida saltada, o el entreno bajo pausa por
-// seguridad, no deben ser "pendientes" sugeridos por el coach).
+// Journey Home (Hoy) — REQ-392: un solo mensaje bajo la acción principal.
+// El coach queda como una fila con su pregunta (sin chips) y lo que pierde el
+// espacio contextual espera en Avisos.
 import { test, expect } from "@playwright/test";
-import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, screeningFixture } from "./helpers.js";
+import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, screeningFixture, completePrefs, daysFromToday } from "./helpers.js";
 
-test.describe("Home — chips del coach", () => {
-  test("REQ-153: una comida saltada deja de aparecer en los chips ('¿Qué como para...?')", async ({ page, context }) => {
-    await installMocks(context);
+const contextual = ".return-card, .ci-banner, .coach-welcome, .home-technique, section.agenda-card.agenda-state:not(.home-primary)";
+
+test.describe("Home — un mensaje a la vez (REQ-392)", () => {
+  test("semana 2 sin entrenar: un solo mensaje, el check-in espera en Avisos y el coach va sin chips", async ({ page, context }) => {
+    await installMocks(context, { prefs: completePrefs({ planStartDate: daysFromToday(-8), planEndDate: daysFromToday(61) }) });
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
     const errors = collectConsoleErrors(page);
-
     await gotoApp(page);
 
-    // Prepara el día (mealCount:3 → desayuno/almuerzo/cena) y lo aplica.
-    const preparar = page.getByRole("button", { name: /Sugerirme un menú/i });
-    await expect(preparar.first()).toBeVisible();
-    await preparar.first().click();
-    const overlay = page.locator("#overlay");
-    await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
-    const aplicar = overlay.getByRole("button", { name: /Aplicar al día/i });
-    await expect(aplicar).toBeEnabled();
-    await aplicar.click();
-
     const app = page.locator("#app");
-    await expect(app).toContainText("¿Qué como para Desayuno?");
-
-    // Saltar el desayuno (misma función que usa el botón "Saltar esta comida").
-    await page.evaluate(() => skipMeal(todayStr(), "desayuno"));
-    await page.locator("#tabs").getByText("Hoy").click();
-
-    // El chip ya no debe ofrecer el desayuno saltado; debe pasar a la siguiente
-    // comida pendiente real (almuerzo), igual que ya hacía la agenda.
-    await expect(app).not.toContainText("¿Qué como para Desayuno?");
-    await expect(app).toContainText("¿Qué como para Almuerzo?");
+    await expect(app.locator(".home-primary")).toBeVisible();
+    // Fuera de Avisos solo cabe un mensaje contextual.
+    await expect(app.locator(`:is(${contextual}):not(#homeNotices *)`)).toHaveCount(1);
+    await expect(app.locator(".coach-chip")).toHaveCount(0);
+    await expect(app.locator(".coach-home-title")).toHaveText("Pregúntale a tu coach");
+    await expect(app.locator("#coachInput")).toBeVisible();
+    await expect(app.getByRole("button", { name: "Cuéntame cómo entrenas", exact: true })).toHaveCount(0);
+    const notices = page.locator("#homeNotices");
+    await expect(notices.locator("> summary")).toContainText("Check-in de la semana 1");
+    await notices.locator("> summary").click();
+    await expect(notices.locator(".ci-banner h2")).toHaveText("Check-in de la semana 1");
+    await expect(notices.locator(".ci-banner").getByRole("button", { name: "Hacer check-in", exact: true })).toBeVisible();
+    // REQ-395: omitir pide confirmación; cancelar deja el check-in pendiente.
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await notices.getByRole("button", { name: "Omitir esta semana", exact: true }).click();
+    await expect(notices.locator(".ci-banner")).toBeVisible();
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  test("REQ-153: con pausa por seguridad activa, ningún chip ofrece el entrenamiento", async ({ page, context }) => {
+  test("con pausa por seguridad no aparece ningún atajo para entrenar en el coach", async ({ page, context }) => {
     await installMocks(context, {
       tables: { safety_screenings: { row: { ...screeningFixture(), has_red_flags: true, cleared_for_training: false, responses: { chest_pain: true } } } },
     });
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
     const errors = collectConsoleErrors(page);
-
     await gotoApp(page);
 
     const app = page.locator("#app");
     await expect(app).not.toContainText("¿Cómo hago el entrenamiento de hoy?");
     await expect(app).not.toContainText("Adapta el entreno de hoy por falta de tiempo");
-    await expect(app).not.toContainText("Perdí la sesión de hoy");
+    await expect(app.getByRole("button", { name: "Iniciar entreno", exact: true })).toHaveCount(0);
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });

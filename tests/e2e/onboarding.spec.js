@@ -79,9 +79,13 @@ test.describe("Onboarding", () => {
     }
     await page.getByRole("button", { name: "Guardar mi plan" }).click();
 
-    // Aterriza en Hoy con las tabs y las kcal del plan recién calculado
+    // Aterriza en Hoy; las kcal del plan recién calculado se ven en Nutrición
+    // (REQ-394: Hoy no muestra la tira de consumo hasta el primer registro).
     await expect(page.locator("#tabs")).toContainText("Hoy");
+    await expect(page.locator("#app .home-primary")).toBeVisible();
+    await page.locator('[data-tab="nutricion"]').click();
     await expect(app).toContainText(String(kcalShown));
+    await page.locator('[data-tab="hoy"]').click();
 
     // MOSTRADO = GUARDADO: el upsert del perfil lleva exactamente los macros del paso 2
     const profilePosts = calls.filter((c) => c.table === "profiles" && c.method === "POST");
