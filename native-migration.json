@@ -167,6 +167,76 @@
       "note": ""
     },
     {
+      "id": "NAT-H9",
+      "title": "Decisiones de producto para la app sin venta",
+      "phase": 0,
+      "track": "decision",
+      "human": true,
+      "deps": [],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": "Revisión 2026-11-16, D-1 a D-4 (docs/native-migration/REVISION-2026-11-16.md §3). No detiene a los agentes: hay valores conservadores por omisión."
+    },
+    {
+      "id": "NAT-H10",
+      "title": "Cliente principal y alcance de la beta",
+      "phase": 0,
+      "track": "decision",
+      "human": true,
+      "deps": [
+        "NAT-71"
+      ],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": "Revisión 2026-11-16, D-5 y D-6. Adelanta la decisión de cliente principal que estaba en NAT-H8."
+    },
+    {
+      "id": "NAT-H11",
+      "title": "Entorno de pruebas y URLs de redirección de Auth para la app",
+      "phase": 0,
+      "track": "decision",
+      "human": true,
+      "deps": [],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": "Revisión 2026-11-16, D-7."
+    },
+    {
+      "id": "NAT-H12",
+      "title": "Validación temprana con las tiendas",
+      "phase": 6,
+      "track": "decision",
+      "human": true,
+      "deps": [
+        "NAT-80",
+        "NAT-H2",
+        "NAT-H5"
+      ],
+      "paths": [
+        "docs/native-migration/decisions.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": "Revisión 2026-11-16, D-8. Registra el resultado con las tiendas que NAT-H3 dejaba para la beta."
+    },
+    {
       "id": "NAT-01",
       "title": "Inventario del dominio que vive en index.html y plan de extracción",
       "phase": 1,
@@ -529,7 +599,8 @@
       "human": false,
       "deps": [
         "NAT-20",
-        "NAT-02"
+        "NAT-02",
+        "NAT-72"
       ],
       "paths": [
         "native/src/core/**",
@@ -550,7 +621,9 @@
       "track": "foundation",
       "human": false,
       "deps": [
-        "NAT-20"
+        "NAT-20",
+        "NAT-70",
+        "NAT-73"
       ],
       "paths": [
         "native/src/ui/**",
@@ -570,7 +643,10 @@
       "human": false,
       "deps": [
         "NAT-20",
-        "NAT-21"
+        "NAT-21",
+        "NAT-70",
+        "NAT-73",
+        "NAT-78"
       ],
       "paths": [
         "native/app/(auth)/**",
@@ -594,7 +670,9 @@
         "NAT-21",
         "NAT-23",
         "NAT-06",
-        "NAT-07"
+        "NAT-07",
+        "NAT-70",
+        "NAT-73"
       ],
       "paths": [
         "native/src/data/**"
@@ -614,7 +692,8 @@
       "human": false,
       "deps": [
         "NAT-22",
-        "NAT-23"
+        "NAT-23",
+        "NAT-70"
       ],
       "paths": [
         "native/app/_layout.tsx",
@@ -718,7 +797,8 @@
       "deps": [
         "NAT-25",
         "NAT-24",
-        "NAT-08"
+        "NAT-08",
+        "NAT-71"
       ],
       "paths": [
         "native/src/features/onboarding/**",
@@ -762,7 +842,8 @@
         "NAT-24",
         "NAT-03",
         "NAT-04",
-        "NAT-05"
+        "NAT-05",
+        "NAT-71"
       ],
       "paths": [
         "native/src/features/hoy/**",
@@ -864,7 +945,8 @@
       "deps": [
         "NAT-25",
         "NAT-24",
-        "NAT-04"
+        "NAT-04",
+        "NAT-71"
       ],
       "paths": [
         "native/src/features/entreno/**",
@@ -927,7 +1009,8 @@
       "deps": [
         "NAT-25",
         "NAT-24",
-        "NAT-05"
+        "NAT-05",
+        "NAT-71"
       ],
       "paths": [
         "native/src/features/progreso/**",
@@ -989,7 +1072,8 @@
       "human": false,
       "deps": [
         "NAT-42",
-        "NAT-10"
+        "NAT-10",
+        "NAT-H11"
       ],
       "paths": [
         "native/src/features/privacidad/**",
@@ -1031,7 +1115,8 @@
       "human": false,
       "deps": [
         "NAT-H3",
-        "NAT-42"
+        "NAT-42",
+        "NAT-70"
       ],
       "paths": [
         "native/src/features/suscripcion/**",
@@ -1053,7 +1138,9 @@
       "human": false,
       "deps": [
         "NAT-32",
-        "NAT-07"
+        "NAT-07",
+        "NAT-70",
+        "NAT-76"
       ],
       "paths": [
         "native/src/features/coach/**",
@@ -1199,7 +1286,8 @@
         "NAT-30",
         "NAT-32",
         "NAT-33",
-        "NAT-38"
+        "NAT-38",
+        "NAT-79"
       ],
       "paths": [
         "native/e2e/**",
@@ -1222,7 +1310,8 @@
         "NAT-24",
         "NAT-33",
         "NAT-38",
-        "NAT-40"
+        "NAT-40",
+        "NAT-75"
       ],
       "paths": [
         "scripts/validate-cross-client-sync.mjs",
@@ -1240,7 +1329,9 @@
       "phase": 6,
       "track": "release",
       "human": false,
-      "deps": [],
+      "deps": [
+        "NAT-70"
+      ],
       "paths": [
         "docs/native-migration/store-listing.md"
       ],
@@ -1297,6 +1388,279 @@
         "docs/native-migration/release-checklist.md",
         "AUTONOMOUS_AGENT.md"
       ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-70",
+      "title": "Aplicar la revisión 2026-11-16 al plan: grafo, alcances y documentos de cobro",
+      "phase": 3,
+      "track": "docs",
+      "human": false,
+      "deps": [],
+      "paths": [
+        "native-migration.json",
+        "docs/native-migration/BACKLOG.md",
+        "docs/native-migration/COBRO-WEB.md",
+        "docs/native-migration/PLAN.md",
+        "docs/native-migration/PARITY.md",
+        "docs/native-migration/PUBLICACION.md",
+        "docs/native-migration/decisions.md",
+        "NATIVE_AGENT.md"
+      ],
+      "exclusiveGroup": "plan-docs",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-71",
+      "title": "Rebasar la matriz de paridad contra la web actual",
+      "phase": 3,
+      "track": "docs",
+      "human": false,
+      "deps": [
+        "NAT-70"
+      ],
+      "paths": [
+        "docs/native-migration/PARITY.md",
+        "docs/native-migration/PLAN.md",
+        "docs/native-migration/BACKLOG.md",
+        "native-migration.json"
+      ],
+      "exclusiveGroup": "plan-docs",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-72",
+      "title": "Verificación en dispositivo sin cuentas de tienda: perfiles EAS y prueba de arranque en CI",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20",
+        "NAT-27"
+      ],
+      "paths": [
+        "native/eas.json",
+        "native/README.md",
+        "native/e2e/smoke.yaml",
+        ".github/workflows/native-smoke.yml",
+        "docs/native-migration/device-smoke.md"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-73",
+      "title": "Instalar de una vez los módulos nativos del allowlist y elegir el almacenamiento",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20"
+      ],
+      "paths": [
+        "native/package.json",
+        "native/package-lock.json",
+        "native/app.config.ts",
+        "native/tests/app-config.test.ts",
+        "native/README.md",
+        "docs/native-migration/ADR-001-stack.md"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-74",
+      "title": "Simulación de dos clientes sobre el motor de sync",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-06"
+      ],
+      "paths": [
+        "scripts/validate-cross-client-sync.mjs",
+        "scripts/release-gate.mjs"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-75",
+      "title": "Sync sin pérdida entre clientes: escritura condicional por revisión y relectura al volver",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-74"
+      ],
+      "paths": [
+        "js/sync-queue.js",
+        "sync-conflicts.js",
+        "app/index.html",
+        "service-worker.js",
+        "supabase/sync_revision.sql",
+        "supabase/schema.sql",
+        "scripts/validate-cross-client-sync.mjs",
+        "scripts/validate-sync-queue.mjs",
+        "scripts/test-sync-conflicts.mjs",
+        "scripts/release-gate.mjs",
+        "native/src/data/**"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-76",
+      "title": "Acceso sin venta de punta a punta: servidor, cliente compartido, validador y páginas legales",
+      "phase": 2,
+      "track": "backend",
+      "human": false,
+      "deps": [],
+      "paths": [
+        "api/claude.js",
+        "js/api-client.js",
+        "scripts/validate-api-client.mjs",
+        "scripts/validate-native-copy.mjs",
+        "scripts/test-native-access-copy.mjs",
+        "tienda/layout.js",
+        "terminos/index.html",
+        "devoluciones/index.html",
+        "contacto/index.html",
+        "tests/e2e/legales-app.spec.js",
+        "service-worker.js",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-77",
+      "title": "Clasificar los módulos de js/ y hacer que el dominio nuevo nazca compartido",
+      "phase": 1,
+      "track": "core",
+      "human": false,
+      "deps": [
+        "NAT-02"
+      ],
+      "paths": [
+        "js/meal-log.js",
+        "js/training-routine.js",
+        "js/streak-friends.js",
+        "js/streak-share.js",
+        "scripts/validate-shared-modules.mjs",
+        "service-worker.js",
+        "AUTONOMOUS_AGENT.md",
+        "scripts/release-gate.mjs"
+      ],
+      "exclusiveGroup": "index-html",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-78",
+      "title": "Configuración por entorno en la app: URL de la API por perfil y configuración remota",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-20",
+        "NAT-29"
+      ],
+      "paths": [
+        "native/app.config.ts",
+        "native/eas.json",
+        "native/.env.example",
+        "native/src/config/**",
+        "native/tests/app-config.test.ts",
+        "native/README.md"
+      ],
+      "exclusiveGroup": "native-config",
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-79",
+      "title": "Arnés E2E temprano: API simulada y flujo de inicio de sesión con Maestro",
+      "phase": 3,
+      "track": "foundation",
+      "human": false,
+      "deps": [
+        "NAT-72",
+        "NAT-23",
+        "NAT-25",
+        "NAT-78"
+      ],
+      "paths": [
+        "native/e2e/**",
+        "native/scripts/mock-api.mjs",
+        ".github/workflows/native-smoke.yml",
+        "native/README.md"
+      ],
+      "status": "pendiente",
+      "owner": null,
+      "claimedAt": null,
+      "doneAt": null,
+      "note": ""
+    },
+    {
+      "id": "NAT-80",
+      "title": "Build mínimo para validar con las tiendas: contenido, configuración y lista de envío",
+      "phase": 6,
+      "track": "release",
+      "human": false,
+      "deps": [
+        "NAT-23",
+        "NAT-25",
+        "NAT-45",
+        "NAT-49",
+        "NAT-62",
+        "NAT-78",
+        "NAT-H9"
+      ],
+      "paths": [
+        "native/eas.json",
+        "native/app.config.ts",
+        "native/tests/app-config.test.ts",
+        "docs/native-migration/store-validation.md"
+      ],
+      "exclusiveGroup": "native-config",
       "status": "pendiente",
       "owner": null,
       "claimedAt": null,

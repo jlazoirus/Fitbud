@@ -40,6 +40,7 @@ git push origin HEAD:main
 - `exclusiveGroup`:
   - `index-html`: tocan `app/index.html`/`service-worker.js` (extracciones de Fase 1). Solo una a la vez para evitar conflictos con el loop desarrollador y entre agentes.
   - `native-config`: tocan `native/package.json` o `native/app.config.ts` (dependencias, plugins, permisos). Solo una a la vez.
+  - `plan-docs`: reescriben los documentos del plan y el grafo de `native-migration.json` (NAT-70, NAT-71). Solo una a la vez.
 - No dupliques lógica de dominio en `native/` (ver `PLAN.md` §4). Si falta, crea una tarea `core`.
 - Respeta los invariantes de `AGENTS.md`: REQ-31, privacidad, historial inmutable, sin dependencias runtime nuevas en la web, migraciones SQL idempotentes con RLS y nunca aplicadas a producción.
 - No hagas llamadas pagadas: usa fixtures y APIs simuladas. Nada de secretos en el repo.
