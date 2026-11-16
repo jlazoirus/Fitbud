@@ -32,10 +32,35 @@ export default function appConfig({ config }: ConfigContext): ExpoConfig {
     android: {
       package: process.env.ANDROID_PACKAGE_NAME || 'club.evolvapp.app',
       versionCode: 1,
+      // NAT-73: instaladas pero aún sin uso. Cada feature habilita solo lo que necesita.
+      blockedPermissions: [
+        'android.permission.CAMERA',
+        'android.permission.RECORD_AUDIO',
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+        'android.permission.READ_MEDIA_IMAGES',
+        'android.permission.READ_MEDIA_VIDEO',
+        'android.permission.READ_MEDIA_AUDIO',
+        'android.permission.POST_NOTIFICATIONS',
+        'android.permission.RECEIVE_BOOT_COMPLETED',
+        'android.permission.VIBRATE',
+        'android.permission.USE_BIOMETRIC',
+        'android.permission.USE_FINGERPRINT',
+      ],
     },
     web: { bundler: 'metro', output: 'single', favicon: './assets/evolv.png' },
     plugins: [
       'expo-router',
+      ['expo-sqlite', { useSQLCipher: true }],
+      ['expo-secure-store', { faceIDPermission: false }],
+      'expo-image',
+      'expo-sharing',
+      'expo-web-browser',
+      'expo-localization',
+      [
+        'expo-image-picker',
+        { photosPermission: false, cameraPermission: false, microphonePermission: false },
+      ],
       [
         'expo-splash-screen',
         { backgroundColor: '#101010', image: './assets/evolv.png', imageWidth: 120 },

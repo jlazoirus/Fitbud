@@ -1484,7 +1484,7 @@
       "owner": "codex-native-20261116",
       "claimedAt": "2026-11-16T19:34:28.761Z",
       "doneAt": null,
-      "note": "Esperando elección de Jonathan entre expo-sqlite + SQLCipher y MMKV antes de fijar almacenamiento, por instrucción explícita. Comparación y recomendación provisional en ADR-001. Sin instalación ni verificación runtime; faltan todos los checks de aceptación de NAT-73."
+      "note": "SQLite + SQLCipher y claves en SecureStore aprobados por Jonathan e instalados. Verificación parcial: expo-doctor 18/20; proxy HTTP 403 impide consultar esquema de Expo y React Native Directory. Falta completar Doctor en red habilitada y revisar manifiesto Android combinado antes de cerrar; PR #126 conserva el trabajo."
     },
     {
       "id": "NAT-74",

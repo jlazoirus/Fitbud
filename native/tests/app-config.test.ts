@@ -48,6 +48,37 @@ describe('Configuración de builds y actualizaciones', () => {
     expect(config.owner).toBe('evolv-qa');
   });
 
+  it('compila SQLCipher en ambas plataformas sin activar biometría ni textos de captura', () => {
+    const config = appConfig(context);
+    expect(config.plugins).toContainEqual(['expo-sqlite', { useSQLCipher: true }]);
+    expect(config.plugins).toContainEqual(['expo-secure-store', { faceIDPermission: false }]);
+    expect(config.plugins).toContainEqual([
+      'expo-image-picker',
+      { photosPermission: false, cameraPermission: false, microphonePermission: false },
+    ]);
+    expect(config.ios?.infoPlist).toBeUndefined();
+    expect(config.android?.permissions).toBeUndefined();
+  });
+
+  it.each([
+    'CAMERA',
+    'RECORD_AUDIO',
+    'READ_EXTERNAL_STORAGE',
+    'WRITE_EXTERNAL_STORAGE',
+    'READ_MEDIA_IMAGES',
+    'READ_MEDIA_VIDEO',
+    'READ_MEDIA_AUDIO',
+    'POST_NOTIFICATIONS',
+    'RECEIVE_BOOT_COMPLETED',
+    'VIBRATE',
+    'USE_BIOMETRIC',
+    'USE_FINGERPRINT',
+  ])('bloquea el permiso %s hasta la tarea que lo use', (permission) => {
+    expect(appConfig(context).android?.blockedPermissions).toContain(
+      `android.permission.${permission}`,
+    );
+  });
+
   it.each(['', ' ', 'not-a-project-id', 'https://expo.dev/accounts/jlazo'])(
     'rechaza un projectId inválido (%s) antes de generar un binario',
     (projectId) => {
