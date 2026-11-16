@@ -33,6 +33,10 @@
       "destination": "/pago/index.html"
     },
     {
+      "source": "/registro",
+      "destination": "/registro/index.html"
+    },
+    {
       "source": "/terminos",
       "destination": "/terminos/index.html"
     },

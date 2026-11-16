@@ -3,7 +3,8 @@
 // y la escalera del recorrido. No carga la app ni Supabase.
 import { PLANES_TIENDA, MONEDA, montoPlan, incluyePlan } from "/tienda/planes.js";
 import { COMERCIO } from "/tienda/comercio.js";
-import { monedaTienda } from "/tienda/moneda.js";
+import { monedaTienda, cargarConfig } from "/tienda/moneda.js";
+import { SUSCRIPCION, formatoPrecio } from "/tienda/planes.js";
 
 const esc = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const TICK = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -39,6 +40,18 @@ monedaTienda().then(({ usd, moneda }) => {
     for (const t of n.childNodes) if (t.nodeType === 3) t.textContent = t.textContent.replace("Pago único en soles", "Pago único en dólares");
   });
 }).catch(() => {});
+// REQ-356: con la suscripción encendida (TIENDA_SUSCRIPCION_ENABLED), las llamadas a la
+// acción invitan a la semana gratis en /registro; los planes de pago único siguen abajo.
+export function aplicarSemanaGratis(root = document) {
+  const monto = formatoPrecio(SUSCRIPCION.montoCentimos, SUSCRIPCION.moneda);
+  root.querySelectorAll('[data-lmode="nav"] a, [data-lmode="hero"] a, [data-lmode="final"] a.l-btn').forEach((a) => {
+    a.href = "/registro";
+    a.textContent = "Empieza tu semana gratis";
+  });
+  const nota = SUSCRIPCION.diasPrueba + " días gratis · Luego " + monto + " al mes · Cancela cuando quieras";
+  root.querySelectorAll('[data-lmode="heroNote"], .l-cta-note').forEach((n) => { n.textContent = nota; });
+}
+cargarConfig().then((cfg) => { if (cfg && cfg.tienda && cfg.tienda.suscripcion === true) aplicarSemanaGratis(); }).catch(() => {});
 document.querySelectorAll("[data-lcomercio]").forEach((n) => { n.textContent = `${COMERCIO.razonSocial} · RUC ${COMERCIO.ruc}`; });
 
 // Demo del día: tres imprevistos reales de la app sobre datos de ejemplo.

@@ -70,6 +70,8 @@ export function parseInscripcion(body) {
     deviceId: clean(b.deviceId, 80),
     acceptTerms: b.acceptTerms === true,
     acceptRenewal: b.acceptRenewal === true,
+    // Sin días gratis el primer mes se cobra el mismo día: solo con esta aceptación aparte.
+    aceptaCobroInmediato: b.aceptaCobroInmediato === true,
     authentication3DS: null,
   };
   const a = b.authentication3DS;
@@ -143,6 +145,10 @@ export function interpretCreacion(status, data, objeto) {
   if (status >= 200 && status < 300 && d.id && (!objeto || !d.object || d.object === objeto)) return { result: "ok", data: d };
   const msg = d.user_message || "No pudimos procesar tu tarjeta. Revisa los datos o prueba con otra.";
   return { result: "error", error: msg, code: d.decline_code || d.code || d.type || "status_" + status };
+}
+
+export function sinPruebaTexto(motivo) {
+  return motivo + " Si te suscribes, hoy se cobran " + formatoPrecio(SUSCRIPCION.montoCentimos, SUSCRIPCION.moneda) + " y luego cada mes hasta que canceles.";
 }
 
 // ── Utilidades HTTP ───────────────────────────────────────────────────────────────
@@ -264,6 +270,10 @@ export async function inscribir(req, res, e = env()) {
     if (await suscripcionViva(e, data.email, userId)) {
       return res.status(409).json({ error: "Ya tienes una suscripción activa con este correo. Puedes verla en Perfil → Mi suscripción." });
     }
+    // Sin días gratis por correo o cuenta: se avisa antes de tocar la tarjeta.
+    if (!data.aceptaCobroInmediato && !(await puedeProbar(e, { email: data.email, userId, tarjeta: null }))) {
+      return res.status(409).json({ sinPrueba: true, error: sinPruebaTexto("Con este correo ya usaste la semana gratis o un plan pagado.") });
+    }
   } catch (_) {
     return res.status(503).json({ error: "La suscripción no está disponible en este momento. Escríbenos y te ayudamos." });
   }
@@ -304,6 +314,10 @@ export async function inscribir(req, res, e = env()) {
     conPrueba = await puedeProbar(e, { email: data.email, userId, tarjeta });
   } catch (_) {
     return res.status(503).json({ error: "La suscripción no está disponible en este momento. Escríbenos y te ayudamos." });
+  }
+  if (!conPrueba && !data.aceptaCobroInmediato) {
+    // La tarjeta ya tuvo prueba: el token ya se usó, así que hay que volver a ingresarla.
+    return res.status(409).json({ sinPrueba: true, nuevaTarjeta: true, error: sinPruebaTexto("Esta tarjeta ya tuvo una semana gratis.") });
   }
   const culqiPlan = conPrueba ? e.planPrueba : e.planMensual;
   let sub;

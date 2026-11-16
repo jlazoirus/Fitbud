@@ -127,6 +127,8 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
 - **Datos:** `supabase/suscripciones.sql` (tablas `subscriptions` y `subscription_charges`). Cada persona lee su fila y solo escribe el servidor. La exportación de datos incluye la suscripción, con marca y últimos 4 de la tarjeta.
 - **Prueba:** `node scripts/test-suscripcion-culqi.mjs` (Culqi y Supabase simulados, más PGlite).
 
+- **Sin días gratis (REQ-356):** si el correo, la cuenta o la tarjeta ya tuvieron prueba o plan pagado, `/api/suscripcion` responde `409 { sinPrueba }` sin crear la suscripción. `/registro` muestra el motivo y pide aceptar aparte el cobro de hoy (`aceptaCobroInmediato`). Si el aviso vino por correo, reenvía el mismo token; si vino por la tarjeta (`nuevaTarjeta`), la pide otra vez.
+
 #### Activación (Jonathan)
 
 1. Aplicar `supabase/suscripciones.sql` en Supabase.
@@ -154,7 +156,7 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
 | 2 | REQ-353: portada sin beta; la beta solo en `/beta` | REQ-352 |
 | 3 | REQ-354: términos y devoluciones de la suscripción (hecho, tras `TIENDA_SUSCRIPCION_ENABLED`) | — |
 | 4 | REQ-355: motor de suscripción con Culqi (hecho; activación en §3, "Motor") | — |
-| 5 | REQ-356: `/registro` con tarjeta y semana gratis, y la llamada a la acción en la portada y la app | REQ-353, REQ-354, REQ-355 |
+| 5 | REQ-356: `/registro` con tarjeta y semana gratis, y la llamada a la acción en la portada y la app (hecho, tras la bandera) | — |
 | 6 | REQ-357: gestionar la suscripción (estado, cancelar) y sus correos | REQ-355 |
 
 La inscripción se abre al público (la portada cambia "Ver planes" por "Empieza tu semana gratis") recién cuando las fases 3 a 6 están en producción.

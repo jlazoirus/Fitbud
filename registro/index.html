@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Empieza tu semana gratis · Evolv</title>
+  <meta name="description" content="Prueba Evolv 7 días gratis. Luego S/ 29.90 al mes hasta que canceles.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=5">
+</head>
+<body>
+  <header id="t-header"></header>
+  <main class="wrap">
+    <h1 id="titulo">Empieza tu semana gratis</h1>
+
+    <div id="cargando" class="nota" role="status">Cargando…</div>
+    <div id="noDisponible" class="nota" hidden>La semana gratis todavía no está disponible. Mientras tanto, puedes ver los <a href="/planes">planes de pago único</a>.</div>
+
+    <div id="registro" class="pago" hidden>
+      <form id="inscripcion" class="form" novalidate>
+        <fieldset>
+          <legend>Tus datos</legend>
+          <div class="field"><label for="email">Correo <span class="req">*</span></label><input id="email" name="email" type="email" autocomplete="email" required maxlength="50">
+            <p class="hint">Si ya tienes cuenta en Evolv, usa el mismo correo. Si no, te enviamos un correo para crear tu contraseña.</p></div>
+          <div class="dos">
+            <div class="field"><label for="firstName">Nombre <span class="req">*</span></label><input id="firstName" name="firstName" autocomplete="given-name" required maxlength="50"></div>
+            <div class="field"><label for="lastName">Apellido <span class="req">*</span></label><input id="lastName" name="lastName" autocomplete="family-name" required maxlength="50"></div>
+          </div>
+          <div class="field"><label for="phone">Celular <span class="req">*</span></label><input id="phone" name="phone" type="tel" autocomplete="tel" required maxlength="20" placeholder="999 999 999"></div>
+          <div class="dos">
+            <div class="field"><label for="address">Dirección <span class="req">*</span></label><input id="address" name="address" autocomplete="street-address" required maxlength="100"></div>
+            <div class="field"><label for="city">Ciudad <span class="req">*</span></label><input id="city" name="city" autocomplete="address-level2" required maxlength="30" placeholder="Lima"></div>
+          </div>
+          <p class="hint">Culqi, la pasarela de pago, pide celular y dirección para guardar tu tarjeta de forma segura.</p>
+        </fieldset>
+        <label class="check"><input type="checkbox" id="aceptoRenovacion" name="aceptoRenovacion" required><span>Acepto la <b>renovación automática</b>: si no cancelo antes del <b class="fecha-cobro">día 8</b>, ese día se cobran <b class="monto">S/ 29.90</b> a mi tarjeta y luego cada mes, hasta que cancele.</span></label>
+        <label class="check"><input type="checkbox" id="acepto" name="acepto" required><span>Leí y acepto los <a href="/terminos#suscripcion" target="_blank">Términos y condiciones</a> y la <a href="/devoluciones#suscripcion" target="_blank">Política de cambios y devoluciones</a>.</span></label>
+        <div id="sinPrueba" class="alerta aviso" hidden>
+          <p id="sinPruebaTxt" style="margin:0 0 10px"></p>
+          <label class="check"><input type="checkbox" id="aceptoCobroHoy"><span>Entiendo y acepto que <b>hoy</b> se cobren <b class="monto">S/ 29.90</b> y luego cada mes, hasta que cancele.</span></label>
+        </div>
+        <div id="resultado" class="alerta error" role="alert" hidden></div>
+        <button id="enviar" class="btn btn-accent btn-block" type="submit">Empezar mi semana gratis</button>
+        <p class="seguro"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Tu tarjeta la guarda Culqi. Evolv no ve ni guarda sus datos. Para comprobarla, Culqi hace un cargo de <span class="validacion">S/ 3.00</span> y lo anula al instante.</span></p>
+      </form>
+
+      <aside class="resumen" aria-label="Resumen de la suscripción">
+        <img class="plan-img" src="/assets/planes/mensual.webp" alt="Ejemplo de desayuno con ingredientes en gramos y macros, y de un ejercicio guiado" width="1200" height="750">
+        <div class="plan-body">
+          <h2 class="plan-nombre">Suscripción mensual</h2>
+          <p class="plan-desc">Acceso completo a Evolv: plan de comidas, rutinas guiadas y seguimiento de tu progreso.</p>
+          <div class="fila"><span>Hoy</span><span>S/ 0.00</span></div>
+          <div class="fila"><span>Días gratis</span><span><span class="dias">7</span> días</span></div>
+          <div class="fila"><span>Desde el <span class="fecha-corta">día 8</span></span><span><span class="monto">S/ 29.90</span> al mes</span></div>
+          <div class="fila total"><span>Hoy pagas</span><span>S/ 0.00</span></div>
+          <p class="hint">Te avisamos por correo <span class="aviso-dias">2</span> días antes del primer cobro. Cancela cuando quieras, sin costo. Precio en soles, impuestos incluidos.</p>
+        </div>
+      </aside>
+    </div>
+
+    <section id="listo" class="narrow" hidden tabindex="-1">
+      <div class="alerta ok"><b id="listoTitulo">¡Tu semana gratis empezó!</b> <span id="listoTxt"></span></div>
+      <div class="hoja" style="margin-top:16px"><dl id="listoFilas"></dl></div>
+      <p class="hint" id="listoNota" style="margin-top:12px"></p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+        <a class="btn btn-accent" href="/app">Ir a Evolv</a>
+        <a class="btn" href="/contacto">¿Dudas? Escríbenos</a>
+      </div>
+    </section>
+  </main>
+  <footer id="t-footer"></footer>
+  <script type="module">
+    // REQ-356: inscripción con tarjeta y 7 días gratis. La tarjeta la tokeniza el Checkout
+    // de Culqi sin cobro; /api/suscripcion (REQ-355) crea cliente, tarjeta y suscripción.
+    // Solo con TIENDA_SUSCRIPCION_ENABLED (tienda.suscripcion en /api/config).
+    import { mountLayout, esc } from "/tienda/layout.js";
+    import { SUSCRIPCION, formatoPrecio } from "/tienda/planes.js";
+    import { cargarConfig } from "/tienda/moneda.js";
+    mountLayout();
+
+    const DAY = 86400000;
+    const monto = formatoPrecio(SUSCRIPCION.montoCentimos, SUSCRIPCION.moneda);
+    const fechaLarga = (d) => new Date(d).toLocaleDateString("es-PE", { timeZone: "America/Lima", day: "numeric", month: "long", year: "numeric" });
+    // El primer cobro es el día siguiente al último día gratis.
+    const primerCobro = fechaLarga(Date.now() + SUSCRIPCION.diasPrueba * DAY);
+    const fill = (sel, v) => document.querySelectorAll(sel).forEach((n) => { n.textContent = v; });
+    fill(".monto", monto);
+    fill(".dias", String(SUSCRIPCION.diasPrueba));
+    fill(".fecha-cobro", primerCobro);
+    fill(".fecha-corta", new Date(Date.now() + SUSCRIPCION.diasPrueba * DAY).toLocaleDateString("es-PE", { timeZone: "America/Lima", day: "numeric", month: "long" }));
+    fill(".aviso-dias", String(SUSCRIPCION.diasAvisoCobro));
+    fill(".validacion", formatoPrecio(SUSCRIPCION.validacionCentimos, SUSCRIPCION.moneda));
+
+    const form = document.getElementById("inscripcion");
+    const resultado = document.getElementById("resultado");
+    const enviarBtn = document.getElementById("enviar");
+    const sinPrueba = document.getElementById("sinPrueba");
+    let textoBoton = enviarBtn.textContent;
+    // Último token válido: si el servidor pide aceptar el cobro de hoy antes de usar la
+    // tarjeta, se reenvía el mismo (vence a los 5 minutos de creado).
+    let pendiente = null;
+
+    const cfg = await cargarConfig();
+    document.getElementById("cargando").hidden = true;
+    if (!(cfg.tienda && cfg.tienda.suscripcion === true)) {
+      document.getElementById("noDisponible").hidden = false;
+    } else {
+      document.getElementById("registro").hidden = false;
+      prefillEmail();
+    }
+
+    function prefillEmail() {
+      try {
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (!/^sb-.*-auth-token$/.test(key)) continue;
+          const email = JSON.parse(localStorage.getItem(key) || "{}")?.user?.email;
+          if (email) { document.getElementById("email").value = email; return; }
+        }
+      } catch (_) { /* sin almacenamiento: el campo queda vacío */ }
+    }
+
+    function leerDatos() {
+      const fd = new FormData(form);
+      const v = (k) => String(fd.get(k) || "").trim();
+      return {
+        email: v("email").toLowerCase(), firstName: v("firstName"), lastName: v("lastName"),
+        phone: v("phone"), address: v("address"), city: v("city"),
+        acceptTerms: document.getElementById("acepto").checked,
+        acceptRenewal: document.getElementById("aceptoRenovacion").checked,
+        aceptaCobroInmediato: !sinPrueba.hidden && document.getElementById("aceptoCobroHoy").checked,
+      };
+    }
+
+    function validar(d) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) return ["Revisa tu correo.", "email"];
+      if (d.firstName.length < 2) return ["Escribe tu nombre.", "firstName"];
+      if (d.lastName.length < 2) return ["Escribe tu apellido.", "lastName"];
+      if (d.phone.replace(/\D/g, "").length < 5) return ["Escribe tu celular.", "phone"];
+      if (d.address.length < 5) return ["Escribe tu dirección.", "address"];
+      if (d.city.length < 2) return ["Escribe tu ciudad.", "city"];
+      if (!d.acceptRenewal) return ["Para continuar, acepta la renovación automática mensual.", "aceptoRenovacion"];
+      if (!d.acceptTerms) return ["Para continuar, acepta los Términos y la Política de devoluciones.", "acepto"];
+      if (!sinPrueba.hidden && !d.aceptaCobroInmediato) return ["Para suscribirte sin días gratis, acepta el cobro de hoy.", "aceptoCobroHoy"];
+      return null;
+    }
+
+    function error(msg, campo) {
+      resultado.className = "alerta error";
+      resultado.textContent = msg;
+      resultado.hidden = false;
+      const el = campo && document.getElementById(campo);
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus({ preventScroll: true }); }
+      else resultado.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    function ocupado(on, texto) {
+      enviarBtn.disabled = on;
+      enviarBtn.textContent = on ? (texto || "Procesando…") : textoBoton;
+    }
+
+    function cargarScript(src) {
+      return new Promise((resolve, reject) => {
+        if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
+        const s = document.createElement("script");
+        s.src = src; s.async = true;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("No se pudo cargar " + src));
+        document.head.appendChild(s);
+      });
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      resultado.hidden = true;
+      const datos = leerDatos();
+      const fallo = validar(datos);
+      if (fallo) { error(fallo[0], fallo[1]); return; }
+      if (pendiente && Date.now() - pendiente.at < 4 * 60000) {
+        inscribir({ ...pendiente.pedido, ...datos });
+        return;
+      }
+      ocupado(true, "Abriendo el formulario seguro…");
+      try {
+        const c = cfg.culqi || {};
+        if (!c.enabled || !c.publicKey) {
+          error("La inscripción con tarjeta no está disponible en este momento. Escríbenos por WhatsApp y te ayudamos.");
+          ocupado(false);
+          return;
+        }
+        await Promise.all([cargarScript("https://js.culqi.com/checkout-js"), cargarScript("https://3ds.culqi.com")]);
+        let deviceId = null;
+        try {
+          window.Culqi3DS.publicKey = c.publicKey;
+          deviceId = await window.Culqi3DS.generateDevice();
+        } catch (_) { /* sin huella del dispositivo sigue; Culqi puede pedir 3DS */ }
+        abrirCheckout(c.publicKey, datos, deviceId);
+      } catch (_) {
+        error("No pudimos abrir el formulario seguro. Revisa tu conexión e intenta de nuevo.");
+        ocupado(false);
+      }
+    });
+
+    function abrirCheckout(publicKey, datos, deviceId) {
+      // Monto 0: el Checkout solo captura la tarjeta; no se cobra nada aquí.
+      const checkout = new window.CulqiCheckout(publicKey, {
+        settings: { title: "Evolv", currency: SUSCRIPCION.moneda, amount: 0 },
+        client: { email: datos.email, firstName: datos.firstName, lastName: datos.lastName },
+        options: {
+          lang: "es",
+          installments: false,
+          modal: true,
+          paymentMethods: { tarjeta: true, yape: false, billetera: false, bancaMovil: false, agente: false, cuotealo: false },
+          paymentMethodsSort: ["tarjeta"],
+        },
+        appearance: { theme: "default", menuType: "default", buttonCardPayText: "Guardar tarjeta" },
+      });
+      checkout.culqi = () => {
+        if (checkout.token) {
+          const tokenId = checkout.token.id;
+          checkout.close();
+          pendiente = { at: Date.now(), pedido: { tokenId, deviceId } };
+          inscribir({ ...datos, tokenId, deviceId });
+        } else if (checkout.error) {
+          checkout.close();
+          error(checkout.error.user_message || "No pudimos validar la tarjeta. Revisa los datos e intenta de nuevo.");
+          ocupado(false);
+        }
+      };
+      checkout.open();
+      ocupado(false);
+    }
+
+    async function inscribir(pedido) {
+      ocupado(true, "Guardando tu tarjeta…");
+      try {
+        const r = await fetch("/api/suscripcion", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(pedido) });
+        const out = await r.json().catch(() => ({}));
+        if (out.needs3ds) { autenticar(pedido); return; }
+        if (out.sinPrueba) { pedirCobroHoy(out); return; }
+        if (!r.ok || !out.ok) {
+          pendiente = null;
+          error(out.error || "No pudimos completar la inscripción. No se hizo ningún cobro.");
+          ocupado(false);
+          return;
+        }
+        listo(out, pedido);
+      } catch (_) {
+        error("Se cortó la conexión. Antes de reintentar, revisa tu correo o escríbenos: así evitamos una doble suscripción.");
+        ocupado(false);
+      }
+    }
+
+    // Quien ya tuvo prueba o un plan pagado no tiene días gratis: el cobro de hoy se
+    // acepta aparte, y el botón dice cuánto se cobra.
+    function pedirCobroHoy(out) {
+      if (out.nuevaTarjeta) pendiente = null; // la tarjeta ya se usó: se vuelve a ingresar
+      document.getElementById("sinPruebaTxt").textContent = out.error;
+      sinPrueba.hidden = false;
+      document.getElementById("titulo").textContent = "Suscríbete a Evolv";
+      textoBoton = "Suscribirme y pagar " + monto + " hoy";
+      ocupado(false);
+      document.getElementById("aceptoCobroHoy").focus();
+      sinPrueba.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+
+    // Si el banco pide 3DS al guardar la tarjeta, se confirma y se reintenta igual.
+    function autenticar(pedido) {
+      ocupado(true, "Confirmando con tu banco…");
+      const C3 = window.Culqi3DS;
+      const alRecibir = (event) => {
+        if (event.origin !== window.location.origin) return;
+        const resp = event.data || {};
+        if (resp.parameters3DS) {
+          window.removeEventListener("message", alRecibir);
+          inscribir({ ...pedido, authentication3DS: resp.parameters3DS });
+        } else if (resp.error) {
+          window.removeEventListener("message", alRecibir);
+          pendiente = null;
+          error("Tu banco no confirmó la tarjeta. No se hizo ningún cobro; intenta de nuevo o usa otra tarjeta.");
+          ocupado(false);
+        }
+      };
+      window.addEventListener("message", alRecibir, false);
+      C3.settings = { charge: { totalAmount: SUSCRIPCION.validacionCentimos, returnUrl: location.href, currency: SUSCRIPCION.moneda }, card: { email: pedido.email } };
+      C3.options = { showModal: true, showLoading: true, showIcon: true, closeModalAction: () => { ocupado(false); } };
+      C3.initAuthentication(pedido.tokenId);
+    }
+
+    function listo(out, pedido) {
+      pendiente = null;
+      const cuenta = {
+        existente: "La suscripción quedó en tu cuenta de Evolv. Entra con tu correo de siempre.",
+        invitada: "Te enviamos un correo a " + pedido.email + " para crear tu contraseña. Al entrar, tu acceso ya estará activo.",
+        pendiente: "Estamos terminando de activar tu acceso. Si en unas horas no lo ves, escríbenos.",
+      }[out.cuenta] || "";
+      const filas = [];
+      if (out.conPrueba) {
+        if (out.accesoHasta) filas.push(["Gratis hasta", fechaLarga(out.accesoHasta)]);
+        filas.push(["Primer cobro", (out.primerCobro ? fechaLarga(out.primerCobro) : primerCobro) + " · " + (out.monto || monto)]);
+      } else {
+        filas.push(["Cobro de hoy", out.monto || monto]);
+        filas.push(["Acceso", "Se activa en cuanto Culqi confirma el cobro (unos minutos)."]);
+      }
+      filas.push(["Luego", (out.monto || monto) + " cada mes, hasta que canceles"]);
+      if (out.tarjeta && out.tarjeta.ultimos4) filas.push(["Tarjeta", (out.tarjeta.marca || "Tarjeta") + " •••• " + out.tarjeta.ultimos4]);
+      filas.push(["Correo", pedido.email]);
+      document.getElementById("listoTitulo").textContent = out.conPrueba ? "¡Tu semana gratis empezó!" : "¡Suscripción creada!";
+      document.getElementById("listoTxt").textContent = cuenta;
+      document.getElementById("listoFilas").innerHTML = filas.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+      document.getElementById("listoNota").textContent = out.conPrueba
+        ? "Te avisamos por correo " + SUSCRIPCION.diasAvisoCobro + " días antes del primer cobro. Si cancelas antes, no se cobra nada."
+        : "Puedes cancelar cuando quieras, sin costo; conservas el acceso hasta el final del mes pagado.";
+      document.getElementById("registro").hidden = true;
+      document.getElementById("titulo").textContent = out.conPrueba ? "Te damos la bienvenida a Evolv" : "Gracias por suscribirte";
+      const sec = document.getElementById("listo");
+      sec.hidden = false;
+      sec.focus({ preventScroll: true });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  </script>
+</body>
+</html>

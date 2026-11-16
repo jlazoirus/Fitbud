@@ -181,8 +181,13 @@ try {
   assert.equal(r.statusCode, 409, "una suscripción viva por correo");
   assert.equal(w.culqi.subs.length, 1);
 
-  // Misma tarjeta (bin + últimos 4) con otro correo: sin prueba.
+  // Misma tarjeta (bin + últimos 4) con otro correo: sin prueba, y solo con aceptación expresa del cobro de hoy.
   r = await run(inscribir, post({ ...ok, email: "otra@example.com" }));
+  assert.equal(r.statusCode, 409);
+  assert.deepEqual([r.payload.sinPrueba, r.payload.nuevaTarjeta], [true, true]);
+  assert.match(r.payload.error, /hoy se cobran S\/ 29\.90/);
+  assert.equal(w.culqi.subs.length, 1, "sin aceptar el cobro inmediato no se crea la suscripción");
+  r = await run(inscribir, post({ ...ok, email: "otra@example.com", aceptaCobroInmediato: true }));
   assert.equal(r.payload.conPrueba, false);
   assert.equal(w.tables.subscriptions[1].culqi_plan_id, "pln_test_mensual");
   assert.equal(w.tables.user_entitlements.length, 1, "sin prueba, el acceso llega con el primer cobro (webhook)");
@@ -192,7 +197,13 @@ try {
   w.users.push(pagador);
   w.tables.user_entitlements.push({ id: crypto.randomUUID(), user_id: pagador.id, origin: "checkout", status: "expired", payment_ref: "chr_test_old", expires_at: "2026-01-01T00:00:00.000Z" });
   w.bin = "520000"; w.last4 = "2222";
+  const tarjetas = w.culqi.cards.length;
   r = await run(inscribir, post({ ...ok, email: "paga@example.com" }));
+  assert.equal(r.statusCode, 409);
+  assert.equal(r.payload.sinPrueba, true);
+  assert.equal(r.payload.nuevaTarjeta, undefined, "por correo se avisa antes de usar la tarjeta");
+  assert.equal(w.culqi.cards.length, tarjetas, "la tarjeta no se toca");
+  r = await run(inscribir, post({ ...ok, email: "paga@example.com", aceptaCobroInmediato: true }));
   assert.equal(r.payload.cuenta, "existente");
   assert.equal(r.payload.conPrueba, false, "quien ya tuvo un plan pagado no tiene días gratis");
 
