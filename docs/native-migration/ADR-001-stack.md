@@ -55,3 +55,21 @@ Prohibido en `native/`: SDKs de analytics/ads de terceros, SDKs que reciban dato
 ## Versiones fijadas
 
 NAT-20, 2026-11-10. Expo 58.0.23, Expo Router 58.0.30, React Native 0.88.1, React 19.3.0, TypeScript 6.0.3, Jest 30.5.2 y jest-expo 58.0.14. Verificación local con Node 22.22.0 y npm 10.9.4. Las versiones de instalación quedan fijadas en `native/package-lock.json`. Node mínimo 22.14.0. El job de CI se implementa en NAT-27.
+
+## NAT-73 — Comparación de almacenamiento (pendiente de Jonathan)
+
+Consulta documental: 2026-11-16. Base instalada: Expo 58.0.23 y React Native 0.88.1. **Propuesta, no elección fijada:** Jonathan pidió revisar ambas opciones antes de seleccionar. No se instalaron paquetes ni se cambió la configuración en esta etapa.
+
+| Criterio | expo-sqlite + SQLCipher | react-native-mmkv V4 |
+|---|---|---|
+| Cifrado de datos de salud | Habilitar `useSQLCipher: true` y configurar la clave al abrir. Comprobar `cipher_version` y fallar si falta: `PRAGMA key` por sí solo puede ignorarse y dejar datos sin cifrar. | Configurar `encryptionKey`; sin ella guarda valores en texto plano. Ofrece AES-128 y opción AES-256. |
+| Sesión y claves | Clave aleatoria protegida con SecureStore; nunca en código ni junto a la base. | Clave aleatoria protegida con SecureStore; nunca hardcodeada ni guardada en MMKV. |
+| Arquitectura / SDK | Módulo de Expo documentado para SDK 58; SQLCipher requiere prebuild y binario propio, no Expo Go. | V4 usa JSI/Nitro y requiere RN ≥0.76; RN 0.88.1 cumple el mínimo, pero falta comprobar integración. Añade `react-native-nitro-modules`, fuera del allowlist actual. |
+| Separación por usuario (diseño propuesto) | Una base y clave por `user_id`; adaptar el puerto asíncrono de NAT-06 en NAT-24. | Una instancia con id y clave por `user_id`; envolver la API síncrona en el puerto de NAT-06. |
+| Mantenimiento / datos | Mismo proveedor que Expo; SQL y transacciones útiles para repositorios y cola. | Proyecto de Margelo sobre Tencent MMKV; API clave/valor sencilla y síncrona, con otra dependencia nativa que mantener. |
+
+**Recomendación provisional:** expo-sqlite con SQLCipher y claves en SecureStore. Encaja con el SDK y evita introducir Nitro. La sesión también debe quedar cifrada; NAT-23 implementará el adaptador y NAT-24 los repositorios, aislamiento y purga. Ninguna opción cifra automáticamente por el mero hecho de instalarla. Ambas requieren verificar cierre/cambio de usuario y tratamiento de backups; SecureStore tiene diferencias de persistencia entre plataformas.
+
+**Fuentes primarias:** [SQLite SDK 58 / SQLCipher](https://docs.expo.dev/versions/v58.0.0/sdk/sqlite/#sqlcipher), [SecureStore SDK 58](https://docs.expo.dev/versions/v58.0.0/sdk/securestore/), [MMKV V4: instalación, cifrado, instancias y requisitos](https://github.com/margelo/react-native-mmkv).
+
+**Verificación pendiente:** decisión de Jonathan, instalación compatible mediante `expo install`, aleatoriedad PKCE en Hermes, manifiesto Android combinado y permisos bloqueados, instalación limpia/doctor, checks nativos y web, exportaciones iOS/Android. No hay evidencia de compilación o cifrado ejecutado; NAT-73 no está terminada y no habilita NAT-22.

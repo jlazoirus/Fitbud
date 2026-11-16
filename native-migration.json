@@ -1480,11 +1480,11 @@
         "docs/native-migration/ADR-001-stack.md"
       ],
       "exclusiveGroup": "native-config",
-      "status": "en_curso",
+      "status": "bloqueado",
       "owner": "codex-native-20261116",
       "claimedAt": "2026-11-16T19:34:28.761Z",
       "doneAt": null,
-      "note": ""
+      "note": "Esperando elección de Jonathan entre expo-sqlite + SQLCipher y MMKV antes de fijar almacenamiento, por instrucción explícita. Comparación y recomendación provisional en ADR-001. Sin instalación ni verificación runtime; faltan todos los checks de aceptación de NAT-73."
     },
     {
       "id": "NAT-74",
