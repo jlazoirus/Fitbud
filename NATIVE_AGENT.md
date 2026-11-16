@@ -41,6 +41,10 @@ git push origin HEAD:main
   - `index-html`: tocan `app/index.html`/`service-worker.js` (extracciones de Fase 1). Solo una a la vez para evitar conflictos con el loop desarrollador y entre agentes.
   - `native-config`: tocan `native/package.json` o `native/app.config.ts` (dependencias, plugins, permisos). Solo una a la vez.
   - `plan-docs`: reescriben los documentos del plan y el grafo de `native-migration.json` (NAT-70, NAT-71). Solo una a la vez.
+- Un archivo de ruta dentro de `native/app/**` que solo reexporta una pantalla de tu carpeta `native/src/features/<journey>/` está dentro de tu alcance.
+- Agregar a `native/src/core/index.ts` y `native/src/core/types/` el import y la fachada tipada de un módulo compartido que tu tarea consume está dentro de tu alcance, solo añadiendo: no se cambia lo existente. Incluye una prueba mínima en `native/src/core/`.
+- Toda tarea de extracción (`core`) agrega su módulo al puente con la regla anterior.
+- Una pantalla que reciba un error con `paywall` muestra el texto local neutral; nunca el mensaje del servidor.
 - No dupliques lógica de dominio en `native/` (ver `PLAN.md` §4). Si falta, crea una tarea `core`.
 - Respeta los invariantes de `AGENTS.md`: REQ-31, privacidad, historial inmutable, sin dependencias runtime nuevas en la web, migraciones SQL idempotentes con RLS y nunca aplicadas a producción.
 - No hagas llamadas pagadas: usa fixtures y APIs simuladas. Nada de secretos en el repo.

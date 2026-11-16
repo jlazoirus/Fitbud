@@ -5,8 +5,8 @@ Checklist para declarar la beta (criterio 2 de `PLAN.md` §10). Cada tarea `feat
 | Journey | Capacidad web (referencia) | Tarea | iOS | Android | Notas |
 |---|---|---|---|---|---|
 | Acceso | Login email/contraseña | NAT-23 | ⬜ | ⬜ | |
-| Acceso | Registro con confirmación por correo | NAT-23, NAT-12 | ⬜ | ⬜ | |
-| Acceso | Recuperar contraseña / crear contraseña desde invitación (REQ-167) | NAT-23, NAT-12 | ⬜ | ⬜ | |
+| Acceso | Pantalla para quien no tiene cuenta | NAT-23 | ⬜ | ⬜ | D-1 a: texto neutral sin enlaces. Registro solo web (flujo A); NAT-H9 abierta. |
+| Acceso | Recuperar contraseña / crear contraseña desde correo de compra o invitación (REQ-167) | NAT-23, NAT-12 | ⬜ | ⬜ | |
 | Acceso | Cerrar sesión con purga de datos locales (REQ-156) | NAT-23 | ⬜ | ⬜ | |
 | Onboarding | 4 pasos, macros calculados, selector de cardio, lugar de fuerza | NAT-30 | ⬜ | ⬜ | |
 | Onboarding | Consentimiento esencial + fotos opcional, versionados | NAT-30 | ⬜ | ⬜ | Texto sujeto a NAT-H4 |
@@ -22,7 +22,7 @@ Checklist para declarar la beta (criterio 2 de `PLAN.md` §10). Cada tarea `feat
 | Nutrición | Semana: preparar, revisar, lista de compras, aplicar | NAT-34 | ⬜ | ⬜ | |
 | Nutrición | Estimar con foto + preguntas (REQ-172) | NAT-35 | ⬜ | ⬜ | |
 | Nutrición | Dictado por voz | NAT-36 | ⬜ | ⬜ | |
-| Coach | Conversación con el coach, paywall comercial | NAT-46 | ⬜ | ⬜ | |
+| Coach | Conversación con el coach, sin acceso o límite de prueba con texto local neutral | NAT-46, NAT-76 | ⬜ | ⬜ | Nunca mostrar el mensaje comercial del servidor. |
 | Entreno | Plan semanal, detalle series × reps (REQ-174), demostraciones | NAT-37 | ⬜ | ⬜ | |
 | Entreno | Cambiar sesión antes de iniciar; modo seguro (REQ-116) | NAT-37 | ⬜ | ⬜ | |
 | Entreno | Reproductor: series, RPE, descansos, descanso entre ejercicios (REQ-168/185/186/187) | NAT-38 | ⬜ | ⬜ | |
@@ -36,9 +36,9 @@ Checklist para declarar la beta (criterio 2 de `PLAN.md` §10). Cada tarea `feat
 | Perfil | Secciones con aviso de cambios sin guardar (REQ-105/107/108) | NAT-42 | ⬜ | ⬜ | |
 | Perfil | Recalcular objetivos y preferencias | NAT-42 | ⬜ | ⬜ | |
 | Privacidad | Exportar datos, borrar cuenta, retirar consentimientos | NAT-43 | ⬜ | ⬜ | Borrado in-app exigido por tiendas |
-| Facturación | Estado del plan / trial, actualizar acceso tras pagar en la web | NAT-45 | ⬜ | ⬜ | Sin precios ni enlaces a comprar (`COBRO-WEB.md` §4) |
+| Facturación | Prueba, activa, cobro fallido, cancelada, vencida, cortesía y beta; actualizar acceso | NAT-45 | ⬜ | ⬜ | Sin precios ni enlaces; beta no ve cobro (REQ-208). Próximo cobro solo fecha cuando REQ-357 lo exponga; mientras, solo datos de entitlement. D-2: sin cancelación in-app hasta NAT-H9. |
 | Facturación | Compra y restaurar compras | — | ➖ | ➖ | Cobro solo en la web (NAT-H3, 2026-11-05); compra integrada solo si se activa la contingencia |
-| Facturación | Compra con Culqi (`/planes` → `/pago`) y canje de cupones | — | ➖ | ➖ | Solo web |
+| Facturación | Suscripción mensual con tarjeta (`/registro`), compra con Culqi (`/planes` → `/pago`) y cupones | — | ➖ | ➖ | Solo web |
 | Plataforma | Funciona sin conexión y sincroniza al volver | NAT-24 | ⬜ | ⬜ | |
 | Plataforma | Versión mínima / actualización | NAT-49 | ⬜ | ⬜ | |
 | Plataforma | Accesibilidad | NAT-48 | ⬜ | ⬜ | |

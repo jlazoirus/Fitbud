@@ -91,7 +91,7 @@ La revisión cuesta días en algunos cambios; mantener dos interfaces cuesta tra
 | **A. La app es el cliente principal (recomendada)** | Con la paridad lograda, los cambios de producto para usuarios con cuenta van solo a la app. La web queda para portada, tienda, administración y arreglos críticos. | Un solo esfuerzo por cambio. Quien use solo la web deja de recibir novedades. |
 | **B. Dos clientes a la par** | Cada cambio se hace y se prueba en web y en app. | La web sigue completa, con el doble de trabajo de interfaz. |
 
-La opción A no apaga la PWA: sigue activa, pero en mantenimiento. **Decide Jonathan en NAT-H8**, con los datos de la validación (plataforma y uso reales), de preferencia al reanudar la migración, porque cambia lo que vale la pena construir. Hasta entonces sigue vigente la recomendación de `PLAN.md` §7.
+La opción A no apaga la PWA: sigue activa, pero en mantenimiento. **Decide Jonathan en NAT-H10**, sobre la matriz rebasada y la propuesta de alcance de NAT-71 (D-5/D-6), antes de construir la paridad, porque cambia lo que vale la pena construir. Hasta entonces sigue vigente la recomendación de `PLAN.md` §7.
 
 Al decidir, cada REQ pasa a declarar a qué cliente aplica y se actualizan `AUTONOMOUS_AGENT.md` y `AUDIT_AGENT.md`, porque hoy el loop desarrollador no toma trabajo nativo.
 
@@ -105,7 +105,8 @@ Al decidir, cada REQ pasa a declarar a qué cliente aplica y se actualizan `AUTO
 | NAT-49 | `minVersion` como último recurso; buscar actualizaciones también al volver a primer plano. |
 | NAT-63 | `expo-updates` en el primer binario, etiqueta por binario y checklist con §5. |
 | NAT-H2 | Tipo de cuenta de Google Play (§5). |
-| NAT-H8 | Cliente principal (§7) y go/no-go con NAT-64 lista. |
+| NAT-H10 | Cliente principal y alcance de beta (§7), con la propuesta de NAT-71. |
+| NAT-H8 | Go/no-go con NAT-64 lista. |
 
 ## 9. Fuentes
 
