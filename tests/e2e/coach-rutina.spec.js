@@ -78,8 +78,8 @@ for(const width of [320,390,1280])test(`conversar, revisar y guardar una rutina 
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   expect(await page.evaluate(()=>effectiveWorkout(addDays(todayStr(),7)).workout.name)).toBe('Mi pierna en máquinas');
   await gotoApp(page);
-  await page.locator('.home-agenda summary').click();
-  await expect(page.locator('.agenda-item.kind-workout .agenda-name')).toHaveText('Mi pierna en máquinas');
+  // REQ-394: el entreno pendiente se ve en «Tu día», sin desplegar «Resto del día».
+  await expect(page.locator('.home-workout-row strong')).toHaveText('Mi pierna en máquinas');
   await assertWorkout();
   await startGuidedSession(page);
   const frozen=await page.evaluate(()=>JSON.stringify(dayState(current).workoutExecution.contentPrescription));
