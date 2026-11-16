@@ -77,7 +77,7 @@ Consulta documental: 2026-11-16. Base instalada: Expo 58.0.23 y React Native 0.8
 
 **Aleatoriedad:** la inspección del código instalado de React Native 0.88.1 (`Libraries/Core/InitializeCore.js` y `setUpGlobals.js`) y Expo no encuentra una instalación de `crypto.getRandomValues`. `@supabase/auth-js` (`generatePKCEVerifier`) cae en `Math.random` si `crypto` está ausente. Se añade `expo-crypto`; NAT-23 debe conectar su `getRandomValues` antes de crear Supabase y probarlo bajo Hermes. Instalarlo no instala un polyfill global. No usar `getRandomBytes` síncrono para ese adaptador: tiene un fallback débil con depuración remota. Las claves de base deben generarse con API nativa segura.
 
-**Permisos:** `android.blockedPermissions` elimina cámara, micrófono, almacenamiento/medios, notificaciones, arranque, vibración y biometría hasta su tarea de uso. El plugin de ImagePicker deshabilita sus tres textos de uso; SecureStore no solicita Face ID. NetInfo necesita estado de red y el runtime/OTA necesita internet. NAT-35/41 habilitan captura, NAT-44 notificaciones y NAT-22 hápticos solo cuando implementen su uso. Generar siempre el proyecto fuera del checkout y revisar el manifiesto combinado tras cada cambio de permisos.
+**Permisos:** `android.blockedPermissions` elimina cámara, micrófono, almacenamiento/medios, notificaciones, arranque, vibración, biometría y los permisos transitivos de FCM, badges y atribución identificados en los AAR descargados hasta su tarea de uso. El plugin de ImagePicker deshabilita sus tres textos de uso; SecureStore no solicita Face ID. NetInfo necesita estado de red y el runtime/OTA necesita internet. NAT-35/41 habilitan captura, NAT-44 notificaciones y NAT-22 hápticos solo cuando implementen su uso. Generar siempre el proyecto fuera del checkout y revisar el manifiesto combinado tras cada cambio de permisos.
 
 **Huella de runtime:** las dependencias y SQLCipher cambian el binario: los clientes de desarrollo previos quedan obsoletos; generar uno nuevo. Sin builds firmados ni credenciales en esta tarea.
 
@@ -107,3 +107,12 @@ Resueltas con `expo install` usando el mapa de SDK 58 incluido en Expo 58.0.23 (
 | `expo-web-browser` | 58.0.8 |
 | `react-native-svg` | 15.16.0 |
 | `react-native-url-polyfill` | 4.0.0 |
+
+### Evidencia y límites de NAT-73
+
+- CI del PR: [Native CI, corrida 40](https://github.com/jlazoirus/Fitbud/actions/runs/43943438151), verde en el commit de instalación. No incluye Doctor ni compilación nativa.
+- Instalación limpia y versiones locales SDK compatibles; TypeScript/lint/Jest (29 pruebas locales tras ampliar permisos), formato, exportaciones Hermes iOS/Android y config público verdes.
+- Prebuild temporal de iOS y Android confirma SQLCipher; iOS no añade textos de captura ni Face ID. Se inspeccionaron los manifiestos fuente y AAR disponibles (FCM, biometría, ShortcutBadger e Install Referrer); sus permisos sin uso están bloqueados.
+- **No hay manifiesto combinado verificado:** Gradle llegó a `:app:processReleaseMainManifest`, pero el artefacto oficial `react-android-0.88.1-release.aar` redirige a `repo.reactnative.dev` y devuelve HTTP 403. La primera ejecución perdió el daemon; la repetición con un trabajador y heap de 768 MB llegó al bloqueo de descarga. No se cambió React Native ni se sustituyó el artefacto.
+- Doctor: 18/20, dos controles sin datos por HTTP 403 de la red (`exp.host`, `api.expo.dev`, `reactnative.directory`). No se deshabilitaron controles. Falta repetirlo en una red habilitada.
+- NAT-73 permanece bloqueada en `main` y en el PR. No habilita NAT-22 ni autoriza reclamar la siguiente tarea. La operación de sesión/base cifrada y PKCE real se probará en NAT-23/24; aquí no se presenta como ejecutada.
