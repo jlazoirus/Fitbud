@@ -5885,7 +5885,7 @@ function renderHoy(){
       <h1>${esc(greeting.title)}</h1>
       ${greeting.sub?`<p class="home-greeting-sub">${esc(greeting.sub)}</p>`:""}
     </div>
-    ${stk>0?`<button type="button" class="btn btn-sm home-streak" aria-label="Ver mi racha y amigos" onclick="openStreakFriends()">Racha ${stk}</button>`:""}
+    <button type="button" class="btn btn-sm home-streak" aria-label="Ver mi racha y amigos" onclick="openStreakFriends()">${stk>0?`Racha ${stk}`:"Racha"}</button>
   </header>
   ${agenda.state==="done"?"":homeConsumptionHtml(agenda.totals)}
   ${homeAgendaHtml(ds,agenda,menuSuggestion)}
