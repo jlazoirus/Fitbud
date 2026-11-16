@@ -2515,3 +2515,20 @@ Fila de entreno con su acción («Iniciar entreno» o «Registrar actividad») c
 Día de gimnasio sin menú: «Iniciar entreno» sin desplegar nada. Sin registros, no hay tira de consumo.
 ### Verificación sugerida
 `tests/e2e/home-optional-menu.spec.js`, `rutina-consistente.spec.js`, `onboarding.spec.js`.
+
+## REQ-395 - Hoy: check-in claro y placeholder legible
+
+**Estado: implementado.** Sigue a REQ-394.
+
+### Origen
+Crítica de Hoy, 2026-11-16 (detector Impeccable y revisión).
+### Problema
+El check-in llevaba la etiqueta «CHECK-IN · SEMANA 4» encima del rango. «Omitir esta semana» pesaba igual que iniciarlo y lo omitía sin confirmar. El placeholder del coach tenía contraste 3.9:1 (sin regla `::placeholder`).
+### Objetivo
+Check-in legible y difícil de omitir por error; placeholders AA.
+### Alcance
+Título «Check-in de la semana N», rango y una línea. «Hacer check-in» como botón; «Omitir esta semana» como acción secundaria con confirmación. `::placeholder` en `--muted`. PWA v253.
+### Criterios de aceptación
+Cancelar la confirmación deja el check-in pendiente. Placeholder ≥ 4.5:1.
+### Verificación sugerida
+`tests/e2e/home.spec.js` y detector Impeccable.

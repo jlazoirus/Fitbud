@@ -25,7 +25,12 @@ test.describe("Home — un mensaje a la vez (REQ-392)", () => {
     const notices = page.locator("#homeNotices");
     await expect(notices.locator("> summary")).toContainText("Check-in de la semana 1");
     await notices.locator("> summary").click();
-    await expect(notices.locator(".ci-banner")).toContainText("Iniciar check-in");
+    await expect(notices.locator(".ci-banner h2")).toHaveText("Check-in de la semana 1");
+    await expect(notices.locator(".ci-banner").getByRole("button", { name: "Hacer check-in", exact: true })).toBeVisible();
+    // REQ-395: omitir pide confirmación; cancelar deja el check-in pendiente.
+    page.once("dialog", (dialog) => dialog.dismiss());
+    await notices.getByRole("button", { name: "Omitir esta semana", exact: true }).click();
+    await expect(notices.locator(".ci-banner")).toBeVisible();
 
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });

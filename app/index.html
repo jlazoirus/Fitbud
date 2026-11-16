@@ -835,6 +835,10 @@
   }
   /* Check-in semanal (REQ-20) */
   .ci-banner{background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg);padding:16px;margin-bottom:14px}
+  .ci-banner .agenda-title{font-size:1.0625rem}
+  .ci-banner-text{margin:6px 0 12px;color:var(--muted);font-size:.8125rem;line-height:1.45;max-width:62ch}
+  .ci-banner-actions{display:flex;flex-wrap:wrap;align-items:center;column-gap:18px;row-gap:4px}
+  .ci-banner-actions .btn{min-height:44px}
   .ci-scale{display:flex;gap:6px;margin-top:7px}
   .ci-scale button{flex:1;height:38px;border-radius:var(--r-sm);background:var(--surf3);border:1px solid var(--border-2);color:var(--muted);font-size:13px;font-weight:600;transition:.15s;line-height:1}
   .ci-scale button.sel{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
@@ -1149,6 +1153,7 @@
   .coach-input-row{display:flex;gap:8px;padding:10px 14px 12px;background:var(--bg);border-top:1px solid var(--border);flex-shrink:0}
   .coach-input-row textarea{flex:1;resize:none;background:var(--surf1);border:1px solid var(--border-2);border-radius:var(--r-md);color:var(--txt);padding:10px 12px;font-size:14px;font-family:inherit;min-height:44px;max-height:120px;line-height:1.4}
   .coach-input-row textarea:focus{outline:none;border-color:var(--accent)}
+  ::placeholder{color:var(--muted);opacity:1}
   .coach-input-row button{height:44px;width:44px;flex-shrink:0;border-radius:var(--r-sm);background:var(--accent);color:var(--on-accent);font-size:18px;align-self:flex-end;display:flex;align-items:center;justify-content:center}
   .coach-input-row button:disabled{opacity:.4}
   .coach-thinking{display:flex;align-items:center;gap:10px;color:var(--txt);font-size:14px}
@@ -17819,20 +17824,20 @@ function weeklyCheckinRangeLabel(startDs,endDs){
   return sMon===eMon?`${s.getDate()}–${e.getDate()} ${sMon}`:`${s.getDate()} ${sMon} – ${e.getDate()} ${eMon}`;
 }
 
+// REQ-395: título con la semana (sin etiqueta encima) y «Omitir» como acción secundaria.
 function weeklyCheckinBanner(){
   const due=weeklyCheckinDue();if(!due)return"";
   const body=due.active
-    ?"Revisa cómo fue tu semana y recibe ajustes a tu plan para la siguiente."
-    :"No registraste actividad esa semana. Aun así puedes ajustar tu plan para la que sigue.";
-  return`<div class="ci-banner">
-    <div class="section-h" style="margin:0 0 3px">Check-in · Semana ${due.num}</div>
-    <div style="font-size:15px;font-weight:600;font-family:var(--font-display)">${weeklyCheckinRangeLabel(due.start,due.end)}</div>
-    <div class="muted small" style="margin:5px 0 12px">${body}</div>
-    <div class="row" style="gap:8px">
-      <button class="btn btn-sm" onclick="openWeeklyCheckin()">Iniciar check-in</button>
-      <button class="btn btn-sm" onclick="skipWeeklyCheckin('${due.key}')">Omitir esta semana</button>
+    ?"Revisa tu semana y ajusta la siguiente."
+    :"Esa semana no tiene registros; igual puedes ajustar la siguiente.";
+  return`<section class="ci-banner" aria-labelledby="ciBannerTitle">
+    <h2 class="agenda-title" id="ciBannerTitle">Check-in de la semana ${due.num}</h2>
+    <p class="ci-banner-text">${weeklyCheckinRangeLabel(due.start,due.end)} · ${body}</p>
+    <div class="ci-banner-actions">
+      <button type="button" class="btn" onclick="openWeeklyCheckin()">Hacer check-in</button>
+      <button type="button" class="home-secondary-action" onclick="skipWeeklyCheckin('${due.key}',true)">Omitir esta semana</button>
     </div>
-  </div>`;
+  </section>`;
 }
 // Acceso discreto al check-in pendiente para vistas que no son Home (evita banner duplicado).
 function weeklyCheckinChip(){
@@ -18105,7 +18110,8 @@ async function declineWeeklyCheckinProposal(weekKey){
 }
 
 // Registra el check-in como omitido (no vuelve a aparecer esta semana).
-async function skipWeeklyCheckin(weekKey){
+async function skipWeeklyCheckin(weekKey,ask){
+  if(ask&&!confirm("¿Omitir el check-in de esta semana? Después no podrás hacerlo."))return;
   const prefs=migrateProfilePrefs({...((profile&&profile.prefs)||{})});
   if(!Array.isArray(prefs.weeklyCheckins))prefs.weeklyCheckins=[];
   if(!prefs.weeklyCheckins.find(c=>c.wk===weekKey)){
