@@ -107,6 +107,35 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
   Se reutiliza `notification_log` para no repetir envíos (REQ-351).
 - **Avisos de vencimiento (REQ-351):** no se envían a quien tiene una suscripción activa, porque no tiene nada que renovar a mano.
 
+### Motor (REQ-355, implementado el 2026-11-16)
+
+- **Código:** `api/_tienda/suscripcion.js`, enrutado por `/api/checkout` (no suma funciones):
+  - `POST /api/suscripcion`: inscripción pública. Solo funciona con `TIENDA_SUSCRIPCION_ENABLED`.
+  - `POST /api/culqi-webhook`: eventos de Culqi.
+  - `POST /api/suscripcion/cancelar`: cancelación, con sesión.
+- **Inscripción:**
+  - Pide `email`, `firstName`, `lastName`, `phone`, `address`, `city`, `tokenId`, `acceptTerms` y `acceptRenewal`. Culqi exige dirección, ciudad y teléfono para crear el cliente, así que REQ-356 debe pedirlos.
+  - Si Culqi pide 3DS al guardar la tarjeta, responde `needs3ds`. El reintento con `authentication3DS` reutiliza el cliente ya creado.
+  - Va con prueba (`CULQI_PLAN_PRUEBA_ID`) solo si ese correo y esa cuenta nunca tuvieron suscripción ni plan pagado, y si la misma tarjeta (bin y últimos 4) no tuvo prueba. Si no, va por `CULQI_PLAN_MENSUAL_ID`, y el acceso llega con el primer cobro.
+  - Con prueba, el acceso de los días gratis queda en `user_entitlements`, con `payment_ref = sxn_…:prueba`.
+- **Webhook:**
+  - Lee el evento con `GET /v2/events/{id}` y la suscripción con `GET /v2/recurrent/subscriptions/{id}`.
+  - `subscription.charge.succeeded` suma 30 días una sola vez, gracias a la clave de `subscription_charges`.
+  - `subscription.charge.failed` → `past_due`; `subscription.cancel.succeeded` → `canceled`.
+  - Un evento repetido o de otra suscripción no cambia nada.
+- **Cancelar:** `DELETE` en Culqi. El acceso ya dado sigue hasta su vencimiento. Borrar la cuenta (`api/privacy.js`) cancela antes la suscripción y, si Culqi no responde, no borra la cuenta.
+- **Datos:** `supabase/suscripciones.sql` (tablas `subscriptions` y `subscription_charges`). Cada persona lee su fila y solo escribe el servidor. La exportación de datos incluye la suscripción, con marca y últimos 4 de la tarjeta.
+- **Prueba:** `node scripts/test-suscripcion-culqi.mjs` (Culqi y Supabase simulados, más PGlite).
+
+#### Activación (Jonathan)
+
+1. Aplicar `supabase/suscripciones.sql` en Supabase.
+2. Con la llave de integración: `CULQI_SECRET_KEY=sk_test_… node scripts/culqi-crear-planes.mjs`, que muestra `CULQI_PLAN_PRUEBA_ID` y `CULQI_PLAN_MENSUAL_ID`.
+3. En un entorno **Preview** de Vercel, cargar esas dos variables, las llaves de prueba y `TIENDA_SUSCRIPCION_ENABLED=1`.
+4. En CulqiPanel (integración), Eventos → Webhooks: `https://<preview>/api/culqi-webhook` con los eventos de Suscripciones.
+5. Inscribirse con una tarjeta de prueba y confirmar 4 cosas: `trial_end` a 7 días, ningún cobro antes, el estado 2 en Culqi y el acceso de 7 días en la app. Si Culqi no respeta `initial_cycles` como prueba, se pasa a la alternativa del diseño, que es crear la suscripción al terminar la prueba.
+6. Solo después, y con REQ-356 y REQ-357 listos: confirmar con Culqi la recurrencia en la cuenta live, crear los planes con `--live`, configurar Production y el webhook live, y encender la bandera.
+
 ### Legales (REQ-354, textos aprobados por Jonathan el 2026-11-14)
 
 - **Detrás de una bandera.** Los textos de la suscripción solo se ven con `TIENDA_SUSCRIPCION_ENABLED` (`1` o `true` en Vercel → `tienda.suscripcion` en `/api/config`). Apagada, que es como queda hoy, `/terminos`, `/devoluciones` y `/planes` no cambian y siguen diciendo «pago único, sin renovación automática», que es lo cierto mientras no se pueda suscribir. Montos y plazos salen de `SUSCRIPCION` en `tienda/planes.js`, y el código está en `tienda/suscripcion.js`.
@@ -124,7 +153,7 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
 | 1 | REQ-352: web pública en `/` y app en `/app` | — |
 | 2 | REQ-353: portada sin beta; la beta solo en `/beta` | REQ-352 |
 | 3 | REQ-354: términos y devoluciones de la suscripción (hecho, tras `TIENDA_SUSCRIPCION_ENABLED`) | — |
-| 4 | REQ-355: motor de suscripción con Culqi (SQL, inscripción en el servidor, webhook, cancelación por API) | — (API confirmada el 2026-11-14) |
+| 4 | REQ-355: motor de suscripción con Culqi (hecho; activación en §3, "Motor") | — |
 | 5 | REQ-356: `/registro` con tarjeta y semana gratis, y la llamada a la acción en la portada y la app | REQ-353, REQ-354, REQ-355 |
 | 6 | REQ-357: gestionar la suscripción (estado, cancelar) y sus correos | REQ-355 |
 
@@ -136,7 +165,7 @@ La inscripción se abre al público (la portada cambia "Ver planes" por "Empieza
 2. ~~Llaves de prueba de Culqi~~: ya existen; la tienda las usa. Nunca se pegan en el chat.
 3. **Configurar el webhook** en CulqiPanel (Eventos → Webhook) con la URL que deje REQ-355.
 4. ~~Revisar y aprobar los textos de REQ-354~~: aprobados por Jonathan (2026-11-14). Cuando REQ-355..357 estén en producción, encender `TIENDA_SUSCRIPCION_ENABLED` y actualizar `vigenciaLegalSuscripcion`.
-5. **Aplicar** el SQL de REQ-355 en Supabase.
+5. **Activar REQ-355**: aplicar el SQL, crear los planes y probar en Preview (§3, "Motor" → "Activación").
 
 ## 6. Riesgos
 

@@ -74,21 +74,23 @@ test.describe("Hoy — tarjeta de regreso (REQ-284)", () => {
     const rows = [row(-8, doneDay()), row(-7, doneDay()), row(-6, doneDay()), row(-5, doneDay()), row(0, plannedDay())];
     const errors = await open(page, context, rows);
 
-    await expect(card(page)).toContainText("Qué bueno verte de vuelta");
-    await expect(card(page)).toContainText("Tu racha se reinició, tu progreso no: en este plan llevas 4 días registrados y 4 entrenos, con una mejor racha de 4 días.");
-    await expect(card(page).locator(".return-goal")).toHaveText(/^Tu objetivo: Bajar grasa · semana \d+ de 10$/);
+    // REQ-393: la bienvenida es el saludo; no hay tarjeta ni «Empezar hoy».
+    const head = page.locator("#app .home-head");
+    await expect(card(page)).toHaveCount(0);
+    await expect(head.locator("h1")).toHaveText(/^Qué bueno verte, /);
+    await expect(head.locator(".home-greeting-sub")).toHaveText("Tu progreso sigue: 4 días registrados y 4 entrenos.");
+    await expect(page.getByRole("button", { name: "Ver mi racha y amigos" })).toHaveText("Racha");
 
     await page.locator(".home-primary").getByRole("button", { name: "Registrar este plato" }).click();
-    await expect(card(page)).toHaveCount(0);
+    await expect(head.locator("h1")).toHaveText(/^Hola, /);
+    await expect(head.locator(".home-greeting-sub")).toHaveCount(0);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
   test("sin ningún registro desde que empezó el plan invita a empezar", async ({ page, context }) => {
     const errors = await open(page, context, []);
-    await expect(card(page)).toContainText("Tu plan te espera");
-    await expect(card(page)).toContainText("Aún no registras tu primer día.");
-    await card(page).getByRole("button", { name: "Empezar hoy" }).click();
     await expect(card(page)).toHaveCount(0);
+    await expect(page.locator("#app .home-greeting-sub")).toHaveText("Tu racha empieza con tu primera comida.");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 

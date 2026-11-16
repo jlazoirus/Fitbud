@@ -88,7 +88,8 @@ test.describe("Progreso — racha combinada (REQ-146)", () => {
 
     await gotoApp(page);
     await page.waitForLoadState("networkidle");
-    await expect(rachaHoyBoton(page)).toHaveText("Racha 0");
+    // REQ-393: en Hoy la racha en 0 no muestra el cero; el acceso a amigos sigue.
+    await expect(rachaHoyBoton(page)).toHaveText("Racha");
     await openProgreso(page);
 
     // Ambos números en cero, coherentes entre sí.

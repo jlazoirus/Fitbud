@@ -2004,119 +2004,15 @@ Pie: "No recibir más estos correos". ✓ `scripts/test-referrals.mjs`.
 
 ## REQ-328 - Entreno: ver el siguiente ejercicio sin salir del actual
 
-**Estado: implementado.** Vista «A continuación» de solo lectura, con el siguiente pendiente real, nombre vigente, dosis y descanso o duración/opcionalidad. Una línea, sin desbordes a 320/360/390/1280 px; las series permanecen en la primera pantalla. Sin cambios de ejecución ni registros. ✓ `tests/e2e/next-exercise.spec.js`.
-
-### Origen
-Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): durante la sesión quieren saber qué viene después sin tocar nada.
-
-### Problema
-En la pantalla del ejercicio de fuerza en curso no hay forma de ver cuál es el siguiente sin completar u omitir el actual, o sin abrir «Hacer otro ejercicio primero».
-
-### Causa raíz
-`renderCurrentWorkoutStep()` (`index.html:6717`) solo pinta el paso actual: título, «Cómo se hace», `.player-dose` (`index.html:6742`), series y controles. No consulta el paso siguiente. El orden real no es «paso actual + 1»: `nextWorkoutStepIndex()` (`index.html:5905`) devuelve el primer paso `pending` distinto del actual, así que cuentan los ejercicios aplazados, los elegidos con `openWorkoutStepPicker()` (`index.html:6231`), los opcionales y los bloques por tiempo (vuelta a la calma).
-
-### Objetivo
-Una tarjeta compacta «A continuación» bajo el título del ejercicio actual, antes de `.player-dose`, con el nombre del siguiente ejercicio, series × repeticiones y descanso, visible en el primer viewport a 360-390 px.
-
-### Alcance
-- Calcular el siguiente con la misma regla que usa `completeWorkoutStep()` (`nextWorkoutStepIndex(execution, execution.currentStep)`), sin duplicar lógica.
-- Fuerza: nombre (con la variación o sustitución vigente), `prescribedSets × reps` y descanso (`restLabel`/`restSeconds`). Bloque por tiempo: su etiqueta y duración u objetivo, sin series. Paso opcional no aceptado: su nombre marcado como opcional.
-- Sin siguiente pendiente: la tarjeta no se muestra.
-- Una sola línea en móvil (texto truncado si hace falta) para no empujar las series; solo lectura, sin botones.
-- Reutilizar clases y tokens existentes; sin fuentes ni colores nuevos. Subir `CACHE_NAME` del service worker.
-
-### Fuera de alcance
-Mostrar máquina o zona, mostrar dos ejercicios por delante, saltar al siguiente desde la tarjeta, cambiar series, cargas, descanso, botones o «Cómo se hace».
-
-### Riesgos
-Mostrar un siguiente distinto del que realmente abre «Siguiente ejercicio» (aplazados, picker, opcionales); desbordes a 320-360 px; bajar las series fuera del primer viewport.
-
-### Criterios de aceptación
-- A 360 y 390 px, la tarjeta se ve sin scroll ni interacción en la pantalla del ejercicio en curso.
-- El ejercicio mostrado es exactamente el que aparece al tocar «Siguiente ejercicio», también tras aplazar uno o usar «Hacer otro ejercicio primero».
-- Avanza al pasar de ejercicio y desaparece cuando no queda nada pendiente.
-- Registrar series, el descanso, sustituir, omitir y completar la sesión siguen igual.
-
-### Verificación sugerida
-Playwright a 360/390/1280: sesión con ≥3 ejercicios, comprobar la tarjeta en cada paso, aplazar uno y comparar con el destino real de «Siguiente ejercicio», último ejercicio sin tarjeta. Regresiones del reproductor, detector Impeccable y release gate.
+**Estado: implementado.** Vista «A continuación» de solo lectura, con el siguiente pendiente real, nombre vigente, dosis y descanso o duración/opcionalidad. Una línea, sin desbordes a 320/360/390/1280 px; las series permanecen en la primera pantalla. Sin cambios de ejecución ni registros. ✓ `tests/e2e/next-exercise.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-329 - Nutrición: registrar alimentos por gramos sin sentir que armas una comida
 
-**Estado: implementado.** Hoy abre Alimento; totales derivados visibles y entrada manual plegable, con reapertura automática para registros antiguos/corregidos y errores. Conserva gramos, porciones, favoritas y guardado. Detalle: `docs/food-registration.md`. ✓ `tests/e2e/registro-gramos.spec.js` y regresiones del editor.
-
-### Origen
-Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): registrar comida se siente complejo, como armar una «comida»; piden buscar un alimento, poner los gramos y que la app calcule.
-
-### Problema
-La capacidad ya existe (REQ-188, REQ-271), pero queda escondida. El editor abre por defecto en «Recientes» o «Favoritas», y muestra a la vez el día y el destino del registro, la descripción, cuatro campos de macros a mano, «Solo conozco las calorías», los botones de estimación y «Guardar en favoritas». El camino alimento + gramos no es el protagonista.
-
-### Causa raíz
-`quickPicksHtml()` (`index.html:11376`) elige la pestaña inicial con `hasRecent?"recent":hasFav?"fav":"food"` (`index.html:11378`). `editorSheet()` (`index.html:11568`) pinta siempre visibles los campos `f_kcal/f_p/f_c/f_f` y el resto de controles, aunque al sumar alimentos (`addFoodToEditor()`, `index.html:10929`) los totales ya se derivan de las líneas y la descripción se completa sola (`autoName`).
-
-Ya resuelto en el código actual, que no hay que rehacer: búsqueda en el catálogo con gramos, varias líneas con total, macros desde la base de alimentos, persistencia con `commitDay()`, validación de gramos (más de 0 y hasta 2000), protección contra doble toque (`e.saving` en `saveEditor()`, `index.html:11612`) y «Guardar en favoritas» desmarcado por defecto.
-
-### Objetivo
-Que registrar por gramos sea el camino evidente del editor existente: buscar alimento → gramos → total en vivo → Guardar, sin nombrar nada ni tocar macros a mano.
-
-### Alcance
-- El editor admite abrir directamente en la pestaña «Alimento» (opción de `openEditor()`), usada por los accesos de registro (Hoy y REQ-330).
-- Con líneas añadidas, mostrar un total destacado (kcal, proteína, carbohidratos, grasa) que se actualiza al añadir, cambiar o quitar líneas.
-- Agrupar en un plegable cerrado por defecto el ingreso a mano: los cuatro campos de macros, «Solo conozco las calorías» y la estimación. Se abre solo, o ya está abierto, al editar un registro que tiene macros manuales.
-- La descripción sigue rellenándose sola con los alimentos y no se exige escribirla.
-- Mantener «Guardar en favoritas» como opción desmarcada; sin nuevos conceptos de «comida».
-- Reutilizar clases y componentes existentes. Subir `CACHE_NAME`.
-
-### Fuera de alcance
-Un flujo o pantalla nuevos paralelos al editor, ingreso por texto libre, cambios de catálogo o de base nutricional, quitar el ingreso manual o la estimación, cambios de backend o migraciones.
-
-### Riesgos
-Romper la edición de registros antiguos con macros manuales o con porciones (REQ-243, REQ-270); perder la corrección manual de totales derivados; que el plegable esconda errores de validación; textos que choquen con REQ-31/REQ-194.
-
-### Criterios de aceptación
-- Desde un acceso de registro se anota «150 g de pollo» + «80 g de avena» sin escribir nombre ni macros, y el total coincide con la base de alimentos (mismos valores que `componentsTotals()`).
-- Tras recargar, el registro sigue ahí y los totales del día son correctos.
-- Gramos vacíos, cero, negativos, no numéricos o mayores de 2000 no se guardan; un doble toque en Guardar no duplica.
-- Abrir «Recientes», «Favoritas», el ingreso a mano y la estimación sigue funcionando; editar un registro manual antiguo muestra sus valores.
-- Móvil 320/390 y escritorio sin desbordes.
-
-### Verificación sugerida
-Playwright a 360/390/1280: registro por gramos con dos alimentos, recarga, doble toque, gramos inválidos, edición de un registro manual y de uno con porción. Regresiones de REQ-188/243/269/270/271, detector Impeccable y release gate.
+**Estado: implementado.** Hoy abre Alimento; totales derivados visibles y entrada manual plegable, con reapertura automática para registros antiguos/corregidos y errores. Conserva gramos, porciones, favoritas y guardado. Detalle: `docs/food-registration.md`. ✓ `tests/e2e/registro-gramos.spec.js` y regresiones del editor. Detalle en `docs/requirements-history.md`.
 
 ## REQ-330 - Nutrición: acceso evidente para registrar algo fuera del plan
 
-**Estado: implementado.** Acceso principal visible antes de la lista, con y sin menú; abre Alimento como extra y persiste sin cambiar comidas. Secundario conservado. ✓ `tests/e2e/registro-extra-visible.spec.js`.
-
-### Origen
-Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): «le puedo dar click a registrar, pero no logro encontrar el camino» para anotar algo fuera del plan (ej. «cené 10 makis»).
-
-### Problema
-En Nutrición, el registro libre solo está al final de la lista de comidas («＋ Agregar comida / snack»), con estilo secundario. Con varias comidas en la lista queda bajo el pliegue.
-
-### Causa raíz
-`renderNutrition()` (`index.html:5285`) añade el botón después de `itemsHtml` dentro de la sección «Comidas del día» (`index.html:5324`). Caminos que ya existen: «Registrar comida» en Hoy (REQ-316, `homeLogFood()` → `openFoodRegistration()`, `index.html:4833`, que propone reemplazar la próxima comida sin registrar), «Registra lo que comiste» en cada comida vacía (REQ-316), el editor de cada comida del plan y «＋ Agregar comida / snack». Falta descubribilidad, no capacidad.
-
-### Objetivo
-Un botón principal sobre la lista de comidas del día que lleve al flujo existente para registrar algo fuera del plan.
-
-### Alcance
-- Botón principal «Registrar algo que comí» antes de la lista de comidas, con texto de apoyo breve. Si el día no tiene menú preparado, evitar «tu plan»; algo como «Aunque no esté en tu menú de hoy» solo cuando hay menú.
-- Abre `openEditor("extra", ds, null, {registration:true, intent:"extra", …})` en la pestaña «Alimento» de REQ-329. Nada de lógica nueva de guardado.
-- «＋ Agregar comida / snack» se conserva como acceso secundario, sin renombrarlo.
-- Subir `CACHE_NAME`.
-
-### Fuera de alcance
-Cambiar Hoy (ya resuelto en REQ-316), eliminar o renombrar el botón actual, cambiar la sugerencia de menú opcional, registro por texto libre.
-
-### Riesgos
-Dos botones de registro compitiendo, jerarquía confusa con la tarjeta «Menú opcional», textos vetados por REQ-194 (ver la nota de verificación de REQ-316) o que mencionen tecnología (REQ-31).
-
-### Criterios de aceptación
-- En Nutrición del día, el acceso se ve sobre la lista de comidas sin scroll a 360-390 px, con y sin menú preparado.
-- Lo registrado desde ahí cuenta en los macros del día como extra y persiste tras recargar.
-- «＋ Agregar comida / snack» sigue funcionando igual.
-
-### Verificación sugerida
-Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gramos desde él, recarga y totales; regresión del botón secundario y de los registros de Hoy. Detector Impeccable y release gate.
+**Estado: implementado.** Acceso principal visible antes de la lista, con y sin menú; abre Alimento como extra y persiste sin cambiar comidas. Secundario conservado. ✓ `tests/e2e/registro-extra-visible.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-331 - Tienda: datos del comercio y páginas legales propias
 
@@ -2247,50 +2143,15 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-355 - Motor de suscripción mensual con Culqi
 
-**Estado: pendiente.** API confirmada el 2026-11-14 (endpoints, campos y eventos en el plan §3). Solo llaves de integración.
+**Estado: implementado.** `api/_tienda/suscripcion.js`: inscripción con prueba única, webhook verificado contra la API (+30 días por cobro, idempotente) y cancelación; `supabase/suscripciones.sql`; planes con `scripts/culqi-crear-planes.mjs`. Activación manual: plan §3, "Motor". REQ-356 debe pedir dirección, ciudad y celular.
 
-### Origen
-Decisión de Jonathan (2026-11-06): suscripción mensual con 7 días gratis.
-### Problema
-La tienda solo cobra pagos únicos; no existe cobro recurrente.
-### Objetivo
-Inscribir, cobrar cada mes con suscripciones de Culqi y cancelar, con el acceso sincronizado.
-### Alcance
-- Tabla `subscriptions` (SQL idempotente, RLS).
-- `op=subscribe`: cliente, tarjeta, suscripción al plan con `initial_cycles` de 7 días, prueba única por persona.
-- `op=culqi-webhook`: verifica con `GET /v2/events/{id}`; +30 días por cobro, idempotente.
-- Cancelar con `DELETE`.
-### Fuera de alcance
-`/registro` (REQ-356); Perfil y correos (REQ-357).
-### Riesgos
-Cobro doble, prueba repetida, webhook falso.
-### Criterios de aceptación
-7 días sin cobro; cada cobro exitoso suma 30 días una vez; cancelar detiene los cobros.
-### Verificación sugerida
-Test Node con Culqi simulado e inscripción real en integración.
+✓ `scripts/test-suscripcion-culqi.mjs`.
 
 ## REQ-356 - /registro con tarjeta y semana gratis
 
-**Estado: pendiente.** Implementar después de REQ-353, REQ-354 y REQ-355. Plan §3.
+**Estado: implementado.** `/registro` (Checkout de Culqi con monto 0, 3DS, renovación aceptada aparte y, sin días gratis, el cobro de hoy también) y llamadas a "Empieza tu semana gratis" en portada, `/planes` y la app sin sesión, todo solo con `TIENDA_SUSCRIPCION_ENABLED`. `/api/suscripcion` responde `sinPrueba` sin cobrar si falta esa aceptación.
 
-### Origen
-Decisión de Jonathan (2026-11-06): la inscripción pide la tarjeta y da 7 días gratis.
-### Problema
-Hoy no existe una inscripción pública: la portada solo vende pagos únicos o lleva a postular.
-### Objetivo
-`/registro` en la web pública: datos, aceptación expresa de la renovación y tarjeta en el Checkout de Culqi sin cobro, con acceso inmediato por 7 días.
-### Alcance
-- Página `/registro` con la misma cabecera y pie de la tienda.
-- Llama a la inscripción de REQ-355 y reutiliza el flujo de invitación y "Ir a Evolv".
-- La portada, `/planes` y la app sin sesión invitan a "Empieza tu semana gratis".
-### Fuera de alcance
-Registro dentro de la app nativa (COBRO-WEB.md).
-### Riesgos
-Cobrar sin una aceptación clara; duplicar cuentas.
-### Criterios de aceptación
-Sin aceptar la renovación no se puede continuar; al terminar, la persona tiene 7 días de acceso y ve la fecha del primer cobro.
-### Verificación sugerida
-E2E con Culqi simulado, como `tests/e2e/tienda.spec.js`.
+✓ `tests/e2e/semana-gratis.spec.js`, `scripts/test-suscripcion-culqi.mjs`.
 
 ## REQ-357 - Gestionar la suscripción y sus correos
 
@@ -2439,135 +2300,262 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-385 - Onboarding: entrenar sin fuerza es una opción más
 
-**Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
-
-### Origen
-Jonathan, 2026-11-11.
-### Problema
-El paso 3 da por hecha la fuerza («¿Haces otro deporte además de la fuerza?», `app/index.html:3843`). «Otro deporte» sin fuerza se bloquea (`:3754`).
-### Objetivo
-Preguntar «¿qué quieres entrenar?»: fuerza, actividad o ambas. Solo una actividad, incluida «Otro deporte», es un camino válido.
-### Alcance
-Paso 3 y Perfil → Entrenamiento: texto neutro y validación, sin migrar valores.
-### Fuera de alcance
-Elegir qué hacer cada día (REQ-386) y acortar el flujo (REQ-389).
-### Riesgos
-No volver a «Descanso total» (REQ-252).
-### Criterios de aceptación
-Ningún texto presupone fuerza. Solo fútbol 3 días termina el onboarding con 3 días de su deporte.
-### Verificación sugerida
-`validate-training-onboarding-decisions.mjs`, e2e de onboarding y release gate.
+**Estado: implementado.** Onboarding esencial según el feedback del 11/11. Detalle en `docs/requirements-history.md` y `docs/onboarding/2026-11-11-feedback.md`.
 
 ## REQ-386 - Onboarding: elegir qué entrenas cada día
 
-**Estado: implementado.** Implementar después de REQ-385. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
-
-### Origen
-Jonathan, 2026-11-11.
-### Problema
-Solo se marcan días. El tipo de sesión sale de la plantilla por posición (`js/nutrition-pure.js:245`). `workoutSchedule` (`app/index.html:1761`) usa el lugar como señal indirecta, escondido en «Ajustar lugar por día».
-### Objetivo
-Selector visible «Fuerza / actividad» por día, respetado por la semana.
-### Alcance
-Usar `prefs.trainingDayKinds`, prellenado con el reparto actual, en `workoutSchedule`, en el onboarding y en Perfil.
-### Fuera de alcance
-Mover un día de una semana ya generada.
-### Riesgos
-Historial inmutable: solo afecta la próxima versión del plan.
-### Criterios de aceptación
-Fuerza lunes, miércoles y viernes y bici martes y sábado → Entreno muestra eso. Sin tocar el selector, la semana es la misma que hoy.
-### Verificación sugerida
-Pruebas puras de `workoutSchedule`, e2e y release gate.
+**Estado: implementado.** Calendario de entrenamiento según el feedback del 11/11. Detalle en `docs/requirements-history.md` y `docs/onboarding/2026-11-11-feedback.md`.
 
 ## REQ-387 - Entreno: indoor cycling como actividad
 
-**Estado: implementado.** Implementar después de REQ-386. Detalle: `docs/onboarding/2026-11-11-feedback.md`.
-
-### Origen
-Jonathan, 2026-11-11.
-### Problema
-Solo existe «Bicicleta», de ruta y en exterior (`app/index.html:1945`).
-### Objetivo
-Poder elegir «Indoor cycling / spinning» como actividad, con sesiones de interior.
-### Alcance
-`indoor_cycling` en etiquetas y opciones; sesiones de 30 a 60 minutos por RPE y cadencia; lugar gimnasio o casa; MET de spinning.
-### Fuera de alcance
-Peloton, Zwift y potencia.
-### Riesgos
-Las preferencias con `cycling` siguen igual.
-### Criterios de aceptación
-Indoor 3 días y fuerza 2 → 3 sesiones de 60 minutos o menos bajo techo. «Bicicleta» sin cambios.
-### Verificación sugerida
-Prueba de plantilla y lugar, e2e y release gate.
+**Estado: implementado.** Indoor cycling / spinning como actividad bajo techo. Detalle en `docs/requirements-history.md` y `docs/onboarding/2026-11-11-feedback.md`.
 
 ## REQ-388 - Onboarding: volver atrás en cada paso sin buscar el botón
 
-**Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.
-
-### Origen
-Jonathan, 2026-11-11.
-### Problema
-«Atrás» solo aparece al pie (`app/index.html:3584`). En el paso 4 queda a 2,65 pantallas. El atrás del sistema sale de la app: no hay `pushState` ni `popstate`.
-### Objetivo
-Volver al paso anterior desde cualquier paso, sin desplazarse y sin perder lo escrito.
-### Alcance
-«Atrás» arriba desde el paso 2; atrás del sistema con `popstate`; «Salir sin cambios» en la revisión de ciclo.
-### Fuera de alcance
-La pantalla de avisos de REQ-289.
-### Riesgos
-Que no choque con los modales ni con las pestañas.
-### Criterios de aceptación
-En los pasos 2 a 4, «Atrás» se ve sin desplazarse. En el paso 4, el atrás del sistema vuelve al paso 3 con los valores intactos.
-### Verificación sugerida
-e2e con `page.goBack()` y release gate.
+**Estado: implementado.** «Atrás» visible desde el paso 2 y atrás del sistema con `popstate`. Detalle en `docs/requirements-history.md` y `docs/onboarding/2026-11-11-feedback.md`.
 
 ## REQ-389 - Onboarding corto: primera semana en 3 pantallas
 
-**Estado: implementado.** Implementar después de REQ-385, REQ-386 y REQ-388. Detalle: `docs/onboarding/2026-11-11-feedback.md`. Defaults: `docs/onboarding/essential-defaults.md`.
-
-### Origen
-Jonathan, 2026-11-11.
-### Problema
-Hoy son 4 pasos y unos 46 controles. Lo opcional está en un `summary` gris de 13 px (`app/index.html:772`) que nadie abre.
-### Objetivo
-Tres pantallas (tú, tu semana, antes de empezar) y unos 90 segundos hasta la primera semana.
-### Alcance
-Lo demás queda con valores por defecto documentados. Lo opcional en Perfil, visible.
-### Fuera de alcance
-Las preguntas posteriores (REQ-390).
-### Riesgos
-Seguridad, consentimiento y alergias siguen antes del plan; kcal = suma de macros; REQ-31.
-### Criterios de aceptación
-20 campos o menos en total y ningún paso de más de 1,5 pantallas.
-### Verificación sugerida
-e2e, validadores de onboarding y release gate.
+**Estado: implementado.** Onboarding corto: primera semana en 3 pantallas. Detalle en `docs/requirements-history.md` y `docs/onboarding/2026-11-11-feedback.md`.
 
 ## REQ-390 - Completar el perfil de a pocos desde Hoy
 
-**Estado: implementado.** Una pregunta diaria después de registrar comida o entreno; posposición de tres días, coordinación con avisos/técnica y acceso desde Perfil. Respuestas privadas, metas desde mañana e historial conservado. Detalle: `docs/onboarding/progressive-profile.md`; especificación: `docs/onboarding/2026-11-11-feedback.md`. ✓ `scripts/test-profile-questions.mjs`, `tests/e2e/profile-questions.spec.js`.
-
-### Origen
-Jonathan, 2026-11-11.
-### Problema
-Tras el onboarding esencial solo queda el aviso fijo «Afina tu plan» en Perfil (`app/index.html:9350`), sin acción.
-### Objetivo
-Hoy muestra como mucho una pregunta corta al día, después de un momento de valor, con «Ahora no».
-### Alcance
-Preguntas ordenadas por impacto, guardadas en `prefs` y aplicadas desde la próxima generación; `profileRefinedAt` al terminar.
-### Fuera de alcance
-Push y preferencias nuevas.
-### Riesgos
-Que no se junte el mismo día con REQ-341 ni REQ-366; REQ-31.
-### Criterios de aceptación
-Una sola pregunta tras la primera comida registrada; «Ahora no» la pospone 3 días; las metas pasadas no cambian.
-### Verificación sugerida
-e2e con reloj controlado y release gate.
+**Estado: implementado.** Una pregunta de perfil al día desde Hoy, tras registrar comida o entreno. ✓ `scripts/test-profile-questions.mjs`, `tests/e2e/profile-questions.spec.js`. Detalle en `docs/requirements-history.md` y `docs/onboarding/2026-11-11-feedback.md`.
 
 ## REQ-391 - Cortesías anteriores: coach completo sin volver a otorgar acceso
 
 **Estado: implementado.** Las cortesías vigentes completan automáticamente los permisos del coach antes de usarlo, también tras reiniciar la cuenta. Conserva el vencimiento y permisos suficientes más largos. Sin migración ni acción manual. Detalle en `docs/requirements-history.md`. ✓ `scripts/test-coach-quota.mjs`.
 
-## REQ-392 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
+## REQ-392 - Hoy: un solo mensaje bajo la acción principal
+
+**Estado: implementado.** Crítica de diseño de Hoy (2026-11-16, 26/40).
+
+### Origen
+Jonathan, 2026-11-16: «demasiado texto y demasiada info».
+### Problema
+`renderHoy` apilaba hasta 13 bloques: regreso, retomar, check-in, bienvenida del coach, «Cuéntame cómo entrenas», 3 chips, menú y referidos.
+### Objetivo
+Un mensaje contextual como máximo; el resto espera en Avisos.
+### Alcance
+`homeContextData()`: rescate o recuperación > retomar > técnica > bienvenida del coach > check-in. Retomar, check-in y referidos que pierden van a Avisos («Check-in de la semana 4 y 2 más»). Coach sin chips. Menú como fila de la tarjeta principal. Rutina en Entreno, también con sesión en curso. PWA v250.
+### Criterios de aceptación
+Fuera de Avisos queda un solo mensaje; el check-in perdedor se abre en Avisos.
+### Verificación sugerida
+`tests/e2e/home.spec.js`, `avisos.spec.js`, `coach-rutina.spec.js`, `home-optional-menu.spec.js`.
+
+## REQ-393 - Hoy: la bienvenida de regreso es el saludo
+
+**Estado: implementado.** Sigue a REQ-392.
+
+### Origen
+Crítica de Hoy, 2026-11-16.
+### Problema
+Tras una pausa, «Racha 0» y la tarjeta de regreso (unas 40 palabras) repetían el reinicio. «Empezar hoy» solo cerraba la tarjeta. El saludo de 26 px ocupaba 2 líneas por «Racha» y «?».
+### Objetivo
+Saludar y dar permiso para empezar, sin estadísticas ni ceros.
+### Alcance
+`homeGreetingData()`: «Qué bueno verte, {nombre}» y «Tu progreso sigue: N días registrados y M entrenos.»; sin registros, «Tu racha empieza con tu primera comida.». Se va al registrar hoy. La racha en 0 se muestra como «Racha», sin el cero: sigue abriendo amigos. Guía rápida en Perfil › Ayuda y soporte. Título de 22 px. PWA v251.
+### Criterios de aceptación
+Sin tarjeta de bienvenida ni «Racha 0». Encabezado normal de 105 a 67 px a 390 px.
+### Verificación sugerida
+`tests/e2e/regreso.spec.js`, `racha.spec.js`, `coach-welcome.spec.js`.
+
+## REQ-394 - Hoy: «Tu día» muestra comida y entreno
+
+**Estado: implementado.** Sigue a REQ-393.
+
+### Origen
+Crítica de Hoy, 2026-11-16.
+### Problema
+Sin menú, el entreno quedaba en «Resto del día · 1 pendiente», con un enlace «Ver entreno» dentro de la tarjeta de comida. La tarjeta repetía lo mismo 3 veces y la tira mostraba «0/4 comidas · 0/2720 kcal».
+### Objetivo
+Comida y entreno visibles en la misma tarjeta, sin ceros.
+### Alcance
+Fila de entreno con su acción («Iniciar entreno» o «Registrar actividad») cuando no es la acción principal; deja «Resto del día». Título «¿Qué comiste hoy?» sin subtítulo. Tira de consumo desde el primer registro. PWA v252.
+### Criterios de aceptación
+Día de gimnasio sin menú: «Iniciar entreno» sin desplegar nada. Sin registros, no hay tira de consumo.
+### Verificación sugerida
+`tests/e2e/home-optional-menu.spec.js`, `rutina-consistente.spec.js`, `onboarding.spec.js`.
+
+## REQ-395 - Hoy: check-in claro y placeholder legible
+
+**Estado: implementado.** Sigue a REQ-394.
+
+### Origen
+Crítica de Hoy, 2026-11-16 (detector Impeccable y revisión).
+### Problema
+El check-in llevaba la etiqueta «CHECK-IN · SEMANA 4» encima del rango. «Omitir esta semana» pesaba igual que iniciarlo y lo omitía sin confirmar. El placeholder del coach tenía contraste 3.9:1 (sin regla `::placeholder`).
+### Objetivo
+Check-in legible y difícil de omitir por error; placeholders AA.
+### Alcance
+Título «Check-in de la semana N», rango y una línea. «Hacer check-in» como botón; «Omitir esta semana» como acción secundaria con confirmación. `::placeholder` en `--muted`. PWA v253.
+### Criterios de aceptación
+Cancelar la confirmación deja el check-in pendiente. Placeholder ≥ 4.5:1.
+### Verificación sugerida
+`tests/e2e/home.spec.js` y detector Impeccable.
+
+## REQ-396 - Entreno: «Iniciar entreno» como acción principal, sin «sesión»
+
+**Estado: pendiente.** Auditoría heurística, severidad 3. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
+
+### Origen
+Auditoría heurística de UX pedida por Jonathan, 2026-11-16.
+### Problema
+En Entreno el botón del día dice «Iniciar sesión guiada», como el login de la portada, mientras Hoy dice «Iniciar entreno». «＋ Registrar otra actividad», lima y de ancho completo, pesa más que el entreno del día.
+### Causa raíz
+`app/index.html:8142` (etiqueta), `:5826`, `:7465`, `:7467`, `:8153` (otros textos con «sesión») y `:6370` (`btn-accent` en actividad manual).
+### Objetivo
+Una sola palabra para entrenar y una sola acción principal por pantalla.
+### Alcance
+«Iniciar entreno», «Pausar entreno», «Terminar antes», «Me perdí el entreno» y el texto del coach. «Registrar otra actividad» como botón secundario cuando hay entreno pendiente; sigue siendo principal en descanso. Actualizar `startGuidedSession()` de los tests y subir la PWA.
+### Fuera de alcance
+Flujo del reproductor, Hoy (REQ-394) y textos de login.
+### Riesgos
+Cinco specs E2E buscan «Iniciar sesión guiada»; buscar el texto en `tests/` y `CONTEXT.md`.
+### Criterios de aceptación
+Ningún texto de entrenamiento visible contiene «sesión». Día con entreno pendiente: un solo botón lima en la pestaña Entreno.
+### Verificación sugerida
+`tests/e2e/entreno.spec.js`, `next-exercise.spec.js`, captura a 390 px.
+
+## REQ-397 - Nutrición: comida vacía sin «Sin asignar» ni «Otra opción»
+
+**Estado: pendiente.** Auditoría heurística, severidad 3. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
+
+### Origen
+Auditoría heurística de UX, 2026-11-16.
+### Problema
+Sin menú, cada comida dice «Sin asignar» y ofrece «Otra opción» aunque no hay primera opción. «＋ Agregar comida / snack» abre lo mismo que «Registrar algo que comí» con otro nombre, y el editor pregunta «Otra comida o snack» o «Una comida del día» sin explicar la diferencia.
+### Causa raíz
+`app/index.html:8261`, `:8267`, `:5939` (`openEditor('extra')`) y `:12906`.
+### Objetivo
+Una comida vacía dice qué falta y qué hacer; una acción, un nombre.
+### Alcance
+Estado «Nada registrado». Sin menú, «Ver opciones» en lugar de «Otra opción». El botón inferior usa el mismo texto que el principal de REQ-330. Opciones del editor: «Extra (se suma al día)» y «En lugar de una comida del plan».
+### Fuera de alcance
+Planificador, menú semanal y REQ-330.
+### Riesgos
+Specs que buscan los textos actuales.
+### Criterios de aceptación
+Sin menú no aparecen «Sin asignar» ni «Otra opción». Los dos accesos al registro extra tienen el mismo texto.
+### Verificación sugerida
+`tests/e2e/nutricion.spec.js`, `registro-extra-visible.spec.js`, 320/390 px.
+
+## REQ-398 - Onboarding: errores junto al campo y todos a la vez
+
+**Estado: pendiente.** Auditoría heurística, severidad 3. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
+
+### Origen
+Auditoría heurística de UX, 2026-11-16.
+### Problema
+Cada intento muestra un solo error en un toast que se va, sin marcar el campo. En el paso 3 se descubren tres errores en tres intentos. El toast «Escribe tu nombre» sigue en el paso 2.
+### Causa raíz
+`validateOnboardingStep()` (`app/index.html:4147`) devuelve el primer string y se muestra con `toast()` (`:3152`).
+### Objetivo
+Ver de una vez qué falta y dónde.
+### Alcance
+La validación devuelve todos los errores del paso con su campo. Mensaje bajo cada campo con `aria-invalid` y `aria-describedby`, foco en el primero y resumen breve junto al botón. Se limpia al corregir y al cambiar de paso.
+### Fuera de alcance
+Campos, orden de pasos y reglas de validación.
+### Riesgos
+`onboarding-essential.spec.js` comprueba los toasts actuales.
+### Criterios de aceptación
+Paso 3 vacío: un intento marca cómo comes, consentimiento y las 4 preguntas. Ningún error del paso anterior se ve en el siguiente.
+### Verificación sugerida
+`tests/e2e/onboarding-essential.spec.js`, `accesibilidad.spec.js`.
+
+## REQ-399 - Acceso: error del login junto al campo
+
+**Estado: pendiente.** Auditoría heurística, severidad 2. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
+
+### Origen
+Auditoría heurística de UX, 2026-11-16.
+### Problema
+«Pon correo y contraseña» aparece en gris bajo el botón, sin decir qué campo falta. No se valida el formato del correo. El placeholder `••••••••` parece una contraseña guardada.
+### Causa raíz
+`app/index.html:11275` y `:11162`.
+### Objetivo
+Saber qué corregir sin adivinar.
+### Alcance
+Mensaje por campo («Escribe tu correo», «Revisa el formato del correo», «Escribe tu contraseña») con `aria-invalid` y foco. Error en color de error. Contraseña sin placeholder. Aplica a entrar, registrarse y recuperar.
+### Fuera de alcance
+Errores de Supabase ya traducidos (REQ-375).
+### Riesgos
+`navegacion.spec.js` (REQ-375).
+### Criterios de aceptación
+Correo «malo» sin contraseña: dos mensajes, uno por campo, y foco en el correo.
+### Verificación sugerida
+`tests/e2e/navegacion.spec.js`.
+
+## REQ-400 - Lenguaje: entreno y macros sin jerga
+
+**Estado: pendiente.** Auditoría heurística, severidad 2. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
+
+### Origen
+Auditoría heurística de UX, 2026-11-16.
+### Problema
+Se muestran «RPE 6/10», «repeticiones en reserva», «bloques» (dos veces en la misma tarjeta), «P 130 · C 146 · G 52 g», «sesión de calidad», «S1 74.7–75.3» sin rótulo y «Pausar» en las demos.
+### Causa raíz
+`app/index.html:2006-2070`, `:7411`, `:7163`, `:7459`, `:4119`, `:1990-1993`, `:8563` y `:6209`.
+### Objetivo
+Que el usuario sin experiencia entienda cada número.
+### Alcance
+«Esfuerzo 6/10» con «¿Qué es?» y «Termina con 3 repeticiones de sobra». «Ejercicios hechos 0/6», una sola vez. Proteína, carbohidratos y grasa sin abreviar en el onboarding. Nombres de sesiones sin «calidad». Rango de peso con rótulo («Meta: 74.7–75.3 kg»). «Pausar animación».
+### Fuera de alcance
+Lógica de RPE, progresión y rangos.
+### Riesgos
+Specs que leen esos textos.
+### Criterios de aceptación
+Ninguno de esos términos se ve sin explicación a 390 px.
+### Verificación sugerida
+`tests/e2e/entreno.spec.js`, `onboarding-essential.spec.js`, `peso-inicial.spec.js`.
+
+## REQ-401 - Tienda: entrar a la app desde el encabezado
+
+**Estado: pendiente.** Auditoría heurística, severidad 2. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
+
+### Origen
+Auditoría heurística de UX, 2026-11-16.
+### Problema
+En `/planes`, `/contacto` y `/pago` el encabezado solo tiene «Planes» y «Contacto»: quien ya pagó no tiene cómo entrar.
+### Causa raíz
+`tienda/layout.js:11-14` (`NAV`).
+### Objetivo
+Entrar a la app desde cualquier página de la tienda.
+### Alcance
+Enlace «Iniciar sesión» a `/app/` en el encabezado de la tienda, como en la portada, legible a 320 px.
+### Fuera de alcance
+Portada, `/unete` y flujo de pago.
+### Riesgos
+Encabezado desbordado a 320 px.
+### Criterios de aceptación
+Las páginas de la tienda llevan a `/app/` en un toque, sin scroll horizontal a 320 px.
+### Verificación sugerida
+`tests/e2e/paywall-tienda.spec.js`, `legales-suscripcion.spec.js`.
+
+## REQ-402 - Perfil: el aviso de actividad ligera no interrumpe
+
+**Estado: pendiente.** Auditoría heurística, severidad 2. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
+
+### Origen
+Auditoría heurística de UX, 2026-11-16.
+### Problema
+Si entrena solo fuerza, al abrir Perfil aparece el modal «Actividad ligera para tu salud», que tapa lo que venía a hacer.
+### Causa raíz
+`showCardioNudge("profile")` al renderizar Perfil (`app/index.html:9790`).
+### Objetivo
+Dar el consejo en contexto, sin bloquear.
+### Alcance
+Quitar el disparo al abrir Perfil. Mostrarlo como tarjeta descartable en Perfil › Entrenamiento, con la misma casilla y el mismo `UI.cardioNudgeDismissed`.
+### Fuera de alcance
+Aviso del onboarding y texto del consejo.
+### Riesgos
+Specs que esperan el modal en Perfil.
+### Criterios de aceptación
+Abrir Perfil no abre ningún modal. La tarjeta agrega la actividad igual que antes y no vuelve tras descartarla.
+### Verificación sugerida
+`tests/e2e/perfil.spec.js`.
+
+## REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
 **Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.
 

@@ -1,9 +1,9 @@
-// REQ-392: un guardado de prefs de fondo armado con una copia vieja no revierte
+// REQ-403: un guardado de prefs de fondo armado con una copia vieja no revierte
 // el guardado más nuevo del usuario, y profile.prefs nunca se adelanta a la
 // versión del plan (mañana coherente con lo guardado en cuanto se ve).
 import {test,expect} from '@playwright/test';
 import {installMocks,seedLoggedInUser,autoDismissNudges,gotoApp,completePrefs} from './helpers.js';
-test('REQ-392: guardado de fondo con copia vieja no revierte el guardado del usuario',async({page,context})=>{
+test('REQ-403: guardado de fondo con copia vieja no revierte el guardado del usuario',async({page,context})=>{
  const {calls}=await installMocks(context,{prefs:completePrefs({diet:['omnivoro'],activityLevel:'moderate'})});
  await seedLoggedInUser(page);await autoDismissNudges(page);await gotoApp(page);
  const r=await page.evaluate(async()=>{

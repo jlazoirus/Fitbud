@@ -19,24 +19,23 @@ for(const width of [320,390,1280]) test(`Hoy prioriza registro, entreno y coach 
   const app=page.locator("#app"),suggestion=app.locator(".menu-suggestion");
   const primary=app.locator(".home-primary");
   const agenda=app.locator(".home-agenda");
+  // REQ-394: «Tu día» muestra comida y entreno; sin registros no hay tira de consumo.
+  await expect(primary.locator("#homePrimaryTitle")).toHaveText("¿Qué comiste hoy?");
   await expect(primary.locator(".btn-accent")).toHaveText("Registrar comida");
-  await expect(primary.getByRole("button",{name:"Ver entreno",exact:true})).toBeInViewport();
-  await expect(agenda).toHaveJSProperty("open",false);
-  await expect(agenda.locator(".home-agenda-count")).toHaveText("1 pendiente");
-  await expect(agenda.getByRole("button",{name:"Iniciar entreno",exact:true})).toHaveCount(0);
-  await agenda.locator("summary").press("Enter");
-  await expect(agenda.getByRole("button",{name:"Iniciar entreno",exact:true})).toBeVisible();
-  await agenda.locator("summary").press("Space");
-  await expect(agenda).toHaveJSProperty("open",false);
-  await expect(suggestion).toContainText("Tú eliges si lo usas");
+  await expect(primary.locator(".agenda-sub")).toHaveCount(0);
+  await expect(primary.locator(".home-workout-row").getByRole("button",{name:"Iniciar entreno",exact:true})).toBeInViewport();
+  await expect(agenda).toHaveCount(0);
+  await expect(app.locator(".home-consumption")).toHaveCount(0);
+  // REQ-392: la sugerencia es una fila dentro de la tarjeta principal.
+  await expect(primary.locator(".menu-suggestion")).toContainText("tú eliges");
   await expect(suggestion.getByRole("button",{name:"Sugerirme un menú"})).not.toHaveClass(/btn-accent/);
   await expect(app).not.toContainText("Aún falta preparar");
   await expect(app).not.toContainText("Afina tu plan");
   const layout=await page.evaluate(()=>{
-    const selectors=[".home-consumption",".home-primary",".home-agenda",".coach-welcome","#coachInput",".menu-suggestion"];
+    const selectors=[".home-primary",".coach-welcome","#coachInput"];
     const boxes=selectors.map(s=>document.querySelector(s).getBoundingClientRect());
     return {ordered:boxes.every((b,i)=>!i||b.top>=boxes[i-1].bottom),overflow:document.documentElement.scrollWidth>innerWidth,
-      controls:[...document.querySelectorAll(".home-consumption,.home-primary button,.home-agenda summary,.menu-suggestion button")].map(b=>b.getBoundingClientRect().height)};
+      controls:[...document.querySelectorAll(".home-primary button,.menu-suggestion button")].map(b=>b.getBoundingClientRect().height)};
   });
   expect(layout.ordered).toBe(true);expect(layout.overflow).toBe(false);
   expect(layout.controls.every(h=>h>=44)).toBe(true);
@@ -45,7 +44,7 @@ for(const width of [320,390,1280]) test(`Hoy prioriza registro, entreno y coach 
     await suggestion.scrollIntoViewIfNeeded();
     await page.screenshot({path:`/tmp/req-316-suggestion-${width}.png`});
   }
-  await app.getByRole("button",{name:/Ver consumo/}).click();
+  await page.locator('[data-tab="nutricion"]').click();
   await expect(app.locator(".mini-macro-dash")).toContainText("Proteínas");
   await expect(app.locator(".nutrition-week").getByRole("button",{name:"Preparar mi semana",exact:true})).toBeVisible();
   if(process.env.CAPTURE_OPTIONAL_MENU){
@@ -73,7 +72,8 @@ test("Registrar comida guarda y suma el consumo sin generar un menú",async({pag
   await expect(page.locator(".menu-suggestion")).toHaveCount(0);
   // Los slots sin contenido no se presentan como comidas pendientes.
   await expect(page.locator(".agenda-item.kind-meal")).toHaveCount(0);
-  await expect(page.locator(".home-agenda-count")).toHaveText("1 pendiente");
+  await expect(page.locator(".home-agenda")).toHaveCount(0);
+  await expect(page.locator(".home-workout-row")).toContainText("Iniciar entreno");
   await expect.poll(()=>Promise.resolve(calls.filter(c=>c.table==="day_log"&&c.method==="POST").length)).toBeGreaterThan(0);
   expect(await page.evaluate(()=>({done:mealState(todayStr(),"desayuno").done,extras:dayState(todayStr()).extras.length}))).toEqual({done:true,extras:0});
   expect(await page.evaluate(()=>JSON.stringify(effectiveWorkout(todayStr())))).toBe(workoutBefore);
@@ -123,7 +123,8 @@ test("La sugerencia solo genera al elegirla y aplica el menú con confirmación"
   await expect(primary).toContainText("Bowl proteico de la mañana");
   await expect(primary.locator(".btn-accent")).toHaveText("Registrar este plato");
   await expect(agenda).toHaveJSProperty("open",false);
-  await expect(agenda.locator(".home-agenda-count")).toHaveText("3 pendientes");
+  await expect(agenda.locator(".home-agenda-count")).toHaveText("2 pendientes");
+  await expect(primary.locator(".home-workout-row")).toContainText("Iniciar entreno");
   await agenda.locator("summary").click();
   await expect(agenda.locator(".kind-meal")).toHaveCount(2);
   await expect(agenda).not.toContainText("Bowl proteico de la mañana");
@@ -135,13 +136,13 @@ test("La sugerencia solo genera al elegirla y aplica el menú con confirmación"
   await overlay.getByRole("button",{name:"Cerrar",exact:true}).last().click();
   await primary.getByRole("button",{name:"Registrar este plato"}).click();
   await expect(agenda).toHaveJSProperty("open",true);
-  await expect(agenda.locator(".home-agenda-count")).toHaveText("2 pendientes");
+  await expect(agenda.locator(".home-agenda-count")).toHaveText("1 pendiente");
   expect(errors).toEqual([]);
 });
 
 test("Iniciar y continuar el entreno funciona sin menú y conserva la ejecución",async({page,context})=>{
   const {paid,errors}=await boot(page,context);
-  await page.locator(".home-primary").getByRole("button",{name:"Ver entreno",exact:true}).click();
+  await page.locator('[data-tab="entreno"]').click();
   await startGuidedSession(page);
   const before=await page.evaluate(()=>JSON.stringify(normalizedWorkoutExecution(todayStr())));
   await page.locator('[data-tab="hoy"]').click();
@@ -165,7 +166,7 @@ test("Sin menú, descanso y entreno registrado no declaran el día cerrado",asyn
   await page.evaluate(()=>{delete dayState(todayStr()).workoutOverride;dayState(todayStr()).workoutDone=true;renderHoy();});
   await expect(page.locator(".home-primary")).toContainText("Entreno completado");
   await expect(page.locator(".agenda-state.done")).toHaveCount(0);
-  await expect(page.locator(".home-consumption")).toBeVisible();
+  await expect(page.locator(".home-consumption")).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Registrar comida",exact:true})).toBeVisible();
   expect(paid).toEqual([]);expect(errors).toEqual([]);
 });
@@ -182,7 +183,7 @@ test("Sin menú, la evaluación de seguridad sigue bloqueando iniciar entreno",a
 
 test("Una pausa por seguridad sustituye la opción de continuar una sesión",async({page,context})=>{
   const {paid,errors}=await boot(page,context);
-  await page.getByRole("button",{name:"Ver entreno",exact:true}).click();
+  await page.locator('[data-tab="entreno"]').click();
   await startGuidedSession(page);
   const before=await page.evaluate(()=>JSON.stringify(dayState(todayStr()).workoutExecution));
   await page.evaluate(()=>{safetyScreening={...safetyScreening,has_red_flags:true,cleared_for_training:false,responses:{chest_pain:true}};});
@@ -238,7 +239,7 @@ test("El descarte de técnica dura ese día y la pausa de seguridad impide suger
   await setExercise();
   await technique.getByRole("button",{name:"Ocultar sugerencia por hoy"}).click();
   await expect(technique).toHaveCount(0);
-  await expect(page.locator(".home-agenda summary")).toBeFocused();
+  await expect(page.locator(".home-primary-action")).toBeFocused();
   await gotoApp(page);
   await setExercise();
   await expect(technique).toHaveCount(0);
