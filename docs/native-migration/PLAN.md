@@ -4,6 +4,8 @@ Fecha de creación: 2026-10-16. Estado: **ejecución reanudada por Jonathan el 2
 
 > Jonathan autorizó iniciar la migración tras revisar Expo y React Native el 2026-11-10. Se registra su instrucción como reanudación y aprobación de NAT-H1, sin atribuir resultados a la validación web. La app se construye en `native/` dentro del mismo repositorio para compartir dominio. NAT-H2..H8 conservan sus decisiones pendientes. La base web actual es `app/index.html` (REQ-352). NAT-01 debe actualizar el inventario y todas las referencias de funciones antes de extraerlas.
 
+> **Revisión del 2026-11-16, pendiente de aplicar.** `REVISION-2026-11-16.md` documenta fallas de este plan y registra las tareas NAT-70..80 y las decisiones NAT-H9..H12 que las corrigen. Hasta que NAT-70 se cierre, este documento conserva datos vencidos: el tamaño de `app/index.html` y sus números de línea (§2), el cobro como pago único (§2 y §7) y el registro dentro de la app (§6). Si este plan y la revisión se contradicen, vale la revisión.
+
 Este documento es el plan maestro. Las piezas operativas están en:
 
 | Archivo | Para qué sirve |
@@ -15,6 +17,7 @@ Este documento es el plan maestro. Las piezas operativas están en:
 | `docs/native-migration/COBRO-WEB.md` | Plan de cobro solo en la web (Culqi) con apps sin compra integrada: reglas de tienda, flujos, fases y contingencia. |
 | `docs/native-migration/PUBLICACION.md` | Política para seguir publicando rápido: qué sale por servidor, por aire (OTA) o por tienda, controles, reversión y compatibilidad con versiones anteriores. |
 | `native-migration.json` | Backlog machine-readable: estado, dependencias, alcance de escritura y dueño de cada tarea. |
+| `docs/native-migration/REVISION-2026-11-16.md` | Revisión del plan: hallazgos con evidencia, decisiones pendientes y especificación detallada de NAT-70..80 y NAT-H9..H12. |
 | `NATIVE_AGENT.md` | Runbook para agentes que trabajan en paralelo en la migración. |
 | `scripts/native-next-task.mjs` | Selector/validador: lista tareas disponibles, reclama, libera y marca hechas. |
 

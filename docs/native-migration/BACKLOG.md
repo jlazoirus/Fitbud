@@ -448,3 +448,122 @@ Cada tarea de esta fase entrega pantallas completas con estados de carga, vacío
 - **Fuera de alcance:** publicar con credenciales reales y decidir el cliente principal (ambas en NAT-H8).
 - **Aceptación:** el check falla con un fixture que cambia la huella, con otro que agrega "comprar" en un `<Text>` y con otro que quita un campo de la API; una corrida en seco del workflow muestra `preview` → 10 % sin llegar al 100 %.
 - **Verificación:** verde web y nativo.
+
+---
+
+## Revisión 2026-11-16 — correcciones al plan
+
+Origen, evidencia y detalle de implementación de todas las tareas de esta sección: `docs/native-migration/REVISION-2026-11-16.md` (el hallazgo en §4, la especificación en §5 bajo el mismo id). Las líneas citadas allí son de `4b9341e`: buscar por nombre de función y confirmar contra `HEAD`.
+
+Varias tareas anteriores esperan a estas (lista y motivo en la revisión, §6.1). Orden recomendado: revisión §7.
+
+## NAT-H9 — Decisiones de producto para la app sin venta
+
+- **Decide:** qué ve en la app quien no tiene cuenta; si la suscripción se puede cancelar desde la app; a dónde lleva "Ayuda"; si Android lleva textos más informativos que iOS (decisiones D-1 a D-4 de la revisión, §3, con opciones y recomendación).
+- **Mientras no se decida:** los agentes usan el valor conservador: solo iniciar sesión con un texto neutral sin enlaces, sin cancelación dentro de la app, ayuda por correo y las mismas reglas de texto en ambas plataformas.
+- **Entrega:** decisión anotada en `docs/native-migration/decisions.md`.
+
+## NAT-H10 — Cliente principal y alcance de la beta
+
+- **Decide:** qué cliente recibe los cambios de producto (`PUBLICACION.md` §7) y qué capacidades de la web entran en la beta, cuáles van después y cuáles se quedan solo en la web (D-5 y D-6). Adelanta esa parte de NAT-H8.
+- **Material:** la matriz rebasada y la propuesta de clasificación que deja NAT-71.
+- **Entrega:** decisión en `decisions.md`. Al decidir, `AUTONOMOUS_AGENT.md` y `AUDIT_AGENT.md` pasan a declarar a qué cliente aplica cada REQ.
+
+## NAT-H11 — Entorno de pruebas y URLs de redirección de Auth para la app
+
+- **Hace:** crear un entorno de pruebas (recomendado: un segundo proyecto de Supabase), aplicar ahí todas las migraciones de `supabase/`, apuntar a él las variables de Preview de Vercel y agregar `evolv://**` a las URLs de redirección de Auth, primero ahí y luego en producción cuando corresponda (D-7).
+- **Entrega para agentes:** la URL de la API de pruebas en `decisions.md` (dato público; nunca llaves de servicio).
+
+## NAT-H12 — Validación temprana con las tiendas
+
+- **Hace:** enviar el build mínimo de NAT-80 a TestFlight externo y a la prueba cerrada de Google Play (que inicia los 14 días exigidos a las cuentas personales), con la lista de `docs/native-migration/store-validation.md` (D-8).
+- **Entrega:** fecha, resultado por tienda y motivo literal de cualquier rechazo en `decisions.md`. Si una tienda rechaza por el cobro, se activa NAT-13 solo para esa plataforma.
+
+## NAT-70 — Aplicar la revisión 2026-11-16 al plan: grafo, alcances y documentos de cobro
+
+- **Objetivo:** que el backlog y los documentos del plan digan lo que ya está decidido y dejen de contradecirse (hallazgos H-03, H-04, H-09, H-12, H-14, H-15).
+- **Alcance:** tarea documental, sin código. Aplicar la tabla de la revisión §6.2 a `native-migration.json`; agregar las cuatro reglas de alcance a `NATIVE_AGENT.md` §2; reescribir en este archivo NAT-21, NAT-22, NAT-23 (sin registro en la app), NAT-45 (estados de la suscripción), NAT-46 (sin "copy comercial"), NAT-60, NAT-61, NAT-62, NAT-H3, NAT-H6 y la cabecera de la Fase 4; alinear `COBRO-WEB.md`, `PLAN.md`, `PUBLICACION.md` §7 y las filas de Acceso, Coach y Facturación de `PARITY.md`. Lista exacta en la revisión §5, NAT-70, apartados A a G.
+- **Fuera de alcance:** cambiar el estado de cualquier tarea, cerrar decisiones humanas, rebasar el resto de `PARITY.md` (NAT-71).
+- **Aceptación:** ningún documento de `docs/native-migration/` presenta el pago único como único modelo ni pide registro en la app; ninguna tarea disponible contradice a otra.
+- **Verificación:** `node scripts/native-next-task.mjs --validate` y `git diff --check`.
+
+## NAT-71 — Rebasar la matriz de paridad contra la web actual
+
+- **Objetivo:** que `PARITY.md` describa la web de `HEAD` y que cada capacidad tenga destino: beta, después de la beta o solo web (H-08).
+- **Alcance:** anotar el commit base; recorrer los REQ implementados desde REQ-189 (lista de partida por journey en la revisión §5, NAT-71) y la app real; proponer la clasificación; reescribir el alcance de NAT-30, NAT-32, NAT-33, NAT-37 y NAT-40 en este archivo; registrar una tarea por cada capacidad de beta que ninguna tarea cubra; anotar las que pidan una dependencia fuera del allowlist; regla de mantenimiento en la cabecera de `PARITY.md`; actualizar `PLAN.md` §6.
+- **Fuera de alcance:** decidir el cliente principal (NAT-H10); construir pantallas.
+- **Aceptación:** cada REQ visible para el usuario normal implementado desde REQ-189 está en una fila o en una lista de exclusiones con motivo.
+- **Verificación:** `--validate`.
+
+## NAT-72 — Verificación en dispositivo sin cuentas de tienda: perfiles EAS y prueba de arranque en CI
+
+- **Objetivo:** poder ejecutar la app en Android e iOS sin esperar a NAT-H2/H5 y desbloquear NAT-21 (H-01, H-11).
+- **Alcance:** `native/eas.json` con un perfil de simulador de iOS y APK de Android; `docs/native-migration/device-smoke.md` con los tres caminos (APK en teléfono o emulador, simulador en un Mac, CI) y la lista de comprobación de NAT-21; `native/e2e/smoke.yaml` (Maestro: abrir y ver la bienvenida); `.github/workflows/native-smoke.yml` con un job de Android en emulador y uno de iOS solo manual, sin credenciales, con la captura como artefacto; actualizar `native/README.md`. Detalle y disparadores en la revisión §5, NAT-72.
+- **Fuera de alcance:** cerrar NAT-21 (la cierra su dueño o una persona con la evidencia); builds firmados.
+- **Aceptación:** corrida verde del job de Android enlazada en el PR; el job falla si se rompe el import de un módulo compartido.
+- **Verificación:** verde nativo.
+
+## NAT-73 — Instalar de una vez los módulos nativos del allowlist y elegir el almacenamiento
+
+- **Objetivo:** que las tareas siguientes no necesiten `native/package.json` y que el cliente de desarrollo no se recompile en cada una (H-09).
+- **Alcance:** instalar con `npx expo install` los paquetes del allowlist de ADR-001 listados en la revisión §5, NAT-73; elegir `expo-sqlite` o `react-native-mmkv` con los criterios indicados y registrarlo en ADR-001; comprobar si hace falta `expo-crypto`; no declarar permisos todavía y bloquear con `android.blockedPermissions` los que una librería agregue sola; actualizar el allowlist y "Versiones fijadas".
+- **Fuera de alcance:** voz (NAT-36), salud (NAT-50), compra integrada, lector de códigos de barras.
+- **Aceptación:** `npm ci` limpio, `npx expo install --check` y `npx expo-doctor` sin pendientes, exportación iOS y Android verde.
+- **Verificación:** verde nativo y verde web. Avisar en el PR que cambia la huella de runtime.
+
+## NAT-74 — Simulación de dos clientes sobre el motor de sync
+
+- **Objetivo:** reproducir de forma determinista qué se pierde hoy cuando la web y la app escriben el mismo día (H-05), antes de construir la capa de datos nativa.
+- **Alcance:** `scripts/validate-cross-client-sync.mjs` con dos instancias de `js/sync-queue.js`, un remoto en memoria y relojes inyectados; escenarios S1 a S7 de la revisión §5, NAT-74. Prueba de caracterización: afirma el comportamiento actual, lista las pérdidas conocidas en `KNOWN_LOSS` y falla si cambia. Se agrega al release gate.
+- **Fuera de alcance:** corregir el motor (NAT-75).
+- **Aceptación:** el escenario S1 (escritura en línea con estado viejo) queda demostrado con una aserción.
+- **Verificación:** verde web.
+
+## NAT-75 — Sync sin pérdida entre clientes: escritura condicional por revisión y relectura al volver
+
+- **Objetivo:** que ninguna escritura reemplace cambios remotos que el cliente no ha visto, sin depender del reloj del dispositivo (H-05).
+- **Alcance:** `supabase/sync_revision.sql` idempotente (columna `rev` y disparador en `day_log` y `weight_log`, RLS sin cambios) con espejo en `schema.sql`; en `js/sync-queue.js`, escritura condicionada a `rev`, merge y reintento al chocar, y respaldo al `upsert` actual si la columna no existe; relectura del día al volver a primer plano en la web; los escenarios de NAT-74 pasan a exigir que nada se pierda. Diseño completo en la revisión §5, NAT-75.
+- **Excepción a la convención `core`:** esta tarea sí cambia el comportamiento del sync en producción; exige release gate y E2E completos.
+- **Fuera de alcance:** aplicar la migración en producción (NAT-H6).
+- **Aceptación:** con la columna presente, S1 y S4 conservan los cambios de ambos clientes; sin ella, el comportamiento es el actual; un cliente viejo y uno nuevo pueden alternar.
+- **Verificación:** verde web; verde nativo si se tocó `native/src/data/**`; `validate-migrations.mjs` acepta la migración.
+
+## NAT-76 — Acceso sin venta de punta a punta: servidor, cliente compartido, validador y páginas legales
+
+- **Objetivo:** que ningún texto ni enlace que llegue a la app empuje a comprar, venga del código nativo, del servidor o de una página enlazada (H-06, H-13).
+- **Alcance:** `api/claude.js` agrega `code` a sus respuestas 402 y devuelve un texto neutral cuando `X-Evolv-Client` es `ios` o `android`; `js/api-client.js` gana la opción `paywallCopy` (`"server"` por omisión, `"local"` para nativo) sin cambiar el comportamiento de la web; `scripts/validate-native-copy.mjs` cubre "activa tu plan" y exporta sus reglas; `scripts/test-native-access-copy.mjs` pasa las respuestas del servidor para clientes nativos por esas reglas; `tienda/layout.js` no dibuja navegación ni pie de tienda con `?app=1`. Textos y detalle en la revisión §5, NAT-76.
+- **Fuera de alcance:** cambiar los textos de la web; la pantalla "Mi plan" (NAT-45); excepciones del validador que dependan de NAT-H9.
+- **Aceptación:** la prueba falla si un cliente nativo vuelve a recibir "Activa tu plan"; `/terminos?app=1` no tiene enlaces a `/planes`, `/pago` ni `/registro`, y sin el parámetro la página no cambia.
+- **Verificación:** verde web.
+
+## NAT-77 — Clasificar los módulos de js/ y hacer que el dominio nuevo nazca compartido
+
+- **Objetivo:** que cada archivo de `js/` declare si es compartido o solo web, y que las reglas de negocio nuevas se escriban fuera de `app/index.html` (H-07).
+- **Alcance:** marca `// shared-module` en `js/meal-log.js` y `js/training-routine.js`; marca nueva `// web-only` con motivo en `js/streak-friends.js` y `js/streak-share.js`; `scripts/validate-shared-modules.mjs` falla si un archivo de `js/` no lleva ninguna; regla para el loop desarrollador en `AUTONOMOUS_AGENT.md`; informe no bloqueante del tamaño de `app/index.html` en el release gate; subir `CACHE_NAME`.
+- **Fuera de alcance:** extraer lógica; agregar módulos al puente nativo.
+- **Aceptación:** el gate falla con un archivo nuevo sin marca en `js/` y pasa con el repo actual.
+- **Verificación:** verde web.
+
+## NAT-78 — Configuración por entorno en la app: URL de la API por perfil y configuración remota
+
+- **Objetivo:** que cada perfil de build apunte a su servidor y que ningún build de desarrollo use producción por descuido (H-10).
+- **Alcance:** `extra.apiBaseUrl` validado en `native/app.config.ts` (el perfil `production` exige `https://evolvapp.club`; sin valor, falla); `env` por perfil en `native/eas.json`; `native/src/config/env.ts` como única fuente de la URL, el cliente, la versión y el id de actualización; `native/src/config/remote-config.ts`, que lee `/api/config` y conserva la última respuesta válida con dependencias inyectadas; pruebas Jest. Detalle en la revisión §5, NAT-78.
+- **Fuera de alcance:** crear el entorno de pruebas (NAT-H11); el cliente de Supabase (NAT-23).
+- **Aceptación:** `npx expo config` falla sin la variable y publica la URL de producción con el perfil `production`.
+- **Verificación:** verde nativo.
+
+## NAT-79 — Arnés E2E temprano: API simulada y flujo de inicio de sesión con Maestro
+
+- **Objetivo:** que desde la primera pantalla real haya una prueba automática de extremo a extremo y que cada tarea de la Fase 4 solo agregue su flujo (H-02, H-11).
+- **Alcance:** `native/scripts/mock-api.mjs` con las respuestas de `tests/e2e/fixtures` para configuración, acceso e inicio de sesión, sin llamadas externas; `native/e2e/login.yaml` y un `README.md` con la convención de un archivo por journey; el job de Android de `native-smoke.yml` levanta la API simulada y corre los flujos.
+- **Fuera de alcance:** los flujos de cada journey (los agrega su tarea; NAT-60 los completa y estabiliza).
+- **Aceptación:** `login.yaml` verde en CI con captura.
+- **Verificación:** verde nativo.
+
+## NAT-80 — Build mínimo para validar con las tiendas: contenido, configuración y lista de envío
+
+- **Objetivo:** dejar listo, sin credenciales, lo que NAT-H12 necesita para enviar un primer build a TestFlight externo y a la prueba cerrada de Play (H-02, H-14).
+- **Alcance:** `docs/native-migration/store-validation.md` (contenido del build, advertencia sobre funcionalidad mínima, lista de envío con cuenta demo y notas para el revisor, qué registrar); `supportsTablet: false` y numeración de versión en `native/app.config.ts`; configuración de `submit` sin secretos en `native/eas.json`; confirmar `expo-updates` y `runtimeVersion` por huella. Detalle en la revisión §5, NAT-80.
+- **Fuera de alcance:** ejecutar builds o envíos (NAT-H12); la ficha completa (NAT-62).
+- **Aceptación:** `npx expo config --type public` sin errores; la lista se puede seguir sin conocer el repo.
+- **Verificación:** verde nativo.

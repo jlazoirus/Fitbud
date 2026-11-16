@@ -14,6 +14,10 @@ Aquí se anotan las respuestas a las tareas `NAT-Hx` (ver `BACKLOG.md`). Solo in
 | NAT-H6 | Migraciones nativas aplicadas en producción | | | pendiente |
 | NAT-H7 | Fichas de tienda y formularios aprobados | | | pendiente |
 | NAT-H8 | Go/no-go beta y público; convivencia PWA | | | pendiente |
+| NAT-H9 | App sin venta: pantalla sin cuenta, cancelar la suscripción, ayuda y textos por plataforma | | | pendiente (opciones y recomendación en `REVISION-2026-11-16.md` §3, D-1 a D-4) |
+| NAT-H10 | Cliente principal y alcance de la beta | | | pendiente (D-5 y D-6; se decide sobre la matriz que deja NAT-71) |
+| NAT-H11 | Entorno de pruebas y URLs de redirección de Auth para la app | | | pendiente (D-7) |
+| NAT-H12 | Validación temprana con las tiendas (build mínimo de NAT-80) | | | pendiente (D-8) |
 
 ## Datos públicos para agentes
 
