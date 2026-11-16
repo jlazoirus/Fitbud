@@ -4,7 +4,7 @@ Fecha de creación: 2026-10-16. Estado: **ejecución reanudada por Jonathan el 2
 
 > Jonathan autorizó iniciar la migración tras revisar Expo y React Native el 2026-11-10. Se registra su instrucción como reanudación y aprobación de NAT-H1, sin atribuir resultados a la validación web. La app se construye en `native/` dentro del mismo repositorio para compartir dominio. NAT-H2..H8 conservan sus decisiones pendientes. La base web actual es `app/index.html` (REQ-352). NAT-01 debe actualizar el inventario y todas las referencias de funciones antes de extraerlas.
 
-> **Revisión del 2026-11-16, pendiente de aplicar.** `REVISION-2026-11-16.md` documenta fallas de este plan y registra las tareas NAT-70..80 y las decisiones NAT-H9..H12 que las corrigen. Hasta que NAT-70 se cierre, este documento conserva datos vencidos: el tamaño de `app/index.html` y sus números de línea (§2), el cobro como pago único (§2 y §7) y el registro dentro de la app (§6). Si este plan y la revisión se contradicen, vale la revisión.
+> **Revisión aplicada por NAT-70.** `REVISION-2026-11-16.md` §5 y §6.2 rige sobre este plan en caso de contradicción. La actualización del resto de la paridad sigue en NAT-71; las decisiones NAT-H9..H12 siguen abiertas.
 
 Este documento es el plan maestro. Las piezas operativas están en:
 
@@ -30,25 +30,25 @@ Publicar Evolv como app nativa en App Store y Google Play con **paridad funciona
 No es objetivo de esta migración:
 
 - Reescribir el backend: Supabase + funciones `api/*.js` en Vercel se mantienen y se extienden.
-- Apagar la PWA: la web sigue siendo canal de adquisición, administración y respaldo. Su eventual retiro es una decisión humana posterior (NAT-H8).
+- Apagar la PWA: la web sigue siendo canal de adquisición, administración y respaldo. La política de clientes es una decisión humana en NAT-H10; esta tarea no autoriza retirar la PWA.
 - Llevar el panel de administración a nativo: admin queda **solo web** (ver §6).
 
 ## 2. Punto de partida (evidencia en el código)
 
 | Aspecto | Hoy | Implicación para nativo |
 |---|---|---|
-| UI | `app/index.html` monolítico (~12.4k líneas, ~780 funciones, handlers inline, render por template strings). | La UI **no** se puede reutilizar en React Native; se reescribe por pantalla. |
+| UI | `app/index.html` monolítico (18 572 líneas en `4083633`, handlers inline, render por template strings). | La UI **no** se puede reutilizar en React Native; se reescribe por pantalla. |
 | Dominio | Módulos puros sin DOM en IIFE que publican en `globalThis`: `js/nutrition-pure.js`, `js/nutrition-domain.js`, `domain-contracts.js`, `training-plan.js`, `workout-player.js`, `sync-conflicts.js`, `exercise-catalog.js` (~170 KB). | **Reutilizables tal cual** en Hermes. Se cargan como módulos compartidos (NAT-02, NAT-21). |
-| Lógica de dominio aún dentro de `app/index.html` | `buildDay()` (`app/index.html:1784`), `dayState()` (`:2206`), `mealValue()` (`:2310`), `dayTotals()` (`:2344`), `effectiveDayTarget()` (`:1525`), `weekOf()` (`:1774`), `migrateProfilePrefs()` (`:997`), `hasCompleteOnboarding()` (`:2638`), `streakStats()` (`:10099`), `prepareFirstCycleWeek()` (`:3468`), `finalizeDayWithGate()` (`:8471`), `pushDay/pullDay/commitDay` (`:10717-10806`), `callClaude()` (`:8389`). | Hay que **extraerla** a módulos puros antes de construir las pantallas nativas que la usan (Fase 1). La extracción también mejora la web. |
-| Backend | `api/*.js` autentican con `Authorization: Bearer <supabase access token>` (p. ej. `api/claude.js:110`). | Funciona desde nativo sin cambios de auth. Falta base URL absoluta, identificación de cliente/versión y push nativo. |
-| Auth | Supabase email/contraseña (`signInWithPassword`, `signUp`, `resetPasswordForEmail`); enlaces de correo vuelven a `location.origin` (`authRedirectUrl()`, `app/index.html:7364`). | Necesita deep links / Universal Links (NAT-12). Sin login social → "Sign in with Apple" no es obligatorio hoy. |
+| Lógica de dominio en `app/index.html` | Buscar por nombre: `buildDay`, `dayState`, `mealValue`, `dayTotals`, `effectiveDayTarget`, `weekOf`, `migrateProfilePrefs`, `hasCompleteOnboarding`, `streakStats`, `prepareFirstCycleWeek`, `finalizeDayWithGate`, `pushDay`, `pullDay`, `commitDay`, `callClaude`. NAT-03 y NAT-07 ya extraen día y cliente API; sus adaptadores web conservan los nombres. | Extraer el dominio restante antes de las pantallas que lo usan (Fase 1); consultar `core-inventory.md` y confirmar contra HEAD, sin depender de números de línea. |
+| Backend | `api/*.js` autentican con `Authorization: Bearer <supabase access token>` (p. ej. `api/claude.js`). | Funciona desde nativo sin cambios de auth. Falta base URL absoluta, identificación de cliente/versión y push nativo. |
+| Auth | Supabase email/contraseña (`signInWithPassword`, `signUp`, `resetPasswordForEmail`); enlaces de correo vuelven a `location.origin` (`authRedirectUrl()` en `app/index.html`). | Necesita deep links / Universal Links (NAT-12). Sin login social → "Sign in with Apple" no es obligatorio hoy. |
 | Persistencia local | `localStorage`: `fitbud_v1` (estado `S`), `fitbud_syncq_v1` (cola offline), `fitbud_sync_meta_v1`, `fitbud_ui`, `fitbud_chat_v1_*`, `fitbud_meal_option_rerolls_v1`, `fitbros_tour_v1`. | Se reemplaza por un adaptador de almacenamiento inyectable (NAT-06, NAT-24). Mismo formato lógico para que web y nativo compartan reglas de sync. |
 | Push | Web Push VAPID con `web-push` (`api/notify.js`, tabla `push_subscriptions(endpoint, keys_p256dh, keys_auth)`). | Necesita tokens nativos (APNs/FCM vía Expo Push) y una tabla nueva (NAT-11). |
-| Cobro | Tienda web con Culqi (`/planes` → `/pago`, pago único sin renovación, REQ-331..334; comercio aprobado por Culqi el 2026-11-04). Stripe Checkout (`api/checkout.js`) quedó sin activar. Cupones y entitlements en Supabase. | Las apps no venden: se paga solo en la web y la app lee el acceso de `/api/entitlement` (NAT-H3, decidido 2026-11-05). Las tiendas no lo permiten de forma explícita en Perú: ver riesgos y contingencia en `COBRO-WEB.md`. |
-| Cámara/voz | `<input type="file" capture="environment">` (foto de comida/progreso), Web Speech API (`toggleMic()`, `app/index.html:9803`). | `expo-image-picker`/cámara y reconocimiento de voz nativo (NAT-35, NAT-36). |
+| Cobro | Suscripción mensual Culqi y `/registro` con tarjeta y 7 días gratis (REQ-355/356), detrás de `TIENDA_SUSCRIPCION_ENABLED`; el pago único `/planes` → `/pago` sigue cuando la bandera está apagada. REQ-357 (gestión y correos) pendiente. | Flujo A: registro/compra solo web; la app inicia sesión y lee `/api/entitlement`. Google permite solo consumo; persiste el riesgo iOS. Detalle y contingencia en `COBRO-WEB.md`; no se afirma activación en producción. |
+| Cámara/voz | `<input type="file" capture="environment">` (foto de comida/progreso), Web Speech API (`toggleMic()` en `app/index.html`). | `expo-image-picker`/cámara y reconocimiento de voz nativo (NAT-35, NAT-36). |
 | Fotos privadas | Storage `progress-photos/<user_id>/...` con URLs firmadas. | Igual en nativo con supabase-js. |
 | Analytics | `/api/analytics` con allowlist, sin datos de salud. | Reutilizar el mismo endpoint y allowlist; nada de SDKs de terceros con datos de salud. |
-| Pruebas | ~100 validadores Node + Playwright E2E con fixtures (`tests/e2e`), `scripts/release-gate.mjs`. | Los validadores de dominio cubren también nativo porque es el mismo código. Se añade CI nativo (NAT-27) y E2E con Maestro (NAT-60). |
+| Pruebas | ~100 validadores Node + Playwright E2E con fixtures (`tests/e2e`), `scripts/release-gate.mjs`. | Los validadores de dominio cubren también nativo porque es el mismo código. Se añade CI nativo (NAT-27) y arnés temprano Maestro (NAT-79) y cobertura completa (NAT-60). |
 
 ## 3. Decisión técnica (resumen; detalle en ADR-001)
 
@@ -96,15 +96,16 @@ Reglas de arquitectura:
 | 1 — Núcleo compartido | NAT-01..09: inventario y extracción del dominio de `app/index.html` a módulos puros, con validadores. | Las pantallas nativas pueden construirse sin tocar `app/index.html`. | Media: las extracciones que tocan `app/index.html` van de una en una (`exclusiveGroup: index-html`). |
 | 2 — Backend para clientes nativos | NAT-10..14: identificación de cliente/versión, push nativo, deep links, entitlements multi-origen, compatibilidad con versiones anteriores. | API lista para iOS/Android. | Alta. |
 | 3 — Fundación nativa | NAT-20..28: scaffold, puente de dominio, design system, auth, datos offline, navegación, telemetría, CI, lint REQ-31. | App que inicia sesión, sincroniza y navega entre tabs vacías. | Media. |
+| Hito entre Fases 3 y 4 — Build mínimo de validación | NAT-79/80 + NAT-H12: inicio de sesión, pestañas, Mi plan y versión mínima. | TestFlight externo y prueba cerrada de Play; primer App Review con publicación manual cuando Hoy, Nutrición y Entreno funcionen (evitar rechazo por funcionalidad mínima). | Envío y resultado humanos; no sustituye la beta completa. |
 | 4 — Paridad por journey | NAT-30..49: onboarding, primer ciclo, Hoy, nutrición, entreno, reproductor, progreso, cierre de ciclo, perfil, privacidad, notificaciones, suscripción, coach. | `PARITY.md` 100 % en verde para usuario normal. | **Alta**: una tarea = un journey con carpeta propia. |
 | 5 — Valor nativo | NAT-50..52: Apple Health / Health Connect, widgets, Live Activity. | Opcional, post-beta. | Alta. |
 | 6 — QA, beta y lanzamiento | NAT-60..64 + NAT-H6..H8: E2E Maestro, prueba web↔nativo, fichas de tienda, builds de beta, publicación OTA escalonada, go/no-go. | App publicada. | Media. |
 
-Ruta crítica estimada (con 3–4 agentes en paralelo y decisiones humanas a tiempo): Fase 1+2+3 ≈ 3–4 semanas; Fase 4 ≈ 4–6 semanas; Fase 6 ≈ 2 semanas incluyendo revisión de tiendas; con una cuenta personal de Google Play toma más, porque exige 14 días de prueba cerrada más la revisión de acceso a producción (`PUBLICACION.md` §5). La ruta crítica real la marcan NAT-H3 (cobro) y NAT-H4 (legal), no el desarrollo.
+Ruta crítica estimada (con 3–4 agentes en paralelo y decisiones humanas a tiempo): Fase 1+2+3 ≈ 3–4 semanas; Fase 4 ≈ 4–6 semanas; Fase 6 ≈ 2 semanas incluyendo revisión de tiendas; con una cuenta personal de Google Play toma más, porque exige 14 días de prueba cerrada más la revisión de acceso a producción (`PUBLICACION.md` §5). La validación temprana se registra en NAT-H12; NAT-H4 (legal) necesita responsable y fecha de Jonathan (D-9). NAT-H3 ya tiene decisión de cobro tomada, aunque su cierre formal sigue siendo humano.
 
 ## 6. Alcance funcional
 
-Dentro (paridad para usuario normal): login/registro/recuperación, onboarding 4 pasos con consentimientos y evaluación de seguridad, preparación del primer ciclo, Hoy, Nutrición (marcar, cambiar comida, rehacer opciones, extras, recientes/favoritas/alimento por gramos, editor manual, semana y lista de compras), estimar con foto, dictado, coach conversacional, Entreno (plan, detalle, demostraciones, reproductor con descansos y recuperación, generar/activar plan), Progreso (peso, grasa, gráfico, racha, check-in), cierre de ciclo con foto privada, Perfil completo, privacidad (exportar, borrar cuenta, consentimientos), recordatorios y push, suscripción/estado del plan, tour inicial.
+Dentro (paridad para usuario normal): iniciar sesión, recuperar contraseña, crear contraseña desde correo de compra o invitación, pantalla para quien no tiene cuenta (texto neutral sin enlaces, D-1 a), onboarding 4 pasos con consentimientos y evaluación de seguridad, preparación del primer ciclo, Hoy, Nutrición (marcar, cambiar comida, rehacer opciones, extras, recientes/favoritas/alimento por gramos, editor manual, semana y lista de compras), estimar con foto, dictado, coach conversacional, Entreno (plan, detalle, demostraciones, reproductor con descansos y recuperación, generar/activar plan), Progreso (peso, grasa, gráfico, racha, check-in), cierre de ciclo con foto privada, Perfil completo, privacidad (exportar, borrar cuenta, consentimientos), recordatorios y push, suscripción/estado del plan, tour inicial.
 
 Fuera (se queda en web): administración de usuarios, catálogos, ejercicios, cupones, consumo y QA; landing pública y reclutamiento beta; herramientas de desarrollo (key local en Ajustes). Un administrador en nativo ve un enlace "Abrir administración" que abre la web.
 
@@ -116,12 +117,16 @@ Las tareas `NAT-Hx` no las puede cerrar un agente. Un agente puede preparar el m
 |---|---|---|---|
 | NAT-H1 | Aprobar ADR-001 (Expo/React Native en `native/`). | NAT-20 en adelante. | Aprobar. |
 | NAT-H2 | Cuentas Apple Developer y Google Play Console; bundle id / package name; Team ID. | NAT-12 (Universal Links reales), NAT-63. | `club.evolvapp.app` en ambas plataformas. Elegir el titular teniendo en cuenta el requisito de Google Play para cuentas personales (`PUBLICACION.md` §5). |
-| NAT-H3 | Modelo de cobro dentro de las apps. | NAT-45 (y NAT-13 si se activa la contingencia). | **Decidido por Jonathan (2026-11-05): cobro solo en la web (Culqi); las apps no venden ni enlazan a comprar y leen el acceso del servidor.** Contingencia: compra integrada ("non-renewing subscription" en iOS, producto equivalente en Play) solo si una tienda la exige. Plan, reglas de tienda verificadas y fases en `COBRO-WEB.md`. El cierre formal queda para después de validar en beta con las tiendas. |
+| NAT-H3 | Modelo de cobro: decisión tomada; cierre formal humano (D-10). | No bloquea NAT-45; NAT-13 espera NAT-H12. | Jonathan decidió cobro solo web con Culqi (2026-11-05). El resultado con tiendas y la eventual contingencia se registran en NAT-H12. Si se exige en iOS, suscripción auto-renovable; estimación al activarla. |
 | NAT-H4 | Revisión legal de privacidad para tiendas. | NAT-30 (texto de consentimiento), NAT-50, NAT-62. | Las guías de App Store (5.1.2(i), actualizada a fines de 2025) exigen informar y pedir permiso explícito cuando datos personales se comparten con IA de terceros. Eso **choca con REQ-31** si se aplica a la UI normal. Propuesta: excepción acotada a REQ-31 solo para el texto legal de consentimiento y la política de privacidad, nunca en la UI de uso diario. También: URL de política de privacidad pública, etiquetas de privacidad (App Store) y Data safety + declaración de apps de salud (Google Play), disclaimer médico. |
 | NAT-H5 | Cuenta Expo/EAS, proyecto Firebase (FCM), llave APNs. | NAT-44, NAT-63. | Crear y guardar como secretos de EAS, nunca en el repo. |
-| NAT-H6 | Aplicar en producción las migraciones SQL de la migración nativa. | Beta (NAT-63). | Aplicar tras revisar `supabase/native_*.sql`. |
+| NAT-H6 | Aplicar en producción las migraciones SQL de la migración nativa. | Beta (NAT-63). | Aplicar tras revisar `supabase/native_*.sql` y `supabase/sync_revision.sql` (NAT-75). Las URLs de Auth pasan a NAT-H11. |
 | NAT-H7 | Aprobar fichas de tienda, capturas, clasificación de edad y formularios de privacidad. | NAT-63 público. | Revisar el borrador de NAT-62. |
-| NAT-H8 | Go/no-go: beta cerrada → público; política de convivencia o retiro de la PWA. | Lanzamiento. | Mantener la PWA indefinidamente como canal web; reevaluar con métricas a 90 días del lanzamiento. Decidir además qué cliente recibe los cambios de producto: `PUBLICACION.md` §7 recomienda la app, con la web en mantenimiento, para no duplicar la interfaz. |
+| NAT-H8 | Go/no-go de beta a público. | Lanzamiento. | Revisar la evidencia de beta y NAT-64. Cliente principal y alcance se deciden antes en NAT-H10. |
+| NAT-H9 | App sin venta: D-1..D-4. | Excepciones de producto/textos de NAT-45/76. | Hasta decidir: login y texto neutral sin enlaces; sin cancelación in-app; ayuda por correo; mismas reglas en ambas plataformas. |
+| NAT-H10 | Cliente principal y alcance de beta (D-5/D-6). | Alcance definitivo y política de cambios. | Decidir con la propuesta de NAT-71; no asumir que la recomendación de cliente principal esté aprobada. |
+| NAT-H11 | Entorno de pruebas y URLs de Auth (D-7). | Verificación de NAT-43 y Auth real. | Segundo Supabase y Preview de Vercel; mientras no exista, pruebas simuladas y ninguna operación destructiva en producción. |
+| NAT-H12 | Validación temprana con tiendas (D-8). | NAT-13 (solo si exige contingencia) y NAT-63. | Enviar el build de NAT-80; registrar resultado por tienda. No ejecutarlo sin intervención humana. |
 
 ## 8. Invariantes que aplican también a nativo
 
@@ -139,10 +144,11 @@ Las tareas `NAT-Hx` no las puede cerrar un agente. Un agente puede preparar el m
 
 | Riesgo | Prob. | Impacto | Mitigación |
 |---|---|---|---|
-| Rechazo de App Store o Google Play por acceso comprado en la web sin compra integrada (App Store 3.1.1/3.1.3(b), Google Play Pagos). | Media-alta. | Bloquea lanzamiento. | Cero llamados a comprar dentro de la app (validador NAT-28), validación temprana en TestFlight y prueba cerrada, y contingencia de compra integrada lista (`COBRO-WEB.md` Fase 3). |
+| Rechazo por acceso comprado en la web sin compra integrada. | Media-alta en iOS; menor en Android, que permite solo consumo. | Bloquea lanzamiento. | Cero llamados a comprar dentro de la app (validador NAT-28), validación temprana NAT-80/NAT-H12 en TestFlight externo y prueba cerrada, y contingencia de compra integrada lista (`COBRO-WEB.md` Fase 3). |
 | Choque REQ-31 vs. divulgación obligatoria de IA de terceros. | Alta. | Rechazo / riesgo legal. | NAT-H4 con excepción acotada al texto legal. |
 | Extraer dominio de `app/index.html` rompe la web. | Media. | Regresión en producción. | Extracciones pequeñas, una a la vez, release gate + E2E en verde, sin cambios de comportamiento. |
 | Divergencia de reglas entre web y nativo. | Media. | Datos inconsistentes. | Regla "un solo dominio"; prohibido duplicar lógica en `native/` (revisión en PR + NAT-02). |
+| Pérdida de datos al alternar clientes online o con relojes desfasados (H-05). | Alta con dos clientes. | Pérdida silenciosa de comidas/peso. | NAT-74 reproduce; NAT-75 implementa revisión de servidor, escritura condicional y relectura; NAT-61 verifica manualmente. Beta exige NAT-75 cerrada. |
 | Conflictos entre agentes en archivos calientes. | Alta sin coordinación. | Trabajo perdido. | `paths` por tarea, `exclusiveGroup`, reclamo atómico vía `origin/main` (ver `NATIVE_AGENT.md`). |
 | Timers del reproductor en segundo plano (la app se suspende). | Media. | Descansos/duración incorrectos. | Tiempos por timestamp (lección de REQ-155/186) + notificaciones locales programadas al fin del descanso. |
 | Sesión/tokens en el dispositivo. | Baja. | Fuga de sesión. | Sesión cifrada (SecureStore + almacenamiento cifrado), purga al cerrar sesión (lección REQ-156). |
@@ -152,7 +158,7 @@ Las tareas `NAT-Hx` no las puede cerrar un agente. Un agente puede preparar el m
 | Una tienda considera que un OTA evade la revisión. | Baja-media. | Rechazo o retiro. | Por OTA no van funciones nuevas; las notas de revisión declaran lo publicado por aire (`PUBLICACION.md` §1 y §5). |
 | Un OTA defectuoso llega a todos los usuarios. | Media. | App rota en producción. | Trenes con controles, 10 % y reversión (NAT-64). |
 | Un cambio de servidor rompe versiones instaladas. | Alta sin control. | Errores o pérdida de datos en versiones viejas. | La API solo crece y los datos desconocidos se conservan (NAT-14). |
-| Mantener dos interfaces duplica el trabajo. | Alta si conviven a la par. | Menor velocidad, mayor que la de la revisión. | Decidir el cliente principal en NAT-H8 (`PUBLICACION.md` §7). |
+| Mantener dos interfaces duplica el trabajo. | Alta si conviven a la par. | Menor velocidad, mayor que la de la revisión. | Decidir el cliente principal en NAT-H10 (`PUBLICACION.md` §7). |
 
 ## 10. Criterios de salida
 
@@ -161,7 +167,7 @@ Beta cerrada (TestFlight + Play Internal) cuando:
 1. Todas las tareas de Fases 1–4 marcadas `hecho` salvo las que dependan de una decisión humana aún abierta, con su bloqueo documentado.
 2. `PARITY.md` sin filas en rojo para usuario normal.
 3. Flujos Maestro de NAT-60 en verde en iOS y Android.
-4. NAT-61 (misma cuenta web ↔ nativo) sin pérdida ni duplicación de datos.
+4. NAT-75 cerrada y NAT-61 (misma cuenta web ↔ nativo) sin pérdida ni duplicación de datos.
 5. `node scripts/release-gate.mjs` en verde en `main` y CI nativo en verde.
 6. NAT-H4 y NAT-H6 cerradas.
 

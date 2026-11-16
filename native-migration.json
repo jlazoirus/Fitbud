@@ -148,7 +148,7 @@
     },
     {
       "id": "NAT-H8",
-      "title": "Go/no-go: envío a beta y a público; convivencia con la PWA",
+      "title": "Go/no-go: envío a beta y a público",
       "phase": 6,
       "track": "decision",
       "human": true,
@@ -510,12 +510,12 @@
     },
     {
       "id": "NAT-13",
-      "title": "Contingencia: entitlements de compras de tienda (solo si NAT-H3 activa la compra integrada)",
+      "title": "Contingencia: entitlements de compras de tienda (solo si NAT-H12 activa la compra integrada)",
       "phase": 2,
       "track": "backend",
       "human": false,
       "deps": [
-        "NAT-H3"
+        "NAT-H12"
       ],
       "paths": [
         "supabase/native_entitlements.sql",
@@ -627,7 +627,8 @@
       ],
       "paths": [
         "native/src/ui/**",
-        "native/assets/fonts/**"
+        "native/assets/fonts/**",
+        "native/app/dev/**"
       ],
       "status": "pendiente",
       "owner": null,
@@ -637,7 +638,7 @@
     },
     {
       "id": "NAT-23",
-      "title": "Auth y sesión: login, registro, recuperación, invitación y cierre de sesión",
+      "title": "Auth y sesión: login, recuperación, compra/invitación y cierre de sesión",
       "phase": 3,
       "track": "foundation",
       "human": false,
@@ -677,7 +678,6 @@
       "paths": [
         "native/src/data/**"
       ],
-      "exclusiveGroup": "native-config",
       "status": "pendiente",
       "owner": null,
       "claimedAt": null,
@@ -698,7 +698,9 @@
       "paths": [
         "native/app/_layout.tsx",
         "native/app/(tabs)/_layout.tsx",
-        "native/src/navigation/**"
+        "native/src/navigation/**",
+        "native/app/index.tsx",
+        "native/app/(tabs)/*/index.tsx"
       ],
       "status": "pendiente",
       "owner": null,
@@ -905,7 +907,6 @@
       ],
       "paths": [
         "native/src/features/foto-comida/**",
-        "native/package.json",
         "native/app.config.ts"
       ],
       "exclusiveGroup": "native-config",
@@ -970,7 +971,6 @@
       "paths": [
         "native/src/features/player/**",
         "native/app/player/**",
-        "native/package.json",
         "native/app.config.ts"
       ],
       "exclusiveGroup": "native-config",
@@ -1035,7 +1035,6 @@
       "paths": [
         "native/src/features/cierre-ciclo/**",
         "native/app/cierre-ciclo/**",
-        "native/package.json",
         "native/app.config.ts"
       ],
       "exclusiveGroup": "native-config",
@@ -1097,7 +1096,6 @@
       ],
       "paths": [
         "native/src/features/notificaciones/**",
-        "native/package.json",
         "native/app.config.ts"
       ],
       "exclusiveGroup": "native-config",
@@ -1114,16 +1112,14 @@
       "track": "feature",
       "human": false,
       "deps": [
-        "NAT-H3",
-        "NAT-42",
+        "NAT-24",
+        "NAT-25",
         "NAT-70"
       ],
       "paths": [
         "native/src/features/suscripcion/**",
-        "native/package.json",
-        "native/app.config.ts"
+        "native/app/mi-plan/**"
       ],
-      "exclusiveGroup": "native-config",
       "status": "pendiente",
       "owner": null,
       "claimedAt": null,
@@ -1184,7 +1180,8 @@
         "NAT-47"
       ],
       "paths": [
-        "native/src/**"
+        "native/src/**",
+        "native/app/**"
       ],
       "status": "pendiente",
       "owner": null,
@@ -1278,7 +1275,7 @@
     },
     {
       "id": "NAT-60",
-      "title": "E2E nativo con Maestro y API simulada",
+      "title": "Completar y estabilizar los flujos E2E sobre el arnés de NAT-79",
       "phase": 6,
       "track": "release",
       "human": false,
@@ -1353,7 +1350,8 @@
         "NAT-H6",
         "NAT-60",
         "NAT-61",
-        "NAT-43"
+        "NAT-43",
+        "NAT-H12"
       ],
       "paths": [
         "native/eas.json",
@@ -1412,10 +1410,10 @@
         "NATIVE_AGENT.md"
       ],
       "exclusiveGroup": "plan-docs",
-      "status": "en_curso",
+      "status": "hecho",
       "owner": "codex-native-20261116",
       "claimedAt": "2026-11-16T19:29:01.958Z",
-      "doneAt": null,
+      "doneAt": "2026-11-16",
       "note": ""
     },
     {
