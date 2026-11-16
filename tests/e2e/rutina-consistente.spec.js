@@ -55,12 +55,10 @@ for (const width of [320, 390, 1280]) {
     };
     const assertHome = async name => {
       await page.locator("#tabs").getByText("Hoy", { exact: true }).click();
-      await app.locator(".home-agenda summary").click();
-      const row = app.locator(".agenda-item.kind-workout");
+      // REQ-394: el entreno pendiente se ve en «Tu día»; el detalle sigue en Entreno.
+      const row = app.locator(".home-workout-row");
       await expect(row).toBeVisible();
-      await expect(row.locator(".agenda-name")).toHaveText(name);
-      await expect(row.locator(".agenda-meta")).toContainText("2 ejercicios");
-      for (const name of seed.names) await expect(row).toContainText(name);
+      await expect(row.locator("strong")).toHaveText(name);
       await page.locator("#tabs").getByText("Entreno").click();
     };
 
@@ -78,8 +76,7 @@ for (const width of [320, 390, 1280]) {
     await assertHome("Pull del viernes");
     await expect.poll(() => calls.filter(c => c.table === "day_log" && c.payload?.state?.repeatWorkout?.savedId === "saved-pull").length).toBeGreaterThan(0);
     await gotoApp(page);
-    await app.locator(".home-agenda summary").click();
-    await expect(app.locator(".agenda-item.kind-workout .agenda-name")).toHaveText("Pull del viernes");
+    await expect(app.locator(".home-workout-row strong")).toHaveText("Pull del viernes");
     await page.locator("#tabs").getByText("Entreno").click();
     await assertRoutine("Pull del viernes");
     await title.scrollIntoViewIfNeeded();

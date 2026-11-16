@@ -885,6 +885,11 @@
   .home-primary .agenda-sub{font-size:.8125rem;line-height:1.45}
   .home-primary-action{width:100%;min-height:48px;margin-top:14px}
   .home-secondary-actions{display:flex;flex-wrap:wrap;column-gap:18px;margin:0 0 -8px}
+  .home-workout-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .home-workout-copy{display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
+  .home-workout-copy small{color:var(--muted);font-size:.75rem}
+  .home-workout-copy strong{font-size:.9375rem;line-height:1.25}
+  .home-workout-action{min-height:44px;white-space:nowrap}
   .home-secondary-action{min-height:44px;padding:6px 0;background:none;color:var(--txt);font-size:.8125rem;text-align:left;text-decoration:underline;text-underline-offset:3px}
   .home-agenda{border-block:1px solid var(--border);margin:12px 0 16px}
   .home-agenda>summary{display:flex;align-items:center;gap:8px;min-height:48px;padding:4px 0;font-size:.875rem;font-weight:700;cursor:pointer;list-style:none}
@@ -5561,6 +5566,8 @@ function homeOpenTomorrow(ds){
   goDay(ds);
 }
 function homeConsumptionHtml({t,target,doneMeals,totMeals}){
+  // REQ-394: en cero no informa nada; aparece con el primer registro.
+  if(!doneMeals&&!t.kcal)return "";
   return `<button type="button" class="home-consumption" onclick="setView('nutricion')">
     <span><b>${doneMeals}/${totMeals} comidas</b> · ${t.kcal}/${target.kcal} kcal</span>
     <span class="home-consumption-link">Ver consumo${chevron()}</span>
@@ -5699,30 +5706,39 @@ function homeAgendaHtml(ds,data,menuSuggestion=""){
   const first=data.items[0];
   const promote=first&&first.kind!=="rest"&&(first.kind!=="workout"||!data.hasOpenMeals);
   const workoutLink={label:"Ver entreno",handler:`homeOpenWorkout('${ds}','workout_detail')`};
-  let logMeta="Añade una comida o un extra de hoy.";
-  if(restWorkout)logMeta="Hoy toca descanso. Añade una comida o un extra.";
-  else if(!first)logMeta=`Entreno ${workoutStatus}. ${logMeta}`;
-  const primary=promote?first:{
-    kind:"log",title:"Registra lo que comiste",action:register,
-    meta:logMeta
-  };
+  // REQ-394: el entreno pendiente se ve en la tarjeta aunque comer vaya primero.
+  const workoutItem=data.items.find(item=>item.kind==="workout");
+  const workoutRow=workoutItem&&!(promote&&first===workoutItem)?workoutItem:null;
+  let logMeta="";
+  if(restWorkout)logMeta="Hoy toca descanso.";
+  else if(!first)logMeta=`Entreno ${workoutStatus}.`;
+  const primary=promote?first:{kind:"log",title:"¿Qué comiste hoy?",action:register,meta:logMeta};
   let secondary=null;
   if(promote){
     secondary=first.kind==="meal"
       ?{...register,label:"Registrar otra comida",handler:`homeLogFood('${ds}','${first.mealId}')`}
       :register;
-  }else if(!restWorkout&&(first?.kind==="workout"||!first)){
+  }else if(!restWorkout&&!first){
     secondary=workoutLink;
   }
   const alternative=restWorkout||(promote&&first.kind==="workout"?first.alternative:null);
   const meta=[primary.label,primary.meta].filter(Boolean).join(" · ");
+  const rest=(promote?data.items.slice(1):data.items).filter(item=>item!==workoutRow);
   return `<section class="agenda-card home-primary kind-${primary.kind}" aria-labelledby="homePrimaryTitle">
     <h2 class="agenda-title" id="homePrimaryTitle">${esc(primary.title)}</h2>
     ${meta?`<div class="agenda-sub">${esc(meta)}</div>`:""}
     ${homeActionHtml(primary.action,"btn btn-accent home-primary-action")}
     ${secondary||alternative?`<div class="home-secondary-actions">${homeActionHtml(secondary,"home-secondary-action")}${homeActionHtml(alternative,"home-secondary-action")}</div>`:""}
+    ${workoutRow?homeWorkoutRowHtml(workoutRow):""}
     ${menuSuggestion}
-  </section>${note}${homeRemainingAgendaHtml(ds,promote?data.items.slice(1):data.items)}`;
+  </section>${note}${homeRemainingAgendaHtml(ds,rest)}`;
+}
+function homeWorkoutRowHtml(item){
+  return `<div class="home-workout-row">
+    <span class="agenda-icon" aria-hidden="true">${tabIcon("entreno")}</span>
+    <span class="home-workout-copy"><small>${esc(item.label||"Entreno")}</small><strong>${esc(item.title)}</strong></span>
+    ${homeActionHtml(item.action,"btn home-workout-action")}
+  </div>`;
 }
 
 /* REQ-314: acompañamiento opcional durante los primeros cinco días de uso.
@@ -18360,7 +18376,7 @@ function tourMarkSeen(v){try{localStorage.setItem(FITBROS_TOUR_KEY,v||"done");}c
 function tourSteps(){
   return [
     {sel:".home-consumption",title:"Tu consumo de hoy",body:"Toca esta línea para ver tus comidas y el detalle de macros en Nutrición.",placement:"bottom"},
-    {sel:".home-primary",title:"Lo que puedes hacer ahora",body:"Registra una comida o entra a tu entreno. Abre el resto del día para ver otras actividades cuando las tengas.",placement:"bottom"},
+    {sel:".home-primary",title:"Tu día",body:"Registra lo que comes y empieza tu entreno desde aquí. Lo demás del día queda en «Resto del día».",placement:"bottom"},
     {sel:'[data-tab="nutricion"]',title:"Nutrición",body:"Tus comidas del día con calorías y macros. Registra, reemplaza por otra opción o agrega un extra.",placement:"top"},
     {sel:'[data-tab="entreno"]',title:"Entreno",body:"Tu sesión guiada paso a paso: calentamiento, series e intervalos con temporizador y demostraciones.",placement:"top"},
     {sel:'[data-tab="progreso"]',title:"Progreso",body:"Registra tu peso semanal y mira tu evolución, racha y adherencia.",placement:"top"},

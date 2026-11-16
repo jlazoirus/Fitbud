@@ -2498,3 +2498,20 @@ Saludar y dar permiso para empezar, sin estadísticas ni ceros.
 Sin tarjeta de bienvenida ni «Racha 0». Encabezado normal de 105 a 67 px a 390 px.
 ### Verificación sugerida
 `tests/e2e/regreso.spec.js`, `racha.spec.js`, `coach-welcome.spec.js`.
+
+## REQ-394 - Hoy: «Tu día» muestra comida y entreno
+
+**Estado: implementado.** Sigue a REQ-393.
+
+### Origen
+Crítica de Hoy, 2026-11-16.
+### Problema
+Sin menú, el entreno quedaba en «Resto del día · 1 pendiente», con un enlace «Ver entreno» dentro de la tarjeta de comida. La tarjeta repetía lo mismo 3 veces y la tira mostraba «0/4 comidas · 0/2720 kcal».
+### Objetivo
+Comida y entreno visibles en la misma tarjeta, sin ceros.
+### Alcance
+Fila de entreno con su acción («Iniciar entreno» o «Registrar actividad») cuando no es la acción principal; deja «Resto del día». Título «¿Qué comiste hoy?» sin subtítulo. Tira de consumo desde el primer registro. PWA v252.
+### Criterios de aceptación
+Día de gimnasio sin menú: «Iniciar entreno» sin desplegar nada. Sin registros, no hay tira de consumo.
+### Verificación sugerida
+`tests/e2e/home-optional-menu.spec.js`, `rutina-consistente.spec.js`, `onboarding.spec.js`.
