@@ -15204,6 +15204,7 @@ function resetData(){if(confirm("¿Borrar todo el progreso (comidas marcadas, ex
 let supa=null;
 let session=null;   // sesión de Supabase Auth (null = sin login)
 let profile=null;   // fila de profiles (is_admin + prefs)
+let profilePrefsSaveQueue=Promise.resolve(),profilePrefsCommitted=null; // REQ-392: ver saveProfilePrefs
 let DB={
   ingredients:[],dishes:[],dishIng:[],diets:[],dietDishes:[],byName:null,
   exercises:LOCAL_EXERCISES.map(x=>({...x})),exerciseReady:false,exerciseError:null,
@@ -15707,6 +15708,7 @@ async function refreshAuth(){
   authReady=true;
 }
 async function loadProfile(){
+  profilePrefsCommitted=null;
   if(!supa||!uid()){profile=null;return;}
   try{
     const r=await supa.from("profiles").select("id,email,is_admin,active,prefs").eq("id",uid()).maybeSingle();
@@ -15716,6 +15718,7 @@ async function loadProfile(){
   if(!profile.prefs||typeof profile.prefs!=="object")profile.prefs={};
   const needsMigration=Number(profile.prefs.profileSchemaVersion||0)<PROFILE_SCHEMA_VERSION;
   profile.prefs=migrateProfilePrefs(profile.prefs);
+  profilePrefsCommitted=profile.prefs;
   if(needsMigration&&supa&&uid()){
     try{
       await supa.from("profiles").upsert({
@@ -15728,24 +15731,44 @@ async function loadProfile(){
   }
   refreshPlanCalendar();
 }
-async function saveProfilePrefs(prefs,meta){
-  if(!supa||!uid())return{error:{message:"Sin sesión"}};
-  const owner=uid();
-  if(!isActive())return{error:{message:"Cuenta desactivada"}};
-  const normalized=migrateProfilePrefs(prefs||{});
-  const result=await supa.from("profiles").upsert({
-    id:uid(),
-    email:(session&&session.user&&session.user.email)||"",
-    prefs:normalized,
-    updated_at:new Date().toISOString(),
-  },{onConflict:"id"});
-  if(owner!==uid())return{error:{message:"La sesión cambió. Vuelve a intentarlo."}};
-  if(!result.error){
-    profile.prefs=normalized;
-    refreshPlanCalendar();
+// REQ-392: los guardados de prefs van en fila y en orden. Si otro guardado
+// publicó prefs más nuevas después de que el llamador armó su copia, solo se
+// aplican encima las claves que ese llamador cambió: un guardado de fondo con
+// una copia vieja no revierte lo que el usuario acaba de guardar. La base es
+// lo último confirmado (no profile.prefs), porque algunos llamadores publican
+// su cambio en memoria antes de guardarlo.
+function rebaseProfilePrefs(prefs,base,latest){
+  if(!prefs||!base||!latest||latest===base||prefs===latest)return prefs;
+  const same=(a,b)=>a===b||stableJson(a)===stableJson(b);
+  const next={...latest};
+  for(const key of new Set([...Object.keys(base),...Object.keys(prefs)])){
+    if(!Object.prototype.hasOwnProperty.call(prefs,key)){if(Object.prototype.hasOwnProperty.call(base,key))delete next[key];continue;}
+    if(!same(prefs[key],base[key]))next[key]=prefs[key];
+  }
+  return next;
+}
+function saveProfilePrefs(prefs,meta){
+  const owner=uid(),base=profilePrefsCommitted||(profile&&profile.prefs);
+  const run=profilePrefsSaveQueue.then(async()=>{
+    if(!supa||!uid())return{error:{message:"Sin sesión"}};
+    if(owner!==uid())return{error:{message:"La sesión cambió. Vuelve a intentarlo."}};
+    if(!isActive())return{error:{message:"Cuenta desactivada"}};
+    const normalized=migrateProfilePrefs(rebaseProfilePrefs(prefs||{},base,profilePrefsCommitted)||{});
+    const result=await supa.from("profiles").upsert({
+      id:uid(),
+      email:(session&&session.user&&session.user.email)||"",
+      prefs:normalized,
+      updated_at:new Date().toISOString(),
+    },{onConflict:"id"});
+    if(owner!==uid())return{error:{message:"La sesión cambió. Vuelve a intentarlo."}};
+    if(result.error)return result;
+    // REQ-392: la versión del plan se registra ANTES de publicar las prefs en
+    // memoria. Antes profile.prefs ya decía lo nuevo mientras planPrefsForDate()
+    // seguía en la versión anterior (mañana con la actividad vieja).
+    let version=null;
     if(!(meta&&meta.skipPlanVersion)){
       try{
-        const version=await ensurePlanVersion({
+        version=await ensurePlanVersion({
           prefs:normalized,
           source:(meta&&meta.source)||"manual",
           reason:(meta&&meta.reason)||"",
@@ -15753,13 +15776,18 @@ async function saveProfilePrefs(prefs,meta){
           validTo:validYmd(meta&&meta.validTo)?meta.validTo:null,
           cycleNumber:(meta&&meta.cycleNumber)!=null?meta.cycleNumber:normalized.planCycleNumber,
         });
-        if(version)await backfillDayVersions();
       }catch(e){
         if(!String((e&&e.message)||e).match(/plan_versions|relation|column|constraint/i))console.warn("No se pudo sincronizar la versión del plan tras guardar el perfil.",e);
       }
     }
-  }
-  return result;
+    if(owner!==uid())return{error:{message:"La sesión cambió. Vuelve a intentarlo."}};
+    profile.prefs=profilePrefsCommitted=normalized;
+    refreshPlanCalendar();
+    if(version)await backfillDayVersions();
+    return result;
+  });
+  profilePrefsSaveQueue=run.catch(()=>{});
+  return run;
 }
 // Progresión automática de nivel (solo sube, nunca baja).
 // Umbral: beginner→intermediate si ≥75% sets con RPE≤6 en ≥3 sesiones (últimas 3 semanas, ≥6 sets con RPE);
@@ -15825,7 +15853,7 @@ function clearSignedOutState(prevUid){
   routineConversation=null;routineReview=null; // REQ-359: borradores privados de la cuenta
   referralState=null; // REQ-317: aislar invitaciones por cuenta
   resetStreakSocial(); // REQ-300: ni invitaciones ni clasificación pasan a otra cuenta
-  session=null;profile=null;view="hoy";
+  session=null;profile=null;profilePrefsCommitted=null;view="hoy";
   entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
   billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
   refreshPlanCalendar();

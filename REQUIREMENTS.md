@@ -2566,3 +2566,26 @@ e2e con reloj controlado y release gate.
 ## REQ-391 - Cortesías anteriores: coach completo sin volver a otorgar acceso
 
 **Estado: implementado.** Las cortesías vigentes completan automáticamente los permisos del coach antes de usarlo, también tras reiniciar la cuenta. Conserva el vencimiento y permisos suficientes más largos. Sin migración ni acción manual. Detalle en `docs/requirements-history.md`. ✓ `scripts/test-coach-quota.mjs`.
+
+## REQ-392 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
+
+**Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.
+
+### Origen
+Jonathan, 2026-11-16: `onboarding-essential.spec.js:40` (REQ-389) fallaba de forma intermitente en `main` (`788a860`), 2 de 6 con `--repeat-each=6`.
+### Problema
+Tras «Guardar cambios» con actividad «high», mañana seguía en «moderate». Además, un guardado de fondo armado con una copia vieja de `prefs` (`profileQuestionBlockDay`, `dismissRestartNudge`, hitos de racha) podía terminar después y revertir en memoria y en la base el guardado más nuevo del usuario.
+### Causa raíz
+`saveProfilePrefs` (`app/index.html`) publicaba `profile.prefs` justo después del upsert y recién después esperaba `ensurePlanVersion`. Durante esa ventana (~25-40 ms) `profile.prefs` ya decía «high» y `planPrefsForDate(mañana)` seguía en la versión anterior. La prueba leía en esa ventana: falla en `after.tomorrow.activityLevel`, no en `profile.prefs`. Aparte, los guardados no iban en orden y cada uno escribía la copia completa que recibió.
+### Objetivo
+Quien lea `profile.prefs` ve la versión del plan ya coherente, y ningún guardado viejo revierte uno más nuevo.
+### Alcance
+`saveProfilePrefs`: fila de guardados en orden; versión del plan antes de publicar las prefs en memoria; si otro guardado confirmó prefs después de que el llamador armó su copia, se aplican encima solo las claves que ese llamador cambió (base: lo último confirmado, no `profile.prefs`, porque algunos llamadores publican antes de guardar). El dueño de la sesión se valida al llamar y al ejecutar.
+### Fuera de alcance
+Reescribir cada llamador; conflictos entre dispositivos.
+### Riesgos
+Un upsert colgado retrasa los guardados siguientes (antes ya colgaba el guardado del usuario). Un llamador que muta `profile.prefs` en el lugar y otro guardado se le adelanta pierde su cambio en vez de revertir al otro; los hitos de racha se vuelven a detectar.
+### Criterios de aceptación
+`onboarding-essential.spec.js:40` pasa 10 de 10 con `--repeat-each=10 --retries=0`. Un guardado de fondo con copia vieja lanzado junto al del usuario conserva ambos cambios en memoria y en el último upsert, y `profile.prefs` nunca muestra «high» mientras mañana sigue en «moderate».
+### Verificación sugerida
+`tests/e2e/perfil-guardado-concurrente.spec.js` (falla en `788a860`), e2e de perfil y preguntas, y release gate.
