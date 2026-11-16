@@ -1480,9 +1480,9 @@
         "docs/native-migration/ADR-001-stack.md"
       ],
       "exclusiveGroup": "native-config",
-      "status": "pendiente",
-      "owner": null,
-      "claimedAt": null,
+      "status": "en_curso",
+      "owner": "codex-native-20261116",
+      "claimedAt": "2026-11-16T19:34:28.761Z",
       "doneAt": null,
       "note": ""
     },
