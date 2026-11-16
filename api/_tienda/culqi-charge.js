@@ -39,11 +39,11 @@ function env() {
   };
 }
 
-function svc(e, extra) {
+export function svc(e, extra) {
   return Object.assign({ apikey: e.service, Authorization: "Bearer " + e.service, "Content-Type": "application/json" }, extra || {});
 }
 
-async function rj(r) {
+export async function rj(r) {
   return r.json().catch(() => ({}));
 }
 
@@ -128,7 +128,7 @@ export function interpretCharge(status, data) {
   return { result: "declined", error: msg, code: d.decline_code || d.code || d.type || "status_" + status };
 }
 
-async function findUserIdByEmail(e, email) {
+export async function findUserIdByEmail(e, email) {
   const r = await fetch(e.url + "/rest/v1/profiles?email=eq." + encodeURIComponent(email) + "&select=id&limit=1", { headers: svc(e) });
   const rows = await rj(r);
   if (r.ok && Array.isArray(rows) && rows[0]) return rows[0].id;
@@ -144,7 +144,7 @@ async function findUserIdByEmail(e, email) {
   return null;
 }
 
-async function inviteUser(e, email, data) {
+export async function inviteUser(e, email, data) {
   const redirect = encodeURIComponent(e.appUrl + "/app?auth=invite");
   const r = await fetch(e.url + "/auth/v1/invite?redirect_to=" + redirect, {
     method: "POST",

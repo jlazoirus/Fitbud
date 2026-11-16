@@ -2247,27 +2247,9 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-355 - Motor de suscripción mensual con Culqi
 
-**Estado: pendiente.** API confirmada el 2026-11-14 (endpoints, campos y eventos en el plan §3). Solo llaves de integración.
+**Estado: implementado.** `api/_tienda/suscripcion.js`: inscripción con prueba única, webhook verificado contra la API (+30 días por cobro, idempotente) y cancelación; `supabase/suscripciones.sql`; planes con `scripts/culqi-crear-planes.mjs`. Activación manual: plan §3, "Motor". REQ-356 debe pedir dirección, ciudad y celular.
 
-### Origen
-Decisión de Jonathan (2026-11-06): suscripción mensual con 7 días gratis.
-### Problema
-La tienda solo cobra pagos únicos; no existe cobro recurrente.
-### Objetivo
-Inscribir, cobrar cada mes con suscripciones de Culqi y cancelar, con el acceso sincronizado.
-### Alcance
-- Tabla `subscriptions` (SQL idempotente, RLS).
-- `op=subscribe`: cliente, tarjeta, suscripción al plan con `initial_cycles` de 7 días, prueba única por persona.
-- `op=culqi-webhook`: verifica con `GET /v2/events/{id}`; +30 días por cobro, idempotente.
-- Cancelar con `DELETE`.
-### Fuera de alcance
-`/registro` (REQ-356); Perfil y correos (REQ-357).
-### Riesgos
-Cobro doble, prueba repetida, webhook falso.
-### Criterios de aceptación
-7 días sin cobro; cada cobro exitoso suma 30 días una vez; cancelar detiene los cobros.
-### Verificación sugerida
-Test Node con Culqi simulado e inscripción real en integración.
+✓ `scripts/test-suscripcion-culqi.mjs`.
 
 ## REQ-356 - /registro con tarjeta y semana gratis
 

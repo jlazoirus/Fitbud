@@ -67,10 +67,24 @@
     {
       "source": "/api/reclamaciones",
       "destination": "/api/checkout?op=reclamaciones"
+    },
+    {
+      "source": "/api/suscripcion/cancelar",
+      "destination": "/api/checkout?op=suscripcion-cancelar"
+    },
+    {
+      "source": "/api/suscripcion",
+      "destination": "/api/checkout?op=suscripcion"
+    },
+    {
+      "source": "/api/culqi-webhook",
+      "destination": "/api/checkout?op=culqi-webhook"
     }
   ],
   "functions": {
-    "api/notify.js": { "maxDuration": 30 }
+    "api/notify.js": {
+      "maxDuration": 30
+    }
   },
   "crons": [
     {

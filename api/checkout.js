@@ -12,6 +12,10 @@
 const TIENDA_OPS = {
   culqi: () => import("./_tienda/culqi-charge.js"),
   reclamaciones: () => import("./_tienda/reclamaciones.js"),
+  // REQ-355: suscripción mensual (inscripción, webhook de Culqi y cancelación).
+  suscripcion: () => import("./_tienda/suscripcion.js"),
+  "culqi-webhook": () => import("./_tienda/suscripcion.js"),
+  "suscripcion-cancelar": () => import("./_tienda/suscripcion.js"),
 };
 
 function tiendaOp(req) {

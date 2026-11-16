@@ -84,7 +84,7 @@ async function listPhotos(e, userId) {
 
 async function exportUser(user, e) {
   const userFilter = { user_id: "eq." + user.id };
-  const [profiles, days, weights, versions, cycles, consents, screenings, coachUsage, coachOptions, photos, whatsapp] = await Promise.all([
+  const [profiles, days, weights, versions, cycles, consents, screenings, coachUsage, coachOptions, photos, whatsapp, subscriptions] = await Promise.all([
     restRows(e, "profiles", { id: "eq." + user.id }, "*"),
     restRows(e, "day_log", userFilter, "*"),
     restRows(e, "weight_log", userFilter, "*"),
@@ -98,6 +98,8 @@ async function exportUser(user, e) {
     // REQ-255: número y consentimiento de WhatsApp (sin códigos de vinculación).
     // Antes de aplicar supabase/whatsapp.sql la tabla no existe: se exporta vacía.
     restRows(e, "whatsapp_links", userFilter, "phone_e164,opted_in,consent_at,opted_out_at,paused_at,created_at,updated_at").catch(() => []),
+    // REQ-355: suscripción (marca y últimos 4 de la tarjeta, nunca el número).
+    restRows(e, "subscriptions", userFilter, "plan_id,status,con_prueba,card_brand,card_last4,trial_ends_at,current_period_end,next_billing_at,cancel_requested_at,canceled_at,created_at").catch(() => []),
   ]);
   return {
     format: "fitbros-personal-data-v1",
@@ -118,6 +120,7 @@ async function exportUser(user, e) {
     coach_usage: coachUsage,
     coach_options: coachOptions,
     whatsapp_reminders: whatsapp,
+    subscriptions,
     progress_photos: photos.map((photo) => ({
       path: photo.path || null,
       created_at: photo.created_at || null,
@@ -156,6 +159,17 @@ async function deleteUser(user, e) {
   if (profile && profile.is_admin && profile.active !== false && await activeAdminCount(e) <= 1) {
     const error = new Error("No se puede borrar al ultimo administrador activo.");
     error.status = 409;
+    throw error;
+  }
+  // REQ-355: primero se cancela la suscripción en Culqi; si no se puede, la cuenta
+  // no se borra (si no, Culqi seguiría cobrando a una cuenta que ya no existe).
+  try {
+    const { env: envSuscripcion, cancelarDeCuenta } = await import("./_tienda/suscripcion.js");
+    await cancelarDeCuenta(envSuscripcion(), user.id);
+  } catch (err) {
+    console.error("privacy: no se pudo cancelar la suscripción", user.id, String(err && err.message || err));
+    const error = new Error("No pudimos cancelar tu suscripción, así que no borramos la cuenta todavía. Intenta de nuevo en unos minutos o escríbenos.");
+    error.status = 502;
     throw error;
   }
   await deletePhotos(e, user.id);
