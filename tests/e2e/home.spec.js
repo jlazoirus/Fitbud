@@ -4,8 +4,7 @@
 import { test, expect } from "@playwright/test";
 import { installMocks, seedLoggedInUser, collectConsoleErrors, gotoApp, autoDismissNudges, screeningFixture, completePrefs, daysFromToday } from "./helpers.js";
 
-// La bienvenida de regreso no compite: pasa al saludo (REQ-393).
-const contextual = ".return-card:not(.home-welcome), .ci-banner, .coach-welcome, .home-technique, section.agenda-card.agenda-state:not(.home-primary)";
+const contextual = ".return-card, .ci-banner, .coach-welcome, .home-technique, section.agenda-card.agenda-state:not(.home-primary)";
 
 test.describe("Home — un mensaje a la vez (REQ-392)", () => {
   test("semana 2 sin entrenar: un solo mensaje, el check-in espera en Avisos y el coach va sin chips", async ({ page, context }) => {

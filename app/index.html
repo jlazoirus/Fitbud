@@ -874,8 +874,9 @@
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-next{margin-top:12px}
   /* REQ-364: resumen, acción principal y resto de la agenda. */
-  .home-head-actions{flex-shrink:0;gap:8px}
-  .home-streak{min-height:44px;white-space:nowrap}
+  .home-head h1{font-size:22px;line-height:1.2;text-wrap:balance}
+  .home-greeting-sub{margin:6px 0 0;color:var(--muted);font-size:.8125rem;line-height:1.45;max-width:46ch}
+  .home-streak{flex-shrink:0;min-height:44px;white-space:nowrap}
   .home-consumption{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:44px;margin:8px 0 0;padding:4px 0;background:none;color:var(--muted);font-size:.8125rem;text-align:left}
   .home-consumption b{color:var(--txt)}
   .home-consumption-link{display:flex;align-items:center;gap:2px;flex-shrink:0;color:var(--txt)}
@@ -918,9 +919,6 @@
   .home-notices-summary-copy b{font-size:.875rem;color:var(--txt)}
   .home-notices .plan-week-notice,.home-notices .agenda-card,.home-notices .ci-banner{margin:0!important;padding:12px 2px;border:0;border-top:1px solid var(--border);border-radius:0;background:none}
   .home-notices .agenda-title{margin:0 0 4px;font-size:1rem}
-  .home-welcome{margin:16px 0;border-bottom:1px solid var(--border)}
-  .home-welcome .agenda-title{font-size:.9375rem;margin-bottom:4px}
-  .home-welcome .return-body{font-size:.8125rem;color:var(--muted)}
   @media(max-width:340px){
     .home-consumption{flex-wrap:wrap;column-gap:12px;row-gap:2px}
   }
@@ -930,7 +928,7 @@
   .menu-suggestion-actions{display:flex;flex-wrap:wrap;gap:8px}
   .menu-suggestion .menu-suggestion-actions{column-gap:18px}
   .menu-suggestion-actions .btn{min-height:44px}
-  .menu-suggestion button:focus-visible,.home-consumption:focus-visible,.home-primary button:focus-visible,.home-agenda summary:focus-visible,.home-welcome button:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .menu-suggestion button:focus-visible,.home-consumption:focus-visible,.home-primary button:focus-visible,.home-agenda summary:focus-visible,.home-streak:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   .nutrition-register{margin:0 0 14px}
   .nutrition-register .btn{width:100%;min-height:48px}
   .nutrition-register p{margin:6px 0 0}
@@ -959,7 +957,6 @@
   .return-flame{flex:0 0 auto;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:var(--accent-dim);border:1px solid var(--border-acc)}
   .return-flame svg{width:24px;height:24px;fill:none;stroke:var(--accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   .return-body{font-size:14px;line-height:1.5;color:var(--txt);margin:0;max-width:62ch}
-  .return-goal{font-size:12.5px;line-height:1.4;color:var(--muted);margin:6px 0 0}
   .agenda-next-head{font-size:11px;color:var(--muted2);font-weight:700;text-transform:uppercase}
   @media(max-width:380px){
     .agenda-head{flex-direction:column}
@@ -5602,11 +5599,9 @@ function homeNoticesHtml(ds,today,extra=[]){
 // que pierden esperan en Avisos; técnica y bienvenida del coach son del día.
 function homeContextData(ds,agenda,menuSuggestion){
   const notices=[];
-  const back=returnCardData();
-  const welcomeBack=!!back&&back.kind==="welcome";
   const due=weeklyCheckinDue();
   const queue=[
-    {html:()=>welcomeBack?"":returnCardHtml()},
+    {html:()=>returnCardHtml()},
     {html:()=>restartNudgeCard(),label:"Retomar tu plan"},
     {html:()=>menuSuggestion?"":homeWorkoutTechniqueHtml(ds,agenda)},
     {html:()=>coachWelcomeHtml()},
@@ -5622,7 +5617,7 @@ function homeContextData(ds,agenda,menuSuggestion){
   }
   const referral=referralNoticeHtml();
   if(referral)notices.push({html:referral,label:"Invita a tus amigos"});
-  return {slot,notices,welcome:welcomeBack?returnCardHtml():""};
+  return {slot,notices};
 }
 function homeNoticesToggled(panel){
   if(!panel.isConnected||!panel.open||!panel.querySelector(".notify-card"))return;
@@ -5840,6 +5835,7 @@ function renderHoy(){
   const agenda=homeAgendaData(ds);
   const menuSuggestion=homeMenuSuggestionHtml(ds);
   const context=homeContextData(ds,agenda,menuSuggestion);
+  const greeting=homeGreetingData(name);
   const hasAI=aiAvailable();
   const canUse=hasAI&&isActive()&&hasRequiredConsents()&&hasCurrentScreening();
   const msgs=loadCoachChat();
@@ -5862,15 +5858,13 @@ function renderHoy(){
     :hasAI?`<h2 class="coach-home-title">Tu coach</h2><div class="ai-box" style="margin:0 0 12px">⚠️ ${!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`
     :"";
   $("#app").innerHTML=`
-  <header class="shead">
+  <header class="shead home-head">
     <div>
       <div class="shead-sub">${wdName}, ${dayMon}</div>
-      <h1>Hola, ${esc(name)}</h1>
+      <h1>${esc(greeting.title)}</h1>
+      ${greeting.sub?`<p class="home-greeting-sub">${esc(greeting.sub)}</p>`:""}
     </div>
-    <div class="row home-head-actions">
-      <button type="button" class="btn btn-sm home-streak" aria-label="Ver mi racha y amigos" onclick="openStreakFriends()">Racha ${stk}</button>
-      <button class="btn btn-sm" title="Ver guía rápida" aria-label="Ver guía rápida" onclick="startFitbrosTour(true)" style="min-width:44px;min-height:44px;padding:0;font-weight:700">?</button>
-    </div>
+    ${stk>0?`<button type="button" class="btn btn-sm home-streak" aria-label="Ver mi racha y amigos" onclick="openStreakFriends()">Racha ${stk}</button>`:""}
   </header>
   ${agenda.state==="done"?"":homeConsumptionHtml(agenda.totals)}
   ${homeAgendaHtml(ds,agenda,menuSuggestion)}
@@ -5878,7 +5872,6 @@ function renderHoy(){
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()&&!agenda.items.some(item=>item.kind==="safety")?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
   ${context.slot}
-  ${context.welcome}
   ${adminBetaPendingCardHtml()}
   ${homeNoticesHtml(ds,today,context.notices)}
   ${coachSection}`;
@@ -9738,6 +9731,7 @@ function renderProfile(){
   <div class="pf-accordion-panel"><div class="dash">
     <div class="muted small" style="margin-bottom:10px">¿Dudas o algo no funciona? Escríbenos por WhatsApp y te ayudamos.</div>
     ${waSupportButtonHtml()}
+    <button type="button" class="btn" style="width:100%;margin-top:8px" onclick="startFitbrosTour(true)">Ver guía rápida de Hoy</button>
   </div></div>
   </details>
 
@@ -16116,14 +16110,6 @@ function returnCardData(){
   const key="welcome:"+(last||START);
   return returnCardDismissed(key)?null:{kind:"welcome",key,never:!last};
 }
-function returnGoalLine(){
-  const p=(profile&&profile.prefs)||{};
-  const goal=GOAL_OPTIONS[p.goal];
-  const today=todayStr();
-  const w=weekOf(today,planPrefsForDate(today))||weekOf(today);
-  const week=w&&w.num?`semana ${w.num} de ${PLAN_DURATION_WEEKS}`:"";
-  return [goal?`Tu objetivo: ${goal.label}`:"",week].filter(Boolean).join(" · ");
-}
 function returnCardHtml(){
   const data=returnCardData();
   if(!data)return "";
@@ -16145,22 +16131,19 @@ function returnCardHtml(){
       </div>
     </section>`;
   }
-  let body;
-  if(data.never)body="Aún no registras tu primer día. Empieza con una comida: ahí arranca tu racha.";
-  else{
-    const s=cycleSummary(todayStr());
-    const workouts=s.workouts+s.partialWorkouts;
-    const parts=[`${s.activeDays} día${s.activeDays===1?"":"s"} registrado${s.activeDays===1?"":"s"}`];
-    if(workouts)parts.push(`${workouts} entreno${workouts===1?"":"s"}`);
-    body=`Tu racha se reinició, tu progreso no: en este plan llevas ${parts.join(" y ")}${s.bestStreak>=2?`, con una mejor racha de ${s.bestStreak} días`:""}.`;
-  }
-  const goal=returnGoalLine();
-  return `<section class="return-card home-welcome" aria-labelledby="returnCardTitle">
-    <h2 class="agenda-title" id="returnCardTitle">${data.never?"Tu plan te espera":"Qué bueno verte de vuelta"}</h2>
-    <p class="return-body">${esc(body)}</p>
-    ${goal?`<p class="return-goal">${esc(goal)}</p>`:""}
-    <button type="button" class="home-secondary-action" onclick="returnStartToday('${data.key}')">Empezar hoy</button>
-  </section>`;
+  return "";
+}
+// REQ-393: la bienvenida de regreso es el saludo de Hoy, no una tarjeta más.
+// Se va sola al registrar algo hoy (returnCardData deja de devolverla).
+function homeGreetingData(name){
+  const data=returnCardData();
+  if(!data||data.kind!=="welcome")return {title:`Hola, ${name}`,sub:""};
+  if(data.never)return {title:`Hola, ${name}`,sub:"Tu racha empieza con tu primera comida."};
+  const s=cycleSummary(todayStr());
+  const workouts=s.workouts+s.partialWorkouts;
+  const parts=[`${s.activeDays} día${s.activeDays===1?"":"s"} registrado${s.activeDays===1?"":"s"}`];
+  if(workouts)parts.push(`${workouts} entreno${workouts===1?"":"s"}`);
+  return {title:`Qué bueno verte, ${name}`,sub:`Tu progreso sigue: ${parts.join(" y ")}.`};
 }
 function dismissReturnCard(key,action){
   try{localStorage.setItem(RETURN_CARD_KEY+":"+uid(),key);}catch(e){/* sin almacenamiento: vuelve a mostrarse */}
@@ -18368,7 +18351,7 @@ async function renderAnalytics(){
    GUIDED TOUR CONTEXTUAL — prototipo (auditoría UX 23 jun 2026)
    Coachmarks ligeros, sin dependencias. Se dispara una sola vez tras el
    onboarding, es saltable, recuerda su estado en localStorage, respeta
-   prefers-reduced-motion y se puede repetir desde el botón "?" de Hoy.
+   prefers-reduced-motion y se puede repetir desde Perfil › Ayuda y soporte (REQ-393).
    =================================================================== */
 const FITBROS_TOUR_KEY="fitbros_tour_v1";
 let _tour=null;

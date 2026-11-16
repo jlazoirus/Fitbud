@@ -2481,3 +2481,20 @@ Un mensaje contextual como máximo; el resto espera en Avisos.
 Fuera de Avisos queda un solo mensaje; el check-in perdedor se abre en Avisos.
 ### Verificación sugerida
 `tests/e2e/home.spec.js`, `avisos.spec.js`, `coach-rutina.spec.js`, `home-optional-menu.spec.js`.
+
+## REQ-393 - Hoy: la bienvenida de regreso es el saludo
+
+**Estado: implementado.** Sigue a REQ-392.
+
+### Origen
+Crítica de Hoy, 2026-11-16.
+### Problema
+Tras una pausa, «Racha 0» y la tarjeta de regreso (unas 40 palabras) repetían el reinicio. «Empezar hoy» solo cerraba la tarjeta. El saludo de 26 px ocupaba 2 líneas por «Racha» y «?».
+### Objetivo
+Saludar y dar permiso para empezar, sin estadísticas ni ceros.
+### Alcance
+`homeGreetingData()`: «Qué bueno verte, {nombre}» y «Tu progreso sigue: N días registrados y M entrenos.»; sin registros, «Tu racha empieza con tu primera comida.». Se va al registrar hoy. Racha oculta en 0 (Progreso la explica). Guía rápida en Perfil › Ayuda y soporte. Título de 22 px. PWA v251.
+### Criterios de aceptación
+Sin tarjeta de bienvenida ni «Racha 0». Encabezado normal de 105 a 67 px a 390 px.
+### Verificación sugerida
+`tests/e2e/regreso.spec.js`, `racha.spec.js`, `coach-welcome.spec.js`.
