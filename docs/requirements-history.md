@@ -14138,3 +14138,123 @@ Que no se junte el mismo día con REQ-341 ni REQ-366; REQ-31.
 Una sola pregunta tras la primera comida registrada; «Ahora no» la pospone 3 días; las metas pasadas no cambian.
 #### Verificación sugerida
 e2e con reloj controlado y release gate.
+
+## Compactación 2026-11-16: REQ-328..330 (siguiente ejercicio, gramos y registro extra)
+
+Detalle movido desde `REQUIREMENTS.md` para dejar espacio a REQ-396..402 (auditoría heurística de UX).
+
+### REQ-328 - Entreno: ver el siguiente ejercicio sin salir del actual
+
+**Estado: implementado.** Vista «A continuación» de solo lectura, con el siguiente pendiente real, nombre vigente, dosis y descanso o duración/opcionalidad. Una línea, sin desbordes a 320/360/390/1280 px; las series permanecen en la primera pantalla. Sin cambios de ejecución ni registros. ✓ `tests/e2e/next-exercise.spec.js`.
+
+#### Origen
+Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): durante la sesión quieren saber qué viene después sin tocar nada.
+
+#### Problema
+En la pantalla del ejercicio de fuerza en curso no hay forma de ver cuál es el siguiente sin completar u omitir el actual, o sin abrir «Hacer otro ejercicio primero».
+
+#### Causa raíz
+`renderCurrentWorkoutStep()` (`index.html:6717`) solo pinta el paso actual: título, «Cómo se hace», `.player-dose` (`index.html:6742`), series y controles. No consulta el paso siguiente. El orden real no es «paso actual + 1»: `nextWorkoutStepIndex()` (`index.html:5905`) devuelve el primer paso `pending` distinto del actual, así que cuentan los ejercicios aplazados, los elegidos con `openWorkoutStepPicker()` (`index.html:6231`), los opcionales y los bloques por tiempo (vuelta a la calma).
+
+#### Objetivo
+Una tarjeta compacta «A continuación» bajo el título del ejercicio actual, antes de `.player-dose`, con el nombre del siguiente ejercicio, series × repeticiones y descanso, visible en el primer viewport a 360-390 px.
+
+#### Alcance
+- Calcular el siguiente con la misma regla que usa `completeWorkoutStep()` (`nextWorkoutStepIndex(execution, execution.currentStep)`), sin duplicar lógica.
+- Fuerza: nombre (con la variación o sustitución vigente), `prescribedSets × reps` y descanso (`restLabel`/`restSeconds`). Bloque por tiempo: su etiqueta y duración u objetivo, sin series. Paso opcional no aceptado: su nombre marcado como opcional.
+- Sin siguiente pendiente: la tarjeta no se muestra.
+- Una sola línea en móvil (texto truncado si hace falta) para no empujar las series; solo lectura, sin botones.
+- Reutilizar clases y tokens existentes; sin fuentes ni colores nuevos. Subir `CACHE_NAME` del service worker.
+
+#### Fuera de alcance
+Mostrar máquina o zona, mostrar dos ejercicios por delante, saltar al siguiente desde la tarjeta, cambiar series, cargas, descanso, botones o «Cómo se hace».
+
+#### Riesgos
+Mostrar un siguiente distinto del que realmente abre «Siguiente ejercicio» (aplazados, picker, opcionales); desbordes a 320-360 px; bajar las series fuera del primer viewport.
+
+#### Criterios de aceptación
+- A 360 y 390 px, la tarjeta se ve sin scroll ni interacción en la pantalla del ejercicio en curso.
+- El ejercicio mostrado es exactamente el que aparece al tocar «Siguiente ejercicio», también tras aplazar uno o usar «Hacer otro ejercicio primero».
+- Avanza al pasar de ejercicio y desaparece cuando no queda nada pendiente.
+- Registrar series, el descanso, sustituir, omitir y completar la sesión siguen igual.
+
+#### Verificación sugerida
+Playwright a 360/390/1280: sesión con ≥3 ejercicios, comprobar la tarjeta en cada paso, aplazar uno y comparar con el destino real de «Siguiente ejercicio», último ejercicio sin tarjeta. Regresiones del reproductor, detector Impeccable y release gate.
+
+### REQ-329 - Nutrición: registrar alimentos por gramos sin sentir que armas una comida
+
+**Estado: implementado.** Hoy abre Alimento; totales derivados visibles y entrada manual plegable, con reapertura automática para registros antiguos/corregidos y errores. Conserva gramos, porciones, favoritas y guardado. Detalle: `docs/food-registration.md`. ✓ `tests/e2e/registro-gramos.spec.js` y regresiones del editor.
+
+#### Origen
+Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): registrar comida se siente complejo, como armar una «comida»; piden buscar un alimento, poner los gramos y que la app calcule.
+
+#### Problema
+La capacidad ya existe (REQ-188, REQ-271), pero queda escondida. El editor abre por defecto en «Recientes» o «Favoritas», y muestra a la vez el día y el destino del registro, la descripción, cuatro campos de macros a mano, «Solo conozco las calorías», los botones de estimación y «Guardar en favoritas». El camino alimento + gramos no es el protagonista.
+
+#### Causa raíz
+`quickPicksHtml()` (`index.html:11376`) elige la pestaña inicial con `hasRecent?"recent":hasFav?"fav":"food"` (`index.html:11378`). `editorSheet()` (`index.html:11568`) pinta siempre visibles los campos `f_kcal/f_p/f_c/f_f` y el resto de controles, aunque al sumar alimentos (`addFoodToEditor()`, `index.html:10929`) los totales ya se derivan de las líneas y la descripción se completa sola (`autoName`).
+
+Ya resuelto en el código actual, que no hay que rehacer: búsqueda en el catálogo con gramos, varias líneas con total, macros desde la base de alimentos, persistencia con `commitDay()`, validación de gramos (más de 0 y hasta 2000), protección contra doble toque (`e.saving` en `saveEditor()`, `index.html:11612`) y «Guardar en favoritas» desmarcado por defecto.
+
+#### Objetivo
+Que registrar por gramos sea el camino evidente del editor existente: buscar alimento → gramos → total en vivo → Guardar, sin nombrar nada ni tocar macros a mano.
+
+#### Alcance
+- El editor admite abrir directamente en la pestaña «Alimento» (opción de `openEditor()`), usada por los accesos de registro (Hoy y REQ-330).
+- Con líneas añadidas, mostrar un total destacado (kcal, proteína, carbohidratos, grasa) que se actualiza al añadir, cambiar o quitar líneas.
+- Agrupar en un plegable cerrado por defecto el ingreso a mano: los cuatro campos de macros, «Solo conozco las calorías» y la estimación. Se abre solo, o ya está abierto, al editar un registro que tiene macros manuales.
+- La descripción sigue rellenándose sola con los alimentos y no se exige escribirla.
+- Mantener «Guardar en favoritas» como opción desmarcada; sin nuevos conceptos de «comida».
+- Reutilizar clases y componentes existentes. Subir `CACHE_NAME`.
+
+#### Fuera de alcance
+Un flujo o pantalla nuevos paralelos al editor, ingreso por texto libre, cambios de catálogo o de base nutricional, quitar el ingreso manual o la estimación, cambios de backend o migraciones.
+
+#### Riesgos
+Romper la edición de registros antiguos con macros manuales o con porciones (REQ-243, REQ-270); perder la corrección manual de totales derivados; que el plegable esconda errores de validación; textos que choquen con REQ-31/REQ-194.
+
+#### Criterios de aceptación
+- Desde un acceso de registro se anota «150 g de pollo» + «80 g de avena» sin escribir nombre ni macros, y el total coincide con la base de alimentos (mismos valores que `componentsTotals()`).
+- Tras recargar, el registro sigue ahí y los totales del día son correctos.
+- Gramos vacíos, cero, negativos, no numéricos o mayores de 2000 no se guardan; un doble toque en Guardar no duplica.
+- Abrir «Recientes», «Favoritas», el ingreso a mano y la estimación sigue funcionando; editar un registro manual antiguo muestra sus valores.
+- Móvil 320/390 y escritorio sin desbordes.
+
+#### Verificación sugerida
+Playwright a 360/390/1280: registro por gramos con dos alimentos, recarga, doble toque, gramos inválidos, edición de un registro manual y de uno con porción. Regresiones de REQ-188/243/269/270/271, detector Impeccable y release gate.
+
+### REQ-330 - Nutrición: acceso evidente para registrar algo fuera del plan
+
+**Estado: implementado.** Acceso principal visible antes de la lista, con y sin menú; abre Alimento como extra y persiste sin cambiar comidas. Secundario conservado. ✓ `tests/e2e/registro-extra-visible.spec.js`.
+
+#### Origen
+Feedback de beta testers recogido por Jonathan (2026-11-02, documento «Implementar 3 cambios de UX en Evolv»): «le puedo dar click a registrar, pero no logro encontrar el camino» para anotar algo fuera del plan (ej. «cené 10 makis»).
+
+#### Problema
+En Nutrición, el registro libre solo está al final de la lista de comidas («＋ Agregar comida / snack»), con estilo secundario. Con varias comidas en la lista queda bajo el pliegue.
+
+#### Causa raíz
+`renderNutrition()` (`index.html:5285`) añade el botón después de `itemsHtml` dentro de la sección «Comidas del día» (`index.html:5324`). Caminos que ya existen: «Registrar comida» en Hoy (REQ-316, `homeLogFood()` → `openFoodRegistration()`, `index.html:4833`, que propone reemplazar la próxima comida sin registrar), «Registra lo que comiste» en cada comida vacía (REQ-316), el editor de cada comida del plan y «＋ Agregar comida / snack». Falta descubribilidad, no capacidad.
+
+#### Objetivo
+Un botón principal sobre la lista de comidas del día que lleve al flujo existente para registrar algo fuera del plan.
+
+#### Alcance
+- Botón principal «Registrar algo que comí» antes de la lista de comidas, con texto de apoyo breve. Si el día no tiene menú preparado, evitar «tu plan»; algo como «Aunque no esté en tu menú de hoy» solo cuando hay menú.
+- Abre `openEditor("extra", ds, null, {registration:true, intent:"extra", …})` en la pestaña «Alimento» de REQ-329. Nada de lógica nueva de guardado.
+- «＋ Agregar comida / snack» se conserva como acceso secundario, sin renombrarlo.
+- Subir `CACHE_NAME`.
+
+#### Fuera de alcance
+Cambiar Hoy (ya resuelto en REQ-316), eliminar o renombrar el botón actual, cambiar la sugerencia de menú opcional, registro por texto libre.
+
+#### Riesgos
+Dos botones de registro compitiendo, jerarquía confusa con la tarjeta «Menú opcional», textos vetados por REQ-194 (ver la nota de verificación de REQ-316) o que mencionen tecnología (REQ-31).
+
+#### Criterios de aceptación
+- En Nutrición del día, el acceso se ve sobre la lista de comidas sin scroll a 360-390 px, con y sin menú preparado.
+- Lo registrado desde ahí cuenta en los macros del día como extra y persiste tras recargar.
+- «＋ Agregar comida / snack» sigue funcionando igual.
+
+#### Verificación sugerida
+Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gramos desde él, recarga y totales; regresión del botón secundario y de los registros de Hoy. Detector Impeccable y release gate.
