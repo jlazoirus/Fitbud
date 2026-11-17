@@ -15,7 +15,7 @@ test("el día guarda restDay: falso con sesión prescrita, verdadero al converti
   const before = await page.evaluate(() => { const ds = todayStr(); commitDay(ds); return S.days[ds].restDay; });
   expect(before).toBe(false);
 
-  await page.getByRole("button", { name: "Me perdí la sesión" }).click();
+  await page.getByRole("button", { name: "Me perdí el entreno" }).click();
   await page.locator("#overlay").getByRole("button", { name: /Convertir en descanso/ }).click();
   await expect(page.locator("#app")).toContainText("Descanso");
   const after = await page.evaluate(() => { const st = S.days[todayStr()]; return { restDay: st.restDay, override: st.workoutOverride }; });

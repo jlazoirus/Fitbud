@@ -14331,6 +14331,31 @@ Cancelar la confirmación deja el check-in pendiente. Placeholder ≥ 4.5:1.
 #### Verificación sugerida
 `tests/e2e/home.spec.js` y detector Impeccable.
 
+### REQ-396 - Entreno: «Iniciar entreno» como acción principal, sin «sesión»
+
+**Estado: implementado.** Auditoría heurística, severidad 3 (`docs/ux/2026-11-16-auditoria-heuristica.md`).
+
+Implementación: los textos de Entreno, del reproductor, del cierre, de las contingencias, de los avisos y del coach dicen «entreno» (Hoy también: «Iniciar entreno», «Entreno en curso», «Continuar entreno»). El coach entiende «perdí el entreno» como `sesion_perdida`. `manualActivityBlock` usa `btn-accent` solo en descanso sin actividades. Fuera quedan los resúmenes del plan en onboarding/Perfil («sesiones de fuerza», «Minutos por sesión», REQ-400) y la racha de Progreso.
+
+#### Origen
+Auditoría heurística de UX pedida por Jonathan, 2026-11-16.
+#### Problema
+En Entreno el botón del día dice «Iniciar sesión guiada», como el login de la portada, mientras Hoy dice «Iniciar entreno». «＋ Registrar otra actividad», lima y de ancho completo, pesa más que el entreno del día.
+#### Causa raíz
+`app/index.html:8142` (etiqueta), `:5826`, `:7465`, `:7467`, `:8153` (otros textos con «sesión») y `:6370` (`btn-accent` en actividad manual).
+#### Objetivo
+Una sola palabra para entrenar y una sola acción principal por pantalla.
+#### Alcance
+«Iniciar entreno», «Pausar entreno», «Terminar antes», «Me perdí el entreno» y el texto del coach. «Registrar otra actividad» como botón secundario cuando hay entreno pendiente; sigue siendo principal en descanso. Actualizar `startGuidedSession()` de los tests y subir la PWA.
+#### Fuera de alcance
+Flujo del reproductor, Hoy (REQ-394) y textos de login.
+#### Riesgos
+Cinco specs E2E buscan «Iniciar sesión guiada»; buscar el texto en `tests/` y `CONTEXT.md`.
+#### Criterios de aceptación
+Ningún texto de entrenamiento visible contiene «sesión». Día con entreno pendiente: un solo botón lima en la pestaña Entreno.
+#### Verificación sugerida
+`tests/e2e/entreno.spec.js`, `next-exercise.spec.js`, captura a 390 px.
+
 ### REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
 **Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.
