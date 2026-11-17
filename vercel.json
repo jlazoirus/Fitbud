@@ -57,6 +57,10 @@
       "destination": "/libro-de-reclamaciones/index.html"
     },
     {
+      "source": "/cuenta",
+      "destination": "/cuenta/index.html"
+    },
+    {
       "source": "/unete",
       "destination": "/unete/index.html"
     },
@@ -71,6 +75,10 @@
     {
       "source": "/api/reclamaciones",
       "destination": "/api/checkout?op=reclamaciones"
+    },
+    {
+      "source": "/api/suscripcion/estado",
+      "destination": "/api/checkout?op=suscripcion-estado"
     },
     {
       "source": "/api/suscripcion/cancelar",

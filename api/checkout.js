@@ -16,6 +16,8 @@ const TIENDA_OPS = {
   suscripcion: () => import("./_tienda/suscripcion.js"),
   "culqi-webhook": () => import("./_tienda/suscripcion.js"),
   "suscripcion-cancelar": () => import("./_tienda/suscripcion.js"),
+  // REQ-357: estado de la suscripción para Perfil y /cuenta.
+  "suscripcion-estado": () => import("./_tienda/suscripcion.js"),
 };
 
 function tiendaOp(req) {

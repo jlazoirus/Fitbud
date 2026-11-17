@@ -53,6 +53,7 @@ function footerHtml() {
         <ul>
           <li><a href="/planes">Planes y precios</a></li>
           <li><a href="/contacto">Contacto</a></li>
+          <li><a href="/cuenta">Mi suscripción</a></li>
           <li><a href="${esc(COMERCIO.whatsappUrl)}" target="_blank" rel="noopener noreferrer">WhatsApp</a></li>
           ${redes}
         </ul>

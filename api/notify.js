@@ -29,7 +29,8 @@
 // en api/_whatsapp/core.js.
 
 import webpush from "web-push";
-import { planPorId } from "../tienda/planes.js";
+import { planPorId, SUSCRIPCION } from "../tienda/planes.js";
+import { mensajeSuscripcion, htmlCorreoSuscripcion } from "./_tienda/suscripcion-correos.js";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { whatsappEnv, sendWhatsapp, templateBody, pendingLabel, wantsWhatsapp, monthStartLima, failurePatch } from "./_whatsapp/core.js";
 import { Agent } from "node:https";
@@ -968,6 +969,7 @@ async function runJob(e, dryRun) {
     results.log.push({ action: "referral_campaign_error", error: err.message });
   }
   await runPlanExpiry(e, dryRun, results);
+  await runSubscriptionNotices(e, dryRun, results);
   return results;
 }
 
@@ -1254,6 +1256,11 @@ export async function runPlanExpiry(e, dryRun, results, now = new Date()) {
       + `&status=in.(active,courtesy)&expires_at=gt.${encodeURIComponent(ent.expires_at)}&select=id&limit=1`).catch(() => null);
     if (later === null) { counter.errors++; results.log.push({ user: ent.user_id, action: "plan_expiry_context_error" }); continue; }
     if (later.length) { counter.skipped++; results.log.push({ user: ent.user_id, type: "plan_expiry", step: notice.kind, action: "renewed" }); continue; }
+    // REQ-357: con una suscripción viva el plan se renueva solo; no hay nada que avisar.
+    // Sin supabase/suscripciones.sql la consulta falla y se avisa como siempre.
+    const live = await supaGet(e, `/rest/v1/subscriptions?user_id=eq.${encodeURIComponent(ent.user_id)}`
+      + `&status=in.(${SUB_LIVE_STATES.join(",")})&select=id&limit=1`).catch(() => []);
+    if (live.length) { counter.skipped++; results.log.push({ user: ent.user_id, type: "plan_expiry", step: notice.kind, action: "subscription" }); continue; }
     const prof = await supaGet(e, `/rest/v1/profiles?id=eq.${encodeURIComponent(ent.user_id)}&select=email,active`).catch(() => null);
     const person = prof && prof[0];
     if (!person || !person.email || person.active === false) { counter.skipped++; continue; }
@@ -1266,6 +1273,52 @@ export async function runPlanExpiry(e, dryRun, results, now = new Date()) {
     // Sin el SQL de plan_expiry el registro falla igual para todos: se corta aquí.
     if (status === "log_failed" || status === "log_unavailable") {
       results.log.push({ action: "plan_expiry_log_unavailable" });
+      return;
+    }
+  }
+}
+
+// ── REQ-357: aviso antes del primer cobro de la suscripción ───────────────────
+// Correo a quien está en la semana gratis cuando faltan 2 días (o menos) para el
+// primer cobro, en el horario de envío de Lima. Una sola vez por suscripción
+// (sub:<sxn>:aviso_cobro en notification_log). El resto de correos del ciclo
+// salen del webhook y de la cancelación (api/_tienda/suscripcion.js).
+const SUB_LIVE_STATES = ["pending", "trialing", "active", "past_due"];
+
+export function subscriptionNoticeDue(sub, now = new Date()) {
+  if (!sub || sub.status !== "trialing") return false;
+  const due = new Date(sub.next_billing_at || sub.trial_ends_at).getTime();
+  if (!Number.isFinite(due)) return false;
+  const hour = limaParts(now).hour;
+  if (hour < EXPIRY_SEND_HOURS[0] || hour > EXPIRY_SEND_HOURS[1]) return false;
+  const left = due - now.getTime();
+  return left > 0 && left <= SUSCRIPCION.diasAvisoCobro * 24 * HOUR_MS;
+}
+
+export async function runSubscriptionNotices(e, dryRun, results, now = new Date()) {
+  const counter = { sent: 0, skipped: 0, errors: 0 };
+  results.subscription = counter;
+  const to = new Date(now.getTime() + SUSCRIPCION.diasAvisoCobro * 24 * HOUR_MS).toISOString();
+  let subs;
+  try {
+    subs = await supaGet(e, "/rest/v1/subscriptions?status=eq.trialing"
+      + `&next_billing_at=gt.${encodeURIComponent(now.toISOString())}&next_billing_at=lte.${encodeURIComponent(to)}`
+      + "&select=id,user_id,email,status,culqi_subscription_id,card_brand,card_last4,trial_ends_at,next_billing_at&limit=500");
+  } catch (err) {
+    // Sin supabase/suscripciones.sql no hay suscripciones: nada que avisar.
+    results.log.push({ action: "subscription_list_unavailable", error: err.message });
+    return;
+  }
+  for (const sub of subs) {
+    if (!sub.user_id || !sub.email || !subscriptionNoticeDue(sub, now)) { counter.skipped++; continue; }
+    const msg = mensajeSuscripcion("aviso_cobro", { fila: sub });
+    const key = `sub:${sub.culqi_subscription_id}:aviso_cobro`;
+    const status = await deliver(e, dryRun, results, counter, {
+      userId: sub.user_id, type: "subscription", keys: [key], refDate: limaParts(now).ymd, step: "aviso_cobro",
+      send: async () => ({ emailId: await sendEmail(e, sub.email, msg.subject, htmlCorreoSuscripcion(e.appUrl, msg), key) }),
+    });
+    if (status === "log_failed" || status === "log_unavailable") {
+      results.log.push({ action: "subscription_log_unavailable" });
       return;
     }
   }

@@ -2090,7 +2090,7 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-357 - Gestionar la suscripción y sus correos
 
-**Estado: pendiente.** Implementar después de REQ-355. Plan §3.
+**Estado: implementado.** Perfil → Mi suscripción y `/cuenta` (web pública) muestran estado, próximo cobro y tarjeta, y cancelan con confirmación (`GET /api/suscripcion/estado`). Cinco correos del ciclo en `api/_tienda/suscripcion-correos.js`, una vez cada uno por su clave en `notification_log`; el aviso previo al primer cobro sale del cron de `/api/notify`, y REQ-351 omite a quien tiene una suscripción viva. Acción manual: aplicar `supabase/notifications_subscription.sql`. Plan §3, "Gestión y correos".
 
 ### Origen
 Decisión de Jonathan (2026-11-06): cancelar en un toque y avisar antes de cada cobro.

@@ -1216,6 +1216,9 @@
   .pf-accordion[open]>summary:after{content:'-';color:var(--txt)}
   .pf-accordion-panel{display:flex;flex-direction:column;gap:12px}
   .pf-accordion-panel>.dash{margin:0}
+  .sub-rows{display:grid;grid-template-columns:minmax(104px,auto) 1fr;gap:6px 12px;margin:4px 0 0;font-size:14px}
+  .sub-rows dt{color:var(--muted)}
+  .sub-rows dd{margin:0;overflow-wrap:anywhere}
   .pf-accordion .field{margin:8px 0}
   .pf-accordion .field input,.pf-accordion .field select,.pf-accordion .field textarea,.pf-accordion .availability-day select{font-size:16px}
   .pf-accordion .adv-settings>summary{min-height:44px;display:flex;align-items:center;margin:0}
@@ -2968,6 +2971,81 @@ async function loadBillingHistory(){
   }finally{
     billingHistoryLoading=false;
     renderBillingHistoryBox();
+  }
+}
+/* --- REQ-357: suscripción mensual (estado y cancelación en Perfil) --------- */
+// Por /api/checkout?op=… (la ruta que admite js/api-client.js); /cuenta usa /api/suscripcion/*.
+let recurringSub=null;          // lo que devuelve el estado de la suscripción (sin ids de Culqi) o null
+let recurringSubChecked=false;
+let recurringSubLoading=false;
+async function loadRecurringSubscription(){
+  const token=session&&session.access_token;if(!token)return;
+  recurringSubLoading=true;
+  try{
+    const r=await apiFetch("/api/checkout?op=suscripcion-estado",{headers:{Authorization:"Bearer "+token}});
+    if(r.ok){const data=await r.json().catch(()=>({}));recurringSub=(data&&data.suscripcion)||null;}
+    recurringSubChecked=true; // 404/503: sin suscripciones aún; Perfil sigue con el plan
+  }catch(_){recurringSubChecked=true;}
+  finally{recurringSubLoading=false;}
+  const box=$("#pfSubscriptionBox");
+  if(box)box.innerHTML=subscriptionStatusHtml();
+}
+function ensureRecurringSubscription(){
+  if(session&&!recurringSubChecked&&!recurringSubLoading)loadRecurringSubscription();
+}
+function resetRecurringSubscription(){recurringSub=null;recurringSubChecked=false;recurringSubLoading=false;}
+const RECURRING_SUB_STATES={pending:"Activándose",trialing:"Semana gratis",active:"Activa",past_due:"Cobro pendiente",canceled:"Cancelada",ended:"Terminada"};
+function recurringSubLive(s){return !!s&&["pending","trialing","active","past_due"].includes(s.estado);}
+function recurringSubDate(iso){
+  const d=new Date(iso);if(!iso||!Number.isFinite(d.getTime()))return "";
+  return d.toLocaleDateString("es-PE",{day:"numeric",month:"long",year:"numeric"});
+}
+function recurringSubscriptionHtml(){
+  const s=recurringSub;if(!s)return "";
+  const live=recurringSubLive(s);
+  const rows=[];
+  if(s.estado==="trialing"&&s.pruebaHasta)rows.push(["Gratis hasta",recurringSubDate(s.pruebaHasta)]);
+  if(live&&s.proximoCobro)rows.push([s.estado==="trialing"?"Primer cobro":"Próximo cobro",recurringSubDate(s.proximoCobro)+" · "+s.monto]);
+  if(live)rows.push(["Precio",s.monto+" al mes, hasta que canceles"]);
+  if(s.tarjeta&&s.tarjeta.ultimos4)rows.push(["Tarjeta",(s.tarjeta.marca||"Tarjeta")+" •••• "+s.tarjeta.ultimos4]);
+  if(!live&&s.canceladaEl)rows.push(["Cancelada el",recurringSubDate(s.canceladaEl)]);
+  if(s.accesoHasta)rows.push(["Acceso hasta",recurringSubDate(s.accesoHasta)]);
+  const note=s.estado==="past_due"?"Tu último cobro no pasó. Se volverá a intentar; si no pasa, la suscripción se cancela sola y no se cobra nada más."
+    :s.estado==="trialing"?"Si cancelas antes del primer cobro, no se cobra nada."
+    :s.estado==="pending"?"Estamos confirmando tu suscripción. Puede tardar unos minutos."
+    :live?"Puedes cancelar cuando quieras, sin costo."
+    :"No se hará ningún cobro más.";
+  const badge=live?(s.estado==="past_due"?"b-Libre":"b-PESAS"):"b-Libre";
+  return`<div class="row between" style="margin-bottom:8px">
+      <span><b>Suscripción mensual</b></span><span class="badge ${badge}">${esc(RECURRING_SUB_STATES[s.estado]||"Activa")}</span>
+    </div>
+    <dl class="sub-rows">${rows.map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    <div class="muted small" style="margin-top:8px">${esc(note)}</div>
+    ${live?`<button class="btn" style="width:100%;margin-top:12px;min-height:44px" onclick="openCancelSubscription()">Cancelar suscripción</button>`:""}`;
+}
+function openCancelSubscription(){
+  const s=recurringSub;if(!recurringSubLive(s))return;
+  const until=s.accesoHasta?recurringSubDate(s.accesoHasta):"";
+  const line=(s.estado==="trialing"?"No se hará ningún cobro":"No se harán más cobros")+(until?` y conservas el acceso hasta el ${until}`:"")+".";
+  modal(`<h3>¿Cancelar tu suscripción?</h3>
+    <p class="muted" style="margin:0 0 16px">${esc(line)}</p>
+    <button class="btn btn-accent" style="width:100%;margin-bottom:8px;min-height:44px" onclick="confirmCancelSubscription(this)">Sí, cancelar</button>
+    <button class="btn" style="width:100%;min-height:44px" onclick="closeModal()">No, seguir suscrito</button>`);
+}
+async function confirmCancelSubscription(btn){
+  const token=session&&session.access_token;if(!token)return;
+  if(btn){btn.disabled=true;btn.textContent="Cancelando…";}
+  try{
+    const r=await apiFetch("/api/checkout?op=suscripcion-cancelar",{method:"POST",headers:{Authorization:"Bearer "+token}});
+    const out=await r.json().catch(()=>({}));
+    if(!r.ok||!out.ok)throw new Error(out.error||"No pudimos cancelar ahora. Intenta de nuevo o escríbenos y lo hacemos por ti.");
+    recurringSub={...recurringSub,estado:"canceled",proximoCobro:null,canceladaEl:new Date().toISOString(),accesoHasta:out.accesoHasta||recurringSub.accesoHasta};
+    closeModal();
+    const box=$("#pfSubscriptionBox");if(box)box.innerHTML=subscriptionStatusHtml();
+    toast(out.accesoHasta?`Suscripción cancelada. Conservas el acceso hasta el ${recurringSubDate(out.accesoHasta)}.`:"Suscripción cancelada. No se hará ningún cobro más.");
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent="Sí, cancelar";}
+    toast(String((e&&e.message)||e));
   }
 }
 function hasEntitlement(){
@@ -9694,7 +9772,7 @@ function renderProfile(){
 
   <details id="pfSecSuscripcion" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
   <summary onclick="return profileAccordionGuard(event,this)">Mi suscripción</summary>
-  <div class="pf-accordion-panel"><div class="dash">${subscriptionStatusHtml()}</div></div>
+  <div class="pf-accordion-panel"><div class="dash" id="pfSubscriptionBox">${subscriptionStatusHtml()}</div></div>
   </details>
 
   <details id="pfSecRecordatorios" name="profile-sections" class="pf-accordion" ontoggle="profileAccordionToggle(this)">
@@ -9780,6 +9858,7 @@ function renderProfile(){
   </div>
   <div id="profileSaveFloat" class="pf-save-float" style="display:none"><button onclick="saveProfile()">Guardar cambios</button></div>`;
   ensureBillingHistory();
+  ensureRecurringSubscription();
   // Cargar preferencias de recordatorios y poblar el formulario + sección push
   if(supa&&uid()){
     loadNotifPrefs().then(()=>{populateNotifPrefsForm();renderPushSection();});
@@ -11034,6 +11113,8 @@ async function refreshBillingHistory(btn){
   if(btn){btn.disabled=false;btn.textContent="Actualizar";}
 }
 function subscriptionStatusHtml(){
+  // REQ-357: con suscripción mensual manda su estado; no hay "Renovar plan" (se renueva sola).
+  if(recurringSub)return recurringSubscriptionHtml()+billingHistorySectionHtml();
   if(entitlement){
     const expTs=new Date(entitlement.expires_at).getTime();
     const daysLeft=Math.max(0,Math.ceil((expTs-Date.now())/86400000));
@@ -15861,7 +15942,7 @@ function clearSignedOutState(prevUid){
   resetStreakSocial(); // REQ-300: ni invitaciones ni clasificación pasan a otra cuenta
   session=null;profile=null;profilePrefsCommitted=null;view="hoy";
   entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
-  billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
+  billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";resetRecurringSubscription();
   refreshPlanCalendar();
   endOnboardingHistory();
   onboardingActive=false;onboardingDraft=null;reviewPromptShown=false;passwordRecovery=false;passwordRecoveryError="";passwordRecoveryMode="recovery";
@@ -15933,7 +16014,7 @@ async function onAuth(){
     await loadProfile();
     await loadPrivacyState();
     entitlement=null;entitlementExpired=null;premiumTrial=null;entitlementChecked=false;
-    billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";
+    billingHistory=[];billingHistoryChecked=false;billingHistoryLoading=false;billingHistoryError="";resetRecurringSubscription();
     loadEntitlement().then(()=>{if(session){render();redeemPendingInvite();storeCheckoutResult();}}); // no-await: no debe bloquear el arranque (REQ-25)
     S.days={};S.weights={};restorePendingFromQueue();save();   // descarta caché de otra sesión; la DB manda salvo lo pendiente de subir (REQ-242)
     if(!isActive()){

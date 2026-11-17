@@ -99,7 +99,8 @@ REQ-385..390: onboarding esencial, calendario/indoor, navegación y preguntas (`
 - REQ-317: referidos; `supabase/referrals.sql`. Audiencia/campaña/operación: `docs/referrals.md`.
 
 
-- Landing publica, catalogo de planes, paywall, Stripe Checkout, webhooks, entitlements, cupones y billing history estan implementados. Cobro real depende de variables y configuracion externa.
+- Paywall, entitlements, cupones y billing history implementados; el cobro real depende de configuracion externa.
+- REQ-355..357: suscripción mensual; Perfil y `/cuenta` (`docs/web-publica-y-suscripcion.md` §3).
 - REQ-350: con Culqi, `showPaywall` vende `tienda/planes.js` → `/pago`; sin cobro, "Disponible pronto" (REQ-104).
 - **Cobro siempre en la web** (Culqi en `/planes` → `/pago`, REQ-331..334), tambien con app nativa: nada de compras dentro de la app. REQ-208: `noPricesMode()` (acceso beta/cupon/cortesia vigente o invitacion sin canjear) reemplaza el paywall por `showAccessNotice()` y Perfil no muestra precios; Admin "Crear cuenta"/"Invitar" con casilla beta da 90 dias de cortesia `quarterly`. REQ-381: USD tras `TIENDA_USD_ENABLED` (`docs/tienda-usd.md`).
 - `api/notify.js`: correo y push cada hora (`notify-hourly.yml`, REQ-266); `planReminder()` elige etapa por ausencia (REQ-285, `docs/reminders-journey.md`).

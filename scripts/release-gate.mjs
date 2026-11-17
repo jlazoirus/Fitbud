@@ -180,6 +180,7 @@ run("test-referrals.mjs (PostgreSQL y campaña)", "node scripts/test-referrals.m
 run("test-streak-friends.mjs (PostgreSQL/RLS)", "node scripts/test-streak-friends.mjs");
 run("test-tienda-culqi.mjs (tienda, Culqi y Libro de Reclamaciones)", "node scripts/test-tienda-culqi.mjs");
 run("test-suscripcion-culqi.mjs (suscripción mensual, REQ-355)", "node scripts/test-suscripcion-culqi.mjs");
+run("test-suscripcion-gestion.mjs (estado, cancelación y correos de la suscripción, REQ-357)", "node scripts/test-suscripcion-gestion.mjs");
 run("test-origen-campana.mjs (REQ-370: origen de campaña hasta la compra)", "node scripts/test-origen-campana.mjs");
 run("test-plan-expiry.mjs (avisos de vencimiento de planes pagados)", "node scripts/test-plan-expiry.mjs");
 

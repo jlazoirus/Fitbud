@@ -329,6 +329,10 @@ export async function installMocks(context, opts = {}) {
       ),
     }),
   );
+  // REQ-357: Perfil pide el estado de la suscripción mensual; por defecto, ninguna.
+  await context.route((url) => /\/api\/(suscripcion\/estado|checkout\?op=suscripcion-estado)$/.test(url.pathname + url.search), (route) =>
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ suscripcion: null }) }),
+  );
   await context.route("**/api/analytics", (route) => {
     if (route.request().method() === "POST")
       return route.fulfill({ status: 204, body: "" });
