@@ -21,8 +21,8 @@ for(const width of [320,360,390,1280])test(`REQ-328: siguiente real, una línea 
   if(next&&await page.getByRole('button',{name:'Siguiente ejercicio',exact:true}).count())await expect(page.locator('.player-title h3')).toHaveText(next.name);
   else if(next){await expect(page.locator('.optional-offer')).toContainText(next.name);await page.locator('.optional-offer').getByRole('button',{name:'Ahora no',exact:true}).click();}
  }
- expect(count).toBeGreaterThanOrEqual(3);await expect(page.locator('.player-next')).toHaveCount(0);await page.getByRole('button',{name:'Finalizar y guardar sesión',exact:true}).click();
- await page.locator('#finishPain').selectOption('none');await page.locator('#finishDifficulty').selectOption('expected');await page.getByRole('button',{name:'Guardar resultado',exact:true}).click();await expect(page.locator('#app')).toContainText('Sesión completada');expect(errors).toEqual([]);
+ expect(count).toBeGreaterThanOrEqual(3);await expect(page.locator('.player-next')).toHaveCount(0);await page.getByRole('button',{name:'Finalizar y guardar entreno',exact:true}).click();
+ await page.locator('#finishPain').selectOption('none');await page.locator('#finishDifficulty').selectOption('expected');await page.getByRole('button',{name:'Guardar resultado',exact:true}).click();await expect(page.locator('#app')).toContainText('Entreno completado');expect(errors).toEqual([]);
 });
 test('REQ-328: el picker aplaza el actual y la tarjeta coincide con el regreso real, conservando series y descanso',async({page,context})=>{
  const {errors}=await boot(page,context);const first=await page.locator('.player-title h3').innerText();
@@ -43,5 +43,5 @@ test('REQ-328: opcional por tiempo, sin siguiente pendiente y objetivo sin serie
  const label=await page.evaluate(()=>normalizedWorkoutExecution(current).steps.at(-1).label);await advance(page);await expect(page.locator('.optional-offer')).toContainText(label);await expect(page.locator('.player-next')).toHaveCount(0);await page.locator('.optional-offer').getByRole('button',{name:'Ahora no',exact:true}).click();await expect(page.locator('.player-next')).toHaveCount(0);
 });
 test('REQ-328: último ejercicio pendiente no muestra tarjeta; los omitidos no se anuncian',async({page,context})=>{
- await boot(page,context);await page.evaluate(()=>{const ex=normalizedWorkoutExecution(current);ex.steps.forEach((s,i)=>{if(i!==ex.currentStep)s.status=s.optional?'declined':'skipped';});persistWorkoutExecution(current,ex,true);});await expect(page.locator('.player-next')).toHaveCount(0);await advance(page);await expect(page.getByRole('button',{name:'Finalizar y guardar sesión',exact:true})).toBeVisible();
+ await boot(page,context);await page.evaluate(()=>{const ex=normalizedWorkoutExecution(current);ex.steps.forEach((s,i)=>{if(i!==ex.currentStep)s.status=s.optional?'declined':'skipped';});persistWorkoutExecution(current,ex,true);});await expect(page.locator('.player-next')).toHaveCount(0);await advance(page);await expect(page.getByRole('button',{name:'Finalizar y guardar entreno',exact:true})).toBeVisible();
 });

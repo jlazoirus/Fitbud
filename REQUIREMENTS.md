@@ -2275,26 +2275,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-396 - Entreno: «Iniciar entreno» como acción principal, sin «sesión»
 
-**Estado: pendiente.** Auditoría heurística, severidad 3. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
-
-### Origen
-Auditoría heurística de UX pedida por Jonathan, 2026-11-16.
-### Problema
-En Entreno el botón del día dice «Iniciar sesión guiada», como el login de la portada, mientras Hoy dice «Iniciar entreno». «＋ Registrar otra actividad», lima y de ancho completo, pesa más que el entreno del día.
-### Causa raíz
-`app/index.html:8142` (etiqueta), `:5826`, `:7465`, `:7467`, `:8153` (otros textos con «sesión») y `:6370` (`btn-accent` en actividad manual).
-### Objetivo
-Una sola palabra para entrenar y una sola acción principal por pantalla.
-### Alcance
-«Iniciar entreno», «Pausar entreno», «Terminar antes», «Me perdí el entreno» y el texto del coach. «Registrar otra actividad» como botón secundario cuando hay entreno pendiente; sigue siendo principal en descanso. Actualizar `startGuidedSession()` de los tests y subir la PWA.
-### Fuera de alcance
-Flujo del reproductor, Hoy (REQ-394) y textos de login.
-### Riesgos
-Cinco specs E2E buscan «Iniciar sesión guiada»; buscar el texto en `tests/` y `CONTEXT.md`.
-### Criterios de aceptación
-Ningún texto de entrenamiento visible contiene «sesión». Día con entreno pendiente: un solo botón lima en la pestaña Entreno.
-### Verificación sugerida
-`tests/e2e/entreno.spec.js`, `next-exercise.spec.js`, captura a 390 px.
+**Estado: implementado.** «Iniciar entreno», «Pausar/Reanudar entreno», «Terminar antes», «Me perdí el entreno» y el coach sin «sesión»; «Registrar otra actividad» es lima solo en descanso. PWA v258. ✓ `tests/e2e/entreno.spec.js` (REQ-396, 320/390 px). Detalle en `docs/requirements-history.md`.
 
 ## REQ-397 - Nutrición: comida vacía sin «Sin asignar» ni «Otra opción»
 
