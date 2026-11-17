@@ -52,7 +52,7 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 
 ## Secuencia activa
 
-**Series de Jonathan (16 nov 2026), cada una en orden:** nutrición REQ-404→407 (`docs/nutrition-first-days.md`) y entreno REQ-408→410 (`docs/training-stable-routine.md`). El paquete MyFitnessPal (REQ-268..276) ya está implementado. Revalidar contra código al tomar cada uno.
+**Series de Jonathan (16 nov 2026), cada una en orden:** nutrición REQ-404→407 (`docs/nutrition-first-days.md`) y entreno REQ-408→410 (`docs/training-stable-routine.md`); después, desde el historial, REQ-411→413 y REQ-414 (`docs/plan-from-history.md`). El paquete MyFitnessPal (REQ-268..276) ya está implementado. Revalidar contra código al tomar cada uno.
 
 Automatizable por el agente desarrollador:
 
@@ -867,11 +867,11 @@ Detalle archivado en [historial](docs/requirements-history.md#req-127).
 
 ## REQ-129 - `finalizeNutritionDay()` etapa 1: puerta pura dormida y normalización de propuestas
 
-**Estado: implementado.** `finalizeNutritionDay(ctx)` en `js/nutrition-domain.js`, dormida: normaliza propuestas contra catálogo, descarta ingredientes desconocidos, completa slots con fallback determinista, conserva `lockedMeals`, reporta `contract` sin activar `runtimeActive`. Validadores: `validate-diet-contract` (engine `finalizeNutritionDay`) y `validate-finalize-nutrition-day`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-129`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-130 - Coherencia de preferencias duras y patrón omnívoro activo
 
-**Estado: implementado.** `dislikedIngredients` como exclusión obligatoria en dominio/cliente/proxy; `highProtLine` con fuentes proteicas dinámicas filtradas; patrón omnívoro con warning/reintento suave (sin 422 duro) y relajación si se excluyen carnes/pescado; `COACH_PROMPT_VERSION`=7. Validadores: `validate-nutrition-domain`, `validate-first-day-preferences`, `validate-high-protein-prompt`, `test-coach-quota`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-130`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-131 - Momento del día, etapa 1: presupuestos por slot y filtro heurístico sin migración
 
@@ -891,9 +891,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-132`).
 
 ## REQ-134 - Pipeline de crecimiento del catálogo validado por el motor
 
-**Estado: implementado.** `scripts/grow-catalog.mjs` es un pipeline offline (`--fixture` sin red; `--brief` usa `ANTHROPIC_API_KEY` local/CI) que normaliza candidatos contra `supabase/seed.sql`, exige slugs/fuente/metadata/límites, rechaza macros inconsistentes y prueba `solveDishPortion` por slot; emite patch SQL + reporte. Validador `scripts/validate-grow-catalog.mjs` en `release-gate`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-134`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-135 - Catálogo lote 1: slots vacíos, desayunos y snacks
 
@@ -935,7 +933,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-138`).
 
 ## REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`
 
-**Estado: implementado.** `applyChangeMeal()` arma un `ctx` para `finalizeDayWithGate()`/`finalizeNutritionDay()` (`lockedMeals` = comidas del día salvo las futuras candidatas + la recién elegida) en vez de `rebalanceFutureMeals()` (que queda como fallback compatible); escribe los ajustes como `ovr`. Validador: `scripts/validate-nutrition-replacements.mjs`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-142`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-143 - Catálogo lote 3: crecimiento drástico dirigido por el canario del contrato
 
@@ -1311,15 +1309,11 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-208`).
 
 ## REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding
 
-**Estado: implementado.** El peso y la grasa del alta quedan como semana 1 (y se rellenan una vez en cuentas existentes); Progreso muestra "Tu punto de partida" en vez de pedirlos otra vez.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-210`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-211 - Onboarding: el objetivo y el "ritmo del plan" se entienden a la primera
 
-**Estado: implementado.** Objetivo como "Bajar grasa / Recomponer mi cuerpo / Ganar músculo" con una línea de ayuda; "Intensidad del entreno" (Recomendada para ti / Suave / Completa) con ayuda viva y "¿Qué cambia?".
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-211`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-212 - Entreno: calentamiento y vuelta a la calma con movimientos concretos y cronómetro opcional
 
@@ -1329,9 +1323,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-212`).
 
 ## REQ-213 - Actualizaciones de la app sin botón "Actualizar app" que estorbe
 
-**Estado: implementado.** Sin botón flotante "Actualizar app": la versión nueva se aplica sola al volver de segundo plano si no hay nada a medias; tras 24 h sin momento seguro se ofrece en Perfil → Cuenta.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-213`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento
 
@@ -1419,9 +1411,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-228`).
 
 ## REQ-229 - Fix: "Estimar con foto" estima el plato planeado en vez del que se ve
 
-**Estado: implementado.** "Estimar con foto" identifica el plato por la foto: el nombre precargado del plan no se envía como descripción, y la descripción entra en la clave de reutilización.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-229`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-230 - Estimar macros: se ve qué valores se aplicaron
 
@@ -1483,9 +1473,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-239`).
 
 ## REQ-240 - Entreno: la demostración y los pasos se abren desde junto al nombre del ejercicio
 
-**Estado: implementado.** Junto al nombre del ejercicio, "▶ Cómo se hace" abre `openExerciseGuide()` (demostración, pasos, respiración, errores y señales para detenerse) en vez de la tarjeta incrustada del reproductor. Prueba: `tests/e2e/entreno.spec.js`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-240`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-241 - Entreno: "Usar progresión" cambia de verdad el ejercicio (o dice que solo toca subir la carga)
 
@@ -1495,9 +1483,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-241`).
 
 ## REQ-242 - Fix: lo registrado ayer desaparece al abrir la app hoy si su subida había fallado
 
-**Estado: implementado.** Tras vaciar la caché en `onAuth()`, `restorePendingFromQueue()` repone desde la cola los días y pesos que aún no subieron, y `drainSyncQueue()` reintenta también los `failed`. Prueba: `tests/e2e/dia-sin-subir.spec.js`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-242`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-243 - Fix: registrar una reciente con porción ×2 deja sus macros duplicados en Recientes
 
@@ -1511,9 +1497,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-243`).
 
 ## REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir
 
-**Estado: implementado.** "← Ejercicio anterior" abre una revisión de solo lectura de los bloques ya registrados (`workoutExecution.reviewStep`), con "Hacerlo ahora" para retomar uno omitido; Siguiente y Omitir no cambian. Prueba: `tests/e2e/entreno.spec.js`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-245`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-246 - Fix: "Estimar macros" (texto) falla en producción cuando el coach trae más de 3 preguntas
 
@@ -1523,9 +1507,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-246`).
 
 ## REQ-247 - Entreno: "Sustituir" solo propone ejercicios del mismo músculo principal
 
-**Estado: implementado.** "Sustituir" solo propone ejercicios con el mismo músculo principal (`FITBUD_EXERCISE_SUBSTITUTION`, `exercise-catalog.js`): sustitutos directos primero y luego el resto del catálogo; el modal dice qué músculo conserva. Prueba: `scripts/validate-exercises.mjs`, `tests/e2e/entreno.spec.js`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-247`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-248 - Beta: los postulantes aceptados usan el coach sin tope durante sus 90 días
 
@@ -1584,8 +1566,6 @@ Meta simulado y release gate.
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-`applyDayComidas` solo preservaba `ms.done`; editar o cambiar una comida sin marcarla hecha se perdía al re-preparar. Nueva marca `ovr.userSet` (en `saveEditor`, `applyChangeMeal`, `applyReplace` y la acción del coach `cambiar_plato`) que `applyDayComidas` también preserva. ✓ `tests/e2e/nutricion.spec.js`.
-
 ## REQ-257 - Fix: el plan de entrenamiento del coach nunca se usa porque la semana llega cortada
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
@@ -1608,8 +1588,6 @@ Los 12 ejercicios de resistencia muestran una foto por disciplina (`assets/exerc
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Feedback Sathya (beta). "Hacer otro ejercicio primero" elige un ejercicio pendiente posterior; el actual queda pendiente con sus series y se vuelve a él al terminar (`nextWorkoutStepIndex` = primer pendiente). ✓ `tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`.
-
 ## REQ-261 - Entreno: sustituir un ejercicio por uno buscado en el catálogo
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
@@ -1619,8 +1597,6 @@ Feedback Sathya. "Sustituir" tiene buscador (nombre, alias o músculo; `FITBUD_E
 ## REQ-262 - Entreno: añadir un ejercicio a la sesión desde un buscador
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
-
-Feedback Sathya. "+ Añadir ejercicio" busca en el catálogo y lo suma antes de la vuelta a la calma con la dosis de la fase (`addedStrengthStep`); sin series hechas se quita. ✓ `tests/e2e/entreno.spec.js`, `scripts/validate-workout-player.mjs`.
 
 ## REQ-263 - Fix Progreso: la "Adherencia a comidas" del ciclo activo se diluye con los días futuros
 
@@ -1726,8 +1702,6 @@ Detalle archivado en [historial](docs/requirements-history.md#req-280).
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Sin el día en `day_log`, o sin nada registrado, `checkPending()` cuenta comidas pendientes y el correo dice "Tu plan de hoy te espera"; el entreno no se avisa sin el día. ✓ `scripts/validate-notify-schedule.mjs`.
-
 ## REQ-283 - Racha: animación al registrar algo que la hace avanzar
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`; diseño en `docs/reminders-journey.md`.
@@ -1742,9 +1716,7 @@ Jonathan (2026-10-26). `returnCardHtml()`: rescate de ayer con racha previa de 2
 
 ## REQ-285 - Recordatorios según cuánto tiempo lleva fuera (día, rescate, última llamada, regreso)
 
-**Estado: implementado.** Migración `supabase/notifications_journey.sql` aplicada el 2026-10-26.
-
-Jonathan (2026-10-26). `planReminder()` en `api/notify.js` elige una etapa por usuario y día: día en juego, rescate de ayer, última llamada (push) o regreso a los 2/5/7/14/30 días; después, silencio. Diseño: `docs/reminders-journey.md`; detalle en `docs/requirements-history.md`. ✓ `scripts/validate-reminder-journey.mjs`, `tests/e2e/recordatorios.spec.js`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-286 - Modo conversación: el hilo del día no se aísla entre cuentas en el mismo dispositivo
 
@@ -1756,8 +1728,6 @@ Jonathan (2026-10-26). `planReminder()` en `api/notify.js` elige una etapa por u
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
-Jonathan (2026-10-27). Sin aviso fijo ni tarjeta del plan: `.wk-planline` ("Semana N de M") abre `openTrainingPlanSheet()` (personalizar, cambiar días/deporte/lugar, señales). Señales bajo "Iniciar sesión guiada" y en la cuenta atrás. ✓ `tests/e2e/entreno.spec.js`.
-
 ## REQ-288 - Push: par VAPID nuevo (la privada de REQ-267 no estaba en ningún lado)
 
 **Estado: implementado.** Variables cargadas en Vercel; el 2026-10-27 el job respondió `push.ready:true`.
@@ -1767,8 +1737,6 @@ El job respondía `push.ready:false` ("falta VAPID_PRIVATE_KEY"). Clave pública
 ## REQ-289 - Onboarding: instalar la app y activar avisos; Hoy lo recuerda cada día
 
 **Estado: implementado.** Detalle en `docs/requirements-history.md`.
-
-Jonathan (2026-10-27). Con la primera semana lista, `renderNotifySetup()` pide instalar Evolv (móvil) y activar avisos (o correo si no hay push). Hoy muestra `notifyNudgeHtml()` hasta activarlos; "Ahora no" lo oculta hasta mañana. ✓ `tests/e2e/avisos.spec.js`.
 
 ## REQ-290 - Precios de lanzamiento: USD 7.99/mes y USD 39.90 por 6 meses
 
@@ -1913,9 +1881,7 @@ Registro y entreno sin menú. Sugerencia descartable.
 
 ## REQ-317 - Beneficio por actividad: invitar hasta a tres amigos
 
-**Estado: implementado y activado en producción (02/11/2026).** Detalle en `docs/requirements-history.md`; operación en `docs/referrals.md`.
-
-Hasta 3 invitaciones para cuentas con 2+ sesiones distintas en los 7 días previos al 09/11/2026 09:00 Lima; 3 meses para cada parte. `supabase/referrals.sql` aplicada en producción. ✓ `scripts/test-referrals.mjs`, `tests/e2e/referrals.spec.js`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-318 - Rachas con amigos: explicar cómo se suma a un amigo
 
@@ -1975,7 +1941,7 @@ Pie: "No recibir más estos correos". ✓ `scripts/test-referrals.mjs`.
 
 ## REQ-328 - Entreno: ver el siguiente ejercicio sin salir del actual
 
-**Estado: implementado.** Vista «A continuación» de solo lectura, con el siguiente pendiente real, nombre vigente, dosis y descanso o duración/opcionalidad. Una línea, sin desbordes a 320/360/390/1280 px; las series permanecen en la primera pantalla. Sin cambios de ejecución ni registros. ✓ `tests/e2e/next-exercise.spec.js`. Detalle en `docs/requirements-history.md`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-329 - Nutrición: registrar alimentos por gramos sin sentir que armas una comida
 
@@ -2108,9 +2074,7 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-354 - Legales de la suscripción con semana gratis
 
-**Estado: implementado.** Textos aprobados por Jonathan en el chat (2026-11-14). `/terminos` 4.1, `/devoluciones` 2.1 y una nota en `/planes`, visibles solo con `TIENDA_SUSCRIPCION_ENABLED`; apagada, nada cambia. Encenderla cuando REQ-355..357 estén en producción (plan §3, "Legales").
-
-✓ `tests/e2e/legales-suscripcion.spec.js`, `scripts/test-tienda-culqi.mjs`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-355 - Motor de suscripción mensual con Culqi
 
@@ -2205,9 +2169,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-370 - Web pública: conservar el origen de campaña hasta la compra
 
-**Estado: implementado.** `web/origen.js` guarda `source`/`utm_*` (primer contacto, 30 días) y `/pago` lo envía; queda como `campana` en `billing_events` y en la metadata de Culqi. PWA v234. `/privacidad` lo menciona en "Datos de compra" (aprobado el 11 nov 2026). Detalle en `docs/requirements-history.md`.
-
-✓ `scripts/test-origen-campana.mjs`, `tests/e2e/campana-origen.spec.js`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-371 - Web pública: inscripción corta al club en /unete
 
@@ -2253,9 +2215,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-381 - Tienda: cobro en dólares para Chile y Colombia
 
-**Estado: implementado y activo** (13 nov 2026: Culqi habilitó USD y acepta tarjetas extranjeras con 3DS; el contador confirmó que no hay IGV para compradores del extranjero; Jonathan aprobó los textos de `/terminos` y `/devoluciones`; `TIENDA_USD_ENABLED=1` en Production). Pasos en `docs/tienda-usd.md`; detalle en `docs/requirements-history.md`.
-
-✓ `scripts/test-tienda-culqi.mjs`, `tests/e2e/tienda-dolares.spec.js`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-382 - Administración: acciones de usuarios con estado visible, reset por correo y cortesía con coach
 
@@ -2493,7 +2453,7 @@ Toda cuenta nueva empieza registrando lo que come, con aviso previo y avance vis
 ### Alcance
 `prefs.nutritionIntake`. Aviso al cerrar el onboarding. Sin menú inicial ni preparación automática; el entreno se prepara igual. Tarjeta «Día 2 de 3» y registrar como acción principal. Día completo: 2 comidas y 40 % de las kcal. Mínimo 3 días, 5 para cerrar solo, tope de 7. Salida «Prefiero recibir un menú ya».
 ### Fuera de alcance
-Resumen (REQ-405), cuentas existentes, recordatorios propios.
+Resumen (REQ-405), cuentas existentes (REQ-411), recordatorios propios.
 ### Riesgos
 El menú llega el día 4 de la semana gratis (REQ-356). Specs que esperan menú tras el onboarding.
 ### Criterios de aceptación
@@ -2638,3 +2598,95 @@ Arrastrar un ejercicio incompatible con el lugar, el nivel o una limitación.
 Ciclo nuevo sin cambios de perfil: mismas sesiones y ejercicios. Con equipo distinto: solo cambian los incompatibles, con aviso. «Cambiar ejercicios» prepara otra rutina. Las cargas sugeridas siguen desde el historial.
 ### Verificación sugerida
 `tests/e2e/plan-weeks.spec.js`, `coach-rutina.spec.js` y release gate.
+
+## REQ-411 - Nutrición: cuentas con historial ven «Así comes» sin periodo
+
+**Estado: pendiente.** Serie REQ-411→413, tras REQ-407. Diseño: `docs/plan-from-history.md`.
+
+### Origen
+Jonathan, 2026-11-16: las cuentas existentes no pasan por el periodo, pero su dieta también debe salir de lo que comen.
+### Problema
+Quien ya tiene historial sigue recibiendo un menú de catálogo y nunca ve su resumen.
+### Causa raíz
+REQ-404..407 solo se activan con `nutritionIntake` de una cuenta nueva.
+### Objetivo
+Con historial suficiente, ofrecer el resumen y preparar el menú desde lo que ya come.
+### Alcance
+Cuenta sin periodo y con 3 días completos en los últimos 28: tarjeta única en Nutrición que abre «Así comes» (REQ-405) con esos días. Al aceptar, el menú siguiente usa el modo `intake` sobre 28 días. «Ahora no» la oculta 28 días.
+### Fuera de alcance
+Forzar el periodo; cambiar el menú vigente sin que el usuario prepare otro.
+### Riesgos
+Historial viejo o parcial que no representa cómo come hoy.
+### Criterios de aceptación
+Cuenta existente con 3 días completos: ve la tarjeta una vez; al aceptar, el menú nuevo trae sus platos repetidos. Con menos historial no cambia nada. El menú vigente no se toca.
+### Verificación sugerida
+`comidas-habituales.spec.js`, `nutricion-continuidad.spec.js` y release gate.
+
+## REQ-412 - Nutrición: el menú aprende de lo que cumples
+
+**Estado: pendiente.** Depende de REQ-411. Reglas: `docs/plan-from-history.md`.
+
+### Origen
+Jonathan, 2026-11-16: generar en base al histórico de lo que come y puede cumplir.
+### Problema
+Un plato que el usuario salta o reemplaza siempre vuelve a sugerirse; lo que come en su lugar no se aprende si el día no quedó en meta.
+### Causa raíz
+`learnHabitualMeals()` solo usa días en meta (`js/nutrition-domain.js:783`) y `habitualMealsHistory()` (`app/index.html:13444`) ignora `ms.skipped` y `ms.ovr.userSet`.
+### Objetivo
+Cada menú nuevo repite lo cumplido y deja de sugerir lo que no se cumple.
+### Alcance
+Ventana de 28 días. Plato hecho 2 veces y en la mitad de los días de su franja: habitual aunque el día no esté en meta, con porción ajustada. Plato saltado o reemplazado 2 veces y cumplido menos de la mitad: en pausa 28 días en esa franja. El reemplazo repetido toma la franja.
+### Fuera de alcance
+Vetos explícitos, metas de macros, guardar la pausa en el perfil.
+### Riesgos
+Menús monótonos; pausar un plato por una mala semana. Elegirlo a mano levanta la pausa.
+### Criterios de aceptación
+Avena saltada 3 de 4 desayunos no vuelve la semana siguiente; el pan con huevo que la reemplazó sí. Elegir la avena a mano la devuelve. Ningún plato vetado reaparece.
+### Verificación sugerida
+`scripts/validate-habitual-meals.mjs`, `comidas-habituales.spec.js`.
+
+## REQ-413 - Nutrición: sugerencias de mejora en el check-in semanal
+
+**Estado: pendiente.** Depende de REQ-412. Reglas: `docs/plan-from-history.md`.
+
+### Origen
+Jonathan, 2026-11-16: el historial debe traer sugerencias de mejoras.
+### Problema
+Tras el primer resumen, nadie vuelve a proponer cambios sobre lo que la persona come.
+### Causa raíz
+El check-in (`openWeeklyCheckin()`) solo ajusta metas; no lee las comidas registradas.
+### Objetivo
+Cada semana, hasta dos mejoras concretas sobre sus comidas, que acepta o descarta.
+### Alcance
+Bloque «Tu comida esta semana»: `analyzeIntakeDays()` sobre 14 días con 3 completos. Tipos de REQ-405 más `drop` (franja saltada la mitad de los días: repartirla). Aceptar cambia lo pendiente; «Ahora no» dura 28 días. Siempre una línea de lo que va bien.
+### Fuera de alcance
+Cambiar metas, avisos push, redacción del coach.
+### Riesgos
+Alargar el check-in; insistir con lo descartado.
+### Criterios de aceptación
+Con proteína baja 14 días aparece un `add` sobre una comida suya; aceptarlo cambia las comidas pendientes. Lo descartado no vuelve en 28 días. Con días en meta no hay sugerencias.
+### Verificación sugerida
+Spec E2E nuevo del check-in, script de `analyzeIntakeDays` y release gate.
+
+## REQ-414 - Entreno: la rutina se ajusta a lo que cumples
+
+**Estado: pendiente.** Depende de REQ-410. Tabla de señales: `docs/plan-from-history.md`.
+
+### Origen
+Jonathan, 2026-11-16: las rutinas también se generan desde el histórico y lo que la persona puede cumplir.
+### Problema
+El plan sale de lo declarado. Si entrena 3 de 5 días, siempre sustituye un ejercicio u omite otro, el plan siguiente repite lo mismo.
+### Causa raíz
+`trainingExpectedWeeks()` (`app/index.html:13701`) solo lee preferencias; `originalExerciseSlug`, `status:"skipped"` y `weeklyCheckinStats()` (`:17879`) no alimentan nada.
+### Objetivo
+Proponer hasta tres ajustes de rutina según lo hecho en las últimas 4 semanas.
+### Alcance
+`analyzeTrainingHistory()` pura: sustitución repetida → dejarla fija; ejercicio omitido → cambiarlo o quitarlo; menos del 70 % de sesiones dos semanas → menos días; sesiones parciales o largas → acortar; 90 % y series completas 3 semanas → sumar. En el check-in y en la revisión del plan nuevo. Se aplica a lo pendiente con `weeklyRoutine` o los días del perfil.
+### Fuera de alcance
+Cargas (REQ-409), deporte, historial.
+### Riesgos
+Recortar tras una semana atípica; sumar en modo suave (no se ofrece).
+### Criterios de aceptación
+Sentadilla cambiada por prensa 2 de 3 veces: se propone dejar la prensa y, al aceptar, queda en las sesiones pendientes y en el plan nuevo. 3 de 5 días dos semanas: se propone rutina de 3 días. Nada cambia sin aceptar; lo descartado no vuelve en 28 días.
+### Verificación sugerida
+Script nuevo de `analyzeTrainingHistory`, `coach-rutina.spec.js`, `plan-weeks.spec.js`.

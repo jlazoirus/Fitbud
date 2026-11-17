@@ -2,7 +2,7 @@
 
 Solicitud de Jonathan del 16 de noviembre de 2026: «Las dietas se deberían generar en base a lo que comes. Cuando recién comienzas, en vez de sugerirte de frente una dieta, durante unos tres o cinco días recopilamos cuáles son tus comidas diarias. Le avisamos antes al usuario. Luego analizamos qué come y le sugerimos algunos cambios. Eso siempre lo deberíamos hacer».
 
-Estado: requerimientos pendientes, con tres decisiones abiertas más abajo. Cada REQ es una implementación y un commit. Orden obligatorio: REQ-404 → 405 → 406 → 407.
+Estado: requerimientos pendientes; decisiones cerradas por Jonathan el 16 de noviembre de 2026. Cada REQ es una implementación y un commit. Orden obligatorio: REQ-404 → 405 → 406 → 407.
 
 ## Qué pasa hoy
 
@@ -52,14 +52,15 @@ El mismo texto resumido queda en la tarjeta de Nutrición mientras dure el perio
 - **Sin presión.** La meta de macros se sigue viendo en Perfil, pero Hoy y Nutrición no muestran «te falta» ni «te pasaste» durante el periodo. Se muestra el total registrado y el avance: «Día 2 de 3».
 - **Registrar es la acción principal** en Hoy y Nutrición, con el flujo existente (`openFoodRegistration()`, REQ-329/330): por alimento y gramos, recientes, favoritas, a mano o con foto.
 - **Salida:** enlace discreto «Prefiero recibir un menú ya» en la tarjeta de Nutrición. Pide confirmación, marca `skipped` y prepara la semana con el flujo actual.
-- **Quién entra:** cuentas que terminan su primer onboarding desde este cambio. Las cuentas existentes no entran. Un ciclo nuevo no repite el periodo si hay 3 días completos en los últimos 28.
+- **Quién entra:** cuentas que terminan su primer onboarding desde este cambio. Las cuentas existentes no entran: usan su historial (REQ-411). Un ciclo nuevo no repite el periodo si hay 3 días completos en los últimos 28.
 - **Coach:** si el usuario pide ideas de comida, el coach responde como siempre. Lo que cambia es que la app no propone menú por su cuenta.
 
-### Decisiones abiertas para Jonathan
+### Decisiones cerradas (Jonathan, 2026-11-16)
 
-- **Salida «Prefiero recibir un menú ya».** Se propone conservarla, porque el principio de producto dice que siempre hay una opción viable para comer hoy. La alternativa es no ofrecerla.
-- **Semana gratis (REQ-356).** Con 7 días de prueba, el primer menú llega el día 4 como muy pronto. Se propone mantener el mínimo en 3 días y medir cuántos llegan al resumen antes del primer cobro.
-- **Metas visibles.** Se propone ocultar los avisos de «te falta / te pasaste» para no cambiar cómo come la persona mientras la observamos.
+- **Salida «Prefiero recibir un menú ya»:** se conserva, como enlace discreto con confirmación.
+- **Semana gratis (REQ-356):** el mínimo queda en 3 días. Se acepta que el primer menú llegue el día 4 de la prueba como muy pronto.
+- **Metas durante el periodo:** se ocultan los avisos de «te falta / te pasaste».
+- **Cuentas existentes:** no pasan por el periodo. Su menú y su rutina también deben salir de su historial y de lo que cumplen, con sugerencias de mejora: REQ-411..414, en `docs/plan-from-history.md`.
 
 ## 2. Así comes — REQ-405
 
@@ -128,4 +129,4 @@ Todo se calcula en el dispositivo. Sin tablas, migraciones, dependencias ni llam
 
 ## Fuera de alcance
 
-Recordatorios específicos del periodo, pedir que entre un día de fin de semana, redacción del resumen por el coach, reabrir el periodo a mano desde Perfil y pasar a las cuentas existentes por el periodo.
+Recordatorios específicos del periodo, pedir que entre un día de fin de semana, redacción del resumen por el coach, reabrir el periodo a mano desde Perfil y pasar a las cuentas existentes por el periodo (su camino es `docs/plan-from-history.md`).
