@@ -52,30 +52,21 @@ Fitbros debe ser un coach personal que siempre ofrece una opcion viable para com
 
 ## Secuencia activa
 
-**Paquete MyFitnessPal aprobado (24 oct 2026): REQ-268..276, en orden.** Especificaciones en `docs/competitive/2026-10-22-myfitnesspal/BACKLOG.md`. No depende de entrevistas/reclutamiento. El selector descubre estos pendientes; revalidar contra código al tomar cada uno.
+**Series de Jonathan (16 nov 2026), cada una en orden:** nutrición REQ-404→407 (`docs/nutrition-first-days.md`) y entreno REQ-408→410 (`docs/training-stable-routine.md`). El paquete MyFitnessPal (REQ-268..276) ya está implementado. Revalidar contra código al tomar cada uno.
 
 Automatizable por el agente desarrollador:
 
 REQ-81..84 (planner determinista, versionado en `plan_versions`, reemplazos con rebalanceo, coach auxiliar validado) ya implementados — detalle en `docs/requirements-history.md`.
 
-Las series UX (REQ-97..112) y «dieta exacta» (REQ-128..141 y 144) ya están implementadas; detalle en `docs/requirements-history.md`. Queda pendiente:
-
-- REQ-142 - Conectar reemplazos ("Cambiar comida") a `finalizeNutritionDay()`. (P2; extraído de REQ-138)
+Las series UX (REQ-97..112) y «dieta exacta» (REQ-128..141 y 144) ya están implementadas; detalle en `docs/requirements-history.md`.
 
 Pendiente de decisión del feedback de Diego (2026-10-21): REQ-254 (ver abajo). Las series ya cerradas (Claudia, flujo beta, Sathya, Jonathan 10-21, Diego) están en `docs/requirements-history.md`, en «Series cerradas de la secuencia activa».
-
-Journey de recordatorios y racha (Jonathan, 2026-10-26; diseño en `docs/reminders-journey.md`): REQ-283 animación de racha, REQ-284 regreso en Hoy, REQ-285 recordatorios por ausencia.
-
-Pausado esperando decisión de producto (ver REQ-147; no está en `agent-loop.json` hasta entonces):
-
-- REQ-143 - Catálogo lote 3. Dos lotes medidos confirman un techo de 32-33 %; ver el REQ y REQ-147.
 
 Pendiente no automatizable por agentes:
 
 - REQ-60 - Configuracion manual de redirects en Supabase.
 - REQ-127 - Personalizar remitente/asunto de correos de Supabase (branding Fitbud).
 - REQ-254 - Decidir el nivel de cocina en el catálogo y si se amplían almuerzos/cenas "sin cocinar" (feedback Diego).
-- REQ-147 - Decidir si vale la pena tocar la selección de `planDeterministicNutritionDay()`/`globalClosePass()` para superar el techo de catálogo (~32-33%) del canario `DIET_CONTRACT`; ver REQ-143.
 - Decision de producto (previa a activar Stripe/REQ-26): frontera free/premium — que queda gratis (dia determinista de hoy + registrar) y que es premium (adaptar, semana completa, check-in con ajustes, conversacion). Analisis en `estrategia/08-Analisis-UI-Exhaustivo-2026-07-01.md` §3 (P0-1).
 
 ## Protocolo antes de implementar
@@ -930,7 +921,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-141`).
 
 ## REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato
 
-**Estado: implementado.** `finalizeNutritionDay()` agrega una pasada global (`globalClosePass`) que hill-climbea sobre los macros del día completo respetando `lineLimits()`/`clampStep()`, y `attemptContractComplement()` añade snack/batido del catálogo compatible si el día sigue fuera de contrato; `runtimeActive` sigue `false`. Canario sube de 39/378 a 122/378 con `failureBreakdown`. Validador: `scripts/validate-finalize-nutrition-day.mjs`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-137`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-138 - Conectar `finalizeNutritionDay()` en cliente sin activar contrato global
 
@@ -1068,11 +1059,7 @@ Detalle archivado en [historial](docs/requirements-history.md#req-166).
 
 ## REQ-167 - Fix activación de cuenta: "Auth session missing!" crudo al crear la contraseña desde una invitación
 
-**Estado: implementado.**
-
-`finishPasswordRecovery()` revalida la sesión del enlace con `getSession()` antes de `updateUser()`, bloquea el botón mientras trabaja y traduce el error a español; si la sesión ya no existe, muestra la pantalla "No pudimos abrir el enlace" con el siguiente paso.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-167`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-168 - Reproductor de entreno usable en móvil: dosis sin desborde, RPE explicado, series añadibles y "serie hecha" explícita
 
@@ -1320,9 +1307,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-208`).
 
 ## REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll
 
-**Estado: implementado.** Descartado por decisión de Jonathan (2026-10-19): no se reprodujo en Chromium móvil ni en producción; la mitigación quedó en REQ-221. Si vuelve a aparecer, se abre un REQ nuevo con captura y dispositivo.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-209`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-210 - Progreso: la semana 1 usa el peso y la grasa del onboarding
 
@@ -1350,15 +1335,11 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-213`).
 
 ## REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento
 
-**Estado: implementado.** Perfil → Objetivo "Empezar de nuevo mi plan" (4 o 10 semanas) archiva el ciclo como interrumpido y arranca hoy desde la semana 1; tras 14 días sin entrenar, Hoy sugiere retomar o empezar de nuevo.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-214`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar"
 
-**Estado: implementado.** Nutrición → "Lista de compra · semana N": cantidades de lo que queda de semana (o la semana completa) sobre las comidas efectivas, agrupadas por categoría, con "Ya lo tengo"/"Por comprar" guardado por semana y compartir lo que falta.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-215`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-216 - Modo conversacional (beta oculta): usar la app desde el chat
 
@@ -1428,9 +1409,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-226`).
 
 ## REQ-227 - Fix onboarding: editar un macro en "Ajustar valores" y continuar guarda una meta donde kcal ≠ suma de macros
 
-**Estado: implementado.** `reconcileOnboardingMacros()` reconcilia el paso 2 del onboarding: si se editó un macro, kcal = p·4+c·4+f·9; si solo kcal, proteína fija y carbos/grasa escalan (piso 50 g/45 g), con aviso. Test: `scripts/validate-onboarding-macro-reconcile.mjs`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-227`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-228 - Fix: "Estimar con foto" falla con un mensaje genérico y sin forma de reintentar
 
@@ -1494,9 +1473,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-237`).
 
 ## REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
 
-**Estado: implementado.** "Estimar macros" (texto y foto) dice por qué falló, con "(código N)" si el motivo no se reconoce, y ofrece "Reintentar"; sin foto ya no se ve la vista previa rota.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-239 - Entreno: con la sesión en curso, el plan y los avisos van en un desplegable
 
@@ -1530,9 +1507,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-243`).
 
 ## REQ-244 - Entreno: la duración cuenta de inicio a fin, también con la app en segundo plano
 
-**Estado: implementado.** Al ocultarse la app el cronómetro sigue (`awayAt`); al volver, `returnFromAway()` cuenta la ausencia entera hasta 1 h y, si fue mayor, deja la sesión en pausa con la duración de cuando saliste. El resumen dice "duración total". Prueba: `scripts/validate-workout-player.mjs`, `tests/e2e/entreno.spec.js`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-244`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-245 - Entreno: volver al ejercicio anterior para revisarlo, sin perder Siguiente ni Omitir
 
@@ -1558,9 +1533,7 @@ Detalle historico: `docs/requirements-history.md` (buscar `## REQ-247`).
 
 ## REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
 
-**Estado: implementado.** Las filas de "Lo que sigue hoy" usan clases `kind-*` en vez de `meal`/`workout` (las tarjetas globales), así que ya no son tarjetas sin relleno lateral y los botones quedan a 16 px del borde. Test: `tests/e2e/home.spec.js`.
-
-Detalle historico: `docs/requirements-history.md` (buscar `## REQ-249`).
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-250 - Fix Entreno: omitir el calentamiento ya elegido dejaba la sesión "parcial"
 
@@ -1669,9 +1642,7 @@ Detalle archivado en [historial](docs/requirements-history.md#req-264).
 
 ## REQ-266 - Fix: los recordatorios por correo y push nunca se enviaban
 
-**Estado: implementado — requiere acción humana:** secreto `CRON_SECRET` en GitHub (mismo valor que en Vercel).
-
-El cron diario (03:00 en Lima) nunca coincidía con la hora elegida (17–23). `.github/workflows/notify-hourly.yml` llama cada hora a `/api/notify`, que envía desde la hora elegida (`isNotifyTime`), una vez por día. ✓ `scripts/validate-notify-schedule.mjs`.
+**Estado: implementado.** Detalle en `docs/requirements-history.md`.
 
 ## REQ-267 - Fix: los avisos push no tenían clave privada VAPID
 
@@ -2328,71 +2299,19 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-392 - Hoy: un solo mensaje bajo la acción principal
 
-**Estado: implementado.** Crítica de diseño de Hoy (2026-11-16, 26/40).
-
-### Origen
-Jonathan, 2026-11-16: «demasiado texto y demasiada info».
-### Problema
-`renderHoy` apilaba hasta 13 bloques: regreso, retomar, check-in, bienvenida del coach, «Cuéntame cómo entrenas», 3 chips, menú y referidos.
-### Objetivo
-Un mensaje contextual como máximo; el resto espera en Avisos.
-### Alcance
-`homeContextData()`: rescate o recuperación > retomar > técnica > bienvenida del coach > check-in. Retomar, check-in y referidos que pierden van a Avisos («Check-in de la semana 4 y 2 más»). Coach sin chips. Menú como fila de la tarjeta principal. Rutina en Entreno, también con sesión en curso. PWA v250.
-### Criterios de aceptación
-Fuera de Avisos queda un solo mensaje; el check-in perdedor se abre en Avisos.
-### Verificación sugerida
-`tests/e2e/home.spec.js`, `avisos.spec.js`, `coach-rutina.spec.js`, `home-optional-menu.spec.js`.
+**Estado: implementado.** `homeContextData()` deja un solo mensaje contextual bajo la acción principal; el resto espera en Avisos. ✓ `tests/e2e/home.spec.js`, `avisos.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-393 - Hoy: la bienvenida de regreso es el saludo
 
-**Estado: implementado.** Sigue a REQ-392.
-
-### Origen
-Crítica de Hoy, 2026-11-16.
-### Problema
-Tras una pausa, «Racha 0» y la tarjeta de regreso (unas 40 palabras) repetían el reinicio. «Empezar hoy» solo cerraba la tarjeta. El saludo de 26 px ocupaba 2 líneas por «Racha» y «?».
-### Objetivo
-Saludar y dar permiso para empezar, sin estadísticas ni ceros.
-### Alcance
-`homeGreetingData()`: «Qué bueno verte, {nombre}» y «Tu progreso sigue: N días registrados y M entrenos.»; sin registros, «Tu racha empieza con tu primera comida.». Se va al registrar hoy. La racha en 0 se muestra como «Racha», sin el cero: sigue abriendo amigos. Guía rápida en Perfil › Ayuda y soporte. Título de 22 px. PWA v251.
-### Criterios de aceptación
-Sin tarjeta de bienvenida ni «Racha 0». Encabezado normal de 105 a 67 px a 390 px.
-### Verificación sugerida
-`tests/e2e/regreso.spec.js`, `racha.spec.js`, `coach-welcome.spec.js`.
+**Estado: implementado.** `homeGreetingData()`: saludo de regreso sin tarjeta ni «Racha 0». ✓ `tests/e2e/regreso.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-394 - Hoy: «Tu día» muestra comida y entreno
 
-**Estado: implementado.** Sigue a REQ-393.
-
-### Origen
-Crítica de Hoy, 2026-11-16.
-### Problema
-Sin menú, el entreno quedaba en «Resto del día · 1 pendiente», con un enlace «Ver entreno» dentro de la tarjeta de comida. La tarjeta repetía lo mismo 3 veces y la tira mostraba «0/4 comidas · 0/2720 kcal».
-### Objetivo
-Comida y entreno visibles en la misma tarjeta, sin ceros.
-### Alcance
-Fila de entreno con su acción («Iniciar entreno» o «Registrar actividad») cuando no es la acción principal; deja «Resto del día». Título «¿Qué comiste hoy?» sin subtítulo. Tira de consumo desde el primer registro. PWA v252.
-### Criterios de aceptación
-Día de gimnasio sin menú: «Iniciar entreno» sin desplegar nada. Sin registros, no hay tira de consumo.
-### Verificación sugerida
-`tests/e2e/home-optional-menu.spec.js`, `rutina-consistente.spec.js`, `onboarding.spec.js`.
+**Estado: implementado.** Comida y entreno en la misma tarjeta, sin ceros. PWA v252. ✓ `tests/e2e/home-optional-menu.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-395 - Hoy: check-in claro y placeholder legible
 
-**Estado: implementado.** Sigue a REQ-394.
-
-### Origen
-Crítica de Hoy, 2026-11-16 (detector Impeccable y revisión).
-### Problema
-El check-in llevaba la etiqueta «CHECK-IN · SEMANA 4» encima del rango. «Omitir esta semana» pesaba igual que iniciarlo y lo omitía sin confirmar. El placeholder del coach tenía contraste 3.9:1 (sin regla `::placeholder`).
-### Objetivo
-Check-in legible y difícil de omitir por error; placeholders AA.
-### Alcance
-Título «Check-in de la semana N», rango y una línea. «Hacer check-in» como botón; «Omitir esta semana» como acción secundaria con confirmación. `::placeholder` en `--muted`. PWA v253.
-### Criterios de aceptación
-Cancelar la confirmación deja el check-in pendiente. Placeholder ≥ 4.5:1.
-### Verificación sugerida
-`tests/e2e/home.spec.js` y detector Impeccable.
+**Estado: implementado.** Check-in con título claro y omisión confirmada; placeholders AA. PWA v253. ✓ `tests/e2e/home.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-396 - Entreno: «Iniciar entreno» como acción principal, sin «sesión»
 
@@ -2557,23 +2476,165 @@ Abrir Perfil no abre ningún modal. La tarjeta agrega la actividad igual que ant
 
 ## REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
-**Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.
+**Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`. Detalle en `docs/requirements-history.md`.
+
+## REQ-404 - Nutrición: los primeros días se registra, sin menú sugerido
+
+**Estado: pendiente.** Serie REQ-404→407. Diseño y textos: `docs/nutrition-first-days.md`.
 
 ### Origen
-Jonathan, 2026-11-16: `onboarding-essential.spec.js:40` (REQ-389) fallaba de forma intermitente en `main` (`788a860`), 2 de 6 con `--repeat-each=6`.
+Jonathan, 2026-11-16: antes de sugerir dietas, recopilar 3 a 5 días de comidas reales y avisarlo.
 ### Problema
-Tras «Guardar cambios» con actividad «high», mañana seguía en «moderate». Además, un guardado de fondo armado con una copia vieja de `prefs` (`profileQuestionBlockDay`, `dismissRestartNudge`, hitos de racha) podía terminar después y revertir en memoria y en la base el guardado más nuevo del usuario.
+El usuario nuevo recibe un menú antes de registrar una sola comida.
 ### Causa raíz
-`saveProfilePrefs` (`app/index.html`) publicaba `profile.prefs` justo después del upsert y recién después esperaba `ensurePlanVersion`. Durante esa ventana (~25-40 ms) `profile.prefs` ya decía «high» y `planPrefsForDate(mañana)` seguía en la versión anterior. La prueba leía en esa ventana: falla en `after.tomorrow.activityLevel`, no en `profile.prefs`. Aparte, los guardados no iban en orden y cada uno escribía la copia completa que recibió.
+`saveOnboarding()` → `prepareFirstCycleWeek()` → `prepareFirstWeekNutrition()` (`app/index.html:4482`, `:4320`).
 ### Objetivo
-Quien lea `profile.prefs` ve la versión del plan ya coherente, y ningún guardado viejo revierte uno más nuevo.
+Toda cuenta nueva empieza registrando lo que come, con aviso previo y avance visible.
 ### Alcance
-`saveProfilePrefs`: fila de guardados en orden; versión del plan antes de publicar las prefs en memoria; si otro guardado confirmó prefs después de que el llamador armó su copia, se aplican encima solo las claves que ese llamador cambió (base: lo último confirmado, no `profile.prefs`, porque algunos llamadores publican antes de guardar). El dueño de la sesión se valida al llamar y al ejecutar.
+`prefs.nutritionIntake`. Aviso al cerrar el onboarding. Sin menú inicial ni preparación automática; el entreno se prepara igual. Tarjeta «Día 2 de 3» y registrar como acción principal. Día completo: 2 comidas y 40 % de las kcal. Mínimo 3 días, 5 para cerrar solo, tope de 7. Salida «Prefiero recibir un menú ya».
 ### Fuera de alcance
-Reescribir cada llamador; conflictos entre dispositivos.
+Resumen (REQ-405), cuentas existentes, recordatorios propios.
 ### Riesgos
-Un upsert colgado retrasa los guardados siguientes (antes ya colgaba el guardado del usuario). Un llamador que muta `profile.prefs` en el lugar y otro guardado se le adelanta pierde su cambio en vez de revertir al otro; los hitos de racha se vuelven a detectar.
+El menú llega el día 4 de la semana gratis (REQ-356). Specs que esperan menú tras el onboarding.
 ### Criterios de aceptación
-`onboarding-essential.spec.js:40` pasa 10 de 10 con `--repeat-each=10 --retries=0`. Un guardado de fondo con copia vieja lanzado junto al del usuario conserva ambos cambios en memoria y en el último upsert, y `profile.prefs` nunca muestra «high» mientras mañana sigue en «moderate».
+Onboarding nuevo: aviso, cero comidas sugeridas y entreno listo. Al tercer día completo se ofrece el resumen. El tope o la salida preparan el menú actual. Persiste al recargar; una cuenta existente no cambia.
 ### Verificación sugerida
-`tests/e2e/perfil-guardado-concurrente.spec.js` (falla en `788a860`), e2e de perfil y preguntas, y release gate.
+`tests/e2e/primeros-dias.spec.js`; regresión de `onboarding*.spec.js` y `home-optional-menu.spec.js`.
+
+## REQ-405 - Nutrición: resumen de cómo comes y cambios sugeridos
+
+**Estado: pendiente.** Depende de REQ-404. Reglas: `docs/nutrition-first-days.md`.
+
+### Origen
+Jonathan, 2026-11-16: analizar lo registrado y sugerir algunos cambios.
+### Problema
+Nada lee esos días: no hay resumen ni propuesta sobre las comidas del usuario.
+### Causa raíz
+No existe análisis del consumo; REQ-360 solo aprende platos repetidos en días en meta.
+### Objetivo
+Mostrar cómo come y hasta tres cambios concretos sobre sus propias comidas.
+### Alcance
+`analyzeIntakeDays()` pura en `js/nutrition-domain.js`: promedios frente a la meta, plato repetido y aporte por franja, franjas saltadas. Cambios `add/portion/swap/fill` y una cosa que ya funciona. Pantalla «Así comes» con Aceptar / Ahora no; lo aceptado va a `nutritionIntake.accepted`.
+### Fuera de alcance
+Armar el menú (REQ-406), redacción del coach, llamadas pagadas.
+### Riesgos
+Tono de juicio; sugerir un alimento vetado; registros a mano sin líneas.
+### Criterios de aceptación
+Con 3 días completos: promedios correctos y máximo 3 cambios, cada uno sobre una comida registrada. Proteína bajo el 90 % produce un `add`. Días en meta no producen cambios. Ninguno viola restricciones ni se aplica sin Aceptar. Sin comidas en analytics.
+### Verificación sugerida
+Script nuevo de `analyzeIntakeDays`, `primeros-dias.spec.js` y release gate.
+
+## REQ-406 - Nutrición: el primer menú repite lo que registraste
+
+**Estado: pendiente.** Depende de REQ-405. Reglas: `docs/nutrition-first-days.md`.
+
+### Origen
+Jonathan, 2026-11-16: las dietas se generan en base a lo que comes.
+### Problema
+El primer menú sale del catálogo y de preferencias declaradas, no de lo registrado.
+### Causa raíz
+`learnHabitualMeals()` exige 7 días registrados y 3 en meta (`HABIT_RULES`, `js/nutrition-domain.js:748`).
+### Objetivo
+El primer menú lleva en cada franja el plato que la persona ya come, con la porción ajustada.
+### Alcance
+Modo `intake`: aprende de los días completos del periodo, con 2 repeticiones y la mitad de los días, sin exigir meta. Aplica encima los cambios aceptados. Franjas sin hábito, con el catálogo. Solo platos con `dishSlug`.
+### Fuera de alcance
+Comidas fuera del catálogo (REQ-407); REQ-360 tras el primer menú.
+### Riesgos
+Repetir un plato que aleja de la meta: mandan el cierre del día y las restricciones.
+### Criterios de aceptación
+Desayuno repetido 2 de 3 días: el menú lo trae toda la semana con «Lo que sueles comer». Un cambio aceptado se ve en el menú. Un plato vetado no vuelve. Sin periodo, nada cambia.
+### Verificación sugerida
+`scripts/validate-habitual-meals.mjs`, `comidas-habituales.spec.js`, `primeros-dias.spec.js`.
+
+## REQ-407 - Nutrición: tus comidas propias entran al menú
+
+**Estado: pendiente.** Depende de REQ-406. Reglas: `docs/nutrition-first-days.md`.
+
+### Origen
+Jonathan, 2026-11-16: el menú parte de lo que la persona come, esté o no en el catálogo.
+### Problema
+Lo registrado a mano, por foto o por gramos sin plato del catálogo nunca vuelve como sugerencia.
+### Causa raíz
+REQ-360 dejó fuera del motor local los platos sin `dishSlug`.
+### Objetivo
+Una comida propia repetida se sugiere en su franja con la porción ajustada.
+### Alcance
+Candidata con su nombre y valores. Con líneas por gramos, se escalan con `lineLimits()`/`clampStep()`. Solo con totales, multiplicador de 0,5 a 1,5 en pasos de 0,25. No entra al catálogo compartido.
+### Fuera de alcance
+Convertirla en receta, compartirla, lista de compra.
+### Riesgos
+Valores mal estimados repetidos toda la semana; restricciones sin ingredientes que revisar.
+### Criterios de aceptación
+«Arroz con pollo» registrado a mano 2 de 3 almuerzos aparece en los almuerzos del menú, con porción en rango y macros recalculados. Tras «No me gusta» deja de sugerirse. Otra cuenta no la ve.
+### Verificación sugerida
+`scripts/validate-habitual-meals.mjs`, `primeros-dias.spec.js` y release gate.
+
+## REQ-408 - Entreno: la misma rutina de fuerza todas las semanas del plan
+
+**Estado: pendiente.** Serie REQ-408→410. Diseño: `docs/training-stable-routine.md`.
+
+### Origen
+Jonathan, 2026-11-16: en el gimnasio la rutina no debe cambiar semana a semana.
+### Problema
+Una misma sesión puede traer ejercicios distintos cada semana; así no se progresa en carga.
+### Causa raíz
+Cada semana se prepara por separado: `trainingWeekPrompt()` (`app/index.html:13812`) no recibe las semanas previas y `validatePlan()` (`training-plan.js:209`) no lo comprueba.
+### Objetivo
+Cada sesión de fuerza conserva ejercicios y orden todo el plan; solo cambia la dosis.
+### Alcance
+La semana 1 define los ejercicios; las semanas 2 a N se construyen en la app con la dosis de su fase. `validatePlan()` rechaza diferencias. En la revisión, «Otra sesión» cambia todas las semanas y se retira «Preparar otra semana N» para fuerza.
+### Fuera de alcance
+Deporte, planes activos, ediciones del usuario, rutina del coach (REQ-359).
+### Riesgos
+REQ-336 prepara las semanas en paralelo; la prueba gratis solo personaliza la semana 1.
+### Criterios de aceptación
+Planes de 4 y 10 semanas: cada sesión de fuerza repite ejercicios y orden; la descarga baja series. Una consulta al coach por plan. Un plan con diferencias no valida. Las ediciones de un día siguen funcionando.
+### Verificación sugerida
+`scripts/validate-training-plan.mjs`, `rutina-consistente.spec.js`, `entreno.spec.js`.
+
+## REQ-409 - Entreno: carga y repeticiones sugeridas para hoy
+
+**Estado: pendiente.** Depende de REQ-408. Tabla de reglas: `docs/training-stable-routine.md`.
+
+### Origen
+Jonathan, 2026-11-16: el sistema debe sugerir por defecto subir peso o alguna repetición.
+### Problema
+El usuario ve lo que hizo la última vez, no lo que le toca hoy.
+### Causa raíz
+`suggestedLoad` es un texto fijo (`workout-player.js:54`, `:276`) y `prefillStepFromLastTime()` (`app/index.html:6513`) copia la última vez.
+### Objetivo
+Cada ejercicio de fuerza con historial muestra y precarga la carga y repeticiones de hoy.
+### Alcance
+`progressionSuggestion()` pura: tope del rango completo → sube carga (2,5 kg; 5 kg en pierna pesada; 2 kg en mancuernas; máximo 10 %) y vuelve al inicio; dentro del rango → una repetición más; bajo el mínimo → repite. Resto de casos según el doc. Reproductor y lista del plan.
+### Fuera de alcance
+1RM, deporte, calentamiento, guardar la sugerencia.
+### Riesgos
+Sugerir de más tras una pausa o con mala técnica; chocar con REQ-337/346.
+### Criterios de aceptación
+3×12 con 40 kg en rango 8-12 → «Hoy: 42,5 kg × 8», precargado y editable. 12, 10, 9 → 40 kg y una repetición más. Sin historial no hay número. En descarga no sube. Sin RPE ni RIR en los textos.
+### Verificación sugerida
+`scripts/validate-workout-player.mjs`, `entreno.spec.js`, `repetir-entreno.spec.js`.
+
+## REQ-410 - Entreno: el plan nuevo conserva tu rutina
+
+**Estado: pendiente.** Depende de REQ-408. Diseño: `docs/training-stable-routine.md`.
+
+### Origen
+Jonathan, 2026-11-16: se sigue la misma rutina y se progresa sobre ella.
+### Problema
+Al empezar otro plan, la rutina se rehace y la acordada con el coach desaparece.
+### Causa raíz
+`weeklyRoutineSession()` (`app/index.html:7515`) descarta la rutina de otro ciclo; el plan nuevo parte de cero.
+### Objetivo
+El plan nuevo mantiene los ejercicios de cada sesión de fuerza, salvo que el usuario pida cambiarlos.
+### Alcance
+El ciclo nuevo reutiliza los ejercicios del plan anterior y la rutina del coach. La revisión dice «Mantienes tu rutina» y ofrece «Cambiar ejercicios». Si cambió el perfil, se conserva lo compatible y se avisa qué se sustituyó.
+### Fuera de alcance
+Cambiar días o duración del plan; historial.
+### Riesgos
+Arrastrar un ejercicio incompatible con el lugar, el nivel o una limitación.
+### Criterios de aceptación
+Ciclo nuevo sin cambios de perfil: mismas sesiones y ejercicios. Con equipo distinto: solo cambian los incompatibles, con aviso. «Cambiar ejercicios» prepara otra rutina. Las cargas sugeridas siguen desde el historial.
+### Verificación sugerida
+`tests/e2e/plan-weeks.spec.js`, `coach-rutina.spec.js` y release gate.

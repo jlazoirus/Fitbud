@@ -14258,3 +14258,162 @@ Dos botones de registro compitiendo, jerarquía confusa con la tarjeta «Menú o
 
 #### Verificación sugerida
 Playwright a 360/390/1280 con y sin menú: posición del botón, registro por gramos desde él, recarga y totales; regresión del botón secundario y de los registros de Hoy. Detector Impeccable y release gate.
+
+## Compactación 2026-11-16: REQ-392..395 y REQ-403 (Hoy y guardado de perfil)
+
+Detalle movido desde `REQUIREMENTS.md` para dejar espacio a REQ-404..410 (primeros días de nutrición y rutina estable).
+
+### REQ-392 - Hoy: un solo mensaje bajo la acción principal
+
+**Estado: implementado.** Crítica de diseño de Hoy (2026-11-16, 26/40).
+
+#### Origen
+Jonathan, 2026-11-16: «demasiado texto y demasiada info».
+#### Problema
+`renderHoy` apilaba hasta 13 bloques: regreso, retomar, check-in, bienvenida del coach, «Cuéntame cómo entrenas», 3 chips, menú y referidos.
+#### Objetivo
+Un mensaje contextual como máximo; el resto espera en Avisos.
+#### Alcance
+`homeContextData()`: rescate o recuperación > retomar > técnica > bienvenida del coach > check-in. Retomar, check-in y referidos que pierden van a Avisos («Check-in de la semana 4 y 2 más»). Coach sin chips. Menú como fila de la tarjeta principal. Rutina en Entreno, también con sesión en curso. PWA v250.
+#### Criterios de aceptación
+Fuera de Avisos queda un solo mensaje; el check-in perdedor se abre en Avisos.
+#### Verificación sugerida
+`tests/e2e/home.spec.js`, `avisos.spec.js`, `coach-rutina.spec.js`, `home-optional-menu.spec.js`.
+
+### REQ-393 - Hoy: la bienvenida de regreso es el saludo
+
+**Estado: implementado.** Sigue a REQ-392.
+
+#### Origen
+Crítica de Hoy, 2026-11-16.
+#### Problema
+Tras una pausa, «Racha 0» y la tarjeta de regreso (unas 40 palabras) repetían el reinicio. «Empezar hoy» solo cerraba la tarjeta. El saludo de 26 px ocupaba 2 líneas por «Racha» y «?».
+#### Objetivo
+Saludar y dar permiso para empezar, sin estadísticas ni ceros.
+#### Alcance
+`homeGreetingData()`: «Qué bueno verte, {nombre}» y «Tu progreso sigue: N días registrados y M entrenos.»; sin registros, «Tu racha empieza con tu primera comida.». Se va al registrar hoy. La racha en 0 se muestra como «Racha», sin el cero: sigue abriendo amigos. Guía rápida en Perfil › Ayuda y soporte. Título de 22 px. PWA v251.
+#### Criterios de aceptación
+Sin tarjeta de bienvenida ni «Racha 0». Encabezado normal de 105 a 67 px a 390 px.
+#### Verificación sugerida
+`tests/e2e/regreso.spec.js`, `racha.spec.js`, `coach-welcome.spec.js`.
+
+### REQ-394 - Hoy: «Tu día» muestra comida y entreno
+
+**Estado: implementado.** Sigue a REQ-393.
+
+#### Origen
+Crítica de Hoy, 2026-11-16.
+#### Problema
+Sin menú, el entreno quedaba en «Resto del día · 1 pendiente», con un enlace «Ver entreno» dentro de la tarjeta de comida. La tarjeta repetía lo mismo 3 veces y la tira mostraba «0/4 comidas · 0/2720 kcal».
+#### Objetivo
+Comida y entreno visibles en la misma tarjeta, sin ceros.
+#### Alcance
+Fila de entreno con su acción («Iniciar entreno» o «Registrar actividad») cuando no es la acción principal; deja «Resto del día». Título «¿Qué comiste hoy?» sin subtítulo. Tira de consumo desde el primer registro. PWA v252.
+#### Criterios de aceptación
+Día de gimnasio sin menú: «Iniciar entreno» sin desplegar nada. Sin registros, no hay tira de consumo.
+#### Verificación sugerida
+`tests/e2e/home-optional-menu.spec.js`, `rutina-consistente.spec.js`, `onboarding.spec.js`.
+
+### REQ-395 - Hoy: check-in claro y placeholder legible
+
+**Estado: implementado.** Sigue a REQ-394.
+
+#### Origen
+Crítica de Hoy, 2026-11-16 (detector Impeccable y revisión).
+#### Problema
+El check-in llevaba la etiqueta «CHECK-IN · SEMANA 4» encima del rango. «Omitir esta semana» pesaba igual que iniciarlo y lo omitía sin confirmar. El placeholder del coach tenía contraste 3.9:1 (sin regla `::placeholder`).
+#### Objetivo
+Check-in legible y difícil de omitir por error; placeholders AA.
+#### Alcance
+Título «Check-in de la semana N», rango y una línea. «Hacer check-in» como botón; «Omitir esta semana» como acción secundaria con confirmación. `::placeholder` en `--muted`. PWA v253.
+#### Criterios de aceptación
+Cancelar la confirmación deja el check-in pendiente. Placeholder ≥ 4.5:1.
+#### Verificación sugerida
+`tests/e2e/home.spec.js` y detector Impeccable.
+
+### REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
+
+**Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.
+
+#### Origen
+Jonathan, 2026-11-16: `onboarding-essential.spec.js:40` (REQ-389) fallaba de forma intermitente en `main` (`788a860`), 2 de 6 con `--repeat-each=6`.
+#### Problema
+Tras «Guardar cambios» con actividad «high», mañana seguía en «moderate». Además, un guardado de fondo armado con una copia vieja de `prefs` (`profileQuestionBlockDay`, `dismissRestartNudge`, hitos de racha) podía terminar después y revertir en memoria y en la base el guardado más nuevo del usuario.
+#### Causa raíz
+`saveProfilePrefs` (`app/index.html`) publicaba `profile.prefs` justo después del upsert y recién después esperaba `ensurePlanVersion`. Durante esa ventana (~25-40 ms) `profile.prefs` ya decía «high» y `planPrefsForDate(mañana)` seguía en la versión anterior. La prueba leía en esa ventana: falla en `after.tomorrow.activityLevel`, no en `profile.prefs`. Aparte, los guardados no iban en orden y cada uno escribía la copia completa que recibió.
+#### Objetivo
+Quien lea `profile.prefs` ve la versión del plan ya coherente, y ningún guardado viejo revierte uno más nuevo.
+#### Alcance
+`saveProfilePrefs`: fila de guardados en orden; versión del plan antes de publicar las prefs en memoria; si otro guardado confirmó prefs después de que el llamador armó su copia, se aplican encima solo las claves que ese llamador cambió (base: lo último confirmado, no `profile.prefs`, porque algunos llamadores publican antes de guardar). El dueño de la sesión se valida al llamar y al ejecutar.
+#### Fuera de alcance
+Reescribir cada llamador; conflictos entre dispositivos.
+#### Riesgos
+Un upsert colgado retrasa los guardados siguientes (antes ya colgaba el guardado del usuario). Un llamador que muta `profile.prefs` en el lugar y otro guardado se le adelanta pierde su cambio en vez de revertir al otro; los hitos de racha se vuelven a detectar.
+#### Criterios de aceptación
+`onboarding-essential.spec.js:40` pasa 10 de 10 con `--repeat-each=10 --retries=0`. Un guardado de fondo con copia vieja lanzado junto al del usuario conserva ambos cambios en memoria y en el último upsert, y `profile.prefs` nunca muestra «high» mientras mañana sigue en «moderate».
+#### Verificación sugerida
+`tests/e2e/perfil-guardado-concurrente.spec.js` (falla en `788a860`), e2e de perfil y preguntas, y release gate.
+
+## Compactación 2026-11-16: resúmenes de REQ implementados (244, 167, 137, 249, 215, 227, 238, 266, 209, 214)
+
+Resúmenes movidos tal cual desde `REQUIREMENTS.md` para dejar espacio a REQ-404..410.
+
+### REQ-244 - Entreno: la duración cuenta de inicio a fin, también con la app en segundo plano
+
+**Estado: implementado.** Al ocultarse la app el cronómetro sigue (`awayAt`); al volver, `returnFromAway()` cuenta la ausencia entera hasta 1 h y, si fue mayor, deja la sesión en pausa con la duración de cuando saliste. El resumen dice "duración total". Prueba: `scripts/validate-workout-player.mjs`, `tests/e2e/entreno.spec.js`.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-244`).
+
+### REQ-167 - Fix activación de cuenta: "Auth session missing!" crudo al crear la contraseña desde una invitación
+
+**Estado: implementado.**
+
+`finishPasswordRecovery()` revalida la sesión del enlace con `getSession()` antes de `updateUser()`, bloquea el botón mientras trabaja y traduce el error a español; si la sesión ya no existe, muestra la pantalla "No pudimos abrir el enlace" con el siguiente paso.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-167`).
+
+### REQ-137 - `finalizeNutritionDay()` etapa 2: cierre global y complemento dentro de contrato
+
+**Estado: implementado.** `finalizeNutritionDay()` agrega una pasada global (`globalClosePass`) que hill-climbea sobre los macros del día completo respetando `lineLimits()`/`clampStep()`, y `attemptContractComplement()` añade snack/batido del catálogo compatible si el día sigue fuera de contrato; `runtimeActive` sigue `false`. Canario sube de 39/378 a 122/378 con `failureBreakdown`. Validador: `scripts/validate-finalize-nutrition-day.mjs`. Detalle histórico: `docs/requirements-history.md` (buscar `## REQ-137`).
+
+### REQ-249 - Fix: en "Lo que sigue hoy" los botones quedan pegados al borde de su tarjeta
+
+**Estado: implementado.** Las filas de "Lo que sigue hoy" usan clases `kind-*` en vez de `meal`/`workout` (las tarjetas globales), así que ya no son tarjetas sin relleno lateral y los botones quedan a 16 px del borde. Test: `tests/e2e/home.spec.js`.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-249`).
+
+### REQ-215 - Nutrición: lista de compra semanal con "ya lo tengo" y "por comprar"
+
+**Estado: implementado.** Nutrición → "Lista de compra · semana N": cantidades de lo que queda de semana (o la semana completa) sobre las comidas efectivas, agrupadas por categoría, con "Ya lo tengo"/"Por comprar" guardado por semana y compartir lo que falta.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-215`).
+
+### REQ-227 - Fix onboarding: editar un macro en "Ajustar valores" y continuar guarda una meta donde kcal ≠ suma de macros
+
+**Estado: implementado.** `reconcileOnboardingMacros()` reconcilia el paso 2 del onboarding: si se editó un macro, kcal = p·4+c·4+f·9; si solo kcal, proteína fija y carbos/grasa escalan (piso 50 g/45 g), con aviso. Test: `scripts/validate-onboarding-macro-reconcile.mjs`.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-227`).
+
+### REQ-238 - Fix: "Estimar macros" falla sin decir por qué y se ve una caja rota "Foto de la comida"
+
+**Estado: implementado.** "Estimar macros" (texto y foto) dice por qué falló, con "(código N)" si el motivo no se reconoce, y ofrece "Reintentar"; sin foto ya no se ve la vista previa rota.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-238`).
+
+### REQ-266 - Fix: los recordatorios por correo y push nunca se enviaban
+
+**Estado: implementado — requiere acción humana:** secreto `CRON_SECRET` en GitHub (mismo valor que en Vercel).
+
+El cron diario (03:00 en Lima) nunca coincidía con la hora elegida (17–23). `.github/workflows/notify-hourly.yml` llama cada hora a `/api/notify`, que envía desde la hora elegida (`isNotifyTime`), una vez por día. ✓ `scripts/validate-notify-schedule.mjs`.
+
+### REQ-209 - Fix: la app no ocupa todo el ancho y siempre hay una barra de scroll
+
+**Estado: implementado.** Descartado por decisión de Jonathan (2026-10-19): no se reprodujo en Chromium móvil ni en producción; la mitigación quedó en REQ-221. Si vuelve a aparecer, se abre un REQ nuevo con captura y dispositivo.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-209`).
+
+### REQ-214 - Plan: empezar de nuevo (4 o 10 semanas) en cualquier momento
+
+**Estado: implementado.** Perfil → Objetivo "Empezar de nuevo mi plan" (4 o 10 semanas) archiva el ciclo como interrumpido y arranca hoy desde la semana 1; tras 14 días sin entrenar, Hoy sugiere retomar o empezar de nuevo.
+
+Detalle historico: `docs/requirements-history.md` (buscar `## REQ-214`).
