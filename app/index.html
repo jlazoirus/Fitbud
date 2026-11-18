@@ -2845,7 +2845,7 @@ function _syncConflictDetail(item){
   if(item.entity==="day_log"){
     if(fields.some(f=>String(f).startsWith("meals.")))return "Hay cambios distintos en comidas del mismo día.";
     if(fields.some(f=>String(f).startsWith("extras.")))return "Hay cambios distintos en comidas extra.";
-    if(fields.some(f=>String(f).includes("workout")))return "La sesión fue modificada en dos lugares.";
+    if(fields.some(f=>String(f).includes("workout")))return "El entreno fue modificado en dos lugares.";
     return "El día fue actualizado en otro dispositivo.";
   }
   if(item.entity==="weight_log")return "El peso o porcentaje de grasa cambió en otro dispositivo.";
@@ -5129,10 +5129,10 @@ function nextDailyAction(ds){
   if(execution&&(workoutOutcome==="in_progress"||workoutOutcome==="paused")){
     const prog=WORKOUT_PLAYER.progress(execution);
     return{type:"workout_resume",
-      eyebrow:"Sesión en curso",
+      eyebrow:"Entreno en curso",
       title:esc(ew.workout.name),
       detail:`${prog.completed} de ${prog.total} bloques completados`,
-      cta:`<button class="btn btn-accent" style="width:100%;min-height:44px" onclick="setView('entreno')">Continuar sesión</button>`,
+      cta:`<button class="btn btn-accent" style="width:100%;min-height:44px" onclick="setView('entreno')">Continuar entreno</button>`,
       reason:""};
   }
 
@@ -5180,7 +5180,7 @@ function nextDailyAction(ds){
       detail:esc(ew.workout.detail||""),
       cta:isFreeActivityWorkout(ew.workout)
         ?`<button class="btn btn-accent" style="width:100%;min-height:44px" onclick="openManualActivity('${ds}')">Registrar mi actividad</button>`
-        :`<div class="row" style="gap:8px"><button class="btn btn-accent" style="flex:1;min-height:44px" onclick="setView('entreno')">Iniciar sesión</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Adaptar</button></div>`,
+        :`<div class="row" style="gap:8px"><button class="btn btn-accent" style="flex:1;min-height:44px" onclick="setView('entreno')">Iniciar entreno</button><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">Adaptar</button></div>`,
       reason:"Comidas del día registradas"};
   }
 
@@ -5565,7 +5565,7 @@ function homeAgendaData(ds){
     items.push({
       kind:"resume",
       title:workout?.name||"Entrenamiento",
-      meta:`Sesión en curso · ${prog.completed} de ${prog.total} bloques completados`,
+      meta:`Entreno en curso · ${prog.completed} de ${prog.total} bloques completados`,
       action:{label:"Continuar entreno",handler:`homeOpenWorkout('${ds}','workout_resume')`}
     });
   }
@@ -5589,8 +5589,8 @@ function homeAgendaData(ds){
     items.push({
       kind:"workout",
       label:"Entreno",
-      title:workout.name||"Sesión de hoy",
-      meta:workout.detail||"Sigue la sesión guiada de hoy.",
+      title:workout.name||"Entreno de hoy",
+      meta:workout.detail||"Sigue el entreno guiado de hoy.",
       action:free
         ?{label:"Registrar actividad",handler:`openManualActivity('${ds}')`}
         :{label:"Iniciar entreno",handler:`homeOpenWorkout('${ds}','workout_start')`},
@@ -5642,7 +5642,7 @@ function homeTomorrowData(ds){
   // comidas propias y no presenta los slots vacíos como un menú completo.
   const definedMeals=day.meals.filter(m=>mealHasContent(mealValue(m,mealState(next,m.id)))).length;
   return {ds:next,items:[
-    {kind:rest?"rest":"workout",label:"Entreno",title:rest?"Descanso planificado":(ew.workout.name||"Sesión del día")},
+    {kind:rest?"rest":"workout",label:"Entreno",title:rest?"Descanso planificado":(ew.workout.name||"Entreno del día")},
     {kind:"meal",label:"Comidas de mañana",title:definedMeals?`${definedMeals} comida${definedMeals===1?"":"s"} definida${definedMeals===1?"":"s"}`:"Puedes registrarlas mañana",meta:definedMeals?"":"Preparar un menú es opcional."}
   ]};
 }
@@ -5861,7 +5861,7 @@ function coachWelcomeHtml(){
   const inProgress=!!normalizedWorkoutExecution(clampDate(today));
   const first=days.length===1;
   const title=first?"Vamos paso a paso":"Aquí estoy para ayudarte";
-  const copy=safety?"Antes de entrenar, revisemos cómo empezar con seguridad.":done?"Tu entreno ya tiene un registro. Si tienes dudas sobre lo que sigue, pregúntame.":inProgress?"Tu sesión sigue donde la dejaste. Te ayudo a retomarla.":rest?"Hoy también cuenta recuperar. Te ayudo a entender tu día.":"Soy tu coach. Elige una pregunta y te ayudo a dar el siguiente paso.";
+  const copy=safety?"Antes de entrenar, revisemos cómo empezar con seguridad.":done?"Tu entreno ya tiene un registro. Si tienes dudas sobre lo que sigue, pregúntame.":inProgress?"Tu entreno sigue donde lo dejaste. Te ayudo a retomarlo.":rest?"Hoy también cuenta recuperar. Te ayudo a entender tu día.":"Soy tu coach. Elige una pregunta y te ayudo a dar el siguiente paso.";
   const canWrite=aiAvailable()&&hasRequiredConsents()&&hasCurrentScreening();
   return `<section class="coach-welcome" aria-labelledby="coachWelcomeTitle">
     <div class="coach-welcome-heading"><h2 id="coachWelcomeTitle">${title}</h2><button class="btn btn-sm" type="button" aria-label="Ocultar ayuda del coach por hoy" onclick="dismissCoachWelcome(false)">Ahora no</button></div>
@@ -5896,12 +5896,12 @@ function coachWelcomeAnswer(topic){
   if(topic==="meals")return {text:"Vamos a Nutrición. Ahí puedes ver tus comidas, registrar lo que comiste o elegir otra opción. Preparar un menú es opcional; empieza con una comida.",action:"meals",label:"Ir a mis comidas"};
   if(trainingSafetyHold())return {text:"Tu entrenamiento está en pausa por seguridad. Te acompaño a revisar la evaluación en Perfil antes de empezar.",action:"safety",label:"Revisar mi evaluación"};
   const ew=effectiveWorkout(ds),st=dayState(ds),outcome=workoutOutcomeForState(st);
-  if(!ew.workout||ew.workout.id==="descanso")return {text:"Hoy tienes descanso planificado. Recuperar también forma parte del plan; no necesitas añadir una sesión. Puedes revisar tu calendario en Entreno.",action:"workout",label:"Ver mi día de descanso"};
-  if(st.workoutDone||["completed","partial","missed"].includes(outcome))return {text:"Tu sesión de hoy ya tiene un registro. Podemos revisarla sin cambiar lo que hiciste. El siguiente entrenamiento seguirá tu plan.",action:"workout",label:"Ver mi registro"};
-  if(normalizedWorkoutExecution(ds))return {text:"Ya tienes una sesión empezada. Vamos a retomarla desde donde la dejaste, conservando tus series y registros.",action:"workout",label:"Continuar mi sesión"};
-  if(topic==="time")return {text:"Busquemos una opción que encaje con tu tiempo. Te mostraré las alternativas para hoy y tú eliges cuál aplicar; tu sesión sigue igual hasta que elijas.",action:"time",label:"Ver opciones para hoy"};
+  if(!ew.workout||ew.workout.id==="descanso")return {text:"Hoy tienes descanso planificado. Recuperar también forma parte del plan; no necesitas añadir un entreno. Puedes revisar tu calendario en Entreno.",action:"workout",label:"Ver mi día de descanso"};
+  if(st.workoutDone||["completed","partial","missed"].includes(outcome))return {text:"Tu entreno de hoy ya tiene un registro. Podemos revisarlo sin cambiar lo que hiciste. El siguiente entrenamiento seguirá tu plan.",action:"workout",label:"Ver mi registro"};
+  if(normalizedWorkoutExecution(ds))return {text:"Ya tienes un entreno empezado. Vamos a retomarlo desde donde la dejaste, conservando tus series y registros.",action:"workout",label:"Continuar mi entreno"};
+  if(topic==="time")return {text:"Busquemos una opción que encaje con tu tiempo. Te mostraré las alternativas para hoy y tú eliges cuál aplicar; tu entreno sigue igual hasta que elijas.",action:"time",label:"Ver opciones para hoy"};
   if(isFreeActivityWorkout(ew.workout))return {text:`Hoy tienes ${ew.workout.name||"actividad libre"}. En Entreno puedes revisar la indicación del día y registrar tu actividad al terminar.`,action:"workout",label:"Ver mi actividad de hoy"};
-  return {text:`Hoy tienes ${ew.workout.name||"tu sesión del día"}. En Entreno verás los ejercicios y cómo hacerlos. Revisa la sesión y, cuando estés listo, toca Iniciar sesión guiada para seguirla paso a paso.`,action:"workout",label:"Llévame a mi entrenamiento"};
+  return {text:`Hoy tienes ${ew.workout.name||"tu entreno del día"}. En Entreno verás los ejercicios y cómo hacerlos. Revísalo y, cuando estés listo, toca Iniciar entreno para seguirlo paso a paso.`,action:"workout",label:"Llévame a mi entrenamiento"};
 }
 function coachWelcomeAsk(topic,userText){
   if(!session||!isActive()||!COACH_WELCOME_QUESTIONS[topic])return;
@@ -6426,7 +6426,7 @@ function activityContextNote(ds){
   const ew=effectiveWorkout(ds);
   if(ew.workout.id==="descanso"||isFreeActivityWorkout(ew.workout))return "Cuenta como día entrenado, aunque hoy tocara descanso.";
   // REQ-253: registrar otro deporte en un día de fuerza lo reemplaza; el plan no se corre.
-  return `Cuenta como día entrenado en lugar de ${esc(ew.workout.name)}. Tu plan sigue igual desde la próxima sesión.`;
+  return `Cuenta como día entrenado en lugar de ${esc(ew.workout.name)}. Tu plan sigue igual desde el próximo entreno.`;
 }
 function lastManualActivitySport(){
   const days=Object.keys(S.days||{}).sort().reverse();
@@ -6436,6 +6436,7 @@ function lastManualActivitySport(){
   }
   return "";
 }
+// REQ-396: con entreno pendiente, el único botón lima de Entreno es «Iniciar entreno»; registrar actividad es principal solo en descanso.
 function manualActivityBlock(ds,restDay){
   const list=manualActivities(S.days[ds]);
   if(!list.length&&!canLogManualActivity(ds))return "";
@@ -6445,7 +6446,7 @@ function manualActivityBlock(ds,restDay){
     </div>`).join("");
   const label=list.length?"＋ Añadir otra actividad":restDay?"Hoy entrené igual: registrar actividad":"＋ Registrar otra actividad";
   return section("wk.actividad","Actividad registrada",`${rows||`<p class="muted small" style="margin:0 0 10px">${restDay?"¿No te apetece descansar? Registra lo que entrenaste y te estimamos las calorías.":"¿Hiciste otro deporte? Regístralo y te estimamos las calorías."}</p>`}
-    ${canLogManualActivity(ds)?`<button class="btn ${list.length?"":"btn-accent"}" style="width:100%" onclick="openManualActivity('${ds}')">${label}</button>`:""}`,list.length?String(list.length):"");
+    ${canLogManualActivity(ds)?`<button class="btn ${!list.length&&restDay?"btn-accent":""}" style="width:100%" onclick="openManualActivity('${ds}')">${label}</button>`:""}`,list.length?String(list.length):"");
 }
 function openManualActivity(ds,index){
   if(!canLogManualActivity(ds)){toast("No se puede registrar actividad en este día");return;}
@@ -6520,7 +6521,7 @@ function formatWorkoutTime(seconds){
   return hours?`${String(hours).padStart(2,"0")}:${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`:`${String(minutes).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
 }
 function workoutPhaseLabel(phase){
-  return {warmup:"Calentamiento",main:"Bloque principal",recovery:"Recuperación",cooldown:"Vuelta a la calma"}[phase]||"Sesión";
+  return {warmup:"Calentamiento",main:"Bloque principal",recovery:"Recuperación",cooldown:"Vuelta a la calma"}[phase]||"Entreno";
 }
 // REQ-241: versión más fácil / progresión de un ejercicio: otro ejercicio del
 // catálogo (cambia título e imagen), una variante del mismo o solo la carga.
@@ -6696,7 +6697,7 @@ function renderReviewedWorkoutStep(ds,execution,stepIndex){
     <div class="player-controls">
       <button class="btn" ${canPrev?"":"disabled"} onclick="reviewPreviousWorkoutStep('${ds}')">← Anterior</button>
       <button class="btn" ${canNext?"":"disabled"} onclick="reviewNextWorkoutStep('${ds}')">Siguiente →</button>
-      <button class="btn btn-accent primary" onclick="exitWorkoutReview('${ds}')">${hasPending?"Volver al ejercicio en curso":"Volver al cierre de la sesión"}</button>
+      <button class="btn btn-accent primary" onclick="exitWorkoutReview('${ds}')">${hasPending?"Volver al ejercicio en curso":"Volver al cierre del entreno"}</button>
     </div>
   </div>`;
 }
@@ -6725,10 +6726,10 @@ function startWorkoutExecution(ds){
   if(trainingSafetySoftHold()){openInjuryTrainingNotice(ds,"start");return;}
   const prescription=workoutPrescription(ds);
   if(prescription.sessionType==="rest"){toast("Hoy corresponde descanso planificado");return;}
-  if(workoutContentIssues(ds).length){toast("Esta sesión necesita actualizar su contenido antes de iniciarse");return;}
+  if(workoutContentIssues(ds).length){toast("Este entreno necesita actualizar su contenido antes de iniciarse");return;}
   const st=dayState(ds);
   if(st.workoutDone&&!st.workoutExecution){toast("Este día ya figura como completado en el historial anterior");return;}
-  if(st.workoutExecution){toast("Este día ya tiene una sesión registrada");return;}
+  if(st.workoutExecution){toast("Este día ya tiene un entreno registrado");return;}
   const first=prescription.steps&&prescription.steps[0];
   // REQ-236: si abre con el calentamiento opcional, después se pregunta; no se anuncia.
   const optionalFirst=first&&first.type==="timed"&&first.phase==="warmup";
@@ -6741,7 +6742,7 @@ function beginWorkoutExecution(ds){
   st.workoutExecution=WORKOUT_PLAYER.createExecution(prescription,Date.now());
   st.workoutExecution.contentPrescription=JSON.parse(JSON.stringify(prescription));
   st.workoutDone=false;
-  commitDay(ds);render();toast("Sesión iniciada");
+  commitDay(ds);render();toast("Entreno iniciado");
 }
 // REQ-235: la sesión no arranca en seco: 3, 2, 1 con pitido y vibración antes
 // de que empiece a correr el reloj. "Empezar ya" la salta; "Cancelar" no crea nada.
@@ -6762,7 +6763,7 @@ function openWorkoutCountdown(ds,firstLabel){
   try{const AC=window.AudioContext||window.webkitAudioContext;if(AC)audio=new AC();}catch(_){}
   const el=document.createElement("div");
   el.id="workoutCountdown";el.className="countdown";
-  el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-label","Cuenta atrás para empezar la sesión");
+  el.setAttribute("role","dialog");el.setAttribute("aria-modal","true");el.setAttribute("aria-label","Cuenta atrás para empezar el entreno");
   el.innerHTML=`<div class="countdown-label">Prepárate</div>
     <div class="countdown-n" aria-live="assertive">3</div>
     ${firstLabel?`<div class="countdown-next">Empiezas con: ${esc(firstLabel)}</div>`:""}
@@ -6863,7 +6864,7 @@ function finishTimedWorkoutStep(ds,skipped){
   const next=nextWorkoutStepIndex(execution,execution.currentStep);
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
-  if(next<0)toast("Todos los bloques están registrados. Finaliza la sesión.");
+  if(next<0)toast("Todos los bloques están registrados. Finaliza el entreno.");
 }
 function skipWorkoutTimer(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution||!execution.timer)return;
@@ -6912,7 +6913,7 @@ function completeWorkoutStep(ds,mode){
   else if(!(execution.timer&&execution.timer.transition))execution.timer=betweenExerciseTimer();
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
-  if(next<0)toast("Todos los bloques están registrados. Finaliza la sesión.");
+  if(next<0)toast("Todos los bloques están registrados. Finaliza el entreno.");
 }
 function betweenExerciseRestSeconds(){return normalizedBetweenExerciseRest(trainingPrefs().betweenExerciseRestSeconds);}
 function betweenExerciseTimer(){
@@ -6923,7 +6924,7 @@ function betweenExerciseTimer(){
 function openPendingSetsPrompt(ds,step,pending){
   const anyDone=step.sets.some(set=>set.done);
   modal(`<h3>Te ${pending.length===1?"queda":"quedan"} ${seriesCount(pending.length)} sin marcar</h3>
-    <p class="muted small">Si ya ${pending.length===1?"la hiciste, márcala":"las hiciste, márcalas"} para que la sesión cuente como completada. Se registran con las repeticiones y el esfuerzo objetivo; puedes corregirlos después.</p>
+    <p class="muted small">Si ya ${pending.length===1?"la hiciste, márcala":"las hiciste, márcalas"} para que el entreno cuente como completado. Se registran con las repeticiones y el esfuerzo objetivo; puedes corregirlos después.</p>
     <button class="btn btn-accent" style="width:100%" onclick="closeModal();completeWorkoutStep('${ds}','fill')">Marcar ${pending.length===1?"la serie":`las ${pending.length}`} como ${pending.length===1?"hecha":"hechas"} y seguir</button>
     ${anyDone?`<button class="btn" style="width:100%;margin-top:8px" onclick="closeModal();completeWorkoutStep('${ds}','advance')">Seguir sin registrar${pending.length===1?"la":"las"}</button>`:""}
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Volver al ejercicio</button>`);
@@ -6937,7 +6938,7 @@ function skipWorkoutStep(ds){
     if(execution.timer&&execution.timer.kind!=="rest")execution.timer=null;
     const next=nextWorkoutStepIndex(execution,-1);
     execution.currentStep=next>=0?next:Math.max(0,execution.steps.length-1);
-    persistWorkoutExecution(ds,execution,true);toast("Ejercicio quitado de la sesión");return;
+    persistWorkoutExecution(ds,execution,true);toast("Ejercicio quitado del entreno");return;
   }
   // REQ-250: omitir un calentamiento o vuelta a la calma es como "Ahora no".
   step.status=step.optional?"declined":"skipped";step.completedAt=new Date().toISOString();execution.timer=null;
@@ -6983,13 +6984,13 @@ function removableAddedStep(step){return !!step&&step.added===true&&step.type===
 function openAddWorkoutExercise(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress"||execution.sessionType!=="strength")return;
   modal(`<h3>Añadir un ejercicio</h3>
-    <p class="muted small">Se suma a la sesión de hoy antes de la vuelta a la calma, con las series de tu fase actual. Tu plan no cambia.</p>
+    <p class="muted small">Se suma al entreno de hoy antes de la vuelta a la calma, con las series de tu fase actual. Tu plan no cambia.</p>
     ${exerciseSearchBox(ds,"add")}`);
 }
 function addWorkoutExercise(ds,slug){
   const exercise=exerciseBySlug(slug);if(!exercise||!exerciseSafeForLimits(exercise,ds))return;
   const execution=normalizedWorkoutExecution(ds);if(!execution||execution.status!=="in_progress"||execution.sessionType!=="strength")return;
-  if(execution.steps.some(step=>step.type==="strength"&&step.exerciseSlug===slug)){toast("Ese ejercicio ya está en la sesión");return;}
+  if(execution.steps.some(step=>step.type==="strength"&&step.exerciseSlug===slug)){toast("Ese ejercicio ya está en el entreno");return;}
   const id=`added-${Date.now().toString(36)}`;
   const at=execution.steps.length&&execution.steps[execution.steps.length-1].phase==="cooldown"?execution.steps.length-1:execution.steps.length;
   const current=currentWorkoutStep(execution);
@@ -7169,9 +7170,9 @@ function openFinishWorkout(ds,partial,keep){
   const pendingHtml=pending.length?`<div class="alert violet finish-pending"><b>${pending.length===1?"Falta":"Faltan"} ${seriesCount(pending.length)} por marcar</b>, por eso se guardaría como parcial:
       <ul>${pending.map(item=>`<li>${esc(item.label)}</li>`).join("")}</ul>
       <button class="btn btn-accent btn-sm" onclick="fillPendingWorkoutSets('${ds}')">${pending.length===1?"Marcarla como hecha":"Marcarlas como hechas"}</button></div>`:"";
-  modal(`<h3>${partial||!complete?"Cerrar sesión parcial":"Finalizar sesión"}</h3>
+  modal(`<h3>${partial||!complete?"Cerrar entreno parcial":"Finalizar entreno"}</h3>
     ${pendingHtml}
-    <p class="muted small">Antes de guardar, registra cómo se sintió la sesión. El historial conservará lo realmente ejecutado.</p>
+    <p class="muted small">Antes de guardar, registra cómo se sintió el entreno. El historial conservará lo realmente ejecutado.</p>
     <div class="field"><label for="finishPain">¿Sentiste dolor o malestar anormal?</label><select id="finishPain">
       <option value="">Selecciona</option><option value="none">No</option>
       <option value="discomfort">Molestia que alteró la técnica</option>
@@ -7209,7 +7210,7 @@ function finishWorkoutExecution(ds,partialRequested){
   execution.notes=$("#finishNotes").value.trim();
   execution.needsReview=safetyIssue;
   persistWorkoutExecution(ds,execution,false);closeModal();render();
-  toast(execution.status==="completed"?"Sesión completada":"Sesión guardada como parcial");
+  toast(execution.status==="completed"?"Entreno completado":"Entreno guardado como parcial");
 }
 // REQ-185: una sesión guardada parcial solo por series sin marcar se reabre
 // en el ejercicio que las tiene, para marcarlas y cerrarla completada.
@@ -7227,7 +7228,7 @@ function markWorkoutCompleted(ds){
   const progress=WORKOUT_PLAYER.progress(execution);
   if(progress.remaining||progress.skipped||pendingPrescribedSets(execution).length)return;
   execution.status="completed";
-  persistWorkoutExecution(ds,execution,false);render();toast("Sesión completada");
+  persistWorkoutExecution(ds,execution,false);render();toast("Entreno completado");
 }
 function resumePartialWorkout(ds,reviewed){
   const execution=reviewed||normalizedWorkoutExecution(ds);if(!execution||execution.status!=="partial"||execution.needsReview)return;
@@ -7238,8 +7239,8 @@ function resumePartialWorkout(ds,reviewed){
   persistWorkoutExecution(ds,execution,true);
 }
 function discardWorkoutExecution(ds){
-  if(!confirm("¿Descartar esta sesión en curso? Se perderán las series y bloques registrados hoy."))return;
-  const st=dayState(ds);delete st.workoutExecution;st.workoutDone=false;commitDay(ds);render();toast("Sesión descartada");
+  if(!confirm("¿Descartar este entreno en curso? Se perderán las series y bloques registrados hoy."))return;
+  const st=dayState(ds);delete st.workoutExecution;st.workoutDone=false;commitDay(ds);render();toast("Entreno descartado");
 }
 let workoutTimerCompleting=false;
 // No re-renderizar por debajo de un modal ni mientras se escribe en un campo
@@ -7318,7 +7319,7 @@ function renderOptionalStepOffer(ds,step){
   return `<div class="player-step optional-offer">
     <div class="player-phase">${workoutPhaseLabel(step.phase)} · opcional</div>
     <h3>${warm?"¿Quieres calentar antes de empezar?":"¿Quieres cerrar con unos minutos suaves?"}</h3>
-    <p class="exercise-copy">${esc(step.label)}: unos ${minutes} min${moves?` · ${moves} movimientos`:""}, esfuerzo suave. Es opcional: ${warm?"si ya vienes en calor o vas justo de tiempo, empieza directo.":"puedes terminar la sesión sin hacerlo."}</p>
+    <p class="exercise-copy">${esc(step.label)}: unos ${minutes} min${moves?` · ${moves} movimientos`:""}, esfuerzo suave. Es opcional: ${warm?"si ya vienes en calor o vas justo de tiempo, empieza directo.":"puedes terminar el entreno sin hacerlo."}</p>
     <div class="player-controls">
       <button class="btn btn-accent" onclick="chooseOptionalWorkoutStep('${ds}',true)">${warm?"Sí, calentar":"Sí, hacerlo"}</button>
       <button class="btn" onclick="chooseOptionalWorkoutStep('${ds}',false)">Ahora no</button>
@@ -7454,7 +7455,7 @@ function nextWorkoutStepHtml(execution){
 }
 function renderCurrentWorkoutStep(ds,execution){
   const step=currentWorkoutStep(execution);
-  if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza la sesión para guardar el resultado.</div>';
+  if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza el entreno para guardar el resultado.</div>';
   const stepIndex=execution.steps.indexOf(step);
   if(step.optional&&!step.optIn)return renderOptionalStepOffer(ds,step);
   if(step.type==="timed"&&Array.isArray(step.movements)&&step.movements.length)return renderMovementStep(ds,execution,step,stepIndex);
@@ -7515,8 +7516,8 @@ function renderWorkoutExecution(ds,execution){
     const painLabels={none:"Sin dolor anormal",discomfort:"Molestia que alteró la técnica",sharp_pain:"Dolor agudo",dizziness:"Mareo o falta de aire inusual"};
     const difficultyLabels={easy:"Más fácil de lo esperado",expected:"Dificultad adecuada",hard:"Más difícil de lo esperado"};
     return `<div class="dash">
-      <div class="row between"><div><div class="slot">Resultado real</div><div class="cl-title">${execution.status==="completed"?"Sesión completada":"Sesión parcial"}</div></div>${workoutStatusHtml(ds,execution)}</div>
-      ${execution.needsReview?'<div class="alert" style="margin-top:12px"><b>No repitas la sesión por ahora.</b><br>La señal registrada requiere orientación profesional antes de volver a exigir esa zona o intensidad.</div>':""}
+      <div class="row between"><div><div class="slot">Resultado real</div><div class="cl-title">${execution.status==="completed"?"Entreno completado":"Entreno parcial"}</div></div>${workoutStatusHtml(ds,execution)}</div>
+      ${execution.needsReview?'<div class="alert" style="margin-top:12px"><b>No repitas este entreno por ahora.</b><br>La señal registrada requiere orientación profesional antes de volver a exigir esa zona o intensidad.</div>':""}
       ${execution.energySource==="spinning"?`<div class="muted small">≈ ${execution.estimatedKcal} kcal estimadas según duración y esfuerzo moderado.</div>`:""}
       <div class="player-summary">
         <div class="scard"><div class="n">${formatWorkoutTime(elapsed)}</div><div class="l">duración total</div></div>
@@ -7527,7 +7528,7 @@ function renderWorkoutExecution(ds,execution){
       <div class="muted small">${esc(painLabels[execution.pain]||"Cierre sin respuesta")} · ${esc(difficultyLabels[execution.difficulty]||"Dificultad sin respuesta")}</div>
       ${execution.notes?`<div class="exercise-copy"><b>Notas:</b> ${esc(execution.notes)}</div>`:""}
       ${workoutSaveCopyHtml(ds)}
-      ${execution.status==="partial"&&!execution.needsReview&&progress.remaining?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="resumePartialWorkout('${ds}')">Continuar sesión</button>`:""}
+      ${execution.status==="partial"&&!execution.needsReview&&progress.remaining?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="resumePartialWorkout('${ds}')">Continuar entreno</button>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&execution.pain==="none"&&!progress.remaining&&!progress.skipped&&!pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="markWorkoutCompleted('${ds}')">Marcar como completada</button>`:""}
       ${execution.status==="partial"&&!execution.needsReview&&!progress.remaining&&ds===todayStr()&&pendingSets.length?`<button class="btn btn-accent" style="width:100%;margin-top:12px" onclick="reviewPendingWorkoutSets('${ds}')">Marcar ${seriesCount(pendingSets.length)} sin registrar</button>`:""}
     </div>`;
@@ -7540,14 +7541,14 @@ function renderWorkoutExecution(ds,execution){
     <div class="player-progress"><i style="width:${percentage}%"></i></div>
     <div class="muted small" style="margin-top:8px">Duración estimada: ${execution.estimatedMinutes} min · el progreso se guarda después de cada acción.</div>
     <div class="row wrap" style="margin-top:12px">
-      <button class="btn btn-sm" onclick="pauseResumeWorkoutExecution('${ds}')">${execution.status==="paused"?"Reanudar sesión":"Pausar sesión"}</button>
+      <button class="btn btn-sm" onclick="pauseResumeWorkoutExecution('${ds}')">${execution.status==="paused"?"Reanudar entreno":"Pausar entreno"}</button>
       ${execution.sessionType==="strength"&&execution.status==="in_progress"?`<button class="btn btn-sm" onclick="openAddWorkoutExercise('${ds}')">+ Añadir ejercicio</button>`:""}
-      <button class="btn btn-sm" onclick="openFinishWorkout('${ds}',true)">Terminar parcialmente</button>
+      <button class="btn btn-sm" onclick="openFinishWorkout('${ds}',true)">Terminar antes</button>
       <button class="btn btn-sm" onclick="discardWorkoutExecution('${ds}')">Descartar</button>
     </div>
   </div>
-  ${execution.status==="paused"?'<div class="alert violet">La sesión está pausada. Reanúdala para continuar con temporizadores y registro.</div>':progress.remaining||reviewedWorkoutStepIndex(execution)!=null?renderActiveWorkoutStep(ds,execution):'<div class="alert violet">Todos los bloques están registrados. Revisa el cierre antes de guardar la sesión.</div>'+workoutBackButton(ds,execution)}
-  ${progress.remaining===0&&reviewedWorkoutStepIndex(execution)==null?`<button class="btn btn-accent" style="width:100%;min-height:50px" onclick="openFinishWorkout('${ds}',false)">Finalizar y guardar sesión</button>`:""}`;
+  ${execution.status==="paused"?'<div class="alert violet">El entreno está en pausa. Reanúdalo para continuar con temporizadores y registro.</div>':progress.remaining||reviewedWorkoutStepIndex(execution)!=null?renderActiveWorkoutStep(ds,execution):'<div class="alert violet">Todos los bloques están registrados. Revisa el cierre antes de guardar el entreno.</div>'+workoutBackButton(ds,execution)}
+  ${progress.remaining===0&&reviewedWorkoutStepIndex(execution)==null?`<button class="btn btn-accent" style="width:100%;min-height:50px" onclick="openFinishWorkout('${ds}',false)">Finalizar y guardar entreno</button>`:""}`;
 }
 
 /* ---------- ENTRENO: detalle del entrenamiento del día ---------- */
@@ -7600,7 +7601,7 @@ function weeklyRoutineWorkout(ds,prefs){
   const saved=execution&&execution.contentPrescription;
   if(saved&&String(saved.workoutId).startsWith("routine-weekly-"))return {
     id:saved.workoutId,name:saved.name,kind:saved.kind||"Gimnasio",role:saved.role||"fullA",
-    exerciseIds:saved.steps.filter(step=>step.type==="strength").map(step=>step.exerciseSlug),detail:"Tu rutina guardada al iniciar la sesión."};
+    exerciseIds:saved.steps.filter(step=>step.type==="strength").map(step=>step.exerciseSlug),detail:"Tu rutina guardada al iniciar el entreno."};
   if(!workoutContentCanUpdate(ds)||dayTrainingPlace(ds))return null;
   const session=weeklyRoutineSession(ds);
   if(!session)return null;
@@ -7932,9 +7933,9 @@ function workoutChangeBlocked(ds){
   const execution=normalizedWorkoutExecution(ds);
   const st=dayState(ds);
   if(st.workoutDone&&!execution){toast("El entrenamiento completado conserva la prescripción histórica");return true;}
-  if(execution){toast("La sesión registrada conserva el entrenamiento ejecutado");return true;}
+  if(execution){toast("El entreno registrado conserva lo que hiciste");return true;}
   if(view==="hoy"&&(ds!==todayStr()||!workoutContentCanUpdate(ds))){
-    toast("Elige una sesión para hoy antes de registrar actividad.");
+    toast("Elige un entreno para hoy antes de registrar actividad.");
     return true;
   }
   return false;
@@ -8193,7 +8194,7 @@ function renderWorkout(){
   const emptyWkHtml=(contentIssues.length&&!execution&&!st.workoutDone&&!restDay&&!trainingSafetyHold())?`<section class="agenda-card agenda-state setup">
     <div class="agenda-head"><div>
       <div class="agenda-kicker">Entreno</div>
-      <h2 class="agenda-title">Tu sesión de hoy no está disponible</h2>
+      <h2 class="agenda-title">Tu entreno de hoy no está disponible</h2>
       <div class="agenda-sub">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción abajo antes de iniciarla.</div>
     </div></div>
   </section>`:"";
@@ -8217,18 +8218,18 @@ function renderWorkout(){
     ${!execution&&!restDay&&!freeDay?workoutPlanSummaryHtml(prescription,ds):""}
     <div class="meal-actions">
       ${contentIssues.length?'<div class="alert">Esta rutina tiene ejercicios archivados o ausentes. Elige otra opción antes de iniciarla.</div>':""}
-      ${!execution&&!st.workoutDone&&!restDay&&!freeDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar sesión guiada</button>${trainingSafetyHold()?"":`<span class="muted small wk-safety-line">${WORKOUT_STOP_SIGNS_SHORT}</span>`}`:""}
+      ${!execution&&!st.workoutDone&&!restDay&&!freeDay?`<button class="btn btn-accent" onclick="startWorkoutExecution('${ds}')" ${trainingSafetyHold()||contentIssues.length?"disabled":""}>Iniciar entreno</button>${trainingSafetyHold()?"":`<span class="muted small wk-safety-line">${WORKOUT_STOP_SIGNS_SHORT}</span>`}`:""}
       ${freeDay&&!execution&&!manualActivities(st).length&&canLogManualActivity(ds)?`<button class="btn btn-accent" onclick="openManualActivity('${ds}')">Registrar mi actividad</button>`:""}
-      ${freeDay&&!manualActivities(st).length?`<span class="muted small" style="width:100%">Si hoy no la haces, no cuenta como sesión perdida.</span>`:""}
+      ${freeDay&&!manualActivities(st).length?`<span class="muted small" style="width:100%">Si hoy no la haces, no cuenta como entreno perdido.</span>`:""}
       ${!execution&&st.workoutDone?'<span class="muted small">Completado con el registro anterior; las series no estaban disponibles.</span>':""}
-      ${restDay?`<span class="muted small">${manualActivities(st).length?"Descanso planificado, pero entrenaste igual: cuenta como día entrenado.":"Descanso planificado: no cuenta como sesión incompleta."}</span>`:""}
+      ${restDay?`<span class="muted small">${manualActivities(st).length?"Descanso planificado, pero entrenaste igual: cuenta como día entrenado.":"Descanso planificado: no cuenta como entreno incompleto."}</span>`:""}
       <button class="btn btn-sm" onclick="openWorkoutPicker('${ds}')" ${trainingSafetyHold()||execution||st.workoutDone?"disabled":""}>Cambiar entrenamiento</button>
       ${strengthDay&&!execution&&!st.workoutDone&&!trainingSafetyHold()?`<button class="btn btn-sm" onclick="openRoutineEditor('${ds}')">Editar ejercicios</button>`:""}
       ${strengthDay&&dayRepeatWorkout(ds)&&dayCustomExercises(ds).length&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="leaveRepeatWorkout('${ds}')">Volver al plan</button>`:""}
       ${strengthDay&&!dayRepeatWorkout(ds)&&dayCustomExercises(ds).length&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="resetDayRoutine('${ds}')">Volver a la rutina del plan</button>`:""}
       ${ew.overridden&&!(strengthDay&&dayRepeatWorkout(ds))&&!execution&&!st.workoutDone?`<button class="btn btn-sm" onclick="setWorkout('${ds}',null)">Volver al plan</button>`:''}
       ${dayPlace&&!execution&&!st.workoutDone&&!trainingSafetyHold()?`<button class="btn btn-sm" onclick="setDayTrainingPlace('${ds}',null)">${esc(dayPlaceBackLabel(plannedPlace))}</button>`:''}
-      ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar ${adaptDayLabel(ds)}:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">${ew.workout.sport==="indoor_cycling"?"Tengo poco tiempo":"Solo 20 min"}</button>${strengthDay||training.strength!=="none"?`<button class="btn btn-sm" onclick="openDayTrainingPlace('${ds}')">${dayPlace?"Cambiar lugar":strengthDay&&plannedPlace!=="gym"?"En el gimnasio":"En casa"}</button>`:""}<button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí la sesión</button>`:""}
+      ${!execution&&!st.workoutDone&&!restDay&&!freeDay&&!trainingSafetyHold()?`<div class="muted small" style="width:100%;margin-top:6px;margin-bottom:2px">Adaptar ${adaptDayLabel(ds)}:</div><button class="btn btn-sm" onclick="openWorkoutContingency('${ds}','tiempo')">${ew.workout.sport==="indoor_cycling"?"Tengo poco tiempo":"Solo 20 min"}</button>${strengthDay||training.strength!=="none"?`<button class="btn btn-sm" onclick="openDayTrainingPlace('${ds}')">${dayPlace?"Cambiar lugar":strengthDay&&plannedPlace!=="gym"?"En el gimnasio":"En casa"}</button>`:""}<button class="btn btn-sm" onclick="openManualActivity('${ds}')">Hice otro deporte</button><button class="btn btn-sm" onclick="openMissedSession('${ds}')">Me perdí el entreno</button>`:""}
     </div>
   </div>`);
   // REQ-239: con la sesión en curso, el reproductor va primero y el plan y la
@@ -8406,7 +8407,7 @@ function daySummary(ds){
     <div class="scard"><div class="n">${workoutSummary}</div><div class="l">entrenamiento</div></div>
   </div>
   <div class="muted small center" style="margin-top:10px">${esc(planWeekLabel(ds))} · faltan ${daysLeft} días para el final</div>
-  ${(()=>{const clog=st.contingencyLog||[];if(!clog.length)return"";const labels={meal_replace:"comida adaptada",meal_revert:"comida restaurada",workout_change:"entrenamiento cambiado",place_change:"lugar cambiado",missed_session:"sesión no realizada"};return`<div class="muted small center" style="margin-top:4px">Adaptaciones: ${clog.map(e=>labels[e.type]||e.type).join(", ")}</div>`;})()}`);
+  ${(()=>{const clog=st.contingencyLog||[];if(!clog.length)return"";const labels={meal_replace:"comida adaptada",meal_revert:"comida restaurada",workout_change:"entrenamiento cambiado",place_change:"lugar cambiado",missed_session:"entreno no realizado"};return`<div class="muted small center" style="margin-top:4px">Adaptaciones: ${clog.map(e=>labels[e.type]||e.type).join(", ")}</div>`;})()}`);
 }
 
 /* ---------- acciones ---------- */
@@ -8434,8 +8435,8 @@ function openWorkoutPicker(ds){
   const groups=[[prefs.strength==="gym"?"Gimnasio":"Peso corporal","💪"],[SPORT_LABELS[prefs.primary],"◉"],["Descanso","☾"]];
   const choosingFromHome=view==="hoy";
   let html=choosingFromHome
-    ?`<h3>Elegir entrenamiento para hoy</h3><p class="muted small">Hoy toca descanso. Puedes elegir una sesión solo para este día.</p>`
-    :`<h3>Cambiar entrenamiento</h3><p class="muted small">Tu plan combina <b>${SPORT_LABELS[prefs.primary]}</b> con <b>${STRENGTH_LABELS[prefs.strength]}</b>. La sesión planificada es <b>${esc(ew.planned.name)}</b>.</p>`;
+    ?`<h3>Elegir entrenamiento para hoy</h3><p class="muted small">Hoy toca descanso. Puedes elegir un entreno solo para este día.</p>`
+    :`<h3>Cambiar entrenamiento</h3><p class="muted small">Tu plan combina <b>${SPORT_LABELS[prefs.primary]}</b> con <b>${STRENGTH_LABELS[prefs.strength]}</b>. El entreno planificado es <b>${esc(ew.planned.name)}</b>.</p>`;
   // REQ-346: primero lo propio: guardados y los últimos entrenos, para repetirlos tal cual.
   html+=workoutCopyPickerHtml(ds);
   groups.forEach(([k,ic])=>{
@@ -8717,7 +8718,7 @@ const COACH_CHAT_KEEP=15;  // mensajes recientes a conservar tras resumir
 const COACH_SUGGESTIONS=[
   "¿Qué puedo comer ahora con las kcal que me quedan?",
   "¿Cómo hago correctamente el ejercicio de hoy?",
-  "Perdí la sesión de hoy — ¿qué hago?",
+  "Perdí el entreno de hoy — ¿qué hago?",
   "Adapta el día de hoy por falta de tiempo",
   "¿Por qué cambió mi plan esta semana?",
 ];
@@ -8733,7 +8734,7 @@ const COACH_WORKOUT_REASON_ALIASES={
   tiempo:"tiempo",solo_20_min:"tiempo",poco_tiempo:"tiempo",falta_de_tiempo:"tiempo",
   casa:"casa",en_casa:"casa",
   equipo:"equipo",sin_equipo:"equipo",sin_acceso_al_equipo:"equipo",
-  sesion_perdida:"sesion_perdida",perdi_la_sesion:"sesion_perdida",me_perdi_la_sesion:"sesion_perdida",
+  sesion_perdida:"sesion_perdida",perdi_la_sesion:"sesion_perdida",me_perdi_la_sesion:"sesion_perdida",perdi_el_entreno:"sesion_perdida",me_perdi_el_entreno:"sesion_perdida",
 };
 const COACH_ACTION_LABELS={
   marcar_descanso:"Convertir en descanso",
@@ -9135,7 +9136,7 @@ function canApplyCoachAction(raw){
   if(action.tipo==="marcar_descanso"){
     const st=dayState(ds);const ew=effectiveWorkout(ds);
     if(ew.workout&&ew.workout.id==="descanso")return {ok:false,action,reason:"Hoy ya es un descanso planificado."};
-    if(st.workoutDone||workoutHasRecordedActivity(st))return {ok:false,action,reason:"La sesión ya tiene registro; no la reescribo."};
+    if(st.workoutDone||workoutHasRecordedActivity(st))return {ok:false,action,reason:"El entreno ya tiene registro; no lo reescribo."};
     return {ok:true,action,ds};
   }
   if(action.tipo==="registrar_comida"){
@@ -9165,7 +9166,7 @@ function canApplyCoachAction(raw){
     const st=dayState(ds);const ew=effectiveWorkout(ds);
     if(trainingSafetyHold())return {ok:false,action,reason:"El entrenamiento está pausado por seguridad."};
     if(ew.workout&&ew.workout.id==="descanso")return {ok:false,action,reason:"Hoy ya es descanso planificado."};
-    if(st.workoutDone||normalizedWorkoutExecution(ds))return {ok:false,action,reason:"La sesión ya tiene registro; no la reescribo."};
+    if(st.workoutDone||normalizedWorkoutExecution(ds))return {ok:false,action,reason:"El entreno ya tiene registro; no lo reescribo."};
     return {ok:true,action,ds};
   }
   if(action.tipo==="registrar_peso"){
@@ -11992,13 +11993,13 @@ async function blockCurrentMealDish(ds,id){
 function openWorkoutContingency(ds,reason){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
   const execution=normalizedWorkoutExecution(ds);
-  if(execution||dayState(ds).workoutDone){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
+  if(execution||dayState(ds).workoutDone){toast("El entreno registrado conserva lo que hiciste");return;}
   // REQ-291: casa o sin equipo adaptan la misma sesión al lugar; antes filtraban
   // las rutinas de gimnasio y solo quedaba "Descanso total".
   if(reason==="casa"||reason==="equipo"){openDayTrainingPlace(ds);return;}
   const ew=effectiveWorkout(ds);const filtered=workoutOptions(ds);
   const titles={tiempo:"Solo tengo poco tiempo"};
-  const hints={tiempo:"Elige la sesión más eficiente o descansa activamente."};
+  const hints={tiempo:"Elige el entreno más eficiente o descansa activamente."};
   const optsHtml=filtered.map(o=>{
     const cur=o.id===ew.id;
     return `<button class="opt" onclick="applyWorkoutContingency('${ds}','${o.id}','${reason}')" style="${cur?'border-color:var(--accent)':''}">${esc(o.name)}${cur?' ✓':''}<div class="o-meta">${esc(o.detail)}</div></button>`;
@@ -12032,7 +12033,7 @@ const DAY_PLACE_OPTIONS={
 };
 function openDayTrainingPlace(ds){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
-  if(normalizedWorkoutExecution(ds)||dayState(ds).workoutDone){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
+  if(normalizedWorkoutExecution(ds)||dayState(ds).workoutDone){toast("El entreno registrado conserva lo que hiciste");return;}
   const planned=plannedStrengthPlace(ds);
   const currentPlace=dayTrainingPlace(ds)||planned;
   const ew=effectiveWorkout(ds);
@@ -12070,14 +12071,14 @@ function openSportDayPlace(ds,ew){
     return `<button class="opt" onclick="setDayTrainingPlace('${ds}','${place}')">${label}<div class="o-meta">${esc(session?session.name:"")}${place==="home"?", sin máquinas.":"."}</div></button>`;
   };
   modal(`<h3>¿Dónde entrenas ${adaptDayLabel(ds)}?</h3>
-    <p class="muted small">Tu plan tiene <b>${esc(ew.workout.name)}</b>. En casa o en el gimnasio haces una sesión de fuerza en su lugar; solo cambia este día.</p>
+    <p class="muted small">Tu plan tiene <b>${esc(ew.workout.name)}</b>. En casa o en el gimnasio haces un entreno de fuerza en su lugar; solo cambia este día.</p>
     ${opt("home","Casa")}
     ${opt("gym","Gimnasio")}
-    <button class="opt" onclick="closeModal()" style="border-color:var(--accent)">${esc(ew.workout.name)} · tu plan ✓<div class="o-meta">Mantener la sesión de hoy.</div></button>`);
+    <button class="opt" onclick="closeModal()" style="border-color:var(--accent)">${esc(ew.workout.name)} · tu plan ✓<div class="o-meta">Mantener el entreno de hoy.</div></button>`);
 }
 function setDayTrainingPlace(ds,place){
   if(trainingSafetyHold()){toast("El entrenamiento está pausado por seguridad");return;}
-  if(normalizedWorkoutExecution(ds)||dayState(ds).workoutDone){toast("La sesión registrada conserva el entrenamiento ejecutado");return;}
+  if(normalizedWorkoutExecution(ds)||dayState(ds).workoutDone){toast("El entreno registrado conserva lo que hiciste");return;}
   const d=dayState(ds);
   const ew=effectiveWorkout(ds);
   if(!isStrengthWorkout(ew.workout)){
@@ -12096,17 +12097,17 @@ function setDayTrainingPlace(ds,place){
   if(next===planned)delete d.trainingPlace;else d.trainingPlace=next;
   if(next!==prev)addContingencyEntry(ds,{type:"place_change",reason:next,prev});
   commitDay(ds);closeModal();render();
-  toast(next===planned?"Sesión de tu plan restaurada":next==="gym"?"Sesión adaptada al gimnasio":`Sesión adaptada para ${next==="home"?"casa":"el aire libre"}: mismos músculos`);
+  toast(next===planned?"Entreno de tu plan restaurado":next==="gym"?"Entreno adaptado al gimnasio":`Entreno adaptado para ${next==="home"?"casa":"el aire libre"}: mismos músculos`);
 }
 function openMissedSession(ds){
-  if(dayState(ds).workoutDone||normalizedWorkoutExecution(ds)){toast("Este día ya tiene una sesión registrada");return;}
+  if(dayState(ds).workoutDone||normalizedWorkoutExecution(ds)){toast("Este día ya tiene un entreno registrado");return;}
   const ew=effectiveWorkout(ds);
   if(ew.workout.id==="descanso"){toast("Este día ya es un descanso planificado");return;}
-  modal(`<h3>Me perdí la sesión</h3>
-    <p class="muted small">Sesión de hoy: <b>${esc(ew.planned.name)}</b>. ¿Qué prefieres hacer?</p>
+  modal(`<h3>Me perdí el entreno</h3>
+    <p class="muted small">Entreno de hoy: <b>${esc(ew.planned.name)}</b>. ¿Qué prefieres hacer?</p>
     <button class="opt" onclick="applyMissedSession('${ds}','continue')">✓ Seguir con el plan<div class="o-meta">No duplicas carga; continúas normalmente desde mañana.</div></button>
     <button class="opt" onclick="applyMissedSession('${ds}','reschedule')">↩ Recuperarla en otro momento<div class="o-meta">Registras la intención; tú decides cuándo hacerla.</div></button>
-    <button class="opt" onclick="applyMissedSession('${ds}','rest')">☾ Convertir en descanso<div class="o-meta">Marcas el día como descanso planificado; no cuenta como sesión perdida.</div></button>
+    <button class="opt" onclick="applyMissedSession('${ds}','rest')">☾ Convertir en descanso<div class="o-meta">Marcas el día como descanso planificado; no cuenta como entreno perdido.</div></button>
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Cancelar</button>`);
 }
 function applyMissedSession(ds,action){
@@ -13406,7 +13407,7 @@ let lastCoachCallOrigin="";
 const COACH_BUSY_LABELS={
   diet_day:"Preparando tus comidas…",diet_week:"Preparando tu semana…",diet_meal:"Buscando otra opción…",meal_option:"Buscando otra opción…",
   meal_estimate:"Estimando tu comida…",macro_review:"Revisando tus macros…",training_plan:"Preparando tu plan…",
-  training_replacement:"Preparando otra sesión…",coach_conversation:"Tu coach está respondiendo…","coach-convo":"Tu coach está respondiendo…",
+  training_replacement:"Preparando otro entreno…",coach_conversation:"Tu coach está respondiendo…","coach-convo":"Tu coach está respondiendo…",
   first_week_diet:"Preparando tu primera semana…",first_week_training:"Preparando tu primera semana…",
 };
 // Acepta la acción del proxy o la clave de la acción en curso (diet_meal_desayuno, training_plan_week_3…).
@@ -13973,7 +13974,7 @@ function trainingDraftReviewHtml(){
       <div class="muted small" style="margin-top:4px">${esc(session.objective)} · ${session.exercises.map(item=>esc((exerciseBySlug(item.exerciseId,true)||{}).name||item.exerciseId)).join(" · ")}</div>
       ${draft.trialFirstWeekOnly&&index>0
         ?`<div class="muted small" style="margin-top:8px">Activa un plan para personalizar esta semana.</div>`
-        :`<button class="btn btn-sm" style="margin-top:8px" onclick="regenerateTrainingDraftSession('${session.date}')">Otra sesión</button>`}
+        :`<button class="btn btn-sm" style="margin-top:8px" onclick="regenerateTrainingDraftSession('${session.date}')">Otro entreno</button>`}
     </div>`).join("")}
     ${draft.trialFirstWeekOnly&&index>0
       ?`<button class="btn btn-sm" onclick="showPaywall('trial_limit')">Personalizar semana ${week.week}</button>`
@@ -14072,7 +14073,7 @@ async function regenerateTrainingDraftSession(date){
   const expected={...expectedWeek,sessions:expectedWeek.sessions.filter(session=>session.date===date)};
   const actionKey=`training_replacement_${date}`;
   const requestId=beginCoachAction(actionKey);if(!requestId)return;
-  const out=$("#trainingPlanOut");if(out)out.innerHTML=`<div class="ai-box">Preparando otra sesión para ${prettyDate(date)}…</div>`;
+  const out=$("#trainingPlanOut");if(out)out.innerHTML=`<div class="ai-box">Preparando otro entreno para ${prettyDate(date)}…</div>`;
   try{
     let result;
     try{
@@ -18495,7 +18496,7 @@ function tourSteps(){
     {sel:".home-consumption",title:"Tu consumo de hoy",body:"Toca esta línea para ver tus comidas y el detalle de macros en Nutrición.",placement:"bottom"},
     {sel:".home-primary",title:"Tu día",body:"Registra lo que comes y empieza tu entreno desde aquí. Lo demás del día queda en «Resto del día».",placement:"bottom"},
     {sel:'[data-tab="nutricion"]',title:"Nutrición",body:"Tus comidas del día con calorías y macros. Registra, reemplaza por otra opción o agrega un extra.",placement:"top"},
-    {sel:'[data-tab="entreno"]',title:"Entreno",body:"Tu sesión guiada paso a paso: calentamiento, series e intervalos con temporizador y demostraciones.",placement:"top"},
+    {sel:'[data-tab="entreno"]',title:"Entreno",body:"Tu entreno guiado paso a paso: calentamiento, series e intervalos con temporizador y demostraciones.",placement:"top"},
     {sel:'[data-tab="progreso"]',title:"Progreso",body:"Registra tu peso semanal y mira tu evolución, racha y adherencia.",placement:"top"},
     {sel:'[data-tab="perfil"]',title:"Perfil",body:"Ajusta metas, comidas, entrenamiento y privacidad. Cada 4 semanas te proponemos revisar.",placement:"top"}
   ];
@@ -18625,7 +18626,7 @@ function reconcileAwayWorkouts(){
     if(result==="paused"){paused=true;execution.updatedAt=new Date().toISOString();}
     commitDay(ds);
   });
-  if(paused)toast("Tu sesión quedó en pausa desde que saliste de la app");
+  if(paused)toast("Tu entreno quedó en pausa desde que saliste de la app");
 }
 document.addEventListener("visibilitychange",()=>{if(document.hidden)markWorkoutsAway();else{reconcileAwayWorkouts();resyncWorkoutView();}});
 window.addEventListener("pagehide",markWorkoutsAway);

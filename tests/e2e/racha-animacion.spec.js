@@ -48,7 +48,7 @@ test.describe("Racha — animación al registrar (REQ-283)", () => {
     await expect(pop(page)).toContainText("Falta el entreno");
 
     await page.locator("#tabs").getByText("Entreno").click();
-    await page.getByRole("button", { name: "Me perdí la sesión" }).click();
+    await page.getByRole("button", { name: "Me perdí el entreno" }).click();
     await page.locator("#overlay").getByRole("button", { name: /Convertir en descanso/ }).click();
     await expect(pop(page)).toHaveClass(/sp-day/);
     await expect(pop(page)).toContainText("Día 4 sumado");

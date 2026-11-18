@@ -70,7 +70,7 @@ test.describe("Actividad registrada a mano", () => {
 
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
-    await expect(app).toContainText("Descanso planificado: no cuenta como sesión incompleta.");
+    await expect(app).toContainText("Descanso planificado: no cuenta como entreno incompleto.");
     await page.getByRole("button", { name: "Hoy entrené igual: registrar actividad" }).click();
 
     const overlay = page.locator("#overlay");
@@ -166,8 +166,8 @@ test.describe("Actividad registrada a mano", () => {
     const app = page.locator("#app");
     await expect(app).toContainText("Día de tu deporte");
     await expect(app).not.toContainText("Descanso total");
-    await expect(page.getByRole("button", { name: "Iniciar sesión guiada" })).toHaveCount(0);
-    await expect(app).toContainText("Si hoy no la haces, no cuenta como sesión perdida.");
+    await expect(page.getByRole("button", { name: "Iniciar entreno" })).toHaveCount(0);
+    await expect(app).toContainText("Si hoy no la haces, no cuenta como entreno perdido.");
     await page.getByRole("button", { name: "Registrar mi actividad" }).click();
     const overlay = page.locator("#overlay");
     await expect(overlay.locator("#ma_sport")).toHaveValue("other");
@@ -212,7 +212,7 @@ test.describe("Actividad registrada a mano", () => {
     expect(sesion).toMatch(/^Gimnasio/);
     await page.getByRole("button", { name: "Hice otro deporte" }).click();
     const overlay = page.locator("#overlay");
-    await expect(overlay).toContainText(`Cuenta como día entrenado en lugar de ${sesion}. Tu plan sigue igual desde la próxima sesión.`);
+    await expect(overlay).toContainText(`Cuenta como día entrenado en lugar de ${sesion}. Tu plan sigue igual desde el próximo entreno.`);
     await expect(overlay.locator("#ma_sport")).toHaveValue("other");
     await overlay.locator("#ma_sport").selectOption("padel");
     await overlay.getByRole("button", { name: "Guardar actividad" }).click();

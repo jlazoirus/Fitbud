@@ -43,7 +43,7 @@ test("Preguntas de texto, comidas y foco en el coach",async({page,context})=>{
   await expect(page.locator("#coachInput")).toBeFocused();
   await page.locator("#coachInput").fill("Hoy día cómo entreno?");
   await page.locator("#coachInput").press("Enter");
-  await expect(page.locator(".coach-guide-reply")).toContainText("Iniciar sesión guiada");
+  await expect(page.locator(".coach-guide-reply")).toContainText("Iniciar entreno");
   await page.evaluate(()=>setView("hoy"));
   await page.locator(".coach-welcome").getByRole("button",{name:"¿Qué puedo comer hoy?"}).click();
   await page.getByRole("button",{name:"Ir a mis comidas",exact:true}).click();

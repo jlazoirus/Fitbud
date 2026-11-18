@@ -39,7 +39,7 @@ test.describe("Entreno", () => {
     // "Ya calenté"/"Ya terminé" (REQ-212) o "Marcar completado" en los bloques de tiempo.
     let sawStrengthBlock = false;
     for (let bloque = 0; bloque < totalBloques; bloque++) {
-      const finalizar = page.getByRole("button", { name: "Finalizar y guardar sesión" });
+      const finalizar = page.getByRole("button", { name: "Finalizar y guardar entreno" });
       if (await finalizar.isVisible().catch(() => false)) break;
 
       const siguiente = page.getByRole("button", { name: "Siguiente ejercicio" }).first();
@@ -60,7 +60,7 @@ test.describe("Entreno", () => {
 
     // Cierre: cuestionario de sensaciones y guardado
     await expect(app).toContainText(/Todos los bloques están registrados/i);
-    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    await page.getByRole("button", { name: "Finalizar y guardar entreno" }).click();
     const overlay = page.locator("#overlay");
     const selects = overlay.locator("select");
     await expect(selects.first()).toBeVisible();
@@ -69,7 +69,7 @@ test.describe("Entreno", () => {
     await overlay.getByRole("button", { name: "Guardar resultado" }).click();
 
     // La sesión quedó cerrada: el reproductor ya no está en curso
-    await expect(app).not.toContainText("Finalizar y guardar sesión");
+    await expect(app).not.toContainText("Finalizar y guardar entreno");
     await expect(app).not.toContainText(/En curso ·/);
 
     // El progreso se persistió por acción (day_log recibe upserts durante la sesión)
@@ -146,7 +146,7 @@ test.describe("Entreno", () => {
     await expect(app).toContainText(/0\/\d+ bloques/);
 
     // Omite UN bloque (calentamiento, siempre el primero; REQ-236: tras elegir
-    // hacerlo) y ABANDONA — nunca "Finalizar y guardar sesión" ni "Terminar parcialmente".
+    // hacerlo) y ABANDONA — nunca "Finalizar y guardar entreno" ni "Terminar antes".
     await page.getByRole("button", { name: "Sí, calentar" }).click();
     await page.getByRole("button", { name: "Omitir bloque" }).click();
 
@@ -215,7 +215,7 @@ test.describe("Entreno", () => {
     const app = page.locator("#app");
 
     const firstExercise = await runSessionLeavingOneSet(page);
-    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    await page.getByRole("button", { name: "Finalizar y guardar entreno" }).click();
     const overlay = page.locator("#overlay");
     // El modal dice qué falta (y no cuenta la serie extra sin hacer).
     await expect(overlay).toContainText("Falta 1 serie por marcar");
@@ -224,10 +224,10 @@ test.describe("Entreno", () => {
     await overlay.getByRole("button", { name: "Marcarla como hecha" }).click();
     await expect(overlay).not.toContainText("por marcar");
     await expect(overlay.locator("#finishPain")).toHaveValue("none"); // conserva lo respondido
-    await expect(overlay.locator("h3")).toHaveText("Finalizar sesión");
+    await expect(overlay.locator("h3")).toHaveText("Finalizar entreno");
     await answerAndSave(page);
 
-    await expect(app).toContainText("Sesión completada");
+    await expect(app).toContainText("Entreno completado");
     const sets = (await app.innerText()).match(/(\d+)\/(\d+)\s*series registradas/);
     expect(sets && sets[1]).toBe(sets && sets[2]);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
@@ -243,18 +243,18 @@ test.describe("Entreno", () => {
     const app = page.locator("#app");
 
     await runSessionLeavingOneSet(page);
-    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    await page.getByRole("button", { name: "Finalizar y guardar entreno" }).click();
     await answerAndSave(page);
-    await expect(app).toContainText("Sesión parcial");
+    await expect(app).toContainText("Entreno parcial");
 
-    // Antes no había salida: 0 bloques pendientes ⇒ sin "Continuar sesión".
+    // Antes no había salida: 0 bloques pendientes ⇒ sin "Continuar entreno".
     await page.getByRole("button", { name: "Marcar 1 serie sin registrar" }).click();
     await page.locator('#app button.set-done:not(.on)').first().click();
     await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
-    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    await page.getByRole("button", { name: "Finalizar y guardar entreno" }).click();
     await expect(page.locator("#overlay")).not.toContainText("por marcar");
     await answerAndSave(page);
-    await expect(app).toContainText("Sesión completada");
+    await expect(app).toContainText("Entreno completado");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
   test("REQ-186: el descanso no se congela si un guardado anterior responde tarde", async ({ page, context }) => {
@@ -408,7 +408,7 @@ test.describe("Cuenta atrás", () => {
     await gotoApp(page);
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
-    const start = page.getByRole("button", { name: "Iniciar sesión guiada" }).last();
+    const start = page.getByRole("button", { name: "Iniciar entreno" }).last();
     const countdown = page.locator("#workoutCountdown");
     const hasExecution = () => page.evaluate(() => !!dayState(current).workoutExecution);
 
@@ -585,13 +585,13 @@ test.describe("Bloques opcionales", () => {
     await page.getByRole("button", { name: "Ahora no" }).click();
     await expect(app).toContainText(new RegExp(`${total - 2}\\/${total - 2} bloques`));
 
-    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    await page.getByRole("button", { name: "Finalizar y guardar entreno" }).click();
     const overlay = page.locator("#overlay");
-    await expect(overlay.locator("h3")).toHaveText("Finalizar sesión");
+    await expect(overlay.locator("h3")).toHaveText("Finalizar entreno");
     await overlay.locator("#finishPain").selectOption({ label: "No" });
     await overlay.locator("#finishDifficulty").selectOption({ label: "Adecuada" });
     await overlay.getByRole("button", { name: "Guardar resultado" }).click();
-    await expect(app).toContainText("Sesión completada");
+    await expect(app).toContainText("Entreno completado");
     await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
@@ -621,13 +621,13 @@ test.describe("Bloques opcionales", () => {
     }
     await page.getByRole("button", { name: "Sí, hacerlo" }).click();
     await page.getByRole("button", { name: "Omitir bloque" }).click();
-    await page.getByRole("button", { name: "Finalizar y guardar sesión" }).click();
+    await page.getByRole("button", { name: "Finalizar y guardar entreno" }).click();
     const overlay = page.locator("#overlay");
-    await expect(overlay.locator("h3")).toHaveText("Finalizar sesión");
+    await expect(overlay.locator("h3")).toHaveText("Finalizar entreno");
     await overlay.locator("#finishPain").selectOption({ label: "No" });
     await overlay.locator("#finishDifficulty").selectOption({ label: "Adecuada" });
     await overlay.getByRole("button", { name: "Guardar resultado" }).click();
-    await expect(app).toContainText("Sesión completada");
+    await expect(app).toContainText("Entreno completado");
     await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
 
     // Una sesión guardada antes del arreglo: calentamiento "skipped" y parcial.
@@ -638,10 +638,10 @@ test.describe("Bloques opcionales", () => {
       st.workoutDone = false;
       commitDay(current); render();
     });
-    await expect(app).toContainText("Sesión parcial");
+    await expect(app).toContainText("Entreno parcial");
     await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
     await app.getByRole("button", { name: "Marcar como completada" }).click();
-    await expect(app).toContainText("Sesión completada");
+    await expect(app).toContainText("Entreno completado");
     expect(await page.evaluate(() => dayState(current).workoutDone)).toBe(true);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
@@ -1189,7 +1189,7 @@ test.describe("Plan compacto", () => {
     await expect(app.locator(".wk-hint")).toHaveCount(0);
 
     // La cuenta atrás recuerda las señales completas.
-    await page.getByRole("button", { name: "Iniciar sesión guiada" }).click();
+    await page.getByRole("button", { name: "Iniciar entreno" }).click();
     const countdown = page.locator("#workoutCountdown");
     await expect(countdown).toContainText("Señales para detenerte: dolor, mareo, desmayo");
     await countdown.getByRole("button", { name: "Cancelar" }).click();
@@ -1222,5 +1222,36 @@ test.describe("Plan compacto", () => {
     await expect(app.locator(".wk-safety-line")).toHaveCount(0);
     await expect(app.locator(".wk-location")).toHaveCount(0);
     await expect(app.getByText("Señales para detenerte:")).toHaveCount(0);
+  });
+});
+
+// REQ-396: «Iniciar entreno» es la única acción lima con entreno pendiente y
+// ningún texto de entrenamiento dice «sesión» (se confundía con el login).
+test.describe("REQ-396 Iniciar entreno", () => {
+  for (const width of [320, 390]) test(`un solo botón principal y sin «sesión» (${width})`, async ({ page, context }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await installMocks(context);
+    await seedLoggedInUser(page);
+    await autoDismissNudges(page);
+    const errors = collectConsoleErrors(page);
+    await gotoApp(page);
+    await page.locator("#tabs").getByText("Entreno").click();
+    const app = page.locator("#app");
+    const start = app.getByRole("button", { name: "Iniciar entreno", exact: true });
+    await expect(start).toBeVisible();
+    await expect(app.locator(".btn-accent:visible")).toHaveCount(1);
+    await expect(app.locator(".btn-accent:visible")).toHaveText("Iniciar entreno");
+    await expect(app.getByRole("button", { name: /Registrar otra actividad/ })).toBeVisible();
+    await expect(app.getByRole("button", { name: "Me perdí el entreno" })).toBeVisible();
+    await expect(app).not.toContainText(/sesi[oó]n/i);
+
+    await startGuidedSession(page);
+    await expect(app.getByRole("button", { name: "Pausar entreno" })).toBeVisible();
+    await expect(app.getByRole("button", { name: "Terminar antes" })).toBeVisible();
+    await expect(app.locator(".player-overview")).not.toContainText(/sesi[oó]n/i);
+    await app.getByRole("button", { name: "Pausar entreno" }).click();
+    await expect(app).toContainText("El entreno está en pausa");
+    await expect(app.getByRole("button", { name: "Reanudar entreno" })).toBeVisible();
+    expect(errors).toEqual([]);
   });
 });

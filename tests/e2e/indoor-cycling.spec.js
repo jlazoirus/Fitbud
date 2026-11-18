@@ -34,7 +34,7 @@ for(const width of [390,1280])test(`REQ-387: indoor 3 días y fuerza 2, en casa,
  const post=calls.filter(c=>c.table==='profiles'&&c.method==='POST').at(-1).payload;
  tables.profiles.row=Array.isArray(post)?post[0]:post;
  await expect.poll(()=>calls.filter(c=>c.table==='day_log'&&c.method==='POST'&&c.payload?.state?.workoutExecution?.status==='completed').length).toBeGreaterThan(0);
- await page.reload();await page.waitForFunction(()=>typeof profile!=='undefined'&&profile&&!_authBusy);await page.locator('[data-tab="entreno"]').click();await expect(page.locator('#app')).toContainText('Sesión completada');
+ await page.reload();await page.waitForFunction(()=>typeof profile!=='undefined'&&profile&&!_authBusy);await page.locator('[data-tab="entreno"]').click();await expect(page.locator('#app')).toContainText('Entreno completado');
  expect(calls.some(c=>c.table==='day_log'&&c.method==='POST')).toBeTruthy();
 });
 test('REQ-387: solo indoor usa gimnasio por defecto y Perfil permite casa',async({page,context})=>{
