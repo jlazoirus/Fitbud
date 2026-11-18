@@ -1,5 +1,5 @@
 import { openManualEntry } from "./helpers.js";
-// REQ-272: al registrar algo se elige «Además de lo previsto» o «En lugar de» una
+// REQ-272/397: al registrar algo se elige «Extra (se suma al día)» o «En lugar de» una
 // comida concreta. La sustitución modifica solo esa comida, el total cambia una
 // sola vez y se puede deshacer sin pisar cambios posteriores.
 import { test, expect } from "@playwright/test";
@@ -16,7 +16,7 @@ async function setup(page, context, meals) {
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   return { overlay: page.locator("#overlay"), errors };
 }
 async function fillMeal(overlay, name, kcal) {
@@ -29,9 +29,9 @@ const kcalDone = (page) => page.evaluate(() => dayTotals(todayStr()).t.kcal);
 test("en lugar del almuerzo pendiente: reemplaza solo esa comida, cuenta una vez y se deshace", async ({ page, context }) => {
   const { overlay, errors } = await setup(page, context, { almuerzo: lunch() });
   const before = await kcalDone(page);
-  await overlay.getByLabel("En lugar de una comida del día").check();
+  await overlay.getByLabel("En lugar de una comida del plan").check();
   await expect(overlay.locator("#f_impact")).toHaveText("Elige qué comida reemplaza.");
-  await overlay.getByLabel("Comida que reemplaza").selectOption("almuerzo");
+  await overlay.getByLabel("Comida del día").selectOption("almuerzo");
   await fillMeal(overlay, "Hamburguesa con papas", "950");
   await expect(overlay.locator("#f_impact")).toContainText("Reemplaza Almuerzo (Arroz con pollo, 600 kcal): +350 kcal en el día.");
   await expect(overlay.locator("#f_impact")).toContainText("Quedará registrada como comida hecha.");
@@ -56,16 +56,16 @@ test("en lugar del almuerzo pendiente: reemplaza solo esa comida, cuenta una vez
 test("una comida ya registrada se corrige (no se suma dos veces) y una saltada vuelve a contar", async ({ page, context }) => {
   const { overlay } = await setup(page, context, { almuerzo: lunch({ done: true }), cena: { done: false, skipped: true } });
   const before = await kcalDone(page);
-  await overlay.getByLabel("En lugar de una comida del día").check();
-  await overlay.getByLabel("Comida que reemplaza").selectOption("almuerzo");
+  await overlay.getByLabel("En lugar de una comida del plan").check();
+  await overlay.getByLabel("Comida del día").selectOption("almuerzo");
   await fillMeal(overlay, "Ensalada César", "450");
   await expect(overlay.locator("#f_impact")).toContainText("Ya estaba registrada: la corriges con lo que comiste.");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   expect(await kcalDone(page)).toBe(before - 600 + 450);
 
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
-  await overlay.getByLabel("En lugar de una comida del día").check();
-  await overlay.getByLabel("Comida que reemplaza").selectOption("cena");
+  await page.locator(".nut-register-more").click();
+  await overlay.getByLabel("En lugar de una comida del plan").check();
+  await overlay.getByLabel("Comida del día").selectOption("cena");
   await expect(overlay.locator("#f_impact")).toContainText("Estaba saltada: vuelve a contar.");
   await fillMeal(overlay, "Pizza", "800");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
@@ -82,14 +82,14 @@ test("una comida ya registrada se corrige (no se suma dos veces) y una saltada v
 test("además de lo previsto mantiene el plan; cancelar no cambia nada", async ({ page, context }) => {
   const { overlay } = await setup(page, context, { almuerzo: lunch() });
   const before = await page.evaluate(() => JSON.stringify(dayState(todayStr())));
-  await overlay.getByLabel("En lugar de una comida del día").check();
-  await overlay.getByLabel("Comida que reemplaza").selectOption("almuerzo");
+  await overlay.getByLabel("En lugar de una comida del plan").check();
+  await overlay.getByLabel("Comida del día").selectOption("almuerzo");
   await fillMeal(overlay, "Algo", "300");
   await page.evaluate(() => closeModal());
   expect(await page.evaluate(() => JSON.stringify(dayState(todayStr())))).toBe(before);
 
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
-  await expect(overlay.getByLabel("Además de lo previsto")).toBeChecked();
+  await page.locator(".nut-register-more").click();
+  await expect(overlay.getByLabel("Extra (se suma al día)")).toBeChecked();
   await fillMeal(overlay, "Café con leche", "120");
   await expect(overlay.locator("#f_impact")).toHaveText("Se suma a lo previsto: +120 kcal hoy. El plan no cambia.");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
@@ -104,9 +104,9 @@ test("otro día: mañana queda planificada sin consumir; deshacer no pisa una ed
   test.skip(await page.evaluate((d) => d > END, tomorrow), "el ciclo termina hoy");
   await overlay.locator("#f_date").fill(tomorrow);
   await overlay.locator("#f_date").dispatchEvent("change");
-  await overlay.getByLabel("En lugar de una comida del día").check();
+  await overlay.getByLabel("En lugar de una comida del plan").check();
   await expect(overlay.getByLabel("Ya me lo comí")).not.toBeChecked();
-  await overlay.getByLabel("Comida que reemplaza").selectOption("almuerzo");
+  await overlay.getByLabel("Comida del día").selectOption("almuerzo");
   await fillMeal(overlay, "Menú del día", "700");
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   const ms = await page.evaluate((d) => mealState(d, "almuerzo"), tomorrow);

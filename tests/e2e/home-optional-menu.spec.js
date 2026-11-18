@@ -61,7 +61,7 @@ test("Registrar comida guarda y suma el consumo sin generar un menú",async({pag
   const overlay=page.locator("#overlay");
   await expect(overlay.locator("h3")).toHaveText("Registrar comida");
   await expect(overlay.locator("#f_target")).toHaveValue("desayuno");
-  await expect(overlay).toContainText("Una comida del día");
+  await expect(overlay).toContainText("En lugar de una comida del plan");
   await openManualEntry(page);
   await page.locator("#f_name").fill("Mi desayuno con avena");
   for(const [id,value] of Object.entries({f_kcal:"400",f_p:"25",f_c:"45",f_f:"13"}))await page.locator("#"+id).fill(value);

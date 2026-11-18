@@ -11,7 +11,7 @@ for(const width of [390,1280])test(`Nutrición ofrece un solo generador y conser
   await expect(app.getByRole('button',{name:'Preparar mi semana',exact:true})).toHaveCount(1);
   await expect(app.getByRole('button',{name:'Sugerirme un menú',exact:true})).toHaveCount(0);
   await expect(app.locator('.nutrition-register p')).toHaveText('Busca un alimento y registra cuánto comiste.');
-  await expect(app.getByRole('button',{name:'Registrar algo que comí',exact:true})).toBeInViewport();
+  await expect(app.locator('.nutrition-register').getByRole('button',{name:'Registrar algo que comí',exact:true})).toBeInViewport();
   await app.getByRole('button',{name:'Más opciones de nutrición'}).click();
   await expect(page.locator('#overlay')).not.toContainText('Volver a preparar este día');
   await page.locator('#overlay').getByRole('button',{name:'Cerrar',exact:true}).last().click();
