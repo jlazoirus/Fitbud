@@ -24,7 +24,7 @@ async function openFreeEditor(page, context, replies) {
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   const overlay = page.locator("#overlay");
   await openManualEntry(overlay);
   return { overlay, calls, errors };

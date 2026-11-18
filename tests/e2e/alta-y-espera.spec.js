@@ -18,7 +18,7 @@ test("la consulta al coach bloquea la app con un aviso hasta que responde", asyn
   await gotoApp(page);
 
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   const overlay = page.locator("#overlay");
   await openManualEntry(overlay);
   await overlay.locator("#f_name").fill("2 panes con palta");

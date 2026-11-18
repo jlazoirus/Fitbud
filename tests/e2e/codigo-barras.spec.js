@@ -32,7 +32,7 @@ async function setup(page, context, { scanner, codes } = {}) {
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   const overlay = page.locator("#overlay");
   await overlay.locator('.qp-tab[data-tab="food"]').click();
   return { overlay, errors, calls: mocks.calls };

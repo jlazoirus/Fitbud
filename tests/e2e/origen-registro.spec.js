@@ -20,7 +20,7 @@ async function setup(page, context, opts = {}) {
   await page.locator("#tabs").getByText("Nutrición").click();
   return { overlay: page.locator("#overlay"), errors, calls: mocks.calls };
 }
-const openAdd = (page) => page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+const openAdd = (page) => page.locator(".nut-register-more").click();
 const extra = (page, i) => page.evaluate((i) => dayState(todayStr()).extras[i], i);
 
 test("estimación guardada conserva su supuesto; corregirla a mano mantiene la base", async ({ page, context }) => {
@@ -56,6 +56,7 @@ test("favorita ×2: snapshot con base y cantidad; editar la favorita no cambia l
   const fav = { name: "Tostadas con palta", kcal: 350, p: 9, c: 38, f: 18, nutritionMeta: { v: 1, source: "manual" } };
   const { overlay } = await setup(page, context, { prefs: completePrefs({ savedMeals: [fav] }) });
   await openAdd(page);
+  await overlay.locator('.qp-tab[data-tab="fav"]').click();
   await overlay.locator(".qp-pick", { hasText: "Tostadas con palta" }).click();
   await overlay.getByRole("button", { name: "×2" }).click();
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();

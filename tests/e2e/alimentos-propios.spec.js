@@ -12,7 +12,7 @@ async function setup(page, context, prefs) {
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   const overlay = page.locator("#overlay");
   await overlay.locator('.qp-tab[data-tab="food"]').click();
   return { overlay, errors, calls: mocks.calls };
@@ -128,7 +128,7 @@ test("editar tras registrar no cambia el pasado; otro dispositivo y borrados se 
 
   // Este dispositivo tenía una copia vieja sin el pan (creado en otro): no se pierde al guardar.
   await page.evaluate(() => { profile.prefs.customFoods = profile.prefs.customFoods.filter((f) => f.id !== "fother01"); });
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   await overlay.locator('.qp-tab[data-tab="food"]').click();
   await overlay.locator("#qpSearch").fill("queso");
   await overlay.getByRole("button", { name: "Editar Queso fresco" }).click();

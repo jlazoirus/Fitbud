@@ -30,7 +30,7 @@ for (const width of [320, 1280]) {
     const { overlay, errors, calls } = await setup(page, context, {
       tables: { ingredients: { rows: [egg, ...INGREDIENTS] } },
     });
-    await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+    await page.locator(".nut-register-more").click();
     await overlay.locator('.qp-tab[data-tab="food"]').click();
     await overlay.locator("#qpSearch").fill("avena");
     await expect(overlay.getByLabel("Gramos de Avena")).toHaveValue("100");
@@ -104,7 +104,7 @@ test("REQ-363: configurar unidades privadas del catálogo, recuperar el ajuste y
   });
 
   const open = async () => {
-    await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+    await page.locator(".nut-register-more").click();
     await overlay.locator('.qp-tab[data-tab="food"]').click();
     await overlay.locator("#qpSearch").fill("platano");
   };
@@ -159,7 +159,7 @@ test("REQ-363: configurar unidades privadas del catálogo, recuperar el ajuste y
 test("gramos decimales sin redondear, editar y quitar líneas, y reabrir con su snapshot", async ({ page, context }) => {
   const { overlay, errors, calls } = await setup(page, context);
   const catalogBefore = await page.evaluate(() => JSON.stringify(DB.ingredients));
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   await addFood(overlay, "avena", "33,5");
   await addFood(overlay, "avena", "0,5");
   await expect(overlay.locator(".comp-row")).toHaveCount(2);
@@ -201,7 +201,8 @@ test("gramos decimales sin redondear, editar y quitar líneas, y reabrir con su 
 test("una favorita elegida antes se conserva como primera línea al sumar un alimento", async ({ page, context }) => {
   const prefs = completePrefs({ savedMeals: [{ name: "Yogur con miel", kcal: 180, p: 10, c: 25, f: 4 }] });
   const { overlay } = await setup(page, context, { prefs });
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
+  await overlay.locator('.qp-tab[data-tab="fav"]').click();
   await overlay.locator(".qp-pick", { hasText: "Yogur con miel" }).click();
   await overlay.getByRole("button", { name: "×2" }).click();
   await addFood(overlay, "almendras", "15");

@@ -21,7 +21,7 @@ const yesterdayWithSnack = () => ({
 
 async function openAddMeal(page) {
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   return page.locator("#overlay");
 }
 
@@ -36,6 +36,9 @@ test.describe("Comidas guardadas", () => {
     await gotoApp(page);
 
     const overlay = await openAddMeal(page);
+    // REQ-330/397: el registro abre en Alimento; Recientes está a un toque.
+    await expect(overlay.locator('.qp-tab[data-tab="food"]')).toHaveAttribute("aria-pressed", "true");
+    await overlay.locator('.qp-tab[data-tab="recent"]').click();
     await expect(overlay.locator('.qp-tab[data-tab="recent"]')).toHaveAttribute("aria-pressed", "true");
     await overlay.locator(".qp-pick", { hasText: "Bowl de yogur con avena" }).click();
     await expect(overlay.locator("#f_name")).toHaveValue("Bowl de yogur con avena");
@@ -62,7 +65,8 @@ test.describe("Comidas guardadas", () => {
       }]);
 
     // Al reabrir, Recientes sigue mostrando una porción, no la ×1,5 de hoy (REQ-243).
-    await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+    await page.locator(".nut-register-more").click();
+    await overlay.locator('.qp-tab[data-tab="recent"]').click();
     await expect(overlay.locator(".qp-pick", { hasText: "Bowl de yogur con avena" })).toContainText("420 kcal · P 30 · C 50 · G 10");
     // Aparece en Favoritas con la estrella encendida; se puede quitar.
     await overlay.locator('.qp-tab[data-tab="fav"]').click();
@@ -89,6 +93,7 @@ test.describe("Comidas guardadas", () => {
 
     // Segundo shake del día, desde Recientes con ×2.
     overlay = await openAddMeal(page);
+    await overlay.locator('.qp-tab[data-tab="recent"]').click();
     await overlay.locator(".qp-pick", { hasText: "Shake proteina" }).click();
     await overlay.getByRole("button", { name: "×2" }).click();
     await expect(overlay.locator("#f_kcal")).toHaveValue("600");
@@ -98,6 +103,7 @@ test.describe("Comidas guardadas", () => {
 
     // La reciente sigue siendo una porción y al tocarla precarga 300, no 600.
     overlay = await openAddMeal(page);
+    await overlay.locator('.qp-tab[data-tab="recent"]').click();
     const recent = overlay.locator(".qp-pick", { hasText: "Shake proteina" });
     await expect(recent).toContainText("300 kcal · P 24 · C 36 · G 3");
     await recent.click();
@@ -120,7 +126,8 @@ test.describe("Comidas guardadas", () => {
     await gotoApp(page);
 
     const overlay = await openAddMeal(page);
-    // Sin recientes, abre en Favoritas.
+    // Favoritas guardadas en el perfil (otro dispositivo) aparecen en su pestaña.
+    await overlay.locator('.qp-tab[data-tab="fav"]').click();
     await expect(overlay.locator('.qp-tab[data-tab="fav"]')).toHaveAttribute("aria-pressed", "true");
     await expect(overlay.locator("#qpList")).toContainText("Tostadas con palta");
 

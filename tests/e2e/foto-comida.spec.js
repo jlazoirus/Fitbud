@@ -27,7 +27,7 @@ test("foto → estimación con pregunta → respuesta → estimación final", as
   await gotoApp(page);
 
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   const overlay = page.locator("#overlay");
   await openManualEntry(overlay);
   await expect(overlay.getByRole("button", { name: /Estimar con foto/i })).toBeVisible();
@@ -83,7 +83,7 @@ test("foto → fallo con motivo claro → reintentar con la misma foto", async (
   await gotoApp(page);
 
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   const overlay = page.locator("#overlay");
   await openManualEntry(overlay);
   await overlay.locator("#f_photo").setInputFiles({ name: "plato.png", mimeType: "image/png", buffer: PNG });
@@ -168,7 +168,7 @@ test("estimar por texto → fallo con motivo y código → reintentar", async ({
   await gotoApp(page);
 
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   const overlay = page.locator("#overlay");
   await expect(overlay.locator("#f_photo_preview")).toBeHidden();
   await expect(overlay.getByAltText("Foto de la comida")).toBeHidden();
