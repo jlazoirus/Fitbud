@@ -4,6 +4,7 @@
 //   POST /api/suscripcion           → op=suscripcion          inscripción (pública)
 //   POST /api/culqi-webhook         → op=culqi-webhook        eventos de Culqi
 //   POST /api/suscripcion/cancelar  → op=suscripcion-cancelar cancelar (con sesión)
+//   GET  /api/suscripcion/estado    → op=suscripcion-estado   estado (con sesión, REQ-357)
 //
 // - Inscripción: cliente → tarjeta (con validación) → suscripción al plan de Culqi con
 //   prueba (CULQI_PLAN_PRUEBA_ID) o sin ella (CULQI_PLAN_MENSUAL_ID), según si la
@@ -13,15 +14,18 @@
 //   con GET /v2/events/{id} (la API no documenta firma) y la suscripción con la API.
 //   Cada cobro exitoso suma 30 días una sola vez (clave: subscription_charges).
 // - Cancelar es inmediato en Culqi; el acceso pagado sigue hasta su vencimiento.
+// - REQ-357: correos del ciclo (suscripcion-correos.js), una sola vez cada uno.
 // - La inscripción solo funciona con TIENDA_SUSCRIPCION_ENABLED (REQ-354: los textos
 //   legales se muestran con la misma bandera). Webhook y cancelación siempre.
 //
 // Vars: CULQI_SECRET_KEY, CULQI_PLAN_PRUEBA_ID, CULQI_PLAN_MENSUAL_ID,
 //       TIENDA_SUSCRIPCION_ENABLED, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-//       SUPABASE_PUBLISHABLE_KEY (cancelar), NOTIFY_APP_URL.
+//       SUPABASE_PUBLISHABLE_KEY (cancelar y estado), NOTIFY_APP_URL,
+//       RESEND_API_KEY y NOTIFY_FROM_EMAIL (correos).
 
 import { SUSCRIPCION, suscripcionHabilitada, formatoPrecio } from "../../tienda/planes.js";
 import { svc, rj, findUserIdByEmail, inviteUser } from "./culqi-charge.js";
+import { mensajeSuscripcion, enviarCorreoSuscripcion, ymdLima } from "./suscripcion-correos.js";
 
 export const CULQI_API = "https://api.culqi.com";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -40,6 +44,8 @@ export function env(source = process.env) {
     planMensual: source.CULQI_PLAN_MENSUAL_ID || "",
     enabled: suscripcionHabilitada(source.TIENDA_SUSCRIPCION_ENABLED),
     appUrl: (source.NOTIFY_APP_URL || "https://evolvapp.club").replace(/\/$/, ""),
+    resendKey: source.RESEND_API_KEY || "",
+    fromEmail: source.NOTIFY_FROM_EMAIL || "recordatorios@fitbros.app",
   };
 }
 
@@ -252,6 +258,26 @@ async function logBilling(e, eventId, eventType, sub, entitlementId, status, pay
   } catch (_) { /* el registro no bloquea */ }
 }
 
+// Vencimiento del acceso vigente más lejano (o null).
+async function accesoHasta(e, userId) {
+  if (!userId) return null;
+  const r = await rest(e, "user_entitlements?user_id=eq." + encodeURIComponent(userId)
+    + "&status=in.(active,courtesy)&order=expires_at.desc&limit=1&select=expires_at");
+  return r.ok && Array.isArray(r.data) && r.data[0] ? r.data[0].expires_at : null;
+}
+
+// REQ-357: un correo del ciclo. Nunca lanza ni bloquea el flujo que lo dispara.
+async function correo(e, tipo, fila, clave, datos) {
+  try {
+    if (!fila || !fila.user_id || !fila.email) return "no_config";
+    const msg = mensajeSuscripcion(tipo, { ...(datos || {}), fila });
+    return await enviarCorreoSuscripcion(e, { userId: fila.user_id, email: fila.email, key: "sub:" + fila.culqi_subscription_id + ":" + clave, msg });
+  } catch (err) {
+    console.error("suscripcion: correo", tipo, String(err && err.message || err));
+    return "error";
+  }
+}
+
 // ── POST /api/suscripcion ─────────────────────────────────────────────────────────
 export async function inscribir(req, res, e = env()) {
   if (req.method !== "POST") return res.status(405).json({ error: "Método no permitido." });
@@ -371,6 +397,7 @@ export async function inscribir(req, res, e = env()) {
       acceso = await sumarAcceso(e, userId, { dias, paymentRef: sub.id + ":prueba", notes: "Suscripción Culqi " + sub.id + " · " + dias + " días gratis" });
     }
     await logBilling(e, sub.id, "culqi.subscription.created", saved, acceso && acceso.id, "processed", { email: data.email, con_prueba: conPrueba, culqi_plan_id: culqiPlan });
+    if (conPrueba) await correo(e, "prueba", { ...row, ...(saved || {}) }, "prueba", { primerCobro: row.next_billing_at });
   } catch (err) {
     console.error("suscripcion: creada en Culqi sin completar", sub.id, String(err && err.message || err));
     await logBilling(e, sub.id, "culqi.subscription.created", { user_id: userId }, null, "failed", { email: data.email, con_prueba: conPrueba }, String(err && err.message || err));
@@ -494,12 +521,21 @@ export async function webhook(req, res, e = env()) {
         next_billing_at: proximo || (ent && ent.expires_at) || null,
       });
       await logBilling(e, eventId, "culqi." + tipo, { user_id: userId }, ent && ent.id, "processed", { subscription: fila.culqi_subscription_id, charge: ref, amount: ids.amount, currency: ids.currency });
+      await correo(e, "recibo", { ...fila, user_id: userId, next_billing_at: proximo || null }, "recibo:" + ref, {
+        monto, accesoHasta: ent && ent.expires_at,
+      });
       return res.status(200).json({ ok: true });
     }
     if (tipo === "subscription.charge.failed") {
-      if (!["canceled", "ended"].includes(fila.status)) await actualizar(e, fila.id, { status: "past_due", ...(proximo ? { next_billing_at: proximo } : {}) });
+      if (!["canceled", "ended"].includes(fila.status)) {
+        await actualizar(e, fila.id, { status: "past_due", ...(proximo ? { next_billing_at: proximo } : {}) });
+        // Un aviso por cobro vencido: los reintentos de Culqi del mismo cobro no repiten el correo.
+        await correo(e, "cobro_fallido", fila, "fallido:" + ymdLima(fila.next_billing_at || undefined));
+      }
     } else if (tipo === "subscription.cancel.succeeded") {
       await actualizar(e, fila.id, { status: "canceled", canceled_at: fila.canceled_at || new Date().toISOString(), next_billing_at: null });
+      // Misma clave que la cancelación desde la cuenta: un solo correo.
+      await correo(e, "cancelada", fila, "cancelada", { accesoHasta: await accesoHasta(e, fila.user_id) });
     } else if (tipo === "subscription.creation.failed") {
       await actualizar(e, fila.id, { status: "ended" });
     } else if (remota) {
@@ -559,9 +595,8 @@ export async function cancelar(req, res, e = env()) {
   try {
     const fila = await cancelarDeCuenta(e, user.id);
     if (!fila) return res.status(404).json({ error: "No tienes una suscripción activa." });
-    const acc = await rest(e, "user_entitlements?user_id=eq." + encodeURIComponent(user.id)
-      + "&status=in.(active,courtesy)&order=expires_at.desc&limit=1&select=expires_at");
-    const hasta = acc.ok && Array.isArray(acc.data) && acc.data[0] ? acc.data[0].expires_at : null;
+    const hasta = await accesoHasta(e, user.id);
+    await correo(e, "cancelada", fila, "cancelada", { accesoHasta: hasta });
     return res.status(200).json({ ok: true, accesoHasta: hasta });
   } catch (err) {
     console.error("suscripcion: no se pudo cancelar", user.id, String(err && err.message || err));
@@ -569,10 +604,47 @@ export async function cancelar(req, res, e = env()) {
   }
 }
 
+// ── GET /api/suscripcion/estado ───────────────────────────────────────────────────
+// REQ-357: lo que Perfil y /cuenta muestran. Sin ids de Culqi ni bin de la tarjeta.
+// La suscripción viva más reciente; si no hay, la última cancelada mientras dure el
+// acceso que ya se pagó. Si no hay ninguna, `suscripcion: null`.
+export function estadoPublico(fila, hasta, now = Date.now()) {
+  if (!fila) return null;
+  const viva = LIVE_STATES.includes(fila.status);
+  if (!viva && !(hasta && new Date(hasta).getTime() > now)) return null;
+  return {
+    estado: fila.status,
+    conPrueba: !!fila.con_prueba,
+    pruebaHasta: fila.status === "trialing" ? fila.trial_ends_at || null : null,
+    proximoCobro: viva ? fila.next_billing_at || null : null,
+    monto: formatoPrecio(SUSCRIPCION.montoCentimos, SUSCRIPCION.moneda),
+    tarjeta: fila.card_last4 ? { marca: fila.card_brand || null, ultimos4: fila.card_last4 } : null,
+    canceladaEl: viva ? null : fila.canceled_at || fila.cancel_requested_at || null,
+    accesoHasta: hasta || null,
+    creadaEl: fila.created_at || null,
+  };
+}
+
+export async function estado(req, res, e = env()) {
+  if (req.method !== "GET") return res.status(405).json({ error: "Método no permitido." });
+  res.setHeader("Cache-Control", "no-store");
+  if (!e.url || !e.service) return res.status(503).json({ error: "No pudimos cargar tu suscripción ahora." });
+  const user = await usuarioDeSesion(req, e);
+  if (!user) return res.status(401).json({ error: "Sesión requerida." });
+  const r = await rest(e, "subscriptions?user_id=eq." + encodeURIComponent(user.id) + "&select=*&order=created_at.desc&limit=5");
+  if (r.status === 404) return res.status(200).json({ suscripcion: null }); // SQL sin aplicar
+  if (!r.ok) return res.status(503).json({ error: "No pudimos cargar tu suscripción ahora." });
+  const filas = Array.isArray(r.data) ? r.data : [];
+  const fila = filas.find((f) => LIVE_STATES.includes(f.status)) || filas.find((f) => f.status === "canceled") || null;
+  const hasta = fila ? await accesoHasta(e, user.id) : null;
+  return res.status(200).json({ suscripcion: estadoPublico(fila, hasta) });
+}
+
 export default async function handler(req, res) {
   const op = (req.query && req.query.op) || (() => { try { return new URL(req.url || "", "http://local").searchParams.get("op") || ""; } catch (_) { return ""; } })();
   if (op === "culqi-webhook") return webhook(req, res);
   if (op === "suscripcion-cancelar") return cancelar(req, res);
+  if (op === "suscripcion-estado") return estado(req, res);
   return inscribir(req, res);
 }
 

@@ -129,6 +129,26 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
 
 - **Sin días gratis (REQ-356):** si el correo, la cuenta o la tarjeta ya tuvieron prueba o plan pagado, `/api/suscripcion` responde `409 { sinPrueba }` sin crear la suscripción. `/registro` muestra el motivo y pide aceptar aparte el cobro de hoy (`aceptaCobroInmediato`). Si el aviso vino por correo, reenvía el mismo token; si vino por la tarjeta (`nuevaTarjeta`), la pide otra vez.
 
+### Gestión y correos (REQ-357, implementado el 2026-11-17)
+
+- **Estado:** `GET /api/suscripcion/estado` (con sesión; en la app, `/api/checkout?op=suscripcion-estado`, la ruta que admite `js/api-client.js`). Devuelve estado, prueba, próximo cobro, monto, marca y últimos 4 de la tarjeta, fecha de cancelación y hasta cuándo dura el acceso. Sin ids de Culqi ni bin. Muestra la suscripción viva o, si no hay, la última cancelada mientras dure el acceso pagado.
+- **Perfil → Mi suscripción** (app web): con una suscripción manda su bloque (sin "Renovar plan", porque se renueva sola) y "Cancelar suscripción" con confirmación de una línea.
+- **`/cuenta`** (web pública, para la app nativa): usa la sesión de la app si está vigente (sin refrescarla, para no cerrar la de la app) o pide correo y contraseña de Evolv. Misma información y la misma cancelación. Enlazada desde el pie de la tienda y desde cada correo.
+- **Correos** (`api/_tienda/suscripcion-correos.js`), una sola vez cada uno por su clave en `notification_log` (tipo `subscription`):
+
+  | Correo | Cuándo | Clave |
+  |---|---|---|
+  | Inicio de la prueba | Al inscribirse con semana gratis | `sub:<sxn>:prueba` |
+  | Aviso del primer cobro | Cron de `/api/notify`, 2 días antes (9 a 20 h de Lima) | `sub:<sxn>:aviso_cobro` |
+  | Recibo | Cada `subscription.charge.succeeded` | `sub:<sxn>:recibo:<chr>` |
+  | Cobro fallido | `subscription.charge.failed`; un aviso por cobro aunque Culqi reintente | `sub:<sxn>:fallido:<fecha>` |
+  | Cancelación | Desde la cuenta o por Culqi (`subscription.cancel.succeeded`) | `sub:<sxn>:cancelada` |
+
+  La clave se reclama antes de enviar; Resend recibe la misma como `Idempotency-Key`. Un envío fallido queda en `error` y se reintenta en el siguiente disparo; sin el SQL no se envía nada. Un correo que falla nunca rompe la inscripción, el webhook ni la cancelación.
+- **REQ-351:** el aviso de vencimiento no sale a quien tiene una suscripción viva (`pending`, `trialing`, `active` o `past_due`).
+- **SQL:** `supabase/notifications_subscription.sql` agrega el tipo `subscription` al CHECK de `notification_log` (después de `whatsapp.sql`).
+- **Prueba:** `node scripts/test-suscripcion-gestion.mjs` y `tests/e2e/suscripcion-gestion.spec.js`.
+
 #### Activación (Jonathan)
 
 1. Aplicar `supabase/suscripciones.sql` en Supabase.
@@ -136,7 +156,8 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
 3. En un entorno **Preview** de Vercel, cargar esas dos variables, las llaves de prueba y `TIENDA_SUSCRIPCION_ENABLED=1`.
 4. En CulqiPanel (integración), Eventos → Webhooks: `https://<preview>/api/culqi-webhook` con los eventos de Suscripciones.
 5. Inscribirse con una tarjeta de prueba y confirmar 4 cosas: `trial_end` a 7 días, ningún cobro antes, el estado 2 en Culqi y el acceso de 7 días en la app. Si Culqi no respeta `initial_cycles` como prueba, se pasa a la alternativa del diseño, que es crear la suscripción al terminar la prueba.
-6. Solo después, y con REQ-356 y REQ-357 listos: confirmar con Culqi la recurrencia en la cuenta live, crear los planes con `--live`, configurar Production y el webhook live, y encender la bandera.
+6. Aplicar `supabase/notifications_subscription.sql` (correos de REQ-357) y confirmar en Preview que llegan el correo de inicio, el recibo y el de cancelación.
+7. Solo después, y con REQ-356 y REQ-357 listos: confirmar con Culqi la recurrencia en la cuenta live, crear los planes con `--live`, configurar Production y el webhook live, y encender la bandera.
 
 ### Legales (REQ-354, textos aprobados por Jonathan el 2026-11-14)
 
@@ -157,7 +178,7 @@ Relación con otros planes: `docs/native-migration/COBRO-WEB.md` sigue vigente (
 | 3 | REQ-354: términos y devoluciones de la suscripción (hecho, tras `TIENDA_SUSCRIPCION_ENABLED`) | — |
 | 4 | REQ-355: motor de suscripción con Culqi (hecho; activación en §3, "Motor") | — |
 | 5 | REQ-356: `/registro` con tarjeta y semana gratis, y la llamada a la acción en la portada y la app (hecho, tras la bandera) | — |
-| 6 | REQ-357: gestionar la suscripción (estado, cancelar) y sus correos | REQ-355 |
+| 6 | REQ-357: gestionar la suscripción (estado, cancelar) y sus correos (hecho; Perfil, `/cuenta` y `notifications_subscription.sql`) | REQ-355 |
 
 La inscripción se abre al público (la portada cambia "Ver planes" por "Empieza tu semana gratis") recién cuando las fases 3 a 6 están en producción.
 

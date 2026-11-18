@@ -1,6 +1,6 @@
 # Bitácora de corridas de agentes (en el repo)
 
-Continuidad operativa entre corridas de agentes que no tienen acceso a `/Users/jonathan/.fitbros/agent-run-memory.md`, como las sesiones en la nube. **No es fuente de verdad.** Si contradice a Git/HEAD, `REQUIREMENTS.md`, `CONTEXT.md` o al código, la bitácora está equivocada. Reglas en `AGENTS.md` (sección «Memoria operativa entre corridas»).
+Bitácora compartida de todos los agentes (Mac y nube). **Se usa primero esta**; la local `/Users/jonathan/.fitbros/agent-run-memory.md` solo si este archivo no existe. **No es fuente de verdad.** Si contradice a Git/HEAD, `REQUIREMENTS.md`, `CONTEXT.md` o el código, la bitácora está equivocada. Reglas en `AGENTS.md` (sección «Memoria operativa entre corridas»).
 
 Formato: una entrada por corrida, la más reciente al final. Incluye timestamp ISO, loop, herramienta, REQ o tarea, rama/commit/PR o bloqueo, acción manual pendiente y aprendizaje. Breve: es un registro, no un informe.
 
@@ -22,3 +22,15 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Aplicado `supabase/notifications_subscription.sql` (de la rama de #127) por la Management API, en una transacción. Después: el CHECK incluye `subscription`; `notification_log` conserva sus 142 filas.
 - Pendiente detectado: `public.subscriptions` y `public.subscription_charges` no existen. `supabase/suscripciones.sql` (REQ-355) **no está aplicado**: sin él `/api/suscripcion` responde 503 y no hay suscripciones que avisen por correo.
 - Aprendizaje: desde la nube, el proxy autentica `api.supabase.com/v1/projects/wtqnvtixvfapdbzcegdw/database/query`, así que el SQL se puede leer y aplicar sin el SQL Editor.
+
+### 2026-11-18T13:35Z · operación · Claude Code (nube) · SQL de REQ-355 y regla de la bitácora
+- Pedido por Jonathan. Dependencias verificadas: `subscription_plans`, `user_entitlements`, `billing_events`, `libro_reclamaciones` y `pgcrypto`.
+- Aplicado `supabase/suscripciones.sql` en una transacción. Ahora existen `subscriptions` (RLS y una política de lectura propia) y `subscription_charges` (RLS sin políticas: solo service_role), con sus 8 índices.
+- Regla nueva (Jonathan): la bitácora del repo va primero y la local solo si el archivo del repo no existe. El auditor puede anexar su entrada. Actualizados `AGENTS.md`, `AUDIT_AGENT.md`, `NATIVE_AGENT.md` y `.claude/agents/qa-auditor.md`.
+- Pendiente: si la bitácora local del Mac tiene entradas que el repo no tiene, copiarlas aquí en la próxima corrida local.
+
+### 2026-11-18T14:10Z · operación · Claude Code (nube) · conflicto de #127 (REQ-357) con main
+- #128 se fusionó en `main` (`d96de21`, `f4a2642`) sin `6a0666b`, que se trae a esta rama por cherry-pick. Se integró `origin/main` en `claude/wonderful-cray-728djr` con un merge (sin rebase).
+- `service-worker.js`: `CACHE_NAME` pasa a **v259**. `main` ya publicó v258 y REQ-357 cambia el shell, así que no puede volver a v257.
+- `work/plan-weeks-{390,1280}.png`: capturas generadas por pruebas que se commitearon por error en ambos lados; se conserva la versión de `main`.
+- Aprendizaje: `git add -A` tras correr E2E arrastra capturas de `work/`; revisar `git status` antes de commitear.

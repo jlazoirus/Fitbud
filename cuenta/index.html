@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mi suscripción · Evolv</title>
+  <meta name="description" content="Revisa el estado de tu suscripción a Evolv y cancélala cuando quieras.">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
+  <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tienda/tienda.css?v=5">
+</head>
+<body>
+  <header id="t-header"></header>
+  <main class="wrap narrow">
+    <h1>Mi suscripción</h1>
+
+    <div id="cargando" class="nota" role="status">Cargando…</div>
+
+    <!-- Sin sesión vigente: se entra con el correo y la contraseña de Evolv. -->
+    <form id="login" class="form" novalidate hidden>
+      <p class="hint" style="margin:0 0 14px">Entra con el correo y la contraseña de tu cuenta de Evolv.</p>
+      <div class="field"><label for="email">Correo</label><input id="email" name="email" type="email" autocomplete="email" required maxlength="80"></div>
+      <div class="field"><label for="password">Contraseña</label><input id="password" name="password" type="password" autocomplete="current-password" required minlength="6"></div>
+      <div id="loginError" class="alerta error" role="alert" hidden></div>
+      <button id="entrar" class="btn btn-accent btn-block" type="submit">Entrar</button>
+      <p class="hint">¿Olvidaste tu contraseña? <a href="/app">Recupérala en la app</a>. También puedes <a href="/contacto">escribirnos</a> y cancelamos por ti.</p>
+    </form>
+
+    <section id="panel" hidden>
+      <div class="hoja">
+        <p class="hint" id="cuentaDe" style="margin:0"></p>
+        <dl id="filas"></dl>
+      </div>
+      <p class="hint" id="nota" style="margin-top:12px"></p>
+      <div id="resultado" class="alerta" role="status" hidden style="margin-top:14px"></div>
+      <div id="acciones" style="margin-top:16px">
+        <button id="cancelar" class="btn btn-block" type="button">Cancelar suscripción</button>
+        <div id="confirmar" class="alerta aviso" hidden>
+          <p id="confirmarTxt" style="margin:0 0 12px"></p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button id="siCancelar" class="btn btn-accent" type="button">Sí, cancelar</button>
+            <button id="noCancelar" class="btn" type="button">No, seguir suscrito</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sinSuscripcion" hidden>
+      <div class="alerta aviso"><span id="sinSuscripcionTxt">No tienes una suscripción activa con esta cuenta.</span></div>
+      <p class="hint" style="margin-top:12px">Si pagaste un plan de pago único, no se renueva solo: no hay nada que cancelar. Puedes ver los <a href="/planes">planes</a> cuando quieras.</p>
+    </section>
+
+    <p class="hint" id="salirFila" hidden style="margin-top:20px"><a href="#" id="salir">Usar otra cuenta</a></p>
+  </main>
+  <footer id="t-footer"></footer>
+  <script type="module">
+    // REQ-357: ver y cancelar la suscripción desde la web pública (la app nativa no
+    // vende ni enlaza a comprar; aquí se gestiona). GET /api/suscripcion/estado y
+    // POST /api/suscripcion/cancelar exigen sesión de Supabase.
+    import { mountLayout, esc } from "/tienda/layout.js";
+    import { cargarConfig } from "/tienda/moneda.js";
+    import { filasEstado, notaEstado, puedeCancelar, textoConfirmar, textoCancelada, sesionGuardada } from "/tienda/cuenta.js";
+    mountLayout();
+
+    const $ = (id) => document.getElementById(id);
+    let token = null;
+    let actual = null;
+
+    const cfg = await cargarConfig();
+    const supa = (cfg && cfg.supabase) || {};
+    const guardada = sesionGuardada(window.localStorage);
+    $("cargando").hidden = true;
+    if (guardada) { token = guardada.token; cargarEstado(guardada.email); }
+    else mostrarLogin();
+
+    function mostrarLogin(msg) {
+      token = null;
+      ["panel", "sinSuscripcion", "salirFila"].forEach((id) => { $(id).hidden = true; });
+      $("login").hidden = false;
+      if (msg) { $("loginError").textContent = msg; $("loginError").hidden = false; }
+    }
+
+    $("login").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      $("loginError").hidden = true;
+      const email = $("email").value.trim().toLowerCase();
+      const password = $("password").value;
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { mostrarLogin("Revisa tu correo."); $("email").focus(); return; }
+      if (!password) { mostrarLogin("Escribe tu contraseña."); $("password").focus(); return; }
+      if (!supa.url || !supa.publishableKey) { mostrarLogin("No pudimos conectar ahora. Intenta en unos minutos o escríbenos."); return; }
+      $("entrar").disabled = true; $("entrar").textContent = "Entrando…";
+      try {
+        const r = await fetch(supa.url.replace(/\/$/, "") + "/auth/v1/token?grant_type=password", {
+          method: "POST",
+          headers: { apikey: supa.publishableKey, "content-type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        const out = await r.json().catch(() => ({}));
+        if (!r.ok || !out.access_token) { mostrarLogin("Correo o contraseña incorrectos."); $("password").focus(); return; }
+        token = out.access_token;
+        $("password").value = "";
+        $("login").hidden = true;
+        cargarEstado(email);
+      } catch (_) {
+        mostrarLogin("Se cortó la conexión. Intenta de nuevo.");
+      } finally {
+        $("entrar").disabled = false; $("entrar").textContent = "Entrar";
+      }
+    });
+
+    async function cargarEstado(email) {
+      $("cargando").hidden = false;
+      try {
+        const r = await fetch("/api/suscripcion/estado", { headers: { Authorization: "Bearer " + token }, cache: "no-store" });
+        if (r.status === 401) { $("cargando").hidden = true; mostrarLogin(); return; }
+        const out = await r.json().catch(() => ({}));
+        $("cargando").hidden = true;
+        $("salirFila").hidden = false;
+        if (!r.ok) { $("sinSuscripcion").hidden = false; $("sinSuscripcionTxt").textContent = out.error || "No pudimos cargar tu suscripción ahora. Intenta en unos minutos."; return; }
+        pintar(out.suscripcion, email);
+      } catch (_) {
+        $("cargando").hidden = true;
+        $("sinSuscripcion").hidden = false;
+        $("sinSuscripcionTxt").textContent = "Se cortó la conexión. Recarga la página para intentar de nuevo.";
+      }
+    }
+
+    function pintar(s, email) {
+      actual = s;
+      if (!s) { $("panel").hidden = true; $("sinSuscripcion").hidden = false; return; }
+      $("sinSuscripcion").hidden = true;
+      $("panel").hidden = false;
+      if (email) $("cuentaDe").textContent = "Cuenta: " + email;
+      $("filas").innerHTML = filasEstado(s).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+      $("nota").textContent = notaEstado(s);
+      $("acciones").hidden = !puedeCancelar(s);
+      $("confirmar").hidden = true;
+      $("cancelar").hidden = false;
+    }
+
+    $("cancelar").addEventListener("click", () => {
+      $("confirmarTxt").textContent = textoConfirmar(actual);
+      $("cancelar").hidden = true;
+      $("confirmar").hidden = false;
+      $("siCancelar").focus();
+    });
+    $("noCancelar").addEventListener("click", () => {
+      $("confirmar").hidden = true;
+      $("cancelar").hidden = false;
+      $("cancelar").focus();
+    });
+    $("siCancelar").addEventListener("click", async () => {
+      const btn = $("siCancelar");
+      btn.disabled = true; btn.textContent = "Cancelando…";
+      const res = $("resultado");
+      try {
+        const r = await fetch("/api/suscripcion/cancelar", { method: "POST", headers: { Authorization: "Bearer " + token } });
+        const out = await r.json().catch(() => ({}));
+        if (r.status === 401) { mostrarLogin("Tu sesión venció. Entra de nuevo para cancelar."); return; }
+        if (!r.ok || !out.ok) throw new Error(out.error || "No pudimos cancelar ahora. Intenta de nuevo o escríbenos y lo hacemos por ti.");
+        res.className = "alerta ok"; res.textContent = textoCancelada(out.accesoHasta); res.hidden = false;
+        pintar({ ...actual, estado: "canceled", proximoCobro: null, canceladaEl: new Date().toISOString(), accesoHasta: out.accesoHasta || actual.accesoHasta }, "");
+      } catch (err) {
+        res.className = "alerta error"; res.textContent = err.message; res.hidden = false;
+      } finally {
+        btn.disabled = false; btn.textContent = "Sí, cancelar";
+      }
+    });
+
+    $("salir").addEventListener("click", (ev) => {
+      ev.preventDefault();
+      $("resultado").hidden = true;
+      $("email").value = "";
+      mostrarLogin();
+      $("email").focus();
+    });
+  </script>
+</body>
+</html>

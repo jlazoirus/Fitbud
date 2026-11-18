@@ -9,7 +9,7 @@ La configuración machine-readable vive en `agent-audit-loop.json`. Las reglas d
 
 ## Regla absoluta
 
-El auditor **NO modifica código de la app**. El único archivo que puede cambiar es `REQUIREMENTS.md`. Si encuentra un fix obvio, lo documenta como REQ con causa raíz; no lo aplica. Cualquier intento de tocar `index.html`, `*.js`, `api/`, `supabase/` o `scripts/` es una condición de parada (`app_code_modification_attempted`).
+El auditor **NO modifica código de la app**. El único archivo que puede cambiar es `REQUIREMENTS.md`, además de anexar su entrada al final de la bitácora `docs/agent-run-memory.md` (reglas en `AGENTS.md`). Si encuentra un fix obvio, lo documenta como REQ con causa raíz; no lo aplica. Cualquier intento de tocar `index.html`, `*.js`, `api/`, `supabase/` o `scripts/` es una condición de parada (`app_code_modification_attempted`).
 
 ## Resultado de una ejecución
 
