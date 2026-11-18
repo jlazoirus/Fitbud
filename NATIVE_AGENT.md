@@ -88,4 +88,4 @@ Publica por PR hacia `main` (o push directo a `main` si así opera tu entorno, t
 
 - El loop **desarrollador** (`AUTONOMOUS_AGENT.md`) sigue tomando REQ de `REQUIREMENTS.md`; no toma tareas NAT. Si un REQ y una tarea NAT del grupo `index-html` chocan, gana el REQ (producción) y la tarea NAT se rebasa.
 - El loop **auditor** puede reportar bugs de la app nativa como REQ nuevos cuando exista una beta; mientras tanto, los hallazgos de la migración se registran como tareas NAT.
-- Bitácora compartida: anexar una entrada breve a `/Users/jonathan/.fitbros/agent-run-memory.md` al terminar, si existe en tu entorno (no es fuente de verdad ni se commitea). Si no existe, anexarla a `docs/agent-run-memory.md` dentro del commit de la tarea.
+- Bitácora compartida: leer al inicio y anexar al terminar una entrada breve en `docs/agent-run-memory.md` dentro del commit de la tarea. Solo si ese archivo no existe, usar `/Users/jonathan/.fitbros/agent-run-memory.md` (no es fuente de verdad; reglas en `AGENTS.md`).

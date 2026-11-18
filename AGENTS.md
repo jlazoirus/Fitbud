@@ -17,7 +17,7 @@ El repositorio tiene **dos** agentes autónomos. Comparten el lock `.git/fitbros
 | **Desarrollador** | Vacía la cola: implementa REQ (uno por corrida) | `agent-loop.json` | `AUTONOMOUS_AGENT.md` | `node scripts/agent-next-requirement.mjs` |
 | **Auditor / QA** | Llena la cola: audita journeys, documenta bugs como REQ nuevos | `agent-audit-loop.json` | `AUDIT_AGENT.md` | `node scripts/agent-next-audit.mjs` |
 
-El auditor **NO modifica código de la app**: su único archivo escribible es `REQUIREMENTS.md`. Las reglas de comportamiento del auditor están en `.claude/agents/qa-auditor.md` — es un archivo de texto plano que cualquier agente debe **leer como spec**; el bloque YAML de cabecera (`name`, `tools`, `model`) es metadato para Claude Code y puede ignorarse cuando lo lee otra herramienta como Codex.
+El auditor **NO modifica código de la app**: su único archivo escribible es `REQUIREMENTS.md` (más su entrada en la bitácora `docs/agent-run-memory.md`). Las reglas de comportamiento del auditor están en `.claude/agents/qa-auditor.md` — es un archivo de texto plano que cualquier agente debe **leer como spec**; el bloque YAML de cabecera (`name`, `tools`, `model`) es metadato para Claude Code y puede ignorarse cuando lo lee otra herramienta como Codex.
 
 ## Tercer track: migración a apps nativas (varios agentes en paralelo)
 
@@ -41,16 +41,18 @@ El [plan vigente de mejoras frente a MyFitnessPal](docs/competitive/2026-10-22-m
 
 ## Memoria operativa entre corridas (continuidad, no fuente de verdad)
 
-Cada corrida autónoma arranca en frío: no hereda el historial conversacional de la anterior. Para preservar continuidad operativa entre corridas existe una **bitácora compartida fuera del repo**:
+Cada corrida autónoma arranca en frío: no hereda el historial conversacional de la anterior. Para preservar continuidad operativa entre corridas existe una **bitácora compartida en el repo**:
 
-`/Users/jonathan/.fitbros/agent-run-memory.md`
+`docs/agent-run-memory.md`
 
-Reglas para **cualquier** agente (Codex o Claude):
+Reglas para **cualquier** agente (Codex o Claude, en el Mac o en la nube):
 
-- **Leer al inicio** (en el preflight) esa ruta **absoluta**. Codex además mantiene memoria per-automation en `/Users/jonathan/.codex/automations/<id>/memory.md`. Usa siempre rutas absolutas: **nunca** la variable `CODEX_HOME` ni rutas relativas para leer memoria, y **no** afirmes "no hay memoria previa" sin haber leído la ruta absoluta y confirmado que está ausente.
-- **Anexar al cierre** una entrada breve (timestamp ISO, loop, herramienta, acción del selector, lock, REQ, commit/push o bloqueo, acción manual pendiente, aprendizaje), **incluso en corridas detenidas** que no generan commit.
-- Vive **fuera del worktree** a propósito: así registra también las corridas detenidas sin ensuciar el worktree ni romper "un commit por corrida", y el **auditor puede anexarla sin violar** que su único archivo escribible del repo es `REQUIREMENTS.md` (la bitácora no es un archivo del repo). **No** la commitees ni la cuentes como cambio del repo.
-- **Sin acceso a esa ruta** (por ejemplo, sesiones en la nube), la bitácora vive en el repo: `docs/agent-run-memory.md`. Se lee al inicio y la entrada se anexa en el mismo commit de la corrida. Si la corrida se detiene sin commit, se informa en el reporte final. El auditor no la escribe, porque su único archivo del repo sigue siendo `REQUIREMENTS.md`.
+- **Primero el repo.** La bitácora es `docs/agent-run-memory.md`. Solo si ese archivo no existe en tu checkout se usa la local `/Users/jonathan/.fitbros/agent-run-memory.md`, con ruta **absoluta** (nunca `CODEX_HOME` ni rutas relativas). Codex además mantiene memoria per-automation en `/Users/jonathan/.codex/automations/<id>/memory.md`. No afirmes "no hay memoria previa" sin haber leído ambas rutas.
+- **Leer al inicio** (en el preflight) la bitácora del repo en `origin/main` actualizado.
+- **Anexar al cierre** una entrada breve al final (timestamp ISO, loop, herramienta, acción del selector, lock, REQ, commit/push o bloqueo, acción manual pendiente, aprendizaje), **dentro del mismo commit de la corrida**: no cuenta como un segundo commit ni rompe "un REQ = un commit".
+- **Corridas detenidas sin commit:** no se crea un commit solo por la bitácora. La entrada va en el reporte final y, si existe, en la bitácora local. La siguiente corrida que haga commit la incorpora al repo.
+- **Auditor:** además de `REQUIREMENTS.md`, puede anexar su entrada a `docs/agent-run-memory.md` en su commit documental. No puede editar entradas anteriores ni ningún otro archivo.
+- Si existe la bitácora local con entradas que el repo no tiene, se copian al repo en el siguiente commit y la local deja de usarse.
 - **No es fuente de verdad.** Si contradice a Git/HEAD, `REQUIREMENTS.md`, `CONTEXT.md`, `docs/requirements-history.md`, `docs/architecture-reference.md` o el código real, la bitácora está equivocada. No decide estado de REQ, orden de la cola ni si el trabajo está hecho.
 
 ## Cómo ejecutar el loop DESARROLLADOR
@@ -85,7 +87,7 @@ node scripts/agent-next-audit.mjs --acquire
 4. Encontrar un bug/gap **con evidencia** (reproducción + causa raíz con `archivo:línea` + evidencia funcional si es visible en UI). Sin evidencia, no hay REQ.
 5. No duplicar: si el problema ya está en `REQUIREMENTS.md`, añadir evidencia al REQ existente en vez de crear otro. Si hay duda historica, consultar `docs/requirements-history.md` por seccion.
 6. Escribir el REQ nuevo (estado `**Estado: pendiente.**`) **al final** de `REQUIREMENTS.md`, usando `nextRequirementId` y el formato estándar (Origen / Problema / Causa raíz / Objetivo / Alcance / Fuera de alcance / Riesgos / Criterios de aceptación / Verificación sugerida).
-7. Verificar que **solo** cambió `REQUIREMENTS.md` y que `node scripts/release-gate.mjs` queda en verde tras commitear.
+7. Verificar que **solo** cambió `REQUIREMENTS.md` (y la entrada anexada a `docs/agent-run-memory.md`) y que `node scripts/release-gate.mjs` queda en verde tras commitear.
 8. Un solo commit documental con el formato `audit(<journey>): REQ-NN — <título>` y publicar:
 
 ```bash
