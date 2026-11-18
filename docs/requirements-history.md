@@ -14356,6 +14356,31 @@ Ningún texto de entrenamiento visible contiene «sesión». Día con entreno pe
 #### Verificación sugerida
 `tests/e2e/entreno.spec.js`, `next-exercise.spec.js`, captura a 390 px.
 
+### REQ-397 - Nutrición: comida vacía sin «Sin asignar» ni «Otra opción»
+
+**Estado: implementado.** Auditoría heurística, severidad 3 (`docs/ux/2026-11-16-auditoria-heuristica.md`).
+
+Implementación: `mealCard()` muestra «Nada registrado» en una comida sin contenido y su botón dice «Ver opciones» (con contenido sigue «Otra opción»); el modal se titula «Opciones — <comida>» en ese caso. El botón al pie de la lista usa `openExtraRegistration(ds)`, la misma función y el mismo texto que el principal de REQ-330 (`.nut-register-more`, secundario). `logIntentHtml()` usa «Extra (se suma al día)» y «En lugar de una comida del plan» en todos los registros, y el selector de comida dice «Nada registrado» en lugar de «Sin asignar». Título por defecto del editor de extras: «Registrar algo que comí». PWA `fitbud-pwa-v260`.
+
+#### Origen
+Auditoría heurística de UX, 2026-11-16.
+#### Problema
+Sin menú, cada comida dice «Sin asignar» y ofrece «Otra opción» aunque no hay primera opción. «＋ Agregar comida / snack» abre lo mismo que «Registrar algo que comí» con otro nombre, y el editor pregunta «Otra comida o snack» o «Una comida del día» sin explicar la diferencia.
+#### Causa raíz
+`app/index.html:8261`, `:8267`, `:5939` (`openEditor('extra')`) y `:12906`.
+#### Objetivo
+Una comida vacía dice qué falta y qué hacer; una acción, un nombre.
+#### Alcance
+Estado «Nada registrado». Sin menú, «Ver opciones» en lugar de «Otra opción». El botón inferior usa el mismo texto que el principal de REQ-330. Opciones del editor: «Extra (se suma al día)» y «En lugar de una comida del plan».
+#### Fuera de alcance
+Planificador, menú semanal y REQ-330.
+#### Riesgos
+Specs que buscan los textos actuales.
+#### Criterios de aceptación
+Sin menú no aparecen «Sin asignar» ni «Otra opción». Los dos accesos al registro extra tienen el mismo texto.
+#### Verificación sugerida
+`tests/e2e/nutricion.spec.js`, `registro-extra-visible.spec.js`, 320/390 px.
+
 ### REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
 **Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.

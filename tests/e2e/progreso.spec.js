@@ -97,7 +97,7 @@ test.describe("Progreso", () => {
     await gotoApp(page);
     await page.locator("#tabs").getByText("Nutrición").click();
     const firstMeal = page.locator(".meal").first();
-    await expect(firstMeal).toContainText("Sin asignar");
+    await expect(firstMeal).toContainText("Nada registrado");
     await expect(firstMeal.locator(".nums")).toHaveCount(0);
     await expect(firstMeal.getByRole("button", { name: /marcar como hecha/ })).toBeDisabled();
   });

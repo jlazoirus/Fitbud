@@ -2279,26 +2279,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-397 - Nutrición: comida vacía sin «Sin asignar» ni «Otra opción»
 
-**Estado: pendiente.** Auditoría heurística, severidad 3. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
-
-### Origen
-Auditoría heurística de UX, 2026-11-16.
-### Problema
-Sin menú, cada comida dice «Sin asignar» y ofrece «Otra opción» aunque no hay primera opción. «＋ Agregar comida / snack» abre lo mismo que «Registrar algo que comí» con otro nombre, y el editor pregunta «Otra comida o snack» o «Una comida del día» sin explicar la diferencia.
-### Causa raíz
-`app/index.html:8261`, `:8267`, `:5939` (`openEditor('extra')`) y `:12906`.
-### Objetivo
-Una comida vacía dice qué falta y qué hacer; una acción, un nombre.
-### Alcance
-Estado «Nada registrado». Sin menú, «Ver opciones» en lugar de «Otra opción». El botón inferior usa el mismo texto que el principal de REQ-330. Opciones del editor: «Extra (se suma al día)» y «En lugar de una comida del plan».
-### Fuera de alcance
-Planificador, menú semanal y REQ-330.
-### Riesgos
-Specs que buscan los textos actuales.
-### Criterios de aceptación
-Sin menú no aparecen «Sin asignar» ni «Otra opción». Los dos accesos al registro extra tienen el mismo texto.
-### Verificación sugerida
-`tests/e2e/nutricion.spec.js`, `registro-extra-visible.spec.js`, 320/390 px.
+**Estado: implementado.** Comida vacía: «Nada registrado» y «Ver opciones»; el acceso al pie de «Comidas del día» es «Registrar algo que comí» y abre el mismo registro que el principal (REQ-330); el editor ofrece «Extra (se suma al día)» y «En lugar de una comida del plan». PWA v260. ✓ `tests/e2e/textos.spec.js`, `registro-extra-visible.spec.js`, `sustitucion.spec.js` (320/390 px). Detalle en `docs/requirements-history.md`.
 
 ## REQ-398 - Onboarding: errores junto al campo y todos a la vez
 

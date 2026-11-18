@@ -64,7 +64,7 @@ test.describe("Nutrición — comidas sin asignar (REQ-161)", () => {
     // Día SIN preparar (no se toca "Sugerirme un menú"): los 3 slots quedan "Sin asignar".
     await page.locator("#tabs").getByText("Nutrición").click();
     const app = page.locator("#app");
-    await expect(app).toContainText("Sin asignar");
+    await expect(app).toContainText("Nada registrado");
 
     // 1) El check debe estar deshabilitado y toggleMeal() debe ignorar el intento
     // (mismo camino que dispara el botón real).

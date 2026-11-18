@@ -5982,6 +5982,10 @@ function renderHoy(){
 function renderCoach(){chatModeActive()?renderChatMode():renderHoy();}
 
 /* ---------- NUTRICIÓN: detalle de comidas + coach ---------- */
+// REQ-330/397: único registro de algo comido fuera del menú (se suma al día).
+function openExtraRegistration(ds){
+  openEditor('extra',ds||current,null,{title:'Registrar algo que comí',registration:true,intent:'extra',initialTab:'food'});
+}
 function renderNutrition(){
   const ds=current; const st=dayState(ds); const day=buildDay(ds);
   const prepared=homeDayHasPreparedMeals(ds,day);
@@ -5995,7 +5999,7 @@ function renderNutrition(){
   }).join("");
   // The weekly entry above is the only menu generator on this screen.
   const registerHtml=`<div class="nutrition-register">
-    <button type="button" class="btn btn-accent" onclick="openEditor('extra','${ds}',null,{title:'Registrar algo que comí',registration:true,intent:'extra',initialTab:'food'})">Registrar algo que comí</button>
+    <button type="button" class="btn btn-accent" onclick="openExtraRegistration('${ds}')">Registrar algo que comí</button>
     <p class="muted small">${prepared?"Aunque no esté en tu menú de hoy.":"Busca un alimento y registra cuánto comiste."}</p>
   </div>`;
   // Acciones secundarias globales. Los reemplazos viven dentro de cada comida para no duplicar flujos.
@@ -6006,6 +6010,8 @@ function renderNutrition(){
     ${shopWeek?`<button class="btn btn-sm nut-tool" id="shopToolBtn" onclick="openShoppingList()">${shoppingToolInner(shopPending)}</button>`:""}
     <button class="btn btn-sm nut-tool" onclick="openNutritionMoreMenu()" aria-label="Más opciones de nutrición">${miniIcon("more")}Más opciones</button>
   </div>`;
+  // REQ-397: el acceso al pie de la lista es el mismo registro, con el mismo nombre.
+  const registerMoreHtml=`<button type="button" class="btn nut-register-more" style="width:100%;margin-top:8px" onclick="openExtraRegistration('${ds}')">Registrar algo que comí</button>`;
   // REQ-124: anillo/resumen -> comidas del día (+ extras interoperadas) -> más opciones (al final).
   $("#app").innerHTML=`
   ${dayHeaderNav(ds)}
@@ -6014,7 +6020,7 @@ function renderNutrition(){
   ${nutritionWeekHtml(ds)}
   ${registerHtml}
   ${section("nut.plan","Comidas del día",
-    itemsHtml+'<button class="btn" style="width:100%;margin-top:8px" onclick="openEditor(\'extra\')">＋ Agregar comida / snack</button>',
+    itemsHtml+registerMoreHtml,
     `${orderedItems.length}`)}
   ${moreBtn}
   `;
@@ -8337,13 +8343,14 @@ function mealCard(ds,b,order){
           ?`<div class="name">${v.name?esc(v.name):'<span class="muted">Comida sin nombre</span>'}</div>
         ${mealNumsHtml(v)}`
           // REQ-195: un hueco vacío no muestra "0 kcal · P 0 · C 0 · G 0 g"
-          :`<div class="name muted">Sin asignar</div>
+          // REQ-397: dice qué falta, no un estado interno.
+          :`<div class="name muted">Nada registrado</div>
         <div class="meal-empty-hint">Registra lo que comiste. El menú es opcional.</div>`}
       </div>
     </div>
     <div class="meal-actions">
       ${!mealHasContent(v)?`<button class="btn btn-sm" aria-label="Registrar ${esc(b.slot)}" onclick="openFoodRegistration('${ds}','${b.id}')">Registrar</button>`:""}
-      <button class="btn btn-sm" onclick="openChangeMeal('${ds}','${b.id}')" ${ms.done?"disabled title=\"Desmarca la comida si necesitas cambiarla\"":""}>Otra opción</button>
+      <button class="btn btn-sm" onclick="openChangeMeal('${ds}','${b.id}')" ${ms.done?"disabled title=\"Desmarca la comida si necesitas cambiarla\"":""}>${mealHasContent(v)?"Otra opción":"Ver opciones"}</button>
       ${canUndoSubst(ms)?`<button class="btn btn-sm" onclick="undoMealSubstitution('${ds}','${b.id}')">Deshacer cambio</button>`:ms.ovr?`<button class="btn btn-sm" onclick="revertMeal('${ds}','${b.id}')">Volver al plan</button>`:""}
       <button class="btn btn-sm" aria-label="Más opciones de ${esc(b.slot)}" onclick="openMealMore('${ds}','${b.id}')">···</button>
     </div>
@@ -11719,7 +11726,7 @@ function openChangeMeal(ds,id){
   const pool=changeMealCandidatePool(ds,id,new Set(),12);
   window._changeMeal={ds,id,options:pool.options,reason:null,ranked:pool.ranked,seenSlugs:new Set()};
   const optsHtml=_buildChangeMealOpts(cv);
-  modal(`<h3>Cambiar — ${esc(base.slot)}</h3>
+  modal(`<h3>${mealHasContent(cv)?"Cambiar":"Opciones"} — ${esc(base.slot)}</h3>
     <p class="muted small" id="chg-hint">Elige un plato compatible con tus metas.${cv.kcal?` Actual: ${cv.kcal} kcal.`:""}</p>
     <div style="margin:8px 0 4px">
       <span class="muted small">Motivo (opcional):</span>
@@ -12121,7 +12128,7 @@ function applyMissedSession(ds,action){
 function openEditor(kind,ds,id,options={}){
   ds=ds||current;
   let pre={name:"",kcal:"",p:"",c:"",f:""};
-  let title="Agregar comida / snack";
+  let title="Registrar algo que comí";
   if(kind==="meal"){const day=buildDay(ds);const base=day.meals.find(m=>m.id===id);const ms=mealState(ds,id);const v=mealValue(base,ms);pre={name:v.name,kcal:v.kcal,p:v.p,c:v.c,f:v.f,macrosUnknown:v.macrosUnknown};title="Editar — "+base.slot;}
   // REQ-229: el nombre precargado de una comida del plan es lo planeado, no lo que comió.
   window._editor={kind,ds,id,extraIdx:null,registration:!!options.registration,initialTab:options.initialTab,intent:options.intent,target:options.target,planName:kind==="meal"?String(pre.name||""):"",...editorMetaDraft(kind==="meal"?mealState(ds,id).ovr:null,pre,kind==="meal")};
@@ -12985,8 +12992,8 @@ function logIntentHtml(){
   return `<fieldset class="log-intent">
     <legend>${e.registration?"¿Dónde lo registras?":"¿Cómo lo registras?"}</legend>
     <div class="field" style="margin:4px 0 2px"><label for="f_date">Día</label><input id="f_date" type="date" min="${START}" max="${END}" value="${e.ds}" onchange="setEditorDate(this.value)"></div>
-    <label class="intent-opt"><input type="radio" name="f_intent" value="extra" ${e.intent==="extra"?"checked":""} onchange="setEditorIntent('extra')"> ${e.registration?"Otra comida o snack":"Además de lo previsto"}</label>
-    <label class="intent-opt"><input type="radio" name="f_intent" value="replace" ${e.intent==="replace"?"checked":""} onchange="setEditorIntent('replace')"> ${e.registration?"Una comida del día":"En lugar de una comida del día"}</label>
+    <label class="intent-opt"><input type="radio" name="f_intent" value="extra" ${e.intent==="extra"?"checked":""} onchange="setEditorIntent('extra')"> Extra (se suma al día)</label>
+    <label class="intent-opt"><input type="radio" name="f_intent" value="replace" ${e.intent==="replace"?"checked":""} onchange="setEditorIntent('replace')"> En lugar de una comida del plan</label>
     <div id="f_replaceBox" ${e.intent==="replace"?"":"hidden"}>${replaceTargetHtml()}</div>
     <div id="f_impact" class="muted small" aria-live="polite"></div>
   </fieldset>`;
@@ -12996,7 +13003,7 @@ function replaceTargetHtml(){
   const opts=day.meals.map(b=>{
     const ms=mealState(e.ds,b.id),v=mealValue(b,ms);
     const state=ms.done?" · registrada":ms.skipped?" · saltada":"";
-    return `<option value="${esc(b.id)}" ${e.target===b.id?"selected":""}>${esc(b.slot)} — ${esc(v.name||"Sin asignar")}${state}</option>`;
+    return `<option value="${esc(b.id)}" ${e.target===b.id?"selected":""}>${esc(b.slot)} — ${esc(v.name||"Nada registrado")}${state}</option>`;
   }).join("");
   const eaten=e.eaten!=null?e.eaten:e.ds<=todayStr();
   return `<div class="field" style="margin:8px 0 0"><label for="f_target">${e.registration?"Comida del día":"Comida que reemplaza"}</label>

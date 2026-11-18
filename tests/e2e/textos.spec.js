@@ -10,7 +10,10 @@ test("REQ-194: Nutrición no muestra vocabulario interno y las fechas no capital
 
   await page.locator("#tabs").getByText("Nutrición").click();
   const app = page.locator("#app");
-  await expect(app).toContainText("Sin asignar");
+  await expect(app).toContainText("Nada registrado");
+  // REQ-397: una comida vacía no dice «Sin asignar» ni ofrece «Otra opción».
+  expect(await app.innerText()).not.toMatch(/Sin asignar|Otra opción/);
+  await expect(app.getByRole("button", { name: "Ver opciones", exact: true }).first()).toBeVisible();
   const text = await app.innerText();
   expect(text).not.toMatch(/\bslots?\b/i);
   expect(text).not.toMatch(/base de datos/i);

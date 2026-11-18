@@ -34,3 +34,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - `service-worker.js`: `CACHE_NAME` pasa a **v259**. `main` ya publicó v258 y REQ-357 cambia el shell, así que no puede volver a v257.
 - `work/plan-weeks-{390,1280}.png`: capturas generadas por pruebas que se commitearon por error en ambos lados; se conserva la versión de `main`.
 - Aprendizaje: `git add -A` tras correr E2E arrastra capturas de `work/`; revisar `git status` antes de commitear.
+
+### 2026-11-18T15:40Z · desarrollador · Claude Code (nube) · REQ-397
+- Pedido por Jonathan («Sigue con REQ-397»). Rama `claude/vigilant-franklin-yt13ej`, base `main` `f9e559c`; PR borrador.
+- Comida vacía: «Nada registrado» + «Ver opciones»; botón al pie = «Registrar algo que comí» (`openExtraRegistration`); editor: «Extra (se suma al día)» / «En lugar de una comida del plan». PWA v260.
+- Sin operación manual pendiente.
+- Aprendizaje: en la nube hace falta `npm ci`; `registro-extra-visible.spec.js` escribe en `/Users/jonathan/.fitbros/qa-archive/req-330` (créala con `mkdir -p` para correrlo). El release gate incluye la suite E2E completa: lánzalo en segundo plano.
