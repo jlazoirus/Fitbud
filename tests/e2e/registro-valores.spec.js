@@ -12,7 +12,7 @@ async function openAddMeal(page, context) {
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
   await page.locator("#tabs").getByText("Nutrición").click();
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   return { overlay: page.locator("#overlay"), errors };
 }
 const snapshot = (page) => page.evaluate(() => ({
@@ -55,7 +55,7 @@ test("cero explícito y decimales con coma se guardan sin truncar; doble envío 
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
   await expect(page.locator("#app")).toContainText("Un vaso de agua");
 
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   await fill(overlay, { f_name: "Pan con mantequilla", f_kcal: "250,5", f_p: "8,25", f_c: "45", f_f: "3.5" });
   await page.evaluate(() => { saveEditor(); saveEditor(); });
   const extras = await page.evaluate(() => dayState(todayStr()).extras.map(({ name, kcal, p, c, f }) => ({ name, kcal, p, c, f })));

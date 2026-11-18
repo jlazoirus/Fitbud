@@ -57,7 +57,7 @@ test("crear receta de 4 porciones y 1000 g, registrar 1/4 y 150 g", async ({ pag
   expect(await page.evaluate(() => dayState(todayStr()).extras.length)).toBe(0);
 
   await page.evaluate(() => closeModal());
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   await overlay.locator('.qp-tab[data-tab="food"]').click();
   await overlay.locator("#qpSearch").fill("arroz con pollo");
   const row = overlay.locator("#qpList .qp-item", { hasText: "Arroz con pollo de casa" });
@@ -82,7 +82,7 @@ test("cambiar el rendimiento y luego eliminar la receta no reescribe lo registra
   const recipe = { id: "rcasa001", name: "Lentejas", version: 1, yield: { servings: 4 },
     lines: [{ name: "Papa cocida", unit: "100g", amount: 500, base: { kcal: 87, p: 1.9, c: 20, f: 0.1 }, ref: { kind: "ingredient", id: "8" } }] };
   const { overlay, calls } = await setup(page, context, completePrefs({ customRecipes: [recipe] }));
-  await page.getByRole("button", { name: /Agregar comida \/ snack/i }).first().click();
+  await page.locator(".nut-register-more").click();
   await overlay.locator('.qp-tab[data-tab="food"]').click();
   await overlay.locator(".qp-item", { hasText: "Lentejas" }).getByRole("button", { name: "Añadir" }).click();
   await overlay.getByRole("button", { name: "Guardar", exact: true }).click();
