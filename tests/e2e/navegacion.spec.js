@@ -73,7 +73,10 @@ test.describe("Navegación", () => {
     const password = page.getByLabel("Contraseña", { exact: true });
     try {
       await button.click();
-      await expect(page.locator("#auOut")).toHaveText("Pon correo y contraseña");
+      // REQ-399: cada campo vacío dice qué falta, bajo ese campo.
+      await expect(page.locator("#au_email_error")).toHaveText("Escribe tu correo");
+      await expect(page.locator("#au_pwd_error")).toHaveText("Escribe tu contraseña");
+      await expect(page.locator("#auOut")).toBeEmpty();
       await expect(button).toBeEnabled();
       expect(attempts).toBe(0);
 
@@ -110,6 +113,72 @@ test.describe("Navegación", () => {
     await expect(page.locator("#tabs").getByText("Hoy")).toBeVisible();
     await expect(button).toHaveCount(0);
     expect(attempts).toBe(2);
+  });
+
+  test("REQ-399: el login marca cada campo con su error y enfoca el correo", async ({ page, context }) => {
+    await installMocks(context);
+    let attempts = 0;
+    await context.route(url => url.href.startsWith(SUPA_URL + "/auth/v1/"), route => { attempts += 1; return route.fallback(); });
+    const errors = collectConsoleErrors(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoApp(page);
+    await expect(page.locator("#au_email")).toBeVisible();
+    attempts = 0; // solo cuentan los envíos del formulario
+
+    const email = page.locator("#au_email");
+    const password = page.locator("#au_pwd");
+    await expect(password).not.toHaveAttribute("placeholder", /./);
+
+    // Correo «malo» sin contraseña: dos mensajes, uno por campo, y foco en el correo.
+    await email.fill("ana@correo");
+    await page.locator("#auSubmit").click();
+    const emailError = page.locator("#au_email_error");
+    const passwordError = page.locator("#au_pwd_error");
+    await expect(emailError).toHaveText("Revisa el formato del correo");
+    await expect(passwordError).toHaveText("Escribe tu contraseña");
+    await expect(email).toHaveAttribute("aria-invalid", "true");
+    await expect(email).toHaveAttribute("aria-describedby", /au_email_error/);
+    await expect(password).toHaveAttribute("aria-invalid", "true");
+    await expect(email).toBeFocused();
+    await expect(page.locator(".auth .field-error")).toHaveCount(2);
+    // Color de error, no el gris de los textos secundarios.
+    const [errorColor, badColor] = await page.evaluate(() => [
+      getComputedStyle(document.getElementById("au_email_error")).color,
+      (() => { const probe = document.createElement("span"); probe.style.color = "var(--bad)"; document.body.append(probe); const c = getComputedStyle(probe).color; probe.remove(); return c; })(),
+    ]);
+    expect(errorColor).toBe(badColor);
+    // El mensaje de la contraseña va bajo el campo completo, no dentro del botón de mostrar.
+    await expect(page.locator(".password-wrap + #au_pwd_error")).toHaveCount(1);
+    expect(attempts).toBe(0);
+
+    // Corregir un campo quita solo su mensaje.
+    await email.fill("ana@correo.test");
+    await expect(emailError).toHaveCount(0);
+    await expect(email).not.toHaveAttribute("aria-invalid", /./);
+    await expect(passwordError).toBeVisible();
+
+    // Recuperar: «Olvidé mi contraseña» también valida el correo junto al campo.
+    await email.fill("");
+    await page.getByRole("button", { name: "Olvidé mi contraseña" }).click();
+    await expect(emailError).toHaveText("Escribe tu correo");
+    await expect(email).toBeFocused();
+    await email.fill("ana correo.test");
+    await page.getByRole("button", { name: "Olvidé mi contraseña" }).click();
+    await expect(emailError).toHaveText("Revisa el formato del correo");
+    expect(attempts).toBe(0);
+
+    // Registrarse usa los mismos mensajes.
+    await page.getByRole("button", { name: "¿No tienes cuenta? Regístrate" }).click();
+    await page.getByRole("button", { name: "Registrarme" }).click();
+    await expect(page.locator("#au_email_error")).toHaveText("Escribe tu correo");
+    await expect(page.locator("#au_pwd_error")).toHaveText("Escribe tu contraseña");
+    await expect(page.locator("#au_email")).toBeFocused();
+    await expect(page.locator("#au_pwd")).not.toHaveAttribute("placeholder", /./);
+    expect(attempts).toBe(0);
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
   test("REQ-151/352: la portada pinta los planes de la tienda aunque su catálogo llegue tarde", async ({ page, context }) => {

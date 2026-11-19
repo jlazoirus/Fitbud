@@ -11301,7 +11301,7 @@ function renderAuth(){
     ${streakSocialPending?`<div class="auth-invite" role="status"><b>Te invitaron a comparar rachas.</b> Entra o crea tu cuenta para decidir si aceptas. Solo compartirás tu alias y tus días de racha.</div>`:""}
     <div class="dash">
       <div class="field"><label for="au_email">Correo</label><input id="au_email" type="email" autocomplete="email" placeholder="tu@correo.com"></div>
-      ${passwordField({id:"au_pwd",label:"Contraseña",autocomplete:mode==="in"?"current-password":"new-password",placeholder:"••••••••"})}
+      ${passwordField({id:"au_pwd",label:"Contraseña",autocomplete:mode==="in"?"current-password":"new-password"})}
       ${mode==="up"&&inviteOnlySignup()?`<div class="field"><label for="au_code">Código de invitación</label><input id="au_code" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="FIT-XXXX-XXXX" value="${esc(pendingInviteCode())}"></div>
       ${pendingInviteCode()?"":`<p class="muted small" style="margin:-4px 0 12px">¿No tienes código? ${subscriptionSignupOpen()?`<a href="/registro">Empieza tu semana gratis</a>`:`<a href="/planes">Ver planes</a>`}.</p>`}`:""}
       <button id="auSubmit" class="btn btn-accent auth-submit" type="button" aria-busy="${authSubmitting}" onclick="doAuth()"${actionDisabled}>
@@ -11410,13 +11410,49 @@ function setAuthSubmitting(pending){
   $("#auStatus").textContent=pending?submit.querySelector(".auth-submit-pending").textContent:"";
   document.querySelectorAll("[data-auth-alternative]").forEach(button=>{button.disabled=pending;});
 }
+// REQ-399: the auth forms say which field to fix, under that field, all at once.
+// Same pattern as the onboarding (REQ-398): .field-error + aria-invalid + aria-describedby,
+// focus on the first one, and each message goes away when its field changes.
+const AUTH_EMAIL_RE=/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
+function authEmailError(email){return !email?"Escribe tu correo":AUTH_EMAIL_RE.test(email)?"":"Revisa el formato del correo";}
+function clearAuthFieldError(id){
+  const msg=document.getElementById(id+"_error");if(msg)msg.remove();
+  const el=document.getElementById(id);
+  if(!el)return;
+  el.removeAttribute("aria-invalid");
+  const ids=(el.getAttribute("aria-describedby")||"").split(/\s+/).filter(v=>v&&v!==id+"_error");
+  if(ids.length)el.setAttribute("aria-describedby",ids.join(" "));else el.removeAttribute("aria-describedby");
+}
+function showAuthFieldErrors(errors){
+  document.querySelectorAll("#app .auth .field-error[data-auth-error]").forEach(msg=>clearAuthFieldError(msg.dataset.authError));
+  let first=null;
+  errors.forEach(({field,message})=>{
+    const el=document.getElementById(field);if(!el)return;
+    const id=field+"_error",msg=document.createElement("div");
+    msg.id=id;msg.className="field-error";msg.dataset.authError=field;msg.textContent=message;
+    (el.closest(".password-wrap")||el).insertAdjacentElement("afterend",msg);
+    el.setAttribute("aria-invalid","true");
+    el.setAttribute("aria-describedby",[...(el.getAttribute("aria-describedby")||"").split(/\s+/).filter(Boolean),id].join(" "));
+    el.addEventListener("input",()=>clearAuthFieldError(field),{once:true});
+    if(!first)first=el;
+  });
+  if(first)first.focus();
+  return errors.length>0;
+}
+function authFormErrors(email,pwd,signingUp){
+  const errors=[],emailError=authEmailError(email);
+  if(emailError)errors.push({field:"au_email",message:emailError});
+  if(!pwd)errors.push({field:"au_pwd",message:"Escribe tu contraseña"});
+  if(signingUp&&inviteOnlySignup()&&$("#au_code")&&!$("#au_code").value.trim())errors.push({field:"au_code",message:"Escribe tu código de invitación."});
+  return errors;
+}
 async function doAuth(){
   if(authSubmitting||session)return;
   const email=$("#au_email").value.trim();const pwd=$("#au_pwd").value;
   const out=$("#auOut");
-  if(!email||!pwd){if(out)out.textContent="Pon correo y contraseña";return;}
   const signingUp=window._authMode==="up";
   if(out)out.textContent="";
+  if(showAuthFieldErrors(authFormErrors(email,pwd,signingUp)))return;
   setAuthSubmitting(true);
   try{
     if(signingUp&&inviteOnlySignup())return await inviteSignUp(email,pwd,out);
@@ -11440,7 +11476,7 @@ async function doAuth(){
 // código; el correo queda confirmado y se entra directo con el acceso activo.
 async function inviteSignUp(email,pwd,out){
   const code=(($("#au_code")&&$("#au_code").value)||"").trim();
-  if(!code){if(out)out.textContent="Escribe tu código de invitación.";const c=$("#au_code");if(c)c.focus();return;}
+  if(!code){showAuthFieldErrors([{field:"au_code",message:"Escribe tu código de invitación."}]);return;}
   let data={};
   try{
     const r=await apiFetch("/api/entitlement",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"invite-signup",code,email,password:pwd})});
@@ -11456,7 +11492,9 @@ async function inviteSignUp(email,pwd,out){
 async function requestOwnPasswordReset(){
   const email=$("#au_email")&&$("#au_email").value.trim();
   const out=$("#auOut");
-  if(!email){if(out)out.textContent="Escribe tu correo primero";return;}
+  if(out)out.textContent="";
+  const emailError=authEmailError(email);
+  if(showAuthFieldErrors(emailError?[{field:"au_email",message:emailError}]:[]))return;
   if(out)out.textContent="Enviando…";
   const redirectTo=authRedirectUrl("recovery");
   const result=await supa.auth.resetPasswordForEmail(email,{redirectTo});
@@ -11491,8 +11529,11 @@ function renderPasswordRecovery(){
 }
 async function finishPasswordRecovery(){
   const pwd=$("#recovery_pwd").value,confirmPwd=$("#recovery_confirm").value,out=$("#recoveryOut");
-  if(pwd.length<8){out.textContent="Usa al menos 8 caracteres.";return;}
-  if(pwd!==confirmPwd){out.textContent="Las contraseñas no coinciden.";return;}
+  out.textContent="";
+  const errors=[];
+  if(pwd.length<8)errors.push({field:"recovery_pwd",message:pwd?"Usa al menos 8 caracteres.":"Escribe tu nueva contraseña"});
+  if(pwd!==confirmPwd)errors.push({field:"recovery_confirm",message:confirmPwd?"Las contraseñas no coinciden.":"Repite tu nueva contraseña"});
+  if(showAuthFieldErrors(errors))return;
   if(_recoveryBusy)return;
   _recoveryBusy=true;
   const btn=document.querySelector("#app .dash .btn-accent");

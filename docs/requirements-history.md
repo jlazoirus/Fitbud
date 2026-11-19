@@ -14406,6 +14406,31 @@ Paso 3 vacío: un intento marca cómo comes, consentimiento y las 4 preguntas. N
 #### Verificación sugerida
 `tests/e2e/onboarding-essential.spec.js`, `accesibilidad.spec.js`.
 
+### REQ-399 - Acceso: error del login junto al campo
+
+**Estado: implementado.** Auditoría heurística, severidad 2 (`docs/ux/2026-11-16-auditoria-heuristica.md`).
+
+Implementación: `authFormErrors()` devuelve todos los errores del formulario de acceso con su campo: correo vacío («Escribe tu correo») o con formato inválido («Revisa el formato del correo», `authEmailError()` con `AUTH_EMAIL_RE`), contraseña vacía («Escribe tu contraseña») y, en la beta cerrada, el código de invitación. `showAuthFieldErrors()` sigue el patrón de REQ-398: `.field-error` (`#<campo>_error`, color `--bad`) bajo el campo —bajo `.password-wrap` en la contraseña—, `aria-invalid`, `aria-describedby`, foco en el primero; cada mensaje se va al escribir en su campo. Lo usan `doAuth()` (entrar y registrarse; no se llama a Supabase con errores), `inviteSignUp()`, `requestOwnPasswordReset()` («Olvidé mi contraseña» valida el formato antes de enviar) y `finishPasswordRecovery()` (nueva contraseña: «Usa al menos 8 caracteres.» / «Escribe tu nueva contraseña» y «Las contraseñas no coinciden.» / «Repite tu nueva contraseña»). `#auOut` queda para respuestas del servidor (REQ-375). La contraseña ya no tiene placeholder `••••••••`. PWA `fitbud-pwa-v262`.
+
+#### Origen
+Auditoría heurística de UX, 2026-11-16.
+#### Problema
+«Pon correo y contraseña» aparece en gris bajo el botón, sin decir qué campo falta. No se valida el formato del correo. El placeholder `••••••••` parece una contraseña guardada.
+#### Causa raíz
+`app/index.html:11275` y `:11162`.
+#### Objetivo
+Saber qué corregir sin adivinar.
+#### Alcance
+Mensaje por campo («Escribe tu correo», «Revisa el formato del correo», «Escribe tu contraseña») con `aria-invalid` y foco. Error en color de error. Contraseña sin placeholder. Aplica a entrar, registrarse y recuperar.
+#### Fuera de alcance
+Errores de Supabase ya traducidos (REQ-375).
+#### Riesgos
+`navegacion.spec.js` (REQ-375).
+#### Criterios de aceptación
+Correo «malo» sin contraseña: dos mensajes, uno por campo, y foco en el correo.
+#### Verificación sugerida
+`tests/e2e/navegacion.spec.js`.
+
 ### REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
 **Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.

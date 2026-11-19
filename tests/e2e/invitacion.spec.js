@@ -87,6 +87,7 @@ test("beta cerrada: sin código no se crea la cuenta (REQ-205)", async ({ page, 
   await page.locator("#au_email").fill("ana@correo.test");
   await page.locator("#au_pwd").fill("ClaveSegura2026");
   await page.getByRole("button", { name: "Registrarme" }).click();
-  await expect(page.locator("#auOut")).toHaveText("Escribe tu código de invitación.");
+  await expect(page.locator("#au_code_error")).toHaveText("Escribe tu código de invitación."); // REQ-399: junto al campo
+  await expect(page.locator("#au_code")).toBeFocused();
   expect(posted).toBe(false);
 });
