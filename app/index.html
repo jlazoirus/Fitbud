@@ -607,7 +607,13 @@
   .qp-save-fav{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px}
   .field-errors{margin-top:10px;padding:8px 10px;border-radius:var(--r-sm);background:var(--bad-dim);color:var(--txt);font-size:13px}
   .field-errors ul{margin:0;padding-left:18px}
-  input[aria-invalid="true"],textarea[aria-invalid="true"]{border-color:var(--bad)}
+  input[aria-invalid="true"],textarea[aria-invalid="true"],select[aria-invalid="true"]{border-color:var(--bad)}
+  .field-error{margin-top:4px;color:var(--bad);font-size:13px;line-height:1.35}
+  .onboarding-error-summary{margin:16px 0 -6px;font-weight:600}
+  .onboarding-error-summary:focus{outline:none}
+  .onboarding-safety-row .field-error{grid-column:1/-1;margin-top:-6px}
+  .chip-check:has(input[aria-invalid="true"]){border-color:var(--bad)}
+  [role="group"][data-invalid="true"] .btn{border-color:var(--bad)}
   .partial-macros{margin-top:6px}
   .meal-origin{margin:8px 0}
   /* REQ-347: un fieldset no se encoge por debajo de su contenido (min-width:min-content) y en iOS
@@ -3787,7 +3793,7 @@ function onboardingSteps(){
   return `<div class="onboarding-nav">${back}<div class="steps" role="progressbar" aria-valuemin="1" aria-valuemax="3" aria-valuenow="${onboardingStep}" aria-label="Paso ${onboardingStep} de 3">${[1,2,3].map(n=>`<div class="step ${n<=onboardingStep?"on":""}"></div>`).join("")}</div></div>`;
 }
 function onboardingButtons(last){
-  return `<div class="onboarding-actions">
+  return `<p id="obErrorSummary" class="field-error onboarding-error-summary" role="alert" tabindex="-1" hidden></p><div class="onboarding-actions">
     ${onboardingStep>1?'<button class="btn" onclick="onboardingBack()">Atrás</button>':""}
     <button class="btn btn-accent" onclick="${last?"saveOnboarding()":"onboardingNext()"}">${last?"Guardar mi plan":"Continuar"}</button>
   </div>`;
@@ -3830,7 +3836,7 @@ function trainingDayKindDefaults(d){
 function trainingDayKindsHtml(prefix,d){
   if(d.strengthMode==="none"||d.primarySport==="strength_only")return "";
   const kinds=trainingDayKindDefaults(d);
-  if(prefix==="ob")return `<label class="muted small">Qué entrenas cada día · toca para cambiar</label><div class="onboarding-kind-grid">${WEEKDAY_OPTIONS.filter(day=>d.trainingDays.includes(day.value)).map(day=>{
+  if(prefix==="ob")return `<span class="muted small" id="ob_kinds_label">Qué entrenas cada día · toca para cambiar</span><div class="onboarding-kind-grid" id="ob_kinds" role="group" aria-labelledby="ob_kinds_label">${WEEKDAY_OPTIONS.filter(day=>d.trainingDays.includes(day.value)).map(day=>{
     const kind=kinds[day.value],label=kind==="strength"?"Fuerza":SPORT_LABELS[d.primarySport];
     return `<button type="button" class="btn btn-sm" id="ob_kind_${day.value}" value="${kind}" aria-label="${day.label}: ${esc(label)}. Cambiar actividad" onclick="onboardingToggleKind(${day.value})"><span>${day.short}</span><span>${esc(label)}</span></button>`;
   }).join("")}</div>`;
@@ -4014,22 +4020,28 @@ function validateTrainingProfile(d){
   if(d.strengthMode!=="none"&&(!Array.isArray(d.equipment)||!d.equipment.length))return "Selecciona al menos un recurso o equipo disponible";
   return "";
 }
-function validateTrainingProfileCore(d){
-  if(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validPlanDuration(d.planDurationWeeks))return "Completa la base de tu plan de entrenamiento";
-  if(d.primarySport==="strength_only"&&d.strengthMode==="none")return "Elige una actividad o una opción de fuerza para preparar tu semana";
-  if(!validTrainingDays((d.trainingDays||[]).length))return `Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días exactos para entrenar`;
-  if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))return "Elige el lugar de entrenamiento para cada día disponible";
-  const kindError=validateTrainingDayKinds(d);if(kindError)return kindError;
-  if(d.primarySport==="swimming"){
-    const priority=TRAINING_PRIORITY_LABELS[d.trainingPriority]?d.trainingPriority:"composition";
-    const poolDays=d.trainingDays.filter(day=>d.trainingLocations[day]==="pool").length;
-    const swimSessions=d.trainingDayKinds?d.trainingDays.filter(day=>d.trainingDayKinds[day]==="sport").length:trainingTemplateForModes(d.trainingDays.length,priority,d.trainingExperience,d.workoutSplit,d.strengthMode,d.primarySport).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
-    if(poolDays<swimSessions)return `Con natación necesitas piscina ${swimSessions} ${swimSessions===1?"día":"días"} por semana`;
+// REQ-398: same rules as before, but every error of the step at once, each with the
+// onboarding control it belongs to (field "" = no control on screen; shown in the summary).
+function trainingProfileCoreErrors(d){
+  if(!SPORT_LABELS[d.primarySport]||!STRENGTH_LABELS[d.strengthMode]||!validPlanDuration(d.planDurationWeeks))return [{field:"ob_sport",message:"Completa la base de tu plan de entrenamiento"}];
+  const errors=[];
+  if(d.primarySport==="strength_only"&&d.strengthMode==="none")errors.push({field:"ob_sport",message:"Elige una actividad o una opción de fuerza para preparar tu semana"});
+  if(!validTrainingDays((d.trainingDays||[]).length))errors.push({field:"ob_days",message:`Elige entre ${MIN_TRAINING_DAYS} y ${MAX_TRAINING_DAYS} días exactos para entrenar`});
+  else{
+    if(d.trainingDays.some(day=>!TRAINING_LOCATION_LABELS[d.trainingLocations&&d.trainingLocations[day]]))errors.push({field:"",message:"Elige el lugar de entrenamiento para cada día disponible"});
+    const kindError=validateTrainingDayKinds(d);if(kindError)errors.push({field:"ob_kinds",message:kindError});
+    if(d.primarySport==="swimming"){
+      const priority=TRAINING_PRIORITY_LABELS[d.trainingPriority]?d.trainingPriority:"composition";
+      const poolDays=d.trainingDays.filter(day=>d.trainingLocations[day]==="pool").length;
+      const swimSessions=d.trainingDayKinds?d.trainingDays.filter(day=>d.trainingDayKinds[day]==="sport").length:trainingTemplateForModes(d.trainingDays.length,priority,d.trainingExperience,d.workoutSplit,d.strengthMode,d.primarySport).filter(id=>["calidad","facil","tecnica"].includes(id)).length;
+      if(poolDays<swimSessions)errors.push({field:"",message:`Con natación necesitas piscina ${swimSessions} ${swimSessions===1?"día":"días"} por semana`});
+    }
   }
-  if(!Number.isFinite(d.sessionMinutes)||d.sessionMinutes<20||d.sessionMinutes>180)return "Los minutos por sesión deben estar entre 20 y 180";
-  if(!TRAINING_EXPERIENCE_LABELS[d.trainingExperience])return "Selecciona tu nivel de experiencia";
-  return "";
+  if(!Number.isFinite(d.sessionMinutes)||d.sessionMinutes<20||d.sessionMinutes>180)errors.push({field:"",message:"Los minutos por sesión deben estar entre 20 y 180"});
+  if(!TRAINING_EXPERIENCE_LABELS[d.trainingExperience])errors.push({field:"",message:"Selecciona tu nivel de experiencia"});
+  return errors;
 }
+function validateTrainingProfileCore(d){const errors=trainingProfileCoreErrors(d);return errors.length?errors[0].message:"";}
 // REQ-390: one small preference question after a meaningful action, never on launch.
 const PROFILE_QUESTIONS=window.FITBUD_PROFILE_QUESTIONS;
 let profileQuestionBusy=false,profileQuestionValueSeen=null,profileQuestionMomentOn='',profileQuestionManual=false,profileQuestionOpenKey='';
@@ -4177,7 +4189,7 @@ function renderOnboarding(){
         <div class="field"><label for="ob_strength">¿Quieres incluir fuerza?</label><select id="ob_strength" onchange="updateOnboardingStrengthChoice()">${STRENGTH_CHOICE_OPTIONS.map(([v,l])=>`<option value="${v}" ${sel(choice,v)}>${l}</option>`).join("")}</select></div>
       </div>${indoorCyclingLocationHtml("ob",d)}
       <div class="field-note" id="ob_sport_help">${esc(primarySportHelp(d.primarySport))}</div>
-      <div style="margin-top:12px"><label class="muted small">Días disponibles · de 3 a 6</label><div class="onboarding-week-days">${WEEKDAY_OPTIONS.map(day=>`<button type="button" id="ob_day_${day.value}" class="btn ${(d.trainingDays||[]).includes(day.value)?"btn-accent":""}" aria-label="${day.label}" aria-pressed="${(d.trainingDays||[]).includes(day.value)}" onclick="onboardingToggleDay(${day.value})">${day.short}</button>`).join("")}</div></div>
+      <div style="margin-top:12px"><span class="muted small" id="ob_days_label">Días disponibles · de 3 a 6</span><div class="onboarding-week-days" id="ob_days" role="group" aria-labelledby="ob_days_label">${WEEKDAY_OPTIONS.map(day=>`<button type="button" id="ob_day_${day.value}" class="btn ${(d.trainingDays||[]).includes(day.value)?"btn-accent":""}" aria-label="${day.label}" aria-pressed="${(d.trainingDays||[]).includes(day.value)}" onclick="onboardingToggleDay(${day.value})">${day.short}</button>`).join("")}</div></div>
       <div id="obDayKinds">${trainingDayKindsHtml("ob",d)}</div>
       <div class="field-note" id="obTrainingSummary">${trainingPlanSummary(d.trainingDays.length,d.primarySport,d.trainingPriority,d.lightCardioEnabled,d.strengthMode,d.trainingDayKinds)}</div>
       ${trainingSafetyRecommendation(d).active?`<p class="field-note">${esc(trainingSafetyRecommendation(d).title)}. Puedes revisar la intensidad en Perfil.</p>`:""}
@@ -4221,25 +4233,68 @@ function readOnboardingStep(){
     d.safetyResponses=Object.fromEntries(SAFETY_QUESTIONS.map(([key])=>[key,$("#ob_safety_"+key).value]));
   }
 }
-function validateOnboardingStep(){
-  const d=onboardingDraft;
+// REQ-398: every error of the step, in screen order, each with the id of its control.
+function onboardingStepErrors(){
+  const d=onboardingDraft,errors=[],add=(field,message)=>errors.push({field,message});
   if(onboardingStep===1){
-    if(!d.name)return "Escribe tu nombre";
-    if(!["male","female"].includes(d.sex))return "Selecciona el sexo usado para el cálculo";
-    if(d.age<MINIMUM_AGE||d.age>90)return `Debes tener entre ${MINIMUM_AGE} y 90 años`;
-    if(d.heightCm<130||d.heightCm>230)return "Revisa tu estatura";
-    if(d.weightKg<35||d.weightKg>250)return "Revisa tu peso";
-    if(!GOAL_OPTIONS[d.goal])return "Elige tu objetivo";
+    if(!d.name)add("ob_name","Escribe tu nombre");
+    if(!["male","female"].includes(d.sex))add("ob_sex","Selecciona el sexo usado para el cálculo");
+    if(d.age<MINIMUM_AGE||d.age>90)add("ob_age",`Debes tener entre ${MINIMUM_AGE} y 90 años`);
+    if(d.heightCm<130||d.heightCm>230)add("ob_height","Revisa tu estatura");
+    if(d.weightKg<35||d.weightKg>250)add("ob_weight","Revisa tu peso");
+    if(!GOAL_OPTIONS[d.goal])add("ob_goal","Elige tu objetivo");
   }
-  if(onboardingStep===2)return validateTrainingProfileCore(d);
+  if(onboardingStep===2)return trainingProfileCoreErrors(d);
   if(onboardingStep===3){
-    if(!["omnivoro","vegetariano","vegano"].some(value=>d.diet.includes(value)))return "Elige cómo comes";
-    const foodError=validateFoodPreferences(d);if(foodError)return foodError;
-    if(![d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].every(v=>Number.isFinite(v)&&v>0))return "Revisa tus datos para calcular las metas";
-    if(!d.consentCore)return "Acepta el uso esencial de datos para crear tu plan";
-    if(SAFETY_QUESTIONS.some(([key])=>!["yes","no"].includes(d.safetyResponses&&d.safetyResponses[key])))return "Responde las cuatro preguntas de seguridad";
+    if(!["omnivoro","vegetariano","vegano"].some(value=>d.diet.includes(value)))add("ob_diet_pattern","Elige cómo comes");
+    else{const foodError=validateFoodPreferences(d);if(foodError)add("ob_diet_pattern",foodError);}
+    if(![d.calorieTarget,d.proteinTarget,d.carbTarget,d.fatTarget].every(v=>Number.isFinite(v)&&v>0))add("","Revisa tus datos para calcular las metas");
+    if(!d.consentCore)add("ob_consent_core","Acepta el uso esencial de datos para crear tu plan");
+    SAFETY_QUESTIONS.forEach(([key])=>{if(!["yes","no"].includes(d.safetyResponses&&d.safetyResponses[key]))add("ob_safety_"+key,"Responde esta pregunta");});
   }
-  return "";
+  return errors;
+}
+// REQ-398: message under each control (aria-invalid + aria-describedby), focus on the first
+// one and a short summary next to the main button. Each message goes away when its control
+// changes; a new step is a fresh render, so nothing carries over.
+function clearOnboardingFieldError(id){
+  const msg=document.getElementById(id+"_error");if(msg)msg.remove();
+  const el=document.getElementById(id);
+  if(el){
+    el.removeAttribute("aria-invalid");el.removeAttribute("data-invalid");
+    const ids=(el.getAttribute("aria-describedby")||"").split(/\s+/).filter(v=>v&&v!==id+"_error");
+    if(ids.length)el.setAttribute("aria-describedby",ids.join(" "));else el.removeAttribute("aria-describedby");
+  }
+}
+function updateOnboardingErrorSummary(loose){
+  const box=$("#obErrorSummary");if(!box)return;
+  const count=document.querySelectorAll("#app .onboarding .field-error[data-ob-error]").length;
+  const lines=[count?(count===1?"Revisa el campo marcado.":`Revisa los ${count} campos marcados.`):"",...(loose||[])].filter(Boolean);
+  box.textContent=lines.join(" ");box.hidden=!lines.length;
+}
+function showOnboardingErrors(errors){
+  document.querySelectorAll("#app .onboarding .field-error[data-ob-error]").forEach(msg=>clearOnboardingFieldError(msg.dataset.obError));
+  const loose=[];let first=null;
+  errors.forEach(({field,message})=>{
+    const el=field&&document.getElementById(field);
+    if(!el){loose.push(message);return;}
+    const id=field+"_error",msg=document.createElement("div");
+    msg.id=id;msg.className="field-error";msg.dataset.obError=field;msg.textContent=message;
+    (el.closest("label.chip-check")||el).insertAdjacentElement("afterend",msg);
+    if(el.getAttribute("role")==="group")el.setAttribute("data-invalid","true");else el.setAttribute("aria-invalid","true");
+    el.setAttribute("aria-describedby",[...(el.getAttribute("aria-describedby")||"").split(/\s+/).filter(Boolean),id].join(" "));
+    const clear=()=>{clearOnboardingFieldError(field);updateOnboardingErrorSummary(loose);};
+    el.addEventListener("input",clear,{once:true});el.addEventListener("change",clear,{once:true});
+    if(!first)first=el;
+  });
+  updateOnboardingErrorSummary(loose);
+  const target=first&&first.getAttribute("role")==="group"?first.querySelector("button"):first;
+  (target||$("#obErrorSummary"))?.focus();
+}
+function validateOnboardingStep(){
+  const errors=onboardingStepErrors();
+  showOnboardingErrors(errors);
+  return errors.length?errors[0].message:"";
 }
 function applyCalculatedMacros(){
   const result=calculateMacroTargets(onboardingDraft);
@@ -4277,8 +4332,7 @@ function reconcileOnboardingMacros(prev,next){
 }
 function onboardingNext(){
   readOnboardingStep();
-  const error=validateOnboardingStep();
-  if(error){toast(error);return;}
+  if(validateOnboardingStep())return;
   if(onboardingStep===1)applyCalculatedMacros();
   const prevStep=onboardingStep;
   onboardingStep=Math.min(3,onboardingStep+1);
@@ -4595,8 +4649,7 @@ async function prepareFirstCycleWeek(ds,options){
 }
 async function saveOnboarding(){
   readOnboardingStep();
-  const error=validateOnboardingStep();
-  if(error){toast(error);return;}
+  if(validateOnboardingStep())return;
   const d=onboardingDraft,now=new Date().toISOString();
   const privacyResult=await savePrivacyChoices(d,"onboarding");
   if(privacyResult&&privacyResult.error){toast("No se pudo guardar privacidad: "+privacyResult.error.message);return;}

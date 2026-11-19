@@ -14381,6 +14381,31 @@ Sin menú no aparecen «Sin asignar» ni «Otra opción». Los dos accesos al re
 #### Verificación sugerida
 `tests/e2e/nutricion.spec.js`, `registro-extra-visible.spec.js`, 320/390 px.
 
+### REQ-398 - Onboarding: errores junto al campo y todos a la vez
+
+**Estado: implementado.** Auditoría heurística, severidad 3 (`docs/ux/2026-11-16-auditoria-heuristica.md`).
+
+Implementación: `onboardingStepErrors()` devuelve todos los errores del paso como `{field,message}` en orden de pantalla, con las mismas reglas (paso 2 vía `trainingProfileCoreErrors()`; `validateTrainingProfileCore()` conserva su contrato de primer mensaje). `showOnboardingErrors()` pone el mensaje (`.field-error`, `#<campo>_error`) bajo cada control, marca `aria-invalid` (o `data-invalid` en los grupos `#ob_days` y `#ob_kinds`, que ahora tienen `role="group"`), añade `aria-describedby`, enfoca el primero y escribe el resumen `#obErrorSummary` (`role="alert"`) junto al botón; los errores sin control en pantalla van solo al resumen. Cada mensaje se borra al cambiar su campo; cambiar de paso re-renderiza, así que nada se arrastra. `onboardingNext()` y `saveOnboarding()` ya no usan `toast()` para validar. Cada pregunta de seguridad sin responder se marca sola («Responde esta pregunta»). PWA `fitbud-pwa-v261`.
+
+#### Origen
+Auditoría heurística de UX, 2026-11-16.
+#### Problema
+Cada intento muestra un solo error en un toast que se va, sin marcar el campo. En el paso 3 se descubren tres errores en tres intentos. El toast «Escribe tu nombre» sigue en el paso 2.
+#### Causa raíz
+`validateOnboardingStep()` (`app/index.html:4147`) devuelve el primer string y se muestra con `toast()` (`:3152`).
+#### Objetivo
+Ver de una vez qué falta y dónde.
+#### Alcance
+La validación devuelve todos los errores del paso con su campo. Mensaje bajo cada campo con `aria-invalid` y `aria-describedby`, foco en el primero y resumen breve junto al botón. Se limpia al corregir y al cambiar de paso.
+#### Fuera de alcance
+Campos, orden de pasos y reglas de validación.
+#### Riesgos
+`onboarding-essential.spec.js` comprueba los toasts actuales.
+#### Criterios de aceptación
+Paso 3 vacío: un intento marca cómo comes, consentimiento y las 4 preguntas. Ningún error del paso anterior se ve en el siguiente.
+#### Verificación sugerida
+`tests/e2e/onboarding-essential.spec.js`, `accesibilidad.spec.js`.
+
 ### REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
 **Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.
