@@ -76,7 +76,8 @@ Quien lo active desde Perfil → Recordatorios recibe, por WhatsApp, el aviso di
 ### 5. Plantilla (Jonathan la registra en WhatsApp Manager)
 
 - Nombre: `recordatorio_diario`. Categoría: **Utility**. Idioma: `es`.
-- Cuerpo: `Hola, hoy te falta registrar {{1}} en Evolv. Responde BAJA si ya no quieres estos avisos.`
+- Cuerpo: `Aviso diario que activaste en Evolv: hoy aún falta registrar {{1}} en tu cuenta. Responde BAJA para desactivarlo.`
+- El primer texto («Hola, hoy te falta registrar…») Meta lo clasificó como Marketing (cuesta unas tres veces más y no cabe en el tope de US$20). Este dice que el aviso lo activó el usuario y que es sobre su cuenta. Se envió como Utility el 2026-11-19.
 - Botón URL (opcional, sin variables): «Abrir Evolv» → `https://evolvapp.club/app`.
 - `{{1}}` puede ser «tus comidas», «tu entreno», «tus comidas y tu entreno», «tu día» (si aún no registró nada hoy) o «lo pendiente de ayer» (si queda algo por rescatar del día anterior). No se envía el nombre: Meta recibe el mínimo de datos (`pendingLabel` en `api/_whatsapp/core.js`).
 - Lo que **no** debe incluir (para que Meta la clasifique como utilidad y por privacidad): precios, ofertas, emojis de urgencia, rachas, «no pierdas», peso, calorías, fotos, metas corporales ni ningún dato de salud. Tampoco menciones de IA, coach automático, modelos ni cuotas (REQ-31).
@@ -173,6 +174,8 @@ Quien lo active desde Perfil → Recordatorios recibe, por WhatsApp, el aviso di
 - Sin llamadas reales a Meta en CI ni en el loop (`paidExternalCallsPerRun: 0`).
 
 ## Activación (acción humana de Jonathan, tras el merge)
+
+Estado al 2026-11-19: hechos el paso 1 (negocio verificado el 16 nov), el 2 (número +1 830-262-9397 registrado; WABA `1835500717684212`, `WHATSAPP_PHONE_NUMBER_ID=1503026172889611`) y el 6 (SQL aplicado el 15 nov). La plantilla del paso 3 está en revisión. Faltan el método de pago y los pasos 4, 5, 7 y 8, además de publicar la app de Meta (sin publicar, Meta no entrega los webhooks reales).
 
 1. Verificar el negocio en [Meta Business Manager](https://business.facebook.com) con el RUC y el nombre comercial «Evolv».
 2. Crear una app en developers.facebook.com con el producto WhatsApp y registrar el número dedicado. El nombre visible «Evolv» lo aprueba Meta.
