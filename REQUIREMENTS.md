@@ -2283,26 +2283,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-398 - Onboarding: errores junto al campo y todos a la vez
 
-**Estado: pendiente.** Auditoría heurística, severidad 3. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
-
-### Origen
-Auditoría heurística de UX, 2026-11-16.
-### Problema
-Cada intento muestra un solo error en un toast que se va, sin marcar el campo. En el paso 3 se descubren tres errores en tres intentos. El toast «Escribe tu nombre» sigue en el paso 2.
-### Causa raíz
-`validateOnboardingStep()` (`app/index.html:4147`) devuelve el primer string y se muestra con `toast()` (`:3152`).
-### Objetivo
-Ver de una vez qué falta y dónde.
-### Alcance
-La validación devuelve todos los errores del paso con su campo. Mensaje bajo cada campo con `aria-invalid` y `aria-describedby`, foco en el primero y resumen breve junto al botón. Se limpia al corregir y al cambiar de paso.
-### Fuera de alcance
-Campos, orden de pasos y reglas de validación.
-### Riesgos
-`onboarding-essential.spec.js` comprueba los toasts actuales.
-### Criterios de aceptación
-Paso 3 vacío: un intento marca cómo comes, consentimiento y las 4 preguntas. Ningún error del paso anterior se ve en el siguiente.
-### Verificación sugerida
-`tests/e2e/onboarding-essential.spec.js`, `accesibilidad.spec.js`.
+**Estado: implementado.** Un intento muestra todos los errores del paso, cada uno bajo su campo con `aria-invalid` y `aria-describedby`, foco en el primero y resumen «Revisa los N campos marcados.» junto al botón; ya no hay toast de validación. Cada mensaje se va al corregir su campo y nada pasa al paso siguiente. PWA v261. ✓ `tests/e2e/onboarding-essential.spec.js` (390 px), `accesibilidad.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-399 - Acceso: error del login junto al campo
 

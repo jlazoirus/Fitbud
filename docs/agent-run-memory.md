@@ -40,3 +40,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Comida vacía: «Nada registrado» + «Ver opciones»; botón al pie = «Registrar algo que comí» (`openExtraRegistration`); editor: «Extra (se suma al día)» / «En lugar de una comida del plan». PWA v260.
 - Sin operación manual pendiente.
 - Aprendizaje: en la nube hace falta `npm ci`; `registro-extra-visible.spec.js` escribe en `/Users/jonathan/.fitbros/qa-archive/req-330` (créala con `mkdir -p` para correrlo). El release gate incluye la suite E2E completa: lánzalo en segundo plano.
+
+### 2026-11-19T11:10Z · desarrollador · Claude Code (nube) · REQ-398
+- Pedido por Jonathan («implementa el REQ-398»). Rama `claude/loving-volta-meuwnr`, base `main` `d1976bb`; PR borrador.
+- Onboarding: `onboardingStepErrors()` devuelve todos los errores del paso con su campo; `showOnboardingErrors()` los pone bajo cada control (`aria-invalid`, `aria-describedby`), enfoca el primero y resume junto al botón (`#obErrorSummary`). Sin toast de validación. PWA v261.
+- Sin operación manual pendiente.
+- Aprendizaje: `onboarding-essential.spec.js` escribe capturas en `/Users/jonathan/.fitbros/qa-archive/req-389` (créala con `mkdir -p` en la nube).
