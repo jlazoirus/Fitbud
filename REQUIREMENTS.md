@@ -2287,26 +2287,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-399 - Acceso: error del login junto al campo
 
-**Estado: pendiente.** Auditoría heurística, severidad 2. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
-
-### Origen
-Auditoría heurística de UX, 2026-11-16.
-### Problema
-«Pon correo y contraseña» aparece en gris bajo el botón, sin decir qué campo falta. No se valida el formato del correo. El placeholder `••••••••` parece una contraseña guardada.
-### Causa raíz
-`app/index.html:11275` y `:11162`.
-### Objetivo
-Saber qué corregir sin adivinar.
-### Alcance
-Mensaje por campo («Escribe tu correo», «Revisa el formato del correo», «Escribe tu contraseña») con `aria-invalid` y foco. Error en color de error. Contraseña sin placeholder. Aplica a entrar, registrarse y recuperar.
-### Fuera de alcance
-Errores de Supabase ya traducidos (REQ-375).
-### Riesgos
-`navegacion.spec.js` (REQ-375).
-### Criterios de aceptación
-Correo «malo» sin contraseña: dos mensajes, uno por campo, y foco en el correo.
-### Verificación sugerida
-`tests/e2e/navegacion.spec.js`.
+**Estado: implementado.** Entrar, registrarse y «Olvidé mi contraseña» marcan cada campo con su mensaje («Escribe tu correo», «Revisa el formato del correo», «Escribe tu contraseña», código de invitación) en color de error, con `aria-invalid`, `aria-describedby` y foco en el primero; la nueva contraseña también. Contraseña sin placeholder. PWA v262. ✓ `tests/e2e/navegacion.spec.js` (390 px), `invitacion.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-400 - Lenguaje: entreno y macros sin jerga
 

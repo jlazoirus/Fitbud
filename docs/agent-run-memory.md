@@ -46,3 +46,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Onboarding: `onboardingStepErrors()` devuelve todos los errores del paso con su campo; `showOnboardingErrors()` los pone bajo cada control (`aria-invalid`, `aria-describedby`), enfoca el primero y resume junto al botón (`#obErrorSummary`). Sin toast de validación. PWA v261.
 - Sin operación manual pendiente.
 - Aprendizaje: `onboarding-essential.spec.js` escribe capturas en `/Users/jonathan/.fitbros/qa-archive/req-389` (créala con `mkdir -p` en la nube).
+
+### 2026-11-19T15:45Z · desarrollador · Claude Code (nube) · REQ-399
+- Pedido por Jonathan («implementa el REQ-399»). Rama `claude/blissful-tesla-0w13b8` (sobre REQ-398 `50f510c`); PR borrador.
+- Acceso: `authFormErrors()` + `showAuthFieldErrors()` (patrón REQ-398) en entrar, registrarse, «Olvidé mi contraseña», código de invitación y nueva contraseña; formato del correo validado; contraseña sin placeholder. `#auOut` solo para respuestas del servidor. PWA v262.
+- Sin operación manual pendiente.
+- Aprendizaje: `next-exercise.spec.js` escribe en `/Users/jonathan/.fitbros/qa-archive/req-328` (créala con `mkdir -p` en la nube, como req-330 y req-389). El campo inválido con foco muestra el borde lima del foco, no el rojo; el mensaje rojo debajo basta, pero sería una mejora común a onboarding y acceso.
