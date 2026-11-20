@@ -271,7 +271,7 @@ async function handleWhatsapp(req, res, e) {
 
 // ── Web Push ─────────────────────────────────────────────────────────────────
 
-export default async function handler(req, res) {
+export async function handler(req, res) {
   const e = env();
   if (!e.url || !e.service) {
     return res.status(503).json({ error: "DB no configurada" });
@@ -330,3 +330,34 @@ export default async function handler(req, res) {
   }
   return res.status(200).json({ ok: true });
 }
+
+// ── Entrada Web (Request → Response) ─────────────────────────────────────────
+// Con la firma (req, res), Vercel lee y parsea el JSON antes de llamar al handler,
+// y los bytes que firmó Meta se pierden. Con GET/POST/DELETE exportados, Vercel
+// entrega un Request estándar: se lee el cuerpo crudo y se reusa el mismo handler.
+export async function webHandler(request) {
+  const url = new URL(request.url);
+  const headers = {};
+  request.headers.forEach((v, k) => { headers[k] = v; });
+  const body = request.method === "GET" || request.method === "HEAD"
+    ? undefined : Buffer.from(await request.arrayBuffer());
+  const out = { status: 200, headers: {}, body: "" };
+  const res = {
+    status(c) { out.status = c; return this; },
+    setHeader(k, v) { out.headers[k] = String(v); },
+    json(b) {
+      if (!Object.keys(out.headers).some((k) => k.toLowerCase() === "content-type")) {
+        out.headers["Content-Type"] = "application/json; charset=utf-8";
+      }
+      out.body = JSON.stringify(b);
+      return this;
+    },
+    send(b) { out.body = b == null ? "" : typeof b === "string" || Buffer.isBuffer(b) ? b : JSON.stringify(b); return this; },
+  };
+  await handler({ method: request.method, url: url.pathname + url.search, headers, body }, res);
+  return new Response(out.status === 204 ? null : out.body, { status: out.status, headers: out.headers });
+}
+
+export const GET = webHandler;
+export const POST = webHandler;
+export const DELETE = webHandler;

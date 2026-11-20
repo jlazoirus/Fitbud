@@ -22,7 +22,7 @@ Object.assign(process.env, {
 
 const core = await import("../api/_whatsapp/core.js");
 const { default: notify } = await import("../api/notify.js");
-const { default: channel } = await import("../api/push-subscribe.js");
+const { handler: channel, POST: webPost, GET: webGet } = await import("../api/push-subscribe.js");
 const { whatsappPublic } = await import("../api/config.js");
 
 const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -192,6 +192,25 @@ const past = new RealDate(RealDate.parse(NOW) - 60 * 1000).toISOString();
     assert.equal(r.code, 200);
     assert.equal(db.links[0].opted_in, true);
     assert.equal(db.links[0].phone_e164, PHONE);
+  }
+
+  // Entrada Web real de Vercel: el cuerpo crudo de Meta llega tal cual y la firma vale.
+  {
+    webhookWorld({ links: [{ user_id: id(4), link_code: "WEB234", link_code_expires_at: future, opted_in: false }] });
+    const payload = inbound(PHONE, "EVOLV WEB234");
+    payload.entry[0].changes[0].value.contacts = [{ profile: { name: "Ñandú 😀" }, wa_id: PHONE }];
+    const metaRaw = JSON.stringify(payload, null, 1).replace(/\//g, "\\/");
+    let r = await webPost(new Request("https://evolvapp.club/api/whatsapp", { method: "POST", body: metaRaw,
+      headers: { "content-type": "application/json", "x-hub-signature-256": sign(metaRaw, "otro-secreto") } }));
+    assert.equal(r.status, 401);
+    r = await webPost(new Request("https://evolvapp.club/api/whatsapp", { method: "POST", body: metaRaw,
+      headers: { "content-type": "application/json", "x-hub-signature-256": sign(metaRaw) } }));
+    assert.equal(r.status, 200);
+    assert.deepEqual(await r.json(), { ok: true });
+    assert.equal(db.links[0].opted_in, true);
+    r = await webGet(new Request("https://evolvapp.club/api/whatsapp?hub.mode=subscribe&hub.verify_token=verify-me&hub.challenge=77"));
+    assert.equal(r.status, 200);
+    assert.equal(await r.text(), "77");
   }
 
   // Código vencido.
