@@ -12,7 +12,7 @@
 // Usa service role para escribir en push_subscriptions y whatsapp_links (tablas
 // solo accesibles por el propio usuario vía RLS o por service role).
 import {
-  whatsappEnv, verifySignature, metaJsonVariants, parseWebhook, classifyText, newLinkCode, linkUrl,
+  whatsappEnv, verifySignature, metaJsonVariants, parseWebhook, PHONE_RE, BSUID_RE, classifyText, newLinkCode, linkUrl,
   textBody, sendWhatsapp, failurePatch, LINK_CODE_TTL_MS,
   LINKED_TEXT, STOP_TEXT, EXPIRED_TEXT, TAKEN_TEXT,
 } from "./_whatsapp/core.js";
@@ -113,24 +113,32 @@ async function replyText(wa, to, text, log) {
   catch (err) { log.push({ action: "reply_error", error: err.message }); }
 }
 
-async function handleLink(e, wa, from, code, log) {
+// Filtro PostgREST del remitente: por número o, si no hay, por BSUID.
+function senderFilter(sender) {
+  const parts = [];
+  if (sender.phone && PHONE_RE.test(sender.phone)) parts.push(`phone_e164.eq.${sender.phone}`);
+  if (sender.userId && BSUID_RE.test(sender.userId)) parts.push(`wa_user_id.eq.${encodeURIComponent(sender.userId)}`);
+  return parts.length ? `or=(${parts.join(",")})` : "";
+}
+async function handleLink(e, wa, sender, code, log) {
   const now = new Date().toISOString();
   const rows = await svc(e, `/rest/v1/whatsapp_links?link_code=eq.${encodeURIComponent(code)}` +
     `&link_code_expires_at=gt.${encodeURIComponent(now)}&select=user_id,timezone`);
   const row = rows && rows[0];
-  if (!row) { log.push({ action: "link_invalid" }); return replyText(wa, from, EXPIRED_TEXT, log); }
-  const taken = await svc(e, `/rest/v1/whatsapp_links?phone_e164=eq.${from}&opted_in=is.true` +
+  if (!row) { log.push({ action: "link_invalid" }); return replyText(wa, sender, EXPIRED_TEXT, log); }
+  const taken = await svc(e, `/rest/v1/whatsapp_links?${senderFilter(sender)}&opted_in=is.true` +
     `&user_id=neq.${row.user_id}&select=user_id&limit=1`);
-  if (taken && taken.length) { log.push({ action: "link_taken" }); return replyText(wa, from, TAKEN_TEXT, log); }
+  if (taken && taken.length) { log.push({ action: "link_taken" }); return replyText(wa, sender, TAKEN_TEXT, log); }
   try {
     await svc(e, `/rest/v1/whatsapp_links?user_id=eq.${row.user_id}`, {
       method: "PATCH",
-      body: JSON.stringify({ phone_e164: from, opted_in: true, consent_at: now, opted_out_at: null, paused_at: null,
+      body: JSON.stringify({ phone_e164: sender.phone || null, wa_user_id: sender.userId || null,
+        opted_in: true, consent_at: now, opted_out_at: null, paused_at: null,
         fail_count: 0, link_code: null, link_code_expires_at: null, updated_at: now }),
     });
   } catch (err) {
-    // Índice único: otro usuario vinculó este número entre la lectura y la escritura.
-    if (err.code === "23505") { log.push({ action: "link_taken" }); return replyText(wa, from, TAKEN_TEXT, log); }
+    // Índice único: otra cuenta vinculó este número o BSUID entre la lectura y la escritura.
+    if (err.code === "23505") { log.push({ action: "link_taken" }); return replyText(wa, sender, TAKEN_TEXT, log); }
     throw err;
   }
   // Activar WhatsApp es elegir recordatorios: la fila de preferencias da la hora,
@@ -141,28 +149,25 @@ async function handleLink(e, wa, from, code, log) {
     body: JSON.stringify({ user_id: row.user_id, timezone: row.timezone || "America/Lima", updated_at: now }),
   }).catch(() => null);
   const prefs = await svc(e, `/rest/v1/notification_preferences?user_id=eq.${row.user_id}&select=notify_hour`).catch(() => null);
-  log.push({ action: "linked" });
-  return replyText(wa, from, LINKED_TEXT(hourLabel(prefs && prefs[0] && prefs[0].notify_hour)), log);
+  log.push({ action: sender.phone ? "linked" : "linked_user_id" });
+  return replyText(wa, sender, LINKED_TEXT(hourLabel(prefs && prefs[0] && prefs[0].notify_hour)), log);
 }
-
-async function handleStop(e, wa, from, log) {
+async function handleStop(e, wa, sender, log) {
   const now = new Date().toISOString();
-  const rows = await svc(e, `/rest/v1/whatsapp_links?phone_e164=eq.${from}&opted_in=is.true`, {
+  const rows = await svc(e, `/rest/v1/whatsapp_links?${senderFilter(sender)}&opted_in=is.true`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
     body: JSON.stringify({ opted_in: false, opted_out_at: now, updated_at: now }),
   });
   if (!rows || !rows.length) { log.push({ action: "stop_none" }); return; }
   log.push({ action: "stopped" });
-  return replyText(wa, from, STOP_TEXT, log);
+  return replyText(wa, sender, STOP_TEXT, log);
 }
-
-// Entregado o leído: el número funciona. Fallido: cuenta el fallo, marca el
-// registro del envío y, tras MAX_DELIVERY_FAILURES seguidos, pausa el canal.
 async function handleStatus(e, s, log) {
-  if (!/^[1-9]\d{7,14}$/.test(s.recipient)) return;
+  const filter = senderFilter({ phone: s.recipient, userId: s.recipientUserId || s.recipient });
+  if (!filter) return;
   if (s.status === "delivered" || s.status === "read") {
-    await svc(e, `/rest/v1/whatsapp_links?phone_e164=eq.${s.recipient}&opted_in=is.true&fail_count=gt.0`, {
+    await svc(e, `/rest/v1/whatsapp_links?${filter}&opted_in=is.true&fail_count=gt.0`, {
       method: "PATCH", body: JSON.stringify({ fail_count: 0 }),
     });
     return;
@@ -171,7 +176,7 @@ async function handleStatus(e, s, log) {
   await svc(e, `/rest/v1/notification_log?provider_message_id=eq.${encodeURIComponent(s.id)}`, {
     method: "PATCH", body: JSON.stringify({ status: "error", error_message: "whatsapp_" + (s.code || "failed") }),
   }).catch(() => null);
-  await registerFailure(e, `phone_e164=eq.${s.recipient}`);
+  await registerFailure(e, filter);
   log.push({ action: "delivery_failed", code: s.code });
 }
 
@@ -203,11 +208,12 @@ async function handleWebhook(req, res, e, wa) {
   const { messages, statuses, shapes } = parseWebhook(payload || {});
   const log = [];
   for (const m of messages) {
-    if (!/^[1-9]\d{7,14}$/.test(m.from)) continue;
+    const sender = { phone: PHONE_RE.test(m.from) ? m.from : "", userId: BSUID_RE.test(m.userId || "") ? m.userId : "" };
+    if (!sender.phone && !sender.userId) continue;
     const intent = classifyText(m.text);
     try {
-      if (intent && intent.kind === "link") await handleLink(e, wa, m.from, intent.code, log);
-      else if (intent && intent.kind === "stop") await handleStop(e, wa, m.from, log);
+      if (intent && intent.kind === "link") await handleLink(e, wa, sender, intent.code, log);
+      else if (intent && intent.kind === "stop") await handleStop(e, wa, sender, log);
     } catch (err) {
       log.push({ action: "message_error", error: err.message });
     }

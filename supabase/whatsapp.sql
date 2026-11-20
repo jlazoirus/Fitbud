@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS whatsapp_links (
   updated_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Con nombre de usuario de WhatsApp, Meta no manda el número: solo el BSUID
+-- (business-scoped user ID). Se guarda para vincular y enviar con "recipient".
+ALTER TABLE whatsapp_links ADD COLUMN IF NOT EXISTS wa_user_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS whatsapp_links_user_id_active_idx
+  ON whatsapp_links (wa_user_id) WHERE opted_in AND wa_user_id IS NOT NULL;
+
 -- Un número activo pertenece a una sola cuenta.
 CREATE UNIQUE INDEX IF NOT EXISTS whatsapp_links_phone_active_idx
   ON whatsapp_links (phone_e164) WHERE opted_in;

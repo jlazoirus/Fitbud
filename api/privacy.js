@@ -97,7 +97,7 @@ async function exportUser(user, e) {
     listPhotos(e, user.id),
     // REQ-255: número y consentimiento de WhatsApp (sin códigos de vinculación).
     // Antes de aplicar supabase/whatsapp.sql la tabla no existe: se exporta vacía.
-    restRows(e, "whatsapp_links", userFilter, "phone_e164,opted_in,consent_at,opted_out_at,paused_at,created_at,updated_at").catch(() => []),
+    restRows(e, "whatsapp_links", userFilter, "phone_e164,wa_user_id,opted_in,consent_at,opted_out_at,paused_at,created_at,updated_at").catch(() => []),
     // REQ-355: suscripción (marca y últimos 4 de la tarjeta, nunca el número).
     restRows(e, "subscriptions", userFilter, "plan_id,status,con_prueba,card_brand,card_last4,trial_ends_at,current_period_end,next_billing_at,cancel_requested_at,canceled_at,created_at").catch(() => []),
   ]);

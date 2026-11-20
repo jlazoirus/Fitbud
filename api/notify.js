@@ -982,7 +982,7 @@ async function loadWhatsappLinks(e, results) {
   results.whatsapp = { ready: true, sent: 0, skipped: 0, errors: 0, capped: 0, cap: wa.monthlyCap };
   try {
     const [links, sent] = await Promise.all([
-      supaGet(e, "/rest/v1/whatsapp_links?opted_in=is.true&phone_e164=not.is.null&select=user_id,phone_e164,fail_count"),
+      supaGet(e, "/rest/v1/whatsapp_links?opted_in=is.true&or=(phone_e164.not.is.null,wa_user_id.not.is.null)&select=user_id,phone_e164,wa_user_id,fail_count"),
       supaGet(e, `/rest/v1/notification_log?notification_type=eq.whatsapp&status=eq.sent&delivered_at=gte.${encodeURIComponent(monthStartLima())}&select=id`),
     ]);
     wa.used = sent.length;
@@ -1007,7 +1007,7 @@ async function deliverWhatsapp(e, dryRun, results, { userId, link, decision, tod
     send: async () => {
       try {
         const id = await boundedRequest(e, (signal) =>
-          sendWhatsapp(wa, templateBody(wa, link.phone_e164, pendingLabel(decision)), (url, init) => fetch(url, { ...init, signal })));
+          sendWhatsapp(wa, templateBody(wa, { phone: link.phone_e164, userId: link.wa_user_id }, pendingLabel(decision)), (url, init) => fetch(url, { ...init, signal })));
         return { channel: "whatsapp", providerMessageId: id };
       } catch (err) {
         await supaPatch(e, `/rest/v1/whatsapp_links?user_id=eq.${userId}&opted_in=is.true`, failurePatch(link.fail_count)).catch(() => null);

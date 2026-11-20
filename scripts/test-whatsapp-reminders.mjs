@@ -85,10 +85,14 @@ function webhookWorld({ links = [], prefs = [] } = {}) {
     if (route.endsWith("/profiles")) return json([{ active: true }]);
     if (route.endsWith("/whatsapp_links")) {
       const eq = (k) => (q.get(k) || "").replace(/^(eq|gt|neq|is)\./, "");
+      const orMatch = (l) => !q.has("or") || q.get("or").replace(/^\(|\)$/g, "").split(",").some((c) => {
+        const [k, , ...v] = c.split("."); return String(l[k] ?? "") === v.join(".");
+      });
       if (method === "GET") {
         let rows = db.links;
         if (q.has("link_code")) rows = rows.filter((l) => l.link_code === eq("link_code") && l.link_code_expires_at > eq("link_code_expires_at"));
         if (q.has("phone_e164")) rows = rows.filter((l) => l.phone_e164 === eq("phone_e164"));
+        rows = rows.filter(orMatch);
         if (q.get("opted_in") === "is.true") rows = rows.filter((l) => l.opted_in);
         if (q.has("user_id") && q.get("user_id").startsWith("neq.")) rows = rows.filter((l) => l.user_id !== eq("user_id"));
         return json(rows);
@@ -103,6 +107,7 @@ function webhookWorld({ links = [], prefs = [] } = {}) {
         let rows = db.links;
         if (q.has("user_id")) rows = rows.filter((l) => l.user_id === eq("user_id"));
         if (q.has("phone_e164")) rows = rows.filter((l) => l.phone_e164 === eq("phone_e164"));
+        rows = rows.filter(orMatch);
         if (q.get("opted_in") === "is.true") rows = rows.filter((l) => l.opted_in);
         if (q.get("fail_count") === "gt.0") rows = rows.filter((l) => l.fail_count > 0);
         const patch = JSON.parse(init.body);
@@ -218,12 +223,43 @@ const past = new RealDate(RealDate.parse(NOW) - 60 * 1000).toISOString();
     const p1 = { object: "whatsapp_business_account", entry: [{ changes: [{ field: "messages", value: {
       contacts: [{ wa_id: PHONE, user_id: "PE.123" }],
       messages: [{ from_user_id: "PE.123", id: "wamid.x", type: "text", text: { body: "EVOLV ABC234" } }] } }] }] };
-    assert.deepEqual(core.parseWebhook(p1).messages, [{ from: PHONE, text: "EVOLV ABC234", id: "wamid.x" }]);
+    assert.deepEqual(core.parseWebhook(p1).messages, [{ from: PHONE, userId: "PE.123", text: "EVOLV ABC234", id: "wamid.x" }]);
     const p2 = { entry: [{ changes: [{ value: { messages: [{ from: PHONE, id: "b", type: "button", button: { text: "BAJA" } }] } }] }] };
     assert.equal(core.parseWebhook(p2).messages[0].text, "BAJA");
     const p3 = { entry: [{ changes: [{ value: { messages: [{ id: "c", type: "image" }] } }] }] };
     assert.deepEqual(core.parseWebhook(p3).messages, []);
-    assert.deepEqual(core.parseWebhook(p3).shapes, [{ type: "image", from: false, waId: false, text: false }]);
+    assert.deepEqual(core.parseWebhook(p3).shapes, [{ type: "image", from: false, waId: false, userId: false, text: false }]);
+    // Destinatario: número con "to"; solo BSUID con "recipient"; sin ninguno, error.
+    assert.deepEqual(core.textBody(PHONE, "x").to, PHONE);
+    assert.equal(core.textBody({ userId: "PE.ABC123456" }, "x").recipient, "PE.ABC123456");
+    assert.equal(core.textBody({ userId: "PE.ABC123456" }, "x").to, undefined);
+    assert.equal(core.templateBody(core.whatsappEnv(), { phone: "", userId: "PE.ABC123456" }, "tu día").recipient, "PE.ABC123456");
+    assert.throws(() => core.textBody({ phone: "12", userId: "nope" }, "x"), /sin_destinatario/);
+  }
+
+  // Usuario con nombre de usuario de WhatsApp: Meta no manda el número, solo el BSUID.
+  {
+    const BSUID = "PE.13491208655302741918";
+    const onlyUser = (text) => ({ object: "whatsapp_business_account", entry: [{ changes: [{ field: "messages", value: {
+      contacts: [{ profile: { name: "J" }, user_id: BSUID }],
+      messages: [{ from_user_id: BSUID, id: "wamid.u", type: "text", text: { body: text } }] } }] }] });
+    webhookWorld({ links: [{ user_id: id(5), link_code: "USR234", link_code_expires_at: future, opted_in: false }] });
+    let r = await webhook(onlyUser("EVOLV USR234"));
+    assert.equal(r.code, 200);
+    assert.equal(db.links[0].opted_in, true);
+    assert.equal(db.links[0].wa_user_id, BSUID);
+    assert.equal(db.links[0].phone_e164, null);
+    assert.equal(db.sent.at(-1).recipient, BSUID, "la confirmación va al BSUID");
+    assert.equal(db.sent.at(-1).to, undefined);
+    // Otra cuenta no puede vincular el mismo BSUID.
+    db.links.push({ user_id: id(6), link_code: "OTR234", link_code_expires_at: future, opted_in: false });
+    await webhook(onlyUser("EVOLV OTR234"));
+    assert.equal(db.links[1].opted_in, false);
+    assert.equal(db.sent.at(-1).text.body, core.TAKEN_TEXT);
+    // BAJA por BSUID.
+    await webhook(onlyUser("BAJA"));
+    assert.equal(db.links[0].opted_in, false);
+    assert.equal(db.sent.at(-1).text.body, core.STOP_TEXT);
   }
 
   // Código vencido.

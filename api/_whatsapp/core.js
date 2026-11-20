@@ -110,13 +110,16 @@ export function parseWebhook(payload) {
         // Meta puede omitir "from" (usuarios con nombre de usuario): se usa el wa_id del contacto.
         const contact = contacts.find((c) => c && m.from_user_id && c.user_id === m.from_user_id) || (contacts.length === 1 ? contacts[0] : null);
         const from = m.from || (contact && contact.wa_id) || "";
+        // Con nombre de usuario de WhatsApp, Meta omite el número y solo manda el BSUID.
+        const userId = m.from_user_id || (contact && contact.user_id) || "";
         const text = inboundText(m);
         // Forma del mensaje para el registro, sin valores.
-        shapes.push({ type: String(m.type || ""), from: !!m.from, waId: !!(contact && contact.wa_id), text: !!text });
-        if (from && text) messages.push({ from: String(from), text, id: m.id || "" });
+        shapes.push({ type: String(m.type || ""), from: !!m.from, waId: !!(contact && contact.wa_id), userId: !!userId, text: !!text });
+        if ((from || userId) && text) messages.push({ from: String(from), userId: String(userId), text, id: m.id || "" });
       }
       for (const s of (Array.isArray(v.statuses) ? v.statuses : [])) {
         if (s && s.id) statuses.push({ id: String(s.id), status: String(s.status || ""), recipient: String(s.recipient_id || ""),
+          recipientUserId: String(s.recipient_user_id || ""),
           code: s.errors && s.errors[0] ? Number(s.errors[0].code) || null : null });
       }
     }
@@ -157,10 +160,20 @@ export function monthStartLima(now = new Date()) {
   return new Date(Date.UTC(lima.getUTCFullYear(), lima.getUTCMonth(), 1, 5)).toISOString();
 }
 
-export function templateBody(cfg, to, label) {
+// Destinatario: número E.164 (to) o, si solo hay BSUID, "recipient".
+export const PHONE_RE = /^[1-9]\d{7,14}$/;
+export const BSUID_RE = /^[A-Za-z]{2}\.[A-Za-z0-9]{6,64}$/;
+export function addressee(target) {
+  const t = typeof target === "string" ? { phone: target } : target || {};
+  if (t.phone && PHONE_RE.test(String(t.phone))) return { to: String(t.phone) };
+  if (t.userId && BSUID_RE.test(String(t.userId))) return { recipient: String(t.userId) };
+  throw new Error("whatsapp_sin_destinatario");
+}
+
+export function templateBody(cfg, target, label) {
   return {
     messaging_product: "whatsapp",
-    to,
+    ...addressee(target),
     type: "template",
     template: {
       name: cfg.template,
@@ -170,8 +183,8 @@ export function templateBody(cfg, to, label) {
   };
 }
 
-export function textBody(to, body) {
-  return { messaging_product: "whatsapp", to, type: "text", text: { preview_url: false, body } };
+export function textBody(target, body) {
+  return { messaging_product: "whatsapp", ...addressee(target), type: "text", text: { preview_url: false, body } };
 }
 
 // Envía a la Graph API. request(url, init) permite acotar el tiempo (REQ-383).
