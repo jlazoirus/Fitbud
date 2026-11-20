@@ -216,8 +216,10 @@ async function handleWebhook(req, res, e, wa) {
     try { await handleStatus(e, s, log); }
     catch (err) { log.push({ action: "status_error", error: err.message }); }
   }
-  // Sin números ni textos en los logs: solo acciones.
-  if (log.length) console.info(JSON.stringify({ event: "whatsapp_webhook", actions: log.map((l) => l.action) }));
+  // Sin números ni textos en los logs: solo conteos y acciones (cada entrega válida deja rastro).
+  const fields = [...new Set(((payload && payload.entry) || []).flatMap((en) => (en.changes || []).map((c) => c && c.field)).filter(Boolean))];
+  console.info(JSON.stringify({ event: "whatsapp_webhook", action: "received", fields, messages: messages.length,
+    statuses: statuses.length, actions: log.map((l) => l.action) }));
   // 200 siempre tras validar la firma: Meta no reintenta lo ya procesado.
   return res.status(200).json({ ok: true });
 }
