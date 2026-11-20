@@ -12,7 +12,7 @@
 // Usa service role para escribir en push_subscriptions y whatsapp_links (tablas
 // solo accesibles por el propio usuario vía RLS o por service role).
 import {
-  whatsappEnv, verifySignature, parseWebhook, classifyText, newLinkCode, linkUrl,
+  whatsappEnv, verifySignature, metaJsonVariants, parseWebhook, classifyText, newLinkCode, linkUrl,
   textBody, sendWhatsapp, failurePatch, LINK_CODE_TTL_MS,
   LINKED_TEXT, STOP_TEXT, EXPIRED_TEXT, TAKEN_TEXT,
 } from "./_whatsapp/core.js";
@@ -29,6 +29,13 @@ function env() {
 }
 
 async function rj(r) { return r.json().catch(() => ({})); }
+
+// En Vercel, consultar req.body hace que la plataforma parsee el JSON: los bytes que
+// firmó Meta se pierden. Por eso el webhook prueba también el formato de Meta.
+function signedBodies(req, raw) {
+  return req.body != null && !Buffer.isBuffer(req.body) && typeof req.body !== "string"
+    ? metaJsonVariants(req.body) : [raw];
+}
 
 async function readRawBody(req) {
   if (req.body != null) {
@@ -187,7 +194,9 @@ async function handleWebhook(req, res, e, wa) {
     return res.status(200).send(url.searchParams.get("hub.challenge") || "");
   }
   const raw = await readRawBody(req);
-  if (!verifySignature(raw, req.headers["x-hub-signature-256"], wa.appSecret)) {
+  const signature = req.headers["x-hub-signature-256"];
+  if (!signedBodies(req, raw).some((b) => verifySignature(b, signature, wa.appSecret))) {
+    console.warn(JSON.stringify({ event: "whatsapp_webhook", action: "bad_signature", parsed: !Buffer.isBuffer(req.body) && req.body != null }));
     return res.status(401).json({ error: "Firma inválida" });
   }
   const payload = parseJson(raw);

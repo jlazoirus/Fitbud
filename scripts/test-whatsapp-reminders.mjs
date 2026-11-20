@@ -175,6 +175,25 @@ const past = new RealDate(RealDate.parse(NOW) - 60 * 1000).toISOString();
   assert.equal(JSON.stringify(db.links), before);
   assert.equal(db.sent.at(-1).text.body, core.EXPIRED_TEXT);
 
+  // En Vercel el cuerpo llega ya parseado: vale la firma sobre el JSON tal como lo
+  // serializa Meta ("\/" y \uXXXX), y una firma ajena sigue rechazándose.
+  {
+    webhookWorld({ links: [{ user_id: id(3), link_code: "MNB234", link_code_expires_at: future, opted_in: false }] });
+    const payload = inbound(PHONE, "EVOLV MNB234");
+    payload.entry[0].changes[0].value.contacts = [{ profile: { name: "José/Lima" }, wa_id: PHONE }];
+    const metaRaw = JSON.stringify(payload).replace(/\//g, "\\/").replace(/[\u007f-\uffff]/g, (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+    assert.notEqual(metaRaw, JSON.stringify(payload));
+    let r = response();
+    await channel({ method: "POST", url: "/api/whatsapp", body: JSON.parse(metaRaw), headers: { "x-hub-signature-256": sign(metaRaw, "otro-secreto") } }, r);
+    assert.equal(r.code, 401);
+    assert.equal(db.links[0].opted_in, false);
+    r = response();
+    await channel({ method: "POST", url: "/api/whatsapp", body: JSON.parse(metaRaw), headers: { "x-hub-signature-256": sign(metaRaw) } }, r);
+    assert.equal(r.code, 200);
+    assert.equal(db.links[0].opted_in, true);
+    assert.equal(db.links[0].phone_e164, PHONE);
+  }
+
   // Código vencido.
   webhookWorld({ links: [{ user_id: id(2), link_code: "XYZ789", link_code_expires_at: past, opted_in: false }] });
   await webhook(inbound(PHONE, "EVOLV XYZ789"));

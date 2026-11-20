@@ -51,6 +51,15 @@ export function whatsappEnv(source = process.env) {
 }
 
 // Firma del webhook: X-Hub-Signature-256 = "sha256=" + HMAC-SHA256(cuerpo crudo, app secret).
+// Meta firma su JSON con "/" escapado como "\/" y lo no ASCII como \uXXXX en hex
+// minúscula. Si el cuerpo ya llegó parseado, estas son las serializaciones posibles.
+export function metaJsonVariants(obj) {
+  const plain = JSON.stringify(obj);
+  const unicode = plain.replace(/[\u007f-\uffff]/g, (c) => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+  const slash = (t) => t.replace(/\//g, "\\/");
+  return [...new Set([plain, unicode, slash(plain), slash(unicode)])].map((t) => Buffer.from(t, "utf8"));
+}
+
 export function verifySignature(rawBody, header, appSecret) {
   if (!appSecret || typeof header !== "string" || !header.startsWith("sha256=")) return false;
   const got = Buffer.from(header.slice(7), "utf8");
