@@ -198,6 +198,10 @@ export async function sendWhatsapp(cfg, body, request = fetch) {
   if (!r.ok) {
     const err = new Error("whatsapp_" + ((data.error && data.error.code) || r.status));
     err.code = data.error && data.error.code;
+    // Detalle para diagnóstico: subcódigo, tipo y mensaje de Meta, con números largos enmascarados.
+    const e = data.error || {};
+    err.detail = [e.error_subcode || "", e.type || "", String(e.message || "").slice(0, 160)]
+      .join("|").replace(/\d{6,}/g, "#");
     throw err;
   }
   return (data.messages && data.messages[0] && data.messages[0].id) || "";

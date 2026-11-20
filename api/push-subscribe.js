@@ -110,7 +110,7 @@ const hourLabel = (h) => String(h == null ? 20 : Number(h)).padStart(2, "0") + "
 
 async function replyText(wa, to, text, log) {
   try { await sendWhatsapp(wa, textBody(to, text)); }
-  catch (err) { log.push({ action: "reply_error", error: err.message }); }
+  catch (err) { log.push({ action: "reply_error", error: err.message, detail: err.detail || "" }); }
 }
 
 // Filtro PostgREST del remitente: por número o, si no hay, por BSUID.
@@ -227,7 +227,8 @@ async function handleWebhook(req, res, e, wa) {
   const valueKeys = [...new Set(((payload && payload.entry) || []).flatMap((en) => (en.changes || []).flatMap((c) => Object.keys((c && c.value) || {}))))];
   console.info(JSON.stringify({ event: "whatsapp_webhook", action: "received", fields, valueKeys, shapes,
     messages: messages.length, statuses: statuses.length, actions: log.map((l) => l.action),
-    errors: log.map((l) => String(l.error || "")).filter((m) => /^whatsapp_[a-z0-9_]{1,40}$/.test(m)) }));
+    errors: log.map((l) => String(l.error || "")).filter((m) => /^whatsapp_[a-z0-9_]{1,40}$/.test(m)),
+    errorDetails: log.map((l) => String(l.detail || "")).filter(Boolean) }));
   // 200 siempre tras validar la firma: Meta no reintenta lo ya procesado.
   return res.status(200).json({ ok: true });
 }
