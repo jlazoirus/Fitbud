@@ -226,7 +226,8 @@ async function handleWebhook(req, res, e, wa) {
   const fields = [...new Set(((payload && payload.entry) || []).flatMap((en) => (en.changes || []).map((c) => c && c.field)).filter(Boolean))];
   const valueKeys = [...new Set(((payload && payload.entry) || []).flatMap((en) => (en.changes || []).flatMap((c) => Object.keys((c && c.value) || {}))))];
   console.info(JSON.stringify({ event: "whatsapp_webhook", action: "received", fields, valueKeys, shapes,
-    messages: messages.length, statuses: statuses.length, actions: log.map((l) => l.action) }));
+    messages: messages.length, statuses: statuses.length, actions: log.map((l) => l.action),
+    errors: log.map((l) => String(l.error || "")).filter((m) => /^whatsapp_[a-z0-9_]{1,40}$/.test(m)) }));
   // 200 siempre tras validar la firma: Meta no reintenta lo ya procesado.
   return res.status(200).json({ ok: true });
 }

@@ -17,7 +17,7 @@ export const LINK_CODE_TTL_MS = 30 * 60 * 1000;
 export const MAX_DELIVERY_FAILURES = 3;
 export const DEFAULT_MONTHLY_CAP = 600;
 export const DEFAULT_TEMPLATE = "recordatorio_diario";
-const DEFAULT_GRAPH_VERSION = "v23.0";
+const DEFAULT_GRAPH_VERSION = "v26.0";
 // Sin 0/O ni 1/I/L: el código se lee y se puede escribir a mano.
 const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
 const STOP_WORDS = new Set(["BAJA", "STOP", "SALIR", "CANCELAR", "DETENER"]);
