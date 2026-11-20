@@ -175,7 +175,7 @@ Quien lo active desde Perfil → Recordatorios recibe, por WhatsApp, el aviso di
 
 ## Activación (acción humana de Jonathan, tras el merge)
 
-Estado al 2026-11-20 (8:36 a. m.): **activo y probado de punta a punta con un usuario real**: recepción, firma, vinculación, baja con BAJA y respuestas (con estados sent/delivered/read). Solo falta la aprobación de la plantilla `recordatorio_diario` (Utility, `PENDING` sin rechazo); sin ella no sale el aviso de la noche. Configuración que hizo falta, además de los pasos de abajo:
+Estado al 2026-11-20 (8:36 a. m.): **activo y probado de punta a punta con un usuario real**: recepción, firma, vinculación, baja con BAJA y respuestas (con estados sent/delivered/read). La plantilla `recordatorio_diario` quedó **aprobada** (Utility) el 20 nov a mediodía; falta solo ver salir el primer aviso real del cron. Configuración que hizo falta, además de los pasos de abajo:
 - El usuario del sistema «Evolv Recordatorios» necesita **acceso total a tres activos**: la app, la *cuenta de WhatsApp* (el número) y la *cuenta de mensajes* «Evolv» (1835500717684212, la que se factura, en Configuración → Cuentas de mensajes). Sin esta última, Meta responde «(#10) Viewer cannot access the provided Paid Message Account».
 - La WABA debe estar suscrita a la app (`POST /1835500717684212/subscribed_apps`); la interfaz nueva de Meta ya no tiene ese interruptor.
 - Quien usa nombre de usuario de WhatsApp llega sin número: Meta manda solo el BSUID (`from_user_id`/`user_id`). Se guarda en `whatsapp_links.wa_user_id` y se responde con `recipient` (Graph API v26).

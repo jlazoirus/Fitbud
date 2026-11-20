@@ -1543,7 +1543,7 @@ Detalle archivado en [historial](docs/requirements-history.md#req-254).
 
 ## REQ-255 - Recordatorios por WhatsApp
 
-**Estado: implementado — requiere acción humana:** activar en Meta y Vercel y aplicar `supabase/whatsapp.sql` (pasos en [whatsapp-reminders](docs/whatsapp-reminders.md)).
+**Estado: implementado y activo en producción (2026-11-20):** probado de punta a punta con un usuario real y plantilla `recordatorio_diario` aprobada (detalle en [whatsapp-reminders](docs/whatsapp-reminders.md)).
 
 ### Origen
 Diego (beta): «que sea al WhatsApp».
