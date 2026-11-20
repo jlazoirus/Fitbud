@@ -8,6 +8,7 @@ const LOGO = `<svg width="30" height="30" viewBox="0 0 512 512" aria-hidden="tru
 // Ícono del aviso del Libro de Reclamaciones (libro abierto), visible en todas las páginas.
 export const LIBRO_ICONO = `<svg width="34" height="28" viewBox="0 0 34 28" aria-hidden="true"><path d="M2 4.5C6.5 2.5 11.5 2.5 16 5v20c-4.5-2.5-9.5-2.5-14-.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M32 4.5C27.5 2.5 22.5 2.5 18 5v20c4.5-2.5 9.5-2.5 14-.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M5 9.5c2.8-.9 5.6-.7 8 .5M5 14c2.8-.9 5.6-.7 8 .5M21 10c2.4-1.2 5.2-1.4 8-.5M21 14.5c2.4-1.2 5.2-1.4 8-.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
 
+// REQ-401: además de la tienda, el encabezado lleva a la app («Iniciar sesión», como la portada).
 const NAV = [
   ["/planes", "Planes"],
   ["/contacto", "Contacto"],
@@ -32,7 +33,7 @@ function current(href) {
 function headerHtml() {
   return `<div class="wrap t-top">
     <a class="t-brand" href="/" aria-label="Evolv, ir al inicio">${LOGO}<span>evol<span class="v">v</span></span></a>
-    <nav class="t-nav" aria-label="Tienda">${NAV.map(([href, label]) => `<a href="${href}"${current(href)}>${label}</a>`).join("")}</nav>
+    <nav class="t-nav" aria-label="Tienda">${NAV.map(([href, label]) => `<a href="${href}"${current(href)}>${label}</a>`).join("")}<a class="t-login" href="/app/">Iniciar sesión</a></nav>
   </div>`;
 }
 

@@ -14456,6 +14456,31 @@ Ninguno de esos términos se ve sin explicación a 390 px.
 #### Verificación sugerida
 `tests/e2e/entreno.spec.js`, `onboarding-essential.spec.js`, `peso-inicial.spec.js`.
 
+### REQ-401 - Tienda: entrar a la app desde el encabezado
+
+**Estado: implementado.** Auditoría heurística, severidad 2 (`docs/ux/2026-11-16-auditoria-heuristica.md`).
+
+Implementación: `headerHtml()` (`tienda/layout.js`) añade después de `NAV` el enlace `a.t-login` «Iniciar sesión» → `/app/`, con borde sutil para distinguirlo de la navegación de la tienda (mismo texto que la portada). Como todas las páginas de la tienda usan `#t-header`, aparece en planes, contacto, pago, cuenta, legales y Libro de Reclamaciones. A ≤360 px (`tienda/tienda.css`) se oculta la palabra «evolv» del logo (el enlace conserva su `aria-label`) y se compactan los enlaces: a 320 px el encabezado queda en una línea, cada enlace mide 44 px de alto y no hay scroll horizontal. La tienda no es parte del shell de la PWA: sin cambio de `CACHE_NAME`.
+
+#### Origen
+Auditoría heurística de UX, 2026-11-16.
+#### Problema
+En `/planes`, `/contacto` y `/pago` el encabezado solo tiene «Planes» y «Contacto»: quien ya pagó no tiene cómo entrar.
+#### Causa raíz
+`tienda/layout.js:11-14` (`NAV`).
+#### Objetivo
+Entrar a la app desde cualquier página de la tienda.
+#### Alcance
+Enlace «Iniciar sesión» a `/app/` en el encabezado de la tienda, como en la portada, legible a 320 px.
+#### Fuera de alcance
+Portada, `/unete` y flujo de pago.
+#### Riesgos
+Encabezado desbordado a 320 px.
+#### Criterios de aceptación
+Las páginas de la tienda llevan a `/app/` en un toque, sin scroll horizontal a 320 px.
+#### Verificación sugerida
+`tests/e2e/paywall-tienda.spec.js`, `legales-suscripcion.spec.js`.
+
 ### REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
 **Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.
