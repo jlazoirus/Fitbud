@@ -14431,6 +14431,31 @@ Correo «malo» sin contraseña: dos mensajes, uno por campo, y foco en el corre
 #### Verificación sugerida
 `tests/e2e/navegacion.spec.js`.
 
+### REQ-400 - Lenguaje: entreno y macros sin jerga
+
+**Estado: implementado.** Auditoría heurística, severidad 2 (`docs/ux/2026-11-16-auditoria-heuristica.md`).
+
+Implementación: `plainEffortText()` convierte al pintar «RPE n» en «esfuerzo n/10» y «repeticiones en reserva» en «repeticiones de sobra»; se aplica a intensidad, objetivo y detalle de los bloques de tiempo, carga sugerida, detalle del entreno del día y de las opciones, intensidad del plan semanal del coach y pasos/variantes de las fichas de ejercicio (los datos guardados y el catálogo en Supabase no cambian). El reproductor muestra «6/10 · esfuerzo ¿Qué es?» y «3 · repeticiones de sobra al terminar» (`spareRepsLabel()`), el campo de cada serie es «Esfuerzo (1-10)», la explicación (`explainWorkoutEffort()`) ya no usa siglas, el plan dice «Esfuerzo 6/10» y «¿Qué es el esfuerzo?», y el historial de series y la última vez dicen «esfuerzo n/10». El contador es «Ejercicios hechos X/Y»: la cabecera del reproductor lo muestra una vez y `workoutStatusHtml(ds,execution,{count:false})` deja solo «En curso»; el cierre dice «ejercicios hechos» / «ejercicios omitidos» y Hoy «Ejercicios hechos X/Y». `strengthProgression()` y `workout-player.js` (carga sugerida) usan «repeticiones de sobra». Onboarding: «proteína N g · carbohidratos N g · grasa N g». Sesión «Correr · series rápidas» y reparto «1 sesión de series rápidas». Tabla de peso: cabecera «Semana | Meta kg» y, en móvil (sin cabecera), «Semana 1 · Meta: 74.7–75.3 kg» (`.wt-m`); el plegable dice «Semanas siguientes (5 a 10)». Demo: «Pausar animación» / «Reproducir animación». PWA `fitbud-pwa-v263`.
+
+#### Origen
+Auditoría heurística de UX, 2026-11-16.
+#### Problema
+Se muestran «RPE 6/10», «repeticiones en reserva», «bloques» (dos veces en la misma tarjeta), «P 130 · C 146 · G 52 g», «sesión de calidad», «S1 74.7–75.3» sin rótulo y «Pausar» en las demos.
+#### Causa raíz
+`app/index.html:2006-2070`, `:7411`, `:7163`, `:7459`, `:4119`, `:1990-1993`, `:8563` y `:6209`.
+#### Objetivo
+Que el usuario sin experiencia entienda cada número.
+#### Alcance
+«Esfuerzo 6/10» con «¿Qué es?» y «Termina con 3 repeticiones de sobra». «Ejercicios hechos 0/6», una sola vez. Proteína, carbohidratos y grasa sin abreviar en el onboarding. Nombres de sesiones sin «calidad». Rango de peso con rótulo («Meta: 74.7–75.3 kg»). «Pausar animación».
+#### Fuera de alcance
+Lógica de RPE, progresión y rangos.
+#### Riesgos
+Specs que leen esos textos.
+#### Criterios de aceptación
+Ninguno de esos términos se ve sin explicación a 390 px.
+#### Verificación sugerida
+`tests/e2e/entreno.spec.js`, `onboarding-essential.spec.js`, `peso-inicial.spec.js`.
+
 ### REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
 **Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.

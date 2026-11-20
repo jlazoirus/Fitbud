@@ -66,7 +66,7 @@ test.describe("Onboarding", () => {
     await expect(app).toContainText("Como de todo");
     await page.selectOption("#ob_diet_pattern","omnivoro");
     const shown=await page.locator('#obMacroResult').textContent();
-    const parts=shown.match(/(\d+) kcal · P (\d+) · C (\d+) · G (\d+)/);
+    const parts=shown.match(/(\d+) kcal · proteína (\d+) g · carbohidratos (\d+) g · grasa (\d+) g/);
     expect(parts).toBeTruthy();
     const [kcalShown,protShown,carbShown,fatShown]=parts.slice(1).map(Number);
     expect(kcalShown).toBeGreaterThan(TDEE*.7);expect(kcalShown).toBeLessThan(TDEE*.95);

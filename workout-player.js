@@ -52,8 +52,8 @@
       targetRir:phase.rir,
       unit,
       suggestedLoad:exercise&&exercise.discipline==="bodyweight"
-        ? `Peso corporal o asistencia que deje ${phase.rir} repeticiones en reserva`
-        : `Carga controlable que deje ${phase.rir} repeticiones en reserva`,
+        ? `Peso corporal o asistencia que deje ${phase.rir} repeticiones de sobra`
+        : `Carga controlable que deje ${phase.rir} repeticiones de sobra`,
     };
   }
   // REQ-212: calentamiento y vuelta a la calma con movimientos concretos y
@@ -274,8 +274,8 @@
         targetRir:clamp(dose.targetRir,0,5),
         unit:/\bseg|segundo|s\b/i.test(String(dose.reps||""))?"seg":"reps",
         suggestedLoad:exercise.discipline==="bodyweight"
-          ?`Peso corporal o asistencia que deje ${clamp(dose.targetRir,0,5)} repeticiones en reserva`
-          :`Carga controlable para RPE ${clamp(dose.targetRpe,3,9)}`,
+          ?`Peso corporal o asistencia que deje ${clamp(dose.targetRir,0,5)} repeticiones de sobra`
+          :`Carga controlable para un esfuerzo de ${clamp(dose.targetRpe,3,9)}/10`,
       });
     });
     steps.push(timedStep(
