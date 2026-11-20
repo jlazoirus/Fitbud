@@ -686,6 +686,9 @@
     table.wt td:nth-child(4)::before{content:"% grasa"}
     table.wt input{width:100%;min-height:44px;font-size:16px;border-radius:var(--r-md);padding:0 8px;box-sizing:border-box}
   }
+  /* REQ-400: en móvil la cabecera se oculta; cada fila lleva su rótulo («Semana 1», «Meta: … kg»). */
+  .wt-m{display:none}
+  @media(max-width:480px){.wt-m{display:inline}}
   .wt-later{margin-top:6px}
   .wt-later summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:600;min-height:44px;display:flex;align-items:center}
   .wt-later summary::after{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin:-4px 0 0 10px;transition:transform .15s}
@@ -1996,10 +1999,10 @@ function trainingPlanSummary(days,primary,priority,lightCardio,strength,dayKinds
     return `${performanceSplit[days]||performanceSplit[6]} de ${SPORT_LABELS[primary]||SPORT_LABELS.running}.`;
   }
   const split={
-    3:"1 sesión full-body + 1 sesión de calidad + 1 sesión aeróbica larga",
-    4:"2 sesiones full-body + 1 sesión de calidad + 1 sesión aeróbica larga",
-    5:"3 sesiones de fuerza + 1 sesión de calidad + 1 sesión aeróbica larga",
-    6:"4 sesiones de fuerza + 1 sesión de calidad + 1 sesión aeróbica larga",
+    3:"1 sesión full-body + 1 sesión de series rápidas + 1 sesión aeróbica larga",
+    4:"2 sesiones full-body + 1 sesión de series rápidas + 1 sesión aeróbica larga",
+    5:"3 sesiones de fuerza + 1 sesión de series rápidas + 1 sesión aeróbica larga",
+    6:"4 sesiones de fuerza + 1 sesión de series rápidas + 1 sesión aeróbica larga",
   };
   return `${split[days]||split[6]} de ${SPORT_LABELS[primary]||SPORT_LABELS.running}.`;
 }
@@ -2012,14 +2015,14 @@ function strengthProgression(ds,prefs){
   const n=trainingWeek(ds,ctx);
   const duration=resolvedPlanDuration(ctx);
   if(duration===4){
-    if(n===1)return "Base: 3 series por ejercicio, deja 3 repeticiones en reserva.";
-    if(n<=3)return "Progresión: sube carga o repeticiones con buena técnica y deja 1-2 repeticiones en reserva.";
+    if(n===1)return "Base: 3 series por ejercicio, termina cada serie con 3 repeticiones de sobra.";
+    if(n<=3)return "Progresión: sube carga o repeticiones con buena técnica y termina cada serie con 1-2 repeticiones de sobra.";
     return "Consolidación: reduce el volumen, conserva intensidad y registra tus mejores series técnicas.";
   }
-  if(n<=2)return "Base: 3 series por ejercicio, deja 3 repeticiones en reserva.";
+  if(n<=2)return "Base: 3 series por ejercicio, termina cada serie con 3 repeticiones de sobra.";
   if(n<=5)return "Progresión: 4 series principales, sube carga o repeticiones con buena técnica.";
   if(n===6)return "Descarga: 2 series por ejercicio al 60-70% del esfuerzo habitual.";
-  if(n<=9)return "Bloque fuerte: 4 series principales, deja 1-2 repeticiones en reserva.";
+  if(n<=9)return "Bloque fuerte: 4 series principales, termina cada serie con 1-2 repeticiones de sobra.";
   return "Consolidación: 2-3 series, sin llegar al fallo y priorizando técnica.";
 }
 function sportSessions(primary,ds,prefs){
@@ -2046,7 +2049,7 @@ function sportSessions(primary,ds,prefs){
         "65-80 min en zona 2; hidrátate y mantén ritmo sostenible.",
         "40-50 min suave o test controlado de 5 km si estás recuperado.",
       ],
-      qualityName:"Correr · calidad",
+      qualityName:"Correr · series rápidas",
       enduranceName:"Correr · fondo fácil",
       techniqueName:"Correr · técnica y economía",
       technique:"30-40 min suaves + técnica de carrera + 6 progresivos de 15 s, sin acumular fatiga.",
@@ -4206,7 +4209,7 @@ function renderOnboarding(){
       ${SAFETY_QUESTIONS.map(([key,label])=>`<div class="field onboarding-safety-row"><label for="ob_safety_${key}">${label}</label>${safetySelect("ob_safety_"+key,d.safetyResponses[key])}</div>`).join("")}
       <p class="field-note"><b>Evolv es bienestar, no atención médica.</b> Detén cualquier ejercicio ante dolor, mareo, desmayo, falta de aire inusual u otro síntoma preocupante.</p>
       <button type="button" class="btn btn-sm privacy-control" onclick="openPrivacyNotice()">Leer aviso de privacidad</button>
-      <p class="field-note" id="obMacroResult"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · P ${d.proteinTarget} · C ${d.carbTarget} · G ${d.fatTarget} g.<br>${hasCompleteOnboarding(profile&&profile.prefs||{})?"Conservamos el nivel de actividad de tu Perfil.":"Actividad estimada según tu semana."} Podrás cambiarla y ajustar estos valores en Perfil. <button type="button" class="btn btn-sm" onclick="openMacroFormulaInfo()">¿Cómo lo calculamos?</button></p>
+      <p class="field-note" id="obMacroResult"><b>Tu referencia diaria:</b> ${d.calorieTarget} kcal · proteína ${d.proteinTarget} g · carbohidratos ${d.carbTarget} g · grasa ${d.fatTarget} g.<br>${hasCompleteOnboarding(profile&&profile.prefs||{})?"Conservamos el nivel de actividad de tu Perfil.":"Actividad estimada según tu semana."} Podrás cambiarla y ajustar estos valores en Perfil. <button type="button" class="btn btn-sm" onclick="openMacroFormulaInfo()">¿Cómo lo calculamos?</button></p>
       ${onboardingButtons(true)}`;
   }
   $("#tabs").innerHTML="";
@@ -5184,7 +5187,7 @@ function nextDailyAction(ds){
     return{type:"workout_resume",
       eyebrow:"Entreno en curso",
       title:esc(ew.workout.name),
-      detail:`${prog.completed} de ${prog.total} bloques completados`,
+      detail:`Ejercicios hechos ${prog.completed}/${prog.total}`,
       cta:`<button class="btn btn-accent" style="width:100%;min-height:44px" onclick="setView('entreno')">Continuar entreno</button>`,
       reason:""};
   }
@@ -5618,7 +5621,7 @@ function homeAgendaData(ds){
     items.push({
       kind:"resume",
       title:workout?.name||"Entrenamiento",
-      meta:`Entreno en curso · ${prog.completed} de ${prog.total} bloques completados`,
+      meta:`Entreno en curso · ejercicios hechos ${prog.completed}/${prog.total}`,
       action:{label:"Continuar entreno",handler:`homeOpenWorkout('${ds}','workout_resume')`}
     });
   }
@@ -6303,7 +6306,7 @@ function openExerciseGuide(slug){
     <div class="exercise-meta">${esc(EXERCISE_DISCIPLINE_LABELS[exercise.discipline]||exercise.discipline)} · ${esc(exerciseLevelLabel(exercise.level))}${equipment.length?` · ${esc(exerciseEquipmentText(equipment))}`:""}${muscles.length?` · ${esc(muscles.join(", "))}`:""}</div>
     ${demo&&exercise.source_name&&exercise.source_name!=="Evolv Studio"?`<div class="exercise-copy" style="opacity:.7;font-size:.85em"><b>Demostración:</b> ${exercise.source_url?`<a href="${esc(exercise.source_url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline">${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}</a>`:`${esc(exercise.attribution||exercise.source_name)} · ${esc(exercise.license_name||"")}`}</div>`:""}
     <div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
-    <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
+    <ol class="exercise-steps">${steps.map(step=>`<li>${esc(plainEffortText(step))}</li>`).join("")}</ol>
     <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
     ${errors.length?`<div class="exercise-copy"><b>Errores comunes:</b> ${esc(errors.join(" · "))}</div>`:""}
     <div class="exercise-copy"><b>Más fácil:</b> ${esc((exerciseVariant(exercise,"regression")||{}).name||"")}<br><b>Más difícil:</b> ${esc((exerciseVariant(exercise,"progression")||{}).name||"")}</div>
@@ -6314,7 +6317,7 @@ function toggleExerciseMotion(button){
   if(!card)return;
   const paused=card.classList.toggle("paused");
   card.querySelectorAll("video").forEach(v=>{paused?v.pause():v.play().catch(()=>{});});
-  button.textContent=paused?"Reproducir":"Pausar";
+  button.textContent=paused?"Reproducir animación":"Pausar animación";
   button.setAttribute("aria-pressed",String(paused));
 }
 function exerciseCard(exercise,admin){
@@ -6335,15 +6338,15 @@ function exerciseCard(exercise,admin){
         ${exercise.active===false?'<span class="badge b-Libre">Archivado</span>':""}
       </div>
       ${admin?`<div class="exercise-copy"><b>Inicio:</b> ${esc(exercise.start_position)}</div>
-      <ol class="exercise-steps">${steps.map(step=>`<li>${esc(step)}</li>`).join("")}</ol>
+      <ol class="exercise-steps">${steps.map(step=>`<li>${esc(plainEffortText(step))}</li>`).join("")}</ol>
       <div class="exercise-copy"><b>Respiración:</b> ${esc(exercise.breathing)}</div>
       <div class="exercise-copy"><b>Errores comunes:</b> ${esc(errors.join(" · "))}</div>
-      <div class="exercise-copy"><b>Más fácil:</b> ${esc(exercise.regression)}<br><b>Más difícil:</b> ${esc(exercise.progression)}</div>
+      <div class="exercise-copy"><b>Más fácil:</b> ${esc(plainEffortText(exercise.regression))}<br><b>Más difícil:</b> ${esc(plainEffortText(exercise.progression))}</div>
       <div class="exercise-safety"><b>Detente si:</b> ${esc(signals.join(" · "))}</div>
       <div class="exercise-copy"><b>Músculos:</b> ${esc(muscles.join(", "))}<br><b>Fuente/licencia:</b> ${esc(exercise.source_name)} · ${esc(exercise.license_name)}${issues.length?`<br><b style="color:var(--bad)">Incompleto:</b> ${esc(issues.join(", "))}`:""}</div>`:""}
       <div class="exercise-actions">
         <button class="btn btn-sm" onclick="openExerciseGuide('${esc(exercise.slug)}')">Ver técnica</button>
-        ${demo?`<button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir":"Pausar"}</button>`:""}
+        ${demo?`<button class="btn btn-sm" onclick="toggleExerciseMotion(this)" aria-pressed="${pausedByDefault}">${pausedByDefault?"Reproducir animación":"Pausar animación"}</button>`:""}
         ${admin&&DB.exerciseReady?`<button class="btn btn-sm" onclick="editExercise('${esc(exercise.slug)}')">Editar</button>`:""}
       </div>
     </div>
@@ -6567,11 +6570,12 @@ function removeManualActivity(ds,index){
   list.splice(index,1);st.manualActivities=list;
   commitDay(ds);render();toast("Actividad quitada");
 }
-function workoutStatusHtml(ds,execution){
+// REQ-400: opts.count=false cuando la tarjeta ya muestra «Ejercicios hechos» (sin repetirlo).
+function workoutStatusHtml(ds,execution,opts){
   if(!execution&&!(S.days[ds]||{}).workoutDone&&manualActivities(S.days[ds]).length)return '<span class="player-status completed"><i></i>Actividad registrada</span>';
   const outcome=execution?WORKOUT_PLAYER.outcome(execution):workoutOutcomeForDay(ds);
   const progress=execution?WORKOUT_PLAYER.progress(execution):null;
-  const detail=progress&&outcome!=="completed"&&outcome!=="partial"?` · ${progress.completed}/${progress.total} bloques`:"";
+  const detail=progress&&outcome!=="completed"&&outcome!=="partial"&&!(opts&&opts.count===false)?` · ejercicios hechos ${progress.completed}/${progress.total}`:"";
   return `<span class="player-status ${outcome}"><i></i>${workoutStatusLabel(outcome)}${detail}</span>`;
 }
 function formatWorkoutTime(seconds){
@@ -6602,8 +6606,8 @@ function workoutVariationLabel(step,exercise){
     if(step.variationKind==="exercise")return `${label}: ${step.variationName}${from?` en lugar de ${from.name}`:""}. Mismas series y repeticiones objetivo.`;
     return `${label} del mismo ejercicio. Mismas series y repeticiones objetivo.`;
   }
-  if(step.variation==="regression")return exercise&&exercise.regression?`Versión más fácil: ${exercise.regression}`:"Versión más fácil";
-  if(step.variation==="progression")return exercise&&exercise.progression?`Progresión: ${exercise.progression}`:"Progresión";
+  if(step.variation==="regression")return exercise&&exercise.regression?`Versión más fácil: ${plainEffortText(exercise.regression)}`:"Versión más fácil";
+  if(step.variation==="progression")return exercise&&exercise.progression?`Progresión: ${plainEffortText(exercise.progression)}`:"Progresión";
   if(step.exerciseSlug!==step.originalExerciseSlug)return "Ejercicio sustituido conservando series y objetivo";
   return "";
 }
@@ -6628,7 +6632,7 @@ function lastPerformanceRpe(perf){
   const rpes=perf.sets.map(set=>set.rpe).filter(Number.isFinite);
   if(!rpes.length)return "";
   const min=Math.min(...rpes),max=Math.max(...rpes);
-  return min===max?`RPE ${min}`:`RPE ${min}-${max}`;
+  return min===max?`esfuerzo ${min}/10`:`esfuerzo ${min}-${max}/10`;
 }
 function lastPerformanceHtml(ds,step,exercise){
   const perf=lastWorkoutPerformance(ds,step.exerciseSlug);
@@ -6743,7 +6747,7 @@ function renderReviewedWorkoutStep(ds,execution,stepIndex){
   const done=step.status==="done";
   const sets=step.type==="strength"?step.sets.filter(set=>set.done):[];
   const unit=step.unit==="seg"?" s":" reps";
-  const setsHtml=done&&sets.length?`<ol class="review-sets">${sets.map(set=>`<li>${esc([workoutLoadLabel(set.load),set.reps==null?"":`${set.reps}${unit}`].filter(Boolean).join(" × ")||"Hecha")}${set.rpe!=null?` <span class="muted">· RPE ${esc(set.rpe)}</span>`:""}</li>`).join("")}</ol>`:"";
+  const setsHtml=done&&sets.length?`<ol class="review-sets">${sets.map(set=>`<li>${esc([workoutLoadLabel(set.load),set.reps==null?"":`${set.reps}${unit}`].filter(Boolean).join(" × ")||"Hecha")}${set.rpe!=null?` <span class="muted">· esfuerzo ${esc(set.rpe)}/10</span>`:""}</li>`).join("")}</ol>`:"";
   const hasPending=execution.steps.some(item=>item.status==="pending");
   const canPrev=previousReviewableStepIndex(execution,stepIndex)>=0;
   const canNext=nextReviewableStepIndex(execution,stepIndex)>=0;
@@ -6923,7 +6927,7 @@ function finishTimedWorkoutStep(ds,skipped){
   const next=nextWorkoutStepIndex(execution,execution.currentStep);
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
-  if(next<0)toast("Todos los bloques están registrados. Finaliza el entreno.");
+  if(next<0)toast("Ya registraste todos los ejercicios. Finaliza el entreno.");
 }
 function skipWorkoutTimer(ds){
   const execution=normalizedWorkoutExecution(ds);if(!execution||!execution.timer)return;
@@ -6972,7 +6976,7 @@ function completeWorkoutStep(ds,mode){
   else if(!(execution.timer&&execution.timer.transition))execution.timer=betweenExerciseTimer();
   if(next>=0)execution.currentStep=next;
   persistWorkoutExecution(ds,execution,true);
-  if(next<0)toast("Todos los bloques están registrados. Finaliza el entreno.");
+  if(next<0)toast("Ya registraste todos los ejercicios. Finaliza el entreno.");
 }
 function betweenExerciseRestSeconds(){return normalizedBetweenExerciseRest(trainingPrefs().betweenExerciseRestSeconds);}
 function betweenExerciseTimer(){
@@ -7118,7 +7122,7 @@ function explainLoadVariation(ds,variation,v,exercise){
     ?`<h3>Cómo progresar</h3>
       <p class="exercise-copy">En ${esc(exercise?exercise.name:"este ejercicio")} la progresión es subir la carga: <b>${esc(v.name)}</b>. No cambia el ejercicio.</p>
       ${last?`<p class="exercise-copy">La última vez: <b>${esc(last)}</b>.</p>`:""}
-      <p class="exercise-copy">Cuando completes todas las series en el rango de repeticiones${rpe?` sin pasar de RPE ${esc(rpe)}`:""}, sube un poco: 2,5–5 kg, el siguiente lastre o un escalón más alto.</p>
+      <p class="exercise-copy">Cuando completes todas las series en el rango de repeticiones${rpe?` sin pasar de esfuerzo ${esc(rpe)}/10`:""}, sube un poco: 2,5–5 kg, el siguiente lastre o un escalón más alto.</p>
       <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`
     :`<h3>Hacerlo más fácil</h3>
       <p class="exercise-copy">En ${esc(exercise?exercise.name:"este ejercicio")} la versión más fácil es bajar la carga: <b>${esc(v.name)}</b>. Mantén la técnica y el esfuerzo objetivo.</p>
@@ -7298,7 +7302,7 @@ function resumePartialWorkout(ds,reviewed){
   persistWorkoutExecution(ds,execution,true);
 }
 function discardWorkoutExecution(ds){
-  if(!confirm("¿Descartar este entreno en curso? Se perderán las series y bloques registrados hoy."))return;
+  if(!confirm("¿Descartar este entreno en curso? Se perderán las series y ejercicios registrados hoy."))return;
   const st=dayState(ds);delete st.workoutExecution;st.workoutDone=false;commitDay(ds);render();toast("Entreno descartado");
 }
 let workoutTimerCompleting=false;
@@ -7338,7 +7342,7 @@ function renderMovementStep(ds,execution,step,stepIndex){
   const minutes=Math.max(1,Math.round((+step.durationSeconds||0)/60));
   const head=`<div class="player-phase">${workoutPhaseLabel(step.phase)} · bloque ${stepIndex+1} de ${execution.steps.length}</div>
     <h3>${esc(step.label)}</h3>
-    <div class="muted small">Unos ${minutes} min · esfuerzo suave (${esc(step.intensity)})</div>
+    <div class="muted small">Unos ${minutes} min · esfuerzo suave (${esc(plainEffortText(step.intensity).replace(/^esfuerzo\s+/,""))})</div>
     ${step.coachNote?`<div class="alert violet" style="margin-top:10px">Indicación de tu coach: ${esc(step.coachNote)}</div>`:""}`;
   const doneLabel=warm?"Ya calenté":"Ya terminé";
   const guide=Number.isInteger(step.guideIndex)?Math.max(0,Math.min(moves.length-1,step.guideIndex)):null;
@@ -7436,7 +7440,7 @@ function renderStrengthSet(ds,step,stepIndex,set,setIndex){
     <div class="set-fields">
       <div><label>${step.unit==="seg"?"Segundos":"Repeticiones"}</label><input aria-label="${step.unit==="seg"?"Segundos":"Repeticiones"}, serie ${setIndex+1}" type="number" min="0" inputmode="decimal" value="${set.reps==null?"":esc(set.reps)}" placeholder="${esc(step.defaultReps)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'reps',this.value)"></div>
       <div><label>Carga / asistencia</label><input aria-label="Carga o asistencia, serie ${setIndex+1}" type="text" value="${esc(set.load||"")}" placeholder="kg" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'load',this.value)"></div>
-      <div><label>Esfuerzo (RPE)</label><input aria-label="Esfuerzo (RPE), serie ${setIndex+1}" type="number" min="1" max="10" inputmode="decimal" value="${set.rpe==null?"":esc(set.rpe)}" placeholder="${esc(step.targetRpe)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'rpe',this.value)"></div>
+      <div><label>Esfuerzo (1-10)</label><input aria-label="Esfuerzo del 1 al 10, serie ${setIndex+1}" type="number" min="1" max="10" inputmode="decimal" value="${set.rpe==null?"":esc(set.rpe)}" placeholder="${esc(step.targetRpe)}" onchange="saveWorkoutSetField('${ds}',${stepIndex},${setIndex},'rpe',this.value)"></div>
     </div>
   </div>`;
 }
@@ -7455,11 +7459,20 @@ function removeWorkoutSet(ds,stepIndex){
   step.sets.pop();step.extraSets-=1;
   persistWorkoutExecution(ds,execution,true);
 }
+// REQ-400: «RPE» y «RIR» no se muestran; aquí se explican con palabras de todos los días.
+function spareRepsLabel(n){
+  return String(n).trim()==="1"?"repetición de sobra al terminar":"repeticiones de sobra al terminar";
+}
+function plainEffortText(text){
+  return String(text==null?"":text)
+    .replace(/\bRPE\s*(\d+(?:[.,]\d+)?(?:\s*[-–]\s*\d+(?:[.,]\d+)?)?)(?:\s*\/\s*10)?/g,(m,v)=>`esfuerzo ${v.replace(/\s+/g,"")}/10`)
+    .replace(/repeticiones en reserva/gi,"repeticiones de sobra");
+}
 function explainWorkoutEffort(){
-  modal(`<h3>Esfuerzo: RPE y RIR</h3>
-    <p class="exercise-copy"><b>RPE</b> es qué tan dura sentiste la serie, del 1 al 10. Un 10 significa que no podías hacer ni una repetición más.</p>
-    <p class="exercise-copy"><b>RIR</b> son las repeticiones que te quedaban en reserva con buena técnica. RIR 2 equivale a un RPE 8: terminas la serie sintiendo que podrías hacer unas 2 más.</p>
-    <p class="exercise-copy">Usa el objetivo para elegir la carga. Al terminar cada serie, anota el RPE que sentiste.</p>
+  modal(`<h3>Esfuerzo del 1 al 10</h3>
+    <p class="exercise-copy"><b>Esfuerzo</b> es qué tan dura sentiste la serie, del 1 al 10. Un 10 significa que no podías hacer ni una repetición más.</p>
+    <p class="exercise-copy"><b>Repeticiones de sobra</b> son las que todavía podrías hacer con buena técnica al terminar la serie. Un esfuerzo 8/10 equivale a terminar con unas 2 de sobra.</p>
+    <p class="exercise-copy">Usa el objetivo para elegir la carga. Al terminar cada serie, anota el esfuerzo que sentiste.</p>
     <button class="btn btn-accent" style="width:100%;margin-top:10px" onclick="closeModal()">Entendido</button>`);
 }
 // REQ-237: el tempo "3-1-1" son los segundos de cada fase de la repetición:
@@ -7508,13 +7521,13 @@ function nextWorkoutStepHtml(execution){
   const rest=step.restLabel||`${step.restSeconds}s`;
   const dose=step.type==="strength"
     ?`${step.prescribedSets} × ${step.reps} · ${rest}`
-    :[step.optional&&!step.optIn?"opcional":"",step.durationSeconds?`${Math.round(step.durationSeconds/60*10)/10} min`:step.target||""].filter(Boolean).join(" · ");
-  const detail=[name,step.optional&&!step.optIn?"opcional":"",step.type==="strength"?`${step.prescribedSets} × ${step.reps} · descanso ${rest}`:step.durationSeconds?`${Math.round(step.durationSeconds/60*10)/10} min`:step.target||""].filter(Boolean).join(" · ");
+    :[step.optional&&!step.optIn?"opcional":"",step.durationSeconds?`${Math.round(step.durationSeconds/60*10)/10} min`:plainEffortText(step.target)].filter(Boolean).join(" · ");
+  const detail=[name,step.optional&&!step.optIn?"opcional":"",step.type==="strength"?`${step.prescribedSets} × ${step.reps} · descanso ${rest}`:step.durationSeconds?`${Math.round(step.durationSeconds/60*10)/10} min`:plainEffortText(step.target)].filter(Boolean).join(" · ");
   return `<div class="player-next muted small" role="note" aria-label="${esc("A continuación: "+detail)}" title="${esc(detail)}"><b>A continuación</b><span class="player-next-detail"><span class="player-next-name">${esc(name)}</span><span class="player-next-dose">${esc(dose)}</span></span></div>`;
 }
 function renderCurrentWorkoutStep(ds,execution){
   const step=currentWorkoutStep(execution);
-  if(!step)return '<div class="alert violet">Todos los bloques están registrados. Finaliza el entreno para guardar el resultado.</div>';
+  if(!step)return '<div class="alert violet">Ya registraste todos los ejercicios. Finaliza el entreno para guardar el resultado.</div>';
   const stepIndex=execution.steps.indexOf(step);
   if(step.optional&&!step.optIn)return renderOptionalStepOffer(ds,step);
   if(step.type==="timed"&&Array.isArray(step.movements)&&step.movements.length)return renderMovementStep(ds,execution,step,stepIndex);
@@ -7522,7 +7535,7 @@ function renderCurrentWorkoutStep(ds,execution){
     return `<div class="player-step">
       <div class="player-phase">${workoutPhaseLabel(step.phase)} · bloque ${stepIndex+1} de ${execution.steps.length}</div>
       <h3>${esc(step.label)}</h3>
-      <div class="player-target"><b>Objetivo:</b> ${esc(step.target)}<br><b>Intensidad:</b> ${esc(step.intensity)}</div>
+      <div class="player-target"><b>Objetivo:</b> ${esc(plainEffortText(step.target))}<br><b>Intensidad:</b> ${esc(plainEffortText(step.intensity))}</div>
       ${renderWorkoutTimer(ds,execution,step)}
       <div class="player-controls">
         <button class="btn" onclick="skipWorkoutStep('${ds}')">Omitir bloque</button>
@@ -7545,10 +7558,10 @@ function renderCurrentWorkoutStep(ds,execution){
       <div class="scard"><div class="n">${esc(step.reps)}</div><div class="l">reps objetivo</div></div>
       <div class="scard"><div class="n">${esc(step.restLabel||`${step.restSeconds}s`)}</div><div class="l">descanso</div></div>
       <button class="scard scard-info" onclick="explainWorkoutTempo('${ds}')" aria-label="Qué significa el ritmo ${esc(step.tempo)}"><div class="n">${esc(step.tempo)}</div><div class="l">${tempoPhases(step.tempo)?"baja · pausa · sube":"ritmo"} ⓘ</div></button>
-      <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué es el esfuerzo RPE"><div class="n">${step.targetRpe}/10</div><div class="l">esfuerzo (RPE) ⓘ</div></button>
-      <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Qué son las repeticiones en reserva RIR"><div class="n">${step.targetRir}</div><div class="l">en reserva (RIR) ⓘ</div></button>
+      <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Esfuerzo ${esc(step.targetRpe)} de 10. ¿Qué es?"><div class="n">${esc(step.targetRpe)}/10</div><div class="l">esfuerzo <span style="white-space:nowrap">¿Qué es?</span></div></button>
+      <button class="scard scard-info" onclick="explainWorkoutEffort()" aria-label="Termina con ${esc(step.targetRir)} repeticiones de sobra. ¿Qué significa?"><div class="n">${esc(step.targetRir)}</div><div class="l">${spareRepsLabel(step.targetRir)} ⓘ</div></button>
     </div>
-    <div class="muted small"><b style="color:var(--txt)">Carga sugerida:</b> ${esc(step.suggestedLoad)}</div>
+    <div class="muted small"><b style="color:var(--txt)">Carga sugerida:</b> ${esc(plainEffortText(step.suggestedLoad))}</div>
     ${postponed.length?`<div class="alert violet postponed-note" style="margin-top:10px">${postponed.length===1?"Te queda pendiente":"Te quedan pendientes"} <b>${esc(postponed.length>1?`${postponed.slice(0,-1).join(", ")} y ${postponed.at(-1)}`:postponed[0])}</b>. Vuelves al terminar este.</div>`:""}
     ${lastPerformanceHtml(ds,step,exercise)}
     ${variation?`<div class="alert violet" style="margin-top:10px">${esc(variation)}</div>`:""}
@@ -7580,9 +7593,9 @@ function renderWorkoutExecution(ds,execution){
       ${execution.energySource==="spinning"?`<div class="muted small">≈ ${execution.estimatedKcal} kcal estimadas según duración y esfuerzo moderado.</div>`:""}
       <div class="player-summary">
         <div class="scard"><div class="n">${formatWorkoutTime(elapsed)}</div><div class="l">duración total</div></div>
-        <div class="scard"><div class="n">${progress.completed}/${progress.total}</div><div class="l">bloques completados</div></div>
+        <div class="scard"><div class="n">${progress.completed}/${progress.total}</div><div class="l">ejercicios hechos</div></div>
         ${sets.totalSets?`<div class="scard"><div class="n">${sets.completedSets}/${sets.totalSets}</div><div class="l">series registradas</div></div>`:""}
-        <div class="scard"><div class="n">${progress.skipped}</div><div class="l">bloques omitidos</div></div>
+        <div class="scard"><div class="n">${progress.skipped}</div><div class="l">ejercicios omitidos</div></div>
       </div>
       <div class="muted small">${esc(painLabels[execution.pain]||"Cierre sin respuesta")} · ${esc(difficultyLabels[execution.difficulty]||"Dificultad sin respuesta")}</div>
       ${execution.notes?`<div class="exercise-copy"><b>Notas:</b> ${esc(execution.notes)}</div>`:""}
@@ -7594,7 +7607,7 @@ function renderWorkoutExecution(ds,execution){
   }
   return `<div class="dash">
     <div class="player-overview">
-      <div><div class="slot">${esc(execution.objective)}</div><div class="cl-title">${progress.completed}/${progress.total} bloques registrados</div>${workoutStatusHtml(ds,execution)}</div>
+      <div><div class="slot">${esc(execution.objective)}</div><div class="cl-title">Ejercicios hechos ${progress.completed}/${progress.total}</div>${workoutStatusHtml(ds,execution,{count:false})}</div>
       <div class="player-clock">${formatWorkoutTime(elapsed)}</div>
     </div>
     <div class="player-progress"><i style="width:${percentage}%"></i></div>
@@ -7606,7 +7619,7 @@ function renderWorkoutExecution(ds,execution){
       <button class="btn btn-sm" onclick="discardWorkoutExecution('${ds}')">Descartar</button>
     </div>
   </div>
-  ${execution.status==="paused"?'<div class="alert violet">El entreno está en pausa. Reanúdalo para continuar con temporizadores y registro.</div>':progress.remaining||reviewedWorkoutStepIndex(execution)!=null?renderActiveWorkoutStep(ds,execution):'<div class="alert violet">Todos los bloques están registrados. Revisa el cierre antes de guardar el entreno.</div>'+workoutBackButton(ds,execution)}
+  ${execution.status==="paused"?'<div class="alert violet">El entreno está en pausa. Reanúdalo para continuar con temporizadores y registro.</div>':progress.remaining||reviewedWorkoutStepIndex(execution)!=null?renderActiveWorkoutStep(ds,execution):'<div class="alert violet">Ya registraste todos los ejercicios. Revisa el cierre antes de guardar el entreno.</div>'+workoutBackButton(ds,execution)}
   ${progress.remaining===0&&reviewedWorkoutStepIndex(execution)==null?`<button class="btn btn-accent" style="width:100%;min-height:50px" onclick="openFinishWorkout('${ds}',false)">Finalizar y guardar entreno</button>`:""}`;
 }
 
@@ -8105,7 +8118,7 @@ function workoutPlanSummaryHtml(prescription,ds){
       const name=exercise?exercise.name:step.label;
       const lastLoad=ds?lastLoadLabel(ds,step.exerciseSlug):"";
       return `<li class="plan-row"><span class="plan-n">${n}</span><div class="plan-main"><b>${esc(name)}</b>
-        <div class="plan-dose"><span>${step.prescribedSets} × ${esc(step.reps)}</span><span>Descanso ${esc(step.restLabel||formatRestShort(step.restSeconds))}</span><span>RPE ${esc(step.targetRpe)}/10</span>${lastLoad?`<span class="plan-last">Última vez ${esc(lastLoad)}</span>`:""}</div></div></li>`;
+        <div class="plan-dose"><span>${step.prescribedSets} × ${esc(step.reps)}</span><span>Descanso ${esc(step.restLabel||formatRestShort(step.restSeconds))}</span><span>Esfuerzo ${esc(step.targetRpe)}/10</span>${lastLoad?`<span class="plan-last">Última vez ${esc(lastLoad)}</span>`:""}</div></div></li>`;
     }
     const minutes=Math.max(1,Math.round((+step.durationSeconds||0)/60));
     const moves=Array.isArray(step.movements)?step.movements.map(m=>m.name).join(" · "):"";
@@ -8115,7 +8128,7 @@ function workoutPlanSummaryHtml(prescription,ds){
   const sets=steps.filter(step=>step.type==="strength").reduce((sum,step)=>sum+(+step.prescribedSets||0),0);
   return `<div class="plan-summary"><div class="muted small">Qué vas a hacer hoy · ${n} ejercicios · ${sets} series${prescription.durationLabel?` · ${esc(prescription.durationLabel)}`:prescription.estimatedMinutes?` · ~${prescription.estimatedMinutes} min`:""}</div><ol class="plan-list">${rows}</ol>
     ${n>1?`<div class="muted small plan-between-rest">Entre ejercicios: ${formatRestShort(betweenExerciseRestSeconds())} de descanso</div>`:""}
-    <button class="link-btn small" onclick="explainWorkoutEffort()">¿Qué es RPE?</button></div>`;
+    <button class="link-btn small" onclick="explainWorkoutEffort()">¿Qué es el esfuerzo?</button></div>`;
 }
 // REQ-287: señales para detenerse. Corta junto al botón de inicio; completa en
 // la cuenta atrás (y en la hoja del plan).
@@ -8268,7 +8281,7 @@ function renderWorkout(){
     <div class="meal-head">
       <div>
         <div class="name" style="font-weight:600">${esc(ew.workout.name)} ${ew.overridden&&!repeating?'<span class="pill" style="background:var(--refeed);color:#3a2600">cambiado</span>':''}${strengthDay&&dayCustomExercises(ds).length?` <span class="pill routine-pill">${repeating?"repetido":"tu rutina"}</span>`:''}</div>
-        <div class="detail">${repeating&&!execution?repeatWorkoutLineHtml(ds):esc(ew.workout.detail)}</div>
+        <div class="detail">${repeating&&!execution?repeatWorkoutLineHtml(ds):esc(plainEffortText(ew.workout.detail))}</div>
         ${location&&!restDay&&!freeDay?`<div class="muted small wk-location">Lugar: ${esc(TRAINING_LOCATION_LABELS[location])}${dayPlace?" · solo este día":""}</div>`:""}
         ${workoutStatusHtml(ds,execution)}
       </div>
@@ -8505,7 +8518,7 @@ function openWorkoutPicker(ds){
     html+=`<div class="section-h" style="margin-left:0">${ic} ${k}</div>`;
     opts.forEach(o=>{
       const cur=o.id===ew.id&&!dayRepeatWorkout(ds), plan=o.id===ew.plannedId;
-      html+=`<button class="opt" onclick="setWorkout('${ds}','${o.id}')" style="${cur?'border-color:var(--accent)':''}">${esc(o.name)}${cur?' ✓':''}${plan?' <span class="muted small">(plan)</span>':''}<div class="o-meta">${esc(o.detail)}</div></button>`;
+      html+=`<button class="opt" onclick="setWorkout('${ds}','${o.id}')" style="${cur?'border-color:var(--accent)':''}">${esc(o.name)}${cur?' ✓':''}${plan?' <span class="muted small">(plan)</span>':''}<div class="o-meta">${esc(plainEffortText(o.detail))}</div></button>`;
     });
   });
   modal(html);
@@ -8690,16 +8703,16 @@ function currentWeightWeek(){
 function weightTableHtml(){
   const weeks=Object.keys(WEIGHT_RANGES).map(Number);
   const upto=Math.max(currentWeightWeek(),...weeks.filter(n=>wkg(n)!=null||wbf(n)!=null));
-  const head=`<thead><tr><th>Sem</th><th>Rango kg</th><th>Peso kg</th><th>% grasa</th></tr></thead>`;
+  const head=`<thead><tr><th>Semana</th><th>Meta kg</th><th>Peso kg</th><th>% grasa</th></tr></thead>`;
   const now=weeks.filter(n=>n<=upto),later=weeks.filter(n=>n>upto);
   return `<table class="wt">${head}<tbody>${weightRows(now)}</tbody></table>`
-    +(later.length?`<details class="wt-later"><summary>Semanas siguientes (S${later[0]}–S${later[later.length-1]})</summary><table class="wt">${head}<tbody>${weightRows(later)}</tbody></table></details>`:"");
+    +(later.length?`<details class="wt-later"><summary>${later.length>1?`Semanas siguientes (${later[0]} a ${later[later.length-1]})`:`Semana siguiente (${later[0]})`}</summary><table class="wt">${head}<tbody>${weightRows(later)}</tbody></table></details>`:"");
 }
 function weightRows(weeks){
   const cur=currentWeightWeek();
   return (weeks||Object.keys(WEIGHT_RANGES)).map(n=>{
     const kg=wkg(n), bf=wbf(n);
-    return `<tr${+n===cur?' class="wt-current"':''}><td>S${n}</td><td class="muted">${WEIGHT_RANGES[n].replace(/ .*/,'')}</td>
+    return `<tr${+n===cur?' class="wt-current"':''}><td><span class="wt-m">Semana </span>${n}</td><td class="muted"><span class="wt-m">Meta: </span>${WEIGHT_RANGES[n].replace(/ .*/,'')}<span class="wt-m"> kg</span></td>
       <td><input type="number" step="0.1" inputmode="decimal" data-week="${n}" value="${kg!=null?kg:""}" onchange="setWeight(${n},this.value)" placeholder="kg" aria-label="Peso de la semana ${n} en kilogramos"></td>
       <td><input type="number" step="0.1" inputmode="decimal" value="${bf!=null?bf:""}" onchange="setBodyFat(${n},this.value)" placeholder="%" aria-label="Grasa corporal de la semana ${n} en porcentaje"></td></tr>`;
   }).join("");
@@ -12103,7 +12116,7 @@ function openWorkoutContingency(ds,reason){
   const hints={tiempo:"Elige el entreno más eficiente o descansa activamente."};
   const optsHtml=filtered.map(o=>{
     const cur=o.id===ew.id;
-    return `<button class="opt" onclick="applyWorkoutContingency('${ds}','${o.id}','${reason}')" style="${cur?'border-color:var(--accent)':''}">${esc(o.name)}${cur?' ✓':''}<div class="o-meta">${esc(o.detail)}</div></button>`;
+    return `<button class="opt" onclick="applyWorkoutContingency('${ds}','${o.id}','${reason}')" style="${cur?'border-color:var(--accent)':''}">${esc(o.name)}${cur?' ✓':''}<div class="o-meta">${esc(plainEffortText(o.detail))}</div></button>`;
   }).join("");
   modal(`<h3>${titles[reason]||"Adaptar entrenamiento"}</h3>
     <p class="muted small">${hints[reason]||""} Planificado hoy: <b>${esc(ew.planned.name)}</b>.</p>
@@ -14071,7 +14084,7 @@ function trainingDraftReviewHtml(){
     <div class="muted small" style="margin:8px 0">${esc(week.reason||"Semana validada según tu perfil.")}</div>
     ${week.sessions.map(session=>`<div class="opt" style="cursor:default">
       <b>${esc(prettyDate(session.date))} · ${esc(session.name)}</b>
-      <div class="o-meta">${esc(TRAINING_LOCATION_LABELS[session.location]||session.location)} · ${session.durationMinutes} min · ${esc(session.intensity)}</div>
+      <div class="o-meta">${esc(TRAINING_LOCATION_LABELS[session.location]||session.location)} · ${session.durationMinutes} min · ${esc(plainEffortText(session.intensity))}</div>
       <div class="muted small" style="margin-top:4px">${esc(session.objective)} · ${session.exercises.map(item=>esc((exerciseBySlug(item.exerciseId,true)||{}).name||item.exerciseId)).join(" · ")}</div>
       ${draft.trialFirstWeekOnly&&index>0
         ?`<div class="muted small" style="margin-top:8px">Activa un plan para personalizar esta semana.</div>`

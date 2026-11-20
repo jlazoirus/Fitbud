@@ -26,13 +26,13 @@ test.describe("Entreno", () => {
 
     // Arrancar el reproductor
     await startGuidedSession(page);
-    await expect(app).toContainText(/0\/\d+ bloques/);
+    await expect(app).toContainText(/ejercicios hechos 0\/\d+/i);
 
     // REQ-92: la sesión empieza con calentamiento y el total de bloques cubre
     // calentamiento + ejercicios + vuelta a la calma (mínimo 5 bloques).
     await expect(app).toContainText(/CALENTAMIENTO/i);
     const text = await app.innerText();
-    const totalBloques = Number((text.match(/0\/(\d+) bloques/) || [])[1]);
+    const totalBloques = Number((text.match(/ejercicios hechos 0\/(\d+)/i) || [])[1]);
     expect(totalBloques).toBeGreaterThanOrEqual(5);
 
     // Completar cada bloque como usuario: series en los de fuerza,
@@ -53,13 +53,13 @@ test.describe("Entreno", () => {
       } else {
         await completeTimedBlock(page);
       }
-      await expect(app).toContainText(new RegExp(`${bloque + 1}\\/${totalBloques} bloques`));
+      await expect(app).toContainText(new RegExp(`ejercicios hechos ${bloque + 1}\\/${totalBloques}(?!\\d)`, "i"));
     }
     expect(sawStrengthBlock, "la sesión debe incluir bloques de fuerza (REQ-92)").toBe(true);
-    await expect(app).toContainText(new RegExp(`${totalBloques}\\/${totalBloques} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos ${totalBloques}\\/${totalBloques}(?!\\d)`, "i"));
 
     // Cierre: cuestionario de sensaciones y guardado
-    await expect(app).toContainText(/Todos los bloques están registrados/i);
+    await expect(app).toContainText(/Ya registraste todos los ejercicios/i);
     await page.getByRole("button", { name: "Finalizar y guardar entreno" }).click();
     const overlay = page.locator("#overlay");
     const selects = overlay.locator("select");
@@ -89,7 +89,7 @@ test.describe("Entreno", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     await startGuidedSession(page);
     const app = page.locator("#app");
-    await expect(app).toContainText(/0\/\d+ bloques/);
+    await expect(app).toContainText(/ejercicios hechos 0\/\d+/i);
 
     // Sale de la app sin pausar: dispara los listeners reales de visibilitychange.
     const setHidden = (hidden) => page.evaluate((h) => {
@@ -143,7 +143,7 @@ test.describe("Entreno", () => {
 
     const app = page.locator("#app");
     await startGuidedSession(page);
-    await expect(app).toContainText(/0\/\d+ bloques/);
+    await expect(app).toContainText(/ejercicios hechos 0\/\d+/i);
 
     // Omite UN bloque (calentamiento, siempre el primero; REQ-236: tras elegir
     // hacerlo) y ABANDONA — nunca "Finalizar y guardar entreno" ni "Terminar antes".
@@ -169,7 +169,7 @@ test.describe("Entreno", () => {
     const app = page.locator("#app");
     await startGuidedSession(page);
     const text = await app.innerText();
-    const total = Number((text.match(/0\/(\d+) bloques/) || [])[1]);
+    const total = Number((text.match(/ejercicios hechos 0\/(\d+)/i) || [])[1]);
     let strength = 0;
     let firstExercise = "";
     for (let bloque = 0; bloque < total; bloque++) {
@@ -193,7 +193,7 @@ test.describe("Entreno", () => {
       } else {
         await completeTimedBlock(page);
       }
-      await expect(app).toContainText(new RegExp(`${bloque + 1}\\/${total} bloques`));
+      await expect(app).toContainText(new RegExp(`ejercicios hechos ${bloque + 1}\\/${total}(?!\\d)`, "i"));
     }
     expect(strength).toBeGreaterThanOrEqual(2);
     return firstExercise;
@@ -433,7 +433,7 @@ test.describe("Cuenta atrás", () => {
     expect(await hasExecution()).toBe(false);
     await expect(countdown).toHaveCount(0, { timeout: 3000 });
     expect(Date.now() - t0).toBeGreaterThanOrEqual(2500);
-    await expect(app).toContainText(/0\/\d+ bloques/);
+    await expect(app).toContainText(/ejercicios hechos 0\/\d+/i);
     await expect(app.locator(".player-clock")).toHaveText(/^00:0[0-2]$/);
 
     // "Empezar ya" la salta.
@@ -443,7 +443,7 @@ test.describe("Cuenta atrás", () => {
     await start.click();
     await countdown.getByRole("button", { name: "Empezar ya" }).click();
     await expect(countdown).toHaveCount(0);
-    await expect(app).toContainText(/0\/\d+ bloques/);
+    await expect(app).toContainText(/ejercicios hechos 0\/\d+/i);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
@@ -480,7 +480,7 @@ test.describe("Última carga", () => {
     const last = app.locator(".last-perf");
     await expect(last).toContainText(/Última vez · \S{3} \d+ \S{3}/);
     await expect(last.locator("b")).toHaveText("40 kg × 8, 42.5 kg × 7");
-    await expect(last).toContainText("RPE 8-9");
+    await expect(last).toContainText("esfuerzo 8-9/10");
 
     // Hoy registra 45 kg; el siguiente ejercicio (sin historial) invita a anotar la carga.
     await app.locator('input[aria-label^="Carga o asistencia, serie 1"]').fill("45");
@@ -525,7 +525,7 @@ test.describe("Series precargadas", () => {
 
     const reps = (n) => app.locator(`input[aria-label^="Repeticiones, serie ${n}"]`);
     const load = (n) => app.locator(`input[aria-label^="Carga o asistencia, serie ${n}"]`);
-    const rpe = (n) => app.locator(`input[aria-label^="Esfuerzo (RPE), serie ${n}"]`);
+    const rpe = (n) => app.locator(`input[aria-label^="Esfuerzo del 1 al 10, serie ${n}"]`);
     await expect(reps(1)).toHaveValue("8");
     await expect(load(1)).toHaveValue("40");
     await expect(reps(2)).toHaveValue("7");
@@ -569,10 +569,10 @@ test.describe("Bloques opcionales", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
     await startGuidedSession(page);
-    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    const total = Number(((await app.innerText()).match(/ejercicios hechos 0\/(\d+)/i) || [])[1]);
 
     await page.getByRole("button", { name: "Ahora no" }).click();
-    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 0\\/${total - 1}(?!\\d)`, "i"));
     await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
     for (;;) {
       const siguiente = page.getByRole("button", { name: "Siguiente ejercicio" });
@@ -583,7 +583,7 @@ test.describe("Bloques opcionales", () => {
     }
     await expect(app.locator(".optional-offer")).toContainText("¿Quieres cerrar con unos minutos suaves?");
     await page.getByRole("button", { name: "Ahora no" }).click();
-    await expect(app).toContainText(new RegExp(`${total - 2}\\/${total - 2} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos ${total - 2}\\/${total - 2}(?!\\d)`, "i"));
 
     await page.getByRole("button", { name: "Finalizar y guardar entreno" }).click();
     const overlay = page.locator("#overlay");
@@ -592,7 +592,7 @@ test.describe("Bloques opcionales", () => {
     await overlay.locator("#finishDifficulty").selectOption({ label: "Adecuada" });
     await overlay.getByRole("button", { name: "Guardar resultado" }).click();
     await expect(app).toContainText("Entreno completado");
-    await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
+    await expect(app.locator(".player-summary")).toContainText(/0\s*ejercicios omitidos/);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 
@@ -607,11 +607,11 @@ test.describe("Bloques opcionales", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
     await startGuidedSession(page);
-    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    const total = Number(((await app.innerText()).match(/ejercicios hechos 0\/(\d+)/i) || [])[1]);
 
     await page.getByRole("button", { name: "Sí, calentar" }).click();
     await page.getByRole("button", { name: "Omitir bloque" }).click();
-    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 0\\/${total - 1}(?!\\d)`, "i"));
     for (;;) {
       const siguiente = page.getByRole("button", { name: "Siguiente ejercicio" });
       if (!(await siguiente.isVisible().catch(() => false))) break;
@@ -628,7 +628,7 @@ test.describe("Bloques opcionales", () => {
     await overlay.locator("#finishDifficulty").selectOption({ label: "Adecuada" });
     await overlay.getByRole("button", { name: "Guardar resultado" }).click();
     await expect(app).toContainText("Entreno completado");
-    await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
+    await expect(app.locator(".player-summary")).toContainText(/0\s*ejercicios omitidos/);
 
     // Una sesión guardada antes del arreglo: calentamiento "skipped" y parcial.
     await page.evaluate(() => {
@@ -639,7 +639,7 @@ test.describe("Bloques opcionales", () => {
       commitDay(current); render();
     });
     await expect(app).toContainText("Entreno parcial");
-    await expect(app.locator(".player-summary")).toContainText(/0\s*bloques omitidos/);
+    await expect(app.locator(".player-summary")).toContainText(/0\s*ejercicios omitidos/);
     await app.getByRole("button", { name: "Marcar como completada" }).click();
     await expect(app).toContainText("Entreno completado");
     expect(await page.evaluate(() => dayState(current).workoutDone)).toBe(true);
@@ -932,7 +932,7 @@ test.describe("Calentamiento guiado", () => {
     await page.getByRole("button", { name: "Anterior" }).click();
     await expect(app).toContainText(/Movimiento 1 de \d/);
     await page.getByRole("button", { name: "Ya calenté sin terminar la guía" }).click();
-    await expect(app).toContainText(/1\/\d+ bloques/);
+    await expect(app).toContainText(/ejercicios hechos 1\/\d+/i);
     await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
     expect(errors).toEqual([]);
   });
@@ -950,7 +950,7 @@ test.describe("Ejercicio anterior", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
     await startGuidedSession(page);
-    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    const total = Number(((await app.innerText()).match(/ejercicios hechos 0\/(\d+)/i) || [])[1]);
     await page.getByRole("button", { name: "Ahora no" }).click();
     // Sin nada registrado antes, no hay a dónde volver.
     await expect(page.getByRole("button", { name: "← Ejercicio anterior" })).toHaveCount(0);
@@ -963,7 +963,7 @@ test.describe("Ejercicio anterior", () => {
     const sets = await pending.count();
     while (await pending.count()) await pending.first().click();
     await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
-    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 1\\/${total - 1}(?!\\d)`, "i"));
     const second = (await app.locator(".player-step h3").innerText()).trim();
     expect(second).not.toBe(first);
 
@@ -975,7 +975,7 @@ test.describe("Ejercicio anterior", () => {
     await expect(review.locator(".review-sets li").first()).toContainText("40 kg");
     await expect(page.getByRole("button", { name: "Omitir ejercicio" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toHaveCount(0);
-    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 1\\/${total - 1}(?!\\d)`, "i"));
 
     // Volver al ejercicio en curso: sigue donde iba, con Omitir y Siguiente.
     await page.getByRole("button", { name: "Volver al ejercicio en curso" }).click();
@@ -994,7 +994,7 @@ test.describe("Ejercicio anterior", () => {
     await expect(review.locator("h3")).toHaveText(second);
     await review.getByRole("button", { name: "Hacerlo ahora" }).click();
     await expect(app.locator(".player-step h3")).toHaveText(second);
-    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 1\\/${total - 1}(?!\\d)`, "i"));
     await expect(page.getByRole("button", { name: "Siguiente ejercicio" })).toBeVisible();
 
     // El registro del primero quedó intacto.
@@ -1022,7 +1022,7 @@ test.describe("Hacer otro ejercicio primero", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
     await startGuidedSession(page);
-    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    const total = Number(((await app.innerText()).match(/ejercicios hechos 0\/(\d+)/i) || [])[1]);
     await page.getByRole("button", { name: "Ahora no" }).click();
 
     // Primer ejercicio: marca una serie y pasa a otro sin terminarlo.
@@ -1039,13 +1039,13 @@ test.describe("Hacer otro ejercicio primero", () => {
     // Ahora está en el elegido; el primero sigue pendiente y se avisa.
     await expect(app.locator(".player-step h3")).toHaveText(later);
     await expect(app.locator(".postponed-note")).toContainText(first);
-    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 0\\/${total - 1}(?!\\d)`, "i"));
 
     // Al terminar el elegido, vuelve al pendiente con su serie marcada.
     const pending = app.locator("button.set-done:not(.on)");
     while (await pending.count()) await pending.first().click();
     await page.getByRole("button", { name: "Siguiente ejercicio" }).click();
-    await expect(app).toContainText(new RegExp(`1\\/${total - 1} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 1\\/${total - 1}(?!\\d)`, "i"));
     await expect(app.locator(".player-step h3")).toHaveText(first);
     await expect(app.locator("button.set-done.on")).toHaveCount(1);
     await expect(app.locator(".postponed-note")).toHaveCount(0);
@@ -1069,7 +1069,7 @@ test.describe("Añadir ejercicio", () => {
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
     await startGuidedSession(page);
-    const total = Number(((await app.innerText()).match(/0\/(\d+) bloques/) || [])[1]);
+    const total = Number(((await app.innerText()).match(/ejercicios hechos 0\/(\d+)/i) || [])[1]);
     await page.getByRole("button", { name: "Ahora no" }).click();
     const first = (await app.locator(".player-step h3").innerText()).trim();
     const overlay = page.locator("#overlay");
@@ -1083,7 +1083,7 @@ test.describe("Añadir ejercicio", () => {
     await expect(overlay).toHaveCount(0);
 
     // Suma un bloque, sigue en el ejercicio en curso y queda antes de la vuelta a la calma.
-    await expect(app).toContainText(new RegExp(`0\\/${total} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 0\\/${total}(?!\\d)`, "i"));
     await expect(app.locator(".player-step h3")).toHaveText(first);
     const added = await page.evaluate(() => {
       const ex = normalizedWorkoutExecution(current);
@@ -1098,7 +1098,7 @@ test.describe("Añadir ejercicio", () => {
     await expect(app.locator(".player-step h3")).toHaveText("Curl martillo");
     await expect(app.locator(".player-phase")).toContainText("Añadido por ti");
     await page.getByRole("button", { name: "Quitar ejercicio" }).click();
-    await expect(app).toContainText(new RegExp(`0\\/${total - 1} bloques`));
+    await expect(app).toContainText(new RegExp(`ejercicios hechos 0\\/${total - 1}(?!\\d)`, "i"));
     await expect(app.locator(".player-step h3")).toHaveText(first);
 
     // Con una serie hecha ya es parte de la sesión: se omite, no se quita.

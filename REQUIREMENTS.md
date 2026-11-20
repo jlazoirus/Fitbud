@@ -2291,26 +2291,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-400 - Lenguaje: entreno y macros sin jerga
 
-**Estado: pendiente.** Auditoría heurística, severidad 2. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
-
-### Origen
-Auditoría heurística de UX, 2026-11-16.
-### Problema
-Se muestran «RPE 6/10», «repeticiones en reserva», «bloques» (dos veces en la misma tarjeta), «P 130 · C 146 · G 52 g», «sesión de calidad», «S1 74.7–75.3» sin rótulo y «Pausar» en las demos.
-### Causa raíz
-`app/index.html:2006-2070`, `:7411`, `:7163`, `:7459`, `:4119`, `:1990-1993`, `:8563` y `:6209`.
-### Objetivo
-Que el usuario sin experiencia entienda cada número.
-### Alcance
-«Esfuerzo 6/10» con «¿Qué es?» y «Termina con 3 repeticiones de sobra». «Ejercicios hechos 0/6», una sola vez. Proteína, carbohidratos y grasa sin abreviar en el onboarding. Nombres de sesiones sin «calidad». Rango de peso con rótulo («Meta: 74.7–75.3 kg»). «Pausar animación».
-### Fuera de alcance
-Lógica de RPE, progresión y rangos.
-### Riesgos
-Specs que leen esos textos.
-### Criterios de aceptación
-Ninguno de esos términos se ve sin explicación a 390 px.
-### Verificación sugerida
-`tests/e2e/entreno.spec.js`, `onboarding-essential.spec.js`, `peso-inicial.spec.js`.
+**Estado: implementado.** Sin «RPE», «RIR», «repeticiones en reserva» ni contador de «bloques» en el entreno: «Esfuerzo 6/10» con «¿Qué es?», «3 repeticiones de sobra al terminar», «Ejercicios hechos 0/6» una sola vez por tarjeta; macros del onboarding sin abreviar; «Correr · series rápidas»; «Semana 1 · Meta: 74.7–75.3 kg» a 390 px; «Pausar animación». PWA v263. ✓ `tests/e2e/entreno.spec.js`, `onboarding.spec.js`, `onboarding-essential.spec.js`, `peso-inicial.spec.js`, `progreso.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-401 - Tienda: entrar a la app desde el encabezado
 

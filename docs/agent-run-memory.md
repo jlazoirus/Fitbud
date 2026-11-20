@@ -52,3 +52,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Acceso: `authFormErrors()` + `showAuthFieldErrors()` (patrón REQ-398) en entrar, registrarse, «Olvidé mi contraseña», código de invitación y nueva contraseña; formato del correo validado; contraseña sin placeholder. `#auOut` solo para respuestas del servidor. PWA v262.
 - Sin operación manual pendiente.
 - Aprendizaje: `next-exercise.spec.js` escribe en `/Users/jonathan/.fitbros/qa-archive/req-328` (créala con `mkdir -p` en la nube, como req-330 y req-389). El campo inválido con foco muestra el borde lima del foco, no el rojo; el mensaje rojo debajo basta, pero sería una mejora común a onboarding y acceso.
+
+### 2026-11-20T10:10Z · desarrollador · Claude Code (nube) · REQ-400
+- Pedido por Jonathan («Implementan req 400»). Rama `claude/keen-albattani-fov2ft`, base `main` `112d85c`; PR borrador.
+- Entreno sin RPE/RIR/«bloques»: `plainEffortText()` traduce al pintar (datos guardados y catálogo en Supabase intactos); «Ejercicios hechos X/Y» una vez (`workoutStatusHtml(...,{count:false})`); macros del onboarding sin abreviar; «Correr · series rápidas»; tabla de peso con «Semana N · Meta: … kg» en móvil; «Pausar animación». PWA v263.
+- Sin operación manual pendiente.
+- Aprendizaje: `exercise-catalog.js` se replica en `supabase/exercises.sql` (validado por `validate-exercises.mjs`); para cambiar solo el texto visible conviene traducir al pintar en vez de regenerar el seed.
