@@ -175,7 +175,7 @@ Quien lo active desde Perfil → Recordatorios recibe, por WhatsApp, el aviso di
 
 ## Activación (acción humana de Jonathan, tras el merge)
 
-Estado al 2026-11-19: hechos el paso 1 (negocio verificado el 16 nov), el 2 (número +1 830-262-9397 registrado; WABA `1835500717684212`, `WHATSAPP_PHONE_NUMBER_ID=1503026172889611`) y el 6 (SQL aplicado el 15 nov). La plantilla del paso 3 está en revisión. Faltan el método de pago y los pasos 4, 5, 7 y 8, además de publicar la app de Meta (sin publicar, Meta no entrega los webhooks reales).
+Estado al 2026-11-19: pasos 1, 2, 4, 5, 6 y 7 hechos. El negocio quedó verificado el 16 nov. El número +1 830-262-9397 está registrado: WABA `1835500717684212`, `WHATSAPP_PHONE_NUMBER_ID=1503026172889611`. El método de pago está agregado. El usuario del sistema es «Evolv Recordatorios» (Employee; app con «Desarrollar app» y WABA con «Mensajes» y «Números solo ver»), y su token está en Vercel. Las 7 variables `WHATSAPP_*` están en producción y `/api/config` devuelve `whatsapp.enabled=true`. El webhook está verificado y suscrito a `messages`. La app de Meta está publicada (modo activo), con privacidad `/privacidad` y términos `/terminos`. Falta la aprobación de la plantilla del paso 3 (en revisión) y la prueba del paso 8.
 
 1. Verificar el negocio en [Meta Business Manager](https://business.facebook.com) con el RUC y el nombre comercial «Evolv».
 2. Crear una app en developers.facebook.com con el producto WhatsApp y registrar el número dedicado. El nombre visible «Evolv» lo aprueba Meta.
