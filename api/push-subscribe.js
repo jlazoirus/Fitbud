@@ -200,7 +200,7 @@ async function handleWebhook(req, res, e, wa) {
     return res.status(401).json({ error: "Firma inválida" });
   }
   const payload = parseJson(raw);
-  const { messages, statuses } = parseWebhook(payload || {});
+  const { messages, statuses, shapes } = parseWebhook(payload || {});
   const log = [];
   for (const m of messages) {
     if (!/^[1-9]\d{7,14}$/.test(m.from)) continue;
@@ -218,8 +218,9 @@ async function handleWebhook(req, res, e, wa) {
   }
   // Sin números ni textos en los logs: solo conteos y acciones (cada entrega válida deja rastro).
   const fields = [...new Set(((payload && payload.entry) || []).flatMap((en) => (en.changes || []).map((c) => c && c.field)).filter(Boolean))];
-  console.info(JSON.stringify({ event: "whatsapp_webhook", action: "received", fields, messages: messages.length,
-    statuses: statuses.length, actions: log.map((l) => l.action) }));
+  const valueKeys = [...new Set(((payload && payload.entry) || []).flatMap((en) => (en.changes || []).flatMap((c) => Object.keys((c && c.value) || {}))))];
+  console.info(JSON.stringify({ event: "whatsapp_webhook", action: "received", fields, valueKeys, shapes,
+    messages: messages.length, statuses: statuses.length, actions: log.map((l) => l.action) }));
   // 200 siempre tras validar la firma: Meta no reintenta lo ya procesado.
   return res.status(200).json({ ok: true });
 }

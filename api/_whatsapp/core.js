@@ -89,14 +89,31 @@ export function classifyText(text) {
 }
 
 // Mensajes de texto y estados de entrega del cuerpo del webhook.
+// Texto del mensaje entrante: texto libre, botón de respuesta rápida o respuesta interactiva.
+function inboundText(m) {
+  if (m.text && typeof m.text.body === "string") return m.text.body;
+  if (m.button && typeof m.button.text === "string") return m.button.text;
+  const i = m.interactive || {};
+  const reply = i.button_reply || i.list_reply;
+  return reply && typeof reply.title === "string" ? reply.title : "";
+}
+
 export function parseWebhook(payload) {
-  const messages = [], statuses = [];
+  const messages = [], statuses = [], shapes = [];
   for (const entry of (payload && Array.isArray(payload.entry) ? payload.entry : [])) {
     for (const change of (Array.isArray(entry.changes) ? entry.changes : [])) {
       const v = change && change.value;
       if (!v) continue;
+      const contacts = Array.isArray(v.contacts) ? v.contacts : [];
       for (const m of (Array.isArray(v.messages) ? v.messages : [])) {
-        if (m && m.type === "text" && m.from) messages.push({ from: String(m.from), text: m.text && m.text.body || "", id: m.id || "" });
+        if (!m) continue;
+        // Meta puede omitir "from" (usuarios con nombre de usuario): se usa el wa_id del contacto.
+        const contact = contacts.find((c) => c && m.from_user_id && c.user_id === m.from_user_id) || (contacts.length === 1 ? contacts[0] : null);
+        const from = m.from || (contact && contact.wa_id) || "";
+        const text = inboundText(m);
+        // Forma del mensaje para el registro, sin valores.
+        shapes.push({ type: String(m.type || ""), from: !!m.from, waId: !!(contact && contact.wa_id), text: !!text });
+        if (from && text) messages.push({ from: String(from), text, id: m.id || "" });
       }
       for (const s of (Array.isArray(v.statuses) ? v.statuses : [])) {
         if (s && s.id) statuses.push({ id: String(s.id), status: String(s.status || ""), recipient: String(s.recipient_id || ""),
@@ -104,7 +121,7 @@ export function parseWebhook(payload) {
       }
     }
   }
-  return { messages, statuses };
+  return { messages, statuses, shapes };
 }
 
 export function maskPhone(e164) {

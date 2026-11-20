@@ -213,6 +213,19 @@ const past = new RealDate(RealDate.parse(NOW) - 60 * 1000).toISOString();
     assert.equal(await r.text(), "77");
   }
 
+  // Variantes reales de Meta: sin "from" (se usa el wa_id del contacto) y respuesta de botón.
+  {
+    const p1 = { object: "whatsapp_business_account", entry: [{ changes: [{ field: "messages", value: {
+      contacts: [{ wa_id: PHONE, user_id: "PE.123" }],
+      messages: [{ from_user_id: "PE.123", id: "wamid.x", type: "text", text: { body: "EVOLV ABC234" } }] } }] }] };
+    assert.deepEqual(core.parseWebhook(p1).messages, [{ from: PHONE, text: "EVOLV ABC234", id: "wamid.x" }]);
+    const p2 = { entry: [{ changes: [{ value: { messages: [{ from: PHONE, id: "b", type: "button", button: { text: "BAJA" } }] } }] }] };
+    assert.equal(core.parseWebhook(p2).messages[0].text, "BAJA");
+    const p3 = { entry: [{ changes: [{ value: { messages: [{ id: "c", type: "image" }] } }] }] };
+    assert.deepEqual(core.parseWebhook(p3).messages, []);
+    assert.deepEqual(core.parseWebhook(p3).shapes, [{ type: "image", from: false, waId: false, text: false }]);
+  }
+
   // Código vencido.
   webhookWorld({ links: [{ user_id: id(2), link_code: "XYZ789", link_code_expires_at: past, opted_in: false }] });
   await webhook(inbound(PHONE, "EVOLV XYZ789"));
