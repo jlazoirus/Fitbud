@@ -2295,26 +2295,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-401 - Tienda: entrar a la app desde el encabezado
 
-**Estado: pendiente.** Auditoría heurística, severidad 2. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
-
-### Origen
-Auditoría heurística de UX, 2026-11-16.
-### Problema
-En `/planes`, `/contacto` y `/pago` el encabezado solo tiene «Planes» y «Contacto»: quien ya pagó no tiene cómo entrar.
-### Causa raíz
-`tienda/layout.js:11-14` (`NAV`).
-### Objetivo
-Entrar a la app desde cualquier página de la tienda.
-### Alcance
-Enlace «Iniciar sesión» a `/app/` en el encabezado de la tienda, como en la portada, legible a 320 px.
-### Fuera de alcance
-Portada, `/unete` y flujo de pago.
-### Riesgos
-Encabezado desbordado a 320 px.
-### Criterios de aceptación
-Las páginas de la tienda llevan a `/app/` en un toque, sin scroll horizontal a 320 px.
-### Verificación sugerida
-`tests/e2e/paywall-tienda.spec.js`, `legales-suscripcion.spec.js`.
+**Estado: implementado.** El encabezado de toda la tienda (`/planes`, `/contacto`, `/pago`, `/cuenta`, legales y Libro de Reclamaciones) lleva «Iniciar sesión» a `/app/`, como la portada; a 320 px cabe en una línea (solo el logo, sin la palabra) y sin scroll horizontal. ✓ `tests/e2e/tienda.spec.js` (REQ-401), `legales-suscripcion.spec.js`, `paywall-tienda.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-402 - Perfil: el aviso de actividad ligera no interrumpe
 

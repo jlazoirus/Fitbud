@@ -58,3 +58,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Entreno sin RPE/RIR/«bloques»: `plainEffortText()` traduce al pintar (datos guardados y catálogo en Supabase intactos); «Ejercicios hechos X/Y» una vez (`workoutStatusHtml(...,{count:false})`); macros del onboarding sin abreviar; «Correr · series rápidas»; tabla de peso con «Semana N · Meta: … kg» en móvil; «Pausar animación». PWA v263.
 - Sin operación manual pendiente.
 - Aprendizaje: `exercise-catalog.js` se replica en `supabase/exercises.sql` (validado por `validate-exercises.mjs`); para cambiar solo el texto visible conviene traducir al pintar en vez de regenerar el seed.
+
+### 2026-11-20T15:20Z · desarrollador · Claude Code (nube) · REQ-401
+- Pedido por Jonathan («401»). Rama `claude/keen-albattani-fov2ft` reiniciada desde `main` `e7bcf37` (REQ-400 fusionado en #133); PR borrador.
+- Tienda: «Iniciar sesión» → `/app/` en `headerHtml()` (`tienda/layout.js`); a ≤360 px se oculta la palabra del logo para que quepa en una línea. Sin cambio de PWA (la tienda no es shell).
+- Sin operación manual pendiente.
+- Aprendizaje: el release gate corta la suite E2E a los 15 min (`E2E_TIMEOUT_MS`, por defecto 900000); en la nube la suite tarda ~25 min, así que hay que subirlo (`E2E_TIMEOUT_MS=1800000`) o correr el resto aparte. Las E2E reescriben `work/plan-*.png`: no los incluyas en el commit.

@@ -206,4 +206,28 @@ test.describe("Tienda web (Culqi)", () => {
     await expect(page.locator('main a[data-comercio="whatsappUrl"]')).toHaveAttribute("href", /^https:\/\/wa\.me\//);
     expect(errors).toEqual([]);
   });
+
+  // REQ-401: quien ya pagó entra a la app desde el encabezado de cualquier página de la tienda.
+  test("REQ-401: el encabezado de la tienda lleva a la app en un toque, sin scroll horizontal a 320 px", async ({ page, context }) => {
+    await installMocks(context);
+    await mockCulqi(context);
+    const errors = collectConsoleErrors(page);
+    await page.setViewportSize({ width: 320, height: 640 });
+    for (const path of ["/planes/", "/contacto/", "/pago/?plan=monthly", "/cuenta/", "/terminos/", "/libro-de-reclamaciones/"]) {
+      await page.goto(path);
+      const login = page.locator("#t-header").getByRole("link", { name: "Iniciar sesión" });
+      await expect(login, path).toBeVisible();
+      await expect(login, path).toHaveAttribute("href", "/app/");
+      const box = await login.boundingBox();
+      expect(box.height, path).toBeGreaterThanOrEqual(44);
+      expect(box.x + box.width, path).toBeLessThanOrEqual(320);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, path).toBe(0);
+    }
+    await page.goto("/planes/");
+    await page.locator("#t-header").getByRole("link", { name: "Iniciar sesión" }).click();
+    await expect(page).toHaveURL(/\/app\/$/);
+    await expect(page.locator("#app")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
 });
