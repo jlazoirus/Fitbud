@@ -168,8 +168,10 @@ test.describe("Avisos — al terminar el onboarding (REQ-289)", () => {
     await seedLoggedInUser(page);
     const errors = collectConsoleErrors(page);
     await gotoApp(page);
+    // REQ-402: Perfil ya no abre el aviso de actividad ligera; ahora sale en el onboarding y se cierra ahí.
+    const cardioNudge = page.locator('#overlay [onclick="dismissCardioNudge()"]');
+    await page.addLocatorHandler(cardioNudge, async () => { await cardioNudge.click(); });
     await page.locator("#tabs").getByText("Perfil").click();
-    await page.keyboard.press("Escape");
     const objetivo = page.locator("details#pfSecObjetivo");
     if (!(await objetivo.evaluate((d) => d.open))) await objetivo.locator("summary").click();
     await page.getByRole("button", { name: "Empezar de nuevo mi plan" }).click();
