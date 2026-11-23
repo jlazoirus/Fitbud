@@ -14481,6 +14481,31 @@ Las páginas de la tienda llevan a `/app/` en un toque, sin scroll horizontal a 
 #### Verificación sugerida
 `tests/e2e/paywall-tienda.spec.js`, `legales-suscripcion.spec.js`.
 
+### REQ-402 - Perfil: el aviso de actividad ligera no interrumpe
+
+**Estado: implementado.** Auditoría heurística, severidad 2 (`docs/ux/2026-11-16-auditoria-heuristica.md`).
+
+Implementación: se quitó `showCardioNudge("profile")` del final de `renderProfile()`. `cardioNudgeCardHtml(p)` pinta, si `primarySport==="strength_only"` y `!UI.cardioNudgeDismissed`, una tarjeta (`#cardioNudgeCard`, `role="region"`) debajo del resumen de entrenamiento en Perfil › Entrenamiento, con el mismo texto (`CARDIO_NUDGE_TEXT`, compartido con el modal) y la misma casilla `#nudge_light_cardio`. «Listo» (`dismissCardioNudgeCard(true)`) marca `UI.cardioNudgeDismissed`, quita la tarjeta y, si la casilla está marcada, guarda `lightCardioEnabled` con `saveCardioLightEnabled(true,{keepForm:true})`, que actualiza el resumen y avisa con un toast en vez de re-renderizar (no se pierde lo que el usuario esté editando). ✕ (44 px) solo descarta. La tarjeta detiene `input`/`change` para no activar «Guardar cambios». El modal del onboarding no cambia. `perfil.spec.js` («secciones colapsables…») mide el límite de 1500 px del panel Entrenamiento sin la tarjeta, que es temporal. PWA `fitbud-pwa-v264`.
+
+#### Origen
+Auditoría heurística de UX, 2026-11-16.
+#### Problema
+Si entrena solo fuerza, al abrir Perfil aparece el modal «Actividad ligera para tu salud», que tapa lo que venía a hacer.
+#### Causa raíz
+`showCardioNudge("profile")` al renderizar Perfil (`app/index.html:9790`).
+#### Objetivo
+Dar el consejo en contexto, sin bloquear.
+#### Alcance
+Quitar el disparo al abrir Perfil. Mostrarlo como tarjeta descartable en Perfil › Entrenamiento, con la misma casilla y el mismo `UI.cardioNudgeDismissed`.
+#### Fuera de alcance
+Aviso del onboarding y texto del consejo.
+#### Riesgos
+Specs que esperan el modal en Perfil.
+#### Criterios de aceptación
+Abrir Perfil no abre ningún modal. La tarjeta agrega la actividad igual que antes y no vuelve tras descartarla.
+#### Verificación sugerida
+`tests/e2e/perfil.spec.js`.
+
 ### REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
 **Estado: implementado.** `saveProfilePrefs` guarda en fila, registra la versión del plan antes de publicar `profile.prefs` y reaplica sobre lo último confirmado solo las claves que cambió cada llamador. ✓ `tests/e2e/perfil-guardado-concurrente.spec.js`; `tests/e2e/onboarding-essential.spec.js:40` 10/10.

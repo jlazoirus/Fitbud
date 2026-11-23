@@ -64,3 +64,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Tienda: «Iniciar sesión» → `/app/` en `headerHtml()` (`tienda/layout.js`); a ≤360 px se oculta la palabra del logo para que quepa en una línea. Sin cambio de PWA (la tienda no es shell).
 - Sin operación manual pendiente.
 - Aprendizaje: el release gate corta la suite E2E a los 15 min (`E2E_TIMEOUT_MS`, por defecto 900000); en la nube la suite tarda ~25 min, así que hay que subirlo (`E2E_TIMEOUT_MS=1800000`) o correr el resto aparte. Las E2E reescriben `work/plan-*.png`: no los incluyas en el commit.
+
+### 2026-11-23T10:30Z · desarrollador · Claude Code (nube) · REQ-402
+- Pedido por Jonathan («go con 401» → confirmó REQ-402; 401 ya estaba en `main` por #134). Rama `claude/keen-albattani-fov2ft` desde `main` `392c42a`; PR borrador.
+- Perfil sin modal: `cardioNudgeCardHtml()` en Perfil › Entrenamiento, mismo `UI.cardioNudgeDismissed`; «Listo» guarda sin re-renderizar (`saveCardioLightEnabled(true,{keepForm:true})`). PWA v264.
+- Sin operación manual pendiente.
+- Aprendizaje: el panel Entrenamiento de Perfil ya mide ~1485 px de los 1500 que permite `perfil.spec.js`; cualquier bloque nuevo ahí rompe ese límite.
