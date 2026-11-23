@@ -47,7 +47,8 @@ test.describe("Perfil", () => {
     await entreno.locator("> summary").click();
     expect(await detailsOpen(entreno)).toBe(true);
     expect(await detailsOpen(comidas)).toBe(false);
-    expect(await entreno.evaluate((el) => el.scrollHeight)).toBeLessThanOrEqual(1500);
+    // REQ-402: la tarjeta de actividad ligera es temporal (se va al descartarla); el límite mide el contenido fijo.
+    expect(await entreno.evaluate((el) => el.scrollHeight - (el.querySelector("#cardioNudgeCard")?.getBoundingClientRect().height || 0))).toBeLessThanOrEqual(1500);
 
     await comidas.locator("> summary").click();
     expect(await detailsOpen(comidas)).toBe(true);
@@ -220,44 +221,56 @@ test.describe("Perfil", () => {
     expect(errors, `Errores de consola en Perfil:\n${errors.join("\n")}`).toEqual([]);
   });
 
-  test("REQ-191: cerrar el aviso de actividad ligera con ✕ no lo vuelve a mostrar", async ({ page, context }) => {
-    await installMocks(context);
+  test("REQ-402: abrir Perfil no abre ningún modal; el consejo de actividad ligera es una tarjeta en Entrenamiento", async ({ page, context }) => {
+    const { calls } = await installMocks(context);
     await seedLoggedInUser(page);
     const errors = collectConsoleErrors(page);
-
     await gotoApp(page);
-    const nudge = page.locator("#overlay .sheet", { hasText: "Actividad ligera para tu salud" });
     const tabs = page.locator("#tabs");
 
-    // Primera visita: el aviso aparece (usuario "solo fuerza") y se cierra con ✕
-    await tabs.getByText("Perfil").click();
-    await expect(nudge).toBeVisible();
-    await page.locator("#overlay .closebar button").click();
-    await expect(nudge).toHaveCount(0);
-
-    // Volver a Perfil ya no lo muestra
-    await tabs.getByText("Hoy").click();
     await tabs.getByText("Perfil").click();
     await expect(page.locator("details.pf-accordion").first()).toBeVisible();
-    await expect(nudge).toHaveCount(0);
+    await page.waitForTimeout(300);
+    await expect(page.locator("#overlay .sheet")).toHaveCount(0);
+
+    await page.locator("#pfSecEntreno > summary").click();
+    const card = page.locator("#cardioNudgeCard");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("Actividad ligera para tu salud");
+    await card.getByLabel("Agregar actividad ligera a mi plan").check();
+    // La casilla no deja el formulario de Perfil «con cambios sin guardar».
+    await expect(page.locator("#profileSaveFloat")).toBeHidden();
+    await card.getByRole("button", { name: "Listo" }).click();
+    await expect(card).toHaveCount(0);
+    await expect.poll(() => calls.filter((c) => c.table === "profiles" && c.payload && c.payload.prefs).map((c) => c.payload.prefs.lightCardioEnabled).at(-1)).toBe(true);
     expect(await page.evaluate(() => UI.cardioNudgeDismissed)).toBe(true);
 
+    // No vuelve tras descartarla
+    await tabs.getByText("Hoy").click();
+    await tabs.getByText("Perfil").click();
+    await page.locator("#pfSecEntreno > summary").click();
+    await expect(page.locator("#pfSecEntreno .pf-accordion-panel")).toBeVisible();
+    await expect(page.locator("#cardioNudgeCard")).toHaveCount(0);
+    await expect(page.locator("#overlay .sheet")).toHaveCount(0);
     expect(errors).toEqual([]);
   });
 
-  test("REQ-191: cerrar el aviso con Esc también cuenta como visto", async ({ page, context }) => {
-    await installMocks(context);
+  test("REQ-402: descartar la tarjeta con ✕ no agrega actividad y no vuelve tras recargar", async ({ page, context }) => {
+    const { calls } = await installMocks(context);
     await seedLoggedInUser(page);
     await gotoApp(page);
-    const nudge = page.locator("#overlay .sheet", { hasText: "Actividad ligera para tu salud" });
     await page.locator("#tabs").getByText("Perfil").click();
-    await expect(nudge).toBeVisible();
-    await page.keyboard.press("Escape");
-    await expect(nudge).toHaveCount(0);
+    await page.locator("#pfSecEntreno > summary").click();
+    const card = page.locator("#cardioNudgeCard");
+    await expect(card).toBeVisible();
+    await card.getByRole("button", { name: "Descartar el consejo de actividad ligera" }).click();
+    await expect(card).toHaveCount(0);
+    expect(calls.filter((c) => c.table === "profiles" && c.payload && c.payload.prefs && c.payload.prefs.lightCardioEnabled === true)).toHaveLength(0);
     await page.reload();
     await gotoApp(page);
     await page.locator("#tabs").getByText("Perfil").click();
-    await expect(page.locator("details.pf-accordion").first()).toBeVisible();
-    await expect(nudge).toHaveCount(0);
+    await page.locator("#pfSecEntreno > summary").click();
+    await expect(page.locator("#pfSecEntreno .pf-accordion-panel")).toBeVisible();
+    await expect(page.locator("#cardioNudgeCard")).toHaveCount(0);
   });
 });

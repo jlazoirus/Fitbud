@@ -139,6 +139,7 @@
   .weeknote{font-size:12px;color:var(--muted);margin-top:2px}
   .alert{background:var(--warn-dim);border:1px solid rgba(245,158,11,.32);color:#fcd34d;border-radius:var(--r-md);padding:10px 12px;font-size:13px;margin-bottom:10px;line-height:1.4}
   .alert.violet{background:var(--accent-dim);border-color:var(--border-acc);color:var(--purple-200)}
+  .cardio-nudge-close{min-width:44px;min-height:44px;flex:none}
 
   /* Macro dashboard */
   .dash{background:linear-gradient(160deg,var(--surf2),var(--surf1));border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;margin-bottom:14px;box-shadow:0 4px 16px rgba(0,0,0,.3)}
@@ -5011,13 +5012,15 @@ async function installApp(){
   UI.installDismissed=true; uiSave(); removeInstallPrompt();   // no volver a sugerir tras el intento
 }
 /* ---- Aviso de actividad ligera para usuarios "solo fuerza" (una vez, dismissable) ---- */
+// REQ-402: en el onboarding es un modal; en Perfil, una tarjeta descartable dentro de Entrenamiento.
+const CARDIO_NUDGE_TEXT="Las guías de salud pública recomiendan sumar actividad moderada durante la semana. La fuerza es una base excelente; combinarla con caminatas u otra actividad regular puede ampliar sus beneficios. Esta es información general — consulta a un profesional de salud para orientación personalizada.";
 let _cardioNudgeCtx=null;
 function showCardioNudge(ctx){
   if(UI.cardioNudgeDismissed)return;
   _cardioNudgeCtx=ctx;
   if(ctx==="onboarding"&&onboardingHistoryId)onboardingHistoryWrite("nudge",true);
   modal(`<h3>Actividad ligera para tu salud</h3>
-    <p class="muted small">Las guías de salud pública recomiendan sumar actividad moderada durante la semana. La fuerza es una base excelente; combinarla con caminatas u otra actividad regular puede ampliar sus beneficios. Esta es información general — consulta a un profesional de salud para orientación personalizada.</p>
+    <p class="muted small">${CARDIO_NUDGE_TEXT}</p>
     <label class="chip-check" style="display:flex;margin:14px 0">
       <input type="checkbox" id="nudge_light_cardio">
       <span>Agregar actividad ligera a mi plan</span>
@@ -5035,16 +5038,37 @@ function dismissCardioNudge(){
   UI.cardioNudgeDismissed=true;uiSave();
   if(_cardioNudgeCtx==="onboarding"&&onboardingDraft){
     onboardingDraft.lightCardioEnabled=enabled;
-  }else if(_cardioNudgeCtx==="profile"&&enabled){
-    saveCardioLightEnabled(true);
   }
   closeModal();
 }
-async function saveCardioLightEnabled(enabled){
+function cardioNudgeCardHtml(p){
+  if(UI.cardioNudgeDismissed||!p||p.primarySport!=="strength_only")return "";
+  // La casilla no marca el formulario de Perfil como modificado: se guarda sola con «Listo».
+  return `<div class="alert violet cardio-nudge-card" id="cardioNudgeCard" role="region" aria-labelledby="cardioNudgeTitle" oninput="event.stopPropagation()" onchange="event.stopPropagation()">
+    <div class="row between" style="align-items:flex-start;gap:8px"><b id="cardioNudgeTitle" style="color:var(--txt);padding-top:12px">Actividad ligera para tu salud</b><button type="button" class="btn btn-sm cardio-nudge-close" aria-label="Descartar el consejo de actividad ligera" onclick="dismissCardioNudgeCard(false)">✕</button></div>
+    <p class="muted small" style="margin:4px 0 0">${CARDIO_NUDGE_TEXT}</p>
+    <label class="chip-check" style="display:flex;margin:12px 0">
+      <input type="checkbox" id="nudge_light_cardio">
+      <span>Agregar actividad ligera a mi plan</span>
+    </label>
+    <button type="button" class="btn btn-sm" onclick="dismissCardioNudgeCard(true)">Listo</button>
+  </div>`;
+}
+function dismissCardioNudgeCard(apply){
+  const box=document.getElementById("nudge_light_cardio");
+  const enabled=!!(apply&&box&&box.checked);
+  UI.cardioNudgeDismissed=true;uiSave();
+  const card=document.getElementById("cardioNudgeCard");if(card)card.remove();
+  if(enabled)saveCardioLightEnabled(true,{keepForm:true});
+}
+async function saveCardioLightEnabled(enabled,opts){
   if(!profile||!profile.prefs)return;
   const prefs={...profile.prefs,lightCardioEnabled:enabled};
   const result=await saveProfilePrefs(prefs);
-  if(!result||!result.error)render();
+  if(result&&result.error)return;
+  // REQ-402: desde la tarjeta de Perfil no se re-renderiza, para no perder lo que el usuario esté editando.
+  if(opts&&opts.keepForm&&view==="perfil"){updateTrainingSummary();toast("Agregamos actividad ligera a tu plan");}
+  else render();
 }
 function isCollapsed(key,def){const c=UI.collapsed;if(c&&Object.prototype.hasOwnProperty.call(c,key))return !!c[key];return !!def;}
 function toggleSection(key,btn){
@@ -9816,6 +9840,7 @@ function renderProfile(){
       ${PLAN_DURATION_OPTIONS.map(o=>`<option value="${o.value}" ${duration===o.value?"selected":""}>${o.label}</option>`).join("")}
     </select><div class="muted small" style="margin-top:6px">4 semanas es un ciclo corto; 10 semanas es el proceso completo recomendado. Cambiar el ciclo conserva tus registros.</div></div>
     <div class="ai-box" id="trainingSummary" style="margin:0 0 10px"><b>${duration} semanas · ${p.trainingDays.length} días.</b> ${trainingPlanSummary(p.trainingDays.length,p.primarySport,p.trainingPriority,p.lightCardioEnabled,p.strengthMode,p.trainingDayKinds)}</div>
+    ${cardioNudgeCardHtml(p)}
     <div class="onboarding-grid training-choice-grid">${trainingSafetyModeHtml("pf",p)}</div>
     <details class="adv-settings">
       <summary>Limitaciones</summary>
@@ -9940,7 +9965,6 @@ function renderProfile(){
   }else{
     renderPushSection();
   }
-  if(p.primarySport==="strength_only")showCardioNudge("profile");
 }
 function updateTrainingSummary(){
   const duration=$("#pf_duration"),priority=$("#pf_priority"),out=$("#trainingSummary");

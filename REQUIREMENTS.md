@@ -2299,26 +2299,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-402 - Perfil: el aviso de actividad ligera no interrumpe
 
-**Estado: pendiente.** Auditoría heurística, severidad 2. Detalle en `docs/ux/2026-11-16-auditoria-heuristica.md`.
-
-### Origen
-Auditoría heurística de UX, 2026-11-16.
-### Problema
-Si entrena solo fuerza, al abrir Perfil aparece el modal «Actividad ligera para tu salud», que tapa lo que venía a hacer.
-### Causa raíz
-`showCardioNudge("profile")` al renderizar Perfil (`app/index.html:9790`).
-### Objetivo
-Dar el consejo en contexto, sin bloquear.
-### Alcance
-Quitar el disparo al abrir Perfil. Mostrarlo como tarjeta descartable en Perfil › Entrenamiento, con la misma casilla y el mismo `UI.cardioNudgeDismissed`.
-### Fuera de alcance
-Aviso del onboarding y texto del consejo.
-### Riesgos
-Specs que esperan el modal en Perfil.
-### Criterios de aceptación
-Abrir Perfil no abre ningún modal. La tarjeta agrega la actividad igual que antes y no vuelve tras descartarla.
-### Verificación sugerida
-`tests/e2e/perfil.spec.js`.
+**Estado: implementado.** Abrir Perfil ya no abre el modal «Actividad ligera para tu salud»: para quien entrena solo fuerza es una tarjeta descartable en Perfil › Entrenamiento, con la misma casilla y el mismo `UI.cardioNudgeDismissed`; «Listo» agrega la actividad sin recargar el formulario y ✕ la descarta. El onboarding conserva su modal. PWA v264. ✓ `tests/e2e/perfil.spec.js` (REQ-402), `onboarding-back.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-403 - Perfil: un guardado de fondo no revierte lo que el usuario acaba de guardar
 
