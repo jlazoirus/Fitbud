@@ -1203,7 +1203,9 @@ test.describe("Plan compacto", () => {
     await expect(sheet).toContainText("Señales para detenerte:");
     await sheet.getByRole("button", { name: "Cambiar días, deporte o lugar" }).click();
     await expect(page.locator("#overlay")).toHaveCount(0);
-    await expect(page.locator("#tabs button.active")).toHaveAttribute("data-tab", "perfil");
+    // REQ-423: Perfil se abre desde la barra superior; su botón queda activo.
+    await expect(page.locator("#profileBtn")).toHaveClass(/\bactive\b/);
+    await expect(page.locator("#tabs button.active")).toHaveCount(0);
     await expect(page.locator("#pfSecEntreno")).toHaveAttribute("open", "");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
