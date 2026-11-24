@@ -14061,6 +14061,27 @@ Specs de Hoy (REQ-392..395); orden con horario flexible.
 ### Verificación sugerida
 `home-optional-menu.spec.js`, `home.spec.js` y release gate.
 
+## REQ-416 - Hoy: «Esta semana» con cumplimiento por día
+
+**Estado: implementado (2026-11-24).** Depende de REQ-415. Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24, misma serie.
+### Problema
+El cumplimiento semanal solo se ve en el check-in o en Progreso.
+### Objetivo
+Leer la semana en Hoy: siete barras y un porcentaje con su regla escrita.
+### Alcance
+Barras L–D, «N % cumplido» con su regla y la semana pasada. Mismo conteo que REQ-415.
+### Fuera de alcance
+Racha, check-in, metas.
+### Riesgos
+Semanas partidas por el inicio del plan; días futuros contados.
+### Criterios de aceptación
+Lunes y martes con 4 de 8: «50 %». Futuro y fuera del plan vacíos.
+### Verificación sugerida
+Spec E2E nuevo y release gate.
+
 ### REQ-385 - Onboarding: entrenar sin fuerza es una opción más
 
 **Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.

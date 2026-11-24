@@ -70,3 +70,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Perfil sin modal: `cardioNudgeCardHtml()` en Perfil › Entrenamiento, mismo `UI.cardioNudgeDismissed`; «Listo» guarda sin re-renderizar (`saveCardioLightEnabled(true,{keepForm:true})`). PWA v264.
 - Sin operación manual pendiente.
 - Aprendizaje: el panel Entrenamiento de Perfil ya mide ~1485 px de los 1500 que permite `perfil.spec.js`; cualquier bloque nuevo ahí rompe ese límite.
+
+### 2026-11-24T16:27Z · sesión interactiva · Claude Code (nube) · REQ-415..421
+- Pedido por Jonathan: copiar la UX y simplicidad de la app del alumno de la demo de CEO App (`demo.modoceofitness.com`). Rama `claude/laughing-feynman-h701v5` desde `main` `4517ba3`; PR borrador. Sin lock (no es corrida del loop).
+- Análisis en `docs/competitive/2026-11-24-modo-ceo/README.md` y serie REQ-415..421. Implementados REQ-415 («Plan de hoy») y REQ-416 («Esta semana»); REQ-417..421 quedan pendientes. PWA v265.
+- Sin operación manual pendiente.
+- Aprendizaje: la demo solo abre la app del alumno dentro de su portada (`/?abrir=cliente`, el iframe exige `window.parent.__ceoDemo`); WebFetch ve solo la portada, hace falta Chromium. `REQUIREMENTS.md` y `CONTEXT.md` quedaron casi en su tope de palabras (15000/2500): compactar REQ implementados al agregar otros.

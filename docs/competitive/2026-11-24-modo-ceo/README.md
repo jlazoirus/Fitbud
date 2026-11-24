@@ -39,7 +39,7 @@ En Evolv, «alumno» es la persona que usa la app (no hay un panel de coach huma
 | Patrón de la demo | En Evolv | REQ |
 |---|---|---|
 | Plan de hoy con línea de tiempo, barra segmentada y «Te faltan N» | Entreno y cada comida del día como filas, ordenadas por hora (comidas por su horario; el entreno por `preferredTrainingTime`). La siguiente pendiente lleva la única acción lima. Registrar una comida planificada es un toque. | REQ-415 |
-| «Esta semana» con barras L–D y regla explícita | Comidas registradas + entreno hecho sobre lo que ya tocaba desde el lunes (o desde el inicio del plan). Descanso y comidas saltadas no cuentan. | REQ-416 |
+| «Esta semana» con barras por día y regla explícita | Comidas registradas + entreno hecho sobre lo que ya tocaba en la semana del plan; de hoy, lo pendiente cuenta desde su hora. Descanso y comidas saltadas no cuentan. | REQ-416 |
 | Reproductor de una serie a la vez | Pantalla de foco: una serie, carga y repeticiones precargadas (última vez o sugerencia de REQ-409), «Registrar serie», descanso a pantalla completa con «Sigue» y «Editar la serie anterior». El esfuerzo pasa a opcional. | REQ-417 |
 | Vista previa por bloques con «Anterior» y «Sugerido hoy» | Bloques numerados (calentamiento, principal, vuelta a la calma) con miniatura, dosis y «La última vez» / «Hoy» por ejercicio; «Iniciar entreno» fijo abajo; personalizar y adaptar en «···». | REQ-418 |
 | Comida como tarjeta con líneas y un solo «Registrar» | Plato con ingredientes (gramos · kcal), «Cambiar» por línea cuando hay receta, P/C/G en una fila y un botón «Registrar». Saltar y ordenar pasan a «···». | REQ-419 |
@@ -73,8 +73,10 @@ Todos son de interfaz: no cambian esquemas, no agregan dependencias ni llamadas 
 - No cuentan: descanso, pausa por seguridad. El día está cerrado cuando todo lo que cuenta está hecho y hay al menos una comida registrada.
 - Debajo de la lista: «Registrar comida» (algo fuera de las franjas) y la fila de menú sugerido cuando corresponde. El resumen de consumo sigue antes del plan (REQ-364) y el resto de Hoy (un mensaje, Avisos, coach) no cambia (REQ-392).
 
-**Esta semana** (`homeWeekHtml`):
+**Esta semana** (`homeWeekHtml`, debajo del plan):
 
-- Siete barras L–D; cada barra se llena según lo hecho sobre lo que tocaba ese día. Hoy se marca; los días futuros y fuera del plan quedan vacíos.
-- «N % cumplido» = hechas / las que ya tocaban hasta hoy. Texto: «Cuenta lo que hiciste sobre lo que ya tocaba hasta hoy: 8 de 16.» y, si hay semana anterior dentro del plan, «Semana pasada: N % · a de b».
-- Sin nada que tocara todavía (primer día antes de cualquier actividad), la tarjeta no se muestra.
+- Usa la semana del plan (`weekOf`), la misma de «Semana N»: siete barras con la inicial de cada día. Cada barra se llena con lo hecho sobre lo que tenía ese día; hoy se marca y los días por venir o fuera del plan quedan vacíos.
+- «N % cumplido» = hechas / las que ya tocaban hasta ahora. De días pasados cuenta todo; de hoy, lo hecho más lo pendiente cuya hora ya pasó (comidas por su horario, entreno por `preferredTrainingTime`; con horario flexible, el entreno de hoy solo cuenta al hacerlo). Así el porcentaje no cae a primera hora ni promete un 100 % al registrar el desayuno. Texto: «Lo hecho sobre lo que ya tocaba hasta ahora: 5 de 10.»
+- «Semana pasada: N % · a de b» cuando la semana anterior tiene días del plan.
+- Sin nada que ya tocara y sin semana anterior (primer día, temprano), la tarjeta no se muestra.
+- Se calcula leyendo el historial sin crear días (`FITBUD_DAY_MODEL.dayState`); no envía nada a analytics.

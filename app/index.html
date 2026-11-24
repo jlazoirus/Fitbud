@@ -927,6 +927,23 @@
   .dp-action{flex:none;min-height:44px;padding:0 14px;white-space:nowrap}
   .dp-action.btn-accent{flex:1 1 100%;margin:2px 0 6px}
   @media(prefers-reduced-motion:reduce){.day-plan-bar span{transition:none}}
+  /* REQ-416: «Esta semana», el cumplimiento de la semana del plan. */
+  .home-week{margin:20px 0 14px;padding:16px;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-lg)}
+  .home-week-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .home-week-head h2{margin:0;font-family:var(--font-body);font-size:1.125rem;font-weight:800;letter-spacing:0}
+  .home-week-head span{flex:none;color:var(--muted);font-size:.8125rem}
+  .home-week-head b{color:var(--txt);font-family:var(--font-mono);font-size:.9375rem;font-variant-numeric:tabular-nums}
+  .home-week-bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:14px}
+  .hw-day{display:grid;justify-items:center;gap:6px;min-width:0}
+  .hw-bar{position:relative;width:100%;height:44px;border-radius:10px;background:var(--surf3);overflow:hidden}
+  .hw-bar i{position:absolute;left:0;right:0;bottom:0;background:var(--accent)}
+  .hw-day.is-future .hw-bar,.hw-day.is-out .hw-bar{background:none;border:1px solid var(--border)}
+  .hw-day.is-today .hw-bar{box-shadow:inset 0 0 0 1px var(--border-acc)}
+  .hw-label{color:var(--muted2);font-size:.75rem;font-weight:600}
+  .hw-day.is-today .hw-label{color:var(--txt);font-weight:800}
+  .home-week-rule{margin:12px 0 0;color:var(--muted);font-size:.8125rem;line-height:1.45}
+  .home-week-last{margin:12px 0 0;padding-top:12px;border-top:1px solid var(--border);color:var(--muted);font-size:.8125rem}
+  .home-week-last b{color:var(--txt);font-family:var(--font-mono);font-variant-numeric:tabular-nums}
   .profile-question{padding:14px 0}
   .profile-question h2{font-size:18px;line-height:1.3;margin:0 0 8px}
   .profile-question-choices{display:grid;gap:8px}
@@ -5732,6 +5749,80 @@ function homeAgendaData(ds){
   return {state:closed?"done":"active",restDay,workoutOutcome,totals,items,next,
     progress:{done,total:counted.length},hasOpenMeals};
 }
+// REQ-416: «Esta semana». Mismo conteo que el Plan de hoy, leído sin crear
+// estado: comidas no saltadas registradas y entreno hecho en días de entreno.
+// Con `now`, lo pendiente cuenta desde su hora (comidas por horario; el entreno
+// por su horario preferido); lo hecho cuenta siempre.
+function homeNowHM(){const d=new Date();return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");}
+function homeDayCounts(ds,now){
+  const st=FITBUD_DAY_MODEL.dayState(S.days[ds]);
+  const day=buildDay(ds);
+  const items=day.meals.filter(meal=>!(st.meals[meal.id]&&st.meals[meal.id].skipped)).map(meal=>{
+    const ms=st.meals[meal.id];
+    return {time:meal.time||"",done:!!(ms&&ms.done&&mealHasContent(mealValue(meal,ms)))};
+  });
+  const {workout}=effectiveWorkout(ds);
+  if(workout&&workout.id!=="descanso"&&workout.id!=="safety_hold"){
+    const outcome=workoutOutcomeForState(st);
+    items.push({time:HOME_TRAINING_CLOCK[planPrefsForDate(ds).preferredTrainingTime]||"",
+      done:!!st.workoutDone||outcome==="completed"||outcome==="partial"});
+  }
+  const done=items.filter(item=>item.done).length;
+  const due=now?items.filter(item=>item.done||(item.time&&item.time<=now)).length:items.length;
+  return {done,due,total:items.length};
+}
+const HOME_WEEK_LETTERS=["D","L","M","X","J","V","S"];
+function homeWeekData(ds){
+  const week=weekOf(ds,planPrefsForDate(ds))||weekOf(ds);
+  if(!week)return null;
+  const today=todayStr(),now=homeNowHM();
+  const days=[];
+  for(let d=week.start;d<=week.end;d=addDays(d,1)){
+    const counts=d>=START&&d<=END&&d<=today?homeDayCounts(d,d===today?now:null):null;
+    days.push({ds:d,today:d===today,future:d>today,counts});
+  }
+  const done=days.reduce((sum,day)=>sum+(day.counts?day.counts.done:0),0);
+  const due=days.reduce((sum,day)=>sum+(day.counts?day.counts.due:0),0);
+  let last=null;
+  const before=addDays(week.start,-1);
+  const lastWeek=weekOf(before,planPrefsForDate(before))||weekOf(before);
+  if(lastWeek){
+    let lastDone=0,lastDue=0;
+    for(let d=lastWeek.start;d<=lastWeek.end;d=addDays(d,1)){
+      if(d<START||d>END||d>today)continue;
+      const counts=homeDayCounts(d);lastDone+=counts.done;lastDue+=counts.due;
+    }
+    if(lastDue)last={done:lastDone,due:lastDue};
+  }
+  return {days,done,due,last};
+}
+const homeWeekPct=({done,due})=>Math.round(done/due*100);
+function homeWeekHtml(ds){
+  const data=homeWeekData(ds);
+  if(!data||(!data.due&&!data.last))return "";
+  const bars=data.days.map(day=>{
+    const date=parseYmd(day.ds);
+    const fill=day.counts&&day.counts.total?Math.round(day.counts.done/day.counts.total*100):0;
+    const state=day.future?" is-future":!day.counts?" is-out":"";
+    return `<div class="hw-day${day.today?" is-today":""}${state}"><span class="hw-bar">${fill?`<i style="height:${fill}%"></i>`:""}</span><span class="hw-label">${HOME_WEEK_LETTERS[date.getDay()]}</span></div>`;
+  }).join("");
+  const described=data.days.map(day=>{
+    const date=parseYmd(day.ds);
+    const name=`${DOW[date.getDay()]} ${date.getDate()}`;
+    if(day.future)return `${name}: por venir`;
+    if(!day.counts)return `${name}: fuera del plan`;
+    return `${name}: ${day.counts.done} de ${day.counts.total}`;
+  }).join(". ");
+  const rule=data.due
+    ?`Lo hecho sobre lo que ya tocaba hasta ahora: ${data.done} de ${data.due}.`
+    :"Lo que hagas hoy empieza a contar.";
+  return `<section class="home-week" aria-labelledby="homeWeekTitle">
+    <div class="home-week-head"><h2 id="homeWeekTitle">Esta semana</h2>${data.due?`<span><b>${homeWeekPct(data)} %</b> cumplido</span>`:""}</div>
+    <div class="home-week-bars" role="img" aria-label="${esc(described)}">${bars}</div>
+    <p class="home-week-rule">${esc(rule)}</p>
+    ${data.last?`<p class="home-week-last">Semana pasada: <b>${homeWeekPct(data.last)} %</b> · ${data.last.done} de ${data.last.due}</p>`:""}
+  </section>`;
+}
 function homeOpenMeal(ds){
   homeTrackAction(ds,"meal_detail");
   current=ds;
@@ -6091,6 +6182,7 @@ function renderHoy(){
   </header>
   ${agenda.state==="done"?"":homeConsumptionHtml(agenda.totals)}
   ${homeAgendaHtml(ds,agenda,menuSuggestion)}
+  ${homeWeekHtml(ds)}
   ${nutritionUpdateHtml()}
   ${planEnded?`<div class="alert violet">🏁 <b>Plan completado</b> — el plan terminó el ${prettyDate(END)}. Mostrando el último día.</div>`:planNotStarted?`<div class="alert">📅 El plan arranca el ${prettyDate(START)}.</div>`:""}
   ${trainingSafetyHold()&&!agenda.items.some(item=>item.kind==="safety")?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
