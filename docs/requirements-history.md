@@ -14038,6 +14038,29 @@ Pruebas: `scripts/test-coach-quota.mjs`, regresiones de administración, trial y
 
 Detalle movido desde `REQUIREMENTS.md` para dejar espacio a REQ-392..395 (Hoy).
 
+## REQ-415 - Hoy: «Plan de hoy» como lista con avance del día
+
+**Estado: implementado (2026-11-24).** Serie REQ-415→421 (simplicidad de la demo de CEO App). Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24: copiar la UX y simplicidad de la app del alumno de la demo.
+### Problema
+Hoy reparte el día entre tarjeta principal, fila de entreno y «Resto del día» plegado; no se ve el avance.
+### Causa raíz
+`homeAgendaHtml()` (`app/index.html:5841`) promueve una acción y pliega el resto.
+### Objetivo
+Entreno y comidas del día en una lista ordenada por hora, con avance y una sola acción destacada.
+### Alcance
+Filas con punto por tipo, título, estado y una píldora; barra por actividad, «Te faltan N» y «x/N». Registrar un plato planificado en un toque.
+### Fuera de alcance
+Pestañas, Avisos, coach, agua/pasos.
+### Riesgos
+Specs de Hoy (REQ-392..395); orden con horario flexible.
+### Criterios de aceptación
+3 comidas y entreno: «0/4»; registrar el desayuno: «1/4». Descanso y pausa no cuentan. Sin desbordes a 320 px.
+### Verificación sugerida
+`home-optional-menu.spec.js`, `home.spec.js` y release gate.
+
 ### REQ-385 - Onboarding: entrenar sin fuerza es una opción más
 
 **Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.

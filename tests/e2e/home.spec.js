@@ -88,8 +88,8 @@ test.describe("Nutrición — comidas sin asignar (REQ-161)", () => {
   });
 });
 
-test.describe("Home — agenda (REQ-249)", () => {
-  test("los botones del resto del día tienen espacio a los lados", async ({ page, context }) => {
+test.describe("Home — agenda (REQ-249, REQ-415)", () => {
+  test("los botones del plan de hoy tienen espacio a los lados", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -101,11 +101,10 @@ test.describe("Home — agenda (REQ-249)", () => {
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
     await overlay.getByRole("button", { name: /Aplicar al día/i }).click();
     await page.locator("#tabs").getByText("Hoy").click();
-    await page.locator(".home-agenda summary").click();
-    await expect(page.locator(".home-agenda .agenda-actions .btn").first()).toBeVisible();
+    await expect(page.locator(".day-plan .dp-action").first()).toBeVisible();
 
-    const gaps = await page.evaluate(() => [...document.querySelectorAll(".home-agenda .agenda-actions .btn")].map((btn) => {
-      const container = btn.closest(".home-agenda").getBoundingClientRect();
+    const gaps = await page.evaluate(() => [...document.querySelectorAll(".day-plan .dp-action")].map((btn) => {
+      const container = btn.closest(".dp-main").getBoundingClientRect();
       return { text: btn.textContent.trim(), gap: Math.round(container.right - btn.getBoundingClientRect().right) };
     }));
     expect(gaps.length).toBeGreaterThan(0);

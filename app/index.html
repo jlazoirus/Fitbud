@@ -899,21 +899,34 @@
   .home-primary .agenda-sub{font-size:.8125rem;line-height:1.45}
   .home-primary-action{width:100%;min-height:48px;margin-top:14px}
   .home-secondary-actions{display:flex;flex-wrap:wrap;column-gap:18px;margin:0 0 -8px}
-  .home-workout-row{display:grid;grid-template-columns:38px minmax(0,1fr) auto;align-items:center;gap:12px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
-  .home-workout-copy{display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
-  .home-workout-copy small{color:var(--muted);font-size:.75rem}
-  .home-workout-copy strong{font-size:.9375rem;line-height:1.25}
-  .home-workout-action{min-height:44px;white-space:nowrap}
   .home-secondary-action{min-height:44px;padding:6px 0;background:none;color:var(--txt);font-size:.8125rem;text-align:left;text-decoration:underline;text-underline-offset:3px}
-  .home-agenda{border-block:1px solid var(--border);margin:12px 0 16px}
-  .home-agenda>summary{display:flex;align-items:center;gap:8px;min-height:48px;padding:4px 0;font-size:.875rem;font-weight:700;cursor:pointer;list-style:none}
-  .home-agenda>summary::-webkit-details-marker{display:none}
-  .home-agenda-count{margin-left:auto;color:var(--muted);font-size:.8125rem;font-weight:500}
-  .home-agenda .chev{flex-shrink:0;margin-left:auto;color:var(--muted);transform:rotate(90deg)}
-  .home-agenda-count+.chev{margin-left:0}
-  .home-agenda[open] .chev{transform:rotate(-90deg)}
-  .home-agenda .agenda-list{border-top:1px solid var(--border);padding:8px 12px 0}
-  .home-agenda .agenda-actions .btn{flex:0 1 auto}
+  /* REQ-415: «Plan de hoy»: la lista del día con su línea de tiempo, sin tarjeta contenedora. */
+  .home-primary.day-plan,.home-primary.day-plan.agenda-state.done{background:none;border:0;border-radius:0;padding:0;margin:18px 0 8px}
+  .day-plan-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+  .day-plan-count{flex:none;font-family:var(--font-mono);font-size:.875rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .day-plan-bar{display:flex;gap:4px;margin-top:12px}
+  .day-plan-bar span{flex:1;height:6px;border-radius:999px;background:var(--surf4);transition:background-color .3s cubic-bezier(.16,1,.3,1)}
+  .day-plan-bar span.on{background:var(--accent)}
+  .day-plan-status{margin:8px 0 0;color:var(--muted);font-size:.8125rem;line-height:1.45}
+  .dp-list{list-style:none;margin:16px 0 6px;padding:0;display:grid;gap:10px}
+  .dp-row{position:relative;display:grid;grid-template-columns:36px minmax(0,1fr);gap:12px;align-items:start}
+  .dp-row:not(:last-child)::before{content:"";position:absolute;left:17px;top:48px;bottom:-12px;width:2px;border-radius:2px;background:var(--border-2)}
+  .dp-dot{width:36px;height:36px;margin-top:11px;border-radius:50%;display:grid;place-items:center;background:var(--surf3);color:var(--muted)}
+  .dp-row.kind-workout .dp-dot,.dp-row.kind-resume .dp-dot{background:var(--accent);color:var(--on-accent)}
+  .dp-row.kind-meal .dp-dot{background:var(--terra-400);color:#fff}
+  .dp-row.kind-safety .dp-dot{background:var(--warn);color:var(--on-accent)}
+  .dp-row.is-done .dp-dot{background:var(--good-dim);color:var(--good)}
+  .dp-main{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;min-width:0;padding:6px 12px 6px 14px;background:var(--surf1);border:1px solid var(--border);border-radius:var(--r-md)}
+  .dp-row.is-next .dp-main{border-color:var(--border-acc)}
+  .dp-row.is-done .dp-main{background:none}
+  .dp-open{flex:1 1 104px;min-width:0;min-height:52px;display:flex;align-items:center;gap:8px;padding:4px 0;background:none;text-align:left}
+  .dp-copy{flex:1;min-width:0;display:grid;gap:2px}
+  .dp-title{font-size:.9375rem;font-weight:800;line-height:1.25;overflow-wrap:anywhere}
+  .dp-meta{color:var(--muted);font-size:.75rem;line-height:1.4;overflow-wrap:anywhere}
+  .dp-open .chev{flex:none;color:var(--muted)}
+  .dp-action{flex:none;min-height:44px;padding:0 14px;white-space:nowrap}
+  .dp-action.btn-accent{flex:1 1 100%;margin:2px 0 6px}
+  @media(prefers-reduced-motion:reduce){.day-plan-bar span{transition:none}}
   .profile-question{padding:14px 0}
   .profile-question h2{font-size:18px;line-height:1.3;margin:0 0 8px}
   .profile-question-choices{display:grid;gap:8px}
@@ -947,7 +960,7 @@
   .menu-suggestion-actions{display:flex;flex-wrap:wrap;gap:8px}
   .menu-suggestion .menu-suggestion-actions{column-gap:18px}
   .menu-suggestion-actions .btn{min-height:44px}
-  .menu-suggestion button:focus-visible,.home-consumption:focus-visible,.home-primary button:focus-visible,.home-agenda summary:focus-visible,.home-streak:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  .menu-suggestion button:focus-visible,.home-consumption:focus-visible,.home-primary button:focus-visible,.home-streak:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
   .nutrition-register{margin:0 0 14px}
   .nutrition-register .btn{width:100%;min-height:48px}
   .nutrition-register p{margin:6px 0 0}
@@ -4930,6 +4943,9 @@ const TAB_ICONS={
   weight:'<path d="M12 3a2 2 0 0 0-2 2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2-2zM9 9h6"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
   chevron:'<path d="M9 6l6 6-6 6"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
+  moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+  alert:'<path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
   play:'<path d="M9 5l11 7-11 7z"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   more:'<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
@@ -5618,6 +5634,74 @@ async function deterministicFromModal(){
   const applied=await applyDeterministicDay(current);
   if(!applied)toast("No pudimos preparar tu día ahora. Inténtalo otra vez en unos minutos.");
 }
+// REQ-415: «Plan de hoy». Una fila por actividad del día (entreno y cada comida
+// no saltada), en el orden de la persona (REQ-125) y con el entreno en su
+// horario. Cuentan las comidas y el entreno de un día de entreno; el descanso y
+// la pausa por seguridad se ven, pero no cuentan.
+const HOME_TRAINING_CLOCK={morning:"07:00",midday:"12:30",afternoon:"17:30",evening:"19:30"};
+function homeWorkoutSummary(ds,workout){
+  if(isFreeActivityWorkout(workout))return workout.detail||"Registra tu actividad al terminar.";
+  try{
+    const prescription=workoutPrescription(ds);
+    const n=(prescription.steps||[]).filter(step=>step.type==="strength").length;
+    const minutes=prescription.durationLabel||(prescription.estimatedMinutes?`~${prescription.estimatedMinutes} min`:"");
+    const parts=[n?`${n} ejercicio${n===1?"":"s"}`:"",minutes].filter(Boolean);
+    if(parts.length)return parts.join(" · ");
+  }catch(e){}
+  return workout.detail||"Sigue el entreno guiado de hoy.";
+}
+function homeWorkoutPlanItem(ds,{st,workout,restDay,safetyHold,execution,workoutOutcome,sessionActive}){
+  const free=isFreeActivityWorkout(workout);
+  if(safetyHold&&!restDay&&(sessionActive||workoutOutcome==="pending")){
+    return {kind:"safety",title:"Entrenamiento en pausa",meta:"Completa la evaluación de seguridad antes de retomar.",
+      pending:true,counts:false,first:true,open:"setView('perfil')",action:{label:"Completar evaluación",handler:"setView('perfil')"}};
+  }
+  if(execution&&sessionActive){
+    const prog=WORKOUT_PLAYER.progress(execution);
+    return {kind:"resume",title:workout?.name||"Entrenamiento",meta:`En curso · ejercicios hechos ${prog.completed}/${prog.total}`,
+      pending:true,counts:true,first:true,open:`homeOpenWorkout('${ds}','workout_resume')`,
+      action:{label:"Continuar entreno",handler:`homeOpenWorkout('${ds}','workout_resume')`}};
+  }
+  if(restDay){
+    const activities=manualActivities(st);
+    return {kind:"rest",title:activities.length?"Descanso · entrenaste igual":"Descanso planificado",
+      meta:activities.length?activities.map(a=>`${activitySport(a.sport)[1]} · ${manualActivitySummary(a)}`).join(" / "):(workout?.detail||"El descanso también cuenta dentro del plan."),
+      done:activities.length>0,pending:false,counts:false,open:`homeOpenWorkout('${ds}','workout_detail')`,
+      action:!activities.length&&canLogManualActivity(ds)?{label:"Entrené igual",handler:`openManualActivity('${ds}')`}:null};
+  }
+  if(safetyHold)return null;
+  const done=!!st.workoutDone||workoutOutcome==="completed"||workoutOutcome==="partial";
+  if(done){
+    const activities=manualActivities(st);
+    const meta=activities.length&&!st.workoutExecution
+      ?activities.map(a=>`${activitySport(a.sport)[1]} · ${a.minutes} min`).join(" / ")
+      :(workoutOutcome==="partial"?"Entreno parcial":"Entreno completado");
+    return {kind:"workout",title:workout.name||"Entreno de hoy",meta,done:true,pending:false,counts:true,
+      open:`homeOpenWorkout('${ds}','workout_detail')`,action:null};
+  }
+  return {kind:"workout",title:workout.name||"Entreno de hoy",meta:homeWorkoutSummary(ds,workout),pending:true,counts:true,
+    open:`homeOpenWorkout('${ds}','workout_detail')`,
+    action:free
+      ?{label:"Registrar actividad",handler:`openManualActivity('${ds}')`}
+      :{label:"Iniciar entreno",handler:`homeOpenWorkout('${ds}','workout_start')`}};
+}
+function homeMealPlanItem(ds,meal){
+  const ms=mealState(ds,meal.id);
+  const value=mealValue(meal,ms);
+  const content=mealHasContent(value);
+  const kcal=value.kcal?`${Math.round(value.kcal)} kcal`:"";
+  const register={label:"Registrar",aria:`Registrar ${meal.slot}`};
+  if(ms.done&&content){
+    return {kind:"meal",title:meal.slot,meta:["Registrado",value.name,kcal].filter(Boolean).join(" · "),mealId:meal.id,time:meal.time,
+      done:true,pending:false,counts:true,open:`homeOpenMeal('${ds}')`,action:null};
+  }
+  if(content){
+    return {kind:"meal",title:meal.slot,meta:[value.name,kcal].filter(Boolean).join(" · "),mealId:meal.id,time:meal.time,planned:true,
+      pending:true,counts:true,open:`homeOpenMeal('${ds}')`,action:{...register,handler:`homeRegisterMeal('${ds}','${meal.id}')`}};
+  }
+  return {kind:"meal",title:meal.slot,meta:["Sin registrar",meal.time].filter(Boolean).join(" · "),mealId:meal.id,time:meal.time,
+    pending:true,counts:true,open:`homeLogFood('${ds}','${meal.id}')`,action:{...register,handler:`homeLogFood('${ds}','${meal.id}')`}};
+}
 function homeAgendaData(ds){
   const st=dayState(ds);
   const {workout}=effectiveWorkout(ds);
@@ -5625,73 +5709,33 @@ function homeAgendaData(ds){
   const execution=safetyHold?null:normalizedWorkoutExecution(ds);
   const workoutOutcome=workoutOutcomeForState(st);
   const restDay=!workout||workout.id==="descanso";
-  // REQ-125: respeta el orden elegido y excluye las comidas saltadas.
-  const openMeals=dayEffectiveOrder(ds).filter(it=>it.type==="meal").map(it=>it.base)
-    .filter(m=>{const ms=mealState(ds,m.id);return !ms.done&&!ms.skipped;});
   const sessionActive=workoutOutcome==="in_progress"||workoutOutcome==="paused";
-  const workoutPending=!restDay&&!safetyHold&&!st.workoutDone&&workoutOutcome==="pending";
+  // REQ-125: respeta el orden elegido y excluye las comidas saltadas.
+  const mealItems=dayEffectiveOrder(ds).filter(it=>it.type==="meal")
+    .filter(it=>{const ms=mealState(ds,it.base.id);return !ms.skipped;})
+    .map(it=>homeMealPlanItem(ds,it.base));
+  const workoutItem=homeWorkoutPlanItem(ds,{st,workout,restDay,safetyHold,execution,workoutOutcome,sessionActive});
+  const items=[...mealItems];
+  if(workoutItem){
+    // Lo que está en curso o bloqueado va primero; el resto, en su horario.
+    const clock=HOME_TRAINING_CLOCK[planPrefsForDate(ds).preferredTrainingTime];
+    const at=workoutItem.first||!clock?0:mealItems.findIndex(item=>item.time&&item.time>clock);
+    items.splice(at<0?items.length:at,0,workoutItem);
+  }
+  const counted=items.filter(item=>item.counts);
+  const done=counted.filter(item=>item.done).length;
+  const next=items.find(item=>item.pending&&item.action)||null;
   const totals=dayTotals(ds);
-  const items=[];
-
-  if(safetyHold&&!restDay&&(sessionActive||workoutOutcome==="pending")){
-    items.push({
-      kind:"safety",
-      title:"Entrenamiento en pausa",
-      meta:"Completa la evaluación de seguridad antes de retomar.",
-      action:{label:"Completar evaluación",handler:"setView('perfil')"}
-    });
-  }else if(execution&&sessionActive){
-    const prog=WORKOUT_PLAYER.progress(execution);
-    items.push({
-      kind:"resume",
-      title:workout?.name||"Entrenamiento",
-      meta:`Entreno en curso · ejercicios hechos ${prog.completed}/${prog.total}`,
-      action:{label:"Continuar entreno",handler:`homeOpenWorkout('${ds}','workout_resume')`}
-    });
-  }
-
-  for(const meal of openMeals){
-    const value=mealValue(meal,mealState(ds,meal.id));
-    if(!mealHasContent(value))continue;
-    items.push({
-      kind:"meal",
-      label:meal.slot,
-      title:value.name||meal.slot,
-      meta:[meal.time,value.kcal?`${Math.round(value.kcal)} kcal`:""].filter(Boolean).join(" · "),
-      mealId:meal.id,
-      action:{label:"Registrar este plato",handler:`homeRegisterMeal('${ds}','${meal.id}')`},
-      alternative:{label:"Ver detalle",handler:"setView('nutricion')"}
-    });
-  }
-
-  if(workoutPending){
-    const free=isFreeActivityWorkout(workout);
-    items.push({
-      kind:"workout",
-      label:"Entreno",
-      title:workout.name||"Entreno de hoy",
-      meta:workout.detail||"Sigue el entreno guiado de hoy.",
-      action:free
-        ?{label:"Registrar actividad",handler:`openManualActivity('${ds}')`}
-        :{label:"Iniciar entreno",handler:`homeOpenWorkout('${ds}','workout_start')`},
-      alternative:free
-        ?{label:"Ver detalle",handler:`homeOpenWorkout('${ds}','workout_detail')`}
-        :{label:"Adaptar",handler:`homeAdaptWorkout('${ds}')`}
-    });
-  }else if(restDay&&(totals.doneMeals<totals.totMeals||!totals.totMeals)){
-    const activities=manualActivities(st);
-    items.push({
-      kind:"rest",
-      label:"Entreno",
-      title:activities.length?"Descanso · entrenaste igual":"Descanso planificado",
-      meta:activities.length?activities.map(a=>`${activitySport(a.sport)[1]} · ${manualActivitySummary(a)}`).join(" / "):(workout?.detail||"El descanso también cuenta dentro del plan."),
-      action:!activities.length&&canLogManualActivity(ds)?{label:"Entrené igual",handler:`openManualActivity('${ds}')`}:null
-    });
-  }
-
-  // Un menú ausente o parcial no es un pendiente ni prueba de día cerrado.
-  const closed=!items.length&&totals.doneMeals===totals.totMeals&&totals.totMeals>0;
-  return {state:closed?"done":"active",restDay,workoutOutcome,totals,items,hasOpenMeals:openMeals.length>0};
+  const hasOpenMeals=mealItems.some(item=>item.pending);
+  // Un menú ausente o parcial no es prueba de día cerrado: hace falta registrar.
+  const closed=!items.some(item=>item.pending)&&totals.doneMeals===totals.totMeals&&totals.totMeals>0;
+  return {state:closed?"done":"active",restDay,workoutOutcome,totals,items,next,
+    progress:{done,total:counted.length},hasOpenMeals};
+}
+function homeOpenMeal(ds){
+  homeTrackAction(ds,"meal_detail");
+  current=ds;
+  setView("nutricion");
 }
 function homeActionHtml(action,buttonClass="btn"){
   if(!action)return "";
@@ -5737,15 +5781,6 @@ function homeConsumptionHtml({t,target,doneMeals,totMeals}){
     <span><b>${doneMeals}/${totMeals} comidas</b> · ${t.kcal}/${target.kcal} kcal</span>
     <span class="home-consumption-link">Ver consumo${chevron()}</span>
   </button>`;
-}
-function homeRemainingAgendaHtml(ds,items){
-  if(!items.length)return "";
-  const pending=items.filter(item=>item.action&&item.kind!=="rest").length;
-  const open=$(`#app .home-agenda[data-date="${ds}"]`)?.open;
-  return `<details class="home-agenda" data-date="${ds}"${open?" open":""}>
-    <summary>Resto del día${pending?`<span class="home-agenda-count">${pending} pendiente${pending===1?"":"s"}</span>`:""}${chevron()}</summary>
-    <div class="agenda-list">${items.map(homeAgendaItemHtml).join("")}</div>
-  </details>`;
 }
 // REQ-367: la semana y los recordatorios no compiten con la agenda diaria.
 let homeReminderShownKey="";
@@ -5807,7 +5842,7 @@ function renderAfterHomeNotice(){
 function homeWorkoutTechniqueHtml(ds,agenda){
   if(profileQuestionReservesDay())return "";
   if(ds!==todayStr()||UI.homeTechniqueDismissed?.[uid()]===ds||trainingInjuryNoticeActive())return "";
-  if(!agenda.items.some(item=>item.kind==="workout"))return "";
+  if(!agenda.items.some(item=>item.kind==="workout"&&item.pending))return "";
   const prescription=workoutPrescription(ds);
   if(prescription.sessionType!=="strength"||workoutContentIssues(ds).length)return "";
   const step=prescription.steps.find(item=>item.type==="strength");
@@ -5836,7 +5871,34 @@ function dismissHomeWorkoutTechnique(ds){
   UI.homeTechniqueDismissed={...UI.homeTechniqueDismissed,[userId]:ds};
   uiSave();
   renderHoy();
-  ($(".home-agenda>summary")||$(".home-primary-action"))?.focus({preventScroll:true});
+  $(".home-primary-action")?.focus({preventScroll:true});
+}
+// REQ-415: un tramo por actividad que cuenta, en el orden de la lista.
+function homeDayPlanBarHtml(items,{done,total}){
+  if(!total)return "";
+  const segments=items.filter(item=>item.counts).map(item=>`<span${item.done?' class="on"':""}></span>`).join("");
+  return `<div class="day-plan-bar" role="progressbar" aria-label="Avance del día" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${done}" aria-valuetext="${done} de ${total}">${segments}</div>`;
+}
+function homeDayPlanIcon(item){
+  if(item.done)return miniIcon("check",18);
+  if(item.kind==="meal")return miniIcon("foods",18);
+  if(item.kind==="rest")return miniIcon("moon",18);
+  if(item.kind==="safety")return miniIcon("alert",18);
+  return miniIcon("entreno",18);
+}
+function homeDayPlanRowHtml(item,isNext){
+  const action=item.action;
+  const actionHtml=action?`<button type="button" class="btn dp-action${isNext?" btn-accent home-primary-action":""}"${action.aria?` aria-label="${esc(action.aria)}"`:""} onclick="${esc(action.handler)}">${esc(action.label)}</button>`:"";
+  return `<li class="dp-row kind-${esc(item.kind)}${item.done?" is-done":""}${isNext?" is-next":""}"${item.mealId?` data-meal="${esc(item.mealId)}"`:""}>
+    <span class="dp-dot" aria-hidden="true">${homeDayPlanIcon(item)}</span>
+    <div class="dp-main">
+      <button type="button" class="dp-open" onclick="${esc(item.open)}">
+        <span class="dp-copy"><span class="dp-title">${esc(item.title)}</span>${item.meta?`<span class="dp-meta">${esc(item.meta)}</span>`:""}</span>
+        ${action?"":chevron()}
+      </button>
+      ${actionHtml}
+    </div>
+  </li>`;
 }
 function homeAgendaHtml(ds,data,menuSuggestion=""){
   const register={id:"homeLogAction",label:"Registrar comida",handler:`homeLogFood('${ds}')`};
@@ -5845,9 +5907,11 @@ function homeAgendaHtml(ds,data,menuSuggestion=""){
     ?{label:"Elegir entrenamiento",handler:`openWorkoutPicker('${ds}')`,dialog:true}
     :null;
   const note=homeCacheNoticeHtml();
-  const workoutStatus=workoutStatusLabel(data.workoutOutcome).toLowerCase();
+  const {done,total}=data.progress;
+  const list=`<ol class="dp-list" aria-label="Actividades de hoy">${data.items.map(item=>homeDayPlanRowHtml(item,item===data.next)).join("")}</ol>`;
   if(data.state==="done"){
     const {doneMeals,totMeals,t}=data.totals;
+    const workoutStatus=workoutStatusLabel(data.workoutOutcome).toLowerCase();
     const todaySummary=`${doneMeals}/${totMeals} comidas registradas · ${t.kcal} kcal · ${data.restDay?"descanso planificado":"entreno "+workoutStatus}`;
     const next=homeTomorrowData(ds);
     const progress={label:"Ver progreso",handler:"setView('progreso')"};
@@ -5856,9 +5920,11 @@ function homeAgendaHtml(ds,data,menuSuggestion=""){
         <div class="agenda-list">${next.items.map(homeAgendaItemHtml).join("")}</div>
       </div>`:"";
     const primary=next?{label:"Ver mañana",handler:`homeOpenTomorrow('${next.ds}')`}:progress;
-    return `<section class="agenda-card agenda-state done home-primary" aria-labelledby="homePrimaryTitle">
-      <h2 class="agenda-title" id="homePrimaryTitle">Todo listo por hoy</h2>
+    return `<section class="agenda-card agenda-state done home-primary day-plan" aria-labelledby="homePrimaryTitle">
+      <div class="day-plan-head"><h2 class="agenda-title" id="homePrimaryTitle">Todo listo por hoy</h2><span class="day-plan-count">${done}/${total}</span></div>
       <div class="agenda-sub">${esc(todaySummary)}</div>
+      ${homeDayPlanBarHtml(data.items,data.progress)}
+      ${list}
       ${nextHtml}
       ${homeActionHtml(primary,"btn btn-accent home-primary-action")}
       <div class="home-secondary-actions">
@@ -5868,42 +5934,18 @@ function homeAgendaHtml(ds,data,menuSuggestion=""){
       </div>
     </section>${note}`;
   }
-  const first=data.items[0];
-  const promote=first&&first.kind!=="rest"&&(first.kind!=="workout"||!data.hasOpenMeals);
-  const workoutLink={label:"Ver entreno",handler:`homeOpenWorkout('${ds}','workout_detail')`};
-  // REQ-394: el entreno pendiente se ve en la tarjeta aunque comer vaya primero.
-  const workoutItem=data.items.find(item=>item.kind==="workout");
-  const workoutRow=workoutItem&&!(promote&&first===workoutItem)?workoutItem:null;
-  let logMeta="";
-  if(restWorkout)logMeta="Hoy toca descanso.";
-  else if(!first)logMeta=`Entreno ${workoutStatus}.`;
-  const primary=promote?first:{kind:"log",title:"¿Qué comiste hoy?",action:register,meta:logMeta};
-  let secondary=null;
-  if(promote){
-    secondary=first.kind==="meal"
-      ?{...register,label:"Registrar otra comida",handler:`homeLogFood('${ds}','${first.mealId}')`}
-      :register;
-  }else if(!restWorkout&&!first){
-    secondary=workoutLink;
-  }
-  const alternative=restWorkout||(promote&&first.kind==="workout"?first.alternative:null);
-  const meta=[primary.label,primary.meta].filter(Boolean).join(" · ");
-  const rest=(promote?data.items.slice(1):data.items).filter(item=>item!==workoutRow);
-  return `<section class="agenda-card home-primary kind-${primary.kind}" aria-labelledby="homePrimaryTitle">
-    <h2 class="agenda-title" id="homePrimaryTitle">${esc(primary.title)}</h2>
-    ${meta?`<div class="agenda-sub">${esc(meta)}</div>`:""}
-    ${homeActionHtml(primary.action,"btn btn-accent home-primary-action")}
-    ${secondary||alternative?`<div class="home-secondary-actions">${homeActionHtml(secondary,"home-secondary-action")}${homeActionHtml(alternative,"home-secondary-action")}</div>`:""}
-    ${workoutRow?homeWorkoutRowHtml(workoutRow):""}
+  const left=total-done;
+  const status=!total?"Registra lo que comas hoy."
+    :left>0?`Te ${left===1?"falta 1 actividad":`faltan ${left} actividades`} para cerrar el día.`
+    :"Nada pendiente por ahora.";
+  return `<section class="agenda-card home-primary day-plan" aria-labelledby="homePrimaryTitle">
+    <div class="day-plan-head"><h2 class="agenda-title" id="homePrimaryTitle">Plan de hoy</h2>${total?`<span class="day-plan-count">${done}/${total}</span>`:""}</div>
+    ${homeDayPlanBarHtml(data.items,data.progress)}
+    <p class="day-plan-status">${esc(status)}</p>
+    ${list}
+    <div class="home-secondary-actions">${homeActionHtml(register,"home-secondary-action")}${homeActionHtml(restWorkout,"home-secondary-action")}</div>
     ${menuSuggestion}
-  </section>${note}${homeRemainingAgendaHtml(ds,rest)}`;
-}
-function homeWorkoutRowHtml(item){
-  return `<div class="home-workout-row">
-    <span class="agenda-icon" aria-hidden="true">${tabIcon("entreno")}</span>
-    <span class="home-workout-copy"><small>${esc(item.label||"Entreno")}</small><strong>${esc(item.title)}</strong></span>
-    ${homeActionHtml(item.action,"btn home-workout-action")}
-  </div>`;
+  </section>${note}`;
 }
 
 /* REQ-314: acompañamiento opcional durante los primeros cinco días de uso.
@@ -18632,7 +18674,7 @@ function tourMarkSeen(v){try{localStorage.setItem(FITBROS_TOUR_KEY,v||"done");}c
 function tourSteps(){
   return [
     {sel:".home-consumption",title:"Tu consumo de hoy",body:"Toca esta línea para ver tus comidas y el detalle de macros en Nutrición.",placement:"bottom"},
-    {sel:".home-primary",title:"Tu día",body:"Registra lo que comes y empieza tu entreno desde aquí. Lo demás del día queda en «Resto del día».",placement:"bottom"},
+    {sel:".home-primary",title:"Plan de hoy",body:"Tu entreno y tus comidas en orden, con lo que te falta. Registra o empieza desde aquí.",placement:"bottom"},
     {sel:'[data-tab="nutricion"]',title:"Nutrición",body:"Tus comidas del día con calorías y macros. Registra, reemplaza por otra opción o agrega un extra.",placement:"top"},
     {sel:'[data-tab="entreno"]',title:"Entreno",body:"Tu entreno guiado paso a paso: calentamiento, series e intervalos con temporizador y demostraciones.",placement:"top"},
     {sel:'[data-tab="progreso"]',title:"Progreso",body:"Registra tu peso semanal y mira tu evolución, racha y adherencia.",placement:"top"},

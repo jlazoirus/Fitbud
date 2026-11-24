@@ -8,7 +8,7 @@ PWA de nutrición y entrenamiento personalizados: planes de 4/10 semanas, regist
 
 Promesa: comida y entrenamiento viables hoy, instrucciones e historial conservado.
 
-REQ-364..367/392..395: Hoy con «Tu día», un mensaje (`homeContextData`), avisos y navegación flotante. REQ-324: fechas (`docs/plan-weeks.md`). REQ-349: sustituciones y renovación opcional (`docs/nutrition-continuity.md`). REQ-360: hábitos (`docs/habitual-meals.md`).
+REQ-364..367/392..395/415: Hoy con «Plan de hoy» (`homeAgendaData`), un mensaje (`homeContextData`), avisos y navegación flotante. REQ-324: fechas (`docs/plan-weeks.md`). REQ-349: sustituciones y renovación opcional (`docs/nutrition-continuity.md`). REQ-360: hábitos (`docs/habitual-meals.md`).
 
 ## Arquitectura vigente
 

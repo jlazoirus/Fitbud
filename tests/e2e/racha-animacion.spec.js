@@ -37,7 +37,8 @@ test.describe("Racha — animación al registrar (REQ-283)", () => {
     await page.waitForLoadState("networkidle");
     await expect(pop(page)).toHaveCount(0);
 
-    const register = page.locator(".home-primary").getByRole("button", { name: "Registrar este plato" });
+    // REQ-415: el registro de un toque del siguiente plato pendiente del plan.
+    const register = page.locator(".home-primary .dp-row.kind-meal:not(.is-done) .dp-action").first();
     await register.click();
     await expect(pop(page)).toBeVisible();
     await expect(pop(page)).toContainText("Falta 1 comida y el entreno");
@@ -77,7 +78,7 @@ test.describe("Racha — animación al registrar (REQ-283)", () => {
 
     await gotoApp(page);
     await page.waitForLoadState("networkidle");
-    await page.locator(".home-primary").getByRole("button", { name: "Registrar este plato" }).click();
+    await page.locator(".home-primary .dp-row.kind-meal:not(.is-done) .dp-action").first().click();
     await expect(pop(page)).toContainText("Día 1");
     await expect(pop(page)).toContainText("Empezó tu racha.");
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);

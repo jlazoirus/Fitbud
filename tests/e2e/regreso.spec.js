@@ -81,7 +81,7 @@ test.describe("Hoy — tarjeta de regreso (REQ-284)", () => {
     await expect(head.locator(".home-greeting-sub")).toHaveText("Tu progreso sigue: 4 días registrados y 4 entrenos.");
     await expect(page.getByRole("button", { name: "Ver mi racha y amigos" })).toHaveText("Racha");
 
-    await page.locator(".home-primary").getByRole("button", { name: "Registrar este plato" }).click();
+    await page.locator(".home-primary .dp-row.kind-meal:not(.is-done) .dp-action").first().click();
     await expect(head.locator("h1")).toHaveText(/^Hola, /);
     await expect(head.locator(".home-greeting-sub")).toHaveCount(0);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);

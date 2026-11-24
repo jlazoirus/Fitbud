@@ -2539,26 +2539,7 @@ Script nuevo de `analyzeTrainingHistory`, `coach-rutina.spec.js`, `plan-weeks.sp
 
 ## REQ-415 - Hoy: «Plan de hoy» como lista con avance del día
 
-**Estado: pendiente.** Serie REQ-415→421 (simplicidad de la demo de CEO App). Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
-
-### Origen
-Jonathan, 2026-11-24: copiar la UX y simplicidad de la app del alumno de la demo.
-### Problema
-Hoy reparte el día entre tarjeta principal, fila de entreno y «Resto del día» plegado; no se ve el avance.
-### Causa raíz
-`homeAgendaHtml()` (`app/index.html:5841`) promueve una acción y pliega el resto.
-### Objetivo
-Entreno y comidas del día en una lista ordenada por hora, con avance y una sola acción destacada.
-### Alcance
-Filas con punto por tipo, título, estado y una píldora; barra por actividad, «Te faltan N» y «x/N». Registrar un plato planificado en un toque.
-### Fuera de alcance
-Pestañas, Avisos, coach, agua/pasos.
-### Riesgos
-Specs de Hoy (REQ-392..395); orden con horario flexible.
-### Criterios de aceptación
-3 comidas y entreno: «0/4»; registrar el desayuno: «1/4». Descanso y pausa no cuentan. Sin desbordes a 320 px.
-### Verificación sugerida
-`home-optional-menu.spec.js`, `home.spec.js` y release gate.
+**Estado: implementado.** Hoy muestra el entreno y cada comida no saltada como filas de una línea de tiempo (`homeAgendaData()`/`homeAgendaHtml()`): orden de la persona (REQ-125), entreno según `preferredTrainingTime`, barra por actividad, «Te faltan N» y «x/N». Una píldora por fila; la primera pendiente va en lima. Registrar un plato planificado: un toque. Descanso y pausa no cuentan. PWA v265. ✓ `home-optional-menu.spec.js`, `home.spec.js`. Detalle en `docs/requirements-history.md`.
 
 ## REQ-416 - Hoy: «Esta semana» con cumplimiento por día
 
