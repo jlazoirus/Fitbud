@@ -2307,26 +2307,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-404 - Nutrición: los primeros días se registra, sin menú sugerido
 
-**Estado: pendiente.** Serie REQ-404→407. Diseño y textos: `docs/nutrition-first-days.md`.
-
-### Origen
-Jonathan, 2026-11-16: antes de sugerir dietas, recopilar 3 a 5 días de comidas reales y avisarlo.
-### Problema
-El usuario nuevo recibe un menú antes de registrar una sola comida.
-### Causa raíz
-`saveOnboarding()` → `prepareFirstCycleWeek()` → `prepareFirstWeekNutrition()` (`app/index.html:4482`, `:4320`).
-### Objetivo
-Toda cuenta nueva empieza registrando lo que come, con aviso previo y avance visible.
-### Alcance
-`prefs.nutritionIntake`. Aviso al cerrar el onboarding. Sin menú inicial ni preparación automática; el entreno se prepara igual. Tarjeta «Día 2 de 3» y registrar como acción principal. Día completo: 2 comidas y 40 % de las kcal. Mínimo 3 días, 5 para cerrar solo, tope de 7. Salida «Prefiero recibir un menú ya».
-### Fuera de alcance
-Resumen (REQ-405), cuentas existentes (REQ-411), recordatorios propios.
-### Riesgos
-El menú llega el día 4 de la semana gratis (REQ-356). Specs que esperan menú tras el onboarding.
-### Criterios de aceptación
-Onboarding nuevo: aviso, cero comidas sugeridas y entreno listo. Al tercer día completo se ofrece el resumen. El tope o la salida preparan el menú actual. Persiste al recargar; una cuenta existente no cambia.
-### Verificación sugerida
-`tests/e2e/primeros-dias.spec.js`; regresión de `onboarding*.spec.js` y `home-optional-menu.spec.js`.
+**Estado: implementado.** El primer onboarding guarda `prefs.nutritionIntake` (`observing`), avisa «Primero queremos conocerte» antes de Hoy y no prepara comidas (el entreno sí); sin preparación automática ni «Sugerirme un menú». Hoy y Nutrición muestran «Día N de 3» y lo registrado, sin «restantes» ni meta. Día completo: 2 comidas y 40 % de las kcal; con 3 se ofrece el resumen o 2 días más, con 5 queda listo, al día 7 se ofrece el resumen o el menú. «Prefiero recibir un menú ya» confirma, marca `skipped` y abre «Preparar mi semana». Cuentas existentes sin cambios. PWA v265. ✓ `tests/e2e/primeros-dias.spec.js` (320/390/1280 px). Detalle en `docs/requirements-history.md`.
 
 ## REQ-405 - Nutrición: resumen de cómo comes y cambios sugeridos
 

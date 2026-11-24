@@ -79,12 +79,13 @@ test.describe("Onboarding", () => {
     }
     await page.getByRole("button", { name: "Guardar mi plan" }).click();
 
-    // Aterriza en Hoy; las kcal del plan recién calculado se ven en Nutrición
-    // (REQ-394: Hoy no muestra la tira de consumo hasta el primer registro).
+    // Aterriza en Hoy; en los primeros días (REQ-404) Nutrición no muestra la
+    // meta: las kcal del plan recién calculado se ven en Perfil.
     await expect(page.locator("#tabs")).toContainText("Hoy");
     await expect(page.locator("#app .home-primary")).toBeVisible();
-    await page.locator('[data-tab="nutricion"]').click();
-    await expect(app).toContainText(String(kcalShown));
+    await page.locator('[data-tab="perfil"]').click();
+    await page.locator("#pfSecObjetivo > summary").click();
+    await expect(page.locator("#pf_kcal")).toHaveValue(String(kcalShown));
     await page.locator('[data-tab="hoy"]').click();
 
     // MOSTRADO = GUARDADO: el upsert del perfil lleva exactamente los macros del paso 2
@@ -108,12 +109,13 @@ test.describe("Onboarding", () => {
     const planPosts = calls.filter((c) => c.table === "plan_versions" && c.method === "POST");
     const combinedPlan = planPosts
       .map((c) => (Array.isArray(c.payload) ? c.payload[0] : c.payload))
-      .find((row) => row?.snapshot?.nutritionPlan && row?.snapshot?.trainingPlan);
-    expect(combinedPlan, "Debe guardar nutritionPlan + trainingPlan en un snapshot activo").toBeTruthy();
+      .find((row) => row?.snapshot?.trainingPlan);
+    // REQ-404: el primer onboarding prepara el entreno, no un menú (primero se registra).
+    expect(combinedPlan, "Debe guardar trainingPlan en un snapshot activo").toBeTruthy();
     expect(combinedPlan.status).toBe("active");
-    expect(combinedPlan.snapshot.nutritionPlan.days.length).toBeGreaterThan(0);
     expect(combinedPlan.snapshot.trainingPlan.weeks.length).toBeGreaterThan(0);
-    expect(calls.filter((c) => c.table === "day_log" && c.method === "POST").length).toBeGreaterThan(0);
+    expect(combinedPlan.snapshot.nutritionPlan?.days?.length || 0).toBe(0);
+    expect(prefs.nutritionIntake?.status).toBe("observing");
 
     // REQ-210: el peso del alta queda como semana 1; Progreso no lo vuelve a pedir
     const w1 = calls.filter((c) => c.table === "weight_log" && c.method === "POST")

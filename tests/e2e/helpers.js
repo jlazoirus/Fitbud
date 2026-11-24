@@ -466,6 +466,11 @@ export async function autoDismissNudges(page) {
   await page.addLocatorHandler(cardio, async () => {
     await cardio.click();
   });
+  // REQ-404: al terminar el primer onboarding se avisa que primero se registra.
+  const intake = page.locator("#overlay [data-intake-start]");
+  await page.addLocatorHandler(intake, async () => {
+    await intake.click();
+  });
   // REQ-289: al terminar el onboarding se pide instalar la app y activar avisos.
   const notifySetup = page.getByRole("button", { name: "Ahora no, ir a mi plan" });
   await page.addLocatorHandler(notifySetup, async () => {

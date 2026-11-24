@@ -2,7 +2,7 @@
 
 Solicitud de Jonathan del 16 de noviembre de 2026: «Las dietas se deberían generar en base a lo que comes. Cuando recién comienzas, en vez de sugerirte de frente una dieta, durante unos tres o cinco días recopilamos cuáles son tus comidas diarias. Le avisamos antes al usuario. Luego analizamos qué come y le sugerimos algunos cambios. Eso siempre lo deberíamos hacer».
 
-Estado: requerimientos pendientes; decisiones cerradas por Jonathan el 16 de noviembre de 2026. Cada REQ es una implementación y un commit. Orden obligatorio: REQ-404 → 405 → 406 → 407.
+Estado: REQ-404 implementado; REQ-405..407 pendientes. Decisiones cerradas por Jonathan el 16 de noviembre de 2026. Cada REQ es una implementación y un commit. Orden obligatorio: REQ-404 → 405 → 406 → 407.
 
 ## Qué pasa hoy
 
