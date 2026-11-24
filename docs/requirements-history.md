@@ -14082,6 +14082,34 @@ Lunes y martes con 4 de 8: «50 %». Futuro y fuera del plan vacíos.
 ### Verificación sugerida
 Spec E2E nuevo y release gate.
 
+## REQ-422 - Avisos en una ventana emergente
+
+**Estado: implementado (2026-11-24).**
+
+### Origen
+Jonathan, 2026-11-24: «necesitamos una pantalla emergente que muestre notificaciones», dentro de la serie que adapta la app del alumno de la demo de CEO App (`docs/competitive/2026-11-24-modo-ceo/README.md`).
+### Problema
+Check-in, semana del plan, recordatorios, retomar e invitaciones vivían plegados en «Avisos» al pie de Hoy (`homeNoticesHtml()`); había que bajar y desplegar para verlos.
+### Objetivo y alcance
+Una campana en la barra superior con el número de avisos abre una ventana con todos (`noticeItems()`, `openNotices()`). Lo que se hace dentro (omitir, entendido, activar, «Ahora no») la actualiza sin cerrarla (`refreshNotices()`); abrir otra pantalla desde ella la cierra. La pregunta del perfil (REQ-390) sigue a la vista en Hoy y el recordatorio cuenta como visto al abrir la ventana (REQ-339). El espacio contextual de Hoy (REQ-392) muestra un solo mensaje; el resto queda en Avisos.
+### Fuera de alcance y riesgos
+Avisos push, historial de notificaciones leídas. Riesgo: un aviso que gana el espacio de Hoy también aparece en la ventana (es la lista completa de pendientes).
+### Verificación
+`tests/e2e/avisos.spec.js`, `home.spec.js`, `plan-weeks.spec.js`.
+
+## REQ-423 - Perfil arriba a la derecha y menú de cuatro pestañas
+
+**Estado: implementado (2026-11-24).**
+
+### Origen
+Jonathan, 2026-11-24: «todo lo que está en perfil se podría llevar a un botón arriba a la derecha que te redirija a esa pantalla, así liberamos el menú de abajo». Resuelve la decisión de pestañas que el informe de la demo dejó a Jonathan.
+### Objetivo y alcance
+`appTopBarHtml()` encabeza Hoy, Nutrición, Entreno, Progreso y Perfil: logo, campana de Avisos (REQ-422) y un botón con la inicial que abre Perfil (`#profileBtn`, `data-tab="perfil"`, activo en Perfil). El menú inferior queda con Hoy, Nutrición, Entreno y Progreso. Perfil muestra «‹ <pantalla>» para volver a donde se abrió (`profileReturnView`). El tour señala Avisos y Perfil arriba.
+### Fuera de alcance y riesgos
+Contenido de Perfil (REQ-421), consola de administración (sus pestañas no cambian). Riesgo: specs que abrían Perfil desde el menú; ahora usan `#profileBtn`.
+### Verificación
+`tests/e2e/navegacion.spec.js`, `perfil.spec.js`, `accesibilidad.spec.js`, `tactil.spec.js`.
+
 ### REQ-385 - Onboarding: entrenar sin fuerza es una opción más
 
 **Estado: implementado.** Detalle: `docs/onboarding/2026-11-11-feedback.md`.

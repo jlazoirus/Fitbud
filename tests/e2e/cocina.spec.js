@@ -37,7 +37,7 @@ test("Perfil: «¿Cuánto cocinas?» parte de «Lo básico», se guarda y el avi
   // diet:["omnivoro"]: saveProfile() exige al menos una opción de alimentación.
   const { mocks, errors } = await boot(page, context, { prefs: { diet: ["omnivoro"] } });
   page.on("dialog", (dialog) => dialog.accept());
-  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#profileBtn").click();
   await page.locator("#pfSecComidas > summary").click();
   const select = page.getByLabel("¿Cuánto cocinas?");
   await expect(select).toHaveValue("basic");

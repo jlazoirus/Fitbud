@@ -17,14 +17,15 @@ test.describe("Home — un mensaje a la vez (REQ-392)", () => {
     const app = page.locator("#app");
     await expect(app.locator(".home-primary")).toBeVisible();
     // Fuera de Avisos solo cabe un mensaje contextual.
-    await expect(app.locator(`:is(${contextual}):not(#homeNotices *)`)).toHaveCount(1);
+    await expect(app.locator(`:is(${contextual})`)).toHaveCount(1);
     await expect(app.locator(".coach-chip")).toHaveCount(0);
     await expect(app.locator(".coach-home-title")).toHaveText("Pregúntale a tu coach");
     await expect(app.locator("#coachInput")).toBeVisible();
     await expect(app.getByRole("button", { name: "Cuéntame cómo entrenas", exact: true })).toHaveCount(0);
-    const notices = page.locator("#homeNotices");
-    await expect(notices.locator("> summary")).toContainText("Check-in de la semana 1");
-    await notices.locator("> summary").click();
+    // REQ-422: el check-in espera en Avisos, la ventana que abre la campana.
+    await expect(page.locator("#noticesBtn")).toHaveAttribute("aria-label", /^Avisos: \d+ nuevos?$/);
+    await page.locator("#noticesBtn").click();
+    const notices = page.locator("#noticesBody");
     await expect(notices.locator(".ci-banner h2")).toHaveText("Check-in de la semana 1");
     await expect(notices.locator(".ci-banner").getByRole("button", { name: "Hacer check-in", exact: true })).toBeVisible();
     // REQ-395: omitir pide confirmación; cancelar deja el check-in pendiente.

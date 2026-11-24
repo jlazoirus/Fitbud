@@ -16,7 +16,7 @@ function mockEntitlement(page, data, { redeemStatus } = {}) {
 }
 
 async function openSubscription(page) {
-  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#profileBtn").click();
   await page.keyboard.press("Escape");
   await page.locator("details.pf-accordion > summary", { hasText: "suscripción" }).click();
 }

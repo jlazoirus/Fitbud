@@ -195,7 +195,7 @@ test.describe("Actividad registrada a mano", () => {
     await gotoApp(page);
     page.on("dialog", (dialog) => dialog.accept());
 
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecEntreno > summary").click();
     await expect(page.locator('label[for="pf_sport"]')).toHaveText("¿Qué actividad quieres practicar?");
     await expect(page.locator("#pf_sport option:checked")).toHaveText("Otro deporte");

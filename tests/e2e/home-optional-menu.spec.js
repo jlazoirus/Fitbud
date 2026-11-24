@@ -183,7 +183,7 @@ test("Sin menú, la evaluación de seguridad sigue bloqueando iniciar entreno",a
   await expect(page.getByRole("button",{name:"Iniciar entreno",exact:true})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Registrar comida",exact:true})).toBeVisible();
   await page.locator(".home-primary").getByRole("button",{name:"Completar evaluación"}).click();
-  await expect(page.locator('[data-tab="perfil"]')).toHaveClass("active");
+  await expect(page.locator('[data-tab="perfil"]')).toHaveClass(/\bactive\b/);
   expect(paid).toEqual([]);expect(errors).toEqual([]);
 });
 

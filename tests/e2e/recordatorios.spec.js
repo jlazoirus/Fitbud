@@ -85,7 +85,7 @@ test("Recordatorios: elegir la hora del aviso y activar el resumen de la mañana
   await autoDismissNudges(page);
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
-  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#profileBtn").click();
   await page.locator("#pfSecRecordatorios > summary").click();
 
   const hours = await page.locator("#notif_hour option").evaluateAll((os) => os.map((o) => o.value));

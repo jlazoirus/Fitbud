@@ -76,3 +76,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Análisis en `docs/competitive/2026-11-24-modo-ceo/README.md` y serie REQ-415..421. Implementados REQ-415 («Plan de hoy») y REQ-416 («Esta semana»); REQ-417..421 quedan pendientes. PWA v265.
 - Sin operación manual pendiente.
 - Aprendizaje: la demo solo abre la app del alumno dentro de su portada (`/?abrir=cliente`, el iframe exige `window.parent.__ceoDemo`); WebFetch ve solo la portada, hace falta Chromium. `REQUIREMENTS.md` y `CONTEXT.md` quedaron casi en su tope de palabras (15000/2500): compactar REQ implementados al agregar otros.
+
+### 2026-11-24T16:43Z · sesión interactiva · Claude Code (nube) · REQ-422/423
+- Pedido por Jonathan en la misma sesión: ventana emergente de notificaciones y Perfil en un botón arriba a la derecha para liberar el menú inferior. Misma rama y PR #137.
+- Barra superior (`appTopBarHtml()`) con campana de Avisos (`openNotices()`) y la inicial que abre Perfil; menú inferior con cuatro pestañas. Specs que abrían Perfil desde el menú ahora usan `#profileBtn`.
+- Sin operación manual pendiente.
+- Aprendizaje: `next-exercise.spec.js`, `registro-extra-visible.spec.js` y `profile-questions.spec.js` escriben en `/Users/jonathan/.fitbros/qa-archive/`; en la nube fallan con ENOENT salvo que se cree esa carpeta. `semana-rapida.spec.js` mide tiempos: no correr dos suites a la vez.

@@ -14,11 +14,13 @@ async function boot(page,context,{date='2026-11-02',prefs={}}={}){
 for(const width of [320,390,1280])test(`fechas de Rocío: semana 1 termina hoy y calendario completo (${width}px)`,async({page,context})=>{
   await page.setViewportSize({width,height:900});
   const {calls,paid,errors}=await boot(page,context);
-  const homeNotice=page.locator('#homeNotices .plan-week-notice');
+  // REQ-422: el aviso de la semana espera en Avisos (la campana de arriba).
+  const homeNotice=page.locator('#noticesBody .plan-week-notice');
   await expect(homeNotice).toBeHidden();
-  await page.locator('#homeNotices > summary').click();
+  await page.locator('#noticesBtn').click();
   await expect(homeNotice).toBeVisible();
   await expect(homeNotice).toContainText('Hoy termina tu semana 1. Mañana comienza la semana 2.');
+  await page.keyboard.press('Escape');
   await page.locator('[data-tab="entreno"]').click();
   const app=page.locator('#app');
   await expect(app.locator('.wk-planline-meta')).toContainText('Semana 1 de 4 · 27 oct–2 nov');
@@ -46,11 +48,12 @@ for(const width of [320,390,1280])test(`fechas de Rocío: semana 1 termina hoy y
 
 test('semana 2 comienza sin registros, ocultar persiste y navegar no anuncia semanas futuras',async({page,context})=>{
   await boot(page,context,{date:'2026-11-03'});
-  await page.locator('#homeNotices > summary').click();
+  await page.locator('#noticesBtn').click();
   await expect(page.locator('.plan-week-notice')).toContainText('¡Comienza tu semana 2!');
   await expect(page.locator('.plan-week-notice')).toContainText('3 nov–9 nov');
   await page.locator('.plan-week-notice').getByRole('button',{name:'Ocultar aviso de semana'}).click();
   await expect(page.locator('.plan-week-notice')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await page.locator('[data-tab="entreno"]').click();
   await expect(page.locator('.wk-planline-meta')).toContainText('Semana 2 de 4 · 3 nov–9 nov');
   await expect(page.locator('.plan-week-notice')).toHaveCount(0);
@@ -63,7 +66,7 @@ test('semana 2 comienza sin registros, ocultar persiste y navegar no anuncia sem
 
 test('avisos aislados por cuenta, ciclo y semana; regreso a mitad de semana no dice que empieza hoy',async({page,context})=>{
   await boot(page,context,{date:'2026-11-04'});
-  await page.locator('#homeNotices > summary').click();
+  await page.locator('#noticesBtn').click();
   await expect(page.locator('.plan-week-notice')).toContainText('Ya estás en tu semana 2');
   await page.locator('.plan-week-notice').getByRole('button',{name:'Ocultar aviso de semana'}).click();
   expect(await page.evaluate(()=>{

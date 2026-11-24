@@ -18,7 +18,7 @@ test.describe("Perfil", () => {
     const errors = collectConsoleErrors(page);
 
     await gotoApp(page);
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     // REQ-108: navegar con cambios sin guardar dispara un confirm(); esta
     // prueba se enfoca en persistencia del DOM, así que lo acepta siempre.
     page.on("dialog", (dialog) => dialog.accept());
@@ -81,7 +81,7 @@ test.describe("Perfil", () => {
     await autoDismissNudges(page);
 
     await gotoApp(page);
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     // REQ-105: los campos quedan montados en el DOM aunque su sección esté
     // colapsada, así que no hace falta abrir cada <details> para auditarlos.
     await expect(page.locator("#pfSecCuenta")).toBeAttached();
@@ -110,7 +110,7 @@ test.describe("Perfil", () => {
     const errors = collectConsoleErrors(page);
 
     await gotoApp(page);
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     // REQ-108: activar el opt-in de recordatorios deja esa sección "dirty";
     // aceptar el confirm() para poder navegar a Avisos en esta prueba.
     page.on("dialog", (dialog) => dialog.accept());
@@ -146,7 +146,7 @@ test.describe("Perfil", () => {
     const errors = collectConsoleErrors(page);
 
     await gotoApp(page);
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
 
     const entreno = page.locator("#pfSecEntreno");
     const comidas = page.locator("#pfSecComidas");
@@ -207,7 +207,7 @@ test.describe("Perfil", () => {
     await autoDismissNudges(page);
     const errors = collectConsoleErrors(page);
     await gotoApp(page);
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecEntreno > summary").click();
     await expect(page.locator("#pf_between_rest")).toHaveValue("120");
     await page.selectOption("#pf_between_rest", "90");
@@ -228,7 +228,7 @@ test.describe("Perfil", () => {
     await gotoApp(page);
     const tabs = page.locator("#tabs");
 
-    await tabs.getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await expect(page.locator("details.pf-accordion").first()).toBeVisible();
     await page.waitForTimeout(300);
     await expect(page.locator("#overlay .sheet")).toHaveCount(0);
@@ -247,7 +247,7 @@ test.describe("Perfil", () => {
 
     // No vuelve tras descartarla
     await tabs.getByText("Hoy").click();
-    await tabs.getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecEntreno > summary").click();
     await expect(page.locator("#pfSecEntreno .pf-accordion-panel")).toBeVisible();
     await expect(page.locator("#cardioNudgeCard")).toHaveCount(0);
@@ -259,7 +259,7 @@ test.describe("Perfil", () => {
     const { calls } = await installMocks(context);
     await seedLoggedInUser(page);
     await gotoApp(page);
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecEntreno > summary").click();
     const card = page.locator("#cardioNudgeCard");
     await expect(card).toBeVisible();
@@ -268,7 +268,7 @@ test.describe("Perfil", () => {
     expect(calls.filter((c) => c.table === "profiles" && c.payload && c.payload.prefs && c.payload.prefs.lightCardioEnabled === true)).toHaveLength(0);
     await page.reload();
     await gotoApp(page);
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecEntreno > summary").click();
     await expect(page.locator("#pfSecEntreno .pf-accordion-panel")).toBeVisible();
     await expect(page.locator("#cardioNudgeCard")).toHaveCount(0);

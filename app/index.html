@@ -887,6 +887,23 @@
   .agenda-state.done{background:linear-gradient(160deg,rgba(16,185,129,.09),var(--surf1));border-color:rgba(16,185,129,.28)}
   .agenda-state.setup{background:linear-gradient(160deg,rgba(58,123,255,.13),var(--surf1));border-color:var(--terra-dim)}
   .agenda-next{margin-top:12px}
+  /* REQ-422/423: barra superior con Avisos y Perfil; el menú inferior queda con cuatro pestañas. */
+  .app-topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;margin:-4px 0 10px}
+  .app-topbar-brand{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-display);font-size:1.0625rem;font-weight:700;letter-spacing:-.02em}
+  .app-topbar-brand .brand-v{color:var(--accent)}
+  .app-topbar-actions{display:flex;align-items:center;gap:8px}
+  .topbar-btn{position:relative;width:44px;height:44px;flex:none;display:grid;place-items:center;padding:0;border-radius:50%;background:var(--surf2);border:1px solid var(--border-2);color:var(--txt)}
+  .topbar-btn:focus-visible,.screen-back:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .topbar-badge{position:absolute;top:-3px;right:-3px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;display:grid;place-items:center;background:var(--accent);color:var(--on-accent);font-family:var(--font-mono);font-size:.6875rem;font-weight:700;line-height:1;box-shadow:0 0 0 2px var(--black)}
+  .topbar-avatar{font-family:var(--font-display);font-size:1rem;font-weight:700}
+  .topbar-avatar.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+  @media(hover:hover){.topbar-btn:not(.active):hover{background:var(--surf3)}}
+  .screen-back{display:inline-flex;align-items:center;gap:2px;min-height:44px;margin:0 0 4px -6px;padding:0 8px 0 2px;background:none;color:var(--muted);font-size:.875rem;font-weight:600}
+  .notices-body{display:grid;gap:12px;margin-top:4px}
+  .notice-item>*{margin:0!important}
+  .notice-item .agenda-card,.notice-item .ci-banner,.notice-item .plan-week-notice{padding:14px;border:1px solid var(--border);border-radius:var(--r-md);background:var(--surf2)}
+  .notice-item .agenda-title{font-size:1rem}
+  .notices-empty{margin:8px 0 4px;color:var(--muted);font-size:.875rem}
   /* REQ-364: resumen, acción principal y resto de la agenda. */
   .home-head h1{font-size:22px;line-height:1.2;text-wrap:balance}
   .home-greeting-sub{margin:6px 0 0;color:var(--muted);font-size:.8125rem;line-height:1.45;max-width:46ch}
@@ -957,17 +974,6 @@
   .home-technique-copy small{color:var(--muted);font-size:.75rem}
   .home-technique-hide{flex:none;width:44px;height:44px;display:grid;place-items:center;background:none;color:var(--muted)}
   .home-technique button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-  .home-notices{margin:12px 0 16px;border-bottom:1px solid var(--border)}
-  .home-notices>summary{display:flex;align-items:center;gap:8px;min-height:48px;padding:6px 2px;cursor:pointer;list-style:none;color:var(--muted)}
-  .home-notices>summary::-webkit-details-marker{display:none}
-  .home-notices>summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .home-notices>summary>svg{flex:none}
-  .home-notices>summary>.chev{transform:rotate(90deg)}
-  .home-notices[open]>summary>.chev{transform:rotate(-90deg)}
-  .home-notices-summary-copy{display:flex;flex:1;flex-wrap:wrap;justify-content:space-between;align-items:baseline;min-width:0;gap:2px 12px;font-size:.8125rem;line-height:1.4}
-  .home-notices-summary-copy b{font-size:.875rem;color:var(--txt)}
-  .home-notices .plan-week-notice,.home-notices .agenda-card,.home-notices .ci-banner{margin:0!important;padding:12px 2px;border:0;border-top:1px solid var(--border);border-radius:0;background:none}
-  .home-notices .agenda-title{margin:0 0 4px;font-size:1rem}
   @media(max-width:340px){
     .home-consumption{flex-wrap:wrap;column-gap:12px;row-gap:2px}
   }
@@ -4836,6 +4842,12 @@ function showMacroInfo(key){
   modal(`<h3>${esc(info.label)}</h3><p class="muted small">${esc(info.text)}</p>`);
 }
 // Cabecera de pantalla (eyebrow + título display + chip de ícono a la derecha)
+// REQ-423: Perfil vuelve a la pantalla desde la que se abrió.
+function profileBackHtml(){
+  const labels={hoy:"Hoy",nutricion:"Nutrición",entreno:"Entreno",progreso:"Progreso"};
+  const back=MAIN_VIEWS.includes(profileReturnView)?profileReturnView:"hoy";
+  return `<button type="button" class="screen-back" onclick="setView('${back}')">${miniIcon("chevronLeft",18)}${labels[back]}</button>`;
+}
 function screenHeader(title,sub,icon){
   return `<header class="shead${ADMIN_CONSOLE&&sub==="Administración"?" admin-shead":""}">
     <div>${sub?`<div class="shead-sub">${sub}</div>`:""}<h1>${esc(title)}</h1></div>
@@ -4912,6 +4924,7 @@ function render(){
   primeStreakSeen(); // REQ-304: también antes de registrar desde el modo conversación
   if(chatModeActive())return renderChatMode();
   renderTabs();
+  if($("#noticesBody"))queueMicrotask(refreshNotices);
   if(view==="nutricion")return renderNutrition();
   if(view==="entreno")return renderWorkout();
   if(view==="progreso")return renderProgress();
@@ -4960,6 +4973,7 @@ const TAB_ICONS={
   weight:'<path d="M12 3a2 2 0 0 0-2 2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4a2 2 0 0 0-2-2zM9 9h6"/>',
   settings:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/>',
   chevron:'<path d="M9 6l6 6-6 6"/>',
+  chevronLeft:'<path d="M15 6l-6 6 6 6"/>',
   check:'<path d="M5 12.5l4.5 4.5L19 7"/>',
   moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
   alert:'<path d="M12 3.5 21.5 20h-19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
@@ -5124,7 +5138,8 @@ function section(key,title,contentHtml,sub,def){
 function renderTabs(){
   const bar=$("#tabs");
   if(!bar.firstElementChild){
-    const tabs=[["hoy","Hoy"],["nutricion","Nutrición"],["entreno","Entreno"],["progreso","Progreso"],["perfil","Perfil"]];
+    // REQ-423: Perfil se abre desde la barra superior; el menú queda con cuatro pestañas.
+    const tabs=[["hoy","Hoy"],["nutricion","Nutrición"],["entreno","Entreno"],["progreso","Progreso"]];
     bar.innerHTML=tabs.map(([v,l])=>`<button type="button" data-tab="${v}" onclick="setView('${v}')"><span class="ic" aria-hidden="true">${tabIcon(v)}</span><span>${l}</span></button>`).join("");
   }
   for(const button of bar.children){
@@ -5134,9 +5149,14 @@ function renderTabs(){
     else button.removeAttribute("aria-current");
   }
 }
+const MAIN_VIEWS=["hoy","nutricion","entreno","progreso"];
+let profileReturnView="hoy";
 function setView(v){
   if(ADMIN_VIEWS.includes(v)&&(!isAdmin()||!ADMIN_CONSOLE))v="perfil";
   if(v==="coach")v="hoy";
+  // REQ-422: ir a otra pantalla desde Avisos cierra la ventana.
+  if($("#noticesBody"))closeModal();
+  if(v==="perfil"&&MAIN_VIEWS.includes(view))profileReturnView=view;
   view=v;
   if(v==="hoy")current=clampDate(todayStr());
   if(v==="foods"&&supa&&!DB.loaded&&!DB.error){dbLoad().then(render);}
@@ -5873,62 +5893,89 @@ function homeConsumptionHtml({t,target,doneMeals,totMeals}){
     <span class="home-consumption-link">Ver consumo${chevron()}</span>
   </button>`;
 }
-// REQ-367: la semana y los recordatorios no compiten con la agenda diaria.
+// REQ-422: los avisos viven en una ventana emergente que abre la campana de
+// la barra superior. Junta lo pendiente que no es el plan del día: retomar el
+// plan, check-in, invitaciones, la semana del plan y los recordatorios. La
+// pregunta del perfil (REQ-390) sigue en Hoy, a la vista.
 let homeReminderShownKey="";
-// REQ-392: también guarda los mensajes que no ganaron el espacio contextual.
-function homeNoticesHtml(ds,today,extra=[]){
-  const question=ds===today?profileQuestionCardHtml():"";
-  const week=planWeekNoticeHtml(ds),reminder=question?"":notifyNudgeHtml();
-  if(!week&&!reminder&&!question&&!extra.length)return "";
-  const count=[question,week,reminder].filter(Boolean).length+extra.length;
-  const preview=extra.length?(count===1?extra[0].label:`${extra[0].label} y ${count-1} más`)
-    :question?"Afina tu plan":week?(reminder?"Plan y recordatorios":"Semana del plan"):"Configura tus recordatorios";
-  const previous=$("#homeNotices");
-  const questionKey=question?uid()+":"+today+":"+PROFILE_QUESTIONS.state(profile.prefs).lastQuestion:"";
-  const open=(question&&profileQuestionOpenKey!==questionKey)||(previous?.open&&previous.dataset.date===today);
-  if(question)profileQuestionOpenKey=questionKey;
-  return `<details id="homeNotices" class="home-notices" data-date="${today}" ontoggle="homeNoticesToggled(this)"${open?" open":""}>
-    <summary>${notifyIcon("bell",18)}<span class="home-notices-summary-copy"><b>Avisos</b><span>${preview}</span></span>${chevron()}</summary>
-    ${question}${extra.map(item=>item.html).join("")}${week}${reminder}
-  </details>`;
+function noticeItems(){
+  if(!session||!profile)return [];
+  const today=todayStr();
+  const question=profileQuestionCardHtml();
+  return [
+    {key:"restart",html:restartNudgeCard()},
+    {key:"checkin",html:weeklyCheckinBanner()},
+    {key:"referral",html:referralNoticeHtml()},
+    {key:"week",html:planWeekNoticeHtml(clampDate(today))},
+    {key:"reminder",html:question?"":notifyNudgeHtml()},
+  ].filter(item=>item.html);
 }
-// REQ-392: bajo la acción principal cabe un solo mensaje. Lo que salva la
-// racha va primero; después, lo que ayuda con el día. Retomar y el check-in
-// que pierden esperan en Avisos; técnica y bienvenida del coach son del día.
-function homeContextData(ds,agenda,menuSuggestion){
-  const notices=[];
-  const due=weeklyCheckinDue();
-  const queue=[
-    {html:()=>returnCardHtml()},
-    {html:()=>restartNudgeCard(),label:"Retomar tu plan"},
-    {html:()=>menuSuggestion?"":homeWorkoutTechniqueHtml(ds,agenda)},
-    {html:()=>coachWelcomeHtml()},
-    {html:()=>weeklyCheckinBanner(),label:due?`Check-in de la semana ${due.num}`:""},
-  ];
-  let slot="";
-  for(const item of queue){
-    // Las sugerencias del día solo se calculan si pueden mostrarse: registran que se vieron.
-    if(slot&&!item.label)continue;
-    const html=item.html();
-    if(!html)continue;
-    if(slot)notices.push({html,label:item.label});else slot=html;
-  }
-  const referral=referralNoticeHtml();
-  if(referral)notices.push({html:referral,label:"Invita a tus amigos"});
-  return {slot,notices};
+function noticesBodyHtml(items){
+  return items.length
+    ?items.map(item=>`<div class="notice-item" data-notice="${item.key}">${item.html}</div>`).join("")
+    :`<p class="notices-empty">No tienes avisos por ahora.</p>`;
 }
-function homeNoticesToggled(panel){
-  if(!panel.isConnected||!panel.open||!panel.querySelector(".notify-card"))return;
-  const key=`${uid()}:${panel.dataset.date}`;
+function openNotices(){
+  const items=noticeItems();
+  modal(`<h3>Avisos</h3><div id="noticesBody" class="notices-body">${noticesBodyHtml(items)}</div>`);
+  noticesShown(items);
+}
+// REQ-339: el recordatorio cuenta como visto una vez por día, al abrir Avisos.
+function noticesShown(items){
+  if(!items.some(item=>item.key==="reminder"))return;
+  const key=`${uid()}:${todayStr()}`;
   if(homeReminderShownKey===key)return;
   homeReminderShownKey=key;
   trackNotifyPrompt("home","shown");
 }
+// Tras una acción dentro de Avisos, la lista y el contador se actualizan sin cerrarla.
+function refreshNotices(){
+  const items=noticeItems();
+  const badge=$("#noticesBtn");
+  if(badge)badge.outerHTML=noticesButtonHtml(items.length);
+  const body=$("#noticesBody");
+  if(!body)return;
+  const sheet=body.closest(".sheet"),lost=!document.activeElement||document.activeElement===document.body||body.contains(document.activeElement);
+  body.innerHTML=noticesBodyHtml(items);
+  if(lost&&!body.contains(document.activeElement))sheet?.querySelector(".closebar button")?.focus({preventScroll:true});
+}
+function noticesButtonHtml(count){
+  const label=count?`Avisos: ${count} ${count===1?"nuevo":"nuevos"}`:"Avisos";
+  return `<button type="button" id="noticesBtn" class="topbar-btn" aria-haspopup="dialog" aria-label="${label}" onclick="openNotices()">${notifyIcon("bell",20)}${count?`<span class="topbar-badge" aria-hidden="true">${count>9?"9+":count}</span>`:""}</button>`;
+}
+// REQ-422/423: barra superior de las vistas principales. Perfil sale del menú
+// inferior y se abre desde aquí, con la inicial de la persona.
+function appTopBarHtml(){
+  const name=(profile&&profile.prefs&&profile.prefs.name)||(session&&session.user&&session.user.email)||"";
+  const initial=(String(name).trim()[0]||"·").toUpperCase();
+  const onProfile=view==="perfil";
+  return `<div class="app-topbar">
+    <span class="app-topbar-brand" role="img" aria-label="Evolv">${brandMark(24)}${brandWordmark()}</span>
+    <div class="app-topbar-actions">
+      ${noticesButtonHtml(noticeItems().length)}
+      <button type="button" id="profileBtn" data-tab="perfil" class="topbar-btn topbar-avatar${onProfile?" active":""}"${onProfile?' aria-current="page"':""} aria-label="Perfil" onclick="setView('perfil')">${esc(initial)}</button>
+    </div>
+  </div>`;
+}
+// REQ-392: bajo la acción principal cabe un solo mensaje. Lo que salva la
+// racha va primero; después, lo que ayuda con el día. Retomar y el check-in
+// que pierden esperan en Avisos; técnica y bienvenida del coach son del día.
+// REQ-422: lo que no gana el espacio sigue en Avisos (la campana de arriba).
+function homeContextData(ds,agenda,menuSuggestion){
+  const queue=[
+    ()=>returnCardHtml(),
+    ()=>restartNudgeCard(),
+    ()=>menuSuggestion?"":homeWorkoutTechniqueHtml(ds,agenda),
+    ()=>coachWelcomeHtml(),
+    ()=>weeklyCheckinBanner(),
+  ];
+  // Las sugerencias del día solo se calculan si pueden mostrarse: registran que se vieron.
+  for(const html of queue){const slot=html();if(slot)return {slot};}
+  return {slot:""};
+}
 function renderAfterHomeNotice(){
-  const panel=$("#homeNotices"),active=document.activeElement;
-  const restore=panel?.open&&(panel.contains(active)||active===document.body);
   render();
-  if(restore&&view==="hoy"&&!$("#overlay"))($("#homeNotices>summary")||$(".home-primary-action"))?.focus();
+  refreshNotices();
 }
 function homeWorkoutTechniqueHtml(ds,agenda){
   if(profileQuestionReservesDay())return "";
@@ -6172,6 +6219,7 @@ function renderHoy(){
     :hasAI?`<h2 class="coach-home-title">Tu coach</h2><div class="ai-box" style="margin:0 0 12px">⚠️ ${!isActive()?"Tu cuenta no está activa.":"Revisa privacidad y seguridad en Perfil para usar tu coach."}</div>`
     :"";
   $("#app").innerHTML=`
+  ${appTopBarHtml()}
   <header class="shead home-head">
     <div>
       <div class="shead-sub">${wdName}, ${dayMon}</div>
@@ -6188,10 +6236,11 @@ function renderHoy(){
   ${trainingSafetyHold()&&!agenda.items.some(item=>item.kind==="safety")?`<div class="alert"><b>Entrenamiento en pausa.</b> Revisa la evaluación de seguridad en Perfil antes de retomar.</div>`:""}
   ${context.slot}
   ${adminBetaPendingCardHtml()}
-  ${homeNoticesHtml(ds,today,context.notices)}
+  ${ds===today?profileQuestionCardHtml():""}
   ${coachSection}`;
   maybeStartFitbrosTour();
   void maybeClaimProfileQuestion();
+  if($("#noticesBody"))refreshNotices();
 }
 function renderCoach(){chatModeActive()?renderChatMode():renderHoy();}
 
@@ -6228,6 +6277,7 @@ function renderNutrition(){
   const registerMoreHtml=`<button type="button" class="btn nut-register-more" style="width:100%;margin-top:8px" onclick="openExtraRegistration('${ds}')">Registrar algo que comí</button>`;
   // REQ-124: anillo/resumen -> comidas del día (+ extras interoperadas) -> más opciones (al final).
   $("#app").innerHTML=`
+  ${appTopBarHtml()}
   ${dayHeaderNav(ds)}
   ${section("nut.macros","Macros del día",heroDash(ds,{compact:"always"})+`<div class="muted small">${dbStatusNote()}</div>`)}
   ${nutritionUpdateHtml()}
@@ -8467,6 +8517,7 @@ function renderWorkout(){
   // La pausa por seguridad sigue siempre a la vista.
   if(sessionActive){
     $("#app").innerHTML=`
+  ${appTopBarHtml()}
   ${dayHeaderNav(ds,{hideWeek:true})}
   ${trainingSafetyHold()?safetyNotice:""}
   ${renderWorkoutExecution(ds,execution)}
@@ -8480,6 +8531,7 @@ function renderWorkout(){
     return;
   }
   $("#app").innerHTML=`
+  ${appTopBarHtml()}
   ${dayHeaderNav(ds,{hideWeek:true})}
   ${safetyNotice}
   ${emptyWkHtml}
@@ -8730,7 +8782,7 @@ function weightSetupCard(empty){
 }
 function renderProgress(){
   const empty=progressIsEmpty();
-  $("#app").innerHTML=`${screenHeader("Progreso","Tu evolución","progreso")}
+  $("#app").innerHTML=`${appTopBarHtml()}${screenHeader("Progreso","Tu evolución","progreso")}
     ${weeklyCheckinChip()}
     ${empty?weightSetupCard(true):startWeightNoteCard()}
     ${section("pr.stats","Tus números",progressStats(),null,empty)}
@@ -9838,7 +9890,7 @@ function renderProfile(){
   const email=(session&&session.user&&session.user.email)||"";
   const duration=resolvedPlanDuration(p);
   const strengthChoice=strengthChoiceFromPrefs(p);
-  $("#app").innerHTML=`${screenHeader("Perfil",email,"perfil")}
+  $("#app").innerHTML=`${appTopBarHtml()}${profileBackHtml()}${screenHeader("Perfil",email)}
   ${referralNoticeHtml()}
   ${nutritionUpdateHtml()}
   ${needsProfileTuning(p)?`<div class="alert violet" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>Afina tu plan</b> — Una pregunta breve cada día para ajustar tus próximas propuestas.</span><button type="button" class="btn" onclick="openProfileQuestion()">Continuar en Hoy</button></div>`:""}
@@ -18770,7 +18822,8 @@ function tourSteps(){
     {sel:'[data-tab="nutricion"]',title:"Nutrición",body:"Tus comidas del día con calorías y macros. Registra, reemplaza por otra opción o agrega un extra.",placement:"top"},
     {sel:'[data-tab="entreno"]',title:"Entreno",body:"Tu entreno guiado paso a paso: calentamiento, series e intervalos con temporizador y demostraciones.",placement:"top"},
     {sel:'[data-tab="progreso"]',title:"Progreso",body:"Registra tu peso semanal y mira tu evolución, racha y adherencia.",placement:"top"},
-    {sel:'[data-tab="perfil"]',title:"Perfil",body:"Ajusta metas, comidas, entrenamiento y privacidad. Cada 4 semanas te proponemos revisar.",placement:"top"}
+    {sel:"#noticesBtn",title:"Avisos",body:"Check-in, semana del plan y recordatorios te esperan aquí. El número dice cuántos hay.",placement:"bottom"},
+    {sel:"#profileBtn",title:"Perfil",body:"Ajusta metas, comidas, entrenamiento y privacidad. Cada 4 semanas te proponemos revisar.",placement:"bottom"}
   ];
 }
 function tourEnsureStyle(){

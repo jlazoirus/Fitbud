@@ -51,12 +51,12 @@ En Evolv, «alumno» es la persona que usa la app (no hay un panel de coach huma
 - **Coach humano** (mensaje del día firmado, formularios, chat con el coach, «el objetivo que fijó…»): Evolv no tiene coach humano. Nuestro coach mantiene su lugar y REQ-31 sigue mandando: nada de IA, modelos ni cuotas en la UI.
 - **RIR, RM y jerga de bloques** («tipo IIa», «RIR 1»): REQ-400 y REQ-409 piden textos sin jerga.
 - **Agua, pasos y suplementos**: son funciones nuevas, no simplificación. Quedan como candidatas; si se aprueban, usan la misma hoja inferior y entran como filas del Plan de hoy.
-- **Cambiar las pestañas a Hoy / Agenda / Progreso / Biblioteca / Perfil**: en la demo Nutrición y Entreno se abren desde Hoy. Cambiar la navegación afecta a todos los recorridos y al tour; es una decisión de producto de Jonathan. Esta serie no toca las pestañas.
+- **Cambiar las pestañas a Hoy / Agenda / Progreso / Biblioteca / Perfil**: en la demo Nutrición y Entreno se abren desde Hoy. Se mantienen Nutrición y Entreno como pestañas. Jonathan decidió (2026-11-24) sacar Perfil del menú: va arriba a la derecha junto a la campana de Avisos, como en la demo (REQ-422/423).
 - **Marca, colores, tipografía y fotos de la demo**: Evolv conserva su identidad. Se adopta el principio de un color por tipo de actividad para los íconos del Plan de hoy, con tonos propios.
 
 ## Orden de implementación
 
-1. REQ-415 y REQ-416 (Hoy): mayor impacto diario, sin cambios de datos. **Implementados en esta rama.**
+1. REQ-415 y REQ-416 (Hoy), REQ-422 (Avisos en ventana emergente) y REQ-423 (Perfil arriba, menú de cuatro): mayor impacto diario, sin cambios de datos. **Implementados en esta rama.**
 2. REQ-417 (reproductor) y REQ-418 (vista previa). REQ-418 muestra «Hoy» cuando exista REQ-409; antes, solo «La última vez».
 3. REQ-419 (comida), REQ-420 (progreso) y REQ-421 (perfil), independientes entre sí.
 

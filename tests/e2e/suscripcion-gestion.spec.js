@@ -34,7 +34,7 @@ test.describe("Gestionar la suscripción (REQ-357)", () => {
     await autoDismissNudges(page);
     const errors = collectConsoleErrors(page);
     await gotoApp(page);
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.keyboard.press("Escape");
     await page.locator("details.pf-accordion > summary", { hasText: "Mi suscripción" }).click();
     const box = page.locator("#pfSubscriptionBox");

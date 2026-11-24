@@ -13,7 +13,7 @@ test("con el enlace de prueba: entreno, peso y comidas desde el hilo, y vuelta a
   await expect(page.locator("#toast")).toContainText("Modo conversación disponible");
   expect(new URL(page.url()).search).toBe("");
 
-  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#profileBtn").click();
   await page.keyboard.press("Escape");
   await page.locator("details.pf-accordion > summary", { hasText: "Cuenta" }).click();
   await page.getByRole("button", { name: "Conversación" }).click();
@@ -65,7 +65,7 @@ test("sin la marca de prueba, Perfil no ofrece el modo conversación", async ({ 
   await seedLoggedInUser(page);
   await autoDismissNudges(page);
   await gotoApp(page);
-  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#profileBtn").click();
   await page.keyboard.press("Escape");
   await page.locator("details.pf-accordion > summary", { hasText: "Cuenta" }).click();
   await expect(page.locator("#app")).not.toContainText("Modo de la app");

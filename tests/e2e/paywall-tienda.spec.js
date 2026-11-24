@@ -66,7 +66,7 @@ test("Renovar plan en Perfil abre el mismo aviso y, al volver tras pagar, el pla
   await mockEntitlement(page, state);
   await gotoApp(page);
 
-  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#profileBtn").click();
   await page.keyboard.press("Escape");
   await page.locator("details.pf-accordion > summary", { hasText: "suscripción" }).click();
   await page.getByRole("button", { name: "Renovar plan" }).click();

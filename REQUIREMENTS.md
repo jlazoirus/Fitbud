@@ -2657,3 +2657,11 @@ REQ-208: sin precios para beta.
 El estado coincide con lo guardado; sin precios en beta.
 ### Verificación sugerida
 `perfil.spec.js`, `recordatorios.spec.js`.
+
+## REQ-422 - Avisos en una ventana emergente
+
+**Estado: implementado.** La campana de la barra superior, con contador, abre «Avisos» (`openNotices()`): retomar el plan, check-in, invitaciones, semana del plan y recordatorios. Hoy ya no los pliega; la pregunta del perfil (REQ-390) sigue a la vista. Lo que se hace dentro la actualiza (`refreshNotices()`). ✓ `avisos.spec.js`, `plan-weeks.spec.js`. Detalle en `docs/requirements-history.md`.
+
+## REQ-423 - Perfil arriba a la derecha y menú de cuatro pestañas
+
+**Estado: implementado.** `appTopBarHtml()` en Hoy, Nutrición, Entreno, Progreso y Perfil: logo, Avisos y la inicial que abre Perfil (`#profileBtn`). El menú inferior queda con Hoy, Nutrición, Entreno y Progreso; Perfil vuelve a la pantalla de origen. ✓ `navegacion.spec.js`, `perfil.spec.js`. Detalle en `docs/requirements-history.md`.
