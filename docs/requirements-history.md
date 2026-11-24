@@ -13490,6 +13490,31 @@ E2E de la portada (sin "beta"), de `/beta` y del canje con código.
 - **Sin cambios:** `/beta`, `?source=`, `/app?codigo=`, el canje en Perfil y REQ-208.
 - **Pruebas:** `portada.spec.js` (sin "beta" ni enlaces a `/beta`; "Ver planes" lleva a los planes), `tienda.spec.js` e `invitacion.spec.js`.
 
+## REQ-357 - Gestionar la suscripción y sus correos
+
+**Estado: implementado.** Perfil → Mi suscripción y `/cuenta` (web pública) muestran estado, próximo cobro y tarjeta, y cancelan con confirmación (`GET /api/suscripcion/estado`). Cinco correos del ciclo en `api/_tienda/suscripcion-correos.js`, una vez cada uno por su clave en `notification_log`; el aviso previo al primer cobro sale del cron de `/api/notify`, y REQ-351 omite a quien tiene una suscripción viva. Acción manual: aplicar `supabase/notifications_subscription.sql`. Plan §3, "Gestión y correos".
+
+### Origen
+Decisión de Jonathan (2026-11-06): cancelar en un toque y avisar antes de cada cobro.
+### Problema
+Sin cancelación fácil ni avisos llegan contracargos y reclamos.
+### Objetivo
+Ver el estado de la suscripción y cancelarla desde Perfil y desde la web pública, y recibir los correos del ciclo.
+### Alcance
+- Perfil → Mi suscripción: estado, próximo cobro, tarjeta (marca y últimos 4) y "Cancelar suscripción" con confirmación.
+- La misma acción en la web pública, para quien usa la app nativa.
+- Correos: inicio de la prueba, aviso 2 días antes del primer cobro, recibo de cada cobro, cobro fallido y cancelación. Se reutiliza `notification_log`.
+- REQ-351 no avisa a quien tiene una suscripción activa.
+### Fuera de alcance
+Cambiar de tarjeta (llega después), otros planes recurrentes.
+### Riesgos
+Correos duplicados; que el acceso se corte antes de tiempo al cancelar.
+### Criterios de aceptación
+- Al cancelar, no hay más cobros y el acceso dura hasta el fin del período.
+- Cada correo sale una sola vez.
+### Verificación sugerida
+Test Node con Culqi y Resend simulados, y E2E de Perfil.
+
 ## REQ-358 - Entreno: reemplazar una rutina actualiza el nombre, los visuales y Hoy
 
 **Estado: implementado.**

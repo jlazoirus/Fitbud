@@ -2090,28 +2090,7 @@ Compartir envía la racha con tu enlace de invitación. ✓ `tests/e2e/rachas-am
 
 ## REQ-357 - Gestionar la suscripción y sus correos
 
-**Estado: implementado.** Perfil → Mi suscripción y `/cuenta` (web pública) muestran estado, próximo cobro y tarjeta, y cancelan con confirmación (`GET /api/suscripcion/estado`). Cinco correos del ciclo en `api/_tienda/suscripcion-correos.js`, una vez cada uno por su clave en `notification_log`; el aviso previo al primer cobro sale del cron de `/api/notify`, y REQ-351 omite a quien tiene una suscripción viva. Acción manual: aplicar `supabase/notifications_subscription.sql`. Plan §3, "Gestión y correos".
-
-### Origen
-Decisión de Jonathan (2026-11-06): cancelar en un toque y avisar antes de cada cobro.
-### Problema
-Sin cancelación fácil ni avisos llegan contracargos y reclamos.
-### Objetivo
-Ver el estado de la suscripción y cancelarla desde Perfil y desde la web pública, y recibir los correos del ciclo.
-### Alcance
-- Perfil → Mi suscripción: estado, próximo cobro, tarjeta (marca y últimos 4) y "Cancelar suscripción" con confirmación.
-- La misma acción en la web pública, para quien usa la app nativa.
-- Correos: inicio de la prueba, aviso 2 días antes del primer cobro, recibo de cada cobro, cobro fallido y cancelación. Se reutiliza `notification_log`.
-- REQ-351 no avisa a quien tiene una suscripción activa.
-### Fuera de alcance
-Cambiar de tarjeta (llega después), otros planes recurrentes.
-### Riesgos
-Correos duplicados; que el acceso se corte antes de tiempo al cancelar.
-### Criterios de aceptación
-- Al cancelar, no hay más cobros y el acceso dura hasta el fin del período.
-- Cada correo sale una sola vez.
-### Verificación sugerida
-Test Node con Culqi y Resend simulados, y E2E de Perfil.
+**Estado: implementado.** Perfil → Mi suscripción y `/cuenta` (web pública) muestran estado, próximo cobro y tarjeta, y cancelan con confirmación (`GET /api/suscripcion/estado`). Cinco correos del ciclo en `api/_tienda/suscripcion-correos.js`, una vez cada uno por su clave en `notification_log`; el aviso previo al primer cobro sale del cron de `/api/notify`, y REQ-351 omite a quien tiene una suscripción viva. Acción manual: aplicar `supabase/notifications_subscription.sql`. Plan §3, "Gestión y correos". Detalle en `docs/requirements-history.md`.
 
 ## REQ-358 - Entreno: reemplazar una rutina actualiza el nombre, los visuales y Hoy
 
@@ -2557,3 +2536,160 @@ Recortar tras una semana atípica; sumar en modo suave (no se ofrece).
 Sentadilla cambiada por prensa 2 de 3 veces: se propone dejar la prensa y, al aceptar, queda en las sesiones pendientes y en el plan nuevo. 3 de 5 días dos semanas: se propone rutina de 3 días. Nada cambia sin aceptar; lo descartado no vuelve en 28 días.
 ### Verificación sugerida
 Script nuevo de `analyzeTrainingHistory`, `coach-rutina.spec.js`, `plan-weeks.spec.js`.
+
+## REQ-415 - Hoy: «Plan de hoy» como lista con avance del día
+
+**Estado: pendiente.** Serie REQ-415→421 (simplicidad de la demo de CEO App). Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24: copiar la UX y simplicidad de la app del alumno de la demo.
+### Problema
+Hoy reparte el día entre tarjeta principal, fila de entreno y «Resto del día» plegado; no se ve el avance.
+### Causa raíz
+`homeAgendaHtml()` (`app/index.html:5841`) promueve una acción y pliega el resto.
+### Objetivo
+Entreno y comidas del día en una lista ordenada por hora, con avance y una sola acción destacada.
+### Alcance
+Filas con punto por tipo, título, estado y una píldora; barra por actividad, «Te faltan N» y «x/N». Registrar un plato planificado en un toque.
+### Fuera de alcance
+Pestañas, Avisos, coach, agua/pasos.
+### Riesgos
+Specs de Hoy (REQ-392..395); orden con horario flexible.
+### Criterios de aceptación
+3 comidas y entreno: «0/4»; registrar el desayuno: «1/4». Descanso y pausa no cuentan. Sin desbordes a 320 px.
+### Verificación sugerida
+`home-optional-menu.spec.js`, `home.spec.js` y release gate.
+
+## REQ-416 - Hoy: «Esta semana» con cumplimiento por día
+
+**Estado: pendiente.** Depende de REQ-415. Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24, misma serie.
+### Problema
+El cumplimiento semanal solo se ve en el check-in o en Progreso.
+### Objetivo
+Leer la semana en Hoy: siete barras y un porcentaje con su regla escrita.
+### Alcance
+Barras L–D, «N % cumplido» con su regla y la semana pasada. Mismo conteo que REQ-415.
+### Fuera de alcance
+Racha, check-in, metas.
+### Riesgos
+Semanas partidas por el inicio del plan; días futuros contados.
+### Criterios de aceptación
+Lunes y martes con 4 de 8: «50 %». Futuro y fuera del plan vacíos.
+### Verificación sugerida
+Spec E2E nuevo y release gate.
+
+## REQ-417 - Entreno: el reproductor muestra una serie a la vez
+
+**Estado: pendiente.** Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24, misma serie.
+### Problema
+Mientras se entrena se ven seis tarjetas de dosis y todas las series con tres campos.
+### Causa raíz
+`renderStrengthSet()` (`app/index.html:7455`) pinta cada serie abierta; el esfuerzo es obligatorio a la vista.
+### Objetivo
+Una serie por pantalla con carga y repeticiones precargadas y un solo «Registrar serie».
+### Alcance
+Descanso a pantalla completa con «Sigue» y «Editar la serie anterior». Sustituir, técnica y molestia en chips. Esfuerzo opcional.
+### Fuera de alcance
+Sugerencia de carga (REQ-409), cierre del entreno.
+### Riesgos
+Ejecuciones guardadas con el formato actual; `entreno.spec.js`.
+### Criterios de aceptación
+Registrar una serie correcta: 1 toque. Retomar conserva las series.
+### Verificación sugerida
+`validate-workout-player.mjs`, `entreno.spec.js`, `repetir-entreno.spec.js`.
+
+## REQ-418 - Entreno: vista previa por bloques con la última vez
+
+**Estado: pendiente.** Mostrar «Hoy» depende de REQ-409. Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24, misma serie.
+### Problema
+«Iniciar entreno» compite con siete bloques en la pestaña.
+### Objetivo
+Ver el entreno como bloques numerados con miniatura, dosis y «La última vez» por ejercicio; «Iniciar entreno» fijo.
+### Alcance
+`renderWorkout()` (`app/index.html:8265`). Personalizar, adaptar y registrar otra actividad en «···».
+### Fuera de alcance
+Cambiar la rutina, cargas sugeridas.
+### Riesgos
+Accesos que hoy prueban specs de contingencia.
+### Criterios de aceptación
+Una acción destacada; las secundarias a dos toques.
+### Verificación sugerida
+`entreno.spec.js`, `coach-rutina.spec.js`, `entreno-casa.spec.js`.
+
+## REQ-419 - Nutrición: cada comida es una tarjeta con su plato y un solo «Registrar»
+
+**Estado: pendiente.** Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24, misma serie.
+### Problema
+Cada comida trae cuatro controles y flechas de orden; el plato no se ve como lo que se come.
+### Causa raíz
+`mealCard()` (`app/index.html:8395`).
+### Objetivo
+Plato con ingredientes (gramos · kcal), P/C/G en una fila y un botón «Registrar».
+### Alcance
+«Cambiar» por línea con receta; saltar, ordenar y opciones en «···».
+### Fuera de alcance
+Motor de reemplazos, catálogo.
+### Riesgos
+Specs de registro y reemplazo.
+### Criterios de aceptación
+Registrar el plato planificado: 1 toque. Ninguna acción actual se pierde.
+### Verificación sugerida
+`nutricion.spec.js`, `registro*.spec.js`, `sustitucion.spec.js`.
+
+## REQ-420 - Progreso: una métrica a la vez con su evolución
+
+**Estado: pendiente.** Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24, misma serie.
+### Problema
+Progreso abre con campos y secciones; no muestra inicio, actual y cambio.
+### Causa raíz
+`renderProgress()` (`app/index.html:8597`).
+### Objetivo
+Peso (y cintura o grasa con datos): cifra, gráfico, Inicio/Actual/Cambio/Registros y registros con diferencia.
+### Alcance
+Selector de métrica; «Agregar» abre el registro actual.
+### Fuera de alcance
+Fotos, fuerza, relojes.
+### Riesgos
+Cuentas sin registros; `progreso.spec.js`.
+### Criterios de aceptación
+Con 3 pesos: cifras correctas y diferencias por registro. Sin registros, una sola invitación.
+### Verificación sugerida
+`progreso.spec.js`, `medicion.spec.js`.
+
+## REQ-421 - Perfil: resumen arriba y cada sección con su estado
+
+**Estado: pendiente.** Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24, misma serie.
+### Problema
+Perfil son ocho acordeones sin estado.
+### Causa raíz
+`renderProfile()` (`app/index.html:9698`).
+### Objetivo
+Tarjeta con nombre, ciclo, semana y cumplimiento; cada sección dice su estado en una línea.
+### Alcance
+«Recordatorios · 2 activos», «Mi suscripción · …», sin cambiar el acordeón (REQ-105).
+### Fuera de alcance
+Foto de perfil, contenido de cada sección.
+### Riesgos
+REQ-208: sin precios para beta.
+### Criterios de aceptación
+El estado coincide con lo guardado; sin precios en beta.
+### Verificación sugerida
+`perfil.spec.js`, `recordatorios.spec.js`.
