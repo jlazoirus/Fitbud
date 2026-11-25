@@ -14626,6 +14626,31 @@ Un upsert colgado retrasa los guardados siguientes (antes ya colgaba el guardado
 #### Verificación sugerida
 `tests/e2e/perfil-guardado-concurrente.spec.js` (falla en `788a860`), e2e de perfil y preguntas, y release gate.
 
+### REQ-404 - Nutrición: los primeros días se registra, sin menú sugerido
+
+**Estado: implementado.** Serie REQ-404→407. Diseño y textos: `docs/nutrition-first-days.md`.
+
+Implementación (`app/index.html`): `saveOnboarding()` agrega `nutritionIntake:{version:1,status:"observing",startedAt:planStartDate,endedAt:null,cycle}` al primer onboarding; un ciclo nuevo lo repite solo si la cuenta ya pasó por el periodo y tiene menos de 3 días completos en los últimos 28. `nutritionIntakeActive()` (observing o review) apaga la nutrición de `prepareFirstCycleWeek()` (el entreno se prepara igual), `maybePrepareNutritionWeek()` y `homeMenuSuggestionHtml()`; `nutritionWeekHtml()` cede su lugar a `nutritionIntakeCardHtml()`. `nutritionIntakeProgress()` calcula desde `S.days` (day_log): `intakeDayComplete()` = 2 comidas o extras hechos y kcal ≥ 40 % de la meta del día; etapas `observing` («Día N de 3», o «de 5» tras «Registrar 2 días más», que guarda `extended`), `offer` (3 días), `ready` (5 días, o el tope de 7 días con al menos 1), `empty` (tope sin días: «Preparar mi menú»). «Ver mi resumen» guarda `status:"review"` y abre un paso mínimo «Así comes» con «Preparar mi menú» (REQ-405 lo completa). «Prefiero recibir un menú ya» confirma y `finishNutritionIntake("skipped")` guarda el estado y abre `aiGenerateWeek()` (el flujo actual, con revisión antes de guardar). `intakeMacroDash()` reemplaza los medidores de Nutrición (lo registrado, sin metas ni «restantes») y `homeConsumptionHtml()` muestra «Día N de 3 · X kcal registradas» también en cero. El aviso `showNutritionIntakeNotice()` sale una vez tras guardar el onboarding, después del paso de avisos de REQ-289 si se muestra (cuyo título pasa a «Tu plan está listo»). Analítica: evento `nutrition_intake` con `action` y `count`, sin comidas (`api/analytics.js`). PWA `fitbud-pwa-v265`. `autoDismissNudges()` (tests) acepta el aviso.
+
+#### Origen
+Jonathan, 2026-11-16: antes de sugerir dietas, recopilar 3 a 5 días de comidas reales y avisarlo.
+#### Problema
+El usuario nuevo recibe un menú antes de registrar una sola comida.
+#### Causa raíz
+`saveOnboarding()` → `prepareFirstCycleWeek()` → `prepareFirstWeekNutrition()` (`app/index.html:4482`, `:4320`).
+#### Objetivo
+Toda cuenta nueva empieza registrando lo que come, con aviso previo y avance visible.
+#### Alcance
+`prefs.nutritionIntake`. Aviso al cerrar el onboarding. Sin menú inicial ni preparación automática; el entreno se prepara igual. Tarjeta «Día 2 de 3» y registrar como acción principal. Día completo: 2 comidas y 40 % de las kcal. Mínimo 3 días, 5 para cerrar solo, tope de 7. Salida «Prefiero recibir un menú ya».
+#### Fuera de alcance
+Resumen (REQ-405), cuentas existentes (REQ-411), recordatorios propios.
+#### Riesgos
+El menú llega el día 4 de la semana gratis (REQ-356). Specs que esperan menú tras el onboarding.
+#### Criterios de aceptación
+Onboarding nuevo: aviso, cero comidas sugeridas y entreno listo. Al tercer día completo se ofrece el resumen. El tope o la salida preparan el menú actual. Persiste al recargar; una cuenta existente no cambia.
+#### Verificación sugerida
+`tests/e2e/primeros-dias.spec.js`; regresión de `onboarding*.spec.js` y `home-optional-menu.spec.js`.
+
 ## Compactación 2026-11-16: resúmenes de REQ implementados (244, 167, 137, 249, 215, 227, 238, 266, 209, 214)
 
 Resúmenes movidos tal cual desde `REQUIREMENTS.md` para dejar espacio a REQ-404..410.

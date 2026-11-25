@@ -437,6 +437,8 @@
   .tempo-list{margin:6px 0 10px;padding-left:18px;display:grid;gap:6px;font-size:14px;line-height:1.4}
   .plan-opt{font-size:11px;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 7px;margin-left:4px;vertical-align:1px}
   .link-btn{background:none;border:none;padding:0;color:var(--purple-200);text-decoration:underline;font:inherit;cursor:pointer}
+  .nutrition-intake .intake-progress{margin:2px 0 6px;color:var(--txt)}
+  .nutrition-intake .intake-exit{display:inline-block;min-height:44px;margin-top:6px;font-size:13px;color:var(--muted)}
   .set-row{background:var(--surf3);border:1px solid var(--border);border-radius:var(--r-md);padding:10px}
   .set-row.done{border-color:var(--good);background:var(--good-dim)}
   .set-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
@@ -4659,7 +4661,8 @@ async function prepareFirstCycleWeek(ds,options){
   const summary={ok:false,nutrition:null,training:null,errors:[]};
   try{
     await loadEntitlement();
-    const nutrition=await prepareFirstWeekNutrition(ds,setup);
+    // REQ-404: durante los primeros días no se prepara menú; el entreno sí.
+    const nutrition=nutritionIntakeActive()?{ok:true,intake:true,daysData:[],problems:[]}:await prepareFirstWeekNutrition(ds,setup);
     summary.nutrition=nutrition;
     if(nutrition&&nutrition.ok)setup.done.push("nutrition");
     else{setup.failed.push("nutrition");summary.errors.push(...((nutrition&&nutrition.problems)||["No pudimos preparar comidas."]));}
@@ -4715,6 +4718,10 @@ async function saveOnboarding(){
     planEndDate=planEndFor(planStartDate,duration);
   }
   const calendarChanged=durationChanged||previous.planStartDate!==planStartDate||previous.planEndDate!==planEndDate;
+  // REQ-404: el primer onboarding empieza registrando lo que come, sin menú.
+  // Un ciclo nuevo solo repite el periodo si no hay 3 días completos en los últimos 28.
+  const intakeStarts=firstCycle||(newCycle&&!!nutritionIntakeState(previous)
+    &&intakeCompleteDaysBetween(addDays(todayStr(),-28),todayStr()).length<INTAKE_RULES.minDays);
   const prefs={...previous,
     profileSchemaVersion:PROFILE_SCHEMA_VERSION,
     name:d.name,sex:d.sex,age:d.age,heightCm:d.heightCm,weightKg:d.weightKg,
@@ -4743,6 +4750,7 @@ async function saveOnboarding(){
     onboardingPending:false,pendingChallenge:null,restartCycle:false,
     onboardingCompletedAt:previous.onboardingCompletedAt||now,onboardingReviewedAt:now,cycleStartedAt:now,
     ...(firstCycle||newCycle?{cycleFirstDayPreparedAt:null,cycleFirstWeekPreparedAt:null}:{}),
+    ...(intakeStarts?{nutritionIntake:{version:1,status:"observing",startedAt:planStartDate,endedAt:null,cycle:planCycleNumber}}:{}),
     ...(firstCycle||newCycle?{onboardingEssentialOnly:true,profileRefinedAt:PROFILE_QUESTIONS.complete(PROFILE_QUESTIONS.state(previous))?(previous.profileRefinedAt||now):null}:{}),
   };
   const result=await saveProfilePrefs(prefs,{
@@ -4775,7 +4783,8 @@ async function saveOnboarding(){
   }
   render();scrollAppTop();
   if(weekIssues)firstWeekIssueModal(firstWeekSummary);
-  if(!notifySetupActive)toast(firstCycle||newCycle?(weekIssues?"Tu semana quedó parcialmente lista":"Tu primera semana está lista"):"Tu plan quedó actualizado");
+  else if(intakeStarts){if(notifySetupActive)intakeNoticePending=true;else showNutritionIntakeNotice();}
+  if(!notifySetupActive&&!(intakeStarts&&!weekIssues))toast(firstCycle||newCycle?(weekIssues?"Tu semana quedó parcialmente lista":"Tu primera semana está lista"):"Tu plan quedó actualizado");
   loadStreakFriendsAfterAuth(); // REQ-300: retomar la invitación tras completar el perfil
 }
 function maybePromptProfileReview(){
@@ -5192,7 +5201,25 @@ function miniMacroMeter(label,v,g,fillClass,key){
     <div class="bar"><i class="${fillClass}" style="width:${pctW(v,g)}%"></i></div>
   </div>`;
 }
+// REQ-404: en los primeros días se ve lo registrado, sin «restantes» ni metas.
+function intakeMacroDash(ds){
+  const {t,doneMeals,partial}=dayTotals(ds),pr=nutritionIntakeProgress();
+  const item=(label,v)=>`<div><div class="mini-macro-label"><span>${label}</span><b>${v} g</b></div></div>`;
+  return `<div class="dash mini-macro-dash intake-dash">
+    <div class="mini-macro-top">
+      <div>
+        <div class="mini-macro-kicker">Registrado ${ds===todayStr()?"hoy":"este día"}</div>
+        <div class="mini-macro-main"><b>${t.kcal}</b> kcal</div>
+      </div>
+      <div class="mini-macro-pill">${doneMeals} comida${doneMeals===1?"":"s"}</div>
+    </div>
+    <div class="mini-macro-grid">${item("Proteínas",t.p)}${item("Carbohidratos",t.c)}${item("Grasas",t.f)}</div>
+    ${pr&&pr.stage==="observing"?`<p class="muted small" style="margin:8px 0 0">Primeros días · ${pr.label}. Tu meta sigue en Perfil.</p>`:""}
+    ${partialMacrosNote(partial)}
+  </div>`;
+}
 function miniMacroDash(ds){
+  if(nutritionIntakeActive())return intakeMacroDash(ds);
   const {t,target,doneMeals,totMeals,partial}=dayTotals(ds);
   const isToday=ds===todayStr();
   const rem=Math.max(0,target.kcal-t.kcal);
@@ -5215,6 +5242,7 @@ function miniMacroDash(ds){
   </div>`;
 }
 function heroDash(ds,opts){
+  if(nutritionIntakeActive())return intakeMacroDash(ds);
   const {t,target,doneMeals,totMeals,partial}=dayTotals(ds);
   if(opts&&opts.compact){
     return miniMacroDash(ds);
@@ -5384,6 +5412,117 @@ function openFoodRegistration(ds,id){
   const next=dayEffectiveOrder(ds).find(it=>it.type==="meal"&&(!id||it.base.id===id)&&!mealState(ds,it.base.id).done&&!mealState(ds,it.base.id).skipped);
   openEditor("extra",ds,null,{title:"Registrar comida",registration:true,initialTab:"food",intent:next?"replace":"extra",target:next?next.base.id:null});
 }
+/* ---------- REQ-404: primeros días — se registra antes de sugerir menú ---------- */
+// Estado en profiles.prefs.nutritionIntake (privado, sin SQL). El avance no se
+// guarda: se calcula desde day_log. Reglas: docs/nutrition-first-days.md.
+const INTAKE_RULES={minDays:3,autoDays:5,maxDays:7,minMeals:2,minKcalShare:0.4};
+const INTAKE_NOTICE_TEXT="Antes de sugerirte platos para llegar a tus macros, queremos entender cómo es tu día a día. Durante los próximos 3 a 5 días registra cada una de tus comidas, tal como comes hoy. Con eso vemos qué comes y te proponemos algunos cambios.";
+function nutritionIntakeState(prefs){
+  const s=(prefs||(profile&&profile.prefs)||{}).nutritionIntake;
+  return s&&typeof s==="object"&&s.version===1&&validYmd(s.startedAt)?s:null;
+}
+// Mientras dura (observing) o espera el resumen (review) no hay menú automático.
+function nutritionIntakeActive(prefs){
+  const s=nutritionIntakeState(prefs);
+  return !!s&&(s.status==="observing"||s.status==="review");
+}
+function intakeDayComplete(ds){
+  const {t,doneMeals,target}=dayTotals(ds);
+  return doneMeals>=INTAKE_RULES.minMeals&&target.kcal>0&&t.kcal>=target.kcal*INTAKE_RULES.minKcalShare;
+}
+function intakeCompleteDaysBetween(from,to){
+  const out=[];
+  for(let d=from;d<=to;d=addDays(d,1))if(S.days&&S.days[d]&&intakeDayComplete(d))out.push(d);
+  return out;
+}
+function nutritionIntakeProgress(prefs){
+  const s=nutritionIntakeState(prefs);if(!s)return null;
+  const today=todayStr(),last=addDays(s.startedAt,INTAKE_RULES.maxDays-1);
+  const days=today<s.startedAt?[]:intakeCompleteDaysBetween(s.startedAt,today<last?today:last);
+  const complete=days.length,todayComplete=days.includes(today);
+  const goal=s.extended?INTAKE_RULES.autoDays:INTAKE_RULES.minDays;
+  const capped=today>=last;
+  // «Día 2 de 3»: el día que toca completar ahora.
+  const dayNum=Math.min(goal,complete-(todayComplete?1:0)+1);
+  let stage="observing";
+  if(s.status==="review")stage="review";
+  else if(complete>=INTAKE_RULES.autoDays)stage="ready";
+  else if(complete>=INTAKE_RULES.minDays&&!s.extended)stage="offer";
+  else if(capped)stage=complete?"ready":"empty";
+  return {state:s,complete,todayComplete,goal,dayNum,capped,stage,label:`Día ${dayNum} de ${goal}`};
+}
+async function saveNutritionIntake(patch){
+  const s=nutritionIntakeState();if(!s)return false;
+  const result=await saveProfilePrefs({...profile.prefs,nutritionIntake:{...s,...patch}},{skipPlanVersion:true});
+  if(result&&result.error){toast("No pudimos guardar tu elección. Inténtalo otra vez.",{tone:"err"});return false;}
+  return true;
+}
+// Aparece una sola vez, al terminar el onboarding y antes de entrar a Hoy
+// (después del paso de avisos de REQ-289 cuando ese paso se muestra).
+let intakeNoticePending=false;
+function showNutritionIntakeNotice(){
+  intakeNoticePending=false;
+  modal(`<h3>Primero queremos conocerte</h3>
+    <p class="muted">${INTAKE_NOTICE_TEXT}</p>
+    <button class="btn btn-accent" style="width:100%" data-intake-start onclick="startNutritionIntake()">Empezar a registrar</button>`);
+}
+function startNutritionIntake(){
+  closeModal();
+  trackEvent("nutrition_intake",{action:"start"});
+}
+// El botón de registrar va justo debajo, en renderNutrition.
+function nutritionIntakeCardHtml(){
+  const pr=nutritionIntakeProgress();if(!pr)return"";
+  const exit=`<button type="button" class="link-btn intake-exit" onclick="askSkipNutritionIntake()">Prefiero recibir un menú ya</button>`;
+  let title="Primero queremos conocerte",body=`Registra cada comida, tal como comes hoy. Con 3 a 5 días vemos qué comes y te proponemos algunos cambios.`,actions="";
+  if(pr.stage==="offer"){
+    title="Ya tenemos 3 días";
+    body="¿Vemos tu resumen o registras 2 días más para afinar?";
+    actions=`<button class="btn btn-accent" onclick="openNutritionIntakeReview()">Ver mi resumen</button><button class="btn" onclick="extendNutritionIntake()">Registrar 2 días más</button>`;
+  }else if(pr.stage==="ready"||pr.stage==="review"){
+    title="Tu resumen está listo";
+    body=`Registraste ${pr.complete} día${pr.complete===1?"":"s"} completo${pr.complete===1?"":"s"}. Con eso preparamos tu menú.`;
+    actions=`<button class="btn btn-accent" onclick="openNutritionIntakeReview()">Ver mi resumen</button>`;
+  }else if(pr.stage==="empty"){
+    title="Preparemos tu menú";
+    body="Pasó una semana y aún no tenemos un día completo. Te preparamos el menú con tus preferencias; puedes seguir registrando lo que comes.";
+    actions=`<button class="btn btn-accent" onclick="finishNutritionIntake('skipped')">Preparar mi menú</button>`;
+  }
+  const progress=pr.stage==="observing"?`<p class="intake-progress"><b>${pr.label}</b>${pr.todayComplete?" · hoy ya está completo":""}</p>`:"";
+  return `<section class="nutrition-week nutrition-intake" aria-labelledby="nutritionIntakeTitle">
+    <h2 id="nutritionIntakeTitle">${title}</h2>${progress}<p>${body}</p>
+    ${actions?`<div class="menu-suggestion-actions">${actions}</div>`:""}
+    ${pr.stage==="observing"||pr.stage==="offer"?exit:""}
+  </section>`;
+}
+async function extendNutritionIntake(){
+  if(await saveNutritionIntake({extended:true}))render();
+}
+// REQ-405 completa esta pantalla con el resumen y los cambios sugeridos.
+async function openNutritionIntakeReview(){
+  const pr=nutritionIntakeProgress();if(!pr)return;
+  if(pr.state.status!=="review"&&!await saveNutritionIntake({status:"review"}))return;
+  trackEvent("nutrition_intake",{action:"review",count:pr.complete});
+  modal(`<h3>Así comes</h3>
+    <p class="muted">Registraste ${pr.complete} día${pr.complete===1?"":"s"} completo${pr.complete===1?"":"s"}. Con lo que comes preparamos tu menú; lo revisas antes de guardarlo.</p>
+    <button class="btn btn-accent" style="width:100%" onclick="finishNutritionIntake('done')">Preparar mi menú</button>`);
+  render();
+}
+function askSkipNutritionIntake(){
+  modal(`<h3>¿Prefieres recibir un menú ya?</h3>
+    <p class="muted">Dejamos de esperar tus registros y preparamos tu semana con tus preferencias. Lo revisas antes de guardarlo.</p>
+    <button class="btn btn-accent" style="width:100%" onclick="finishNutritionIntake('skipped')">Sí, prepararlo</button>
+    <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Seguir registrando</button>`);
+}
+async function finishNutritionIntake(status){
+  const pr=nutritionIntakeProgress();
+  closeModal();
+  if(!await saveNutritionIntake({status,endedAt:todayStr()}))return;
+  trackEvent("nutrition_intake",{action:status,count:pr?pr.complete:0});
+  current=clampDate(todayStr());
+  render();
+  await aiGenerateWeek();
+}
 // Solo una fecha por cuenta/dispositivo; no guarda comidas ni datos de salud.
 const menuSuggestionMemory={};
 function menuSuggestionKey(){return uid()?"fitbud_menu_suggestion_v1_"+uid():null;}
@@ -5400,7 +5539,7 @@ function dismissMenuSuggestion(ds){
   $("#homeLogAction")?.focus({preventScroll:true});
 }
 function homeMenuSuggestionHtml(ds){
-  if(ds!==todayStr()||homeDayHasPreparedMeals(ds,buildDay(ds))||menuSuggestionDismissed(ds))return "";
+  if(ds!==todayStr()||nutritionIntakeActive()||homeDayHasPreparedMeals(ds,buildDay(ds))||menuSuggestionDismissed(ds))return "";
   // REQ-392: una fila dentro de la tarjeta principal, no una tarjeta más.
   return `<div class="menu-suggestion" role="group" aria-labelledby="menuSuggestionTitle">
     <p id="menuSuggestionTitle">¿Sin ideas? Te proponemos un menú y tú eliges.</p>
@@ -5553,6 +5692,7 @@ function nutritionWeekStatus(ds){
   return{week,missing,hadMenu,hasMenu,future};
 }
 function nutritionWeekHtml(ds){
+  if(nutritionIntakeActive())return nutritionIntakeCardHtml();
   const status=nutritionWeekStatus(ds);if(!status)return"";
   const auto=profile.prefs.autoNutritionWeeks===true;
   const title=!status.future.length?"Menú de esta semana":status.missing.length?(status.hadMenu&&!status.hasMenu?"Tu menú anterior terminó":status.hasMenu?"Puedes completar tu menú semanal":"¿Quieres un menú para esta semana?"):"Tu menú semanal está listo";
@@ -5581,7 +5721,7 @@ function scheduleNutritionWeek(){
 }
 async function maybePrepareNutritionWeek(){
   const owner=uid();
-  if(!owner||nutritionReadyUser!==owner||nutritionUpdating||_authBusy||onboardingActive||mustChangePassword()||!isActive()||!hasRequiredConsents()||!hasCurrentScreening()||!navigator.onLine||!DB.loaded||profile.prefs.autoNutritionWeeks!==true)return;
+  if(!owner||nutritionReadyUser!==owner||nutritionUpdating||_authBusy||onboardingActive||mustChangePassword()||!isActive()||!hasRequiredConsents()||!hasCurrentScreening()||!navigator.onLine||!DB.loaded||profile.prefs.autoNutritionWeeks!==true||nutritionIntakeActive())return;
   const status=nutritionWeekStatus(todayStr());if(!status||!status.missing.length)return;
   const key=owner+":"+cycleNumber()+":"+status.week.start;
   if(nutritionAutoAttempt===key)return;
@@ -5761,7 +5901,9 @@ function homeAgendaData(ds){
   }
   const counted=items.filter(item=>item.counts);
   const done=counted.filter(item=>item.done).length;
-  const next=items.find(item=>item.pending&&item.action)||null;
+  // REQ-404: en los primeros días registrar es lo principal; lo en curso o bloqueado sigue primero.
+  const pending=items.filter(item=>item.pending&&item.action);
+  const next=(nutritionIntakeActive()&&!pending[0]?.first&&pending.find(item=>item.kind==="meal"))||pending[0]||null;
   const totals=dayTotals(ds);
   const hasOpenMeals=mealItems.some(item=>item.pending);
   // Un menú ausente o parcial no es prueba de día cerrado: hace falta registrar.
@@ -5886,6 +6028,12 @@ function homeOpenTomorrow(ds){
   goDay(ds);
 }
 function homeConsumptionHtml({t,target,doneMeals,totMeals}){
+  // REQ-404: en los primeros días, el avance y lo registrado; sin la meta.
+  const pr=nutritionIntakeActive()?nutritionIntakeProgress():null;
+  if(pr)return `<button type="button" class="home-consumption intake-consumption" onclick="setView('nutricion')">
+    <span><b>${pr.stage==="observing"?pr.label:"Tu resumen está listo"}</b> · ${t.kcal} kcal registradas</span>
+    <span class="home-consumption-link">${pr.stage==="observing"?"Primeros días":"Ver resumen"}${chevron()}</span>
+  </button>`;
   // REQ-394: en cero no informa nada; aparece con el primer registro.
   if(!doneMeals&&!t.kcal)return "";
   return `<button type="button" class="home-consumption" onclick="setView('nutricion')">
@@ -9685,6 +9833,7 @@ function chatWorkoutCard(ds){
 }
 function chatMealsCard(ds){
   const day=buildDay(ds);
+  if(!homeDayHasPreparedMeals(ds,day)&&nutritionIntakeActive())return `<div class="muted small">Estos días registras lo que comes, tal como comes hoy.</div><button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="openExtraRegistration('${ds}')">Registrar algo que comí</button>`;
   if(!homeDayHasPreparedMeals(ds,day))return `<div class="muted small">Aún no hay comidas preparadas para hoy.</div><button class="btn btn-accent" style="width:100%;margin-top:8px" onclick="homePrepareDay('${ds}')">Sugerirme un menú</button>`;
   return day.meals.map(b=>mealCard(ds,b)).join("");
 }
@@ -10748,7 +10897,7 @@ function renderNotifySetup(){
   const done=!installPending()&&remindersCovered();
   $("#app").innerHTML=`<div class="onboarding notify-setup">
     <div class="onboarding-brand">EVOLV · TU PLAN</div>
-    <h1>Tu semana está lista. Que no se te pase.</h1>
+    <h1>${nutritionIntakeActive()?"Tu plan está listo":"Tu semana está lista"}. Que no se te pase.</h1>
     <p class="onboarding-copy">Dos pasos para que tu plan te encuentre: la app en tu inicio y un aviso cuando te falte algo. Nunca más de uno al día.</p>
     <ol class="notify-steps">${isMobileDevice()?notifyStepHtml(notifyInstallCopy("onboarding")):""}${notifyStepHtml(notifyPushCopy("onboarding"))}</ol>
     <button class="btn ${done?"btn-accent":""}" style="width:100%;margin-top:18px" onclick="finishNotifySetup(${done?"'done'":"'skip'"})">${done||devicePushState()==="needs_install"?"Ir a mi plan":"Ahora no, ir a mi plan"}</button>
@@ -10759,6 +10908,7 @@ function finishNotifySetup(reason){
   markReminderInvite({last:new Date().toISOString()}); // REQ-255: no repetir el pedido esta semana
   notifySetupActive=false;
   render();scrollAppTop();
+  if(intakeNoticePending)showNutritionIntakeNotice();
   if(streakSocialPending)loadStreakFriendsAfterAuth();
 }
 /* ---------- REQ-341: pedir los avisos al celebrar la racha ---------- */
