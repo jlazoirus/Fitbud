@@ -864,13 +864,15 @@
   //            meals:[{slot_id, dishSlug?, nombre}]}] — solo comidas registradas.
   // Devuelve {ready, loggedDays, qualifiedDays, bySlot:{slot:{dishSlug,nombre,count,days,share}}}.
   function learnHabitualMeals(history,opts){
-    const rules={...HABIT_RULES,...(opts||{})};
+    // En el primer menú, el llamador pasa solo los días completos del periodo.
+    const intake=opts?.mode==="intake";
+    const rules={...HABIT_RULES,...(intake?{minLoggedDays:2,minQualifiedDays:2,minRepeats:2}:{}),...opts};
     const rows=(Array.isArray(history)?history:[])
       .filter(day=>day&&day.date&&Array.isArray(day.meals)&&day.meals.length)
       .sort((a,b)=>String(b.date).localeCompare(String(a.date)));
     const seenDates=new Set();
     const logged=rows.filter(day=>!seenDates.has(day.date)&&seenDates.add(day.date));
-    const qualified=logged.filter(day=>dayMeetsMacroGoal(day.totals,day.target));
+    const qualified=intake?logged:logged.filter(day=>dayMeetsMacroGoal(day.totals,day.target));
     const result={ready:false,loggedDays:logged.length,qualifiedDays:qualified.length,bySlot:{}};
     if(logged.length<rules.minLoggedDays||qualified.length<rules.minQualifiedDays)return result;
     const perSlot=new Map();
@@ -881,7 +883,7 @@
         const nombre=String(meal&&(meal.nombre||meal.name)||"").trim();
         const slug=String(meal&&meal.dishSlug||"").trim();
         const key=slug||solverKey(nombre);
-        if(!slot||!key||seenSlots.has(slot))return;
+        if(!slot||!key||seenSlots.has(slot)||(intake&&!slug))return;
         seenSlots.add(slot);
         if(!perSlot.has(slot))perSlot.set(slot,{days:0,dishes:new Map()});
         const entry=perSlot.get(slot);
@@ -895,9 +897,10 @@
     perSlot.forEach((entry,slot)=>{
       const best=[...entry.dishes.values()].sort((a,b)=>b.count-a.count||a.lastRecency-b.lastRecency)[0];
       if(!best)return;
-      const share=best.count/entry.days;
+      const days=intake?qualified.length:entry.days;
+      const share=best.count/days;
       if(best.count<rules.minRepeats||share<rules.minShare)return;
-      result.bySlot[slot]={dishSlug:best.dishSlug,nombre:best.nombre,count:best.count,days:entry.days,share:Number(share.toFixed(2))};
+      result.bySlot[slot]={dishSlug:best.dishSlug,nombre:best.nombre,count:best.count,days,share:Number(share.toFixed(2))};
     });
     result.ready=Object.keys(result.bySlot).length>0;
     return result;
