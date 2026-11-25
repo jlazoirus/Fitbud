@@ -84,3 +84,17 @@ La regresión web que precede al puente pasó 333/333 E2E y todos los checks fun
 Instalación limpia, TypeScript, ESLint, cuatro pruebas Jest y diagnóstico Expo 20/20. Exportación de iOS y Android a Hermes y web completada. La vista web de desarrollo se revisó a 390 × 844 y 820 × 1180 sin errores de ejecución ni desbordamiento. Las pruebas en simuladores y dispositivos quedan pendientes de Xcode, Android SDK o acceso a EAS.
 
 `npm audit` informa 31 incidencias transitivas (30 moderadas y una baja) en herramientas de Expo, Jest y ESLint, asociadas a glob, minimatch y deepmerge. `npm audit fix` conserva ese resultado. La remediación automática restante propone degradaciones incompatibles del SDK o de Jest. Revisar actualizaciones compatibles antes de distribuir builds. Esta base no procesa datos de usuarios.
+
+## Dependencias y almacenamiento (NAT-73)
+
+Allowlist instalado para SDK 58; versiones y aprobación de Jonathan en `../docs/native-migration/ADR-001-stack.md`. El almacenamiento elegido es `expo-sqlite` con `useSQLCipher: true` en iOS y Android; claves protegidas con SecureStore. La configuración habilita SQLCipher en el siguiente binario; NAT-23/24 implementan el adaptador, verifican `cipher_version` antes de guardar datos, separan bases/claves por usuario y prueban la purga al cerrar sesión. No abrir una base en claro como fallback. SQLCipher requiere un binario propio y no está disponible en Expo Go.
+
+`expo-crypto` provee aleatoriedad nativa para claves y PKCE; NAT-23 debe conectar `getRandomValues` antes de crear Supabase, pues instalar el paquete no crea el global. No aceptar el fallback a `Math.random` del cliente Auth.
+
+Los permisos no usados quedan en `android.blockedPermissions`; ImagePicker no agrega textos de cámara, fotos ni micrófono y SecureStore no pide Face ID. Cada tarea habilita solo los permisos que use y vuelve a revisar el manifiesto combinado en un proyecto temporal.
+
+**Hay que regenerar el cliente de desarrollo:** las dependencias nativas y SQLCipher cambian la huella de runtime. Un cliente anterior no sirve para comprobar estos módulos. Esta instalación no publica builds ni OTA.
+
+Para inspeccionar permisos sin generar proyectos dentro del repositorio, copiar `native/` a un directorio temporal, conservar acceso a los módulos compartidos y a sus dependencias, ejecutar `npx expo prebuild --platform android --no-install` y luego `./gradlew :app:processReleaseMainManifest` dentro de `android/`. Revisar `app/build/intermediates/merged_manifests/**/AndroidManifest.xml` y el informe del manifest merger; el manifiesto de prebuild por sí solo no incluye todas las librerías. No se necesita generar un APK firmado para este control.
+
+`expo-doctor` necesita acceso a `exp.host`, `api.expo.dev` y `reactnative.directory`. `EXPO_OFFLINE=1 npx expo install --check` verifica el mapa local del SDK, pero no reemplaza los controles en línea de Doctor. Si esos hosts están bloqueados, registrar la verificación incompleta y mantener NAT-73 bloqueada.

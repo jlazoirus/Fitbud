@@ -48,6 +48,67 @@ describe('Configuración de builds y actualizaciones', () => {
     expect(config.owner).toBe('evolv-qa');
   });
 
+  it('compila SQLCipher en ambas plataformas sin activar biometría ni textos de captura', () => {
+    const config = appConfig(context);
+    expect(config.plugins).toContainEqual(['expo-sqlite', { useSQLCipher: true }]);
+    expect(config.plugins).toContainEqual(['expo-secure-store', { faceIDPermission: false }]);
+    expect(config.plugins).toContainEqual([
+      'expo-image-picker',
+      { photosPermission: false, cameraPermission: false, microphonePermission: false },
+    ]);
+    expect(config.ios?.infoPlist).toBeUndefined();
+    expect(config.android?.permissions).toBeUndefined();
+  });
+
+  it.each([
+    'CAMERA',
+    'RECORD_AUDIO',
+    'READ_EXTERNAL_STORAGE',
+    'WRITE_EXTERNAL_STORAGE',
+    'READ_MEDIA_IMAGES',
+    'READ_MEDIA_VIDEO',
+    'READ_MEDIA_AUDIO',
+    'POST_NOTIFICATIONS',
+    'RECEIVE_BOOT_COMPLETED',
+    'VIBRATE',
+    'USE_BIOMETRIC',
+    'USE_FINGERPRINT',
+  ])('bloquea el permiso %s hasta la tarea que lo use', (permission) => {
+    expect(appConfig(context).android?.blockedPermissions).toContain(
+      `android.permission.${permission}`,
+    );
+  });
+
+  it('elimina permisos transitivos de FCM, badges y atribución mientras no se usan', () => {
+    expect(appConfig(context).android?.blockedPermissions).toEqual(
+      expect.arrayContaining([
+        'android.permission.READ_APP_BADGE',
+        'android.permission.WAKE_LOCK',
+        'com.anddoes.launcher.permission.UPDATE_COUNT',
+        'com.android.launcher.permission.INSTALL_SHORTCUT',
+        'com.android.launcher.permission.READ_SETTINGS',
+        'com.android.launcher.permission.UNINSTALL_SHORTCUT',
+        'com.android.launcher.permission.WRITE_SETTINGS',
+        'com.google.android.c2dm.permission.RECEIVE',
+        'com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE',
+        'com.htc.launcher.permission.READ_SETTINGS',
+        'com.htc.launcher.permission.UPDATE_SHORTCUT',
+        'com.huawei.android.launcher.permission.CHANGE_BADGE',
+        'com.huawei.android.launcher.permission.READ_SETTINGS',
+        'com.huawei.android.launcher.permission.WRITE_SETTINGS',
+        'com.majeur.launcher.permission.UPDATE_BADGE',
+        'com.oppo.launcher.permission.READ_SETTINGS',
+        'com.oppo.launcher.permission.WRITE_SETTINGS',
+        'com.sec.android.provider.badge.permission.READ',
+        'com.sec.android.provider.badge.permission.WRITE',
+        'com.sonyericsson.home.permission.BROADCAST_BADGE',
+        'com.sonymobile.home.permission.PROVIDER_INSERT_BADGE',
+        'me.everything.badger.permission.BADGE_COUNT_READ',
+        'me.everything.badger.permission.BADGE_COUNT_WRITE',
+      ]),
+    );
+  });
+
   it.each(['', ' ', 'not-a-project-id', 'https://expo.dev/accounts/jlazo'])(
     'rechaza un projectId inválido (%s) antes de generar un binario',
     (projectId) => {
