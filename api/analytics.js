@@ -32,6 +32,7 @@ const ALLOWED_EVENT_TYPES = new Set([
   "streak_milestone",
   "reminder_opened", // REQ-285: etapa del recordatorio que abrió la app (props.step)
   "notifications_prompt", // REQ-289: instalar/activar avisos (props.source, props.action)
+  "nutrition_intake", // REQ-404: primeros días (props.action: start|review|done|skipped, props.count); sin comidas
 ]);
 
 // Solo estas claves se almacenan en properties. Ningun dato de salud, identidad ni prompts.

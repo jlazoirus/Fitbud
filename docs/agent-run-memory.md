@@ -70,3 +70,9 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Perfil sin modal: `cardioNudgeCardHtml()` en Perfil › Entrenamiento, mismo `UI.cardioNudgeDismissed`; «Listo» guarda sin re-renderizar (`saveCardioLightEnabled(true,{keepForm:true})`). PWA v264.
 - Sin operación manual pendiente.
 - Aprendizaje: el panel Entrenamiento de Perfil ya mide ~1485 px de los 1500 que permite `perfil.spec.js`; cualquier bloque nuevo ahí rompe ese límite.
+
+### 2026-11-24T16:30Z · desarrollador · Claude Code (nube) · REQ-404
+- Pedido por Jonathan («continúa con el siguiente»; REQ-403 ya estaba implementado). Rama `claude/keen-albattani-fov2ft` con `main` `4517ba3` (REQ-402, #135) fusionado; PR borrador.
+- Primeros días: `prefs.nutritionIntake` al primer onboarding; sin menú, sin preparación automática ni «Sugerirme un menú»; tarjeta en Nutrición («Día N de 3», 3/5/7 días, «Prefiero recibir un menú ya»); Hoy y Nutrición sin metas ni «restantes». «Ver mi resumen» deja `review` y un paso mínimo que REQ-405 completa. Evento `nutrition_intake` agregado a `api/analytics.js`. PWA v265.
+- Sin operación manual pendiente (el evento nuevo entra con el deploy de `api/analytics.js`; no hay SQL).
+- Aprendizaje: el mock de `profiles` no guarda los upsert, así que una recarga tras el onboarding vuelve a pedirlo; la persistencia se prueba arrancando con `nutritionIntake` sembrado. `autoDismissNudges()` ahora acepta el aviso de los primeros días.
