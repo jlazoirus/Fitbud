@@ -45,7 +45,7 @@ test("si no hubo momento seguro en 24 h, Perfil → Cuenta lo ofrece", async ({ 
   await autoDismissNudges(page);
   await gotoApp(page);
   await page.evaluate(() => { notifyAppUpdateAvailable(); localStorage.setItem("evolv_update_pending_since", String(Date.now() - 25 * 3600 * 1000)); });
-  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#profileBtn").click();
   await page.keyboard.press("Escape");
   await page.locator("details.pf-accordion > summary", { hasText: "Cuenta" }).click();
   await expect(page.locator("#app")).toContainText("Hay una versión nueva de la app");

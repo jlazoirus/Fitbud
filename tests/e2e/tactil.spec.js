@@ -34,7 +34,8 @@ test("REQ-193: los controles de las 5 tabs miden ≥44 px en táctil", async ({ 
 
   const found = {};
   for (const tab of ["Hoy", "Nutrición", "Entreno", "Progreso", "Perfil"]) {
-    await page.locator("#tabs").getByText(tab).click();
+    // REQ-423: Perfil se abre desde la barra superior.
+    await (tab === "Perfil" ? page.locator("#profileBtn") : page.locator("#tabs").getByText(tab)).click();
     if (tab === "Perfil") {
       await page.keyboard.press("Escape");
       for (const summary of await page.locator("details.pf-accordion > summary").all()) await summary.click();

@@ -91,7 +91,7 @@ test("Seguridad y guía sin servicio del coach",async({page,context})=>{
   await page.locator(".coach-welcome").getByRole("button",{name:"¿Cómo empiezo con seguridad?"}).click();
   await expect(page.locator(".coach-guide-reply")).toContainText("pausa por seguridad");
   await page.getByRole("button",{name:"Revisar mi evaluación",exact:true}).click();
-  await expect(page.locator('[data-tab="perfil"]')).toHaveClass("active");
+  await expect(page.locator('[data-tab="perfil"]')).toHaveClass(/\bactive\b/);
   await page.evaluate(()=>{REMOTE.anthropic.proxy=false;S.settings={...(S.settings||{}),apiKey:""};CONFIG.anthropic.apiKey="";setView("hoy");});
   await page.locator(".coach-welcome").getByRole("button",{name:"¿Qué puedo comer hoy?"}).click();
   await expect(page.locator(".coach-guide-reply").last()).toContainText("Preparar un menú es opcional");

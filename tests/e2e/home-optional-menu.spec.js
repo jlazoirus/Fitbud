@@ -18,13 +18,18 @@ for(const width of [320,390,1280]) test(`Hoy prioriza registro, entreno y coach 
   const {paid,errors}=await boot(page,context);
   const app=page.locator("#app"),suggestion=app.locator(".menu-suggestion");
   const primary=app.locator(".home-primary");
-  const agenda=app.locator(".home-agenda");
-  // REQ-394: «Tu día» muestra comida y entreno; sin registros no hay tira de consumo.
-  await expect(primary.locator("#homePrimaryTitle")).toHaveText("¿Qué comiste hoy?");
-  await expect(primary.locator(".btn-accent")).toHaveText("Registrar comida");
-  await expect(primary.locator(".agenda-sub")).toHaveCount(0);
-  await expect(primary.locator(".home-workout-row").getByRole("button",{name:"Iniciar entreno",exact:true})).toBeInViewport();
-  await expect(agenda).toHaveCount(0);
+  // REQ-415: «Plan de hoy» lista el entreno (en su horario: mañana) y cada comida, con su avance.
+  await expect(primary.locator("#homePrimaryTitle")).toHaveText("Plan de hoy");
+  await expect(primary.locator(".day-plan-count")).toHaveText("0/4");
+  await expect(primary.locator(".day-plan-bar span")).toHaveCount(4);
+  await expect(primary.locator(".day-plan-status")).toHaveText("Te faltan 4 actividades para cerrar el día.");
+  await expect(primary.locator(".dp-row .dp-title")).toHaveText(["Gimnasio · Torso A","Desayuno","Almuerzo","Cena"]);
+  await expect(primary.locator(".dp-row.kind-meal").first()).toContainText("Sin registrar · 08:00");
+  // Una sola acción lima: la primera pendiente.
+  await expect(primary.locator(".btn-accent")).toHaveCount(1);
+  await expect(primary.locator(".btn-accent")).toHaveText("Iniciar entreno");
+  await expect(primary.getByRole("button",{name:"Iniciar entreno",exact:true})).toBeInViewport();
+  await expect(primary.getByRole("button",{name:"Registrar comida",exact:true})).not.toHaveClass(/btn-accent/);
   await expect(app.locator(".home-consumption")).toHaveCount(0);
   // REQ-392: la sugerencia es una fila dentro de la tarjeta principal.
   await expect(primary.locator(".menu-suggestion")).toContainText("tú eliges");
@@ -70,10 +75,11 @@ test("Registrar comida guarda y suma el consumo sin generar un menú",async({pag
   await expect(page.locator(".home-consumption")).toContainText("400/2200 kcal");
   await expect(page.locator(".home-consumption")).toContainText("1/3 comidas");
   await expect(page.locator(".menu-suggestion")).toHaveCount(0);
-  // Los slots sin contenido no se presentan como comidas pendientes.
-  await expect(page.locator(".agenda-item.kind-meal")).toHaveCount(0);
-  await expect(page.locator(".home-agenda")).toHaveCount(0);
-  await expect(page.locator(".home-workout-row")).toContainText("Iniciar entreno");
+  // REQ-415: el desayuno queda hecho en el plan y el avance sube.
+  await expect(page.locator(".day-plan-count")).toHaveText("1/4");
+  await expect(page.locator('.dp-row[data-meal="desayuno"]')).toHaveClass(/is-done/);
+  await expect(page.locator('.dp-row[data-meal="desayuno"]')).toContainText("Registrado · Mi desayuno con avena · 400 kcal");
+  await expect(page.locator(".dp-row.kind-workout")).toContainText("Iniciar entreno");
   await expect.poll(()=>Promise.resolve(calls.filter(c=>c.table==="day_log"&&c.method==="POST").length)).toBeGreaterThan(0);
   expect(await page.evaluate(()=>({done:mealState(todayStr(),"desayuno").done,extras:dayState(todayStr()).extras.length}))).toEqual({done:true,extras:0});
   expect(await page.evaluate(()=>JSON.stringify(effectiveWorkout(todayStr())))).toBe(workoutBefore);
@@ -118,25 +124,24 @@ test("La sugerencia solo genera al elegirla y aplica el menú con confirmación"
   expect(await page.evaluate(()=>JSON.stringify(dayState(todayStr())))).toBe(before);
   await overlay.getByRole("button",{name:"Aplicar al día"}).click();
   await expect(page.locator(".menu-suggestion")).toHaveCount(0);
-  const primary=page.locator(".home-primary.kind-meal");
-  const agenda=page.locator(".home-agenda");
-  await expect(primary).toContainText("Bowl proteico de la mañana");
-  await expect(primary.locator(".btn-accent")).toHaveText("Registrar este plato");
-  await expect(agenda).toHaveJSProperty("open",false);
-  await expect(agenda.locator(".home-agenda-count")).toHaveText("2 pendientes");
-  await expect(primary.locator(".home-workout-row")).toContainText("Iniciar entreno");
-  await agenda.locator("summary").click();
-  await expect(agenda.locator(".kind-meal")).toHaveCount(2);
-  await expect(agenda).not.toContainText("Bowl proteico de la mañana");
+  // REQ-415: el menú aplicado se ve completo en el plan, cada plato con su registro de un toque.
+  const plan=page.locator(".home-primary");
+  const breakfast=plan.locator('.dp-row[data-meal="desayuno"]');
+  await expect(breakfast).toContainText("Bowl proteico de la mañana");
+  await expect(plan.locator(".dp-row.kind-meal .dp-action")).toHaveCount(3);
+  await expect(plan.locator(".btn-accent")).toHaveText("Iniciar entreno");
+  await expect(plan.locator(".day-plan-count")).toHaveText("0/4");
 
   // Abrir el registro alternativo no confirma el plato ni cambia el menú.
-  await primary.getByRole("button",{name:"Registrar otra comida"}).click();
+  await plan.getByRole("button",{name:"Registrar comida",exact:true}).click();
   await expect(overlay.locator("#f_target")).toHaveValue("desayuno");
   expect(await page.evaluate(()=>!!mealState(todayStr(),"desayuno").done)).toBe(false);
   await overlay.getByRole("button",{name:"Cerrar",exact:true}).last().click();
-  await primary.getByRole("button",{name:"Registrar este plato"}).click();
-  await expect(agenda).toHaveJSProperty("open",true);
-  await expect(agenda.locator(".home-agenda-count")).toHaveText("1 pendiente");
+  await breakfast.getByRole("button",{name:"Registrar Desayuno",exact:true}).click();
+  await expect(breakfast).toHaveClass(/is-done/);
+  await expect(plan.locator(".day-plan-count")).toHaveText("1/4");
+  await expect(plan.locator(".day-plan-bar span.on")).toHaveCount(1);
+  await expect(plan.locator(".day-plan-status")).toHaveText("Te faltan 3 actividades para cerrar el día.");
   expect(errors).toEqual([]);
 });
 
@@ -146,7 +151,7 @@ test("Iniciar y continuar el entreno funciona sin menú y conserva la ejecución
   await startGuidedSession(page);
   const before=await page.evaluate(()=>JSON.stringify(normalizedWorkoutExecution(todayStr())));
   await page.locator('[data-tab="hoy"]').click();
-  const resume=page.locator(".home-primary.kind-resume").getByRole("button",{name:"Continuar entreno",exact:true});
+  const resume=page.locator(".home-primary .dp-row.kind-resume").getByRole("button",{name:"Continuar entreno",exact:true});
   await expect(resume).toBeInViewport();
   await expect(resume).toHaveClass(/btn-accent/);
   await expect(page.locator("#homeLogAction")).not.toHaveClass(/btn-accent/);
@@ -161,7 +166,8 @@ test("Sin menú, descanso y entreno registrado no declaran el día cerrado",asyn
   const {paid,errors}=await boot(page,context);
   await page.evaluate(()=>{dayState(todayStr()).workoutOverride="descanso";renderHoy();});
   await expect(page.locator(".kind-rest")).toContainText("Descanso planificado");
-  await expect(page.locator(".home-agenda-count")).toHaveCount(0);
+  // El descanso se ve, pero no cuenta en el avance del día.
+  await expect(page.locator(".day-plan-count")).toHaveText("0/3");
   await expect(page.locator(".agenda-state.done")).toHaveCount(0);
   await page.evaluate(()=>{delete dayState(todayStr()).workoutOverride;dayState(todayStr()).workoutDone=true;renderHoy();});
   await expect(page.locator(".home-primary")).toContainText("Entreno completado");
@@ -173,11 +179,11 @@ test("Sin menú, descanso y entreno registrado no declaran el día cerrado",asyn
 
 test("Sin menú, la evaluación de seguridad sigue bloqueando iniciar entreno",async({page,context})=>{
   const {paid,errors}=await boot(page,context,{tables:{safety_screenings:{row:{...screeningFixture(),has_red_flags:true,cleared_for_training:false,responses:{chest_pain:true}}}}});
-  await expect(page.locator(".home-primary.kind-safety")).toContainText("Entrenamiento en pausa");
+  await expect(page.locator(".home-primary .dp-row.kind-safety")).toContainText("Entrenamiento en pausa");
   await expect(page.getByRole("button",{name:"Iniciar entreno",exact:true})).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Registrar comida",exact:true})).toBeVisible();
   await page.locator(".home-primary").getByRole("button",{name:"Completar evaluación"}).click();
-  await expect(page.locator('[data-tab="perfil"]')).toHaveClass("active");
+  await expect(page.locator('[data-tab="perfil"]')).toHaveClass(/\bactive\b/);
   expect(paid).toEqual([]);expect(errors).toEqual([]);
 });
 
@@ -226,7 +232,7 @@ test("Hoy muestra la técnica del primer ejercicio previsto cuando no ofrece un 
   await page.locator('#tabs [data-tab="entreno"]').click();
   await startGuidedSession(page);
   await page.locator('#tabs [data-tab="hoy"]').click();
-  await expect(page.locator(".home-primary.kind-resume")).toBeVisible();
+  await expect(page.locator(".home-primary .dp-row.kind-resume")).toBeVisible();
   await expect(technique).toHaveCount(0);
   expect(paid).toEqual([]);expect(errors).toEqual([]);
 });
@@ -252,7 +258,7 @@ test("El descarte de técnica dura ese día y la pausa de seguridad impide suger
     safetyScreening={...safetyScreening,has_red_flags:true,cleared_for_training:false,responses:{chest_pain:true}};
     renderHoy();
   });
-  await expect(page.locator(".home-primary.kind-safety")).toBeVisible();
+  await expect(page.locator(".home-primary .dp-row.kind-safety")).toBeVisible();
   await expect(technique).toHaveCount(0);
   expect(paid).toEqual([]);expect(errors).toEqual([]);
 });

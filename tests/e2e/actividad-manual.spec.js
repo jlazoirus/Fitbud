@@ -58,15 +58,14 @@ test.describe("Actividad registrada a mano", () => {
     await gotoApp(page);
     expect(await page.evaluate(() => trainingDayResult(todayStr()))).toBe("rest");
     // En Hoy, el descanso ofrece registrar que entrenó igual.
-    const agenda = page.locator(".home-agenda");
-    await agenda.locator("summary").click();
+    const agenda = page.locator(".home-primary");
     await expect(agenda.locator(".kind-rest")).toBeVisible();
     await expect(agenda.locator(".kind-rest")).toContainText("Descanso planificado");
     await agenda.getByRole("button", { name: "Entrené igual", exact: true }).click();
     const registerFromHome = page.getByRole("dialog", { name: "Registrar actividad" });
     await expect(registerFromHome).toBeVisible();
     await registerFromHome.getByRole("button", { name: "Cerrar", exact: true }).click();
-    await expect(agenda.locator(".home-agenda-count")).toHaveText("2 pendientes"); // dos comidas, el descanso no cuenta
+    await expect(agenda.locator(".day-plan-count")).toHaveText("0/3"); // REQ-415: tres comidas; el descanso no cuenta
 
     await page.locator("#tabs").getByText("Entreno").click();
     const app = page.locator("#app");
@@ -104,7 +103,6 @@ test.describe("Actividad registrada a mano", () => {
 
     // Hoy (Home) refleja que entrenó igual.
     await page.locator("#tabs").getByText("Hoy").click();
-    await agenda.locator("summary").click();
     await expect(agenda.locator(".kind-rest")).toContainText(/entrenaste igual/i);
 
     // Quitarla devuelve el día a descanso planificado.
@@ -197,7 +195,7 @@ test.describe("Actividad registrada a mano", () => {
     await gotoApp(page);
     page.on("dialog", (dialog) => dialog.accept());
 
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecEntreno > summary").click();
     await expect(page.locator('label[for="pf_sport"]')).toHaveText("¿Qué actividad quieres practicar?");
     await expect(page.locator("#pf_sport option:checked")).toHaveText("Otro deporte");

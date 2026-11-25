@@ -7,7 +7,8 @@ import {
 
 const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 const card = (page) => page.locator(".notify-card");
-const notices = (page) => page.locator("#homeNotices > summary");
+// REQ-422: los avisos se abren desde la campana de la barra superior.
+const notices = (page) => page.locator("#noticesBtn");
 const prefsWrites = (calls) => calls.filter((c) => c.table === "notification_preferences" && c.method === "POST").map((c) => (Array.isArray(c.payload) ? c.payload[0] : c.payload));
 
 async function openHoy(page, context, opts = {}) {
@@ -29,9 +30,10 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
       init: () => Object.defineProperty(Notification, "permission", { get: () => "default" }),
       mocks: { prefs: completePrefs({ planStartDate: daysFromToday(-8), planEndDate: daysFromToday(61) }) },
     });
-    const week = page.locator("#homeNotices .plan-week-notice");
-    // REQ-392: el check-in que pierde el espacio contextual también espera aquí.
-    await expect(notices(page)).toContainText("Check-in de la semana 1 y 2 más");
+    const week = page.locator("#noticesBody .plan-week-notice");
+    // REQ-422: check-in, semana y recordatorio esperan en Avisos; la campana dice cuántos.
+    await expect(notices(page)).toHaveAttribute("aria-label", "Avisos: 3 nuevos");
+    await expect(notices(page).locator(".topbar-badge")).toHaveText("3");
     await expect(page.locator(".home-primary-action")).toBeInViewport();
     await expect(week).toBeHidden();
     await expect(card(page)).toBeHidden();
@@ -41,7 +43,8 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     await calendar.click();
     await expect(page.getByRole("dialog", { name: "Tu plan de entrenamiento" })).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(calendar).toBeFocused();
+    await expect(notices(page)).toBeFocused();
+    await notices(page).click();
     await expect(card(page)).toContainText("Activa tus recordatorios");
     await expect(card(page)).toContainText("Un aviso al día como máximo, a las 20:00");
     await expect(card(page).getByRole("button", { name: "Activar avisos" })).toBeVisible();
@@ -49,8 +52,8 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     await card(page).getByRole("button", { name: "Ahora no" }).click();
     await expect(card(page)).toHaveCount(0);
     await expect(week).toBeVisible();
-    await expect(notices(page)).toBeFocused();
-    await expect(notices(page)).toContainText("Check-in de la semana 1 y 1 más");
+    await expect(page.locator("#overlay .closebar button")).toBeFocused();
+    await expect(notices(page)).toHaveAttribute("aria-label", "Avisos: 2 nuevos");
     await page.reload();
     await gotoApp(page);
     await page.waitForLoadState("networkidle");
@@ -95,7 +98,7 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     await notices(page).click();
     await expect(card(page)).toBeVisible();
     await expect.poll(() => events.filter((e) => e.action === "shown").length).toBe(1);
-    await notices(page).click();
+    await page.keyboard.press("Escape");
     await expect(card(page)).toBeHidden();
     await notices(page).click();
     await page.evaluate(() => { window.subscribePush = async () => { throw Object.assign(new Error("x"), { name: "AbortError" }); }; });
@@ -131,7 +134,8 @@ test.describe("Avisos — recordatorio diario en Hoy (REQ-289)", () => {
     });
     await expect(page.locator(".agenda-card").first()).toBeVisible();
     await expect(card(page)).toHaveCount(0);
-    await expect(notices(page)).toHaveCount(0);
+    await expect(notices(page)).toHaveAttribute("aria-label", "Avisos");
+    await expect(notices(page).locator(".topbar-badge")).toHaveCount(0);
     expect(errors, `Errores de consola:\n${errors.join("\n")}`).toEqual([]);
   });
 });
@@ -171,7 +175,7 @@ test.describe("Avisos — al terminar el onboarding (REQ-289)", () => {
     // REQ-402: Perfil ya no abre el aviso de actividad ligera; ahora sale en el onboarding y se cierra ahí.
     const cardioNudge = page.locator('#overlay [onclick="dismissCardioNudge()"]');
     await page.addLocatorHandler(cardioNudge, async () => { await cardioNudge.click(); });
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     const objetivo = page.locator("details#pfSecObjetivo");
     if (!(await objetivo.evaluate((d) => d.open))) await objetivo.locator("summary").click();
     await page.getByRole("button", { name: "Empezar de nuevo mi plan" }).click();
@@ -243,6 +247,7 @@ test.describe("Avisos — pedido al sumar un día de racha (REQ-341)", () => {
     await notices(page).click();
     await page.locator(".notify-card").getByRole("button", { name: "Ahora no" }).click();
     await expect(page.locator(".notify-card")).toHaveCount(0);
+    await page.keyboard.press("Escape");
     await page.evaluate(() => toggleMeal(todayStr(), "almuerzo"));
     await page.locator("#streakPop .sp-card").click();
     await expect(page.locator("#overlay .sheet")).toContainText("¡2 días seguidos!");

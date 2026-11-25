@@ -13490,6 +13490,31 @@ E2E de la portada (sin "beta"), de `/beta` y del canje con código.
 - **Sin cambios:** `/beta`, `?source=`, `/app?codigo=`, el canje en Perfil y REQ-208.
 - **Pruebas:** `portada.spec.js` (sin "beta" ni enlaces a `/beta`; "Ver planes" lleva a los planes), `tienda.spec.js` e `invitacion.spec.js`.
 
+## REQ-357 - Gestionar la suscripción y sus correos
+
+**Estado: implementado.** Perfil → Mi suscripción y `/cuenta` (web pública) muestran estado, próximo cobro y tarjeta, y cancelan con confirmación (`GET /api/suscripcion/estado`). Cinco correos del ciclo en `api/_tienda/suscripcion-correos.js`, una vez cada uno por su clave en `notification_log`; el aviso previo al primer cobro sale del cron de `/api/notify`, y REQ-351 omite a quien tiene una suscripción viva. Acción manual: aplicar `supabase/notifications_subscription.sql`. Plan §3, "Gestión y correos".
+
+### Origen
+Decisión de Jonathan (2026-11-06): cancelar en un toque y avisar antes de cada cobro.
+### Problema
+Sin cancelación fácil ni avisos llegan contracargos y reclamos.
+### Objetivo
+Ver el estado de la suscripción y cancelarla desde Perfil y desde la web pública, y recibir los correos del ciclo.
+### Alcance
+- Perfil → Mi suscripción: estado, próximo cobro, tarjeta (marca y últimos 4) y "Cancelar suscripción" con confirmación.
+- La misma acción en la web pública, para quien usa la app nativa.
+- Correos: inicio de la prueba, aviso 2 días antes del primer cobro, recibo de cada cobro, cobro fallido y cancelación. Se reutiliza `notification_log`.
+- REQ-351 no avisa a quien tiene una suscripción activa.
+### Fuera de alcance
+Cambiar de tarjeta (llega después), otros planes recurrentes.
+### Riesgos
+Correos duplicados; que el acceso se corte antes de tiempo al cancelar.
+### Criterios de aceptación
+- Al cancelar, no hay más cobros y el acceso dura hasta el fin del período.
+- Cada correo sale una sola vez.
+### Verificación sugerida
+Test Node con Culqi y Resend simulados, y E2E de Perfil.
+
 ## REQ-358 - Entreno: reemplazar una rutina actualiza el nombre, los visuales y Hoy
 
 **Estado: implementado.**
@@ -14012,6 +14037,78 @@ Pruebas: `scripts/test-coach-quota.mjs`, regresiones de administración, trial y
 ## Compactación 2026-11-16: REQ-385..390 (onboarding esencial)
 
 Detalle movido desde `REQUIREMENTS.md` para dejar espacio a REQ-392..395 (Hoy).
+
+## REQ-415 - Hoy: «Plan de hoy» como lista con avance del día
+
+**Estado: implementado (2026-11-24).** Serie REQ-415→421 (simplicidad de la demo de CEO App). Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24: copiar la UX y simplicidad de la app del alumno de la demo.
+### Problema
+Hoy reparte el día entre tarjeta principal, fila de entreno y «Resto del día» plegado; no se ve el avance.
+### Causa raíz
+`homeAgendaHtml()` (`app/index.html:5841`) promueve una acción y pliega el resto.
+### Objetivo
+Entreno y comidas del día en una lista ordenada por hora, con avance y una sola acción destacada.
+### Alcance
+Filas con punto por tipo, título, estado y una píldora; barra por actividad, «Te faltan N» y «x/N». Registrar un plato planificado en un toque.
+### Fuera de alcance
+Pestañas, Avisos, coach, agua/pasos.
+### Riesgos
+Specs de Hoy (REQ-392..395); orden con horario flexible.
+### Criterios de aceptación
+3 comidas y entreno: «0/4»; registrar el desayuno: «1/4». Descanso y pausa no cuentan. Sin desbordes a 320 px.
+### Verificación sugerida
+`home-optional-menu.spec.js`, `home.spec.js` y release gate.
+
+## REQ-416 - Hoy: «Esta semana» con cumplimiento por día
+
+**Estado: implementado (2026-11-24).** Depende de REQ-415. Diseño: `docs/competitive/2026-11-24-modo-ceo/README.md`.
+
+### Origen
+Jonathan, 2026-11-24, misma serie.
+### Problema
+El cumplimiento semanal solo se ve en el check-in o en Progreso.
+### Objetivo
+Leer la semana en Hoy: siete barras y un porcentaje con su regla escrita.
+### Alcance
+Barras L–D, «N % cumplido» con su regla y la semana pasada. Mismo conteo que REQ-415.
+### Fuera de alcance
+Racha, check-in, metas.
+### Riesgos
+Semanas partidas por el inicio del plan; días futuros contados.
+### Criterios de aceptación
+Lunes y martes con 4 de 8: «50 %». Futuro y fuera del plan vacíos.
+### Verificación sugerida
+Spec E2E nuevo y release gate.
+
+## REQ-422 - Avisos en una ventana emergente
+
+**Estado: implementado (2026-11-24).**
+
+### Origen
+Jonathan, 2026-11-24: «necesitamos una pantalla emergente que muestre notificaciones», dentro de la serie que adapta la app del alumno de la demo de CEO App (`docs/competitive/2026-11-24-modo-ceo/README.md`).
+### Problema
+Check-in, semana del plan, recordatorios, retomar e invitaciones vivían plegados en «Avisos» al pie de Hoy (`homeNoticesHtml()`); había que bajar y desplegar para verlos.
+### Objetivo y alcance
+Una campana en la barra superior con el número de avisos abre una ventana con todos (`noticeItems()`, `openNotices()`). Lo que se hace dentro (omitir, entendido, activar, «Ahora no») la actualiza sin cerrarla (`refreshNotices()`); abrir otra pantalla desde ella la cierra. La pregunta del perfil (REQ-390) sigue a la vista en Hoy y el recordatorio cuenta como visto al abrir la ventana (REQ-339). El espacio contextual de Hoy (REQ-392) muestra un solo mensaje; el resto queda en Avisos.
+### Fuera de alcance y riesgos
+Avisos push, historial de notificaciones leídas. Riesgo: un aviso que gana el espacio de Hoy también aparece en la ventana (es la lista completa de pendientes).
+### Verificación
+`tests/e2e/avisos.spec.js`, `home.spec.js`, `plan-weeks.spec.js`.
+
+## REQ-423 - Perfil arriba a la derecha y menú de cuatro pestañas
+
+**Estado: implementado (2026-11-24).**
+
+### Origen
+Jonathan, 2026-11-24: «todo lo que está en perfil se podría llevar a un botón arriba a la derecha que te redirija a esa pantalla, así liberamos el menú de abajo». Resuelve la decisión de pestañas que el informe de la demo dejó a Jonathan.
+### Objetivo y alcance
+`appTopBarHtml()` encabeza Hoy, Nutrición, Entreno, Progreso y Perfil: logo, campana de Avisos (REQ-422) y un botón con la inicial que abre Perfil (`#profileBtn`, `data-tab="perfil"`, activo en Perfil). El menú inferior queda con Hoy, Nutrición, Entreno y Progreso. Perfil muestra «‹ <pantalla>» para volver a donde se abrió (`profileReturnView`). El tour señala Avisos y Perfil arriba.
+### Fuera de alcance y riesgos
+Contenido de Perfil (REQ-421), consola de administración (sus pestañas no cambian). Riesgo: specs que abrían Perfil desde el menú; ahora usan `#profileBtn`.
+### Verificación
+`tests/e2e/navegacion.spec.js`, `perfil.spec.js`, `accesibilidad.spec.js`, `tactil.spec.js`.
 
 ### REQ-385 - Onboarding: entrenar sin fuerza es una opción más
 

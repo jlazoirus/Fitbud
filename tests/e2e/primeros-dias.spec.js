@@ -72,7 +72,10 @@ for (const width of [320, 390, 1280]) test(`REQ-404: el primer onboarding avisa 
 
   // Hoy: registrar es la acción principal, con el avance y sin la meta.
   const app = page.locator("#app");
-  await expect(app.locator(".home-primary .btn-accent")).toHaveText("Registrar comida");
+  // REQ-415: la acción lima del «Plan de hoy» es registrar la siguiente comida, no el entreno.
+  await expect(app.locator(".home-primary .btn-accent")).toHaveCount(1);
+  await expect(app.locator(".home-primary .dp-row.kind-meal .btn-accent")).toHaveText("Registrar");
+  await expect(app.locator(".home-primary").getByRole("button", { name: "Registrar comida", exact: true })).toBeVisible();
   await expect(app.locator(".home-consumption")).toContainText("Día 1 de 3");
   await expect(app.locator(".menu-suggestion")).toHaveCount(0);
   await expect(app).not.toContainText("restantes");

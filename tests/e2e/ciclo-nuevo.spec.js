@@ -15,7 +15,7 @@ test("en la semana 5, 'Empezar de nuevo' con 4 semanas arranca hoy el ciclo 2 y 
   await autoDismissNudges(page);
   const errors = collectConsoleErrors(page);
   await gotoApp(page);
-  await page.locator("#tabs").getByText("Perfil").click();
+  await page.locator("#profileBtn").click();
   await page.keyboard.press("Escape");
   const objetivo = page.locator("details#pfSecObjetivo");
   if (!(await objetivo.evaluate((d) => d.open))) await objetivo.locator("summary").click();

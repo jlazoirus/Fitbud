@@ -17,14 +17,15 @@ test.describe("Home — un mensaje a la vez (REQ-392)", () => {
     const app = page.locator("#app");
     await expect(app.locator(".home-primary")).toBeVisible();
     // Fuera de Avisos solo cabe un mensaje contextual.
-    await expect(app.locator(`:is(${contextual}):not(#homeNotices *)`)).toHaveCount(1);
+    await expect(app.locator(`:is(${contextual})`)).toHaveCount(1);
     await expect(app.locator(".coach-chip")).toHaveCount(0);
     await expect(app.locator(".coach-home-title")).toHaveText("Pregúntale a tu coach");
     await expect(app.locator("#coachInput")).toBeVisible();
     await expect(app.getByRole("button", { name: "Cuéntame cómo entrenas", exact: true })).toHaveCount(0);
-    const notices = page.locator("#homeNotices");
-    await expect(notices.locator("> summary")).toContainText("Check-in de la semana 1");
-    await notices.locator("> summary").click();
+    // REQ-422: el check-in espera en Avisos, la ventana que abre la campana.
+    await expect(page.locator("#noticesBtn")).toHaveAttribute("aria-label", /^Avisos: \d+ nuevos?$/);
+    await page.locator("#noticesBtn").click();
+    const notices = page.locator("#noticesBody");
     await expect(notices.locator(".ci-banner h2")).toHaveText("Check-in de la semana 1");
     await expect(notices.locator(".ci-banner").getByRole("button", { name: "Hacer check-in", exact: true })).toBeVisible();
     // REQ-395: omitir pide confirmación; cancelar deja el check-in pendiente.
@@ -88,8 +89,8 @@ test.describe("Nutrición — comidas sin asignar (REQ-161)", () => {
   });
 });
 
-test.describe("Home — agenda (REQ-249)", () => {
-  test("los botones del resto del día tienen espacio a los lados", async ({ page, context }) => {
+test.describe("Home — agenda (REQ-249, REQ-415)", () => {
+  test("los botones del plan de hoy tienen espacio a los lados", async ({ page, context }) => {
     await installMocks(context);
     await seedLoggedInUser(page);
     await autoDismissNudges(page);
@@ -101,11 +102,10 @@ test.describe("Home — agenda (REQ-249)", () => {
     await expect(overlay).toContainText(/Total del día/i, { timeout: 15_000 });
     await overlay.getByRole("button", { name: /Aplicar al día/i }).click();
     await page.locator("#tabs").getByText("Hoy").click();
-    await page.locator(".home-agenda summary").click();
-    await expect(page.locator(".home-agenda .agenda-actions .btn").first()).toBeVisible();
+    await expect(page.locator(".day-plan .dp-action").first()).toBeVisible();
 
-    const gaps = await page.evaluate(() => [...document.querySelectorAll(".home-agenda .agenda-actions .btn")].map((btn) => {
-      const container = btn.closest(".home-agenda").getBoundingClientRect();
+    const gaps = await page.evaluate(() => [...document.querySelectorAll(".day-plan .dp-action")].map((btn) => {
+      const container = btn.closest(".dp-main").getBoundingClientRect();
       return { text: btn.textContent.trim(), gap: Math.round(container.right - btn.getBoundingClientRect().right) };
     }));
     expect(gaps.length).toBeGreaterThan(0);

@@ -27,7 +27,10 @@ test.describe("Navegación", () => {
     await tabs.getByText("Progreso").click();
     await expect(app).toContainText(/Progreso|Peso/i);
 
-    await tabs.getByText("Perfil").click();
+    // REQ-423: Perfil se abre desde la barra superior, no desde el menú.
+    await expect(tabs.getByText("Perfil")).toHaveCount(0);
+    await expect(tabs.locator("button")).toHaveCount(4);
+    await page.locator("#profileBtn").click();
     await expect(app).toContainText(/Perfil|Cerrar sesión/i);
 
     await tabs.getByText("Hoy").click();

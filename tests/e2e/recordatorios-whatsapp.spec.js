@@ -126,7 +126,7 @@ test.describe("Invitación en un teléfono (REQ-255)", () => {
 test.describe("WhatsApp en Perfil → Recordatorios (REQ-255)", () => {
   test("sin configuración del servidor no se ofrece", async ({ page, context }) => {
     await open(page, context, { reminderInvite: false });
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecRecordatorios > summary").click();
     await expect(page.locator("#notif_hour")).toBeVisible();
     await expect(page.locator("#whatsappSection")).toBeEmpty();
@@ -145,7 +145,7 @@ test.describe("WhatsApp en Perfil → Recordatorios (REQ-255)", () => {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
     });
     await page.evaluate(() => { window.open = (url) => { window.__waOpened = url; return null; }; });
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecRecordatorios > summary").click();
     const section = page.locator("#whatsappSection");
     await expect(section).toContainText("WhatsApp (Meta) recibe tu número y el texto del aviso");
@@ -173,7 +173,7 @@ test.describe("WhatsApp en Perfil → Recordatorios (REQ-255)", () => {
       reminderInvite: false, config: WA_CONFIG,
       tables: { whatsapp_links: { rows: [{ user_id: USER_ID, phone_e164: "51987654321", opted_in: false, paused_at: new Date().toISOString(), opted_out_at: null }] } },
     });
-    await page.locator("#tabs").getByText("Perfil").click();
+    await page.locator("#profileBtn").click();
     await page.locator("#pfSecRecordatorios > summary").click();
     await expect(page.locator("#whatsappSection")).toContainText("No pudimos entregarte avisos por WhatsApp; vuelve a activarlos.");
   });

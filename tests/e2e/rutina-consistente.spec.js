@@ -55,10 +55,10 @@ for (const width of [320, 390, 1280]) {
     };
     const assertHome = async name => {
       await page.locator("#tabs").getByText("Hoy", { exact: true }).click();
-      // REQ-394: el entreno pendiente se ve en «Tu día»; el detalle sigue en Entreno.
-      const row = app.locator(".home-workout-row");
+      // REQ-415: el entreno pendiente es una fila del «Plan de hoy»; el detalle sigue en Entreno.
+      const row = app.locator(".dp-row.kind-workout");
       await expect(row).toBeVisible();
-      await expect(row.locator("strong")).toHaveText(name);
+      await expect(row.locator(".dp-title")).toHaveText(name);
       await page.locator("#tabs").getByText("Entreno").click();
     };
 
@@ -76,7 +76,7 @@ for (const width of [320, 390, 1280]) {
     await assertHome("Pull del viernes");
     await expect.poll(() => calls.filter(c => c.table === "day_log" && c.payload?.state?.repeatWorkout?.savedId === "saved-pull").length).toBeGreaterThan(0);
     await gotoApp(page);
-    await expect(app.locator(".home-workout-row strong")).toHaveText("Pull del viernes");
+    await expect(app.locator(".dp-row.kind-workout .dp-title")).toHaveText("Pull del viernes");
     await page.locator("#tabs").getByText("Entreno").click();
     await assertRoutine("Pull del viernes");
     await title.scrollIntoViewIfNeeded();
@@ -91,7 +91,7 @@ for (const width of [320, 390, 1280]) {
       ids: dayState(current).workoutExecution.steps.filter(s => s.type === "strength").map(s => s.exerciseSlug) }));
     expect(recorded).toEqual({ name: "Pull del viernes", ids: seed.ids });
     await page.locator("#tabs").getByText("Hoy", { exact: true }).click();
-    await expect(app.locator(".home-primary.kind-resume .agenda-title")).toHaveText("Pull del viernes");
+    await expect(app.locator(".home-primary .dp-row.kind-resume .dp-title")).toHaveText("Pull del viernes");
     await page.locator("#tabs").getByText("Entreno").click();
     page.once("dialog", dialog => dialog.accept());
     await app.getByRole("button", { name: "Descartar", exact: true }).click();

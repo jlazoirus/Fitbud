@@ -76,3 +76,15 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Primeros días: `prefs.nutritionIntake` al primer onboarding; sin menú, sin preparación automática ni «Sugerirme un menú»; tarjeta en Nutrición («Día N de 3», 3/5/7 días, «Prefiero recibir un menú ya»); Hoy y Nutrición sin metas ni «restantes». «Ver mi resumen» deja `review` y un paso mínimo que REQ-405 completa. Evento `nutrition_intake` agregado a `api/analytics.js`. PWA v265.
 - Sin operación manual pendiente (el evento nuevo entra con el deploy de `api/analytics.js`; no hay SQL).
 - Aprendizaje: el mock de `profiles` no guarda los upsert, así que una recarga tras el onboarding vuelve a pedirlo; la persistencia se prueba arrancando con `nutritionIntake` sembrado. `autoDismissNudges()` ahora acepta el aviso de los primeros días.
+
+### 2026-11-24T16:27Z · sesión interactiva · Claude Code (nube) · REQ-415..421
+- Pedido por Jonathan: copiar la UX y simplicidad de la app del alumno de la demo de CEO App (`demo.modoceofitness.com`). Rama `claude/laughing-feynman-h701v5` desde `main` `4517ba3`; PR borrador. Sin lock (no es corrida del loop).
+- Análisis en `docs/competitive/2026-11-24-modo-ceo/README.md` y serie REQ-415..421. Implementados REQ-415 («Plan de hoy») y REQ-416 («Esta semana»); REQ-417..421 quedan pendientes. PWA v265.
+- Sin operación manual pendiente.
+- Aprendizaje: la demo solo abre la app del alumno dentro de su portada (`/?abrir=cliente`, el iframe exige `window.parent.__ceoDemo`); WebFetch ve solo la portada, hace falta Chromium. `REQUIREMENTS.md` y `CONTEXT.md` quedaron casi en su tope de palabras (15000/2500): compactar REQ implementados al agregar otros.
+
+### 2026-11-24T16:43Z · sesión interactiva · Claude Code (nube) · REQ-422/423
+- Pedido por Jonathan en la misma sesión: ventana emergente de notificaciones y Perfil en un botón arriba a la derecha para liberar el menú inferior. Misma rama y PR #137.
+- Barra superior (`appTopBarHtml()`) con campana de Avisos (`openNotices()`) y la inicial que abre Perfil; menú inferior con cuatro pestañas. Specs que abrían Perfil desde el menú ahora usan `#profileBtn`.
+- Sin operación manual pendiente.
+- Aprendizaje: `next-exercise.spec.js`, `registro-extra-visible.spec.js` y `profile-questions.spec.js` escriben en `/Users/jonathan/.fitbros/qa-archive/`; en la nube fallan con ENOENT salvo que se cree esa carpeta. `semana-rapida.spec.js` mide tiempos: no correr dos suites a la vez.

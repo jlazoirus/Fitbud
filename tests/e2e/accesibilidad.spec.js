@@ -13,7 +13,8 @@ test.describe("Accesibilidad", () => {
     await gotoApp(page);
 
     for (const tab of ["Hoy", "Nutrición", "Entreno", "Progreso", "Perfil"]) {
-      await page.locator("#tabs").getByText(tab).click();
+      // REQ-423: Perfil se abre desde la barra superior.
+      await (tab === "Perfil" ? page.locator("#profileBtn") : page.locator("#tabs").getByText(tab)).click();
       await expect(page.locator("main")).toHaveCount(1);
       await expect(page.locator("#app h1"), `h1 en ${tab}`).toHaveCount(1);
     }
