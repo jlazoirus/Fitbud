@@ -146,6 +146,30 @@ test("REQ-404: al tope de 7 días sin un día completo se ofrece el menú de sie
   expect(errors).toEqual([]);
 });
 
+for (const width of [320, 390, 1280]) test(`REQ-405: resume registros y guarda solo cambios aceptados (${width}px)`, async ({ page, context }) => {
+  await page.setViewportSize({ width, height: 900 });
+  const days = [-3, -2, -1].map(n => loggedDay(daysFromToday(n)));
+  for (const day of days) {
+    day.state.meals.desayuno = { done: true, ovr: { name: "Avena casera", kcal: 300, p: 10, c: 45, f: 9 } };
+  }
+  const { calls, errors, paid } = await boot(page, context, { prefs: completePrefs({ nutritionIntake: intake(-3) }), days });
+  await page.locator('[data-tab="nutricion"]').click();
+  await page.getByRole("button", { name: "Ver mi resumen" }).click();
+  const review = page.getByRole("dialog", { name: "Así comes" });
+  await expect(review).toContainText("1400 kcal");
+  await expect(review).toContainText("Avena casera");
+  await expect(review.getByRole("heading", { name: "Lo que te proponemos" })).toBeVisible();
+  await review.getByRole("radio", { name: "Aceptar" }).first().check();
+  await review.getByRole("radio", { name: "Ahora no" }).nth(1).check();
+  expect(lastPrefs(calls).nutritionIntake.accepted).toBeUndefined();
+  expect(paid).toEqual([]);
+  await noOverflow(page);
+  await review.getByRole("button", { name: "Preparar mi menú" }).click();
+  await expect.poll(() => lastPrefs(calls).nutritionIntake.accepted?.length).toBe(1);
+  expect(lastPrefs(calls).nutritionIntake.status).toBe("done");
+  expect(errors).toEqual([]);
+});
+
 test("REQ-404: «Prefiero recibir un menú ya» confirma, marca skipped y prepara la semana", async ({ page, context }) => {
   const { calls, errors } = await boot(page, context, { prefs: completePrefs({ nutritionIntake: intake(-1) }) });
   await page.locator('[data-tab="nutricion"]').click();

@@ -88,3 +88,8 @@ Formato: una entrada por corrida, la más reciente al final. Incluye timestamp I
 - Barra superior (`appTopBarHtml()`) con campana de Avisos (`openNotices()`) y la inicial que abre Perfil; menú inferior con cuatro pestañas. Specs que abrían Perfil desde el menú ahora usan `#profileBtn`.
 - Sin operación manual pendiente.
 - Aprendizaje: `next-exercise.spec.js`, `registro-extra-visible.spec.js` y `profile-questions.spec.js` escriben en `/Users/jonathan/.fitbros/qa-archive/`; en la nube fallan con ENOENT salvo que se cree esa carpeta. `semana-rapida.spec.js` mide tiempos: no correr dos suites a la vez.
+
+### 2026-11-25 · sesión interactiva · Codex · REQ-405
+- Selector: `implement`, lock local, base `5fd1a53`. «Así comes» resume días completos y guarda solo las sugerencias confirmadas al preparar el menú.
+- Verificación: 11 E2E de primeros días, validadores de análisis, dominio y hábitos, subida de caché PWA y chequeo de diff. El gate completo conserva fallos de entorno Windows en pruebas ajenas al flujo.
+- Sin operación manual de datos. El uso de los cambios aceptados en el primer menú corresponde a REQ-406.

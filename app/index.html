@@ -5445,11 +5445,11 @@ function nutritionIntakeProgress(prefs){
   // «Día 2 de 3»: el día que toca completar ahora.
   const dayNum=Math.min(goal,complete-(todayComplete?1:0)+1);
   let stage="observing";
-  if(s.status==="review")stage="review";
+  if(s.status==="review")stage=complete?"review":"empty";
   else if(complete>=INTAKE_RULES.autoDays)stage="ready";
   else if(complete>=INTAKE_RULES.minDays&&!s.extended)stage="offer";
   else if(capped)stage=complete?"ready":"empty";
-  return {state:s,complete,todayComplete,goal,dayNum,capped,stage,label:`Día ${dayNum} de ${goal}`};
+  return {state:s,days,complete,todayComplete,goal,dayNum,capped,stage,label:`Día ${dayNum} de ${goal}`};
 }
 async function saveNutritionIntake(patch){
   const s=nutritionIntakeState();if(!s)return false;
@@ -5498,14 +5498,69 @@ function nutritionIntakeCardHtml(){
 async function extendNutritionIntake(){
   if(await saveNutritionIntake({extended:true}))render();
 }
-// REQ-405 completa esta pantalla con el resumen y los cambios sugeridos.
+function nutritionIntakeHistory(dates){
+  const ingredients=entry=>entry?.components?.length
+    ?normalizeComponents(entry.components).map(line=>({nombre:line.name,grams:line.unit==="g"?line.amount:0}))
+    :entry?.ingredientes||[];
+  return dates.map(date=>{
+    const state=S.days[date],day=buildDay(date);
+    const meals=day.meals.flatMap(base=>{
+      const log=state.meals?.[base.id];
+      if(!log?.done)return [];
+      const value=mealValue(base,log);
+      if(!value.name)return [];
+      return [{...value,slot_id:base.id,nombre:value.name,dishSlug:habitualMealSlug(base,log,value),
+        ingredientes:ingredients(log.ovr||base)}];
+    });
+    (state.extras||[]).filter(extra=>extra.done&&extra.name).forEach(extra=>{
+      meals.push({...extra,slot_id:extra.slot_id||"snack_extra",nombre:extra.name,ingredientes:ingredients(extra)});
+    });
+    return {date,totals:dayTotals(date).t,meals};
+  });
+}
+function intakeChangeText(change,slot){
+  const {type,dish,ingredient,grams,factor,replacement,delta}=change;
+  if(type==="add")return `Suma ${grams} g de ${ingredient} a «${dish}» (+${delta.p} g de proteína).`;
+  if(type==="swap")return `En ${slot}, cambia «${dish}» por «${replacement}».`;
+  if(type==="fill")return `Incluye «${dish}» en ${slot} cuando te venga bien.`;
+  const amount=ingredient?`${Math.abs(grams)} g de ${ingredient}`:"un cuarto de la porción";
+  return `En «${dish}», ${grams>0||factor>1?"suma":"reduce"} ${amount} (${delta.kcal>0?"+":""}${delta.kcal} kcal).`;
+}
 async function openNutritionIntakeReview(){
-  const pr=nutritionIntakeProgress();if(!pr)return;
+  const pr=nutritionIntakeProgress();if(!pr||!pr.complete)return;
+  const owner=uid();
   if(pr.state.status!=="review"&&!await saveNutritionIntake({status:"review"}))return;
+  if(uid()!==owner)return;
+  const prefs=profile.prefs,target=effectiveDayTarget(),slots=mealSlotsForPrefs(prefs);
+  const summary=FITBUD_NUTRITION_DOMAIN.analyzeIntakeDays(nutritionIntakeHistory(pr.days),target,slots,{prefs,catalog:DB});
+  const labels={kcal:"Energía",p:"Proteína",c:"Carbohidratos",f:"Grasa"};
+  const unit=key=>key==="kcal"?"kcal":"g";
+  const accepted=Array.isArray(pr.state.accepted)?pr.state.accepted:[];
+  const sameChange=(a,b)=>a&&["slot","type","dish","ingredient","grams","factor","replacement"].every(key=>a[key]===b[key]);
   trackEvent("nutrition_intake",{action:"review",count:pr.complete});
   modal(`<h3>Así comes</h3>
-    <p class="muted">Registraste ${pr.complete} día${pr.complete===1?"":"s"} completo${pr.complete===1?"":"s"}. Con lo que comes preparamos tu menú; lo revisas antes de guardarlo.</p>
-    <button class="btn btn-accent" style="width:100%" onclick="finishNutritionIntake('done')">Preparar mi menú</button>`);
+    <p class="muted">Promedio de ${pr.complete} día${pr.complete===1?"":"s"} de registros.</p>
+    <ul>${Object.keys(labels).map(key=>`<li>${labels[key]}: <b>${summary.average[key]} ${unit(key)}</b> · meta ${Math.round(target[key])} ${unit(key)}</li>`).join("")}</ul>
+    <h4>Por comida</h4>
+    <ul>${summary.bySlot.map(slot=>`<li><b>${esc(slot.label)}</b>: ${slot.average.kcal} kcal · ${slot.average.p} g de proteína
+      ${slot.repeated?`<br>Se repite: ${esc(slot.repeated)}`:""}${slot.missed>=2?`<br>Sin registro en ${slot.missed} días`:""}</li>`).join("")}</ul>
+    ${summary.highlight?`<p>${esc(summary.highlight.label)} aporta en promedio ${summary.highlight.average.p} g de proteína.</p>`
+      :summary.average.kcal>0?"<p>Ya registraste suficiente para ver cómo comes en un día habitual.</p>":""}
+    ${summary.changes.length?`<h4>Lo que te proponemos</h4>
+      ${summary.changes.map((change,i)=>`<fieldset class="log-intent"><legend style="overflow-wrap:anywhere">${esc(intakeChangeText(change,slots.find(slot=>slot.id===change.slot)?.slot||"esa comida"))}</legend>
+        <label class="qp-save-fav"><input type="radio" name="intake-change-${i}" value="accept" ${accepted.some(saved=>sameChange(saved,change))?"checked":""}> Aceptar</label>
+        <label class="qp-save-fav"><input type="radio" name="intake-change-${i}" value="decline"> Ahora no</label>
+      </fieldset>`).join("")}`
+      :FITBUD_NUTRITION_DOMAIN.dayMeetsMacroGoal(summary.average,target)?"<p>Ya comes cerca de tu objetivo. Puedes seguir con lo que haces.</p>":""}
+    <button id="prepareIntakeMenu" class="btn btn-accent" style="width:100%;margin-top:12px">Preparar mi menú</button>`);
+  const button=$("#prepareIntakeMenu");
+  button.addEventListener("click",async()=>{
+    if(uid()!==owner)return;
+    button.disabled=true;
+    const selected=summary.changes.filter((_,i)=>$(`input[name="intake-change-${i}"]:checked`)?.value==="accept");
+    await finishNutritionIntake("done",selected);
+    button.disabled=false;
+  });
   render();
 }
 function askSkipNutritionIntake(){
@@ -5514,10 +5569,11 @@ function askSkipNutritionIntake(){
     <button class="btn btn-accent" style="width:100%" onclick="finishNutritionIntake('skipped')">Sí, prepararlo</button>
     <button class="btn" style="width:100%;margin-top:8px" onclick="closeModal()">Seguir registrando</button>`);
 }
-async function finishNutritionIntake(status){
+async function finishNutritionIntake(status,accepted){
   const pr=nutritionIntakeProgress();
+  const owner=uid();
+  if(!await saveNutritionIntake({status,endedAt:todayStr(),...(accepted?{accepted}:{})})||uid()!==owner)return;
   closeModal();
-  if(!await saveNutritionIntake({status,endedAt:todayStr()}))return;
   trackEvent("nutrition_intake",{action:status,count:pr?pr.complete:0});
   current=clampDate(todayStr());
   render();

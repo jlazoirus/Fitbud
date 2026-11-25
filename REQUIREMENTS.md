@@ -2290,7 +2290,7 @@ Campana plegable para semana y recordatorios vigentes. Seguridad y agenda visibl
 
 ## REQ-405 - Nutrición: resumen de cómo comes y cambios sugeridos
 
-**Estado: pendiente.** Depende de REQ-404. Reglas: `docs/nutrition-first-days.md`.
+**Estado: implementado.** «Así comes» compara el promedio del periodo con tus metas, resume lo registrado por franja y propone hasta tres cambios. Solo guarda los cambios aceptados al preparar el menú. Validado con `validate-intake-analysis.mjs` y `primeros-dias.spec.js`.
 
 ### Origen
 Jonathan, 2026-11-16: analizar lo registrado y sugerir algunos cambios.

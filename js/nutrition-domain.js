@@ -770,6 +770,96 @@
     return true;
   }
 
+  function analyzeIntakeDays(history,target,slots,{prefs={},catalog={}}={}){
+    const days=Array.isArray(history)?history:[];
+    const average={kcal:0,p:0,c:0,f:0};
+    days.forEach(day=>addMacros(average,mealMacrosForTotals(day.totals)));
+    Object.keys(average).forEach(key=>average[key]/=Math.max(1,days.length));
+    const entries=days.flatMap(day=>day.meals||[]).filter(meal=>meal.nombre);
+    const bySlot=slots.map(({id,slot})=>{
+      const logged=days.map(day=>(day.meals||[]).filter(meal=>slotIdForMeal(meal)===id));
+      const counts=new Map();
+      logged.forEach(meals=>{
+        const distinct=new Map(meals.filter(meal=>meal.nombre).map(meal=>[solverKey(meal.nombre),meal.nombre]));
+        distinct.forEach((name,key)=>{
+          const current=counts.get(key)||{name,count:0};
+          current.count++;
+          counts.set(key,current);
+        });
+      });
+      const repeated=[...counts.values()].sort((a,b)=>b.count-a.count)[0];
+      const total=logged.flat().reduce((sum,meal)=>addMacros(sum,mealMacrosForTotals(meal)),{kcal:0,p:0,c:0,f:0});
+      Object.keys(total).forEach(key=>total[key]/=Math.max(1,days.length));
+      return {id,label:slot,average:roundMacros(total),missed:logged.filter(meals=>!meals.length).length,repeated:repeated?.count>=2?repeated.name:null};
+    });
+    const highlight=bySlot.filter(slot=>slot.average.p>0).sort((a,b)=>b.average.p-a.average.p)[0]||null;
+    const changes=[];
+    if(!days.length||dayMeetsMacroGoal(average,target))return {average:roundMacros(average),bySlot,highlight,changes};
+
+    const diet=Array.isArray(prefs.diet)?prefs.diet:[];
+    const dietAllowsText=text=>!(diet.includes("vegano")&&textHasAnimalProtein(text))
+      &&!(diet.includes("vegetariano")&&foodTextViolatesTerms(text,ANIMAL_PROTEIN_RELAX_TERMS));
+    const compatible=entries.filter(meal=>!mealPreferenceConflict(meal,prefs,catalog)
+      &&dietAllowsText([meal.nombre,...(meal.ingredientes||[]).map(line=>line.nombre||line.name)].join(" ")));
+    const candidates=[];
+    const tk=num(target.kcal),tp=num(target.p);
+    const calorieGap=tk-average.kcal,proteinGap=tp-average.p;
+    const score=delta=>Math.abs(calorieGap)/Math.max(1,tk)+Math.max(0,proteinGap)/Math.max(1,tp)
+      -Math.abs(calorieGap-delta.kcal)/Math.max(1,tk)-Math.max(0,proteinGap-delta.p)/Math.max(1,tp);
+    const propose=(type,meal,delta,details)=>{
+      const impact=score(delta);
+      if(impact>0||type==="add")candidates.push({type,slot:slotIdForMeal(meal),dish:meal.nombre,delta:roundMacros(delta),...details,impact});
+    };
+    const maps=catalogMaps(catalog);
+    if(tp>0&&average.p<tp*.9&&compatible.length){
+      const meal=[...compatible].sort((a,b)=>mealMacrosForTotals(b).p-mealMacrosForTotals(a).p)[0];
+      const additions=maps.ingredients.filter(ingredient=>ingredient.name&&dietAllowsText(ingredient.name)
+        &&!mealPreferenceConflict({nombre:ingredient.name},prefs,catalog))
+        .map(ingredient=>({ingredient,delta:macrosForIngredient(ingredient,50)}))
+        .filter(({delta})=>delta.p>=4&&delta.kcal>0)
+        .sort((a,b)=>score(b.delta)-score(a.delta));
+      if(additions.length){
+        const {ingredient,delta}=additions[0];
+        propose("add",meal,delta,{ingredient:ingredient.name,ingredientId:ingredient.id,grams:50});
+      }
+    }
+    if(tk>0&&Math.abs(calorieGap)>tk*.1){
+      const direction=Math.sign(calorieGap);
+      compatible.forEach(meal=>{
+        const lines=(meal.ingredientes||[]).map(line=>({grams:num(line.grams??line.gramos),ingredient:ingredientForLine(line,maps)}))
+          .filter(({grams,ingredient})=>ingredient&&grams>0&&macroPer100(ingredient).kcal>0);
+        const selected=lines.sort((a,b)=>macrosForIngredient(b.ingredient,b.grams).kcal-macrosForIngredient(a.ingredient,a.grams).kcal)[0];
+        if(selected){
+          const grams=Math.round(selected.grams/4);
+          if(grams>0)propose("portion",meal,macrosForIngredient(selected.ingredient,direction*grams),
+            {ingredient:selected.ingredient.name,ingredientId:selected.ingredient.id,grams:direction*grams});
+        }else{
+          const macros=mealMacrosForTotals(meal);
+          propose("portion",meal,Object.fromEntries(Object.entries(macros).map(([key,value])=>[key,value*direction/4])),{factor:1+direction/4});
+        }
+      });
+    }
+    bySlot.forEach(slot=>{
+      const meals=compatible.filter(meal=>slotIdForMeal(meal)===slot.id);
+      const repeated=meals.find(meal=>meal.nombre===slot.repeated);
+      if(repeated)meals.filter(meal=>meal.nombre!==repeated.nombre&&meal.dishSlug).forEach(meal=>{
+        const from=mealMacrosForTotals(repeated),to=mealMacrosForTotals(meal);
+        propose("swap",repeated,Object.fromEntries(Object.keys(to).map(key=>[key,to[key]-from[key]])),
+          {replacement:meal.nombre,replacementSlug:meal.dishSlug});
+      });
+      if(slot.missed>=2&&calorieGap>0)meals.forEach(meal=>propose("fill",meal,mealMacrosForTotals(meal),{}));
+    });
+    const types=new Set();
+    const ranked=candidates.sort((a,b)=>(b.type==="add")-(a.type==="add")||b.impact-a.impact);
+    ranked.filter(change=>{
+      if(types.has(change.type))return false;
+      types.add(change.type);
+      return true;
+    }).slice(0,3)
+      .sort((a,b)=>b.impact-a.impact).forEach(({impact,...change})=>changes.push(change));
+    return {average:roundMacros(average),bySlot,highlight,changes};
+  }
+
   // history: [{date:"YYYY-MM-DD", totals:{kcal,p,c,f}, target:{kcal,p,c,f},
   //            meals:[{slot_id, dishSlug?, nombre}]}] — solo comidas registradas.
   // Devuelve {ready, loggedDays, qualifiedDays, bySlot:{slot:{dishSlug,nombre,count,days,share}}}.
@@ -1850,6 +1940,7 @@
     planNutritionWeek,
     HABIT_RULES,
     dayMeetsMacroGoal,
+    analyzeIntakeDays,
     learnHabitualMeals,
   };
   root.FITBUD_NUTRITION_DOMAIN=FITBUD_NUTRITION_DOMAIN;
