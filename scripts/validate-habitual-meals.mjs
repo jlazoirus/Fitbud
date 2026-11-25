@@ -60,6 +60,24 @@ const mixed = Array.from({ length: 8 }, (_, i) => day(`2026-10-${String(i + 1).p
   i < 3 ? avena : { nombre: `Desayuno ${i}`, slug: null }, lunches[i % 7]));
 assert.ok(!d.learnHabitualMeals(mixed).bySlot.desayuno, "3 de 8 días no alcanza la mitad");
 
+// REQ-406: el primer menú mira el periodo completo, aunque falte llegar a la meta.
+const intakeDays = [
+  day("2026-11-09", miss, avena, "Comida propia"),
+  day("2026-11-10", miss, avena, "Comida propia"),
+  day("2026-11-11", miss, huevos, "Comida propia"),
+];
+const intake = d.learnHabitualMeals(intakeDays, { mode: "intake" });
+assert.equal(intake.bySlot.desayuno.dishSlug, avena.slug);
+assert.equal(intake.bySlot.desayuno.days, 3);
+assert.equal(intake.bySlot.desayuno.share, 0.67);
+assert.ok(!intake.bySlot.almuerzo, "las comidas propias quedan para REQ-407");
+assert.equal(d.learnHabitualMeals(intakeDays).ready, false, "el modo habitual conserva el mínimo anterior");
+const sparseIntake = [...intakeDays, ...["12", "13"].map(date => ({
+  date: `2026-11-${date}`, totals: miss, target, meals: [{ slot_id: "cena", nombre: "Cena registrada" }],
+}))];
+assert.ok(!d.learnHabitualMeals(sparseIntake, { mode: "intake" }).bySlot.desayuno,
+  "dos de cinco días completos no alcanzan la mitad aunque falte registrar esa franja");
+
 // ── 4. El motor determinista repite el desayuno habitual toda la semana ──────
 const catalog = parseCatalog();
 const prefs = { mealCount: 4, diet: ["omnivoro"] };
